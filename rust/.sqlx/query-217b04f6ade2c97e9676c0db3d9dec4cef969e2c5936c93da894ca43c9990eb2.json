@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            DELETE FROM \"ob-poc\".document_attribute_mappings\n            WHERE document_type_id = $1 AND attribute_uuid = $2\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "217b04f6ade2c97e9676c0db3d9dec4cef969e2c5936c93da894ca43c9990eb2"
+}

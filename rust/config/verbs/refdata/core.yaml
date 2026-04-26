@@ -12,78 +12,84 @@ domains:
           phase_tags: [stewardship]
           side_effects: state_write
         invocation_phrases:
-        - "add reference data"
-        - "upsert reference data"
-        - "configure a reference code"
-        - "create refdata entry"
-        - "register a market or currency"
-        - "define a jurisdiction or case type"
+          - "add reference data"
+          - "upsert reference data"
+          - "configure a reference code"
+          - "create refdata entry"
+          - "register a market or currency"
+          - "define a jurisdiction or case type"
         behavior: plugin
         handler: RefdataEnsureOp
         args:
-        - name: domain
-          type: string
-          required: true
-        - name: code
-          type: string
-          required: false
-        - name: iso-code
-          type: string
-          required: false
-        - name: mic
-          type: string
-          required: false
-        - name: name
-          type: string
-          required: false
-        - name: description
-          type: string
-          required: false
-        - name: country-code
-          type: string
-          required: false
-        - name: primary-currency
-          type: string
-          required: false
-        - name: symbol
-          type: string
-          required: false
-        - name: decimal-places
-          type: integer
-          required: false
-        - name: display-order
-          type: integer
-          required: false
-        - name: severity-level
-          type: integer
-          required: false
-        - name: region
-          type: string
-          required: false
-        - name: regulatory-framework
-          type: string
-          required: false
-        - name: entity-formation-allowed
-          type: boolean
-          required: false
-        - name: offshore
-          type: boolean
-          required: false
-        - name: regulatory-authority
-          type: string
-          required: false
-        - name: csd-bic
-          type: string
-          required: false
-        - name: timezone
-          type: string
-          required: false
-        - name: is-active
-          type: boolean
-          required: false
+          - name: domain
+            type: string
+            required: true
+          - name: code
+            type: string
+            required: false
+          - name: iso-code
+            type: string
+            required: false
+          - name: mic
+            type: string
+            required: false
+          - name: name
+            type: string
+            required: false
+          - name: description
+            type: string
+            required: false
+          - name: country-code
+            type: string
+            required: false
+          - name: primary-currency
+            type: string
+            required: false
+          - name: symbol
+            type: string
+            required: false
+          - name: decimal-places
+            type: integer
+            required: false
+          - name: display-order
+            type: integer
+            required: false
+          - name: severity-level
+            type: integer
+            required: false
+          - name: region
+            type: string
+            required: false
+          - name: regulatory-framework
+            type: string
+            required: false
+          - name: entity-formation-allowed
+            type: boolean
+            required: false
+          - name: offshore
+            type: boolean
+            required: false
+          - name: regulatory-authority
+            type: string
+            required: false
+          - name: csd-bic
+            type: string
+            required: false
+          - name: timezone
+            type: string
+            required: false
+          - name: is-active
+            type: boolean
+            required: false
         returns:
           type: record
 
+        three_axis:
+          state_effect: preserving
+          external_effects:
+            - emitting
+          consequence:
+            baseline: reviewable
       read:
         description: Read a reference data record for the requested domain
         metadata:
@@ -94,28 +100,34 @@ domains:
           phase_tags: [stewardship]
           side_effects: facts_only
         invocation_phrases:
-        - "read reference data"
-        - "look up a reference code"
-        - "show reference data details"
-        - "fetch a market or currency"
+          - "read reference data"
+          - "look up a reference code"
+          - "show reference data details"
+          - "fetch a market or currency"
         behavior: plugin
         handler: RefdataReadOp
         args:
-        - name: domain
-          type: string
-          required: true
-        - name: code
-          type: string
-          required: false
-        - name: iso-code
-          type: string
-          required: false
-        - name: mic
-          type: string
-          required: false
+          - name: domain
+            type: string
+            required: true
+          - name: code
+            type: string
+            required: false
+          - name: iso-code
+            type: string
+            required: false
+          - name: mic
+            type: string
+            required: false
         returns:
           type: record
 
+        three_axis:
+          state_effect: preserving
+          external_effects:
+            - observational
+          consequence:
+            baseline: benign
       list:
         description: List reference data records for the requested domain
         metadata:
@@ -126,30 +138,36 @@ domains:
           phase_tags: [stewardship]
           side_effects: facts_only
         invocation_phrases:
-        - "list reference data"
-        - "show available refdata"
-        - "display configured reference values"
+          - "list reference data"
+          - "show available refdata"
+          - "display configured reference values"
         behavior: plugin
         handler: RefdataListOp
         args:
-        - name: domain
-          type: string
-          required: true
-        - name: region
-          type: string
-          required: false
-        - name: offshore
-          type: boolean
-          required: false
-        - name: country-code
-          type: string
-          required: false
-        - name: is-active
-          type: boolean
-          required: false
+          - name: domain
+            type: string
+            required: true
+          - name: region
+            type: string
+            required: false
+          - name: offshore
+            type: boolean
+            required: false
+          - name: country-code
+            type: string
+            required: false
+          - name: is-active
+            type: boolean
+            required: false
         returns:
           type: record_set
 
+        three_axis:
+          state_effect: preserving
+          external_effects:
+            - observational
+          consequence:
+            baseline: benign
       deactivate:
         description: Deactivate or remove a reference data record for the requested domain
         metadata:
@@ -160,24 +178,29 @@ domains:
           phase_tags: [stewardship]
           side_effects: state_write
         invocation_phrases:
-        - "deactivate reference data"
-        - "retire a reference code"
-        - "remove a market or currency"
-        - "disable a case type"
+          - "deactivate reference data"
+          - "retire a reference code"
+          - "remove a market or currency"
+          - "disable a case type"
         behavior: plugin
         handler: RefdataDeactivateOp
         args:
-        - name: domain
-          type: string
-          required: true
-        - name: code
-          type: string
-          required: false
-        - name: iso-code
-          type: string
-          required: false
-        - name: mic
-          type: string
-          required: false
+          - name: domain
+            type: string
+            required: true
+          - name: code
+            type: string
+            required: false
+          - name: iso-code
+            type: string
+            required: false
+          - name: mic
+            type: string
+            required: false
         returns:
           type: void
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable

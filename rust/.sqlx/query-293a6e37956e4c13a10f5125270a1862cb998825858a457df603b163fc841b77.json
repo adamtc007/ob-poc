@@ -1,0 +1,28 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        INSERT INTO \"ob-poc\".cbu_trading_profiles\n        (cbu_id, version, status, document, document_hash, created_by, created_at, notes)\n        VALUES ($1, $2, 'DRAFT', $3, $4, $5, $6, $7)\n        RETURNING profile_id\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "profile_id",
+        "type_info": "Uuid"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Int4",
+        "Jsonb",
+        "Text",
+        "Varchar",
+        "Timestamptz",
+        "Text"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "293a6e37956e4c13a10f5125270a1862cb998825858a457df603b163fc841b77"
+}

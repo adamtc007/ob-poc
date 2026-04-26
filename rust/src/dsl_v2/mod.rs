@@ -136,8 +136,6 @@ pub use display_nouns::{
 };
 pub use domain_context::{ActiveDomain, DomainContext, IterationContext};
 pub use enrichment::{enrich_program, EnrichmentError, EnrichmentResult};
-#[cfg(feature = "database")]
-pub use entity_deps::init_entity_deps;
 pub use execution_result::{ExecutionResults, StepResult};
 #[cfg(feature = "database")]
 pub use idempotency::{compute_idempotency_key, IdempotencyManager};
@@ -161,11 +159,11 @@ pub use verb_taxonomy::{
     verb_taxonomy, DomainSummary, TaxonomyCategory, TaxonomyDomain, VerbLocation, VerbTaxonomy,
 };
 
-// Re-export expansion module types
+// Re-export expansion module types (consumed externally)
+#[allow(unused_imports)]
 pub use expansion::{
-    expand_templates, expand_templates_simple, BatchPolicy, ExpansionDiagnostic, ExpansionError,
-    ExpansionOutput, ExpansionReport, LockAccess, LockKey, LockMode, LockTarget, LockingPolicy,
-    PerItemOrigin, RuntimePolicy, TemplateDigest, TemplateInvocationReport, TemplatePolicy,
+    expand_templates, expand_templates_simple, BatchPolicy, ExpansionReport, LockAccess, LockKey,
+    LockMode,
 };
 
 // Re-export error aggregation types
@@ -173,13 +171,8 @@ pub use errors::{
     AffectedVerb, CauseDetails, CausedErrors, ErrorCause, ExecutionErrors, FailureTiming,
 };
 
-// Re-export macro expansion types
-pub use macros::{
-    expand_macro, expand_macro_fixpoint, load_macro_registry, load_macro_registry_from_dir,
-    ArgStyle, ExpansionLimits, FixpointExpansionOutput, MacroArg, MacroArgType, MacroArgs,
-    MacroExpansionError, MacroExpansionOutput, MacroExpansionStep, MacroKind, MacroPrereq,
-    MacroRegistry, MacroRouting, MacroSchema, MacroTarget, MacroUi, SetState, VerbCallStep,
-};
+// Re-export macro expansion types (consumed externally)
+pub use macros::{load_macro_registry, load_macro_registry_from_dir, MacroRegistry};
 
 /// Syntax-facing DSL seam: parse input and inspect AST/bindings.
 pub mod syntax {

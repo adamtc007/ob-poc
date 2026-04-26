@@ -1,0 +1,1154 @@
+# Deal Workspace — DAG Taxonomy (R-5 targeted fixes, v1.3 — 2026-04-24)
+#
+# ============================================================================
+# R-5 TARGETED FIXES (2026-04-24):
+#
+# Deal findings §7 surfaced 13 business-reality gaps. R-5 applies 8 of
+# them (P0 + P1) as targeted schema changes:
+#
+#   G-1  BAC_APPROVAL state (Business Acceptance Committee) between
+#        NEGOTIATING and KYC_CLEARANCE — internal commercial approval gate
+#   G-2  Pricing internal-approval states on rate_card
+#        (PENDING_INTERNAL_APPROVAL, APPROVED_INTERNALLY)
+#   G-3  Terminal-state granularity — CANCELLED split into
+#        LOST / REJECTED / WITHDRAWN / CANCELLED
+#   G-4  Amendment lifecycle via V1.3-5 dual_lifecycle (parallel chain
+#        on ACTIVE deals — scope extensions / repricing without
+#        reverting primary lifecycle)
+#   G-5  SUSPENDED state on deal (V1.3-4 universal)
+#   G-7  deal_sla promoted from stateless to stateful
+#   G-8  Internal accountability attributes on deal (sponsor_entity_id,
+#        rm_entity_id, coverage_banker_entity_id) — documented here;
+#        schema migration deferred to Tranche 3
+#   G-10 Commercial-vs-operational dual_lifecycle documented via the
+#        deal.dual_lifecycle chain (primary = commercial, secondary =
+#        operational after CONTRACTED)
+#
+# Plus v1.3 conventions:
+#   V1.3-1 cross_workspace_constraints: KYC-APPROVED → deal.CONTRACTED
+#          (promoted from cross_slot_constraints entry deal_contracted_
+#          requires_kyc_clearance, which had v1_3_candidate: true)
+#   V1.3-4 expected_lifetime: long_lived on deal + billing_profile +
+#          deal_sla (all include SUSPENDED)
+#   V1.3-6 periodic_review_cadence on deal (annual commercial review)
+#
+# Schema migrations deferred per D-2 (Tranche 3 window):
+#   - Expand deals_status_check with BAC_APPROVAL, SUSPENDED, LOST,
+#     REJECTED, WITHDRAWN
+#   - Expand deal_rate_cards_status_check with PENDING_INTERNAL_APPROVAL,
+#     APPROVED_INTERNALLY
+#   - Add deal_slas.sla_status column + CHECK
+#   - Add deals.sponsor_entity_id / rm_entity_id / coverage_banker_entity_id
+#
+# ============================================================================
+# WORKSPACE IDENTITY (v1.3 spec §5.1 framing):
+#
+# Deal is the commercial agreement that lets us extract revenue for
+# servicing the CBU. The CBU is the client's money-making apparatus;
+# Deal is OUR commercial engagement with that apparatus. Orthogonal
+# to CBU's revenue mechanics — Deal bills fees for servicing; CBU
+# generates returns for the client.
+#
+# Deal projects INTO the CBU tollgate:
+#   deal.status ∈ [CONTRACTED, ONBOARDING, ACTIVE] → CBU.operationally_active eligible
+#
+# ============================================================================
+# KEY DIFFERENCES vs IM / KYC / CBU:
+# - Commercial-origination workspace. Centre of gravity is the
+#   negotiation chain (propose/counter/agree rate cards).
+# - Cross-workspace: KYC APPROVED gates deal.CONTRACTED; deal.ACTIVE
+#   feeds CBU tollgate; one deal may cover many CBUs.
+# - Billing sub-domain has two-level parallel lifecycle (profile +
+#   period). Billing periods are NOT sub-state of profile.
+# - Rate-card supersession: DB-enforced one-AGREED-per-tuple
+#   (idx_deal_rate_cards_one_agreed, migration 069).
+#
+# PARENT DOCS:
+#   - docs/todo/catalogue-platform-refinement-v1_3.md (spec)
+#   - docs/todo/tranche-2-deal-findings-2026-04-23.md (§7 13 gaps)
+#   - docs/todo/tranche-2-cross-workspace-reconciliation-2026-04-24.md §4.3
+
+version: "1.0"
+workspace: deal
+dag_id: deal_dag
+
+# =============================================================================
+# 1. OVERALL DEAL LIFECYCLE (per deal, derived)
+# =============================================================================
+
+overall_lifecycle:
+  id: deal_overall_lifecycle
+  scope: per_deal
+  derived: true
+  description: >
+    Aggregate 10-phase lifecycle of a deal from prospect qualification
+    through KYC clearance, rate-card negotiation, contracting, operational
+    onboarding, active servicing, winding-down, offboard. Derived from
+    deals.deal_status + deal_rate_cards.status + deal_onboarding_requests
+    + fee_billing_profiles.status + (cross-workspace) cases.status.
+
+  phases:
+
+    - name: prospect
+      description: "Initial opportunity created; no qualification yet."
+      derivation:
+        all_of:
+          - "deals.deal_status = 'PROSPECT'"
+      progression_verbs: [deal.create, deal.update-status]
+      next_phase: qualifying
+
+    - name: qualifying
+      description: |
+        Deal qualified; participants added; product shortlist forming.
+        Rate card might be in DRAFT but no proposal sent.
+      derivation:
+        all_of:
+          - "deals.deal_status = 'QUALIFYING'"
+      progression_verbs:
+        - deal.update-status
+        - deal.add-participant
+        - deal.add-product
+        - deal.create-rate-card
+      next_phase: negotiating
+
+    - name: negotiating
+      description: |
+        Active rate-card negotiation chain (propose → counter → agree).
+        One or more AGREED rate cards required before contracting.
+      derivation:
+        all_of:
+          - "deals.deal_status = 'NEGOTIATING'"
+          - "EXISTS deal_rate_cards WHERE status IN ('PROPOSED','COUNTER_PROPOSED','AGREED')"
+      progression_verbs:
+        - deal.propose-rate-card
+        - deal.counter-rate-card
+        - deal.agree-rate-card
+        - deal.add-rate-card-line
+        - deal.update-rate-card-line
+      next_phase: kyc_clearance
+
+    - name: kyc_clearance
+      description: |
+        At least one AGREED rate card on the deal. Awaiting group-level
+        KYC clearance (cross-workspace gate). UBO assessments pending.
+      derivation:
+        all_of:
+          - "deals.deal_status = 'KYC_CLEARANCE'"
+          - "EXISTS deal_rate_cards WHERE status = 'AGREED'"
+        any_of:
+          - "EXISTS deal_ubo_assessments WHERE assessment_status IN ('PENDING','IN_PROGRESS')"
+          - "cases.status IN ('DISCOVERY','ASSESSMENT','REVIEW') WHERE client_group_id = this.primary_client_group_id"
+      progression_verbs:
+        - deal.add-ubo-assessment
+        - deal.update-ubo-assessment
+        - deal.update-status  # → contracted once kyc cleared
+      next_phase: contracted
+      # NOTE: transition to 'contracted' requires cross-workspace
+      # cases.status = 'APPROVED'. See §3 cross_slot_constraints.
+
+    - name: contracted
+      description: |
+        Legal contract bound; one or more AGREED rate cards attached.
+        Pre-operational state; onboarding request not yet emitted.
+      derivation:
+        all_of:
+          - "deals.deal_status = 'CONTRACTED'"
+          - "EXISTS deal_contracts WHERE deal_id = this.deal_id"
+      progression_verbs:
+        - deal.add-contract
+        - deal.request-onboarding
+        - deal.request-onboarding-batch
+        - billing.create-profile
+      next_phase: onboarding
+
+    - name: onboarding
+      description: |
+        Operational onboarding handoff emitted. Onboarding requests
+        in PENDING / IN_PROGRESS. Billing profile likely DRAFT.
+      derivation:
+        all_of:
+          - "deals.deal_status = 'ONBOARDING'"
+          - "EXISTS deal_onboarding_requests WHERE request_status IN ('PENDING','IN_PROGRESS')"
+      progression_verbs:
+        - deal.update-onboarding-status
+        - billing.activate-profile
+        - deal.update-status
+      next_phase: active
+
+    - name: active
+      description: |
+        Terminal-positive operational state. All onboarding requests
+        COMPLETED. Billing profile ACTIVE. Revenue is flowing; periods
+        being calculated/invoiced on cadence.
+      derivation:
+        all_of:
+          - "deals.deal_status = 'ACTIVE'"
+          - "ALL deal_onboarding_requests.request_status = 'COMPLETED'"
+          - "EXISTS fee_billing_profiles WHERE status = 'ACTIVE'"
+      progression_verbs:
+        - billing.create-period
+        - billing.calculate-period
+        - billing.review-period
+        - billing.approve-period
+        - billing.generate-invoice
+        - deal.counter-rate-card   # mid-deal repricing
+        - deal.agree-rate-card     # supersedes prior AGREED
+      next_phase: winding_down
+
+    - name: winding_down
+      description: |
+        Deal exiting servicing. Billing periods still being closed out.
+        No new subscriptions; last invoices being generated.
+      derivation:
+        all_of:
+          - "deals.deal_status = 'WINDING_DOWN'"
+      progression_verbs:
+        - billing.suspend-profile
+        - billing.approve-period
+        - billing.generate-invoice
+        - deal.update-status
+      next_phase: offboarded
+
+    - name: offboarded
+      description: |
+        Terminal-positive end-of-life. Billing CLOSED. All periods
+        INVOICED or DISPUTED (dispute resolution is out-of-scope here —
+        handled in billing dispute workflow).
+      derivation:
+        all_of:
+          - "deals.deal_status = 'OFFBOARDED'"
+          - "ALL fee_billing_profiles.status = 'CLOSED'"
+      progression_verbs: []
+      next_phase: (none)
+
+    - name: cancelled
+      description: |
+        Terminal-negative. Deal never reached ACTIVE, or abandoned.
+        Cancel is available from any pre-ACTIVE state. Billing profile
+        (if exists) must be CLOSED.
+      derivation:
+        all_of:
+          - "deals.deal_status = 'CANCELLED'"
+      progression_verbs: []
+      next_phase: (none)
+
+# =============================================================================
+# 2. PER-SLOT STATE MACHINES
+# =============================================================================
+
+slots:
+
+  # ---------------------------------------------------------------------------
+  # 2.1 Reconcile-existing state machines
+  # ---------------------------------------------------------------------------
+
+  - id: deal
+    stateless: false
+    # V1.3-6 periodic annual commercial review.
+    periodic_review_cadence:
+      base_window: "P1Y"
+      risk_tiered_overrides:
+        - risk_tier: HIGH
+          window: "P6M"
+        - risk_tier: LOW
+          window: "P2Y"
+      review_scope: full
+    # G-8: Internal accountability documented at DAG level. Schema
+    # migration deferred (Tranche 3) — adds deals.sponsor_entity_id,
+    # rm_entity_id, coverage_banker_entity_id columns.
+    internal_accountability:
+      sponsor: "deals.sponsor_entity_id (FK → entities; commercial owner on our side)"
+      relationship_manager: "deals.rm_entity_id (FK → entities; owns client relationship)"
+      coverage_banker: "deals.coverage_banker_entity_id (FK → entities; cross-sell owner)"
+    state_machine:
+      id: deal_commercial_lifecycle
+      owner: "sales+BAC"                 # V1.3-5 governance artefact
+      expected_lifetime: long_lived      # V1.3-4
+      source_entity: '"ob-poc".deals'
+      state_column: deal_status
+      scope: per_deal
+      description: |
+        Commercial lifecycle (sales + BAC owned). 9 primary states:
+        PROSPECT → QUALIFYING → NEGOTIATING → BAC_APPROVAL →
+        KYC_CLEARANCE → CONTRACTED (junction to operational dual).
+        Terminal-negative split: LOST / REJECTED / WITHDRAWN /
+        CANCELLED (G-3 granularity).
+
+        R-5 additions (schema lag per D-2):
+          BAC_APPROVAL — Business Acceptance Committee review
+          LOST / REJECTED / WITHDRAWN — distinct terminal-negative
+          reasons (was all CANCELLED)
+          SUSPENDED — moved to dual_lifecycle (operational chain)
+      states:
+        - id: PROSPECT
+          entry: true
+          description: "Initial opportunity created."
+        - id: QUALIFYING
+          description: "Participants added; product shortlist forming."
+        - id: NEGOTIATING
+          description: "Active rate-card negotiation chain."
+        - id: BAC_APPROVAL
+          description: |
+            Awaiting Business Acceptance Committee approval — internal
+            commercial review. Required for revenue above threshold,
+            new jurisdictions, non-standard pricing, credit exposure.
+            Separate from client-side rate-card AGREED and from
+            contract SIGNED.
+        - id: KYC_CLEARANCE
+          description: "BAC approved; awaiting cross-workspace group KYC clearance."
+        - id: CONTRACTED
+          description: |
+            Commercial lifecycle terminal-positive. Junction to the
+            operational dual_lifecycle chain (ONBOARDING → ACTIVE →
+            SUSPENDED / WINDING_DOWN → OFFBOARDED).
+        # Terminal-negative outcomes (G-3 granularity)
+        - id: LOST
+          description: "Terminal-negative: competitor won the deal."
+        - id: REJECTED
+          description: "Terminal-negative: internal BAC or KYC said no."
+        - id: WITHDRAWN
+          description: "Terminal-negative: client walked away."
+        - id: CANCELLED
+          description: "Terminal-negative: we walked away."
+      transitions:
+        - from: PROSPECT
+          to: QUALIFYING
+          via: [deal.create, deal.update-status]
+        - from: QUALIFYING
+          to: NEGOTIATING
+          via: [deal.update-status, deal.create-rate-card]
+        # G-1 BAC gate inserted between NEGOTIATING and KYC_CLEARANCE
+        - from: NEGOTIATING
+          to: BAC_APPROVAL
+          via: deal.submit-for-bac
+          precondition: "at least one deal_rate_card in AGREED"
+        - from: BAC_APPROVAL
+          to: KYC_CLEARANCE
+          via: deal.bac-approve
+        - from: BAC_APPROVAL
+          to: REJECTED
+          via: deal.bac-reject
+        - from: KYC_CLEARANCE
+          to: CONTRACTED
+          via: [deal.update-status, deal.add-contract]
+          precondition: "group KYC case status = APPROVED (V1.3-1 cross-workspace)"
+        - from: KYC_CLEARANCE
+          to: REJECTED
+          via: deal.reject
+          precondition: "KYC failed (case.status = REJECTED or DO_NOT_ONBOARD)"
+        # G-3 terminal-negative granularity
+        - from: [PROSPECT, QUALIFYING, NEGOTIATING, BAC_APPROVAL, KYC_CLEARANCE]
+          to: LOST
+          via: deal.mark-lost
+        - from: [PROSPECT, QUALIFYING, NEGOTIATING, BAC_APPROVAL, KYC_CLEARANCE]
+          to: WITHDRAWN
+          via: deal.mark-withdrawn
+        - from: [PROSPECT, QUALIFYING, NEGOTIATING, BAC_APPROVAL, KYC_CLEARANCE]
+          to: CANCELLED
+          via: deal.cancel
+      terminal_states: [CONTRACTED, LOST, REJECTED, WITHDRAWN, CANCELLED]
+      # NOTE: CONTRACTED is terminal-in-commercial, NOT terminal globally —
+      # junction to dual_lifecycle operational chain.
+
+    # V1.3-5 operational dual_lifecycle (G-10 commercial/operational duality).
+    # Starts at CONTRACTED junction; ops-owned.
+    dual_lifecycle:
+      - id: deal_operational_lifecycle
+        description: |
+          Operational servicing lifecycle — ops-owned. Begins at
+          CONTRACTED once commercial lifecycle completes. G-10
+          commercial-vs-operational duality captured here. Schema
+          migration to add these states to deals.deal_status
+          (or a separate deals.operational_status column) deferred
+          to Tranche 3 (D-2).
+        owner: "ops"
+        junction_state_from_primary: CONTRACTED
+        states:
+          - id: ONBOARDING
+            entry: true
+            description: "Onboarding requests emitted; billing profile DRAFT."
+          - id: ACTIVE
+            description: "Revenue flowing; periods calculated/invoiced. CBU tollgate eligible."
+          - id: SUSPENDED
+            description: |
+              G-5 SUSPENDED universal. Regulatory hold, billing dispute,
+              client distress. Restorable to ACTIVE.
+          - id: WINDING_DOWN
+            description: "Exit intent; final billing periods being closed."
+          - id: OFFBOARDED
+            description: "Terminal-positive operational."
+        transitions:
+          - from: ONBOARDING
+            to: ACTIVE
+            via: deal.update-status
+            precondition: "ALL deal_onboarding_requests.request_status = COMPLETED"
+          - from: ACTIVE
+            to: SUSPENDED
+            via: deal.suspend
+          - from: SUSPENDED
+            to: ACTIVE
+            via: deal.reinstate
+          - from: [ACTIVE, SUSPENDED]
+            to: WINDING_DOWN
+            via: deal.begin-winding-down
+          - from: WINDING_DOWN
+            to: OFFBOARDED
+            via: deal.update-status
+        terminal_states: [OFFBOARDED]
+
+    # G-4 amendment dual_lifecycle — parallel chain during ACTIVE
+    # allowing mid-life scope / rate / SLA changes without reverting
+    # primary lifecycle. A deal can have one active amendment at a
+    # time; amendment closeout merges back into ACTIVE or transitions
+    # deal to WINDING_DOWN.
+    # NOTE: dual_lifecycle schema currently supports one junction.
+    # Second amendment chain is authored as a separate slot sibling
+    # until V1.3 is extended. For R-5 we document the intent here and
+    # leave the second-chain implementation as a schema follow-up.
+
+  # ---------------------------------------------------------------------------
+  # 2.2 New state machines (from schema evidence)
+  # ---------------------------------------------------------------------------
+
+  - id: deal_product
+    stateless: false
+    state_machine:
+      id: deal_product_lifecycle
+      source_entity: '"ob-poc".deal_products'
+      state_column: product_status
+      scope: per_deal_product
+      description: |
+        Per-(deal, product) commercial commitment lifecycle. 5 states from
+        schema CHECK. A product enters the deal as PROPOSED, is haggled
+        through NEGOTIATING, lands at AGREED or DECLINED, and can be
+        REMOVED by retraction before contracting.
+      states:
+        - id: PROPOSED
+          entry: true
+        - id: NEGOTIATING
+        - id: AGREED
+        - id: DECLINED
+          description: "Terminal-negative; client declined the product."
+        - id: REMOVED
+          description: "Terminal; product pulled from the deal scope."
+      transitions:
+        - from: PROPOSED
+          to: NEGOTIATING
+          via: deal.update-product-status
+        - from: NEGOTIATING
+          to: AGREED
+          via: [deal.update-product-status, deal.agree-rate-card]
+        - from: "(PROPOSED, NEGOTIATING)"
+          to: DECLINED
+          via: deal.update-product-status
+        - from: "(PROPOSED, NEGOTIATING, AGREED)"
+          to: REMOVED
+          via: deal.remove-product
+      terminal_states: [AGREED, DECLINED, REMOVED]
+
+  - id: deal_rate_card
+    stateless: false
+    state_machine:
+      id: deal_rate_card_lifecycle
+      owner: "sales+pricing-committee"
+      source_entity: '"ob-poc".deal_rate_cards'
+      state_column: status
+      scope: per_rate_card
+      description: |
+        Rate-card negotiation lifecycle. 8 states (was 6; R-5 G-2 adds
+        PENDING_INTERNAL_APPROVAL + APPROVED_INTERNALLY for pricing-
+        committee gate). Internal approval precedes PROPOSED whenever
+        discount exceeds threshold, pricing model is bespoke, or the
+        deal is in a new jurisdiction. Otherwise DRAFT → PROPOSED is
+        direct.
+
+        SUPERSEDED is db-triggered by idx_deal_rate_cards_one_agreed
+        (migration 069). External commercial-commitment tier applies
+        at AGREED transition (V1.3-7).
+      states:
+        - id: DRAFT
+          entry: true
+          description: "Authoring lines; not yet shared."
+        - id: PENDING_INTERNAL_APPROVAL
+          description: |
+            Submitted to pricing committee for internal approval (R-5
+            G-2). Required when discount > threshold / bespoke model /
+            new jurisdiction.
+        - id: APPROVED_INTERNALLY
+          description: "Pricing committee approved; ready to propose to counterparty."
+        - id: PROPOSED
+          description: "Sent to counterparty; awaiting response."
+        - id: COUNTER_PROPOSED
+          description: "Counterparty proposed edits; ball in our court."
+        - id: AGREED
+          description: "Both sides agreed. At most one AGREED per (deal, contract, product)."
+        - id: SUPERSEDED
+          description: "Superseded by newer AGREED. Terminal; history."
+        - id: CANCELLED
+          description: "Withdrawn before agreement. Terminal."
+      transitions:
+        # G-2 internal approval path
+        - from: DRAFT
+          to: PENDING_INTERNAL_APPROVAL
+          via: deal.submit-for-pricing-approval
+          precondition: "discount > threshold OR bespoke_model OR new_jurisdiction"
+        - from: PENDING_INTERNAL_APPROVAL
+          to: APPROVED_INTERNALLY
+          via: deal.pricing-approve
+        - from: PENDING_INTERNAL_APPROVAL
+          to: DRAFT
+          via: deal.pricing-reject   # back to draft for revision
+        - from: APPROVED_INTERNALLY
+          to: PROPOSED
+          via: deal.propose-rate-card
+        # Direct path (no internal approval needed)
+        - from: DRAFT
+          to: PROPOSED
+          via: deal.propose-rate-card
+          precondition: "discount within threshold AND standard_model"
+        - from: PROPOSED
+          to: COUNTER_PROPOSED
+          via: deal.counter-rate-card
+        - from: COUNTER_PROPOSED
+          to: PROPOSED
+          via: deal.propose-rate-card  # re-propose after counter
+        - from: [PROPOSED, COUNTER_PROPOSED]
+          to: AGREED
+          via: deal.agree-rate-card
+        - from: AGREED
+          to: SUPERSEDED
+          via: "(backend: new AGREED for same (deal, contract, product))"
+        - from: [DRAFT, PENDING_INTERNAL_APPROVAL, APPROVED_INTERNALLY, PROPOSED, COUNTER_PROPOSED]
+          to: CANCELLED
+          via: "(implicit: rate card removed or deal cancelled)"
+      terminal_states: [SUPERSEDED, CANCELLED]
+
+  - id: deal_onboarding_request
+    stateless: false
+    state_machine:
+      id: deal_onboarding_request_lifecycle
+      source_entity: '"ob-poc".deal_onboarding_requests'
+      state_column: request_status
+      scope: per_onboarding_request
+      description: |
+        Handoff to ops — a per-CBU onboarding request emitted when deal
+        reaches CONTRACTED. 5 states from schema CHECK.
+      states:
+        - id: PENDING
+          entry: true
+        - id: IN_PROGRESS
+        - id: BLOCKED
+          description: "Held on external dependency (usually a KYC re-open or document gap)."
+        - id: COMPLETED
+          description: "Terminal-positive; CBU fully onboarded for this deal scope."
+        - id: CANCELLED
+          description: "Terminal-negative."
+      transitions:
+        - from: PENDING
+          to: IN_PROGRESS
+          via: deal.update-onboarding-status
+        - from: IN_PROGRESS
+          to: COMPLETED
+          via: deal.update-onboarding-status
+        - from: "(PENDING, IN_PROGRESS)"
+          to: BLOCKED
+          via: deal.update-onboarding-status
+        - from: BLOCKED
+          to: IN_PROGRESS
+          via: deal.update-onboarding-status
+        - from: "(PENDING, IN_PROGRESS, BLOCKED)"
+          to: CANCELLED
+          via: deal.update-onboarding-status
+      terminal_states: [COMPLETED, CANCELLED]
+
+  - id: deal_document
+    stateless: false
+    state_machine:
+      id: deal_document_lifecycle
+      source_entity: '"ob-poc".deal_documents'
+      state_column: document_status
+      scope: per_deal_document
+      description: |
+        Legal / commercial artefact lifecycle. 6 states from schema
+        CHECK. Covers contracts, term sheets, side letters, NDAs,
+        rate schedules, SLAs, proposals, RFP responses, board
+        approvals, legal opinions.
+      states:
+        - id: DRAFT
+          entry: true
+        - id: UNDER_REVIEW
+        - id: SIGNED
+          description: "Counterparty signature obtained."
+        - id: EXECUTED
+          description: "Fully executed; binding. Terminal-positive."
+        - id: SUPERSEDED
+          description: "Replaced by a newer version."
+        - id: ARCHIVED
+          description: "Retained for audit; no longer operationally live."
+      transitions:
+        - from: DRAFT
+          to: UNDER_REVIEW
+          via: deal.update-document-status
+        - from: UNDER_REVIEW
+          to: SIGNED
+          via: deal.update-document-status
+        - from: SIGNED
+          to: EXECUTED
+          via: deal.update-document-status
+        - from: "(EXECUTED, SIGNED)"
+          to: SUPERSEDED
+          via: deal.update-document-status
+        - from: "(EXECUTED, SUPERSEDED)"
+          to: ARCHIVED
+          via: deal.update-document-status
+      terminal_states: [EXECUTED, SUPERSEDED, ARCHIVED]
+
+  # ---------------------------------------------------------------------------
+  # 2.2.1 Booking Principal clearance — HOISTED to standalone workspace
+  # ---------------------------------------------------------------------------
+  # Originally R3 (2026-04-26) placed booking_principal_clearance as a slot
+  # inside deal_dag, with the compound gate expressed via
+  # cross_slot_constraints. R3.5 (2026-04-26) hoisted it into a standalone
+  # `booking_principal` workspace (see booking_principal_dag.yaml) so the
+  # compound BAC+KYC+BP gate can be expressed as a real
+  # cross_workspace_constraint readable by the v1.3 GateChecker runtime.
+  #
+  # The gate now lives in `cross_workspace_constraints` below
+  # (deal_contracted_requires_bp_approved). This slot is intentionally
+  # absent from deal_dag.
+
+  - id: deal_ubo_assessment
+    stateless: false
+    state_machine:
+      id: deal_ubo_assessment_lifecycle
+      source_entity: '"ob-poc".deal_ubo_assessments'
+      state_column: assessment_status
+      scope: per_entity_in_deal
+      description: |
+        Per-entity UBO/KYC risk assessment within a deal. 5 states from
+        schema CHECK. Overlaps with KYC workspace's kyc_ubo_registry
+        (v1.3 candidate: consolidate the two, they're epistemic states
+        of the same underlying UBO determination).
+      states:
+        - id: PENDING
+          entry: true
+        - id: IN_PROGRESS
+        - id: COMPLETED
+          description: "Terminal-positive; risk-rated (LOW/MEDIUM/HIGH)."
+        - id: REQUIRES_EDD
+          description: "Enhanced due diligence required; routes to KYC."
+        - id: BLOCKED
+          description: "PROHIBITED risk rating — deal cannot proceed for this entity."
+      transitions:
+        - from: PENDING
+          to: IN_PROGRESS
+          via: deal.update-ubo-assessment
+        - from: IN_PROGRESS
+          to: COMPLETED
+          via: deal.update-ubo-assessment
+        - from: "(IN_PROGRESS, COMPLETED)"
+          to: REQUIRES_EDD
+          via: deal.update-ubo-assessment
+        - from: "(IN_PROGRESS, REQUIRES_EDD)"
+          to: BLOCKED
+          via: deal.update-ubo-assessment
+      terminal_states: [COMPLETED, BLOCKED]
+
+  - id: billing_profile
+    stateless: false
+    state_machine:
+      id: billing_profile_lifecycle
+      owner: "ops+finance"
+      expected_lifetime: long_lived      # V1.3-4 (SUSPENDED present)
+      source_entity: '"ob-poc".fee_billing_profiles'
+      state_column: status
+      scope: per_billing_profile
+      description: |
+        Fee billing profile lifecycle. 4 states from schema CHECK.
+        Profile binds a deal + contract + rate card + CBU + product.
+        Cannot activate without an AGREED rate card.
+      states:
+        - id: DRAFT
+          entry: true
+        - id: ACTIVE
+          description: "Billing cycle running; periods being created."
+        - id: SUSPENDED
+          description: "Temporarily paused (dispute, credit hold, winding-down)."
+        - id: CLOSED
+          description: "Terminal; deal offboarded or billing retired."
+      transitions:
+        - from: DRAFT
+          to: ACTIVE
+          via: billing.activate-profile
+          precondition: "bound deal_rate_card.status = AGREED"
+        - from: ACTIVE
+          to: SUSPENDED
+          via: billing.suspend-profile
+        - from: SUSPENDED
+          to: ACTIVE
+          via: billing.activate-profile
+        - from: "(DRAFT, ACTIVE, SUSPENDED)"
+          to: CLOSED
+          via: billing.close-profile
+      terminal_states: [CLOSED]
+
+  - id: billing_period
+    stateless: false
+    state_machine:
+      id: billing_period_lifecycle
+      source_entity: '"ob-poc".fee_billing_periods'
+      state_column: calc_status
+      scope: per_billing_period
+      description: |
+        Per-period billing lifecycle. 6 states from schema CHECK.
+        Runs in parallel to billing_profile (multiple periods per
+        profile lifetime). INVOICED and DISPUTED are terminal
+        per-period; dispute resolution is out-of-scope (Layer 3
+        operational).
+      states:
+        - id: PENDING
+          entry: true
+          description: "Period created; calculation not yet run."
+        - id: CALCULATED
+          description: "Fees computed; pending analyst review."
+        - id: REVIEWED
+          description: "Reviewed by ops; ready for approval."
+        - id: APPROVED
+          description: "Approved for invoicing."
+        - id: INVOICED
+          description: "Invoice emitted. Terminal-positive."
+        - id: DISPUTED
+          description: "Client raised a dispute; out-of-band resolution required."
+      transitions:
+        - from: PENDING
+          to: CALCULATED
+          via: billing.calculate-period
+        - from: CALCULATED
+          to: REVIEWED
+          via: billing.review-period
+        - from: REVIEWED
+          to: APPROVED
+          via: billing.approve-period
+        - from: APPROVED
+          to: INVOICED
+          via: billing.generate-invoice
+        - from: "(CALCULATED, REVIEWED, APPROVED, INVOICED)"
+          to: DISPUTED
+          via: billing.dispute-period
+      terminal_states: [INVOICED, DISPUTED]
+
+  # ---------------------------------------------------------------------------
+  # 2.3 Reconcile-existing (cross-workspace)
+  # ---------------------------------------------------------------------------
+
+  - id: client_group
+    stateless: false
+    state_machine: "(reconcile-existing — see instrument_matrix_dag.yaml §2.2 group.discovery_status_lifecycle; shared across workspaces)"
+
+  - id: group_kyc_clearance
+    stateless: false
+    state_machine: "(reconcile-existing — see kyc_dag.yaml §2.1 kyc_case_lifecycle; this is the same kyc_case row at group scope)"
+    cross_workspace_gate: true
+    description: |
+      KYC-clearance check for the primary_client_group. A deal cannot
+      advance past NEGOTIATING to CONTRACTED without this slot being
+      APPROVED. Cross-workspace v1.3 candidate: formalise as
+      cross_workspace_constraints in v1.3 schema.
+
+  - id: kyc_case
+    stateless: false
+    state_machine: "(reconcile-existing — see kyc_dag.yaml §2.1 kyc_case_lifecycle; this is per-CBU case row)"
+
+  - id: cbu
+    stateless: false
+    state_machine: "(reconcile-existing — see instrument_matrix_dag.yaml §2.2 cbu_lifecycle)"
+
+  - id: contract
+    stateless: false
+    state_machine: "(reference — contract.* domain has its own lifecycle; legal_contracts table)"
+
+  # ---------------------------------------------------------------------------
+  # 2.4 Stateless (compositional / reference / rule-entity)
+  # ---------------------------------------------------------------------------
+
+  - id: workspace_root
+    stateless: true
+    rationale: "Aggregation root over Deal domains."
+
+  - id: deal_participant
+    stateless: true
+    rationale: |
+      Participants are reference rows (role categorical: CONTRACTING_PARTY,
+      GUARANTOR, INTRODUCER, INVESTMENT_MANAGER, FUND_ADMIN). They are
+      added/removed; no per-participant lifecycle. The underlying entity
+      itself has a lifecycle (entity_kyc_lifecycle) governed by KYC
+      workspace.
+
+  - id: deal_contract
+    stateless: true
+    rationale: |
+      Link row between deals and legal_contracts with a role categorical
+      (PRIMARY, ADDENDUM, SCHEDULE, SIDE_LETTER, NDA). The legal_contracts
+      record itself has contract.* lifecycle; the link is transactional.
+
+  - id: rate_card_line
+    stateless: true
+    rationale: |
+      Sub-entity of deal_rate_card (fee lines). Lines are added/updated/
+      removed within the rate card's lifecycle; no independent state.
+      Line-level changes trigger the parent rate-card to return to DRAFT
+      or COUNTER_PROPOSED (business rule, not a line-level state).
+
+  # R-5 G-7: promoted from stateless. SLAs have lifecycle — breaches
+  # trigger penalty calculations that feed into billing. Schema
+  # migration deferred (Tranche 3) — adds deal_slas.sla_status column.
+  - id: deal_sla
+    stateless: false
+    # V1.3-4: no SUSPENDED state — SLAs are continuously monitored;
+    # WAIVED is the analog for "paused due to business decision", but
+    # breach handling uses BREACHED → IN_REMEDIATION → RESOLVED rather
+    # than a generic suspension.
+    suspended_state_exempt: true
+    state_machine:
+      id: deal_sla_lifecycle
+      owner: "ops"
+      expected_lifetime: long_lived
+      source_entity: '"ob-poc".deal_slas'
+      state_column: sla_status     # DAG-first per D-2; column added in Tranche 3
+      scope: per_sla
+      description: |
+        Per-SLA commitment lifecycle. 6 states. SLAs negotiated as
+        part of the deal; become active at deal.CONTRACTED; breaches
+        trigger penalty calculations; remediation restores to active.
+        sla_type (AVAILABILITY / TURNAROUND / ACCURACY / REPORTING)
+        and penalty_type (FEE_REBATE / CREDIT / ESCALATION) remain
+        categorical.
+      states:
+        - id: NEGOTIATED
+          entry: true
+          description: "SLA agreed but deal not yet CONTRACTED."
+        - id: ACTIVE
+          description: "Deal CONTRACTED; SLA being measured."
+        - id: BREACHED
+          description: |
+            Measured performance fell below SLA threshold; penalty
+            calculation triggered (feeds into billing_period via
+            billing workflow).
+        - id: IN_REMEDIATION
+          description: "Corrective action in progress; breach being resolved."
+        - id: RESOLVED
+          description: "Breach mitigated; SLA returns to ACTIVE."
+        - id: WAIVED
+          description: "Client waived the breach (out-of-band concession)."
+      transitions:
+        - from: NEGOTIATED
+          to: ACTIVE
+          via: "(backend: deal.CONTRACTED)"
+        - from: ACTIVE
+          to: BREACHED
+          via: "(backend: SLA measurement fails threshold)"
+        - from: BREACHED
+          to: IN_REMEDIATION
+          via: deal.start-sla-remediation
+        - from: IN_REMEDIATION
+          to: RESOLVED
+          via: deal.resolve-sla-breach
+        - from: RESOLVED
+          to: ACTIVE
+          via: "(backend: remediation complete; return to monitoring)"
+        - from: BREACHED
+          to: WAIVED
+          via: deal.waive-sla-breach
+      terminal_states: []   # SLAs are continuously monitored; no terminal-positive
+
+  - id: pricing_config
+    stateless: true
+    rationale: |
+      Pricing configuration (valuation schedule, NAV thresholds, tax
+      status, reclaim configs). Reference data keyed by (deal, instrument,
+      jurisdiction). Changes are create/update/deactivate; no multi-state
+      lifecycle beyond active/deactivated flag.
+
+  - id: client_principal_relationship
+    stateless: true
+    rationale: |
+      Cross-reference between clients and principals for sales-ops
+      reporting. Reference data; record/terminate/cross-sell-check.
+      No lifecycle.
+
+  - id: contract_template
+    stateless: true
+    rationale: |
+      Contract-pack library entries (reference data for legal template
+      assembly). Governed by contract-pack.* domain, not deal workspace.
+
+  - id: billing_account_target
+    stateless: true
+    rationale: |
+      Billing account routing (which bank/ledger account receives the
+      invoice). Reference rows under a billing_profile. Add/remove;
+      no lifecycle.
+
+# =============================================================================
+# 3. CROSS-SLOT CONSTRAINTS
+# =============================================================================
+
+cross_slot_constraints:
+
+  # R3 (2026-04-26) → R3.5 (2026-04-26): the BP compound gate moved from
+  # cross_slot_constraints to cross_workspace_constraints below
+  # (deal_contracted_requires_bp_approved) once BP was hoisted into its
+  # own workspace. Lives at the v1.3 typed cross_workspace_constraints
+  # path so GateChecker can dispatch on it.
+
+  - id: deal_contracted_requires_agreed_rate_card
+    description: |
+      Deal → CONTRACTED requires at least one AGREED rate card for the
+      deal. Rate cards must complete the propose/counter/agree chain.
+    rule: |
+      deals.deal_status = 'CONTRACTED'
+        → EXISTS deal_rate_cards WHERE deal_id = this.deal_id AND status = 'AGREED'
+    severity: error
+
+  # Note: the former v1_3_candidate `deal_contracted_requires_kyc_clearance`
+  # has been promoted to the new `cross_workspace_constraints:` section
+  # below (V1.3-1 Mode A). It no longer lives here.
+
+  - id: deal_active_requires_all_onboarding_complete
+    description: "Deal → ACTIVE requires all onboarding requests COMPLETED."
+    rule: |
+      deals.deal_status = 'ACTIVE'
+        → ALL deal_onboarding_requests WHERE deal_id = this.deal_id
+            .request_status = 'COMPLETED'
+    severity: error
+
+  - id: deal_active_requires_active_billing_profile
+    description: |
+      Deal → ACTIVE requires at least one ACTIVE fee_billing_profile.
+      Rationale: ACTIVE means revenue flowing; no active profile means
+      no revenue recognition, which contradicts the business semantic.
+    rule: |
+      deals.deal_status = 'ACTIVE'
+        → EXISTS fee_billing_profiles WHERE deal_id = this.deal_id
+            AND status = 'ACTIVE'
+    severity: error
+
+  - id: rate_card_agreed_uniqueness
+    description: |
+      At most ONE AGREED rate card per (deal, contract, product).
+      New AGREED automatically SUPERSEDES the previous AGREED. DB-enforced
+      via idx_deal_rate_cards_one_agreed (migration 069).
+    rule: |
+      COUNT deal_rate_cards WHERE deal_id = X AND contract_id = Y
+        AND product_id = Z AND status = 'AGREED' <= 1
+    severity: error
+    enforced_by: database
+
+  - id: billing_profile_activation_requires_agreed_rate_card
+    description: |
+      fee_billing_profiles.status = ACTIVE requires the bound
+      deal_rate_card.status = AGREED.
+    rule: |
+      fee_billing_profiles.status = 'ACTIVE'
+        → deal_rate_cards WHERE rate_card_id = this.rate_card_id
+            .status = 'AGREED'
+    severity: error
+
+  - id: billing_period_creation_requires_active_profile
+    description: "fee_billing_periods require parent profile = ACTIVE."
+    rule: |
+      fee_billing_periods exists
+        → fee_billing_profiles WHERE profile_id = this.profile_id
+            .status IN ('ACTIVE', 'SUSPENDED')
+    severity: error
+
+  - id: deal_offboarded_requires_all_billing_closed
+    description: "Deal → OFFBOARDED requires all billing_profile.status = CLOSED."
+    rule: |
+      deals.deal_status = 'OFFBOARDED'
+        → ALL fee_billing_profiles WHERE deal_id = this.deal_id
+            .status = 'CLOSED'
+    severity: error
+
+  - id: deal_ubo_assessment_blocked_halts_deal
+    description: |
+      If any deal_ubo_assessment.assessment_status = BLOCKED
+      (PROHIBITED risk rating), the deal cannot advance past
+      KYC_CLEARANCE. Manual remediation or deal cancellation required.
+    rule: |
+      EXISTS deal_ubo_assessments WHERE deal_id = this.deal_id
+        AND assessment_status = 'BLOCKED'
+        → deals.deal_status NOT IN ('CONTRACTED', 'ONBOARDING', 'ACTIVE')
+    severity: error
+
+  - id: counter_proposal_returns_agreed_to_counter
+    description: |
+      When a previously AGREED rate card has lines updated, the
+      rate-card status returns to COUNTER_PROPOSED (business rule —
+      substantive edits invalidate the agreement). Enforced by verb
+      lifecycle, not validator.
+    rule: |
+      deal_rate_cards.status = 'AGREED' AND lines updated
+        → deal_rate_cards.status transitions to 'COUNTER_PROPOSED'
+    severity: informational
+
+# =============================================================================
+# 4. CROSS-WORKSPACE CONSTRAINTS (V1.3-1 — Mode A blocking)
+# =============================================================================
+# Deal workspace blocking gates on other workspaces' state. Promoted
+# from cross_slot_constraints as part of R-5 (were marked
+# v1_3_candidate: true in v1.2 authoring).
+
+cross_workspace_constraints:
+
+  - id: deal_contracted_requires_kyc_approved
+    description: |
+      Deal cannot progress KYC_CLEARANCE → CONTRACTED unless the
+      client-group KYC case is APPROVED in the KYC workspace.
+    source_workspace: kyc
+    source_slot: kyc_case
+    source_state: APPROVED
+    source_predicate: "cases.client_group_id = this_deal.primary_client_group_id"
+    target_workspace: deal
+    target_slot: deal
+    target_transition: "KYC_CLEARANCE -> CONTRACTED"
+    severity: error
+
+  # R3.5 (2026-04-26): compound BAC+KYC+BP gate — third leg.
+  # Deal cannot progress KYC_CLEARANCE → CONTRACTED unless every
+  # booking-principal clearance attached to this deal is APPROVED or
+  # ACTIVE. BP was hoisted into its own workspace (booking_principal_dag)
+  # specifically so this gate can be expressed inter-workspace and
+  # dispatched by GateChecker at runtime.
+  - id: deal_contracted_requires_bp_approved
+    description: |
+      Deal → CONTRACTED requires every booking-principal clearance
+      attached to this deal to be in APPROVED or ACTIVE state. Third
+      leg of Adam's deal tollgate triad (BAC + KYC + BP).
+    source_workspace: booking_principal
+    source_slot: clearance
+    source_state: [APPROVED, ACTIVE]
+    source_predicate: "booking_principal_clearances.deal_id = this_deal.deal_id"
+    target_workspace: deal
+    target_slot: deal
+    target_transition: "KYC_CLEARANCE -> CONTRACTED"
+    severity: error
+
+
+# =============================================================================
+# 5. PRODUCT-MODULE GATES
+# =============================================================================
+# Deal workspace is cross-product — it applies to every commercial
+# engagement. No conditional slots based on product bundle. Billing is
+# sub-product: different billing models (flat/tiered/spread) are
+# expressed as rate_card_line.pricing_model, not as DAG slots.
+
+product_module_gates:
+
+  always_on:
+    - workspace_root
+    - deal
+    - deal_product
+    - deal_rate_card
+    - rate_card_line
+    - deal_onboarding_request
+    - deal_document
+    - deal_ubo_assessment
+    # booking_principal_clearance hoisted to booking_principal workspace (R3.5)
+    - deal_participant
+    - deal_contract
+    - deal_sla
+    - billing_profile
+    - billing_period
+    - billing_account_target
+    - pricing_config
+    - client_principal_relationship
+    - contract_template
+    - client_group
+    - group_kyc_clearance
+    - kyc_case
+    - cbu
+    - contract
+
+  conditionally_on: []
+
+# =============================================================================
+# 5. OUT OF SCOPE (P16 three-layer + cross-workspace)
+# =============================================================================
+
+out_of_scope:
+
+  # Layer 3 operational runtime
+  - "Invoice PDF generation + delivery — layer 3 (document rendering + SMTP/ERP)"
+  - "Fee calculation engine runs — layer 3 (compute against rate_card_lines)"
+  - "Invoice dispute resolution workflow — layer 3 (out-of-band ops + finance)"
+  - "Rate-card supersession trigger implementation — layer 2 (db trigger / app logic on insert)"
+  - "Contract template rendering + legal review routing — layer 2/3"
+
+  # Cross-workspace dependencies
+  - "Group KYC case lifecycle — governed by KYC workspace"
+  - "CBU onboarding execution (billing account opening, etc) — governed by CBU / OnBoarding workspace"
+  - "Instrument matrix mandate approval — governed by IM workspace (also dependent on deal CONTRACTED)"
+  - "Entity KYC (per-party) — governed by KYC workspace"
+
+  # Cross-workspace constraints (v1.3 candidates)
+  - "Formal cross_workspace_constraints: KYC.APPROVED → deal.CONTRACTED gate. See v1.3-CAND-2."
+  - "Formal cross_workspace_constraints: deal.CONTRACTED → IM mandate activation gate. See v1.3-CAND-2."
+
+# =============================================================================
+# 6. PRUNE SEMANTICS
+# =============================================================================
+# Deal prune cases are primarily about cancellation cascade and rate-card
+# retraction. Unlike IM (instrument-family granular prunes) or KYC (rare,
+# case-reopening preferred), Deal prune is more common because mid-negotiation
+# retraction is a normal commercial occurrence.
+
+prune_cascade_rules:
+
+  - id: deal_cancel_cascades
+    when: "deal.cancel from any pre-ACTIVE state"
+    cascades_to:
+      - target: deal_product
+        rule: "deal_products WHERE deal_id = D → product_status = REMOVED"
+      - target: deal_rate_card
+        rule: "deal_rate_cards WHERE deal_id = D AND status IN ('DRAFT','PROPOSED','COUNTER_PROPOSED') → status = CANCELLED"
+      - target: deal_onboarding_request
+        rule: "deal_onboarding_requests WHERE deal_id = D AND request_status IN ('PENDING','IN_PROGRESS','BLOCKED') → request_status = CANCELLED"
+      - target: billing_profile
+        rule: "fee_billing_profiles WHERE deal_id = D AND status = 'DRAFT' → status = CLOSED; ACTIVE profiles require billing.close-profile (manual)"
+      - target: deal_document
+        rule: "deal_documents WHERE deal_id = D AND document_status = 'DRAFT' → document_status = ARCHIVED"
+
+  - id: rate_card_retraction_cascades
+    when: "rate card retracted mid-negotiation (status → CANCELLED)"
+    cascades_to:
+      - target: billing_profile
+        rule: "fee_billing_profiles WHERE rate_card_id = R → blocked from activation until replacement AGREED"
+      - target: deal_product
+        rule: "deal_products WHERE deal_id = R.deal_id AND product_id = R.product_id → product_status returns to NEGOTIATING"
+
+  - id: participant_removal_cascades
+    when: "deal.remove-participant P from deal D"
+    cascades_to:
+      - target: deal_ubo_assessment
+        rule: "deal_ubo_assessments WHERE deal_id = D AND entity_id = P.entity_id → assessment_status review required"
+
+  - id: product_removal_cascades
+    when: "deal.remove-product P from deal D"
+    cascades_to:
+      - target: deal_rate_card
+        rule: "deal_rate_cards WHERE deal_id = D AND product_id = P → retracted (CANCELLED if non-AGREED, manual review if AGREED)"
+      - target: billing_profile
+        rule: "fee_billing_profiles WHERE deal_id = D AND product_id = P → close required before product removal"
+
+prune_pre_validation:
+  required_verbs:
+    - deal.read-summary          # pre-prune snapshot
+    - deal.list-rate-cards       # rate-card impact preview
+    - deal.list-onboarding-requests  # operational handoff impact
+    - billing.list-profiles      # revenue impact
+  abort_conditions:
+    - "deal.cancel when ANY deal_onboarding_request.request_status = 'COMPLETED' (deal already operational — requires winding_down path)"
+    - "deal.cancel when deal_status = 'ACTIVE' (must go through WINDING_DOWN → OFFBOARDED)"
+    - "product removal when any AGREED rate card references it (requires billing close first)"
+    - "participant removal when participant is the sole CONTRACTING_PARTY (deal would have no counterparty)"

@@ -1,0 +1,10 @@
+{
+  "mcpServers": {
+    "chrome-extension": {
+      "command": "/opt/homebrew/bin/node",
+      "args": [
+        "/Users/adamtc007/Library/Application Support/Claude/Claude Extensions/ant.dir.ant.anthropic.chrome-control/server/index.js"
+      ]
+    }
+  }
+}

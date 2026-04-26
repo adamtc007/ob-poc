@@ -760,20 +760,13 @@ pub fn compute_summary(hydrated: &HydratedConstellation) -> ConstellationSummary
         .filter(|slot| !slot.blocked_verbs.is_empty())
         .count();
     let blocking_slots = slots.iter().filter(|slot| slot.blocking).count();
-    let overall_progress = if total_slots == 0 {
-        0
-    } else {
-        (slots
-            .iter()
-            .map(|slot| slot.progress as usize)
-            .sum::<usize>()
-            / total_slots) as u8
-    };
-    let completion_pct = if total_slots == 0 {
-        0
-    } else {
-        ((slots_complete * 100) / total_slots) as u8
-    };
+    let overall_progress = slots
+        .iter()
+        .map(|slot| slot.progress as usize)
+        .sum::<usize>()
+        .checked_div(total_slots)
+        .unwrap_or(0) as u8;
+    let completion_pct = (slots_complete * 100).checked_div(total_slots).unwrap_or(0) as u8;
     let ownership_chain = slots
         .iter()
         .find(|slot| slot.slot_type == HydratedSlotType::EntityGraph)

@@ -64,6 +64,11 @@ domains:
         returns:
           type: uuid
           name: id
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
       read:
         description: "Read the root client group record"
         behavior: crud
@@ -96,6 +101,12 @@ domains:
               primary_key: id
         returns:
           type: record
+        three_axis:
+          state_effect: preserving
+          external_effects:
+            - observational
+          consequence:
+            baseline: benign
       update:
         description: "Update the root client group record"
         behavior: crud
@@ -144,6 +155,11 @@ domains:
       # ENTITY MEMBERSHIP - Track which entities belong to client groups
       # ============================================================================
 
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
       entity-manage:
         description: >
           Consolidated entity lifecycle verb — add, remove, confirm, or reject
@@ -157,12 +173,9 @@ domains:
           side_effects: state_write
         invocation_phrases:
           - "manage entity in client group"
-          - "add entity to client group"
-          - "remove entity from group"
+          - "modify client group membership"
           - "confirm entity membership"
-          - "reject entity from group"
-          - "include entity in group"
-          - "exclude entity from group"
+          - "update entity membership"
         behavior: plugin
         handler: ClientGroupEntityManageOp
         args:
@@ -201,6 +214,12 @@ domains:
         returns:
           type: record
 
+        three_axis:
+          state_effect: preserving
+          external_effects: &id001
+            - emitting
+          consequence:
+            baseline: reviewable
       entity-add:
         description: "Add an entity to this client group's universe"
         invocation_phrases:
@@ -256,6 +275,11 @@ domains:
           type: uuid
           description: "Membership record ID"
 
+        three_axis:
+          state_effect: preserving
+          external_effects: *id001
+          consequence:
+            baseline: reviewable
       entity-remove:
         description: "Remove an entity from this client group (or mark historical)"
         invocation_phrases:
@@ -304,6 +328,12 @@ domains:
           type: affected
           description: "Number of rows affected"
 
+        three_axis:
+          state_effect: preserving
+          external_effects: &id004
+            - emitting
+          consequence:
+            baseline: requires_confirmation
       list-entities:
         description: "List all entities in this client group"
         behavior: plugin
@@ -341,15 +371,13 @@ domains:
             default: 100
         returns:
           type: record_set
-          fields:
-            [
-              entity_id,
-              entity_name,
-              membership_type,
-              added_by,
-              tags,
-              created_at,
-            ]
+          fields: [entity_id, entity_name, membership_type, added_by, tags, created_at]
+        three_axis:
+          state_effect: preserving
+          external_effects:
+            - observational
+          consequence:
+            baseline: benign
 
       # ============================================================================
       # SHORTHAND TAGS - Human-readable labels for entities
@@ -408,6 +436,11 @@ domains:
           - "Computes tag_norm (normalized)"
           - "Queues embedding computation"
 
+        three_axis:
+          state_effect: preserving
+          external_effects: &id002 []
+          consequence:
+            baseline: reviewable
       tag-remove:
         description: "Remove a shorthand tag"
         invocation_phrases:
@@ -438,6 +471,11 @@ domains:
         returns:
           type: affected
 
+        three_axis:
+          state_effect: preserving
+          external_effects: *id002
+          consequence:
+            baseline: reviewable
       list-tags:
         description: "List tags for entities in client group"
         behavior: plugin
@@ -479,8 +517,13 @@ domains:
             description: "Filter to persona"
         returns:
           type: record_set
-          fields:
-            [tag_id, entity_id, entity_name, tag, persona, source, confidence]
+          fields: [tag_id, entity_id, entity_name, tag, persona, source, confidence]
+        three_axis:
+          state_effect: preserving
+          external_effects:
+            - observational
+          consequence:
+            baseline: benign
 
       # ============================================================================
       # SEMANTIC SEARCH - The core capability
@@ -550,6 +593,12 @@ domains:
       # DISCOVERY WORKFLOW - Onboarding new client entity universes
       # ============================================================================
 
+        three_axis:
+          state_effect: preserving
+          external_effects:
+            - observational
+          consequence:
+            baseline: benign
       discover-entities:
         description: "Discover entities that might belong to this client (onboarding)"
         behavior: plugin
@@ -592,13 +641,18 @@ domains:
             description: "Automatically add as 'suspected' membership"
         returns:
           type: record_set
-          fields:
-            [entity_id, entity_name, entity_type, match_reason, already_member]
+          fields: [entity_id, entity_name, entity_type, match_reason, already_member]
         effects:
           - "Searches entities by name patterns"
           - "Searches via GLEIF relationships if available"
           - "If auto-add: creates membership with type='suspected'"
 
+        three_axis:
+          state_effect: preserving
+          external_effects:
+            - observational
+          consequence:
+            baseline: benign
       confirm-entity:
         description: "Confirm a suspected entity as belonging to client"
         behavior: plugin
@@ -647,6 +701,11 @@ domains:
           - "Updates membership_type to 'confirmed'"
           - "If tags provided: creates shorthand tags"
 
+        three_axis:
+          state_effect: preserving
+          external_effects: *id001
+          consequence:
+            baseline: reviewable
       reject-entity:
         description: "Mark a suspected entity as NOT belonging to client"
         invocation_phrases:
@@ -699,6 +758,11 @@ domains:
       # ROLE MANAGEMENT - Entity roles within client group (uses roles table)
       # ============================================================================
 
+        three_axis:
+          state_effect: preserving
+          external_effects: *id001
+          consequence:
+            baseline: reviewable
       assign-role:
         description: "Assign a role to an entity within the client group context"
         behavior: plugin
@@ -730,8 +794,7 @@ domains:
           - name: entity-id
             type: uuid
             required: true
-            description:
-              "Entity to assign role to"
+            description: "Entity to assign role to"
               # Slot type for scoped entity search within client group
             slot_type: entity_ref
             lookup:
@@ -753,11 +816,9 @@ domains:
           - name: target-entity-id
             type: uuid
             required: false
-            description:
-              "Target entity for directed roles (e.g., IM for which fund)"
+            description: "Target entity for directed roles (e.g., IM for which fund)"
               # Slot type for scoped entity search within client group
-            slot_type:
-              entity_ref
+            slot_type: entity_ref
               # Preferred roles for target entities (typically funds/SICAVs)
             preferred_roles: [FUND, SICAV, UCITS, AIF, SPV]
             lookup:
@@ -780,6 +841,11 @@ domains:
           type: uuid
           description: "Role assignment ID"
 
+        three_axis:
+          state_effect: preserving
+          external_effects: *id001
+          consequence:
+            baseline: reviewable
       remove-role:
         description: "Remove a role assignment from an entity"
         invocation_phrases:
@@ -810,6 +876,11 @@ domains:
         returns:
           type: affected
 
+        three_axis:
+          state_effect: preserving
+          external_effects: *id001
+          consequence:
+            baseline: reviewable
       list-roles:
         description: "List role assignments for entities in a client group"
         behavior: plugin
@@ -859,19 +930,13 @@ domains:
               primary_key: role_id
         returns:
           type: record_set
-          fields:
-            [
-              id,
-              entity_id,
-              entity_name,
-              role_id,
-              role_name,
-              target_entity_id,
-              target_entity_name,
-              effective_from,
-              effective_to,
-              source,
-            ]
+          fields: [id, entity_id, entity_name, role_id, role_name, target_entity_id, target_entity_name, effective_from, effective_to, source]
+        three_axis:
+          state_effect: preserving
+          external_effects:
+            - observational
+          consequence:
+            baseline: benign
 
       list-parties:
         description: "List all parties (entities with roles) in a client group"
@@ -912,8 +977,13 @@ domains:
             description: "Include external partners (IM, custodian, etc.)"
         returns:
           type: record_set
-          fields:
-            [entity_id, entity_name, membership_type, roles, role_categories]
+          fields: [entity_id, entity_name, membership_type, roles, role_categories]
+        three_axis:
+          state_effect: preserving
+          external_effects:
+            - observational
+          consequence:
+            baseline: benign
 
       # ============================================================================
       # RELATIONSHIP MANAGEMENT - Ownership/control edges within group
@@ -977,6 +1047,11 @@ domains:
           type: uuid
           description: "Relationship ID"
 
+        three_axis:
+          state_effect: preserving
+          external_effects: *id001
+          consequence:
+            baseline: reviewable
       list-relationships:
         description: "List ownership/control relationships in a client group"
         behavior: plugin
@@ -1020,18 +1095,13 @@ domains:
             valid_values: ["ownership", "control", "beneficial", "management"]
         returns:
           type: record_set
-          fields:
-            [
-              id,
-              parent_entity_id,
-              parent_name,
-              child_entity_id,
-              child_name,
-              relationship_kind,
-              canonical_ownership_pct,
-              source_count,
-              review_status,
-            ]
+          fields: [id, parent_entity_id, parent_name, child_entity_id, child_name, relationship_kind, canonical_ownership_pct, source_count, review_status]
+        three_axis:
+          state_effect: preserving
+          external_effects:
+            - observational
+          consequence:
+            baseline: benign
 
       # ============================================================================
       # OWNERSHIP SOURCE MANAGEMENT - Multi-source lineage for trust-but-verify
@@ -1063,19 +1133,7 @@ domains:
           - name: source
             type: string
             required: true
-            valid_values:
-              [
-                "client_allegation",
-                "gleif",
-                "bods",
-                "companies_house",
-                "clearstream",
-                "annual_report",
-                "fund_prospectus",
-                "kyc_document",
-                "scraper",
-                "manual",
-              ]
+            valid_values: ["client_allegation", "gleif", "bods", "companies_house", "clearstream", "annual_report", "fund_prospectus", "kyc_document", "scraper", "manual"]
           - name: source-type
             type: string
             required: false
@@ -1106,6 +1164,12 @@ domains:
           type: uuid
           description: "Source record ID"
 
+        three_axis:
+          state_effect: preserving
+          external_effects: &id003
+            - emitting
+          consequence:
+            baseline: reviewable
       verify-ownership:
         description: "Mark an ownership source as verified"
         behavior: plugin
@@ -1138,6 +1202,11 @@ domains:
         returns:
           type: affected
 
+        three_axis:
+          state_effect: preserving
+          external_effects: *id003
+          consequence:
+            baseline: reviewable
       set-canonical:
         description: "Designate a source as the canonical value for a relationship"
         behavior: plugin
@@ -1171,6 +1240,11 @@ domains:
       # REVIEW WORKFLOW - List unverified and discrepancies
       # ============================================================================
 
+        three_axis:
+          state_effect: preserving
+          external_effects: *id002
+          consequence:
+            baseline: reviewable
       list-unverified:
         description: "List unverified ownership allegations needing review"
         behavior: plugin
@@ -1204,16 +1278,13 @@ domains:
             default: 50
         returns:
           type: record_set
-          fields:
-            [
-              relationship_id,
-              parent_name,
-              child_name,
-              alleged_pct,
-              source_document_ref,
-              source_document_date,
-              verification_count,
-            ]
+          fields: [relationship_id, parent_name, child_name, alleged_pct, source_document_ref, source_document_date, verification_count]
+        three_axis:
+          state_effect: preserving
+          external_effects:
+            - observational
+          consequence:
+            baseline: benign
 
       list-discrepancies:
         description: "List ownership relationships with conflicting source values"
@@ -1249,17 +1320,13 @@ domains:
             description: "Minimum percentage spread to report (default 1%)"
         returns:
           type: record_set
-          fields:
-            [
-              relationship_id,
-              parent_name,
-              child_name,
-              sources,
-              ownership_values,
-              ownership_spread,
-              alleged_pct,
-              verified_pct,
-            ]
+          fields: [relationship_id, parent_name, child_name, sources, ownership_values, ownership_spread, alleged_pct, verified_pct]
+        three_axis:
+          state_effect: preserving
+          external_effects:
+            - observational
+          consequence:
+            baseline: benign
 
       # ============================================================================
       # DISCOVERY STATUS - Group-level discovery workflow
@@ -1307,6 +1374,11 @@ domains:
           - "Sets discovery_status to 'in_progress'"
           - "Records discovery_started_at"
 
+        three_axis:
+          state_effect: preserving
+          external_effects: *id001
+          consequence:
+            baseline: reviewable
       complete-discovery:
         description: "Mark discovery process as complete"
         behavior: plugin
@@ -1341,3 +1413,8 @@ domains:
         effects:
           - "Sets discovery_status to 'complete'"
           - "Records discovery_completed_at"
+        three_axis:
+          state_effect: preserving
+          external_effects: *id004
+          consequence:
+            baseline: requires_confirmation

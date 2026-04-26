@@ -22,8 +22,14 @@ fn main() -> Result<()> {
     match args[0].as_str() {
         "smoke" => run_profile("smoke", &args[1..]),
         "stress" => run_profile("stress", &args[1..]),
+        "poison-jobs" => run_profile("poison", &args[1..]),
+        "subscription-fanout" => run_profile("subscription", &args[1..]),
         "docker-smoke" => run_docker_profile("smoke", &args[1..]),
         "docker-stress" => run_docker_profile("stress", &args[1..]),
+        "docker-poison-jobs" => run_docker_profile("poison", &args[1..]),
+        "docker-subscription-fanout" => run_docker_profile("subscription", &args[1..]),
+        "docker-ha-stress" => run_docker_ha_profile("stress", &args[1..]),
+        "docker-ha-subscription-fanout" => run_docker_ha_profile("subscription", &args[1..]),
         "docker-up" => docker_up_command(&args[1..]),
         "docker-down" => docker_down_command(&args[1..]),
         "help" | "--help" | "-h" => {
@@ -46,12 +52,12 @@ fn run_profile(profile: &str, extra_args: &[String]) -> Result<()> {
         }
     });
 
-    let server_child = if parsed.spawn_server {
-        Some(spawn_server(
+    let mut server_child = if parsed.spawn_server {
+        Some(ChildGuard::new(spawn_server(
             &workspace_root,
             &server_url,
             parsed.database_url.as_deref(),
-        )?)
+        )?))
     } else {
         None
     };
@@ -76,9 +82,8 @@ fn run_profile(profile: &str, extra_args: &[String]) -> Result<()> {
         .status()
         .context("failed to run load harness")?;
 
-    if let Some(mut child) = server_child {
-        let _ = child.kill();
-        let _ = child.wait();
+    if let Some(child) = &mut server_child {
+        child.stop();
     }
 
     if !status.success() {
@@ -97,7 +102,7 @@ fn run_docker_profile(profile: &str, extra_args: &[String]) -> Result<()> {
         .clone()
         .unwrap_or_else(|| deployment.server_url.clone());
 
-    let status = Command::new("cargo")
+    let result = Command::new("cargo")
         .arg("run")
         .arg("-p")
         .arg("bpmn-lite-server")
@@ -111,16 +116,118 @@ fn run_docker_profile(profile: &str, extra_args: &[String]) -> Result<()> {
         .args(&parsed.forward_args)
         .current_dir(&workspace_root)
         .status()
-        .context("failed to run load harness against docker deployment")?;
+        .context("failed to run load harness against docker deployment")
+        .and_then(|status| {
+            if status.success() {
+                Ok(())
+            } else {
+                bail!("load harness exited with {}", status)
+            }
+        });
 
     if !parsed.keep_running {
-        docker_down(&workspace_root, &parsed)?;
+        let cleanup = docker_down_deployment(&deployment);
+        result.and(cleanup)?;
+    } else {
+        result?;
     }
 
-    if !status.success() {
-        bail!("load harness exited with {}", status);
+    Ok(())
+}
+
+fn run_docker_ha_profile(profile: &str, extra_args: &[String]) -> Result<()> {
+    let workspace_root = workspace_root()?;
+    let parsed = parse_args(extra_args)?;
+    let deployment = docker_up(&workspace_root, &parsed)?;
+    let replicas = parsed.server_replicas.unwrap_or(2).max(2);
+    let mut extra_containers = Vec::new();
+
+    let setup_result = (|| -> Result<()> {
+        for replica_idx in 2..=replicas {
+            let name = format!(
+                "bpmn-lite-svc-{}-r{}",
+                deployment.instance_name, replica_idx
+            );
+            remove_container_if_exists(&name)?;
+            let port = deployment.server_port + replica_idx as u16 - 1;
+            let database_url = format!(
+                "postgresql://postgres@{}/{}",
+                deployment.db_container_name, deployment.db_name
+            );
+            run_command(
+                Command::new("docker")
+                    .arg("run")
+                    .arg("-d")
+                    .arg("--name")
+                    .arg(&name)
+                    .arg("--network")
+                    .arg(&deployment.network_name)
+                    .arg("-p")
+                    .arg(format!("{port}:50051"))
+                    .arg("-e")
+                    .arg(format!("DATABASE_URL={database_url}"))
+                    .arg("-e")
+                    .arg(format!("BPMN_LITE_SCHEDULER_OWNER={name}"))
+                    .arg("-e")
+                    .arg("RUST_LOG=info")
+                    .arg(&deployment.image),
+            )?;
+            extra_containers.push(name);
+        }
+        for replica_idx in 2..=replicas {
+            let name = format!(
+                "bpmn-lite-svc-{}-r{}",
+                deployment.instance_name, replica_idx
+            );
+            let port = deployment.server_port + replica_idx as u16 - 1;
+            wait_for_server(&format!("http://127.0.0.1:{port}"), Duration::from_secs(30))
+                .with_context(|| format!("timed out waiting for HA replica '{}'", name))?;
+        }
+        Ok(())
+    })();
+
+    if let Err(error) = setup_result {
+        cleanup_extra_containers(&extra_containers)?;
+        docker_down_deployment(&deployment)?;
+        return Err(error);
     }
 
+    let mut harness_args = parsed.forward_args.clone();
+    if profile == "subscription" && !has_forward_arg(&harness_args, "--subscription-server-url") {
+        harness_args.push("--subscription-server-url".to_string());
+        harness_args.push(format!("http://127.0.0.1:{}", deployment.server_port + 1));
+    }
+
+    let result = Command::new("cargo")
+        .arg("run")
+        .arg("-p")
+        .arg("bpmn-lite-server")
+        .arg("--bin")
+        .arg("load_harness")
+        .arg("--")
+        .arg("--profile")
+        .arg(profile)
+        .arg("--server-url")
+        .arg(&deployment.server_url)
+        .args(&harness_args)
+        .current_dir(&workspace_root)
+        .status()
+        .context("failed to run load harness against HA docker deployment")
+        .and_then(|status| {
+            if status.success() {
+                Ok(())
+            } else {
+                bail!("load harness exited with {}", status)
+            }
+        });
+
+    if !parsed.keep_running {
+        let cleanup = cleanup_extra_containers(&extra_containers)
+            .and_then(|_| docker_down_deployment(&deployment));
+        result.and(cleanup)?;
+    } else {
+        result?;
+    }
     Ok(())
 }
 
@@ -152,8 +259,6 @@ fn spawn_server(
         .arg("run")
         .arg("-p")
         .arg("bpmn-lite-server")
-        .arg("--bin")
-        .arg("bpmn-lite-server")
         .current_dir(workspace_root)
         .stdout(Stdio::inherit())
         .stderr(Stdio::inherit())
@@ -161,8 +266,12 @@ fn spawn_server(
         .env("BPMN_LITE_BIND", &bind_addr);
 
     if let Some(url) = database_url {
+        command.arg("--features").arg("postgres");
         command.env("DATABASE_URL", url);
+    } else {
+        command.env("BPMN_LITE_STORE", "memory");
     }
+    command.arg("--bin").arg("bpmn-lite-server");
 
     let child = command.spawn().with_context(|| {
         format!(
@@ -290,6 +399,17 @@ fn parse_args(extra_args: &[String]) -> Result<ParsedArgs> {
                 parsed.skip_build = true;
                 i += 1;
             }
+            "--server-replicas" => {
+                let value = extra_args
+                    .get(i + 1)
+                    .ok_or_else(|| anyhow!("--server-replicas requires a value"))?;
+                parsed.server_replicas = Some(
+                    value
+                        .parse()
+                        .with_context(|| format!("invalid --server-replicas '{}'", value))?,
+                );
+                i += 2;
+            }
             other => {
                 forward_args.push(other.to_string());
                 i += 1;
@@ -329,82 +449,108 @@ fn docker_up(workspace_root: &Path, parsed: &ParsedArgs) -> Result<DockerDeploym
     let db_container_name = format!("bpmn-lite-db-{instance_name}");
     let server_container_name = format!("bpmn-lite-svc-{instance_name}");
     let volume_name = format!("bpmn-lite-pgdata-{instance_name}");
-
-    remove_container_if_exists(&db_container_name)?;
-    remove_container_if_exists(&server_container_name)?;
-    remove_network_if_exists(&network_name)?;
-    remove_volume_if_exists(&volume_name)?;
-
-    run_command(
-        Command::new("docker")
-            .arg("network")
-            .arg("create")
-            .arg(&network_name),
-    )?;
-
-    run_command(
-        Command::new("docker")
-            .arg("volume")
-            .arg("create")
-            .arg(&volume_name),
-    )?;
-
-    run_command(
-        Command::new("docker")
-            .arg("run")
-            .arg("-d")
-            .arg("--name")
-            .arg(&db_container_name)
-            .arg("--network")
-            .arg(&network_name)
-            .arg("-p")
-            .arg(format!("{db_port}:5432"))
-            .arg("-e")
-            .arg("POSTGRES_HOST_AUTH_METHOD=trust")
-            .arg("-e")
-            .arg(format!("POSTGRES_DB={db_name}"))
-            .arg("-v")
-            .arg(format!("{volume_name}:/var/lib/postgresql/data"))
-            .arg("postgres:16-bookworm"),
-    )?;
-
-    wait_for_postgres(&db_container_name, &db_name, Duration::from_secs(30))?;
-
-    let container_database_url = format!("postgresql://postgres@{db_container_name}/{db_name}");
-
-    run_command(
-        Command::new("docker")
-            .arg("run")
-            .arg("-d")
-            .arg("--name")
-            .arg(&server_container_name)
-            .arg("--network")
-            .arg(&network_name)
-            .arg("-p")
-            .arg(format!("{server_port}:50051"))
-            .arg("-e")
-            .arg(format!("DATABASE_URL={container_database_url}"))
-            .arg("-e")
-            .arg("RUST_LOG=info")
-            .arg(&image),
-    )?;
-
-    let server_url = parsed
-        .server_url
-        .clone()
-        .unwrap_or_else(|| format!("http://127.0.0.1:{server_port}"));
-    wait_for_server(&server_url, Duration::from_secs(30))?;
-
-    Ok(DockerDeployment {
+    let deployment = DockerDeployment {
         instance_name,
         image,
-        server_url,
+        server_url: parsed
+            .server_url
+            .clone()
+            .unwrap_or_else(|| format!("http://127.0.0.1:{server_port}")),
+        server_port,
+        db_name: db_name.clone(),
         host_database_url: format!("postgresql://postgres@127.0.0.1:{db_port}/{db_name}"),
         db_container_name,
         server_container_name,
         network_name,
         volume_name,
-    })
+    };
+
+    remove_container_if_exists(&deployment.db_container_name)?;
+    remove_container_if_exists(&deployment.server_container_name)?;
+    remove_containers_with_prefix(&format!("bpmn-lite-svc-{}-r", deployment.instance_name))?;
+    remove_network_if_exists(&deployment.network_name)?;
+    remove_volume_if_exists(&deployment.volume_name)?;
+
+    let result = (|| -> Result<()> {
+        run_command(
+            Command::new("docker")
+                .arg("network")
+                .arg("create")
+                .arg(&deployment.network_name),
+        )?;
+
+        run_command(
+            Command::new("docker")
+                .arg("volume")
+                .arg("create")
+                .arg(&deployment.volume_name),
+        )?;
+
+        run_command(
+            Command::new("docker")
+                .arg("run")
+                .arg("-d")
+                .arg("--name")
+                .arg(&deployment.db_container_name)
+                .arg("--network")
+                .arg(&deployment.network_name)
+                .arg("-p")
+                .arg(format!("{db_port}:5432"))
+                .arg("-e")
+                .arg("POSTGRES_HOST_AUTH_METHOD=trust")
+                .arg("-e")
+                .arg(format!("POSTGRES_DB={db_name}"))
+                .arg("-v")
+                .arg(format!(
+                    "{}:/var/lib/postgresql/data",
+                    deployment.volume_name
+                ))
+                .arg("postgres:16-bookworm"),
+        )?;
+
+        wait_for_postgres(
+            &deployment.db_container_name,
+            &db_name,
+            Duration::from_secs(30),
+        )?;
+
+        let container_database_url = format!(
+            "postgresql://postgres@{}/{}",
+            deployment.db_container_name, db_name
+        );
+
+        run_command(
+            Command::new("docker")
+                .arg("run")
+                .arg("-d")
+                .arg("--name")
+                .arg(&deployment.server_container_name)
+                .arg("--network")
+                .arg(&deployment.network_name)
+                .arg("-p")
+                .arg(format!("{server_port}:50051"))
+                .arg("-e")
+                .arg(format!("DATABASE_URL={container_database_url}"))
+                .arg("-e")
+                .arg(format!(
+                    "BPMN_LITE_SCHEDULER_OWNER={}",
+                    deployment.server_container_name
+                ))
+                .arg("-e")
+                .arg("RUST_LOG=info")
+                .arg(&deployment.image),
+        )?;
+
+        wait_for_server(&deployment.server_url, Duration::from_secs(30))?;
+        Ok(())
+    })();
+
+    if let Err(error) = result {
+        let _ = docker_down_deployment(&deployment);
+        return Err(error);
+    }
+
+    Ok(deployment)
 }
 
 fn docker_down(_workspace_root: &Path, parsed: &ParsedArgs) -> Result<()> {
@@ -418,8 +564,25 @@ fn docker_down(_workspace_root: &Path, parsed: &ParsedArgs) -> Result<()> {
 
     remove_container_if_exists(&format!("bpmn-lite-svc-{instance_name}"))?;
     remove_container_if_exists(&format!("bpmn-lite-db-{instance_name}"))?;
+    remove_containers_with_prefix(&format!("bpmn-lite-svc-{instance_name}-r"))?;
     remove_network_if_exists(&format!("bpmn-lite-net-{instance_name}"))?;
     remove_volume_if_exists(&format!("bpmn-lite-pgdata-{instance_name}"))?;
+    Ok(())
+}
+
+fn docker_down_deployment(deployment: &DockerDeployment) -> Result<()> {
+    remove_container_if_exists(&deployment.server_container_name)?;
+    remove_container_if_exists(&deployment.db_container_name)?;
+    remove_containers_with_prefix(&format!("bpmn-lite-svc-{}-r", deployment.instance_name))?;
+    remove_network_if_exists(&deployment.network_name)?;
+    remove_volume_if_exists(&deployment.volume_name)?;
+    Ok(())
+}
+
+fn cleanup_extra_containers(names: &[String]) -> Result<()> {
+    for name in names {
+        remove_container_if_exists(name)?;
+    }
     Ok(())
 }
 
@@ -437,18 +600,6 @@ fn ensure_docker_image(workspace_root: &Path, image: &str) -> Result<()> {
     let repo_root = workspace_root
         .parent()
         .ok_or_else(|| anyhow!("failed to locate repo root from bpmn-lite workspace"))?;
-    let inspect = Command::new("docker")
-        .arg("image")
-        .arg("inspect")
-        .arg(image)
-        .stdout(Stdio::null())
-        .stderr(Stdio::null())
-        .status()
-        .context("failed to inspect docker image")?;
-    if inspect.success() {
-        return Ok(());
-    }
-
     run_command(
         Command::new("docker")
             .arg("build")
@@ -523,6 +674,24 @@ fn remove_volume_if_exists(name: &str) -> Result<()> {
     Ok(())
 }
 
+fn remove_containers_with_prefix(prefix: &str) -> Result<()> {
+    let output = Command::new("docker")
+        .arg("ps")
+        .arg("-a")
+        .arg("--format")
+        .arg("{{.Names}}")
+        .output()
+        .context("failed to list docker containers")?;
+    if !output.status.success() {
+        return Ok(());
+    }
+    let names = String::from_utf8_lossy(&output.stdout);
+    for name in names.lines().filter(|name| name.starts_with(prefix)) {
+        remove_container_if_exists(name)?;
+    }
+    Ok(())
+}
+
 fn run_command(command: &mut Command) -> Result<()> {
     let status = command.status().context("failed to spawn command")?;
     if !status.success() {
@@ -547,23 +716,61 @@ fn sanitize_instance_name(raw: &str) -> String {
     }
 }
 
+fn has_forward_arg(args: &[String], flag: &str) -> bool {
+    args.iter().any(|arg| arg == flag)
+}
+
+struct ChildGuard {
+    child: Option<Child>,
+}
+
+impl ChildGuard {
+    fn new(child: Child) -> Self {
+        Self { child: Some(child) }
+    }
+
+    fn stop(&mut self) {
+        if let Some(mut child) = self.child.take() {
+            let _ = child.kill();
+            let _ = child.wait();
+        }
+    }
+}
+
+impl Drop for ChildGuard {
+    fn drop(&mut self) {
+        self.stop();
+    }
+}
+
 fn print_help() {
     eprintln!(
         "Usage:
   cargo run -p xtask -- smoke [--spawn-server] [--database-url URL] [harness args...]
   cargo run -p xtask -- stress [--spawn-server] [--database-url URL] [harness args...]
+  cargo run -p xtask -- poison-jobs [--spawn-server] [--database-url URL] [harness args...]
+  cargo run -p xtask -- subscription-fanout [--spawn-server] [--database-url URL] [harness args...]
   cargo run -p xtask -- docker-up [--instance-name NAME] [--server-port PORT] [--db-port PORT]
   cargo run -p xtask -- docker-down [--instance-name NAME]
   cargo run -p xtask -- docker-smoke [--instance-name NAME] [--server-port PORT] [--db-port PORT] [--keep-running] [harness args...]
   cargo run -p xtask -- docker-stress [--instance-name NAME] [--server-port PORT] [--db-port PORT] [--keep-running] [harness args...]
+  cargo run -p xtask -- docker-poison-jobs [--instance-name NAME] [--server-port PORT] [--db-port PORT] [--keep-running] [harness args...]
+  cargo run -p xtask -- docker-subscription-fanout [--instance-name NAME] [--server-port PORT] [--db-port PORT] [--keep-running] [harness args...]
+  cargo run -p xtask -- docker-ha-stress [--instance-name NAME] [--server-port PORT] [--db-port PORT] [--server-replicas N] [--keep-running] [harness args...]
+  cargo run -p xtask -- docker-ha-subscription-fanout [--instance-name NAME] [--server-port PORT] [--db-port PORT] [--server-replicas N] [--keep-running] [harness args...]
 
 Examples:
   cargo run -p xtask -- smoke --spawn-server
   cargo run -p xtask -- stress --spawn-server --instances 500 --workers 24
+  cargo run -p xtask -- poison-jobs --spawn-server --instances 50 --workers 8
+  cargo run -p xtask -- subscription-fanout --spawn-server --instances 24 --subscriptions-per-instance 3
   cargo run -p xtask -- stress --server-url http://127.0.0.1:50051 --timeout-secs 180
   cargo run -p xtask -- docker-up --instance-name alpha --server-port 50071 --db-port 5541
   cargo run -p xtask -- docker-smoke --instance-name alpha --server-port 50071 --db-port 5541
-  cargo run -p xtask -- docker-stress --instance-name beta --server-port 50072 --db-port 5542 --instances 200"
+  cargo run -p xtask -- docker-stress --instance-name beta --server-port 50072 --db-port 5542 --instances 200
+  cargo run -p xtask -- docker-subscription-fanout --instance-name sub --server-port 50073 --db-port 5543
+  cargo run -p xtask -- docker-ha-stress --instance-name ha --server-port 50100 --db-port 5550 --server-replicas 2 --instances 200
+  cargo run -p xtask -- docker-ha-subscription-fanout --instance-name hasub --server-port 50110 --db-port 5560 --server-replicas 2"
     );
 }
 
@@ -577,6 +784,7 @@ struct ParsedArgs {
     db_port: Option<u16>,
     db_name: Option<String>,
     docker_image: Option<String>,
+    server_replicas: Option<usize>,
     keep_running: bool,
     skip_build: bool,
     forward_args: Vec<String>,
@@ -586,6 +794,8 @@ struct DockerDeployment {
     instance_name: String,
     image: String,
     server_url: String,
+    server_port: u16,
+    db_name: String,
     host_database_url: String,
     #[allow(dead_code)]
     db_container_name: String,

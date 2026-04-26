@@ -112,3 +112,8 @@ domains:
         returns:
           type: record
           description: Edge upsert result with action taken (created, replaced, no_change)
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable

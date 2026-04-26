@@ -1,0 +1,30 @@
+name: "CBU operationally_active aggregate (Mode B)"
+suite_id: "cbu_operationally_active"
+description: |
+  Verify the canonical cbu_operationally_active derived state aggregate
+  evaluates correctly. The aggregate composes 5 source conditions across
+  KYC, Deal, IM, cbu_evidence, and service_consumption — the CBU is
+  operationally_active iff every condition is satisfied (Mode B all_of).
+
+  This fixture tests the unsatisfied case — no predicates wired means
+  every condition's source-side predicate fails to resolve, which the
+  evaluator scores as unsatisfied. Satisfied-case testing requires
+  reproducing the production multi-line predicate strings verbatim;
+  see the README for the pattern.
+
+entity_aliases:
+  cbu-1: "00000000-0000-0000-0000-000000000040"
+
+initial_state:
+  - { workspace: cbu, slot: cbu, entity: "cbu-1", state: "VALIDATED" }
+
+steps:
+  - name: "unsatisfied: no predicates resolve any source rows"
+    evaluate_derived:
+      workspace: cbu
+      slot: cbu
+      derived_id: "cbu_operationally_active"
+      host_entity: "cbu-1"
+    expect:
+      derived:
+        satisfied: false

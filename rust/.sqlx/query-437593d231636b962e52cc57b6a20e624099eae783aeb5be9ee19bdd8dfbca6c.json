@@ -1,0 +1,46 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT\n                dr.request_id,\n                dr.doc_type as document_type,\n                dr.status,\n                w.entity_id as requested_from_entity_id,\n                e.name as \"entity_name?\"\n               FROM \"ob-poc\".doc_requests dr\n               JOIN \"ob-poc\".entity_workstreams w ON w.workstream_id = dr.workstream_id\n               JOIN \"ob-poc\".cases c ON c.case_id = w.case_id\n               LEFT JOIN \"ob-poc\".entities e ON e.entity_id = w.entity_id AND e.deleted_at IS NULL\n               WHERE c.cbu_id = $1",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "request_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "document_type",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 2,
+        "name": "status",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 3,
+        "name": "requested_from_entity_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 4,
+        "name": "entity_name?",
+        "type_info": "Varchar"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "437593d231636b962e52cc57b6a20e624099eae783aeb5be9ee19bdd8dfbca6c"
+}

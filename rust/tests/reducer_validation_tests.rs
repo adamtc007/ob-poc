@@ -2,7 +2,7 @@
 mod tests {
     use std::collections::HashMap;
 
-    use ob_poc::state_reducer::{
+    use dsl_runtime::state_reducer::{
         validate_state_machine, ConditionDef, ConsistencyCheckDef, OverlaySourceDef, ReducerDef,
         RuleDef, StateMachineDefinition,
     };

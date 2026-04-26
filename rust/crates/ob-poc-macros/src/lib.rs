@@ -1,37 +1,18 @@
 //! Procedural macros for ob-poc
 //!
-//! This crate provides two macros:
-//! - `#[register_custom_op]` - Auto-register custom operations with the registry
-//! - `#[derive(IdType)]` - Generate boilerplate for UUID-backed ID newtypes
+//! This crate provides:
+//! - `#[derive(IdType)]` — UUID-backed ID newtype boilerplate.
+//!
+//! # Phase 5c-migrate slice #80 note
+//!
+//! `#[register_custom_op]` was deleted altogether once every plugin op
+//! had migrated to `sem_os_postgres::ops::SemOsVerbOp`; the sibling
+//! `dsl-runtime-macros` crate that briefly owned it was removed in the
+//! same slice.
 
 use proc_macro::TokenStream;
 
 mod id_type;
-mod register_op;
-
-/// Auto-register a custom operation with the registry.
-///
-/// Apply to unit structs that implement `CustomOperation`.
-///
-/// **Important:** All ops must live in the main crate (uses `crate::domain_ops` path).
-///
-/// # Example
-///
-/// ```ignore
-/// #[register_custom_op]
-/// pub struct MyOp;
-///
-/// impl CustomOperation for MyOp {
-///     fn domain(&self) -> &'static str { "my" }
-///     fn verb(&self) -> &'static str { "op" }
-///     fn rationale(&self) -> &'static str { "Custom logic required" }
-///     // ...
-/// }
-/// ```
-#[proc_macro_attribute]
-pub fn register_custom_op(_attr: TokenStream, input: TokenStream) -> TokenStream {
-    register_op::register_custom_op_impl(input)
-}
 
 /// Derive macro for UUID-backed ID newtypes.
 ///

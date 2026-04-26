@@ -18,6 +18,10 @@ service BpmnLite {
 
     // Event stream
     rpc SubscribeEvents(SubscribeRequest) returns (stream LifecycleEvent);
+
+    // Operations
+    rpc Health(HealthRequest) returns (HealthResponse);
+    rpc Metrics(MetricsRequest) returns (MetricsResponse);
 }
 
 // --- Compile ---
@@ -155,6 +159,27 @@ message LifecycleEvent {
     string event_type = 2;
     string process_instance_id = 3;
     string payload_json = 4;
+}
+
+// --- Operations ---
+
+message HealthRequest {}
+
+message HealthResponse {
+    bool ready = 1;
+    string status = 2;
+}
+
+message MetricsRequest {}
+
+message MetricsResponse {
+    uint64 requests_total = 1;
+    uint64 request_rejections_total = 2;
+    uint64 job_activations_total = 3;
+    uint64 job_completions_total = 4;
+    uint64 job_failures_total = 5;
+    uint64 active_subscriptions = 6;
+    uint64 subscription_rejections_total = 7;
 }
 
 // --- Shared types ---

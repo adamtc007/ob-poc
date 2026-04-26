@@ -124,6 +124,11 @@ domains:
       # UBO Snapshot Capture + Diff (Phase 3.2)
       # =========================================================================
 
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
       snapshot.capture:
         description: |
           Capture a deterministic snapshot of a UBO determination run.
@@ -168,6 +173,12 @@ domains:
             - name: chains_captured
               type: integer
 
+        three_axis:
+          state_effect: preserving
+          external_effects:
+            - emitting
+          consequence:
+            baseline: reviewable
       snapshot.diff:
         description: |
           Compare two UBO determination snapshots by run_id.
@@ -213,6 +224,12 @@ domains:
             - name: changed
               type: array
               description: "Changed fields between runs"
+        three_axis:
+          state_effect: preserving
+          external_effects:
+            - observational
+          consequence:
+            baseline: benign
       update-ownership:
         description: Update ownership percentage or end date
         invocation_phrases:
@@ -260,6 +277,11 @@ domains:
             maps_to: notes
         returns:
           type: affected
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
       add-trust-role:
         description: Add trust role relationship (settlor, trustee, beneficiary, protector)
         invocation_phrases:
@@ -346,6 +368,11 @@ domains:
           name: relationship_id
           capture: true
 
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
       end-relationship:
         description: End any entity relationship by ID (soft delete - sets effective_to date)
         invocation_phrases:
@@ -391,6 +418,11 @@ domains:
         returns:
           type: affected
 
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
       delete-relationship:
         description: Hard delete any entity relationship by ID (generic fallback)
         invocation_phrases:
@@ -430,6 +462,11 @@ domains:
             description: Optional relationship discriminator (ownership, control, trust-role)
         returns:
           type: affected
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: requires_confirmation
       list-owners:
         description: List owners of an entity as of a specific date
         invocation_phrases:
@@ -475,6 +512,12 @@ domains:
             description: Point-in-time date for temporal query (defaults to today)
         returns:
           type: record_set
+        three_axis:
+          state_effect: preserving
+          external_effects:
+            - observational
+          consequence:
+            baseline: benign
       list-owned:
         description: List entities owned by an entity (what does this entity own)
         invocation_phrases:
@@ -512,6 +555,12 @@ domains:
               primary_key: entity_id
         returns:
           type: record_set
+        three_axis:
+          state_effect: preserving
+          external_effects:
+            - observational
+          consequence:
+            baseline: benign
       list-ubos:
         description: List UBO candidates for a CBU (natural persons with ≥25% ownership)
         invocation_phrases:
@@ -557,6 +606,12 @@ domains:
               primary_key: cbu_id
         returns:
           type: record_set
+        three_axis:
+          state_effect: preserving
+          external_effects:
+            - observational
+          consequence:
+            baseline: benign
       list-owners-of:
         description: List ownership relationships where entity is the owned party
         invocation_phrases:
@@ -594,6 +649,12 @@ domains:
               primary_key: entity_id
         returns:
           type: record_set
+        three_axis:
+          state_effect: preserving
+          external_effects:
+            - observational
+          consequence:
+            baseline: benign
       trace-chains:
         description: Trace all ownership and control chains to natural persons for a CBU or client
         invocation_phrases:
@@ -666,6 +727,12 @@ domains:
         returns:
           type: record
 
+        three_axis:
+          state_effect: preserving
+          external_effects:
+            - observational
+          consequence:
+            baseline: benign
       compute-chains:
         description: Compute UBO ownership chains for entities linked to a KYC case
         invocation_phrases:
@@ -723,6 +790,12 @@ domains:
       # These plugin handlers manage lifecycle events that affect UBO status
       # =========================================================================
 
+        three_axis:
+          state_effect: preserving
+          external_effects:
+            - observational
+          consequence:
+            baseline: benign
       mark-deceased:
         description: Mark a person as deceased and cascade effects to ownership/control relationships
         invocation_phrases:
@@ -762,6 +835,12 @@ domains:
         returns:
           type: record
 
+        three_axis:
+          state_effect: preserving
+          external_effects: &id001
+            - emitting
+          consequence:
+            baseline: requires_confirmation
       convergence-supersede:
         description: Atomically supersede an ownership relationship with a new one in the convergence model
         invocation_phrases:
@@ -825,6 +904,11 @@ domains:
         returns:
           type: record
 
+        three_axis:
+          state_effect: preserving
+          external_effects: *id001
+          consequence:
+            baseline: requires_confirmation
       transfer-control:
         description: Transfer control relationship from one entity to another
         invocation_phrases:
@@ -904,6 +988,12 @@ domains:
         returns:
           type: record
 
+        three_axis:
+          state_effect: preserving
+          external_effects:
+            - emitting
+          consequence:
+            baseline: requires_explicit_authorisation
       waive-verification:
         description: Waive verification requirement for a relationship with documented justification
         invocation_phrases:
@@ -970,6 +1060,12 @@ domains:
       # UBO Chain Terminus - Mark where ownership chain terminates
       # =========================================================================
 
+        three_axis:
+          state_effect: preserving
+          external_effects:
+            - emitting
+          consequence:
+            baseline: requires_confirmation
       mark-terminus:
         description: Mark an entity as a UBO chain terminus (ownership tracing stops here)
         invocation_phrases:
@@ -1042,3 +1138,8 @@ domains:
           type: uuid
           name: relationship_id
           capture: true
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable

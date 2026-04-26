@@ -119,7 +119,6 @@ allowed_verbs:
   - booking-principal.impact-analysis
   # Booking location
   - booking-location.create
-  - booking-location.read
   - booking-location.list
   - booking-location.update
   # Corporate actions
@@ -133,15 +132,8 @@ allowed_verbs:
   - corporate-action.link-ca-ssi
   - corporate-action.list-ca-ssi-mappings
   # Matrix overlay
-  - matrix-overlay.create
-  - matrix-overlay.read
   - matrix-overlay.list
-  - matrix-overlay.update
-  - matrix-overlay.apply
   - matrix-overlay.remove
-  - matrix-overlay.diff
-  - matrix-overlay.preview
-  - matrix-overlay.list-active
   - matrix-overlay.add
   - matrix-overlay.activate
   - matrix-overlay.suspend
@@ -215,9 +207,6 @@ allowed_verbs:
   - movement.distribute-recallable
   - movement.record-commitment
   # Delivery
-  - delivery.create
-  - delivery.read
-  - delivery.list
   # Reference data
   - instrument-class.ensure
   - instrument-class.list

@@ -33,16 +33,11 @@ allowed_verbs:
   - deal.create
   - deal.read
   - deal.list-contracts
-  - deal.assign-rate-card
-  - deal.activate
-  - deal.amend
   - contract.create
-  - contract.negotiate
   - billing.create-profile
-  - billing.assign-period
+  # R3.5 (2026-04-26): Booking Principal verbs hoisted to booking-principal pack.
 
-forbidden_verbs:
-  - deal.delete
+forbidden_verbs: []
 
 risk_policy:
   require_confirm_before_execute: true
@@ -80,7 +75,7 @@ templates:
         args:
           deal_name: "{answers.deal_name}"
           counterparty: "{answers.counterparty}"
-      - verb: deal.assign-rate-card
+      - verb: deal.propose-rate-card
         args:
           deal_ref: "$prev"
       - verb: contract.create

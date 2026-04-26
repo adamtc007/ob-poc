@@ -265,6 +265,11 @@ domains:
             entity_kind: fund
             description: ID of the newly created fund
 
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
       ensure:
         description: Create or update a fund structure or share class using a fund-type discriminator
         invocation_phrases:
@@ -469,6 +474,11 @@ domains:
           name: entity_id
           capture: true
 
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
       link-feeder:
         description: Link an existing feeder fund to a master fund (idempotent by parent+child+type)
         invocation_phrases:
@@ -530,6 +540,11 @@ domains:
       # FUND STRUCTURE OPERATIONS
       # =========================================================================
 
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
       add-to-umbrella:
         description: Add an existing sub-fund to an umbrella (idempotent by parent+child+type)
         invocation_phrases:
@@ -587,6 +602,11 @@ domains:
           type: uuid
           name: structure_id
 
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
       add-share-class:
         description: Add a share class to a sub-fund (idempotent by parent+child+type)
         invocation_phrases:
@@ -647,6 +667,11 @@ domains:
           type: uuid
           name: structure_id
 
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
       list-subfunds:
         description: List all sub-funds within an umbrella
         invocation_phrases:
@@ -692,6 +717,12 @@ domains:
         returns:
           type: record_set
 
+        three_axis:
+          state_effect: preserving
+          external_effects:
+            - observational
+          consequence:
+            baseline: benign
       list-share-classes:
         description: List all share classes for a sub-fund
         invocation_phrases:
@@ -740,6 +771,12 @@ domains:
         returns:
           type: record_set
 
+        three_axis:
+          state_effect: preserving
+          external_effects:
+            - observational
+          consequence:
+            baseline: benign
       list-feeders:
         description: List all feeder funds for a master
         invocation_phrases:
@@ -782,6 +819,12 @@ domains:
       # FUND VEHICLE METADATA (merged from fund-vehicle)
       # =========================================================================
 
+        three_axis:
+          state_effect: preserving
+          external_effects:
+            - observational
+          consequence:
+            baseline: benign
       upsert-vehicle:
         description: Create or update fund vehicle metadata for an existing fund entity.
         invocation_phrases:
@@ -879,6 +922,11 @@ domains:
           name: fund_entity_id
           capture: true
 
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
       read-vehicle:
         description: Read fund vehicle metadata by fund entity ID.
         invocation_phrases:
@@ -913,6 +961,12 @@ domains:
         returns:
           type: record
 
+        three_axis:
+          state_effect: preserving
+          external_effects:
+            - observational
+          consequence:
+            baseline: benign
       delete-vehicle:
         description: Delete fund vehicle metadata from a fund entity.
         invocation_phrases:
@@ -948,6 +1002,11 @@ domains:
         returns:
           type: affected
 
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: requires_confirmation
       list-by-manager:
         description: List all funds managed by an entity.
         invocation_phrases:
@@ -981,6 +1040,12 @@ domains:
         returns:
           type: record_set
 
+        three_axis:
+          state_effect: preserving
+          external_effects:
+            - observational
+          consequence:
+            baseline: benign
       list-by-vehicle-type:
         description: List all funds of a specific vehicle type.
         invocation_phrases:
@@ -1029,6 +1094,12 @@ domains:
       # FUND COMPARTMENTS (merged from fund-compartment)
       # =========================================================================
 
+        three_axis:
+          state_effect: preserving
+          external_effects:
+            - observational
+          consequence:
+            baseline: benign
       upsert-compartment:
         description: Create or update a compartment under an umbrella fund.
         invocation_phrases:
@@ -1092,6 +1163,11 @@ domains:
           name: id
           capture: true
 
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
       read-compartment:
         description: Read compartment details by ID.
         invocation_phrases:
@@ -1119,6 +1195,12 @@ domains:
         returns:
           type: record
 
+        three_axis:
+          state_effect: preserving
+          external_effects:
+            - observational
+          consequence:
+            baseline: benign
       delete-compartment:
         description: Delete a compartment.
         invocation_phrases:
@@ -1148,6 +1230,11 @@ domains:
         returns:
           type: affected
 
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: requires_confirmation
       list-compartments-by-umbrella:
         description: List all compartments under an umbrella fund.
         invocation_phrases:
@@ -1186,6 +1273,12 @@ domains:
       # FUND-OF-FUNDS INVESTMENT LINKS
       # =========================================================================
 
+        three_axis:
+          state_effect: preserving
+          external_effects:
+            - observational
+          consequence:
+            baseline: benign
       add-investment:
         description: Record a fund's investment in another fund (idempotent by investor+investee)
         invocation_phrases:
@@ -1268,6 +1361,11 @@ domains:
           type: uuid
           name: investment_id
 
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
       update-investment:
         description: Update investment allocation percentage
         invocation_phrases:
@@ -1308,6 +1406,11 @@ domains:
         returns:
           type: affected
 
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
       end-investment:
         description: End/redeem a fund investment
         invocation_phrases:
@@ -1344,6 +1447,11 @@ domains:
         returns:
           type: affected
 
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
       list-investments:
         description: List all investments made by a fund (what does this FoF hold)
         invocation_phrases:
@@ -1382,6 +1490,12 @@ domains:
         returns:
           type: record_set
 
+        three_axis:
+          state_effect: preserving
+          external_effects:
+            - observational
+          consequence:
+            baseline: benign
       list-investors:
         description: List all fund investors in a fund (who holds this fund)
         invocation_phrases:
@@ -1429,3 +1543,9 @@ domains:
       # =========================================================================
       # show-structure and calculate-lookthrough verbs removed - no plugin handlers exist
       # Re-add when FundShowStructureOp and FundLookthroughOp are implemented
+        three_axis:
+          state_effect: preserving
+          external_effects:
+            - observational
+          consequence:
+            baseline: benign

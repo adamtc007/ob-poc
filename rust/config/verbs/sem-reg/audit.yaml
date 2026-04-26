@@ -54,6 +54,11 @@ domains:
           type: record
           capture: false
 
+        three_axis:
+          state_effect: preserving
+          external_effects: &id001 []
+          consequence:
+            baseline: reviewable
       add-plan-step:
         description: Add a step to an existing agent plan
         metadata:
@@ -90,6 +95,11 @@ domains:
           type: record
           capture: false
 
+        three_axis:
+          state_effect: preserving
+          external_effects: *id001
+          consequence:
+            baseline: reviewable
       validate-plan:
         description: Validate an agent plan (check all steps have valid verbs and snapshots)
         metadata:
@@ -118,6 +128,12 @@ domains:
           type: record
           capture: false
 
+        three_axis:
+          state_effect: preserving
+          external_effects:
+            - observational
+          consequence:
+            baseline: benign
       execute-plan-step:
         description: Execute a specific step in an agent plan
         metadata:
@@ -153,6 +169,12 @@ domains:
       # ============================================
       # Decision & Observation Recording
       # ============================================
+        three_axis:
+          state_effect: preserving
+          external_effects:
+            - emitting
+          consequence:
+            baseline: reviewable
       record-decision:
         description: Record an agent decision with snapshot manifest provenance
         metadata:
@@ -190,6 +212,12 @@ domains:
           type: record
           capture: false
 
+        three_axis:
+          state_effect: preserving
+          external_effects:
+            - emitting
+          consequence:
+            baseline: reviewable
       record-escalation:
         description: Record an escalation to a human reviewer
         metadata:
@@ -227,6 +255,12 @@ domains:
           type: record
           capture: false
 
+        three_axis:
+          state_effect: preserving
+          external_effects:
+            - emitting
+          consequence:
+            baseline: reviewable
       record-disambiguation:
         description: Record a disambiguation prompt and selected choice
         metadata:
@@ -267,6 +301,12 @@ domains:
           type: record
           capture: false
 
+        three_axis:
+          state_effect: preserving
+          external_effects:
+            - emitting
+          consequence:
+            baseline: reviewable
       record-observation:
         description: Record an observation on a subject entity
         metadata:
@@ -303,3 +343,9 @@ domains:
         returns:
           type: record
           capture: false
+        three_axis:
+          state_effect: preserving
+          external_effects:
+            - emitting
+          consequence:
+            baseline: reviewable

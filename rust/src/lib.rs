@@ -18,7 +18,10 @@
 //! ```
 
 // Core error handling
-pub mod entity_kind;
+// Phase 5a composite-blocker #23 — entity_kind relocated to dsl-runtime
+// (alongside discovery_ops which consumed it). Other ob-poc consumers
+// (mcp::verb_search, dsl_v2::runtime_registry, service_resources::discovery,
+// sage::verb_resolve) now import from `dsl_runtime::entity_kind`.
 pub mod error;
 
 // Data dictionary
@@ -56,13 +59,27 @@ pub mod mcp;
 // Agentic DSL generation module
 pub mod agentic;
 
+// Phase A (F5): shadow envelope construction.
+// Builds a `GatedVerbEnvelope` alongside the existing dispatch path as a
+// determinism-harness observable. Does not gate execution yet — Phase B
+// (F6) is the slice that makes the envelope the primary dispatch contract.
+pub mod envelope_builder;
+
+// Phase D.3 — TOCTOU recheck scaffold (2026-04-22). Verifies the
+// state_gate_hash computed at gate time still matches the current DB
+// state after the Sequencer has acquired row locks inside its outer
+// transaction. Pure scaffolding until D.2 migration is applied
+// AND real envelopes are constructed at stage 6.
+pub mod toctou_recheck;
+
 // Graph visualization module
 #[cfg(feature = "database")]
 pub mod graph;
 
-// StateGraph pipeline substrate
-#[cfg(feature = "database")]
-pub mod stategraph;
+// Phase 5a composite-blocker #23 — stategraph relocated to dsl-runtime
+// (alongside discovery_ops which is its sole consumer). Pure data + file-loading
+// module with only `dsl_core::config::loader::ConfigLoader` as a non-std dep —
+// dsl_core is already a dsl-runtime dependency.
 
 // Navigation module - Nom-based parser for graph navigation commands
 #[cfg(feature = "database")]
@@ -93,15 +110,18 @@ pub mod sem_os_runtime;
 #[cfg(feature = "database")]
 pub mod derived_attributes;
 
-// Cross-workspace state consistency: shared atom registry, staleness, replay
-pub mod cross_workspace;
+// Phase 5a composite #2 — `cross_workspace` relocated to
+// `dsl-runtime::cross_workspace`. External callers reach it via
+// `dsl_runtime::cross_workspace::*` now. `WorkspaceKind` dep was
+// narrowed to `String` (same snake_case serde repr) to keep the
+// module plane-neutral.
 
 // Loopback calibration harness
 #[cfg(feature = "database")]
 pub mod calibration;
 
-// Verification module - adversarial agent model for KYC
-pub mod verification;
+// Phase 4 Slice B (Group 2) — `verification` module relocated to
+// `dsl-runtime::verification`; consumer `verify_ops` moved alongside it.
 
 // Taxonomy module - generic taxonomy pattern for Product/Instrument domains
 pub mod taxonomy;
@@ -127,9 +147,8 @@ pub mod lookup;
 #[cfg(feature = "database")]
 pub mod gleif;
 
-// BODS integration - Beneficial Ownership Data Standard for UBO discovery
-#[cfg(feature = "database")]
-pub mod bods;
+// Phase 4 Slice B (Group 3) — `bods` module relocated to
+// `dsl-runtime::bods`; consumer `bods_ops` moved alongside it.
 
 // Research macros - LLM + web search for structured discovery with human review
 #[cfg(feature = "database")]
@@ -157,6 +176,40 @@ pub mod runbook;
 #[cfg(feature = "database")]
 pub mod repl;
 
+// Agentic Sequencer — the nine-stage dispatch contract (V&S §8). Phase 5b
+// relocated the orchestrator here from `repl::orchestrator_v2`; the
+// `ReplOrchestratorV2` struct is unchanged and continues to host the
+// tollgate state machine. Future slices (5c/5e) split stage ownership
+// across finer modules; 5b is a pure path move.
+#[cfg(feature = "database")]
+pub mod sequencer;
+
+// Sequencer-side concrete `TransactionScope` impl (Phase 5c-prep). The
+// trait lives in `dsl_runtime::tx`; `PgTransactionScope` wraps a
+// `sqlx::Transaction` so the Sequencer can begin/commit a txn and pass
+// a `&mut dyn TransactionScope` through stage-8 dispatch once plugin
+// ops migrate their signatures in Phase 5c-migrate.
+#[cfg(feature = "database")]
+pub mod sequencer_tx;
+
+// Phase 5b-deep — typed I/O + error contracts for the nine V&S stages.
+// Scaffold only: the types are defined here and unit-tested for
+// serde round-tripping; the actual extraction of `sequencer.rs`'s
+// tollgate handlers into per-stage typed functions lands one stage
+// at a time as `5b-deep-stage-N` slices. See `sequencer_stages.rs`
+// header for the rationale.
+pub mod sequencer_stages;
+
+// Phase 5e — outbox drainer. Polls `public.outbox` for post-commit
+// effects (maintenance subprocess spawn, narration synthesis, UI push,
+// constellation broadcast, external HTTP notify), claims rows with
+// `FOR UPDATE SKIP LOCKED` semantics, dispatches to per-effect-kind
+// `AsyncOutboxConsumer` impls, and updates row status to done /
+// failed_retryable / failed_terminal. See `outbox/mod.rs` for the
+// full lifecycle model.
+#[cfg(feature = "database")]
+pub mod outbox;
+
 // BPMN-Lite integration - gRPC client, workflow dispatch, job worker, event bridge
 #[cfg(feature = "database")]
 pub mod bpmn_integration;
@@ -167,13 +220,11 @@ pub mod journey;
 // Plan Builder — compilation pipeline decomposition (verb classifier, constraint gate, plan assembler)
 pub mod plan_builder;
 
-// Document Bundles - Versioned document requirement sets for structure macros
-#[cfg(feature = "database")]
-pub mod document_bundles;
+// Phase 4 Slice B (Group 4) — `document_bundles` module relocated to
+// `dsl-runtime::document_bundles`; consumer `docs_bundle_ops` moved alongside it.
 
-// Placeholder Entities - Deferred entity resolution for macro expansion
-#[cfg(feature = "database")]
-pub mod placeholder;
+// Phase 4 Slice B (Group 1) — `placeholder` module relocated to
+// `dsl-runtime::placeholder`; consumer `entity_ops` moved alongside it.
 
 // Clarify module - Unified DecisionPacket-based clarification UX
 pub mod clarify;
@@ -185,11 +236,9 @@ pub mod policy;
 #[cfg(feature = "database")]
 pub mod sem_reg;
 
-// Constellation — CBU case/structure ownership graph with resolver
-#[cfg(feature = "database")]
-// State Reducer — canonical reducer definitions for constellation/case state
-#[cfg(feature = "database")]
-pub mod state_reducer;
+// Phase 4 Slice B (Group 9) — `state_reducer` module relocated to
+// `dsl-runtime::state_reducer`; consumer `state_ops` moved alongside it.
+// Constellation graph + resolver was removed/relocated alongside this.
 
 // SemTaxonomy — replacement discovery/composition contract for utterance handling
 #[cfg(feature = "database")]

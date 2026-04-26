@@ -20,11 +20,11 @@ use dsl_core::config::types::VerbsConfig;
 use ob_poc::journey::router::PackRouter;
 use ob_poc::repl::intent_matcher::IntentMatcher;
 use ob_poc::repl::intent_service::{ClarificationOutcome, IntentService};
-use ob_poc::repl::orchestrator_v2::{ReplOrchestratorV2, StubExecutor};
 use ob_poc::repl::runbook::ConfirmPolicy;
 use ob_poc::repl::types::{IntentMatchResult, MatchContext, MatchOutcome};
 use ob_poc::repl::types_v2::{UserInputV2, WorkspaceKind};
 use ob_poc::repl::verb_config_index::VerbConfigIndex;
+use ob_poc::sequencer::{ReplOrchestratorV2, StubExecutor};
 
 // ---------------------------------------------------------------------------
 // Helpers

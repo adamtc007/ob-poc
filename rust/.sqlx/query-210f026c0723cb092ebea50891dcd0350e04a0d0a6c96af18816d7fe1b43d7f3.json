@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            UPDATE \"ob-poc\".entity_workstreams\n            SET status = CASE\n                    WHEN status = 'BLOCKED' THEN 'COLLECT'\n                    ELSE status\n                END,\n                blocker_type = NULL,\n                blocker_request_id = NULL,\n                blocker_message = NULL\n            WHERE workstream_id = $1 AND status = 'BLOCKED'\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "210f026c0723cb092ebea50891dcd0350e04a0d0a6c96af18816d7fe1b43d7f3"
+}

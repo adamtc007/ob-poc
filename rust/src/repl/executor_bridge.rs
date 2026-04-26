@@ -12,10 +12,10 @@ use serde_json::json;
 use sqlx::PgPool;
 use uuid::Uuid;
 
-use super::orchestrator_v2::DslExecutor;
 use crate::dsl_v2::execution::{ExecutionContext, ExecutionResult};
 use crate::dsl_v2::planning::compile;
 use crate::dsl_v2::syntax::parse_program;
+use crate::sequencer::DslExecutor;
 
 // ---------------------------------------------------------------------------
 // RealDslExecutor
@@ -27,6 +27,12 @@ use crate::dsl_v2::syntax::parse_program;
 pub struct RealDslExecutor {
     pool: PgPool,
     allow_durable_direct: bool,
+    service_registry: std::sync::Arc<dsl_runtime::ServiceRegistry>,
+    /// Canonical [`sem_os_postgres::ops::SemOsVerbOpRegistry`] threaded onto
+    /// every inner `DslExecutor` this bridge constructs. Required for plugin
+    /// dispatch post-Phase-5c-migrate slice #80 — without it, plugin verbs
+    /// fail with an actionable "no SemOsVerbOp registered" error.
+    sem_os_ops: Option<std::sync::Arc<sem_os_postgres::ops::SemOsVerbOpRegistry>>,
 }
 
 impl RealDslExecutor {
@@ -34,12 +40,72 @@ impl RealDslExecutor {
         Self {
             pool,
             allow_durable_direct: false,
+            service_registry: std::sync::Arc::new(dsl_runtime::ServiceRegistry::empty()),
+            sem_os_ops: None,
         }
     }
 
     pub fn allow_durable_direct(mut self) -> Self {
         self.allow_durable_direct = true;
         self
+    }
+
+    /// Install the platform service registry. Threaded into every inner
+    /// `DslExecutor` this bridge constructs.
+    pub fn with_services(mut self, services: std::sync::Arc<dsl_runtime::ServiceRegistry>) -> Self {
+        self.service_registry = services;
+        self
+    }
+
+    /// Install the canonical SemOS plugin op registry. Threaded into every
+    /// inner `DslExecutor` this bridge constructs so plugin verbs dispatch
+    /// correctly.
+    pub fn with_sem_os_ops(
+        mut self,
+        ops: std::sync::Arc<sem_os_postgres::ops::SemOsVerbOpRegistry>,
+    ) -> Self {
+        self.sem_os_ops = Some(ops);
+        self
+    }
+}
+
+impl RealDslExecutor {
+    /// Shared parse → compile → build context path used by both the
+    /// self-scoped (`execute`) and in-scope (`execute_in_scope`) entry
+    /// points.
+    fn build_executor_and_ctx(&self) -> (crate::dsl_v2::executor::DslExecutor, ExecutionContext) {
+        let mut ctx = if self.allow_durable_direct {
+            ExecutionContext::new().allow_durable_direct()
+        } else {
+            ExecutionContext::new()
+        };
+        ctx.execution_id = Uuid::new_v4();
+
+        let mut executor = crate::dsl_v2::executor::DslExecutor::new(self.pool.clone())
+            .with_services(self.service_registry.clone());
+        if let Some(ref ops) = self.sem_os_ops {
+            executor = executor.with_sem_os_ops(ops.clone());
+        }
+
+        (executor, ctx)
+    }
+
+    fn build_response(results: &[ExecutionResult], ctx: &ExecutionContext) -> serde_json::Value {
+        let step_results: Vec<serde_json::Value> =
+            results.iter().map(execution_result_to_json).collect();
+
+        let bindings: serde_json::Map<String, serde_json::Value> = ctx
+            .symbols
+            .iter()
+            .map(|(k, v)| (k.clone(), json!(v.to_string())))
+            .collect();
+
+        json!({
+            "success": true,
+            "steps_executed": step_results.len(),
+            "results": step_results,
+            "bindings": bindings,
+        })
     }
 }
 
@@ -52,37 +118,46 @@ impl DslExecutor for RealDslExecutor {
         // 2. Compile → ExecutionPlan (topological sort, injections).
         let plan = compile(&program).map_err(|e| format!("Compile error: {:?}", e))?;
 
-        // 3. Build execution context.
-        let mut ctx = if self.allow_durable_direct {
-            ExecutionContext::new().allow_durable_direct()
-        } else {
-            ExecutionContext::new()
-        };
-        ctx.execution_id = Uuid::new_v4();
+        // 3. Build executor + context (shared with execute_in_scope).
+        let (executor, mut ctx) = self.build_executor_and_ctx();
 
-        // 4. Execute via the real dsl_v2 executor.
-        let executor = crate::dsl_v2::executor::DslExecutor::new(self.pool.clone());
+        // 4. Execute via execute_plan (per-verb txns — each verb commits).
+        //    This preserves legacy non-atomic semantics for callers that
+        //    don't have an outer scope to pass in.
         let results = executor
             .execute_plan(&plan, &mut ctx)
             .await
             .map_err(|e| format!("Execution error: {}", e))?;
 
-        // 5. Convert results to JSON.
-        let step_results: Vec<serde_json::Value> =
-            results.iter().map(execution_result_to_json).collect();
+        Ok(Self::build_response(&results, &ctx))
+    }
 
-        let bindings: serde_json::Map<String, serde_json::Value> = ctx
-            .symbols
-            .iter()
-            .map(|(k, v)| (k.clone(), json!(v.to_string())))
-            .collect();
+    /// Phase B.2b-γ (2026-04-22): scope-aware entry point for the
+    /// Sequencer's step executor bridge. Parses + compiles the DSL,
+    /// then runs the plan through
+    /// [`DslExecutor::execute_plan_atomic_in_scope`] so every verb
+    /// dispatches through the CALLER'S scope — no per-verb txns.
+    ///
+    /// Caller (step executor bridge → runbook executor → Sequencer)
+    /// owns commit/rollback. When the Sequencer opens one scope per
+    /// runbook (B.2b-ζ), multiple steps share one transaction and
+    /// commit atomically or roll back together.
+    async fn execute_in_scope(
+        &self,
+        dsl: &str,
+        scope: &mut dyn dsl_runtime::tx::TransactionScope,
+    ) -> Result<serde_json::Value, String> {
+        let program = parse_program(dsl).map_err(|e| format!("Parse error: {}", e))?;
+        let plan = compile(&program).map_err(|e| format!("Compile error: {:?}", e))?;
 
-        Ok(json!({
-            "success": true,
-            "steps_executed": step_results.len(),
-            "results": step_results,
-            "bindings": bindings,
-        }))
+        let (executor, mut ctx) = self.build_executor_and_ctx();
+
+        let results = executor
+            .execute_plan_atomic_in_scope(&plan, &mut ctx, scope)
+            .await
+            .map_err(|e| format!("Execution error: {}", e))?;
+
+        Ok(Self::build_response(&results, &ctx))
     }
 }
 

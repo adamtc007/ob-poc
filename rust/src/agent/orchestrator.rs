@@ -2920,21 +2920,21 @@ pub async fn handle_utterance_with_forced_verb(
     let mut verb_denied = false;
 
     match Phase2Service::runtime_gate_status(&phase2.artifacts, forced_verb_fqn) {
-        "blocked_unavailable" => {
+        "blocked_unavailable"
             if policy.semreg_fail_closed()
-                && !crate::agent::verb_surface::is_safe_harbor_verb(forced_verb_fqn)
-            {
-                blocked_reason = Some(format!(
-                    "SemReg unavailable (fail-closed): verb '{}' not in safe-harbor set",
-                    forced_verb_fqn
-                ));
-                verb_denied = true;
-                tracing::warn!(
-                    verb = forced_verb_fqn,
-                    "Forced verb denied: SemReg unavailable in strict mode"
-                );
-            }
+                && !crate::agent::verb_surface::is_safe_harbor_verb(forced_verb_fqn) =>
+        {
+            blocked_reason = Some(format!(
+                "SemReg unavailable (fail-closed): verb '{}' not in safe-harbor set",
+                forced_verb_fqn
+            ));
+            verb_denied = true;
+            tracing::warn!(
+                verb = forced_verb_fqn,
+                "Forced verb denied: SemReg unavailable in strict mode"
+            );
         }
+        "blocked_unavailable" => {}
         "blocked_deny_all" => {
             sem_reg_denied_all = true;
             if policy.semreg_fail_closed() {

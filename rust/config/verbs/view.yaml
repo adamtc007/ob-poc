@@ -90,6 +90,12 @@ domains:
           capture: true
           description: "Sets session view state, returns summary"
 
+        three_axis:
+          state_effect: preserving
+          external_effects:
+            - observational
+          consequence:
+            baseline: benign
       book:
         description: "View all CBUs for a commercial client (book view)"
         invocation_phrases:
@@ -132,6 +138,12 @@ domains:
           type: view_state
           capture: true
 
+        three_axis:
+          state_effect: preserving
+          external_effects:
+            - observational
+          consequence:
+            baseline: benign
       cbu:
         description: "Focus on a single CBU with specified view mode"
         invocation_phrases:
@@ -180,6 +192,12 @@ domains:
           type: view_state
           capture: true
 
+        three_axis:
+          state_effect: preserving
+          external_effects:
+            - observational
+          consequence:
+            baseline: benign
       entity-forest:
         description: "View entities by type/ownership filters"
         invocation_phrases:
@@ -226,6 +244,12 @@ domains:
       # REFINEMENT
       # =========================================================================
 
+        three_axis:
+          state_effect: preserving
+          external_effects:
+            - observational
+          consequence:
+            baseline: benign
       refine:
         description: "Refine current view with additional filter"
         invocation_phrases:
@@ -273,6 +297,12 @@ domains:
           type: view_state
           capture: true
 
+        three_axis:
+          state_effect: preserving
+          external_effects:
+            - observational
+          consequence:
+            baseline: benign
       clear-refinements:
         description: "Clear refinements and return to the base view"
         invocation_phrases:
@@ -306,6 +336,12 @@ domains:
       # SELECTION
       # =========================================================================
 
+        three_axis:
+          state_effect: preserving
+          external_effects:
+            - observational
+          consequence:
+            baseline: benign
       set-selection:
         description: "Explicitly set selection within the current view"
         invocation_phrases:
@@ -352,6 +388,12 @@ domains:
       # LAYOUT
       # =========================================================================
 
+        three_axis:
+          state_effect: preserving
+          external_effects:
+            - navigating
+          consequence:
+            baseline: benign
       set-layout:
         description: "Set the layout strategy for the current view"
         invocation_phrases:
@@ -416,6 +458,12 @@ domains:
       # FRACTAL NAVIGATION - Zoom in/out through taxonomy
       # =========================================================================
 
+        three_axis:
+          state_effect: preserving
+          external_effects:
+            - observational
+          consequence:
+            baseline: benign
       zoom-in:
         description: "Zoom into a node, expanding it into its child taxonomy"
         invocation_phrases:
@@ -452,6 +500,12 @@ domains:
           capture: true
           description: "Sets session view state to child taxonomy"
 
+        three_axis:
+          state_effect: preserving
+          external_effects:
+            - observational
+          consequence:
+            baseline: benign
       zoom-out:
         description: "Zoom out to the parent taxonomy"
         invocation_phrases:
@@ -484,6 +538,12 @@ domains:
           capture: true
           description: "Pops current frame, returns to parent view"
 
+        three_axis:
+          state_effect: preserving
+          external_effects:
+            - observational
+          consequence:
+            baseline: benign
       navigate-back-to:
         description: "Navigate back to a specific breadcrumb level"
         invocation_phrases:
@@ -523,6 +583,12 @@ domains:
           capture: true
           description: "Pops frames until reaching target level"
 
+        three_axis:
+          state_effect: preserving
+          external_effects:
+            - observational
+          consequence:
+            baseline: benign
       read-breadcrumbs:
         description: "Read the current navigation breadcrumbs"
         invocation_phrases:
@@ -544,8 +610,7 @@ domains:
           source_of_truth: session
           scope: global
           noun: view_state
-          tags:
-            [navigation, fractal, breadcrumbs, introspection, data-management]
+          tags: [navigation, fractal, breadcrumbs, introspection, data-management]
           subject_kinds: []
           phase_tags: [navigation]
           side_effects: facts_only
@@ -559,6 +624,12 @@ domains:
       # INTROSPECTION
       # =========================================================================
 
+        three_axis:
+          state_effect: preserving
+          external_effects:
+            - observational
+          consequence:
+            baseline: benign
       read-status:
         description: "Read the current view state summary"
         invocation_phrases:
@@ -588,6 +659,12 @@ domains:
           type: view_state
           capture: true
 
+        three_axis:
+          state_effect: preserving
+          external_effects:
+            - observational
+          consequence:
+            baseline: benign
       read-selection-info:
         description: "Read detailed info about the current selection"
         invocation_phrases:
@@ -616,3 +693,9 @@ domains:
         returns:
           type: selection_info
           capture: true
+        three_axis:
+          state_effect: preserving
+          external_effects:
+            - observational
+          consequence:
+            baseline: benign

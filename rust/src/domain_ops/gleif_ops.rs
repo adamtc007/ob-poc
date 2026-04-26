@@ -1,23 +1,33 @@
-//! GLEIF custom operations
+//! GLEIF custom operations (17 plugin verbs) — `gleif.*`
 //!
 //! Operations for LEI data enrichment and corporate tree import that require
 //! GLEIF API calls.
+//!
+//! Phase 5c-migrate Phase B Pattern B slice #77: ported from
+//! `CustomOperation` + `inventory::collect!` to `SemOsVerbOp`. Stays in
+//! `ob-poc::domain_ops::gleif_ops` because the ops bridge to
+//! `crate::gleif::*` (external GLEIF HTTP client + enrichment service) and
+//! `crate::dsl_v2::{DslExecutor, ExecutionContext}` — both upstream of
+//! `sem_os_postgres`.
 
 use anyhow::Result;
 use async_trait::async_trait;
-use ob_poc_macros::register_custom_op;
+use sem_os_postgres::ops::SemOsVerbOp;
 
-use super::helpers::{extract_bool_opt, extract_int_opt, extract_string_opt, extract_uuid_opt};
+use dsl_runtime::domain_ops::helpers::{
+    json_extract_bool_opt, json_extract_int_opt, json_extract_string_opt, json_extract_uuid_opt,
+    json_get_required_uuid,
+};
+use dsl_runtime::tx::TransactionScope;
+use dsl_runtime::{VerbExecutionContext, VerbExecutionOutcome};
 
-use super::CustomOperation;
-use crate::dsl_v2::ast::VerbCall;
-use crate::dsl_v2::executor::{ExecutionContext, ExecutionResult};
 #[allow(unused_imports)]
 use crate::gleif::client::extract_lei_from_url;
 
 #[cfg(feature = "database")]
 use {
     crate::dsl_v2::execution::DslExecutor,
+    crate::dsl_v2::executor::ExecutionContext,
     crate::gleif::{
         client::TreeFetchOptions, ChainLink, DiscoveredEntity, FundListResult, GleifClient,
         GleifEnrichmentService, LeiRecord, OwnershipChain, SuccessorResult, UboStatus,
@@ -28,94 +38,38 @@ use {
     uuid::Uuid,
 };
 
+// ═══════════════════════════════════════════════════════════════════════════════
+// gleif.enrich
+// ═══════════════════════════════════════════════════════════════════════════════
+
 /// Enrich entity from GLEIF by LEI
-///
-/// Rationale: Requires external GLEIF API call to fetch LEI data.
-#[register_custom_op]
-pub struct GleifEnrichOp;
+pub struct GleifEnrich;
 
 #[async_trait]
-impl CustomOperation for GleifEnrichOp {
-    fn domain(&self) -> &'static str {
-        "gleif"
-    }
-    fn verb(&self) -> &'static str {
-        "enrich"
-    }
-    fn rationale(&self) -> &'static str {
-        "Requires external GLEIF API call to fetch and persist LEI data"
+impl SemOsVerbOp for GleifEnrich {
+    fn fqn(&self) -> &str {
+        "gleif.enrich"
     }
 
-    #[cfg(feature = "database")]
-    async fn execute(
+    /// Phase F.3b (2026-04-22): HTTP-only phase. Resolves the effective
+    /// LEI (from args or from entity-id via DB lookup), then calls
+    /// `GleifEnrichmentService::fetch_all_for_enrich` which bundles
+    /// all 9 GLEIF HTTP calls (primary record, BICs, direct/ultimate
+    /// parents, fund manager, umbrella, master) into one struct.
+    /// Zero DB writes in this phase.
+    async fn pre_fetch(
         &self,
-        verb_call: &VerbCall,
-        ctx: &mut ExecutionContext,
-        pool: &PgPool,
-    ) -> Result<ExecutionResult> {
-        // Get LEI or entity-id
-        let lei = extract_string_opt(verb_call, "lei");
-        let entity_id_arg = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "entity-id")
-            .and_then(|a| {
-                if let Some(name) = a.value.as_symbol() {
-                    ctx.resolve(name)
-                } else {
-                    a.value.as_uuid()
-                }
-            });
+        args: &serde_json::Value,
+        ctx: &mut VerbExecutionContext,
+        pool: &sqlx::PgPool,
+    ) -> Result<Option<serde_json::Value>> {
+        let lei_arg = json_extract_string_opt(args, "lei");
+        let entity_id_arg = json_extract_uuid_opt(args, ctx, "entity-id");
 
-        let (lei, entity_id): (String, Uuid) = match (lei, entity_id_arg) {
-            (Some(l), _) => {
-                // Look up or create entity by LEI
-                let existing: Option<Uuid> = sqlx::query_scalar(
-                    r#"SELECT entity_id FROM "ob-poc".entity_limited_companies WHERE lei = $1"#,
-                )
-                .bind(&l)
-                .fetch_optional(pool)
-                .await?;
-
-                match existing {
-                    Some(id) => (l, id),
-                    None => {
-                        // Create new entity from GLEIF using DSL (ensures deduplication by name)
-                        let client = GleifClient::new()?;
-
-                        // Fetch LEI record first to get entity name
-                        let record = client.get_lei_record(&l).await?;
-                        let name = &record.attributes.entity.legal_name.name;
-                        let jurisdiction = record
-                            .attributes
-                            .entity
-                            .jurisdiction
-                            .as_deref()
-                            .unwrap_or("XX");
-
-                        // Use DSL to create entity (idempotent by name - prevents duplicates)
-                        let dsl = format!(
-                            r#"(entity.ensure :entity-type "limited-company" :name "{}" :jurisdiction "{}" :lei "{}" :as @entity)"#,
-                            escape_dsl_string(name),
-                            jurisdiction,
-                            l
-                        );
-
-                        let executor = DslExecutor::new(pool.clone());
-                        let mut dsl_ctx = ExecutionContext::new();
-                        executor.execute_dsl(&dsl, &mut dsl_ctx).await?;
-
-                        // Get the created/existing entity ID from context
-                        let entity_id = dsl_ctx
-                            .resolve("entity")
-                            .ok_or_else(|| anyhow::anyhow!("DSL did not bind @entity"))?;
-
-                        (l, entity_id)
-                    }
-                }
-            }
+        // Determine effective LEI.
+        let lei: String = match (lei_arg, entity_id_arg) {
+            (Some(l), _) => l,
             (None, Some(eid)) => {
-                // Get LEI from existing entity
                 let lei: Option<String> = sqlx::query_scalar(
                     r#"SELECT lei FROM "ob-poc".entity_limited_companies WHERE entity_id = $1"#,
                 )
@@ -123,25 +77,99 @@ impl CustomOperation for GleifEnrichOp {
                 .fetch_optional(pool)
                 .await?
                 .flatten();
-
-                match lei {
-                    Some(l) => (l, eid),
-                    None => return Err(anyhow::anyhow!("Entity {} has no LEI", eid)),
-                }
+                lei.ok_or_else(|| anyhow::anyhow!("Entity {} has no LEI", eid))?
             }
             (None, None) => {
                 return Err(anyhow::anyhow!("Either :lei or :entity-id required"));
             }
         };
 
-        // Enrich entity with GLEIF data
+        // Fetch the full enrichment bundle (all HTTP, no DB writes).
         let service = GleifEnrichmentService::new(Arc::new(pool.clone()))?;
-        let result = service.enrich_entity(entity_id, &lei).await?;
+        let fetched = service.fetch_all_for_enrich(&lei).await?;
 
-        // Bind result
-        if let Some(binding) = &verb_call.binding {
-            ctx.bind(binding, entity_id);
-        }
+        Ok(Some(serde_json::json!({
+            "_gleif_enrich_fetched": serde_json::to_value(fetched)?,
+            "_gleif_enrich_effective_lei": lei,
+        })))
+    }
+
+    async fn execute(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut VerbExecutionContext,
+        scope: &mut dyn TransactionScope,
+    ) -> Result<VerbExecutionOutcome> {
+        let pool = scope.pool().clone();
+
+        let lei = args
+            .get("_gleif_enrich_effective_lei")
+            .and_then(|v| v.as_str())
+            .ok_or_else(|| {
+                anyhow::anyhow!(
+                    "gleif.enrich: pre_fetch result missing \
+                     (`_gleif_enrich_effective_lei` absent from args)"
+                )
+            })?
+            .to_string();
+
+        let fetched: crate::gleif::enrichment::EnrichmentFetch = args
+            .get("_gleif_enrich_fetched")
+            .cloned()
+            .map(serde_json::from_value)
+            .ok_or_else(|| {
+                anyhow::anyhow!(
+                    "gleif.enrich: pre_fetch result missing \
+                     (`_gleif_enrich_fetched` absent from args)"
+                )
+            })??;
+
+        // Resolve entity_id: lookup by LEI, or create-by-name using the
+        // pre-fetched record's legal_name (no new HTTP here).
+        let entity_id_arg = json_extract_uuid_opt(args, ctx, "entity-id");
+        let entity_id: Uuid = match entity_id_arg {
+            Some(eid) => eid,
+            None => {
+                let existing: Option<Uuid> = sqlx::query_scalar(
+                    r#"SELECT entity_id FROM "ob-poc".entity_limited_companies WHERE lei = $1"#,
+                )
+                .bind(&lei)
+                .fetch_optional(&pool)
+                .await?;
+
+                match existing {
+                    Some(id) => id,
+                    None => {
+                        // Use the pre-fetched record to build the ensure DSL.
+                        let name = &fetched.record.attributes.entity.legal_name.name;
+                        let jurisdiction = fetched
+                            .record
+                            .attributes
+                            .entity
+                            .jurisdiction
+                            .as_deref()
+                            .unwrap_or("XX");
+                        let dsl = format!(
+                            r#"(entity.ensure :entity-type "limited-company" :name "{}" :jurisdiction "{}" :lei "{}" :as @entity)"#,
+                            escape_dsl_string(name),
+                            jurisdiction,
+                            lei
+                        );
+
+                        let executor = DslExecutor::new(pool.clone());
+                        let mut dsl_ctx = ExecutionContext::new();
+                        executor.execute_dsl(&dsl, &mut dsl_ctx).await?;
+                        dsl_ctx
+                            .resolve("entity")
+                            .ok_or_else(|| anyhow::anyhow!("DSL did not bind @entity"))?
+                    }
+                }
+            }
+        };
+
+        // Persist the pre-fetched enrichment (all DB writes).
+        let service = GleifEnrichmentService::new(Arc::new(pool.clone()))?;
+        let result = service.persist_enrichment(entity_id, &lei, fetched).await?;
 
         let result_json = serde_json::json!({
             "entity_id": entity_id,
@@ -152,15 +180,14 @@ impl CustomOperation for GleifEnrichOp {
             "parent_relationships_added": result.parent_relationships_added,
         });
 
-        // Log research action if decision-id provided (links Phase 2 execution to Phase 1 selection)
-        if let Some(decision_id) = extract_uuid_opt(verb_call, ctx, "decision-id") {
+        if let Some(decision_id) = json_extract_uuid_opt(args, ctx, "decision-id") {
             let entities_updated = if result.names_added > 0 || result.addresses_added > 0 {
                 1
             } else {
                 0
             };
             log_research_action(
-                pool,
+                &pool,
                 decision_id,
                 "gleif:enrich",
                 &result_json,
@@ -170,63 +197,35 @@ impl CustomOperation for GleifEnrichOp {
             .await?;
         }
 
-        Ok(ExecutionResult::Record(result_json))
-    }
-
-    #[cfg(not(feature = "database"))]
-    async fn execute(
-        &self,
-        _verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-    ) -> Result<ExecutionResult> {
-        Ok(ExecutionResult::Record(serde_json::json!({
-            "entity_id": uuid::Uuid::new_v4(),
-            "lei": "MOCK_LEI",
-            "names_added": 0,
-            "addresses_added": 0,
-        })))
+        Ok(VerbExecutionOutcome::Record(result_json))
     }
 }
 
+// ═══════════════════════════════════════════════════════════════════════════════
+// gleif.search
+// ═══════════════════════════════════════════════════════════════════════════════
+
 /// Search GLEIF for entities
-///
-/// Rationale: Requires external GLEIF API search call.
-#[register_custom_op]
-pub struct GleifSearchOp;
+pub struct GleifSearch;
 
 #[async_trait]
-impl CustomOperation for GleifSearchOp {
-    fn domain(&self) -> &'static str {
-        "gleif"
-    }
-    fn verb(&self) -> &'static str {
-        "search"
-    }
-    fn rationale(&self) -> &'static str {
-        "Requires external GLEIF API search call"
+impl SemOsVerbOp for GleifSearch {
+    fn fqn(&self) -> &str {
+        "gleif.search"
     }
 
-    #[cfg(feature = "database")]
-    async fn execute(
+    async fn pre_fetch(
         &self,
-        verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-        _pool: &PgPool,
-    ) -> Result<ExecutionResult> {
-        let name = extract_string_opt(verb_call, "name");
-        let limit = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "limit")
-            .and_then(|a| a.value.as_integer())
-            .unwrap_or(20) as usize;
+        args: &serde_json::Value,
+        _ctx: &mut VerbExecutionContext,
+        _pool: &sqlx::PgPool,
+    ) -> Result<Option<serde_json::Value>> {
+        let name = json_extract_string_opt(args, "name")
+            .ok_or_else(|| anyhow::anyhow!(":name required for search"))?;
+        let limit = json_extract_int_opt(args, "limit").unwrap_or(20) as usize;
 
         let client = GleifClient::new()?;
-
-        let results = match name {
-            Some(ref n) => client.search_by_name(n, limit).await?,
-            None => return Err(anyhow::anyhow!(":name required for search")),
-        };
+        let results = client.search_by_name(&name, limit).await?;
 
         let candidates: Vec<serde_json::Value> = results
             .iter()
@@ -241,56 +240,100 @@ impl CustomOperation for GleifSearchOp {
             })
             .collect();
 
-        Ok(ExecutionResult::RecordSet(candidates))
+        Ok(Some(
+            serde_json::json!({ "_gleif_search_candidates": candidates }),
+        ))
     }
 
-    #[cfg(not(feature = "database"))]
     async fn execute(
         &self,
-        _verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-    ) -> Result<ExecutionResult> {
-        Ok(ExecutionResult::RecordSet(vec![]))
+        args: &serde_json::Value,
+        _ctx: &mut VerbExecutionContext,
+        _scope: &mut dyn TransactionScope,
+    ) -> Result<VerbExecutionOutcome> {
+        let candidates = args
+            .get("_gleif_search_candidates")
+            .and_then(|v| v.as_array())
+            .cloned()
+            .ok_or_else(|| {
+                anyhow::anyhow!(
+                    "gleif.search: pre_fetch result missing \
+                     (`_gleif_search_candidates` absent from args)"
+                )
+            })?;
+        Ok(VerbExecutionOutcome::RecordSet(candidates))
     }
 }
 
+// ═══════════════════════════════════════════════════════════════════════════════
+// gleif.import-tree
+// ═══════════════════════════════════════════════════════════════════════════════
+
 /// Import corporate tree from GLEIF
-///
-/// Rationale: Requires multiple GLEIF API calls to traverse the corporate structure.
-#[register_custom_op]
-pub struct GleifImportTreeOp;
+pub struct GleifImportTree;
 
 #[async_trait]
-impl CustomOperation for GleifImportTreeOp {
-    fn domain(&self) -> &'static str {
-        "gleif"
-    }
-    fn verb(&self) -> &'static str {
-        "import-tree"
-    }
-    fn rationale(&self) -> &'static str {
-        "Requires multiple GLEIF API calls to traverse and import corporate structure"
+impl SemOsVerbOp for GleifImportTree {
+    fn fqn(&self) -> &str {
+        "gleif.import-tree"
     }
 
-    #[cfg(feature = "database")]
-    async fn execute(
+    /// Phase F.3b (2026-04-22): HTTP-only fetch of the corporate tree
+    /// (BFS from root LEI up to `:max-depth`). Execute handles all DB
+    /// writes using the pre-fetched `CorporateTreeResult`.
+    async fn pre_fetch(
         &self,
-        verb_call: &VerbCall,
-        ctx: &mut ExecutionContext,
-        pool: &PgPool,
-    ) -> Result<ExecutionResult> {
-        let root_lei = extract_string_opt(verb_call, "root-lei")
+        args: &serde_json::Value,
+        _ctx: &mut VerbExecutionContext,
+        pool: &sqlx::PgPool,
+    ) -> Result<Option<serde_json::Value>> {
+        let root_lei = json_extract_string_opt(args, "root-lei")
             .ok_or_else(|| anyhow::anyhow!(":root-lei required"))?;
-
-        let max_depth = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "max-depth")
-            .and_then(|a| a.value.as_integer())
-            .unwrap_or(3) as usize;
+        let max_depth = json_extract_int_opt(args, "max-depth").unwrap_or(3) as usize;
 
         let service = GleifEnrichmentService::new(Arc::new(pool.clone()))?;
-        let result = service.import_corporate_tree(&root_lei, max_depth).await?;
+        let tree = service
+            .fetch_corporate_tree_only(&root_lei, max_depth)
+            .await?;
+
+        Ok(Some(serde_json::json!({
+            "_gleif_tree_fetched": serde_json::to_value(tree)?,
+            "_gleif_tree_root_lei": root_lei,
+        })))
+    }
+
+    async fn execute(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut VerbExecutionContext,
+        scope: &mut dyn TransactionScope,
+    ) -> Result<VerbExecutionOutcome> {
+        let pool = scope.pool().clone();
+
+        let root_lei = args
+            .get("_gleif_tree_root_lei")
+            .and_then(|v| v.as_str())
+            .ok_or_else(|| {
+                anyhow::anyhow!(
+                    "gleif.import-tree: pre_fetch result missing \
+                     (`_gleif_tree_root_lei` absent from args)"
+                )
+            })?
+            .to_string();
+
+        let tree: crate::gleif::client::CorporateTreeResult = args
+            .get("_gleif_tree_fetched")
+            .cloned()
+            .map(serde_json::from_value)
+            .ok_or_else(|| {
+                anyhow::anyhow!(
+                    "gleif.import-tree: pre_fetch result missing \
+                     (`_gleif_tree_fetched` absent from args)"
+                )
+            })??;
+
+        let service = GleifEnrichmentService::new(Arc::new(pool.clone()))?;
+        let result = service.persist_corporate_tree(&root_lei, tree).await?;
 
         let result_json = serde_json::json!({
             "root_lei": result.root_lei,
@@ -300,10 +343,9 @@ impl CustomOperation for GleifImportTreeOp {
             "terminal_entities": result.terminal_entities.len(),
         });
 
-        // Log research action if decision-id provided
-        if let Some(decision_id) = extract_uuid_opt(verb_call, ctx, "decision-id") {
+        if let Some(decision_id) = json_extract_uuid_opt(args, ctx, "decision-id") {
             log_research_action(
-                pool,
+                &pool,
                 decision_id,
                 "gleif:import-tree",
                 &result_json,
@@ -313,90 +355,63 @@ impl CustomOperation for GleifImportTreeOp {
             .await?;
         }
 
-        Ok(ExecutionResult::Record(result_json))
-    }
-
-    #[cfg(not(feature = "database"))]
-    async fn execute(
-        &self,
-        _verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-    ) -> Result<ExecutionResult> {
-        Ok(ExecutionResult::Record(serde_json::json!({
-            "root_lei": "MOCK_LEI",
-            "entities_created": 0,
-            "entities_updated": 0,
-            "relationships_created": 0,
-        })))
+        Ok(VerbExecutionOutcome::Record(result_json))
     }
 }
 
+// ═══════════════════════════════════════════════════════════════════════════════
+// gleif.refresh
+// ═══════════════════════════════════════════════════════════════════════════════
+
 /// Refresh stale GLEIF data
-///
-/// Rationale: Requires GLEIF API calls to update entity data.
-#[register_custom_op]
-pub struct GleifRefreshOp;
+pub struct GleifRefresh;
 
 #[async_trait]
-impl CustomOperation for GleifRefreshOp {
-    fn domain(&self) -> &'static str {
-        "gleif"
-    }
-    fn verb(&self) -> &'static str {
-        "refresh"
-    }
-    fn rationale(&self) -> &'static str {
-        "Requires GLEIF API calls to refresh stale entity data"
+impl SemOsVerbOp for GleifRefresh {
+    fn fqn(&self) -> &str {
+        "gleif.refresh"
     }
 
-    #[cfg(feature = "database")]
-    async fn execute(
+    /// Phase F.3b (2026-04-22): DB discovery of refresh targets + all
+    /// HTTP enrichment bundles happen in pre_fetch. Execute replays the
+    /// fetched bundles into persist_enrichment calls inside the scope.
+    ///
+    /// For the single-entity mode: 1 DB lookup (entity-id → LEI) + 1
+    /// fetch bundle.
+    ///
+    /// For the bulk-refresh mode: 1 DB query (stale-entity discovery) +
+    /// N fetch bundles. This does the same N HTTP requests the legacy
+    /// loop did — just all before the txn opens. Bulk refreshes with
+    /// large N will be HTTP-latency-bound, same as before.
+    async fn pre_fetch(
         &self,
-        verb_call: &VerbCall,
-        ctx: &mut ExecutionContext,
-        pool: &PgPool,
-    ) -> Result<ExecutionResult> {
-        let entity_id_arg = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "entity-id")
-            .and_then(|a| {
-                if let Some(name) = a.value.as_symbol() {
-                    ctx.resolve(name)
-                } else {
-                    a.value.as_uuid()
-                }
-            });
-
-        let stale_days = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "stale-days")
-            .and_then(|a| a.value.as_integer())
-            .unwrap_or(30) as i32;
-
-        let limit = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "limit")
-            .and_then(|a| a.value.as_integer())
-            .unwrap_or(100) as i32;
+        args: &serde_json::Value,
+        ctx: &mut VerbExecutionContext,
+        pool: &sqlx::PgPool,
+    ) -> Result<Option<serde_json::Value>> {
+        let entity_id_arg = json_extract_uuid_opt(args, ctx, "entity-id");
+        let stale_days = json_extract_int_opt(args, "stale-days").unwrap_or(30) as i32;
+        let limit = json_extract_int_opt(args, "limit").unwrap_or(100) as i32;
 
         let service = GleifEnrichmentService::new(Arc::new(pool.clone()))?;
 
-        match entity_id_arg {
+        // Resolve the (entity_id, lei) pairs to refresh.
+        let targets: Vec<(Uuid, String)> = match entity_id_arg {
             Some(entity_id) => {
-                // Refresh single entity
-                let result = service.refresh_entity(entity_id).await?;
-                Ok(ExecutionResult::Record(serde_json::json!({
-                    "refreshed": 1,
-                    "entity_id": entity_id,
-                    "lei": result.lei,
-                })))
+                let lei: Option<String> = sqlx::query_scalar(
+                    r#"SELECT lei FROM "ob-poc".entity_limited_companies WHERE entity_id = $1"#,
+                )
+                .bind(entity_id)
+                .fetch_optional(pool)
+                .await?
+                .flatten();
+                match lei {
+                    Some(l) => vec![(entity_id, l)],
+                    None => return Err(anyhow::anyhow!("Entity {} has no LEI", entity_id)),
+                }
             }
             None => {
-                // Find stale entities and refresh them
-                let stale_entities: Vec<(Uuid, String)> = sqlx::query_as(
+                sqlx::query_as(
                     r#"SELECT entity_id, lei FROM "ob-poc".entity_limited_companies
                        WHERE lei IS NOT NULL
                          AND (gleif_last_update IS NULL
@@ -406,257 +421,434 @@ impl CustomOperation for GleifRefreshOp {
                 .bind(stale_days)
                 .bind(limit)
                 .fetch_all(pool)
-                .await?;
+                .await?
+            }
+        };
 
-                let mut refreshed = 0;
-                let mut errors = 0;
-
-                for (entity_id, lei) in stale_entities {
-                    match service.enrich_entity(entity_id, &lei).await {
-                        Ok(_) => refreshed += 1,
-                        Err(e) => {
-                            tracing::warn!("Failed to refresh entity {}: {}", entity_id, e);
-                            errors += 1;
-                        }
-                    }
+        // Fetch the enrichment bundle for each target. Errors are
+        // captured per-target so one bad fetch doesn't abort the whole
+        // refresh — execute logs them in the errors counter.
+        let mut bundles: Vec<serde_json::Value> = Vec::with_capacity(targets.len());
+        for (eid, lei) in &targets {
+            match service.fetch_all_for_enrich(lei).await {
+                Ok(fetch) => bundles.push(serde_json::json!({
+                    "entity_id": eid,
+                    "lei": lei,
+                    "fetched": serde_json::to_value(&fetch)?,
+                })),
+                Err(e) => {
+                    tracing::warn!(
+                        entity_id = %eid,
+                        lei = %lei,
+                        error = %e,
+                        "gleif.refresh: pre_fetch bundle failed for one target"
+                    );
+                    bundles.push(serde_json::json!({
+                        "entity_id": eid,
+                        "lei": lei,
+                        "error": e.to_string(),
+                    }));
                 }
-
-                Ok(ExecutionResult::Record(serde_json::json!({
-                    "refreshed": refreshed,
-                    "errors": errors,
-                    "stale_days": stale_days,
-                })))
             }
         }
+
+        Ok(Some(serde_json::json!({
+            "_gleif_refresh_bundles": bundles,
+            "_gleif_refresh_stale_days": stale_days,
+        })))
     }
 
-    #[cfg(not(feature = "database"))]
     async fn execute(
         &self,
-        _verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-    ) -> Result<ExecutionResult> {
-        Ok(ExecutionResult::Record(serde_json::json!({
-            "refreshed": 0,
-            "errors": 0,
-        })))
+        args: &serde_json::Value,
+        _ctx: &mut VerbExecutionContext,
+        scope: &mut dyn TransactionScope,
+    ) -> Result<VerbExecutionOutcome> {
+        let pool = scope.pool().clone();
+
+        let bundles = args
+            .get("_gleif_refresh_bundles")
+            .and_then(|v| v.as_array())
+            .cloned()
+            .ok_or_else(|| {
+                anyhow::anyhow!(
+                    "gleif.refresh: pre_fetch result missing \
+                     (`_gleif_refresh_bundles` absent from args)"
+                )
+            })?;
+        let stale_days = args
+            .get("_gleif_refresh_stale_days")
+            .and_then(|v| v.as_i64())
+            .unwrap_or(30) as i32;
+
+        let service = GleifEnrichmentService::new(Arc::new(pool.clone()))?;
+        let mut refreshed = 0usize;
+        let mut errors = 0usize;
+
+        for bundle in bundles {
+            let entity_id: Option<Uuid> = bundle
+                .get("entity_id")
+                .and_then(|v| v.as_str())
+                .and_then(|s| Uuid::parse_str(s).ok());
+            let lei: Option<String> = bundle
+                .get("lei")
+                .and_then(|v| v.as_str())
+                .map(|s| s.to_string());
+
+            if bundle.get("error").is_some() {
+                errors += 1;
+                continue;
+            }
+
+            let (Some(eid), Some(lei)) = (entity_id, lei) else {
+                errors += 1;
+                continue;
+            };
+
+            let fetched: crate::gleif::enrichment::EnrichmentFetch = match bundle
+                .get("fetched")
+                .cloned()
+                .map(serde_json::from_value::<crate::gleif::enrichment::EnrichmentFetch>)
+            {
+                Some(Ok(f)) => f,
+                _ => {
+                    errors += 1;
+                    continue;
+                }
+            };
+
+            match service.persist_enrichment(eid, &lei, fetched).await {
+                Ok(_) => refreshed += 1,
+                Err(e) => {
+                    tracing::warn!("Failed to persist refresh for entity {}: {}", eid, e);
+                    errors += 1;
+                }
+            }
+        }
+
+        // Single-entity mode echoes back entity_id + lei; bulk mode
+        // returns aggregate counts. Mirror the legacy response shape.
+        let is_single = args.get("entity-id").is_some();
+        let response = if is_single {
+            let single = args
+                .get("_gleif_refresh_bundles")
+                .and_then(|v| v.as_array())
+                .and_then(|a| a.first())
+                .cloned()
+                .unwrap_or(serde_json::Value::Null);
+            serde_json::json!({
+                "refreshed": refreshed,
+                "entity_id": single.get("entity_id"),
+                "lei": single.get("lei"),
+            })
+        } else {
+            serde_json::json!({
+                "refreshed": refreshed,
+                "errors": errors,
+                "stale_days": stale_days,
+            })
+        };
+
+        Ok(VerbExecutionOutcome::Record(response))
     }
 }
 
+// ═══════════════════════════════════════════════════════════════════════════════
+// gleif.get-record
+// ═══════════════════════════════════════════════════════════════════════════════
+
 /// Get raw GLEIF record (does not persist)
-///
-/// Rationale: Direct GLEIF API call for inspection.
-#[register_custom_op]
-pub struct GleifGetRecordOp;
+pub struct GleifGetRecord;
 
 #[async_trait]
-impl CustomOperation for GleifGetRecordOp {
-    fn domain(&self) -> &'static str {
-        "gleif"
-    }
-    fn verb(&self) -> &'static str {
-        "get-record"
-    }
-    fn rationale(&self) -> &'static str {
-        "Direct GLEIF API call for record inspection"
+impl SemOsVerbOp for GleifGetRecord {
+    fn fqn(&self) -> &str {
+        "gleif.get-record"
     }
 
-    #[cfg(feature = "database")]
-    async fn execute(
+    async fn pre_fetch(
         &self,
-        verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-        _pool: &PgPool,
-    ) -> Result<ExecutionResult> {
+        args: &serde_json::Value,
+        _ctx: &mut VerbExecutionContext,
+        _pool: &sqlx::PgPool,
+    ) -> Result<Option<serde_json::Value>> {
         let lei =
-            extract_string_opt(verb_call, "lei").ok_or_else(|| anyhow::anyhow!(":lei required"))?;
+            json_extract_string_opt(args, "lei").ok_or_else(|| anyhow::anyhow!(":lei required"))?;
 
         let client = GleifClient::new()?;
         let record = client.get_lei_record(&lei).await?;
 
-        Ok(ExecutionResult::Record(serde_json::json!({
-            "lei": record.lei(),
-            "name": record.attributes.entity.legal_name.name,
-            "jurisdiction": record.attributes.entity.jurisdiction,
-            "category": record.attributes.entity.category,
-            "sub_category": record.attributes.entity.sub_category,
-            "status": record.attributes.entity.status,
-            "legal_form": record.attributes.entity.legal_form,
-            "registration": record.attributes.registration,
+        Ok(Some(serde_json::json!({
+            "_gleif_record": {
+                "lei": record.lei(),
+                "name": record.attributes.entity.legal_name.name,
+                "jurisdiction": record.attributes.entity.jurisdiction,
+                "category": record.attributes.entity.category,
+                "sub_category": record.attributes.entity.sub_category,
+                "status": record.attributes.entity.status,
+                "legal_form": record.attributes.entity.legal_form,
+                "registration": record.attributes.registration,
+            }
         })))
     }
 
-    #[cfg(not(feature = "database"))]
     async fn execute(
         &self,
-        _verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-    ) -> Result<ExecutionResult> {
-        Ok(ExecutionResult::Record(serde_json::json!({})))
+        args: &serde_json::Value,
+        _ctx: &mut VerbExecutionContext,
+        _scope: &mut dyn TransactionScope,
+    ) -> Result<VerbExecutionOutcome> {
+        let record = args.get("_gleif_record").cloned().ok_or_else(|| {
+            anyhow::anyhow!(
+                "gleif.get-record: pre_fetch result missing (`_gleif_record` absent from args)"
+            )
+        })?;
+        Ok(VerbExecutionOutcome::Record(record))
     }
 }
 
+// ═══════════════════════════════════════════════════════════════════════════════
+// gleif.get-parent
+// ═══════════════════════════════════════════════════════════════════════════════
+
 /// Get direct parent from GLEIF
-///
-/// Rationale: Direct GLEIF API call for parent relationship.
-#[register_custom_op]
-pub struct GleifGetParentOp;
+pub struct GleifGetParent;
 
 #[async_trait]
-impl CustomOperation for GleifGetParentOp {
-    fn domain(&self) -> &'static str {
-        "gleif"
-    }
-    fn verb(&self) -> &'static str {
-        "get-parent"
-    }
-    fn rationale(&self) -> &'static str {
-        "Direct GLEIF API call for parent relationship"
+impl SemOsVerbOp for GleifGetParent {
+    fn fqn(&self) -> &str {
+        "gleif.get-parent"
     }
 
-    #[cfg(feature = "database")]
-    async fn execute(
+    async fn pre_fetch(
         &self,
-        verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-        _pool: &PgPool,
-    ) -> Result<ExecutionResult> {
+        args: &serde_json::Value,
+        _ctx: &mut VerbExecutionContext,
+        _pool: &sqlx::PgPool,
+    ) -> Result<Option<serde_json::Value>> {
         let lei =
-            extract_string_opt(verb_call, "lei").ok_or_else(|| anyhow::anyhow!(":lei required"))?;
+            json_extract_string_opt(args, "lei").ok_or_else(|| anyhow::anyhow!(":lei required"))?;
 
         let client = GleifClient::new()?;
         let parent = client.get_direct_parent(&lei).await?;
 
-        match parent {
-            Some(rel) => Ok(ExecutionResult::Record(serde_json::json!({
+        let payload = match parent {
+            Some(rel) => serde_json::json!({
                 "parent_lei": rel.attributes.relationship.end_node.id,
                 "relationship_type": rel.attributes.relationship.relationship_type,
                 "relationship_status": rel.attributes.relationship.status,
-            }))),
-            None => Ok(ExecutionResult::Record(serde_json::json!({
+            }),
+            None => serde_json::json!({
                 "parent_lei": null,
                 "message": "No direct parent found"
-            }))),
-        }
+            }),
+        };
+
+        Ok(Some(serde_json::json!({ "_gleif_parent": payload })))
     }
 
-    #[cfg(not(feature = "database"))]
     async fn execute(
         &self,
-        _verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-    ) -> Result<ExecutionResult> {
-        Ok(ExecutionResult::Record(serde_json::json!({
-            "parent_lei": null,
-        })))
+        args: &serde_json::Value,
+        _ctx: &mut VerbExecutionContext,
+        _scope: &mut dyn TransactionScope,
+    ) -> Result<VerbExecutionOutcome> {
+        let parent = args.get("_gleif_parent").cloned().ok_or_else(|| {
+            anyhow::anyhow!(
+                "gleif.get-parent: pre_fetch result missing (`_gleif_parent` absent from args)"
+            )
+        })?;
+        Ok(VerbExecutionOutcome::Record(parent))
     }
 }
 
+// ═══════════════════════════════════════════════════════════════════════════════
+// gleif.import-managed-funds
+// ═══════════════════════════════════════════════════════════════════════════════
+
 /// Import managed funds from GLEIF with full CBU structure
-///
-/// Rationale: Fetches funds from GLEIF API and creates entities + CBUs with role assignments.
-#[register_custom_op]
-pub struct GleifImportManagedFundsOp;
+pub struct GleifImportManagedFunds;
 
 #[async_trait]
-impl CustomOperation for GleifImportManagedFundsOp {
-    fn domain(&self) -> &'static str {
-        "gleif"
-    }
-    fn verb(&self) -> &'static str {
-        "import-managed-funds"
-    }
-    fn rationale(&self) -> &'static str {
-        "Fetches managed funds from GLEIF API and creates entities + CBUs with role assignments"
+impl SemOsVerbOp for GleifImportManagedFunds {
+    fn fqn(&self) -> &str {
+        "gleif.import-managed-funds"
     }
 
-    #[cfg(feature = "database")]
-    async fn execute(
+    /// Phase F.3b-5 (2026-04-22): all HTTP runs in pre_fetch. The
+    /// previously conditional HTTP inside `get_or_create_entity_by_lei`
+    /// is eliminated by pre-checking DB existence for every LEI we
+    /// MIGHT need to create, then HTTP-fetching only the records for
+    /// LEIs NOT already in the DB. Execute uses the pre-fetched
+    /// records via `get_or_create_entity_by_lei_from_prefetched`.
+    async fn pre_fetch(
         &self,
-        verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-        pool: &PgPool,
-    ) -> Result<ExecutionResult> {
-        let manager_lei = extract_string_opt(verb_call, "manager-lei");
-        let name_pattern = extract_string_opt(verb_call, "name-pattern");
+        args: &serde_json::Value,
+        _ctx: &mut VerbExecutionContext,
+        pool: &sqlx::PgPool,
+    ) -> Result<Option<serde_json::Value>> {
+        let manager_lei = json_extract_string_opt(args, "manager-lei");
+        let name_pattern = json_extract_string_opt(args, "name-pattern");
 
-        // Either manager-lei or name-pattern is required
         if manager_lei.is_none() && name_pattern.is_none() {
             return Err(anyhow::anyhow!(":manager-lei or :name-pattern required"));
         }
 
-        let ultimate_client_lei = extract_string_opt(verb_call, "ultimate-client-lei");
-
-        let create_cbus = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "create-cbus")
-            .and_then(|a| a.value.as_boolean())
-            .unwrap_or(true);
-
-        let limit = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "limit")
-            .and_then(|a| a.value.as_integer())
+        let ultimate_client_lei = json_extract_string_opt(args, "ultimate-client-lei");
+        let limit = json_extract_int_opt(args, "limit")
             .map(|l| l as usize)
-            .unwrap_or(1000); // Default limit to prevent runaway imports
-
-        let dry_run = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "dry-run")
-            .and_then(|a| a.value.as_boolean())
-            .unwrap_or(false);
+            .unwrap_or(1000);
 
         let client = GleifClient::new()?;
 
-        // Fetch funds - try relationship endpoint first, then fall back to name search
+        // --- HTTP Phase 1: fetch funds list + optional manager record.
         let mut funds = Vec::new();
         let mut search_method = "relationship";
 
         if let Some(ref lei) = manager_lei {
-            tracing::info!("Fetching managed funds for manager LEI: {}", lei);
             funds = client.get_managed_funds(lei).await?;
 
-            // If relationship endpoint returns nothing, try name-based search
             if funds.is_empty() {
                 if let Some(ref pattern) = name_pattern {
-                    tracing::info!(
-                        "Relationship endpoint empty, falling back to name search: {}",
-                        pattern
-                    );
                     funds = client.search_funds_by_name(pattern, limit).await?;
                     search_method = "name_search";
                 } else {
-                    // Try to get manager name for fallback search
                     let manager_record = client.get_lei_record(lei).await?;
                     let manager_name = &manager_record.attributes.entity.legal_name.name;
-
-                    // Extract a searchable prefix (e.g., "Allianz" from "Allianz Global Investors GmbH")
                     let search_prefix = manager_name
                         .split_whitespace()
                         .next()
                         .unwrap_or(manager_name);
-                    tracing::info!(
-                        "Relationship endpoint empty, falling back to name search with prefix: {}",
-                        search_prefix
-                    );
                     funds = client.search_funds_by_name(search_prefix, limit).await?;
                     search_method = "name_search_auto";
                 }
             }
         } else if let Some(ref pattern) = name_pattern {
-            tracing::info!("Searching funds by name pattern: {}", pattern);
             funds = client.search_funds_by_name(pattern, limit).await?;
             search_method = "name_search";
         }
 
-        // Apply limit
         funds.truncate(limit);
 
+        // --- Collect LEIs that might need entity creation.
+        let mut dep_leis: Vec<String> = Vec::new();
+        if let Some(ref lei) = manager_lei {
+            dep_leis.push(lei.clone());
+        }
+        if let Some(ref lei) = ultimate_client_lei {
+            dep_leis.push(lei.clone());
+        }
+        for fund in &funds {
+            dep_leis.push(fund.lei().to_string());
+            if let Some(ref rels) = fund.relationships {
+                if let Some(ref umbrella) = rels.umbrella_fund {
+                    if let Some(ref url) = umbrella.links.related {
+                        if let Some(umbrella_lei) = url.split('/').next_back() {
+                            dep_leis.push(umbrella_lei.to_string());
+                        }
+                    }
+                }
+            }
+        }
+        dep_leis.sort();
+        dep_leis.dedup();
+
+        // --- Pre-fetched records map (seeded with what we already have).
+        let mut prefetched: HashMap<String, LeiRecord> = HashMap::new();
+        for fund in &funds {
+            prefetched.insert(fund.lei().to_string(), fund.clone());
+        }
+
+        // --- HTTP Phase 2: for each dep LEI that's NOT in DB AND NOT
+        //     already in prefetched (i.e. not a fund), fetch its record.
+        for lei in &dep_leis {
+            if prefetched.contains_key(lei) {
+                continue;
+            }
+            // DB existence check — if the entity already exists, we
+            // won't need the record to create it.
+            let in_funds: Option<Uuid> =
+                sqlx::query_scalar(r#"SELECT entity_id FROM "ob-poc".entity_funds WHERE lei = $1"#)
+                    .bind(lei)
+                    .fetch_optional(pool)
+                    .await?;
+            if in_funds.is_some() {
+                continue;
+            }
+            let in_lcs: Option<Uuid> = sqlx::query_scalar(
+                r#"SELECT entity_id FROM "ob-poc".entity_limited_companies WHERE lei = $1"#,
+            )
+            .bind(lei)
+            .fetch_optional(pool)
+            .await?;
+            if in_lcs.is_some() {
+                continue;
+            }
+            // Not in DB and not already fetched → HTTP fetch.
+            match client.get_lei_record(lei).await {
+                Ok(record) => {
+                    prefetched.insert(lei.clone(), record);
+                }
+                Err(e) => {
+                    tracing::warn!(
+                        lei = %lei,
+                        error = %e,
+                        "gleif.import-managed-funds pre_fetch: failed to fetch LEI record; \
+                         execute will error if this LEI turns out to need creation"
+                    );
+                }
+            }
+        }
+
+        Ok(Some(serde_json::json!({
+            "_gleif_import_mf_funds": serde_json::to_value(&funds)?,
+            "_gleif_import_mf_prefetched": serde_json::to_value(&prefetched)?,
+            "_gleif_import_mf_search_method": search_method,
+        })))
+    }
+
+    async fn execute(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut VerbExecutionContext,
+        scope: &mut dyn TransactionScope,
+    ) -> Result<VerbExecutionOutcome> {
+        let pool = scope.pool().clone();
+
+        let manager_lei = json_extract_string_opt(args, "manager-lei");
+        let name_pattern = json_extract_string_opt(args, "name-pattern");
+        let ultimate_client_lei = json_extract_string_opt(args, "ultimate-client-lei");
+        let create_cbus = json_extract_bool_opt(args, "create-cbus").unwrap_or(true);
+        let dry_run = json_extract_bool_opt(args, "dry-run").unwrap_or(false);
+
+        let funds: Vec<LeiRecord> = args
+            .get("_gleif_import_mf_funds")
+            .cloned()
+            .map(serde_json::from_value)
+            .ok_or_else(|| {
+                anyhow::anyhow!(
+                    "gleif.import-managed-funds: pre_fetch result missing \
+                     (`_gleif_import_mf_funds` absent from args)"
+                )
+            })??;
+        let prefetched: HashMap<String, LeiRecord> = args
+            .get("_gleif_import_mf_prefetched")
+            .cloned()
+            .map(serde_json::from_value)
+            .ok_or_else(|| {
+                anyhow::anyhow!(
+                    "gleif.import-managed-funds: pre_fetch result missing \
+                     (`_gleif_import_mf_prefetched` absent from args)"
+                )
+            })??;
+        let search_method = args
+            .get("_gleif_import_mf_search_method")
+            .and_then(|v| v.as_str())
+            .unwrap_or("relationship")
+            .to_string();
+
         tracing::info!(
-            "Found {} funds to import via {}",
+            "gleif.import-managed-funds: {} funds (via {})",
             funds.len(),
             search_method
         );
@@ -673,8 +865,7 @@ impl CustomOperation for GleifImportManagedFundsOp {
                     })
                 })
                 .collect();
-
-            return Ok(ExecutionResult::Record(serde_json::json!({
+            return Ok(VerbExecutionOutcome::Record(serde_json::json!({
                 "dry_run": true,
                 "manager_lei": manager_lei,
                 "name_pattern": name_pattern,
@@ -684,16 +875,14 @@ impl CustomOperation for GleifImportManagedFundsOp {
             })));
         }
 
-        // Get or create manager entity (only if manager_lei provided)
         let manager_entity_id = if let Some(ref lei) = manager_lei {
-            Some(get_or_create_entity_by_lei(pool, &client, lei).await?)
+            Some(get_or_create_entity_by_lei_from_prefetched(&pool, lei, &prefetched).await?)
         } else {
             None
         };
 
-        // Get or create ultimate client entity (if provided)
         let ultimate_client_entity_id = if let Some(ref uc_lei) = ultimate_client_lei {
-            Some(get_or_create_entity_by_lei(pool, &client, uc_lei).await?)
+            Some(get_or_create_entity_by_lei_from_prefetched(&pool, uc_lei, &prefetched).await?)
         } else {
             None
         };
@@ -703,7 +892,7 @@ impl CustomOperation for GleifImportManagedFundsOp {
         let mut roles_assigned = 0;
 
         for fund in &funds {
-            let fund_lei = &fund.lei();
+            let fund_lei = fund.lei();
             let fund_name = &fund.attributes.entity.legal_name.name;
             let jurisdiction = fund
                 .attributes
@@ -712,46 +901,40 @@ impl CustomOperation for GleifImportManagedFundsOp {
                 .as_deref()
                 .unwrap_or("LU");
 
-            // Get or create fund entity
-            let fund_entity_id = get_or_create_entity_from_record(pool, fund).await?;
+            let fund_entity_id = get_or_create_entity_from_record(&pool, fund).await?;
             entities_created += 1;
 
             if create_cbus {
-                // Create CBU for the fund
-                let cbu_id = create_fund_cbu(pool, fund_name, jurisdiction).await?;
+                let cbu_id = create_fund_cbu(&pool, fund_name, jurisdiction).await?;
                 cbus_created += 1;
 
-                // Assign ASSET_OWNER role (fund owns itself)
-                assign_role(pool, cbu_id, fund_entity_id, "ASSET_OWNER").await?;
+                assign_role(&pool, cbu_id, fund_entity_id, "ASSET_OWNER").await?;
                 roles_assigned += 1;
 
-                // Assign INVESTMENT_MANAGER and MANAGEMENT_COMPANY roles if manager known
                 if let Some(mgr_id) = manager_entity_id {
-                    assign_role(pool, cbu_id, mgr_id, "INVESTMENT_MANAGER").await?;
+                    assign_role(&pool, cbu_id, mgr_id, "INVESTMENT_MANAGER").await?;
                     roles_assigned += 1;
-
-                    // Assign MANAGEMENT_COMPANY role (same as IM for self-managed)
-                    assign_role(pool, cbu_id, mgr_id, "MANAGEMENT_COMPANY").await?;
+                    assign_role(&pool, cbu_id, mgr_id, "MANAGEMENT_COMPANY").await?;
                     roles_assigned += 1;
                 }
 
-                // Assign ULTIMATE_CLIENT role if provided
                 if let Some(uc_id) = ultimate_client_entity_id {
-                    assign_role(pool, cbu_id, uc_id, "ULTIMATE_CLIENT").await?;
+                    assign_role(&pool, cbu_id, uc_id, "ULTIMATE_CLIENT").await?;
                     roles_assigned += 1;
                 }
 
-                // Check for umbrella fund relationship
                 if let Some(ref rels) = fund.relationships {
                     if let Some(ref umbrella) = rels.umbrella_fund {
                         if let Some(ref url) = umbrella.links.related {
                             if let Some(umbrella_lei) = url.split('/').next_back() {
-                                // Get or create umbrella entity
                                 let umbrella_entity_id =
-                                    get_or_create_entity_by_lei(pool, &client, umbrella_lei)
-                                        .await?;
-                                // Assign SICAV role (umbrella is the SICAV)
-                                assign_role(pool, cbu_id, umbrella_entity_id, "SICAV").await?;
+                                    get_or_create_entity_by_lei_from_prefetched(
+                                        &pool,
+                                        umbrella_lei,
+                                        &prefetched,
+                                    )
+                                    .await?;
+                                assign_role(&pool, cbu_id, umbrella_entity_id, "SICAV").await?;
                                 roles_assigned += 1;
                             }
                         }
@@ -772,10 +955,9 @@ impl CustomOperation for GleifImportManagedFundsOp {
             "roles_assigned": roles_assigned,
         });
 
-        // Log research action if decision-id provided
-        if let Some(decision_id) = extract_uuid_opt(verb_call, _ctx, "decision-id") {
+        if let Some(decision_id) = json_extract_uuid_opt(args, ctx, "decision-id") {
             log_research_action(
-                pool,
+                &pool,
                 decision_id,
                 "gleif:import-managed-funds",
                 &result_json,
@@ -785,56 +967,60 @@ impl CustomOperation for GleifImportManagedFundsOp {
             .await?;
         }
 
-        Ok(ExecutionResult::Record(result_json))
-    }
-
-    #[cfg(not(feature = "database"))]
-    async fn execute(
-        &self,
-        _verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-    ) -> Result<ExecutionResult> {
-        Ok(ExecutionResult::Record(serde_json::json!({
-            "dry_run": true,
-            "funds_imported": 0,
-        })))
+        Ok(VerbExecutionOutcome::Record(result_json))
     }
 }
 
-// Helper functions for GleifImportManagedFundsOp
+// Helper functions for GleifImportManagedFunds
+
+/// Phase F.3b-5 (2026-04-22): DB-only variant of
+/// `get_or_create_entity_by_lei`. Uses a pre-fetched records map
+/// instead of calling HTTP when the entity needs to be created.
+/// The caller (pre_fetch in `GleifImportManagedFunds`) is
+/// responsible for populating `prefetched_records` with every LEI
+/// that might need creation.
 #[cfg(feature = "database")]
-async fn get_or_create_entity_by_lei(
+async fn get_or_create_entity_by_lei_from_prefetched(
     pool: &PgPool,
-    client: &GleifClient,
     lei: &str,
+    prefetched_records: &HashMap<String, LeiRecord>,
 ) -> Result<Uuid> {
-    // Check if entity exists in entity_funds first (for FUND category)
+    // Same DB checks as get_or_create_entity_by_lei.
     let existing: Option<Uuid> =
         sqlx::query_scalar(r#"SELECT entity_id FROM "ob-poc".entity_funds WHERE lei = $1"#)
             .bind(lei)
             .fetch_optional(pool)
             .await?;
-
     if let Some(id) = existing {
         return Ok(id);
     }
 
-    // Also check entity_limited_companies (for non-fund entities like ManCos)
     let existing: Option<Uuid> = sqlx::query_scalar(
         r#"SELECT entity_id FROM "ob-poc".entity_limited_companies WHERE lei = $1"#,
     )
     .bind(lei)
     .fetch_optional(pool)
     .await?;
-
     if let Some(id) = existing {
         return Ok(id);
     }
 
-    // Fetch from GLEIF and create
-    let record = client.get_lei_record(lei).await?;
-    get_or_create_entity_from_record(pool, &record).await
+    // NOT in DB — use the pre-fetched record instead of calling HTTP.
+    let record = prefetched_records.get(lei).ok_or_else(|| {
+        anyhow::anyhow!(
+            "LEI {} was not pre-fetched. Pre_fetch must include all \
+             LEIs that could need entity creation.",
+            lei
+        )
+    })?;
+    get_or_create_entity_from_record(pool, record).await
 }
+
+// Phase F.3b-5 (2026-04-22): `get_or_create_entity_by_lei` (the HTTP-
+// on-miss variant) was removed — all callers migrated to
+// `get_or_create_entity_by_lei_from_prefetched` which takes a
+// pre-fetched records map instead of calling HTTP. This closes the
+// last A1 violation path in gleif_ops.rs.
 
 #[cfg(feature = "database")]
 async fn get_or_create_entity_from_record(pool: &PgPool, record: &LeiRecord) -> Result<Uuid> {
@@ -953,33 +1139,27 @@ async fn assign_role(pool: &PgPool, cbu_id: Uuid, entity_id: Uuid, role_name: &s
     }
 }
 
+// ═══════════════════════════════════════════════════════════════════════════════
+// gleif.get-children
+// ═══════════════════════════════════════════════════════════════════════════════
+
 /// Get direct children from GLEIF
-///
-/// Rationale: Direct GLEIF API call for child entities.
-#[register_custom_op]
-pub struct GleifGetChildrenOp;
+pub struct GleifGetChildren;
 
 #[async_trait]
-impl CustomOperation for GleifGetChildrenOp {
-    fn domain(&self) -> &'static str {
-        "gleif"
-    }
-    fn verb(&self) -> &'static str {
-        "get-children"
-    }
-    fn rationale(&self) -> &'static str {
-        "Direct GLEIF API call for child entities"
+impl SemOsVerbOp for GleifGetChildren {
+    fn fqn(&self) -> &str {
+        "gleif.get-children"
     }
 
-    #[cfg(feature = "database")]
-    async fn execute(
+    async fn pre_fetch(
         &self,
-        verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-        _pool: &PgPool,
-    ) -> Result<ExecutionResult> {
+        args: &serde_json::Value,
+        _ctx: &mut VerbExecutionContext,
+        _pool: &sqlx::PgPool,
+    ) -> Result<Option<serde_json::Value>> {
         let lei =
-            extract_string_opt(verb_call, "lei").ok_or_else(|| anyhow::anyhow!(":lei required"))?;
+            json_extract_string_opt(args, "lei").ok_or_else(|| anyhow::anyhow!(":lei required"))?;
 
         let client = GleifClient::new()?;
         let children = client.get_direct_children(&lei).await?;
@@ -995,59 +1175,53 @@ impl CustomOperation for GleifGetChildrenOp {
             })
             .collect();
 
-        Ok(ExecutionResult::RecordSet(results))
+        Ok(Some(serde_json::json!({ "_gleif_children": results })))
     }
 
-    #[cfg(not(feature = "database"))]
     async fn execute(
         &self,
-        _verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-    ) -> Result<ExecutionResult> {
-        Ok(ExecutionResult::RecordSet(vec![]))
+        args: &serde_json::Value,
+        _ctx: &mut VerbExecutionContext,
+        _scope: &mut dyn TransactionScope,
+    ) -> Result<VerbExecutionOutcome> {
+        let results = args
+            .get("_gleif_children")
+            .and_then(|v| v.as_array())
+            .cloned()
+            .ok_or_else(|| {
+                anyhow::anyhow!(
+                    "gleif.get-children: pre_fetch result missing \
+                     (`_gleif_children` absent from args)"
+                )
+            })?;
+        Ok(VerbExecutionOutcome::RecordSet(results))
     }
 }
 
+// ═══════════════════════════════════════════════════════════════════════════════
+// gleif.trace-ownership
+// ═══════════════════════════════════════════════════════════════════════════════
+
 /// Trace ownership chain to UBO terminus
-#[register_custom_op]
-pub struct GleifTraceOwnershipOp;
+pub struct GleifTraceOwnership;
 
 #[async_trait]
-impl CustomOperation for GleifTraceOwnershipOp {
-    fn domain(&self) -> &'static str {
-        "gleif"
-    }
-    fn verb(&self) -> &'static str {
-        "trace-ownership"
-    }
-    fn rationale(&self) -> &'static str {
-        "Follows parent relationships to UBO terminus via GLEIF API"
+impl SemOsVerbOp for GleifTraceOwnership {
+    fn fqn(&self) -> &str {
+        "gleif.trace-ownership"
     }
 
-    #[cfg(feature = "database")]
-    async fn execute(
+    async fn pre_fetch(
         &self,
-        verb_call: &VerbCall,
-        ctx: &mut ExecutionContext,
-        pool: &PgPool,
-    ) -> Result<ExecutionResult> {
-        let lei = match extract_string_opt(verb_call, "lei") {
+        args: &serde_json::Value,
+        ctx: &mut VerbExecutionContext,
+        pool: &sqlx::PgPool,
+    ) -> Result<Option<serde_json::Value>> {
+        let lei = match json_extract_string_opt(args, "lei") {
             Some(l) => l,
             None => {
-                // Try to get LEI from entity-id
-                let entity_id = verb_call
-                    .arguments
-                    .iter()
-                    .find(|a| a.key == "entity-id")
-                    .and_then(|a| {
-                        if let Some(name) = a.value.as_symbol() {
-                            ctx.resolve(name)
-                        } else {
-                            a.value.as_uuid()
-                        }
-                    })
+                let entity_id = json_extract_uuid_opt(args, ctx, "entity-id")
                     .ok_or_else(|| anyhow::anyhow!(":lei or :entity-id required"))?;
-
                 get_lei_for_entity(pool, entity_id)
                     .await?
                     .ok_or_else(|| anyhow::anyhow!("Entity {} has no LEI", entity_id))?
@@ -1056,11 +1230,9 @@ impl CustomOperation for GleifTraceOwnershipOp {
 
         let client = GleifClient::new()?;
 
-        // Get starting entity info
         let start_record = client.get_lei_record(&lei).await?;
         let start_name = start_record.attributes.entity.legal_name.name.clone();
 
-        // Trace parent chain
         let mut chain = Vec::new();
         let mut current_lei = lei.clone();
         let mut terminus = UboStatus::Unknown;
@@ -1082,8 +1254,6 @@ impl CustomOperation for GleifTraceOwnershipOp {
                     current_lei = parent_lei;
                 }
                 None => {
-                    // No parent - check for reporting exception
-                    // For now, assume public float if no parent
                     terminus = UboStatus::PublicFloat;
                     break;
                 }
@@ -1098,63 +1268,56 @@ impl CustomOperation for GleifTraceOwnershipOp {
             total_depth: chain.len(),
         };
 
-        if let Some(binding) = &verb_call.binding {
-            ctx.bind_json(binding, serde_json::to_value(&result)?);
-        }
-
-        Ok(ExecutionResult::Record(serde_json::to_value(&result)?))
+        Ok(Some(serde_json::json!({
+            "_gleif_trace_ownership": serde_json::to_value(&result)?
+        })))
     }
 
-    #[cfg(not(feature = "database"))]
     async fn execute(
         &self,
-        _verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-    ) -> Result<ExecutionResult> {
-        Ok(ExecutionResult::Record(serde_json::json!({
-            "chain": [],
-            "terminus": "Unknown",
-        })))
+        args: &serde_json::Value,
+        _ctx: &mut VerbExecutionContext,
+        _scope: &mut dyn TransactionScope,
+    ) -> Result<VerbExecutionOutcome> {
+        let result = args.get("_gleif_trace_ownership").cloned().ok_or_else(|| {
+            anyhow::anyhow!(
+                "gleif.trace-ownership: pre_fetch result missing \
+                 (`_gleif_trace_ownership` absent from args)"
+            )
+        })?;
+        Ok(VerbExecutionOutcome::Record(result))
     }
 }
 
+// ═══════════════════════════════════════════════════════════════════════════════
+// gleif.get-managed-funds
+// ═══════════════════════════════════════════════════════════════════════════════
+
 /// Get all funds managed by an investment manager
-#[register_custom_op]
-pub struct GleifGetManagedFundsOp;
+pub struct GleifGetManagedFunds;
 
 #[async_trait]
-impl CustomOperation for GleifGetManagedFundsOp {
-    fn domain(&self) -> &'static str {
-        "gleif"
+impl SemOsVerbOp for GleifGetManagedFunds {
+    fn fqn(&self) -> &str {
+        "gleif.get-managed-funds"
     }
-    fn verb(&self) -> &'static str {
-        "get-managed-funds"
-    }
-    fn rationale(&self) -> &'static str {
-        "Fetches all funds managed by an investment manager from GLEIF"
-    }
-
-    #[cfg(feature = "database")]
-    async fn execute(
+    async fn pre_fetch(
         &self,
-        verb_call: &VerbCall,
-        ctx: &mut ExecutionContext,
-        _pool: &PgPool,
-    ) -> Result<ExecutionResult> {
-        let manager_lei = extract_string_opt(verb_call, "manager-lei")
+        args: &serde_json::Value,
+        _ctx: &mut VerbExecutionContext,
+        _pool: &sqlx::PgPool,
+    ) -> Result<Option<serde_json::Value>> {
+        let manager_lei = json_extract_string_opt(args, "manager-lei")
             .ok_or_else(|| anyhow::anyhow!(":manager-lei required"))?;
-        let resolve_umbrellas = extract_bool_opt(verb_call, "resolve-umbrellas").unwrap_or(true);
-        let limit = extract_int_opt(verb_call, "limit");
+        let resolve_umbrellas = json_extract_bool_opt(args, "resolve-umbrellas").unwrap_or(true);
+        let limit = json_extract_int_opt(args, "limit");
 
         let client = GleifClient::new()?;
 
-        // Get manager name
         let manager_record = client.get_lei_record(&manager_lei).await?;
         let manager_name = manager_record.attributes.entity.legal_name.name.clone();
 
-        // Fetch managed funds
         let mut all_funds = client.get_managed_funds(&manager_lei).await?;
-
         if let Some(lim) = limit {
             all_funds.truncate(lim as usize);
         }
@@ -1164,7 +1327,6 @@ impl CustomOperation for GleifGetManagedFundsOp {
             .map(DiscoveredEntity::from_lei_record)
             .collect();
 
-        // Resolve umbrellas
         let mut fund_umbrellas: HashMap<String, DiscoveredEntity> = HashMap::new();
         if resolve_umbrellas {
             for fund in &funds {
@@ -1185,51 +1347,48 @@ impl CustomOperation for GleifGetManagedFundsOp {
             total_count: funds.len(),
         };
 
-        if let Some(binding) = &verb_call.binding {
-            ctx.bind_json(binding, serde_json::to_value(&result)?);
-        }
-
-        Ok(ExecutionResult::Record(serde_json::to_value(&result)?))
+        Ok(Some(serde_json::json!({
+            "_gleif_managed_funds": serde_json::to_value(&result)?
+        })))
     }
 
-    #[cfg(not(feature = "database"))]
     async fn execute(
         &self,
-        _verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-    ) -> Result<ExecutionResult> {
-        Ok(ExecutionResult::Record(serde_json::json!({
-            "funds": [],
-            "total_count": 0,
-        })))
+        args: &serde_json::Value,
+        _ctx: &mut VerbExecutionContext,
+        _scope: &mut dyn TransactionScope,
+    ) -> Result<VerbExecutionOutcome> {
+        let result = args.get("_gleif_managed_funds").cloned().ok_or_else(|| {
+            anyhow::anyhow!(
+                "gleif.get-managed-funds: pre_fetch result missing \
+                 (`_gleif_managed_funds` absent from args)"
+            )
+        })?;
+        Ok(VerbExecutionOutcome::Record(result))
     }
 }
 
+// ═══════════════════════════════════════════════════════════════════════════════
+// gleif.resolve-successor
+// ═══════════════════════════════════════════════════════════════════════════════
+
 /// Resolve merged/inactive LEI to current successor
-#[register_custom_op]
-pub struct GleifResolveSuccessorOp;
+pub struct GleifResolveSuccessor;
 
 #[async_trait]
-impl CustomOperation for GleifResolveSuccessorOp {
-    fn domain(&self) -> &'static str {
-        "gleif"
-    }
-    fn verb(&self) -> &'static str {
-        "resolve-successor"
-    }
-    fn rationale(&self) -> &'static str {
-        "Follows successor chain for merged/inactive entities"
+impl SemOsVerbOp for GleifResolveSuccessor {
+    fn fqn(&self) -> &str {
+        "gleif.resolve-successor"
     }
 
-    #[cfg(feature = "database")]
-    async fn execute(
+    async fn pre_fetch(
         &self,
-        verb_call: &VerbCall,
-        ctx: &mut ExecutionContext,
-        _pool: &PgPool,
-    ) -> Result<ExecutionResult> {
+        args: &serde_json::Value,
+        _ctx: &mut VerbExecutionContext,
+        _pool: &sqlx::PgPool,
+    ) -> Result<Option<serde_json::Value>> {
         let lei =
-            extract_string_opt(verb_call, "lei").ok_or_else(|| anyhow::anyhow!(":lei required"))?;
+            json_extract_string_opt(args, "lei").ok_or_else(|| anyhow::anyhow!(":lei required"))?;
 
         let client = GleifClient::new()?;
 
@@ -1239,7 +1398,6 @@ impl CustomOperation for GleifResolveSuccessorOp {
 
         loop {
             let record = client.get_lei_record(&current_lei).await?;
-
             let status = record
                 .attributes
                 .entity
@@ -1249,10 +1407,8 @@ impl CustomOperation for GleifResolveSuccessorOp {
             if status == "ACTIVE" {
                 break;
             }
-
             was_merged = true;
 
-            // Check for successor
             if let Some(successor) = record.attributes.entity.successor_entities.first() {
                 chain.push(successor.lei.clone());
                 current_lei = successor.lei.clone();
@@ -1275,22 +1431,24 @@ impl CustomOperation for GleifResolveSuccessorOp {
             was_merged,
         };
 
-        if let Some(binding) = &verb_call.binding {
-            ctx.bind_json(binding, serde_json::to_value(&result)?);
-        }
-
-        Ok(ExecutionResult::Record(serde_json::to_value(&result)?))
+        Ok(Some(serde_json::json!({
+            "_gleif_successor": serde_json::to_value(&result)?
+        })))
     }
 
-    #[cfg(not(feature = "database"))]
     async fn execute(
         &self,
-        _verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-    ) -> Result<ExecutionResult> {
-        Ok(ExecutionResult::Record(serde_json::json!({
-            "was_merged": false,
-        })))
+        args: &serde_json::Value,
+        _ctx: &mut VerbExecutionContext,
+        _scope: &mut dyn TransactionScope,
+    ) -> Result<VerbExecutionOutcome> {
+        let result = args.get("_gleif_successor").cloned().ok_or_else(|| {
+            anyhow::anyhow!(
+                "gleif.resolve-successor: pre_fetch result missing \
+                 (`_gleif_successor` absent from args)"
+            )
+        })?;
+        Ok(VerbExecutionOutcome::Record(result))
     }
 }
 
@@ -1298,48 +1456,34 @@ impl CustomOperation for GleifResolveSuccessorOp {
 // Fund Structure Relationship Verbs (Lean GLEIF API)
 // =============================================================================
 
+// ═══════════════════════════════════════════════════════════════════════════════
+// gleif.get-umbrella
+// ═══════════════════════════════════════════════════════════════════════════════
+
 /// Get umbrella fund for a sub-fund (IS_SUBFUND_OF relationship)
 ///
 /// Single deterministic lookup - returns the umbrella fund that a sub-fund belongs to.
 /// SICAVs are self-governed and have no umbrella - use get-manager to find ManCo instead.
-#[register_custom_op]
-pub struct GleifGetUmbrellaOp;
+pub struct GleifGetUmbrella;
 
 #[async_trait]
-impl CustomOperation for GleifGetUmbrellaOp {
-    fn domain(&self) -> &'static str {
-        "gleif"
-    }
-    fn verb(&self) -> &'static str {
-        "get-umbrella"
-    }
-    fn rationale(&self) -> &'static str {
-        "Single GLEIF API lookup for IS_SUBFUND_OF relationship"
+impl SemOsVerbOp for GleifGetUmbrella {
+    fn fqn(&self) -> &str {
+        "gleif.get-umbrella"
     }
 
-    #[cfg(feature = "database")]
-    async fn execute(
+    async fn pre_fetch(
         &self,
-        verb_call: &VerbCall,
-        ctx: &mut ExecutionContext,
-        pool: &PgPool,
-    ) -> Result<ExecutionResult> {
+        args: &serde_json::Value,
+        ctx: &mut VerbExecutionContext,
+        pool: &sqlx::PgPool,
+    ) -> Result<Option<serde_json::Value>> {
         use crate::gleif::{UmbrellaEntity, UmbrellaResult};
 
-        let lei = match extract_string_opt(verb_call, "lei") {
+        let lei = match json_extract_string_opt(args, "lei") {
             Some(l) => l,
             None => {
-                let entity_id = verb_call
-                    .arguments
-                    .iter()
-                    .find(|a| a.key == "entity-id")
-                    .and_then(|a| {
-                        if let Some(name) = a.value.as_symbol() {
-                            ctx.resolve(name)
-                        } else {
-                            a.value.as_uuid()
-                        }
-                    })
+                let entity_id = json_extract_uuid_opt(args, ctx, "entity-id")
                     .ok_or_else(|| anyhow::anyhow!(":lei or :entity-id required"))?;
 
                 get_lei_for_entity(pool, entity_id)
@@ -1350,11 +1494,8 @@ impl CustomOperation for GleifGetUmbrellaOp {
 
         let client = GleifClient::new()?;
 
-        // Get the sub-fund record for its name
         let subfund = client.get_lei_record(&lei).await?;
         let subfund_name = subfund.attributes.entity.legal_name.name.clone();
-
-        // Look up umbrella fund
         let umbrella = client.get_umbrella_fund(&lei).await?;
 
         let result = UmbrellaResult {
@@ -1367,69 +1508,55 @@ impl CustomOperation for GleifGetUmbrellaOp {
             }),
         };
 
-        if let Some(binding) = &verb_call.binding {
-            ctx.bind_json(binding, serde_json::to_value(&result)?);
-        }
-
-        Ok(ExecutionResult::Record(serde_json::to_value(&result)?))
-    }
-
-    #[cfg(not(feature = "database"))]
-    async fn execute(
-        &self,
-        _verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-    ) -> Result<ExecutionResult> {
-        Ok(ExecutionResult::Record(serde_json::json!({
-            "subfund_lei": "MOCK",
-            "subfund_name": "Mock Fund",
-            "umbrella": null,
+        Ok(Some(serde_json::json!({
+            "_gleif_umbrella": serde_json::to_value(&result)?
         })))
     }
+
+    async fn execute(
+        &self,
+        args: &serde_json::Value,
+        _ctx: &mut VerbExecutionContext,
+        _scope: &mut dyn TransactionScope,
+    ) -> Result<VerbExecutionOutcome> {
+        let result = args.get("_gleif_umbrella").cloned().ok_or_else(|| {
+            anyhow::anyhow!(
+                "gleif.get-umbrella: pre_fetch result missing \
+                 (`_gleif_umbrella` absent from args)"
+            )
+        })?;
+        Ok(VerbExecutionOutcome::Record(result))
+    }
 }
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// gleif.get-manager
+// ═══════════════════════════════════════════════════════════════════════════════
 
 /// Get fund manager for a fund (IS_FUND-MANAGED_BY relationship)
 ///
 /// Single deterministic lookup - returns the ManCo/AIFM/IM that manages the fund.
 /// This is the correct starting point for SICAVs which have no umbrella above them.
-#[register_custom_op]
-pub struct GleifGetManagerOp;
+pub struct GleifGetManager;
 
 #[async_trait]
-impl CustomOperation for GleifGetManagerOp {
-    fn domain(&self) -> &'static str {
-        "gleif"
-    }
-    fn verb(&self) -> &'static str {
-        "get-manager"
-    }
-    fn rationale(&self) -> &'static str {
-        "Single GLEIF API lookup for IS_FUND-MANAGED_BY relationship"
+impl SemOsVerbOp for GleifGetManager {
+    fn fqn(&self) -> &str {
+        "gleif.get-manager"
     }
 
-    #[cfg(feature = "database")]
-    async fn execute(
+    async fn pre_fetch(
         &self,
-        verb_call: &VerbCall,
-        ctx: &mut ExecutionContext,
-        pool: &PgPool,
-    ) -> Result<ExecutionResult> {
+        args: &serde_json::Value,
+        ctx: &mut VerbExecutionContext,
+        pool: &sqlx::PgPool,
+    ) -> Result<Option<serde_json::Value>> {
         use crate::gleif::{ManagerEntity, ManagerResult};
 
-        let lei = match extract_string_opt(verb_call, "lei") {
+        let lei = match json_extract_string_opt(args, "lei") {
             Some(l) => l,
             None => {
-                let entity_id = verb_call
-                    .arguments
-                    .iter()
-                    .find(|a| a.key == "entity-id")
-                    .and_then(|a| {
-                        if let Some(name) = a.value.as_symbol() {
-                            ctx.resolve(name)
-                        } else {
-                            a.value.as_uuid()
-                        }
-                    })
+                let entity_id = json_extract_uuid_opt(args, ctx, "entity-id")
                     .ok_or_else(|| anyhow::anyhow!(":lei or :entity-id required"))?;
 
                 get_lei_for_entity(pool, entity_id)
@@ -1440,11 +1567,8 @@ impl CustomOperation for GleifGetManagerOp {
 
         let client = GleifClient::new()?;
 
-        // Get the fund record for its name
         let fund = client.get_lei_record(&lei).await?;
         let fund_name = fund.attributes.entity.legal_name.name.clone();
-
-        // Look up fund manager
         let manager = client.get_fund_manager(&lei).await?;
 
         let result = ManagerResult {
@@ -1458,68 +1582,54 @@ impl CustomOperation for GleifGetManagerOp {
             }),
         };
 
-        if let Some(binding) = &verb_call.binding {
-            ctx.bind_json(binding, serde_json::to_value(&result)?);
-        }
-
-        Ok(ExecutionResult::Record(serde_json::to_value(&result)?))
-    }
-
-    #[cfg(not(feature = "database"))]
-    async fn execute(
-        &self,
-        _verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-    ) -> Result<ExecutionResult> {
-        Ok(ExecutionResult::Record(serde_json::json!({
-            "fund_lei": "MOCK",
-            "fund_name": "Mock Fund",
-            "manager": null,
+        Ok(Some(serde_json::json!({
+            "_gleif_manager": serde_json::to_value(&result)?
         })))
     }
+
+    async fn execute(
+        &self,
+        args: &serde_json::Value,
+        _ctx: &mut VerbExecutionContext,
+        _scope: &mut dyn TransactionScope,
+    ) -> Result<VerbExecutionOutcome> {
+        let result = args.get("_gleif_manager").cloned().ok_or_else(|| {
+            anyhow::anyhow!(
+                "gleif.get-manager: pre_fetch result missing \
+                 (`_gleif_manager` absent from args)"
+            )
+        })?;
+        Ok(VerbExecutionOutcome::Record(result))
+    }
 }
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// gleif.get-master-fund
+// ═══════════════════════════════════════════════════════════════════════════════
 
 /// Get master fund for a feeder fund (IS_FEEDER_TO relationship)
 ///
 /// Single deterministic lookup - returns the master fund that a feeder invests in.
-#[register_custom_op]
-pub struct GleifGetMasterFundOp;
+pub struct GleifGetMasterFund;
 
 #[async_trait]
-impl CustomOperation for GleifGetMasterFundOp {
-    fn domain(&self) -> &'static str {
-        "gleif"
-    }
-    fn verb(&self) -> &'static str {
-        "get-master-fund"
-    }
-    fn rationale(&self) -> &'static str {
-        "Single GLEIF API lookup for IS_FEEDER_TO relationship"
+impl SemOsVerbOp for GleifGetMasterFund {
+    fn fqn(&self) -> &str {
+        "gleif.get-master-fund"
     }
 
-    #[cfg(feature = "database")]
-    async fn execute(
+    async fn pre_fetch(
         &self,
-        verb_call: &VerbCall,
-        ctx: &mut ExecutionContext,
-        pool: &PgPool,
-    ) -> Result<ExecutionResult> {
+        args: &serde_json::Value,
+        ctx: &mut VerbExecutionContext,
+        pool: &sqlx::PgPool,
+    ) -> Result<Option<serde_json::Value>> {
         use crate::gleif::{MasterEntity, MasterFundResult};
 
-        let lei = match extract_string_opt(verb_call, "lei") {
+        let lei = match json_extract_string_opt(args, "lei") {
             Some(l) => l,
             None => {
-                let entity_id = verb_call
-                    .arguments
-                    .iter()
-                    .find(|a| a.key == "entity-id")
-                    .and_then(|a| {
-                        if let Some(name) = a.value.as_symbol() {
-                            ctx.resolve(name)
-                        } else {
-                            a.value.as_uuid()
-                        }
-                    })
+                let entity_id = json_extract_uuid_opt(args, ctx, "entity-id")
                     .ok_or_else(|| anyhow::anyhow!(":lei or :entity-id required"))?;
 
                 get_lei_for_entity(pool, entity_id)
@@ -1530,11 +1640,8 @@ impl CustomOperation for GleifGetMasterFundOp {
 
         let client = GleifClient::new()?;
 
-        // Get the feeder fund record for its name
         let feeder = client.get_lei_record(&lei).await?;
         let feeder_name = feeder.attributes.entity.legal_name.name.clone();
-
-        // Look up master fund
         let master = client.get_master_fund(&lei).await?;
 
         let result = MasterFundResult {
@@ -1547,55 +1654,51 @@ impl CustomOperation for GleifGetMasterFundOp {
             }),
         };
 
-        if let Some(binding) = &verb_call.binding {
-            ctx.bind_json(binding, serde_json::to_value(&result)?);
-        }
-
-        Ok(ExecutionResult::Record(serde_json::to_value(&result)?))
-    }
-
-    #[cfg(not(feature = "database"))]
-    async fn execute(
-        &self,
-        _verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-    ) -> Result<ExecutionResult> {
-        Ok(ExecutionResult::Record(serde_json::json!({
-            "feeder_lei": "MOCK",
-            "feeder_name": "Mock Feeder",
-            "master": null,
+        Ok(Some(serde_json::json!({
+            "_gleif_master_fund": serde_json::to_value(&result)?
         })))
     }
+
+    async fn execute(
+        &self,
+        args: &serde_json::Value,
+        _ctx: &mut VerbExecutionContext,
+        _scope: &mut dyn TransactionScope,
+    ) -> Result<VerbExecutionOutcome> {
+        let result = args.get("_gleif_master_fund").cloned().ok_or_else(|| {
+            anyhow::anyhow!(
+                "gleif.get-master-fund: pre_fetch result missing \
+                 (`_gleif_master_fund` absent from args)"
+            )
+        })?;
+        Ok(VerbExecutionOutcome::Record(result))
+    }
 }
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// gleif.lookup-by-isin
+// ═══════════════════════════════════════════════════════════════════════════════
 
 /// Look up entity LEI by ISIN
 ///
 /// Single deterministic lookup - given an ISIN, returns the issuing entity's LEI.
-#[register_custom_op]
-pub struct GleifLookupByIsinOp;
+pub struct GleifLookupByIsin;
 
 #[async_trait]
-impl CustomOperation for GleifLookupByIsinOp {
-    fn domain(&self) -> &'static str {
-        "gleif"
-    }
-    fn verb(&self) -> &'static str {
-        "lookup-by-isin"
-    }
-    fn rationale(&self) -> &'static str {
-        "Single GLEIF API lookup for ISIN to LEI mapping"
+impl SemOsVerbOp for GleifLookupByIsin {
+    fn fqn(&self) -> &str {
+        "gleif.lookup-by-isin"
     }
 
-    #[cfg(feature = "database")]
-    async fn execute(
+    async fn pre_fetch(
         &self,
-        verb_call: &VerbCall,
-        ctx: &mut ExecutionContext,
-        _pool: &PgPool,
-    ) -> Result<ExecutionResult> {
+        args: &serde_json::Value,
+        _ctx: &mut VerbExecutionContext,
+        _pool: &sqlx::PgPool,
+    ) -> Result<Option<serde_json::Value>> {
         use crate::gleif::IsinLookupResult;
 
-        let isin = extract_string_opt(verb_call, "isin")
+        let isin = json_extract_string_opt(args, "isin")
             .ok_or_else(|| anyhow::anyhow!(":isin required"))?;
 
         let client = GleifClient::new()?;
@@ -1617,23 +1720,22 @@ impl CustomOperation for GleifLookupByIsinOp {
             }),
         };
 
-        if let Some(binding) = &verb_call.binding {
-            ctx.bind_json(binding, result.clone());
-        }
-
-        Ok(ExecutionResult::Record(result))
+        Ok(Some(serde_json::json!({ "_gleif_isin_lookup": result })))
     }
 
-    #[cfg(not(feature = "database"))]
     async fn execute(
         &self,
-        _verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-    ) -> Result<ExecutionResult> {
-        Ok(ExecutionResult::Record(serde_json::json!({
-            "isin": "MOCK",
-            "lei": null,
-        })))
+        args: &serde_json::Value,
+        _ctx: &mut VerbExecutionContext,
+        _scope: &mut dyn TransactionScope,
+    ) -> Result<VerbExecutionOutcome> {
+        let result = args.get("_gleif_isin_lookup").cloned().ok_or_else(|| {
+            anyhow::anyhow!(
+                "gleif.lookup-by-isin: pre_fetch result missing \
+                 (`_gleif_isin_lookup` absent from args)"
+            )
+        })?;
+        Ok(VerbExecutionOutcome::Record(result))
     }
 }
 
@@ -1690,7 +1792,7 @@ fn escape_dsl_string(s: &str) -> String {
 }
 
 // =============================================================================
-// GLEIF IMPORT TO CLIENT GROUP
+// gleif.import-to-client-group
 // =============================================================================
 
 /// Import GLEIF tree and populate client_group_entity with role tagging
@@ -1702,37 +1804,89 @@ fn escape_dsl_string(s: &str) -> String {
 /// 4. Auto-tags entities with roles based on GLEIF category/relationships
 /// 5. Creates client_group_relationship edges
 /// 6. Records source provenance
-#[register_custom_op]
-pub struct GleifImportToClientGroupOp;
+pub struct GleifImportToClientGroup;
 
 #[async_trait]
-impl CustomOperation for GleifImportToClientGroupOp {
-    fn domain(&self) -> &'static str {
-        "gleif"
-    }
-    fn verb(&self) -> &'static str {
-        "import-to-client-group"
-    }
-    fn rationale(&self) -> &'static str {
-        "Imports GLEIF tree and populates client_group tables with role tagging"
+impl SemOsVerbOp for GleifImportToClientGroup {
+    fn fqn(&self) -> &str {
+        "gleif.import-to-client-group"
     }
 
-    #[cfg(feature = "database")]
+    /// Phase F.3b-6 (2026-04-22): tree fetch runs in pre_fetch (all
+    /// HTTP outside txn). Execute does `persist_corporate_tree` + the
+    /// client-group-specific DB work (discovery status update,
+    /// entity-group membership, role assignments, relationship
+    /// creation).
+    async fn pre_fetch(
+        &self,
+        args: &serde_json::Value,
+        _ctx: &mut VerbExecutionContext,
+        pool: &sqlx::PgPool,
+    ) -> Result<Option<serde_json::Value>> {
+        let root_lei = json_extract_string_opt(args, "root-lei")
+            .ok_or_else(|| anyhow::anyhow!(":root-lei required"))?;
+        let max_depth = json_extract_int_opt(args, "max-depth").unwrap_or(3) as usize;
+        let include_funds = json_extract_bool_opt(args, "include-funds").unwrap_or(false);
+        let max_funds_per_manco =
+            json_extract_int_opt(args, "max-funds-per-manco").map(|v| v as usize);
+
+        let service = GleifEnrichmentService::new(Arc::new(pool.clone()))?;
+
+        let tree = if include_funds {
+            let options = TreeFetchOptions {
+                max_depth,
+                include_managed_funds: true,
+                include_fund_structures: true,
+                include_master_feeder: true,
+                fund_type_filter: vec![],
+                fund_jurisdiction_filter: vec![],
+                max_funds_per_manco: max_funds_per_manco.or(Some(500)),
+            };
+            service
+                .fetch_corporate_tree_with_options_only(&root_lei, options)
+                .await?
+        } else {
+            service
+                .fetch_corporate_tree_only(&root_lei, max_depth)
+                .await?
+        };
+
+        Ok(Some(serde_json::json!({
+            "_gleif_icg_tree": serde_json::to_value(tree)?,
+            "_gleif_icg_root_lei": root_lei,
+        })))
+    }
+
     async fn execute(
         &self,
-        verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-        pool: &PgPool,
-    ) -> Result<ExecutionResult> {
-        let group_id = super::helpers::get_required_uuid(verb_call, "group-id")?;
-        let root_lei = extract_string_opt(verb_call, "root-lei")
-            .ok_or_else(|| anyhow::anyhow!(":root-lei required"))?;
-        let max_depth = extract_int_opt(verb_call, "max-depth").unwrap_or(3) as usize;
+        args: &serde_json::Value,
+        ctx: &mut VerbExecutionContext,
+        scope: &mut dyn TransactionScope,
+    ) -> Result<VerbExecutionOutcome> {
+        let pool = scope.pool().clone();
 
-        // New: fund inclusion options
-        let include_funds = extract_bool_opt(verb_call, "include-funds").unwrap_or(false);
-        let max_funds_per_manco =
-            extract_int_opt(verb_call, "max-funds-per-manco").map(|v| v as usize);
+        let group_id = json_get_required_uuid(args, "group-id")?;
+        let root_lei = args
+            .get("_gleif_icg_root_lei")
+            .and_then(|v| v.as_str())
+            .ok_or_else(|| {
+                anyhow::anyhow!(
+                    "gleif.import-to-client-group: pre_fetch result missing \
+                     (`_gleif_icg_root_lei` absent from args)"
+                )
+            })?
+            .to_string();
+
+        let tree: crate::gleif::client::CorporateTreeResult = args
+            .get("_gleif_icg_tree")
+            .cloned()
+            .map(serde_json::from_value)
+            .ok_or_else(|| {
+                anyhow::anyhow!(
+                    "gleif.import-to-client-group: pre_fetch result missing \
+                     (`_gleif_icg_tree` absent from args)"
+                )
+            })??;
 
         // Start discovery status
         sqlx::query!(
@@ -1748,29 +1902,12 @@ impl CustomOperation for GleifImportToClientGroupOp {
             group_id,
             &root_lei
         )
-        .execute(pool)
+        .execute(&pool)
         .await?;
 
-        // Import the GLEIF tree (creates/updates entities)
+        // Persist the pre-fetched corporate tree (all DB writes).
         let service = GleifEnrichmentService::new(Arc::new(pool.clone()))?;
-
-        // Use enhanced traversal if including funds, otherwise basic traversal
-        let tree_result = if include_funds {
-            let options = TreeFetchOptions {
-                max_depth,
-                include_managed_funds: true,
-                include_fund_structures: true,
-                include_master_feeder: true,
-                fund_type_filter: vec![],
-                fund_jurisdiction_filter: vec![],
-                max_funds_per_manco: max_funds_per_manco.or(Some(500)),
-            };
-            service
-                .import_corporate_tree_with_options(&root_lei, options)
-                .await?
-        } else {
-            service.import_corporate_tree(&root_lei, max_depth).await?
-        };
+        let tree_result = service.persist_corporate_tree(&root_lei, tree).await?;
 
         // Get all entities with LEIs that were part of this import
         // We use the imported_leis from tree_result to ensure we get exactly the entities
@@ -1796,7 +1933,7 @@ impl CustomOperation for GleifImportToClientGroupOp {
                 "#,
                 )
                 .bind(imported_leis)
-                .fetch_all(pool)
+                .fetch_all(&pool)
                 .await?
             };
 
@@ -1827,7 +1964,7 @@ impl CustomOperation for GleifImportToClientGroupOp {
             "#,
         )
         .bind(imported_leis)
-        .fetch_all(pool)
+        .fetch_all(&pool)
         .await?;
 
         for (fund_lei, manco_lei) in fund_manager_rels {
@@ -1846,7 +1983,7 @@ impl CustomOperation for GleifImportToClientGroupOp {
             )
             "#,
         )
-        .fetch_all(pool)
+        .fetch_all(&pool)
         .await?
         .into_iter()
         .collect();
@@ -1889,7 +2026,7 @@ impl CustomOperation for GleifImportToClientGroupOp {
             .bind(relationship_category)
             .bind(is_fund)
             .bind(manco_lei)
-            .fetch_one(pool)
+            .fetch_one(&pool)
             .await?;
 
             entities_added += 1;
@@ -1909,7 +2046,7 @@ impl CustomOperation for GleifImportToClientGroupOp {
                     "#,
                 )
                 .bind(entity_id)
-                .fetch_optional(pool)
+                .fetch_optional(&pool)
                 .await?
                 .flatten();
 
@@ -1924,7 +2061,7 @@ impl CustomOperation for GleifImportToClientGroupOp {
                     "#,
                 )
                 .bind(entity_id)
-                .fetch_optional(pool)
+                .fetch_optional(&pool)
                 .await?
                 .flatten();
 
@@ -1939,7 +2076,7 @@ impl CustomOperation for GleifImportToClientGroupOp {
                         "#,
                     )
                     .bind(m_lei)
-                    .fetch_optional(pool)
+                    .fetch_optional(&pool)
                     .await?
                 } else {
                     None
@@ -1953,7 +2090,7 @@ impl CustomOperation for GleifImportToClientGroupOp {
                              AND deleted_at IS NULL"#,
                     )
                     .bind(manco_eid)
-                    .fetch_optional(pool)
+                    .fetch_optional(&pool)
                     .await?
                 } else {
                     None
@@ -1988,7 +2125,7 @@ impl CustomOperation for GleifImportToClientGroupOp {
                 .bind(manco_lei.as_ref())
                 .bind(&manco_name)
                 .bind(manco_entity_id)
-                .execute(pool)
+                .execute(&pool)
                 .await?;
             }
 
@@ -2022,7 +2159,7 @@ impl CustomOperation for GleifImportToClientGroupOp {
                         role_id,
                         lei
                     )
-                    .execute(pool)
+                    .execute(&pool)
                     .await?
                     .rows_affected();
                     roles_assigned += inserted as i64;
@@ -2053,7 +2190,7 @@ impl CustomOperation for GleifImportToClientGroupOp {
             "#,
         )
         .bind(group_id)
-        .fetch_all(pool)
+        .fetch_all(&pool)
         .await?;
 
         for (child_id, parent_id, rel_type) in parent_rels {
@@ -2076,7 +2213,7 @@ impl CustomOperation for GleifImportToClientGroupOp {
             } else {
                 "control"
             })
-            .fetch_one(pool)
+            .fetch_one(&pool)
             .await?;
 
             relationships_created += 1;
@@ -2091,7 +2228,7 @@ impl CustomOperation for GleifImportToClientGroupOp {
                 "#,
                 relationship_id
             )
-            .execute(pool)
+            .execute(&pool)
             .await?;
         }
 
@@ -2110,9 +2247,10 @@ impl CustomOperation for GleifImportToClientGroupOp {
             "#,
             group_id
         )
-        .execute(pool)
+        .execute(&pool)
         .await?;
 
+        let include_funds = json_extract_bool_opt(args, "include-funds").unwrap_or(false);
         let result = serde_json::json!({
             "group_id": group_id,
             "root_lei": root_lei,
@@ -2128,9 +2266,9 @@ impl CustomOperation for GleifImportToClientGroupOp {
         });
 
         // Log research action if decision-id provided
-        if let Some(decision_id) = extract_uuid_opt(verb_call, _ctx, "decision-id") {
+        if let Some(decision_id) = json_extract_uuid_opt(args, ctx, "decision-id") {
             log_research_action(
-                pool,
+                &pool,
                 decision_id,
                 "gleif:import-to-client-group",
                 &result,
@@ -2140,20 +2278,13 @@ impl CustomOperation for GleifImportToClientGroupOp {
             .await?;
         }
 
-        Ok(ExecutionResult::Record(result))
-    }
-
-    #[cfg(not(feature = "database"))]
-    async fn execute(
-        &self,
-        _verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-    ) -> Result<ExecutionResult> {
-        Err(anyhow::anyhow!(
-            "Database feature required for gleif.import-to-client-group"
-        ))
+        Ok(VerbExecutionOutcome::Record(result))
     }
 }
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// gleif.lookup (dispatcher)
+// ═══════════════════════════════════════════════════════════════════════════════
 
 /// Consolidated GLEIF lookup — dispatches to specific handlers by target-type.
 ///
@@ -2161,40 +2292,35 @@ impl CustomOperation for GleifImportToClientGroupOp {
 /// get-manager, get-managed-funds, get-master-fund, get-umbrella, lookup-by-isin.
 ///
 /// The `target-type` arg selects which lookup to perform.
-#[register_custom_op]
-pub struct GleifLookupOp;
+pub struct GleifLookup;
 
 #[async_trait]
-impl CustomOperation for GleifLookupOp {
-    fn domain(&self) -> &'static str {
-        "gleif"
-    }
-    fn verb(&self) -> &'static str {
-        "lookup"
-    }
-    fn rationale(&self) -> &'static str {
-        "Consolidated GLEIF relationship lookup — dispatches by target-type"
+impl SemOsVerbOp for GleifLookup {
+    fn fqn(&self) -> &str {
+        "gleif.lookup"
     }
 
-    #[cfg(feature = "database")]
-    async fn execute(
+    /// Phase F.2: dispatcher delegates pre_fetch to the selected sub-op
+    /// so the sub-op's HTTP call (and any optional DB lookup for LEI)
+    /// runs outside the txn scope. Execute then delegates to the same
+    /// sub-op's execute, which reads the pre-fetched key from args.
+    async fn pre_fetch(
         &self,
-        verb_call: &VerbCall,
-        ctx: &mut ExecutionContext,
-        pool: &PgPool,
-    ) -> Result<ExecutionResult> {
-        let target_type = extract_string_opt(verb_call, "target-type")
+        args: &serde_json::Value,
+        ctx: &mut VerbExecutionContext,
+        pool: &sqlx::PgPool,
+    ) -> Result<Option<serde_json::Value>> {
+        let target_type = json_extract_string_opt(args, "target-type")
             .ok_or_else(|| anyhow::anyhow!(":target-type required (record|parent|children|manager|managed-funds|master-fund|umbrella|isin)"))?;
-
         match target_type.as_str() {
-            "record" => GleifGetRecordOp.execute(verb_call, ctx, pool).await,
-            "parent" => GleifGetParentOp.execute(verb_call, ctx, pool).await,
-            "children" => GleifGetChildrenOp.execute(verb_call, ctx, pool).await,
-            "manager" => GleifGetManagerOp.execute(verb_call, ctx, pool).await,
-            "managed-funds" => GleifGetManagedFundsOp.execute(verb_call, ctx, pool).await,
-            "master-fund" => GleifGetMasterFundOp.execute(verb_call, ctx, pool).await,
-            "umbrella" => GleifGetUmbrellaOp.execute(verb_call, ctx, pool).await,
-            "isin" => GleifLookupByIsinOp.execute(verb_call, ctx, pool).await,
+            "record" => GleifGetRecord.pre_fetch(args, ctx, pool).await,
+            "parent" => GleifGetParent.pre_fetch(args, ctx, pool).await,
+            "children" => GleifGetChildren.pre_fetch(args, ctx, pool).await,
+            "manager" => GleifGetManager.pre_fetch(args, ctx, pool).await,
+            "managed-funds" => GleifGetManagedFunds.pre_fetch(args, ctx, pool).await,
+            "master-fund" => GleifGetMasterFund.pre_fetch(args, ctx, pool).await,
+            "umbrella" => GleifGetUmbrella.pre_fetch(args, ctx, pool).await,
+            "isin" => GleifLookupByIsin.pre_fetch(args, ctx, pool).await,
             other => Err(anyhow::anyhow!(
                 "Unknown GLEIF lookup target-type '{}'. Valid: record, parent, children, manager, managed-funds, master-fund, umbrella, isin",
                 other
@@ -2202,12 +2328,28 @@ impl CustomOperation for GleifLookupOp {
         }
     }
 
-    #[cfg(not(feature = "database"))]
     async fn execute(
         &self,
-        _verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-    ) -> Result<ExecutionResult> {
-        Ok(ExecutionResult::Record(serde_json::json!({})))
+        args: &serde_json::Value,
+        ctx: &mut VerbExecutionContext,
+        scope: &mut dyn TransactionScope,
+    ) -> Result<VerbExecutionOutcome> {
+        let target_type = json_extract_string_opt(args, "target-type")
+            .ok_or_else(|| anyhow::anyhow!(":target-type required (record|parent|children|manager|managed-funds|master-fund|umbrella|isin)"))?;
+
+        match target_type.as_str() {
+            "record" => GleifGetRecord.execute(args, ctx, scope).await,
+            "parent" => GleifGetParent.execute(args, ctx, scope).await,
+            "children" => GleifGetChildren.execute(args, ctx, scope).await,
+            "manager" => GleifGetManager.execute(args, ctx, scope).await,
+            "managed-funds" => GleifGetManagedFunds.execute(args, ctx, scope).await,
+            "master-fund" => GleifGetMasterFund.execute(args, ctx, scope).await,
+            "umbrella" => GleifGetUmbrella.execute(args, ctx, scope).await,
+            "isin" => GleifLookupByIsin.execute(args, ctx, scope).await,
+            other => Err(anyhow::anyhow!(
+                "Unknown GLEIF lookup target-type '{}'. Valid: record, parent, children, manager, managed-funds, master-fund, umbrella, isin",
+                other
+            )),
+        }
     }
 }

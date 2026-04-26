@@ -1,0 +1,22 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT cbu_id as \"cbu_id!\" FROM \"ob-poc\".cbus WHERE jurisdiction = $1 AND deleted_at IS NULL",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "cbu_id!",
+        "type_info": "Uuid"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "97f3da6844bf1fb0b44913636a5505c2fb2f773e20ecbc82f9986c878618facf"
+}

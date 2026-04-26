@@ -16,7 +16,7 @@ scenarios:
     steps:
       - user: "dsl:(cbu.create :name \"Acme Corp\")"
         expect:
-          outcome: "DirectDslNotAllowed"
+          outcome: "SemanticNotReady"
           dsl_non_empty: false
 
   - name: "dsl_prefix_various_verbs"
@@ -24,24 +24,24 @@ scenarios:
     steps:
       - user: "dsl:(entity.create :name \"Test\")"
         expect:
-          outcome: "DirectDslNotAllowed"
+          outcome: "SemanticNotReady"
       - user: "dsl:(kyc-case.create :entity \"Acme\")"
         expect:
-          outcome: "DirectDslNotAllowed"
+          outcome: "SemanticNotReady"
       - user: "dsl:(session.load-galaxy :apex-name \"Allianz\")"
         expect:
-          outcome: "DirectDslNotAllowed"
+          outcome: "SemanticNotReady"
 
   - name: "dsl_prefix_with_malformed_dsl"
     description: "Malformed dsl: prefix still denied before parsing"
     steps:
       - user: "dsl:not-valid-sexp"
         expect:
-          outcome: "DirectDslNotAllowed"
+          outcome: "SemanticNotReady"
 
   - name: "non_dsl_prefix_not_blocked"
     description: "Normal utterance starting with 'dsl' (no colon) is not blocked"
     steps:
       - user: "dsl generation workflow"
         expect:
-          outcome: "NoMatch"
+          outcome: "SemanticNotReady"

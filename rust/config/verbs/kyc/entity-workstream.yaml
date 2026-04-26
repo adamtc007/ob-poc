@@ -96,6 +96,11 @@ domains:
           type: uuid
           name: workstream_id
           capture: true
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
       update-status:
         description: Update workstream status
         invocation_phrases:
@@ -149,6 +154,11 @@ domains:
           - ENHANCED_DD
         returns:
           type: affected
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
       block:
         description: Block workstream with reason
         invocation_phrases:
@@ -195,6 +205,11 @@ domains:
           maps_to: blocked_reason
         returns:
           type: affected
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
       complete:
         description: Mark workstream as complete
         invocation_phrases:
@@ -247,6 +262,11 @@ domains:
           - VERY_HIGH
         returns:
           type: affected
+        three_axis:
+          state_effect: preserving
+          external_effects: [emitting]
+          consequence:
+            baseline: reviewable
       escalate-dd:
         description: Escalate workstream to enhanced due diligence
         invocation_phrases:
@@ -287,6 +307,11 @@ domains:
             primary_key: workstream_id
         returns:
           type: affected
+        three_axis:
+          state_effect: preserving
+          external_effects: [emitting]
+          consequence:
+            baseline: reviewable
       set-ubo:
         description: Mark workstream entity as UBO
         invocation_phrases:
@@ -328,6 +353,11 @@ domains:
           maps_to: ownership_percentage
         returns:
           type: affected
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
       list-by-case:
         description: List workstreams for a case
         invocation_phrases:
@@ -365,6 +395,11 @@ domains:
           maps_to: status
         returns:
           type: record_set
+        three_axis:
+          state_effect: preserving
+          external_effects: [observational]
+          consequence:
+            baseline: benign
       read:
         description: Read workstream details
         invocation_phrases:
@@ -398,6 +433,11 @@ domains:
             primary_key: workstream_id
         returns:
           type: record
+        three_axis:
+          state_effect: preserving
+          external_effects: [observational]
+          consequence:
+            baseline: benign
       state:
         description: Get workstream state with embedded awaiting requests, checks, and documents
         invocation_phrases:
@@ -431,3 +471,8 @@ domains:
             Returns workstream with embedded `awaiting` array of pending requests,
             plus completed checks and received documents. Domain-coherent view
             where requests are child nodes, not a separate list.
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable

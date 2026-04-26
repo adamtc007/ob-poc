@@ -32,7 +32,11 @@ pub use ast::{
 };
 pub use binding_context::BindingContext;
 pub use config::loader::ConfigLoader;
-pub use config::types::*;
+pub use config::types::{
+    ArgConfig, ArgType, CrudConfig, CrudOperation, DomainConfig, LookupConfig, ReturnTypeConfig,
+    ReturnsConfig, SearchKeyConfig, VerbBehavior, VerbConfig, VerbConsumes, VerbLifecycle,
+    VerbMetadata, VerbOutputConfig, VerbProduces, VerbsConfig,
+};
 pub use diagnostics::{Diagnostic, DiagnosticCode, Severity, SourceSpan};
 pub use parser::parse_program;
 pub use viewport_parser::{

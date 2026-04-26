@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        UPDATE \"ob-poc\".outstanding_requests\n        SET client_notes = COALESCE(client_notes || E'\\n', '') || $2,\n            updated_at = now()\n        WHERE request_id = $1\n        ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "83231756828740c32afeb8b6fb922b66858f2411c560ea4d973c235eaa8de9fb"
+}

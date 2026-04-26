@@ -426,7 +426,7 @@ impl ReplSessionV2 {
         match self.snapshot_policy {
             super::session_trace::SnapshotPolicy::Never => false,
             super::session_trace::SnapshotPolicy::EveryN(n) => {
-                n > 0 && sequence % u64::from(n) == 0
+                n > 0 && sequence.is_multiple_of(u64::from(n))
             }
             super::session_trace::SnapshotPolicy::OnStackOp => matches!(
                 op,
@@ -1036,6 +1036,8 @@ fn workspace_kind_to_shared(
         WorkspaceKind::InstrumentMatrix => SessionWorkspaceKind::InstrumentMatrix,
         WorkspaceKind::OnBoarding => SessionWorkspaceKind::OnBoarding,
         WorkspaceKind::SemOsMaintenance => SessionWorkspaceKind::SemOsMaintenance,
+        WorkspaceKind::LifecycleResources => SessionWorkspaceKind::LifecycleResources,
+        WorkspaceKind::BookingPrincipal => SessionWorkspaceKind::BookingPrincipal,
     }
 }
 

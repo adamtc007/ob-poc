@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            UPDATE \"ob-poc\".bpmn_parked_tokens\n            SET status = 'resolved',\n                resolved_at = now(),\n                result_payload = $2\n            WHERE correlation_key = $1 AND status = 'waiting'\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Jsonb"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "a6bfdbde24b210899e7e13fbd1fc9c856f1f554bf0789b8be96ab70471f1977a"
+}

@@ -1,0 +1,46 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT\n                i.isda_id,\n                i.counterparty_entity_id,\n                e.name as counterparty_name,\n                i.governing_law,\n                i.agreement_date\n               FROM \"ob-poc\".isda_agreements i\n               JOIN \"ob-poc\".entities e ON e.entity_id = i.counterparty_entity_id\n               WHERE i.cbu_id = $1 AND i.is_active = true AND e.deleted_at IS NULL\n               ORDER BY e.name",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "isda_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "counterparty_entity_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 2,
+        "name": "counterparty_name",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 3,
+        "name": "governing_law",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 4,
+        "name": "agreement_date",
+        "type_info": "Date"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      true,
+      false
+    ]
+  },
+  "hash": "725d1e4696d80e49998c9f65989bfed68faf062f5f8135d9319ce0e9fbf189d0"
+}

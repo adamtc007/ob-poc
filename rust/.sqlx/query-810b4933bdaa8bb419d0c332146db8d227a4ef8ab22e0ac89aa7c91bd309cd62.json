@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "DELETE FROM \"ob-poc\".repl_sessions_v2 WHERE session_id = $1",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "810b4933bdaa8bb419d0c332146db8d227a4ef8ab22e0ac89aa7c91bd309cd62"
+}

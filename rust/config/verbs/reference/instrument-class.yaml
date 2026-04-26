@@ -80,6 +80,11 @@ domains:
           type: uuid
           name: class_id
           capture: true
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
       read:
         description: Read instrument class by code
         metadata:
@@ -110,6 +115,11 @@ domains:
           maps_to: code
         returns:
           type: record
+        three_axis:
+          state_effect: preserving
+          external_effects: [observational]
+          consequence:
+            baseline: benign
       list:
         description: List instrument classes with filters
         metadata:
@@ -148,3 +158,8 @@ domains:
           maps_to: requires_isda
         returns:
           type: record_set
+        three_axis:
+          state_effect: preserving
+          external_effects: [observational]
+          consequence:
+            baseline: benign

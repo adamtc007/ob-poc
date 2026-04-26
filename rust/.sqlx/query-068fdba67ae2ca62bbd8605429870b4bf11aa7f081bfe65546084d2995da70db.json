@@ -1,0 +1,25 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        INSERT INTO \"ob-poc\".escalations\n            (client_id, reason, preferred_contact, conversation_context)\n        VALUES ($1, $2, $3, $4)\n        RETURNING escalation_id\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "escalation_id",
+        "type_info": "Uuid"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Text",
+        "Varchar",
+        "Jsonb"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "068fdba67ae2ca62bbd8605429870b4bf11aa7f081bfe65546084d2995da70db"
+}

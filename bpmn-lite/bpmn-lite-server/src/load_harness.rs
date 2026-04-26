@@ -13,7 +13,8 @@ use tonic::transport::Channel;
 use crate::grpc::proto::bpmn_lite_client::BpmnLiteClient;
 use crate::grpc::proto::{
     ActivateJobsRequest, CancelRequest, CompileRequest, CompleteJobRequest, FailJobRequest,
-    InspectRequest, JobActivationMsg, ProtoValue, SignalRequest, StartRequest,
+    HealthRequest, InspectRequest, JobActivationMsg, MetricsRequest, ProtoValue, SignalRequest,
+    StartRequest, SubscribeRequest,
 };
 
 const SINGLE_TASK_BPMN: &str = r#"<?xml version="1.0" encoding="UTF-8"?>
@@ -106,6 +107,7 @@ struct InstanceTracker {
 #[derive(Clone)]
 struct HarnessConfig {
     server_url: String,
+    subscription_server_url: Option<String>,
     instances: usize,
     workers: usize,
     max_jobs_per_poll: i32,
@@ -115,13 +117,16 @@ struct HarnessConfig {
     profile: String,
     fail_every: usize,
     ghost_signal_every: usize,
+    cancel_after_fail: bool,
     seed: u64,
+    subscriptions_per_instance: usize,
 }
 
 impl HarnessConfig {
     fn smoke(server_url: String) -> Self {
         Self {
             server_url,
+            subscription_server_url: None,
             instances: 16,
             workers: 4,
             max_jobs_per_poll: 8,
@@ -131,13 +136,16 @@ impl HarnessConfig {
             profile: "smoke".to_string(),
             fail_every: 0,
             ghost_signal_every: 5,
+            cancel_after_fail: true,
             seed: 7,
+            subscriptions_per_instance: 0,
         }
     }
 
     fn stress(server_url: String) -> Self {
         Self {
             server_url,
+            subscription_server_url: None,
             instances: 250,
             workers: 16,
             max_jobs_per_poll: 32,
@@ -147,7 +155,47 @@ impl HarnessConfig {
             profile: "stress".to_string(),
             fail_every: 13,
             ghost_signal_every: 7,
+            cancel_after_fail: true,
             seed: 97,
+            subscriptions_per_instance: 0,
+        }
+    }
+
+    fn poison(server_url: String) -> Self {
+        Self {
+            server_url,
+            subscription_server_url: None,
+            instances: 50,
+            workers: 8,
+            max_jobs_per_poll: 16,
+            signal_interval_ms: 50,
+            inspect_concurrency: 16,
+            timeout_secs: 90,
+            profile: "poison".to_string(),
+            fail_every: 1,
+            ghost_signal_every: 5,
+            cancel_after_fail: false,
+            seed: 211,
+            subscriptions_per_instance: 0,
+        }
+    }
+
+    fn subscription(server_url: String) -> Self {
+        Self {
+            server_url,
+            subscription_server_url: None,
+            instances: 24,
+            workers: 6,
+            max_jobs_per_poll: 12,
+            signal_interval_ms: 50,
+            inspect_concurrency: 12,
+            timeout_secs: 60,
+            profile: "subscription".to_string(),
+            fail_every: 0,
+            ghost_signal_every: 5,
+            cancel_after_fail: true,
+            seed: 313,
+            subscriptions_per_instance: 3,
         }
     }
 }
@@ -160,6 +208,7 @@ struct Metrics {
     job_failures: AtomicUsize,
     signals_sent: AtomicUsize,
     inspections: AtomicUsize,
+    subscription_events: AtomicUsize,
 }
 
 #[derive(Default)]
@@ -206,6 +255,7 @@ struct WorkerLoopConfig {
     shutdown: Arc<AtomicUsize>,
     sequence: Arc<Sequence>,
     fail_every: usize,
+    cancel_after_fail: bool,
     max_jobs: i32,
 }
 
@@ -222,6 +272,7 @@ where
 fn parse_args(args: &[String]) -> Result<HarnessConfig> {
     let mut profile = "stress".to_string();
     let mut server_url = "http://127.0.0.1:50051".to_string();
+    let mut subscription_server_url = None;
     let mut instances = None;
     let mut workers = None;
     let mut max_jobs_per_poll = None;
@@ -230,7 +281,9 @@ fn parse_args(args: &[String]) -> Result<HarnessConfig> {
     let mut timeout_secs = None;
     let mut fail_every = None;
     let mut ghost_signal_every = None;
+    let mut cancel_after_fail = None;
     let mut seed = None;
+    let mut subscriptions_per_instance = None;
 
     let mut i = 0usize;
     while i < args.len() {
@@ -247,6 +300,14 @@ fn parse_args(args: &[String]) -> Result<HarnessConfig> {
                 server_url = value
                     .ok_or_else(|| anyhow!("--server-url requires a value"))?
                     .clone();
+                i += 2;
+            }
+            "--subscription-server-url" => {
+                subscription_server_url = Some(
+                    value
+                        .ok_or_else(|| anyhow!("--subscription-server-url requires a value"))?
+                        .clone(),
+                );
                 i += 2;
             }
             "--instances" => {
@@ -281,8 +342,21 @@ fn parse_args(args: &[String]) -> Result<HarnessConfig> {
                 ghost_signal_every = Some(parse_usize_flag("--ghost-signal-every", value)?);
                 i += 2;
             }
+            "--cancel-after-fail" => {
+                cancel_after_fail = Some(true);
+                i += 1;
+            }
+            "--no-cancel-after-fail" => {
+                cancel_after_fail = Some(false);
+                i += 1;
+            }
             "--seed" => {
                 seed = Some(parse_u64_flag("--seed", value)?);
+                i += 2;
+            }
+            "--subscriptions-per-instance" => {
+                subscriptions_per_instance =
+                    Some(parse_usize_flag("--subscriptions-per-instance", value)?);
                 i += 2;
             }
             "--help" | "-h" => {
@@ -296,12 +370,18 @@ fn parse_args(args: &[String]) -> Result<HarnessConfig> {
     let mut config = match profile.as_str() {
         "smoke" => HarnessConfig::smoke(server_url),
         "stress" => HarnessConfig::stress(server_url),
-        other => bail!("Unknown profile '{}'. Use smoke or stress.", other),
+        "poison" | "poison-jobs" => HarnessConfig::poison(server_url),
+        "subscription" | "subscription-fanout" => HarnessConfig::subscription(server_url),
+        other => bail!(
+            "Unknown profile '{}'. Use smoke, stress, poison, or subscription.",
+            other
+        ),
     };
 
     if let Some(value) = instances {
         config.instances = value;
     }
+    config.subscription_server_url = subscription_server_url;
     if let Some(value) = workers {
         config.workers = value;
     }
@@ -323,8 +403,14 @@ fn parse_args(args: &[String]) -> Result<HarnessConfig> {
     if let Some(value) = ghost_signal_every {
         config.ghost_signal_every = value.max(1);
     }
+    if let Some(value) = cancel_after_fail {
+        config.cancel_after_fail = value;
+    }
     if let Some(value) = seed {
         config.seed = value;
+    }
+    if let Some(value) = subscriptions_per_instance {
+        config.subscriptions_per_instance = value;
     }
 
     Ok(config)
@@ -354,9 +440,12 @@ fn parse_u64_flag(name: &str, value: Option<&String>) -> Result<u64> {
 fn print_help() {
     eprintln!(
         "Usage: cargo run -p bpmn-lite-server --bin load_harness -- \
-         [--profile smoke|stress] [--server-url URL] [--instances N] [--workers N] \
+         [--profile smoke|stress] [--server-url URL] [--subscription-server-url URL] \
+         [--instances N] [--workers N] \
          [--max-jobs N] [--signal-interval-ms N] [--inspect-concurrency N] \
-         [--timeout-secs N] [--fail-every N] [--ghost-signal-every N] [--seed N]"
+         [--timeout-secs N] [--fail-every N] [--ghost-signal-every N] \
+         [--cancel-after-fail|--no-cancel-after-fail] [--seed N] \
+         [--subscriptions-per-instance N]"
     );
 }
 
@@ -371,6 +460,7 @@ async fn run_harness(config: HarnessConfig) -> Result<()> {
         config.profile, config.server_url, config.instances, config.workers
     );
 
+    assert_service_ready(&config.server_url).await?;
     let compiled = compile_fixtures(&config.server_url).await?;
     let task_types = compiled
         .iter()
@@ -394,6 +484,8 @@ async fn run_harness(config: HarnessConfig) -> Result<()> {
     )
     .await?;
 
+    let subscription_handles = spawn_subscription_watchers(&config, &instances, &metrics).await;
+
     let shutdown = Arc::new(AtomicUsize::new(0));
     let mut worker_handles = Vec::with_capacity(config.workers);
     for worker_idx in 0..config.workers {
@@ -403,6 +495,7 @@ async fn run_harness(config: HarnessConfig) -> Result<()> {
         let shutdown = Arc::clone(&shutdown);
         let sequence = Arc::clone(&sequence);
         let fail_every = config.fail_every;
+        let cancel_after_fail = config.cancel_after_fail;
         let max_jobs = config.max_jobs_per_poll;
         worker_handles.push(tokio::spawn(async move {
             worker_loop(WorkerLoopConfig {
@@ -413,6 +506,7 @@ async fn run_harness(config: HarnessConfig) -> Result<()> {
                 shutdown,
                 sequence,
                 fail_every,
+                cancel_after_fail,
                 max_jobs,
             })
             .await
@@ -448,8 +542,119 @@ async fn run_harness(config: HarnessConfig) -> Result<()> {
         handle.await??;
     }
     signal_handle.await??;
+    wait_for_subscription_watchers(subscription_handles).await?;
 
     emit_summary(&config, &metrics, &summary, started_at.elapsed());
+    assert_service_metrics(&config.server_url).await?;
+    Ok(())
+}
+
+async fn spawn_subscription_watchers(
+    config: &HarnessConfig,
+    instances: &Arc<Mutex<Vec<InstanceTracker>>>,
+    metrics: &Arc<Metrics>,
+) -> Vec<tokio::task::JoinHandle<Result<usize>>> {
+    if config.subscriptions_per_instance == 0 {
+        return Vec::new();
+    }
+
+    let snapshot = instances.lock().await.clone();
+    let mut handles = Vec::with_capacity(snapshot.len() * config.subscriptions_per_instance);
+    for tracker in snapshot {
+        for subscriber_idx in 0..config.subscriptions_per_instance {
+            let server_url = config
+                .subscription_server_url
+                .clone()
+                .unwrap_or_else(|| config.server_url.clone());
+            let process_instance_id = tracker.process_instance_id.clone();
+            let metrics = Arc::clone(metrics);
+            handles.push(tokio::spawn(async move {
+                subscription_watcher(server_url, process_instance_id, subscriber_idx, metrics).await
+            }));
+        }
+    }
+    handles
+}
+
+async fn subscription_watcher(
+    server_url: String,
+    process_instance_id: String,
+    subscriber_idx: usize,
+    metrics: Arc<Metrics>,
+) -> Result<usize> {
+    let mut client = connect_client(&server_url).await?;
+    let mut stream = client
+        .subscribe_events(SubscribeRequest {
+            process_instance_id: process_instance_id.clone(),
+        })
+        .await
+        .with_context(|| {
+            format!(
+                "SubscribeEvents failed for {} subscriber {}",
+                process_instance_id, subscriber_idx
+            )
+        })?
+        .into_inner();
+
+    let mut count = 0usize;
+    while let Some(event) = stream.message().await? {
+        if event.process_instance_id != process_instance_id {
+            bail!(
+                "subscriber {} received event for wrong instance: expected {}, got {}",
+                subscriber_idx,
+                process_instance_id,
+                event.process_instance_id
+            );
+        }
+        count += 1;
+        metrics.subscription_events.fetch_add(1, Ordering::Relaxed);
+    }
+
+    if count == 0 {
+        bail!(
+            "subscriber {} received no events for {}",
+            subscriber_idx,
+            process_instance_id
+        );
+    }
+    Ok(count)
+}
+
+async fn wait_for_subscription_watchers(
+    handles: Vec<tokio::task::JoinHandle<Result<usize>>>,
+) -> Result<()> {
+    if handles.is_empty() {
+        return Ok(());
+    }
+
+    let mut total_events = 0usize;
+    for handle in handles {
+        let count = tokio::time::timeout(Duration::from_secs(10), handle)
+            .await
+            .context("timed out waiting for subscription watcher to finish")???;
+        total_events += count;
+    }
+    if total_events == 0 {
+        bail!("subscription watchers received no lifecycle events");
+    }
+    Ok(())
+}
+
+async fn assert_service_ready(server_url: &str) -> Result<()> {
+    let mut client = connect_client(server_url).await?;
+    let health = client.health(HealthRequest {}).await?.into_inner();
+    if !health.ready {
+        bail!("BPMN-Lite service is not ready: {}", health.status);
+    }
+    Ok(())
+}
+
+async fn assert_service_metrics(server_url: &str) -> Result<()> {
+    let mut client = connect_client(server_url).await?;
+    let metrics = client.metrics(MetricsRequest {}).await?.into_inner();
+    if metrics.requests_total == 0 {
+        bail!("BPMN-Lite metrics did not record requests");
+    }
     Ok(())
 }
 
@@ -534,6 +739,7 @@ async fn worker_loop(config: WorkerLoopConfig) -> Result<()> {
         shutdown,
         sequence,
         fail_every,
+        cancel_after_fail,
         max_jobs,
     } = config;
     let mut client = connect_client(&server_url).await?;
@@ -556,7 +762,15 @@ async fn worker_loop(config: WorkerLoopConfig) -> Result<()> {
         while let Some(job) = stream.message().await? {
             saw_job = true;
             metrics.job_activations.fetch_add(1, Ordering::Relaxed);
-            process_job(&mut client, job, &metrics, &sequence, fail_every).await?;
+            process_job(
+                &mut client,
+                job,
+                &metrics,
+                &sequence,
+                fail_every,
+                cancel_after_fail,
+            )
+            .await?;
         }
 
         if !saw_job {
@@ -572,6 +786,7 @@ async fn process_job(
     metrics: &Arc<Metrics>,
     sequence: &Arc<Sequence>,
     fail_every: usize,
+    cancel_after_fail: bool,
 ) -> Result<()> {
     let turn = sequence.next() as usize;
     if fail_every > 0 && turn.is_multiple_of(fail_every) {
@@ -584,12 +799,14 @@ async fn process_job(
                 retry_hint_ms: 250,
             })
             .await?;
-        client
-            .cancel(CancelRequest {
-                process_instance_id,
-                reason: "synthetic load-harness cancellation after fail_job".to_string(),
-            })
-            .await?;
+        if cancel_after_fail {
+            client
+                .cancel(CancelRequest {
+                    process_instance_id,
+                    reason: "synthetic load-harness cancellation after fail_job".to_string(),
+                })
+                .await?;
+        }
         metrics.job_failures.fetch_add(1, Ordering::Relaxed);
         return Ok(());
     }
@@ -820,6 +1037,7 @@ fn emit_summary(
     let failures = metrics.job_failures.load(Ordering::Relaxed);
     let signals = metrics.signals_sent.load(Ordering::Relaxed);
     let inspections = metrics.inspections.load(Ordering::Relaxed);
+    let subscription_events = metrics.subscription_events.load(Ordering::Relaxed);
     let throughput = if elapsed.as_secs_f64() > 0.0 {
         jobs_total as f64 / elapsed.as_secs_f64()
     } else {
@@ -845,6 +1063,7 @@ fn emit_summary(
             "job_failures": failures,
             "signals_sent": signals,
             "inspections": inspections,
+            "subscription_events": subscription_events,
             "elapsed_ms": elapsed.as_millis(),
             "jobs_per_second": throughput,
             "terminal_counts": summary.terminal_counts,

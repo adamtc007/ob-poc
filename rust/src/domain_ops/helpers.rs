@@ -225,6 +225,113 @@ pub async fn resolve_cbu_id(
 // Entity Resolution (async, requires DB)
 // ============================================================================
 
+// ============================================================================
+// JSON-based extraction (for SemOS VerbExecutionContext path — Phase 2)
+// ============================================================================
+// These mirror the VerbCall-based helpers above but work with
+// serde_json::Value args and sem_os_core::VerbExecutionContext.
+
+/// Extract a required string from JSON args.
+pub fn json_extract_string(args: &serde_json::Value, arg_name: &str) -> Result<String> {
+    json_extract_string_opt(args, arg_name).ok_or_else(|| anyhow!("Missing {} argument", arg_name))
+}
+
+/// Extract an optional string from JSON args.
+pub fn json_extract_string_opt(args: &serde_json::Value, arg_name: &str) -> Option<String> {
+    args.get(arg_name)
+        .and_then(|v| v.as_str())
+        .map(|s| s.to_string())
+}
+
+/// Extract a required UUID from JSON args + context symbols.
+pub fn json_extract_uuid(
+    args: &serde_json::Value,
+    ctx: &dsl_runtime::VerbExecutionContext,
+    arg_name: &str,
+) -> Result<Uuid> {
+    json_extract_uuid_opt(args, ctx, arg_name)
+        .ok_or_else(|| anyhow!("Missing {} argument", arg_name))
+}
+
+/// Extract an optional UUID from JSON args + context symbols.
+pub fn json_extract_uuid_opt(
+    args: &serde_json::Value,
+    ctx: &dsl_runtime::VerbExecutionContext,
+    arg_name: &str,
+) -> Option<Uuid> {
+    args.get(arg_name).and_then(|v| {
+        // Try as string → parse as UUID
+        if let Some(s) = v.as_str() {
+            // Check if it's a @symbol reference
+            if let Some(sym) = s.strip_prefix('@') {
+                return ctx.resolve(sym);
+            }
+            return Uuid::parse_str(s).ok();
+        }
+        None
+    })
+}
+
+/// Simple UUID extraction from JSON args without context.
+pub fn json_get_required_uuid(args: &serde_json::Value, arg_name: &str) -> Result<Uuid> {
+    args.get(arg_name)
+        .and_then(|v| v.as_str())
+        .and_then(|s| Uuid::parse_str(s).ok())
+        .ok_or_else(|| anyhow!("Missing or invalid {} argument", arg_name))
+}
+
+/// Extract an optional boolean from JSON args.
+pub fn json_extract_bool_opt(args: &serde_json::Value, arg_name: &str) -> Option<bool> {
+    args.get(arg_name).and_then(|v| v.as_bool())
+}
+
+/// Extract a required boolean from JSON args.
+pub fn json_extract_bool(args: &serde_json::Value, arg_name: &str) -> Result<bool> {
+    json_extract_bool_opt(args, arg_name).ok_or_else(|| anyhow!("Missing {} argument", arg_name))
+}
+
+/// Extract an optional integer from JSON args.
+pub fn json_extract_int_opt(args: &serde_json::Value, arg_name: &str) -> Option<i64> {
+    args.get(arg_name).and_then(|v| v.as_i64())
+}
+
+/// Extract a required integer from JSON args.
+pub fn json_extract_int(args: &serde_json::Value, arg_name: &str) -> Result<i64> {
+    json_extract_int_opt(args, arg_name).ok_or_else(|| anyhow!("Missing {} argument", arg_name))
+}
+
+/// Extract an optional string list from JSON args.
+pub fn json_extract_string_list_opt(
+    args: &serde_json::Value,
+    arg_name: &str,
+) -> Option<Vec<String>> {
+    args.get(arg_name).and_then(|v| v.as_array()).map(|arr| {
+        arr.iter()
+            .filter_map(|v| v.as_str().map(|s| s.to_string()))
+            .collect()
+    })
+}
+
+/// Extract a required string list from JSON args.
+pub fn json_extract_string_list(args: &serde_json::Value, arg_name: &str) -> Result<Vec<String>> {
+    json_extract_string_list_opt(args, arg_name)
+        .ok_or_else(|| anyhow!("Missing {} argument", arg_name))
+}
+
+/// Extract CBU ID from JSON args, accepting "cbu" or "cbu-id".
+pub fn json_extract_cbu_id(
+    args: &serde_json::Value,
+    ctx: &dsl_runtime::VerbExecutionContext,
+) -> Result<Uuid> {
+    json_extract_uuid_opt(args, ctx, "cbu-id")
+        .or_else(|| json_extract_uuid_opt(args, ctx, "cbu"))
+        .ok_or_else(|| anyhow!("Missing cbu or cbu-id argument"))
+}
+
+// ============================================================================
+// Entity Resolution (async, requires DB)
+// ============================================================================
+
 /// Extract and resolve an entity reference from a verb argument.
 ///
 /// Handles multiple formats:
@@ -366,5 +473,195 @@ pub async fn extract_entity_ref_opt(
         ))
     } else {
         Ok(None)
+    }
+}
+
+// ============================================================================
+// VerbExecutionContext extensions transport (Phase 2.5 Slice B+)
+// ============================================================================
+// Native `execute_json` bodies read/write session-scoped side-channel state
+// through `VerbExecutionContext.extensions` under stable JSON keys. These
+// helpers replace the legacy `ExecutionContext.pending_*` field access
+// pattern used by session/view/agent ops.
+
+use crate::session::{UnifiedSession, ViewState};
+
+/// JSON key used to carry the pending `UnifiedSession` across the
+/// dispatch boundary.
+pub const EXT_KEY_PENDING_SESSION: &str = "pending_session";
+
+/// JSON key used to carry the pending `ViewState` across the dispatch
+/// boundary.
+pub const EXT_KEY_PENDING_VIEW_STATE: &str = "pending_view_state";
+
+fn ext_obj_mut(
+    ctx: &mut dsl_runtime::VerbExecutionContext,
+) -> &mut serde_json::Map<String, serde_json::Value> {
+    if !ctx.extensions.is_object() {
+        ctx.extensions = serde_json::Value::Object(serde_json::Map::new());
+    }
+    ctx.extensions.as_object_mut().unwrap()
+}
+
+/// Consume the pending `UnifiedSession` from `sem_ctx.extensions` if any.
+pub fn ext_take_pending_session(
+    ctx: &mut dsl_runtime::VerbExecutionContext,
+) -> Option<UnifiedSession> {
+    let obj = ctx.extensions.as_object_mut()?;
+    let v = obj.remove(EXT_KEY_PENDING_SESSION)?;
+    serde_json::from_value(v).ok()
+}
+
+/// Write a `UnifiedSession` to `sem_ctx.extensions` under the pending-session key.
+pub fn ext_set_pending_session(
+    ctx: &mut dsl_runtime::VerbExecutionContext,
+    session: UnifiedSession,
+) {
+    if let Ok(v) = serde_json::to_value(&session) {
+        ext_obj_mut(ctx).insert(EXT_KEY_PENDING_SESSION.to_string(), v);
+    }
+}
+
+/// Get-or-create the pending `UnifiedSession` in `sem_ctx.extensions`.
+/// Mirrors `ExecutionContext::get_or_create_session_mut` but over JSON
+/// transport — caller mutates the owned value, then writes back via
+/// `ext_set_pending_session`.
+pub fn ext_take_or_create_pending_session(
+    ctx: &mut dsl_runtime::VerbExecutionContext,
+) -> UnifiedSession {
+    ext_take_pending_session(ctx).unwrap_or_default()
+}
+
+/// Write a `ViewState` to `sem_ctx.extensions` under the pending-view-state key.
+pub fn ext_set_pending_view_state(ctx: &mut dsl_runtime::VerbExecutionContext, view: ViewState) {
+    if let Ok(v) = serde_json::to_value(&view) {
+        ext_obj_mut(ctx).insert(EXT_KEY_PENDING_VIEW_STATE.to_string(), v);
+    }
+}
+
+/// Read a string-valued key from `sem_ctx.extensions`.
+pub fn ext_get_string(ctx: &dsl_runtime::VerbExecutionContext, key: &str) -> Option<String> {
+    ctx.extensions
+        .as_object()?
+        .get(key)?
+        .as_str()
+        .map(|s| s.to_string())
+}
+
+// ============================================================================
+// Tests
+// ============================================================================
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use sem_os_core::principal::Principal;
+
+    #[test]
+    fn json_extract_string_present() {
+        let args = serde_json::json!({"name": "Acme Fund"});
+        assert_eq!(json_extract_string(&args, "name").unwrap(), "Acme Fund");
+    }
+
+    #[test]
+    fn json_extract_string_missing() {
+        let args = serde_json::json!({});
+        assert!(json_extract_string(&args, "name").is_err());
+    }
+
+    #[test]
+    fn json_extract_string_opt_present() {
+        let args = serde_json::json!({"name": "Test"});
+        assert_eq!(
+            json_extract_string_opt(&args, "name"),
+            Some("Test".to_string())
+        );
+    }
+
+    #[test]
+    fn json_extract_string_opt_missing() {
+        let args = serde_json::json!({});
+        assert_eq!(json_extract_string_opt(&args, "name"), None);
+    }
+
+    #[test]
+    fn json_extract_uuid_from_string() {
+        let id = uuid::Uuid::new_v4();
+        let args = serde_json::json!({"entity-id": id.to_string()});
+        let ctx = dsl_runtime::VerbExecutionContext::new(Principal::system());
+        assert_eq!(json_extract_uuid(&args, &ctx, "entity-id").unwrap(), id);
+    }
+
+    #[test]
+    fn json_extract_uuid_from_symbol() {
+        let id = uuid::Uuid::new_v4();
+        let args = serde_json::json!({"cbu-id": "@cbu"});
+        let mut ctx = dsl_runtime::VerbExecutionContext::new(Principal::system());
+        ctx.bind("cbu", id);
+        assert_eq!(json_extract_uuid(&args, &ctx, "cbu-id").unwrap(), id);
+    }
+
+    #[test]
+    fn json_extract_uuid_missing() {
+        let args = serde_json::json!({});
+        let ctx = dsl_runtime::VerbExecutionContext::new(Principal::system());
+        assert!(json_extract_uuid(&args, &ctx, "id").is_err());
+    }
+
+    #[test]
+    fn json_get_required_uuid_valid() {
+        let id = uuid::Uuid::new_v4();
+        let args = serde_json::json!({"id": id.to_string()});
+        assert_eq!(json_get_required_uuid(&args, "id").unwrap(), id);
+    }
+
+    #[test]
+    fn json_get_required_uuid_invalid() {
+        let args = serde_json::json!({"id": "not-a-uuid"});
+        assert!(json_get_required_uuid(&args, "id").is_err());
+    }
+
+    #[test]
+    fn json_extract_bool_opt_present() {
+        let args = serde_json::json!({"active": true});
+        assert_eq!(json_extract_bool_opt(&args, "active"), Some(true));
+    }
+
+    #[test]
+    fn json_extract_int_present() {
+        let args = serde_json::json!({"count": 42});
+        assert_eq!(json_extract_int(&args, "count").unwrap(), 42);
+    }
+
+    #[test]
+    fn json_extract_string_list_present() {
+        let args = serde_json::json!({"tags": ["a", "b", "c"]});
+        assert_eq!(
+            json_extract_string_list(&args, "tags").unwrap(),
+            vec!["a", "b", "c"]
+        );
+    }
+
+    #[test]
+    fn json_extract_cbu_id_from_cbu_id_key() {
+        let id = uuid::Uuid::new_v4();
+        let args = serde_json::json!({"cbu-id": id.to_string()});
+        let ctx = dsl_runtime::VerbExecutionContext::new(Principal::system());
+        assert_eq!(json_extract_cbu_id(&args, &ctx).unwrap(), id);
+    }
+
+    #[test]
+    fn json_extract_cbu_id_from_cbu_key() {
+        let id = uuid::Uuid::new_v4();
+        let args = serde_json::json!({"cbu": id.to_string()});
+        let ctx = dsl_runtime::VerbExecutionContext::new(Principal::system());
+        assert_eq!(json_extract_cbu_id(&args, &ctx).unwrap(), id);
+    }
+
+    #[test]
+    fn json_extract_cbu_id_missing() {
+        let args = serde_json::json!({});
+        let ctx = dsl_runtime::VerbExecutionContext::new(Principal::system());
+        assert!(json_extract_cbu_id(&args, &ctx).is_err());
     }
 }

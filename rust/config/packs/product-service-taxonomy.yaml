@@ -35,12 +35,28 @@ allowed_verbs:
   - service.list
   - service.read
   - service.list-by-product
+  - service.list-versions
+  - service.show
   - service-resource.list
   - service-resource.read
   - service-resource.list-by-service
   - service-resource.list-attributes
   - attribute.list
   - attribute.read
+  # R2 (2026-04-26) — service + service-version governance verbs.
+  # These mutate the catalogue lifecycle and are admin-AgentMode-gated
+  # at runtime by ABAC policy; the read-only exploration flow above is
+  # unaffected for non-admin users.
+  - service.define
+  - service.propose-revision
+  - service.deprecate
+  - service.retire
+  - service-version.draft
+  - service-version.submit-for-review
+  - service-version.publish
+  - service-version.retire
+  - service-version.update
+  - service-version.compare
 
 forbidden_verbs:
   - service-resource.provision

@@ -52,6 +52,11 @@ domains:
         returns:
           type: record
           capture: false
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
 
       submit-for-review:
         description: Submit a changeset for human review
@@ -81,6 +86,11 @@ domains:
         returns:
           type: record
           capture: false
+        three_axis:
+          state_effect: preserving
+          external_effects: [emitting]
+          consequence:
+            baseline: requires_confirmation
 
       record-review:
         description: Record a review decision (approve/reject) on a changeset
@@ -118,6 +128,11 @@ domains:
         returns:
           type: record
           capture: false
+        three_axis:
+          state_effect: preserving
+          external_effects: [emitting]
+          consequence:
+            baseline: reviewable
 
       # ============================================
       # CoreService-Delegated Ops
@@ -150,6 +165,11 @@ domains:
         returns:
           type: record
           capture: false
+        three_axis:
+          state_effect: preserving
+          external_effects: [emitting]
+          consequence:
+            baseline: requires_confirmation
 
       dry-run:
         description: Dry-run a changeset (Stage 2 scratch schema validation)
@@ -181,6 +201,11 @@ domains:
         returns:
           type: record
           capture: false
+        three_axis:
+          state_effect: preserving
+          external_effects: [observational]
+          consequence:
+            baseline: benign
 
       plan-publish:
         description: Plan a publish operation (diff preview against active snapshot set)
@@ -209,6 +234,11 @@ domains:
         returns:
           type: record
           capture: false
+        three_axis:
+          state_effect: preserving
+          external_effects: [emitting]
+          consequence:
+            baseline: requires_confirmation
 
       publish:
         description: Publish a validated changeset to the active snapshot set
@@ -238,6 +268,15 @@ domains:
         returns:
           type: record
           capture: false
+        three_axis:
+          state_effect: transition
+          external_effects: [emitting]
+          consequence:
+            baseline: requires_explicit_authorisation
+        transition_args:
+          entity_id_arg: changeset-id
+          target_workspace: semos_maintenance
+          target_slot: changeset
 
       publish-batch:
         description: Batch publish multiple changesets in topological order
@@ -267,6 +306,15 @@ domains:
         returns:
           type: record
           capture: false
+        three_axis:
+          state_effect: transition
+          external_effects: [emitting]
+          consequence:
+            baseline: requires_explicit_authorisation
+        transition_args:
+          entity_id_arg: changeset-id
+          target_workspace: semos_maintenance
+          target_slot: changeset
 
       rollback:
         description: Rollback the active snapshot set to a previous version
@@ -296,3 +344,12 @@ domains:
         returns:
           type: record
           capture: false
+        three_axis:
+          state_effect: transition
+          external_effects: [emitting]
+          consequence:
+            baseline: requires_explicit_authorisation
+        transition_args:
+          entity_id_arg: changeset-id
+          target_workspace: semos_maintenance
+          target_slot: changeset

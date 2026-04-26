@@ -16,13 +16,13 @@ pub mod cbu_entity_roles_service;
 pub mod cbu_service;
 pub mod context_discovery_service;
 pub mod crud_service;
-pub mod document_policy_service;
+// Phase 4 Slice B — document_policy_service + governed_document_requirements_service
+// relocated to `dsl-runtime::document_requirements::{policy, governed}`.
 pub mod document_service;
 pub mod dsl_repository;
 pub mod entity_service;
 pub mod execution_audit;
 pub mod expansion_audit;
-pub mod governed_document_requirements_service;
 pub mod semantic_state_service;
 // Fuzzy search is now handled by EntityGateway gRPC service.
 // See rust/crates/entity-gateway/ for the central lookup service.
@@ -59,10 +59,6 @@ pub use bods_types::{
 pub use cbu_entity_roles_service::{CbuEntityRoleExpanded, CbuEntityRolesService, RoleRow};
 pub use cbu_service::{CbuRow, CbuService, NewCbuFields};
 pub use crud_service::{AssetType, CrudOperation, CrudService, OperationType};
-pub use document_policy_service::{
-    ActiveDocumentPolicyBundle, DocumentPolicyService, PublishedEvidenceStrategy,
-    PublishedProofObligation, PublishedRequirementProfile,
-};
 pub use document_service::{
     DocumentCatalogEntry, DocumentService, DocumentType, NewDocumentFields,
 };
@@ -115,11 +111,6 @@ pub use execution_audit::{
 };
 
 pub use expansion_audit::{ExpansionAuditRepository, ExpansionReportRow};
-pub use governed_document_requirements_service::{
-    EntityPolicyContext, GovernedComponentStatus, GovernedDocumentGap,
-    GovernedDocumentRequirements, GovernedDocumentRequirementsService, GovernedObligationCategory,
-    GovernedObligationStatus, GovernedRequirementMatrix, GovernedStrategyStatus,
-};
 
 pub use context_discovery_service::{
     CbuContextRow, ContextDiscoveryService, DiscoveredContext, LinkedContextRow,

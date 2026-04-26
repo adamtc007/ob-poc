@@ -1,0 +1,46 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT s.service_id, s.name, s.service_code, s.service_category, ps.is_mandatory\n               FROM \"ob-poc\".services s\n               JOIN \"ob-poc\".product_services ps ON ps.service_id = s.service_id\n               WHERE ps.product_id = $1\n               ORDER BY ps.display_order, s.name",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "service_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "name",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 2,
+        "name": "service_code",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 3,
+        "name": "service_category",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 4,
+        "name": "is_mandatory",
+        "type_info": "Bool"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      true,
+      true,
+      true
+    ]
+  },
+  "hash": "01083cb74994494e5da3165fe3dc131535870ae975cf5a25791dc539906f7f3c"
+}

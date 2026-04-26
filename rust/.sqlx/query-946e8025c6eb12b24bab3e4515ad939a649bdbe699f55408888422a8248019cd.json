@@ -1,0 +1,53 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            SELECT\n                cg.id as group_id,\n                cg.canonical_name as \"group_name!\",\n                cga.alias as \"matched_alias!\",\n                cga.confidence as \"confidence!\",\n                (cga.alias_norm = $1) as \"exact_match!\",\n                (dmetaphone(cga.alias_norm) = dmetaphone($1)) as \"phonetic_match!\"\n            FROM \"ob-poc\".client_group_alias cga\n            JOIN \"ob-poc\".client_group cg ON cg.id = cga.group_id\n            WHERE cga.alias_norm = $1\n               OR cga.alias_norm ILIKE '%' || $1 || '%'\n               OR similarity(cga.alias_norm, $1) > $2\n               OR dmetaphone(cga.alias_norm) = dmetaphone($1)\n            ORDER BY\n                (cga.alias_norm = $1) DESC,\n                (dmetaphone(cga.alias_norm) = dmetaphone($1)) DESC,\n                cga.confidence DESC,\n                similarity(cga.alias_norm, $1) DESC\n            LIMIT 5\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "group_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "group_name!",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 2,
+        "name": "matched_alias!",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 3,
+        "name": "confidence!",
+        "type_info": "Float8"
+      },
+      {
+        "ordinal": 4,
+        "name": "exact_match!",
+        "type_info": "Bool"
+      },
+      {
+        "ordinal": 5,
+        "name": "phonetic_match!",
+        "type_info": "Bool"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Float4"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      true,
+      null,
+      null
+    ]
+  },
+  "hash": "946e8025c6eb12b24bab3e4515ad939a649bdbe699f55408888422a8248019cd"
+}

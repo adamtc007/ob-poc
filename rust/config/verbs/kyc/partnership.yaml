@@ -115,6 +115,11 @@ domains:
           type: uuid
           name: partner_capital_id
           capture: true
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
 
       record-contribution:
         description: Record capital contribution (drawdown)
@@ -169,6 +174,11 @@ domains:
         returns:
           type: uuid
           name: contribution_id
+        three_axis:
+          state_effect: preserving
+          external_effects: [emitting]
+          consequence:
+            baseline: reviewable
 
       record-distribution:
         description: Record distribution to partner
@@ -222,6 +232,11 @@ domains:
         returns:
           type: uuid
           name: distribution_id
+        three_axis:
+          state_effect: preserving
+          external_effects: [emitting]
+          consequence:
+            baseline: reviewable
 
       withdraw-partner:
         description: Record partner withdrawal/exit
@@ -272,6 +287,11 @@ domains:
           is_active: false
         returns:
           type: affected
+        three_axis:
+          state_effect: preserving
+          external_effects: [emitting]
+          consequence:
+            baseline: requires_confirmation
 
       list-partners:
         description: List all partners in a partnership
@@ -318,6 +338,11 @@ domains:
           default: false
         returns:
           type: record_set
+        three_axis:
+          state_effect: preserving
+          external_effects: [observational]
+          consequence:
+            baseline: benign
 
       reconcile:
         description: |
@@ -379,6 +404,11 @@ domains:
             - entity_id
             - partner_type
             - control_basis
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
 
       analyze-control:
         description: |
@@ -431,3 +461,8 @@ domains:
           - name: ubo_candidates
             type: array
             description: "Natural persons identified as potential UBOs"
+        three_axis:
+          state_effect: preserving
+          external_effects: [observational]
+          consequence:
+            baseline: benign

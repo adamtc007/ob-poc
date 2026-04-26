@@ -430,23 +430,23 @@ fn apply_action_domain_bias(lower: &str, scores: &mut HashMap<&'static str, i32>
                 add_score(scores, "kyc", 3);
             }
         }
-        "screen" | "check" => {
+        "screen" | "check"
             if lower.contains("pep")
                 || lower.contains("sanctions")
                 || lower.contains("adverse media")
-                || lower.contains("screening")
-            {
-                add_score(scores, "screening", 5);
-            }
+                || lower.contains("screening") =>
+        {
+            add_score(scores, "screening", 5);
         }
-        "assign" | "add" | "make" => {
+        "screen" | "check" => {}
+        "assign" | "add" | "make"
             if lower.contains("role")
                 || lower.contains("custodian")
-                || lower.contains("transfer agent")
-            {
-                add_score(scores, "cbu", 4);
-            }
+                || lower.contains("transfer agent") =>
+        {
+            add_score(scores, "cbu", 4);
         }
+        "assign" | "add" | "make" => {}
         "show" | "list" | "what" | "who" => {
             if lower.contains("ownership") || lower.contains("beneficial owner") {
                 add_score(scores, "ubo", 3);
@@ -455,16 +455,16 @@ fn apply_action_domain_bias(lower: &str, scores: &mut HashMap<&'static str, i32>
                 add_score(scores, "fund", 3);
             }
         }
-        "set" | "onboard" | "launch" | "create" => {
+        "set" | "onboard" | "launch" | "create"
             if lower.contains("icav")
                 || lower.contains("sicav")
                 || lower.contains("oeic")
                 || lower.contains("40-act")
-                || lower.contains("fund structure")
-            {
-                add_score(scores, "struct", 5);
-            }
+                || lower.contains("fund structure") =>
+        {
+            add_score(scores, "struct", 5);
         }
+        "set" | "onboard" | "launch" | "create" => {}
         _ => {}
     }
 }

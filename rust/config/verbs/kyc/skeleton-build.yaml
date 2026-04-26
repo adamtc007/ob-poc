@@ -74,3 +74,8 @@ domains:
             type: integer
           - name: steps_completed
             type: list
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable

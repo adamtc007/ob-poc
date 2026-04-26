@@ -47,6 +47,12 @@ domains:
           type: record
           capture: false
 
+        three_axis:
+          state_effect: preserving
+          external_effects:
+            - observational
+          consequence:
+            baseline: benign
       health-stale-dryruns:
         description: Check for stale dry-run results older than threshold
         metadata:
@@ -75,6 +81,12 @@ domains:
       # ============================================
       # Cleanup
       # ============================================
+        three_axis:
+          state_effect: preserving
+          external_effects:
+            - observational
+          consequence:
+            baseline: benign
       cleanup:
         description: Run retention cleanup on old rejected/failed changesets
         metadata:
@@ -103,6 +115,12 @@ domains:
       # ============================================
       # Bootstrap Seeds
       # ============================================
+        three_axis:
+          state_effect: preserving
+          external_effects: &id001
+            - emitting
+          consequence:
+            baseline: reviewable
       bootstrap-seeds:
         description: Bootstrap seed bundles into the registry
         metadata:
@@ -131,6 +149,11 @@ domains:
       # ============================================
       # Outbox Drain
       # ============================================
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
       drain-outbox:
         description: Check outbox event queue status and trigger flush
         metadata:
@@ -159,6 +182,12 @@ domains:
       # ============================================
       # Reindex Embeddings
       # ============================================
+        three_axis:
+          state_effect: preserving
+          external_effects:
+            - observational
+          consequence:
+            baseline: benign
       reindex-embeddings:
         description: Trigger embedding reindex by spawning populate_embeddings binary
         metadata:
@@ -192,6 +221,11 @@ domains:
       # ============================================
       # Schema Sync Validation
       # ============================================
+        three_axis:
+          state_effect: preserving
+          external_effects: *id001
+          consequence:
+            baseline: reviewable
       validate-schema-sync:
         description: Validate that schema and registry are in sync (drift detection)
         metadata:
@@ -216,3 +250,9 @@ domains:
         returns:
           type: record
           capture: false
+        three_axis:
+          state_effect: preserving
+          external_effects:
+            - observational
+          consequence:
+            baseline: benign

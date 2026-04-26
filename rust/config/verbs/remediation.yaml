@@ -39,6 +39,11 @@ domains:
         - show remediation events
         - what remediations are pending
         - stale workspace status
+        three_axis:
+          state_effect: preserving
+          external_effects: [observational]
+          consequence:
+            baseline: benign
 
       defer:
         description: Explicitly accept divergence from a superseded shared attribute version
@@ -72,6 +77,11 @@ domains:
         - accept divergence
         - waive remediation
         - defer stale state
+        three_axis:
+          state_effect: preserving
+          external_effects: [emitting]
+          consequence:
+            baseline: requires_confirmation
 
       revoke-deferral:
         description: Re-open a previously deferred remediation event
@@ -100,6 +110,11 @@ domains:
         - revoke deferral
         - re-open remediation
         - undo defer
+        three_axis:
+          state_effect: preserving
+          external_effects: [emitting]
+          consequence:
+            baseline: requires_confirmation
 
       confirm-external-correction:
         description: Record that a manual external correction has been confirmed by the provider
@@ -133,3 +148,8 @@ domains:
         - confirm external correction
         - provider confirmed correction
         - manual correction done
+        three_axis:
+          state_effect: preserving
+          external_effects: [emitting]
+          consequence:
+            baseline: requires_confirmation

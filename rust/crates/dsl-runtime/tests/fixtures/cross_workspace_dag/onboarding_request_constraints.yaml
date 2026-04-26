@@ -1,0 +1,67 @@
+name: "Onboarding-request cross-workspace constraints"
+suite_id: "onboarding_request_constraints"
+description: |
+  Exercises both onboarding_request constraints:
+  - onboarding_request_requires_deal_contracted (Deal must be CONTRACTED+)
+  - onboarding_request_requires_cbu_validated (CBU must be VALIDATED)
+
+  Walks: blocked-by-both → mutate Deal → blocked-by-CBU → mutate CBU →
+  green.
+
+mode: mock
+
+entity_aliases:
+  request-1: "55555555-0000-0000-0000-000000000001"
+  deal-1:    "55555555-0000-0000-0000-000000000002"
+  cbu-1:     "55555555-0000-0000-0000-000000000003"
+
+initial_state:
+  - { workspace: onboarding_request, slot: onboarding_request, entity: "request-1", state: "validating" }
+  - { workspace: deal, slot: deal, entity: "deal-1", state: "QUALIFYING" }
+  - { workspace: cbu, slot: cbu, entity: "cbu-1", state: "VALIDATION_PENDING" }
+
+predicates:
+  "deals.deal_id = this_request.deal_id":
+    - { target: "request-1", source: "deal-1" }
+  "cbus.cbu_id = this_request.cbu_id":
+    - { target: "request-1", source: "cbu-1" }
+
+steps:
+  - name: "blocked: Deal not CONTRACTED + CBU not VALIDATED"
+    check_transition:
+      workspace: onboarding_request
+      slot: onboarding_request
+      entity: "request-1"
+      from: "validating"
+      to: "submitted"
+    expect:
+      violations:
+        - { constraint_id: "onboarding_request_requires_deal_contracted", severity: "error" }
+        - { constraint_id: "onboarding_request_requires_cbu_validated",   severity: "error" }
+
+  - mutate:
+      - { workspace: deal, slot: deal, entity: "deal-1", state: "CONTRACTED" }
+
+  - name: "still blocked: CBU not VALIDATED"
+    check_transition:
+      workspace: onboarding_request
+      slot: onboarding_request
+      entity: "request-1"
+      from: "validating"
+      to: "submitted"
+    expect:
+      violations:
+        - { constraint_id: "onboarding_request_requires_cbu_validated", severity: "error" }
+
+  - mutate:
+      - { workspace: cbu, slot: cbu, entity: "cbu-1", state: "VALIDATED" }
+
+  - name: "succeeds: both Deal and CBU green"
+    check_transition:
+      workspace: onboarding_request
+      slot: onboarding_request
+      entity: "request-1"
+      from: "validating"
+      to: "submitted"
+    expect:
+      violations: []

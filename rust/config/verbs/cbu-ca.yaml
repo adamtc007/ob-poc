@@ -1,0 +1,177 @@
+# Cbu-ca verbs — Tranche 2+3 DAG alignment (2026-04-24)
+# 
+# Generated as part of the verb-declaration batch that backfills
+# verbs implied by DAG state machines but not previously declared.
+
+domains:
+  cbu-ca:
+    description: CBU-level corporate-action events (rename, redomiciliation, merger, conversion)
+    invocation_hints: []
+    verbs:
+      submit-for-review:
+        description: "Submit CBU-level CA event for board / legal / compliance review"
+        behavior: plugin
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: cbu
+          noun: cbu-corporate-action
+          subject_kinds: [cbu-corporate-action]
+          phase_tags: [cbu-corporate-action]
+          side_effects: state_write
+          harm_class: reversible
+        invocation_phrases:
+          - "submit CBU CA for review"
+          - "escalate CBU CA event"
+          - "send CBU corporate action for approval"
+        args:
+          - name: event-id
+            type: uuid
+            required: true
+            maps_to: event_id
+        returns:
+          type: affected
+        three_axis:
+          state_effect: transition
+          external_effects: [emitting]
+          consequence:
+            baseline: reviewable
+        transition_args:
+          entity_id_arg: event-id
+          target_workspace: cbu
+          target_slot: cbu_corporate_action
+
+      approve:
+        description: "Approve CBU-level CA event (board / legal / compliance sign-off)"
+        behavior: plugin
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: cbu
+          noun: cbu-corporate-action
+          subject_kinds: [cbu-corporate-action]
+          phase_tags: [cbu-corporate-action]
+          side_effects: state_write
+          harm_class: reversible
+        invocation_phrases:
+          - "approve CBU corporate action"
+          - "CBU CA approve"
+          - "sign off CBU corporate action"
+        args:
+          - name: event-id
+            type: uuid
+            required: true
+            maps_to: event_id
+        returns:
+          type: affected
+        three_axis:
+          state_effect: transition
+          external_effects: [emitting]
+          consequence:
+            baseline: requires_explicit_authorisation
+        transition_args:
+          entity_id_arg: event-id
+          target_workspace: cbu
+          target_slot: cbu_corporate_action
+
+      reject:
+        description: "Reject CBU-level CA event (terminal-negative)"
+        behavior: plugin
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: cbu
+          noun: cbu-corporate-action
+          subject_kinds: [cbu-corporate-action]
+          phase_tags: [cbu-corporate-action]
+          side_effects: state_write
+          harm_class: reversible
+        invocation_phrases:
+          - "reject CBU corporate action"
+          - "decline CBU CA"
+        args:
+          - name: event-id
+            type: uuid
+            required: true
+            maps_to: event_id
+          - name: reason
+            type: string
+            required: true
+            maps_to: reason
+        returns:
+          type: affected
+        three_axis:
+          state_effect: transition
+          external_effects: [emitting]
+          consequence:
+            baseline: requires_explicit_authorisation
+        transition_args:
+          entity_id_arg: event-id
+          target_workspace: cbu
+          target_slot: cbu_corporate_action
+
+      withdraw:
+        description: "Withdraw CBU-level CA event before decision (proposer retracts)"
+        behavior: plugin
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: cbu
+          noun: cbu-corporate-action
+          subject_kinds: [cbu-corporate-action]
+          phase_tags: [cbu-corporate-action]
+          side_effects: state_write
+          harm_class: reversible
+        invocation_phrases:
+          - "withdraw CBU corporate action"
+          - "retract CBU CA proposal"
+          - "cancel CBU CA"
+        args:
+          - name: event-id
+            type: uuid
+            required: true
+            maps_to: event_id
+        returns:
+          type: affected
+        three_axis:
+          state_effect: transition
+          external_effects: []
+          consequence:
+            baseline: requires_confirmation
+        transition_args:
+          entity_id_arg: event-id
+          target_workspace: cbu
+          target_slot: cbu_corporate_action
+
+      mark-implemented:
+        description: "Mark CBU-level CA event as implemented (post-effective; terminal-positive)"
+        behavior: plugin
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: cbu
+          noun: cbu-corporate-action
+          subject_kinds: [cbu-corporate-action]
+          phase_tags: [cbu-corporate-action]
+          side_effects: state_write
+          harm_class: reversible
+        invocation_phrases:
+          - "mark CBU CA implemented"
+          - "CBU CA complete"
+          - "close CBU corporate action"
+        args:
+          - name: event-id
+            type: uuid
+            required: true
+            maps_to: event_id
+        returns:
+          type: affected
+        three_axis:
+          state_effect: transition
+          external_effects: [emitting]
+          consequence:
+            baseline: requires_confirmation
+        transition_args:
+          entity_id_arg: event-id
+          target_workspace: cbu
+          target_slot: cbu_corporate_action

@@ -1096,6 +1096,311 @@ pub async fn execute_runbook_with_pool(
 }
 
 // ---------------------------------------------------------------------------
+// acquire_advisory_locks_on_scope — Phase B.2b-ζ (2026-04-22)
+// ---------------------------------------------------------------------------
+
+/// Acquire advisory locks on an **existing** `TransactionScope` rather than
+/// opening a fresh pool transaction. Data mutations and locks share the
+/// same txn — when the scope commits, locks release atomically with the
+/// data; when it rolls back, locks release with the rollback.
+///
+/// This is the Phase B.2b-ζ companion to [`acquire_advisory_locks`]. Use
+/// from the Sequencer when a single outer scope spans multiple runbook
+/// entries: acquire locks once on scope open, hold them across the whole
+/// batch, release with scope commit/rollback at the end.
+///
+/// # Arguments
+/// - `scope`: the caller-owned transaction scope. This function takes
+///   `scope.transaction()` and issues `pg_advisory_xact_lock` calls on it.
+/// - `write_set`: UUIDs to lock, typically aggregated from `CompiledStep.write_set`.
+/// - `store`: used for holder-lookup on contention (same as the
+///   pool-based variant).
+///
+/// # Returns
+/// - `Ok(LockStats)` when all locks acquired. Caller keeps executing;
+///   locks auto-release when the scope commits or rolls back.
+/// - `Err(ExecutionError::LockTimeout)` on contention. Caller is
+///   responsible for rolling back the scope. Other concurrent sessions
+///   holding the locks are identified via the store when possible.
+pub async fn acquire_advisory_locks_on_scope(
+    scope: &mut dyn dsl_runtime::tx::TransactionScope,
+    write_set: &BTreeSet<Uuid>,
+    store: &dyn RunbookStoreBackend,
+) -> Result<LockStats, ExecutionError> {
+    use crate::database::locks::{acquire_locks, LockError, LockKey, LockMode};
+
+    const LOCK_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(30);
+
+    if write_set.is_empty() {
+        return Ok(LockStats::default());
+    }
+
+    let lock_keys: Vec<LockKey> = write_set
+        .iter()
+        .map(|id| LockKey::write("entity", id.to_string()))
+        .collect();
+
+    let lock_start = std::time::Instant::now();
+
+    match acquire_locks(
+        scope.transaction(),
+        &lock_keys,
+        LockMode::Timeout(LOCK_TIMEOUT),
+    )
+    .await
+    {
+        Ok(result) => Ok(LockStats {
+            locks_acquired: result.acquired.len(),
+            lock_wait_ms: lock_start.elapsed().as_millis() as u64,
+        }),
+        Err(LockError::Contention {
+            entity_type,
+            entity_id,
+            holder_runbook_id,
+            ..
+        }) => {
+            let holder = if holder_runbook_id.is_some() {
+                holder_runbook_id.map(CompiledRunbookId)
+            } else {
+                store
+                    .lookup_lock_holder(&entity_type, &entity_id)
+                    .await
+                    .map(CompiledRunbookId)
+            };
+            let entity_uuid = Uuid::parse_str(&entity_id).unwrap_or(Uuid::nil());
+            Err(ExecutionError::LockTimeout {
+                entity_ids: vec![entity_uuid],
+                write_set: write_set.clone(),
+                holder_runbook_id: holder,
+            })
+        }
+        Err(LockError::Database(e)) => Err(ExecutionError::Database(e.to_string())),
+    }
+}
+
+// ---------------------------------------------------------------------------
+// execute_runbook_in_scope — Phase B.2b-ε (2026-04-22)
+// ---------------------------------------------------------------------------
+
+/// Execute a compiled runbook inside a caller-owned `TransactionScope`.
+///
+/// This is the Phase B.2b-ε variant of [`execute_runbook_with_pool`]. The
+/// caller owns the outer transaction; every step's verb dispatch runs
+/// against that same transaction via `StepExecutor::execute_step_in_scope`.
+/// If any step fails, the caller is expected to roll back the scope —
+/// which rolls back ALL prior steps in the runbook (cross-step atomicity).
+///
+/// **Caller responsibilities:**
+/// 1. Begin the `TransactionScope` before calling.
+/// 2. Commit on Ok result with `Completed` final status.
+/// 3. Roll back on Err OR on `Failed` / `Parked` final status if atomicity
+///    is desired for the failed run.
+/// 4. Advisory locks, if needed, must be acquired on the same scope's
+///    transaction before calling — this function does NOT acquire locks
+///    (unlike `execute_runbook_with_pool`). The Sequencer (B.2b-ζ) handles
+///    locking explicitly on its outer scope.
+///
+/// The in-memory and Postgres store backends see identical event
+/// sequences to `execute_runbook_with_pool` — the per-step status
+/// updates, step_completed/step_failed/step_skipped events, and final
+/// status transition all fire the same way.
+///
+/// ## Returns
+/// Same `RunbookExecutionResult` shape as `execute_runbook_with_pool`,
+/// with `lock_stats = LockStats::default()` since this variant does not
+/// track locks (that's the caller's domain).
+pub async fn execute_runbook_in_scope(
+    store: &dyn RunbookStoreBackend,
+    runbook_id: CompiledRunbookId,
+    cursor: Option<StepCursor>,
+    executor: &dyn StepExecutor,
+    scope: &mut dyn dsl_runtime::tx::TransactionScope,
+) -> Result<RunbookExecutionResult, ExecutionError> {
+    let start = std::time::Instant::now();
+
+    let runbook = store
+        .get(&runbook_id)
+        .await?
+        .ok_or(ExecutionError::NotFound(runbook_id))?;
+
+    if !runbook.is_executable() {
+        return Err(ExecutionError::NotExecutable(
+            runbook_id,
+            format!("{:?}", runbook.status),
+        ));
+    }
+
+    let start_idx = cursor.map(|c| c.index).unwrap_or(0);
+
+    store
+        .update_status(
+            &runbook_id,
+            "compiled",
+            CompiledRunbookStatus::Executing {
+                current_step: start_idx,
+            },
+        )
+        .await?;
+
+    let mut step_results = Vec::with_capacity(runbook.steps.len());
+    let mut final_status = CompiledRunbookStatus::Completed {
+        completed_at: Utc::now(),
+    };
+
+    for step in runbook.steps.iter().take(start_idx) {
+        step_results.push(StepExecutionResult {
+            step_id: step.step_id,
+            verb: step.verb.clone(),
+            outcome: StepOutcome::Skipped {
+                reason: "Before resume cursor".into(),
+            },
+        });
+    }
+
+    let mut failed_steps: std::collections::HashSet<Uuid> = std::collections::HashSet::new();
+
+    for (idx, step) in runbook.steps.iter().enumerate().skip(start_idx) {
+        let dep_failed = step
+            .depends_on
+            .iter()
+            .any(|dep_id| failed_steps.contains(dep_id));
+
+        if dep_failed {
+            failed_steps.insert(step.step_id);
+            let _ = store
+                .append_event(RunbookEvent {
+                    compiled_runbook_id: runbook_id,
+                    event_type: "step_skipped".into(),
+                    old_status: None,
+                    new_status: None,
+                    detail: Some(serde_json::json!({
+                        "step_id": step.step_id.to_string(),
+                        "verb": &step.verb,
+                        "step_index": idx,
+                        "reason": "Dependency failed",
+                    })),
+                })
+                .await;
+            step_results.push(StepExecutionResult {
+                step_id: step.step_id,
+                verb: step.verb.clone(),
+                outcome: StepOutcome::Skipped {
+                    reason: "Dependency failed".into(),
+                },
+            });
+            continue;
+        }
+
+        store
+            .update_status(
+                &runbook_id,
+                "executing",
+                CompiledRunbookStatus::Executing { current_step: idx },
+            )
+            .await?;
+
+        // Phase B.2b-ε: dispatch through caller-owned scope.
+        let outcome = executor.execute_step_in_scope(step, scope).await;
+
+        let step_event_type = match &outcome {
+            StepOutcome::Completed { .. } => "step_completed",
+            StepOutcome::Failed { .. } => "step_failed",
+            StepOutcome::Parked { .. } => "step_parked",
+            StepOutcome::Skipped { .. } => "step_skipped",
+        };
+        let _ = store
+            .append_event(RunbookEvent {
+                compiled_runbook_id: runbook_id,
+                event_type: step_event_type.into(),
+                old_status: None,
+                new_status: None,
+                detail: Some(serde_json::json!({
+                    "step_id": step.step_id.to_string(),
+                    "verb": &step.verb,
+                    "step_index": idx,
+                })),
+            })
+            .await;
+
+        let should_break = match &outcome {
+            StepOutcome::Parked {
+                correlation_key, ..
+            } => {
+                final_status = CompiledRunbookStatus::Parked {
+                    reason: ParkReason::AwaitingCallback {
+                        correlation_key: correlation_key.clone(),
+                    },
+                    cursor: StepCursor {
+                        index: idx,
+                        step_id: step.step_id,
+                    },
+                };
+                Some("Runbook parked")
+            }
+            StepOutcome::Failed { error } => {
+                failed_steps.insert(step.step_id);
+                final_status = CompiledRunbookStatus::Failed {
+                    error: error.clone(),
+                    failed_step: Some(StepCursor {
+                        index: idx,
+                        step_id: step.step_id,
+                    }),
+                };
+                Some("Previous step failed")
+            }
+            StepOutcome::Completed { .. } | StepOutcome::Skipped { .. } => None,
+        };
+
+        step_results.push(StepExecutionResult {
+            step_id: step.step_id,
+            verb: step.verb.clone(),
+            outcome,
+        });
+
+        if let Some(skip_reason) = should_break {
+            for (rem_idx, remaining) in runbook.steps.iter().enumerate().skip(idx + 1) {
+                let _ = store
+                    .append_event(RunbookEvent {
+                        compiled_runbook_id: runbook_id,
+                        event_type: "step_skipped".into(),
+                        old_status: None,
+                        new_status: None,
+                        detail: Some(serde_json::json!({
+                            "step_id": remaining.step_id.to_string(),
+                            "verb": &remaining.verb,
+                            "step_index": rem_idx,
+                            "reason": skip_reason,
+                        })),
+                    })
+                    .await;
+                step_results.push(StepExecutionResult {
+                    step_id: remaining.step_id,
+                    verb: remaining.verb.clone(),
+                    outcome: StepOutcome::Skipped {
+                        reason: skip_reason.into(),
+                    },
+                });
+            }
+            break;
+        }
+    }
+
+    store
+        .update_status(&runbook_id, "executing", final_status.clone())
+        .await?;
+
+    let elapsed_ms = start.elapsed().as_millis() as u64;
+
+    Ok(RunbookExecutionResult {
+        runbook_id,
+        step_results,
+        final_status,
+        elapsed_ms,
+        lock_stats: LockStats::default(),
+    })
+}
+
+// ---------------------------------------------------------------------------
 // StepExecutor trait
 // ---------------------------------------------------------------------------
 
@@ -1106,6 +1411,27 @@ pub async fn execute_runbook_with_pool(
 /// to `DslExecutorV2`. In tests, a stub implementation can be used.
 #[async_trait::async_trait]
 pub trait StepExecutor: Send + Sync {
+    /// Scope-aware step execution (Phase B.2b-δ, 2026-04-22).
+    ///
+    /// Routes dispatch through a caller-owned `TransactionScope` —
+    /// the Sequencer (B.2b-ζ) opens one scope per runbook and passes
+    /// it into every step, so the whole runbook commits atomically
+    /// or rolls back together.
+    ///
+    /// The default implementation ignores the scope and delegates to
+    /// `execute_step`. Stubs that don't touch the DB (SuccessExecutor,
+    /// FailureExecutor, ParkOnVerb) don't need to override. Production
+    /// bridges (DslStepExecutor) override it.
+    ///
+    /// Caller owns scope lifetime: this method does NOT begin, commit,
+    /// or roll back the scope.
+    async fn execute_step_in_scope(
+        &self,
+        step: &CompiledStep,
+        _scope: &mut dyn dsl_runtime::tx::TransactionScope,
+    ) -> StepOutcome {
+        self.execute_step(step).await
+    }
     /// Execute a single compiled step and return the outcome.
     async fn execute_step(&self, step: &CompiledStep) -> StepOutcome;
 }
@@ -1510,10 +1836,10 @@ mod tests {
     }
 
     /// Regression (Fix 1): Static grep ensuring no raw `self.executor.execute(`
-    /// calls exist in orchestrator_v2.rs. All execution must go through the gate.
+    /// calls exist in sequencer.rs. All execution must go through the gate.
     #[test]
     fn test_no_raw_executor_calls_in_orchestrator() {
-        let source = include_str!("../repl/orchestrator_v2.rs");
+        let source = include_str!("../sequencer.rs");
 
         // Count occurrences of the raw execution pattern.
         let raw_calls: Vec<&str> = source
@@ -1530,7 +1856,7 @@ mod tests {
 
         assert!(
             raw_calls.is_empty(),
-            "INV-3 VIOLATION: Found {} raw executor.execute() call(s) in orchestrator_v2.rs \
+            "INV-3 VIOLATION: Found {} raw executor.execute() call(s) in sequencer.rs \
              that bypass the execution gate:\n{}",
             raw_calls.len(),
             raw_calls.join("\n")
@@ -1540,7 +1866,7 @@ mod tests {
     /// Regression (Fix 1): Static grep ensuring execute_entry_v2 is fully removed.
     #[test]
     fn test_execute_entry_v2_removed() {
-        let source = include_str!("../repl/orchestrator_v2.rs");
+        let source = include_str!("../sequencer.rs");
 
         let v2_calls: Vec<&str> = source
             .lines()
@@ -1627,7 +1953,7 @@ mod tests {
     #[test]
     fn test_runbook_gate_chat_and_repl() {
         let agent_source = include_str!("../api/agent_service.rs");
-        let repl_source = include_str!("../repl/orchestrator_v2.rs");
+        let repl_source = include_str!("../sequencer.rs");
 
         let chat_has_gate = agent_source.contains("execute_runbook");
         let repl_has_gate = repl_source.contains("execute_runbook");
@@ -1639,7 +1965,7 @@ mod tests {
         );
         assert!(
             repl_has_gate,
-            "INV-11 VIOLATION: orchestrator_v2.rs does not contain 'execute_runbook'. \
+            "INV-11 VIOLATION: sequencer.rs does not contain 'execute_runbook'. \
              The REPL must go through the runbook execution gate."
         );
     }

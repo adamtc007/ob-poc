@@ -1,0 +1,146 @@
+gate_version: 1
+phase: "0"
+phase_name: "Matrix + envelope + harnesses + outbox schema + row-version audit + drift framework"
+opened_at: 2026-04-18T09:00:00Z
+opened_by: adamtc007
+depends_on: []
+scope_statement: |
+  Per implementation plan §13 Phase 0. Deliverables 0a–0f + 0g + 0h.
+  Produces the ownership matrix, concrete envelope/outcome types, the
+  StateGateHash encoding spec, the outbox schema migration, harness
+  scaffolds, row-versioning audit, Pattern A remediation, and the drift
+  control framework infrastructure. No production-path changes outside
+  Stream 2 (row-versioning migration) and Stream 3 (Pattern A subprocess
+  outbox) — both explicitly authorised (Q1 and D11 respectively).
+
+criteria:
+  - id: matrix-reviewed
+    description: "Phase 0a ownership matrix reviewed and approved; A1 clarification done"
+    check_command: "test -f docs/todo/phase-0a-ownership-matrix.md && grep -q 'A1 clarification pass (completed' docs/todo/phase-0a-ownership-matrix.md"
+    status: passed
+    signed_by: adamtc007
+    evidence: "docs/todo/phase-0a-ownership-matrix.md §9"
+    closed_at: 2026-04-18T12:00:00Z
+
+  - id: envelope-types-compile
+    description: "GatedVerbEnvelope + AuthorisationProof + VerbExecutionOutcome + PendingStateAdvance + OutboxDraft + TransactionScope + StateGateHash compile-only in ob-poc-types"
+    check_command: "cargo build -p ob-poc-types"
+    status: passed
+    signed_by: adamtc007
+    evidence: "rust/crates/ob-poc-types/src/gated_envelope.rs; build succeeded 2026-04-18T12:40:00Z"
+    closed_at: 2026-04-18T12:45:00Z
+
+  - id: envelope-types-serde-roundtrip
+    description: "gated_envelope unit tests (19 tests) pass including all serde round-trips and StateGateHash determinism vectors"
+    check_command: "cargo test -p ob-poc-types gated_envelope"
+    status: passed
+    signed_by: adamtc007
+    evidence: "19/19 tests pass; see test output 2026-04-18T12:42:00Z"
+    closed_at: 2026-04-18T12:45:00Z
+
+  - id: state-gate-hash-encoding-deterministic
+    description: "StateGateHash produces byte-identical output for identical inputs; canonical encoding length predictable"
+    check_command: "cargo test -p ob-poc-types state_gate_hash_is_order_sensitive_on_row_version state_gate_hash_vector canonical_encoding_length"
+    status: passed
+    signed_by: adamtc007
+    evidence: "5 StateGateHash tests pass"
+    closed_at: 2026-04-18T12:45:00Z
+
+  - id: state-gate-hash-vectors-frozen
+    description: "Phase 0c: specific hex values picked and assertions updated to check them"
+    check_command: "! grep -q 'PHASE_0C_CAPTURE' rust/crates/ob-poc-types/src/gated_envelope.rs"
+    status: passed
+    signed_by: adamtc007
+    evidence: "empty-entities vector = 167379fa374250b219901b9ab39f7ce3bd1a356bb6e54a8701728c686a96accc; two-entities vector = 21103d794f9069c4cbd30e9a5f570d12f7bd40dcd25fc54032bad6df2ee29e55; 19/19 tests pass"
+    closed_at: 2026-04-18T13:02:00Z
+
+  - id: outbox-migration-drafted
+    description: "public.outbox table migration compiled (not yet wired to production); drainer trait contract in ob-poc-types"
+    check_command: "test -f migrations/131_public_outbox.sql && grep -q 'pub trait OutboxDrainer' rust/crates/ob-poc-types/src/gated_envelope.rs"
+    status: passed
+    signed_by: adamtc007
+    evidence: "migrations/131_public_outbox.sql drafted per v0.3 §10.7 + D10 (separate table from sem_reg.outbox_events); OutboxDrainer + OutboxConsumer + ClaimedOutboxRow + OutboxProcessOutcome + OutboxRowStatus + DrainerRegisterError traits/types added to ob-poc-types; tests green"
+    closed_at: 2026-04-18T13:08:00Z
+
+  - id: determinism-harness-compiles
+    description: "rust/crates/determinism-harness/ builds green with 6 unit tests"
+    check_command: "cargo test -p determinism-harness"
+    status: passed
+    signed_by: adamtc007
+    evidence: "6/6 tests pass; StageCapture + HarnessRun + first_divergence scaffold per v0.3 §9.4; byte-identity fingerprint via BLAKE3 over serde_json canonical serialisation"
+    closed_at: 2026-04-18T13:25:00Z
+
+  - id: round-trip-harness-compiles
+    description: "rust/crates/round-trip-harness/ builds green with 4 unit tests"
+    check_command: "cargo test -p round-trip-harness"
+    status: passed
+    signed_by: adamtc007
+    evidence: "4/4 tests pass; effect-equivalence comparator (post-state + returned value + side-effects + PendingStateAdvance + outbox set-equality) per v0.3 §14"
+    closed_at: 2026-04-18T13:25:00Z
+
+  - id: row-version-audit-complete
+    description: "docs/todo/row-versioning-audit.md lists every affected entity table with per-table decision"
+    check_command: "test -f docs/todo/row-versioning-audit.md"
+    status: passed
+    signed_by: adamtc007
+    evidence: "42 high-priority gate-surface tables identified across 6 migration groups (A–F). Zero existing row_version coverage. Batched D2 rollout plan in §3. Stream 2 kickoff unblocked."
+    closed_at: 2026-04-18T13:15:00Z
+
+  - id: pattern-a-closed
+    description: "Phase 0g: MaintenanceReindexEmbeddingsOp subprocess moved to OutboxDraft; ledger row CLOSED"
+    check_command: "grep -A 2 'sem_os_maintenance_ops.rs' docs/todo/pattern-b-a1-remediation-ledger.md | grep -q 'CLOSED'"
+    status: passed
+    signed_by: adamtc007
+    evidence: "Rewrote MaintenanceReindexEmbeddingsOp::{execute, execute_json} to INSERT public.outbox row with effect_kind='maintenance_spawn' via shared enqueue_reindex_embeddings() helper. Zero tokio::process/Command::new/reqwest/http::/hyper:: matches in file (verified via grep). cargo build clean. Ledger §2.1 row CLOSED. Drainer consumption deferred to Phase 5e — documented transitional behaviour (queued vs success)."
+    closed_at: 2026-04-18T13:35:00Z
+
+  - id: drift-framework-active
+    description: "Phase 0h: framework doc committed + directory structure + FRAMEWORK-VERSION + first baseline captured + Phase 0 gate YAML itself exists"
+    check_command: "test -d docs/refactor-health/baselines && test -f docs/refactor-health/FRAMEWORK-VERSION.md && ls docs/refactor-health/baselines/phase-0-*.yaml"
+    status: passed
+    signed_by: adamtc007
+    evidence: "docs/refactor-health/ directory scaffolded; phase-0-2026-04-18.yaml captured; FRAMEWORK-VERSION v0.1 committed"
+    closed_at: 2026-04-18T12:50:00Z
+
+  - id: workspace-compiles-clean
+    description: "cargo build --workspace returns zero errors post-Phase-0b types addition"
+    check_command: "cargo build --workspace"
+    status: passed
+    signed_by: adamtc007
+    evidence: "Finished dev profile in 9m 16s, zero errors. One pre-existing warning in sem_os_postgres/src/crud_executor.rs:1354 (unused variable `crud`, unrelated to Phase 0b). 2026-04-18T12:58:00Z"
+    closed_at: 2026-04-18T12:58:00Z
+
+  - id: phase-0-baseline-captured
+    description: "docs/refactor-health/baselines/phase-0-*.yaml exists with captured_by=phase-0-entry"
+    check_command: "ls docs/refactor-health/baselines/phase-0-*.yaml"
+    status: passed
+    signed_by: adamtc007
+    evidence: "docs/refactor-health/baselines/phase-0-2026-04-18.yaml"
+    closed_at: 2026-04-18T12:50:00Z
+
+exit_conditions:
+  phase_0g_unblocked: true        # Pattern A remediation completed
+  phase_1_unblocked: true         # All 13 criteria passed — Phase 1 may begin
+
+closed_at: 2026-04-18T13:40:00Z
+closed_by: adamtc007
+sign_off_commit_sha: pending-commit  # update after commit
+
+# ---
+# Final summary at 2026-04-18T13:40:00Z:
+#   [PASS] 0a ownership matrix (89 files classified, A1 clarification done)
+#   [PASS] 0b envelope types (1032+ lines, 19 tests, build clean)
+#   [PASS] 0b StateGateHash encoding deterministic (5 tests)
+#   [PASS] 0c StateGateHash hex vectors frozen
+#     empty-entities: 167379fa374250b219901b9ab39f7ce3bd1a356bb6e54a8701728c686a96accc
+#     two-entities:   21103d794f9069c4cbd30e9a5f570d12f7bd40dcd25fc54032bad6df2ee29e55
+#   [PASS] 0d outbox migration 131_public_outbox.sql + OutboxDrainer/OutboxConsumer/ClaimedOutboxRow traits
+#   [PASS] 0e determinism-harness (6 tests) + round-trip-harness (4 tests)
+#   [PASS] 0f row-versioning audit (42 HIGH priority tables, 6 migration groups A-F)
+#   [PASS] 0g Pattern A CLOSED: MaintenanceReindexEmbeddingsOp now writes public.outbox row, no subprocess in execute body
+#   [PASS] 0h framework live (directory + baseline + gate YAML + version file)
+#   [PASS] workspace build green
+#
+# Ledger status: 1/39 rows CLOSED. 38 remaining = Phase 5f.
+# Stream 2 row-versioning migrations: unblocked to start in parallel with Phase 1-4.
+# ---

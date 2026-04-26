@@ -1,0 +1,22 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            SELECT COUNT(DISTINCT instrument_class_id) as \"count!\"\n            FROM \"ob-poc\".cbu_instrument_universe\n            WHERE cbu_id = $1 AND is_active = true\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "count!",
+        "type_info": "Int8"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "272bf6a05287e8032527cd892763757f5f8e871603182800771f9eb51f0a1105"
+}

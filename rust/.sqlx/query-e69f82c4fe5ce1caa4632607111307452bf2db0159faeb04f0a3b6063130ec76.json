@@ -1,0 +1,40 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            SELECT reminder_count, max_reminders, last_reminder_at, case_id\n            FROM \"ob-poc\".outstanding_requests\n            WHERE request_id = $1 AND status = 'PENDING'\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "reminder_count",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 1,
+        "name": "max_reminders",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 2,
+        "name": "last_reminder_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 3,
+        "name": "case_id",
+        "type_info": "Uuid"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      true,
+      true,
+      true,
+      true
+    ]
+  },
+  "hash": "e69f82c4fe5ce1caa4632607111307452bf2db0159faeb04f0a3b6063130ec76"
+}

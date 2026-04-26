@@ -52,20 +52,14 @@ impl DictionaryServiceImpl {
         value: &serde_json::Value,
     ) -> Result<(), String> {
         match data_type {
-            "string" | "text" => {
-                if !value.is_string() {
-                    return Err(format!("Expected string for attribute {}", attribute_name));
-                }
+            "string" | "text" if !value.is_string() => {
+                return Err(format!("Expected string for attribute {}", attribute_name));
             }
-            "number" | "numeric" | "integer" | "decimal" => {
-                if !value.is_number() {
-                    return Err(format!("Expected number for attribute {}", attribute_name));
-                }
+            "number" | "numeric" | "integer" | "decimal" if !value.is_number() => {
+                return Err(format!("Expected number for attribute {}", attribute_name));
             }
-            "boolean" | "bool" => {
-                if !value.is_boolean() {
-                    return Err(format!("Expected boolean for attribute {}", attribute_name));
-                }
+            "boolean" | "bool" if !value.is_boolean() => {
+                return Err(format!("Expected boolean for attribute {}", attribute_name));
             }
             _ => {}
         }

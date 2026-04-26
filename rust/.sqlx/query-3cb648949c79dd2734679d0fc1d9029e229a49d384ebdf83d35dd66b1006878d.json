@@ -1,0 +1,78 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            SELECT id, fingerprint, learning_type, input_pattern, suggested_output,\n                   occurrence_count, risk_level, status, first_seen, last_seen\n            FROM \"ob-poc\".learning_candidates\n            WHERE ($1::TEXT IS NULL OR status = $1)\n              AND ($2::TEXT IS NULL OR learning_type = $2)\n            ORDER BY occurrence_count DESC, last_seen DESC\n            LIMIT $3\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 1,
+        "name": "fingerprint",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 2,
+        "name": "learning_type",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 3,
+        "name": "input_pattern",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 4,
+        "name": "suggested_output",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 5,
+        "name": "occurrence_count",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 6,
+        "name": "risk_level",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 7,
+        "name": "status",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 8,
+        "name": "first_seen",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 9,
+        "name": "last_seen",
+        "type_info": "Timestamptz"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Text",
+        "Int8"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      true,
+      true,
+      true,
+      true,
+      true
+    ]
+  },
+  "hash": "3cb648949c79dd2734679d0fc1d9029e229a49d384ebdf83d35dd66b1006878d"
+}

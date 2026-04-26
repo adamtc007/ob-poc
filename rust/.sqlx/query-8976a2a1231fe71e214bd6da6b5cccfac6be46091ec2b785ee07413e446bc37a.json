@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        UPDATE \"ob-poc\".outstanding_requests\n        SET communication_log = communication_log || $2::jsonb\n        WHERE request_id = (\n            SELECT request_id FROM \"ob-poc\".outstanding_requests\n            WHERE case_id = $1 AND status = 'PENDING'\n            LIMIT 1\n        )\n        ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Jsonb"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "8976a2a1231fe71e214bd6da6b5cccfac6be46091ec2b785ee07413e446bc37a"
+}

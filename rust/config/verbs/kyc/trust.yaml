@@ -140,6 +140,11 @@ domains:
           type: uuid
           name: provision_id
           capture: true
+        three_axis:
+          state_effect: preserving
+          external_effects: [emitting]
+          consequence:
+            baseline: reviewable
 
       update-provision:
         description: Update an existing trust provision
@@ -198,6 +203,11 @@ domains:
           maps_to: notes
         returns:
           type: affected
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
 
       end-provision:
         description: End/revoke a trust provision
@@ -237,6 +247,11 @@ domains:
           is_active: false
         returns:
           type: affected
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
 
       list-provisions:
         description: List all provisions for a trust
@@ -282,6 +297,11 @@ domains:
           default: false
         returns:
           type: record_set
+        three_axis:
+          state_effect: preserving
+          external_effects: [observational]
+          consequence:
+            baseline: benign
 
       list-by-holder:
         description: List all trust provisions held by an entity
@@ -324,6 +344,11 @@ domains:
           default: false
         returns:
           type: record_set
+        three_axis:
+          state_effect: preserving
+          external_effects: [observational]
+          consequence:
+            baseline: benign
 
       analyze-control:
         description: |
@@ -376,6 +401,11 @@ domains:
             description: Inferred trust type (DISCRETIONARY, FIXED_INTEREST, BARE)
           - name: control_summary
             type: object
+        three_axis:
+          state_effect: preserving
+          external_effects: [observational]
+          consequence:
+            baseline: benign
 
       identify-ubos:
         description: |
@@ -426,6 +456,11 @@ domains:
         returns:
           type: record_set
           description: Array of UBO candidates with control/ownership vector
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
 
       classify:
         description: |
@@ -475,3 +510,8 @@ domains:
             type: array
           - name: confidence
             type: decimal
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable

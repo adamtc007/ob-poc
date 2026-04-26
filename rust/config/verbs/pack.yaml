@@ -17,10 +17,10 @@ domains:
         behavior: plugin
         handler: PackSelectOp
         invocation_phrases:
-        - "select pack"
-        - "use pack"
-        - "switch to pack"
-        - "start journey"
+          - "select pack"
+          - "use pack"
+          - "switch to pack"
+          - "start journey"
         metadata:
           tier: intent
           source_of_truth: session
@@ -30,33 +30,39 @@ domains:
           phase_tags: [administration]
           side_effects: state_write
         args:
-        - name: pack-id
-          type: string
-          required: true
-          description: Pack identifier
-        - name: pack-version
-          type: string
-          required: false
-          description: Pack version (defaults to latest)
-        - name: manifest-hash
-          type: string
-          required: false
-          description: Canonical hash of the pack manifest
-        - name: handoff-from
-          type: string
-          required: false
-          description: Source pack ID if this is a handoff
+          - name: pack-id
+            type: string
+            required: true
+            description: Pack identifier
+          - name: pack-version
+            type: string
+            required: false
+            description: Pack version (defaults to latest)
+          - name: manifest-hash
+            type: string
+            required: false
+            description: Canonical hash of the pack manifest
+          - name: handoff-from
+            type: string
+            required: false
+            description: Source pack ID if this is a handoff
         returns:
           type: record
           fields: [pack_id, pack_name, pack_version]
+        three_axis:
+          state_effect: preserving
+          external_effects: &id001
+            - navigating
+          consequence:
+            baseline: benign
 
       answer:
         description: Record an answer to a pack question
         behavior: plugin
         handler: PackAnswerOp
         invocation_phrases:
-        - "answer question"
-        - "set answer"
+          - "answer question"
+          - "set answer"
         metadata:
           tier: intent
           source_of_truth: session
@@ -66,18 +72,23 @@ domains:
           phase_tags: [administration]
           side_effects: state_write
         args:
-        - name: field
-          type: string
-          required: true
-          description: Question field name
-        - name: value
-          type: string
-          required: true
-          description: Answer value
-        - name: pack-id
-          type: string
-          required: false
-          description: Pack this answer belongs to
+          - name: field
+            type: string
+            required: true
+            description: Question field name
+          - name: value
+            type: string
+            required: true
+            description: Answer value
+          - name: pack-id
+            type: string
+            required: false
+            description: Pack this answer belongs to
         returns:
           type: record
           fields: [field, value, accepted]
+        three_axis:
+          state_effect: preserving
+          external_effects: *id001
+          consequence:
+            baseline: benign

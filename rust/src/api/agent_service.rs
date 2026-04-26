@@ -113,15 +113,14 @@ use crate::dsl_v2::ref_resolver::ResolveResult;
 use crate::dsl_v2::syntax::parse_program;
 use crate::dsl_v2::validation::RefType;
 use crate::dsl_v2::{enrich_program, Statement};
-#[cfg(not(feature = "runbook-gate-vnext"))]
-use crate::graph::GraphScope;
+// Slice 4.1-c (2026-04-22): cfg(not(runbook-gate-vnext)) imports removed —
+// runbook-gate-vnext is now in default features so `(not ...)` paths are
+// dead code. See agent_service.rs legacy sites deleted in the same slice.
 use crate::mcp::macro_index::MacroIndex;
 use crate::mcp::scenario_index::ScenarioIndex;
 // VerbSearchResult/VerbSearchSource: removed with process_chat
 use crate::mcp::verb_search_factory::VerbSearcherFactory;
 use crate::sage::SageEngine;
-#[cfg(not(feature = "runbook-gate-vnext"))]
-use crate::session::SessionScope;
 use crate::session::{SessionEvent, SessionState, UnifiedSession, UnresolvedRefInfo};
 // Phase2Service: removed with process_chat (TOCTOU recheck in REPL orchestrator)
 use serde::{Deserialize, Serialize};
@@ -251,7 +250,6 @@ impl Default for AgentServiceConfig {
     }
 }
 
-#[cfg(feature = "runbook-gate-vnext")]
 fn agent_phase5_recheck_record(
     verb_fqn: &str,
     dsl_source: &str,
@@ -279,7 +277,6 @@ fn agent_phase5_recheck_record(
 }
 
 /// TOCTOU recheck: verify verb is still allowed in current SemOS envelope before execution.
-#[cfg(feature = "runbook-gate-vnext")]
 fn agent_phase5_recheck_failure(
     verb_fqn: &str,
     envelope: &crate::agent::sem_os_context_envelope::SemOsContextEnvelope,
@@ -289,7 +286,6 @@ fn agent_phase5_recheck_failure(
     Phase2Service::runtime_gate_failure(&phase2.artifacts, verb_fqn)
 }
 
-#[cfg(feature = "runbook-gate-vnext")]
 fn agent_execution_artifact(
     runbook_id: crate::runbook::types::CompiledRunbookId,
     step: &crate::runbook::executor::StepExecutionResult,
@@ -390,6 +386,14 @@ pub struct AgentService {
     macro_registry: Option<Arc<MacroRegistry>>,
     /// Optional Sage engine for Stage 1.5 shadow classification.
     sage_engine: Option<Arc<dyn SageEngine>>,
+    /// Canonical SemOS plugin op registry. Threaded into every inner
+    /// `DslExecutor` / `RealDslExecutor` constructed by this service so
+    /// plugin verbs dispatch correctly post-Phase-5c-migrate slice #80.
+    sem_os_ops: Option<Arc<sem_os_postgres::ops::SemOsVerbOpRegistry>>,
+    /// Platform service registry. Threaded into every inner executor this
+    /// service constructs so ops that consume platform traits via
+    /// `VerbExecutionContext::service::<dyn T>()` resolve correctly.
+    service_registry: Option<Arc<dsl_runtime::ServiceRegistry>>,
 }
 
 #[allow(dead_code)] // Remaining helpers pending further decomposition
@@ -479,6 +483,8 @@ impl AgentService {
             scenario_index: None,
             macro_registry: None,
             sage_engine: None,
+            sem_os_ops: None,
+            service_registry: None,
         }
     }
 
@@ -527,6 +533,50 @@ impl AgentService {
     pub fn with_sage_engine(mut self, sage_engine: Arc<dyn SageEngine>) -> Self {
         self.sage_engine = Some(sage_engine);
         self
+    }
+
+    /// Install the canonical SemOS plugin op registry. Threaded into every
+    /// inner `DslExecutor` / `RealDslExecutor` this service constructs so
+    /// plugin verbs dispatch correctly (post-Phase-5c-migrate slice #80).
+    pub fn with_sem_os_ops(mut self, ops: Arc<sem_os_postgres::ops::SemOsVerbOpRegistry>) -> Self {
+        self.sem_os_ops = Some(ops);
+        self
+    }
+
+    /// Install the platform service registry. Threaded into every inner
+    /// executor this service constructs so ops that consume platform traits
+    /// via `VerbExecutionContext::service::<dyn T>()` resolve correctly.
+    pub fn with_service_registry(mut self, services: Arc<dsl_runtime::ServiceRegistry>) -> Self {
+        self.service_registry = Some(services);
+        self
+    }
+
+    /// Build an inner `DslExecutor` with the canonical registry + services
+    /// chained in. All agent-side legacy-path `DslExecutor` construction
+    /// MUST flow through this helper.
+    fn build_dsl_executor(&self) -> crate::dsl_v2::execution::DslExecutor {
+        let mut executor = crate::dsl_v2::execution::DslExecutor::new(self.pool.clone());
+        if let Some(ref services) = self.service_registry {
+            executor = executor.with_services(services.clone());
+        }
+        if let Some(ref ops) = self.sem_os_ops {
+            executor = executor.with_sem_os_ops(ops.clone());
+        }
+        executor
+    }
+
+    /// Build an inner `RealDslExecutor` with the canonical registry + services
+    /// chained in. All agent-side runbook-gate-vnext `RealDslExecutor`
+    /// construction MUST flow through this helper.
+    fn build_real_dsl_executor(&self) -> crate::repl::executor_bridge::RealDslExecutor {
+        let mut executor = crate::repl::executor_bridge::RealDslExecutor::new(self.pool.clone());
+        if let Some(ref services) = self.service_registry {
+            executor = executor.with_services(services.clone());
+        }
+        if let Some(ref ops) = self.sem_os_ops {
+            executor = executor.with_sem_os_ops(ops.clone());
+        }
+        executor
     }
 
     /// Extract entity mentions from utterance and build debug info
@@ -1136,148 +1186,16 @@ impl AgentService {
             .await
     }
 
-    /// Legacy execution path — bypasses runbook compilation gate.
-    ///
-    /// Retained under `#[cfg(not(feature = "runbook-gate-vnext"))]` as fallback.
-    /// When `runbook-gate-vnext` is enabled, this is dead code and `execute_via_runbook_gate`
-    /// is used instead.
-    #[cfg(not(feature = "runbook-gate-vnext"))]
-    async fn execute_resolved_dsl(
-        &self,
-        session: &mut UnifiedSession,
-        resolved_dsl: String,
-        program: crate::dsl_v2::ast::Program,
-    ) -> Result<AgentChatResponse, String> {
-        use crate::dsl_v2::execution::{DslExecutor, ExecutionContext};
-
-        let executor = DslExecutor::new(self.pool.clone());
-        let mut exec_ctx = ExecutionContext::new();
-        match executor.execute_dsl(&resolved_dsl, &mut exec_ctx).await {
-            Ok(results) => {
-                // Check if any result is a macro that returned combined_dsl to stage
-                for result in &results {
-                    if let crate::dsl_v2::execution::ExecutionResult::Record(json) = result {
-                        if let Some(combined_dsl) =
-                            json.get("combined_dsl").and_then(|v| v.as_str())
-                        {
-                            if !combined_dsl.is_empty() {
-                                session.run_sheet.entries.clear();
-
-                                let ast = parse_program(combined_dsl)
-                                    .map(|p| p.statements)
-                                    .unwrap_or_default();
-                                session.set_pending_dsl(combined_dsl.to_string(), ast, None, false);
-
-                                let entities_found = json
-                                    .get("entities_found")
-                                    .and_then(|v| v.as_i64())
-                                    .unwrap_or(0);
-                                let msg = json
-                                    .get("message")
-                                    .and_then(|v| v.as_str())
-                                    .unwrap_or("DSL batch generated");
-
-                                let response_msg = format!(
-                                    "{}\n\nStaged {} cbu.create statements. Say 'run' to execute.",
-                                    msg, entities_found
-                                );
-                                session.add_agent_message(
-                                    response_msg.clone(),
-                                    None,
-                                    Some(combined_dsl.to_string()),
-                                );
-
-                                return Ok(AgentChatResponse {
-                                    message: response_msg,
-                                    dsl_source: Some(combined_dsl.to_string()),
-                                    can_execute: true,
-                                    session_state: SessionState::ReadyToExecute,
-
-                                    ast: None,
-                                    disambiguation: None,
-                                    commands: None,
-                                    unresolved_refs: None,
-                                    current_ref_index: None,
-                                    dsl_hash: None,
-                                    verb_disambiguation: None,
-                                    intent_tier: None,
-                                    decision: None,
-                                    sage_explain: None,
-                                    coder_proposal: None,
-                                    discovery_bootstrap: None,
-                                    parked_entries: None,
-                                    onboarding_state: None,
-                                });
-                            }
-                        }
-                    }
-                }
-
-                // Normal execution - mark as executed
-                session.run_sheet.mark_all_executed();
-                self.sync_scope_from_exec_ctx(session, &mut exec_ctx);
-
-                // Record positive learning signal (non-vnext path)
-                if !results.is_empty() {
-                    let original_utterance = session
-                        .messages
-                        .iter()
-                        .rev()
-                        .find(|m| m.role == crate::session::unified::MessageRole::User)
-                        .map(|m| m.content.clone());
-
-                    if let Some(utterance) = original_utterance {
-                        let executed_verbs: Vec<String> = program
-                            .statements
-                            .iter()
-                            .filter_map(|stmt| {
-                                if let crate::dsl_v2::ast::Statement::VerbCall(vc) = stmt {
-                                    Some(vc.full_name())
-                                } else {
-                                    None
-                                }
-                            })
-                            .collect();
-
-                        // Verb selection signal recording removed — learning routes deleted
-                        let _ = (&executed_verbs, &utterance);
-                    }
-                }
-
-                let msg = Self::narrate_execution(
-                    &session.run_sheet,
-                    results.len(),
-                    session.context.cbu_ids.len(),
-                );
-                session.add_agent_message(msg.clone(), None, None);
-                Ok(AgentChatResponse {
-                    message: msg,
-                    dsl_source: Some(resolved_dsl),
-                    can_execute: false,
-                    session_state: SessionState::Executed,
-
-                    ast: None,
-                    disambiguation: None,
-                    commands: None,
-                    unresolved_refs: None,
-                    current_ref_index: None,
-                    dsl_hash: None,
-                    verb_disambiguation: None,
-                    intent_tier: None,
-                    decision: None,
-                    sage_explain: None,
-                    coder_proposal: None,
-                    discovery_bootstrap: None,
-                    parked_entries: None,
-                    onboarding_state: None,
-                })
-            }
-            Err(e) => {
-                let msg = format!("Execution failed: {}", e);
-                Ok(self.fail(&msg, session))
-            }
-        }
-    }
+    // Slice 4.1-c (2026-04-22): legacy `execute_resolved_dsl`
+    // (the `#[cfg(not(feature = "runbook-gate-vnext"))]` path) has been
+    // deleted. Under runbook-gate-vnext (now always on via default
+    // features, Slice 4.1), all Chat API execution compiles into a
+    // CompiledRunbook and dispatches through execute_runbook() via
+    // `execute_via_runbook_gate`. The legacy DslExecutor::execute_dsl
+    // direct path is no longer reachable; its function body (~130
+    // lines covering macro-staged combined_dsl, mark_all_executed,
+    // legacy narration, and sync_scope_from_exec_ctx) was removed
+    // in commit 43eb3fed's follow-up.
 
     /// Runbook-gated execution path (INV-1, INV-11).
     ///
@@ -1286,14 +1204,12 @@ impl AgentService {
     ///
     /// INV-1: Every verb call is wrapped in a `CompiledRunbook` and executed
     /// through `execute_runbook()`. No raw `DslExecutor::execute_dsl()` call.
-    #[cfg(feature = "runbook-gate-vnext")]
     async fn execute_resolved_dsl(
         &self,
         session: &mut UnifiedSession,
         resolved_dsl: String,
         program: crate::dsl_v2::ast::Program,
     ) -> Result<AgentChatResponse, String> {
-        use crate::repl::executor_bridge::RealDslExecutor;
         use crate::runbook::executor::RunbookStoreBackend;
         use crate::runbook::step_executor_bridge::DslStepExecutor;
         use crate::runbook::{
@@ -1395,7 +1311,7 @@ impl AgentService {
                 }
 
                 // Execute through the gate (INV-1)
-                let real_executor = RealDslExecutor::new(self.pool.clone());
+                let real_executor = self.build_real_dsl_executor();
                 let step_executor = DslStepExecutor::new(std::sync::Arc::new(real_executor));
                 match execute_runbook(store, runbook_id, None, &step_executor).await {
                     Ok(result) => {
@@ -1590,47 +1506,10 @@ impl AgentService {
         })
     }
 
-    /// Sync scope from execution context into session (legacy path only).
-    #[cfg(not(feature = "runbook-gate-vnext"))]
-    fn sync_scope_from_exec_ctx(
-        &self,
-        session: &mut UnifiedSession,
-        exec_ctx: &mut crate::dsl_v2::execution::ExecutionContext,
-    ) {
-        if let Some(unified_session) = exec_ctx.take_pending_session() {
-            let loaded = unified_session.cbu_ids_vec();
-            let cbu_count = loaded.len();
-
-            for cbu_id in &loaded {
-                if !session.context.cbu_ids.contains(cbu_id) {
-                    session.context.cbu_ids.push(*cbu_id);
-                }
-            }
-
-            let scope_def = if cbu_count == 1 {
-                GraphScope::SingleCbu {
-                    cbu_id: loaded[0],
-                    cbu_name: unified_session.name.clone().unwrap_or_default(),
-                }
-            } else if cbu_count > 1 {
-                GraphScope::Custom {
-                    description: unified_session
-                        .name
-                        .clone()
-                        .unwrap_or_else(|| format!("{} CBUs", cbu_count)),
-                }
-            } else {
-                GraphScope::Empty
-            };
-
-            session.context.scope = Some(SessionScope::from_graph_scope(scope_def));
-            tracing::info!(
-                "[EXEC] Set context.scope with {} CBUs, scope_type={:?}",
-                cbu_count,
-                session.context.scope.as_ref().map(|s| &s.definition)
-            );
-        }
-    }
+    // Slice 4.1-c (2026-04-22): `sync_scope_from_exec_ctx` deleted.
+    // It was called only from the legacy `execute_resolved_dsl` path
+    // (now removed) and threaded `GraphScope` / `SessionScope` types
+    // whose imports were already stripped in the cfg(not) cleanup.
 
     /// Recursively resolve EntityRefs in an AST node
     async fn resolve_ast_node(&self, node: &mut AstNode) {
@@ -1936,33 +1815,38 @@ impl AgentService {
                     None
                 };
 
-                let verb_kind =
-                    match c.source {
-                        VerbSearchSource::MacroIndex | VerbSearchSource::ScenarioIndex => "macro",
-                        _ => match rv {
-                            Some(v) => match &v.behavior {
-                                crate::dsl_v2::runtime_registry::RuntimeBehavior::Crud(crud) => {
-                                    match crud.operation {
-                                        crate::dsl_v2::config::types::CrudOperation::Select => {
-                                            "query"
-                                        }
-                                        _ => "primitive",
-                                    }
+                let verb_kind = match c.source {
+                    VerbSearchSource::MacroIndex | VerbSearchSource::ScenarioIndex => "macro",
+                    _ => match rv {
+                        Some(v) => match &v.behavior {
+                            crate::dsl_v2::runtime_registry::RuntimeBehavior::Crud(crud) => {
+                                match crud.operation {
+                                    crate::dsl_v2::config::types::CrudOperation::Select => "query",
+                                    _ => "primitive",
                                 }
-                                crate::dsl_v2::runtime_registry::RuntimeBehavior::Plugin(_) => {
-                                    if v.produces.is_none() && v.harm_class.as_ref().map(|h| {
-                                    matches!(h, crate::dsl_v2::config::types::HarmClass::ReadOnly)
-                                }).unwrap_or(false) {
-                                    "query"
-                                } else {
-                                    "primitive"
-                                }
-                                }
-                                _ => "primitive",
-                            },
-                            None => "primitive",
+                            }
+                            crate::dsl_v2::runtime_registry::RuntimeBehavior::Plugin(_)
+                                if v.produces.is_none()
+                                    && v.harm_class
+                                        .as_ref()
+                                        .map(|h| {
+                                            matches!(
+                                                h,
+                                                crate::dsl_v2::config::types::HarmClass::ReadOnly
+                                            )
+                                        })
+                                        .unwrap_or(false) =>
+                            {
+                                "query"
+                            }
+                            crate::dsl_v2::runtime_registry::RuntimeBehavior::Plugin(_) => {
+                                "primitive"
+                            }
+                            _ => "primitive",
                         },
-                    };
+                        None => "primitive",
+                    },
+                };
 
                 let step_count: Option<u32> = None; // Populated when macro metadata available
 

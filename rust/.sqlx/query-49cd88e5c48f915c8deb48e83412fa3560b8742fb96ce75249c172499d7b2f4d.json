@@ -1,0 +1,34 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            SELECT\n                av.attribute_id,\n                av.value_text,\n                ar.display_name as attribute_name\n            FROM \"ob-poc\".attribute_values_typed av\n            JOIN \"ob-poc\".attribute_registry ar ON ar.id = av.attribute_id\n            WHERE av.entity_id = $1\n            ORDER BY ar.display_name\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "attribute_id",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 1,
+        "name": "value_text",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 2,
+        "name": "attribute_name",
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      true,
+      false
+    ]
+  },
+  "hash": "49cd88e5c48f915c8deb48e83412fa3560b8742fb96ce75249c172499d7b2f4d"
+}

@@ -10,7 +10,6 @@ use std::path::PathBuf;
 
 use dsl_core::config::types::{DurableConfig, SourceOfTruth, VerbBehavior, VerbScope, VerbTier};
 use dsl_core::config::ConfigLoader;
-use ob_poc::domain_ops::CustomOperationRegistry;
 use ob_poc::dsl_v2::execution::RuntimeVerbRegistry;
 use ob_poc::session::verb_contract::VerbDiagnostics;
 use ob_poc::session::verb_sync::VerbSyncService;
@@ -477,16 +476,146 @@ pub async fn verbs_lint(errors_only: bool, verbose: bool, tier: &str) -> Result<
 
         println!("\n  By Tier:");
         let mut tiers: Vec<_> = tier_counts.into_iter().collect();
-        tiers.sort_by(|a, b| b.1.cmp(&a.1));
+        tiers.sort_by_key(|item| std::cmp::Reverse(item.1));
         for (tier, count) in tiers {
             println!("    {:15} {}", tier, count);
         }
 
         println!("\n  By Source of Truth:");
         let mut sources: Vec<_> = source_counts.into_iter().collect();
-        sources.sort_by(|a, b| b.1.cmp(&a.1));
+        sources.sort_by_key(|item| std::cmp::Reverse(item.1));
         for (source, count) in sources {
             println!("    {:15} {}", source, count);
+        }
+    }
+
+    // =========================================================================
+    // P.1.h + V1.2-5 — three-axis + pack-hygiene declaration checks
+    //
+    // Runs the pure-function catalogue validator from dsl-core alongside
+    // the tiering linter. Reports structural errors, well-formedness
+    // errors (three-axis + pack-hygiene), and conservative policy-sanity
+    // warnings per v1.1 §6.2 + v1.2 amendment V1.2-5.
+    //
+    // Rollout-mode defaults: require_declaration=false + known_dags empty
+    // (matches the startup gate in ob-poc-web::main). Catches mechanical
+    // inconsistencies in whatever verbs DO carry three_axis declarations;
+    // missing declarations are silent until P.3 flips require_declaration
+    // per-workspace. Pack-hygiene check is ALWAYS on.
+    // =========================================================================
+    {
+        use dsl_core::config::{
+            collect_declared_fqns, flatten_pack_entries, load_packs_from_dir, validate_pack_fqns,
+            validate_verbs_config, ValidationContext,
+        };
+        use std::collections::HashSet;
+        use std::path::PathBuf;
+        println!("\n===========================================");
+        println!("  Three-Axis + Pack-Hygiene Lint (v1.1 P1 + v1.2 V1.2-5)");
+        println!("===========================================");
+        let ctx = ValidationContext {
+            require_declaration: false,
+            ..ValidationContext::default()
+        };
+        let mut three_axis_report = validate_verbs_config(&verbs_config, &ctx);
+
+        // V1.2-5 pack-hygiene cross-check.
+        let packs_dir = PathBuf::from("config/packs");
+        let macros_dir = PathBuf::from("config/verb_schemas/macros");
+        let mut pack_errors = Vec::new();
+        if packs_dir.exists() {
+            let declared_fqns = collect_declared_fqns(&verbs_config);
+            let mut macros: HashSet<String> = HashSet::new();
+            if macros_dir.exists() {
+                if let Ok(entries) = std::fs::read_dir(&macros_dir) {
+                    for entry in entries.flatten() {
+                        let p = entry.path();
+                        if p.extension().and_then(|e| e.to_str()) != Some("yaml") {
+                            continue;
+                        }
+                        let Ok(raw) = std::fs::read_to_string(&p) else {
+                            continue;
+                        };
+                        let Ok(v) = serde_yaml::from_str::<serde_yaml::Value>(&raw) else {
+                            continue;
+                        };
+                        if let Some(m) = v.as_mapping() {
+                            for (k, b) in m {
+                                if let (Some(fqn), Some(body)) = (k.as_str(), b.as_mapping()) {
+                                    if body
+                                        .get(serde_yaml::Value::String("kind".into()))
+                                        .and_then(|x| x.as_str())
+                                        == Some("macro")
+                                    {
+                                        macros.insert(fqn.to_string());
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            if let Ok(packs) = load_packs_from_dir(&packs_dir) {
+                pack_errors =
+                    validate_pack_fqns(&declared_fqns, &macros, flatten_pack_entries(&packs));
+                three_axis_report
+                    .well_formedness
+                    .extend(pack_errors.clone());
+            }
+        }
+
+        let declared = verbs_config
+            .domains
+            .values()
+            .flat_map(|d| d.verbs.values())
+            .filter(|v| v.three_axis.is_some())
+            .count();
+        let total = verbs_config
+            .domains
+            .values()
+            .map(|d| d.verbs.len())
+            .sum::<usize>();
+        println!("  Declared:             {} / {}", declared, total);
+        println!(
+            "  Structural errors:    {}",
+            three_axis_report.structural.len()
+        );
+        println!(
+            "  Well-formedness errs: {}  ({} three-axis + {} pack-hygiene)",
+            three_axis_report.well_formedness.len(),
+            three_axis_report.well_formedness.len() - pack_errors.len(),
+            pack_errors.len()
+        );
+        println!(
+            "  Policy-sanity warns:  {}",
+            three_axis_report.warnings.len()
+        );
+
+        if !three_axis_report.is_clean() {
+            println!("\n  Issues:");
+            for e in &three_axis_report.structural {
+                println!("    ERROR [structural]       {}", e);
+            }
+            for e in &three_axis_report.well_formedness {
+                println!("    ERROR [well-formedness]  {}", e);
+            }
+        }
+        if !three_axis_report.warnings.is_empty() && !errors_only {
+            for w in &three_axis_report.warnings {
+                println!("    WARN  [policy-sanity]    {}", w);
+            }
+        }
+
+        // Fail the lint if any error is present (matching the tiering-linter
+        // exit semantic). Warnings alone don't fail.
+        if !three_axis_report.is_clean() {
+            println!("\n===========================================");
+            println!(
+                "  FAILED: {} three-axis + pack-hygiene errors in the catalogue",
+                three_axis_report.error_count()
+            );
+            println!("===========================================");
+            std::process::exit(1);
         }
     }
 
@@ -1069,14 +1198,15 @@ pub fn verbs_atlas(output_dir: Option<PathBuf>, lint_only: bool, verbose: bool) 
     let lexicon_verbs = load_verb_concepts(&config_dir)?;
     println!("  Found {} concept entries", lexicon_verbs.len());
 
-    // Build handler registry (inventory-based)
+    // Build handler registry from the canonical SemOS plugin op registry.
+    // Post-Phase-5c-migrate slice #80 every plugin op lives here (including
+    // the Pattern B ops appended by `ob_poc::domain_ops::extend_registry`).
     println!("Building handler registry...");
-    let custom_ops = CustomOperationRegistry::new();
-    let handler_list: HashSet<String> = custom_ops
-        .list()
-        .iter()
-        .map(|(domain, verb, _)| format!("{}.{}", domain, verb))
-        .collect();
+    let handler_list: HashSet<String> = {
+        let mut reg = sem_os_postgres::ops::build_registry();
+        ob_poc::domain_ops::extend_registry(&mut reg);
+        reg.manifest().into_iter().collect()
+    };
     println!("  Found {} registered handlers", handler_list.len());
 
     // Build pack membership indices
@@ -1413,7 +1543,7 @@ pub fn verbs_atlas(output_dir: Option<PathBuf>, lint_only: bool, verbose: bool) 
                 code: "NO_HANDLER".to_string(),
                 severity: Severity::Error,
                 verb_fqn: row.fqn.clone(),
-                message: "Plugin verb with no registered CustomOperation handler".to_string(),
+                message: "Plugin verb with no registered SemOsVerbOp handler".to_string(),
             });
         }
 

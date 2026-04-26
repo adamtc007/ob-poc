@@ -1,0 +1,40 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT s.screening_id, s.screening_type, s.status, s.result_summary as result\n               FROM \"ob-poc\".screenings s\n               JOIN \"ob-poc\".entity_workstreams w ON w.workstream_id = s.workstream_id\n               WHERE w.entity_id = $1",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "screening_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "screening_type",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 2,
+        "name": "status",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 3,
+        "name": "result",
+        "type_info": "Varchar"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      true
+    ]
+  },
+  "hash": "005a0b3c57830a34fa9a30c21f0d6a8b2787f508d12112f75be9436c87be29f4"
+}

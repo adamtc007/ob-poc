@@ -1,0 +1,46 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            SELECT\n                COUNT(DISTINCT cer.entity_id) as total_entities,\n                COUNT(DISTINCT CASE WHEN et.type_code = 'limited_company' THEN e.entity_id END) as companies,\n                COUNT(DISTINCT CASE WHEN et.type_code = 'proper_person' THEN e.entity_id END) as persons,\n                COUNT(DISTINCT CASE WHEN et.type_code = 'trust_discretionary' THEN e.entity_id END) as trusts,\n                COUNT(DISTINCT CASE WHEN et.type_code = 'partnership_limited' THEN e.entity_id END) as partnerships\n            FROM \"ob-poc\".cbu_entity_roles cer\n            JOIN \"ob-poc\".entities e ON cer.entity_id = e.entity_id\n            JOIN \"ob-poc\".entity_types et ON e.entity_type_id = et.entity_type_id\n            WHERE cer.cbu_id = $1\n              AND e.deleted_at IS NULL\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "total_entities",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 1,
+        "name": "companies",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 2,
+        "name": "persons",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 3,
+        "name": "trusts",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 4,
+        "name": "partnerships",
+        "type_info": "Int8"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      null,
+      null,
+      null,
+      null,
+      null
+    ]
+  },
+  "hash": "3b9582a0ca89007c58cc49bf75428f90851862a813603fabfe3c6d4f2ce833f3"
+}

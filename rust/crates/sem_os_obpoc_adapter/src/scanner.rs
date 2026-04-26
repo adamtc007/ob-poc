@@ -60,6 +60,7 @@ pub fn verb_config_to_contract(
                 .default
                 .as_ref()
                 .and_then(|v| serde_json::to_value(v).ok()),
+            maps_to: a.maps_to.clone(),
         })
         .collect();
 
@@ -159,6 +160,19 @@ pub fn verb_config_to_contract(
         table: c.table.clone(),
         schema: c.schema.clone(),
         key_column: c.key.clone(),
+        returning: c.returning.clone(),
+        conflict_keys: c.conflict_keys.clone().unwrap_or_default(),
+        conflict_constraint: c.conflict_constraint.clone(),
+        junction: c.junction.clone(),
+        from_col: c.from_col.clone(),
+        to_col: c.to_col.clone(),
+        role_table: c.role_table.clone(),
+        role_col: c.role_col.clone(),
+        fk_col: c.fk_col.clone(),
+        filter_col: c.filter_col.clone(),
+        primary_table: c.primary_table.clone(),
+        join_table: c.join_table.clone(),
+        join_col: c.join_col.clone(),
     });
 
     VerbContractBody {
@@ -1024,6 +1038,8 @@ mod tests {
             sentences: None,
             confirm_policy: None,
             outputs: vec![],
+            three_axis: None,
+            transition_args: None,
         }
     }
 

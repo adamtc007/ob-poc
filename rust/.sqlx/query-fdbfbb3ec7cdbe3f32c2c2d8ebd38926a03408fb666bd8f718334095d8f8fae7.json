@@ -1,0 +1,46 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            SELECT\n                mapping_id,\n                document_type_id,\n                attribute_uuid,\n                extraction_method,\n                is_required\n            FROM \"ob-poc\".document_attribute_mappings\n            WHERE document_type_id = $1\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "mapping_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "document_type_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 2,
+        "name": "attribute_uuid",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 3,
+        "name": "extraction_method",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 4,
+        "name": "is_required",
+        "type_info": "Bool"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      true
+    ]
+  },
+  "hash": "fdbfbb3ec7cdbe3f32c2c2d8ebd38926a03408fb666bd8f718334095d8f8fae7"
+}

@@ -1,0 +1,282 @@
+# Product-Service-Taxonomy Workspace — DAG Taxonomy (Tranche 3 — 2026-04-24)
+#
+# ============================================================================
+# WORKSPACE PURPOSE:
+#
+# Product-Service-Taxonomy is the CATALOG-EXPLORATION workspace.
+# Read-only navigation over the design-time product → service →
+# servicing-resource → attribute dictionary taxonomy. This is how
+# a user browses "what products exist, what services they include,
+# what resources power those services, what attributes those
+# resources require."
+#
+# Pack profile: 11 allowed_verbs (all list/read) + 4 forbidden_verbs
+# (blocks any mutations). Pure exploration.
+#
+# ============================================================================
+# CBU CONSTRUCT RELATIONSHIP:
+#
+# Pre-CBU — this is the design-time catalog. Consumers of the
+# taxonomy are downstream workspaces (CBU, Deal, Book-Setup) that
+# select products + services for specific CBUs. The taxonomy tells
+# the catalog what's AVAILABLE; the CBU DAG says what's ACTIVATED.
+#
+# Adam's tollgate pattern from compound gating:
+#   "CBU and Products gate instrument matrix extended metadata —
+#    e.g. Fund adds pricing preference to each asset class"
+# — the PRODUCT in that compound gate comes from THIS taxonomy.
+#
+# ============================================================================
+# WORKSPACE SHAPE:
+#
+# This is a READ workspace. No state transitions, no authoring. The
+# governed authoring of product/service/resource definitions happens
+# in the SemOsMaintenance workspace (via attribute_def +
+# service_resource_def lifecycles). This workspace exposes the
+# published state of that registry for consumers.
+#
+# No stateful slots on the workspace itself — all data is sourced
+# from SemOsMaintenance's published artefacts.
+#
+# ============================================================================
+# V1.3 conventions: minimal — read-only workspace.
+#
+# PARENT DOCS:
+#   - docs/todo/catalogue-platform-refinement-v1_3.md
+#   - semos_maintenance_dag.yaml (the governed source)
+#   - rust/config/packs/product-service-taxonomy.yaml
+
+version: "1.0"
+workspace: product_maintenance
+dag_id: product_service_taxonomy_dag
+
+# =============================================================================
+# 1. OVERALL LIFECYCLE — catalog-exploration journey
+# =============================================================================
+
+overall_lifecycle:
+  id: product_service_taxonomy_overall_lifecycle
+  scope: per_exploration
+  derived: true
+  description: >
+    Per-session exploration journey. 3 phases reflecting what the user
+    is looking at: selecting an anchor (product / service / resource),
+    browsing from it, inspecting attributes. No persistent state —
+    this is a navigation journey, not an operational one.
+  phases:
+    - name: anchor_selection
+      description: |
+        User being prompted for an anchor (product / service / resource
+        id). Pack's required_questions are in play.
+      derivation:
+        all_of:
+          - "pack_state = awaiting_anchor_selection"
+      progression_verbs:
+        - product.list
+        - service.list
+        - service-resource.list
+      next_phase: browsing
+    - name: browsing
+      description: |
+        Anchor selected. User navigating the taxonomy tree down from
+        product → services → resources → attributes, or laterally.
+      derivation:
+        any_of:
+          - "pack.answers.product_id IS NOT NULL"
+          - "pack.answers.service_id IS NOT NULL"
+          - "pack.answers.resource_id IS NOT NULL"
+      progression_verbs:
+        - product.read
+        - service.read
+        - service.list-by-product
+        - service-resource.read
+        - service-resource.list-by-service
+        - service-resource.list-attributes
+        - attribute.list
+        - attribute.read
+      next_phase: "(stay in browsing — exploration is ad-hoc)"
+
+# =============================================================================
+# 2. SLOTS — all stateless (read-only views)
+# =============================================================================
+
+slots:
+
+  - id: workspace_root
+    stateless: true
+    rationale: "Aggregation root for taxonomy exploration."
+
+  - id: product
+    stateless: true
+    rationale: |
+      Product catalog entries. Read-only view on products table.
+      Product definitions are authored in SemOsMaintenance workspace
+      (via service_resource_def + attribute_def governed flows). This
+      workspace only reads.
+
+  # R2 (2026-04-26): service slot promoted to stateful. Pattern after
+  # attribute_def_lifecycle in semos_maintenance_dag.yaml. Enables
+  # cbu.service_consumption.proposed → provisioned to gate on
+  # "service is published in catalogue" via cross-workspace constraint.
+  - id: service
+    stateless: false
+    state_machine:
+      id: service_lifecycle
+      owner: stewards
+      expected_lifetime: long_lived
+      source_entity: '"ob-poc".services'
+      state_column: lifecycle_status
+      scope: per_service
+      description: |
+        Service-definition lifecycle. 5 states modelled after
+        attribute_def_lifecycle (ungoverned → draft → active →
+        deprecated → retired). Catalog services start ungoverned
+        (discovered but not yet defined); transition to draft via
+        service.define; reach active when included in a published
+        changeset; deprecated/retired follow attribute_def semantics.
+      states:
+        - id: ungoverned
+          entry: true
+          description: "Pre-governance; service exists but is not formally defined."
+        - id: draft
+          description: "Service being authored within a changeset."
+        - id: active
+          description: "Published; consumers reference this service."
+        - id: deprecated
+          description: "Replaced by newer version; migrate consumers."
+        - id: retired
+          description: "Terminal; no longer in use."
+      transitions:
+        - from: ungoverned
+          to: draft
+          via: service.define
+        - from: draft
+          to: active
+          via: "(backend: changeset.publish includes this service)"
+        - from: active
+          to: draft
+          via: service.propose-revision
+        - from: active
+          to: deprecated
+          via: service.deprecate
+        - from: deprecated
+          to: retired
+          via: service.retire
+      terminal_states: [retired]
+    suspended_state_exempt: true
+
+  # R2 (2026-04-26): service_version slot — per-version lifecycle keyed
+  # to a parent service. Service_version draft → reviewed → published →
+  # superseded → retired tracks the publication lifecycle of each
+  # version of a service definition.
+  - id: service_version
+    stateless: false
+    parent_slot:
+      workspace: product_maintenance
+      slot: service
+      join:
+        via: service_versions
+        parent_fk: service_id
+        child_fk: id
+    state_machine:
+      id: service_version_lifecycle
+      owner: stewards
+      expected_lifetime: long_lived
+      source_entity: '"ob-poc".service_versions'
+      state_column: lifecycle_status
+      scope: per_service_version
+      description: |
+        Service-version lifecycle. 5 states (drafted → reviewed →
+        published → superseded → retired). Each version of a service
+        definition flows through review and publication independently
+        of the parent service's overall lifecycle state.
+      states:
+        - id: drafted
+          entry: true
+          description: "Version drafted; under authoring."
+        - id: reviewed
+          description: "Submitted for and passed review."
+        - id: published
+          description: "Active version; consumers may reference."
+        - id: superseded
+          description: "Newer version published; this one no longer current."
+        - id: retired
+          description: "Terminal; removed from circulation."
+      transitions:
+        - from: drafted
+          to: reviewed
+          via: service-version.submit-for-review
+        - from: reviewed
+          to: published
+          via: service-version.publish
+        - from: published
+          to: superseded
+          via: "(backend: new published version of same service)"
+        - from: [published, superseded]
+          to: retired
+          via: service-version.retire
+      terminal_states: [retired]
+    suspended_state_exempt: true
+
+  - id: service_resource
+    stateless: true
+    rationale: |
+      Servicing resource instances (e.g. custody system, fund-admin
+      system, TA system). Read-only view. The governed DEFINITIONS
+      (service_resource_def) live in SemOsMaintenance; per-CBU
+      activation lives in CBU's service_consumption slot.
+
+  - id: attribute
+    stateless: true
+    rationale: |
+      Attribute dictionary. Each service-resource requires a set of
+      attribute values (BIC, account number, routing code, etc.). The
+      attribute DEFINITION lifecycle (attribute_def) lives in
+      SemOsMaintenance; per-entity values are typed_attribute rows
+      in CBU workspace. This workspace just browses the dictionary.
+
+# =============================================================================
+# 3. CROSS-SLOT / CROSS-WORKSPACE CONSTRAINTS
+# =============================================================================
+# Read-only workspace has no constraints to enforce — every verb is
+# benign observational.
+
+cross_slot_constraints: []
+cross_workspace_constraints: []
+derived_cross_workspace_state: []
+
+# =============================================================================
+# 4. PRODUCT-MODULE GATES
+# =============================================================================
+# Always-on for all workspace consumers.
+
+product_module_gates:
+  always_on:
+    - workspace_root
+    - product
+    - service
+    - service_version
+    - service_resource
+    - attribute
+  conditionally_on: []
+
+# =============================================================================
+# 5. OUT OF SCOPE
+# =============================================================================
+
+out_of_scope:
+  - "Product authoring — governed by SemOsMaintenance workspace (changeset + service_resource_def + attribute_def)"
+  - "Product activation per CBU — governed by CBU workspace's service_consumption slot"
+  - "Product assignment to deal — governed by Deal workspace's deal_product slot"
+  - "Runtime product provisioning (account opening, routing config) — Layer 2/3"
+
+# =============================================================================
+# 6. PRUNE SEMANTICS
+# =============================================================================
+# None — read-only workspace. Prune happens in SemOsMaintenance
+# (attribute.retire, service-resource-def retirement).
+
+prune_cascade_rules: []
+prune_pre_validation:
+  required_verbs: []
+  abort_conditions: []

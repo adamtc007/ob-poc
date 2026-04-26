@@ -12,14 +12,14 @@ domains:
           phase_tags: [kyc]
           side_effects: state_write
         invocation_phrases:
-        - "record observation discrepancy"
-        - "log data conflict"
-        - "flag conflicting observations"
-        - "add discrepancy between sources"
-        - "two observations disagree"
-        - "capture attribute mismatch"
-        - "create discrepancy finding"
-        - "report inconsistent data"
+          - "record observation discrepancy"
+          - "log data conflict"
+          - "flag conflicting observations"
+          - "add discrepancy between sources"
+          - "two observations disagree"
+          - "capture attribute mismatch"
+          - "create discrepancy finding"
+          - "report inconsistent data"
         behavior: crud
         crud:
           operation: insert
@@ -27,90 +27,95 @@ domains:
           schema: ob-poc
           returning: discrepancy_id
         args:
-        - name: entity-id
-          type: uuid
-          required: true
-          maps_to: entity_id
-          lookup:
-            table: entities
-            entity_type: entity
-            schema: ob-poc
-            search_key: name
-            primary_key: entity_id
-        - name: attribute-id
-          type: uuid
-          required: true
-          maps_to: attribute_id
-          lookup:
-            table: attribute_registry
-            entity_type: attribute
-            schema: ob-poc
-            search_key: attribute_code
-            primary_key: attribute_id
-        - name: observation-1-id
-          type: uuid
-          required: true
-          maps_to: observation_1_id
-          lookup:
-            table: attribute_observations
-            entity_type: observation
-            schema: ob-poc
-            search_key: observation_id
-            primary_key: observation_id
-        - name: observation-2-id
-          type: uuid
-          required: true
-          maps_to: observation_2_id
-          lookup:
-            table: attribute_observations
-            entity_type: observation
-            schema: ob-poc
-            search_key: observation_id
-            primary_key: observation_id
-        - name: type
-          type: string
-          required: true
-          maps_to: discrepancy_type
-        - name: severity
-          type: string
-          required: true
-          maps_to: severity
-        - name: description
-          type: string
-          required: true
-          maps_to: description
-        - name: value-1-display
-          type: string
-          required: false
-          maps_to: value_1_display
-        - name: value-2-display
-          type: string
-          required: false
-          maps_to: value_2_display
-        - name: case-id
-          type: uuid
-          required: false
-          maps_to: case_id
-          lookup:
-            table: cases
-            entity_type: kyc_case
-            schema: kyc
-            search_key: case_id
-            primary_key: case_id
-        - name: workstream-id
-          type: uuid
-          required: false
-          maps_to: workstream_id
-          lookup:
-            table: entity_workstreams
-            entity_type: entity_workstream
-            schema: kyc
-            search_key: workstream_id
-            primary_key: workstream_id
+          - name: entity-id
+            type: uuid
+            required: true
+            maps_to: entity_id
+            lookup:
+              table: entities
+              entity_type: entity
+              schema: ob-poc
+              search_key: name
+              primary_key: entity_id
+          - name: attribute-id
+            type: uuid
+            required: true
+            maps_to: attribute_id
+            lookup:
+              table: attribute_registry
+              entity_type: attribute
+              schema: ob-poc
+              search_key: attribute_code
+              primary_key: attribute_id
+          - name: observation-1-id
+            type: uuid
+            required: true
+            maps_to: observation_1_id
+            lookup:
+              table: attribute_observations
+              entity_type: observation
+              schema: ob-poc
+              search_key: observation_id
+              primary_key: observation_id
+          - name: observation-2-id
+            type: uuid
+            required: true
+            maps_to: observation_2_id
+            lookup:
+              table: attribute_observations
+              entity_type: observation
+              schema: ob-poc
+              search_key: observation_id
+              primary_key: observation_id
+          - name: type
+            type: string
+            required: true
+            maps_to: discrepancy_type
+          - name: severity
+            type: string
+            required: true
+            maps_to: severity
+          - name: description
+            type: string
+            required: true
+            maps_to: description
+          - name: value-1-display
+            type: string
+            required: false
+            maps_to: value_1_display
+          - name: value-2-display
+            type: string
+            required: false
+            maps_to: value_2_display
+          - name: case-id
+            type: uuid
+            required: false
+            maps_to: case_id
+            lookup:
+              table: cases
+              entity_type: kyc_case
+              schema: kyc
+              search_key: case_id
+              primary_key: case_id
+          - name: workstream-id
+            type: uuid
+            required: false
+            maps_to: workstream_id
+            lookup:
+              table: entity_workstreams
+              entity_type: entity_workstream
+              schema: kyc
+              search_key: workstream_id
+              primary_key: workstream_id
         returns:
           type: uuid
           name: discrepancy_id
           capture: true
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
       resolve:
         description: Resolve a discrepancy
         metadata:
@@ -121,14 +126,14 @@ domains:
           phase_tags: [kyc]
           side_effects: state_write
         invocation_phrases:
-        - "resolve data discrepancy"
-        - "close observation conflict"
-        - "settle conflicting data"
-        - "pick the correct observation"
-        - "mark discrepancy as resolved"
-        - "accept resolution for conflict"
-        - "fix the data mismatch"
-        - "reconcile the discrepancy"
+          - "resolve data discrepancy"
+          - "close observation conflict"
+          - "settle conflicting data"
+          - "pick the correct observation"
+          - "mark discrepancy as resolved"
+          - "accept resolution for conflict"
+          - "fix the data mismatch"
+          - "reconcile the discrepancy"
         behavior: crud
         crud:
           operation: update
@@ -139,40 +144,45 @@ domains:
             resolution_status: RESOLVED
             resolved_at: now()
         args:
-        - name: discrepancy-id
-          type: uuid
-          required: true
-          maps_to: discrepancy_id
-          lookup:
-            table: observation_discrepancies
-            entity_type: discrepancy
-            schema: ob-poc
-            search_key: discrepancy_id
-            primary_key: discrepancy_id
-        - name: resolution-type
-          type: string
-          required: true
-          maps_to: resolution_type
-        - name: accepted-observation-id
-          type: uuid
-          required: false
-          maps_to: accepted_observation_id
-          lookup:
-            table: attribute_observations
-            entity_type: observation
-            schema: ob-poc
-            search_key: observation_id
-            primary_key: observation_id
-        - name: notes
-          type: string
-          required: false
-          maps_to: resolution_notes
-        - name: resolved-by
-          type: string
-          required: false
-          maps_to: resolved_by
+          - name: discrepancy-id
+            type: uuid
+            required: true
+            maps_to: discrepancy_id
+            lookup:
+              table: observation_discrepancies
+              entity_type: discrepancy
+              schema: ob-poc
+              search_key: discrepancy_id
+              primary_key: discrepancy_id
+          - name: resolution-type
+            type: string
+            required: true
+            maps_to: resolution_type
+          - name: accepted-observation-id
+            type: uuid
+            required: false
+            maps_to: accepted_observation_id
+            lookup:
+              table: attribute_observations
+              entity_type: observation
+              schema: ob-poc
+              search_key: observation_id
+              primary_key: observation_id
+          - name: notes
+            type: string
+            required: false
+            maps_to: resolution_notes
+          - name: resolved-by
+            type: string
+            required: false
+            maps_to: resolved_by
         returns:
           type: affected
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
       escalate:
         description: Escalate a discrepancy
         metadata:
@@ -183,14 +193,14 @@ domains:
           phase_tags: [kyc]
           side_effects: state_write
         invocation_phrases:
-        - "escalate the discrepancy"
-        - "raise data conflict to senior"
-        - "send discrepancy for review"
-        - "escalate conflicting observations"
-        - "bump discrepancy to compliance"
-        - "flag discrepancy for escalation"
-        - "this conflict needs attention"
-        - "refer discrepancy to manager"
+          - "escalate the discrepancy"
+          - "raise data conflict to senior"
+          - "send discrepancy for review"
+          - "escalate conflicting observations"
+          - "bump discrepancy to compliance"
+          - "flag discrepancy for escalation"
+          - "this conflict needs attention"
+          - "refer discrepancy to manager"
         behavior: crud
         crud:
           operation: update
@@ -200,22 +210,27 @@ domains:
           set_values:
             resolution_status: ESCALATED
         args:
-        - name: discrepancy-id
-          type: uuid
-          required: true
-          maps_to: discrepancy_id
-          lookup:
-            table: observation_discrepancies
-            entity_type: discrepancy
-            schema: ob-poc
-            search_key: discrepancy_id
-            primary_key: discrepancy_id
-        - name: notes
-          type: string
-          required: false
-          maps_to: resolution_notes
+          - name: discrepancy-id
+            type: uuid
+            required: true
+            maps_to: discrepancy_id
+            lookup:
+              table: observation_discrepancies
+              entity_type: discrepancy
+              schema: ob-poc
+              search_key: discrepancy_id
+              primary_key: discrepancy_id
+          - name: notes
+            type: string
+            required: false
+            maps_to: resolution_notes
         returns:
           type: affected
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
       list-open:
         description: List open discrepancies
         metadata:
@@ -226,43 +241,49 @@ domains:
           phase_tags: [kyc]
           side_effects: facts_only
         invocation_phrases:
-        - "list open discrepancies"
-        - "show unresolved data conflicts"
-        - "what discrepancies are pending"
-        - "display outstanding conflicts"
-        - "any open observation mismatches"
-        - "get unresolved discrepancies"
-        - "which conflicts need resolution"
-        - "pending data discrepancies"
+          - "list open discrepancies"
+          - "show unresolved data conflicts"
+          - "what discrepancies are pending"
+          - "display outstanding conflicts"
+          - "any open observation mismatches"
+          - "get unresolved discrepancies"
+          - "which conflicts need resolution"
+          - "pending data discrepancies"
         behavior: crud
         crud:
           operation: select
           table: observation_discrepancies
           schema: ob-poc
         args:
-        - name: entity-id
-          type: uuid
-          required: false
-          maps_to: entity_id
-          lookup:
-            table: entities
-            entity_type: entity
-            schema: ob-poc
-            search_key: name
-            primary_key: entity_id
-        - name: case-id
-          type: uuid
-          required: false
-          maps_to: case_id
-          lookup:
-            table: cases
-            entity_type: kyc_case
-            schema: kyc
-            search_key: case_id
-            primary_key: case_id
-        - name: severity
-          type: string
-          required: false
-          maps_to: severity
+          - name: entity-id
+            type: uuid
+            required: false
+            maps_to: entity_id
+            lookup:
+              table: entities
+              entity_type: entity
+              schema: ob-poc
+              search_key: name
+              primary_key: entity_id
+          - name: case-id
+            type: uuid
+            required: false
+            maps_to: case_id
+            lookup:
+              table: cases
+              entity_type: kyc_case
+              schema: kyc
+              search_key: case_id
+              primary_key: case_id
+          - name: severity
+            type: string
+            required: false
+            maps_to: severity
         returns:
           type: record_set
+        three_axis:
+          state_effect: preserving
+          external_effects:
+            - observational
+          consequence:
+            baseline: benign

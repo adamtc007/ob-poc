@@ -1,0 +1,46 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            SELECT\n                dc.doc_id,\n                dc.document_type_id,\n                dt.type_code,\n                dc.cbu_id,\n                dc.document_name\n            FROM \"ob-poc\".document_catalog dc\n            JOIN \"ob-poc\".document_types dt ON dt.type_id = dc.document_type_id\n            WHERE dc.doc_id = $1\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "doc_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "document_type_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 2,
+        "name": "type_code",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 3,
+        "name": "cbu_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 4,
+        "name": "document_name",
+        "type_info": "Varchar"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      true,
+      false,
+      true,
+      true
+    ]
+  },
+  "hash": "cf8901125c6f9743e0cf6ff0e4816e616a20c1ede607b4e351289a75fc935d55"
+}

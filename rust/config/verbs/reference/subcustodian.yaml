@@ -83,6 +83,11 @@ domains:
           type: uuid
           name: network_id
           capture: true
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
       list-by-market:
         description: List sub-custodian entries for a market
         metadata:
@@ -124,6 +129,11 @@ domains:
           maps_to: currency
         returns:
           type: record_set
+        three_axis:
+          state_effect: preserving
+          external_effects: [observational]
+          consequence:
+            baseline: benign
       lookup:
         description: Find sub-custodian for market/currency
         metadata:
@@ -156,3 +166,8 @@ domains:
           required: false
         returns:
           type: record
+        three_axis:
+          state_effect: preserving
+          external_effects: [observational]
+          consequence:
+            baseline: benign

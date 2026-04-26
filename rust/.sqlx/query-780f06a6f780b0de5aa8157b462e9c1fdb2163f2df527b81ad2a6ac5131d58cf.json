@@ -1,0 +1,16 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            UPDATE \"ob-poc\".bpmn_correlations\n            SET status = $2, completed_at = $3\n            WHERE correlation_id = $1\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Text",
+        "Timestamptz"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "780f06a6f780b0de5aa8157b462e9c1fdb2163f2df527b81ad2a6ac5131d58cf"
+}

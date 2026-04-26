@@ -1,0 +1,17 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n                    UPDATE \"ob-poc\".entity_workstreams\n                    SET status = 'BLOCKED',\n                        blocker_type = $2,\n                        blocker_request_id = $3,\n                        blocker_message = $4,\n                        blocked_at = NOW()\n                    WHERE workstream_id = $1 AND status != 'BLOCKED'\n                    ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Varchar",
+        "Uuid",
+        "Varchar"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "29309b086ff9607856e7cee1515684196ed16d75a703e9746675e889d5d6d735"
+}

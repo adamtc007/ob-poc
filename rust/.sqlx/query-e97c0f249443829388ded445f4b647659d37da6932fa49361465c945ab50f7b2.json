@@ -1,0 +1,66 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            INSERT INTO \"ob-poc\".failures (\n                fingerprint, fingerprint_version,\n                error_type, remediation_path, status,\n                verb, source, error_message, error_context,\n                user_intent, command_sequence,\n                first_seen_at, last_seen_at\n            ) VALUES (\n                $1, $2,\n                $3, $4, 'NEW',\n                $5, $6, $7, $8,\n                $9, $10,\n                $11, $11\n            )\n            RETURNING id\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Int2",
+        {
+          "Custom": {
+            "name": "\"ob-poc\".error_type",
+            "kind": {
+              "Enum": [
+                "TIMEOUT",
+                "RATE_LIMITED",
+                "CONNECTION_RESET",
+                "SERVICE_UNAVAILABLE",
+                "POOL_EXHAUSTED",
+                "ENUM_DRIFT",
+                "SCHEMA_DRIFT",
+                "PARSE_ERROR",
+                "HANDLER_PANIC",
+                "HANDLER_ERROR",
+                "DSL_PARSE_ERROR",
+                "API_ENDPOINT_MOVED",
+                "API_AUTH_CHANGED",
+                "VALIDATION_FAILED",
+                "UNKNOWN"
+              ]
+            }
+          }
+        },
+        {
+          "Custom": {
+            "name": "\"ob-poc\".remediation_path",
+            "kind": {
+              "Enum": [
+                "RUNTIME",
+                "CODE",
+                "LOG_ONLY"
+              ]
+            }
+          }
+        },
+        "Text",
+        "Text",
+        "Text",
+        "Jsonb",
+        "Text",
+        "TextArray",
+        "Timestamptz"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "e97c0f249443829388ded445f4b647659d37da6932fa49361465c945ab50f7b2"
+}

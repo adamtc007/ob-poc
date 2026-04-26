@@ -1,27 +1,29 @@
-//! BPMN-Lite control operations — direct gRPC verbs for workflow management.
+//! BPMN-Lite control verbs (5 plugin verbs) — `bpmn.{compile, start,
+//! signal, cancel, inspect}`. Direct gRPC pass-throughs to the
+//! bpmn-lite service, reached via `crate::bpmn_integration::client`.
 //!
-//! These ops expose bpmn-lite gRPC service functionality as DSL verbs:
-//! compile, start, signal, cancel, inspect.
+//! Phase 5c-migrate Phase B Pattern B slice #73: ported from
+//! `CustomOperation` + `inventory::collect!` to `SemOsVerbOp`. Stays
+//! in `ob-poc::domain_ops` because the client types live in
+//! `ob-poc::bpmn_integration` (not upstream of `sem_os_postgres`).
 
 use anyhow::Result;
 use async_trait::async_trait;
-use ob_poc_macros::register_custom_op;
 use ob_poc_types::session_stack::SessionStackState;
+use sem_os_postgres::ops::SemOsVerbOp;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
-use super::CustomOperation;
-use crate::dsl_v2::ast::VerbCall;
-use crate::dsl_v2::executor::{ExecutionContext, ExecutionResult};
-
-#[cfg(feature = "database")]
-use sqlx::PgPool;
+use dsl_runtime::domain_ops::helpers::{
+    json_extract_string, json_extract_string_opt, json_get_required_uuid,
+};
+use dsl_runtime::tx::TransactionScope;
+use dsl_runtime::{VerbExecutionContext, VerbExecutionOutcome};
 
 // =============================================================================
-// Result Types
+// Result types
 // =============================================================================
 
-/// Result of compiling a BPMN model.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct BpmnCompileResult {
     pub bytecode_version_hex: String,
@@ -29,7 +31,6 @@ pub struct BpmnCompileResult {
     pub diagnostics: Vec<BpmnDiagnosticResult>,
 }
 
-/// Single diagnostic from BPMN compilation.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct BpmnDiagnosticResult {
     pub severity: String,
@@ -37,7 +38,6 @@ pub struct BpmnDiagnosticResult {
     pub element_id: String,
 }
 
-/// Result of inspecting a BPMN process instance.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct BpmnInspectResult {
     pub state: String,
@@ -47,34 +47,6 @@ pub struct BpmnInspectResult {
     pub domain_payload_hash: String,
 }
 
-// =============================================================================
-// Helpers
-// =============================================================================
-
-fn get_required_string(verb_call: &VerbCall, key: &str) -> Result<String> {
-    verb_call
-        .arguments
-        .iter()
-        .find(|a| a.key == key)
-        .and_then(|a| a.value.as_string().map(|s| s.to_string()))
-        .ok_or_else(|| anyhow::anyhow!("Missing required argument :{}", key))
-}
-
-fn get_optional_string(verb_call: &VerbCall, key: &str) -> Option<String> {
-    verb_call
-        .arguments
-        .iter()
-        .find(|a| a.key == key)
-        .and_then(|a| a.value.as_string().map(|s| s.to_string()))
-}
-
-fn get_required_uuid(verb_call: &VerbCall, key: &str) -> Result<Uuid> {
-    let s = get_required_string(verb_call, key)?;
-    Uuid::parse_str(&s).map_err(|e| anyhow::anyhow!("Invalid UUID for :{}: {}", key, e))
-}
-
-/// Get BpmnLiteConnection from env. Returns error if BPMN_LITE_GRPC_URL not set.
-#[cfg(feature = "database")]
 fn get_bpmn_client() -> Result<crate::bpmn_integration::client::BpmnLiteConnection> {
     crate::bpmn_integration::client::BpmnLiteConnection::from_env()
 }
@@ -83,29 +55,25 @@ fn get_bpmn_client() -> Result<crate::bpmn_integration::client::BpmnLiteConnecti
 // bpmn.compile
 // =============================================================================
 
-#[register_custom_op]
-pub struct BpmnCompileOp;
+pub struct BpmnCompile;
 
 #[async_trait]
-impl CustomOperation for BpmnCompileOp {
-    fn domain(&self) -> &'static str {
-        "bpmn"
-    }
-    fn verb(&self) -> &'static str {
-        "compile"
-    }
-    fn rationale(&self) -> &'static str {
-        "Calls bpmn-lite gRPC Compile RPC"
+impl SemOsVerbOp for BpmnCompile {
+    fn fqn(&self) -> &str {
+        "bpmn.compile"
     }
 
-    #[cfg(feature = "database")]
-    async fn execute(
+    /// Phase F.1b (Pattern B §3.1, 2026-04-22): gRPC compile moves to
+    /// pre_fetch. Compilation is idempotent (bytecode is a hash of the
+    /// XML) so re-compilation on scope rollback + retry is safe — the
+    /// bpmn-server returns the same bytecode every time.
+    async fn pre_fetch(
         &self,
-        verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-        _pool: &PgPool,
-    ) -> Result<ExecutionResult> {
-        let bpmn_xml = get_required_string(verb_call, "bpmn-xml")?;
+        args: &serde_json::Value,
+        _ctx: &mut VerbExecutionContext,
+        _pool: &sqlx::PgPool,
+    ) -> Result<Option<serde_json::Value>> {
+        let bpmn_xml = json_extract_string(args, "bpmn-xml")?;
         let client = get_bpmn_client()?;
         let result = client.compile(&bpmn_xml).await?;
 
@@ -122,16 +90,24 @@ impl CustomOperation for BpmnCompileOp {
                 })
                 .collect(),
         };
-        Ok(ExecutionResult::Record(serde_json::to_value(typed)?))
+        Ok(Some(serde_json::json!({
+            "_bpmn_compile_result": serde_json::to_value(typed)?
+        })))
     }
 
-    #[cfg(not(feature = "database"))]
     async fn execute(
         &self,
-        _verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-    ) -> Result<ExecutionResult> {
-        Err(anyhow::anyhow!("bpmn.compile requires database feature"))
+        args: &serde_json::Value,
+        _ctx: &mut VerbExecutionContext,
+        _scope: &mut dyn TransactionScope,
+    ) -> Result<VerbExecutionOutcome> {
+        let result = args.get("_bpmn_compile_result").cloned().ok_or_else(|| {
+            anyhow::anyhow!(
+                "bpmn.compile: pre_fetch result missing \
+                 (`_bpmn_compile_result` absent from args)"
+            )
+        })?;
+        Ok(VerbExecutionOutcome::Record(result))
     }
 }
 
@@ -139,30 +115,47 @@ impl CustomOperation for BpmnCompileOp {
 // bpmn.start
 // =============================================================================
 
-#[register_custom_op]
-pub struct BpmnStartOp;
+pub struct BpmnStart;
 
 #[async_trait]
-impl CustomOperation for BpmnStartOp {
-    fn domain(&self) -> &'static str {
-        "bpmn"
-    }
-    fn verb(&self) -> &'static str {
-        "start"
-    }
-    fn rationale(&self) -> &'static str {
-        "Calls bpmn-lite gRPC StartProcess RPC"
+impl SemOsVerbOp for BpmnStart {
+    fn fqn(&self) -> &str {
+        "bpmn.start"
     }
 
-    #[cfg(feature = "database")]
-    async fn execute(
+    /// Phase F.1d (Pattern B §3.1, 2026-04-22): start_process moves to
+    /// pre_fetch. Non-idempotent (bpmn-server generates a fresh
+    /// instance_id per call), so the saga surface is real:
+    ///
+    /// - If the outer transaction commits normally, the bpmn instance
+    ///   and any caller-side DB state that references its id are
+    ///   consistent. This is the happy path — same as pre-F.1d.
+    ///
+    /// - If the outer transaction rolls back (e.g. a later step in
+    ///   the runbook fails), the bpmn-server holds a live instance
+    ///   with no DB trail on the caller side. The instance is
+    ///   ORPHANED and would execute on its own schedule until a
+    ///   reaper detects it.
+    ///
+    /// - Comparison: the pre-F.1d implementation had the SAME orphan
+    ///   window — the gRPC call fired inside the verb body; if later
+    ///   steps in the same runbook failed, the bpmn instance was
+    ///   already live and the verb's own per-verb txn was irrelevant
+    ///   (the bpmn service sees no txn boundary).
+    ///
+    /// Net effect of this migration: the A1 invariant (no external
+    /// effects inside the inner txn) is satisfied. The saga risk is
+    /// unchanged. Closing the saga requires a separate reaper —
+    /// tracked in the pattern-b remediation ledger under §3.1
+    /// follow-ups and deferred to a later design slice.
+    async fn pre_fetch(
         &self,
-        verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-        _pool: &PgPool,
-    ) -> Result<ExecutionResult> {
-        let process_key = get_required_string(verb_call, "process-key")?;
-        let payload = get_optional_string(verb_call, "payload").unwrap_or_else(|| "{}".to_string());
+        args: &serde_json::Value,
+        _ctx: &mut VerbExecutionContext,
+        _pool: &sqlx::PgPool,
+    ) -> Result<Option<serde_json::Value>> {
+        let process_key = json_extract_string(args, "process-key")?;
+        let payload = json_extract_string_opt(args, "payload").unwrap_or_else(|| "{}".to_string());
 
         let (canonical, hash) = crate::bpmn_integration::canonical::canonical_json_with_hash(
             &serde_json::from_str(&payload)
@@ -173,7 +166,7 @@ impl CustomOperation for BpmnStartOp {
         let instance_id = client
             .start_process(crate::bpmn_integration::client::StartProcessRequest {
                 process_key,
-                bytecode_version: Vec::new(), // Service resolves by process_key
+                bytecode_version: Vec::new(),
                 domain_payload: canonical,
                 domain_payload_hash: hash,
                 session_stack: SessionStackState::default(),
@@ -184,16 +177,29 @@ impl CustomOperation for BpmnStartOp {
             })
             .await?;
 
-        Ok(ExecutionResult::Uuid(instance_id))
+        Ok(Some(serde_json::json!({
+            "_bpmn_start_instance_id": instance_id.to_string()
+        })))
     }
 
-    #[cfg(not(feature = "database"))]
     async fn execute(
         &self,
-        _verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-    ) -> Result<ExecutionResult> {
-        Err(anyhow::anyhow!("bpmn.start requires database feature"))
+        args: &serde_json::Value,
+        _ctx: &mut VerbExecutionContext,
+        _scope: &mut dyn TransactionScope,
+    ) -> Result<VerbExecutionOutcome> {
+        let instance_id = args
+            .get("_bpmn_start_instance_id")
+            .and_then(|v| v.as_str())
+            .and_then(|s| Uuid::parse_str(s).ok())
+            .ok_or_else(|| {
+                anyhow::anyhow!(
+                    "bpmn.start: pre_fetch result missing \
+                 (`_bpmn_start_instance_id` absent from args — dispatcher \
+                 must have bypassed the pre_fetch hook)"
+                )
+            })?;
+        Ok(VerbExecutionOutcome::Uuid(instance_id))
     }
 }
 
@@ -201,51 +207,99 @@ impl CustomOperation for BpmnStartOp {
 // bpmn.signal
 // =============================================================================
 
-#[register_custom_op]
-pub struct BpmnSignalOp;
+pub struct BpmnSignal;
 
 #[async_trait]
-impl CustomOperation for BpmnSignalOp {
-    fn domain(&self) -> &'static str {
-        "bpmn"
-    }
-    fn verb(&self) -> &'static str {
-        "signal"
-    }
-    fn rationale(&self) -> &'static str {
-        "Calls bpmn-lite gRPC Signal RPC"
+impl SemOsVerbOp for BpmnSignal {
+    fn fqn(&self) -> &str {
+        "bpmn.signal"
     }
 
-    #[cfg(feature = "database")]
+    /// Phase F.1 (Pattern B A1 remediation, 2026-04-22): bpmn.signal was a
+    /// "fire-and-forget" gRPC call inside the verb body — a direct A1
+    /// violation per three-plane v0.3 §11.2. This impl now defers the
+    /// gRPC call to the outbox: the verb writes a `bpmn_signal` row into
+    /// `public.outbox` inside the ambient transaction scope and returns
+    /// `Void` synchronously. The drainer consumer (to be registered in
+    /// `ob-poc-web::main` alongside `MaintenanceSpawnConsumer`) performs
+    /// the actual `client.signal(...)` post-commit.
+    ///
+    /// Why outbox rather than two-phase:
+    ///  - `bpmn.signal` has no return value — callers don't wait on the
+    ///    signal to reach the BPMN service. Outbox deferral preserves
+    ///    the synchronous contract while moving the external call out
+    ///    of the verb body.
+    ///  - Outbox deferral also preserves atomicity: if the enclosing
+    ///    transaction rolls back, the outbox row is gone too — the
+    ///    BPMN signal is never sent. A two-phase approach (fire gRPC
+    ///    now, rollback later) would leak the signal to the BPMN
+    ///    service even on outer-txn failure.
+    ///
+    /// Idempotency key:
+    ///   `bpmn_signal:<instance_id>:<message_name>:<payload_hash>`
+    /// Two identical signals within the same transaction collapse to
+    /// one outbox row (the unique index on `(idempotency_key,
+    /// effect_kind)` dedupes silently via `ON CONFLICT DO NOTHING`).
     async fn execute(
         &self,
-        verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-        _pool: &PgPool,
-    ) -> Result<ExecutionResult> {
-        let instance_id = get_required_uuid(verb_call, "instance-id")?;
-        let message_name = get_required_string(verb_call, "message-name")?;
-        let payload = get_optional_string(verb_call, "payload");
+        args: &serde_json::Value,
+        _ctx: &mut VerbExecutionContext,
+        scope: &mut dyn TransactionScope,
+    ) -> Result<VerbExecutionOutcome> {
+        let instance_id = json_get_required_uuid(args, "instance-id")?;
+        let message_name = json_extract_string(args, "message-name")?;
+        let payload = json_extract_string_opt(args, "payload");
 
-        let client = get_bpmn_client()?;
-        client
-            .signal(
-                instance_id,
-                &message_name,
-                payload.as_ref().map(|p| p.as_bytes()),
-            )
-            .await?;
+        let outbox_id = uuid::Uuid::new_v4();
+        let trace_id = uuid::Uuid::new_v4();
 
-        Ok(ExecutionResult::Void)
-    }
+        // Idempotency: BLAKE3 of (message_name || payload_bytes) keeps the
+        // key bounded regardless of payload size.
+        let payload_bytes = payload.as_deref().unwrap_or("").as_bytes();
+        let mut hasher = blake3::Hasher::new();
+        hasher.update(message_name.as_bytes());
+        hasher.update(b"\x00"); // separator
+        hasher.update(payload_bytes);
+        let payload_hash = hasher.finalize().to_hex().to_string();
+        let idempotency_key = format!(
+            "bpmn_signal:{}:{}:{}",
+            instance_id,
+            message_name,
+            &payload_hash[..16]
+        );
 
-    #[cfg(not(feature = "database"))]
-    async fn execute(
-        &self,
-        _verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-    ) -> Result<ExecutionResult> {
-        Err(anyhow::anyhow!("bpmn.signal requires database feature"))
+        let outbox_payload = serde_json::json!({
+            "instance_id": instance_id,
+            "message_name": message_name,
+            "payload": payload,
+        });
+
+        sqlx::query(
+            r#"
+            INSERT INTO public.outbox
+                (id, trace_id, envelope_version, effect_kind, payload, idempotency_key, status)
+            VALUES
+                ($1, $2, $3, $4, $5, $6, 'pending')
+            ON CONFLICT (idempotency_key, effect_kind) DO NOTHING
+            "#,
+        )
+        .bind(outbox_id)
+        .bind(trace_id)
+        .bind(1i16) // EnvelopeVersion::CURRENT
+        .bind("bpmn_signal")
+        .bind(&outbox_payload)
+        .bind(&idempotency_key)
+        .execute(scope.executor())
+        .await?;
+
+        tracing::info!(
+            %instance_id,
+            %message_name,
+            %idempotency_key,
+            "bpmn.signal queued to public.outbox (Phase F.1 outbox deferral)"
+        );
+
+        Ok(VerbExecutionOutcome::Void)
     }
 }
 
@@ -253,75 +307,96 @@ impl CustomOperation for BpmnSignalOp {
 // bpmn.cancel
 // =============================================================================
 
-#[register_custom_op]
-pub struct BpmnCancelOp;
+pub struct BpmnCancel;
 
 #[async_trait]
-impl CustomOperation for BpmnCancelOp {
-    fn domain(&self) -> &'static str {
-        "bpmn"
-    }
-    fn verb(&self) -> &'static str {
-        "cancel"
-    }
-    fn rationale(&self) -> &'static str {
-        "Calls bpmn-lite gRPC Cancel RPC"
+impl SemOsVerbOp for BpmnCancel {
+    fn fqn(&self) -> &str {
+        "bpmn.cancel"
     }
 
-    #[cfg(feature = "database")]
+    /// Phase F.1 (2026-04-22): same outbox-deferral pattern as
+    /// `BpmnSignal`. Fire-and-forget cancel — no return value, caller
+    /// doesn't wait on the BPMN service to acknowledge.
+    /// Idempotency key: `bpmn_cancel:<instance_id>:<reason-hash-16>`.
     async fn execute(
         &self,
-        verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-        _pool: &PgPool,
-    ) -> Result<ExecutionResult> {
-        let instance_id = get_required_uuid(verb_call, "instance-id")?;
-        let reason = get_optional_string(verb_call, "reason")
+        args: &serde_json::Value,
+        _ctx: &mut VerbExecutionContext,
+        scope: &mut dyn TransactionScope,
+    ) -> Result<VerbExecutionOutcome> {
+        let instance_id = json_get_required_uuid(args, "instance-id")?;
+        let reason = json_extract_string_opt(args, "reason")
             .unwrap_or_else(|| "Cancelled by operator".to_string());
 
-        let client = get_bpmn_client()?;
-        client.cancel(instance_id, &reason).await?;
+        let outbox_id = uuid::Uuid::new_v4();
+        let trace_id = uuid::Uuid::new_v4();
 
-        Ok(ExecutionResult::Void)
-    }
+        let reason_hash = blake3::hash(reason.as_bytes()).to_hex().to_string();
+        let idempotency_key = format!("bpmn_cancel:{}:{}", instance_id, &reason_hash[..16]);
 
-    #[cfg(not(feature = "database"))]
-    async fn execute(
-        &self,
-        _verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-    ) -> Result<ExecutionResult> {
-        Err(anyhow::anyhow!("bpmn.cancel requires database feature"))
+        let outbox_payload = serde_json::json!({
+            "instance_id": instance_id,
+            "reason": reason,
+        });
+
+        sqlx::query(
+            r#"
+            INSERT INTO public.outbox
+                (id, trace_id, envelope_version, effect_kind, payload, idempotency_key, status)
+            VALUES
+                ($1, $2, $3, $4, $5, $6, 'pending')
+            ON CONFLICT (idempotency_key, effect_kind) DO NOTHING
+            "#,
+        )
+        .bind(outbox_id)
+        .bind(trace_id)
+        .bind(1i16)
+        .bind("bpmn_cancel")
+        .bind(&outbox_payload)
+        .bind(&idempotency_key)
+        .execute(scope.executor())
+        .await?;
+
+        tracing::info!(
+            %instance_id,
+            reason = %reason,
+            %idempotency_key,
+            "bpmn.cancel queued to public.outbox (Phase F.1 outbox deferral)"
+        );
+
+        Ok(VerbExecutionOutcome::Void)
     }
 }
 
 // =============================================================================
 // bpmn.inspect
+//
+// Phase F.1 (2026-04-22, Pattern B ledger §3.1): gRPC call moved from
+// the `execute` body into `pre_fetch`. The dispatcher calls `pre_fetch`
+// BEFORE opening the transaction scope, so the external `client.inspect`
+// round-trip happens outside the inner txn — A1 invariant satisfied.
+//
+// `pre_fetch` returns the inspection payload under the `_inspection`
+// key; `execute` reads it back from args and formats the typed result
+// with no I/O of its own.
 // =============================================================================
 
-#[register_custom_op]
-pub struct BpmnInspectOp;
+pub struct BpmnInspect;
 
 #[async_trait]
-impl CustomOperation for BpmnInspectOp {
-    fn domain(&self) -> &'static str {
-        "bpmn"
-    }
-    fn verb(&self) -> &'static str {
-        "inspect"
-    }
-    fn rationale(&self) -> &'static str {
-        "Calls bpmn-lite gRPC Inspect RPC"
+impl SemOsVerbOp for BpmnInspect {
+    fn fqn(&self) -> &str {
+        "bpmn.inspect"
     }
 
-    #[cfg(feature = "database")]
-    async fn execute(
+    async fn pre_fetch(
         &self,
-        verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-        _pool: &PgPool,
-    ) -> Result<ExecutionResult> {
-        let instance_id = get_required_uuid(verb_call, "instance-id")?;
+        args: &serde_json::Value,
+        _ctx: &mut VerbExecutionContext,
+        _pool: &sqlx::PgPool,
+    ) -> Result<Option<serde_json::Value>> {
+        let instance_id = json_get_required_uuid(args, "instance-id")?;
 
         let client = get_bpmn_client()?;
         let inspection = client.inspect(instance_id).await?;
@@ -333,15 +408,27 @@ impl CustomOperation for BpmnInspectOp {
             bytecode_version_hex: hex::encode(&inspection.bytecode_version),
             domain_payload_hash: inspection.domain_payload_hash,
         };
-        Ok(ExecutionResult::Record(serde_json::to_value(typed)?))
+        Ok(Some(serde_json::json!({
+            "_inspection": serde_json::to_value(typed)?
+        })))
     }
 
-    #[cfg(not(feature = "database"))]
     async fn execute(
         &self,
-        _verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-    ) -> Result<ExecutionResult> {
-        Err(anyhow::anyhow!("bpmn.inspect requires database feature"))
+        args: &serde_json::Value,
+        _ctx: &mut VerbExecutionContext,
+        _scope: &mut dyn TransactionScope,
+    ) -> Result<VerbExecutionOutcome> {
+        // Pre-fetch populated `_inspection`. If it's missing something
+        // went wrong upstream — surface that rather than silently
+        // falling back to an in-txn gRPC call.
+        let inspection = args.get("_inspection").cloned().ok_or_else(|| {
+            anyhow::anyhow!(
+                "bpmn.inspect: pre_fetch result missing — dispatcher did not \
+                 merge `_inspection` into args. This indicates a dispatcher \
+                 regression (Phase F.1 pre-fetch hook must run before execute)."
+            )
+        })?;
+        Ok(VerbExecutionOutcome::Record(inspection))
     }
 }

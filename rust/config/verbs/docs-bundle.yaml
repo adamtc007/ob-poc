@@ -2,11 +2,11 @@ domains:
   docs-bundle:
     description: Document bundle management - apply versioned document requirement sets to CBUs
     invocation_hints:
-    - docs bundle
-    - document bundle
-    - apply bundle
-    - required documents
-    - document set
+      - docs bundle
+      - document bundle
+      - apply bundle
+      - required documents
+      - document set
     verbs:
       # ========================================================================
       # Apply Bundle (creates document requirements)
@@ -15,12 +15,12 @@ domains:
         description: Apply a document bundle to a CBU, creating document requirements
         behavior: plugin
         invocation_phrases:
-        - apply document bundle
-        - apply docs bundle
-        - set up required documents
-        - apply ucits documents
-        - apply aif documents
-        - configure fund documents
+          - apply document bundle
+          - apply docs bundle
+          - set up required documents
+          - apply ucits documents
+          - apply aif documents
+          - configure fund documents
         metadata:
           tier: intent
           source_of_truth: operational
@@ -30,52 +30,52 @@ domains:
           phase_tags: [kyc]
           side_effects: state_write
         args:
-        - name: cbu-id
-          type: uuid
-          required: true
-          description: CBU to apply the bundle to
-          lookup:
-            table: cbus
-            entity_type: cbu
-            schema: ob-poc
-            search_key: name
-            primary_key: cbu_id
-        - name: bundle
-          type: string
-          required: true
-          description: Bundle identifier (e.g., docs.bundle.ucits-baseline)
-          valid_values:
-          - docs.bundle.ucits-baseline
-          - docs.bundle.aif-baseline
-          - docs.bundle.hedge-baseline
-          - docs.bundle.private-equity-baseline
-          - docs.bundle.etf-baseline
-          - docs.bundle.uk-authorised-baseline
-          - docs.bundle.ltaf-baseline
-          - docs.bundle.manager-baseline
-          - docs.bundle.us-40act-baseline
-        - name: has-prime-broker
-          type: boolean
-          required: false
-          default: false
-          description: Whether the structure has a prime broker (for conditional docs)
-        - name: has-market-maker
-          type: boolean
-          required: false
-          default: false
-          description: Whether the ETF has designated market makers
-        - name: wrapper
-          type: string
-          required: false
-          description: Fund wrapper type (for conditional docs)
-          valid_values:
-          - sicav
-          - fcp
-          - lp
-          - oeic
-          - aut
-          - acs
-          - icav
+          - name: cbu-id
+            type: uuid
+            required: true
+            description: CBU to apply the bundle to
+            lookup:
+              table: cbus
+              entity_type: cbu
+              schema: ob-poc
+              search_key: name
+              primary_key: cbu_id
+          - name: bundle
+            type: string
+            required: true
+            description: Bundle identifier (e.g., docs.bundle.ucits-baseline)
+            valid_values:
+              - docs.bundle.ucits-baseline
+              - docs.bundle.aif-baseline
+              - docs.bundle.hedge-baseline
+              - docs.bundle.private-equity-baseline
+              - docs.bundle.etf-baseline
+              - docs.bundle.uk-authorised-baseline
+              - docs.bundle.ltaf-baseline
+              - docs.bundle.manager-baseline
+              - docs.bundle.us-40act-baseline
+          - name: has-prime-broker
+            type: boolean
+            required: false
+            default: false
+            description: Whether the structure has a prime broker (for conditional docs)
+          - name: has-market-maker
+            type: boolean
+            required: false
+            default: false
+            description: Whether the ETF has designated market makers
+          - name: wrapper
+            type: string
+            required: false
+            description: Fund wrapper type (for conditional docs)
+            valid_values:
+              - sicav
+              - fcp
+              - lp
+              - oeic
+              - aut
+              - acs
+              - icav
         returns:
           type: record
           fields:
@@ -86,14 +86,20 @@ domains:
       # ========================================================================
       # List Applied Bundles
       # ========================================================================
+        three_axis:
+          state_effect: preserving
+          external_effects:
+            - emitting
+          consequence:
+            baseline: reviewable
       list-applied:
         description: List document bundles applied to a CBU
         behavior: plugin
         invocation_phrases:
-        - list applied bundles
-        - show applied document bundles
-        - what bundles are applied
-        - get cbu bundles
+          - list applied bundles
+          - show applied document bundles
+          - what bundles are applied
+          - get cbu bundles
         metadata:
           tier: intent
           source_of_truth: operational
@@ -103,16 +109,16 @@ domains:
           phase_tags: [kyc]
           side_effects: facts_only
         args:
-        - name: cbu-id
-          type: uuid
-          required: true
-          description: CBU to query
-          lookup:
-            table: cbus
-            entity_type: cbu
-            schema: ob-poc
-            search_key: name
-            primary_key: cbu_id
+          - name: cbu-id
+            type: uuid
+            required: true
+            description: CBU to query
+            lookup:
+              table: cbus
+              entity_type: cbu
+              schema: ob-poc
+              search_key: name
+              primary_key: cbu_id
         returns:
           type: record_set
           fields:
@@ -124,14 +130,20 @@ domains:
       # ========================================================================
       # List Available Bundles
       # ========================================================================
+        three_axis:
+          state_effect: preserving
+          external_effects:
+            - observational
+          consequence:
+            baseline: benign
       list-available:
         description: List all available document bundles
         behavior: plugin
         invocation_phrases:
-        - list available bundles
-        - show available document bundles
-        - what bundles exist
-        - list docs bundles
+          - list available bundles
+          - show available document bundles
+          - what bundles exist
+          - list docs bundles
         metadata:
           tier: intent
           source_of_truth: catalog
@@ -149,3 +161,9 @@ domains:
             version: string
             extends: string
             document_count: integer
+        three_axis:
+          state_effect: preserving
+          external_effects:
+            - observational
+          consequence:
+            baseline: benign

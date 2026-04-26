@@ -1,0 +1,32 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            SELECT token, token_type, token_subtype\n            FROM \"ob-poc\".lexicon_tokens\n            ORDER BY occurrence_count DESC\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "token",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 1,
+        "name": "token_type",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 2,
+        "name": "token_subtype",
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": [
+      false,
+      false,
+      true
+    ]
+  },
+  "hash": "223d0048abdc09c83bdfb8160f955132df1afb88ab435a8e2c4bb755c7c63fbf"
+}

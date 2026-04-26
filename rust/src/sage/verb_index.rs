@@ -686,6 +686,8 @@ mod tests {
                 sentences: None,
                 confirm_policy: None,
                 outputs: vec![],
+                three_axis: None,
+                transition_args: None,
             },
         );
         let mut registry_verbs = HashMap::new();
@@ -713,6 +715,8 @@ mod tests {
                 sentences: None,
                 confirm_policy: None,
                 outputs: vec![],
+                three_axis: None,
+                transition_args: None,
             },
         );
         domains.insert(
@@ -818,6 +822,8 @@ mod tests {
                 sentences: None,
                 confirm_policy: None,
                 outputs: vec![],
+                three_axis: None,
+                transition_args: None,
             },
         );
 

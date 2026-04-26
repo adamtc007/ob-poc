@@ -1,0 +1,931 @@
+# KYC Workspace — DAG Taxonomy (Tranche 2 — 2026-04-23)
+#
+# Declarative lifecycle + semantic layer over the existing KYC tables
+# (cases, screenings, ubo_evidence, red_flags, etc.). Second workspace
+# to ship via the pilot pattern (after Instrument Matrix). Same shape
+# as instrument_matrix_dag.yaml; KYC-specific content.
+#
+# KEY DIFFERENCES vs IM:
+# - Richer pre-existing state-model density (11 tables with CHECK
+#   constraints vs IM's 3).
+# - 2 pre-existing state machines (kyc_case_lifecycle, entity_kyc_lifecycle)
+#   to reconcile-existing.
+# - No product-module gating — KYC applies to every CBU regardless
+#   of product bundle. One exception: kyc_service_agreement gated by
+#   product.kyc_service (KYC-as-a-Service sponsor arrangement).
+# - Cross-workspace dependency: KYC decision → Instrument Matrix
+#   mandate gate (v1.3 amendment candidate, not formalized here).
+#
+# PARENT DOCS:
+#   - docs/todo/tranche-2-kyc-kickoff-2026-04-23.md
+#   - docs/todo/catalogue-platform-refinement-v1_2.md
+#   - docs/todo/instrument-matrix-pilot-findings-2026-04-23.md
+
+version: "1.0"
+workspace: kyc
+dag_id: kyc_dag
+
+# =============================================================================
+# 1. OVERALL KYC-CASE LIFECYCLE (per case, derived)
+# =============================================================================
+
+overall_lifecycle:
+  id: kyc_case_overall_lifecycle
+  scope: per_kyc_case
+  derived: true
+  description: >
+    Aggregate 8-phase lifecycle of a KYC case from intake through
+    decision + any periodic-review re-entry. Derived from
+    cases.status + entity_workstreams.status + screenings.status +
+    kyc_decisions + red_flags + tollgate evaluations.
+
+  phases:
+
+    - name: case_opened
+      description: "Case created; no workstreams or screenings yet."
+      derivation:
+        all_of:
+          - "cases.status = 'INTAKE'"
+          - "COUNT entity_workstreams WHERE case_id = this.case_id = 0"
+      progression_verbs: [kyc-case.create, case-event.record]
+      next_phase: discovery
+
+    - name: discovery
+      description: |
+        Entity workstreams created; evidence collection in progress.
+        UBO discovery runs here; document requests outbound.
+      derivation:
+        all_of:
+          - "cases.status = 'DISCOVERY'"
+          - "EXISTS entity_workstreams WHERE case_id = this.case_id"
+      progression_verbs:
+        - kyc-case.update-status
+        - entity-workstream.update-status
+        - doc-request.create
+        - ubo-registry.discover
+      next_phase: screening_in_flight
+
+    - name: screening_in_flight
+      description: |
+        Screenings running against parties; red-flags raised where hits
+        found; screening-ops decisions pending.
+      derivation:
+        all_of:
+          - "cases.status IN ('DISCOVERY', 'ASSESSMENT')"
+          - "EXISTS screenings WHERE status IN ('RUNNING', 'HIT_PENDING_REVIEW')"
+      progression_verbs:
+        - screening.record-hit
+        - red-flag.raise
+        - screening.confirm
+        - screening.dismiss
+      next_phase: assessment
+
+    - name: assessment
+      description: |
+        Risk-rating set; UBO chain finalized; all workstreams reached
+        SCREEN or ASSESS state. Red-flags addressed.
+      derivation:
+        all_of:
+          - "cases.status = 'ASSESSMENT'"
+          - "cases.risk_rating IS NOT NULL"
+          - "ALL entity_workstreams.status IN ('ASSESS', 'COMPLETE', 'ENHANCED_DD')"
+      progression_verbs:
+        - kyc-case.set-risk-rating
+        - ubo-registry.promote-to-ubo
+        - red-flag.resolve
+      next_phase: review
+
+    - name: review
+      description: |
+        Committee / senior-compliance review. All workstreams complete;
+        kyc_decision row being drafted.
+      derivation:
+        all_of:
+          - "cases.status = 'REVIEW'"
+          - "ALL entity_workstreams.status = 'COMPLETE'"
+      progression_verbs:
+        - tollgate.evaluate
+        - case.approve
+        - case.reject
+        - tollgate.override
+      next_phase: decided
+
+    - name: decided
+      description: |
+        Terminal business decision captured in kyc_decisions.status.
+        Case proceeds to approval, rejection, referral, or closure.
+      derivation:
+        any_of:
+          - "cases.status IN ('APPROVED', 'REJECTED', 'BLOCKED', 'WITHDRAWN', 'DO_NOT_ONBOARD')"
+          - "EXISTS kyc_decisions WHERE case_id = this.case_id AND status IN ('CLEARED', 'REJECTED', 'CONDITIONAL')"
+      progression_verbs:
+        - kyc-case.close
+        - kyc-case.reopen  # → remediation or discovery
+      next_phase: closed (terminal) or remediation
+
+    - name: remediation
+      description: |
+        Post-decision periodic review or event-driven re-review. Case
+        re-opens with case_type = 'REMEDIATION' or 'PERIODIC_REVIEW'.
+        Flags v1.3 candidate: periodic-review cadence not yet formally
+        modeled (calendar-driven, not modeled here).
+      derivation:
+        all_of:
+          - "cases.case_type IN ('PERIODIC_REVIEW', 'REMEDIATION', 'EVENT_DRIVEN')"
+          - "cases.status IN ('DISCOVERY', 'ASSESSMENT', 'REVIEW')"
+      progression_verbs: (re-enter the per-phase transitions above)
+      next_phase: decided
+
+    - name: closed
+      description: |
+        Terminal. Case concluded; no further transitions. Re-opens
+        require a new case row (or reopen verb).
+      derivation:
+        all_of:
+          - "cases.closed_at IS NOT NULL"
+      progression_verbs: []
+      next_phase: (none)
+
+# =============================================================================
+# 2. PER-SLOT STATE MACHINES
+# =============================================================================
+
+slots:
+
+  # ---------------------------------------------------------------------------
+  # 2.1 Reconcile-existing state machines
+  # ---------------------------------------------------------------------------
+
+  - id: kyc_case
+    stateless: false
+    state_machine:
+      id: kyc_case_lifecycle
+      source_entity: '"ob-poc".cases'
+      state_column: status
+      scope: per_case
+      description: |
+        11-state KYC case lifecycle. Lifted (reconcile-existing) from
+        existing rust/config/sem_os_seeds/state_machines/kyc_case_lifecycle.yaml.
+        Schema-backed via cases.status CHECK constraint.
+      states:
+        - id: INTAKE
+          entry: true
+          description: "Case created; scope not yet determined."
+        - id: DISCOVERY
+          description: "Entity workstreams created; evidence collection."
+        - id: ASSESSMENT
+          description: "Risk-rating being determined; UBO chain finalized."
+        - id: REVIEW
+          description: "Committee / compliance sign-off in progress."
+        - id: APPROVED
+          description: "Case approved; CBU cleared for onboarding."
+        - id: REJECTED
+          description: "Case rejected; CBU cannot onboard under this case."
+        - id: BLOCKED
+          description: "Blocked pending external resolution (investigation, regulator)."
+        - id: WITHDRAWN
+          description: "Client withdrew application."
+        - id: DO_NOT_ONBOARD
+          description: "Hard-stop terminal — refusal with compliance hold."
+        # Additional valid states from case lifecycle YAML:
+        - id: EXPIRED
+          description: "Case timed out (external — e.g. document validity lapsed)."
+        - id: REFER_TO_REGULATOR
+          description: "Escalated to external authority."
+      transitions:
+        - from: INTAKE
+          to: DISCOVERY
+          via: kyc-case.update-status
+        - from: DISCOVERY
+          to: ASSESSMENT
+          via: kyc-case.update-status
+        - from: ASSESSMENT
+          to: REVIEW
+          via: kyc-case.update-status
+        - from: REVIEW
+          to: APPROVED
+          via: case.approve
+        - from: REVIEW
+          to: REJECTED
+          via: case.reject
+        - from: "(any non-terminal)"
+          to: BLOCKED
+          via: kyc-case.escalate
+        - from: "(any non-terminal)"
+          to: WITHDRAWN
+          via: kyc-case.close
+        - from: "(any non-terminal)"
+          to: DO_NOT_ONBOARD
+          via: case.reject (with do-not-onboard flag)
+        - from: "(any non-terminal)"
+          to: REFER_TO_REGULATOR
+          via: kyc-case.escalate
+        - from: APPROVED
+          to: DISCOVERY
+          via: kyc-case.reopen (for periodic review)
+      terminal_states: [APPROVED, REJECTED, WITHDRAWN, DO_NOT_ONBOARD, EXPIRED, REFER_TO_REGULATOR]
+
+  - id: entity_kyc
+    stateless: false
+    state_machine:
+      id: entity_kyc_lifecycle
+      source_entity: "(derived — tracks entity journey through case workstreams)"
+      state_column: (derived from entity_workstreams.status + kyc_ubo_registry.status)
+      description: |
+        Entity-level KYC journey (reconcile-existing from
+        state_machines/entity_kyc_lifecycle.yaml). Tracks an entity's
+        progression from initial skeleton/placeholder through
+        workstream completion to approval as part of a case.
+      states:
+        - id: placeholder
+          entry: true
+          description: "Entity exists in skeleton form; no investigation yet."
+        - id: empty
+          description: "Entity identified but no data beyond basic identifiers."
+        - id: filled
+          description: "Entity data captured; workstream opened."
+        - id: workstream_open
+          description: "Active workstream progressing."
+        - id: screening_complete
+          description: "All required screenings run and cleared/dismissed."
+        - id: evidence_collected
+          description: "Required evidence collected and linked."
+        - id: verified
+          description: "Entity data verified against evidence + third-party sources."
+        - id: approved
+          description: "Entity cleared as part of a case."
+      transitions:
+        - from: placeholder
+          to: empty
+          via: "(backend: entity lookup / GLEIF import)"
+        - from: empty
+          to: filled
+          via: skeleton.build
+        - from: filled
+          to: workstream_open
+          via: entity-workstream.add
+        - from: workstream_open
+          to: screening_complete
+          via: screening-ops.full
+        - from: screening_complete
+          to: evidence_collected
+          via: evidence.link
+        - from: evidence_collected
+          to: verified
+          via: evidence.verify
+        - from: verified
+          to: approved
+          via: entity-workstream.close
+      terminal_states: [approved]
+
+  # ---------------------------------------------------------------------------
+  # 2.2 New state machines (from schema evidence)
+  # ---------------------------------------------------------------------------
+
+  - id: entity_workstream
+    stateless: false
+    state_machine:
+      id: entity_workstream_lifecycle
+      source_entity: '"ob-poc".entity_workstreams'
+      state_column: status
+      description: |
+        Per-entity workstream within a KYC case. 10 states from
+        schema CHECK constraint.
+      states:
+        - id: PENDING
+          entry: true
+          description: "Workstream created; no activity."
+        - id: COLLECT
+          description: "Collecting facts + evidence."
+        - id: VERIFY
+          description: "Verifying collected data."
+        - id: SCREEN
+          description: "Running screenings."
+        - id: ASSESS
+          description: "Risk assessment in progress."
+        - id: COMPLETE
+          description: "All steps passed; ready for case-level review."
+        - id: BLOCKED
+          description: "Held on external dependency."
+        - id: ENHANCED_DD
+          description: "Enhanced due diligence required."
+        - id: REFERRED
+          description: "Referred up the escalation chain."
+        - id: PROHIBITED
+          description: "Terminal — entity cannot proceed."
+      transitions:
+        - from: PENDING
+          to: COLLECT
+          via: entity-workstream.add
+        - from: COLLECT
+          to: VERIFY
+          via: evidence.verify
+        - from: VERIFY
+          to: SCREEN
+          via: screening-ops.full
+        - from: SCREEN
+          to: ASSESS
+          via: "(backend: screenings cleared)"
+        - from: ASSESS
+          to: COMPLETE
+          via: entity-workstream.close
+        - from: "(any non-terminal)"
+          to: BLOCKED
+          via: entity-workstream.update-status
+        - from: "(any non-terminal)"
+          to: ENHANCED_DD
+          via: red-flag.escalate
+        - from: "(any non-terminal)"
+          to: REFERRED
+          via: kyc-case.escalate
+        - from: "(any non-terminal)"
+          to: PROHIBITED
+          via: case.reject (cascading)
+      terminal_states: [COMPLETE, PROHIBITED]
+
+  - id: screening
+    stateless: false
+    state_machine:
+      id: screening_lifecycle
+      source_entity: '"ob-poc".screenings'
+      state_column: status
+      description: |
+        Per-screening lifecycle. 8 states from schema CHECK. Applies
+        to each screening_type (SANCTIONS, PEP, ADVERSE_MEDIA, CREDIT,
+        CRIMINAL, REGULATORY, CONSOLIDATED).
+      states:
+        - id: PENDING
+          entry: true
+          description: "Screening queued; not yet run."
+        - id: RUNNING
+          description: "Provider call in flight."
+        - id: CLEAR
+          description: "No hit."
+        - id: HIT_PENDING_REVIEW
+          description: "Hit found; awaiting analyst review."
+        - id: HIT_CONFIRMED
+          description: "Hit reviewed and confirmed — real match."
+        - id: HIT_DISMISSED
+          description: "Hit reviewed and dismissed — false positive."
+        - id: ERROR
+          description: "Provider error; needs retry."
+        - id: EXPIRED
+          description: "Stale; needs re-running."
+      transitions:
+        - from: PENDING
+          to: RUNNING
+          via: screening-ops.start
+        - from: RUNNING
+          to: CLEAR
+          via: "(backend: no hits)"
+        - from: RUNNING
+          to: HIT_PENDING_REVIEW
+          via: screening.record-hit
+        - from: HIT_PENDING_REVIEW
+          to: HIT_CONFIRMED
+          via: screening.confirm
+        - from: HIT_PENDING_REVIEW
+          to: HIT_DISMISSED
+          via: screening.dismiss
+        - from: RUNNING
+          to: ERROR
+          via: "(backend: provider error)"
+        - from: ERROR
+          to: PENDING
+          via: screening-ops.retry
+        - from: "(CLEAR, HIT_DISMISSED)"
+          to: EXPIRED
+          via: "(time-decay trigger)"
+        - from: EXPIRED
+          to: PENDING
+          via: screening-ops.refresh
+      terminal_states: [HIT_CONFIRMED]  # needs red_flag escalation
+
+  - id: ubo_evidence
+    stateless: false
+    state_machine:
+      id: ubo_evidence_lifecycle
+      source_entity: '"ob-poc".ubo_evidence'
+      state_column: verification_status
+      description: "UBO evidence verification (4 states)."
+      states:
+        - id: PENDING
+          entry: true
+        - id: VERIFIED
+        - id: REJECTED
+        - id: EXPIRED
+      transitions:
+        - from: PENDING
+          to: VERIFIED
+          via: evidence.verify
+        - from: PENDING
+          to: REJECTED
+          via: evidence.reject
+        - from: VERIFIED
+          to: EXPIRED
+          via: "(time-decay)"
+        - from: EXPIRED
+          to: PENDING
+          via: evidence.require  # re-collection
+      terminal_states: [REJECTED]
+
+  - id: kyc_ubo_registry
+    stateless: false
+    state_machine:
+      id: kyc_ubo_registry_lifecycle
+      source_entity: '"ob-poc".kyc_ubo_registry'
+      state_column: status
+      description: |
+        UBO promotion lifecycle within a KYC case. 9 states tracking
+        the UBO's journey from candidate through formal declaration.
+      states:
+        - id: CANDIDATE
+          entry: true
+          description: "Identified as potential UBO."
+        - id: IDENTIFIED
+          description: "Formally identified as UBO."
+        - id: PROVABLE
+          description: "Evidence path exists to prove UBO status."
+        - id: PROVED
+          description: "Evidence collected and verified."
+        - id: REVIEWED
+          description: "Reviewed by compliance."
+        - id: APPROVED
+          description: "Approved as UBO in the case."
+        - id: WAIVED
+          description: "Waived — compliance accepts non-UBO outcome."
+        - id: REJECTED
+          description: "Rejected — not a UBO."
+        - id: EXPIRED
+          description: "Stale; periodic review required."
+      transitions:
+        - from: CANDIDATE
+          to: IDENTIFIED
+          via: ubo-registry.verify
+        - from: IDENTIFIED
+          to: PROVABLE
+          via: ubo-registry.verify
+        - from: PROVABLE
+          to: PROVED
+          via: evidence.verify
+        - from: PROVED
+          to: REVIEWED
+          via: "(compliance review)"
+        - from: REVIEWED
+          to: APPROVED
+          via: ubo-registry.approve
+        - from: REVIEWED
+          to: WAIVED
+          via: "(compliance waiver)"
+        - from: REVIEWED
+          to: REJECTED
+          via: ubo-registry.reject
+        - from: APPROVED
+          to: EXPIRED
+          via: "(time-decay)"
+        - from: EXPIRED
+          to: CANDIDATE
+          via: ubo-registry.expire + ubo-registry.discover
+      terminal_states: [APPROVED, WAIVED, REJECTED]
+
+  - id: kyc_ubo_evidence
+    stateless: false
+    state_machine:
+      id: kyc_ubo_evidence_lifecycle
+      source_entity: '"ob-poc".kyc_ubo_evidence'
+      state_column: status
+      description: "Evidence for UBO determination (7 states)."
+      states:
+        - id: REQUIRED
+          entry: true
+        - id: REQUESTED
+        - id: RECEIVED
+        - id: VERIFIED
+        - id: REJECTED
+        - id: WAIVED
+        - id: EXPIRED
+      transitions:
+        - from: REQUIRED
+          to: REQUESTED
+          via: doc-request.send
+        - from: REQUESTED
+          to: RECEIVED
+          via: doc-request.verify
+        - from: RECEIVED
+          to: VERIFIED
+          via: evidence.verify
+        - from: RECEIVED
+          to: REJECTED
+          via: evidence.reject
+        - from: "(any non-terminal)"
+          to: WAIVED
+          via: evidence.waive
+        - from: VERIFIED
+          to: EXPIRED
+          via: "(time-decay)"
+      terminal_states: [REJECTED, WAIVED]
+
+  - id: red_flag
+    stateless: false
+    state_machine:
+      id: red_flag_lifecycle
+      source_entity: '"ob-poc".red_flags'
+      state_column: status
+      description: "Risk-flag lifecycle (6 states)."
+      states:
+        - id: OPEN
+          entry: true
+          description: "Raised; no action yet."
+        - id: UNDER_REVIEW
+          description: "Being investigated."
+        - id: MITIGATED
+          description: "Mitigation applied; flag closed as handled."
+        - id: WAIVED
+          description: "Compliance waiver granted."
+        - id: BLOCKING
+          description: "Unresolved blocker — case cannot proceed."
+        - id: CLOSED
+          description: "Terminal — resolved or no-longer-applicable."
+      transitions:
+        - from: OPEN
+          to: UNDER_REVIEW
+          via: red-flag.escalate
+        - from: UNDER_REVIEW
+          to: MITIGATED
+          via: red-flag.resolve
+        - from: UNDER_REVIEW
+          to: WAIVED
+          via: red-flag.waive
+        - from: UNDER_REVIEW
+          to: BLOCKING
+          via: red-flag.update-rating
+        - from: "(MITIGATED, WAIVED)"
+          to: CLOSED
+          via: "(case progression)"
+        - from: BLOCKING
+          to: MITIGATED
+          via: red-flag.resolve
+      terminal_states: [CLOSED]
+
+  - id: doc_request
+    stateless: false
+    state_machine:
+      id: doc_request_lifecycle
+      source_entity: '"ob-poc".doc_requests'
+      state_column: status
+      description: "Document request lifecycle (9 states)."
+      states:
+        - id: DRAFT
+          entry: true
+        - id: REQUIRED
+        - id: REQUESTED
+        - id: RECEIVED
+        - id: UNDER_REVIEW
+        - id: VERIFIED
+        - id: REJECTED
+        - id: WAIVED
+        - id: EXPIRED
+      transitions:
+        - from: DRAFT
+          to: REQUIRED
+          via: doc-request.create
+        - from: REQUIRED
+          to: REQUESTED
+          via: doc-request.send
+        - from: REQUESTED
+          to: RECEIVED
+          via: doc-request.verify
+        - from: RECEIVED
+          to: UNDER_REVIEW
+          via: "(compliance review)"
+        - from: UNDER_REVIEW
+          to: VERIFIED
+          via: evidence.verify
+        - from: UNDER_REVIEW
+          to: REJECTED
+          via: evidence.reject
+        - from: "(any non-terminal)"
+          to: WAIVED
+          via: evidence.waive
+        - from: "(VERIFIED, REJECTED)"
+          to: EXPIRED
+          via: "(time-decay)"
+      terminal_states: [REJECTED, WAIVED]
+
+  - id: outreach_request
+    stateless: false
+    state_machine:
+      id: outreach_request_lifecycle
+      source_entity: '"ob-poc".outreach_requests'
+      state_column: status
+      description: "Counterparty outreach (7 states)."
+      states:
+        - id: DRAFT
+          entry: true
+        - id: PENDING
+        - id: SENT
+        - id: REMINDED
+        - id: RESPONDED
+        - id: CLOSED
+        - id: EXPIRED
+      transitions:
+        - from: DRAFT
+          to: PENDING
+          via: request.create
+        - from: PENDING
+          to: SENT
+          via: request.send
+        - from: SENT
+          to: REMINDED
+          via: request.remind
+        - from: "(SENT, REMINDED)"
+          to: RESPONDED
+          via: request.record-response
+        - from: "(RESPONDED, REMINDED)"
+          to: CLOSED
+          via: request.close
+        - from: "(SENT, REMINDED)"
+          to: EXPIRED
+          via: "(cutoff passed)"
+      terminal_states: [CLOSED, EXPIRED]
+
+  - id: kyc_decision
+    stateless: false
+    state_machine:
+      id: kyc_decision_lifecycle
+      source_entity: '"ob-poc".kyc_decisions'
+      state_column: status
+      description: "Final KYC decision (4 states)."
+      states:
+        - id: PENDING_REVIEW
+          entry: true
+        - id: CLEARED
+        - id: REJECTED
+        - id: CONDITIONAL
+      transitions:
+        - from: PENDING_REVIEW
+          to: CLEARED
+          via: case.approve
+        - from: PENDING_REVIEW
+          to: REJECTED
+          via: case.reject
+        - from: PENDING_REVIEW
+          to: CONDITIONAL
+          via: case.approve-with-conditions
+      terminal_states: [CLEARED, REJECTED, CONDITIONAL]
+
+  - id: kyc_service_agreement
+    stateless: false
+    state_machine:
+      id: kyc_service_agreement_lifecycle
+      source_entity: '"ob-poc".kyc_service_agreements'
+      state_column: status
+      description: |
+        KYC-as-a-Service sponsor arrangement (4 states, proposed —
+        schema today has no CHECK constraint).
+      states:
+        - id: DRAFT
+          entry: true
+        - id: ACTIVE
+        - id: SUSPENDED
+        - id: TERMINATED
+      transitions:
+        - from: DRAFT
+          to: ACTIVE
+          via: kyc-agreement.update (status=ACTIVE)
+        - from: ACTIVE
+          to: SUSPENDED
+          via: kyc-agreement.update (status=SUSPENDED)
+        - from: SUSPENDED
+          to: ACTIVE
+          via: kyc-agreement.update (status=ACTIVE)
+        - from: "(ACTIVE, SUSPENDED)"
+          to: TERMINATED
+          via: kyc-agreement.delete
+      terminal_states: [TERMINATED]
+    product_gates:
+      activated_by: [product.kyc_service]
+
+  # ---------------------------------------------------------------------------
+  # 2.3 Stateless (compositional / read-only / rule-entity)
+  # ---------------------------------------------------------------------------
+
+  - id: workspace_root
+    stateless: true
+    rationale: "Aggregation root over KYC domains."
+
+  - id: client_group
+    stateless: false
+    state_machine: (reconcile-existing — see instrument_matrix_dag.yaml §2.2 group.discovery_status_lifecycle; same table shared across workspaces)
+
+  - id: board
+    stateless: true
+    rationale: |
+      Board composition is transactional data (director lists, disclosures,
+      resolutions). No lifecycle per se; directors are added / retired.
+      Verbs are CRUD + research. Flag for v1.3: director approval might
+      warrant its own workflow under enhanced-DD scope.
+
+  - id: partnership
+    stateless: true
+    rationale: |
+      Partnership structure is reference data (partners, interests).
+      Partnership KYC uses the same entity_kyc lifecycle; the partnership
+      itself doesn't have independent state.
+
+  - id: trust
+    stateless: true
+    rationale: |
+      Trust structure (trustee, settlor, beneficiaries) is ref data.
+      Each party in the trust runs through entity_kyc_lifecycle
+      independently.
+
+  - id: capital
+    stateless: true
+    rationale: |
+      Source-of-wealth / source-of-funds assessment. Verbs are assess /
+      verify / report — CRUD pattern. No independent lifecycle; feeds
+      into entity_kyc verification.
+
+  - id: coverage
+    stateless: true
+    rationale: |
+      Coverage computation is a cross-cutting read — given a case,
+      what's covered. Stateless projection.
+
+  - id: skeleton_build
+    stateless: true
+    rationale: |
+      One-shot operation to create entity scaffold. No state;
+      invocation either succeeds or fails.
+
+  - id: tollgate
+    stateless: true
+    rationale: |
+      Tollgate evaluations are pass/fail boolean at each case checkpoint
+      (see tollgate_evaluations table — `passed` boolean, `overridden`
+      boolean). No lifecycle. The GATE itself has behavior (approve /
+      override / waive) but the tollgate instance is transactional.
+
+  - id: case_event
+    stateless: true
+    rationale: |
+      Event log (record / list). Append-only audit trail. Individual
+      events don't transition state.
+
+  - id: ubo_snapshot
+    stateless: true
+    rationale: |
+      Point-in-time snapshot of UBO state (not a lifecycle entity).
+      snapshot_type categorical only (MANUAL / PERIODIC / EVENT_DRIVEN /
+      CASE_OPEN / CASE_CLOSE).
+
+# =============================================================================
+# 3. CROSS-SLOT CONSTRAINTS
+# =============================================================================
+
+cross_slot_constraints:
+
+  - id: case_cannot_approve_without_workstreams_complete
+    description: "Case → APPROVED requires all entity workstreams = COMPLETE."
+    rule: |
+      cases.status = 'APPROVED'
+        → ALL entity_workstreams.status = 'COMPLETE'
+    severity: error
+
+  - id: case_cannot_approve_with_unresolved_red_flags
+    description: "Case → APPROVED blocks while any red_flag.status = BLOCKING."
+    rule: |
+      cases.status = 'APPROVED'
+        → COUNT red_flags WHERE status = 'BLOCKING' AND case_id = this.case_id = 0
+    severity: error
+
+  - id: case_cannot_approve_with_unresolved_screening_hits
+    description: "Case → APPROVED blocks while any screening.status = HIT_CONFIRMED AND not cleared."
+    rule: |
+      cases.status = 'APPROVED'
+        → ALL screenings.status IN ('CLEAR', 'HIT_DISMISSED', 'EXPIRED')
+           OR EXISTS red_flags WHERE source = 'screening' AND status = 'MITIGATED'
+    severity: error
+
+  - id: ubo_approved_requires_provable_evidence_chain
+    description: "kyc_ubo_registry.status = APPROVED requires at least one ubo_evidence.verification_status = VERIFIED."
+    rule: |
+      kyc_ubo_registry.status = 'APPROVED'
+        → EXISTS ubo_evidence WHERE ubo_id = this.ubo_id AND verification_status = 'VERIFIED'
+    severity: error
+
+  - id: doc_request_verified_triggers_workstream_advance
+    description: |
+      When all required doc_requests for a workstream are VERIFIED / WAIVED,
+      entity_workstream.status advances (automatic, not validator error).
+    rule: |
+      ALL doc_requests WHERE workstream_id = this.workstream_id
+        AND status IN ('VERIFIED', 'WAIVED')
+        → entity_workstream.status advances VERIFY → SCREEN
+    severity: informational
+
+  - id: kyc_service_agreement_active_required_for_sponsored_cases
+    description: "KYC-as-a-Service sponsored cases require ACTIVE service agreement."
+    rule: |
+      cases.kyc_context = 'SPONSORED'
+        → EXISTS kyc_service_agreements WHERE sponsor_id = this.sponsor_cbu_id AND status = 'ACTIVE'
+    severity: error
+
+  - id: periodic_review_cases_must_reference_predecessor
+    description: "cases.case_type = PERIODIC_REVIEW must link to the predecessor case."
+    rule: |
+      cases.case_type = 'PERIODIC_REVIEW'
+        → cases.predecessor_case_id IS NOT NULL
+    severity: error
+
+# =============================================================================
+# 4. PRODUCT-MODULE GATES
+# =============================================================================
+
+product_module_gates:
+
+  always_on:
+    - workspace_root
+    - kyc_case
+    - entity_kyc
+    - entity_workstream
+    - screening
+    - ubo_evidence
+    - kyc_ubo_registry
+    - kyc_ubo_evidence
+    - red_flag
+    - doc_request
+    - outreach_request
+    - kyc_decision
+    - client_group
+    - board
+    - partnership
+    - trust
+    - capital
+    - coverage
+    - skeleton_build
+    - tollgate
+    - case_event
+    - ubo_snapshot
+
+  conditionally_on:
+    - slot: kyc_service_agreement
+      activated_by: [product.kyc_service]
+
+# =============================================================================
+# 5. OUT OF SCOPE (P16 three-layer + cross-workspace)
+# =============================================================================
+
+out_of_scope:
+
+  # Layer 3 operational runtime
+  - "Screening provider API calls + retry policy — layer 2 service-resource integration"
+  - "Document scanning + OCR — layer 2/3 (provider integration)"
+  - "Actual UBO computational determination runs — layer 3 (ubo_determination_runs is a log)"
+  - "Case timer / deadline enforcement — layer 3 scheduler"
+  - "Regulator reporting submissions — layer 3"
+
+  # Cross-workspace dependencies (KYC → other workspaces)
+  - "Investment Matrix mandate activation — requires KYC clearance; cross-workspace constraint captured separately"
+  - "Deal onboarding — requires KYC. Cross-workspace"
+  - "Client-group research (GLEIF import, corporate tree) — lives in instrument_matrix_dag (client_group slot)"
+
+# =============================================================================
+# 6. PRUNE SEMANTICS
+# =============================================================================
+# KYC has fewer prune cases than IM. Most KYC work is additive
+# (add parties, add evidence, add screenings). Pruning = removing a
+# party/workstream from a case's scope — rare; case-reopening is the
+# more common mechanism.
+
+prune_cascade_rules:
+
+  - id: party_prune_cascades
+    when: "pruning party P from a case's scope"
+    cascades_to:
+      - target: entity_workstream
+        rule: "entity_workstream WHERE party_id = P → status = REFERRED (manual review)"
+      - target: screening
+        rule: "screenings WHERE party_id = P → status = EXPIRED (invalidated)"
+      - target: ubo_evidence
+        rule: "ubo_evidence WHERE party_id = P → removed"
+      - target: red_flag
+        rule: "red_flags WHERE party_id = P → CLOSED with audit trail"
+
+  - id: workstream_prune_cascades
+    when: "pruning entity_workstream W from a case"
+    cascades_to:
+      - target: doc_request
+        rule: "doc_requests WHERE workstream_id = W → WAIVED with audit"
+      - target: ubo_evidence
+        rule: "ubo_evidence WHERE workstream_id = W → removed"
+
+prune_pre_validation:
+  required_verbs:
+    - kyc-case.summarize  # read-only impact preview
+    - ubo-registry.compute-impact  # assess UBO-chain impact
+  abort_conditions:
+    - "prune would leave case in APPROVED state without any active workstreams"
+    - "prune would remove the last UBO in the chain (case cannot be UBO-less)"
+    - "prune would orphan a red_flag linked to a regulatory notice"

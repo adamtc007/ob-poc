@@ -1,0 +1,40 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            SELECT id, learning_type, input_pattern, suggested_output\n            FROM \"ob-poc\".learning_candidates\n            WHERE fingerprint = $1 AND status = 'pending'\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 1,
+        "name": "learning_type",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 2,
+        "name": "input_pattern",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 3,
+        "name": "suggested_output",
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "0bebe6246ae103611b5577d2244bddd0946c50c10d46bab286ade8695fa96f2a"
+}

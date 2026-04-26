@@ -1,0 +1,70 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT\n                case_id, cbu_id, status, escalation_level, risk_rating,\n                case_type, sla_deadline, opened_at, closed_at\n               FROM \"ob-poc\".cases\n               WHERE case_id = $1",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "case_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "cbu_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 2,
+        "name": "status",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 3,
+        "name": "escalation_level",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 4,
+        "name": "risk_rating",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 5,
+        "name": "case_type",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 6,
+        "name": "sla_deadline",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 7,
+        "name": "opened_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 8,
+        "name": "closed_at",
+        "type_info": "Timestamptz"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      true,
+      true,
+      true,
+      false,
+      true
+    ]
+  },
+  "hash": "1ed69af93b0382123536b84d7d2a003e94b05b936708b070ce807b5ed6154b4e"
+}

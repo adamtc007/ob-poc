@@ -126,6 +126,11 @@ domains:
           type: uuid
           name: board_appointment_id
           capture: true
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
 
       resign:
         description: Record resignation/removal from board
@@ -170,6 +175,11 @@ domains:
           is_active: false
         returns:
           type: affected
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
 
       list-by-entity:
         description: List current board composition for an entity
@@ -213,6 +223,11 @@ domains:
           default: false
         returns:
           type: record_set
+        three_axis:
+          state_effect: preserving
+          external_effects: [observational]
+          consequence:
+            baseline: benign
 
       list-by-person:
         description: List all board positions held by a person
@@ -256,6 +271,11 @@ domains:
           default: false
         returns:
           type: record_set
+        three_axis:
+          state_effect: preserving
+          external_effects: [observational]
+          consequence:
+            baseline: benign
 
       grant-appointment-right:
         description: Record an appointment right from SHA/articles
@@ -382,6 +402,11 @@ domains:
           type: uuid
           name: appointment_right_id
           capture: true
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
 
       revoke-appointment-right:
         description: Revoke an appointment right
@@ -426,6 +451,11 @@ domains:
           is_active: false
         returns:
           type: affected
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
 
       list-appointment-rights:
         description: List who has appointment rights over an entity's board
@@ -469,6 +499,11 @@ domains:
           default: false
         returns:
           type: record_set
+        three_axis:
+          state_effect: preserving
+          external_effects: [observational]
+          consequence:
+            baseline: benign
 
       list-rights-held:
         description: List appointment rights held by an entity
@@ -512,6 +547,11 @@ domains:
           default: false
         returns:
           type: record_set
+        three_axis:
+          state_effect: preserving
+          external_effects: [observational]
+          consequence:
+            baseline: benign
 
       analyze-control:
         description: |
@@ -565,3 +605,8 @@ domains:
           - name: majority_controller
             type: uuid
             description: Entity with majority of appointments (if any)
+        three_axis:
+          state_effect: preserving
+          external_effects: [observational]
+          consequence:
+            baseline: benign

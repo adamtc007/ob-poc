@@ -16,7 +16,7 @@ use uuid::Uuid;
 
 use super::correlation::CorrelationStore;
 use super::types::OutcomeEvent;
-use crate::repl::orchestrator_v2::ReplOrchestratorV2;
+use crate::sequencer::ReplOrchestratorV2;
 
 // ---------------------------------------------------------------------------
 // SignalRelay

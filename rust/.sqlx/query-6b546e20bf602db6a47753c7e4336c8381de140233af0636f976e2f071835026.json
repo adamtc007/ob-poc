@@ -1,0 +1,70 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT\n                u.universe_id,\n                u.instrument_class_id,\n                u.market_id,\n                u.currencies,\n                u.settlement_types,\n                u.is_active,\n                ic.name as \"class_name?\",\n                m.name as \"market_name?\",\n                m.mic as \"mic?\"\n               FROM \"ob-poc\".cbu_instrument_universe u\n               LEFT JOIN \"ob-poc\".instrument_classes ic ON ic.class_id = u.instrument_class_id\n               LEFT JOIN \"ob-poc\".markets m ON m.market_id = u.market_id\n               WHERE u.cbu_id = $1",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "universe_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "instrument_class_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 2,
+        "name": "market_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 3,
+        "name": "currencies",
+        "type_info": "VarcharArray"
+      },
+      {
+        "ordinal": 4,
+        "name": "settlement_types",
+        "type_info": "VarcharArray"
+      },
+      {
+        "ordinal": 5,
+        "name": "is_active",
+        "type_info": "Bool"
+      },
+      {
+        "ordinal": 6,
+        "name": "class_name?",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 7,
+        "name": "market_name?",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 8,
+        "name": "mic?",
+        "type_info": "Varchar"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      true,
+      false,
+      true,
+      true,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "6b546e20bf602db6a47753c7e4336c8381de140233af0636f976e2f071835026"
+}

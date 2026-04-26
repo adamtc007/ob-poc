@@ -1,0 +1,21 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            INSERT INTO \"ob-poc\".bpmn_parked_tokens\n                (token_id, correlation_key, session_id, entry_id,\n                 process_instance_id, expected_signal, status, created_at)\n            VALUES ($1, $2, $3, $4, $5, $6, $7, $8)\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Text",
+        "Uuid",
+        "Uuid",
+        "Uuid",
+        "Text",
+        "Text",
+        "Timestamptz"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "43b3eec094adf2fab2248a5881ce46aeb64de4d9adcdce6db98df6cfae745ffc"
+}

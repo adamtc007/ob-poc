@@ -72,8 +72,6 @@ pub mod control_routes;
 #[cfg(feature = "server")]
 pub mod constellation_routes;
 
-// cbu_session_routes removed — superseded by REPL V2 unified pipeline
-
 #[cfg(feature = "server")]
 pub mod service_resource_routes;
 
@@ -152,8 +150,6 @@ pub use control_routes::control_routes;
 
 #[cfg(feature = "server")]
 pub use constellation_routes::create_constellation_router;
-
-// cbu_session_routes: superseded by REPL V2 unified pipeline (session_scoped_router)
 
 #[cfg(feature = "server")]
 pub use service_resource_routes::{service_resource_router, ServiceResourceState};

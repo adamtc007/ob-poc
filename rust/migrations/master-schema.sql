@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict WG34E4NwyrH0CpanaqBEb2poijvxzdWeK1MYn8CcM0DAQtoW7gY67qzzBDA7EKs
+\restrict rcCKICNa6fReLN6Yn3I0hVEwgQdVQZ9YLuv3kwMVDxJNFCHWSPrJge2BLbjCaRL
 
 -- Dumped from database version 18.1 (Homebrew)
 -- Dumped by pg_dump version 18.1 (Homebrew)
@@ -326,7 +326,8 @@ CREATE TYPE sem_reg.object_type AS ENUM (
     'evidence_requirement',
     'document_type_def',
     'observation_def',
-    'derivation_spec'
+    'derivation_spec',
+    'phrase_mapping'
 );
 
 
@@ -3940,6 +3941,131 @@ COMMENT ON FUNCTION "ob-poc".process_provisioning_result(p_request_id uuid, p_pa
 
 
 --
+-- Name: propagate_derived_chain_staleness(uuid, uuid); Type: FUNCTION; Schema: ob-poc; Owner: -
+--
+
+CREATE FUNCTION "ob-poc".propagate_derived_chain_staleness(p_attr_id uuid, p_entity_id uuid) RETURNS bigint
+    LANGUAGE plpgsql
+    AS $$
+DECLARE
+    affected bigint;
+BEGIN
+    UPDATE "ob-poc".derived_attribute_values dav
+    SET stale = true
+    WHERE dav.superseded_by IS NULL
+      AND dav.stale = false
+      AND EXISTS (
+          SELECT 1
+          FROM "ob-poc".derived_attribute_dependencies dad
+          WHERE dad.derived_value_id = dav.id
+            AND dad.input_attr_id = p_attr_id
+            AND dad.input_entity_id = p_entity_id
+      );
+
+    GET DIAGNOSTICS affected = ROW_COUNT;
+    RETURN affected;
+END;
+$$;
+
+
+--
+-- Name: propagate_observation_staleness(); Type: FUNCTION; Schema: ob-poc; Owner: -
+--
+
+CREATE FUNCTION "ob-poc".propagate_observation_staleness() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+BEGIN
+    UPDATE "ob-poc".derived_attribute_values dav
+    SET stale = true
+    WHERE dav.superseded_by IS NULL
+      AND dav.stale = false
+      AND EXISTS (
+          SELECT 1
+          FROM "ob-poc".derived_attribute_dependencies dad
+          WHERE dad.derived_value_id = dav.id
+            AND dad.input_attr_id = NEW.attribute_id
+            AND dad.input_entity_id = NEW.entity_id
+      );
+
+    RETURN NEW;
+END;
+$$;
+
+
+--
+-- Name: propagate_shared_fact_staleness(); Type: FUNCTION; Schema: ob-poc; Owner: -
+--
+
+CREATE FUNCTION "ob-poc".propagate_shared_fact_staleness() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+DECLARE
+    v_atom_lifecycle TEXT;
+    v_stale_count INTEGER;
+BEGIN
+    -- Only propagate for Active or Deprecated atoms
+    SELECT lifecycle_status INTO v_atom_lifecycle
+    FROM "ob-poc".shared_atom_registry
+    WHERE id = NEW.atom_id;
+
+    IF v_atom_lifecycle IS NULL OR v_atom_lifecycle NOT IN ('active', 'deprecated') THEN
+        RETURN NEW;
+    END IF;
+
+    -- Mark all consumer refs stale where held_version < new version
+    UPDATE "ob-poc".workspace_fact_refs
+    SET status = 'stale',
+        stale_since = COALESCE(stale_since, now())
+    WHERE atom_id = NEW.atom_id
+      AND entity_id = NEW.entity_id
+      AND status = 'current'
+      AND held_version < NEW.version;
+
+    GET DIAGNOSTICS v_stale_count = ROW_COUNT;
+
+    -- Log propagation (useful for debugging, low overhead at O(50) atoms)
+    IF v_stale_count > 0 THEN
+        RAISE NOTICE 'Shared fact staleness propagated: atom_id=%, entity_id=%, new_version=%, stale_consumers=%',
+            NEW.atom_id, NEW.entity_id, NEW.version, v_stale_count;
+    END IF;
+
+    RETURN NEW;
+END;
+$$;
+
+
+--
+-- Name: FUNCTION propagate_shared_fact_staleness(); Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON FUNCTION "ob-poc".propagate_shared_fact_staleness() IS 'Stage 2 of three-stage staleness propagation: marks workspace_fact_refs as stale when a new shared fact version supersedes a prior version. Only fires for Active/Deprecated atoms.';
+
+
+--
+-- Name: propagate_spec_staleness(text, uuid); Type: FUNCTION; Schema: ob-poc; Owner: -
+--
+
+CREATE FUNCTION "ob-poc".propagate_spec_staleness(p_spec_fqn text, p_new_snapshot_id uuid) RETURNS bigint
+    LANGUAGE plpgsql
+    AS $$
+DECLARE
+    affected bigint;
+BEGIN
+    UPDATE "ob-poc".derived_attribute_values
+    SET stale = true
+    WHERE derivation_spec_fqn = p_spec_fqn
+      AND spec_snapshot_id <> p_new_snapshot_id
+      AND superseded_by IS NULL
+      AND stale = false;
+
+    GET DIAGNOSTICS affected = ROW_COUNT;
+    RETURN affected;
+END;
+$$;
+
+
+--
 -- Name: push_scope_history(uuid, character varying, character varying); Type: FUNCTION; Schema: ob-poc; Owner: -
 --
 
@@ -5452,6 +5578,26 @@ $$;
 
 
 --
+-- Name: trg_shared_fact_version_supersede(); Type: FUNCTION; Schema: ob-poc; Owner: -
+--
+
+CREATE FUNCTION "ob-poc".trg_shared_fact_version_supersede() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+BEGIN
+    -- Clear is_current on all prior versions for the same atom × entity
+    UPDATE "ob-poc".shared_fact_versions
+    SET is_current = false
+    WHERE atom_id = NEW.atom_id
+      AND entity_id = NEW.entity_id
+      AND id != NEW.id
+      AND is_current = true;
+    RETURN NEW;
+END;
+$$;
+
+
+--
 -- Name: trg_update_runbook_timestamp(); Type: FUNCTION; Schema: ob-poc; Owner: -
 --
 
@@ -6065,6 +6211,28 @@ $$;
 
 
 --
+-- Name: validate_derived_attr_id(); Type: FUNCTION; Schema: ob-poc; Owner: -
+--
+
+CREATE FUNCTION "ob-poc".validate_derived_attr_id() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1
+        FROM "ob-poc".attribute_registry
+        WHERE uuid = NEW.attr_id
+          AND is_derived = true
+    ) THEN
+        RAISE EXCEPTION 'Attribute % is not marked as derived in attribute_registry', NEW.attr_id;
+    END IF;
+
+    RETURN NEW;
+END;
+$$;
+
+
+--
 -- Name: validate_picker_selection(uuid, uuid[]); Type: FUNCTION; Schema: ob-poc; Owner: -
 --
 
@@ -6517,6 +6685,162 @@ $$;
 
 
 --
+-- Name: materialize_attribute_def_to_registry(); Type: FUNCTION; Schema: sem_reg; Owner: -
+--
+
+CREATE FUNCTION sem_reg.materialize_attribute_def_to_registry() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+DECLARE
+    v_fqn          text;
+    v_uuid         uuid;
+    v_name         text;
+    v_domain       text;
+    v_data_type    text;
+    v_category     text;
+    v_evidence     text;
+    v_is_derived   boolean;
+    v_deriv_fqn    text;
+    v_val_rules    jsonb;
+    v_applicability jsonb;
+BEGIN
+    -- Only fire for active attribute_def snapshots that are not yet superseded
+    IF NEW.object_type::text <> 'attribute_def'
+       OR NEW.status::text <> 'active'
+       OR NEW.effective_until IS NOT NULL
+    THEN
+        RETURN NEW;
+    END IF;
+
+    -- Extract fields from the snapshot definition
+    v_fqn          := NEW.definition ->> 'fqn';
+    v_name         := NEW.definition ->> 'name';
+    v_domain       := NEW.definition ->> 'domain';
+    v_data_type    := NEW.definition ->> 'data_type';
+    v_category     := NEW.definition ->> 'category';
+    v_evidence     := COALESCE(NEW.definition ->> 'evidence_grade', 'none');
+    v_is_derived   := COALESCE((NEW.definition ->> 'is_derived')::boolean, false);
+    v_deriv_fqn    := NEW.definition ->> 'derivation_spec_fqn';
+    v_val_rules    := NEW.definition -> 'validation_rules';
+    v_applicability := NEW.definition -> 'applicability';
+
+    -- Cannot materialize without an FQN
+    IF v_fqn IS NULL THEN
+        RETURN NEW;
+    END IF;
+
+    -- Deterministic UUID from the object_id (same logic as Rust object_id_for)
+    v_uuid := NEW.object_id;
+
+    INSERT INTO "ob-poc".attribute_registry (
+        id, uuid, display_name, category, value_type, domain,
+        validation_rules, applicability, evidence_grade,
+        is_derived, derivation_spec_fqn, sem_reg_snapshot_id,
+        metadata, created_at, updated_at
+    )
+    VALUES (
+        v_fqn,
+        v_uuid,
+        COALESCE(v_name, v_fqn),
+        COALESCE(v_category, 'entity'),
+        COALESCE(v_data_type, 'string'),
+        v_domain,
+        COALESCE(v_val_rules, '{}'::jsonb),
+        COALESCE(v_applicability, '{}'::jsonb),
+        v_evidence,
+        v_is_derived,
+        v_deriv_fqn,
+        NEW.snapshot_id,
+        jsonb_build_object('sem_os', jsonb_build_object(
+            'snapshot_id', NEW.snapshot_id,
+            'object_id', NEW.object_id,
+            'attribute_fqn', v_fqn
+        )),
+        NOW(),
+        NOW()
+    )
+    ON CONFLICT (id) DO UPDATE SET
+        display_name        = EXCLUDED.display_name,
+        category            = EXCLUDED.category,
+        value_type          = EXCLUDED.value_type,
+        domain              = EXCLUDED.domain,
+        validation_rules    = COALESCE(EXCLUDED.validation_rules, "ob-poc".attribute_registry.validation_rules),
+        applicability       = COALESCE(EXCLUDED.applicability, "ob-poc".attribute_registry.applicability),
+        evidence_grade      = EXCLUDED.evidence_grade,
+        is_derived          = EXCLUDED.is_derived,
+        derivation_spec_fqn = EXCLUDED.derivation_spec_fqn,
+        sem_reg_snapshot_id = EXCLUDED.sem_reg_snapshot_id,
+        metadata            = jsonb_set(
+            COALESCE("ob-poc".attribute_registry.metadata, '{}'::jsonb),
+            '{sem_os}',
+            COALESCE("ob-poc".attribute_registry.metadata -> 'sem_os', '{}'::jsonb)
+                || jsonb_build_object(
+                    'snapshot_id', NEW.snapshot_id,
+                    'object_id', NEW.object_id,
+                    'attribute_fqn', v_fqn
+                ),
+            true
+        ),
+        updated_at = NOW();
+
+    RETURN NEW;
+END;
+$$;
+
+
+--
+-- Name: materialize_phrase_mapping_to_bank(); Type: FUNCTION; Schema: sem_reg; Owner: -
+--
+
+CREATE FUNCTION sem_reg.materialize_phrase_mapping_to_bank() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+DECLARE
+    v_phrase    text;
+    v_verb_fqn  text;
+    v_workspace text;
+    v_source    text;
+    v_risk_tier text;
+BEGIN
+    IF NEW.object_type::text <> 'phrase_mapping'
+       OR NEW.status::text <> 'active'
+       OR NEW.effective_until IS NOT NULL
+    THEN
+        RETURN NEW;
+    END IF;
+
+    v_phrase    := NEW.definition ->> 'phrase';
+    v_verb_fqn  := NEW.definition ->> 'verb_fqn';
+    v_workspace := NEW.definition ->> 'workspace';
+    v_source    := COALESCE(NEW.definition ->> 'source', 'governed');
+    v_risk_tier := COALESCE(NEW.definition ->> 'risk_tier', 'elevated');
+
+    IF v_phrase IS NULL OR v_verb_fqn IS NULL THEN
+        RETURN NEW;
+    END IF;
+
+    -- Deactivate any existing active row for this (phrase, workspace)
+    UPDATE "ob-poc".phrase_bank
+    SET active = FALSE
+    WHERE phrase = v_phrase
+      AND COALESCE(workspace, '__global__') = COALESCE(v_workspace, '__global__')
+      AND active = TRUE;
+
+    -- Insert new active row
+    INSERT INTO "ob-poc".phrase_bank (
+        phrase, verb_fqn, workspace, source, risk_tier,
+        sem_reg_snapshot_id, active
+    ) VALUES (
+        v_phrase, v_verb_fqn, v_workspace, v_source, v_risk_tier,
+        NEW.snapshot_id, TRUE
+    );
+
+    RETURN NEW;
+END;
+$$;
+
+
+--
 -- Name: snapshots; Type: TABLE; Schema: sem_reg; Owner: -
 --
 
@@ -6777,6 +7101,27 @@ COMMENT ON VIEW "ob-poc".active_issues IS 'Issues needing attention, prioritized
 
 
 --
+-- Name: appointment_rights; Type: TABLE; Schema: ob-poc; Owner: -
+--
+
+CREATE TABLE "ob-poc".appointment_rights (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    target_entity_id uuid NOT NULL,
+    holder_entity_id uuid NOT NULL,
+    right_type character varying(30) NOT NULL,
+    max_appointments integer,
+    is_active boolean DEFAULT true NOT NULL,
+    effective_from date,
+    effective_to date,
+    source character varying(50) DEFAULT 'manual'::character varying NOT NULL,
+    source_document_ref character varying(255),
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT appt_rights_chk_type CHECK (((right_type)::text = ANY ((ARRAY['APPOINT'::character varying, 'REMOVE'::character varying, 'APPOINT_AND_REMOVE'::character varying, 'VETO_APPOINTMENT'::character varying, 'OBSERVER'::character varying])::text[])))
+);
+
+
+--
 -- Name: attribute_observations; Type: TABLE; Schema: ob-poc; Owner: -
 --
 
@@ -6870,10 +7215,12 @@ CREATE TABLE "ob-poc".attribute_registry (
     is_derived boolean DEFAULT false NOT NULL,
     derivation_spec_fqn text,
     evidence_grade text DEFAULT 'none'::text NOT NULL,
+    visibility text DEFAULT 'external'::text NOT NULL,
     CONSTRAINT check_category CHECK ((category = ANY (ARRAY['identity'::text, 'financial'::text, 'compliance'::text, 'document'::text, 'risk'::text, 'contact'::text, 'address'::text, 'tax'::text, 'employment'::text, 'product'::text, 'entity'::text, 'ubo'::text, 'isda'::text, 'resource'::text, 'cbu'::text, 'trust'::text, 'fund'::text, 'partnership'::text]))),
     CONSTRAINT check_value_type CHECK ((value_type = ANY (ARRAY['string'::text, 'integer'::text, 'number'::text, 'decimal'::text, 'boolean'::text, 'date'::text, 'datetime'::text, 'timestamp'::text, 'uuid'::text, 'email'::text, 'phone'::text, 'address'::text, 'currency'::text, 'percentage'::text, 'tax_id'::text, 'json'::text, 'enum'::text]))),
     CONSTRAINT chk_derived_has_spec CHECK ((((NOT is_derived) AND (derivation_spec_fqn IS NULL)) OR (is_derived AND (derivation_spec_fqn IS NOT NULL)))),
-    CONSTRAINT chk_evidence_grade CHECK ((evidence_grade = ANY (ARRAY['none'::text, 'prohibited'::text, 'allowed_with_constraints'::text, 'regulatory_evidence'::text])))
+    CONSTRAINT chk_evidence_grade CHECK ((evidence_grade = ANY (ARRAY['none'::text, 'prohibited'::text, 'allowed_with_constraints'::text, 'regulatory_evidence'::text]))),
+    CONSTRAINT chk_visibility CHECK ((visibility = ANY (ARRAY['external'::text, 'internal'::text])))
 );
 
 
@@ -6989,6 +7336,28 @@ CREATE TABLE "ob-poc".audit_log (
 --
 
 COMMENT ON TABLE "ob-poc".audit_log IS 'Full audit trail of all state transitions';
+
+
+--
+-- Name: board_compositions; Type: TABLE; Schema: ob-poc; Owner: -
+--
+
+CREATE TABLE "ob-poc".board_compositions (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    entity_id uuid NOT NULL,
+    person_entity_id uuid NOT NULL,
+    role_id uuid NOT NULL,
+    appointed_by_entity_id uuid,
+    appointment_date date,
+    resignation_date date,
+    is_active boolean DEFAULT true NOT NULL,
+    source character varying(50) DEFAULT 'manual'::character varying NOT NULL,
+    source_document_ref character varying(255),
+    notes text,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT board_comp_no_self_appointment CHECK ((entity_id <> person_entity_id))
+);
 
 
 --
@@ -7297,6 +7666,7 @@ CREATE TABLE "ob-poc".bpmn_pending_dispatches (
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     last_attempted_at timestamp with time zone,
     dispatched_at timestamp with time zone,
+    session_stack jsonb DEFAULT '{}'::jsonb NOT NULL,
     CONSTRAINT bpmn_pending_dispatches_status_check CHECK ((status = ANY (ARRAY['pending'::text, 'dispatched'::text, 'failed_permanent'::text])))
 );
 
@@ -7600,7 +7970,7 @@ CREATE TABLE "ob-poc".cbu_attr_values (
     as_of timestamp with time zone DEFAULT now() NOT NULL,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     updated_at timestamp with time zone DEFAULT now() NOT NULL,
-    CONSTRAINT cbu_attr_values_source_check CHECK ((source = ANY (ARRAY['derived'::text, 'entity'::text, 'cbu'::text, 'document'::text, 'manual'::text, 'external'::text])))
+    CONSTRAINT cbu_attr_values_source_check CHECK ((source = ANY (ARRAY['derived'::text, 'entity'::text, 'cbu'::text, 'document'::text, 'manual'::text, 'external'::text, 'system'::text])))
 );
 
 
@@ -8825,7 +9195,7 @@ COMMENT ON TABLE "ob-poc".cbu_tax_status IS 'CBU tax status per jurisdiction';
 
 CREATE TABLE "ob-poc".cbu_trading_profiles (
     profile_id uuid DEFAULT uuidv7() NOT NULL,
-    cbu_id uuid NOT NULL,
+    cbu_id uuid,
     version integer DEFAULT 1 NOT NULL,
     status character varying(20) DEFAULT 'DRAFT'::character varying NOT NULL,
     document jsonb NOT NULL,
@@ -8849,6 +9219,9 @@ CREATE TABLE "ob-poc".cbu_trading_profiles (
     rejection_reason text,
     superseded_at timestamp with time zone,
     superseded_by_version integer,
+    group_id uuid,
+    is_template boolean DEFAULT false NOT NULL,
+    template_id uuid,
     CONSTRAINT cbu_trading_profiles_status_check CHECK (((status)::text = ANY (ARRAY[('DRAFT'::character varying)::text, ('VALIDATED'::character varying)::text, ('PENDING_REVIEW'::character varying)::text, ('ACTIVE'::character varying)::text, ('SUPERSEDED'::character varying)::text, ('ARCHIVED'::character varying)::text])))
 );
 
@@ -8878,6 +9251,27 @@ COMMENT ON COLUMN "ob-poc".cbu_trading_profiles.document_hash IS 'SHA-256 hash o
 
 
 --
+-- Name: COLUMN cbu_trading_profiles.group_id; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON COLUMN "ob-poc".cbu_trading_profiles.group_id IS 'Client group ID for group-level templates (NULL for CBU instances)';
+
+
+--
+-- Name: COLUMN cbu_trading_profiles.is_template; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON COLUMN "ob-poc".cbu_trading_profiles.is_template IS 'True for group-level templates, false for CBU-specific instances';
+
+
+--
+-- Name: COLUMN cbu_trading_profiles.template_id; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON COLUMN "ob-poc".cbu_trading_profiles.template_id IS 'Source template profile_id when this instance was cloned from a template';
+
+
+--
 -- Name: cbu_unified_attr_requirements; Type: TABLE; Schema: ob-poc; Owner: -
 --
 
@@ -8891,7 +9285,7 @@ CREATE TABLE "ob-poc".cbu_unified_attr_requirements (
     conflict jsonb,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     updated_at timestamp with time zone DEFAULT now() NOT NULL,
-    CONSTRAINT cbu_unified_attr_requirements_preferred_source_check CHECK ((preferred_source = ANY (ARRAY['derived'::text, 'entity'::text, 'cbu'::text, 'document'::text, 'manual'::text, 'external'::text]))),
+    CONSTRAINT cbu_unified_attr_requirements_preferred_source_check CHECK ((preferred_source = ANY (ARRAY['derived'::text, 'entity'::text, 'cbu'::text, 'document'::text, 'manual'::text, 'external'::text, 'system'::text]))),
     CONSTRAINT cbu_unified_attr_requirements_requirement_strength_check CHECK ((requirement_strength = ANY (ARRAY['required'::text, 'optional'::text, 'conditional'::text])))
 );
 
@@ -9506,6 +9900,35 @@ CREATE TABLE "ob-poc".commitments (
     updated_at timestamp with time zone DEFAULT now() NOT NULL,
     CONSTRAINT commitments_status_check CHECK (((status)::text = ANY (ARRAY[('PENDING'::character varying)::text, ('FULFILLED'::character varying)::text, ('OVERDUE'::character varying)::text, ('CANCELLED'::character varying)::text])))
 );
+
+
+--
+-- Name: compensation_records; Type: TABLE; Schema: ob-poc; Owner: -
+--
+
+CREATE TABLE "ob-poc".compensation_records (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    remediation_id uuid NOT NULL,
+    entity_id uuid NOT NULL,
+    provider text NOT NULL,
+    original_call_id uuid,
+    correction_call_id uuid,
+    correction_type text NOT NULL,
+    changed_fields jsonb,
+    outcome text DEFAULT 'pending'::text NOT NULL,
+    confirmed_at timestamp with time zone,
+    confirmed_by text,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT chk_compensation_outcome CHECK ((outcome = ANY (ARRAY['success'::text, 'pending'::text, 'failed'::text]))),
+    CONSTRAINT chk_correction_type CHECK ((correction_type = ANY (ARRAY['amend'::text, 'cancel_recreate'::text, 'correction_filing'::text, 'manual'::text])))
+);
+
+
+--
+-- Name: TABLE compensation_records; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON TABLE "ob-poc".compensation_records IS 'Regulatory audit trail for every external correction triggered by constellation replay. Primary evidence table for compliance review.';
 
 
 --
@@ -10198,6 +10621,50 @@ CREATE TABLE "ob-poc".delegation_relationships (
     effective_from date NOT NULL,
     effective_to date,
     created_at timestamp with time zone DEFAULT now()
+);
+
+
+--
+-- Name: derived_attribute_dependencies; Type: TABLE; Schema: ob-poc; Owner: -
+--
+
+CREATE TABLE "ob-poc".derived_attribute_dependencies (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    derived_value_id uuid NOT NULL,
+    input_kind text NOT NULL,
+    input_attr_id uuid NOT NULL,
+    input_entity_id uuid NOT NULL,
+    input_source_row_id uuid,
+    dependency_role text,
+    resolved_value jsonb,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT derived_attribute_dependencies_input_kind_check CHECK ((input_kind = ANY (ARRAY['observation'::text, 'derived_value'::text])))
+);
+
+
+--
+-- Name: derived_attribute_values; Type: TABLE; Schema: ob-poc; Owner: -
+--
+
+CREATE TABLE "ob-poc".derived_attribute_values (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    attr_id uuid NOT NULL,
+    entity_id uuid NOT NULL,
+    entity_type text NOT NULL,
+    value jsonb NOT NULL,
+    derivation_spec_fqn text NOT NULL,
+    spec_snapshot_id uuid NOT NULL,
+    content_hash text NOT NULL,
+    input_values jsonb DEFAULT '{}'::jsonb NOT NULL,
+    inherited_security_label jsonb,
+    dependency_depth integer DEFAULT 0 NOT NULL,
+    evaluated_at timestamp with time zone DEFAULT now() NOT NULL,
+    stale boolean DEFAULT false NOT NULL,
+    superseded_by uuid,
+    superseded_at timestamp with time zone,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT chk_derived_attribute_not_self_superseded CHECK (((superseded_by IS NULL) OR (superseded_by <> id))),
+    CONSTRAINT chk_derived_attribute_supersession_pair CHECK ((((superseded_by IS NULL) AND (superseded_at IS NULL)) OR ((superseded_by IS NOT NULL) AND (superseded_at IS NOT NULL))))
 );
 
 
@@ -12256,6 +12723,34 @@ COMMENT ON COLUMN "ob-poc".expansion_reports.invocations IS 'Template invocation
 
 
 --
+-- Name: external_call_log; Type: TABLE; Schema: ob-poc; Owner: -
+--
+
+CREATE TABLE "ob-poc".external_call_log (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    entity_id uuid NOT NULL,
+    verb_fqn text NOT NULL,
+    provider text NOT NULL,
+    operation text NOT NULL,
+    external_ref text,
+    request_hash bigint NOT NULL,
+    request_snapshot jsonb,
+    response_snapshot jsonb,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    superseded_by uuid,
+    is_current boolean DEFAULT true NOT NULL,
+    CONSTRAINT chk_external_call_superseded CHECK ((NOT (is_current AND (superseded_by IS NOT NULL))))
+);
+
+
+--
+-- Name: TABLE external_call_log; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON TABLE "ob-poc".external_call_log IS 'Records every third-party system interaction. Enables idempotency checks on constellation replay — same request_hash = skip, different = amend per provider capability.';
+
+
+--
 -- Name: fee_billing_account_targets; Type: TABLE; Schema: ob-poc; Owner: -
 --
 
@@ -14263,6 +14758,51 @@ COMMENT ON TABLE "ob-poc".person_pep_status IS 'BODS-compliant PEP status tracki
 
 
 --
+-- Name: phrase_bank; Type: TABLE; Schema: ob-poc; Owner: -
+--
+
+CREATE TABLE "ob-poc".phrase_bank (
+    id integer NOT NULL,
+    phrase text NOT NULL,
+    verb_fqn text NOT NULL,
+    workspace text,
+    source text DEFAULT 'governed'::text NOT NULL,
+    risk_tier text DEFAULT 'elevated'::text NOT NULL,
+    sem_reg_snapshot_id uuid,
+    supersedes_id integer,
+    active boolean DEFAULT true NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+--
+-- Name: TABLE phrase_bank; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON TABLE "ob-poc".phrase_bank IS 'Governed phrase bank — curated phrase-to-verb mappings with collision safety';
+
+
+--
+-- Name: phrase_bank_id_seq; Type: SEQUENCE; Schema: ob-poc; Owner: -
+--
+
+CREATE SEQUENCE "ob-poc".phrase_bank_id_seq
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: phrase_bank_id_seq; Type: SEQUENCE OWNED BY; Schema: ob-poc; Owner: -
+--
+
+ALTER SEQUENCE "ob-poc".phrase_bank_id_seq OWNED BY "ob-poc".phrase_bank.id;
+
+
+--
 -- Name: phrase_blocklist; Type: TABLE; Schema: ob-poc; Owner: -
 --
 
@@ -14303,6 +14843,47 @@ CREATE SEQUENCE "ob-poc".phrase_blocklist_id_seq
 --
 
 ALTER SEQUENCE "ob-poc".phrase_blocklist_id_seq OWNED BY "ob-poc".phrase_blocklist.id;
+
+
+--
+-- Name: phrase_observation_state; Type: TABLE; Schema: ob-poc; Owner: -
+--
+
+CREATE TABLE "ob-poc".phrase_observation_state (
+    id integer NOT NULL,
+    last_observed_sequence bigint DEFAULT 0 NOT NULL,
+    last_run_at timestamp with time zone DEFAULT now() NOT NULL,
+    patterns_found integer DEFAULT 0 NOT NULL,
+    wrong_match_patterns_found integer DEFAULT 0 NOT NULL,
+    next_run_at timestamp with time zone
+);
+
+
+--
+-- Name: TABLE phrase_observation_state; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON TABLE "ob-poc".phrase_observation_state IS 'Watermark state for phrase observation batch runs';
+
+
+--
+-- Name: phrase_observation_state_id_seq; Type: SEQUENCE; Schema: ob-poc; Owner: -
+--
+
+CREATE SEQUENCE "ob-poc".phrase_observation_state_id_seq
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: phrase_observation_state_id_seq; Type: SEQUENCE OWNED BY; Schema: ob-poc; Owner: -
+--
+
+ALTER SEQUENCE "ob-poc".phrase_observation_state_id_seq OWNED BY "ob-poc".phrase_observation_state.id;
 
 
 --
@@ -14372,6 +14953,28 @@ CREATE TABLE "ob-poc".proofs (
 --
 
 COMMENT ON TABLE "ob-poc".proofs IS 'Evidence documents that prove ownership/control assertions';
+
+
+--
+-- Name: provider_capabilities; Type: TABLE; Schema: ob-poc; Owner: -
+--
+
+CREATE TABLE "ob-poc".provider_capabilities (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    provider text NOT NULL,
+    operation text NOT NULL,
+    capability text NOT NULL,
+    amend_details jsonb,
+    notes text,
+    CONSTRAINT chk_provider_capability CHECK ((capability = ANY (ARRAY['amendable'::text, 'cancel_and_recreate'::text, 'immutable'::text, 'manual'::text])))
+);
+
+
+--
+-- Name: TABLE provider_capabilities; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON TABLE "ob-poc".provider_capabilities IS 'Reference data: per-provider, per-operation correction classification for replay behaviour (amendable, cancel_and_recreate, immutable, manual).';
 
 
 --
@@ -14644,6 +15247,44 @@ CREATE TABLE "ob-poc".regulators (
 
 
 --
+-- Name: remediation_events; Type: TABLE; Schema: ob-poc; Owner: -
+--
+
+CREATE TABLE "ob-poc".remediation_events (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    entity_id uuid NOT NULL,
+    source_atom_id uuid NOT NULL,
+    source_workspace text NOT NULL,
+    prior_version integer NOT NULL,
+    new_version integer NOT NULL,
+    affected_workspace text NOT NULL,
+    affected_constellation_family text NOT NULL,
+    status text DEFAULT 'detected'::text NOT NULL,
+    failed_at_step text,
+    failure_reason text,
+    deferral_reason text,
+    resolved_at timestamp with time zone,
+    resolved_by uuid,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT chk_remediation_status CHECK ((status = ANY (ARRAY['detected'::text, 'replaying'::text, 'resolved'::text, 'escalated'::text, 'deferred'::text])))
+);
+
+
+--
+-- Name: TABLE remediation_events; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON TABLE "ob-poc".remediation_events IS 'Lifecycle entity tracking cross-workspace state drift caused by a superseded shared attribute version. FSM: Detected → Replaying → Resolved | Escalated → Resolved | Deferred.';
+
+
+--
+-- Name: COLUMN remediation_events.status; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON COLUMN "ob-poc".remediation_events.status IS 'detected = staleness found; replaying = constellation replay in progress; resolved = replay complete; escalated = replay failed, human review; deferred = divergence explicitly accepted.';
+
+
+--
 -- Name: repl_invocation_records; Type: TABLE; Schema: ob-poc; Owner: -
 --
 
@@ -14678,7 +15319,8 @@ CREATE TABLE "ob-poc".repl_sessions_v2 (
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     last_active_at timestamp with time zone DEFAULT now() NOT NULL,
     park_expires_at timestamp with time zone,
-    version bigint DEFAULT 0 NOT NULL
+    version bigint DEFAULT 0 NOT NULL,
+    extended_state jsonb DEFAULT '{}'::jsonb NOT NULL
 );
 
 
@@ -16021,6 +16663,91 @@ COMMENT ON COLUMN "ob-poc".share_classes.compartment_id IS 'Optional link to fun
 
 
 --
+-- Name: shared_atom_registry; Type: TABLE; Schema: ob-poc; Owner: -
+--
+
+CREATE TABLE "ob-poc".shared_atom_registry (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    atom_path text NOT NULL,
+    display_name text NOT NULL,
+    owner_workspace text NOT NULL,
+    owner_constellation_family text NOT NULL,
+    lifecycle_status text DEFAULT 'draft'::text NOT NULL,
+    validation_rule jsonb,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    activated_at timestamp with time zone,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT chk_lifecycle_status CHECK ((lifecycle_status = ANY (ARRAY['draft'::text, 'active'::text, 'deprecated'::text, 'retired'::text])))
+);
+
+
+--
+-- Name: TABLE shared_atom_registry; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON TABLE "ob-poc".shared_atom_registry IS 'Declares shared atoms whose values are owned by one workspace but consumed by others. Governed SemOS entity with lifecycle FSM (Draft → Active → Deprecated → Retired).';
+
+
+--
+-- Name: COLUMN shared_atom_registry.atom_path; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON COLUMN "ob-poc".shared_atom_registry.atom_path IS 'Dot-notation attribute path, e.g. entity.lei, entity.jurisdiction';
+
+
+--
+-- Name: COLUMN shared_atom_registry.lifecycle_status; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON COLUMN "ob-poc".shared_atom_registry.lifecycle_status IS 'Draft = declared but not enforced; Active = full propagation; Deprecated = enforced but no new consumers; Retired = historical only';
+
+
+--
+-- Name: COLUMN shared_atom_registry.validation_rule; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON COLUMN "ob-poc".shared_atom_registry.validation_rule IS 'Optional validation: {format, allowed_values, gleif_verification, ...}. Always read/written through typed SharedAtomValidation struct.';
+
+
+--
+-- Name: shared_fact_versions; Type: TABLE; Schema: ob-poc; Owner: -
+--
+
+CREATE TABLE "ob-poc".shared_fact_versions (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    atom_id uuid NOT NULL,
+    entity_id uuid NOT NULL,
+    version integer DEFAULT 1 NOT NULL,
+    value jsonb NOT NULL,
+    mutated_by_verb text,
+    mutated_by_user uuid,
+    mutated_at timestamp with time zone DEFAULT now() NOT NULL,
+    is_current boolean DEFAULT true NOT NULL
+);
+
+
+--
+-- Name: TABLE shared_fact_versions; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON TABLE "ob-poc".shared_fact_versions IS 'Versioned fact store for shared atoms. One row per entity × atom × version. The is_current flag denotes the latest version; superseded versions are retained for audit.';
+
+
+--
+-- Name: COLUMN shared_fact_versions.version; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON COLUMN "ob-poc".shared_fact_versions.version IS 'Monotonically increasing version number per (atom_id, entity_id) pair.';
+
+
+--
+-- Name: COLUMN shared_fact_versions.is_current; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON COLUMN "ob-poc".shared_fact_versions.is_current IS 'Denormalized flag: true for the latest version only. Maintained by trigger.';
+
+
+--
 -- Name: sheet_execution_audit; Type: TABLE; Schema: ob-poc; Owner: -
 --
 
@@ -16705,6 +17432,25 @@ CREATE TABLE "ob-poc".tollgate_evaluations (
 
 
 --
+-- Name: tollgate_thresholds; Type: TABLE; Schema: ob-poc; Owner: -
+--
+
+CREATE TABLE "ob-poc".tollgate_thresholds (
+    threshold_id uuid DEFAULT gen_random_uuid() NOT NULL,
+    threshold_name character varying(100) NOT NULL,
+    metric_type character varying(50) NOT NULL,
+    comparison character varying(10) DEFAULT 'gte'::character varying NOT NULL,
+    threshold_value numeric(10,2),
+    is_blocking boolean DEFAULT true NOT NULL,
+    weight numeric(5,2),
+    applies_to_case_types text[],
+    description text,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT tollgate_thresholds_chk_comparison CHECK (((comparison)::text = ANY ((ARRAY['eq'::character varying, 'neq'::character varying, 'gt'::character varying, 'gte'::character varying, 'lt'::character varying, 'lte'::character varying])::text[])))
+);
+
+
+--
 -- Name: trading_profile_materializations; Type: TABLE; Schema: ob-poc; Owner: -
 --
 
@@ -17234,14 +17980,21 @@ CREATE VIEW "ob-poc".v_attribute_lineage_summary AS
 
 CREATE VIEW "ob-poc".v_attribute_reconciliation_summary AS
  SELECT count(*) AS total_attributes,
-    count(*) FILTER (WHERE (sem_reg_snapshot_id IS NOT NULL)) AS bridged_to_sem_reg,
-    count(*) FILTER (WHERE is_derived) AS derived_attributes,
-    count(*) FILTER (WHERE (is_derived AND (derivation_spec_fqn IS NULL))) AS derived_missing_spec,
-    count(*) FILTER (WHERE (sem_reg_snapshot_id IS NULL)) AS missing_snapshot_link,
-    count(*) FILTER (WHERE (COALESCE((metadata #>> '{sem_os,attribute_fqn}'::text[]), ''::text) = ''::text)) AS missing_attribute_fqn,
-    count(*) FILTER (WHERE (evidence_grade = 'none'::text)) AS evidence_grade_none,
-    count(*) FILTER (WHERE (evidence_grade <> 'none'::text)) AS evidence_grade_governed
+    count(*) FILTER (WHERE (sem_reg_snapshot_id IS NOT NULL)) AS reconciled,
+    count(*) FILTER (WHERE ((sem_reg_snapshot_id IS NULL) AND ((metadata #>> '{sem_os,reconciliation_status}'::text[]) = 'out_of_scope'::text))) AS out_of_scope,
+    count(*) FILTER (WHERE ((sem_reg_snapshot_id IS NULL) AND (COALESCE((metadata #>> '{sem_os,reconciliation_status}'::text[]), ''::text) <> 'out_of_scope'::text))) AS pending_manual,
+    count(*) FILTER (WHERE is_derived) AS derived,
+    count(*) FILTER (WHERE (NOT is_derived)) AS primary_attributes,
+    count(*) FILTER (WHERE (evidence_grade <> 'none'::text)) AS evidence_graded,
+    round(((100.0 * (count(*) FILTER (WHERE (sem_reg_snapshot_id IS NOT NULL)))::numeric) / (NULLIF((count(*) - count(*) FILTER (WHERE ((metadata #>> '{sem_os,reconciliation_status}'::text[]) = 'out_of_scope'::text))), 0))::numeric), 1) AS pct_reconciled
    FROM "ob-poc".attribute_registry;
+
+
+--
+-- Name: VIEW v_attribute_reconciliation_summary; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON VIEW "ob-poc".v_attribute_reconciliation_summary IS 'Dashboard: attribute reconciliation progress. pct_reconciled excludes out_of_scope from denominator.';
 
 
 --
@@ -17476,10 +18229,96 @@ COMMENT ON VIEW "ob-poc".v_case_redflag_summary IS 'Summary view of case red-fla
 
 
 --
+-- Name: v_derived_latest; Type: VIEW; Schema: ob-poc; Owner: -
+--
+
+CREATE VIEW "ob-poc".v_derived_latest AS
+ SELECT id,
+    attr_id,
+    entity_id,
+    entity_type,
+    value,
+    derivation_spec_fqn,
+    spec_snapshot_id,
+    content_hash,
+    input_values,
+    inherited_security_label,
+    dependency_depth,
+    evaluated_at,
+    stale,
+    superseded_by,
+    superseded_at,
+    created_at
+   FROM "ob-poc".derived_attribute_values dav
+  WHERE (superseded_by IS NULL);
+
+
+--
+-- Name: v_derived_current; Type: VIEW; Schema: ob-poc; Owner: -
+--
+
+CREATE VIEW "ob-poc".v_derived_current AS
+ SELECT id,
+    attr_id,
+    entity_id,
+    entity_type,
+    value,
+    derivation_spec_fqn,
+    spec_snapshot_id,
+    content_hash,
+    input_values,
+    inherited_security_label,
+    dependency_depth,
+    evaluated_at,
+    stale,
+    superseded_by,
+    superseded_at,
+    created_at
+   FROM "ob-poc".v_derived_latest
+  WHERE (stale = false);
+
+
+--
+-- Name: v_cbu_derived_values; Type: VIEW; Schema: ob-poc; Owner: -
+--
+
+CREATE VIEW "ob-poc".v_cbu_derived_values AS
+ SELECT dav.entity_id AS cbu_id,
+    dav.attr_id,
+    dav.value,
+    'derived'::text AS source,
+    COALESCE(jsonb_agg(DISTINCT jsonb_build_object('type', dad.input_kind, 'id', dad.input_source_row_id, 'path', dad.dependency_role, 'details', jsonb_build_object('input_attr_id', dad.input_attr_id, 'input_entity_id', dad.input_entity_id, 'resolved_value', dad.resolved_value))) FILTER (WHERE (dad.id IS NOT NULL)), '[]'::jsonb) AS evidence_refs,
+    jsonb_build_array(jsonb_build_object('rule', format('derivation:%s'::text, dav.derivation_spec_fqn), 'input', jsonb_build_object('spec_snapshot_id', dav.spec_snapshot_id, 'input_values', dav.input_values, 'dependency_depth', dav.dependency_depth), 'output', jsonb_build_object('value', dav.value, 'evaluated_at', dav.evaluated_at, 'inherited_security_label', dav.inherited_security_label))) AS explain_refs,
+    dav.evaluated_at AS as_of,
+    dav.created_at,
+    dav.created_at AS updated_at
+   FROM ("ob-poc".v_derived_current dav
+     LEFT JOIN "ob-poc".derived_attribute_dependencies dad ON ((dad.derived_value_id = dav.id)))
+  WHERE (dav.entity_type = 'cbu'::text)
+  GROUP BY dav.id, dav.entity_id, dav.attr_id, dav.value, dav.derivation_spec_fqn, dav.spec_snapshot_id, dav.input_values, dav.dependency_depth, dav.inherited_security_label, dav.evaluated_at, dav.created_at;
+
+
+--
 -- Name: v_cbu_attr_gaps; Type: VIEW; Schema: ob-poc; Owner: -
 --
 
 CREATE VIEW "ob-poc".v_cbu_attr_gaps AS
+ WITH effective_cbu_values AS (
+         SELECT cbu_attr_values.cbu_id,
+            cbu_attr_values.attr_id,
+            cbu_attr_values.value,
+            cbu_attr_values.source,
+            cbu_attr_values.as_of
+           FROM "ob-poc".cbu_attr_values
+          WHERE (cbu_attr_values.source <> 'derived'::text)
+        UNION ALL
+         SELECT v_cbu_derived_values.cbu_id,
+            v_cbu_derived_values.attr_id,
+            v_cbu_derived_values.value,
+            v_cbu_derived_values.source,
+            v_cbu_derived_values.as_of
+           FROM "ob-poc".v_cbu_derived_values
+        )
  SELECT r.cbu_id,
     c.name AS cbu_name,
     r.attr_id,
@@ -17496,9 +18335,8 @@ CREATE VIEW "ob-poc".v_cbu_attr_gaps AS
    FROM ((("ob-poc".cbu_unified_attr_requirements r
      JOIN "ob-poc".cbus c ON ((c.cbu_id = r.cbu_id)))
      JOIN "ob-poc".attribute_registry ar ON ((ar.uuid = r.attr_id)))
-     LEFT JOIN "ob-poc".cbu_attr_values v ON (((v.cbu_id = r.cbu_id) AND (v.attr_id = r.attr_id))))
-  WHERE (r.requirement_strength = 'required'::text)
-  ORDER BY r.cbu_id, ar.category, ar.display_name;
+     LEFT JOIN effective_cbu_values v ON (((v.cbu_id = r.cbu_id) AND (v.attr_id = r.attr_id))))
+  WHERE (r.requirement_strength = 'required'::text);
 
 
 --
@@ -17513,6 +18351,18 @@ COMMENT ON VIEW "ob-poc".v_cbu_attr_gaps IS 'Required attributes per CBU with ga
 --
 
 CREATE VIEW "ob-poc".v_cbu_attr_summary AS
+ WITH effective_cbu_values AS (
+         SELECT cbu_attr_values.cbu_id,
+            cbu_attr_values.attr_id,
+            cbu_attr_values.value
+           FROM "ob-poc".cbu_attr_values
+          WHERE (cbu_attr_values.source <> 'derived'::text)
+        UNION ALL
+         SELECT v_cbu_derived_values.cbu_id,
+            v_cbu_derived_values.attr_id,
+            v_cbu_derived_values.value
+           FROM "ob-poc".v_cbu_derived_values
+        )
  SELECT r.cbu_id,
     c.name AS cbu_name,
     count(*) AS total_required,
@@ -17522,10 +18372,9 @@ CREATE VIEW "ob-poc".v_cbu_attr_summary AS
     round(((100.0 * (count(v.value))::numeric) / (NULLIF(count(*), 0))::numeric), 1) AS pct_complete
    FROM (("ob-poc".cbu_unified_attr_requirements r
      JOIN "ob-poc".cbus c ON ((c.cbu_id = r.cbu_id)))
-     LEFT JOIN "ob-poc".cbu_attr_values v ON (((v.cbu_id = r.cbu_id) AND (v.attr_id = r.attr_id))))
+     LEFT JOIN effective_cbu_values v ON (((v.cbu_id = r.cbu_id) AND (v.attr_id = r.attr_id))))
   WHERE (r.requirement_strength = 'required'::text)
-  GROUP BY r.cbu_id, c.name
-  ORDER BY (round(((100.0 * (count(v.value))::numeric) / (NULLIF(count(*), 0))::numeric), 1)), c.name;
+  GROUP BY r.cbu_id, c.name;
 
 
 --
@@ -18612,6 +19461,39 @@ COMMENT ON VIEW "ob-poc".v_deal_summary IS 'Summary view of deals with related e
 
 
 --
+-- Name: v_derived_recompute_queue; Type: VIEW; Schema: ob-poc; Owner: -
+--
+
+CREATE VIEW "ob-poc".v_derived_recompute_queue AS
+ SELECT dav.id,
+    dav.attr_id,
+    dav.entity_id,
+    dav.entity_type,
+    dav.value,
+    dav.derivation_spec_fqn,
+    dav.spec_snapshot_id,
+    dav.content_hash,
+    dav.input_values,
+    dav.inherited_security_label,
+    dav.dependency_depth,
+    dav.evaluated_at,
+    dav.stale,
+    dav.superseded_by,
+    dav.superseded_at,
+    dav.created_at
+   FROM ("ob-poc".v_derived_latest dav
+     JOIN "ob-poc".attribute_registry ar ON ((ar.uuid = dav.attr_id)))
+  WHERE (dav.stale = true)
+  ORDER BY
+        CASE ar.evidence_grade
+            WHEN 'regulatory_evidence'::text THEN 1
+            WHEN 'allowed_with_constraints'::text THEN 2
+            WHEN 'prohibited'::text THEN 3
+            ELSE 4
+        END, dav.dependency_depth, dav.evaluated_at;
+
+
+--
 -- Name: v_document_extraction_map; Type: VIEW; Schema: ob-poc; Owner: -
 --
 
@@ -19234,7 +20116,8 @@ CREATE TABLE "ob-poc".verb_pattern_embeddings (
     priority integer DEFAULT 50 NOT NULL,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     updated_at timestamp with time zone DEFAULT now() NOT NULL,
-    match_method text DEFAULT 'semantic'::text
+    match_method text DEFAULT 'semantic'::text,
+    workspace text
 );
 
 
@@ -20117,6 +21000,44 @@ COMMENT ON COLUMN "ob-poc".workflow_instances.blockers IS 'JSON array of current
 
 
 --
+-- Name: workspace_fact_refs; Type: TABLE; Schema: ob-poc; Owner: -
+--
+
+CREATE TABLE "ob-poc".workspace_fact_refs (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    atom_id uuid NOT NULL,
+    entity_id uuid NOT NULL,
+    consumer_workspace text NOT NULL,
+    held_version integer NOT NULL,
+    status text DEFAULT 'current'::text NOT NULL,
+    stale_since timestamp with time zone,
+    remediation_id uuid,
+    CONSTRAINT chk_workspace_fact_ref_status CHECK ((status = ANY (ARRAY['current'::text, 'stale'::text, 'deferred'::text])))
+);
+
+
+--
+-- Name: TABLE workspace_fact_refs; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON TABLE "ob-poc".workspace_fact_refs IS 'Consumption-state projection — tracks which shared fact version each consuming workspace last acknowledged. A stale row means the consumer is operating against a superseded attribute version.';
+
+
+--
+-- Name: COLUMN workspace_fact_refs.held_version; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON COLUMN "ob-poc".workspace_fact_refs.held_version IS 'The version number from shared_fact_versions that this workspace last operated against.';
+
+
+--
+-- Name: COLUMN workspace_fact_refs.status; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON COLUMN "ob-poc".workspace_fact_refs.status IS 'current = up to date; stale = superseded attribute exists; deferred = divergence explicitly accepted.';
+
+
+--
 -- Name: _sqlx_migrations; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -20127,6 +21048,28 @@ CREATE TABLE public._sqlx_migrations (
     success boolean NOT NULL,
     checksum bytea NOT NULL,
     execution_time bigint NOT NULL
+);
+
+
+--
+-- Name: outbox; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.outbox (
+    id uuid NOT NULL,
+    trace_id uuid NOT NULL,
+    envelope_version smallint NOT NULL,
+    effect_kind text NOT NULL,
+    payload jsonb NOT NULL,
+    idempotency_key text NOT NULL,
+    status text DEFAULT 'pending'::text NOT NULL,
+    attempts integer DEFAULT 0 NOT NULL,
+    claimed_by text,
+    claimed_at timestamp with time zone,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    processed_at timestamp with time zone,
+    last_error text,
+    CONSTRAINT outbox_status_check CHECK ((status = ANY (ARRAY['pending'::text, 'processing'::text, 'done'::text, 'failed_retryable'::text, 'failed_terminal'::text])))
 );
 
 
@@ -21214,10 +22157,24 @@ ALTER TABLE ONLY "ob-poc".lexicon_tokens ALTER COLUMN id SET DEFAULT nextval('"o
 
 
 --
+-- Name: phrase_bank id; Type: DEFAULT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".phrase_bank ALTER COLUMN id SET DEFAULT nextval('"ob-poc".phrase_bank_id_seq'::regclass);
+
+
+--
 -- Name: phrase_blocklist id; Type: DEFAULT; Schema: ob-poc; Owner: -
 --
 
 ALTER TABLE ONLY "ob-poc".phrase_blocklist ALTER COLUMN id SET DEFAULT nextval('"ob-poc".phrase_blocklist_id_seq'::regclass);
+
+
+--
+-- Name: phrase_observation_state id; Type: DEFAULT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".phrase_observation_state ALTER COLUMN id SET DEFAULT nextval('"ob-poc".phrase_observation_state_id_seq'::regclass);
 
 
 --
@@ -21281,6 +22238,14 @@ ALTER TABLE ONLY "ob-poc".access_review_items
 
 
 --
+-- Name: appointment_rights appointment_rights_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".appointment_rights
+    ADD CONSTRAINT appointment_rights_pkey PRIMARY KEY (id);
+
+
+--
 -- Name: attribute_observations attribute_observations_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
 --
 
@@ -21310,6 +22275,14 @@ ALTER TABLE ONLY "ob-poc".attribute_values_typed
 
 ALTER TABLE ONLY "ob-poc".audit_log
     ADD CONSTRAINT audit_log_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: board_compositions board_compositions_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".board_compositions
+    ADD CONSTRAINT board_compositions_pkey PRIMARY KEY (id);
 
 
 --
@@ -22225,6 +23198,14 @@ ALTER TABLE ONLY "ob-poc".commitments
 
 
 --
+-- Name: compensation_records compensation_records_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".compensation_records
+    ADD CONSTRAINT compensation_records_pkey PRIMARY KEY (id);
+
+
+--
 -- Name: compiled_runbook_events compiled_runbook_events_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
 --
 
@@ -22478,6 +23459,22 @@ ALTER TABLE ONLY "ob-poc".deals
 
 ALTER TABLE ONLY "ob-poc".delegation_relationships
     ADD CONSTRAINT delegation_relationships_pkey PRIMARY KEY (delegation_id);
+
+
+--
+-- Name: derived_attribute_dependencies derived_attribute_dependencies_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".derived_attribute_dependencies
+    ADD CONSTRAINT derived_attribute_dependencies_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: derived_attribute_values derived_attribute_values_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".derived_attribute_values
+    ADD CONSTRAINT derived_attribute_values_pkey PRIMARY KEY (id);
 
 
 --
@@ -23134,6 +24131,14 @@ ALTER TABLE ONLY "ob-poc".events
 
 ALTER TABLE ONLY "ob-poc".expansion_reports
     ADD CONSTRAINT expansion_reports_pkey PRIMARY KEY (expansion_id);
+
+
+--
+-- Name: external_call_log external_call_log_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".external_call_log
+    ADD CONSTRAINT external_call_log_pkey PRIMARY KEY (id);
 
 
 --
@@ -23801,11 +24806,27 @@ ALTER TABLE ONLY "ob-poc".person_pep_status
 
 
 --
+-- Name: phrase_bank phrase_bank_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".phrase_bank
+    ADD CONSTRAINT phrase_bank_pkey PRIMARY KEY (id);
+
+
+--
 -- Name: phrase_blocklist phrase_blocklist_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
 --
 
 ALTER TABLE ONLY "ob-poc".phrase_blocklist
     ADD CONSTRAINT phrase_blocklist_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: phrase_observation_state phrase_observation_state_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".phrase_observation_state
+    ADD CONSTRAINT phrase_observation_state_pkey PRIMARY KEY (id);
 
 
 --
@@ -23857,6 +24878,14 @@ ALTER TABLE ONLY "ob-poc".proofs
 
 
 --
+-- Name: provider_capabilities provider_capabilities_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".provider_capabilities
+    ADD CONSTRAINT provider_capabilities_pkey PRIMARY KEY (id);
+
+
+--
 -- Name: provisioning_events provisioning_events_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
 --
 
@@ -23894,6 +24923,14 @@ ALTER TABLE ONLY "ob-poc".red_flags
 
 ALTER TABLE ONLY "ob-poc".regulators
     ADD CONSTRAINT regulators_pkey PRIMARY KEY (regulator_code);
+
+
+--
+-- Name: remediation_events remediation_events_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".remediation_events
+    ADD CONSTRAINT remediation_events_pkey PRIMARY KEY (id);
 
 
 --
@@ -24393,6 +25430,22 @@ ALTER TABLE ONLY "ob-poc".share_classes
 
 
 --
+-- Name: shared_atom_registry shared_atom_registry_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".shared_atom_registry
+    ADD CONSTRAINT shared_atom_registry_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: shared_fact_versions shared_fact_versions_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".shared_fact_versions
+    ADD CONSTRAINT shared_fact_versions_pkey PRIMARY KEY (id);
+
+
+--
 -- Name: sheet_execution_audit sheet_execution_audit_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
 --
 
@@ -24697,6 +25750,14 @@ ALTER TABLE ONLY "ob-poc".tollgate_evaluations
 
 
 --
+-- Name: tollgate_thresholds tollgate_thresholds_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".tollgate_thresholds
+    ADD CONSTRAINT tollgate_thresholds_pkey PRIMARY KEY (threshold_id);
+
+
+--
 -- Name: trading_profile_materializations trading_profile_materializations_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
 --
 
@@ -24833,6 +25894,14 @@ ALTER TABLE ONLY "ob-poc".issuer_control_config
 
 
 --
+-- Name: shared_fact_versions uq_shared_fact_version; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".shared_fact_versions
+    ADD CONSTRAINT uq_shared_fact_version UNIQUE (atom_id, entity_id, version);
+
+
+--
 -- Name: special_rights uq_special_rights_holder_issuer_type_class; Type: CONSTRAINT; Schema: ob-poc; Owner: -
 --
 
@@ -24953,11 +26022,35 @@ ALTER TABLE ONLY "ob-poc".workflow_instances
 
 
 --
+-- Name: workspace_fact_refs workspace_fact_refs_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".workspace_fact_refs
+    ADD CONSTRAINT workspace_fact_refs_pkey PRIMARY KEY (id);
+
+
+--
 -- Name: _sqlx_migrations _sqlx_migrations_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public._sqlx_migrations
     ADD CONSTRAINT _sqlx_migrations_pkey PRIMARY KEY (version);
+
+
+--
+-- Name: outbox outbox_idempotency_key_effect_kind_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.outbox
+    ADD CONSTRAINT outbox_idempotency_key_effect_kind_key UNIQUE (idempotency_key, effect_kind);
+
+
+--
+-- Name: outbox outbox_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.outbox
+    ADD CONSTRAINT outbox_pkey PRIMARY KEY (id);
 
 
 --
@@ -25374,6 +26467,13 @@ CREATE UNIQUE INDEX entity_proper_persons_id_doc_uniq ON "ob-poc".entity_proper_
 
 
 --
+-- Name: entity_relationships_upsert_key; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE UNIQUE INDEX entity_relationships_upsert_key ON "ob-poc".entity_relationships USING btree (from_entity_id, to_entity_id, relationship_type) WHERE (effective_to IS NULL);
+
+
+--
 -- Name: entity_workstreams_idx_workstreams_case; Type: INDEX; Schema: ob-poc; Owner: -
 --
 
@@ -25514,6 +26614,20 @@ CREATE INDEX idx_analysis_type_date ON "ob-poc".intent_feedback_analysis USING b
 
 
 --
+-- Name: idx_appt_rights_holder; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_appt_rights_holder ON "ob-poc".appointment_rights USING btree (holder_entity_id) WHERE (is_active = true);
+
+
+--
+-- Name: idx_appt_rights_target; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_appt_rights_target ON "ob-poc".appointment_rights USING btree (target_entity_id) WHERE (is_active = true);
+
+
+--
 -- Name: idx_assertion_log_case; Type: INDEX; Schema: ob-poc; Owner: -
 --
 
@@ -25630,6 +26744,20 @@ CREATE INDEX idx_audit_failure_id ON "ob-poc".audit_log USING btree (failure_id)
 --
 
 CREATE INDEX idx_audit_instance ON "ob-poc".workflow_audit_log USING btree (instance_id, transitioned_at DESC);
+
+
+--
+-- Name: idx_board_comp_entity; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_board_comp_entity ON "ob-poc".board_compositions USING btree (entity_id) WHERE (is_active = true);
+
+
+--
+-- Name: idx_board_comp_person; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_board_comp_person ON "ob-poc".board_compositions USING btree (person_entity_id) WHERE (is_active = true);
 
 
 --
@@ -26473,6 +27601,20 @@ CREATE INDEX idx_cbu_tax_status_jurisdiction ON "ob-poc".cbu_tax_status USING bt
 
 
 --
+-- Name: idx_cbu_trading_profiles_group_template; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_cbu_trading_profiles_group_template ON "ob-poc".cbu_trading_profiles USING btree (group_id) WHERE (is_template = true);
+
+
+--
+-- Name: idx_cbu_trading_profiles_template_id; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_cbu_trading_profiles_template_id ON "ob-poc".cbu_trading_profiles USING btree (template_id) WHERE (template_id IS NOT NULL);
+
+
+--
 -- Name: idx_cbu_unified_attr_cbu; Type: INDEX; Schema: ob-poc; Owner: -
 --
 
@@ -26771,6 +27913,20 @@ CREATE INDEX idx_companies_name_trgm ON "ob-poc".entity_limited_companies USING 
 --
 
 CREATE INDEX idx_companies_reg_number ON "ob-poc".entity_limited_companies USING btree (registration_number);
+
+
+--
+-- Name: idx_compensation_records_entity; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_compensation_records_entity ON "ob-poc".compensation_records USING btree (entity_id);
+
+
+--
+-- Name: idx_compensation_records_remediation; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_compensation_records_remediation ON "ob-poc".compensation_records USING btree (remediation_id);
 
 
 --
@@ -27254,6 +28410,69 @@ CREATE INDEX idx_delegation_delegate ON "ob-poc".delegation_relationships USING 
 --
 
 CREATE INDEX idx_delegation_delegator ON "ob-poc".delegation_relationships USING btree (delegator_entity_id);
+
+
+--
+-- Name: idx_derived_attribute_dependencies_dedupe; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE UNIQUE INDEX idx_derived_attribute_dependencies_dedupe ON "ob-poc".derived_attribute_dependencies USING btree (derived_value_id, input_kind, input_attr_id, input_entity_id, COALESCE(input_source_row_id, '00000000-0000-0000-0000-000000000000'::uuid), COALESCE(dependency_role, ''::text));
+
+
+--
+-- Name: idx_derived_attribute_dependencies_source_row; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_derived_attribute_dependencies_source_row ON "ob-poc".derived_attribute_dependencies USING btree (input_source_row_id) WHERE (input_source_row_id IS NOT NULL);
+
+
+--
+-- Name: idx_derived_attribute_dependencies_staleness; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_derived_attribute_dependencies_staleness ON "ob-poc".derived_attribute_dependencies USING btree (input_attr_id, input_entity_id);
+
+
+--
+-- Name: idx_derived_attribute_dependencies_value; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_derived_attribute_dependencies_value ON "ob-poc".derived_attribute_dependencies USING btree (derived_value_id);
+
+
+--
+-- Name: idx_derived_attribute_values_current; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE UNIQUE INDEX idx_derived_attribute_values_current ON "ob-poc".derived_attribute_values USING btree (entity_type, entity_id, attr_id) WHERE (superseded_by IS NULL);
+
+
+--
+-- Name: idx_derived_attribute_values_entity_scope; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_derived_attribute_values_entity_scope ON "ob-poc".derived_attribute_values USING btree (entity_type, entity_id) WHERE (superseded_by IS NULL);
+
+
+--
+-- Name: idx_derived_attribute_values_history; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_derived_attribute_values_history ON "ob-poc".derived_attribute_values USING btree (entity_type, entity_id, attr_id, evaluated_at DESC);
+
+
+--
+-- Name: idx_derived_attribute_values_spec_lookup; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_derived_attribute_values_spec_lookup ON "ob-poc".derived_attribute_values USING btree (derivation_spec_fqn) WHERE (superseded_by IS NULL);
+
+
+--
+-- Name: idx_derived_attribute_values_stale_queue; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_derived_attribute_values_stale_queue ON "ob-poc".derived_attribute_values USING btree (stale, entity_type, dependency_depth, evaluated_at) WHERE ((superseded_by IS NULL) AND (stale = true));
 
 
 --
@@ -28059,6 +29278,13 @@ CREATE INDEX idx_expansion_reports_session ON "ob-poc".expansion_reports USING b
 --
 
 CREATE INDEX idx_expansion_reports_source_digest ON "ob-poc".expansion_reports USING btree (source_digest);
+
+
+--
+-- Name: idx_external_call_log_current; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE UNIQUE INDEX idx_external_call_log_current ON "ob-poc".external_call_log USING btree (entity_id, verb_fqn, provider) WHERE (is_current = true);
 
 
 --
@@ -29105,6 +30331,20 @@ CREATE INDEX idx_persons_search_name_trgm ON "ob-poc".entity_proper_persons USIN
 
 
 --
+-- Name: idx_phrase_bank_active_unique; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE UNIQUE INDEX idx_phrase_bank_active_unique ON "ob-poc".phrase_bank USING btree (phrase, COALESCE(workspace, '__global__'::text)) WHERE (active = true);
+
+
+--
+-- Name: idx_phrase_bank_lookup; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_phrase_bank_lookup ON "ob-poc".phrase_bank USING btree (phrase, workspace) WHERE (active = true);
+
+
+--
 -- Name: idx_phrase_blocklist_embedding; Type: INDEX; Schema: ob-poc; Owner: -
 --
 
@@ -29186,6 +30426,13 @@ CREATE INDEX idx_proper_persons_id_document ON "ob-poc".entity_proper_persons US
 --
 
 CREATE INDEX idx_proper_persons_nationality ON "ob-poc".entity_proper_persons USING btree (nationality);
+
+
+--
+-- Name: idx_provider_capabilities_unique; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE UNIQUE INDEX idx_provider_capabilities_unique ON "ob-poc".provider_capabilities USING btree (provider, operation);
 
 
 --
@@ -29319,6 +30566,20 @@ CREATE INDEX idx_rel_history_temporal ON "ob-poc".entity_relationships_history U
 --
 
 CREATE INDEX idx_rel_history_to_entity ON "ob-poc".entity_relationships_history USING btree (to_entity_id);
+
+
+--
+-- Name: idx_remediation_events_entity_status; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_remediation_events_entity_status ON "ob-poc".remediation_events USING btree (entity_id, status);
+
+
+--
+-- Name: idx_remediation_events_status; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_remediation_events_status ON "ob-poc".remediation_events USING btree (status) WHERE (status <> ALL (ARRAY['resolved'::text, 'deferred'::text]));
 
 
 --
@@ -29784,6 +31045,34 @@ CREATE INDEX idx_share_classes_parent ON "ob-poc".entity_share_classes USING btr
 
 
 --
+-- Name: idx_shared_atom_registry_active; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_shared_atom_registry_active ON "ob-poc".shared_atom_registry USING btree (lifecycle_status) WHERE (lifecycle_status = 'active'::text);
+
+
+--
+-- Name: idx_shared_atom_registry_path; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE UNIQUE INDEX idx_shared_atom_registry_path ON "ob-poc".shared_atom_registry USING btree (atom_path);
+
+
+--
+-- Name: idx_shared_fact_versions_current; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE UNIQUE INDEX idx_shared_fact_versions_current ON "ob-poc".shared_fact_versions USING btree (atom_id, entity_id) WHERE (is_current = true);
+
+
+--
+-- Name: idx_shared_fact_versions_entity; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_shared_fact_versions_entity ON "ob-poc".shared_fact_versions USING btree (entity_id);
+
+
+--
 -- Name: idx_sheet_audit_session; Type: INDEX; Schema: ob-poc; Owner: -
 --
 
@@ -30015,6 +31304,13 @@ CREATE INDEX idx_trading_profiles_cbu_version ON "ob-poc".cbu_trading_profiles U
 
 
 --
+-- Name: idx_trading_profiles_group_template; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_trading_profiles_group_template ON "ob-poc".cbu_trading_profiles USING btree (group_id) WHERE (is_template = true);
+
+
+--
 -- Name: idx_trading_profiles_one_active; Type: INDEX; Schema: ob-poc; Owner: -
 --
 
@@ -30026,6 +31322,13 @@ CREATE UNIQUE INDEX idx_trading_profiles_one_active ON "ob-poc".cbu_trading_prof
 --
 
 CREATE UNIQUE INDEX idx_trading_profiles_one_working_version ON "ob-poc".cbu_trading_profiles USING btree (cbu_id) WHERE ((status)::text = ANY (ARRAY[('DRAFT'::character varying)::text, ('VALIDATED'::character varying)::text, ('PENDING_REVIEW'::character varying)::text]));
+
+
+--
+-- Name: idx_trading_profiles_template_source; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_trading_profiles_template_source ON "ob-poc".cbu_trading_profiles USING btree (template_id) WHERE (template_id IS NOT NULL);
 
 
 --
@@ -30404,6 +31707,27 @@ CREATE INDEX idx_workflow_subject ON "ob-poc".workflow_instances USING btree (su
 --
 
 CREATE INDEX idx_workflow_updated ON "ob-poc".workflow_instances USING btree (updated_at DESC);
+
+
+--
+-- Name: idx_workspace_fact_refs_entity; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_workspace_fact_refs_entity ON "ob-poc".workspace_fact_refs USING btree (entity_id, status);
+
+
+--
+-- Name: idx_workspace_fact_refs_stale; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_workspace_fact_refs_stale ON "ob-poc".workspace_fact_refs USING btree (consumer_workspace, status) WHERE (status = 'stale'::text);
+
+
+--
+-- Name: idx_workspace_fact_refs_unique; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE UNIQUE INDEX idx_workspace_fact_refs_unique ON "ob-poc".workspace_fact_refs USING btree (atom_id, entity_id, consumer_workspace);
 
 
 --
@@ -30824,6 +32148,20 @@ CREATE UNIQUE INDEX uq_entity_rel_natural_key ON "ob-poc".entity_relationships U
 --
 
 CREATE UNIQUE INDEX uq_entity_rel_natural_key_null_from ON "ob-poc".entity_relationships USING btree (from_entity_id, to_entity_id, relationship_type) WHERE ((effective_from IS NULL) AND (effective_to IS NULL));
+
+
+--
+-- Name: outbox_pending_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX outbox_pending_idx ON public.outbox USING btree (status, created_at) WHERE (status = ANY (ARRAY['pending'::text, 'failed_retryable'::text]));
+
+
+--
+-- Name: outbox_processing_claimed_at_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX outbox_processing_claimed_at_idx ON public.outbox USING btree (claimed_at) WHERE (status = 'processing'::text);
 
 
 --
@@ -31457,6 +32795,20 @@ CREATE TRIGGER trg_proofs_updated BEFORE UPDATE ON "ob-poc".proofs FOR EACH ROW 
 
 
 --
+-- Name: attribute_observations trg_propagate_observation_staleness; Type: TRIGGER; Schema: ob-poc; Owner: -
+--
+
+CREATE TRIGGER trg_propagate_observation_staleness AFTER INSERT OR UPDATE OF value_text, value_number, value_boolean, value_date, value_datetime, value_json, status, superseded_at ON "ob-poc".attribute_observations FOR EACH ROW EXECUTE FUNCTION "ob-poc".propagate_observation_staleness();
+
+
+--
+-- Name: shared_fact_versions trg_propagate_shared_fact_staleness; Type: TRIGGER; Schema: ob-poc; Owner: -
+--
+
+CREATE TRIGGER trg_propagate_shared_fact_staleness AFTER INSERT ON "ob-poc".shared_fact_versions FOR EACH ROW EXECUTE FUNCTION "ob-poc".propagate_shared_fact_staleness();
+
+
+--
 -- Name: provisioning_events trg_provisioning_events_immutable; Type: TRIGGER; Schema: ob-poc; Owner: -
 --
 
@@ -31489,6 +32841,13 @@ CREATE TRIGGER trg_sdm_updated BEFORE UPDATE ON "ob-poc".service_delivery_map FO
 --
 
 CREATE TRIGGER trg_service_intents_updated BEFORE UPDATE ON "ob-poc".service_intents FOR EACH ROW EXECUTE FUNCTION "ob-poc".update_service_intents_timestamp();
+
+
+--
+-- Name: shared_fact_versions trg_shared_fact_version_supersede; Type: TRIGGER; Schema: ob-poc; Owner: -
+--
+
+CREATE TRIGGER trg_shared_fact_version_supersede AFTER INSERT ON "ob-poc".shared_fact_versions FOR EACH ROW EXECUTE FUNCTION "ob-poc".trg_shared_fact_version_supersede();
 
 
 --
@@ -31527,6 +32886,13 @@ CREATE TRIGGER trg_ubo_status_transition BEFORE UPDATE ON "ob-poc".ubo_registry 
 
 
 --
+-- Name: derived_attribute_values trg_validate_derived_attr_id; Type: TRIGGER; Schema: ob-poc; Owner: -
+--
+
+CREATE TRIGGER trg_validate_derived_attr_id BEFORE INSERT ON "ob-poc".derived_attribute_values FOR EACH ROW EXECUTE FUNCTION "ob-poc".validate_derived_attr_id();
+
+
+--
 -- Name: deal_rate_cards trg_validate_rate_card_supersession; Type: TRIGGER; Schema: ob-poc; Owner: -
 --
 
@@ -31555,6 +32921,20 @@ CREATE TRIGGER trigger_update_attribute_registry_timestamp BEFORE UPDATE ON "ob-
 
 
 --
+-- Name: snapshots trg_materialize_attribute_def; Type: TRIGGER; Schema: sem_reg; Owner: -
+--
+
+CREATE TRIGGER trg_materialize_attribute_def AFTER INSERT ON sem_reg.snapshots FOR EACH ROW EXECUTE FUNCTION sem_reg.materialize_attribute_def_to_registry();
+
+
+--
+-- Name: snapshots trg_materialize_phrase_mapping; Type: TRIGGER; Schema: sem_reg; Owner: -
+--
+
+CREATE TRIGGER trg_materialize_phrase_mapping AFTER INSERT ON sem_reg.snapshots FOR EACH ROW EXECUTE FUNCTION sem_reg.materialize_phrase_mapping_to_bank();
+
+
+--
 -- Name: access_attestations access_attestations_campaign_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
 --
 
@@ -31576,6 +32956,22 @@ ALTER TABLE ONLY "ob-poc".access_review_items
 
 ALTER TABLE ONLY "ob-poc".access_review_items
     ADD CONSTRAINT access_review_items_membership_id_fkey FOREIGN KEY (membership_id) REFERENCES "ob-poc".memberships(membership_id);
+
+
+--
+-- Name: appointment_rights appointment_rights_holder_entity_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".appointment_rights
+    ADD CONSTRAINT appointment_rights_holder_entity_id_fkey FOREIGN KEY (holder_entity_id) REFERENCES "ob-poc".entities(entity_id);
+
+
+--
+-- Name: appointment_rights appointment_rights_target_entity_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".appointment_rights
+    ADD CONSTRAINT appointment_rights_target_entity_id_fkey FOREIGN KEY (target_entity_id) REFERENCES "ob-poc".entities(entity_id);
 
 
 --
@@ -31640,6 +33036,38 @@ ALTER TABLE ONLY "ob-poc".attribute_values_typed
 
 ALTER TABLE ONLY "ob-poc".audit_log
     ADD CONSTRAINT audit_log_failure_id_fkey FOREIGN KEY (failure_id) REFERENCES "ob-poc".failures(id) ON DELETE CASCADE;
+
+
+--
+-- Name: board_compositions board_compositions_appointed_by_entity_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".board_compositions
+    ADD CONSTRAINT board_compositions_appointed_by_entity_id_fkey FOREIGN KEY (appointed_by_entity_id) REFERENCES "ob-poc".entities(entity_id);
+
+
+--
+-- Name: board_compositions board_compositions_entity_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".board_compositions
+    ADD CONSTRAINT board_compositions_entity_id_fkey FOREIGN KEY (entity_id) REFERENCES "ob-poc".entities(entity_id);
+
+
+--
+-- Name: board_compositions board_compositions_person_entity_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".board_compositions
+    ADD CONSTRAINT board_compositions_person_entity_id_fkey FOREIGN KEY (person_entity_id) REFERENCES "ob-poc".entities(entity_id);
+
+
+--
+-- Name: board_compositions board_compositions_role_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".board_compositions
+    ADD CONSTRAINT board_compositions_role_id_fkey FOREIGN KEY (role_id) REFERENCES "ob-poc".roles(role_id);
 
 
 --
@@ -32611,11 +34039,27 @@ ALTER TABLE ONLY "ob-poc".cbu_trading_profiles
 
 
 --
+-- Name: cbu_trading_profiles cbu_trading_profiles_group_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".cbu_trading_profiles
+    ADD CONSTRAINT cbu_trading_profiles_group_id_fkey FOREIGN KEY (group_id) REFERENCES "ob-poc".client_group(id);
+
+
+--
 -- Name: cbu_trading_profiles cbu_trading_profiles_source_document_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
 --
 
 ALTER TABLE ONLY "ob-poc".cbu_trading_profiles
     ADD CONSTRAINT cbu_trading_profiles_source_document_id_fkey FOREIGN KEY (source_document_id) REFERENCES "ob-poc".document_catalog(doc_id);
+
+
+--
+-- Name: cbu_trading_profiles cbu_trading_profiles_template_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".cbu_trading_profiles
+    ADD CONSTRAINT cbu_trading_profiles_template_id_fkey FOREIGN KEY (template_id) REFERENCES "ob-poc".cbu_trading_profiles(profile_id);
 
 
 --
@@ -32896,6 +34340,30 @@ ALTER TABLE ONLY "ob-poc".clients
 
 ALTER TABLE ONLY "ob-poc".commitments
     ADD CONSTRAINT commitments_client_id_fkey FOREIGN KEY (client_id) REFERENCES "ob-poc".clients(client_id) ON DELETE CASCADE;
+
+
+--
+-- Name: compensation_records compensation_records_correction_call_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".compensation_records
+    ADD CONSTRAINT compensation_records_correction_call_id_fkey FOREIGN KEY (correction_call_id) REFERENCES "ob-poc".external_call_log(id);
+
+
+--
+-- Name: compensation_records compensation_records_original_call_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".compensation_records
+    ADD CONSTRAINT compensation_records_original_call_id_fkey FOREIGN KEY (original_call_id) REFERENCES "ob-poc".external_call_log(id);
+
+
+--
+-- Name: compensation_records compensation_records_remediation_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".compensation_records
+    ADD CONSTRAINT compensation_records_remediation_id_fkey FOREIGN KEY (remediation_id) REFERENCES "ob-poc".remediation_events(id);
 
 
 --
@@ -33216,6 +34684,38 @@ ALTER TABLE ONLY "ob-poc".delegation_relationships
 
 ALTER TABLE ONLY "ob-poc".delegation_relationships
     ADD CONSTRAINT delegation_relationships_delegator_entity_id_fkey FOREIGN KEY (delegator_entity_id) REFERENCES "ob-poc".entities(entity_id);
+
+
+--
+-- Name: derived_attribute_dependencies derived_attribute_dependencies_derived_value_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".derived_attribute_dependencies
+    ADD CONSTRAINT derived_attribute_dependencies_derived_value_id_fkey FOREIGN KEY (derived_value_id) REFERENCES "ob-poc".derived_attribute_values(id) ON DELETE CASCADE;
+
+
+--
+-- Name: derived_attribute_dependencies derived_attribute_dependencies_input_attr_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".derived_attribute_dependencies
+    ADD CONSTRAINT derived_attribute_dependencies_input_attr_id_fkey FOREIGN KEY (input_attr_id) REFERENCES "ob-poc".attribute_registry(uuid);
+
+
+--
+-- Name: derived_attribute_values derived_attribute_values_attr_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".derived_attribute_values
+    ADD CONSTRAINT derived_attribute_values_attr_id_fkey FOREIGN KEY (attr_id) REFERENCES "ob-poc".attribute_registry(uuid);
+
+
+--
+-- Name: derived_attribute_values derived_attribute_values_superseded_by_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".derived_attribute_values
+    ADD CONSTRAINT derived_attribute_values_superseded_by_fkey FOREIGN KEY (superseded_by) REFERENCES "ob-poc".derived_attribute_values(id);
 
 
 --
@@ -33731,6 +35231,14 @@ ALTER TABLE ONLY "ob-poc".escalations
 
 
 --
+-- Name: external_call_log external_call_log_superseded_by_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".external_call_log
+    ADD CONSTRAINT external_call_log_superseded_by_fkey FOREIGN KEY (superseded_by) REFERENCES "ob-poc".external_call_log(id);
+
+
+--
 -- Name: fee_billing_account_targets fee_billing_account_targets_cbu_resource_instance_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
 --
 
@@ -33984,6 +35492,14 @@ ALTER TABLE ONLY "ob-poc".ubo_registry
 
 ALTER TABLE ONLY "ob-poc".ubo_registry
     ADD CONSTRAINT fk_ubo_registry_ubo_proper_person_id FOREIGN KEY (ubo_proper_person_id) REFERENCES "ob-poc".entities(entity_id) ON DELETE CASCADE;
+
+
+--
+-- Name: workspace_fact_refs fk_workspace_fact_refs_remediation; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".workspace_fact_refs
+    ADD CONSTRAINT fk_workspace_fact_refs_remediation FOREIGN KEY (remediation_id) REFERENCES "ob-poc".remediation_events(id);
 
 
 --
@@ -34675,6 +36191,14 @@ ALTER TABLE ONLY "ob-poc".person_pep_status
 
 
 --
+-- Name: phrase_bank phrase_bank_supersedes_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".phrase_bank
+    ADD CONSTRAINT phrase_bank_supersedes_id_fkey FOREIGN KEY (supersedes_id) REFERENCES "ob-poc".phrase_bank(id);
+
+
+--
 -- Name: product_services product_services_product_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
 --
 
@@ -34744,6 +36268,14 @@ ALTER TABLE ONLY "ob-poc".red_flags
 
 ALTER TABLE ONLY "ob-poc".red_flags
     ADD CONSTRAINT red_flags_workstream_id_fkey FOREIGN KEY (workstream_id) REFERENCES "ob-poc".entity_workstreams(workstream_id) ON DELETE CASCADE;
+
+
+--
+-- Name: remediation_events remediation_events_source_atom_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".remediation_events
+    ADD CONSTRAINT remediation_events_source_atom_id_fkey FOREIGN KEY (source_atom_id) REFERENCES "ob-poc".shared_atom_registry(id);
 
 
 --
@@ -35112,6 +36644,14 @@ ALTER TABLE ONLY "ob-poc".share_classes
 
 ALTER TABLE ONLY "ob-poc".share_classes
     ADD CONSTRAINT share_classes_issuer_entity_id_fkey FOREIGN KEY (issuer_entity_id) REFERENCES "ob-poc".entities(entity_id);
+
+
+--
+-- Name: shared_fact_versions shared_fact_versions_atom_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".shared_fact_versions
+    ADD CONSTRAINT shared_fact_versions_atom_id_fkey FOREIGN KEY (atom_id) REFERENCES "ob-poc".shared_atom_registry(id);
 
 
 --
@@ -35643,6 +37183,14 @@ ALTER TABLE ONLY "ob-poc".workflow_audit_log
 
 
 --
+-- Name: workspace_fact_refs workspace_fact_refs_atom_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".workspace_fact_refs
+    ADD CONSTRAINT workspace_fact_refs_atom_id_fkey FOREIGN KEY (atom_id) REFERENCES "ob-poc".shared_atom_registry(id);
+
+
+--
 -- Name: basis_claims basis_claims_basis_id_fkey; Type: FK CONSTRAINT; Schema: sem_reg; Owner: -
 --
 
@@ -35854,5 +37402,5 @@ ALTER TABLE ONLY sem_reg_authoring.validation_reports
 -- PostgreSQL database dump complete
 --
 
-\unrestrict WG34E4NwyrH0CpanaqBEb2poijvxzdWeK1MYn8CcM0DAQtoW7gY67qzzBDA7EKs
+\unrestrict rcCKICNa6fReLN6Yn3I0hVEwgQdVQZ9YLuv3kwMVDxJNFCHWSPrJge2BLbjCaRL
 

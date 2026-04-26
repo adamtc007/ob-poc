@@ -71,6 +71,11 @@ domains:
               type: date
             - name: snapshots_created
               type: integer
+        three_axis:
+          state_effect: preserving
+          external_effects: [observational]
+          consequence:
+            baseline: benign
 
       snapshot.list:
         description: List ownership snapshots for an issuer
@@ -137,6 +142,11 @@ domains:
                 - DECLARED
         returns:
           type: record_set
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
 
       snapshot.get:
         description: Get a specific ownership snapshot
@@ -171,6 +181,11 @@ domains:
             maps_to: snapshot_id
         returns:
           type: record
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
 
       # --------------------------------------------------------------------------
       # Control Position Queries
@@ -240,6 +255,11 @@ domains:
               type: boolean
             - name: board_seats
               type: integer
+        three_axis:
+          state_effect: preserving
+          external_effects: [observational]
+          consequence:
+            baseline: benign
 
       find-controller:
         description: Find who controls an issuer (>50% voting or board majority)
@@ -283,6 +303,11 @@ domains:
             required: false
         returns:
           type: record_set
+        three_axis:
+          state_effect: preserving
+          external_effects: [observational]
+          consequence:
+            baseline: benign
 
       # --------------------------------------------------------------------------
       # Special Rights
@@ -400,6 +425,11 @@ domains:
           type: uuid
           name: right_id
           capture: true
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
 
       right.add-to-holder:
         description: Add a special right attached to a specific holder (side letter)
@@ -529,6 +559,11 @@ domains:
           type: uuid
           name: right_id
           capture: true
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
 
       right.end:
         description: End a special right (set effective_to date)
@@ -567,6 +602,11 @@ domains:
             maps_to: effective_to
         returns:
           type: affected
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
 
       right.list-for-issuer:
         description: List all special rights for an issuer
@@ -609,6 +649,11 @@ domains:
               primary_key: entity_id
         returns:
           type: record_set
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
 
       right.list-for-holder:
         description: List all special rights held by an entity
@@ -651,6 +696,11 @@ domains:
               primary_key: entity_id
         returns:
           type: record_set
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
 
       # --------------------------------------------------------------------------
       # Reconciliation
@@ -733,6 +783,11 @@ domains:
           capture: true
         produces:
           type: reconciliation_run
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
 
       reconcile.findings:
         description: List findings from a reconciliation run
@@ -792,6 +847,11 @@ domains:
                 - ALL
         returns:
           type: record_set
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
 
       reconcile.resolve-finding:
         description: Resolve a reconciliation finding
@@ -846,6 +906,11 @@ domains:
           resolved_at: now()
         returns:
           type: affected
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
 
       reconcile.list-runs:
         description: List reconciliation runs for an issuer
@@ -895,6 +960,11 @@ domains:
                 - CANCELLED
         returns:
           type: record_set
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
 
       # --------------------------------------------------------------------------
       # Ownership Analysis
@@ -946,6 +1016,11 @@ domains:
               type: array
             - name: is_reconciled
               type: boolean
+        three_axis:
+          state_effect: preserving
+          external_effects: [observational]
+          consequence:
+            baseline: benign
 
       trace-chain:
         description: Trace ownership chain from one entity to another
@@ -1000,3 +1075,8 @@ domains:
               type: array
             - name: cumulative_pct
               type: decimal
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable

@@ -89,7 +89,9 @@ pub(crate) fn create_agent_router_with_state(state: AgentState) -> Router {
         .route("/api/session/:id", get(get_session))
         .route("/api/session/:id", delete(delete_session))
         .route("/api/session/:id/input", post(session_input))
-        .route("/api/session/:id/chat", post(chat_session_legacy_blocked))
+        // F20 fix (Slice 5.2, 2026-04-22): legacy `/api/session/:id/chat`
+        // route removed. Previously returned 410 Gone — now returns 404 from
+        // the router. Use `/api/session/:id/input` with `kind=utterance`.
         .route(
             "/api/session/:id/execute",
             post(execute_session_dsl_legacy_raw_only),
@@ -119,11 +121,9 @@ pub(crate) fn create_agent_router_with_state(state: AgentState) -> Router {
         // Learning routes removed — verb selection signals through REPL pipeline
         // Semantic OS context
         .route("/api/sem-os/context", get(get_semos_context))
-        // Unified decision reply (NEW - handles all clarification responses)
-        .route(
-            "/api/session/:id/decision/reply",
-            post(decision_reply_legacy_blocked),
-        )
+        // F20 fix (Slice 5.2, 2026-04-22): legacy `/decision/reply` route
+        // removed. Previously returned 410 Gone — now 404 from the router.
+        // Use `/api/session/:id/input` with `kind=decision_reply`.
         .with_state(state)
 }
 
@@ -131,25 +131,11 @@ pub(crate) fn create_agent_router_with_state(state: AgentState) -> Router {
 // Session Handlers
 // ============================================================================
 
-/// POST /api/session/:id/chat (legacy) — hard-blocked in unified-input cutover.
-async fn chat_session_legacy_blocked() -> (StatusCode, Json<serde_json::Value>) {
-    (
-        StatusCode::GONE,
-        Json(serde_json::json!({
-            "error": "Legacy endpoint removed. Use POST /api/session/:id/input with kind=utterance."
-        })),
-    )
-}
-
-/// POST /api/session/:id/decision/reply (legacy) — hard-blocked in unified-input cutover.
-async fn decision_reply_legacy_blocked() -> (StatusCode, Json<serde_json::Value>) {
-    (
-        StatusCode::GONE,
-        Json(serde_json::json!({
-            "error": "Legacy endpoint removed. Use POST /api/session/:id/input with kind=decision_reply."
-        })),
-    )
-}
+// F20 fix (Slice 5.2, 2026-04-22): `chat_session_legacy_blocked` and
+// `decision_reply_legacy_blocked` 410-Gone stub handlers removed. The
+// routes themselves are gone too; requests to them now return 404 from
+// the axum router. Use `POST /api/session/:id/input` with
+// `kind=utterance` or `kind=decision_reply` instead.
 
 /// POST /api/session/:id/input - Unified session input endpoint.
 async fn session_input(
@@ -213,7 +199,7 @@ async fn session_input(
 /// Returns `None` if no REPL session exists for this ID (legacy agent session).
 async fn try_route_through_repl(
     req: &SessionInputRequest,
-    orchestrator: &std::sync::Arc<crate::repl::orchestrator_v2::ReplOrchestratorV2>,
+    orchestrator: &std::sync::Arc<crate::sequencer::ReplOrchestratorV2>,
     session_id: Uuid,
 ) -> Option<crate::repl::response_v2::ReplResponseV2> {
     use crate::repl::types_v2::UserInputV2;
@@ -1661,24 +1647,25 @@ async fn execute_session_dsl_raw(
         let sessions = state.sessions.read().await;
         let session = sessions.get(&session_id).ok_or(StatusCode::NOT_FOUND)?;
 
-        // Determine DSL source - prefer explicit request, then run_sheet current entry
+        // F16 fix (Slice 3.1, 2026-04-22): raw DSL bypass removed. Previously
+        // gated by `PolicyGate::can_execute_raw_dsl` + `OBPOC_ALLOW_RAW_EXECUTE`
+        // flag — both now deleted. Raw DSL in the request body is ALWAYS
+        // rejected here: it would execute without reaching SemOS envelope
+        // resolution, violating the "no bypassing sem-os" tollgate rule. The
+        // run-sheet path (resolved DSL from a compiled runbook step that
+        // already passed SemOS) remains the only execution route.
         let dsl_source = if let Some(ref req) = req {
-            if let Some(ref dsl_str) = req.dsl {
-                // Gate: raw DSL requires server-side PolicyGate approval
+            if req.dsl.is_some() {
                 let actor = crate::policy::ActorResolver::from_headers(&headers);
-                if !state.policy_gate.can_execute_raw_dsl(&actor) {
-                    tracing::warn!(
-                        session = %session_id,
-                        actor_id = %actor.actor_id,
-                        "Raw DSL execution blocked by PolicyGate"
-                    );
-                    return Err(StatusCode::FORBIDDEN);
-                }
-                tracing::warn!(session = %session_id, actor = %actor.actor_id, "Raw DSL execution via /execute (PolicyGate approved)");
-                dsl_str.clone()
-            } else {
-                session.run_sheet.runnable_dsl().unwrap_or_default()
+                tracing::warn!(
+                    session = %session_id,
+                    actor_id = %actor.actor_id,
+                    "Raw DSL in request body rejected — raw-execute bypass removed in Slice 3.1. \
+                     Route through ReplOrchestratorV2::process() instead."
+                );
+                return Err(StatusCode::FORBIDDEN);
             }
+            session.run_sheet.runnable_dsl().unwrap_or_default()
         } else {
             session.run_sheet.runnable_dsl().unwrap_or_default()
         };
@@ -2340,7 +2327,7 @@ async fn execute_session_dsl_raw(
             // View operations (view.universe, view.book, etc.) store ViewState in
             // ExecutionContext.pending_view_state. Propagate it to SessionContext
             // so the UI can access it. This fixes the "session state side door" where
-            // ViewState was previously discarded because CustomOperation only receives
+            // ViewState was previously discarded because verb ops only receive
             // ExecutionContext, not the full session.
             if let Some(view_state) = exec_ctx.take_pending_view_state() {
                 tracing::info!(

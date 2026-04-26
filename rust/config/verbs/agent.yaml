@@ -80,6 +80,12 @@ domains:
           name: agent_session_id
           capture: true
 
+        three_axis:
+          state_effect: preserving
+          external_effects:
+            - navigating
+          consequence:
+            baseline: reviewable
       pause:
         description: Pause the running agent loop
         metadata:
@@ -105,6 +111,12 @@ domains:
         returns:
           type: affected
 
+        three_axis:
+          state_effect: preserving
+          external_effects:
+            - navigating
+          consequence:
+            baseline: reviewable
       resume:
         description: Resume a paused agent loop
         metadata:
@@ -130,6 +142,12 @@ domains:
         returns:
           type: affected
 
+        three_axis:
+          state_effect: preserving
+          external_effects:
+            - navigating
+          consequence:
+            baseline: reviewable
       stop:
         description: Stop the agent loop completely
         metadata:
@@ -158,6 +176,12 @@ domains:
       # ============================================
       # Checkpoint Operations
       # ============================================
+        three_axis:
+          state_effect: preserving
+          external_effects:
+            - navigating
+          consequence:
+            baseline: reviewable
       confirm-decision:
         description: Confirm the current checkpoint decision
         metadata:
@@ -194,6 +218,12 @@ domains:
         returns:
           type: affected
 
+        three_axis:
+          state_effect: preserving
+          external_effects: &id001
+            - navigating
+          consequence:
+            baseline: reviewable
       reject-decision:
         description: Reject a checkpoint and skip this decision
         metadata:
@@ -228,6 +258,11 @@ domains:
         returns:
           type: affected
 
+        three_axis:
+          state_effect: preserving
+          external_effects: *id001
+          consequence:
+            baseline: reviewable
       select-decision-option:
         description: Select a specific candidate from checkpoint options
         metadata:
@@ -265,6 +300,12 @@ domains:
       # ============================================
       # Status Operations
       # ============================================
+        three_axis:
+          state_effect: preserving
+          external_effects:
+            - navigating
+          consequence:
+            baseline: benign
       read-status:
         description: Read current agent status
         metadata:
@@ -297,6 +338,12 @@ domains:
           type: record
           capture: false
 
+        three_axis:
+          state_effect: preserving
+          external_effects:
+            - observational
+          consequence:
+            baseline: benign
       read-history:
         description: Read agent decision and action history for current session
         metadata:
@@ -331,6 +378,12 @@ domains:
       # ============================================
       # Configuration Operations
       # ============================================
+        three_axis:
+          state_effect: preserving
+          external_effects:
+            - observational
+          consequence:
+            baseline: benign
       set-selection-threshold:
         description: Set confidence thresholds for auto-selection
         metadata:
@@ -368,6 +421,11 @@ domains:
         returns:
           type: affected
 
+        three_axis:
+          state_effect: preserving
+          external_effects: &id002 []
+          consequence:
+            baseline: reviewable
       set-execution-mode:
         description: Set the agent execution mode
         metadata:
@@ -403,6 +461,11 @@ domains:
         returns:
           type: affected
 
+        three_axis:
+          state_effect: preserving
+          external_effects: *id002
+          consequence:
+            baseline: reviewable
       set-authoring-mode:
         description: Set the authoring mode boundary
         metadata:
@@ -448,6 +511,11 @@ domains:
       # ============================================
       # Teaching Operations (Direct Pattern Learning)
       # ============================================
+        three_axis:
+          state_effect: preserving
+          external_effects: *id002
+          consequence:
+            baseline: reviewable
       teach:
         description: Teach a phrase→verb mapping to improve intent recognition
         metadata:
@@ -495,6 +563,12 @@ domains:
           type: record
           capture: false
 
+        three_axis:
+          state_effect: preserving
+          external_effects: &id003
+            - emitting
+          consequence:
+            baseline: reviewable
       unteach:
         description: Remove a previously taught phrase→verb mapping
         metadata:
@@ -540,6 +614,11 @@ domains:
           type: record
           capture: false
 
+        three_axis:
+          state_effect: preserving
+          external_effects: *id003
+          consequence:
+            baseline: reviewable
       read-teaching-status:
         description: Read recently taught patterns and their embedding status
         metadata:
@@ -585,6 +664,12 @@ domains:
       # ============================================
       # Mode & Policy Introspection
       # ============================================
+        three_axis:
+          state_effect: preserving
+          external_effects:
+            - observational
+          consequence:
+            baseline: benign
       read-mode:
         description: Read the current agent operating mode (Research or Governed)
         metadata:
@@ -613,6 +698,12 @@ domains:
           type: record
           capture: false
 
+        three_axis:
+          state_effect: preserving
+          external_effects:
+            - observational
+          consequence:
+            baseline: benign
       read-policy:
         description: Read the current PolicyGate configuration and active policy snapshot
         metadata:
@@ -640,6 +731,12 @@ domains:
           type: record
           capture: false
 
+        three_axis:
+          state_effect: preserving
+          external_effects:
+            - observational
+          consequence:
+            baseline: benign
       list-tools:
         description: List available MCP tool specifications from the registry
         metadata:
@@ -683,6 +780,12 @@ domains:
           type: record_set
           capture: false
 
+        three_axis:
+          state_effect: preserving
+          external_effects:
+            - observational
+          consequence:
+            baseline: benign
       read-telemetry-summary:
         description: Read intent event telemetry for hit-rate analysis and pipeline health
         metadata:
@@ -725,6 +828,12 @@ domains:
           type: record
           capture: false
 
+        three_axis:
+          state_effect: preserving
+          external_effects:
+            - observational
+          consequence:
+            baseline: benign
       activate-teaching:
         description: Activate taught patterns by generating embeddings for semantic search
         metadata:
@@ -751,3 +860,8 @@ domains:
         returns:
           type: record
           capture: false
+        three_axis:
+          state_effect: preserving
+          external_effects: *id003
+          consequence:
+            baseline: reviewable

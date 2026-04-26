@@ -119,6 +119,11 @@ domains:
           type: uuid
           name: sweep_id
           capture: true
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
 
       link-resource:
         description: Link sweep config to cash management resource
@@ -161,6 +166,11 @@ domains:
             primary_key: instance_id
         returns:
           type: affected
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
 
       list:
         description: List cash sweep configurations for CBU
@@ -203,6 +213,11 @@ domains:
           maps_to: is_active
         returns:
           type: record_set
+        three_axis:
+          state_effect: preserving
+          external_effects: [observational]
+          consequence:
+            baseline: benign
 
       update-threshold:
         description: Update sweep threshold amount
@@ -239,6 +254,11 @@ domains:
           maps_to: threshold_amount
         returns:
           type: affected
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
 
       update-timing:
         description: Update sweep timing
@@ -288,6 +308,11 @@ domains:
           - MONTHLY
         returns:
           type: affected
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
 
       change-vehicle:
         description: Change sweep investment vehicle
@@ -339,6 +364,19 @@ domains:
           maps_to: vehicle_name
         returns:
           type: affected
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
+            escalation:
+              - name: non_standard_vehicle
+                when:
+                  op: arg_in
+                  arg: vehicle-type
+                  values: ["OVERNIGHT_REPO", "TRI_PARTY_REPO", "MANUAL"]
+                tier: requires_confirmation
+                reason: "Non-standard cash-sweep vehicle — risk profile differs from approved STIF/MMF defaults."
 
       suspend:
         description: Suspend cash sweep
@@ -373,6 +411,11 @@ domains:
           maps_to: sweep_id
         returns:
           type: affected
+        three_axis:
+          state_effect: preserving
+          external_effects: [emitting]
+          consequence:
+            baseline: requires_confirmation
 
       reactivate:
         description: Reactivate cash sweep
@@ -407,6 +450,11 @@ domains:
           maps_to: sweep_id
         returns:
           type: affected
+        three_axis:
+          state_effect: preserving
+          external_effects: [emitting]
+          consequence:
+            baseline: requires_confirmation
 
       remove:
         description: Remove cash sweep configuration
@@ -438,3 +486,8 @@ domains:
           maps_to: sweep_id
         returns:
           type: affected
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: requires_confirmation

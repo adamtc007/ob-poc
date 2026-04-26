@@ -1,0 +1,261 @@
+# Onboarding-Request Workspace — DAG Taxonomy (Tranche 3 — 2026-04-24)
+#
+# ============================================================================
+# WORKSPACE PURPOSE:
+#
+# Onboarding-Request is the JOURNEY workspace for the Deal → Ops
+# handoff. Once a Deal reaches CONTRACTED, operational onboarding
+# requests are fired per-CBU-product to trigger account setup, SSI
+# provisioning, custody routing, etc. This workspace sequences that
+# handoff.
+#
+# Pack profile: 6 verbs, all cross-workspace (deal.* + cbu.read).
+# No new stateful slots — the primary operational entity
+# (deal_onboarding_request) already lives in Deal DAG §2.2.
+# This workspace is a PACK-LEVEL WRAPPER that guides the Q&A for
+# populating a deal_onboarding_request.
+#
+# ============================================================================
+# CBU CONSTRUCT RELATIONSHIP:
+#
+# One DEAL typically covers many CBUs. Onboarding-Request produces
+# ONE deal_onboarding_request per (deal, cbu, product) triple —
+# that's the handoff to ops to provision the service for that
+# specific CBU + product combination.
+#
+# Onboarding-Request bridges:
+#   Deal (CONTRACTED commercial agreement) →
+#   CBU (service_consumption transitions proposed → provisioned) →
+#   CBU (operationally_active once all services provisioned)
+#
+# ============================================================================
+# V1.3 conventions adopted: minimal. This workspace does not host
+# entity state — it references Deal and CBU.
+#
+# PARENT DOCS:
+#   - docs/todo/catalogue-platform-refinement-v1_3.md
+#   - deal_dag.yaml §2.2 deal_onboarding_request slot (owning workspace)
+#   - rust/config/packs/onboarding-request.yaml
+
+version: "1.0"
+workspace: onboarding_request
+dag_id: onboarding_request_dag
+
+# =============================================================================
+# 1. OVERALL LIFECYCLE — handoff-request journey
+# =============================================================================
+# Mirrors deal_onboarding_request lifecycle but adds a pre-submit
+# assembly phase for the pack's Q&A flow.
+
+overall_lifecycle:
+  id: onboarding_request_overall_lifecycle
+  scope: per_onboarding_request
+  derived: true
+  description: >
+    6-phase journey from pre-submit assembly through ops acceptance
+    to completion. Pre-submit phases (scoping / validating) are
+    local to this workspace; post-submit phases reconcile to
+    deal_onboarding_request states (PENDING / IN_PROGRESS /
+    BLOCKED / COMPLETED / CANCELLED — owned by Deal workspace).
+  phases:
+    - name: scoping
+      description: |
+        Pack Q&A in progress: deal selected, contract confirmed, target
+        CBU selected, product being specified. No deal_onboarding_request
+        row yet; this is the pack's assembly phase.
+      derivation:
+        all_of:
+          - "pack_state = scoping"
+          - "NOT EXISTS deal_onboarding_request for this (deal, cbu, product)"
+      progression_verbs:
+        - deal.read
+        - deal.list-contracts
+        - deal.list-products
+        - cbu.read
+      next_phase: validating
+    - name: validating
+      description: |
+        Assembled answers being validated: (deal exists + contracted,
+        contract valid, CBU VALIDATED, product on deal). Ready to
+        submit the handoff.
+      derivation:
+        all_of:
+          - "answers populated + valid"
+          - "deal.status = 'CONTRACTED'"
+          - "cbus.status = 'VALIDATED'"
+      progression_verbs: []
+      next_phase: submitted
+    - name: submitted
+      description: |
+        deal.request-onboarding fired. deal_onboarding_request row
+        created in PENDING state. Ops team picks it up.
+      derivation:
+        all_of:
+          - "EXISTS deal_onboarding_request for this (deal, cbu, product)"
+          - "deal_onboarding_request.request_status = 'PENDING'"
+      progression_verbs:
+        - deal.update-onboarding-status  # ops advances
+      next_phase: in_progress
+    - name: in_progress
+      description: |
+        Ops working the handoff: accounts opening, SSIs setting up,
+        service_consumption transitioning proposed → provisioned in
+        CBU workspace.
+      derivation:
+        all_of:
+          - "deal_onboarding_request.request_status = 'IN_PROGRESS'"
+      progression_verbs:
+        - deal.update-onboarding-status
+      next_phase: "(completed | blocked)"
+    - name: blocked
+      description: |
+        Handoff blocked on external dependency (KYC re-open, document
+        gap, service-provider issue). Resumable.
+      derivation:
+        all_of:
+          - "deal_onboarding_request.request_status = 'BLOCKED'"
+      progression_verbs:
+        - deal.update-onboarding-status
+      next_phase: in_progress
+    - name: completed
+      description: |
+        Terminal-positive. CBU fully onboarded for this deal scope.
+        Contributes to CBU's operationally_active tollgate.
+      derivation:
+        all_of:
+          - "deal_onboarding_request.request_status = 'COMPLETED'"
+      progression_verbs: []
+      next_phase: "(terminal)"
+    - name: cancelled
+      description: "Terminal-negative."
+      derivation:
+        all_of:
+          - "deal_onboarding_request.request_status = 'CANCELLED'"
+      progression_verbs: []
+      next_phase: "(terminal)"
+
+# =============================================================================
+# 2. SLOTS — minimal; references to other workspaces
+# =============================================================================
+
+slots:
+
+  - id: workspace_root
+    stateless: true
+    rationale: "Aggregation root for onboarding-request pack journey."
+
+  - id: onboarding_request
+    stateless: false
+    state_machine: "(reconcile-existing — see deal_dag.yaml §2.2 deal_onboarding_request_lifecycle; Deal workspace owns the 5-state request lifecycle: PENDING → IN_PROGRESS → BLOCKED → COMPLETED / CANCELLED. This workspace creates rows and advances state but the authoritative state machine lives in Deal.)"
+
+  - id: deal
+    stateless: false
+    state_machine: "(reference — see deal_dag.yaml §2.1 deal_commercial_lifecycle; read-only here — we pick an existing CONTRACTED deal)"
+
+  - id: cbu
+    stateless: false
+    state_machine: "(reference — see cbu_dag.yaml §2.1; read-only here — we pick an existing VALIDATED CBU)"
+
+  - id: contract
+    stateless: true
+    rationale: |
+      Contract is selected (not state-transitioned) during the handoff.
+      Contract lifecycle lives in contract domain (separate from Deal
+      DAG). Stateless reference.
+
+# =============================================================================
+# 3. CROSS-SLOT CONSTRAINTS
+# =============================================================================
+
+cross_slot_constraints:
+
+  - id: onboarding_request_requires_validated_cbu
+    description: "Cannot submit onboarding request for a non-VALIDATED CBU."
+    rule: |
+      onboarding_request transitions scoping → submitted
+        → cbu.status = 'VALIDATED'
+    severity: error
+
+  - id: onboarding_request_requires_contracted_deal
+    description: "Cannot submit onboarding request for a non-CONTRACTED deal."
+    rule: |
+      onboarding_request transitions scoping → submitted
+        → deal.status IN ('CONTRACTED', 'ONBOARDING', 'ACTIVE')
+    severity: error
+
+# =============================================================================
+# 4. CROSS-WORKSPACE CONSTRAINTS (V1.3-1)
+# =============================================================================
+
+cross_workspace_constraints:
+
+  - id: onboarding_request_requires_deal_contracted
+    description: |
+      Cannot create deal_onboarding_request unless the source deal is
+      in CONTRACTED or later state (commercial agreement in place).
+    source_workspace: deal
+    source_slot: deal
+    source_state: [CONTRACTED, ONBOARDING, ACTIVE]
+    source_predicate: "deals.deal_id = this_request.deal_id"
+    target_workspace: onboarding_request
+    target_slot: onboarding_request
+    target_transition: "validating -> submitted"
+    severity: error
+
+  - id: onboarding_request_requires_cbu_validated
+    description: "Target CBU must be VALIDATED before onboarding handoff."
+    source_workspace: cbu
+    source_slot: cbu
+    source_state: VALIDATED
+    source_predicate: "cbus.cbu_id = this_request.cbu_id"
+    target_workspace: onboarding_request
+    target_slot: onboarding_request
+    target_transition: "validating -> submitted"
+    severity: error
+
+derived_cross_workspace_state: []
+
+# =============================================================================
+# 5. PRODUCT-MODULE GATES
+# =============================================================================
+
+product_module_gates:
+  always_on:
+    - workspace_root
+    - onboarding_request
+    - deal
+    - cbu
+    - contract
+  conditionally_on: []
+
+# =============================================================================
+# 6. OUT OF SCOPE
+# =============================================================================
+
+out_of_scope:
+  - "deal_onboarding_request state machine — owned by Deal workspace"
+  - "Service provisioning execution — CBU workspace's service_consumption slot governs this; Layer 3 ops runs the actual provisioning"
+  - "Account opening, SSI setup, BIC routing — Layer 2 (triggered by CBU workspace transitions post-handoff)"
+  - "Contract lifecycle — owned by contract domain (separate from Deal DAG)"
+
+# =============================================================================
+# 7. PRUNE SEMANTICS
+# =============================================================================
+# Cancellation of an onboarding request cascades to CBU's
+# service_consumption slots (any provisioned services for this
+# request may need to be unwound — ops decision).
+
+prune_cascade_rules:
+  - id: onboarding_request_cancel_cascade
+    when: "deal.update-onboarding-status sets status = CANCELLED"
+    cascades_to:
+      - target: cbu
+        rule: "service_consumption slots associated with this request → candidates for winding_down (manual ops review)"
+
+prune_pre_validation:
+  required_verbs:
+    - deal.read
+    - deal.list-products
+    - cbu.read
+  abort_conditions:
+    - "cancel an IN_PROGRESS request where service_consumption is already active (must coordinate with ops)"

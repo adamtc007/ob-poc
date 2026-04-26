@@ -1,0 +1,28 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            INSERT INTO \"ob-poc\".learning_candidates (\n                fingerprint, learning_type, input_pattern, suggested_output,\n                risk_level, auto_applicable, example_events\n            )\n            VALUES ($1, $2, $3, $4, $5, $6, ARRAY[$7]::BIGINT[])\n            ON CONFLICT (fingerprint) DO UPDATE SET\n                occurrence_count = \"ob-poc\".learning_candidates.occurrence_count + 1,\n                last_seen = NOW(),\n                example_events = array_append(\n                    \"ob-poc\".learning_candidates.example_events[1:9],\n                    $7\n                ),\n                updated_at = NOW()\n            RETURNING\n                (xmax = 0) as \"is_insert!\"\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "is_insert!",
+        "type_info": "Bool"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Text",
+        "Text",
+        "Text",
+        "Text",
+        "Bool",
+        "Int8"
+      ]
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "b2aa1a300b622345cf70307ebdf799771e6c2a4e78839c5d55193b4105f4af63"
+}

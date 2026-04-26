@@ -1,0 +1,65 @@
+# Test fixture: structure macros for runbook pipeline tests
+#
+# structure.setup — single-step macro (expands to cbu.create)
+# structure.full-setup — multi-step macro (expands to 2x cbu.create)
+
+structure.setup:
+  kind: macro
+  ui:
+    label: "Set up Structure"
+    description: "Create a new structure"
+    target-label: "Structure"
+  routing:
+    mode-tags: []
+    operator-domain: structure
+  target:
+    operates-on: client-ref
+    produces: structure-ref
+  args:
+    style: keyworded
+    required:
+      name:
+        type: str
+        ui-label: "Name"
+    optional: {}
+  prereqs: []
+  expands-to:
+    - verb: cbu.create
+      args:
+        name: "${arg.name}"
+        client-id: "\"${scope.client_id}\""
+  sets-state: []
+  unlocks: []
+
+structure.full-setup:
+  kind: macro
+  ui:
+    label: "Full Structure Setup"
+    description: "Create structure and profile"
+    target-label: "Structure"
+  routing:
+    mode-tags: []
+    operator-domain: structure
+  target:
+    operates-on: client-ref
+    produces: structure-ref
+  args:
+    style: keyworded
+    required:
+      name:
+        type: str
+        ui-label: "Name"
+    optional: {}
+  prereqs: []
+  expands-to:
+    - verb: cbu.create
+      args:
+        name: "${arg.name}"
+        client-id: "\"${scope.client_id}\""
+      as: "@cbu"
+    - verb: cbu.create
+      args:
+        name: "${arg.name} Secondary"
+        client-id: "\"${scope.client_id}\""
+  sets-state: []
+  unlocks: []

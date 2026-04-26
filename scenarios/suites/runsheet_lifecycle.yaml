@@ -15,7 +15,7 @@ scenarios:
     steps:
       - user: "random unrecognized phrase"
         expect:
-          outcome: "NoMatch"
+          outcome: "SemanticNotReady"
           run_sheet_delta: 0
           runnable_count: 0
 
@@ -24,11 +24,11 @@ scenarios:
     steps:
       - user: "first random phrase"
         expect:
-          outcome: "NoMatch"
+          outcome: "SemanticNotReady"
           run_sheet_delta: 0
       - user: "second random phrase"
         expect:
-          outcome: "NoMatch"
+          outcome: "SemanticNotReady"
           run_sheet_delta: 0
           runnable_count: 0
 
@@ -44,7 +44,7 @@ scenarios:
     steps:
       - user: "dsl:(cbu.create :name \"Test\")"
         expect:
-          outcome: "DirectDslNotAllowed"
+          outcome: "SemanticNotReady"
           run_sheet_delta: 0
           runnable_count: 0
 
@@ -53,10 +53,10 @@ scenarios:
     steps:
       - user: "dsl:(entity.create :name \"A\")"
         expect:
-          outcome: "DirectDslNotAllowed"
+          outcome: "SemanticNotReady"
           run_sheet_delta: 0
       - user: "dsl:(entity.create :name \"B\")"
         expect:
-          outcome: "DirectDslNotAllowed"
+          outcome: "SemanticNotReady"
           run_sheet_delta: 0
           runnable_count: 0

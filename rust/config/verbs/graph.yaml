@@ -26,50 +26,56 @@ domains:
           phase_tags: [stewardship]
           side_effects: facts_only
         invocation_phrases:
-        - "show the graph"
-        - "display entity graph for CBU"
-        - "visualize ownership structure"
-        - "render the graph view"
-        - "what does the structure look like"
-        - "show me the full graph"
-        - "build graph from CBU"
-        - "open graph visualization"
+          - "show the graph"
+          - "display entity graph for CBU"
+          - "visualize ownership structure"
+          - "render the graph view"
+          - "what does the structure look like"
+          - "show me the full graph"
+          - "build graph from CBU"
+          - "open graph visualization"
         behavior: graph_query
         graph_query:
           operation: view
           root_type: cbu
           max_depth: 10
         args:
-        - name: cbu-id
-          type: uuid
-          required: true
-          description: "CBU to visualize"
-          lookup:
-            table: cbus
-            schema: ob-poc
-            entity_type: cbu
-            search_key: name
-            primary_key: cbu_id
-            resolution_mode: entity
-        - name: view-mode
-          type: string
-          required: false
-          default: "TRADING"
-          valid_values:
-          - TRADING
-          - KYC_UBO
-          - UBO_ONLY
-          - CUSTODY
-          description: "View mode determining which layers and edges to include"
-        - name: max-depth
-          type: integer
-          required: false
-          default: 10
-          description: "Maximum traversal depth from root"
+          - name: cbu-id
+            type: uuid
+            required: true
+            description: "CBU to visualize"
+            lookup:
+              table: cbus
+              schema: ob-poc
+              entity_type: cbu
+              search_key: name
+              primary_key: cbu_id
+              resolution_mode: entity
+          - name: view-mode
+            type: string
+            required: false
+            default: "TRADING"
+            valid_values:
+              - TRADING
+              - KYC_UBO
+              - UBO_ONLY
+              - CUSTODY
+            description: "View mode determining which layers and edges to include"
+          - name: max-depth
+            type: integer
+            required: false
+            default: 10
+            description: "Maximum traversal depth from root"
         returns:
           type: graph_result
           capture: true
 
+        three_axis:
+          state_effect: preserving
+          external_effects:
+            - observational
+          consequence:
+            baseline: benign
       focus:
         description: "Focus on a specific node with its immediate neighborhood"
         metadata:
@@ -81,47 +87,47 @@ domains:
           phase_tags: [stewardship]
           side_effects: state_write
         invocation_phrases:
-        - "focus on this entity"
-        - "zoom into node"
-        - "show neighborhood of entity"
-        - "highlight this node"
-        - "drill into entity connections"
-        - "what surrounds this entity"
-        - "expand node neighborhood"
-        - "center graph on entity"
+          - "focus on this entity"
+          - "zoom into node"
+          - "show neighborhood of entity"
+          - "highlight this node"
+          - "drill into entity connections"
+          - "what surrounds this entity"
+          - "expand node neighborhood"
+          - "center graph on entity"
         behavior: graph_query
         graph_query:
           operation: focus
           root_type: entity
           max_depth: 2
         args:
-        - name: cbu-id
-          type: uuid
-          required: true
-          description: "CBU context for the focus"
-          lookup:
-            table: cbus
-            schema: ob-poc
-            entity_type: cbu
-            search_key: name
-            primary_key: cbu_id
-            resolution_mode: entity
-        - name: entity-id
-          type: uuid
-          required: true
-          description: "Entity to focus on"
-          lookup:
-            table: entities
-            schema: ob-poc
-            entity_type: entity
-            search_key: name
-            primary_key: entity_id
-            resolution_mode: entity
-        - name: depth
-          type: integer
-          required: false
-          default: 2
-          description: "Depth of neighborhood to include"
+          - name: cbu-id
+            type: uuid
+            required: true
+            description: "CBU context for the focus"
+            lookup:
+              table: cbus
+              schema: ob-poc
+              entity_type: cbu
+              search_key: name
+              primary_key: cbu_id
+              resolution_mode: entity
+          - name: entity-id
+            type: uuid
+            required: true
+            description: "Entity to focus on"
+            lookup:
+              table: entities
+              schema: ob-poc
+              entity_type: entity
+              search_key: name
+              primary_key: entity_id
+              resolution_mode: entity
+          - name: depth
+            type: integer
+            required: false
+            default: 2
+            description: "Depth of neighborhood to include"
         returns:
           type: graph_result
           capture: true
@@ -130,6 +136,12 @@ domains:
       # FILTER & GROUP OPERATIONS
       # =========================================================================
 
+        three_axis:
+          state_effect: preserving
+          external_effects:
+            - observational
+          consequence:
+            baseline: benign
       filter:
         description: "Filter graph by criteria (node types, layers, roles, etc.)"
         metadata:
@@ -141,80 +153,86 @@ domains:
           phase_tags: [stewardship]
           side_effects: state_write
         invocation_phrases:
-        - "filter the graph"
-        - "show only entities by role"
-        - "narrow graph by jurisdiction"
-        - "filter nodes by type"
-        - "hide unrelated nodes"
-        - "show graph for custody layer"
-        - "apply filter to graph"
-        - "restrict graph to UBO layer"
+          - "filter the graph"
+          - "show only entities by role"
+          - "narrow graph by jurisdiction"
+          - "filter nodes by type"
+          - "hide unrelated nodes"
+          - "show graph for custody layer"
+          - "apply filter to graph"
+          - "restrict graph to UBO layer"
         behavior: graph_query
         graph_query:
           operation: filter
         args:
-        - name: cbu-id
-          type: uuid
-          required: true
-          description: "CBU to filter"
-          lookup:
-            table: cbus
-            schema: ob-poc
-            entity_type: cbu
-            search_key: name
-            primary_key: cbu_id
-            resolution_mode: entity
-        - name: node-types
-          type: string_list
-          required: false
-          description: "Node types to include (entity, product, service, etc.)"
-        - name: edge-types
-          type: string_list
-          required: false
-          description: "Edge types to include (owns, controls, has_role, etc.)"
-        - name: layers
-          type: string_list
-          required: false
-          description: "Layers to include (core, ubo, kyc, services, custody)"
-        - name: role
-          type: string
-          required: false
-          description: "Filter to entities with this role"
-          lookup:
-            table: roles
-            schema: ob-poc
-            entity_type: role
-            search_key: name
-            primary_key: name
-        - name: jurisdiction
-          type: string
-          required: false
-          description: "Filter to entities in this jurisdiction"
-          lookup:
-            table: master_jurisdictions
-            schema: ob-poc
-            entity_type: jurisdiction
-            search_key: jurisdiction_code
-            primary_key: jurisdiction_code
-        - name: search
-          type: string
-          required: false
-          description: "Text search filter on node labels"
+          - name: cbu-id
+            type: uuid
+            required: true
+            description: "CBU to filter"
+            lookup:
+              table: cbus
+              schema: ob-poc
+              entity_type: cbu
+              search_key: name
+              primary_key: cbu_id
+              resolution_mode: entity
+          - name: node-types
+            type: string_list
+            required: false
+            description: "Node types to include (entity, product, service, etc.)"
+          - name: edge-types
+            type: string_list
+            required: false
+            description: "Edge types to include (owns, controls, has_role, etc.)"
+          - name: layers
+            type: string_list
+            required: false
+            description: "Layers to include (core, ubo, kyc, services, custody)"
+          - name: role
+            type: string
+            required: false
+            description: "Filter to entities with this role"
+            lookup:
+              table: roles
+              schema: ob-poc
+              entity_type: role
+              search_key: name
+              primary_key: name
+          - name: jurisdiction
+            type: string
+            required: false
+            description: "Filter to entities in this jurisdiction"
+            lookup:
+              table: master_jurisdictions
+              schema: ob-poc
+              entity_type: jurisdiction
+              search_key: jurisdiction_code
+              primary_key: jurisdiction_code
+          - name: search
+            type: string
+            required: false
+            description: "Text search filter on node labels"
         returns:
           type: graph_result
           capture: true
 
+        three_axis:
+          state_effect: preserving
+          external_effects:
+            - observational
+          consequence:
+            baseline: benign
       group-by:
         description: "Group nodes by an attribute (jurisdiction, role, type, etc.)"
         invocation_phrases:
-        - "group graph by"
-        - "cluster by attribute"
-        - "group nodes by jurisdiction"
-        - "group by role"
-        - "group by type"
-        - "cluster entities"
-        - "group graph nodes"
-        - "organize by"
+          - "group graph by"
+          - "cluster by attribute"
+          - "group nodes by jurisdiction"
+          - "group by role"
+          - "group by type"
+          - "cluster entities"
+          - "group graph nodes"
+          - "organize by"
         metadata:
           tier: intent
           source_of_truth: entity
@@ -227,28 +245,28 @@ domains:
         graph_query:
           operation: group_by
         args:
-        - name: cbu-id
-          type: uuid
-          required: true
-          description: "CBU to group"
-          lookup:
-            table: cbus
-            schema: ob-poc
-            entity_type: cbu
-            search_key: name
-            primary_key: cbu_id
-            resolution_mode: entity
-        - name: group-by
-          type: string
-          required: true
-          valid_values:
-          - jurisdiction
-          - role
-          - layer
-          - type
-          - status
-          - entity_category
-          description: "Attribute to group nodes by"
+          - name: cbu-id
+            type: uuid
+            required: true
+            description: "CBU to group"
+            lookup:
+              table: cbus
+              schema: ob-poc
+              entity_type: cbu
+              search_key: name
+              primary_key: cbu_id
+              resolution_mode: entity
+          - name: group-by
+            type: string
+            required: true
+            valid_values:
+              - jurisdiction
+              - role
+              - layer
+              - type
+              - status
+              - entity_category
+            description: "Attribute to group nodes by"
         returns:
           type: graph_result
           capture: true
@@ -257,17 +275,23 @@ domains:
       # PATH & TRAVERSAL OPERATIONS
       # =========================================================================
 
+        three_axis:
+          state_effect: preserving
+          external_effects:
+            - observational
+          consequence:
+            baseline: benign
       path:
         description: "Find shortest path between two nodes"
         invocation_phrases:
-        - "find path between"
-        - "show connection"
-        - "path from A to B"
-        - "how are they connected"
-        - "find relationship path"
-        - "trace path"
-        - "show link between"
-        - "graph path"
+          - "find path between"
+          - "show connection"
+          - "path from A to B"
+          - "how are they connected"
+          - "find relationship path"
+          - "trace path"
+          - "show link between"
+          - "graph path"
         metadata:
           tier: intent
           source_of_truth: entity
@@ -280,47 +304,53 @@ domains:
         graph_query:
           operation: path
         args:
-        - name: cbu-id
-          type: uuid
-          required: true
-          description: "CBU context for path finding"
-          lookup:
-            table: cbus
-            schema: ob-poc
-            entity_type: cbu
-            search_key: name
-            primary_key: cbu_id
-            resolution_mode: entity
-        - name: from-entity-id
-          type: uuid
-          required: true
-          description: "Starting entity"
-          lookup:
-            table: entities
-            schema: ob-poc
-            entity_type: entity
-            search_key: name
-            primary_key: entity_id
-            resolution_mode: entity
-        - name: to-entity-id
-          type: uuid
-          required: true
-          description: "Target entity"
-          lookup:
-            table: entities
-            schema: ob-poc
-            entity_type: entity
-            search_key: name
-            primary_key: entity_id
-            resolution_mode: entity
-        - name: edge-types
-          type: string_list
-          required: false
-          description: "Restrict path to these edge types"
+          - name: cbu-id
+            type: uuid
+            required: true
+            description: "CBU context for path finding"
+            lookup:
+              table: cbus
+              schema: ob-poc
+              entity_type: cbu
+              search_key: name
+              primary_key: cbu_id
+              resolution_mode: entity
+          - name: from-entity-id
+            type: uuid
+            required: true
+            description: "Starting entity"
+            lookup:
+              table: entities
+              schema: ob-poc
+              entity_type: entity
+              search_key: name
+              primary_key: entity_id
+              resolution_mode: entity
+          - name: to-entity-id
+            type: uuid
+            required: true
+            description: "Target entity"
+            lookup:
+              table: entities
+              schema: ob-poc
+              entity_type: entity
+              search_key: name
+              primary_key: entity_id
+              resolution_mode: entity
+          - name: edge-types
+            type: string_list
+            required: false
+            description: "Restrict path to these edge types"
         returns:
           type: path_result
           capture: true
 
+        three_axis:
+          state_effect: preserving
+          external_effects:
+            - observational
+          consequence:
+            baseline: benign
       find-connected:
         description: "Find all nodes connected to a starting point within depth"
         metadata:
@@ -332,54 +362,60 @@ domains:
           phase_tags: [stewardship]
           side_effects: facts_only
         invocation_phrases:
-        - "find connected entities"
-        - "show all linked nodes"
-        - "what is connected to this"
-        - "discover related entities"
-        - "traverse connections from entity"
-        - "list connected parties"
-        - "show reachable nodes"
-        - "find related within depth"
+          - "find connected entities"
+          - "show all linked nodes"
+          - "what is connected to this"
+          - "discover related entities"
+          - "traverse connections from entity"
+          - "list connected parties"
+          - "show reachable nodes"
+          - "find related within depth"
         behavior: graph_query
         graph_query:
           operation: find_connected
           max_depth: 5
         args:
-        - name: cbu-id
-          type: uuid
-          required: true
-          description: "CBU context"
-          lookup:
-            table: cbus
-            schema: ob-poc
-            entity_type: cbu
-            search_key: name
-            primary_key: cbu_id
-            resolution_mode: entity
-        - name: entity-id
-          type: uuid
-          required: true
-          description: "Starting entity"
-          lookup:
-            table: entities
-            schema: ob-poc
-            entity_type: entity
-            search_key: name
-            primary_key: entity_id
-            resolution_mode: entity
-        - name: max-depth
-          type: integer
-          required: false
-          default: 5
-          description: "Maximum traversal depth"
-        - name: edge-types
-          type: string_list
-          required: false
-          description: "Restrict to these edge types"
+          - name: cbu-id
+            type: uuid
+            required: true
+            description: "CBU context"
+            lookup:
+              table: cbus
+              schema: ob-poc
+              entity_type: cbu
+              search_key: name
+              primary_key: cbu_id
+              resolution_mode: entity
+          - name: entity-id
+            type: uuid
+            required: true
+            description: "Starting entity"
+            lookup:
+              table: entities
+              schema: ob-poc
+              entity_type: entity
+              search_key: name
+              primary_key: entity_id
+              resolution_mode: entity
+          - name: max-depth
+            type: integer
+            required: false
+            default: 5
+            description: "Maximum traversal depth"
+          - name: edge-types
+            type: string_list
+            required: false
+            description: "Restrict to these edge types"
         returns:
           type: graph_result
           capture: true
 
+        three_axis:
+          state_effect: preserving
+          external_effects:
+            - observational
+          consequence:
+            baseline: benign
       ancestors:
         description: "Find all ancestors (owners/controllers) of an entity"
         metadata:
@@ -391,40 +427,46 @@ domains:
           phase_tags: [stewardship]
           side_effects: state_write
         invocation_phrases:
-        - "show parent entities"
-        - "trace ownership upward"
-        - "show ownership chain above"
-        - "list controlling entities"
-        - "walk up the ownership tree"
-        - "find ancestor companies"
+          - "show parent entities"
+          - "trace ownership upward"
+          - "show ownership chain above"
+          - "list controlling entities"
+          - "walk up the ownership tree"
+          - "find ancestor companies"
         behavior: graph_query
         graph_query:
           operation: ancestors
           edge_types:
-          - owns
-          - controls
+            - owns
+            - controls
           max_depth: 10
         args:
-        - name: entity-id
-          type: uuid
-          required: true
-          description: "Entity to trace upward from"
-          lookup:
-            table: entities
-            schema: ob-poc
-            entity_type: entity
-            search_key: name
-            primary_key: entity_id
-            resolution_mode: entity
-        - name: max-depth
-          type: integer
-          required: false
-          default: 10
-          description: "Maximum depth to traverse"
+          - name: entity-id
+            type: uuid
+            required: true
+            description: "Entity to trace upward from"
+            lookup:
+              table: entities
+              schema: ob-poc
+              entity_type: entity
+              search_key: name
+              primary_key: entity_id
+              resolution_mode: entity
+          - name: max-depth
+            type: integer
+            required: false
+            default: 10
+            description: "Maximum depth to traverse"
         returns:
           type: graph_result
           capture: true
 
+        three_axis:
+          state_effect: preserving
+          external_effects:
+            - observational
+          consequence:
+            baseline: benign
       descendants:
         description: "Find all descendants (owned/controlled entities) of an entity"
         metadata:
@@ -436,38 +478,38 @@ domains:
           phase_tags: [stewardship]
           side_effects: state_write
         invocation_phrases:
-        - "show subsidiaries"
-        - "what does this entity own"
-        - "trace ownership downward"
-        - "list controlled entities below"
-        - "find all sub-entities"
-        - "show downstream ownership"
-        - "walk down the ownership tree"
-        - "find child companies"
+          - "show subsidiaries"
+          - "what does this entity own"
+          - "trace ownership downward"
+          - "list controlled entities below"
+          - "find all sub-entities"
+          - "show downstream ownership"
+          - "walk down the ownership tree"
+          - "find child companies"
         behavior: graph_query
         graph_query:
           operation: descendants
           edge_types:
-          - owns
-          - controls
+            - owns
+            - controls
           max_depth: 10
         args:
-        - name: entity-id
-          type: uuid
-          required: true
-          description: "Entity to trace downward from"
-          lookup:
-            table: entities
-            schema: ob-poc
-            entity_type: entity
-            search_key: name
-            primary_key: entity_id
-            resolution_mode: entity
-        - name: max-depth
-          type: integer
-          required: false
-          default: 10
-          description: "Maximum depth to traverse"
+          - name: entity-id
+            type: uuid
+            required: true
+            description: "Entity to trace downward from"
+            lookup:
+              table: entities
+              schema: ob-poc
+              entity_type: entity
+              search_key: name
+              primary_key: entity_id
+              resolution_mode: entity
+          - name: max-depth
+            type: integer
+            required: false
+            default: 10
+            description: "Maximum depth to traverse"
         returns:
           type: graph_result
           capture: true
@@ -480,15 +522,21 @@ domains:
       # VALIDATION OPERATIONS
       # =========================================================================
 
+        three_axis:
+          state_effect: preserving
+          external_effects:
+            - observational
+          consequence:
+            baseline: benign
       validate:
         description: "Validate ownership/control graph integrity for a KYC case"
         invocation_phrases:
-        - "validate graph"
-        - "check graph integrity"
-        - "detect ownership cycles"
-        - "validate ownership graph"
-        - "check for graph anomalies"
-        - "graph validation"
+          - "validate graph"
+          - "check graph integrity"
+          - "detect ownership cycles"
+          - "validate ownership graph"
+          - "check for graph anomalies"
+          - "graph validation"
         metadata:
           tier: intent
           source_of_truth: operational
@@ -501,31 +549,37 @@ domains:
         plugin:
           handler: GraphValidateOp
         args:
-        - name: case-id
-          type: uuid
-          required: false
-          description: "Scope validation to entities in this KYC case"
-          lookup:
-            table: cases
-            schema: kyc
-            search_key: case_id
-            primary_key: case_id
+          - name: case-id
+            type: uuid
+            required: false
+            description: "Scope validation to entities in this KYC case"
+            lookup:
+              table: cases
+              schema: kyc
+              search_key: case_id
+              primary_key: case_id
         returns:
           type: record
           fields:
-          - name: anomalies_found
-            type: integer
-            description: "Number of anomalies detected"
-          - name: anomalies
-            type: array
-            description: "List of anomaly objects with type, entity_ids, detail, severity"
-          - name: edges_analysed
-            type: integer
-          - name: entities_analysed
-            type: integer
-          - name: anomalies_persisted
-            type: integer
+            - name: anomalies_found
+              type: integer
+              description: "Number of anomalies detected"
+            - name: anomalies
+              type: array
+              description: "List of anomaly objects with type, entity_ids, detail, severity"
+            - name: edges_analysed
+              type: integer
+            - name: entities_analysed
+              type: integer
+            - name: anomalies_persisted
+              type: integer
 
+        three_axis:
+          state_effect: preserving
+          external_effects:
+            - observational
+          consequence:
+            baseline: benign
       compare:
         description: "Compare two graph snapshots to find differences"
         metadata:
@@ -537,37 +591,43 @@ domains:
           phase_tags: [stewardship]
           side_effects: state_write
         invocation_phrases:
-        - "compare graph snapshots"
-        - "what changed in the graph"
-        - "diff between two snapshots"
-        - "show graph differences"
-        - "compare before and after"
-        - "detect ownership changes"
-        - "highlight graph modifications"
-        - "show delta between versions"
+          - "compare graph snapshots"
+          - "what changed in the graph"
+          - "diff between two snapshots"
+          - "show graph differences"
+          - "compare before and after"
+          - "detect ownership changes"
+          - "highlight graph modifications"
+          - "show delta between versions"
         behavior: graph_query
         graph_query:
           operation: compare
         args:
-        - name: cbu-id
-          type: uuid
-          required: true
-          description: "CBU to compare snapshots for"
-          lookup:
-            table: cbus
-            schema: ob-poc
-            entity_type: cbu
-            search_key: name
-            primary_key: cbu_id
-            resolution_mode: entity
-        - name: left-snapshot-id
-          type: uuid
-          required: true
-          description: "Left (before) snapshot ID"
-        - name: right-snapshot-id
-          type: uuid
-          required: true
-          description: "Right (after) snapshot ID"
+          - name: cbu-id
+            type: uuid
+            required: true
+            description: "CBU to compare snapshots for"
+            lookup:
+              table: cbus
+              schema: ob-poc
+              entity_type: cbu
+              search_key: name
+              primary_key: cbu_id
+              resolution_mode: entity
+          - name: left-snapshot-id
+            type: uuid
+            required: true
+            description: "Left (before) snapshot ID"
+          - name: right-snapshot-id
+            type: uuid
+            required: true
+            description: "Right (after) snapshot ID"
         returns:
           type: graph_result
           capture: true
+        three_axis:
+          state_effect: preserving
+          external_effects:
+            - observational
+          consequence:
+            baseline: benign

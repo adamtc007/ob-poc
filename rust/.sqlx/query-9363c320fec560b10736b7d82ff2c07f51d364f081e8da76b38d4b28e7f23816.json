@@ -1,0 +1,16 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            UPDATE \"ob-poc\".outstanding_requests\n            SET status = 'ESCALATED',\n                escalated_at = NOW(),\n                escalation_level = COALESCE(escalation_level, 0) + 1,\n                escalated_to_user_id = $2,\n                escalation_reason = $3\n            WHERE request_id = $1 AND status IN ('PENDING', 'ESCALATED')\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Varchar"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "9363c320fec560b10736b7d82ff2c07f51d364f081e8da76b38d4b28e7f23816"
+}

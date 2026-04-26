@@ -1,0 +1,40 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT\n                COUNT(*) FILTER (WHERE status IN ('REQUIRED', 'REQUESTED')) as \"pending!\",\n                COUNT(*) FILTER (WHERE status IN ('RECEIVED', 'UNDER_REVIEW')) as \"received!\",\n                COUNT(*) FILTER (WHERE status = 'VERIFIED') as \"verified!\",\n                COUNT(*) FILTER (WHERE status = 'REJECTED') as \"rejected!\"\n               FROM \"ob-poc\".doc_requests\n               WHERE workstream_id = $1",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "pending!",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 1,
+        "name": "received!",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 2,
+        "name": "verified!",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 3,
+        "name": "rejected!",
+        "type_info": "Int8"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      null,
+      null,
+      null,
+      null
+    ]
+  },
+  "hash": "ca8c32d76025501b6891ab75671abb3910fb8e93a4aca4887804ef4386a71702"
+}

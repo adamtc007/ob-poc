@@ -97,7 +97,7 @@ pub enum ActionClass {
 }
 
 /// CRUD table/operation mapping captured from verb YAML.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct VerbCrudMapping {
     pub operation: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -106,6 +106,45 @@ pub struct VerbCrudMapping {
     pub schema: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub key_column: Option<String>,
+    /// Column name for RETURNING clause (INSERT/UPSERT).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub returning: Option<String>,
+    /// Columns for ON CONFLICT (UPSERT).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub conflict_keys: Vec<String>,
+    /// Named constraint for ON CONFLICT (when conflict_keys has computed columns).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub conflict_constraint: Option<String>,
+    /// Junction table name (LINK/UNLINK operations).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub junction: Option<String>,
+    /// Source column in junction table.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub from_col: Option<String>,
+    /// Target column in junction table.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub to_col: Option<String>,
+    /// Role table (ROLE_LINK/ROLE_UNLINK).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub role_table: Option<String>,
+    /// Role column name.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub role_col: Option<String>,
+    /// Foreign key column (LIST_BY_FK).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub fk_col: Option<String>,
+    /// Filter column (LIST_BY_FK).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub filter_col: Option<String>,
+    /// Primary table for join queries.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub primary_table: Option<String>,
+    /// Join table for SELECT_WITH_JOIN.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub join_table: Option<String>,
+    /// Join column.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub join_col: Option<String>,
 }
 
 /// Definition of a verb argument.
@@ -123,6 +162,9 @@ pub struct VerbArgDef {
     pub valid_values: Option<Vec<String>>,
     #[serde(default)]
     pub default: Option<serde_json::Value>,
+    /// Database column this argument maps to (for CRUD operations).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub maps_to: Option<String>,
 }
 
 /// Entity lookup configuration for a verb argument.
@@ -219,6 +261,7 @@ mod tests {
                 lookup: None,
                 valid_values: None,
                 default: None,
+                maps_to: None,
             }],
             returns: Some(VerbReturnSpec {
                 return_type: "uuid".into(),
@@ -257,6 +300,7 @@ mod tests {
                 table: Some("cbus".into()),
                 schema: Some("ob-poc".into()),
                 key_column: None,
+                ..Default::default()
             }),
             reads_from: vec![],
             writes_to: vec!["cbus".into()],

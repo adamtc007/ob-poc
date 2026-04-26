@@ -20,9 +20,9 @@ domains:
       - CARRIED_INTEREST: Carry/promote entitlement
 
     invocation_hints:
-    - "share class"
-    - "instrument type"
-    - "link to compartment"
+      - "share class"
+      - "instrument type"
+      - "link to compartment"
 
     verbs:
       # ============================================
@@ -42,11 +42,11 @@ domains:
           phase_tags: [onboarding]
           side_effects: state_write
         invocation_phrases:
-        - "set instrument type"
-        - "classify share class"
-        - "set as LP interest"
-        - "set as units"
-        - "set as shares"
+          - "set instrument type"
+          - "classify share class"
+          - "set as LP interest"
+          - "set as units"
+          - "set as shares"
         behavior: crud
         crud:
           operation: update
@@ -54,41 +54,46 @@ domains:
           schema: kyc
           key: id
         args:
-        - name: share-class-id
-          type: uuid
-          required: true
-          maps_to: id
-          lookup:
-            table: share_classes
-            entity_type: share_class
-            schema: kyc
-            search_key: name
-            primary_key: id
-        - name: instrument-type
-          type: string
-          required: true
-          maps_to: instrument_type
-          description: |
-            Instrument classification:
-            - UNITS: Standard fund units
-            - SHARES: Corporate shares
-            - LP_INTEREST: Limited partnership interest
-            - PARTNERSHIP_INTEREST: General partnership
-            - NOMINEE_POSITION: Nominee holding
-            - TRACKING_SHARES: Performance tracking
-            - CARRIED_INTEREST: Carry/promote
-          validation:
-            enum:
-            - UNITS
-            - SHARES
-            - LP_INTEREST
-            - PARTNERSHIP_INTEREST
-            - NOMINEE_POSITION
-            - TRACKING_SHARES
-            - CARRIED_INTEREST
+          - name: share-class-id
+            type: uuid
+            required: true
+            maps_to: id
+            lookup:
+              table: share_classes
+              entity_type: share_class
+              schema: kyc
+              search_key: name
+              primary_key: id
+          - name: instrument-type
+            type: string
+            required: true
+            maps_to: instrument_type
+            description: |
+              Instrument classification:
+              - UNITS: Standard fund units
+              - SHARES: Corporate shares
+              - LP_INTEREST: Limited partnership interest
+              - PARTNERSHIP_INTEREST: General partnership
+              - NOMINEE_POSITION: Nominee holding
+              - TRACKING_SHARES: Performance tracking
+              - CARRIED_INTEREST: Carry/promote
+            validation:
+              enum:
+                - UNITS
+                - SHARES
+                - LP_INTEREST
+                - PARTNERSHIP_INTEREST
+                - NOMINEE_POSITION
+                - TRACKING_SHARES
+                - CARRIED_INTEREST
         returns:
           type: affected
 
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
       link-to-compartment:
         description: |
           Link a share class to a fund compartment.
@@ -104,10 +109,10 @@ domains:
           phase_tags: [onboarding]
           side_effects: state_write
         invocation_phrases:
-        - "link share class to compartment"
-        - "assign to compartment"
-        - "connect to sub-fund"
-        - "link to sleeve"
+          - "link share class to compartment"
+          - "assign to compartment"
+          - "connect to sub-fund"
+          - "link to sleeve"
         behavior: crud
         crud:
           operation: update
@@ -115,29 +120,34 @@ domains:
           schema: kyc
           key: id
         args:
-        - name: share-class-id
-          type: uuid
-          required: true
-          maps_to: id
-          lookup:
-            table: share_classes
-            entity_type: share_class
-            schema: kyc
-            search_key: name
-            primary_key: id
-        - name: compartment-id
-          type: uuid
-          required: true
-          maps_to: compartment_id
-          lookup:
-            table: fund_compartments
-            entity_type: fund_compartment
-            schema: kyc
-            search_key: compartment_code
-            primary_key: id
+          - name: share-class-id
+            type: uuid
+            required: true
+            maps_to: id
+            lookup:
+              table: share_classes
+              entity_type: share_class
+              schema: kyc
+              search_key: name
+              primary_key: id
+          - name: compartment-id
+            type: uuid
+            required: true
+            maps_to: compartment_id
+            lookup:
+              table: fund_compartments
+              entity_type: fund_compartment
+              schema: kyc
+              search_key: compartment_code
+              primary_key: id
         returns:
           type: affected
 
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
       unlink-from-compartment:
         description: |
           Remove share class from compartment (set compartment_id to NULL).
@@ -151,9 +161,9 @@ domains:
           phase_tags: [onboarding]
           side_effects: state_write
         invocation_phrases:
-        - "unlink from compartment"
-        - "remove from compartment"
-        - "detach from sleeve"
+          - "unlink from compartment"
+          - "remove from compartment"
+          - "detach from sleeve"
         behavior: crud
         crud:
           operation: update
@@ -163,19 +173,24 @@ domains:
           set_values:
             compartment_id:
         args:
-        - name: share-class-id
-          type: uuid
-          required: true
-          maps_to: id
-          lookup:
-            table: share_classes
-            entity_type: share_class
-            schema: kyc
-            search_key: name
-            primary_key: id
+          - name: share-class-id
+            type: uuid
+            required: true
+            maps_to: id
+            lookup:
+              table: share_classes
+              entity_type: share_class
+              schema: kyc
+              search_key: name
+              primary_key: id
         returns:
           type: affected
 
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
       list-by-compartment:
         description: |
           List all share classes in a compartment.
@@ -190,9 +205,9 @@ domains:
           phase_tags: [onboarding]
           side_effects: facts_only
         invocation_phrases:
-        - "share classes in compartment"
-        - "list classes by compartment"
-        - "compartment share classes"
+          - "share classes in compartment"
+          - "list classes by compartment"
+          - "compartment share classes"
         behavior: crud
         crud:
           operation: list_by_fk
@@ -200,14 +215,20 @@ domains:
           schema: kyc
           fk_col: compartment_id
         args:
-        - name: compartment-id
-          type: uuid
-          required: true
-          lookup:
-            table: fund_compartments
-            entity_type: fund_compartment
-            schema: kyc
-            search_key: compartment_code
-            primary_key: id
+          - name: compartment-id
+            type: uuid
+            required: true
+            lookup:
+              table: fund_compartments
+              entity_type: fund_compartment
+              schema: kyc
+              search_key: compartment_code
+              primary_key: id
         returns:
           type: record_set
+        three_axis:
+          state_effect: preserving
+          external_effects:
+            - observational
+          consequence:
+            baseline: benign

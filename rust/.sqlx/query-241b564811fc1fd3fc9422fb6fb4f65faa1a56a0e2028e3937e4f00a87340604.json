@@ -1,0 +1,19 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            INSERT INTO \"ob-poc\".dsl_session_events\n                (event_id, session_id, event_type, dsl_source, error_message, metadata, occurred_at)\n            VALUES ($1, $2, $3, $4, $5, $6, now())\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Varchar",
+        "Text",
+        "Text",
+        "Jsonb"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "241b564811fc1fd3fc9422fb6fb4f65faa1a56a0e2028e3937e4f00a87340604"
+}

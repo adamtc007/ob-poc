@@ -1,9 +1,12 @@
 use super::ir::*;
-use anyhow::{anyhow, Result};
+use anyhow::{anyhow, Context, Result};
 use petgraph::graph::NodeIndex;
 use quick_xml::events::{BytesStart, Event};
 use quick_xml::reader::Reader;
 use std::collections::HashMap;
+
+const MAX_TIMER_MS: u64 = 366 * 24 * 60 * 60 * 1_000;
+const MAX_TIMER_CYCLE_FIRES: u32 = 1_000;
 
 /// Parse BPMN 2.0 XML into an IRGraph.
 ///
@@ -493,7 +496,11 @@ fn handle_close_tag(
             {
                 let condition = condition_text
                     .take()
-                    .and_then(|text| parse_condition(&text));
+                    .map(|text| parse_condition(&text))
+                    .transpose()
+                    .with_context(|| {
+                        format!("Invalid conditionExpression on sequenceFlow '{}'", id)
+                    })?;
                 flows.push(SequenceFlowRaw {
                     id,
                     source,
@@ -658,7 +665,7 @@ fn name_to_snake(name: &str) -> String {
 /// Parse condition expression text.
 /// Format: `= flag_name == true` or `flag_name > 5`
 /// Strips leading `=`, parses `flag_name OP literal`.
-fn parse_condition(text: &str) -> Option<ConditionExpr> {
+fn parse_condition(text: &str) -> Result<ConditionExpr> {
     let text = text.trim();
     let text = text.strip_prefix('=').unwrap_or(text).trim();
 
@@ -672,8 +679,11 @@ fn parse_condition(text: &str) -> Option<ConditionExpr> {
     } else if let Some((lhs, rhs)) = text.split_once('<') {
         (lhs.trim(), ConditionOp::Lt, rhs.trim())
     } else {
-        return None;
+        return Err(anyhow!("missing supported operator (==, !=, >, <)"));
     };
+    if flag.is_empty() {
+        return Err(anyhow!("condition flag name is empty"));
+    }
 
     let literal = match literal {
         "true" => ConditionLiteral::Bool(true),
@@ -682,12 +692,12 @@ fn parse_condition(text: &str) -> Option<ConditionExpr> {
             if let Ok(n) = other.parse::<i64>() {
                 ConditionLiteral::I64(n)
             } else {
-                return None;
+                return Err(anyhow!("unsupported condition literal '{}'", other));
             }
         }
     };
 
-    Some(ConditionExpr {
+    Ok(ConditionExpr {
         flag_name: flag.to_string(),
         op,
         literal,
@@ -726,9 +736,10 @@ fn parse_timer_spec(kind: Option<TimerKind>, text: Option<String>) -> Result<Tim
 fn parse_iso_duration(s: &str) -> Result<u64> {
     let s = s.trim();
     if !s.starts_with('P') {
-        return s
+        let ms = s
             .parse::<u64>()
-            .map_err(|_| anyhow!("Cannot parse duration: {}", s));
+            .map_err(|_| anyhow!("Cannot parse duration: {}", s))?;
+        return bounded_duration(ms, s);
     }
 
     let mut total_ms: u64 = 0;
@@ -749,7 +760,7 @@ fn parse_iso_duration(s: &str) -> Result<u64> {
                 let n: u64 = num_buf
                     .parse()
                     .map_err(|_| anyhow!("Bad duration number: {}", num_buf))?;
-                total_ms += n * 86_400_000;
+                add_duration_ms(&mut total_ms, n, 86_400_000, s)?;
                 num_buf.clear();
             }
         }
@@ -765,9 +776,9 @@ fn parse_iso_duration(s: &str) -> Result<u64> {
                     .parse()
                     .map_err(|_| anyhow!("Bad duration number: {}", num_buf))?;
                 match ch {
-                    'H' => total_ms += n * 3_600_000,
-                    'M' => total_ms += n * 60_000,
-                    'S' => total_ms += n * 1_000,
+                    'H' => add_duration_ms(&mut total_ms, n, 3_600_000, s)?,
+                    'M' => add_duration_ms(&mut total_ms, n, 60_000, s)?,
+                    'S' => add_duration_ms(&mut total_ms, n, 1_000, s)?,
                     _ => return Err(anyhow!("Unknown duration unit: {}", ch)),
                 }
                 num_buf.clear();
@@ -778,8 +789,32 @@ fn parse_iso_duration(s: &str) -> Result<u64> {
     if total_ms == 0 {
         Err(anyhow!("Duration parsed to 0ms: {}", s))
     } else {
-        Ok(total_ms)
+        bounded_duration(total_ms, s)
     }
+}
+
+fn add_duration_ms(total_ms: &mut u64, n: u64, unit_ms: u64, input: &str) -> Result<()> {
+    let component = n
+        .checked_mul(unit_ms)
+        .ok_or_else(|| anyhow!("Duration overflows milliseconds: {}", input))?;
+    *total_ms = total_ms
+        .checked_add(component)
+        .ok_or_else(|| anyhow!("Duration overflows milliseconds: {}", input))?;
+    Ok(())
+}
+
+fn bounded_duration(ms: u64, input: &str) -> Result<u64> {
+    if ms == 0 {
+        return Err(anyhow!("Duration parsed to 0ms: {}", input));
+    }
+    if ms > MAX_TIMER_MS {
+        return Err(anyhow!(
+            "Duration exceeds max timer bound: {}ms > {}ms",
+            ms,
+            MAX_TIMER_MS
+        ));
+    }
+    Ok(ms)
 }
 
 /// Parse an ISO 8601 repeating interval to (interval_ms, max_fires).
@@ -804,6 +839,13 @@ fn parse_iso_cycle(s: &str) -> Result<(u64, u32)> {
 
     if max_fires == 0 {
         return Err(anyhow!("Cycle count must be >= 1: {}", s));
+    }
+    if max_fires > MAX_TIMER_CYCLE_FIRES {
+        return Err(anyhow!(
+            "Cycle count exceeds max timer bound: {} > {}",
+            max_fires,
+            MAX_TIMER_CYCLE_FIRES
+        ));
     }
 
     let interval_ms = parse_iso_duration(duration_str)?;
@@ -1103,7 +1145,7 @@ mod tests {
         assert_eq!(c.op, ConditionOp::Gt);
         assert_eq!(c.literal, ConditionLiteral::I64(5));
 
-        assert!(parse_condition("garbage").is_none());
+        assert!(parse_condition("garbage").is_err());
     }
 
     // ═══════════════════════════════════════════════════════════

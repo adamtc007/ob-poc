@@ -1,0 +1,42 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        WITH cbu_matches AS (\n            SELECT\n                c.cbu_id as id,\n                c.name,\n                -- Match type priority: exact > code > trigram > ilike\n                CASE\n                    WHEN LOWER(c.name) = $2 THEN 'exact'\n                    WHEN c.cbu_id::text ILIKE $2 || '%' THEN 'code'\n                    WHEN similarity(c.name, $2) > 0.3 THEN 'trigram'\n                    WHEN c.name ILIKE '%' || $2 || '%' THEN 'ilike'\n                    ELSE 'none'\n                END as match_type,\n                -- Confidence scoring\n                CASE\n                    WHEN LOWER(c.name) = $2 THEN 1.0\n                    WHEN c.cbu_id::text ILIKE $2 || '%' THEN 0.95\n                    ELSE COALESCE(similarity(c.name, $2), 0.0)\n                END as confidence\n            FROM \"ob-poc\".cbus c\n            JOIN \"ob-poc\".client_group_entity cge\n                ON cge.entity_id = c.commercial_client_entity_id\n            WHERE cge.group_id = $1\n              AND cge.membership_type != 'historical'\n              AND (\n                  LOWER(c.name) = $2                           -- exact\n                  OR c.cbu_id::text ILIKE $2 || '%'           -- code prefix\n                  OR similarity(c.name, $2) > 0.3             -- trigram\n                  OR c.name ILIKE '%' || $2 || '%'            -- fallback ILIKE\n              )\n        )\n        SELECT\n            id as \"id!\",\n            name as \"name!\",\n            match_type as \"match_type!\",\n            confidence as \"confidence!: f64\"\n        FROM cbu_matches\n        WHERE match_type != 'none'\n        ORDER BY\n            CASE match_type\n                WHEN 'exact' THEN 0\n                WHEN 'code' THEN 1\n                WHEN 'trigram' THEN 2\n                ELSE 3\n            END,\n            confidence DESC\n        LIMIT $3\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id!",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "name!",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 2,
+        "name": "match_type!",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 3,
+        "name": "confidence!: f64",
+        "type_info": "Float4"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Text",
+        "Int8"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      null,
+      null
+    ]
+  },
+  "hash": "275e0f62fbac1ecea3da49931471b5f7d1c19a929e39841ae99593f268646385"
+}

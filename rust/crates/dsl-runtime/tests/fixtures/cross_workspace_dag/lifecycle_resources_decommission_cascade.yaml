@@ -1,0 +1,39 @@
+name: "Application instance decommissioning cascades to bindings"
+suite_id: "lifecycle_resources_decommission_cascade"
+description: |
+  Mode C cascade: when an application_instance enters DECOMMISSIONED,
+  every capability_binding parented to it is forced to RETIRED.
+
+  Models the scenario "BNY shuts down a custody application; all
+  CBU/service bindings on that app instance go to terminal RETIRED
+  automatically".
+
+mode: mock
+
+entity_aliases:
+  app-instance-1: "77777777-0000-0000-0000-000000000001"
+  binding-cbu-a:  "77777777-0000-0000-0000-000000000002"
+  binding-cbu-b:  "77777777-0000-0000-0000-000000000003"
+
+initial_state:
+  - { workspace: lifecycle_resources, slot: application_instance, entity: "app-instance-1", state: "ACTIVE" }
+  - { workspace: lifecycle_resources, slot: capability_binding, entity: "binding-cbu-a", state: "LIVE" }
+  - { workspace: lifecycle_resources, slot: capability_binding, entity: "binding-cbu-b", state: "LIVE" }
+
+children:
+  lifecycle_resources.application_instance:
+    app-instance-1:
+      - { workspace: lifecycle_resources, slot: capability_binding, entity: "binding-cbu-a" }
+      - { workspace: lifecycle_resources, slot: capability_binding, entity: "binding-cbu-b" }
+
+steps:
+  - name: "instance DECOMMISSIONED → 2 bindings planned to RETIRED"
+    plan_cascade:
+      parent_workspace: lifecycle_resources
+      parent_slot: application_instance
+      parent_entity: "app-instance-1"
+      parent_new_state: "DECOMMISSIONED"
+    expect:
+      cascade_actions:
+        - { child_workspace: lifecycle_resources, child_slot: capability_binding, child_entity: "binding-cbu-a", target_state: "RETIRED", severity: "error" }
+        - { child_workspace: lifecycle_resources, child_slot: capability_binding, child_entity: "binding-cbu-b", target_state: "RETIRED", severity: "error" }

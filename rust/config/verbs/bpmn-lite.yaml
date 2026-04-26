@@ -30,6 +30,12 @@ domains:
           type: record
           description: "Compilation result with bytecode version and diagnostics"
 
+        three_axis:
+          state_effect: preserving
+          external_effects:
+            - observational
+          consequence:
+            baseline: benign
       start:
         description: "Start a BPMN process instance"
         behavior: plugin
@@ -56,6 +62,12 @@ domains:
           type: uuid
           description: "Process instance ID"
 
+        three_axis:
+          state_effect: preserving
+          external_effects: &id001
+            - emitting
+          consequence:
+            baseline: reviewable
       signal:
         description: "Send a signal to a running BPMN process instance"
         behavior: plugin
@@ -85,6 +97,11 @@ domains:
         returns:
           type: void
 
+        three_axis:
+          state_effect: preserving
+          external_effects: *id001
+          consequence:
+            baseline: reviewable
       cancel:
         description: "Cancel a running BPMN process instance"
         behavior: plugin
@@ -110,6 +127,12 @@ domains:
         returns:
           type: void
 
+        three_axis:
+          state_effect: preserving
+          external_effects:
+            - emitting
+          consequence:
+            baseline: requires_confirmation
       inspect:
         description: "Inspect a running BPMN process instance"
         behavior: plugin
@@ -131,3 +154,9 @@ domains:
         returns:
           type: record
           description: "Process state, fibers, and wait conditions"
+        three_axis:
+          state_effect: preserving
+          external_effects:
+            - observational
+          consequence:
+            baseline: benign

@@ -1,32 +1,41 @@
-//! Booking Principal Operations
+//! Booking Principal Operations (32 plugin verbs) — `legal-entity.*`,
+//! `rule-field.*`, `booking-location.*`, `booking-principal.*`,
+//! `client-principal-relationship.*`, `service-availability.*`, `ruleset.*`,
+//! `rule.*`, `contract-pack.*`.
 //!
 //! Operations for booking principal selection, eligibility evaluation,
 //! client-principal relationship management, and coverage analysis.
 //!
 //! The booking principal selection capability determines "who can contract what,
 //! for whom, where" through a rule-driven, boundary-aware evaluation pipeline.
+//!
+//! Phase 5c-migrate Phase B Pattern B slice #78: ported from
+//! `CustomOperation` + `inventory::collect!` to `SemOsVerbOp`. Stays in
+//! `ob-poc::domain_ops::booking_principal_ops` because the ops bridge to
+//! `crate::database::booking_principal_repository::BookingPrincipalRepository`
+//! and `crate::domain_ops::rule_evaluator` (both upstream of
+//! `sem_os_postgres`) and depend on the shared
+//! `crate::api::booking_principal_types::*` result/context types.
 
 use anyhow::{anyhow, Result};
 use async_trait::async_trait;
-use ob_poc_macros::register_custom_op;
+use sem_os_postgres::ops::SemOsVerbOp;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
-use super::helpers::{
-    extract_bool_opt, extract_int_opt, extract_string, extract_string_opt, extract_uuid,
-    extract_uuid_opt,
+use dsl_runtime::domain_ops::helpers::{
+    json_extract_bool_opt, json_extract_int_opt, json_extract_string, json_extract_string_opt,
+    json_extract_uuid, json_extract_uuid_opt,
 };
-use super::CustomOperation;
+use dsl_runtime::tx::TransactionScope;
+use dsl_runtime::{VerbExecutionContext, VerbExecutionOutcome};
+
 use crate::api::booking_principal_types::*;
-use crate::dsl_v2::ast::VerbCall;
-use crate::dsl_v2::executor::{ExecutionContext, ExecutionResult};
 
 #[cfg(feature = "database")]
 use crate::database::booking_principal_repository::BookingPrincipalRepository;
 #[cfg(feature = "database")]
 use crate::domain_ops::rule_evaluator;
-#[cfg(feature = "database")]
-use sqlx::PgPool;
 
 // =============================================================================
 // Result Types
@@ -109,35 +118,27 @@ pub struct CrossSellResult {
 // =============================================================================
 
 /// Create a new BNY legal entity
-#[register_custom_op]
-pub struct LegalEntityCreateOp;
+pub struct LegalEntityCreate;
 
 #[async_trait]
-impl CustomOperation for LegalEntityCreateOp {
-    fn domain(&self) -> &'static str {
-        "legal-entity"
+impl SemOsVerbOp for LegalEntityCreate {
+    fn fqn(&self) -> &str {
+        "legal-entity.create"
     }
-    fn verb(&self) -> &'static str {
-        "create"
-    }
-    fn rationale(&self) -> &'static str {
-        "Validates incorporation jurisdiction and optional LEI before insert"
-    }
-
-    #[cfg(feature = "database")]
     async fn execute(
         &self,
-        verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-        pool: &PgPool,
-    ) -> Result<ExecutionResult> {
-        let name = extract_string(verb_call, "name")?;
-        let incorporation_jurisdiction = extract_string(verb_call, "incorporation-jurisdiction")?;
-        let lei = extract_string_opt(verb_call, "lei");
-        let entity_id = extract_uuid_opt(verb_call, _ctx, "entity-id");
+        args: &serde_json::Value,
+        ctx: &mut VerbExecutionContext,
+        scope: &mut dyn TransactionScope,
+    ) -> Result<VerbExecutionOutcome> {
+        let pool = scope.pool().clone();
+        let name = json_extract_string(args, "name")?;
+        let incorporation_jurisdiction = json_extract_string(args, "incorporation-jurisdiction")?;
+        let lei = json_extract_string_opt(args, "lei");
+        let entity_id = json_extract_uuid_opt(args, ctx, "entity-id");
 
         let id = BookingPrincipalRepository::insert_legal_entity(
-            pool,
+            &pool,
             &name,
             &incorporation_jurisdiction,
             lei.as_deref(),
@@ -149,46 +150,29 @@ impl CustomOperation for LegalEntityCreateOp {
             legal_entity_id: id,
             name,
         };
-        Ok(ExecutionResult::Record(serde_json::to_value(result)?))
-    }
-
-    #[cfg(not(feature = "database"))]
-    async fn execute(
-        &self,
-        _verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-    ) -> Result<ExecutionResult> {
-        Ok(ExecutionResult::Uuid(Uuid::new_v4()))
+        Ok(VerbExecutionOutcome::Record(serde_json::to_value(result)?))
     }
 }
 
 /// Update an existing legal entity
-#[register_custom_op]
-pub struct LegalEntityUpdateOp;
+pub struct LegalEntityUpdate;
 
 #[async_trait]
-impl CustomOperation for LegalEntityUpdateOp {
-    fn domain(&self) -> &'static str {
-        "legal-entity"
+impl SemOsVerbOp for LegalEntityUpdate {
+    fn fqn(&self) -> &str {
+        "legal-entity.update"
     }
-    fn verb(&self) -> &'static str {
-        "update"
-    }
-    fn rationale(&self) -> &'static str {
-        "Supports partial updates of legal entity fields"
-    }
-
-    #[cfg(feature = "database")]
     async fn execute(
         &self,
-        verb_call: &VerbCall,
-        ctx: &mut ExecutionContext,
-        pool: &PgPool,
-    ) -> Result<ExecutionResult> {
-        let legal_entity_id = extract_uuid(verb_call, ctx, "legal-entity-id")?;
-        let name = extract_string_opt(verb_call, "name");
-        let lei = extract_string_opt(verb_call, "lei");
-        let status = extract_string_opt(verb_call, "status");
+        args: &serde_json::Value,
+        ctx: &mut VerbExecutionContext,
+        scope: &mut dyn TransactionScope,
+    ) -> Result<VerbExecutionOutcome> {
+        let pool = scope.pool().clone();
+        let legal_entity_id = json_extract_uuid(args, ctx, "legal-entity-id")?;
+        let name = json_extract_string_opt(args, "name");
+        let lei = json_extract_string_opt(args, "lei");
+        let status = json_extract_string_opt(args, "status");
 
         let mut set_clauses = Vec::new();
         let mut param_idx = 2u32;
@@ -226,59 +210,33 @@ impl CustomOperation for LegalEntityUpdateOp {
         }
         let _ = param_idx; // suppress warning
 
-        query.execute(pool).await?;
+        query.execute(&pool).await?;
 
-        Ok(ExecutionResult::Uuid(legal_entity_id))
-    }
-
-    #[cfg(not(feature = "database"))]
-    async fn execute(
-        &self,
-        _verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-    ) -> Result<ExecutionResult> {
-        Ok(ExecutionResult::Void)
+        Ok(VerbExecutionOutcome::Uuid(legal_entity_id))
     }
 }
 
 /// List active legal entities
-#[register_custom_op]
-pub struct LegalEntityListOp;
+pub struct LegalEntityList;
 
 #[async_trait]
-impl CustomOperation for LegalEntityListOp {
-    fn domain(&self) -> &'static str {
-        "legal-entity"
+impl SemOsVerbOp for LegalEntityList {
+    fn fqn(&self) -> &str {
+        "legal-entity.list"
     }
-    fn verb(&self) -> &'static str {
-        "list"
-    }
-    fn rationale(&self) -> &'static str {
-        "Filters to active entities only, returns structured list"
-    }
-
-    #[cfg(feature = "database")]
     async fn execute(
         &self,
-        _verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-        pool: &PgPool,
-    ) -> Result<ExecutionResult> {
-        let entities = BookingPrincipalRepository::list_legal_entities(pool).await?;
+        _args: &serde_json::Value,
+        _ctx: &mut VerbExecutionContext,
+        scope: &mut dyn TransactionScope,
+    ) -> Result<VerbExecutionOutcome> {
+        let pool = scope.pool().clone();
+        let entities = BookingPrincipalRepository::list_legal_entities(&pool).await?;
         let values: Vec<serde_json::Value> = entities
             .into_iter()
             .map(|e| serde_json::to_value(e).unwrap_or_default())
             .collect();
-        Ok(ExecutionResult::RecordSet(values))
-    }
-
-    #[cfg(not(feature = "database"))]
-    async fn execute(
-        &self,
-        _verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-    ) -> Result<ExecutionResult> {
-        Ok(ExecutionResult::RecordSet(vec![]))
+        Ok(VerbExecutionOutcome::RecordSet(values))
     }
 }
 
@@ -295,32 +253,24 @@ pub struct RuleFieldRegisterResult {
 }
 
 /// Register a new field in the rule field dictionary
-#[register_custom_op]
-pub struct RuleFieldRegisterOp;
+pub struct RuleFieldRegister;
 
 #[async_trait]
-impl CustomOperation for RuleFieldRegisterOp {
-    fn domain(&self) -> &'static str {
-        "rule-field"
+impl SemOsVerbOp for RuleFieldRegister {
+    fn fqn(&self) -> &str {
+        "rule-field.register"
     }
-    fn verb(&self) -> &'static str {
-        "register"
-    }
-    fn rationale(&self) -> &'static str {
-        "Validates field_type against allowed enum, upserts into closed-world dictionary"
-    }
-
-    #[cfg(feature = "database")]
     async fn execute(
         &self,
-        verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-        pool: &PgPool,
-    ) -> Result<ExecutionResult> {
-        let field_key = extract_string(verb_call, "field-key")?;
-        let field_type = extract_string(verb_call, "field-type")?;
-        let description = extract_string_opt(verb_call, "description");
-        let source_table = extract_string_opt(verb_call, "source-table");
+        args: &serde_json::Value,
+        _ctx: &mut VerbExecutionContext,
+        scope: &mut dyn TransactionScope,
+    ) -> Result<VerbExecutionOutcome> {
+        let pool = scope.pool().clone();
+        let field_key = json_extract_string(args, "field-key")?;
+        let field_type = json_extract_string(args, "field-type")?;
+        let description = json_extract_string_opt(args, "description");
+        let source_table = json_extract_string_opt(args, "source-table");
 
         // Validate field_type against allowed values
         const VALID_TYPES: &[&str] = &["string", "string_array", "boolean", "number", "date"];
@@ -333,7 +283,7 @@ impl CustomOperation for RuleFieldRegisterOp {
         }
 
         let entry = BookingPrincipalRepository::register_field(
-            pool,
+            &pool,
             &field_key,
             &field_type,
             description.as_deref(),
@@ -347,57 +297,31 @@ impl CustomOperation for RuleFieldRegisterOp {
             description: entry.description,
             source_table: entry.source_table,
         };
-        Ok(ExecutionResult::Record(serde_json::to_value(result)?))
-    }
-
-    #[cfg(not(feature = "database"))]
-    async fn execute(
-        &self,
-        _verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-    ) -> Result<ExecutionResult> {
-        Err(anyhow!("rule-field.register requires database"))
+        Ok(VerbExecutionOutcome::Record(serde_json::to_value(result)?))
     }
 }
 
 /// List all registered fields in the rule field dictionary
-#[register_custom_op]
-pub struct RuleFieldListOp;
+pub struct RuleFieldList;
 
 #[async_trait]
-impl CustomOperation for RuleFieldListOp {
-    fn domain(&self) -> &'static str {
-        "rule-field"
+impl SemOsVerbOp for RuleFieldList {
+    fn fqn(&self) -> &str {
+        "rule-field.list"
     }
-    fn verb(&self) -> &'static str {
-        "list"
-    }
-    fn rationale(&self) -> &'static str {
-        "Returns the full closed-world field dictionary for rule authoring"
-    }
-
-    #[cfg(feature = "database")]
     async fn execute(
         &self,
-        _verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-        pool: &PgPool,
-    ) -> Result<ExecutionResult> {
-        let entries = BookingPrincipalRepository::get_field_dictionary(pool).await?;
+        _args: &serde_json::Value,
+        _ctx: &mut VerbExecutionContext,
+        scope: &mut dyn TransactionScope,
+    ) -> Result<VerbExecutionOutcome> {
+        let pool = scope.pool().clone();
+        let entries = BookingPrincipalRepository::get_field_dictionary(&pool).await?;
         let values: Vec<serde_json::Value> = entries
             .into_iter()
             .map(serde_json::to_value)
             .collect::<Result<Vec<_>, _>>()?;
-        Ok(ExecutionResult::RecordSet(values))
-    }
-
-    #[cfg(not(feature = "database"))]
-    async fn execute(
-        &self,
-        _verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-    ) -> Result<ExecutionResult> {
-        Ok(ExecutionResult::RecordSet(vec![]))
+        Ok(VerbExecutionOutcome::RecordSet(values))
     }
 }
 
@@ -406,44 +330,36 @@ impl CustomOperation for RuleFieldListOp {
 // =============================================================================
 
 /// Create a new booking location
-#[register_custom_op]
-pub struct BookingLocationCreateOp;
+pub struct BookingLocationCreate;
 
 #[async_trait]
-impl CustomOperation for BookingLocationCreateOp {
-    fn domain(&self) -> &'static str {
-        "booking-location"
+impl SemOsVerbOp for BookingLocationCreate {
+    fn fqn(&self) -> &str {
+        "booking-location.create"
     }
-    fn verb(&self) -> &'static str {
-        "create"
-    }
-    fn rationale(&self) -> &'static str {
-        "Validates jurisdiction FK and regulatory regime tags before insert"
-    }
-
-    #[cfg(feature = "database")]
     async fn execute(
         &self,
-        verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-        pool: &PgPool,
-    ) -> Result<ExecutionResult> {
-        let country_code = extract_string(verb_call, "country-code")?;
-        let region_code = extract_string_opt(verb_call, "region-code");
-        let jurisdiction_code = extract_string_opt(verb_call, "jurisdiction-code");
-        let regime_tags: Vec<String> = verb_call
-            .get_arg("regulatory-regime-tags")
-            .and_then(|a| a.value.as_list())
+        args: &serde_json::Value,
+        _ctx: &mut VerbExecutionContext,
+        scope: &mut dyn TransactionScope,
+    ) -> Result<VerbExecutionOutcome> {
+        let pool = scope.pool().clone();
+        let country_code = json_extract_string(args, "country-code")?;
+        let region_code = json_extract_string_opt(args, "region-code");
+        let jurisdiction_code = json_extract_string_opt(args, "jurisdiction-code");
+        let regime_tags: Vec<String> = args
+            .get("regulatory-regime-tags")
+            .and_then(|v| v.as_array())
             .map(|items| {
                 items
                     .iter()
-                    .filter_map(|v| v.as_string().map(|s| s.to_string()))
+                    .filter_map(|v| v.as_str().map(|s| s.to_string()))
                     .collect()
             })
             .unwrap_or_default();
 
         let id = BookingPrincipalRepository::insert_booking_location(
-            pool,
+            &pool,
             &country_code,
             region_code.as_deref(),
             &regime_tags,
@@ -455,45 +371,28 @@ impl CustomOperation for BookingLocationCreateOp {
             booking_location_id: id,
             country_code,
         };
-        Ok(ExecutionResult::Record(serde_json::to_value(result)?))
-    }
-
-    #[cfg(not(feature = "database"))]
-    async fn execute(
-        &self,
-        _verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-    ) -> Result<ExecutionResult> {
-        Ok(ExecutionResult::Uuid(Uuid::new_v4()))
+        Ok(VerbExecutionOutcome::Record(serde_json::to_value(result)?))
     }
 }
 
 /// Update a booking location
-#[register_custom_op]
-pub struct BookingLocationUpdateOp;
+pub struct BookingLocationUpdate;
 
 #[async_trait]
-impl CustomOperation for BookingLocationUpdateOp {
-    fn domain(&self) -> &'static str {
-        "booking-location"
+impl SemOsVerbOp for BookingLocationUpdate {
+    fn fqn(&self) -> &str {
+        "booking-location.update"
     }
-    fn verb(&self) -> &'static str {
-        "update"
-    }
-    fn rationale(&self) -> &'static str {
-        "Supports partial updates of booking location fields"
-    }
-
-    #[cfg(feature = "database")]
     async fn execute(
         &self,
-        verb_call: &VerbCall,
-        ctx: &mut ExecutionContext,
-        pool: &PgPool,
-    ) -> Result<ExecutionResult> {
-        let id = extract_uuid(verb_call, ctx, "booking-location-id")?;
-        let region_code = extract_string_opt(verb_call, "region-code");
-        let jurisdiction_code = extract_string_opt(verb_call, "jurisdiction-code");
+        args: &serde_json::Value,
+        ctx: &mut VerbExecutionContext,
+        scope: &mut dyn TransactionScope,
+    ) -> Result<VerbExecutionOutcome> {
+        let pool = scope.pool().clone();
+        let id = json_extract_uuid(args, ctx, "booking-location-id")?;
+        let region_code = json_extract_string_opt(args, "region-code");
+        let jurisdiction_code = json_extract_string_opt(args, "jurisdiction-code");
 
         let mut updates = vec!["updated_at = now()"];
         if region_code.is_some() {
@@ -512,45 +411,28 @@ impl CustomOperation for BookingLocationUpdateOp {
             .bind(id)
             .bind(&region_code)
             .bind(&jurisdiction_code)
-            .execute(pool)
+            .execute(&pool)
             .await?;
 
-        Ok(ExecutionResult::Uuid(id))
-    }
-
-    #[cfg(not(feature = "database"))]
-    async fn execute(
-        &self,
-        _verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-    ) -> Result<ExecutionResult> {
-        Ok(ExecutionResult::Void)
+        Ok(VerbExecutionOutcome::Uuid(id))
     }
 }
 
 /// List booking locations
-#[register_custom_op]
-pub struct BookingLocationListOp;
+pub struct BookingLocationList;
 
 #[async_trait]
-impl CustomOperation for BookingLocationListOp {
-    fn domain(&self) -> &'static str {
-        "booking-location"
+impl SemOsVerbOp for BookingLocationList {
+    fn fqn(&self) -> &str {
+        "booking-location.list"
     }
-    fn verb(&self) -> &'static str {
-        "list"
-    }
-    fn rationale(&self) -> &'static str {
-        "Returns all locations with regulatory regime tags"
-    }
-
-    #[cfg(feature = "database")]
     async fn execute(
         &self,
-        _verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-        pool: &PgPool,
-    ) -> Result<ExecutionResult> {
+        _args: &serde_json::Value,
+        _ctx: &mut VerbExecutionContext,
+        scope: &mut dyn TransactionScope,
+    ) -> Result<VerbExecutionOutcome> {
+        let pool = scope.pool().clone();
         let rows: Vec<(
             Uuid,
             String,
@@ -565,7 +447,7 @@ impl CustomOperation for BookingLocationListOp {
                 ORDER BY country_code
                 "#,
         )
-        .fetch_all(pool)
+        .fetch_all(&pool)
         .await?;
 
         let values: Vec<serde_json::Value> = rows
@@ -581,16 +463,7 @@ impl CustomOperation for BookingLocationListOp {
             })
             .collect();
 
-        Ok(ExecutionResult::RecordSet(values))
-    }
-
-    #[cfg(not(feature = "database"))]
-    async fn execute(
-        &self,
-        _verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-    ) -> Result<ExecutionResult> {
-        Ok(ExecutionResult::RecordSet(vec![]))
+        Ok(VerbExecutionOutcome::RecordSet(values))
     }
 }
 
@@ -599,35 +472,27 @@ impl CustomOperation for BookingLocationListOp {
 // =============================================================================
 
 /// Create a new booking principal (LE + location envelope)
-#[register_custom_op]
-pub struct BookingPrincipalCreateOp;
+pub struct BookingPrincipalCreate;
 
 #[async_trait]
-impl CustomOperation for BookingPrincipalCreateOp {
-    fn domain(&self) -> &'static str {
-        "booking-principal"
+impl SemOsVerbOp for BookingPrincipalCreate {
+    fn fqn(&self) -> &str {
+        "booking-principal.create"
     }
-    fn verb(&self) -> &'static str {
-        "create"
-    }
-    fn rationale(&self) -> &'static str {
-        "Validates FK to legal entity and booking location, generates principal code"
-    }
-
-    #[cfg(feature = "database")]
     async fn execute(
         &self,
-        verb_call: &VerbCall,
-        ctx: &mut ExecutionContext,
-        pool: &PgPool,
-    ) -> Result<ExecutionResult> {
-        let legal_entity_id = extract_uuid(verb_call, ctx, "legal-entity-id")?;
-        let booking_location_id = extract_uuid_opt(verb_call, ctx, "booking-location-id");
-        let principal_code = extract_string(verb_call, "principal-code")?;
-        let book_code = extract_string_opt(verb_call, "book-code");
+        args: &serde_json::Value,
+        ctx: &mut VerbExecutionContext,
+        scope: &mut dyn TransactionScope,
+    ) -> Result<VerbExecutionOutcome> {
+        let pool = scope.pool().clone();
+        let legal_entity_id = json_extract_uuid(args, ctx, "legal-entity-id")?;
+        let booking_location_id = json_extract_uuid_opt(args, ctx, "booking-location-id");
+        let principal_code = json_extract_string(args, "principal-code")?;
+        let book_code = json_extract_string_opt(args, "book-code");
 
         let id = BookingPrincipalRepository::insert_booking_principal(
-            pool,
+            &pool,
             legal_entity_id,
             booking_location_id,
             &principal_code,
@@ -639,45 +504,28 @@ impl CustomOperation for BookingPrincipalCreateOp {
             booking_principal_id: id,
             principal_code,
         };
-        Ok(ExecutionResult::Record(serde_json::to_value(result)?))
-    }
-
-    #[cfg(not(feature = "database"))]
-    async fn execute(
-        &self,
-        _verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-    ) -> Result<ExecutionResult> {
-        Ok(ExecutionResult::Uuid(Uuid::new_v4()))
+        Ok(VerbExecutionOutcome::Record(serde_json::to_value(result)?))
     }
 }
 
 /// Update a booking principal
-#[register_custom_op]
-pub struct BookingPrincipalUpdateOp;
+pub struct BookingPrincipalUpdate;
 
 #[async_trait]
-impl CustomOperation for BookingPrincipalUpdateOp {
-    fn domain(&self) -> &'static str {
-        "booking-principal"
+impl SemOsVerbOp for BookingPrincipalUpdate {
+    fn fqn(&self) -> &str {
+        "booking-principal.update"
     }
-    fn verb(&self) -> &'static str {
-        "update"
-    }
-    fn rationale(&self) -> &'static str {
-        "Supports partial updates (book code, status, metadata)"
-    }
-
-    #[cfg(feature = "database")]
     async fn execute(
         &self,
-        verb_call: &VerbCall,
-        ctx: &mut ExecutionContext,
-        pool: &PgPool,
-    ) -> Result<ExecutionResult> {
-        let id = extract_uuid(verb_call, ctx, "booking-principal-id")?;
-        let book_code = extract_string_opt(verb_call, "book-code");
-        let status = extract_string_opt(verb_call, "status");
+        args: &serde_json::Value,
+        ctx: &mut VerbExecutionContext,
+        scope: &mut dyn TransactionScope,
+    ) -> Result<VerbExecutionOutcome> {
+        let pool = scope.pool().clone();
+        let id = json_extract_uuid(args, ctx, "booking-principal-id")?;
+        let book_code = json_extract_string_opt(args, "book-code");
+        let status = json_extract_string_opt(args, "status");
 
         let mut set_parts = vec!["updated_at = now()".to_string()];
         if book_code.is_some() {
@@ -696,49 +544,32 @@ impl CustomOperation for BookingPrincipalUpdateOp {
             .bind(id)
             .bind(&book_code)
             .bind(&status)
-            .execute(pool)
+            .execute(&pool)
             .await?;
 
-        Ok(ExecutionResult::Uuid(id))
-    }
-
-    #[cfg(not(feature = "database"))]
-    async fn execute(
-        &self,
-        _verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-    ) -> Result<ExecutionResult> {
-        Ok(ExecutionResult::Void)
+        Ok(VerbExecutionOutcome::Uuid(id))
     }
 }
 
 /// Retire a booking principal (with active relationship check)
-#[register_custom_op]
-pub struct BookingPrincipalRetireOp;
+pub struct BookingPrincipalRetire;
 
 #[async_trait]
-impl CustomOperation for BookingPrincipalRetireOp {
-    fn domain(&self) -> &'static str {
-        "booking-principal"
+impl SemOsVerbOp for BookingPrincipalRetire {
+    fn fqn(&self) -> &str {
+        "booking-principal.retire"
     }
-    fn verb(&self) -> &'static str {
-        "retire"
-    }
-    fn rationale(&self) -> &'static str {
-        "Counts active relationships before retiring for impact visibility"
-    }
-
-    #[cfg(feature = "database")]
     async fn execute(
         &self,
-        verb_call: &VerbCall,
-        ctx: &mut ExecutionContext,
-        pool: &PgPool,
-    ) -> Result<ExecutionResult> {
-        let id = extract_uuid(verb_call, ctx, "booking-principal-id")?;
-        let force = extract_bool_opt(verb_call, "force").unwrap_or(false);
+        args: &serde_json::Value,
+        ctx: &mut VerbExecutionContext,
+        scope: &mut dyn TransactionScope,
+    ) -> Result<VerbExecutionOutcome> {
+        let pool = scope.pool().clone();
+        let id = json_extract_uuid(args, ctx, "booking-principal-id")?;
+        let force = json_extract_bool_opt(args, "force").unwrap_or(false);
 
-        let active_count = BookingPrincipalRepository::retire_booking_principal(pool, id).await?;
+        let active_count = BookingPrincipalRepository::retire_booking_principal(&pool, id).await?;
 
         if active_count > 0 && !force {
             return Err(anyhow!(
@@ -751,16 +582,7 @@ impl CustomOperation for BookingPrincipalRetireOp {
             booking_principal_id: id,
             active_relationships: active_count,
         };
-        Ok(ExecutionResult::Record(serde_json::to_value(result)?))
-    }
-
-    #[cfg(not(feature = "database"))]
-    async fn execute(
-        &self,
-        _verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-    ) -> Result<ExecutionResult> {
-        Ok(ExecutionResult::Void)
+        Ok(VerbExecutionOutcome::Record(serde_json::to_value(result)?))
     }
 }
 
@@ -769,62 +591,51 @@ impl CustomOperation for BookingPrincipalRetireOp {
 // =============================================================================
 
 /// Primary eligibility evaluation pipeline
-#[register_custom_op]
-pub struct BookingPrincipalEvaluateOp;
+pub struct BookingPrincipalEvaluate;
 
 #[async_trait]
-impl CustomOperation for BookingPrincipalEvaluateOp {
-    fn domain(&self) -> &'static str {
-        "booking-principal"
+impl SemOsVerbOp for BookingPrincipalEvaluate {
+    fn fqn(&self) -> &str {
+        "booking-principal.evaluate"
     }
-    fn verb(&self) -> &'static str {
-        "evaluate"
-    }
-    fn rationale(&self) -> &'static str {
-        "Full evaluation pipeline: profile snapshot, rule gathering, boundary-aware merge, delivery check, audit pin"
-    }
-
-    #[cfg(feature = "database")]
     async fn execute(
         &self,
-        verb_call: &VerbCall,
-        ctx: &mut ExecutionContext,
-        pool: &PgPool,
-    ) -> Result<ExecutionResult> {
-        let client_group_id = extract_uuid(verb_call, ctx, "client-group-id")?;
-        let segment = extract_string(verb_call, "segment")?;
-        let domicile_country = extract_string(verb_call, "domicile-country")?;
-        let entity_types: Vec<String> = verb_call
-            .get_arg("entity-types")
-            .and_then(|a| a.value.as_list())
+        args: &serde_json::Value,
+        ctx: &mut VerbExecutionContext,
+        scope: &mut dyn TransactionScope,
+    ) -> Result<VerbExecutionOutcome> {
+        let pool = scope.pool().clone();
+        let client_group_id = json_extract_uuid(args, ctx, "client-group-id")?;
+        let segment = json_extract_string(args, "segment")?;
+        let domicile_country = json_extract_string(args, "domicile-country")?;
+        let entity_types: Vec<String> = args
+            .get("entity-types")
+            .and_then(|v| v.as_array())
             .map(|items| {
                 items
                     .iter()
-                    .filter_map(|v| v.as_string().map(|s| s.to_string()))
+                    .filter_map(|v| v.as_str().map(|s| s.to_string()))
                     .collect()
             })
             .unwrap_or_default();
         let requested_by =
-            extract_string_opt(verb_call, "requested-by").unwrap_or_else(|| "system".to_string());
+            json_extract_string_opt(args, "requested-by").unwrap_or_else(|| "system".to_string());
 
         // Offering IDs from product lookup
-        let offering_ids: Vec<Uuid> = verb_call
-            .get_arg("offering-ids")
-            .and_then(|a| a.value.as_list())
+        let offering_ids: Vec<Uuid> = args
+            .get("offering-ids")
+            .and_then(|v| v.as_array())
             .map(|items| {
                 items
                     .iter()
-                    .filter_map(|v| {
-                        v.as_uuid()
-                            .or_else(|| v.as_string().and_then(|s| uuid::Uuid::parse_str(s).ok()))
-                    })
+                    .filter_map(|v| v.as_str().and_then(|s| uuid::Uuid::parse_str(s).ok()))
                     .collect()
             })
             .unwrap_or_default();
 
         // 1. Create client profile snapshot
         let profile_id = BookingPrincipalRepository::insert_client_profile(
-            pool,
+            &pool,
             client_group_id,
             &segment,
             &domicile_country,
@@ -834,12 +645,12 @@ impl CustomOperation for BookingPrincipalEvaluateOp {
         .await?;
 
         // 2. Get all active principals
-        let principals = BookingPrincipalRepository::list_active_principals(pool).await?;
+        let principals = BookingPrincipalRepository::list_active_principals(&pool).await?;
         let principal_ids: Vec<Uuid> = principals.iter().map(|p| p.booking_principal_id).collect();
 
         // 3. Gather applicable rules
         let rulesets = BookingPrincipalRepository::gather_rules_for_evaluation(
-            pool,
+            &pool,
             &offering_ids,
             &principal_ids,
         )
@@ -847,7 +658,7 @@ impl CustomOperation for BookingPrincipalEvaluateOp {
 
         // 4. Get existing relationships for scoring
         let existing_rels =
-            BookingPrincipalRepository::get_active_relationships_for_client(pool, client_group_id)
+            BookingPrincipalRepository::get_active_relationships_for_client(&pool, client_group_id)
                 .await?;
 
         // 5. Build base context
@@ -871,7 +682,7 @@ impl CustomOperation for BookingPrincipalEvaluateOp {
 
             // Add principal context
             let location = if let Some(loc_id) = principal.booking_location_id {
-                BookingPrincipalRepository::get_booking_location(pool, loc_id).await?
+                BookingPrincipalRepository::get_booking_location(&pool, loc_id).await?
             } else {
                 None
             };
@@ -931,7 +742,7 @@ impl CustomOperation for BookingPrincipalEvaluateOp {
             let relationship_boost = if has_relationship { 0.1 } else { 0.0 };
 
             // Get legal entity name
-            let le = BookingPrincipalRepository::get_legal_entity(pool, principal.legal_entity_id)
+            let le = BookingPrincipalRepository::get_legal_entity(&pool, principal.legal_entity_id)
                 .await?;
             let le_name = le.map(|e| e.name).unwrap_or_default();
 
@@ -971,11 +782,11 @@ impl CustomOperation for BookingPrincipalEvaluateOp {
             // Check delivery (service availability)
             for offering_id in &offering_ids {
                 let services =
-                    BookingPrincipalRepository::get_services_for_product(pool, *offering_id)
+                    BookingPrincipalRepository::get_services_for_product(&pool, *offering_id)
                         .await?;
                 for service_id in services {
                     let avail = BookingPrincipalRepository::get_availability(
-                        pool,
+                        &pool,
                         principal.booking_principal_id,
                         service_id,
                     )
@@ -1034,7 +845,7 @@ impl CustomOperation for BookingPrincipalEvaluateOp {
         });
 
         let evaluation_id = BookingPrincipalRepository::insert_evaluation(
-            pool,
+            &pool,
             profile_id,
             client_group_id,
             &offering_ids,
@@ -1056,47 +867,32 @@ impl CustomOperation for BookingPrincipalEvaluateOp {
             policy_snapshot,
         };
 
-        Ok(ExecutionResult::Record(serde_json::to_value(eval_result)?))
-    }
-
-    #[cfg(not(feature = "database"))]
-    async fn execute(
-        &self,
-        _verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-    ) -> Result<ExecutionResult> {
-        Ok(ExecutionResult::Void)
+        Ok(VerbExecutionOutcome::Record(serde_json::to_value(
+            eval_result,
+        )?))
     }
 }
 
 /// Record selection of a principal from an evaluation
-#[register_custom_op]
-pub struct BookingPrincipalSelectOp;
+pub struct BookingPrincipalSelect;
 
 #[async_trait]
-impl CustomOperation for BookingPrincipalSelectOp {
-    fn domain(&self) -> &'static str {
-        "booking-principal"
+impl SemOsVerbOp for BookingPrincipalSelect {
+    fn fqn(&self) -> &str {
+        "booking-principal.select"
     }
-    fn verb(&self) -> &'static str {
-        "select"
-    }
-    fn rationale(&self) -> &'static str {
-        "Validates candidate eligibility and updates evaluation record with selection"
-    }
-
-    #[cfg(feature = "database")]
     async fn execute(
         &self,
-        verb_call: &VerbCall,
-        ctx: &mut ExecutionContext,
-        pool: &PgPool,
-    ) -> Result<ExecutionResult> {
-        let evaluation_id = extract_uuid(verb_call, ctx, "evaluation-id")?;
-        let principal_id = extract_uuid(verb_call, ctx, "principal-id")?;
+        args: &serde_json::Value,
+        ctx: &mut VerbExecutionContext,
+        scope: &mut dyn TransactionScope,
+    ) -> Result<VerbExecutionOutcome> {
+        let pool = scope.pool().clone();
+        let evaluation_id = json_extract_uuid(args, ctx, "evaluation-id")?;
+        let principal_id = json_extract_uuid(args, ctx, "principal-id")?;
 
         let updated = BookingPrincipalRepository::select_principal_on_evaluation(
-            pool,
+            &pool,
             evaluation_id,
             principal_id,
         )
@@ -1116,58 +912,32 @@ impl CustomOperation for BookingPrincipalSelectOp {
             override_gate: None,
         };
 
-        Ok(ExecutionResult::Record(serde_json::to_value(result)?))
-    }
-
-    #[cfg(not(feature = "database"))]
-    async fn execute(
-        &self,
-        _verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-    ) -> Result<ExecutionResult> {
-        Ok(ExecutionResult::Void)
+        Ok(VerbExecutionOutcome::Record(serde_json::to_value(result)?))
     }
 }
 
 /// Retrieve full explain payload for an evaluation
-#[register_custom_op]
-pub struct BookingPrincipalExplainOp;
+pub struct BookingPrincipalExplain;
 
 #[async_trait]
-impl CustomOperation for BookingPrincipalExplainOp {
-    fn domain(&self) -> &'static str {
-        "booking-principal"
+impl SemOsVerbOp for BookingPrincipalExplain {
+    fn fqn(&self) -> &str {
+        "booking-principal.explain"
     }
-    fn verb(&self) -> &'static str {
-        "explain"
-    }
-    fn rationale(&self) -> &'static str {
-        "Retrieves full audit trail and evaluation explain from immutable record"
-    }
-
-    #[cfg(feature = "database")]
     async fn execute(
         &self,
-        verb_call: &VerbCall,
-        ctx: &mut ExecutionContext,
-        pool: &PgPool,
-    ) -> Result<ExecutionResult> {
-        let evaluation_id = extract_uuid(verb_call, ctx, "evaluation-id")?;
+        args: &serde_json::Value,
+        ctx: &mut VerbExecutionContext,
+        scope: &mut dyn TransactionScope,
+    ) -> Result<VerbExecutionOutcome> {
+        let pool = scope.pool().clone();
+        let evaluation_id = json_extract_uuid(args, ctx, "evaluation-id")?;
 
-        let eval = BookingPrincipalRepository::get_evaluation(pool, evaluation_id)
+        let eval = BookingPrincipalRepository::get_evaluation(&pool, evaluation_id)
             .await?
             .ok_or_else(|| anyhow!("Evaluation not found: {}", evaluation_id))?;
 
-        Ok(ExecutionResult::Record(serde_json::to_value(eval)?))
-    }
-
-    #[cfg(not(feature = "database"))]
-    async fn execute(
-        &self,
-        _verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-    ) -> Result<ExecutionResult> {
-        Ok(ExecutionResult::Void)
+        Ok(VerbExecutionOutcome::Record(serde_json::to_value(eval)?))
     }
 }
 
@@ -1176,35 +946,27 @@ impl CustomOperation for BookingPrincipalExplainOp {
 // =============================================================================
 
 /// Record a new client-principal-offering relationship
-#[register_custom_op]
-pub struct ClientPrincipalRelationshipRecordOp;
+pub struct ClientPrincipalRelationshipRecord;
 
 #[async_trait]
-impl CustomOperation for ClientPrincipalRelationshipRecordOp {
-    fn domain(&self) -> &'static str {
-        "client-principal-relationship"
+impl SemOsVerbOp for ClientPrincipalRelationshipRecord {
+    fn fqn(&self) -> &str {
+        "client-principal-relationship.record"
     }
-    fn verb(&self) -> &'static str {
-        "record"
-    }
-    fn rationale(&self) -> &'static str {
-        "Creates relationship with partial unique index enforcement on active records"
-    }
-
-    #[cfg(feature = "database")]
     async fn execute(
         &self,
-        verb_call: &VerbCall,
-        ctx: &mut ExecutionContext,
-        pool: &PgPool,
-    ) -> Result<ExecutionResult> {
-        let client_group_id = extract_uuid(verb_call, ctx, "client-group-id")?;
-        let booking_principal_id = extract_uuid(verb_call, ctx, "booking-principal-id")?;
-        let product_offering_id = extract_uuid(verb_call, ctx, "product-offering-id")?;
-        let contract_ref = extract_string_opt(verb_call, "contract-ref");
+        args: &serde_json::Value,
+        ctx: &mut VerbExecutionContext,
+        scope: &mut dyn TransactionScope,
+    ) -> Result<VerbExecutionOutcome> {
+        let pool = scope.pool().clone();
+        let client_group_id = json_extract_uuid(args, ctx, "client-group-id")?;
+        let booking_principal_id = json_extract_uuid(args, ctx, "booking-principal-id")?;
+        let product_offering_id = json_extract_uuid(args, ctx, "product-offering-id")?;
+        let contract_ref = json_extract_string_opt(args, "contract-ref");
 
         let id = BookingPrincipalRepository::record_relationship(
-            pool,
+            &pool,
             client_group_id,
             booking_principal_id,
             product_offering_id,
@@ -1217,88 +979,54 @@ impl CustomOperation for ClientPrincipalRelationshipRecordOp {
             client_group_id,
             booking_principal_id,
         };
-        Ok(ExecutionResult::Record(serde_json::to_value(result)?))
-    }
-
-    #[cfg(not(feature = "database"))]
-    async fn execute(
-        &self,
-        _verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-    ) -> Result<ExecutionResult> {
-        Ok(ExecutionResult::Uuid(Uuid::new_v4()))
+        Ok(VerbExecutionOutcome::Record(serde_json::to_value(result)?))
     }
 }
 
 /// Terminate a client-principal relationship
-#[register_custom_op]
-pub struct ClientPrincipalRelationshipTerminateOp;
+pub struct ClientPrincipalRelationshipTerminate;
 
 #[async_trait]
-impl CustomOperation for ClientPrincipalRelationshipTerminateOp {
-    fn domain(&self) -> &'static str {
-        "client-principal-relationship"
+impl SemOsVerbOp for ClientPrincipalRelationshipTerminate {
+    fn fqn(&self) -> &str {
+        "client-principal-relationship.terminate"
     }
-    fn verb(&self) -> &'static str {
-        "terminate"
-    }
-    fn rationale(&self) -> &'static str {
-        "Sets status to terminated only if currently active"
-    }
-
-    #[cfg(feature = "database")]
     async fn execute(
         &self,
-        verb_call: &VerbCall,
-        ctx: &mut ExecutionContext,
-        pool: &PgPool,
-    ) -> Result<ExecutionResult> {
-        let relationship_id = extract_uuid(verb_call, ctx, "relationship-id")?;
+        args: &serde_json::Value,
+        ctx: &mut VerbExecutionContext,
+        scope: &mut dyn TransactionScope,
+    ) -> Result<VerbExecutionOutcome> {
+        let pool = scope.pool().clone();
+        let relationship_id = json_extract_uuid(args, ctx, "relationship-id")?;
 
         let affected =
-            BookingPrincipalRepository::terminate_relationship(pool, relationship_id).await?;
+            BookingPrincipalRepository::terminate_relationship(&pool, relationship_id).await?;
 
-        Ok(ExecutionResult::Affected(affected as u64))
-    }
-
-    #[cfg(not(feature = "database"))]
-    async fn execute(
-        &self,
-        _verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-    ) -> Result<ExecutionResult> {
-        Ok(ExecutionResult::Affected(1))
+        Ok(VerbExecutionOutcome::Affected(affected as u64))
     }
 }
 
 /// List relationships for a client group
-#[register_custom_op]
-pub struct ClientPrincipalRelationshipListOp;
+pub struct ClientPrincipalRelationshipList;
 
 #[async_trait]
-impl CustomOperation for ClientPrincipalRelationshipListOp {
-    fn domain(&self) -> &'static str {
-        "client-principal-relationship"
+impl SemOsVerbOp for ClientPrincipalRelationshipList {
+    fn fqn(&self) -> &str {
+        "client-principal-relationship.list"
     }
-    fn verb(&self) -> &'static str {
-        "list"
-    }
-    fn rationale(&self) -> &'static str {
-        "Returns relationships with optional status filter"
-    }
-
-    #[cfg(feature = "database")]
     async fn execute(
         &self,
-        verb_call: &VerbCall,
-        ctx: &mut ExecutionContext,
-        pool: &PgPool,
-    ) -> Result<ExecutionResult> {
-        let client_group_id = extract_uuid(verb_call, ctx, "client-group-id")?;
-        let status = extract_string_opt(verb_call, "status");
+        args: &serde_json::Value,
+        ctx: &mut VerbExecutionContext,
+        scope: &mut dyn TransactionScope,
+    ) -> Result<VerbExecutionOutcome> {
+        let pool = scope.pool().clone();
+        let client_group_id = json_extract_uuid(args, ctx, "client-group-id")?;
+        let status = json_extract_string_opt(args, "status");
 
         let rels = BookingPrincipalRepository::list_relationships(
-            pool,
+            &pool,
             client_group_id,
             status.as_deref(),
         )
@@ -1309,46 +1037,29 @@ impl CustomOperation for ClientPrincipalRelationshipListOp {
             .map(|r| serde_json::to_value(r).unwrap_or_default())
             .collect();
 
-        Ok(ExecutionResult::RecordSet(values))
-    }
-
-    #[cfg(not(feature = "database"))]
-    async fn execute(
-        &self,
-        _verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-    ) -> Result<ExecutionResult> {
-        Ok(ExecutionResult::RecordSet(vec![]))
+        Ok(VerbExecutionOutcome::RecordSet(values))
     }
 }
 
 /// Cross-sell check: what other offerings could this client use?
-#[register_custom_op]
-pub struct ClientPrincipalRelationshipCrossSellOp;
+pub struct ClientPrincipalRelationshipCrossSellCheck;
 
 #[async_trait]
-impl CustomOperation for ClientPrincipalRelationshipCrossSellOp {
-    fn domain(&self) -> &'static str {
-        "client-principal-relationship"
+impl SemOsVerbOp for ClientPrincipalRelationshipCrossSellCheck {
+    fn fqn(&self) -> &str {
+        "client-principal-relationship.cross-sell-check"
     }
-    fn verb(&self) -> &'static str {
-        "cross-sell-check"
-    }
-    fn rationale(&self) -> &'static str {
-        "Compares existing offerings against all available offerings to find gaps"
-    }
-
-    #[cfg(feature = "database")]
     async fn execute(
         &self,
-        verb_call: &VerbCall,
-        ctx: &mut ExecutionContext,
-        pool: &PgPool,
-    ) -> Result<ExecutionResult> {
-        let client_group_id = extract_uuid(verb_call, ctx, "client-group-id")?;
+        args: &serde_json::Value,
+        ctx: &mut VerbExecutionContext,
+        scope: &mut dyn TransactionScope,
+    ) -> Result<VerbExecutionOutcome> {
+        let pool = scope.pool().clone();
+        let client_group_id = json_extract_uuid(args, ctx, "client-group-id")?;
 
         let active_rels =
-            BookingPrincipalRepository::get_active_relationships_for_client(pool, client_group_id)
+            BookingPrincipalRepository::get_active_relationships_for_client(&pool, client_group_id)
                 .await?;
 
         let existing_offering_ids: Vec<Uuid> =
@@ -1360,7 +1071,7 @@ impl CustomOperation for ClientPrincipalRelationshipCrossSellOp {
         let all_products: Vec<(Uuid, String)> = sqlx::query_as(
             r#"SELECT product_id, COALESCE(product_code, name) FROM "ob-poc".products WHERE is_active = true"#,
         )
-        .fetch_all(pool)
+        .fetch_all(&pool)
         .await?;
 
         let potential: Vec<String> = all_products
@@ -1382,16 +1093,7 @@ impl CustomOperation for ClientPrincipalRelationshipCrossSellOp {
             existing_principals: existing_principal_ids,
         };
 
-        Ok(ExecutionResult::Record(serde_json::to_value(result)?))
-    }
-
-    #[cfg(not(feature = "database"))]
-    async fn execute(
-        &self,
-        _verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-    ) -> Result<ExecutionResult> {
-        Ok(ExecutionResult::Void)
+        Ok(VerbExecutionOutcome::Record(serde_json::to_value(result)?))
     }
 }
 
@@ -1400,37 +1102,29 @@ impl CustomOperation for ClientPrincipalRelationshipCrossSellOp {
 // =============================================================================
 
 /// Set three-lane service availability for a principal x service
-#[register_custom_op]
-pub struct ServiceAvailabilitySetOp;
+pub struct ServiceAvailabilitySet;
 
 #[async_trait]
-impl CustomOperation for ServiceAvailabilitySetOp {
-    fn domain(&self) -> &'static str {
-        "service-availability"
+impl SemOsVerbOp for ServiceAvailabilitySet {
+    fn fqn(&self) -> &str {
+        "service-availability.set"
     }
-    fn verb(&self) -> &'static str {
-        "set"
-    }
-    fn rationale(&self) -> &'static str {
-        "Validates three-lane statuses and handles GiST temporal exclusion conflicts"
-    }
-
-    #[cfg(feature = "database")]
     async fn execute(
         &self,
-        verb_call: &VerbCall,
-        ctx: &mut ExecutionContext,
-        pool: &PgPool,
-    ) -> Result<ExecutionResult> {
-        let booking_principal_id = extract_uuid(verb_call, ctx, "booking-principal-id")?;
-        let service_id = extract_uuid(verb_call, ctx, "service-id")?;
-        let regulatory_status = extract_string(verb_call, "regulatory-status")?;
-        let commercial_status = extract_string(verb_call, "commercial-status")?;
-        let operational_status = extract_string(verb_call, "operational-status")?;
-        let delivery_model = extract_string_opt(verb_call, "delivery-model");
+        args: &serde_json::Value,
+        ctx: &mut VerbExecutionContext,
+        scope: &mut dyn TransactionScope,
+    ) -> Result<VerbExecutionOutcome> {
+        let pool = scope.pool().clone();
+        let booking_principal_id = json_extract_uuid(args, ctx, "booking-principal-id")?;
+        let service_id = json_extract_uuid(args, ctx, "service-id")?;
+        let regulatory_status = json_extract_string(args, "regulatory-status")?;
+        let commercial_status = json_extract_string(args, "commercial-status")?;
+        let operational_status = json_extract_string(args, "operational-status")?;
+        let delivery_model = json_extract_string_opt(args, "delivery-model");
 
         let id = BookingPrincipalRepository::set_service_availability(
-            pool,
+            &pool,
             booking_principal_id,
             service_id,
             &regulatory_status,
@@ -1450,110 +1144,71 @@ impl CustomOperation for ServiceAvailabilitySetOp {
             booking_principal_id,
             service_id,
         };
-        Ok(ExecutionResult::Record(serde_json::to_value(result)?))
-    }
-
-    #[cfg(not(feature = "database"))]
-    async fn execute(
-        &self,
-        _verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-    ) -> Result<ExecutionResult> {
-        Ok(ExecutionResult::Uuid(Uuid::new_v4()))
+        Ok(VerbExecutionOutcome::Record(serde_json::to_value(result)?))
     }
 }
 
 /// List service availability for a booking principal
-#[register_custom_op]
-pub struct ServiceAvailabilityListOp;
+pub struct ServiceAvailabilityList;
 
 #[async_trait]
-impl CustomOperation for ServiceAvailabilityListOp {
-    fn domain(&self) -> &'static str {
-        "service-availability"
+impl SemOsVerbOp for ServiceAvailabilityList {
+    fn fqn(&self) -> &str {
+        "service-availability.list"
     }
-    fn verb(&self) -> &'static str {
-        "list"
-    }
-    fn rationale(&self) -> &'static str {
-        "Returns active availability records with three-lane status for display"
-    }
-
-    #[cfg(feature = "database")]
     async fn execute(
         &self,
-        verb_call: &VerbCall,
-        ctx: &mut ExecutionContext,
-        pool: &PgPool,
-    ) -> Result<ExecutionResult> {
-        let booking_principal_id = extract_uuid(verb_call, ctx, "booking-principal-id")?;
+        args: &serde_json::Value,
+        ctx: &mut VerbExecutionContext,
+        scope: &mut dyn TransactionScope,
+    ) -> Result<VerbExecutionOutcome> {
+        let pool = scope.pool().clone();
+        let booking_principal_id = json_extract_uuid(args, ctx, "booking-principal-id")?;
 
-        let records =
-            BookingPrincipalRepository::list_availability_for_principal(pool, booking_principal_id)
-                .await?;
+        let records = BookingPrincipalRepository::list_availability_for_principal(
+            &pool,
+            booking_principal_id,
+        )
+        .await?;
 
         let values: Vec<serde_json::Value> = records
             .into_iter()
             .map(|r| serde_json::to_value(r).unwrap_or_default())
             .collect();
 
-        Ok(ExecutionResult::RecordSet(values))
-    }
-
-    #[cfg(not(feature = "database"))]
-    async fn execute(
-        &self,
-        _verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-    ) -> Result<ExecutionResult> {
-        Ok(ExecutionResult::RecordSet(vec![]))
+        Ok(VerbExecutionOutcome::RecordSet(values))
     }
 }
 
 /// List service availability by principal (alias for list)
-#[register_custom_op]
-pub struct ServiceAvailabilityListByPrincipalOp;
+pub struct ServiceAvailabilityListByPrincipal;
 
 #[async_trait]
-impl CustomOperation for ServiceAvailabilityListByPrincipalOp {
-    fn domain(&self) -> &'static str {
-        "service-availability"
+impl SemOsVerbOp for ServiceAvailabilityListByPrincipal {
+    fn fqn(&self) -> &str {
+        "service-availability.list-by-principal"
     }
-    fn verb(&self) -> &'static str {
-        "list-by-principal"
-    }
-    fn rationale(&self) -> &'static str {
-        "Convenience alias with principal-focused result grouping"
-    }
-
-    #[cfg(feature = "database")]
     async fn execute(
         &self,
-        verb_call: &VerbCall,
-        ctx: &mut ExecutionContext,
-        pool: &PgPool,
-    ) -> Result<ExecutionResult> {
-        let booking_principal_id = extract_uuid(verb_call, ctx, "booking-principal-id")?;
+        args: &serde_json::Value,
+        ctx: &mut VerbExecutionContext,
+        scope: &mut dyn TransactionScope,
+    ) -> Result<VerbExecutionOutcome> {
+        let pool = scope.pool().clone();
+        let booking_principal_id = json_extract_uuid(args, ctx, "booking-principal-id")?;
 
-        let records =
-            BookingPrincipalRepository::list_availability_for_principal(pool, booking_principal_id)
-                .await?;
+        let records = BookingPrincipalRepository::list_availability_for_principal(
+            &pool,
+            booking_principal_id,
+        )
+        .await?;
 
         let values: Vec<serde_json::Value> = records
             .into_iter()
             .map(|r| serde_json::to_value(r).unwrap_or_default())
             .collect();
 
-        Ok(ExecutionResult::RecordSet(values))
-    }
-
-    #[cfg(not(feature = "database"))]
-    async fn execute(
-        &self,
-        _verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-    ) -> Result<ExecutionResult> {
-        Ok(ExecutionResult::RecordSet(vec![]))
+        Ok(VerbExecutionOutcome::RecordSet(values))
     }
 }
 
@@ -1562,32 +1217,24 @@ impl CustomOperation for ServiceAvailabilityListByPrincipalOp {
 // =============================================================================
 
 /// Create a new ruleset (starts in draft status)
-#[register_custom_op]
-pub struct RulesetCreateOp;
+pub struct RulesetCreate;
 
 #[async_trait]
-impl CustomOperation for RulesetCreateOp {
-    fn domain(&self) -> &'static str {
-        "ruleset"
+impl SemOsVerbOp for RulesetCreate {
+    fn fqn(&self) -> &str {
+        "ruleset.create"
     }
-    fn verb(&self) -> &'static str {
-        "create"
-    }
-    fn rationale(&self) -> &'static str {
-        "Validates owner type/id and boundary before creating draft ruleset"
-    }
-
-    #[cfg(feature = "database")]
     async fn execute(
         &self,
-        verb_call: &VerbCall,
-        ctx: &mut ExecutionContext,
-        pool: &PgPool,
-    ) -> Result<ExecutionResult> {
-        let name = extract_string(verb_call, "name")?;
-        let owner_type = extract_string(verb_call, "owner-type")?;
-        let owner_id = extract_uuid_opt(verb_call, ctx, "owner-id");
-        let boundary = extract_string(verb_call, "boundary")?;
+        args: &serde_json::Value,
+        ctx: &mut VerbExecutionContext,
+        scope: &mut dyn TransactionScope,
+    ) -> Result<VerbExecutionOutcome> {
+        let pool = scope.pool().clone();
+        let name = json_extract_string(args, "name")?;
+        let owner_type = json_extract_string(args, "owner-type")?;
+        let owner_id = json_extract_uuid_opt(args, ctx, "owner-id");
+        let boundary = json_extract_string(args, "boundary")?;
 
         // Validate boundary
         RulesetBoundary::from_str_val(&boundary).ok_or_else(|| {
@@ -1606,7 +1253,7 @@ impl CustomOperation for RulesetCreateOp {
         }
 
         let id = BookingPrincipalRepository::create_ruleset(
-            pool,
+            &pool,
             &owner_type,
             owner_id,
             &name,
@@ -1621,46 +1268,29 @@ impl CustomOperation for RulesetCreateOp {
             name,
             status: "draft".to_string(),
         };
-        Ok(ExecutionResult::Record(serde_json::to_value(result)?))
-    }
-
-    #[cfg(not(feature = "database"))]
-    async fn execute(
-        &self,
-        _verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-    ) -> Result<ExecutionResult> {
-        Ok(ExecutionResult::Uuid(Uuid::new_v4()))
+        Ok(VerbExecutionOutcome::Record(serde_json::to_value(result)?))
     }
 }
 
 /// Publish a ruleset (draft → active, with field dictionary validation)
-#[register_custom_op]
-pub struct RulesetPublishOp;
+pub struct RulesetPublish;
 
 #[async_trait]
-impl CustomOperation for RulesetPublishOp {
-    fn domain(&self) -> &'static str {
-        "ruleset"
+impl SemOsVerbOp for RulesetPublish {
+    fn fqn(&self) -> &str {
+        "ruleset.publish"
     }
-    fn verb(&self) -> &'static str {
-        "publish"
-    }
-    fn rationale(&self) -> &'static str {
-        "Validates all rule field references against dictionary before activating, checks temporal overlap"
-    }
-
-    #[cfg(feature = "database")]
     async fn execute(
         &self,
-        verb_call: &VerbCall,
-        ctx: &mut ExecutionContext,
-        pool: &PgPool,
-    ) -> Result<ExecutionResult> {
-        let ruleset_id = extract_uuid(verb_call, ctx, "ruleset-id")?;
+        args: &serde_json::Value,
+        ctx: &mut VerbExecutionContext,
+        scope: &mut dyn TransactionScope,
+    ) -> Result<VerbExecutionOutcome> {
+        let pool = scope.pool().clone();
+        let ruleset_id = json_extract_uuid(args, ctx, "ruleset-id")?;
 
         // Load field dictionary for validation
-        let dict = BookingPrincipalRepository::get_field_dictionary(pool).await?;
+        let dict = BookingPrincipalRepository::get_field_dictionary(&pool).await?;
         let known_fields: std::collections::HashMap<String, String> = dict
             .into_iter()
             .map(|d| (d.field_key, d.field_type))
@@ -1675,7 +1305,7 @@ impl CustomOperation for RulesetPublishOp {
             "#,
         )
         .bind(ruleset_id)
-        .fetch_all(pool)
+        .fetch_all(&pool)
         .await?;
 
         // Validate each rule's field references
@@ -1705,7 +1335,7 @@ impl CustomOperation for RulesetPublishOp {
         }
 
         // Publish (will fail on temporal overlap via trigger)
-        let published = BookingPrincipalRepository::publish_ruleset(pool, ruleset_id).await?;
+        let published = BookingPrincipalRepository::publish_ruleset(&pool, ruleset_id).await?;
 
         if !published {
             return Err(anyhow!(
@@ -1713,60 +1343,34 @@ impl CustomOperation for RulesetPublishOp {
             ));
         }
 
-        Ok(ExecutionResult::Uuid(ruleset_id))
-    }
-
-    #[cfg(not(feature = "database"))]
-    async fn execute(
-        &self,
-        _verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-    ) -> Result<ExecutionResult> {
-        Ok(ExecutionResult::Void)
+        Ok(VerbExecutionOutcome::Uuid(ruleset_id))
     }
 }
 
 /// Retire an active ruleset
-#[register_custom_op]
-pub struct RulesetRetireOp;
+pub struct RulesetRetire;
 
 #[async_trait]
-impl CustomOperation for RulesetRetireOp {
-    fn domain(&self) -> &'static str {
-        "ruleset"
+impl SemOsVerbOp for RulesetRetire {
+    fn fqn(&self) -> &str {
+        "ruleset.retire"
     }
-    fn verb(&self) -> &'static str {
-        "retire"
-    }
-    fn rationale(&self) -> &'static str {
-        "Sets effective_to = now() and status to retired, only if currently active"
-    }
-
-    #[cfg(feature = "database")]
     async fn execute(
         &self,
-        verb_call: &VerbCall,
-        ctx: &mut ExecutionContext,
-        pool: &PgPool,
-    ) -> Result<ExecutionResult> {
-        let ruleset_id = extract_uuid(verb_call, ctx, "ruleset-id")?;
+        args: &serde_json::Value,
+        ctx: &mut VerbExecutionContext,
+        scope: &mut dyn TransactionScope,
+    ) -> Result<VerbExecutionOutcome> {
+        let pool = scope.pool().clone();
+        let ruleset_id = json_extract_uuid(args, ctx, "ruleset-id")?;
 
-        let retired = BookingPrincipalRepository::retire_ruleset(pool, ruleset_id).await?;
+        let retired = BookingPrincipalRepository::retire_ruleset(&pool, ruleset_id).await?;
 
         if !retired {
             return Err(anyhow!("Could not retire ruleset — not in active status"));
         }
 
-        Ok(ExecutionResult::Uuid(ruleset_id))
-    }
-
-    #[cfg(not(feature = "database"))]
-    async fn execute(
-        &self,
-        _verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-    ) -> Result<ExecutionResult> {
-        Ok(ExecutionResult::Void)
+        Ok(VerbExecutionOutcome::Uuid(ruleset_id))
     }
 }
 
@@ -1775,35 +1379,27 @@ impl CustomOperation for RulesetRetireOp {
 // =============================================================================
 
 /// Add a rule to a ruleset
-#[register_custom_op]
-pub struct RuleAddOp;
+pub struct RuleAdd;
 
 #[async_trait]
-impl CustomOperation for RuleAddOp {
-    fn domain(&self) -> &'static str {
-        "rule"
+impl SemOsVerbOp for RuleAdd {
+    fn fqn(&self) -> &str {
+        "rule.add"
     }
-    fn verb(&self) -> &'static str {
-        "add"
-    }
-    fn rationale(&self) -> &'static str {
-        "Validates rule structure (when_expr/then_effect JSON) before inserting"
-    }
-
-    #[cfg(feature = "database")]
     async fn execute(
         &self,
-        verb_call: &VerbCall,
-        ctx: &mut ExecutionContext,
-        pool: &PgPool,
-    ) -> Result<ExecutionResult> {
-        let ruleset_id = extract_uuid(verb_call, ctx, "ruleset-id")?;
-        let name = extract_string(verb_call, "name")?;
-        let kind = extract_string(verb_call, "kind")?;
-        let when_expr_str = extract_string(verb_call, "when-expr")?;
-        let then_effect_str = extract_string(verb_call, "then-effect")?;
-        let explain = extract_string_opt(verb_call, "explain");
-        let priority = extract_int_opt(verb_call, "priority").map(|v| v as i32);
+        args: &serde_json::Value,
+        ctx: &mut VerbExecutionContext,
+        scope: &mut dyn TransactionScope,
+    ) -> Result<VerbExecutionOutcome> {
+        let pool = scope.pool().clone();
+        let ruleset_id = json_extract_uuid(args, ctx, "ruleset-id")?;
+        let name = json_extract_string(args, "name")?;
+        let kind = json_extract_string(args, "kind")?;
+        let when_expr_str = json_extract_string(args, "when-expr")?;
+        let then_effect_str = json_extract_string(args, "then-effect")?;
+        let explain = json_extract_string_opt(args, "explain");
+        let priority = json_extract_int_opt(args, "priority").map(|v| v as i32);
 
         // Parse and validate JSON
         let when_expr: serde_json::Value = serde_json::from_str(&when_expr_str)
@@ -1820,7 +1416,7 @@ impl CustomOperation for RuleAddOp {
             .map_err(|e| anyhow!("Invalid effect structure: {}", e))?;
 
         let id = BookingPrincipalRepository::add_rule(
-            pool,
+            &pool,
             ruleset_id,
             &name,
             &kind,
@@ -1836,47 +1432,30 @@ impl CustomOperation for RuleAddOp {
             ruleset_id,
             name,
         };
-        Ok(ExecutionResult::Record(serde_json::to_value(result)?))
-    }
-
-    #[cfg(not(feature = "database"))]
-    async fn execute(
-        &self,
-        _verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-    ) -> Result<ExecutionResult> {
-        Ok(ExecutionResult::Uuid(Uuid::new_v4()))
+        Ok(VerbExecutionOutcome::Record(serde_json::to_value(result)?))
     }
 }
 
 /// Update an existing rule
-#[register_custom_op]
-pub struct RuleUpdateOp;
+pub struct RuleUpdate;
 
 #[async_trait]
-impl CustomOperation for RuleUpdateOp {
-    fn domain(&self) -> &'static str {
-        "rule"
+impl SemOsVerbOp for RuleUpdate {
+    fn fqn(&self) -> &str {
+        "rule.update"
     }
-    fn verb(&self) -> &'static str {
-        "update"
-    }
-    fn rationale(&self) -> &'static str {
-        "Validates updated JSON structures and checks ruleset is still in draft"
-    }
-
-    #[cfg(feature = "database")]
     async fn execute(
         &self,
-        verb_call: &VerbCall,
-        ctx: &mut ExecutionContext,
-        pool: &PgPool,
-    ) -> Result<ExecutionResult> {
-        let rule_id = extract_uuid(verb_call, ctx, "rule-id")?;
-        let name = extract_string_opt(verb_call, "name");
-        let when_expr_str = extract_string_opt(verb_call, "when-expr");
-        let then_effect_str = extract_string_opt(verb_call, "then-effect");
-        let priority = extract_int_opt(verb_call, "priority").map(|v| v as i32);
+        args: &serde_json::Value,
+        ctx: &mut VerbExecutionContext,
+        scope: &mut dyn TransactionScope,
+    ) -> Result<VerbExecutionOutcome> {
+        let pool = scope.pool().clone();
+        let rule_id = json_extract_uuid(args, ctx, "rule-id")?;
+        let name = json_extract_string_opt(args, "name");
+        let when_expr_str = json_extract_string_opt(args, "when-expr");
+        let then_effect_str = json_extract_string_opt(args, "then-effect");
+        let priority = json_extract_int_opt(args, "priority").map(|v| v as i32);
 
         // Validate JSON if provided
         let when_expr: Option<serde_json::Value> = if let Some(ref s) = when_expr_str {
@@ -1940,45 +1519,28 @@ impl CustomOperation for RuleUpdateOp {
             query = query.bind(p);
         }
 
-        query.execute(pool).await?;
+        query.execute(&pool).await?;
 
-        Ok(ExecutionResult::Uuid(rule_id))
-    }
-
-    #[cfg(not(feature = "database"))]
-    async fn execute(
-        &self,
-        _verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-    ) -> Result<ExecutionResult> {
-        Ok(ExecutionResult::Void)
+        Ok(VerbExecutionOutcome::Uuid(rule_id))
     }
 }
 
 /// Disable a rule (soft delete)
-#[register_custom_op]
-pub struct RuleDisableOp;
+pub struct RuleDisable;
 
 #[async_trait]
-impl CustomOperation for RuleDisableOp {
-    fn domain(&self) -> &'static str {
-        "rule"
+impl SemOsVerbOp for RuleDisable {
+    fn fqn(&self) -> &str {
+        "rule.disable"
     }
-    fn verb(&self) -> &'static str {
-        "disable"
-    }
-    fn rationale(&self) -> &'static str {
-        "Soft-disables rule by setting kind to 'disabled' rather than deleting"
-    }
-
-    #[cfg(feature = "database")]
     async fn execute(
         &self,
-        verb_call: &VerbCall,
-        ctx: &mut ExecutionContext,
-        pool: &PgPool,
-    ) -> Result<ExecutionResult> {
-        let rule_id = extract_uuid(verb_call, ctx, "rule-id")?;
+        args: &serde_json::Value,
+        ctx: &mut VerbExecutionContext,
+        scope: &mut dyn TransactionScope,
+    ) -> Result<VerbExecutionOutcome> {
+        let pool = scope.pool().clone();
+        let rule_id = json_extract_uuid(args, ctx, "rule-id")?;
 
         sqlx::query(
             r#"
@@ -1988,19 +1550,10 @@ impl CustomOperation for RuleDisableOp {
             "#,
         )
         .bind(rule_id)
-        .execute(pool)
+        .execute(&pool)
         .await?;
 
-        Ok(ExecutionResult::Uuid(rule_id))
-    }
-
-    #[cfg(not(feature = "database"))]
-    async fn execute(
-        &self,
-        _verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-    ) -> Result<ExecutionResult> {
-        Ok(ExecutionResult::Void)
+        Ok(VerbExecutionOutcome::Uuid(rule_id))
     }
 }
 
@@ -2009,34 +1562,26 @@ impl CustomOperation for RuleDisableOp {
 // =============================================================================
 
 /// Create a new contract pack
-#[register_custom_op]
-pub struct ContractPackCreateOp;
+pub struct ContractPackCreate;
 
 #[async_trait]
-impl CustomOperation for ContractPackCreateOp {
-    fn domain(&self) -> &'static str {
-        "contract-pack"
+impl SemOsVerbOp for ContractPackCreate {
+    fn fqn(&self) -> &str {
+        "contract-pack.create"
     }
-    fn verb(&self) -> &'static str {
-        "create"
-    }
-    fn rationale(&self) -> &'static str {
-        "Validates unique code before creating contract pack"
-    }
-
-    #[cfg(feature = "database")]
     async fn execute(
         &self,
-        verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-        pool: &PgPool,
-    ) -> Result<ExecutionResult> {
-        let code = extract_string(verb_call, "code")?;
-        let name = extract_string(verb_call, "name")?;
-        let description = extract_string_opt(verb_call, "description");
+        args: &serde_json::Value,
+        _ctx: &mut VerbExecutionContext,
+        scope: &mut dyn TransactionScope,
+    ) -> Result<VerbExecutionOutcome> {
+        let pool = scope.pool().clone();
+        let code = json_extract_string(args, "code")?;
+        let name = json_extract_string(args, "name")?;
+        let description = json_extract_string_opt(args, "description");
 
         let id = BookingPrincipalRepository::create_contract_pack(
-            pool,
+            &pool,
             &code,
             &name,
             description.as_deref(),
@@ -2047,48 +1592,31 @@ impl CustomOperation for ContractPackCreateOp {
             contract_pack_id: id,
             code,
         };
-        Ok(ExecutionResult::Record(serde_json::to_value(result)?))
-    }
-
-    #[cfg(not(feature = "database"))]
-    async fn execute(
-        &self,
-        _verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-    ) -> Result<ExecutionResult> {
-        Ok(ExecutionResult::Uuid(Uuid::new_v4()))
+        Ok(VerbExecutionOutcome::Record(serde_json::to_value(result)?))
     }
 }
 
 /// Add a template to a contract pack
-#[register_custom_op]
-pub struct ContractPackAddTemplateOp;
+pub struct ContractPackAddTemplate;
 
 #[async_trait]
-impl CustomOperation for ContractPackAddTemplateOp {
-    fn domain(&self) -> &'static str {
-        "contract-pack"
+impl SemOsVerbOp for ContractPackAddTemplate {
+    fn fqn(&self) -> &str {
+        "contract-pack.add-template"
     }
-    fn verb(&self) -> &'static str {
-        "add-template"
-    }
-    fn rationale(&self) -> &'static str {
-        "Validates contract pack exists and template type is valid"
-    }
-
-    #[cfg(feature = "database")]
     async fn execute(
         &self,
-        verb_call: &VerbCall,
-        ctx: &mut ExecutionContext,
-        pool: &PgPool,
-    ) -> Result<ExecutionResult> {
-        let contract_pack_id = extract_uuid(verb_call, ctx, "contract-pack-id")?;
-        let template_type = extract_string(verb_call, "template-type")?;
-        let template_ref = extract_string_opt(verb_call, "template-ref");
+        args: &serde_json::Value,
+        ctx: &mut VerbExecutionContext,
+        scope: &mut dyn TransactionScope,
+    ) -> Result<VerbExecutionOutcome> {
+        let pool = scope.pool().clone();
+        let contract_pack_id = json_extract_uuid(args, ctx, "contract-pack-id")?;
+        let template_type = json_extract_string(args, "template-type")?;
+        let template_ref = json_extract_string_opt(args, "template-ref");
 
         let id = BookingPrincipalRepository::add_contract_template(
-            pool,
+            &pool,
             contract_pack_id,
             &template_type,
             template_ref.as_deref(),
@@ -2099,16 +1627,7 @@ impl CustomOperation for ContractPackAddTemplateOp {
             contract_template_id: id,
             contract_pack_id,
         };
-        Ok(ExecutionResult::Record(serde_json::to_value(result)?))
-    }
-
-    #[cfg(not(feature = "database"))]
-    async fn execute(
-        &self,
-        _verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-    ) -> Result<ExecutionResult> {
-        Ok(ExecutionResult::Uuid(Uuid::new_v4()))
+        Ok(VerbExecutionOutcome::Record(serde_json::to_value(result)?))
     }
 }
 
@@ -2117,28 +1636,20 @@ impl CustomOperation for ContractPackAddTemplateOp {
 // =============================================================================
 
 /// Generate coverage matrix: segments x jurisdictions x principals
-#[register_custom_op]
-pub struct BookingPrincipalCoverageMatrixOp;
+pub struct BookingPrincipalCoverageMatrix;
 
 #[async_trait]
-impl CustomOperation for BookingPrincipalCoverageMatrixOp {
-    fn domain(&self) -> &'static str {
-        "booking-principal"
+impl SemOsVerbOp for BookingPrincipalCoverageMatrix {
+    fn fqn(&self) -> &str {
+        "booking-principal.coverage-matrix"
     }
-    fn verb(&self) -> &'static str {
-        "coverage-matrix"
-    }
-    fn rationale(&self) -> &'static str {
-        "Cross-joins principals with offerings and checks three-lane availability per cell"
-    }
-
-    #[cfg(feature = "database")]
     async fn execute(
         &self,
-        _verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-        pool: &PgPool,
-    ) -> Result<ExecutionResult> {
+        _args: &serde_json::Value,
+        _ctx: &mut VerbExecutionContext,
+        scope: &mut dyn TransactionScope,
+    ) -> Result<VerbExecutionOutcome> {
+        let pool = scope.pool().clone();
         // Build coverage matrix from principals x services
         let rows: Vec<(Uuid, String, String, String, String, String, String)> = sqlx::query_as(
             r#"
@@ -2158,7 +1669,7 @@ impl CustomOperation for BookingPrincipalCoverageMatrixOp {
             ORDER BY bl.country_code, bp.principal_code
             "#,
         )
-        .fetch_all(pool)
+        .fetch_all(&pool)
         .await?;
 
         let values: Vec<serde_json::Value> = rows
@@ -2184,96 +1695,62 @@ impl CustomOperation for BookingPrincipalCoverageMatrixOp {
             })
             .collect();
 
-        Ok(ExecutionResult::RecordSet(values))
-    }
-
-    #[cfg(not(feature = "database"))]
-    async fn execute(
-        &self,
-        _verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-    ) -> Result<ExecutionResult> {
-        Ok(ExecutionResult::RecordSet(vec![]))
+        Ok(VerbExecutionOutcome::RecordSet(values))
     }
 }
 
 /// Generate gap report across all three boundaries
-#[register_custom_op]
-pub struct BookingPrincipalGapReportOp;
+pub struct BookingPrincipalGapReport;
 
 #[async_trait]
-impl CustomOperation for BookingPrincipalGapReportOp {
-    fn domain(&self) -> &'static str {
-        "booking-principal"
+impl SemOsVerbOp for BookingPrincipalGapReport {
+    fn fqn(&self) -> &str {
+        "booking-principal.gap-report"
     }
-    fn verb(&self) -> &'static str {
-        "gap-report"
-    }
-    fn rationale(&self) -> &'static str {
-        "Aggregates regulatory, commercial, and operational gaps from coverage views"
-    }
-
-    #[cfg(feature = "database")]
     async fn execute(
         &self,
-        _verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-        pool: &PgPool,
-    ) -> Result<ExecutionResult> {
+        _args: &serde_json::Value,
+        _ctx: &mut VerbExecutionContext,
+        scope: &mut dyn TransactionScope,
+    ) -> Result<VerbExecutionOutcome> {
+        let pool = scope.pool().clone();
         let mut all_gaps = Vec::new();
 
-        let reg_gaps = BookingPrincipalRepository::get_regulatory_gaps(pool).await?;
+        let reg_gaps = BookingPrincipalRepository::get_regulatory_gaps(&pool).await?;
         for g in reg_gaps {
             all_gaps.push(serde_json::to_value(g)?);
         }
 
-        let com_gaps = BookingPrincipalRepository::get_commercial_gaps(pool).await?;
+        let com_gaps = BookingPrincipalRepository::get_commercial_gaps(&pool).await?;
         for g in com_gaps {
             all_gaps.push(serde_json::to_value(g)?);
         }
 
-        let ops_gaps = BookingPrincipalRepository::get_operational_gaps(pool).await?;
+        let ops_gaps = BookingPrincipalRepository::get_operational_gaps(&pool).await?;
         for g in ops_gaps {
             all_gaps.push(serde_json::to_value(g)?);
         }
 
-        Ok(ExecutionResult::RecordSet(all_gaps))
-    }
-
-    #[cfg(not(feature = "database"))]
-    async fn execute(
-        &self,
-        _verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-    ) -> Result<ExecutionResult> {
-        Ok(ExecutionResult::RecordSet(vec![]))
+        Ok(VerbExecutionOutcome::RecordSet(all_gaps))
     }
 }
 
 /// Impact analysis for principal retirement
-#[register_custom_op]
-pub struct BookingPrincipalImpactAnalysisOp;
+pub struct BookingPrincipalImpactAnalysis;
 
 #[async_trait]
-impl CustomOperation for BookingPrincipalImpactAnalysisOp {
-    fn domain(&self) -> &'static str {
-        "booking-principal"
+impl SemOsVerbOp for BookingPrincipalImpactAnalysis {
+    fn fqn(&self) -> &str {
+        "booking-principal.impact-analysis"
     }
-    fn verb(&self) -> &'static str {
-        "impact-analysis"
-    }
-    fn rationale(&self) -> &'static str {
-        "Identifies affected client relationships and suggests alternative principals"
-    }
-
-    #[cfg(feature = "database")]
     async fn execute(
         &self,
-        verb_call: &VerbCall,
-        ctx: &mut ExecutionContext,
-        pool: &PgPool,
-    ) -> Result<ExecutionResult> {
-        let principal_id = extract_uuid(verb_call, ctx, "booking-principal-id")?;
+        args: &serde_json::Value,
+        ctx: &mut VerbExecutionContext,
+        scope: &mut dyn TransactionScope,
+    ) -> Result<VerbExecutionOutcome> {
+        let pool = scope.pool().clone();
+        let principal_id = json_extract_uuid(args, ctx, "booking-principal-id")?;
 
         // Find all active relationships for this principal
         let affected: Vec<(Uuid, Uuid, String)> = sqlx::query_as(
@@ -2285,7 +1762,7 @@ impl CustomOperation for BookingPrincipalImpactAnalysisOp {
             "#,
         )
         .bind(principal_id)
-        .fetch_all(pool)
+        .fetch_all(&pool)
         .await?;
 
         // Find alternative principals (same location or broader)
@@ -2303,7 +1780,7 @@ impl CustomOperation for BookingPrincipalImpactAnalysisOp {
             "#,
         )
         .bind(principal_id)
-        .fetch_all(pool)
+        .fetch_all(&pool)
         .await?;
 
         let impact_entries: Vec<serde_json::Value> = affected
@@ -2328,15 +1805,6 @@ impl CustomOperation for BookingPrincipalImpactAnalysisOp {
             })
             .collect();
 
-        Ok(ExecutionResult::RecordSet(impact_entries))
-    }
-
-    #[cfg(not(feature = "database"))]
-    async fn execute(
-        &self,
-        _verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-    ) -> Result<ExecutionResult> {
-        Ok(ExecutionResult::RecordSet(vec![]))
+        Ok(VerbExecutionOutcome::RecordSet(impact_entries))
     }
 }

@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            UPDATE \"ob-poc\".bpmn_job_frames\n            SET status = 'failed', completed_at = now()\n            WHERE job_key = $1 AND status = 'active'\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "62fe9d3c030c5c98cdc7de94b6c983ede61128d2860ae5ef38506e2f3e81fd24"
+}

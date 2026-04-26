@@ -421,6 +421,7 @@ mod tests {
                 table: Some("cbus".into()),
                 schema: Some("ob-poc".into()),
                 key_column: None,
+                ..Default::default()
             }),
             reads_from: vec![],
             writes_to: vec![],
@@ -464,6 +465,7 @@ mod tests {
                 }),
                 valid_values: None,
                 default: None,
+                maps_to: None,
             }],
             returns: None,
             preconditions: vec![],
@@ -739,6 +741,7 @@ mod tests {
                 table: Some("cbus".into()),
                 schema: Some("ob-poc".into()),
                 key_column: None,
+                ..Default::default()
             }),
             reads_from: vec![],
             writes_to: vec![],
@@ -773,6 +776,7 @@ mod tests {
                 table: Some("cbus".into()),
                 schema: Some("ob-poc".into()),
                 key_column: None,
+                ..Default::default()
             }),
             reads_from: vec![],
             writes_to: vec![],
@@ -842,6 +846,7 @@ mod tests {
                 table: Some("cbus".into()),
                 schema: Some("ob-poc".into()),
                 key_column: None,
+                ..Default::default()
             }),
             reads_from: vec![],
             writes_to: vec![],

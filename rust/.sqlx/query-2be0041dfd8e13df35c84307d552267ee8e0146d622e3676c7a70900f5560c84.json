@@ -1,0 +1,16 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            INSERT INTO \"ob-poc\".learning_audit (action, learning_type, candidate_id, actor)\n            VALUES ('applied', $1, $2, $3)\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Int8",
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "2be0041dfd8e13df35c84307d552267ee8e0146d622e3676c7a70900f5560c84"
+}

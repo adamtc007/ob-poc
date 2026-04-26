@@ -6,9 +6,9 @@ use crate::sem_os_runtime::constellation_runtime::{
     RuntimeStateMachine, RuntimeStateTransition,
 };
 
-pub(crate) type ReducerMachineBacking = crate::state_reducer::ValidatedStateMachine;
-pub(crate) type RuntimeEvalScope = crate::state_reducer::EvalScope;
-pub(crate) type ReducerOverlayData = crate::state_reducer::SlotOverlayData;
+pub(crate) type ReducerMachineBacking = dsl_runtime::state_reducer::ValidatedStateMachine;
+pub(crate) type RuntimeEvalScope = dsl_runtime::state_reducer::EvalScope;
+pub(crate) type ReducerOverlayData = dsl_runtime::state_reducer::SlotOverlayData;
 
 pub(crate) struct SlotRuntimeArtifacts {
     pub overlays: ReducerOverlayData,
@@ -18,7 +18,7 @@ pub(crate) struct SlotRuntimeArtifacts {
 pub(crate) fn load_runtime_state_machine(
     machine_name: &str,
 ) -> anyhow::Result<RuntimeStateMachine> {
-    crate::state_reducer::load_builtin_state_machine(machine_name)
+    dsl_runtime::state_reducer::load_builtin_state_machine(machine_name)
         .map(runtime_state_machine_from_reducer)
         .map_err(|err| anyhow::anyhow!(err.to_string()))
 }
@@ -28,7 +28,7 @@ pub(crate) async fn build_eval_scope(
     cbu_id: Uuid,
     case_id: Option<Uuid>,
 ) -> anyhow::Result<RuntimeEvalScope> {
-    crate::state_reducer::build_eval_scope_tx(tx, cbu_id, case_id).await
+    dsl_runtime::state_reducer::build_eval_scope_tx(tx, cbu_id, case_id).await
 }
 
 pub(crate) async fn fetch_slot_overlays(
@@ -37,7 +37,7 @@ pub(crate) async fn fetch_slot_overlays(
     entity_id: Uuid,
     case_id: Option<Uuid>,
 ) -> anyhow::Result<ReducerOverlayData> {
-    crate::state_reducer::fetch_slot_overlays_tx(tx, cbu_id, entity_id, case_id).await
+    dsl_runtime::state_reducer::fetch_slot_overlays_tx(tx, cbu_id, entity_id, case_id).await
 }
 
 pub(crate) async fn get_active_override(
@@ -45,8 +45,8 @@ pub(crate) async fn get_active_override(
     cbu_id: Uuid,
     case_id: Option<Uuid>,
     slot_name: &str,
-) -> anyhow::Result<Option<crate::state_reducer::overrides::StateOverride>> {
-    crate::state_reducer::get_active_override_tx(tx, cbu_id, case_id, slot_name).await
+) -> anyhow::Result<Option<dsl_runtime::state_reducer::overrides::StateOverride>> {
+    dsl_runtime::state_reducer::get_active_override_tx(tx, cbu_id, case_id, slot_name).await
 }
 
 pub(crate) async fn collect_slot_runtime_artifacts(
@@ -77,16 +77,16 @@ pub(crate) fn reduce_slot(
     machine: &RuntimeStateMachine,
     slot_name: &str,
     overlays: &ReducerOverlayData,
-    override_entry: Option<crate::state_reducer::overrides::StateOverride>,
+    override_entry: Option<dsl_runtime::state_reducer::overrides::StateOverride>,
 ) -> anyhow::Result<RuntimeSlotReduceResult> {
     let reducer_machine = reducer_state_machine_from_runtime(machine);
-    crate::state_reducer::reduce_slot(&reducer_machine, slot_name, overlays, override_entry)
+    dsl_runtime::state_reducer::reduce_slot(&reducer_machine, slot_name, overlays, override_entry)
         .map(runtime_reduce_result_from_reducer)
         .map_err(|err| anyhow::anyhow!(err.to_string()))
 }
 
 pub(crate) fn runtime_reduce_result_from_reducer(
-    value: crate::state_reducer::SlotReduceResult,
+    value: dsl_runtime::state_reducer::SlotReduceResult,
 ) -> RuntimeSlotReduceResult {
     RuntimeSlotReduceResult {
         slot_path: value.slot_path,

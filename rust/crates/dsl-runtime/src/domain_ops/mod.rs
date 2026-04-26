@@ -1,0 +1,109 @@
+//! Domain-plugin ops helpers — historical home for the `CustomOperation`
+//! implementations that made up Phase 4 of the three-plane architecture
+//! refactor.
+//!
+//! Post-Phase-5c-migrate slice #80 every plugin op has been relocated to
+//! `sem_os_postgres::ops::*` (or kept inside `rust/src/domain_ops/` for the
+//! Pattern B ops that reach into ob-poc internals). The only artefacts left
+//! in this module are shared helpers used across those new homes:
+//!
+//! - [`helpers`] — JSON argument extraction helpers consumed by
+//!   `SemOsVerbOp` impls.
+//! - [`affinity_graph_cache`] — in-process affinity graph cache still
+//!   consumed by sem_os_postgres affinity ops.
+
+pub mod helpers;
+
+// Phase 5c-migrate Phase B slice #44: access_review_ops → `sem_os_postgres::ops::access_review`.
+// Phase 5c-migrate Phase B slice #64: agent_ops → `sem_os_postgres::ops::agent`.
+// Phase 5c-migrate Phase B slice #5 (2026-04-21): attribute_ops relocated
+// to `sem_os_postgres::ops::attribute::*`.
+// Phase 5c-migrate Phase B slice #71: batch_control_ops → `sem_os_postgres::ops::batch_control`.
+// BatchControlResult relocated to `ob-poc-types::batch_control`.
+pub mod affinity_graph_cache;
+// Phase 5c-migrate Phase B slice #9: affinity_ops → `sem_os_postgres::ops::affinity`.
+// Phase 5c-migrate Phase B slice #60: billing_ops → `sem_os_postgres::ops::billing`.
+// Phase 5c-migrate Phase B slice #17: board_ops → `sem_os_postgres::ops::board`.
+// Phase 5c-migrate Phase B slice #37: bods_ops → `sem_os_postgres::ops::bods`.
+// Phase 5c-migrate Phase B slice #35: coverage_compute_ops → `sem_os_postgres::ops::coverage_compute`.
+// Phase 5c-migrate Phase B slice #65: capital_ops → `sem_os_postgres::ops::capital`.
+// Phase 5c-migrate Phase B slice #67: cbu_ops → `sem_os_postgres::ops::cbu`.
+// Phase 5c-migrate Phase B slice #53: cbu_role_ops → `sem_os_postgres::ops::cbu_role`.
+// Phase 5c-migrate Phase B slice #66: client_group_ops → `sem_os_postgres::ops::client_group`.
+// Phase 5c-migrate Phase B slice #3 (2026-04-21): constellation_ops
+// relocated to `sem_os_postgres::ops::constellation::*` as YAML-first
+// re-implementations; legacy file deleted.
+// Phase 5c-migrate Phase B slice #34: control_compute_ops → `sem_os_postgres::ops::control_compute`.
+// Phase 5c-migrate Phase B slice #33: control_ops → `sem_os_postgres::ops::control`.
+// Phase 5c-migrate Phase B slice #50: custody → `sem_os_postgres::ops::custody`.
+// Phase 5c-migrate Phase B slice #68: deal_ops → `sem_os_postgres::ops::deal`.
+// Phase 5c-migrate Phase B slice #59: dilution_ops → `sem_os_postgres::ops::dilution`.
+// Phase 5c-migrate Phase B slice #69: discovery_ops → `sem_os_postgres::ops::discovery`.
+// Phase 5c-migrate Phase B slice #13: docs_bundle_ops → `sem_os_postgres::ops::docs_bundle`.
+// Phase 5c-migrate Phase B slice #61: document_ops → `sem_os_postgres::ops::document`.
+// Phase 5c-migrate Phase B slice #29: economic_exposure_ops → `sem_os_postgres::ops::economic_exposure`.
+// Phase 5c-migrate Phase B slice #30: edge_ops → `sem_os_postgres::ops::edge`.
+// Phase 5c-migrate Phase B slice #25: entity_ops → `sem_os_postgres::ops::entity`.
+// Phase 5c-migrate Phase B slice #70: entity_query → `sem_os_postgres::ops::entity_query`.
+// EntityQueryResult relocated to `ob-poc-types::entity_query`.
+// Phase 5c-migrate Phase B slice #40: evidence_ops → `sem_os_postgres::ops::evidence`.
+// Phase 5c-migrate Phase B slice #54: graph_validate_ops → `sem_os_postgres::ops::graph_validate`.
+// Phase 5c-migrate Phase B slice #23: import_run_ops → `sem_os_postgres::ops::import_run`.
+// Phase 5c-migrate Phase B slice #46: investor_ops → `sem_os_postgres::ops::investor`.
+// Phase 5c-migrate Phase B slice #28: investor_role_ops → `sem_os_postgres::ops::investor_role`.
+// Phase 5c-migrate Phase B slice #62: kyc_case_ops → `sem_os_postgres::ops::kyc_case`.
+// Phase 5c-migrate Phase B slice #57: lifecycle_ops → `sem_os_postgres::ops::lifecycle`.
+// Phase 5c-migrate Phase B slice #31: manco_ops → `sem_os_postgres::ops::manco`.
+// Phase 5c-migrate Phase B slice #20: matrix_overlay_ops → `sem_os_postgres::ops::matrix_overlay`.
+// Phase 5c-migrate Phase B slice #2 (2026-04-21): navigation_ops relocated
+// to `sem_os_postgres::ops::nav::*` as YAML-first re-implementations; legacy
+// file deleted.
+// Phase 5c-migrate Phase B slice #36: observation_ops → `sem_os_postgres::ops::observation`.
+// Phase 5c-migrate Phase B slice #16: outreach_ops → `sem_os_postgres::ops::outreach`.
+// Phase 5c-migrate Phase B slice #41: outreach_plan_ops → `sem_os_postgres::ops::outreach_plan`.
+// Phase 5c-migrate Phase B slice #55: ownership_ops → `sem_os_postgres::ops::ownership`.
+// Phase 5c-migrate Phase B slice #1 (2026-04-21): pack_ops relocated to
+// `sem_os_postgres::ops::{pack_select,pack_answer}` as YAML-first
+// re-implementations; legacy file deleted.
+// Phase 5c-migrate Phase B slice #43: partnership_ops → `sem_os_postgres::ops::partnership`.
+// Phase 5c-migrate Phase B slice #4 (2026-04-21): phrase_ops relocated to
+// `sem_os_postgres::ops::phrase::*` as YAML-first re-implementations;
+// legacy file deleted.
+// Phase 5c-migrate Phase B slice #56: refdata_loader → `sem_os_postgres::ops::refdata_loader`.
+// Phase 5c-migrate Phase B slice #45: refdata_ops → `sem_os_postgres::ops::refdata`.
+// Phase 5c-migrate Phase B slice #18: regulatory_ops → `sem_os_postgres::ops::regulatory`.
+// Phase 5c-migrate Phase B slice #14: remediation_ops → `sem_os_postgres::ops::remediation`.
+// Phase 5c-migrate Phase B slice #11: requirement_ops → `sem_os_postgres::ops::requirement`.
+// Phase 5c-migrate Phase B slice #27: resource_ops → `sem_os_postgres::ops::service_resource`.
+// Phase 5c-migrate Phase B slice #19: screening_ops → `sem_os_postgres::ops::screening`.
+// Phase 5c-migrate Phase B slice #12: research_normalize_ops → `sem_os_postgres::ops::research_normalize`.
+// Phase 5c-migrate Phase B slice #58: research_workflow_ops → `sem_os_postgres::ops::research_workflow`.
+// Phase 5c-migrate Phase B slice #6: sem_os_audit_ops → `sem_os_postgres::ops::audit`.
+// Phase 5c-migrate Phase B slice #6: sem_os_changeset_ops → `sem_os_postgres::ops::changeset`.
+// Phase 5c-migrate Phase B slice #6: sem_os_focus_ops → `sem_os_postgres::ops::focus`.
+// Phase 5c-migrate Phase B slice #6: sem_os_governance_ops → `sem_os_postgres::ops::governance`.
+// Phase 5c-migrate Phase B slice #7: sem_os_maintenance_ops → `sem_os_postgres::ops::maintenance`.
+// Phase 5c-migrate Phase B slice #6: sem_os_registry_ops → `sem_os_postgres::ops::registry_ops`.
+// Phase 5c-migrate Phase B slice #15: sem_os_schema_ops → `sem_os_postgres::ops::schema`.
+// Phase 5c-migrate Phase B slice #8: semantic_ops → `sem_os_postgres::ops::semantic`.
+// Phase 5c-migrate Phase B slice #5 (2026-04-21): service_pipeline_ops
+// relocated to `sem_os_postgres::ops::service_pipeline::*`.
+// Phase 5c-migrate Phase B slice #5 (2026-04-21): session_ops relocated to
+// `sem_os_postgres::ops::session::*`.
+// Phase 5c-migrate Phase B slice #22: shared_atom_ops → `sem_os_postgres::ops::shared_atom`.
+// Phase 5c-migrate Phase B slice #63: skeleton_build_ops → `sem_os_postgres::ops::skeleton_build`.
+// Phase 5c-migrate Phase B slice #21: state_ops → `sem_os_postgres::ops::state`.
+// Phase 5c-migrate Phase B slice #10: team_ops → `sem_os_postgres::ops::team`.
+// Phase 5c-migrate Phase B slice #32: temporal_ops → `sem_os_postgres::ops::temporal`.
+// Phase 5c-migrate Phase B slice #51: tollgate_evaluate_ops → `sem_os_postgres::ops::tollgate_evaluate`.
+// Phase 5c-migrate Phase B slice #38: tollgate_ops → `sem_os_postgres::ops::tollgate`.
+// Phase 5c-migrate Phase B slice #26: trading_matrix → `sem_os_postgres::ops::trading_matrix`.
+// Phase 5c-migrate Phase B slice #52: trading_profile_ca_ops → `sem_os_postgres::ops::trading_profile_ca`.
+// Phase 5c-migrate Phase B slice #42: trust_ops → `sem_os_postgres::ops::trust`.
+// Phase 5c-migrate Phase B slice #5 (2026-04-21): view_ops relocated to
+// `sem_os_postgres::ops::view::*`.
+// Phase 5c-migrate Phase B slice #39: ubo_analysis → `sem_os_postgres::ops::ubo_analysis`.
+// Phase 5c-migrate Phase B slice #48: ubo_compute_ops → `sem_os_postgres::ops::ubo_compute`.
+// Phase 5c-migrate Phase B slice #49: ubo_graph_ops → `sem_os_postgres::ops::ubo_graph`.
+// Phase 5c-migrate Phase B slice #24: ubo_registry_ops → `sem_os_postgres::ops::ubo_registry`.
+// Phase 5c-migrate Phase B slice #47: verify_ops → `sem_os_postgres::ops::verify`.

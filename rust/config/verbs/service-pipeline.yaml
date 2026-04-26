@@ -69,6 +69,11 @@ domains:
           type: uuid
           name: intent_id
           capture: true
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
 
       list:
         description: "List all service intents for a CBU"
@@ -102,6 +107,11 @@ domains:
         returns:
           type: record_set
           name: intents
+        three_axis:
+          state_effect: preserving
+          external_effects: [observational]
+          consequence:
+            baseline: benign
 
       supersede:
         description: "Supersede an existing service intent with new options"
@@ -133,6 +143,127 @@ domains:
         returns:
           type: uuid
           name: new_intent_id
+
+      # =========================================================================
+      # P.3 ADDITIONS (2026-04-23) — SERVICE-INTENT LIFECYCLE TRANSITIONS
+      # Adds transition verbs for the 3-state service_intent_lifecycle per
+      # instrument_matrix_dag.yaml (active / suspended / cancelled).
+      # =========================================================================
+        three_axis:
+          state_effect: preserving
+          external_effects: [emitting]
+          consequence:
+            baseline: requires_confirmation
+
+      suspend:
+        description: "Suspend an active service intent (temporary hold)"
+        invocation_phrases:
+          - "suspend service intent"
+          - "pause intent"
+        metadata:
+          tier: intent
+          source_of_truth: matrix
+          scope: cbu
+          noun: service_intent
+          subject_kinds: [service-intent]
+          phase_tags: [operational]
+          side_effects: state_write
+          harm_class: reversible
+        behavior: plugin
+        args:
+        - name: intent-id
+          type: uuid
+          required: true
+        - name: reason
+          type: string
+          required: false
+        three_axis:
+          state_effect: transition
+          external_effects: []
+          consequence:
+            baseline: requires_confirmation
+          transitions:
+            dag: instrument_matrix_dag
+            edges:
+              - from: active
+                to: suspended
+        transition_args:
+          entity_id_arg: intent-id
+          target_workspace: instrument_matrix
+          target_slot: service_intent
+
+      resume:
+        description: "Resume a suspended service intent (suspended → active)"
+        invocation_phrases:
+          - "resume service intent"
+          - "reactivate intent"
+        metadata:
+          tier: intent
+          source_of_truth: matrix
+          scope: cbu
+          noun: service_intent
+          subject_kinds: [service-intent]
+          phase_tags: [operational]
+          side_effects: state_write
+          harm_class: reversible
+        behavior: plugin
+        args:
+        - name: intent-id
+          type: uuid
+          required: true
+        three_axis:
+          state_effect: transition
+          external_effects: []
+          consequence:
+            baseline: requires_confirmation
+          transitions:
+            dag: instrument_matrix_dag
+            edges:
+              - from: suspended
+                to: active
+        transition_args:
+          entity_id_arg: intent-id
+          target_workspace: instrument_matrix
+          target_slot: service_intent
+
+      cancel:
+        description: "Cancel a service intent (terminal)"
+        invocation_phrases:
+          - "cancel service intent"
+          - "terminate intent"
+        metadata:
+          tier: intent
+          source_of_truth: matrix
+          scope: cbu
+          noun: service_intent
+          subject_kinds: [service-intent]
+          phase_tags: [archive, terminate]
+          side_effects: state_write
+          harm_class: irreversible
+        behavior: plugin
+        args:
+        - name: intent-id
+          type: uuid
+          required: true
+        - name: reason
+          type: string
+          required: false
+        three_axis:
+          state_effect: transition
+          external_effects: [emitting]
+          consequence:
+            baseline: requires_explicit_authorisation
+          transitions:
+            dag: instrument_matrix_dag
+            edges:
+              - from: active
+                to: cancelled
+              - from: suspended
+                to: cancelled
+        transition_args:
+          entity_id_arg: intent-id
+          target_workspace: instrument_matrix
+          target_slot: service_intent
 
   discovery:
     description: "Resource discovery operations"
@@ -171,6 +302,11 @@ domains:
         returns:
           type: record
           name: discovery_result
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
 
       explain:
         description: "Explain why specific SRDEFs were discovered"
@@ -204,6 +340,11 @@ domains:
         returns:
           type: record_set
           name: explanations
+        three_axis:
+          state_effect: preserving
+          external_effects: [observational]
+          consequence:
+            baseline: benign
 
   attributes:
     description: "Attribute requirement and value management"
@@ -241,6 +382,11 @@ domains:
         returns:
           type: record
           name: rollup_result
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
 
       populate:
         description: "Auto-populate attribute values from available sources"
@@ -278,6 +424,11 @@ domains:
         returns:
           type: record
           name: population_result
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
 
       gaps:
         description: "Show attribute gaps - required values that are missing"
@@ -315,6 +466,11 @@ domains:
         returns:
           type: record_set
           name: gaps
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
 
       set:
         description: "Set an attribute value manually"
@@ -358,6 +514,11 @@ domains:
         returns:
           type: affected
           name: rows
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
 
   provisioning:
     description: "Resource provisioning operations"
@@ -399,6 +560,11 @@ domains:
         returns:
           type: record
           name: provisioning_result
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
 
       status:
         description: "Check provisioning request status"
@@ -427,6 +593,11 @@ domains:
         returns:
           type: record
           name: request_status
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
 
   readiness:
     description: "Service readiness operations"
@@ -468,6 +639,11 @@ domains:
         returns:
           type: record
           name: readiness_result
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
 
       explain:
         description: "Explain blocking reasons for a service"
@@ -510,6 +686,11 @@ domains:
         returns:
           type: record_set
           name: blocking_reasons
+        three_axis:
+          state_effect: preserving
+          external_effects: [observational]
+          consequence:
+            baseline: benign
 
   pipeline:
     description: "Full pipeline orchestration"
@@ -552,3 +733,8 @@ domains:
         returns:
           type: record
           name: pipeline_result
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable

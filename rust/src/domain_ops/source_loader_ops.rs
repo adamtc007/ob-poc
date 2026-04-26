@@ -1,19 +1,26 @@
-//! Research Source Loader Custom Operations
-//!
-//! Plugin handlers for the SourceLoader trait, enabling DSL verbs to interact with
+//! Research source loader verbs (15 plugin verbs) — `research.sources.*`,
+//! `research.companies-house.*`, `research.sec-edgar.*`. Plugin handlers
+//! for the SourceLoader trait, enabling DSL verbs to interact with
 //! pluggable research data sources (GLEIF, Companies House, SEC EDGAR, etc.).
 //!
-//! Rationale: These operations require external API calls and the SourceRegistry
-//! abstraction layer to search, fetch, and normalize data from multiple sources.
+//! Phase 5c-migrate Phase B Pattern B slice #75: ported from
+//! `CustomOperation` + `inventory::collect!` to `SemOsVerbOp`. Stays in
+//! `ob-poc::domain_ops::source_loader_ops` because the ops bridge to
+//! `crate::research::sources::*` — upstream of `sem_os_postgres`.
+//!
+//! Rationale: These operations require external API calls and the
+//! SourceRegistry abstraction layer to search, fetch, and normalize
+//! data from multiple sources.
 
 use anyhow::Result;
 use async_trait::async_trait;
-use ob_poc_macros::register_custom_op;
+use sem_os_postgres::ops::SemOsVerbOp;
 
-use super::helpers::{extract_bool_opt, extract_int_opt, extract_string_opt, extract_uuid_opt};
-use super::CustomOperation;
-use crate::dsl_v2::ast::VerbCall;
-use crate::dsl_v2::executor::{ExecutionContext, ExecutionResult};
+use dsl_runtime::domain_ops::helpers::{
+    json_extract_bool_opt, json_extract_int_opt, json_extract_string_opt, json_extract_uuid_opt,
+};
+use dsl_runtime::tx::TransactionScope;
+use dsl_runtime::{VerbExecutionContext, VerbExecutionOutcome};
 
 #[cfg(feature = "database")]
 use {
@@ -35,28 +42,19 @@ use {
 // =============================================================================
 
 /// List all available research sources
-#[register_custom_op]
-pub struct SourceListOp;
+pub struct SourcesList;
 
 #[async_trait]
-impl CustomOperation for SourceListOp {
-    fn domain(&self) -> &'static str {
-        "research.sources"
+impl SemOsVerbOp for SourcesList {
+    fn fqn(&self) -> &str {
+        "research.sources.list"
     }
-    fn verb(&self) -> &'static str {
-        "list"
-    }
-    fn rationale(&self) -> &'static str {
-        "Lists all available research sources from the SourceRegistry"
-    }
-
-    #[cfg(feature = "database")]
     async fn execute(
         &self,
-        verb_call: &VerbCall,
-        ctx: &mut ExecutionContext,
-        _pool: &PgPool,
-    ) -> Result<ExecutionResult> {
+        _args: &serde_json::Value,
+        _ctx: &mut VerbExecutionContext,
+        _scope: &mut dyn TransactionScope,
+    ) -> Result<VerbExecutionOutcome> {
         let registry = build_source_registry();
 
         let sources: Vec<serde_json::Value> = registry
@@ -73,47 +71,25 @@ impl CustomOperation for SourceListOp {
             })
             .collect();
 
-        if let Some(binding) = &verb_call.binding {
-            ctx.bind_json(binding, serde_json::json!(sources));
-        }
-
-        Ok(ExecutionResult::RecordSet(sources))
-    }
-
-    #[cfg(not(feature = "database"))]
-    async fn execute(
-        &self,
-        _verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-    ) -> Result<ExecutionResult> {
-        Ok(ExecutionResult::RecordSet(vec![]))
+        Ok(VerbExecutionOutcome::RecordSet(sources))
     }
 }
 
 /// Get information about a specific research source
-#[register_custom_op]
-pub struct SourceInfoOp;
+pub struct SourcesInfo;
 
 #[async_trait]
-impl CustomOperation for SourceInfoOp {
-    fn domain(&self) -> &'static str {
-        "research.sources"
+impl SemOsVerbOp for SourcesInfo {
+    fn fqn(&self) -> &str {
+        "research.sources.info"
     }
-    fn verb(&self) -> &'static str {
-        "info"
-    }
-    fn rationale(&self) -> &'static str {
-        "Returns detailed information about a specific research source"
-    }
-
-    #[cfg(feature = "database")]
     async fn execute(
         &self,
-        verb_call: &VerbCall,
-        ctx: &mut ExecutionContext,
-        _pool: &PgPool,
-    ) -> Result<ExecutionResult> {
-        let source_id = extract_string_opt(verb_call, "source-id")
+        args: &serde_json::Value,
+        _ctx: &mut VerbExecutionContext,
+        _scope: &mut dyn TransactionScope,
+    ) -> Result<VerbExecutionOutcome> {
+        let source_id = json_extract_string_opt(args, "source-id")
             .ok_or_else(|| anyhow::anyhow!(":source-id required"))?;
 
         let registry = build_source_registry();
@@ -130,53 +106,32 @@ impl CustomOperation for SourceInfoOp {
             "key_type": source.key_type(),
         });
 
-        if let Some(binding) = &verb_call.binding {
-            ctx.bind_json(binding, result.clone());
-        }
-
-        Ok(ExecutionResult::Record(result))
-    }
-
-    #[cfg(not(feature = "database"))]
-    async fn execute(
-        &self,
-        _verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-    ) -> Result<ExecutionResult> {
-        Ok(ExecutionResult::Record(serde_json::json!({})))
+        Ok(VerbExecutionOutcome::Record(result))
     }
 }
 
 /// Search a specific source for entities
-#[register_custom_op]
-pub struct SourceSearchOp;
+pub struct SourcesSearch;
 
 #[async_trait]
-impl CustomOperation for SourceSearchOp {
-    fn domain(&self) -> &'static str {
-        "research.sources"
-    }
-    fn verb(&self) -> &'static str {
-        "search"
-    }
-    fn rationale(&self) -> &'static str {
-        "Searches a specific source for entities by name - requires external API call"
+impl SemOsVerbOp for SourcesSearch {
+    fn fqn(&self) -> &str {
+        "research.sources.search"
     }
 
-    #[cfg(feature = "database")]
-    async fn execute(
+    async fn pre_fetch(
         &self,
-        verb_call: &VerbCall,
-        ctx: &mut ExecutionContext,
-        _pool: &PgPool,
-    ) -> Result<ExecutionResult> {
-        let source_id = extract_string_opt(verb_call, "source-id")
+        args: &serde_json::Value,
+        _ctx: &mut VerbExecutionContext,
+        _pool: &sqlx::PgPool,
+    ) -> Result<Option<serde_json::Value>> {
+        let source_id = json_extract_string_opt(args, "source-id")
             .ok_or_else(|| anyhow::anyhow!(":source-id required"))?;
-        let query = extract_string_opt(verb_call, "query")
+        let query = json_extract_string_opt(args, "query")
             .ok_or_else(|| anyhow::anyhow!(":query required"))?;
-        let jurisdiction = extract_string_opt(verb_call, "jurisdiction");
-        let limit = extract_int_opt(verb_call, "limit").map(|l| l as usize);
-        let include_inactive = extract_bool_opt(verb_call, "include-inactive").unwrap_or(false);
+        let jurisdiction = json_extract_string_opt(args, "jurisdiction");
+        let limit = json_extract_int_opt(args, "limit").map(|l| l as usize);
+        let include_inactive = json_extract_bool_opt(args, "include-inactive").unwrap_or(false);
 
         let registry = build_source_registry();
 
@@ -211,52 +166,52 @@ impl CustomOperation for SourceSearchOp {
             })
             .collect();
 
-        if let Some(binding) = &verb_call.binding {
-            ctx.bind_json(binding, serde_json::json!(results));
-        }
-
-        Ok(ExecutionResult::RecordSet(results))
+        Ok(Some(
+            serde_json::json!({ "_sources_search_results": results }),
+        ))
     }
 
-    #[cfg(not(feature = "database"))]
     async fn execute(
         &self,
-        _verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-    ) -> Result<ExecutionResult> {
-        Ok(ExecutionResult::RecordSet(vec![]))
+        args: &serde_json::Value,
+        _ctx: &mut VerbExecutionContext,
+        _scope: &mut dyn TransactionScope,
+    ) -> Result<VerbExecutionOutcome> {
+        let results = args
+            .get("_sources_search_results")
+            .and_then(|v| v.as_array())
+            .cloned()
+            .ok_or_else(|| {
+                anyhow::anyhow!(
+                    "sources.search: pre_fetch result missing \
+                     (`_sources_search_results` absent from args)"
+                )
+            })?;
+        Ok(VerbExecutionOutcome::RecordSet(results))
     }
 }
 
 /// Fetch entity data from a source by key
-#[register_custom_op]
-pub struct SourceFetchOp;
+pub struct SourcesFetch;
 
 #[async_trait]
-impl CustomOperation for SourceFetchOp {
-    fn domain(&self) -> &'static str {
-        "research.sources"
-    }
-    fn verb(&self) -> &'static str {
-        "fetch"
-    }
-    fn rationale(&self) -> &'static str {
-        "Fetches entity data from a source by key - requires external API call"
+impl SemOsVerbOp for SourcesFetch {
+    fn fqn(&self) -> &str {
+        "research.sources.fetch"
     }
 
-    #[cfg(feature = "database")]
-    async fn execute(
+    async fn pre_fetch(
         &self,
-        verb_call: &VerbCall,
-        ctx: &mut ExecutionContext,
-        pool: &PgPool,
-    ) -> Result<ExecutionResult> {
-        let source_id = extract_string_opt(verb_call, "source-id")
+        args: &serde_json::Value,
+        ctx: &mut VerbExecutionContext,
+        _pool: &sqlx::PgPool,
+    ) -> Result<Option<serde_json::Value>> {
+        let source_id = json_extract_string_opt(args, "source-id")
             .ok_or_else(|| anyhow::anyhow!(":source-id required"))?;
         let key =
-            extract_string_opt(verb_call, "key").ok_or_else(|| anyhow::anyhow!(":key required"))?;
-        let include_raw = extract_bool_opt(verb_call, "include-raw").unwrap_or(false);
-        let decision_id = extract_uuid_opt(verb_call, ctx, "decision-id");
+            json_extract_string_opt(args, "key").ok_or_else(|| anyhow::anyhow!(":key required"))?;
+        let include_raw = json_extract_bool_opt(args, "include-raw").unwrap_or(false);
+        let decision_id = json_extract_uuid_opt(args, ctx, "decision-id");
 
         let registry = build_source_registry();
 
@@ -264,7 +219,6 @@ impl CustomOperation for SourceFetchOp {
             .get(&source_id)
             .ok_or_else(|| anyhow::anyhow!("Source not found: {}", source_id))?;
 
-        // Validate key format
         if !source.validate_key(&key) {
             return Err(anyhow::anyhow!(
                 "Invalid key format for {}: {}",
@@ -282,58 +236,67 @@ impl CustomOperation for SourceFetchOp {
         }
 
         let entity = source.fetch_entity(&key, Some(options)).await?;
-
         let result = normalized_entity_to_json(&entity);
 
-        // Log research action if decision-id provided
-        if let Some(dec_id) = decision_id {
-            log_research_action(pool, dec_id, &format!("{}:fetch", source_id), &result, 0, 0)
-                .await?;
-        }
-
-        if let Some(binding) = &verb_call.binding {
-            ctx.bind_json(binding, result.clone());
-        }
-
-        Ok(ExecutionResult::Record(result))
+        Ok(Some(
+            serde_json::json!({ "_sources_fetched_entity": result }),
+        ))
     }
 
-    #[cfg(not(feature = "database"))]
     async fn execute(
         &self,
-        _verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-    ) -> Result<ExecutionResult> {
-        Ok(ExecutionResult::Record(serde_json::json!({})))
+        args: &serde_json::Value,
+        ctx: &mut VerbExecutionContext,
+        scope: &mut dyn TransactionScope,
+    ) -> Result<VerbExecutionOutcome> {
+        let result = args
+            .get("_sources_fetched_entity")
+            .cloned()
+            .ok_or_else(|| {
+                anyhow::anyhow!(
+                    "sources.fetch: pre_fetch result missing \
+                 (`_sources_fetched_entity` absent from args)"
+                )
+            })?;
+
+        let decision_id = json_extract_uuid_opt(args, ctx, "decision-id");
+        if let Some(dec_id) = decision_id {
+            // `source_id` is needed for the log tag; re-read from args.
+            let source_id = json_extract_string_opt(args, "source-id")
+                .ok_or_else(|| anyhow::anyhow!(":source-id required"))?;
+            let pool = scope.pool().clone();
+            log_research_action(
+                &pool,
+                dec_id,
+                &format!("{}:fetch", source_id),
+                &result,
+                0,
+                0,
+            )
+            .await?;
+        }
+
+        Ok(VerbExecutionOutcome::Record(result))
     }
 }
 
 /// Find the best source for a jurisdiction and data type
-#[register_custom_op]
-pub struct SourceFindForJurisdictionOp;
+pub struct SourcesFindForJurisdiction;
 
 #[async_trait]
-impl CustomOperation for SourceFindForJurisdictionOp {
-    fn domain(&self) -> &'static str {
-        "research.sources"
+impl SemOsVerbOp for SourcesFindForJurisdiction {
+    fn fqn(&self) -> &str {
+        "research.sources.find-for-jurisdiction"
     }
-    fn verb(&self) -> &'static str {
-        "find-for-jurisdiction"
-    }
-    fn rationale(&self) -> &'static str {
-        "Finds the best available source for a given jurisdiction and data type"
-    }
-
-    #[cfg(feature = "database")]
     async fn execute(
         &self,
-        verb_call: &VerbCall,
-        ctx: &mut ExecutionContext,
-        _pool: &PgPool,
-    ) -> Result<ExecutionResult> {
-        let jurisdiction = extract_string_opt(verb_call, "jurisdiction")
+        args: &serde_json::Value,
+        _ctx: &mut VerbExecutionContext,
+        _scope: &mut dyn TransactionScope,
+    ) -> Result<VerbExecutionOutcome> {
+        let jurisdiction = json_extract_string_opt(args, "jurisdiction")
             .ok_or_else(|| anyhow::anyhow!(":jurisdiction required"))?;
-        let data_type = extract_string_opt(verb_call, "data-type")
+        let data_type = json_extract_string_opt(args, "data-type")
             .ok_or_else(|| anyhow::anyhow!(":data-type required"))?;
 
         let registry = build_source_registry();
@@ -362,20 +325,7 @@ impl CustomOperation for SourceFindForJurisdictionOp {
             })
             .collect();
 
-        if let Some(binding) = &verb_call.binding {
-            ctx.bind_json(binding, serde_json::json!(results));
-        }
-
-        Ok(ExecutionResult::RecordSet(results))
-    }
-
-    #[cfg(not(feature = "database"))]
-    async fn execute(
-        &self,
-        _verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-    ) -> Result<ExecutionResult> {
-        Ok(ExecutionResult::RecordSet(vec![]))
+        Ok(VerbExecutionOutcome::RecordSet(results))
     }
 }
 
@@ -384,32 +334,27 @@ impl CustomOperation for SourceFindForJurisdictionOp {
 // =============================================================================
 
 /// Search Companies House for UK companies
-#[register_custom_op]
-pub struct ChSearchOp;
+pub struct CompaniesHouseSearch;
 
 #[async_trait]
-impl CustomOperation for ChSearchOp {
-    fn domain(&self) -> &'static str {
-        "research.companies-house"
-    }
-    fn verb(&self) -> &'static str {
-        "search"
-    }
-    fn rationale(&self) -> &'static str {
-        "Searches UK Companies House API for companies by name"
+impl SemOsVerbOp for CompaniesHouseSearch {
+    fn fqn(&self) -> &str {
+        "research.companies-house.search"
     }
 
-    #[cfg(feature = "database")]
-    async fn execute(
+    /// Phase F.2 (ledger §3.2, 2026-04-22): HTTP call moved to pre_fetch.
+    /// Executes outside the transaction scope; result is serialized into
+    /// args under `_search_results` for `execute` to hand back.
+    async fn pre_fetch(
         &self,
-        verb_call: &VerbCall,
-        ctx: &mut ExecutionContext,
-        _pool: &PgPool,
-    ) -> Result<ExecutionResult> {
-        let query = extract_string_opt(verb_call, "query")
+        args: &serde_json::Value,
+        _ctx: &mut VerbExecutionContext,
+        _pool: &sqlx::PgPool,
+    ) -> Result<Option<serde_json::Value>> {
+        let query = json_extract_string_opt(args, "query")
             .ok_or_else(|| anyhow::anyhow!(":query required"))?;
-        let limit = extract_int_opt(verb_call, "limit").map(|l| l as usize);
-        let include_inactive = extract_bool_opt(verb_call, "include-inactive").unwrap_or(false);
+        let limit = json_extract_int_opt(args, "limit").map(|l| l as usize);
+        let include_inactive = json_extract_bool_opt(args, "include-inactive").unwrap_or(false);
 
         let loader = CompaniesHouseLoader::from_env()?;
 
@@ -436,49 +381,50 @@ impl CustomOperation for ChSearchOp {
             })
             .collect();
 
-        if let Some(binding) = &verb_call.binding {
-            ctx.bind_json(binding, serde_json::json!(results));
-        }
-
-        Ok(ExecutionResult::RecordSet(results))
+        Ok(Some(serde_json::json!({ "_search_results": results })))
     }
 
-    #[cfg(not(feature = "database"))]
     async fn execute(
         &self,
-        _verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-    ) -> Result<ExecutionResult> {
-        Ok(ExecutionResult::RecordSet(vec![]))
+        args: &serde_json::Value,
+        _ctx: &mut VerbExecutionContext,
+        _scope: &mut dyn TransactionScope,
+    ) -> Result<VerbExecutionOutcome> {
+        let results = args
+            .get("_search_results")
+            .and_then(|v| v.as_array())
+            .cloned()
+            .ok_or_else(|| {
+                anyhow::anyhow!(
+                    "companies-house.search: pre_fetch result missing \
+                     (`_search_results` absent from args)"
+                )
+            })?;
+        Ok(VerbExecutionOutcome::RecordSet(results))
     }
 }
 
 /// Fetch company profile from Companies House
-#[register_custom_op]
-pub struct ChFetchCompanyOp;
+pub struct CompaniesHouseFetchCompany;
 
 #[async_trait]
-impl CustomOperation for ChFetchCompanyOp {
-    fn domain(&self) -> &'static str {
-        "research.companies-house"
-    }
-    fn verb(&self) -> &'static str {
-        "fetch-company"
-    }
-    fn rationale(&self) -> &'static str {
-        "Fetches company profile from UK Companies House API"
+impl SemOsVerbOp for CompaniesHouseFetchCompany {
+    fn fqn(&self) -> &str {
+        "research.companies-house.fetch-company"
     }
 
-    #[cfg(feature = "database")]
-    async fn execute(
+    /// Phase F.2 (2026-04-22): HTTP fetch moves to pre_fetch; the DB log
+    /// (log_research_action) stays in execute so it shares the inner
+    /// transaction scope.
+    async fn pre_fetch(
         &self,
-        verb_call: &VerbCall,
-        ctx: &mut ExecutionContext,
-        pool: &PgPool,
-    ) -> Result<ExecutionResult> {
-        let company_number = extract_string_opt(verb_call, "company-number")
+        args: &serde_json::Value,
+        ctx: &mut VerbExecutionContext,
+        _pool: &sqlx::PgPool,
+    ) -> Result<Option<serde_json::Value>> {
+        let company_number = json_extract_string_opt(args, "company-number")
             .ok_or_else(|| anyhow::anyhow!(":company-number required"))?;
-        let decision_id = extract_uuid_opt(verb_call, ctx, "decision-id");
+        let decision_id = json_extract_uuid_opt(args, ctx, "decision-id");
 
         let loader = CompaniesHouseLoader::from_env()?;
 
@@ -490,56 +436,59 @@ impl CustomOperation for ChFetchCompanyOp {
         let entity = loader.fetch_entity(&company_number, Some(options)).await?;
         let result = normalized_entity_to_json(&entity);
 
-        // Log research action if decision-id provided
-        if let Some(dec_id) = decision_id {
-            log_research_action(pool, dec_id, "companies-house:fetch-company", &result, 0, 0)
-                .await?;
-        }
-
-        if let Some(binding) = &verb_call.binding {
-            ctx.bind_json(binding, result.clone());
-        }
-
-        Ok(ExecutionResult::Record(result))
+        Ok(Some(serde_json::json!({ "_fetched_entity": result })))
     }
 
-    #[cfg(not(feature = "database"))]
     async fn execute(
         &self,
-        _verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-    ) -> Result<ExecutionResult> {
-        Ok(ExecutionResult::Record(serde_json::json!({})))
+        args: &serde_json::Value,
+        ctx: &mut VerbExecutionContext,
+        scope: &mut dyn TransactionScope,
+    ) -> Result<VerbExecutionOutcome> {
+        let result = args.get("_fetched_entity").cloned().ok_or_else(|| {
+            anyhow::anyhow!(
+                "companies-house.fetch-company: pre_fetch result missing \
+                 (`_fetched_entity` absent from args)"
+            )
+        })?;
+
+        let decision_id = json_extract_uuid_opt(args, ctx, "decision-id");
+        if let Some(dec_id) = decision_id {
+            let pool = scope.pool().clone();
+            log_research_action(
+                &pool,
+                dec_id,
+                "companies-house:fetch-company",
+                &result,
+                0,
+                0,
+            )
+            .await?;
+        }
+
+        Ok(VerbExecutionOutcome::Record(result))
     }
 }
 
 /// Fetch PSC (Persons with Significant Control) from Companies House
-#[register_custom_op]
-pub struct ChFetchPscOp;
+pub struct CompaniesHouseFetchPsc;
 
 #[async_trait]
-impl CustomOperation for ChFetchPscOp {
-    fn domain(&self) -> &'static str {
-        "research.companies-house"
-    }
-    fn verb(&self) -> &'static str {
-        "fetch-psc"
-    }
-    fn rationale(&self) -> &'static str {
-        "Fetches PSC (beneficial owners) from UK Companies House API"
+impl SemOsVerbOp for CompaniesHouseFetchPsc {
+    fn fqn(&self) -> &str {
+        "research.companies-house.fetch-psc"
     }
 
-    #[cfg(feature = "database")]
-    async fn execute(
+    async fn pre_fetch(
         &self,
-        verb_call: &VerbCall,
-        ctx: &mut ExecutionContext,
-        pool: &PgPool,
-    ) -> Result<ExecutionResult> {
-        let company_number = extract_string_opt(verb_call, "company-number")
+        args: &serde_json::Value,
+        ctx: &mut VerbExecutionContext,
+        _pool: &sqlx::PgPool,
+    ) -> Result<Option<serde_json::Value>> {
+        let company_number = json_extract_string_opt(args, "company-number")
             .ok_or_else(|| anyhow::anyhow!(":company-number required"))?;
-        let include_ceased = extract_bool_opt(verb_call, "include-ceased").unwrap_or(false);
-        let decision_id = extract_uuid_opt(verb_call, ctx, "decision-id");
+        let include_ceased = json_extract_bool_opt(args, "include-ceased").unwrap_or(false);
+        let decision_id = json_extract_uuid_opt(args, ctx, "decision-id");
 
         let loader = CompaniesHouseLoader::from_env()?;
 
@@ -573,10 +522,31 @@ impl CustomOperation for ChFetchPscOp {
             })
             .collect();
 
-        // Log research action if decision-id provided
+        Ok(Some(serde_json::json!({ "_psc_holders": results })))
+    }
+
+    async fn execute(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut VerbExecutionContext,
+        scope: &mut dyn TransactionScope,
+    ) -> Result<VerbExecutionOutcome> {
+        let results = args
+            .get("_psc_holders")
+            .and_then(|v| v.as_array())
+            .cloned()
+            .ok_or_else(|| {
+                anyhow::anyhow!(
+                    "companies-house.fetch-psc: pre_fetch result missing \
+                     (`_psc_holders` absent from args)"
+                )
+            })?;
+
+        let decision_id = json_extract_uuid_opt(args, ctx, "decision-id");
         if let Some(dec_id) = decision_id {
+            let pool = scope.pool().clone();
             log_research_action(
-                pool,
+                &pool,
                 dec_id,
                 "companies-house:fetch-psc",
                 &serde_json::json!({ "holders": results.len() }),
@@ -586,49 +556,28 @@ impl CustomOperation for ChFetchPscOp {
             .await?;
         }
 
-        if let Some(binding) = &verb_call.binding {
-            ctx.bind_json(binding, serde_json::json!(results));
-        }
-
-        Ok(ExecutionResult::RecordSet(results))
-    }
-
-    #[cfg(not(feature = "database"))]
-    async fn execute(
-        &self,
-        _verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-    ) -> Result<ExecutionResult> {
-        Ok(ExecutionResult::RecordSet(vec![]))
+        Ok(VerbExecutionOutcome::RecordSet(results))
     }
 }
 
 /// Fetch officers (directors, secretaries) from Companies House
-#[register_custom_op]
-pub struct ChFetchOfficersOp;
+pub struct CompaniesHouseFetchOfficers;
 
 #[async_trait]
-impl CustomOperation for ChFetchOfficersOp {
-    fn domain(&self) -> &'static str {
-        "research.companies-house"
-    }
-    fn verb(&self) -> &'static str {
-        "fetch-officers"
-    }
-    fn rationale(&self) -> &'static str {
-        "Fetches officers from UK Companies House API"
+impl SemOsVerbOp for CompaniesHouseFetchOfficers {
+    fn fqn(&self) -> &str {
+        "research.companies-house.fetch-officers"
     }
 
-    #[cfg(feature = "database")]
-    async fn execute(
+    async fn pre_fetch(
         &self,
-        verb_call: &VerbCall,
-        ctx: &mut ExecutionContext,
-        _pool: &PgPool,
-    ) -> Result<ExecutionResult> {
-        let company_number = extract_string_opt(verb_call, "company-number")
+        args: &serde_json::Value,
+        _ctx: &mut VerbExecutionContext,
+        _pool: &sqlx::PgPool,
+    ) -> Result<Option<serde_json::Value>> {
+        let company_number = json_extract_string_opt(args, "company-number")
             .ok_or_else(|| anyhow::anyhow!(":company-number required"))?;
-        let include_resigned = extract_bool_opt(verb_call, "include-resigned").unwrap_or(false);
+        let include_resigned = json_extract_bool_opt(args, "include-resigned").unwrap_or(false);
 
         let loader = CompaniesHouseLoader::from_env()?;
 
@@ -656,86 +605,118 @@ impl CustomOperation for ChFetchOfficersOp {
             })
             .collect();
 
-        if let Some(binding) = &verb_call.binding {
-            ctx.bind_json(binding, serde_json::json!(results));
-        }
-
-        Ok(ExecutionResult::RecordSet(results))
+        Ok(Some(serde_json::json!({ "_officers": results })))
     }
 
-    #[cfg(not(feature = "database"))]
     async fn execute(
         &self,
-        _verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-    ) -> Result<ExecutionResult> {
-        Ok(ExecutionResult::RecordSet(vec![]))
+        args: &serde_json::Value,
+        _ctx: &mut VerbExecutionContext,
+        _scope: &mut dyn TransactionScope,
+    ) -> Result<VerbExecutionOutcome> {
+        let results = args
+            .get("_officers")
+            .and_then(|v| v.as_array())
+            .cloned()
+            .ok_or_else(|| {
+                anyhow::anyhow!(
+                    "companies-house.fetch-officers: pre_fetch result missing \
+                     (`_officers` absent from args)"
+                )
+            })?;
+        Ok(VerbExecutionOutcome::RecordSet(results))
     }
 }
 
 /// Import company (and optionally PSC/officers) from Companies House to database
-#[register_custom_op]
-pub struct ChImportCompanyOp;
+pub struct CompaniesHouseImportCompany;
 
 #[async_trait]
-impl CustomOperation for ChImportCompanyOp {
-    fn domain(&self) -> &'static str {
-        "research.companies-house"
-    }
-    fn verb(&self) -> &'static str {
-        "import-company"
-    }
-    fn rationale(&self) -> &'static str {
-        "Imports company from Companies House and creates entity in database"
+impl SemOsVerbOp for CompaniesHouseImportCompany {
+    fn fqn(&self) -> &str {
+        "research.companies-house.import-company"
     }
 
-    #[cfg(feature = "database")]
-    async fn execute(
+    /// Phase F.2: ALL external HTTP (entity + optional PSC + optional
+    /// officers) runs in pre_fetch. DB writes (create_entity,
+    /// log_research_action) stay in execute where they share the inner
+    /// transaction scope.
+    async fn pre_fetch(
         &self,
-        verb_call: &VerbCall,
-        ctx: &mut ExecutionContext,
-        pool: &PgPool,
-    ) -> Result<ExecutionResult> {
-        let company_number = extract_string_opt(verb_call, "company-number")
+        args: &serde_json::Value,
+        ctx: &mut VerbExecutionContext,
+        _pool: &sqlx::PgPool,
+    ) -> Result<Option<serde_json::Value>> {
+        let company_number = json_extract_string_opt(args, "company-number")
             .ok_or_else(|| anyhow::anyhow!(":company-number required"))?;
-        let include_psc = extract_bool_opt(verb_call, "include-psc").unwrap_or(true);
-        let include_officers = extract_bool_opt(verb_call, "include-officers").unwrap_or(false);
-        let decision_id = extract_uuid_opt(verb_call, ctx, "decision-id");
+        let include_psc = json_extract_bool_opt(args, "include-psc").unwrap_or(true);
+        let include_officers = json_extract_bool_opt(args, "include-officers").unwrap_or(false);
+        let decision_id = json_extract_uuid_opt(args, ctx, "decision-id");
 
         let loader = CompaniesHouseLoader::from_env()?;
 
-        // Fetch company
         let mut options = FetchOptions::new();
         if let Some(dec_id) = decision_id {
             options = options.with_decision_id(dec_id);
         }
         let entity = loader.fetch_entity(&company_number, Some(options)).await?;
 
-        // Create entity in database
-        let entity_id = create_entity_from_normalized(pool, &entity).await?;
-
         let mut psc_count = 0;
-        let mut officer_count = 0;
-
-        // Optionally import PSC
         if include_psc {
             let psc_options = FetchControlHoldersOptions::new();
             let holders = loader
                 .fetch_control_holders(&company_number, Some(psc_options))
                 .await?;
             psc_count = holders.len();
-            // TODO: Create PSC relationships in database
         }
 
-        // Optionally import officers
+        let mut officer_count = 0;
         if include_officers {
             let officer_options = FetchOfficersOptions::new();
             let officers = loader
                 .fetch_officers(&company_number, Some(officer_options))
                 .await?;
             officer_count = officers.len();
-            // TODO: Create officer relationships in database
         }
+
+        Ok(Some(serde_json::json!({
+            "_ch_import_entity": serde_json::to_value(&entity)?,
+            "_ch_import_psc_count": psc_count,
+            "_ch_import_officer_count": officer_count,
+        })))
+    }
+
+    async fn execute(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut VerbExecutionContext,
+        scope: &mut dyn TransactionScope,
+    ) -> Result<VerbExecutionOutcome> {
+        let company_number = json_extract_string_opt(args, "company-number")
+            .ok_or_else(|| anyhow::anyhow!(":company-number required"))?;
+        let decision_id = json_extract_uuid_opt(args, ctx, "decision-id");
+        let pool = scope.pool().clone();
+
+        let entity: crate::research::sources::normalized::NormalizedEntity = args
+            .get("_ch_import_entity")
+            .cloned()
+            .map(serde_json::from_value)
+            .ok_or_else(|| {
+                anyhow::anyhow!(
+                    "companies-house.import-company: pre_fetch result missing \
+                     (`_ch_import_entity` absent from args)"
+                )
+            })??;
+        let psc_count = args
+            .get("_ch_import_psc_count")
+            .and_then(|v| v.as_u64())
+            .unwrap_or(0) as usize;
+        let officer_count = args
+            .get("_ch_import_officer_count")
+            .and_then(|v| v.as_u64())
+            .unwrap_or(0) as usize;
+
+        let entity_id = create_entity_from_normalized(&pool, &entity).await?;
 
         let result = serde_json::json!({
             "entity_id": entity_id,
@@ -748,7 +729,7 @@ impl CustomOperation for ChImportCompanyOp {
         // Log research action if decision-id provided
         if let Some(dec_id) = decision_id {
             log_research_action(
-                pool,
+                &pool,
                 dec_id,
                 "companies-house:import-company",
                 &result,
@@ -758,22 +739,7 @@ impl CustomOperation for ChImportCompanyOp {
             .await?;
         }
 
-        if let Some(binding) = &verb_call.binding {
-            ctx.bind(binding, entity_id);
-        }
-
-        Ok(ExecutionResult::Record(result))
-    }
-
-    #[cfg(not(feature = "database"))]
-    async fn execute(
-        &self,
-        _verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-    ) -> Result<ExecutionResult> {
-        Ok(ExecutionResult::Record(serde_json::json!({
-            "entity_id": uuid::Uuid::new_v4(),
-        })))
+        Ok(VerbExecutionOutcome::Record(result))
     }
 }
 
@@ -782,31 +748,23 @@ impl CustomOperation for ChImportCompanyOp {
 // =============================================================================
 
 /// Search SEC EDGAR for US public companies
-#[register_custom_op]
-pub struct SecSearchOp;
+pub struct SecEdgarSearch;
 
 #[async_trait]
-impl CustomOperation for SecSearchOp {
-    fn domain(&self) -> &'static str {
-        "research.sec-edgar"
-    }
-    fn verb(&self) -> &'static str {
-        "search"
-    }
-    fn rationale(&self) -> &'static str {
-        "Searches SEC EDGAR API for companies by name"
+impl SemOsVerbOp for SecEdgarSearch {
+    fn fqn(&self) -> &str {
+        "research.sec-edgar.search"
     }
 
-    #[cfg(feature = "database")]
-    async fn execute(
+    async fn pre_fetch(
         &self,
-        verb_call: &VerbCall,
-        ctx: &mut ExecutionContext,
-        _pool: &PgPool,
-    ) -> Result<ExecutionResult> {
-        let query = extract_string_opt(verb_call, "query")
+        args: &serde_json::Value,
+        _ctx: &mut VerbExecutionContext,
+        _pool: &sqlx::PgPool,
+    ) -> Result<Option<serde_json::Value>> {
+        let query = json_extract_string_opt(args, "query")
             .ok_or_else(|| anyhow::anyhow!(":query required"))?;
-        let limit = extract_int_opt(verb_call, "limit").map(|l| l as usize);
+        let limit = json_extract_int_opt(args, "limit").map(|l| l as usize);
 
         let loader = SecEdgarLoader::new()?;
 
@@ -829,49 +787,47 @@ impl CustomOperation for SecSearchOp {
             })
             .collect();
 
-        if let Some(binding) = &verb_call.binding {
-            ctx.bind_json(binding, serde_json::json!(results));
-        }
-
-        Ok(ExecutionResult::RecordSet(results))
+        Ok(Some(serde_json::json!({ "_sec_search_results": results })))
     }
 
-    #[cfg(not(feature = "database"))]
     async fn execute(
         &self,
-        _verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-    ) -> Result<ExecutionResult> {
-        Ok(ExecutionResult::RecordSet(vec![]))
+        args: &serde_json::Value,
+        _ctx: &mut VerbExecutionContext,
+        _scope: &mut dyn TransactionScope,
+    ) -> Result<VerbExecutionOutcome> {
+        let results = args
+            .get("_sec_search_results")
+            .and_then(|v| v.as_array())
+            .cloned()
+            .ok_or_else(|| {
+                anyhow::anyhow!(
+                    "sec-edgar.search: pre_fetch result missing \
+                     (`_sec_search_results` absent from args)"
+                )
+            })?;
+        Ok(VerbExecutionOutcome::RecordSet(results))
     }
 }
 
 /// Fetch company from SEC EDGAR
-#[register_custom_op]
-pub struct SecFetchCompanyOp;
+pub struct SecEdgarFetchCompany;
 
 #[async_trait]
-impl CustomOperation for SecFetchCompanyOp {
-    fn domain(&self) -> &'static str {
-        "research.sec-edgar"
-    }
-    fn verb(&self) -> &'static str {
-        "fetch-company"
-    }
-    fn rationale(&self) -> &'static str {
-        "Fetches company information from SEC EDGAR API"
+impl SemOsVerbOp for SecEdgarFetchCompany {
+    fn fqn(&self) -> &str {
+        "research.sec-edgar.fetch-company"
     }
 
-    #[cfg(feature = "database")]
-    async fn execute(
+    async fn pre_fetch(
         &self,
-        verb_call: &VerbCall,
-        ctx: &mut ExecutionContext,
-        pool: &PgPool,
-    ) -> Result<ExecutionResult> {
+        args: &serde_json::Value,
+        ctx: &mut VerbExecutionContext,
+        _pool: &sqlx::PgPool,
+    ) -> Result<Option<serde_json::Value>> {
         let cik =
-            extract_string_opt(verb_call, "cik").ok_or_else(|| anyhow::anyhow!(":cik required"))?;
-        let decision_id = extract_uuid_opt(verb_call, ctx, "decision-id");
+            json_extract_string_opt(args, "cik").ok_or_else(|| anyhow::anyhow!(":cik required"))?;
+        let decision_id = json_extract_uuid_opt(args, ctx, "decision-id");
 
         let loader = SecEdgarLoader::new()?;
 
@@ -883,56 +839,52 @@ impl CustomOperation for SecFetchCompanyOp {
         let entity = loader.fetch_entity(&cik, Some(options)).await?;
         let result = normalized_entity_to_json(&entity);
 
-        // Log research action if decision-id provided
-        if let Some(dec_id) = decision_id {
-            log_research_action(pool, dec_id, "sec-edgar:fetch-company", &result, 0, 0).await?;
-        }
-
-        if let Some(binding) = &verb_call.binding {
-            ctx.bind_json(binding, result.clone());
-        }
-
-        Ok(ExecutionResult::Record(result))
+        Ok(Some(serde_json::json!({ "_sec_fetched_entity": result })))
     }
 
-    #[cfg(not(feature = "database"))]
     async fn execute(
         &self,
-        _verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-    ) -> Result<ExecutionResult> {
-        Ok(ExecutionResult::Record(serde_json::json!({})))
+        args: &serde_json::Value,
+        ctx: &mut VerbExecutionContext,
+        scope: &mut dyn TransactionScope,
+    ) -> Result<VerbExecutionOutcome> {
+        let result = args.get("_sec_fetched_entity").cloned().ok_or_else(|| {
+            anyhow::anyhow!(
+                "sec-edgar.fetch-company: pre_fetch result missing \
+                 (`_sec_fetched_entity` absent from args)"
+            )
+        })?;
+
+        let decision_id = json_extract_uuid_opt(args, ctx, "decision-id");
+        if let Some(dec_id) = decision_id {
+            let pool = scope.pool().clone();
+            log_research_action(&pool, dec_id, "sec-edgar:fetch-company", &result, 0, 0).await?;
+        }
+
+        Ok(VerbExecutionOutcome::Record(result))
     }
 }
 
 /// Fetch 13D/13G beneficial ownership filings from SEC EDGAR
-#[register_custom_op]
-pub struct SecFetchBeneficialOwnersOp;
+pub struct SecEdgarFetchBeneficialOwners;
 
 #[async_trait]
-impl CustomOperation for SecFetchBeneficialOwnersOp {
-    fn domain(&self) -> &'static str {
-        "research.sec-edgar"
-    }
-    fn verb(&self) -> &'static str {
-        "fetch-beneficial-owners"
-    }
-    fn rationale(&self) -> &'static str {
-        "Fetches 13D/13G beneficial ownership filings from SEC EDGAR API"
+impl SemOsVerbOp for SecEdgarFetchBeneficialOwners {
+    fn fqn(&self) -> &str {
+        "research.sec-edgar.fetch-beneficial-owners"
     }
 
-    #[cfg(feature = "database")]
-    async fn execute(
+    async fn pre_fetch(
         &self,
-        verb_call: &VerbCall,
-        ctx: &mut ExecutionContext,
-        pool: &PgPool,
-    ) -> Result<ExecutionResult> {
+        args: &serde_json::Value,
+        ctx: &mut VerbExecutionContext,
+        _pool: &sqlx::PgPool,
+    ) -> Result<Option<serde_json::Value>> {
         let cik =
-            extract_string_opt(verb_call, "cik").ok_or_else(|| anyhow::anyhow!(":cik required"))?;
-        let _include_13d = extract_bool_opt(verb_call, "include-13d").unwrap_or(true);
-        let _include_13g = extract_bool_opt(verb_call, "include-13g").unwrap_or(true);
-        let decision_id = extract_uuid_opt(verb_call, ctx, "decision-id");
+            json_extract_string_opt(args, "cik").ok_or_else(|| anyhow::anyhow!(":cik required"))?;
+        let _include_13d = json_extract_bool_opt(args, "include-13d").unwrap_or(true);
+        let _include_13g = json_extract_bool_opt(args, "include-13g").unwrap_or(true);
+        let decision_id = json_extract_uuid_opt(args, ctx, "decision-id");
 
         let loader = SecEdgarLoader::new()?;
 
@@ -957,10 +909,33 @@ impl CustomOperation for SecFetchBeneficialOwnersOp {
             })
             .collect();
 
-        // Log research action if decision-id provided
+        Ok(Some(
+            serde_json::json!({ "_sec_beneficial_owners": results }),
+        ))
+    }
+
+    async fn execute(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut VerbExecutionContext,
+        scope: &mut dyn TransactionScope,
+    ) -> Result<VerbExecutionOutcome> {
+        let results = args
+            .get("_sec_beneficial_owners")
+            .and_then(|v| v.as_array())
+            .cloned()
+            .ok_or_else(|| {
+                anyhow::anyhow!(
+                    "sec-edgar.fetch-beneficial-owners: pre_fetch result missing \
+                     (`_sec_beneficial_owners` absent from args)"
+                )
+            })?;
+
+        let decision_id = json_extract_uuid_opt(args, ctx, "decision-id");
         if let Some(dec_id) = decision_id {
+            let pool = scope.pool().clone();
             log_research_action(
-                pool,
+                &pool,
                 dec_id,
                 "sec-edgar:fetch-beneficial-owners",
                 &serde_json::json!({ "holders": results.len() }),
@@ -970,51 +945,29 @@ impl CustomOperation for SecFetchBeneficialOwnersOp {
             .await?;
         }
 
-        if let Some(binding) = &verb_call.binding {
-            ctx.bind_json(binding, serde_json::json!(results));
-        }
-
-        Ok(ExecutionResult::RecordSet(results))
-    }
-
-    #[cfg(not(feature = "database"))]
-    async fn execute(
-        &self,
-        _verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-    ) -> Result<ExecutionResult> {
-        Ok(ExecutionResult::RecordSet(vec![]))
+        Ok(VerbExecutionOutcome::RecordSet(results))
     }
 }
 
 /// Fetch recent SEC filings
-#[register_custom_op]
-pub struct SecFetchFilingsOp;
+pub struct SecEdgarFetchFilings;
 
 #[async_trait]
-impl CustomOperation for SecFetchFilingsOp {
-    fn domain(&self) -> &'static str {
-        "research.sec-edgar"
-    }
-    fn verb(&self) -> &'static str {
-        "fetch-filings"
-    }
-    fn rationale(&self) -> &'static str {
-        "Fetches recent SEC filings from EDGAR API"
+impl SemOsVerbOp for SecEdgarFetchFilings {
+    fn fqn(&self) -> &str {
+        "research.sec-edgar.fetch-filings"
     }
 
-    #[cfg(feature = "database")]
-    async fn execute(
+    async fn pre_fetch(
         &self,
-        verb_call: &VerbCall,
-        ctx: &mut ExecutionContext,
-        _pool: &PgPool,
-    ) -> Result<ExecutionResult> {
+        args: &serde_json::Value,
+        _ctx: &mut VerbExecutionContext,
+        _pool: &sqlx::PgPool,
+    ) -> Result<Option<serde_json::Value>> {
         let cik =
-            extract_string_opt(verb_call, "cik").ok_or_else(|| anyhow::anyhow!(":cik required"))?;
-        let _limit = extract_int_opt(verb_call, "limit").unwrap_or(50);
+            json_extract_string_opt(args, "cik").ok_or_else(|| anyhow::anyhow!(":cik required"))?;
+        let _limit = json_extract_int_opt(args, "limit").unwrap_or(50);
 
-        // For now, fetch entity and return filing summary from raw_response
         let loader = SecEdgarLoader::new()?;
 
         let options = FetchOptions::new().with_raw();
@@ -1028,77 +981,98 @@ impl CustomOperation for SecFetchFilingsOp {
             .cloned()
             .unwrap_or_else(|| serde_json::json!([]));
 
-        if let Some(binding) = &verb_call.binding {
-            ctx.bind_json(binding, filings.clone());
-        }
-
-        Ok(ExecutionResult::Record(
-            serde_json::json!({ "filings": filings }),
-        ))
+        Ok(Some(serde_json::json!({ "_sec_filings": filings })))
     }
 
-    #[cfg(not(feature = "database"))]
     async fn execute(
         &self,
-        _verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-    ) -> Result<ExecutionResult> {
-        Ok(ExecutionResult::Record(
-            serde_json::json!({ "filings": [] }),
+        args: &serde_json::Value,
+        _ctx: &mut VerbExecutionContext,
+        _scope: &mut dyn TransactionScope,
+    ) -> Result<VerbExecutionOutcome> {
+        let filings = args.get("_sec_filings").cloned().ok_or_else(|| {
+            anyhow::anyhow!(
+                "sec-edgar.fetch-filings: pre_fetch result missing \
+                 (`_sec_filings` absent from args)"
+            )
+        })?;
+        Ok(VerbExecutionOutcome::Record(
+            serde_json::json!({ "filings": filings }),
         ))
     }
 }
 
 /// Import SEC company to database
-#[register_custom_op]
-pub struct SecImportCompanyOp;
+pub struct SecEdgarImportCompany;
 
 #[async_trait]
-impl CustomOperation for SecImportCompanyOp {
-    fn domain(&self) -> &'static str {
-        "research.sec-edgar"
-    }
-    fn verb(&self) -> &'static str {
-        "import-company"
-    }
-    fn rationale(&self) -> &'static str {
-        "Imports SEC company and creates entity in database"
+impl SemOsVerbOp for SecEdgarImportCompany {
+    fn fqn(&self) -> &str {
+        "research.sec-edgar.import-company"
     }
 
-    #[cfg(feature = "database")]
-    async fn execute(
+    /// Phase F.2: HTTP fetches (entity + optional BO) in pre_fetch; DB
+    /// writes (create_entity, log_research_action) in execute.
+    async fn pre_fetch(
         &self,
-        verb_call: &VerbCall,
-        ctx: &mut ExecutionContext,
-        pool: &PgPool,
-    ) -> Result<ExecutionResult> {
+        args: &serde_json::Value,
+        ctx: &mut VerbExecutionContext,
+        _pool: &sqlx::PgPool,
+    ) -> Result<Option<serde_json::Value>> {
         let cik =
-            extract_string_opt(verb_call, "cik").ok_or_else(|| anyhow::anyhow!(":cik required"))?;
+            json_extract_string_opt(args, "cik").ok_or_else(|| anyhow::anyhow!(":cik required"))?;
         let include_beneficial_owners =
-            extract_bool_opt(verb_call, "include-beneficial-owners").unwrap_or(true);
-        let decision_id = extract_uuid_opt(verb_call, ctx, "decision-id");
+            json_extract_bool_opt(args, "include-beneficial-owners").unwrap_or(true);
+        let decision_id = json_extract_uuid_opt(args, ctx, "decision-id");
 
         let loader = SecEdgarLoader::new()?;
 
-        // Fetch company
         let mut options = FetchOptions::new();
         if let Some(dec_id) = decision_id {
             options = options.with_decision_id(dec_id);
         }
         let entity = loader.fetch_entity(&cik, Some(options)).await?;
 
-        // Create entity in database
-        let entity_id = create_entity_from_normalized(pool, &entity).await?;
-
         let mut bo_count = 0;
-
-        // Optionally import beneficial owners
         if include_beneficial_owners {
             let bo_options = FetchControlHoldersOptions::new();
             let holders = loader.fetch_control_holders(&cik, Some(bo_options)).await?;
             bo_count = holders.len();
-            // TODO: Create BO relationships in database
         }
+
+        Ok(Some(serde_json::json!({
+            "_sec_import_entity": serde_json::to_value(&entity)?,
+            "_sec_import_bo_count": bo_count,
+        })))
+    }
+
+    async fn execute(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut VerbExecutionContext,
+        scope: &mut dyn TransactionScope,
+    ) -> Result<VerbExecutionOutcome> {
+        let cik =
+            json_extract_string_opt(args, "cik").ok_or_else(|| anyhow::anyhow!(":cik required"))?;
+        let decision_id = json_extract_uuid_opt(args, ctx, "decision-id");
+        let pool = scope.pool().clone();
+
+        let entity: crate::research::sources::normalized::NormalizedEntity = args
+            .get("_sec_import_entity")
+            .cloned()
+            .map(serde_json::from_value)
+            .ok_or_else(|| {
+                anyhow::anyhow!(
+                    "sec-edgar.import-company: pre_fetch result missing \
+                     (`_sec_import_entity` absent from args)"
+                )
+            })??;
+        let bo_count = args
+            .get("_sec_import_bo_count")
+            .and_then(|v| v.as_u64())
+            .unwrap_or(0) as usize;
+
+        let entity_id = create_entity_from_normalized(&pool, &entity).await?;
 
         let result = serde_json::json!({
             "entity_id": entity_id,
@@ -1107,27 +1081,11 @@ impl CustomOperation for SecImportCompanyOp {
             "beneficial_owners_imported": bo_count,
         });
 
-        // Log research action if decision-id provided
         if let Some(dec_id) = decision_id {
-            log_research_action(pool, dec_id, "sec-edgar:import-company", &result, 1, 0).await?;
+            log_research_action(&pool, dec_id, "sec-edgar:import-company", &result, 1, 0).await?;
         }
 
-        if let Some(binding) = &verb_call.binding {
-            ctx.bind(binding, entity_id);
-        }
-
-        Ok(ExecutionResult::Record(result))
-    }
-
-    #[cfg(not(feature = "database"))]
-    async fn execute(
-        &self,
-        _verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-    ) -> Result<ExecutionResult> {
-        Ok(ExecutionResult::Record(serde_json::json!({
-            "entity_id": uuid::Uuid::new_v4(),
-        })))
+        Ok(VerbExecutionOutcome::Record(result))
     }
 }
 

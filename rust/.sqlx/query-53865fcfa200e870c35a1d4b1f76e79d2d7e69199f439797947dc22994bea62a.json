@@ -1,0 +1,52 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            SELECT id, session_id, user_message, generated_dsl, corrected_dsl, correction_type\n            FROM \"ob-poc\".events\n            WHERE was_corrected = TRUE\n              AND timestamp >= $1\n            ORDER BY timestamp DESC\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 1,
+        "name": "session_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 2,
+        "name": "user_message",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 3,
+        "name": "generated_dsl",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 4,
+        "name": "corrected_dsl",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 5,
+        "name": "correction_type",
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Timestamptz"
+      ]
+    },
+    "nullable": [
+      false,
+      true,
+      true,
+      true,
+      true,
+      true
+    ]
+  },
+  "hash": "53865fcfa200e870c35a1d4b1f76e79d2d7e69199f439797947dc22994bea62a"
+}

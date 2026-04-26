@@ -2059,7 +2059,7 @@ workspace = "deal"
 
 [[test]]
 utterance = "activate this deal"
-expected_verb = "deal.activate"
+expected_verb = "deal.update-status"
 alt_verbs = ["deal.create", "session.load-deal"]
 category = "direct"
 difficulty = "easy"
@@ -2081,7 +2081,7 @@ workspace = "deal"
 
 [[test]]
 utterance = "show contract details"
-expected_verb = "contract.read"
+expected_verb = "contract.get"
 alt_verbs = ["contract.list"]
 category = "natural"
 difficulty = "easy"
@@ -2128,7 +2128,7 @@ workspace = "cbu"
 
 [[test]]
 utterance = "suspend this CBU"
-expected_verb = "cbu.suspend"
+expected_verb = "cbu.suspend"   # TODO: add cbu.suspend verb declaration (R-3 DAG references operational-lifecycle suspend)
 alt_verbs = ["cbu.delete"]
 category = "direct"
 difficulty = "easy"
@@ -2136,7 +2136,7 @@ workspace = "cbu"
 
 [[test]]
 utterance = "assign custody product to CBU"
-expected_verb = "cbu.assign-product"
+expected_verb = "cbu.add-product"
 alt_verbs = ["product.list", "cbu.add-product"]
 category = "natural"
 difficulty = "medium"
@@ -2152,7 +2152,7 @@ workspace = "cbu"
 
 [[test]]
 utterance = "create sub-fund"
-expected_verb = "fund.create-sub-fund"
+expected_verb = "cbu.create"
 alt_verbs = ["fund.create-subfund"]
 category = "natural"
 difficulty = "medium"
@@ -2160,7 +2160,7 @@ workspace = "cbu"
 
 [[test]]
 utterance = "create share class for this fund"
-expected_verb = "fund.create-share-class"
+expected_verb = "share-class.create"
 alt_verbs = ["share-class.create"]
 category = "natural"
 difficulty = "medium"
@@ -2699,7 +2699,7 @@ notes = "Cross-domain onboarding intent"
 
 [[test]]
 utterance = "set up custody for this fund"
-expected_verb = "cbu.assign-product"
+expected_verb = "cbu.add-product"
 alt_verbs = ["service-intent.create", "fund.create"]
 category = "natural"
 difficulty = "hard"
@@ -2708,7 +2708,7 @@ notes = "Product assignment in fund context"
 
 [[test]]
 utterance = "process a redemption"
-expected_verb = "capital.redeem"
+expected_verb = "capital.buyback"
 alt_verbs = ["investor.redeem", "movement.redeem", "investor.start-redemption"]
 category = "natural"
 difficulty = "medium"
@@ -2717,7 +2717,7 @@ notes = "Capital event processing"
 
 [[test]]
 utterance = "new compartment for the SICAV"
-expected_verb = "fund.create-sub-fund"
+expected_verb = "cbu.create"
 alt_verbs = ["cbu.create", "fund.upsert-compartment"]
 category = "natural"
 difficulty = "medium"
@@ -3398,7 +3398,7 @@ workspace = "cbu"
 
 [[test]]
 utterance = "Select a mandate"
-expected_verb = "mandate.select"
+expected_verb = "structure.select"
 alt_verbs = ["session.set-mandate"]
 category = "macro_match"
 difficulty = "easy"

@@ -1,0 +1,86 @@
+[package]
+name = "dsl-runtime"
+version = "0.1.0"
+edition = "2021"
+description = "DSL verb execution runtime — the data plane of the three-plane architecture. Owns VerbExecutionPort, VerbExecutionContext/Outcome, CrudExecutionPort, and the metadata-CRUD interpreter."
+
+# Phase 2 note — see docs/todo/three-plane-architecture-implementation-plan-v0.1.md §3:
+#   Phase 2 moved VerbExecutionContext/Outcome/SideEffects/Result and
+#   CrudExecutionPort from sem_os_core into this crate. The sem_os_core dep
+#   is STILL present (not yet removed) because dsl-runtime references
+#   sem_os_core::Principal, sem_os_core::SemOsError, and
+#   sem_os_core::verb_contract::VerbContractBody. A future slice inverts
+#   the dep direction by either moving Principal to a shared lower crate
+#   or introducing a dsl-runtime-local error type. Phase 2 does not gate
+#   on inversion — see the v0.3 Phase 2 gate.
+# Phase 5c-migrate slice #80 note: the former `CustomOperation` trait,
+# `CustomOperationRegistry`, and the `dsl-runtime-macros` crate were
+# deleted once every plugin op had migrated to
+# `sem_os_postgres::ops::SemOsVerbOp`. The `inventory` dep and the
+# `dsl-runtime-macros` path dep were removed in the same slice.
+[dependencies]
+ob-poc-types = { path = "../ob-poc-types" }
+# Phase 5a composite-blocker #23 — discovery_ops + stategraph use
+# `dsl_core::config::loader::ConfigLoader` and `dsl_core::config::types::*`
+# for verb metadata loading; entity-gateway proto + client for
+# search-entities op.
+dsl-core = { path = "../dsl-core" }
+entity-gateway = { path = "../entity-gateway" }
+tonic = "0.12"
+# Remaining transitional dep — sem_os_core provides Principal, SemOsError,
+# and the VerbContractBody consumed by CrudExecutionPort. Kept deliberately
+# until a later slice resolves the cycle cleanly.
+sem_os_core = { path = "../sem_os_core" }
+# Composite-blocker #1 (agent_ops) uses `#[governed_query]` on a live
+# execute_json method; keeping the attribute requires the proc-macro
+# crate in dsl-runtime's graph. Zero transitive ob-poc pull.
+governed_query_proc = { path = "../governed_query_proc" }
+async-trait = "0.1"
+anyhow = "1.0"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+# Phase 3 — PgCrudExecutor lives here now; needs chrono/json/uuid/rust_decimal
+# sqlx bindings for row introspection and typed value binding.
+sqlx = { version = "0.8", features = ["runtime-tokio-rustls", "postgres", "uuid", "chrono", "json", "rust_decimal", "bigdecimal"] }
+chrono = { version = "0.4", features = ["serde"] }
+rust_decimal = { version = "1", features = ["db-postgres"] }
+# Phase 4 Slice A — temporal_ops uses sqlx::types::BigDecimal for historical
+# ownership percentages bound directly from NUMERIC columns.
+bigdecimal = { version = "0.4", features = ["serde"] }
+tracing = "0.1"
+uuid = { version = "1", features = ["v4", "serde"] }
+# Phase 4 Slice A — research_normalize_ops uses sha2 + hex for deterministic
+# content hashing of canonicalised payloads.
+sha2 = "0.10"
+hex = "0.4"
+# Phase 4 Slice B Group 4 — document_bundles registry loads YAML from disk.
+serde_yaml = "0.9"
+# Phase 4 Slice B Group 9 — state_reducer uses nom for its eval-expression parser
+# and thiserror for its ReducerError enum.
+nom = "7"
+thiserror = "1"
+# Phase 5e — dilution_ops uses tokio::time::sleep for retry backoff and
+# futures::future::try_join_all for parallel summary aggregation.
+# `process` for agent_ops `activate-teaching` subprocess spawn. This is
+# a latent A1 violation (external effect in execute_json body) —
+# tracked in the Pattern-B-A1 ledger, to be refactored to the outbox
+# in Phase 5f. Until then the feature stays on so the op compiles.
+tokio = { version = "1", features = ["time", "process"] }
+futures = "0.3"
+
+[features]
+# Cross-workspace DAG test harness. Off by default; enabled by integration
+# tests in this crate (and optionally by external crates that want to use
+# the harness for their own DAG-driven scenario tests).
+harness = []
+
+[dev-dependencies]
+tokio = { version = "1", features = ["macros", "rt"] }
+
+[[test]]
+name = "cross_workspace_dag_scenarios"
+required-features = ["harness"]
+
+[[test]]
+name = "cross_workspace_dag_live_scenarios"
+required-features = ["harness"]

@@ -97,6 +97,11 @@ domains:
               type: uuid
             - name: relationship_id
               type: uuid
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
 
       assign-control:
         description: |
@@ -172,6 +177,11 @@ domains:
               type: uuid
             - name: relationship_id
               type: uuid
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
 
       # ═══════════════════════════════════════════════════════════════════════
       # TRUST ROLE ASSIGNMENT
@@ -256,6 +266,11 @@ domains:
               type: uuid
             - name: relationship_id
               type: uuid
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
 
       # ═══════════════════════════════════════════════════════════════════════
       # FUND STRUCTURE ROLES
@@ -344,6 +359,11 @@ domains:
               type: uuid
             - name: relationship_id
               type: uuid
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
 
       # ═══════════════════════════════════════════════════════════════════════
       # SERVICE PROVIDER ROLES
@@ -418,6 +438,11 @@ domains:
         returns:
           type: uuid
           name: role_id
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
 
       # ═══════════════════════════════════════════════════════════════════════
       # TRADING/EXECUTION ROLES
@@ -491,6 +516,11 @@ domains:
         returns:
           type: uuid
           name: role_id
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
 
       # ═══════════════════════════════════════════════════════════════════════
       # BULK OPERATIONS
@@ -522,3 +552,8 @@ domains:
 
         returns:
           type: record
+        three_axis:
+          state_effect: preserving
+          external_effects: [observational]
+          consequence:
+            baseline: benign

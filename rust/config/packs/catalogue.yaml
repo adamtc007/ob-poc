@@ -1,0 +1,22 @@
+# Catalogue workspace pack — P.8 prototype (2026-04-23)
+#
+# Lightweight Catalogue workspace per pilot plan §P.8. Proves the
+# P9 hypothesis (Catalogue workspace is a normal SemOS workspace) for
+# Instrument Matrix only. Four authorship verbs wrapped around a
+# filesystem staging store. NO Observatory integration, NO Sage
+# wiring, NO full Tranche-3 authorship library.
+
+id: catalogue
+version: "1.0"
+workspaces: [catalogue]
+display_name: "Catalogue Authoring (Pilot P.8)"
+description: >
+  Minimal authorship surface for proposing, committing, and rolling
+  back verb declarations against the Instrument Matrix catalogue.
+  Staging is filesystem-backed at rust/config/verb_staging/.
+
+allowed_verbs:
+  - catalogue.propose-verb-declaration
+  - catalogue.commit-verb-declaration
+  - catalogue.rollback-verb-declaration
+  - catalogue.list-proposals

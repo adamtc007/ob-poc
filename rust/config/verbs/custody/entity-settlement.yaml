@@ -60,6 +60,11 @@ domains:
           type: uuid
           name: identity_id
           capture: true
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
       add-ssi:
         description: Add counterparty SSI (idempotent by entity+counterparty_bic+market+currency)
         metadata:
@@ -162,6 +167,11 @@ domains:
           type: uuid
           name: entity_ssi_id
           capture: true
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
       remove-ssi:
         description: Remove a counterparty SSI
         metadata:
@@ -192,3 +202,8 @@ domains:
           maps_to: entity_ssi_id
         returns:
           type: affected
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: requires_confirmation

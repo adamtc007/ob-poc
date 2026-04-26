@@ -7,6 +7,7 @@ pub mod context_resolution;
 pub mod diagram;
 pub mod enforce;
 pub mod error;
+pub mod execution;
 pub mod gates;
 pub mod grounding;
 pub mod ids;

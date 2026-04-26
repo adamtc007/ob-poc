@@ -1,0 +1,58 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            SELECT\n                er.relationship_id,\n                er.from_entity_id,\n                e_from.name as from_name,\n                er.to_entity_id,\n                e_to.name as to_name,\n                er.relationship_type,\n                er.percentage\n            FROM \"ob-poc\".entity_relationships er\n            JOIN \"ob-poc\".entities e_from ON er.from_entity_id = e_from.entity_id\n            JOIN \"ob-poc\".entities e_to ON er.to_entity_id = e_to.entity_id\n            WHERE (er.from_entity_id = $1 OR er.to_entity_id = $1)\n              AND e_from.deleted_at IS NULL\n              AND e_to.deleted_at IS NULL\n              AND er.effective_to IS NULL\n            ORDER BY er.relationship_type, er.percentage DESC NULLS LAST\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "relationship_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "from_entity_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 2,
+        "name": "from_name",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 3,
+        "name": "to_entity_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 4,
+        "name": "to_name",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 5,
+        "name": "relationship_type",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 6,
+        "name": "percentage",
+        "type_info": "Numeric"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      true
+    ]
+  },
+  "hash": "5bbea8bf7da7024e566869e84222fae8fea3041466f3092f7b41f0b7ec7df007"
+}

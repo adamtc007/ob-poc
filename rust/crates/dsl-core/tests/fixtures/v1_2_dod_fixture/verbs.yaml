@@ -1,0 +1,120 @@
+# v1.2 Tranche 1 DoD item 9 fixture — transition_args + EXISTS predicate.
+#
+# This fixture supplements `tests/fixtures/three_axis_samples/verbs.yaml`
+# (v1.1 happy-path 20 verbs). It exercises the v1.2 amendments:
+#
+#   - `transition_args:` is the canonical structural carrier of
+#     state_effect: transition (replaces inline `transitions:` block).
+#   - `state_effect: transition` without `transition_args:` is a
+#     structural error.
+#   - `state_effect: preserving` with `transition_args:` is a migration
+#     warning (will be promoted to structural error after R.4 lands
+#     estate-wide).
+#   - Legacy `transitions:` block is grandfathered during the migration
+#     window.
+
+version: "1.0"
+
+domains:
+  v1_2_fixture:
+    description: "v1.2 DoD item 9 fixture — transition_args canonical path"
+    verbs:
+
+      # ── 1. v1.2 canonical: transition + transition_args, no legacy block.
+      v1-canonical-transition:
+        description: "Canonical v1.2 transition verb — transition_args only"
+        behavior: plugin
+        args:
+          - name: deal-id
+            type: uuid
+            required: true
+        three_axis:
+          state_effect: transition
+          external_effects: [emitting]
+          consequence:
+            baseline: requires_confirmation
+        transition_args:
+          entity_id_arg: deal-id
+          target_workspace: deal
+          target_slot: deal
+
+      # ── 2. v1.2 with target_state_arg (entity + state both as args).
+      v1-with-target-state-arg:
+        description: "v1.2 transition verb with explicit target_state_arg"
+        behavior: plugin
+        args:
+          - name: deal-id
+            type: uuid
+            required: true
+          - name: new-status
+            type: string
+            required: true
+        three_axis:
+          state_effect: transition
+          external_effects: [emitting]
+          consequence:
+            baseline: reviewable
+        transition_args:
+          entity_id_arg: deal-id
+          target_state_arg: new-status
+          target_workspace: deal
+          target_slot: deal
+
+      # ── 3. Transition + escalation + transition_args (full v1.2 shape).
+      v1-transition-with-escalation:
+        description: "v1.2 transition with arg-threshold escalation rule"
+        behavior: plugin
+        args:
+          - name: deal-id
+            type: uuid
+            required: true
+          - name: amount
+            type: decimal
+            required: true
+        three_axis:
+          state_effect: transition
+          external_effects: [emitting]
+          consequence:
+            baseline: reviewable
+            escalation:
+              - name: large_deal_threshold
+                when:
+                  op: arg_gt
+                  arg: amount
+                  value: 50000000
+                tier: requires_explicit_authorisation
+                reason: "deal amount exceeds operator sign-off threshold"
+        transition_args:
+          entity_id_arg: deal-id
+          target_workspace: deal
+          target_slot: deal
+
+      # ── 4. Pure preserving — no transition_args, clean.
+      # (v1.2 §6.2 strict: preserving + transition_args is a structural
+      #  error; the migration-window warning was promoted after T2.A.1
+      #  fixed the 153 mislabeled verbs in the live catalogue.)
+      v1-pure-preserving:
+        description: "Preserving without transition_args — clean v1.2 shape"
+        behavior: plugin
+        three_axis:
+          state_effect: preserving
+          external_effects: [observational]
+          consequence:
+            baseline: benign
+
+      # ── 6. Legacy v1.1 verb grandfathered — has transitions: block, no
+      # transition_args: yet. R.4 will migrate.
+      legacy-v1-1-transition:
+        description: "v1.1 transition verb with legacy transitions: block"
+        behavior: plugin
+        three_axis:
+          state_effect: transition
+          external_effects: []
+          consequence:
+            baseline: reviewable
+          transitions:
+            dag: fixture_dag
+            edges:
+              - from: draft
+                to: submitted
+        # No transition_args — grandfathered during the migration window.

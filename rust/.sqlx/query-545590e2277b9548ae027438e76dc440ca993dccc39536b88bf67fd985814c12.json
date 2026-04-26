@@ -1,0 +1,58 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT r.rule_name, r.priority, s.ssi_name,\n                      ic.code as instrument_class,\n                      m.mic as market,\n                      r.currency, r.settlement_type\n               FROM \"ob-poc\".ssi_booking_rules r\n               JOIN \"ob-poc\".cbu_ssi s ON r.ssi_id = s.ssi_id\n               LEFT JOIN \"ob-poc\".instrument_classes ic ON r.instrument_class_id = ic.class_id\n               LEFT JOIN \"ob-poc\".markets m ON r.market_id = m.market_id\n               WHERE r.cbu_id = $1",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "rule_name",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 1,
+        "name": "priority",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 2,
+        "name": "ssi_name",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 3,
+        "name": "instrument_class",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 4,
+        "name": "market",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 5,
+        "name": "currency",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 6,
+        "name": "settlement_type",
+        "type_info": "Varchar"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      true,
+      true
+    ]
+  },
+  "hash": "545590e2277b9548ae027438e76dc440ca993dccc39536b88bf67fd985814c12"
+}

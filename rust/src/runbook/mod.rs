@@ -57,15 +57,19 @@ pub use errors::{CompilationError, CompilationErrorKind};
 #[cfg(feature = "database")]
 pub use executor::PostgresRunbookStore;
 pub use executor::{
-    compute_write_set, execute_runbook, ExecutionError, LockStats, RunbookEvent,
-    RunbookExecutionResult, RunbookStore, RunbookStoreBackend, StepExecutionResult, StepExecutor,
-    StepOutcome,
+    acquire_advisory_locks_on_scope, compute_write_set, execute_runbook, execute_runbook_in_scope,
+    ExecutionError, LockStats, RunbookEvent, RunbookExecutionResult, RunbookStore,
+    RunbookStoreBackend, StepExecutionResult, StepExecutor, StepOutcome,
 };
 pub use response::{
     ClarificationContext, ClarificationRequest, CompiledRunbookSummary, ConstraintViolationDetail,
     MissingField, OrchestratorResponse, Remediation, StepPreview,
 };
 pub use sem_os_filter::{filter_verbs_against_allowed_set, SemOsDeniedVerb, SemOsFilterResult};
+pub use step_executor_bridge::{
+    DslExecutorV2StepExecutor, DslStepExecutor, GatePipeline, HashMapVerbTransitionLookup,
+    VerbExecutionPortStepExecutor, VerbTransitionLookup,
+};
 pub use types::{
     CompiledRunbook, CompiledRunbookId, CompiledRunbookStatus, CompiledStep, ExecutionMode,
     ParkReason, StepCursor,
@@ -133,6 +137,9 @@ pub fn compile_invocation(
 // ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
+
+#[cfg(test)]
+mod invariant_tests;
 
 #[cfg(test)]
 mod tests {

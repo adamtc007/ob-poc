@@ -17,12 +17,15 @@
 //! 2. Tagged enums only: `#[serde(tag = "type")]`
 //! 3. UUIDs as strings for JSON compatibility
 
+pub mod batch_control;
 pub mod chat;
 pub mod commands;
 pub mod control;
 pub mod decision;
 pub mod disambiguation;
+pub mod entity_query;
 pub mod galaxy;
+pub mod gated_envelope;
 pub mod graph_scene;
 pub mod investor_register;
 pub mod manco_group;
@@ -33,8 +36,61 @@ pub mod resolution;
 pub mod semantic_stage;
 pub mod session_input;
 pub mod session_stack;
+pub mod state_token_resolver;
 pub mod trading_matrix;
 pub mod viewport;
+
+pub use state_token_resolver::{resolve_pending_state_advance, resolve_state_token};
+
+// --------------------------------------------------------------------------
+// gated_envelope — Phase 0b boundary types (three-plane refactor).
+//
+// Explicit allowlist per feedback_no_wildcard_reexports.md. Do NOT add
+// `pub use gated_envelope::*`. Every new cross-plane type gets listed here
+// deliberately so the wire surface is reviewable at a glance.
+// --------------------------------------------------------------------------
+pub use gated_envelope::{
+    // envelope + identity
+    default_envelope_version,
+    AuthorisationProof,
+    // outcome
+    CatalogueEffect,
+    CatalogueSnapshotId,
+    // outbox
+    ClaimedOutboxRow,
+    ClosedLoopMarker,
+    ConstellationMark,
+    DagNodeId,
+    DagNodeVersion,
+    DiscoverySignals,
+    DrainerRegisterError,
+    EnvelopeVersion,
+    GatedOutcome,
+    GatedVerbEnvelope,
+    IdempotencyKey,
+    LogicalClock,
+    OutboxConsumer,
+    OutboxDraft,
+    OutboxDrainer,
+    OutboxEffectKind,
+    OutboxProcessOutcome,
+    OutboxRowStatus,
+    OutcomeResult,
+    PendingStateAdvance,
+    ResolvedEntities,
+    ResolvedEntity,
+    SessionScopeRef,
+    SideEffectSummary,
+    // state gate hash
+    StateGateHash,
+    StateTransition,
+    TraceId,
+    // transaction scope — ID only; the trait lives in `dsl-runtime::tx`
+    TransactionScopeId,
+    VerbArgs,
+    VerbRef,
+    WorkspaceSnapshotId,
+};
 
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};

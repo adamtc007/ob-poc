@@ -55,6 +55,11 @@ domains:
         returns:
           type: record_set
           description: Ownership relationships valid on that date
+        three_axis:
+          state_effect: preserving
+          external_effects: [observational]
+          consequence:
+            baseline: benign
 
       ubo-chain-as-of:
         description: Trace ownership chain to UBOs as of a specific date
@@ -102,6 +107,11 @@ domains:
         returns:
           type: record_set
           description: UBO chains with effective percentages
+        three_axis:
+          state_effect: preserving
+          external_effects: [observational]
+          consequence:
+            baseline: benign
 
       # =========================================================================
       # CBU State Queries
@@ -148,6 +158,11 @@ domains:
         returns:
           type: record_set
           description: All relationships for CBU entities on that date
+        three_axis:
+          state_effect: preserving
+          external_effects: [observational]
+          consequence:
+            baseline: benign
 
       cbu-roles-as-of:
         description: Get entity roles within a CBU as of a specific date
@@ -190,6 +205,11 @@ domains:
         returns:
           type: record_set
           description: Entity-role assignments valid on that date
+        three_axis:
+          state_effect: preserving
+          external_effects: [observational]
+          consequence:
+            baseline: benign
 
       cbu-state-at-approval:
         description: Get CBU state at the time its KYC case was approved
@@ -227,6 +247,11 @@ domains:
         returns:
           type: record_set
           description: State snapshot from KYC approval date
+        three_axis:
+          state_effect: preserving
+          external_effects: [observational]
+          consequence:
+            baseline: benign
 
       # =========================================================================
       # History/Audit Queries
@@ -267,6 +292,11 @@ domains:
         returns:
           type: record_set
           description: Audit trail of changes to this relationship
+        three_axis:
+          state_effect: preserving
+          external_effects: [observational]
+          consequence:
+            baseline: benign
 
       entity-history:
         description: Get all relationship changes involving an entity
@@ -317,6 +347,11 @@ domains:
         returns:
           type: record_set
           description: All relationship changes for this entity
+        three_axis:
+          state_effect: preserving
+          external_effects: [observational]
+          consequence:
+            baseline: benign
 
       # =========================================================================
       # Comparison Queries
@@ -366,3 +401,8 @@ domains:
         returns:
           type: record
           description: Diff showing added, removed, and changed relationships
+        three_axis:
+          state_effect: preserving
+          external_effects: [observational]
+          consequence:
+            baseline: benign

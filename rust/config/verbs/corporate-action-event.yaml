@@ -1,0 +1,127 @@
+# Corporate Action Event Verbs (Pilot P.3 — 2026-04-23)
+#
+# Per-mandate CA event lifecycle per pass-3 addendum §9.2. Captures
+# the MANDATE'S ELECTION DECISION for a specific CA event — NOT the
+# processing/settlement of that election (layer-3 runtime, out of DAG).
+#
+# State machine: corporate_action_event_lifecycle (3 states).
+#   election_pending → elected | default_applied (both terminal)
+#
+# Distinct from corporate_action_policy (stateless — static election
+# defaults on trading profile). Policy feeds event: default_applied
+# transition consults the policy for the cutoff-time fallback choice.
+#
+# Product gate: activated_by [product.custody] — CA processing
+# happens in the custody pipeline.
+
+domains:
+  corporate-action-event:
+    description: "Per-mandate corporate-action election decision capture"
+    invocation_hints:
+      - corporate action
+      - CA event
+      - election
+      - elect
+      - dividend election
+      - tender offer
+      - split
+    verbs:
+
+      attach:
+        description: "Attach a CA event to a mandate (entry state: election_pending)"
+        invocation_phrases:
+          - "attach CA event"
+          - "register corporate action"
+          - "notify mandate of CA"
+        metadata:
+          tier: intent
+          source_of_truth: matrix
+          scope: cbu
+          noun: corporate_action_event
+          subject_kinds: [cbu, trading_profile]
+          phase_tags: [active]
+          side_effects: state_write
+          harm_class: reversible
+        behavior: plugin
+        args:
+          - name: cbu
+            type: uuid
+            required: true
+          - name: event-type
+            type: string
+            required: true
+            description: "E.g. cash_dividend, stock_split, tender_offer, merger"
+          - name: event-id
+            type: string
+            required: true
+            description: "Identifier of the CA event from the global feed"
+          - name: record-date
+            type: date
+            required: true
+          - name: payable-date
+            type: date
+            required: false
+        returns:
+          type: uuid
+          name: ca_event_id
+          capture: true
+        three_axis:
+          state_effect: transition
+          external_effects: [observational]
+          consequence:
+            baseline: benign
+          transitions:
+            dag: instrument_matrix_dag
+            edges:
+              - from: "(new)"
+                to: election_pending
+
+      elect:
+        description: "Make an election on a pending CA event"
+        invocation_phrases:
+          - "elect corporate action"
+          - "choose CA option"
+          - "submit election"
+          - "make election"
+        metadata:
+          tier: intent
+          source_of_truth: matrix
+          scope: cbu
+          noun: corporate_action_event
+          subject_kinds: [corporate_action_event]
+          phase_tags: [active]
+          side_effects: state_write
+          harm_class: reversible
+        behavior: plugin
+        args:
+          - name: event
+            type: uuid
+            required: true
+          - name: option
+            type: string
+            required: true
+            description: "The election option chosen (e.g. cash, stock, tender_yes, tender_no)"
+        three_axis:
+          state_effect: transition
+          external_effects: [emitting]
+          consequence:
+            baseline: requires_confirmation
+            escalation:
+              - name: high_impact_election
+                when:
+                  op: or
+                  preds:
+                    - op: arg_eq
+                      arg: option
+                      value: "tender_yes"
+                    - op: entity_attr_in
+                      entity_kind: corporate_action_event
+                      attr: event-type
+                      values: ["merger", "spinoff", "liquidation"]
+                tier: requires_explicit_authorisation
+                reason: "Election has material economic impact"
+          transitions:
+            dag: instrument_matrix_dag
+            edges:
+              - from: election_pending
+                to: elected

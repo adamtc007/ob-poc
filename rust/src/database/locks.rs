@@ -37,6 +37,7 @@ use sqlx::{Postgres, Transaction};
 use thiserror::Error;
 
 // Re-use the LockKey type from expansion module
+#[allow(unused_imports)]
 pub use crate::dsl_v2::expansion::{LockAccess, LockKey, LockMode};
 
 // =============================================================================

@@ -1,0 +1,34 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT DISTINCT e.entity_id, e.name, et.type_code as \"entity_type!\"\n               FROM \"ob-poc\".cbu_entity_roles cer\n               JOIN \"ob-poc\".entities e ON cer.entity_id = e.entity_id\n               JOIN \"ob-poc\".entity_types et ON e.entity_type_id = et.entity_type_id\n               WHERE cer.cbu_id = $1\n                 AND e.deleted_at IS NULL",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "entity_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "name",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 2,
+        "name": "entity_type!",
+        "type_info": "Varchar"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      true
+    ]
+  },
+  "hash": "14960cd8cd419f2b7993fd4881374e07ec9d2ed4f6728723b6778aaa6f097077"
+}

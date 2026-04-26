@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            UPDATE \"ob-poc\".failures\n            SET repro_verified = true, status = 'REPRO_VERIFIED'\n            WHERE fingerprint = $1\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "4eafcae83e482c6990f1fa6cc8474458b6357b467301dfd7f20bb0dd1c01f190"
+}

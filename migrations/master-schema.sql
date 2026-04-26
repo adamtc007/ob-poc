@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict BQw5hRKvSGY2yYFhzcabWBOeVg97MpwqFUux3vy9ZBa7sO5h1tAWyDId3H9zGSB
+\restrict D08NJJMTcm0AuA1d35m1KJcGbljGN92Wdl3356HU8y8FyQc0H1apX42IUj6ZEEk
 
 -- Dumped from database version 18.1 (Homebrew)
 -- Dumped by pg_dump version 18.1 (Homebrew)
@@ -7666,6 +7666,7 @@ CREATE TABLE "ob-poc".bpmn_pending_dispatches (
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     last_attempted_at timestamp with time zone,
     dispatched_at timestamp with time zone,
+    session_stack jsonb DEFAULT '{}'::jsonb NOT NULL,
     CONSTRAINT bpmn_pending_dispatches_status_check CHECK ((status = ANY (ARRAY['pending'::text, 'dispatched'::text, 'failed_permanent'::text])))
 );
 
@@ -8240,6 +8241,34 @@ CREATE VIEW "ob-poc".cbu_convergence_status AS
     (count(*) FILTER (WHERE ((status)::text = ANY (ARRAY[('proven'::character varying)::text, ('waived'::character varying)::text]))) = count(*)) AS is_converged
    FROM "ob-poc".cbu_relationship_verification
   GROUP BY cbu_id;
+
+
+--
+-- Name: cbu_corporate_action_events; Type: TABLE; Schema: ob-poc; Owner: -
+--
+
+CREATE TABLE "ob-poc".cbu_corporate_action_events (
+    event_id uuid DEFAULT uuidv7() NOT NULL,
+    cbu_id uuid NOT NULL,
+    event_type character varying(40) NOT NULL,
+    ca_status character varying(30) DEFAULT 'proposed'::character varying NOT NULL,
+    effective_date date,
+    description text,
+    proposed_by uuid,
+    approved_by uuid,
+    rejected_reason text,
+    created_at timestamp with time zone DEFAULT (now() AT TIME ZONE 'utc'::text),
+    updated_at timestamp with time zone DEFAULT (now() AT TIME ZONE 'utc'::text),
+    CONSTRAINT cbu_ca_events_status_check CHECK (((ca_status)::text = ANY (ARRAY[('proposed'::character varying)::text, ('under_review'::character varying)::text, ('approved'::character varying)::text, ('effective'::character varying)::text, ('implemented'::character varying)::text, ('rejected'::character varying)::text, ('withdrawn'::character varying)::text]))),
+    CONSTRAINT cbu_ca_events_type_check CHECK (((event_type)::text = ANY (ARRAY[('rename'::character varying)::text, ('redomiciliation'::character varying)::text, ('merger'::character varying)::text, ('conversion'::character varying)::text, ('restructuring'::character varying)::text])))
+);
+
+
+--
+-- Name: TABLE cbu_corporate_action_events; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON TABLE "ob-poc".cbu_corporate_action_events IS 'CBU-level corporate-action events (R-6 G-9). Rename, redomiciliation, merger with another CBU, fund-type conversion, restructuring. Distinct from instrument-level CAs (IM workspace corporate_action_event slot).';
 
 
 --
@@ -8836,6 +8865,32 @@ COMMENT ON COLUMN "ob-poc".cbu_resource_instances.srdef_id IS 'SRDEF that this i
 
 
 --
+-- Name: cbu_service_consumption; Type: TABLE; Schema: ob-poc; Owner: -
+--
+
+CREATE TABLE "ob-poc".cbu_service_consumption (
+    consumption_id uuid DEFAULT uuidv7() NOT NULL,
+    cbu_id uuid NOT NULL,
+    service_kind character varying(40) NOT NULL,
+    status character varying(30) DEFAULT 'proposed'::character varying NOT NULL,
+    provisioned_at timestamp with time zone,
+    activated_at timestamp with time zone,
+    retired_at timestamp with time zone,
+    created_at timestamp with time zone DEFAULT (now() AT TIME ZONE 'utc'::text),
+    updated_at timestamp with time zone DEFAULT (now() AT TIME ZONE 'utc'::text),
+    CONSTRAINT cbu_service_consumption_service_kind_check CHECK (((service_kind)::text = ANY (ARRAY[('CUSTODY'::character varying)::text, ('TA'::character varying)::text, ('FA'::character varying)::text, ('SEC_LENDING'::character varying)::text, ('FX'::character varying)::text, ('TRADING'::character varying)::text, ('REPORTING'::character varying)::text, ('PRICING'::character varying)::text, ('COLLATERAL'::character varying)::text]))),
+    CONSTRAINT cbu_service_consumption_status_check CHECK (((status)::text = ANY (ARRAY[('proposed'::character varying)::text, ('provisioned'::character varying)::text, ('active'::character varying)::text, ('suspended'::character varying)::text, ('winding_down'::character varying)::text, ('retired'::character varying)::text])))
+);
+
+
+--
+-- Name: TABLE cbu_service_consumption; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON TABLE "ob-poc".cbu_service_consumption IS 'Per-(cbu, service_kind) service provisioning lifecycle (R-3). CBU consumes services to operate on the street; this table tracks which services are in which state for each CBU.';
+
+
+--
 -- Name: cbu_service_readiness; Type: TABLE; Schema: ob-poc; Owner: -
 --
 
@@ -9189,6 +9244,29 @@ COMMENT ON TABLE "ob-poc".cbu_tax_status IS 'CBU tax status per jurisdiction';
 
 
 --
+-- Name: cbu_trading_activity; Type: TABLE; Schema: ob-poc; Owner: -
+--
+
+CREATE TABLE "ob-poc".cbu_trading_activity (
+    cbu_id uuid NOT NULL,
+    activity_state character varying(30) DEFAULT 'never_traded'::character varying NOT NULL,
+    first_trade_at timestamp with time zone,
+    last_trade_at timestamp with time zone,
+    dormancy_window_days integer DEFAULT 90,
+    created_at timestamp with time zone DEFAULT (now() AT TIME ZONE 'utc'::text),
+    updated_at timestamp with time zone DEFAULT (now() AT TIME ZONE 'utc'::text),
+    CONSTRAINT cbu_trading_activity_state_check CHECK (((activity_state)::text = ANY (ARRAY[('never_traded'::character varying)::text, ('trading'::character varying)::text, ('dormant'::character varying)::text, ('suspended'::character varying)::text])))
+);
+
+
+--
+-- Name: TABLE cbu_trading_activity; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON TABLE "ob-poc".cbu_trading_activity IS 'Per-CBU trading-activity signal (R-4 IM slot trading_activity). Drives overall_lifecycle.actively_trading phase and CBU operationally_active tollgate. Populated by settlement pipeline / trade-posting events.';
+
+
+--
 -- Name: cbu_trading_profiles; Type: TABLE; Schema: ob-poc; Owner: -
 --
 
@@ -9336,7 +9414,12 @@ CREATE TABLE "ob-poc".cbus (
     status character varying(30) DEFAULT 'DISCOVERED'::character varying,
     kyc_scope_template character varying(50),
     deleted_at timestamp with time zone,
+    operational_status character varying(30),
+    disposition_status character varying(30) DEFAULT 'active'::character varying,
+    book_id uuid,
     CONSTRAINT chk_cbu_category CHECK (((cbu_category IS NULL) OR ((cbu_category)::text = ANY (ARRAY[('FUND_MANDATE'::character varying)::text, ('CORPORATE_GROUP'::character varying)::text, ('INSTITUTIONAL_ACCOUNT'::character varying)::text, ('RETAIL_CLIENT'::character varying)::text, ('FAMILY_TRUST'::character varying)::text, ('CORRESPONDENT_BANK'::character varying)::text, ('INTERNAL_TEST'::character varying)::text])))),
+    CONSTRAINT chk_cbu_disposition_status CHECK (((disposition_status)::text = ANY (ARRAY[('active'::character varying)::text, ('under_remediation'::character varying)::text, ('soft_deleted'::character varying)::text, ('hard_deleted'::character varying)::text]))),
+    CONSTRAINT chk_cbu_operational_status CHECK (((operational_status IS NULL) OR ((operational_status)::text = ANY (ARRAY[('dormant'::character varying)::text, ('trade_permissioned'::character varying)::text, ('actively_trading'::character varying)::text, ('restricted'::character varying)::text, ('suspended'::character varying)::text, ('winding_down'::character varying)::text, ('offboarded'::character varying)::text, ('archived'::character varying)::text])))),
     CONSTRAINT chk_cbu_status CHECK (((status)::text = ANY (ARRAY[('DISCOVERED'::character varying)::text, ('VALIDATION_PENDING'::character varying)::text, ('VALIDATED'::character varying)::text, ('UPDATE_PENDING_PROOF'::character varying)::text, ('VALIDATION_FAILED'::character varying)::text])))
 );
 
@@ -9384,6 +9467,27 @@ COMMENT ON COLUMN "ob-poc".cbus.cbu_category IS 'Template discriminator for visu
 
 
 --
+-- Name: COLUMN cbus.operational_status; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON COLUMN "ob-poc".cbus.operational_status IS 'Post-VALIDATED operational-lifecycle state (R-3 dual_lifecycle). NULL while CBU is still in discovery lifecycle (cbus.status != VALIDATED). dormant | trade_permissioned | actively_trading | restricted | suspended | winding_down | offboarded | archived';
+
+
+--
+-- Name: COLUMN cbus.disposition_status; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON COLUMN "ob-poc".cbus.disposition_status IS 'Administrative disposition (R-6 G-11+G-13). Orthogonal to operational_status. active | under_remediation | soft_deleted | hard_deleted';
+
+
+--
+-- Name: COLUMN cbus.book_id; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON COLUMN "ob-poc".cbus.book_id IS 'Parent client_book (T3-B). Groups CBUs under one commercial client. NULL for CBUs predating book-setup workspace introduction.';
+
+
+--
 -- Name: client_allegations; Type: TABLE; Schema: ob-poc; Owner: -
 --
 
@@ -9419,6 +9523,30 @@ CREATE TABLE "ob-poc".client_allegations (
 --
 
 COMMENT ON TABLE "ob-poc".client_allegations IS 'Client allegations - the unverified claims that form the starting point of KYC verification.';
+
+
+--
+-- Name: client_books; Type: TABLE; Schema: ob-poc; Owner: -
+--
+
+CREATE TABLE "ob-poc".client_books (
+    book_id uuid DEFAULT uuidv7() NOT NULL,
+    client_group_id uuid NOT NULL,
+    name character varying(255) NOT NULL,
+    status character varying(30) DEFAULT 'proposed'::character varying NOT NULL,
+    jurisdiction_hint character varying(50),
+    structure_template character varying(100),
+    created_at timestamp with time zone DEFAULT (now() AT TIME ZONE 'utc'::text),
+    updated_at timestamp with time zone DEFAULT (now() AT TIME ZONE 'utc'::text),
+    CONSTRAINT client_books_status_check CHECK (((status)::text = ANY (ARRAY[('proposed'::character varying)::text, ('structure_chosen'::character varying)::text, ('entities_provisioned'::character varying)::text, ('cbus_scaffolded'::character varying)::text, ('parties_assigned'::character varying)::text, ('mandates_defined'::character varying)::text, ('ready_for_deal'::character varying)::text, ('abandoned'::character varying)::text])))
+);
+
+
+--
+-- Name: TABLE client_books; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON TABLE "ob-poc".client_books IS 'Client book — grouping of CBUs under a single commercial client (T3-B). Book-setup journey lifecycle: proposed → structure_chosen → entities_provisioned → cbus_scaffolded → parties_assigned → mandates_defined → ready_for_deal (+ abandoned terminal).';
 
 
 --
@@ -10461,7 +10589,7 @@ CREATE TABLE "ob-poc".deal_rate_cards (
     superseded_by uuid,
     created_at timestamp with time zone DEFAULT now(),
     updated_at timestamp with time zone DEFAULT now(),
-    CONSTRAINT deal_rate_cards_status_check CHECK (((status)::text = ANY ((ARRAY['DRAFT'::character varying, 'PROPOSED'::character varying, 'COUNTER_PROPOSED'::character varying, 'AGREED'::character varying, 'SUPERSEDED'::character varying, 'CANCELLED'::character varying])::text[])))
+    CONSTRAINT deal_rate_cards_status_check CHECK (((status)::text = ANY (ARRAY[('DRAFT'::character varying)::text, ('PENDING_INTERNAL_APPROVAL'::character varying)::text, ('APPROVED_INTERNALLY'::character varying)::text, ('PROPOSED'::character varying)::text, ('COUNTER_PROPOSED'::character varying)::text, ('AGREED'::character varying)::text, ('SUPERSEDED'::character varying)::text, ('CANCELLED'::character varying)::text])))
 );
 
 
@@ -10498,7 +10626,9 @@ CREATE TABLE "ob-poc".deal_slas (
     penalty_value numeric(18,2),
     effective_from date NOT NULL,
     effective_to date,
-    created_at timestamp with time zone DEFAULT now()
+    created_at timestamp with time zone DEFAULT now(),
+    sla_status character varying(30) DEFAULT 'NEGOTIATED'::character varying NOT NULL,
+    CONSTRAINT deal_slas_sla_status_check CHECK (((sla_status)::text = ANY (ARRAY[('NEGOTIATED'::character varying)::text, ('ACTIVE'::character varying)::text, ('BREACHED'::character varying)::text, ('IN_REMEDIATION'::character varying)::text, ('RESOLVED'::character varying)::text, ('WAIVED'::character varying)::text])))
 );
 
 
@@ -10521,6 +10651,13 @@ COMMENT ON COLUMN "ob-poc".deal_slas.sla_type IS 'AVAILABILITY | TURNAROUND | AC
 --
 
 COMMENT ON COLUMN "ob-poc".deal_slas.penalty_type IS 'FEE_REBATE | CREDIT | ESCALATION';
+
+
+--
+-- Name: COLUMN deal_slas.sla_status; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON COLUMN "ob-poc".deal_slas.sla_status IS 'SLA commitment lifecycle (R-5 G-7). NEGOTIATED (pre-contract) → ACTIVE (measured) → BREACHED → IN_REMEDIATION → RESOLVED (+ WAIVED).';
 
 
 --
@@ -10584,7 +10721,11 @@ CREATE TABLE "ob-poc".deals (
     metadata jsonb DEFAULT '{}'::jsonb,
     created_at timestamp with time zone DEFAULT now(),
     updated_at timestamp with time zone DEFAULT now(),
-    CONSTRAINT deals_status_check CHECK (((deal_status)::text = ANY ((ARRAY['PROSPECT'::character varying, 'QUALIFYING'::character varying, 'NEGOTIATING'::character varying, 'CONTRACTED'::character varying, 'ONBOARDING'::character varying, 'ACTIVE'::character varying, 'WINDING_DOWN'::character varying, 'OFFBOARDED'::character varying, 'CANCELLED'::character varying])::text[])))
+    sponsor_entity_id uuid,
+    rm_entity_id uuid,
+    coverage_banker_entity_id uuid,
+    parent_deal_id uuid,
+    CONSTRAINT deals_status_check CHECK (((deal_status)::text = ANY (ARRAY[('PROSPECT'::character varying)::text, ('QUALIFYING'::character varying)::text, ('NEGOTIATING'::character varying)::text, ('BAC_APPROVAL'::character varying)::text, ('KYC_CLEARANCE'::character varying)::text, ('CONTRACTED'::character varying)::text, ('ONBOARDING'::character varying)::text, ('ACTIVE'::character varying)::text, ('SUSPENDED'::character varying)::text, ('WINDING_DOWN'::character varying)::text, ('OFFBOARDED'::character varying)::text, ('CANCELLED'::character varying)::text, ('LOST'::character varying)::text, ('REJECTED'::character varying)::text, ('WITHDRAWN'::character varying)::text])))
 );
 
 
@@ -10600,6 +10741,34 @@ COMMENT ON TABLE "ob-poc".deals IS 'Hub entity for commercial origination - link
 --
 
 COMMENT ON COLUMN "ob-poc".deals.deal_status IS 'PROSPECT | QUALIFYING | NEGOTIATING | CONTRACTED | ONBOARDING | ACTIVE | WINDING_DOWN | OFFBOARDED | CANCELLED';
+
+
+--
+-- Name: COLUMN deals.sponsor_entity_id; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON COLUMN "ob-poc".deals.sponsor_entity_id IS 'Internal deal sponsor — commercial owner on our side. R-5 G-8.';
+
+
+--
+-- Name: COLUMN deals.rm_entity_id; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON COLUMN "ob-poc".deals.rm_entity_id IS 'Relationship manager — owns client relationship. R-5 G-8.';
+
+
+--
+-- Name: COLUMN deals.coverage_banker_entity_id; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON COLUMN "ob-poc".deals.coverage_banker_entity_id IS 'Coverage banker — cross-sell owner. R-5 G-8.';
+
+
+--
+-- Name: COLUMN deals.parent_deal_id; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON COLUMN "ob-poc".deals.parent_deal_id IS 'Parent deal (master agreement) for schedule/addendum/side-letter deals. Child deal state must be consistent with parent per V1.3-3 state_dependency.';
 
 
 --
@@ -14138,6 +14307,39 @@ COMMENT ON TABLE "ob-poc".lifecycles IS 'Operational lifecycles/services that in
 
 
 --
+-- Name: manco_regulatory_status; Type: TABLE; Schema: ob-poc; Owner: -
+--
+
+CREATE TABLE "ob-poc".manco_regulatory_status (
+    manco_entity_id uuid NOT NULL,
+    regulatory_status character varying(30) DEFAULT 'UNDER_REVIEW'::character varying NOT NULL,
+    flagged_reason text,
+    flagged_at timestamp with time zone,
+    cleared_at timestamp with time zone,
+    sunset_started_at timestamp with time zone,
+    terminated_at timestamp with time zone,
+    notes text,
+    created_at timestamp with time zone DEFAULT (now() AT TIME ZONE 'utc'::text),
+    updated_at timestamp with time zone DEFAULT (now() AT TIME ZONE 'utc'::text),
+    CONSTRAINT manco_regulatory_status_check CHECK (((regulatory_status)::text = ANY (ARRAY[('UNDER_REVIEW'::character varying)::text, ('APPROVED'::character varying)::text, ('UNDER_INVESTIGATION'::character varying)::text, ('SUSPENDED'::character varying)::text, ('SUNSET'::character varying)::text, ('TERMINATED'::character varying)::text])))
+);
+
+
+--
+-- Name: TABLE manco_regulatory_status; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON TABLE "ob-poc".manco_regulatory_status IS 'Per-manco regulatory + operational state (R-6 G-3). Keyed by manco_entity_id (entities row with role = management-company). Lazy-create: row exists once manco is formally tracked. Cascade: UNDER_INVESTIGATION / SUSPENDED on a manco propagates SUSPENDED to all CBUs that reference it via cbu_entity_roles where role = management-company / sub-manager.';
+
+
+--
+-- Name: COLUMN manco_regulatory_status.regulatory_status; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON COLUMN "ob-poc".manco_regulatory_status.regulatory_status IS 'Manco lifecycle state: UNDER_REVIEW (onboarding) → APPROVED → UNDER_INVESTIGATION (regulatory flag) → SUSPENDED (full hold) → SUNSET (no new mandates; existing run to exit) → TERMINATED.';
+
+
+--
 -- Name: markets; Type: TABLE; Schema: ob-poc; Owner: -
 --
 
@@ -16544,8 +16746,10 @@ CREATE TABLE "ob-poc".share_classes (
     is_carried_interest boolean DEFAULT false,
     instrument_type character varying(30) DEFAULT 'SHARES'::character varying,
     compartment_id uuid,
+    lifecycle_status character varying(30) DEFAULT 'DRAFT'::character varying,
     CONSTRAINT share_classes_chk_class_category CHECK (((class_category)::text = ANY (ARRAY[('CORPORATE'::character varying)::text, ('FUND'::character varying)::text]))),
-    CONSTRAINT share_classes_chk_instrument_kind CHECK (((instrument_kind IS NULL) OR ((instrument_kind)::text = ANY (ARRAY[('ORDINARY_EQUITY'::character varying)::text, ('PREFERENCE_EQUITY'::character varying)::text, ('DEFERRED_EQUITY'::character varying)::text, ('FUND_UNIT'::character varying)::text, ('FUND_SHARE'::character varying)::text, ('LP_INTEREST'::character varying)::text, ('GP_INTEREST'::character varying)::text, ('DEBT'::character varying)::text, ('CONVERTIBLE'::character varying)::text, ('WARRANT'::character varying)::text, ('OTHER'::character varying)::text]))))
+    CONSTRAINT share_classes_chk_instrument_kind CHECK (((instrument_kind IS NULL) OR ((instrument_kind)::text = ANY (ARRAY[('ORDINARY_EQUITY'::character varying)::text, ('PREFERENCE_EQUITY'::character varying)::text, ('DEFERRED_EQUITY'::character varying)::text, ('FUND_UNIT'::character varying)::text, ('FUND_SHARE'::character varying)::text, ('LP_INTEREST'::character varying)::text, ('GP_INTEREST'::character varying)::text, ('DEBT'::character varying)::text, ('CONVERTIBLE'::character varying)::text, ('WARRANT'::character varying)::text, ('OTHER'::character varying)::text])))),
+    CONSTRAINT share_classes_lifecycle_status_check CHECK (((lifecycle_status)::text = ANY (ARRAY[('DRAFT'::character varying)::text, ('OPEN'::character varying)::text, ('SOFT_CLOSED'::character varying)::text, ('HARD_CLOSED'::character varying)::text, ('WINDING_DOWN'::character varying)::text, ('LIQUIDATED'::character varying)::text])))
 );
 
 
@@ -16659,6 +16863,13 @@ COMMENT ON COLUMN "ob-poc".share_classes.instrument_type IS 'UNITS, SHARES, LP_I
 --
 
 COMMENT ON COLUMN "ob-poc".share_classes.compartment_id IS 'Optional link to fund compartment (for umbrella funds with compartment-specific share classes)';
+
+
+--
+-- Name: COLUMN share_classes.lifecycle_status; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON COLUMN "ob-poc".share_classes.lifecycle_status IS 'Share-class subscription-availability lifecycle (R-6 G-7). DRAFT (pre-launch) | OPEN (accepting subs) | SOFT_CLOSED (no new subs) | HARD_CLOSED (no subs or redemptions) | WINDING_DOWN | LIQUIDATED';
 
 
 --
@@ -19925,6 +20136,30 @@ COMMENT ON VIEW "ob-poc".v_manco_group_summary IS 'Summary of governance control
 
 
 --
+-- Name: v_manco_regulatory_status_summary; Type: VIEW; Schema: ob-poc; Owner: -
+--
+
+CREATE VIEW "ob-poc".v_manco_regulatory_status_summary AS
+ SELECT mrs.manco_entity_id,
+    e.name AS manco_name,
+    mrs.regulatory_status,
+    mrs.flagged_at,
+    mrs.flagged_reason,
+    ( SELECT count(*) AS count
+           FROM "ob-poc".fn_get_manco_group_cbus(mrs.manco_entity_id) fn_get_manco_group_cbus(cbu_id, cbu_name, cbu_category, jurisdiction, fund_entity_id, fund_entity_name, membership_source)) AS managed_cbu_count,
+    mrs.updated_at
+   FROM ("ob-poc".manco_regulatory_status mrs
+     JOIN "ob-poc".entities e ON ((e.entity_id = mrs.manco_entity_id)));
+
+
+--
+-- Name: VIEW v_manco_regulatory_status_summary; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON VIEW "ob-poc".v_manco_regulatory_status_summary IS 'Per-manco regulatory state + count of managed CBUs. Read-only convenience view for ops dashboards. Cascade target preview.';
+
+
+--
 -- Name: v_offerings_without_rules; Type: VIEW; Schema: ob-poc; Owner: -
 --
 
@@ -21047,6 +21282,28 @@ CREATE TABLE public._sqlx_migrations (
     success boolean NOT NULL,
     checksum bytea NOT NULL,
     execution_time bigint NOT NULL
+);
+
+
+--
+-- Name: outbox; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.outbox (
+    id uuid NOT NULL,
+    trace_id uuid NOT NULL,
+    envelope_version smallint NOT NULL,
+    effect_kind text NOT NULL,
+    payload jsonb NOT NULL,
+    idempotency_key text NOT NULL,
+    status text DEFAULT 'pending'::text NOT NULL,
+    attempts integer DEFAULT 0 NOT NULL,
+    claimed_by text,
+    claimed_at timestamp with time zone,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    processed_at timestamp with time zone,
+    last_error text,
+    CONSTRAINT outbox_status_check CHECK ((status = ANY (ARRAY['pending'::text, 'processing'::text, 'done'::text, 'failed_retryable'::text, 'failed_terminal'::text])))
 );
 
 
@@ -22575,6 +22832,14 @@ ALTER TABLE ONLY "ob-poc".cbu_control_anchors
 
 
 --
+-- Name: cbu_corporate_action_events cbu_corporate_action_events_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".cbu_corporate_action_events
+    ADD CONSTRAINT cbu_corporate_action_events_pkey PRIMARY KEY (event_id);
+
+
+--
 -- Name: cbu_creation_log cbu_creation_log_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
 --
 
@@ -22799,6 +23064,22 @@ ALTER TABLE ONLY "ob-poc".cbu_resource_instances
 
 
 --
+-- Name: cbu_service_consumption cbu_service_consumption_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".cbu_service_consumption
+    ADD CONSTRAINT cbu_service_consumption_pkey PRIMARY KEY (consumption_id);
+
+
+--
+-- Name: cbu_service_consumption cbu_service_consumption_unique_kind; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".cbu_service_consumption
+    ADD CONSTRAINT cbu_service_consumption_unique_kind UNIQUE (cbu_id, service_kind);
+
+
+--
 -- Name: cbu_service_readiness cbu_service_readiness_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
 --
 
@@ -22943,6 +23224,14 @@ ALTER TABLE ONLY "ob-poc".cbu_tax_status
 
 
 --
+-- Name: cbu_trading_activity cbu_trading_activity_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".cbu_trading_activity
+    ADD CONSTRAINT cbu_trading_activity_pkey PRIMARY KEY (cbu_id);
+
+
+--
 -- Name: cbu_trading_profiles cbu_trading_profiles_cbu_id_version_key; Type: CONSTRAINT; Schema: ob-poc; Owner: -
 --
 
@@ -22988,6 +23277,14 @@ ALTER TABLE ONLY "ob-poc".cbus
 
 ALTER TABLE ONLY "ob-poc".client_allegations
     ADD CONSTRAINT client_allegations_pkey PRIMARY KEY (allegation_id);
+
+
+--
+-- Name: client_books client_books_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".client_books
+    ADD CONSTRAINT client_books_pkey PRIMARY KEY (book_id);
 
 
 --
@@ -24631,6 +24928,14 @@ ALTER TABLE ONLY "ob-poc".lifecycles
 
 
 --
+-- Name: manco_regulatory_status manco_regulatory_status_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".manco_regulatory_status
+    ADD CONSTRAINT manco_regulatory_status_pkey PRIMARY KEY (manco_entity_id);
+
+
+--
 -- Name: markets markets_mic_key; Type: CONSTRAINT; Schema: ob-poc; Owner: -
 --
 
@@ -26015,6 +26320,22 @@ ALTER TABLE ONLY public._sqlx_migrations
 
 
 --
+-- Name: outbox outbox_idempotency_key_effect_kind_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.outbox
+    ADD CONSTRAINT outbox_idempotency_key_effect_kind_key UNIQUE (idempotency_key, effect_kind);
+
+
+--
+-- Name: outbox outbox_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.outbox
+    ADD CONSTRAINT outbox_pkey PRIMARY KEY (id);
+
+
+--
 -- Name: agent_plans agent_plans_pkey; Type: CONSTRAINT; Schema: sem_reg; Owner: -
 --
 
@@ -27114,6 +27435,20 @@ CREATE INDEX idx_cbu_board_controller_method ON "ob-poc".cbu_board_controller US
 
 
 --
+-- Name: idx_cbu_ca_events_cbu; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_cbu_ca_events_cbu ON "ob-poc".cbu_corporate_action_events USING btree (cbu_id);
+
+
+--
+-- Name: idx_cbu_ca_events_status; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_cbu_ca_events_status ON "ob-poc".cbu_corporate_action_events USING btree (ca_status);
+
+
+--
 -- Name: idx_cbu_change_log_case_id; Type: INDEX; Schema: ob-poc; Owner: -
 --
 
@@ -27422,6 +27757,20 @@ CREATE INDEX idx_cbu_resource_instances_market ON "ob-poc".cbu_resource_instance
 
 
 --
+-- Name: idx_cbu_service_consumption_cbu; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_cbu_service_consumption_cbu ON "ob-poc".cbu_service_consumption USING btree (cbu_id);
+
+
+--
+-- Name: idx_cbu_service_consumption_status; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_cbu_service_consumption_status ON "ob-poc".cbu_service_consumption USING btree (status);
+
+
+--
 -- Name: idx_cbu_service_readiness_blocked; Type: INDEX; Schema: ob-poc; Owner: -
 --
 
@@ -27601,6 +27950,13 @@ CREATE INDEX idx_cbu_unified_attr_required ON "ob-poc".cbu_unified_attr_requirem
 --
 
 CREATE INDEX idx_cbus_active ON "ob-poc".cbus USING btree (cbu_id) WHERE (deleted_at IS NULL);
+
+
+--
+-- Name: idx_cbus_book; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_cbus_book ON "ob-poc".cbus USING btree (book_id) WHERE (book_id IS NOT NULL);
 
 
 --
@@ -27825,6 +28181,20 @@ CREATE INDEX idx_cgrs_unverified ON "ob-poc".client_group_relationship_sources U
 --
 
 CREATE INDEX idx_cgrs_verifies ON "ob-poc".client_group_relationship_sources USING btree (verifies_source_id) WHERE (verifies_source_id IS NOT NULL);
+
+
+--
+-- Name: idx_client_books_client_group; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_client_books_client_group ON "ob-poc".client_books USING btree (client_group_id);
+
+
+--
+-- Name: idx_client_books_status; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_client_books_status ON "ob-poc".client_books USING btree (status);
 
 
 --
@@ -28329,6 +28699,13 @@ CREATE INDEX idx_deals_client_status ON "ob-poc".deals USING btree (primary_clie
 --
 
 CREATE INDEX idx_deals_opened_at ON "ob-poc".deals USING btree (opened_at);
+
+
+--
+-- Name: idx_deals_parent_deal; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_deals_parent_deal ON "ob-poc".deals USING btree (parent_deal_id) WHERE (parent_deal_id IS NOT NULL);
 
 
 --
@@ -29981,6 +30358,13 @@ CREATE INDEX idx_limited_companies_reg_num ON "ob-poc".entity_limited_companies 
 --
 
 CREATE INDEX idx_limited_companies_ultimate_parent ON "ob-poc".entity_limited_companies USING btree (ultimate_parent_lei) WHERE (ultimate_parent_lei IS NOT NULL);
+
+
+--
+-- Name: idx_manco_regulatory_status_status; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_manco_regulatory_status_status ON "ob-poc".manco_regulatory_status USING btree (regulatory_status);
 
 
 --
@@ -32112,6 +32496,20 @@ CREATE UNIQUE INDEX uq_entity_rel_natural_key_null_from ON "ob-poc".entity_relat
 
 
 --
+-- Name: outbox_pending_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX outbox_pending_idx ON public.outbox USING btree (status, created_at) WHERE (status = ANY (ARRAY['pending'::text, 'failed_retryable'::text]));
+
+
+--
+-- Name: outbox_processing_claimed_at_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX outbox_processing_claimed_at_idx ON public.outbox USING btree (claimed_at) WHERE (status = 'processing'::text);
+
+
+--
 -- Name: idx_agent_plans_case_id; Type: INDEX; Schema: sem_reg; Owner: -
 --
 
@@ -33234,6 +33632,14 @@ ALTER TABLE ONLY "ob-poc".cbu_board_controller
 
 
 --
+-- Name: cbu_corporate_action_events cbu_ca_events_cbu_fk; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".cbu_corporate_action_events
+    ADD CONSTRAINT cbu_ca_events_cbu_fk FOREIGN KEY (cbu_id) REFERENCES "ob-poc".cbus(cbu_id) ON DELETE CASCADE;
+
+
+--
 -- Name: cbu_ca_instruction_windows cbu_ca_instruction_windows_cbu_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
 --
 
@@ -33722,6 +34128,14 @@ ALTER TABLE ONLY "ob-poc".cbu_resource_instances
 
 
 --
+-- Name: cbu_service_consumption cbu_service_consumption_cbu_fk; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".cbu_service_consumption
+    ADD CONSTRAINT cbu_service_consumption_cbu_fk FOREIGN KEY (cbu_id) REFERENCES "ob-poc".cbus(cbu_id) ON DELETE CASCADE;
+
+
+--
 -- Name: cbu_service_readiness cbu_service_readiness_cbu_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
 --
 
@@ -33978,6 +34392,14 @@ ALTER TABLE ONLY "ob-poc".cbu_tax_status
 
 
 --
+-- Name: cbu_trading_activity cbu_trading_activity_cbu_fk; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".cbu_trading_activity
+    ADD CONSTRAINT cbu_trading_activity_cbu_fk FOREIGN KEY (cbu_id) REFERENCES "ob-poc".cbus(cbu_id) ON DELETE CASCADE;
+
+
+--
 -- Name: cbu_trading_profiles cbu_trading_profiles_cbu_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
 --
 
@@ -34023,6 +34445,14 @@ ALTER TABLE ONLY "ob-poc".cbu_unified_attr_requirements
 
 ALTER TABLE ONLY "ob-poc".cbu_unified_attr_requirements
     ADD CONSTRAINT cbu_unified_attr_requirements_cbu_id_fkey FOREIGN KEY (cbu_id) REFERENCES "ob-poc".cbus(cbu_id) ON DELETE CASCADE;
+
+
+--
+-- Name: cbus cbus_book_id_fk; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".cbus
+    ADD CONSTRAINT cbus_book_id_fk FOREIGN KEY (book_id) REFERENCES "ob-poc".client_books(book_id);
 
 
 --
@@ -34591,6 +35021,14 @@ ALTER TABLE ONLY "ob-poc".deal_ubo_assessments
 
 ALTER TABLE ONLY "ob-poc".deal_ubo_assessments
     ADD CONSTRAINT deal_ubo_assessments_kyc_case_id_fkey FOREIGN KEY (kyc_case_id) REFERENCES "ob-poc".cases(case_id);
+
+
+--
+-- Name: deals deals_parent_deal_fk; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".deals
+    ADD CONSTRAINT deals_parent_deal_fk FOREIGN KEY (parent_deal_id) REFERENCES "ob-poc".deals(deal_id);
 
 
 --
@@ -35871,6 +36309,14 @@ ALTER TABLE ONLY "ob-poc".lifecycle_resource_capabilities
 
 ALTER TABLE ONLY "ob-poc".lifecycle_resource_capabilities
     ADD CONSTRAINT lifecycle_resource_capabilities_resource_fk FOREIGN KEY (resource_type_id) REFERENCES "ob-poc".lifecycle_resource_types(resource_type_id);
+
+
+--
+-- Name: manco_regulatory_status manco_regulatory_status_entity_fk; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".manco_regulatory_status
+    ADD CONSTRAINT manco_regulatory_status_entity_fk FOREIGN KEY (manco_entity_id) REFERENCES "ob-poc".entities(entity_id) ON DELETE CASCADE;
 
 
 --
@@ -37349,5 +37795,5 @@ ALTER TABLE ONLY sem_reg_authoring.validation_reports
 -- PostgreSQL database dump complete
 --
 
-\unrestrict BQw5hRKvSGY2yYFhzcabWBOeVg97MpwqFUux3vy9ZBa7sO5h1tAWyDId3H9zGSB
+\unrestrict D08NJJMTcm0AuA1d35m1KJcGbljGN92Wdl3356HU8y8FyQc0H1apX42IUj6ZEEk
 

@@ -54,8 +54,11 @@ pub fn verb_synonyms() -> HashMap<&'static str, Vec<&'static str>> {
     // Discovery
     synonyms.insert("trace", vec!["follow", "track", "path"]);
     synonyms.insert("discover", vec!["find", "identify", "detect"]);
-    synonyms.insert("find", vec!["search", "locate", "lookup"]);
-    synonyms.insert("search", vec!["find", "lookup", "query"]);
+    // "lookup" removed from find/search synonym sets — collides with
+    // dedicated `lookup` verbs (e.g. gleif.lookup, subcustodian.lookup)
+    // when both lookup + search live in the same domain.
+    synonyms.insert("find", vec!["search", "locate"]);
+    synonyms.insert("search", vec!["find", "query"]);
 
     // Workflow
     synonyms.insert("approve", vec!["accept", "confirm", "authorize"]);

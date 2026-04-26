@@ -165,11 +165,7 @@ fn build_kyc_case_layer(c: &GroupCompositeState) -> OnboardingLayer {
 
     let with_case = c.cbu_states.iter().filter(|s| s.has_kyc_case).count();
     let total = c.cbu_states.len();
-    let progress = if total == 0 {
-        0
-    } else {
-        ((with_case * 100) / total) as u8
-    };
+    let progress = (with_case * 100).checked_div(total).unwrap_or(0) as u8;
 
     let state = match (with_case, total) {
         (w, t) if w == t && t > 0 => LayerState::Complete,

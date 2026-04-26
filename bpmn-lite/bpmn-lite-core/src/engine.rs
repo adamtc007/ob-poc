@@ -11,6 +11,12 @@ use std::sync::Arc;
 #[allow(unused_imports)]
 use uuid::Uuid;
 
+const MAX_BPMN_XML_BYTES: usize = 2_000_000;
+const MAX_IR_NODES: usize = 2_048;
+const MAX_IR_EDGES: usize = 4_096;
+const MAX_BYTECODE_INSTRUCTIONS: usize = 10_000;
+const MAX_TASK_MANIFEST: usize = 512;
+
 /// BpmnLiteEngine is the top-level facade that wires together the compiler,
 /// VM, and store. gRPC handlers delegate to this.
 pub struct BpmnLiteEngine {
@@ -59,6 +65,42 @@ pub struct FiberInspection {
     pub stack_depth: usize,
 }
 
+fn enforce_ir_limits(ir: &crate::compiler::ir::IRGraph) -> Result<()> {
+    if ir.node_count() > MAX_IR_NODES {
+        return Err(anyhow!(
+            "BPMN graph has too many nodes: {} > {}",
+            ir.node_count(),
+            MAX_IR_NODES
+        ));
+    }
+    if ir.edge_count() > MAX_IR_EDGES {
+        return Err(anyhow!(
+            "BPMN graph has too many sequence flows: {} > {}",
+            ir.edge_count(),
+            MAX_IR_EDGES
+        ));
+    }
+    Ok(())
+}
+
+fn enforce_program_limits(program: &CompiledProgram) -> Result<()> {
+    if program.program.len() > MAX_BYTECODE_INSTRUCTIONS {
+        return Err(anyhow!(
+            "compiled bytecode has too many instructions: {} > {}",
+            program.program.len(),
+            MAX_BYTECODE_INSTRUCTIONS
+        ));
+    }
+    if program.task_manifest.len() > MAX_TASK_MANIFEST {
+        return Err(anyhow!(
+            "compiled task manifest has too many task types: {} > {}",
+            program.task_manifest.len(),
+            MAX_TASK_MANIFEST
+        ));
+    }
+    Ok(())
+}
+
 impl BpmnLiteEngine {
     pub fn new(store: Arc<dyn ProcessStore>) -> Self {
         Self::new_with_tenant(store, "default")
@@ -73,13 +115,22 @@ impl BpmnLiteEngine {
 
     /// Compile BPMN XML → verified IR → bytecode, store the program.
     pub async fn compile(&self, bpmn_xml: &str) -> Result<CompileResult> {
+        if bpmn_xml.len() > MAX_BPMN_XML_BYTES {
+            return Err(anyhow!(
+                "BPMN XML exceeds max size: {} bytes > {}",
+                bpmn_xml.len(),
+                MAX_BPMN_XML_BYTES
+            ));
+        }
         let ir = parser::parse_bpmn(bpmn_xml)?;
+        enforce_ir_limits(&ir)?;
         let errors = verifier::verify(&ir);
         if !errors.is_empty() {
             let msgs: Vec<String> = errors.iter().map(|e| e.message.clone()).collect();
             return Err(anyhow!("Verification failed:\n{}", msgs.join("\n")));
         }
         let program = lowering::lower(&ir)?;
+        enforce_program_limits(&program)?;
 
         // Bytecode verification (bounded loop enforcement)
         let bytecode_errors = verifier::verify_bytecode(&program);
@@ -119,6 +170,7 @@ impl BpmnLiteEngine {
         }
 
         let ir = authoring::dto_to_ir::dto_to_ir(dto)?;
+        enforce_ir_limits(&ir)?;
 
         let verify_errors = verifier::verify(&ir);
         if !verify_errors.is_empty() {
@@ -127,6 +179,7 @@ impl BpmnLiteEngine {
         }
 
         let program = lowering::lower(&ir)?;
+        enforce_program_limits(&program)?;
 
         let bytecode_errors = verifier::verify_bytecode(&program);
         if !bytecode_errors.is_empty() {
@@ -249,10 +302,28 @@ impl BpmnLiteEngine {
     /// Tick all running instances. Returns count ticked.
     pub async fn tick_all(&self) -> Result<u32> {
         let ids = self.store.list_running_instances(&self.tenant_id).await?;
+        self.tick_instance_ids(ids).await
+    }
+
+    /// Claim and tick a bounded batch of running instances for scheduler loops.
+    pub async fn tick_claimed_batch(
+        &self,
+        owner: &str,
+        limit: usize,
+        lease_ms: u64,
+    ) -> Result<u32> {
+        let ids = self
+            .store
+            .claim_running_instances(&self.tenant_id, owner, limit, lease_ms)
+            .await?;
+        self.tick_instance_ids(ids).await
+    }
+
+    async fn tick_instance_ids(&self, ids: Vec<Uuid>) -> Result<u32> {
         let mut ticked = 0u32;
         for id in ids {
             if let Err(e) = self.tick_instance(id).await {
-                tracing::warn!(instance_id = %id, error = %e, "tick_all: instance tick failed");
+                tracing::warn!(instance_id = %id, error = %e, "tick_instance_ids: instance tick failed");
             }
             ticked += 1;
         }
@@ -806,6 +877,7 @@ impl BpmnLiteEngine {
                 format!("fail_job(key={}, state={:?})", job_key, instance.state),
             )
             .await?;
+            self.store.ack_job(job_key).await?;
             return Ok(());
         }
 
@@ -825,6 +897,7 @@ impl BpmnLiteEngine {
             // Guard 2: no matching fiber (ghost)
             self.emit_late(instance_id, format!("fail_job(key={}, no fiber)", job_key))
                 .await?;
+            self.store.ack_job(job_key).await?;
             return Ok(());
         };
 
@@ -900,6 +973,7 @@ impl BpmnLiteEngine {
         let mut instance = instance;
         instance.state = ProcessState::Failed { incident_id };
         self.store.save_instance(&instance).await?;
+        self.store.ack_job(job_key).await?;
 
         Ok(())
     }
@@ -1113,6 +1187,10 @@ impl BpmnLiteEngine {
         from_seq: u64,
     ) -> Result<Vec<(u64, RuntimeEvent)>> {
         self.store.read_events(instance_id, from_seq).await
+    }
+
+    pub async fn health_check(&self) -> Result<()> {
+        self.store.health_check().await
     }
 }
 
@@ -3705,7 +3783,7 @@ mod tests {
     <bpmn:sequenceFlow id="f2" sourceRef="prep" targetRef="ig_fork"/>
     <bpmn:sequenceFlow id="f3" sourceRef="ig_fork" targetRef="task_a"/>
     <bpmn:sequenceFlow id="f4" sourceRef="ig_fork" targetRef="task_b">
-      <bpmn:conditionExpression>= high_risk</bpmn:conditionExpression>
+      <bpmn:conditionExpression>= high_risk == true</bpmn:conditionExpression>
     </bpmn:sequenceFlow>
     <bpmn:sequenceFlow id="f5" sourceRef="task_a" targetRef="ig_join"/>
     <bpmn:sequenceFlow id="f6" sourceRef="task_b" targetRef="ig_join"/>

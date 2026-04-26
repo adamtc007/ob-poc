@@ -74,6 +74,11 @@ domains:
             entity_kind: contract
             description: ID of the newly created contract
 
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
       get:
         description: "Get contract details by ID"
         behavior: crud
@@ -106,6 +111,12 @@ domains:
         returns:
           type: record
 
+        three_axis:
+          state_effect: preserving
+          external_effects:
+            - observational
+          consequence:
+            baseline: benign
       list:
         description: "List contracts, optionally filtered by client"
         behavior: crud
@@ -144,6 +155,12 @@ domains:
         returns:
           type: record_set
 
+        three_axis:
+          state_effect: preserving
+          external_effects:
+            - observational
+          consequence:
+            baseline: benign
       update:
         description: "Update contract details"
         behavior: crud
@@ -182,6 +199,11 @@ domains:
         returns:
           type: affected
 
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
       terminate:
         description: "Terminate a contract"
         behavior: crud
@@ -226,6 +248,11 @@ domains:
       # CONTRACT PRODUCTS
       # =========================================================================
 
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: requires_confirmation
       add-product:
         description: "Add a product to a contract with rate card"
         behavior: crud
@@ -273,6 +300,11 @@ domains:
         returns:
           type: affected
 
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
       remove-product:
         description: "Remove a product from a contract"
         behavior: crud
@@ -305,6 +337,11 @@ domains:
         returns:
           type: affected
 
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: requires_confirmation
       list-products:
         description: "List products for a contract"
         behavior: crud
@@ -337,6 +374,12 @@ domains:
       # RATE CARDS
       # =========================================================================
 
+        three_axis:
+          state_effect: preserving
+          external_effects:
+            - observational
+          consequence:
+            baseline: benign
       create-rate-card:
         description: "Create a new rate card"
         behavior: crud
@@ -385,6 +428,11 @@ domains:
           name: rate_card_id
           capture: true
 
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
       list-rate-cards:
         description: "List all rate cards"
         behavior: crud
@@ -413,6 +461,12 @@ domains:
       # CBU SUBSCRIPTIONS (onboarding gate)
       # =========================================================================
 
+        three_axis:
+          state_effect: preserving
+          external_effects:
+            - observational
+          consequence:
+            baseline: benign
       subscribe:
         description: "Subscribe a CBU to a contract+product (onboarding gate)"
         behavior: crud
@@ -461,6 +515,11 @@ domains:
         returns:
           type: affected
 
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
       unsubscribe:
         description: "Unsubscribe a CBU from a contract+product"
         behavior: crud
@@ -496,6 +555,11 @@ domains:
         returns:
           type: affected
 
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: requires_confirmation
       list-subscriptions:
         description: "List CBU subscriptions, optionally filtered"
         behavior: crud
@@ -535,6 +599,12 @@ domains:
       # LOOKUPS
       # =========================================================================
 
+        three_axis:
+          state_effect: preserving
+          external_effects:
+            - observational
+          consequence:
+            baseline: benign
       for-client:
         description: "Get the active contract for a client"
         behavior: crud
@@ -563,3 +633,9 @@ domains:
             maps_to: client_label
         returns:
           type: record
+        three_axis:
+          state_effect: preserving
+          external_effects:
+            - observational
+          consequence:
+            baseline: benign

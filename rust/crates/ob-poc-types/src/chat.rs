@@ -377,6 +377,13 @@ pub struct ChatResponse {
     /// Design: ADR 043.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub narration: Option<crate::narration::NarrationPayload>,
+
+    /// Phase A.2 (F5 follow-on, 2026-04-22): turn-level correlation id.
+    /// Set on every response that reaches a consumer; threaded into the
+    /// shadow `GatedVerbEnvelope` and every `tracing::debug!` event so an
+    /// utterance can be followed from stage 1 → stage 9b with one grep.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub trace_id: Option<uuid::Uuid>,
 }
 
 /// User-facing Sage explanation payload.

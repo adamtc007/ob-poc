@@ -14,6 +14,7 @@ use crate::mcp::verb_search::HybridVerbSearcher;
 use crate::policy::PolicyGate;
 use crate::sem_reg::abac::ActorContext;
 
+use super::semos_stub::HarnessSemOsClient;
 use super::{ModeExpectations, SessionSeed};
 
 /// Build an OrchestratorContext for stub mode testing.
@@ -34,9 +35,13 @@ pub fn build_stub_context(
         jurisdictions: vec![],
     };
 
+    // F16 fix (Slice 3.1, 2026-04-22): `allow_raw_execute` field removed
+    // from `PolicyGate`. `mode.allow_raw_execute` is retained in the
+    // harness fixture schema for migration-period compat but no longer
+    // wires anywhere — raw DSL bypass is always rejected.
+    let _ = mode.allow_raw_execute;
     let policy = PolicyGate {
         strict_single_pipeline: mode.strict_single_pipeline,
-        allow_raw_execute: mode.allow_raw_execute,
         strict_semreg: mode.strict_semreg,
         allow_legacy_generate: false,
     };
@@ -52,7 +57,7 @@ pub fn build_stub_context(
         lookup_service: None,
         policy_gate: Arc::new(policy),
         source: UtteranceSource::Chat,
-        sem_os_client: None,
+        sem_os_client: Some(HarnessSemOsClient::new_arc()),
         agent_mode: sem_os_core::authoring::agent_mode::AgentMode::default(),
         goals: vec![],
         stage_focus: None,

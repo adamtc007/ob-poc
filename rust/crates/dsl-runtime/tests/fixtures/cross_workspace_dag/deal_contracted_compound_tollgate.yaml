@@ -1,0 +1,66 @@
+name: "Deal CONTRACTED compound tollgate"
+suite_id: "deal_contracted_tollgate"
+description: |
+  Verify Adam's three deal tollgates compose: deal cannot transition
+  KYC_CLEARANCE → CONTRACTED unless BOTH the KYC case is APPROVED
+  AND every booking-principal clearance is APPROVED/ACTIVE.
+
+  Walks: blocked-by-both → mutate KYC → blocked-by-BP → mutate BP → green.
+
+entity_aliases:
+  deal-1: "00000000-0000-0000-0000-000000000001"
+  case-1: "00000000-0000-0000-0000-000000000002"
+  bpc-1:  "00000000-0000-0000-0000-000000000003"
+
+initial_state:
+  - { workspace: deal,              slot: deal,      entity: "deal-1", state: "KYC_CLEARANCE" }
+  - { workspace: kyc,               slot: kyc_case,  entity: "case-1", state: "REVIEW" }
+  - { workspace: booking_principal, slot: clearance, entity: "bpc-1",  state: "PENDING" }
+
+predicates:
+  "cases.client_group_id = this_deal.primary_client_group_id":
+    - { target: "deal-1", source: "case-1" }
+  "booking_principal_clearances.deal_id = this_deal.deal_id":
+    - { target: "deal-1", source: "bpc-1" }
+
+steps:
+  - name: "blocked: KYC and BP both pending"
+    check_transition:
+      workspace: deal
+      slot: deal
+      entity: "deal-1"
+      from: "KYC_CLEARANCE"
+      to: "CONTRACTED"
+    expect:
+      violations:
+        - constraint_id: "deal_contracted_requires_kyc_approved"
+          severity: "error"
+        - constraint_id: "deal_contracted_requires_bp_approved"
+          severity: "error"
+
+  - mutate:
+      - { workspace: kyc, slot: kyc_case, entity: "case-1", state: "APPROVED" }
+
+  - name: "still blocked: BP not approved"
+    check_transition:
+      workspace: deal
+      slot: deal
+      entity: "deal-1"
+      from: "KYC_CLEARANCE"
+      to: "CONTRACTED"
+    expect:
+      violations:
+        - constraint_id: "deal_contracted_requires_bp_approved"
+
+  - mutate:
+      - { workspace: booking_principal, slot: clearance, entity: "bpc-1", state: "ACTIVE" }
+
+  - name: "succeeds: all three tollgates green"
+    check_transition:
+      workspace: deal
+      slot: deal
+      entity: "deal-1"
+      from: "KYC_CLEARANCE"
+      to: "CONTRACTED"
+    expect:
+      violations: []

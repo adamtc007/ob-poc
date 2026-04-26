@@ -2,31 +2,31 @@ domains:
   trading-profile:
     description: "Trading profile document management - single source of truth for CBU trading configuration"
     invocation_hints:
-    - trading profile
-    - trading setup
-    - trading configuration
-    - ISDA
-    - CSA
-    - counterparty
-    - instruments
-    - markets
+      - trading profile
+      - trading setup
+      - trading configuration
+      - ISDA
+      - CSA
+      - counterparty
+      - instruments
+      - markets
     verbs:
       import:
         description: Import a trading profile document from YAML/JSON file or inline content
         behavior: plugin
         handler: import_trading_profile
         invocation_phrases:
-        - "import trading profile"
-        - "load trading profile"
-        - "import profile for"
-        - "upload trading mandate document"
-        - "ingest trading profile YAML"
-        - "bring in trading configuration"
-        - "load custody mandate profile"
-        - "import mandate from file"
-        - "load profile from JSON"
-        - "import trading setup document"
-        - "upload trading mandate"
+          - "import trading profile"
+          - "load trading profile"
+          - "import profile for"
+          - "upload trading mandate document"
+          - "ingest trading profile YAML"
+          - "bring in trading configuration"
+          - "load custody mandate profile"
+          - "import mandate from file"
+          - "load profile from JSON"
+          - "import trading setup document"
+          - "upload trading mandate"
         metadata:
           tier: intent
           source_of_truth: matrix
@@ -36,66 +36,71 @@ domains:
           phase_tags: [trading]
           side_effects: state_write
         args:
-        - name: cbu-id
-          type: uuid
-          required: true
-          maps_to: cbu_id
-          lookup:
-            table: cbus
-            entity_type: cbu
-            schema: ob-poc
-            search_key: name
-            primary_key: cbu_id
-        - name: file-path
-          type: string
-          required: false
-          description: Path to YAML/JSON file containing the trading profile
-        - name: document
-          type: json
-          required: false
-          description: Inline JSON document (alternative to file-path)
-        - name: version
-          type: integer
-          required: false
-          default: 1
-          description: Version number for the profile
-        - name: status
-          type: string
-          required: false
-          default: DRAFT
-          valid_values:
-          - DRAFT
-          - VALIDATED
-          - PENDING_REVIEW
-          - ACTIVE
-          - SUPERSEDED
-          - ARCHIVED
-        - name: notes
-          type: string
-          required: false
-          description: Import notes
+          - name: cbu-id
+            type: uuid
+            required: true
+            maps_to: cbu_id
+            lookup:
+              table: cbus
+              entity_type: cbu
+              schema: ob-poc
+              search_key: name
+              primary_key: cbu_id
+          - name: file-path
+            type: string
+            required: false
+            description: Path to YAML/JSON file containing the trading profile
+          - name: document
+            type: json
+            required: false
+            description: Inline JSON document (alternative to file-path)
+          - name: version
+            type: integer
+            required: false
+            default: 1
+            description: Version number for the profile
+          - name: status
+            type: string
+            required: false
+            default: DRAFT
+            valid_values:
+              - DRAFT
+              - VALIDATED
+              - PENDING_REVIEW
+              - ACTIVE
+              - SUPERSEDED
+              - ARCHIVED
+          - name: notes
+            type: string
+            required: false
+            description: Import notes
         returns:
           type: uuid
           name: profile_id
           capture: true
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
 
       read:
         description: Read a trading profile by ID
         behavior: crud
         invocation_phrases:
-        - "show trading profile"
-        - "get trading profile"
-        - "read trading profile"
-        - "display trading mandate details"
-        - "view profile configuration"
-        - "fetch trading profile by ID"
-        - "what does this mandate contain"
-        - "retrieve trading profile record"
-        - "look up trading profile"
-        - "show mandate setup"
-        - "show trading matrix"
-        - "display trading profile"
-        - "view trading profile"
+          - "show trading profile"
+          - "get trading profile"
+          - "read trading profile"
+          - "display trading mandate details"
+          - "view profile configuration"
+          - "fetch trading profile by ID"
+          - "what does this mandate contain"
+          - "retrieve trading profile record"
+          - "look up trading profile"
+          - "show mandate setup"
+          - "show trading matrix"
+          - "display trading profile"
+          - "view trading profile"
         metadata:
           tier: diagnostics
           source_of_truth: matrix
@@ -109,28 +114,33 @@ domains:
           table: cbu_trading_profiles
           schema: ob-poc
         args:
-        - name: profile-id
-          type: uuid
-          required: true
-          maps_to: profile_id
+          - name: profile-id
+            type: uuid
+            required: true
+            maps_to: profile_id
         returns:
           type: record
+        three_axis:
+          state_effect: preserving
+          external_effects: [observational]
+          consequence:
+            baseline: benign
 
       get-active:
         description: Get the active trading profile for a CBU
         behavior: plugin
         handler: get_active_trading_profile
         invocation_phrases:
-        - "get active profile"
-        - "show active trading profile"
-        - "current trading profile"
-        - "which mandate is live"
-        - "show current trading configuration"
-        - "what profile is active now"
-        - "display live trading mandate"
-        - "fetch active mandate for CBU"
-        - "get production trading profile"
-        - "show live profile version"
+          - "get active profile"
+          - "show active trading profile"
+          - "current trading profile"
+          - "which mandate is live"
+          - "show current trading configuration"
+          - "what profile is active now"
+          - "display live trading mandate"
+          - "fetch active mandate for CBU"
+          - "get production trading profile"
+          - "show live profile version"
         metadata:
           tier: diagnostics
           source_of_truth: matrix
@@ -140,31 +150,36 @@ domains:
           phase_tags: [trading]
           side_effects: facts_only
         args:
-        - name: cbu-id
-          type: uuid
-          required: true
-          lookup:
-            table: cbus
-            entity_type: cbu
-            schema: ob-poc
-            search_key: name
-            primary_key: cbu_id
+          - name: cbu-id
+            type: uuid
+            required: true
+            lookup:
+              table: cbus
+              entity_type: cbu
+              schema: ob-poc
+              search_key: name
+              primary_key: cbu_id
         returns:
           type: record
+        three_axis:
+          state_effect: preserving
+          external_effects: [observational]
+          consequence:
+            baseline: benign
 
       list-versions:
         description: List all versions of trading profiles for a CBU
         invocation_phrases:
-        - "list trading profile versions"
-        - "show profile version history"
-        - "view all profile versions"
-        - "list profile revisions"
-        - "show trading history"
-        - "get version history"
-        - "list CBU profile versions"
-        - "show profile changelog"
-        - "how many mandate versions exist"
-        - "display all trading profile drafts"
+          - "list trading profile versions"
+          - "show profile version history"
+          - "view all profile versions"
+          - "list profile revisions"
+          - "show trading history"
+          - "get version history"
+          - "list CBU profile versions"
+          - "show profile changelog"
+          - "how many mandate versions exist"
+          - "display all trading profile drafts"
         behavior: crud
         metadata:
           tier: diagnostics
@@ -181,31 +196,48 @@ domains:
           fk_col: cbu_id
           order_by: version DESC
         args:
-        - name: cbu-id
-          type: uuid
-          required: true
-          lookup:
-            table: cbus
-            entity_type: cbu
-            schema: ob-poc
-            search_key: name
-            primary_key: cbu_id
+          - name: cbu-id
+            type: uuid
+            required: true
+            lookup:
+              table: cbus
+              entity_type: cbu
+              schema: ob-poc
+              search_key: name
+              primary_key: cbu_id
         returns:
           type: record_set
+        three_axis:
+          state_effect: preserving
+          external_effects: [observational]
+          consequence:
+            baseline: benign
 
       activate:
-        description: Activate a trading profile (sets status to ACTIVE, supersedes previous active)
+        description: |
+          DEPRECATED — use trading-profile.go-live instead.
+
+          Legacy verb that directly transitioned APPROVED → ACTIVE. The pilot
+          P.2 lifecycle refactor introduced parallel_run as an explicit state
+          between approved and active: APPROVED → PARALLEL_RUN → ACTIVE via
+          enter-parallel-run + go-live respectively.
+
+          Retained for backward compatibility with the existing
+          activate_trading_profile handler; new code should route through
+          trading-profile.enter-parallel-run → trading-profile.go-live.
+
+          Tier tightened to match go-live: requires_explicit_authorisation
+          (live mandate activation has same blast radius regardless of path).
         invocation_phrases:
-        - "activate trading profile"
-        - "make profile active"
-        - "activate this version"
-        - "switch to active profile"
-        - "enable trading profile"
-        - "set profile as active"
-        - "go live with profile"
-        - "activate CBU profile"
-        - "put mandate into production"
-        - "promote profile to live"
+          - "activate trading profile"
+          - "make profile active"
+          - "activate this version"
+          - "switch to active profile"
+          - "enable trading profile"
+          - "set profile as active"
+          - "activate CBU profile"
+          - "put mandate into production"
+          - "promote profile to live"
         behavior: plugin
         handler: activate_trading_profile
         metadata:
@@ -213,36 +245,45 @@ domains:
           source_of_truth: matrix
           scope: cbu
           noun: trading_matrix
-          tags: [lifecycle, activation]
+          tags: [lifecycle, activation, deprecated]
           phase_tags: [trading]
           side_effects: state_write
+          status: deprecated
+          replaced_by: "trading-profile.go-live"
+          since_version: "0.1"
+          removal_version: "1.0"
         args:
-        - name: profile-id
-          type: uuid
-          required: true
-          description: The profile to activate
-        - name: activated-by
-          type: string
-          required: false
-          description: User who activated the profile
+          - name: profile-id
+            type: uuid
+            required: true
+            description: The profile to activate
+          - name: activated-by
+            type: string
+            required: false
+            description: User who activated the profile
         returns:
           type: record
+        three_axis:
+          state_effect: preserving
+          external_effects: [emitting]
+          consequence:
+            baseline: requires_explicit_authorisation
 
       materialize:
         description: Materialize trading profile to operational tables (universe, SSIs, booking rules)
         behavior: plugin
         handler: materialize_trading_profile
         invocation_phrases:
-        - "materialize trading profile"
-        - "materialize profile"
-        - "sync trading profile"
-        - "deploy profile"
-        - "apply trading profile"
-        - "push mandate to operational tables"
-        - "project profile to universe and SSIs"
-        - "sync profile to custody tables"
-        - "deploy trading configuration live"
-        - "write profile to settlement tables"
+          - "materialize trading profile"
+          - "materialize profile"
+          - "sync trading profile"
+          - "deploy profile"
+          - "apply trading profile"
+          - "push mandate to operational tables"
+          - "project profile to universe and SSIs"
+          - "sync profile to custody tables"
+          - "deploy trading configuration live"
+          - "write profile to settlement tables"
         metadata:
           tier: composite
           source_of_truth: matrix
@@ -254,47 +295,52 @@ domains:
           side_effects: state_write
         lifecycle:
           writes_tables:
-          - custody.cbu_instrument_universe
-          - custody.cbu_ssi
-          - custody.ssi_booking_rules
-          - custody.isda_agreements
-          - custody.csa_agreements
+            - custody.cbu_instrument_universe
+            - custody.cbu_ssi
+            - custody.ssi_booking_rules
+            - custody.isda_agreements
+            - custody.csa_agreements
         args:
-        - name: profile-id
-          type: uuid
-          required: true
-          description: The profile to materialize
-        - name: sections
-          type: string_list
-          required: false
-          description: "Sections to materialize (default: all). Options: universe, ssis, booking_rules, isda, subcustodians"
-        - name: dry-run
-          type: boolean
-          required: false
-          default: false
-          description: If true, show what would be created without actually creating
-        - name: force
-          type: boolean
-          required: false
-          default: false
-          description: If true, overwrite existing records instead of skipping
+          - name: profile-id
+            type: uuid
+            required: true
+            description: The profile to materialize
+          - name: sections
+            type: string_list
+            required: false
+            description: "Sections to materialize (default: all). Options: universe, ssis, booking_rules, isda, subcustodians"
+          - name: dry-run
+            type: boolean
+            required: false
+            default: false
+            description: If true, show what would be created without actually creating
+          - name: force
+            type: boolean
+            required: false
+            default: false
+            description: If true, overwrite existing records instead of skipping
         returns:
           type: record
           description: Materialization result with counts of records created/updated/deleted
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
 
       diff:
         description: Compare two trading profile versions
         invocation_phrases:
-        - "diff trading profiles"
-        - "compare profiles"
-        - "show profile differences"
-        - "compare two versions"
-        - "what changed between"
-        - "diff profile versions"
-        - "show profile delta"
-        - "highlight mandate differences"
-        - "what is different between versions"
-        - "compare trading profile changes"
+          - "diff trading profiles"
+          - "compare profiles"
+          - "show profile differences"
+          - "compare two versions"
+          - "what changed between"
+          - "diff profile versions"
+          - "show profile delta"
+          - "highlight mandate differences"
+          - "what is different between versions"
+          - "compare trading profile changes"
         behavior: plugin
         handler: diff_trading_profiles
         metadata:
@@ -306,14 +352,14 @@ domains:
           phase_tags: [trading]
           side_effects: facts_only
         args:
-        - name: profile-id-1
-          type: uuid
-          required: true
-          description: First profile to compare
-        - name: profile-id-2
-          type: uuid
-          required: true
-          description: Second profile to compare
+          - name: profile-id-1
+            type: uuid
+            required: true
+            description: First profile to compare
+          - name: profile-id-2
+            type: uuid
+            required: true
+            description: Second profile to compare
         returns:
           type: record
           description: Diff result showing additions, removals, and changes
@@ -322,23 +368,28 @@ domains:
       # DOCUMENT CONSTRUCTION VERBS
       # These verbs modify the JSONB document directly (source of truth)
       # =========================================================================
+        three_axis:
+          state_effect: preserving
+          external_effects: [observational]
+          consequence:
+            baseline: benign
 
       create-draft:
         description: Create a new draft trading profile for a CBU (use clone-to to copy from existing)
         invocation_phrases:
-        - "create draft profile"
-        - "start new profile draft"
-        - "create trading draft"
-        - "new profile version"
-        - "draft new profile"
-        - "start profile edit"
-        - "create draft from active"
-        - "begin profile changes"
-        - "open new mandate draft"
-        - "initialize trading profile draft"
-        - "create a trading profile"
-        - "new trading profile"
-        - "create trading profile"
+          - "create draft profile"
+          - "start new profile draft"
+          - "create trading draft"
+          - "new profile version"
+          - "draft new profile"
+          - "start profile edit"
+          - "create draft from active"
+          - "begin profile changes"
+          - "open new mandate draft"
+          - "initialize trading profile draft"
+          - "create a trading profile"
+          - "new trading profile"
+          - "create trading profile"
         behavior: plugin
         handler: create_draft_trading_profile
         metadata:
@@ -350,37 +401,42 @@ domains:
           phase_tags: [trading]
           side_effects: state_write
         args:
-        - name: cbu-id
-          type: uuid
-          required: true
-          lookup:
-            table: cbus
-            entity_type: cbu
-            schema: ob-poc
-            search_key: name
-            primary_key: cbu_id
-        - name: notes
-          type: string
-          required: false
-          description: Notes about this draft
+          - name: cbu-id
+            type: uuid
+            required: true
+            lookup:
+              table: cbus
+              entity_type: cbu
+              schema: ob-poc
+              search_key: name
+              primary_key: cbu_id
+          - name: notes
+            type: string
+            required: false
+            description: Notes about this draft
         returns:
           type: uuid
           name: profile_id
           capture: true
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
 
       clone-to:
         description: Clone a trading profile to another CBU, creating a new DRAFT profile
         invocation_phrases:
-        - "clone profile to CBU"
-        - "copy trading profile"
-        - "clone profile"
-        - "duplicate profile to"
-        - "copy profile to new CBU"
-        - "replicate trading setup"
-        - "clone configuration"
-        - "copy to target CBU"
-        - "duplicate mandate to another structure"
-        - "replicate trading mandate across CBUs"
+          - "clone profile to CBU"
+          - "copy trading profile"
+          - "clone profile"
+          - "duplicate profile to"
+          - "copy profile to new CBU"
+          - "replicate trading setup"
+          - "clone configuration"
+          - "copy to target CBU"
+          - "duplicate mandate to another structure"
+          - "replicate trading mandate across CBUs"
         behavior: plugin
         handler: clone_trading_profile_to_cbu
         metadata:
@@ -392,55 +448,60 @@ domains:
           phase_tags: [trading]
           side_effects: state_write
         args:
-        - name: profile-id
-          type: uuid
-          required: true
-          description: Source profile to clone from
-        - name: target-cbu-id
-          type: uuid
-          required: true
-          lookup:
-            table: cbus
-            entity_type: cbu
-            schema: ob-poc
-            search_key: name
-            primary_key: cbu_id
-          description: Target CBU to clone the profile to
-        - name: cloned-by
-          type: string
-          required: false
-          description: User or system that performed the clone
-        - name: adapt-base-currency
-          type: string
-          required: false
-          description: Optionally change the base currency in the cloned profile
-        - name: include-isda
-          type: boolean
-          required: false
-          default: true
-          description: Include ISDA agreements (may need counterparty adjustment)
-        - name: notes
-          type: string
-          required: false
-          description: Notes about the cloned profile
+          - name: profile-id
+            type: uuid
+            required: true
+            description: Source profile to clone from
+          - name: target-cbu-id
+            type: uuid
+            required: true
+            lookup:
+              table: cbus
+              entity_type: cbu
+              schema: ob-poc
+              search_key: name
+              primary_key: cbu_id
+            description: Target CBU to clone the profile to
+          - name: cloned-by
+            type: string
+            required: false
+            description: User or system that performed the clone
+          - name: adapt-base-currency
+            type: string
+            required: false
+            description: Optionally change the base currency in the cloned profile
+          - name: include-isda
+            type: boolean
+            required: false
+            default: true
+            description: Include ISDA agreements (may need counterparty adjustment)
+          - name: notes
+            type: string
+            required: false
+            description: Notes about the cloned profile
         returns:
           type: uuid
           name: profile_id
           capture: true
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
 
       create-new-version:
         description: Create a new draft version from the current ACTIVE profile. Used when modifying a live trading matrix.
         invocation_phrases:
-        - "create new profile version"
-        - "version this profile"
-        - "bump profile version"
-        - "new version from current"
-        - "create version"
-        - "increment profile version"
-        - "save as new version"
-        - "draft revision of active mandate"
-        - "fork new version from live"
-        - "create amendment to trading profile"
+          - "create new profile version"
+          - "version this profile"
+          - "bump profile version"
+          - "new version from current"
+          - "create version"
+          - "increment profile version"
+          - "save as new version"
+          - "draft revision of active mandate"
+          - "fork new version from live"
+          - "create amendment to trading profile"
         behavior: plugin
         handler: create_new_version_trading_profile
         metadata:
@@ -452,24 +513,24 @@ domains:
           phase_tags: [trading]
           side_effects: state_write
         args:
-        - name: cbu-id
-          type: uuid
-          required: true
-          lookup:
-            table: cbus
-            entity_type: cbu
-            schema: ob-poc
-            search_key: name
-            primary_key: cbu_id
-          description: CBU to create new version for (must have an ACTIVE profile)
-        - name: created-by
-          type: string
-          required: false
-          description: User or system creating the new version
-        - name: notes
-          type: string
-          required: false
-          description: Notes about why a new version is being created
+          - name: cbu-id
+            type: uuid
+            required: true
+            lookup:
+              table: cbus
+              entity_type: cbu
+              schema: ob-poc
+              search_key: name
+              primary_key: cbu_id
+            description: CBU to create new version for (must have an ACTIVE profile)
+          - name: created-by
+            type: string
+            required: false
+            description: User or system creating the new version
+          - name: notes
+            type: string
+            required: false
+            description: Notes about why a new version is being created
         returns:
           type: uuid
           name: profile_id
@@ -477,33 +538,36 @@ domains:
           description: The new DRAFT profile ID (version = previous + 1)
 
       # --- Universe Section ---
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
 
       add-component:
         description: Add a component to the trading profile document
         invocation_phrases:
-        - "add component to trading profile"
-        - "add instrument class"
-        - "add equity component"
-        - "add equity"
-        - "add fixed income component"
-        - "add fixed income"
-        - "add FI component"
-        - "add market"
-        - "add allowed currency"
-        - "add standing instruction"
-        - "add booking rule"
-        - "add ISDA configuration"
-        - "add ISDA coverage"
-        - "add CSA configuration"
-        - "add CSA collateral"
-        - "add IM mandate"
-        - "configure counterparty limits"
-        - "ISDA terms for counterparty"
-        - "ISDA terms for this counterparty"
-        - "counterparty limits"
-        - "set up SSIs"
-        - "set up the SSIs"
-        - "standing settlement instructions"
+          - "add component to trading profile"
+          - "add equity component"
+          - "add equity"
+          - "add fixed income component"
+          - "add fixed income"
+          - "add FI component"
+          - "add allowed currency"
+          - "add standing instruction"
+          - "add booking rule"
+          - "add ISDA configuration"
+          - "add ISDA coverage"
+          - "add CSA configuration"
+          - "add CSA collateral"
+          - "add IM mandate"
+          - "configure counterparty limits"
+          - "ISDA terms for counterparty"
+          - "ISDA terms for this counterparty"
+          - "counterparty limits"
+          - "set up SSIs"
+          - "set up the SSIs"
+          - "standing settlement instructions"
         behavior: plugin
         handler: TradingProfileAddComponentOp
         metadata:
@@ -515,194 +579,197 @@ domains:
           phase_tags: [trading]
           side_effects: state_write
         args:
-        - name: profile-id
-          type: uuid
-          required: true
-        - name: component-type
-          type: string
-          required: true
-          valid_values: [instrument-class, market, allowed-currency, standing-instruction, booking-rule, isda-config, isda-coverage, csa-config, csa-collateral, im-mandate]
-        - name: class-code
-          type: string
-          required: false
-        - name: cfi-prefixes
-          type: string_list
-          required: false
-        - name: isda-asset-classes
-          type: string_list
-          required: false
-        - name: is-held
-          type: boolean
-          required: false
-          default: true
-        - name: is-traded
-          type: boolean
-          required: false
-          default: true
-        - name: instrument-class
-          type: string
-          required: false
-        - name: mic
-          type: string
-          required: false
-        - name: market-name
-          type: string
-          required: false
-        - name: country-code
-          type: string
-          required: false
-        - name: currency
-          type: string
-          required: false
-        - name: ssi-type
-          type: string
-          required: false
-        - name: ssi-name
-          type: string
-          required: false
-        - name: safekeeping-account
-          type: string
-          required: false
-        - name: safekeeping-bic
-          type: string
-          required: false
-        - name: cash-account
-          type: string
-          required: false
-        - name: cash-bic
-          type: string
-          required: false
-        - name: cash-currency
-          type: string
-          required: false
-        - name: pset-bic
-          type: string
-          required: false
-        - name: rule-name
-          type: string
-          required: false
-        - name: priority
-          type: integer
-          required: false
-        - name: ssi-ref
-          type: string
-          required: false
-        - name: match-instrument-class
-          type: string
-          required: false
-        - name: match-security-type
-          type: string
-          required: false
-        - name: match-mic
-          type: string
-          required: false
-        - name: match-currency
-          type: string
-          required: false
-        - name: match-settlement-type
-          type: string
-          required: false
-        - name: match-counterparty-id
-          type: string
-          required: false
-        - name: counterparty-entity-id
-          type: string
-          required: false
-        - name: counterparty-name
-          type: string
-          required: false
-        - name: counterparty-lei
-          type: string
-          required: false
-        - name: governing-law
-          type: string
-          required: false
-        - name: agreement-date
-          type: string
-          required: false
-        - name: isda-ref
-          type: string
-          required: false
-        - name: asset-class
-          type: string
-          required: false
-        - name: base-products
-          type: string_list
-          required: false
-        - name: csa-type
-          type: string
-          required: false
-        - name: threshold-currency
-          type: string
-          required: false
-        - name: threshold-amount
-          type: decimal
-          required: false
-        - name: minimum-transfer-amount
-          type: decimal
-          required: false
-        - name: collateral-ssi-ref
-          type: string
-          required: false
-        - name: counterparty-ref
-          type: string
-          required: false
-        - name: collateral-type
-          type: string
-          required: false
-        - name: currencies
-          type: string_list
-          required: false
-        - name: issuers
-          type: string_list
-          required: false
-        - name: min-rating
-          type: string
-          required: false
-        - name: haircut-pct
-          type: decimal
-          required: false
-        - name: manager-ref
-          type: string
-          required: false
-        - name: manager-ref-type
-          type: string
-          required: false
-        - name: role
-          type: string
-          required: false
-        - name: scope-all
-          type: boolean
-          required: false
-        - name: scope-mics
-          type: string_list
-          required: false
-        - name: scope-instrument-classes
-          type: string_list
-          required: false
-        - name: instruction-method
-          type: string
-          required: false
-        - name: can-trade
-          type: boolean
-          required: false
-        - name: can-settle
-          type: boolean
-          required: false
+          - name: profile-id
+            type: uuid
+            required: true
+          - name: component-type
+            type: string
+            required: true
+            valid_values: [instrument-class, market, allowed-currency, standing-instruction, booking-rule, isda-config, isda-coverage, csa-config, csa-collateral, im-mandate]
+          - name: class-code
+            type: string
+            required: false
+          - name: cfi-prefixes
+            type: string_list
+            required: false
+          - name: isda-asset-classes
+            type: string_list
+            required: false
+          - name: is-held
+            type: boolean
+            required: false
+            default: true
+          - name: is-traded
+            type: boolean
+            required: false
+            default: true
+          - name: instrument-class
+            type: string
+            required: false
+          - name: mic
+            type: string
+            required: false
+          - name: market-name
+            type: string
+            required: false
+          - name: country-code
+            type: string
+            required: false
+          - name: currency
+            type: string
+            required: false
+          - name: ssi-type
+            type: string
+            required: false
+          - name: ssi-name
+            type: string
+            required: false
+          - name: safekeeping-account
+            type: string
+            required: false
+          - name: safekeeping-bic
+            type: string
+            required: false
+          - name: cash-account
+            type: string
+            required: false
+          - name: cash-bic
+            type: string
+            required: false
+          - name: cash-currency
+            type: string
+            required: false
+          - name: pset-bic
+            type: string
+            required: false
+          - name: rule-name
+            type: string
+            required: false
+          - name: priority
+            type: integer
+            required: false
+          - name: ssi-ref
+            type: string
+            required: false
+          - name: match-instrument-class
+            type: string
+            required: false
+          - name: match-security-type
+            type: string
+            required: false
+          - name: match-mic
+            type: string
+            required: false
+          - name: match-currency
+            type: string
+            required: false
+          - name: match-settlement-type
+            type: string
+            required: false
+          - name: match-counterparty-id
+            type: string
+            required: false
+          - name: counterparty-entity-id
+            type: string
+            required: false
+          - name: counterparty-name
+            type: string
+            required: false
+          - name: counterparty-lei
+            type: string
+            required: false
+          - name: governing-law
+            type: string
+            required: false
+          - name: agreement-date
+            type: string
+            required: false
+          - name: isda-ref
+            type: string
+            required: false
+          - name: asset-class
+            type: string
+            required: false
+          - name: base-products
+            type: string_list
+            required: false
+          - name: csa-type
+            type: string
+            required: false
+          - name: threshold-currency
+            type: string
+            required: false
+          - name: threshold-amount
+            type: decimal
+            required: false
+          - name: minimum-transfer-amount
+            type: decimal
+            required: false
+          - name: collateral-ssi-ref
+            type: string
+            required: false
+          - name: counterparty-ref
+            type: string
+            required: false
+          - name: collateral-type
+            type: string
+            required: false
+          - name: currencies
+            type: string_list
+            required: false
+          - name: issuers
+            type: string_list
+            required: false
+          - name: min-rating
+            type: string
+            required: false
+          - name: haircut-pct
+            type: decimal
+            required: false
+          - name: manager-ref
+            type: string
+            required: false
+          - name: manager-ref-type
+            type: string
+            required: false
+          - name: role
+            type: string
+            required: false
+          - name: scope-all
+            type: boolean
+            required: false
+          - name: scope-mics
+            type: string_list
+            required: false
+          - name: scope-instrument-classes
+            type: string_list
+            required: false
+          - name: instruction-method
+            type: string
+            required: false
+          - name: can-trade
+            type: boolean
+            required: false
+          - name: can-settle
+            type: boolean
+            required: false
         returns:
           type: record
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
 
       remove-component:
         description: Remove a component from the trading profile document
         invocation_phrases:
-        - "remove component from trading profile"
-        - "remove instrument class"
-        - "remove market"
-        - "remove standing instruction"
-        - "remove booking rule"
-        - "remove ISDA configuration"
-        - "remove CSA configuration"
-        - "remove IM mandate"
+          - "remove component from trading profile"
+          - "remove standing instruction"
+          - "remove booking rule"
+          - "remove ISDA configuration"
+          - "remove CSA configuration"
+          - "remove IM mandate"
         behavior: plugin
         handler: TradingProfileRemoveComponentOp
         metadata:
@@ -714,56 +781,61 @@ domains:
           phase_tags: [trading]
           side_effects: state_write
         args:
-        - name: profile-id
-          type: uuid
-          required: true
-        - name: component-type
-          type: string
-          required: true
-          valid_values: [instrument-class, market, standing-instruction, booking-rule, isda-config, csa-config, im-mandate]
-        - name: class-code
-          type: string
-          required: false
-        - name: instrument-class
-          type: string
-          required: false
-        - name: mic
-          type: string
-          required: false
-        - name: ssi-name
-          type: string
-          required: false
-        - name: ssi-ref
-          type: string
-          required: false
-        - name: rule-id
-          type: string
-          required: false
-        - name: counterparty-ref
-          type: string
-          required: false
-        - name: csa-type
-          type: string
-          required: false
-        - name: manager-ref
-          type: string
-          required: false
+          - name: profile-id
+            type: uuid
+            required: true
+          - name: component-type
+            type: string
+            required: true
+            valid_values: [instrument-class, market, standing-instruction, booking-rule, isda-config, csa-config, im-mandate]
+          - name: class-code
+            type: string
+            required: false
+          - name: instrument-class
+            type: string
+            required: false
+          - name: mic
+            type: string
+            required: false
+          - name: ssi-name
+            type: string
+            required: false
+          - name: ssi-ref
+            type: string
+            required: false
+          - name: rule-id
+            type: string
+            required: false
+          - name: counterparty-ref
+            type: string
+            required: false
+          - name: csa-type
+            type: string
+            required: false
+          - name: manager-ref
+            type: string
+            required: false
         returns:
           type: record
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: requires_confirmation
 
       set-base-currency:
         description: Set base currency for trading profile
         invocation_phrases:
-        - "set base currency"
-        - "change base currency"
-        - "set profile currency"
-        - "update base currency"
-        - "set primary currency"
-        - "configure base currency"
-        - "set CBU base currency"
-        - "define fund denomination currency"
-        - "what is the reporting currency"
-        - "change mandate base currency"
+          - "set base currency"
+          - "change base currency"
+          - "set profile currency"
+          - "update base currency"
+          - "set primary currency"
+          - "configure base currency"
+          - "set CBU base currency"
+          - "define fund denomination currency"
+          - "what is the reporting currency"
+          - "change mandate base currency"
         behavior: plugin
         handler: set_profile_base_currency
         metadata:
@@ -775,12 +847,12 @@ domains:
           phase_tags: [trading]
           side_effects: state_write
         args:
-        - name: profile-id
-          type: uuid
-          required: true
-        - name: currency
-          type: string
-          required: true
+          - name: profile-id
+            type: uuid
+            required: true
+          - name: currency
+            type: string
+            required: true
         returns:
           type: affected
 
@@ -789,20 +861,25 @@ domains:
       # --- Booking Rules Section ---
 
       # --- ISDA/CSA Section ---
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
 
       link-csa-ssi:
         description: Link CSA to collateral SSI in standing instructions
         invocation_phrases:
-        - "link CSA to SSI"
-        - "connect CSA SSI"
-        - "associate CSA with SSI"
-        - "set CSA settlement"
-        - "link collateral SSI"
-        - "configure CSA settlement"
-        - "attach SSI to CSA"
-        - "point margin calls to this SSI"
-        - "wire collateral transfers to account"
-        - "set collateral movement settlement route"
+          - "link CSA to SSI"
+          - "connect CSA SSI"
+          - "associate CSA with SSI"
+          - "set CSA settlement"
+          - "link collateral SSI"
+          - "configure CSA settlement"
+          - "attach SSI to CSA"
+          - "point margin calls to this SSI"
+          - "wire collateral transfers to account"
+          - "set collateral movement settlement route"
         behavior: plugin
         handler: link_csa_ssi_in_profile
         metadata:
@@ -814,34 +891,39 @@ domains:
           phase_tags: [trading]
           side_effects: state_write
         args:
-        - name: profile-id
-          type: uuid
-          required: true
-        - name: counterparty-ref
-          type: string
-          required: true
-        - name: ssi-name
-          type: string
-          required: true
-          description: SSI name from OTC_COLLATERAL category
+          - name: profile-id
+            type: uuid
+            required: true
+          - name: counterparty-ref
+            type: string
+            required: true
+          - name: ssi-name
+            type: string
+            required: true
+            description: SSI name from OTC_COLLATERAL category
         returns:
           type: affected
 
       # --- Investment Managers Section ---
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
 
       update-im-scope:
         description: Update scope for existing IM mandate
         invocation_phrases:
-        - "update IM scope"
-        - "modify mandate scope"
-        - "change IM coverage"
-        - "update management scope"
-        - "adjust mandate scope"
-        - "change discretionary scope"
-        - "modify IM permissions"
-        - "expand manager authorized markets"
-        - "restrict IM to these instruments"
-        - "change which markets manager trades"
+          - "update IM scope"
+          - "modify mandate scope"
+          - "change IM coverage"
+          - "update management scope"
+          - "adjust mandate scope"
+          - "change discretionary scope"
+          - "modify IM permissions"
+          - "expand manager authorized markets"
+          - "restrict IM to these instruments"
+          - "change which markets manager trades"
         behavior: plugin
         handler: update_im_scope_in_profile
         metadata:
@@ -853,39 +935,44 @@ domains:
           phase_tags: [trading]
           side_effects: state_write
         args:
-        - name: profile-id
-          type: uuid
-          required: true
-        - name: manager-ref
-          type: string
-          required: true
-        - name: scope-all
-          type: boolean
-          required: false
-        - name: scope-mics
-          type: string_list
-          required: false
-        - name: scope-instrument-classes
-          type: string_list
-          required: false
+          - name: profile-id
+            type: uuid
+            required: true
+          - name: manager-ref
+            type: string
+            required: true
+          - name: scope-all
+            type: boolean
+            required: false
+          - name: scope-mics
+            type: string_list
+            required: false
+          - name: scope-instrument-classes
+            type: string_list
+            required: false
         returns:
           type: affected
 
       # --- Validation Verbs ---
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
 
       validate-go-live-ready:
         description: Full validation for production readiness
         invocation_phrases:
-        - "validate go live ready"
-        - "check ready for activation"
-        - "validate profile completeness"
-        - "is profile ready"
-        - "check go live status"
-        - "validate activation ready"
-        - "run go live checks"
-        - "pre-activation validation"
-        - "is this mandate production ready"
-        - "run readiness checks on profile"
+          - "validate go live ready"
+          - "check ready for activation"
+          - "validate profile completeness"
+          - "is profile ready"
+          - "check go live status"
+          - "validate activation ready"
+          - "run go live checks"
+          - "pre-activation validation"
+          - "is this mandate production ready"
+          - "run readiness checks on profile"
         behavior: plugin
         handler: validate_profile_go_live_ready
         metadata:
@@ -897,30 +984,35 @@ domains:
           phase_tags: [trading]
           side_effects: state_write
         args:
-        - name: profile-id
-          type: uuid
-          required: true
-        - name: strictness
-          type: string
-          required: false
-          default: STRICT
-          valid_values: [STRICT, STANDARD, PERMISSIVE]
+          - name: profile-id
+            type: uuid
+            required: true
+          - name: strictness
+            type: string
+            required: false
+            default: STRICT
+            valid_values: [STRICT, STANDARD, PERMISSIVE]
         returns:
           type: record
           description: "{ ready: bool, blockers: [...], warnings: [...], coverage_pct: float }"
+        three_axis:
+          state_effect: preserving
+          external_effects: [observational]
+          consequence:
+            baseline: benign
 
       validate-universe-coverage:
         description: Validate all universe entries have required SSIs and booking rules
         invocation_phrases:
-        - "validate universe coverage"
-        - "check universe completeness"
-        - "verify instrument coverage"
-        - "check SSI coverage"
-        - "coverage validation"
-        - "check all markets covered"
-        - "are all instruments mapped to SSIs"
-        - "find gaps in booking rule coverage"
-        - "which markets lack settlement routes"
+          - "validate universe coverage"
+          - "check universe completeness"
+          - "verify instrument coverage"
+          - "check SSI coverage"
+          - "coverage validation"
+          - "check all markets covered"
+          - "are all instruments mapped to SSIs"
+          - "find gaps in booking rule coverage"
+          - "which markets lack settlement routes"
         behavior: plugin
         handler: validate_universe_coverage
         metadata:
@@ -932,9 +1024,9 @@ domains:
           phase_tags: [trading]
           side_effects: facts_only
         args:
-        - name: profile-id
-          type: uuid
-          required: true
+          - name: profile-id
+            type: uuid
+            required: true
         returns:
           type: record
           description: "{ complete: bool, gaps: [...] }"
@@ -949,20 +1041,25 @@ domains:
       #   - SUPERSEDED: Replaced by newer active version
       #   - ARCHIVED: Soft deleted
       # =========================================================================
+        three_axis:
+          state_effect: preserving
+          external_effects: [observational]
+          consequence:
+            baseline: benign
 
       submit:
         description: Submit a validated trading profile for client review (transitions VALIDATED -> PENDING_REVIEW)
         invocation_phrases:
-        - "submit profile for approval"
-        - "submit trading profile"
-        - "request profile approval"
-        - "send for approval"
-        - "submit profile changes"
-        - "request go-live approval"
-        - "submit profile for review"
-        - "send mandate to client for sign-off"
-        - "route profile for client approval"
-        - "submit trading profile for review"
+          - "submit profile for approval"
+          - "submit trading profile"
+          - "request profile approval"
+          - "send for approval"
+          - "submit profile changes"
+          - "request go-live approval"
+          - "submit profile for review"
+          - "send mandate to client for sign-off"
+          - "route profile for client approval"
+          - "submit trading profile for review"
         behavior: plugin
         handler: submit_trading_profile
         metadata:
@@ -974,34 +1071,60 @@ domains:
           phase_tags: [trading]
           side_effects: state_write
         args:
-        - name: profile-id
-          type: uuid
-          required: true
-        - name: submitted-by
-          type: string
-          required: false
-          description: User or system submitting the profile
-        - name: notes
-          type: string
-          required: false
-          description: Submission notes
+          - name: profile-id
+            type: uuid
+            required: true
+          - name: submitted-by
+            type: string
+            required: false
+            description: User or system submitting the profile
+          - name: notes
+            type: string
+            required: false
+            description: Submission notes
         returns:
           type: record
           description: Updated profile with PENDING_REVIEW status
+        three_axis:
+          state_effect: transition
+          external_effects: [emitting]
+          consequence:
+            baseline: requires_confirmation
+            escalation:
+              - name: high_risk_jurisdiction
+                when:
+                  op: entity_attr_in
+                  entity_kind: cbu
+                  attr: jurisdiction
+                  values: ["IR", "KP", "RU", "BY", "SY"]
+                tier: requires_explicit_authorisation
+                reason: "CBU jurisdiction is on the high-risk / sanctions watchlist — compliance sign-off required before submission."
+              - name: derivatives_scope
+                when:
+                  op: entity_attr_eq
+                  entity_kind: trading_profile
+                  attr: has_derivatives_in_scope
+                  value: true
+                tier: requires_explicit_authorisation
+                reason: "Profile includes derivative instruments — requires compliance + risk sign-off."
+        transition_args:
+          entity_id_arg: profile-id
+          target_workspace: instrument_matrix
+          target_slot: trading_profile
 
       approve:
         description: Approve a pending trading profile, activating it (transitions PENDING_REVIEW -> ACTIVE)
         invocation_phrases:
-        - "approve trading profile"
-        - "approve profile"
-        - "authorize profile"
-        - "approve go-live"
-        - "give profile approval"
-        - "approve activation"
-        - "authorize trading setup"
-        - "approve trading profile activation"
-        - "sign off on mandate"
-        - "confirm profile for production"
+          - "approve trading profile"
+          - "approve profile"
+          - "authorize profile"
+          - "approve go-live"
+          - "give profile approval"
+          - "approve activation"
+          - "authorize trading setup"
+          - "approve trading profile activation"
+          - "sign off on mandate"
+          - "confirm profile for production"
         behavior: plugin
         handler: approve_trading_profile
         metadata:
@@ -1013,34 +1136,43 @@ domains:
           phase_tags: [trading]
           side_effects: state_write
         args:
-        - name: profile-id
-          type: uuid
-          required: true
-        - name: approved-by
-          type: string
-          required: false
-          description: User or system approving the profile
-        - name: notes
-          type: string
-          required: false
-          description: Approval notes
+          - name: profile-id
+            type: uuid
+            required: true
+          - name: approved-by
+            type: string
+            required: false
+            description: User or system approving the profile
+          - name: notes
+            type: string
+            required: false
+            description: Approval notes
         returns:
           type: record
           description: Updated profile with ACTIVE status
+        three_axis:
+          state_effect: transition
+          external_effects: [emitting]
+          consequence:
+            baseline: requires_confirmation
+        transition_args:
+          entity_id_arg: profile-id
+          target_workspace: instrument_matrix
+          target_slot: trading_profile
 
       reject:
         description: Reject a pending trading profile (transitions PENDING_REVIEW -> DRAFT with rejection reason)
         invocation_phrases:
-        - "reject trading profile"
-        - "reject profile"
-        - "decline profile approval"
-        - "reject changes"
-        - "send back for changes"
-        - "reject activation request"
-        - "deny profile approval"
-        - "return mandate for rework"
-        - "fail approval on trading profile"
-        - "push profile back to draft"
+          - "reject trading profile"
+          - "reject profile"
+          - "decline profile approval"
+          - "reject changes"
+          - "send back for changes"
+          - "reject activation request"
+          - "deny profile approval"
+          - "return mandate for rework"
+          - "fail approval on trading profile"
+          - "push profile back to draft"
         behavior: plugin
         handler: reject_trading_profile
         metadata:
@@ -1052,34 +1184,43 @@ domains:
           phase_tags: [trading]
           side_effects: state_write
         args:
-        - name: profile-id
-          type: uuid
-          required: true
-        - name: rejection-reason
-          type: string
-          required: true
-          description: Reason for rejection
-        - name: rejected-by
-          type: string
-          required: false
-          description: User or system rejecting the profile
+          - name: profile-id
+            type: uuid
+            required: true
+          - name: rejection-reason
+            type: string
+            required: true
+            description: Reason for rejection
+          - name: rejected-by
+            type: string
+            required: false
+            description: User or system rejecting the profile
         returns:
           type: record
           description: Updated profile with DRAFT status and rejection notes
+        three_axis:
+          state_effect: transition
+          external_effects: [emitting]
+          consequence:
+            baseline: requires_confirmation
+        transition_args:
+          entity_id_arg: profile-id
+          target_workspace: instrument_matrix
+          target_slot: trading_profile
 
       archive:
         description: Archive a trading profile (soft delete, transitions to ARCHIVED status)
         invocation_phrases:
-        - "archive trading profile"
-        - "archive profile"
-        - "archive old version"
-        - "move to archive"
-        - "archive superseded profile"
-        - "store in archive"
-        - "mark profile archived"
-        - "retire this trading mandate"
-        - "soft delete old profile version"
-        - "shelve inactive trading profile"
+          - "archive trading profile"
+          - "archive profile"
+          - "archive old version"
+          - "move to archive"
+          - "archive superseded profile"
+          - "store in archive"
+          - "mark profile archived"
+          - "retire this trading mandate"
+          - "soft delete old profile version"
+          - "shelve inactive trading profile"
         behavior: plugin
         handler: archive_trading_profile
         metadata:
@@ -1091,17 +1232,17 @@ domains:
           phase_tags: [trading]
           side_effects: state_write
         args:
-        - name: profile-id
-          type: uuid
-          required: true
-        - name: archived-by
-          type: string
-          required: false
-          description: User or system archiving the profile
-        - name: notes
-          type: string
-          required: false
-          description: Archive reason/notes
+          - name: profile-id
+            type: uuid
+            required: true
+          - name: archived-by
+            type: string
+            required: false
+            description: User or system archiving the profile
+          - name: notes
+            type: string
+            required: false
+            description: Archive reason/notes
         returns:
           type: record
           description: Updated profile with ARCHIVED status
@@ -1110,19 +1251,25 @@ domains:
       # CORPORATE ACTIONS POLICY (Intent - writes matrix JSONB)
       # =========================================================================
 
+        three_axis:
+          state_effect: preserving
+          external_effects:
+            - emitting
+          consequence:
+            baseline: requires_confirmation
       ca.enable-event-types:
         description: Enable CA event types for this trading profile
         invocation_phrases:
-        - "enable corporate action types"
-        - "turn on CA events"
-        - "enable dividend events"
-        - "enable stock split"
-        - "activate CA event types"
-        - "enable CA processing"
-        - "turn on event types"
-        - "subscribe to corporate action notifications"
-        - "add event types to CA policy"
-        - "permit rights issue processing"
+          - "enable corporate action types"
+          - "turn on CA events"
+          - "enable dividend events"
+          - "enable stock split"
+          - "activate CA event types"
+          - "enable CA processing"
+          - "turn on event types"
+          - "subscribe to corporate action notifications"
+          - "add event types to CA policy"
+          - "permit rights issue processing"
         behavior: plugin
         handler: TradingProfileCaEnableEventTypesOp
         metadata:
@@ -1134,33 +1281,38 @@ domains:
           phase_tags: [trading]
           side_effects: state_write
         args:
-        - name: profile-id
-          type: uuid
-          required: true
-          description: Trading profile ID to update
-        - name: event-types
-          type: string_list
-          required: true
-          description: "Event codes to enable: DVCA, DVOP, RHTS, TEND, MRGR, etc."
+          - name: profile-id
+            type: uuid
+            required: true
+            description: Trading profile ID to update
+          - name: event-types
+            type: string_list
+            required: true
+            description: "Event codes to enable: DVCA, DVOP, RHTS, TEND, MRGR, etc."
         returns:
           type: record
           fields:
-          - name: enabled_count
-            type: integer
+            - name: enabled_count
+              type: integer
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
 
       ca.disable-event-types:
         description: Disable CA event types for this trading profile
         invocation_phrases:
-        - "disable corporate action types"
-        - "turn off CA events"
-        - "disable dividend events"
-        - "disable CA processing"
-        - "deactivate event types"
-        - "turn off CA events"
-        - "stop processing these CA events"
-        - "remove event types from policy"
-        - "exclude corporate action categories"
-        - "unsubscribe from CA event types"
+          - "disable corporate action types"
+          - "turn off CA events"
+          - "disable dividend events"
+          - "disable CA processing"
+          - "deactivate event types"
+          - "turn off CA events"
+          - "stop processing these CA events"
+          - "remove event types from policy"
+          - "exclude corporate action categories"
+          - "unsubscribe from CA event types"
         behavior: plugin
         handler: TradingProfileCaDisableEventTypesOp
         metadata:
@@ -1172,29 +1324,34 @@ domains:
           phase_tags: [trading]
           side_effects: state_write
         args:
-        - name: profile-id
-          type: uuid
-          required: true
-        - name: event-types
-          type: string_list
-          required: true
-          description: "Event codes to disable"
+          - name: profile-id
+            type: uuid
+            required: true
+          - name: event-types
+            type: string_list
+            required: true
+            description: "Event codes to disable"
         returns:
           type: affected
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
 
       ca.set-notification-policy:
         description: Configure CA notification settings
         invocation_phrases:
-        - "set CA notification policy"
-        - "configure CA notifications"
-        - "set notification preferences"
-        - "configure event alerts"
-        - "set CA alert policy"
-        - "notification settings"
-        - "configure CA alerts"
-        - "how should CA events be communicated"
-        - "set corporate action delivery channels"
-        - "configure SLA for CA notifications"
+          - "set CA notification policy"
+          - "configure CA notifications"
+          - "set notification preferences"
+          - "configure event alerts"
+          - "set CA alert policy"
+          - "notification settings"
+          - "configure CA alerts"
+          - "how should CA events be communicated"
+          - "set corporate action delivery channels"
+          - "configure SLA for CA notifications"
         behavior: plugin
         handler: TradingProfileCaSetNotificationOp
         metadata:
@@ -1206,41 +1363,46 @@ domains:
           phase_tags: [trading]
           side_effects: state_write
         args:
-        - name: profile-id
-          type: uuid
-          required: true
-        - name: channels
-          type: string_list
-          required: true
-          description: "Notification channels: email, portal, swift"
-        - name: sla-hours
-          type: integer
-          required: false
-          default: 24
-          description: SLA hours for notification delivery
-        - name: escalation-contact
-          type: string
-          required: false
-          description: Email or contact for escalations
+          - name: profile-id
+            type: uuid
+            required: true
+          - name: channels
+            type: string_list
+            required: true
+            description: "Notification channels: email, portal, swift"
+          - name: sla-hours
+            type: integer
+            required: false
+            default: 24
+            description: SLA hours for notification delivery
+          - name: escalation-contact
+            type: string
+            required: false
+            description: Email or contact for escalations
         returns:
           type: affected
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
 
       ca.set-election-policy:
         description: Configure who makes CA elections and requirements
         invocation_phrases:
-        - "set CA election policy"
-        - "configure election defaults"
-        - "set default elections"
-        - "election policy settings"
-        - "configure CA choices"
-        - "set election preferences"
-        - "configure automatic elections"
-        - "who decides on corporate actions"
-        - "set auto-instruct threshold for CA"
-        - "define CA election authority"
-        - "set CA policy"
-        - "set CA policy for CBU"
-        - "corporate action policy"
+          - "set CA election policy"
+          - "configure election defaults"
+          - "set default elections"
+          - "election policy settings"
+          - "configure CA choices"
+          - "set election preferences"
+          - "configure automatic elections"
+          - "who decides on corporate actions"
+          - "set auto-instruct threshold for CA"
+          - "define CA election authority"
+          - "set CA policy"
+          - "set CA policy for CBU"
+          - "corporate action policy"
         behavior: plugin
         handler: TradingProfileCaSetElectionOp
         metadata:
@@ -1252,42 +1414,47 @@ domains:
           phase_tags: [trading]
           side_effects: state_write
         args:
-        - name: profile-id
-          type: uuid
-          required: true
-        - name: elector
-          type: string
-          required: true
-          valid_values:
-          - investment_manager
-          - admin
-          - client
-          description: Who makes election decisions
-        - name: evidence-required
-          type: boolean
-          required: false
-          default: true
-          description: Whether documentation is required for elections
-        - name: auto-instruct-threshold
-          type: decimal
-          required: false
-          description: Value threshold below which auto-instruct applies
+          - name: profile-id
+            type: uuid
+            required: true
+          - name: elector
+            type: string
+            required: true
+            valid_values:
+              - investment_manager
+              - admin
+              - client
+            description: Who makes election decisions
+          - name: evidence-required
+            type: boolean
+            required: false
+            default: true
+            description: Whether documentation is required for elections
+          - name: auto-instruct-threshold
+            type: decimal
+            required: false
+            description: Value threshold below which auto-instruct applies
         returns:
           type: affected
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
 
       ca.set-default-option:
         description: Set default election for specific event type
         invocation_phrases:
-        - "set default CA option"
-        - "configure default election"
-        - "set default choice"
-        - "set automatic election"
-        - "configure default option"
-        - "set fallback election"
-        - "default CA selection"
-        - "always elect cash for dividends"
-        - "set standing instruction for rights"
-        - "configure auto-elect for event type"
+          - "set default CA option"
+          - "configure default election"
+          - "set default choice"
+          - "set automatic election"
+          - "configure default option"
+          - "set fallback election"
+          - "default CA selection"
+          - "always elect cash for dividends"
+          - "set standing instruction for rights"
+          - "configure auto-elect for event type"
         behavior: plugin
         handler: TradingProfileCaSetDefaultOp
         metadata:
@@ -1299,39 +1466,44 @@ domains:
           phase_tags: [trading]
           side_effects: state_write
         args:
-        - name: profile-id
-          type: uuid
-          required: true
-        - name: event-type
-          type: string
-          required: true
-          description: "Event code: DVOP, RHTS, TEND, EXOF, etc."
-        - name: default-option
-          type: string
-          required: true
-          valid_values:
-          - CASH
-          - STOCK
-          - ROLLOVER
-          - LAPSE
-          - DECLINE
-          description: Default election option for this event type
+          - name: profile-id
+            type: uuid
+            required: true
+          - name: event-type
+            type: string
+            required: true
+            description: "Event code: DVOP, RHTS, TEND, EXOF, etc."
+          - name: default-option
+            type: string
+            required: true
+            valid_values:
+              - CASH
+              - STOCK
+              - ROLLOVER
+              - LAPSE
+              - DECLINE
+            description: Default election option for this event type
         returns:
           type: affected
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
 
       ca.remove-default-option:
         description: Remove default election for specific event type
         invocation_phrases:
-        - "remove default CA option"
-        - "clear default election"
-        - "remove automatic election"
-        - "delete default option"
-        - "clear default choice"
-        - "remove CA default"
-        - "stop auto-electing for this event"
-        - "unset standing CA election"
-        - "revert to manual election"
-        - "remove fallback option for CA"
+          - "remove default CA option"
+          - "clear default election"
+          - "remove automatic election"
+          - "delete default option"
+          - "clear default choice"
+          - "remove CA default"
+          - "stop auto-electing for this event"
+          - "unset standing CA election"
+          - "revert to manual election"
+          - "remove fallback option for CA"
         behavior: plugin
         handler: TradingProfileCaRemoveDefaultOp
         metadata:
@@ -1343,28 +1515,33 @@ domains:
           phase_tags: [trading]
           side_effects: state_write
         args:
-        - name: profile-id
-          type: uuid
-          required: true
-        - name: event-type
-          type: string
-          required: true
+          - name: profile-id
+            type: uuid
+            required: true
+          - name: event-type
+            type: string
+            required: true
         returns:
           type: affected
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: requires_confirmation
 
       ca.add-cutoff-rule:
         description: Add deadline cutoff rule for market/depository
         invocation_phrases:
-        - "add CA cutoff rule"
-        - "set election cutoff"
-        - "add deadline rule"
-        - "configure cutoff time"
-        - "add instruction deadline"
-        - "set CA deadline"
-        - "add cutoff configuration"
-        - "define internal deadline for depository"
-        - "set warning days before market deadline"
-        - "configure escalation cutoff for CA"
+          - "add CA cutoff rule"
+          - "set election cutoff"
+          - "add deadline rule"
+          - "configure cutoff time"
+          - "add instruction deadline"
+          - "set CA deadline"
+          - "add cutoff configuration"
+          - "define internal deadline for depository"
+          - "set warning days before market deadline"
+          - "configure escalation cutoff for CA"
         behavior: plugin
         handler: TradingProfileCaAddCutoffOp
         metadata:
@@ -1376,51 +1553,56 @@ domains:
           phase_tags: [trading]
           side_effects: state_write
         args:
-        - name: profile-id
-          type: uuid
-          required: true
-        - name: event-type
-          type: string
-          required: false
-          description: "Event code (if rule is event-specific)"
-        - name: market-code
-          type: string
-          required: false
-          description: "MIC code (e.g., XNYS, XLON)"
-        - name: depository-code
-          type: string
-          required: false
-          description: "Depository (e.g., DTCC, CREST, EUROCLEAR)"
-        - name: days-before
-          type: integer
-          required: true
-          description: Days before market deadline for internal cutoff
-        - name: warning-days
-          type: integer
-          required: false
-          default: 3
-          description: Days before cutoff to send warning
-        - name: escalation-days
-          type: integer
-          required: false
-          default: 1
-          description: Days before cutoff to escalate
+          - name: profile-id
+            type: uuid
+            required: true
+          - name: event-type
+            type: string
+            required: false
+            description: "Event code (if rule is event-specific)"
+          - name: market-code
+            type: string
+            required: false
+            description: "MIC code (e.g., XNYS, XLON)"
+          - name: depository-code
+            type: string
+            required: false
+            description: "Depository (e.g., DTCC, CREST, EUROCLEAR)"
+          - name: days-before
+            type: integer
+            required: true
+            description: Days before market deadline for internal cutoff
+          - name: warning-days
+            type: integer
+            required: false
+            default: 3
+            description: Days before cutoff to send warning
+          - name: escalation-days
+            type: integer
+            required: false
+            default: 1
+            description: Days before cutoff to escalate
         returns:
           type: affected
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
 
       ca.remove-cutoff-rule:
         description: Remove cutoff rule by market/depository
         invocation_phrases:
-        - "remove CA cutoff rule"
-        - "delete cutoff rule"
-        - "remove deadline rule"
-        - "clear cutoff configuration"
-        - "remove instruction deadline"
-        - "drop internal deadline for market"
-        - "clear depository cutoff setting"
-        - "delete CA escalation rule"
-        - "remove warning days configuration"
-        - "unset election deadline rule"
+          - "remove CA cutoff rule"
+          - "delete cutoff rule"
+          - "remove deadline rule"
+          - "clear cutoff configuration"
+          - "remove instruction deadline"
+          - "drop internal deadline for market"
+          - "clear depository cutoff setting"
+          - "delete CA escalation rule"
+          - "remove warning days configuration"
+          - "unset election deadline rule"
         behavior: plugin
         handler: TradingProfileCaRemoveCutoffOp
         metadata:
@@ -1432,31 +1614,36 @@ domains:
           phase_tags: [trading]
           side_effects: state_write
         args:
-        - name: profile-id
-          type: uuid
-          required: true
-        - name: market-code
-          type: string
-          required: false
-        - name: depository-code
-          type: string
-          required: false
+          - name: profile-id
+            type: uuid
+            required: true
+          - name: market-code
+            type: string
+            required: false
+          - name: depository-code
+            type: string
+            required: false
         returns:
           type: affected
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: requires_confirmation
 
       ca.link-proceeds-ssi:
         description: Map CA proceeds to settlement instruction
         invocation_phrases:
-        - "link proceeds SSI"
-        - "set CA proceeds account"
-        - "link dividend SSI"
-        - "configure proceeds settlement"
-        - "set proceeds destination"
-        - "link CA payout SSI"
-        - "configure proceeds routing"
-        - "map CA cash payout to SSI"
-        - "assign settlement for stock dividends"
-        - "route corporate action proceeds"
+          - "link proceeds SSI"
+          - "set CA proceeds account"
+          - "link dividend SSI"
+          - "configure proceeds settlement"
+          - "set proceeds destination"
+          - "link CA payout SSI"
+          - "configure proceeds routing"
+          - "map CA cash payout to SSI"
+          - "assign settlement for stock dividends"
+          - "route corporate action proceeds"
         behavior: plugin
         handler: TradingProfileCaLinkSsiOp
         metadata:
@@ -1468,40 +1655,45 @@ domains:
           phase_tags: [trading]
           side_effects: state_write
         args:
-        - name: profile-id
-          type: uuid
-          required: true
-        - name: proceeds-type
-          type: string
-          required: true
-          valid_values:
-          - cash
-          - stock
-          description: Type of proceeds (cash or stock)
-        - name: currency
-          type: string
-          required: false
-          description: "Currency code (if currency-specific mapping)"
-        - name: ssi-name
-          type: string
-          required: true
-          description: SSI name from standing instructions section
+          - name: profile-id
+            type: uuid
+            required: true
+          - name: proceeds-type
+            type: string
+            required: true
+            valid_values:
+              - cash
+              - stock
+            description: Type of proceeds (cash or stock)
+          - name: currency
+            type: string
+            required: false
+            description: "Currency code (if currency-specific mapping)"
+          - name: ssi-name
+            type: string
+            required: true
+            description: SSI name from standing instructions section
         returns:
           type: affected
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
 
       ca.remove-proceeds-ssi:
         description: Remove CA proceeds SSI mapping
         invocation_phrases:
-        - "remove proceeds SSI"
-        - "unlink proceeds account"
-        - "remove dividend SSI"
-        - "clear proceeds SSI"
-        - "remove payout routing"
-        - "delete proceeds link"
-        - "detach CA payout settlement instruction"
-        - "unmap stock dividend SSI"
-        - "clear cash proceeds routing"
-        - "remove CA settlement destination"
+          - "remove proceeds SSI"
+          - "unlink proceeds account"
+          - "remove dividend SSI"
+          - "clear proceeds SSI"
+          - "remove payout routing"
+          - "delete proceeds link"
+          - "detach CA payout settlement instruction"
+          - "unmap stock dividend SSI"
+          - "clear cash proceeds routing"
+          - "remove CA settlement destination"
         behavior: plugin
         handler: TradingProfileCaRemoveSsiOp
         metadata:
@@ -1513,34 +1705,39 @@ domains:
           phase_tags: [trading]
           side_effects: state_write
         args:
-        - name: profile-id
-          type: uuid
-          required: true
-        - name: proceeds-type
-          type: string
-          required: true
-          valid_values:
-          - cash
-          - stock
-        - name: currency
-          type: string
-          required: false
+          - name: profile-id
+            type: uuid
+            required: true
+          - name: proceeds-type
+            type: string
+            required: true
+            valid_values:
+              - cash
+              - stock
+          - name: currency
+            type: string
+            required: false
         returns:
           type: affected
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: requires_confirmation
 
       ca.get-policy:
         description: Get current CA policy configuration from trading profile
         invocation_phrases:
-        - "get CA policy"
-        - "show CA configuration"
-        - "view CA settings"
-        - "display CA policy"
-        - "get corporate action policy"
-        - "show CA setup"
-        - "view event policy"
-        - "what are the CA rules"
-        - "retrieve corporate action configuration"
-        - "inspect CA election and cutoff setup"
+          - "get CA policy"
+          - "show CA configuration"
+          - "view CA settings"
+          - "display CA policy"
+          - "get corporate action policy"
+          - "show CA setup"
+          - "view event policy"
+          - "what are the CA rules"
+          - "retrieve corporate action configuration"
+          - "inspect CA election and cutoff setup"
         behavior: plugin
         handler: TradingProfileCaGetPolicyOp
         metadata:
@@ -1552,9 +1749,745 @@ domains:
           phase_tags: [trading]
           side_effects: facts_only
         args:
-        - name: profile-id
-          type: uuid
-          required: true
+          - name: profile-id
+            type: uuid
+            required: true
         returns:
           type: record
           description: "{ enabled_event_types: [...], notification_policy: {...}, election_policy: {...}, default_options: [...], cutoff_rules: [...], proceeds_ssi_mappings: [...] }"
+        three_axis:
+          state_effect: preserving
+          external_effects: [observational]
+          consequence:
+            baseline: benign
+
+      # =========================================================================
+      # P.3 ADDITIONS (2026-04-23) — TRADING-PROFILE LIFECYCLE TRANSITIONS
+      # Adds missing transitions + parallel_run + supersede per
+      # instrument_matrix_dag.yaml trading_profile_lifecycle (9 states).
+      # =========================================================================
+
+      enter-parallel-run:
+        description: "Enter parallel_run state (approved → parallel_run)"
+        invocation_phrases:
+          - "enter parallel run"
+          - "start shadow trading"
+          - "begin parallel run"
+        metadata:
+          tier: intent
+          source_of_truth: matrix
+          scope: cbu
+          noun: trading_profile
+          subject_kinds: [trading-profile]
+          phase_tags: [parallel_run]
+          side_effects: state_write
+          harm_class: reversible
+        behavior: plugin
+        args:
+          - name: profile
+            type: uuid
+            required: true
+        three_axis:
+          state_effect: transition
+          external_effects: [emitting]
+          consequence:
+            baseline: requires_confirmation
+          transitions:
+            dag: instrument_matrix_dag
+            edges:
+              - from: APPROVED
+                to: PARALLEL_RUN
+
+      go-live:
+        description: "Go-live on a mandate (parallel_run → active)"
+        invocation_phrases:
+          - "go live"
+          - "activate mandate"
+          - "launch trading profile"
+        metadata:
+          tier: intent
+          source_of_truth: matrix
+          scope: cbu
+          noun: trading_profile
+          subject_kinds: [trading-profile]
+          phase_tags: [active]
+          side_effects: state_write
+          harm_class: reversible
+        behavior: plugin
+        args:
+          - name: profile
+            type: uuid
+            required: true
+        three_axis:
+          state_effect: transition
+          external_effects: [emitting]
+          consequence:
+            baseline: requires_explicit_authorisation
+          transitions:
+            dag: instrument_matrix_dag
+            edges:
+              - from: PARALLEL_RUN
+                to: ACTIVE
+        transition_args:
+          entity_id_arg: profile
+          target_workspace: instrument_matrix
+          target_slot: trading_profile
+
+      abort-parallel-run:
+        description: "Abort parallel run — roll back to approved"
+        invocation_phrases:
+          - "abort parallel run"
+          - "rollback parallel mandate"
+        metadata:
+          tier: intent
+          source_of_truth: matrix
+          scope: cbu
+          noun: trading_profile
+          subject_kinds: [trading-profile]
+          phase_tags: [operational]
+          side_effects: state_write
+          harm_class: reversible
+        behavior: plugin
+        args:
+          - name: profile
+            type: uuid
+            required: true
+          - name: reason
+            type: string
+            required: false
+        three_axis:
+          state_effect: transition
+          external_effects: [emitting]
+          consequence:
+            baseline: requires_confirmation
+          transitions:
+            dag: instrument_matrix_dag
+            edges:
+              - from: PARALLEL_RUN
+                to: APPROVED
+
+      suspend:
+        description: "Suspend active mandate (operational hold)"
+        invocation_phrases:
+          - "suspend mandate"
+          - "suspend trading profile"
+        metadata:
+          tier: intent
+          source_of_truth: matrix
+          scope: cbu
+          noun: trading_profile
+          subject_kinds: [trading-profile]
+          phase_tags: [operational]
+          side_effects: state_write
+          harm_class: reversible
+        behavior: plugin
+        args:
+          - name: profile
+            type: uuid
+            required: true
+          - name: reason
+            type: string
+            required: false
+        three_axis:
+          state_effect: transition
+          external_effects: [emitting]
+          consequence:
+            baseline: requires_explicit_authorisation
+          transitions:
+            dag: instrument_matrix_dag
+            edges:
+              - from: ACTIVE
+                to: SUSPENDED
+        transition_args:
+          entity_id_arg: profile
+          target_workspace: instrument_matrix
+          target_slot: trading_profile
+
+      reactivate:
+        description: "Reactivate a suspended mandate (suspended → active)"
+        invocation_phrases:
+          - "reactivate mandate"
+          - "resume trading profile"
+        metadata:
+          tier: intent
+          source_of_truth: matrix
+          scope: cbu
+          noun: trading_profile
+          subject_kinds: [trading-profile]
+          phase_tags: [operational]
+          side_effects: state_write
+          harm_class: reversible
+        behavior: plugin
+        args:
+          - name: profile
+            type: uuid
+            required: true
+        three_axis:
+          state_effect: transition
+          external_effects: [emitting]
+          consequence:
+            baseline: requires_explicit_authorisation
+          transitions:
+            dag: instrument_matrix_dag
+            edges:
+              - from: SUSPENDED
+                to: ACTIVE
+        transition_args:
+          entity_id_arg: profile
+          target_workspace: instrument_matrix
+          target_slot: trading_profile
+
+      supersede:
+        description: "Supersede active version with newer version (active → superseded)"
+        invocation_phrases:
+          - "supersede mandate"
+          - "replace trading profile version"
+        metadata:
+          tier: intent
+          source_of_truth: matrix
+          scope: cbu
+          noun: trading_profile
+          subject_kinds: [trading-profile]
+          phase_tags: [archive]
+          side_effects: state_write
+          harm_class: irreversible
+        behavior: plugin
+        args:
+          - name: profile
+            type: uuid
+            required: true
+          - name: new-version
+            type: uuid
+            required: true
+        three_axis:
+          state_effect: transition
+          external_effects: [emitting]
+          consequence:
+            baseline: requires_explicit_authorisation
+          transitions:
+            dag: instrument_matrix_dag
+            edges:
+              - from: ACTIVE
+                to: SUPERSEDED
+
+      # =========================================================================
+      # P.3 ADDITIONS — TEMPLATE MAINTENANCE VERBS
+      # Support for template-lifecycle + content-maintenance macros.
+      # =========================================================================
+
+      retire-template:
+        description: "Retire a template (available → unavailable)"
+        invocation_phrases:
+          - "retire template"
+          - "deprecate template"
+        metadata:
+          tier: intent
+          source_of_truth: matrix
+          scope: cbu
+          noun: trading_profile
+          subject_kinds: [trading-profile-template]
+          phase_tags: [archive]
+          side_effects: state_write
+          harm_class: irreversible
+        behavior: plugin
+        args:
+          - name: template
+            type: uuid
+            required: true
+          - name: reason
+            type: string
+            required: false
+        three_axis:
+          state_effect: transition
+          external_effects: []
+          consequence:
+            baseline: requires_explicit_authorisation
+          transitions:
+            dag: instrument_matrix_dag
+            edges:
+              - from: available
+                to: unavailable
+
+      add-instrument-class:
+        description: "Add instrument class to trading profile / template"
+        invocation_phrases:
+          - "add instrument class"
+          - "enable instrument class"
+        metadata:
+          tier: intent
+          source_of_truth: matrix
+          scope: cbu
+          noun: trading_profile
+          subject_kinds: [trading-profile]
+          phase_tags: [matrix_scoped]
+          side_effects: state_write
+          harm_class: reversible
+        behavior: plugin
+        args:
+          - name: profile
+            type: uuid
+            required: true
+          - name: instrument-class
+            type: string
+            required: true
+          - name: market
+            type: string
+            required: false
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
+
+      remove-instrument-class:
+        description: "Remove instrument class from trading profile / template (no cascade)"
+        invocation_phrases:
+          - "remove instrument class"
+          - "disable instrument class"
+        metadata:
+          tier: intent
+          source_of_truth: matrix
+          scope: cbu
+          noun: trading_profile
+          subject_kinds: [trading-profile]
+          phase_tags: [matrix_scoped]
+          side_effects: state_write
+          harm_class: reversible
+        behavior: plugin
+        args:
+          - name: profile
+            type: uuid
+            required: true
+          - name: instrument-class
+            type: string
+            required: true
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: requires_confirmation
+
+      add-market:
+        description: "Add market to trading profile / template"
+        invocation_phrases:
+          - "add market"
+          - "enable market"
+        metadata:
+          tier: intent
+          source_of_truth: matrix
+          scope: cbu
+          noun: trading_profile
+          subject_kinds: [trading-profile]
+          phase_tags: [matrix_scoped]
+          side_effects: state_write
+          harm_class: reversible
+        behavior: plugin
+        args:
+          - name: profile
+            type: uuid
+            required: true
+          - name: market
+            type: string
+            required: true
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
+
+      remove-market:
+        description: "Remove market from trading profile / template (no cascade)"
+        invocation_phrases:
+          - "remove market"
+          - "disable market"
+        metadata:
+          tier: intent
+          source_of_truth: matrix
+          scope: cbu
+          noun: trading_profile
+          subject_kinds: [trading-profile]
+          phase_tags: [matrix_scoped]
+          side_effects: state_write
+          harm_class: reversible
+        behavior: plugin
+        args:
+          - name: profile
+            type: uuid
+            required: true
+          - name: market
+            type: string
+            required: true
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: requires_confirmation
+
+      add-counterparty-type:
+        description: "Add counterparty type to template"
+        metadata:
+          tier: intent
+          source_of_truth: matrix
+          scope: cbu
+          noun: trading_profile
+          subject_kinds: [trading-profile-template]
+          phase_tags: [matrix_scoped]
+          side_effects: state_write
+          harm_class: reversible
+        behavior: plugin
+        args:
+          - name: template
+            type: uuid
+            required: true
+          - name: counterparty-type
+            type: string
+            required: true
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
+
+      publish-template-version:
+        description: "Publish a new template version as default for cloning"
+        metadata:
+          tier: intent
+          source_of_truth: matrix
+          scope: cbu
+          noun: trading_profile
+          subject_kinds: [trading-profile-template]
+          phase_tags: [governance]
+          side_effects: state_write
+          harm_class: reversible
+        behavior: plugin
+        args:
+          - name: template-version
+            type: uuid
+            required: true
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: requires_explicit_authorisation
+
+      list-components:
+        description: "List all components of a trading profile / template"
+        invocation_phrases:
+          - "list components"
+          - "show trading profile components"
+        metadata:
+          tier: intent
+          source_of_truth: matrix
+          scope: cbu
+          noun: trading_profile
+          subject_kinds: [trading-profile]
+          phase_tags: [read]
+          side_effects: none
+          harm_class: read_only
+        behavior: plugin
+        args:
+          - name: profile
+            type: uuid
+            required: true
+        returns:
+          type: record_set
+        three_axis:
+          state_effect: preserving
+          external_effects: [observational]
+          consequence:
+            baseline: benign
+
+      # =========================================================================
+      # P.3 ADDITIONS — PRUNE VERBS (DESTRUCTIVE, WITH CASCADE)
+      # See instrument_matrix_dag.yaml §6 for cascade rules.
+      # Prune verbs baseline to requires_explicit_authorisation.
+      # =========================================================================
+
+      prune-asset-family:
+        description: "Prune asset family from profile/template with cascade"
+        metadata:
+          tier: intent
+          source_of_truth: matrix
+          scope: cbu
+          noun: trading_profile
+          subject_kinds: [trading-profile]
+          phase_tags: [governance, destructive]
+          side_effects: state_write
+          harm_class: irreversible
+        behavior: plugin
+        args:
+          - name: profile
+            type: uuid
+            required: true
+          - name: family
+            type: string
+            required: true
+            valid_values: [equity, fixed_income, otc_derivatives, listed_derivatives, fx, money_market, funds]
+          - name: cascade
+            type: boolean
+            required: false
+            default: true
+          - name: reason
+            type: string
+            required: false
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: requires_explicit_authorisation
+
+      prune-market:
+        description: "Prune market from profile/template with cascade"
+        metadata:
+          tier: intent
+          source_of_truth: matrix
+          scope: cbu
+          noun: trading_profile
+          subject_kinds: [trading-profile]
+          phase_tags: [governance, destructive]
+          side_effects: state_write
+          harm_class: irreversible
+        behavior: plugin
+        args:
+          - name: profile
+            type: uuid
+            required: true
+          - name: market
+            type: string
+            required: true
+          - name: cascade
+            type: boolean
+            required: false
+            default: true
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: requires_explicit_authorisation
+
+      prune-instrument-class:
+        description: "Prune single instrument class with cascade"
+        metadata:
+          tier: intent
+          source_of_truth: matrix
+          scope: cbu
+          noun: trading_profile
+          subject_kinds: [trading-profile]
+          phase_tags: [governance, destructive]
+          side_effects: state_write
+          harm_class: irreversible
+        behavior: plugin
+        args:
+          - name: profile
+            type: uuid
+            required: true
+          - name: instrument-class
+            type: string
+            required: true
+          - name: cascade
+            type: boolean
+            required: false
+            default: true
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: requires_explicit_authorisation
+
+      prune-counterparty:
+        description: "Prune specific counterparty from CBU mandate with cascade"
+        metadata:
+          tier: intent
+          source_of_truth: matrix
+          scope: cbu
+          noun: trading_profile
+          subject_kinds: [trading-profile]
+          phase_tags: [governance, destructive]
+          side_effects: state_write
+          harm_class: irreversible
+        behavior: plugin
+        args:
+          - name: profile
+            type: uuid
+            required: true
+          - name: counterparty
+            type: uuid
+            required: true
+          - name: cascade
+            type: boolean
+            required: false
+            default: true
+        three_axis:
+          state_effect: preserving
+          external_effects: [emitting]
+          consequence:
+            baseline: requires_explicit_authorisation
+
+      prune-counterparty-type:
+        description: "Prune counterparty type (all counterparties of category)"
+        metadata:
+          tier: intent
+          source_of_truth: matrix
+          scope: cbu
+          noun: trading_profile
+          subject_kinds: [trading-profile-template]
+          phase_tags: [governance, destructive]
+          side_effects: state_write
+          harm_class: irreversible
+        behavior: plugin
+        args:
+          - name: template
+            type: uuid
+            required: true
+          - name: counterparty-type
+            type: string
+            required: true
+          - name: cascade
+            type: boolean
+            required: false
+            default: true
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: requires_explicit_authorisation
+
+      prune-impact:
+        description: "Read-only impact analysis before invoking a destructive prune"
+        invocation_phrases:
+          - "prune impact"
+          - "preview prune"
+          - "what would prune remove"
+        metadata:
+          tier: intent
+          source_of_truth: matrix
+          scope: cbu
+          noun: trading_profile
+          subject_kinds: [trading-profile]
+          phase_tags: [review, read-only]
+          side_effects: none
+          harm_class: read_only
+        behavior: plugin
+        args:
+          - name: profile
+            type: uuid
+            required: true
+          - name: kind
+            type: string
+            required: true
+            valid_values: [asset_family, market, instrument_class, counterparty, counterparty_type]
+          - name: target
+            type: string
+            required: true
+        returns:
+          type: record
+          description: "{ slots_affected: [...], verbs_cascaded: [...], abort_conditions: [...] }"
+        three_axis:
+          state_effect: preserving
+          external_effects: [observational]
+          consequence:
+            baseline: benign
+
+      sync-from-template:
+        description: "Sync a CBU mandate from its group template (adopt forward-only template changes)"
+        invocation_phrases:
+          - "sync from template"
+          - "pull template updates"
+          - "adopt template changes"
+        metadata:
+          tier: intent
+          source_of_truth: matrix
+          scope: cbu
+          noun: trading_profile
+          subject_kinds: [trading-profile]
+          phase_tags: [amendment]
+          side_effects: state_write
+          harm_class: reversible
+        behavior: plugin
+        args:
+          - name: cbu
+            type: uuid
+            required: true
+          - name: template
+            type: uuid
+            required: true
+          - name: prune-diff-only
+            type: boolean
+            required: false
+            default: false
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: requires_confirmation
+
+      restrict:
+        description: "Apply partial trading restriction to mandate (pull specific markets / instruments)"
+        behavior: plugin
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: cbu
+          noun: trading-profile
+          subject_kinds: [trading-profile]
+          phase_tags: [trading-profile]
+          side_effects: state_write
+          harm_class: reversible
+        invocation_phrases:
+          - "restrict mandate"
+          - "pull markets from mandate"
+          - "narrow trading profile"
+          - "limit mandate scope"
+        args:
+          - name: profile-id
+            type: uuid
+            required: true
+            maps_to: profile_id
+          - name: scope
+            type: string
+            required: true
+            maps_to: restriction_scope
+        returns:
+          type: affected
+        three_axis:
+          state_effect: transition
+          external_effects: [emitting]
+          consequence:
+            baseline: requires_confirmation
+        transition_args:
+          entity_id_arg: profile-id
+          target_workspace: instrument_matrix
+          target_slot: trading_profile
+
+      lift-restriction:
+        description: "Lift trading-profile restriction (restore full mandate scope)"
+        behavior: plugin
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: cbu
+          noun: trading-profile
+          subject_kinds: [trading-profile]
+          phase_tags: [trading-profile]
+          side_effects: state_write
+          harm_class: reversible
+        invocation_phrases:
+          - "lift mandate restriction"
+          - "unrestrict mandate"
+          - "restore full trading scope"
+        args:
+          - name: profile-id
+            type: uuid
+            required: true
+            maps_to: profile_id
+        returns:
+          type: affected
+        three_axis:
+          state_effect: transition
+          external_effects: [emitting]
+          consequence:
+            baseline: reviewable
+        transition_args:
+          entity_id_arg: profile-id
+          target_workspace: instrument_matrix
+          target_slot: trading_profile

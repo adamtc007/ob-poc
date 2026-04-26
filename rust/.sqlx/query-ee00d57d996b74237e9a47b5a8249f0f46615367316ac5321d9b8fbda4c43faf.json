@@ -1,0 +1,28 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            INSERT INTO \"ob-poc\".outstanding_requests (\n                subject_type, subject_id,\n                case_id,\n                request_type, request_subtype,\n                request_details,\n                requested_by_agent,\n                created_by_verb\n            ) VALUES (\n                COALESCE($1, 'ENTITY'), $2,\n                $3,\n                $4, $5,\n                $6,\n                true,\n                $7\n            )\n            RETURNING request_id\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "request_id",
+        "type_info": "Uuid"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Uuid",
+        "Uuid",
+        "Varchar",
+        "Varchar",
+        "Jsonb",
+        "Varchar"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "ee00d57d996b74237e9a47b5a8249f0f46615367316ac5321d9b8fbda4c43faf"
+}

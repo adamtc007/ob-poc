@@ -5,7 +5,8 @@
 //!
 //! The executor routes verbs through:
 //! - GenericCrudExecutor for CRUD operations (defined in verbs.yaml)
-//! - CustomOperationRegistry for plugins (complex logic, external APIs)
+//! - SemOsVerbOpRegistry for plugins (post-Phase-5c-migrate; the legacy
+//!   `CustomOperationRegistry` was removed in slice #80)
 
 #[cfg(feature = "database")]
 use anyhow::{anyhow, bail, Result};
@@ -46,9 +47,7 @@ use super::runtime_registry::{runtime_registry, RuntimeBehavior};
 #[cfg(feature = "database")]
 use super::submission::{DslSubmission, SubmissionError, SubmissionLimits};
 #[cfg(feature = "database")]
-use crate::domain_ops::CustomOperationRegistry;
-#[cfg(feature = "database")]
-use crate::domain_ops::{verify_plugin_verb_coverage, verify_plugin_verb_coverage_strict};
+use sem_os_postgres::ops::SemOsVerbOpRegistry;
 
 #[cfg(feature = "database")]
 use sqlx::PgPool;
@@ -206,13 +205,13 @@ pub enum ExecutionResult {
     /// No result (void operation)
     Void,
     /// Entity query result for batch iteration (entity.query verb)
-    EntityQuery(crate::domain_ops::entity_query::EntityQueryResult),
+    EntityQuery(ob_poc_types::entity_query::EntityQueryResult),
     /// Template invocation result (template.invoke verb)
     TemplateInvoked(crate::domain_ops::template_ops::TemplateInvokeResult),
     /// Template batch execution result (template.batch verb)
     TemplateBatch(crate::domain_ops::template_ops::TemplateBatchResult),
     /// Batch control operation result (batch.pause, batch.resume, etc.)
-    BatchControl(crate::domain_ops::batch_control_ops::BatchControlResult),
+    BatchControl(ob_poc_types::batch_control::BatchControlResult),
 }
 
 // ============================================================================
@@ -437,7 +436,7 @@ pub struct ExecutionContext {
     /// it via `session.set_view(view_state)`.
     ///
     /// This solves the "session state side door" where ViewState was being discarded
-    /// because CustomOperation only receives ExecutionContext, not UnifiedSessionContext.
+    /// because verb ops only receive ExecutionContext, not UnifiedSessionContext.
     pub pending_view_state: Option<ViewState>,
     /// Pending viewport state from viewport.* operations
     ///
@@ -1140,8 +1139,13 @@ pub struct IterationResult {
 pub struct DslExecutor {
     #[cfg(feature = "database")]
     pool: PgPool,
+    /// SemOS-native plugin op registry. Post-Phase-5c-migrate slice #80 this
+    /// is the single source of truth for plugin dispatch. `None` is allowed
+    /// so tests / harnesses can build an executor without a populated registry;
+    /// in production `ob-poc-web::main` wires the canonical registry via
+    /// [`Self::with_sem_os_ops`].
     #[cfg(feature = "database")]
-    custom_ops: CustomOperationRegistry,
+    sem_os_ops: Option<std::sync::Arc<SemOsVerbOpRegistry>>,
     #[cfg(feature = "database")]
     generic_executor: GenericCrudExecutor,
     #[cfg(feature = "database")]
@@ -1150,13 +1154,20 @@ pub struct DslExecutor {
     verb_hash_lookup: crate::session::verb_hash_lookup::VerbHashLookupService,
     /// Event emitter for observability (optional, zero-overhead when None)
     events: Option<SharedEmitter>,
+    /// Platform service registry, threaded onto each `VerbExecutionContext`
+    /// this executor builds. Defaults to empty for tests/standalone use;
+    /// production wires it via [`Self::with_services`] at host startup.
+    service_registry: std::sync::Arc<dsl_runtime::ServiceRegistry>,
 }
 
 impl DslExecutor {
     /// Create a new executor with a database pool.
     ///
-    /// Verifies at construction time that every YAML `behavior: plugin` verb has a
-    /// registered `CustomOperation`.
+    /// Phase 5c-migrate slice #80 removed the legacy `CustomOperationRegistry`;
+    /// plugin dispatch now runs through [`SemOsVerbOpRegistry`]. The registry
+    /// is optional on the executor — tests / harnesses can construct one
+    /// without it, while production wires the canonical registry via
+    /// [`Self::with_sem_os_ops`] at host startup.
     ///
     /// # Examples
     ///
@@ -1170,9 +1181,6 @@ impl DslExecutor {
     /// ```
     #[cfg(feature = "database")]
     pub fn new(pool: PgPool) -> Self {
-        let custom_ops = CustomOperationRegistry::new();
-        verify_plugin_verb_coverage_strict(&custom_ops);
-
         Self {
             generic_executor: GenericCrudExecutor::new(pool.clone()),
             idempotency: super::idempotency::IdempotencyManager::new(pool.clone()),
@@ -1180,37 +1188,36 @@ impl DslExecutor {
                 pool.clone(),
             ),
             pool,
-            custom_ops,
+            sem_os_ops: None,
             events: None,
+            service_registry: std::sync::Arc::new(dsl_runtime::ServiceRegistry::empty()),
         }
     }
 
-    /// Verify that all YAML plugin verbs are backed by registered custom operations.
+    /// Install the canonical [`SemOsVerbOpRegistry`] for plugin dispatch.
     ///
-    /// Returns the fully-qualified YAML plugin verbs that are missing handlers.
-    ///
-    /// # Examples
-    ///
-    /// ```rust,no_run
-    /// # use ob_poc::dsl_v2::executor::DslExecutor;
-    /// # use sqlx::PgPool;
-    /// # fn demo(pool: PgPool) {
-    /// let executor = DslExecutor::new(pool);
-    /// let _ = executor.verify_registry_coverage();
-    /// # }
-    /// ```
+    /// In production, `ob-poc-web::main` builds the registry from
+    /// `sem_os_postgres::ops::build_registry()` + `ob_poc::domain_ops::extend_registry()`
+    /// and hands it to every `DslExecutor` via this builder. Without it,
+    /// `execute_verb` will reject any verb that resolves to `RuntimeBehavior::Plugin`.
     #[cfg(feature = "database")]
-    pub fn verify_registry_coverage(&self) -> std::result::Result<(), Vec<String>> {
-        let result = verify_plugin_verb_coverage(&self.custom_ops);
-        if result.yaml_missing_op.is_empty() {
-            Ok(())
-        } else {
-            Err(result
-                .yaml_missing_op
-                .into_iter()
-                .map(|(domain, verb)| format!("{domain}.{verb}"))
-                .collect())
-        }
+    pub fn with_sem_os_ops(mut self, ops: std::sync::Arc<SemOsVerbOpRegistry>) -> Self {
+        self.sem_os_ops = Some(ops);
+        self
+    }
+
+    /// Install the platform service registry. Call once at host startup
+    /// after constructing the executor with [`Self::new`].
+    pub fn with_services(mut self, services: std::sync::Arc<dsl_runtime::ServiceRegistry>) -> Self {
+        self.service_registry = services;
+        self
+    }
+
+    /// Borrow the installed service registry. Exposed so other executor-like
+    /// shims (e.g. [`crate::runbook::step_executor_bridge`]) can clone it
+    /// onto contexts they build themselves.
+    pub fn service_registry(&self) -> std::sync::Arc<dsl_runtime::ServiceRegistry> {
+        self.service_registry.clone()
     }
 
     /// Set the event emitter for observability.
@@ -1279,103 +1286,66 @@ impl DslExecutor {
         result
     }
 
-    /// Inner verb execution logic (no event emission)
+    /// Inner verb execution logic (no event emission).
+    ///
+    /// Phase B.2b-α (2026-04-22): this is now a thin wrapper that opens a
+    /// per-verb `PgTransactionScope` and delegates to
+    /// [`Self::execute_verb_in_scope`] — the single in-scope dispatch
+    /// entry point. All three behavior variants (Plugin, Durable-direct,
+    /// Generic CRUD) are handled uniformly there. The Sequencer migration
+    /// (B.2b-ζ) replaces this per-verb scope with an outer scope threaded
+    /// from the runbook step loop, giving true cross-step atomicity.
     #[cfg(feature = "database")]
     async fn execute_verb_inner(
         &self,
         vc: &VerbCall,
         ctx: &mut ExecutionContext,
     ) -> Result<ExecutionResult> {
+        use crate::sequencer_tx::PgTransactionScope;
+
         tracing::debug!("execute_verb: ENTER {}.{}", vc.domain, vc.verb);
 
-        // Look up verb in runtime registry (loaded from YAML)
-        let runtime_verb = runtime_registry()
-            .get(&vc.domain, &vc.verb)
-            .ok_or_else(|| anyhow!("Unknown verb: {}.{}", vc.domain, vc.verb))?;
-        tracing::debug!(
-            "execute_verb: found verb, behavior={:?}",
-            runtime_verb.behavior
-        );
-
-        // Check if this is a plugin (custom operation)
-        if let RuntimeBehavior::Plugin(_handler) = &runtime_verb.behavior {
-            tracing::debug!("execute_verb: routing to PLUGIN");
-            // Dispatch to custom operations handler
-            if let Some(op) = self.custom_ops.get(&vc.domain, &vc.verb) {
-                let result = op.execute(vc, ctx, &self.pool).await;
-                tracing::debug!("execute_verb: plugin returned {:?}", result.is_ok());
-                return result;
-            }
-            return Err(anyhow!(
-                "Plugin {}.{} has no handler implementation",
-                vc.domain,
-                vc.verb
-            ));
-        }
-
-        // Durable verbs normally require the V2 REPL / WorkflowDispatcher
-        // infrastructure. Inside a BPMN worker, however, we may need to invoke
-        // the direct implementation of a durable verb as an internal service
-        // task without starting a nested orchestration.
-        if let RuntimeBehavior::Durable(d) = &runtime_verb.behavior {
-            if ctx.allow_durable_direct {
-                tracing::debug!(
-                    "execute_verb: allowing direct execution of durable verb {}.{} inside BPMN worker",
-                    vc.domain,
-                    vc.verb
-                );
-                if let Some(op) = self.custom_ops.get(&vc.domain, &vc.verb) {
-                    let result = op.execute(vc, ctx, &self.pool).await;
-                    tracing::debug!(
-                        "execute_verb: durable direct plugin returned {:?}",
-                        result.is_ok()
-                    );
-                    return result;
-                }
-
-                return Err(anyhow!(
-                    "Durable verb {}.{} is executing inside BPMN worker but has no direct custom-op implementation",
-                    vc.domain,
-                    vc.verb
-                ));
-            }
-
-            return Err(anyhow!(
-                "Durable verb {}.{} (process_key={}) requires V2 REPL with WorkflowDispatcher. \
-                 Use /api/repl/v2/ endpoints instead.",
+        // Legacy per-verb scope. Phase B.2b-ζ replaces this with an outer
+        // Sequencer-owned scope threaded into `execute_verb_in_scope`.
+        let mut scope = PgTransactionScope::begin(&self.pool).await.map_err(|e| {
+            anyhow!(
+                "execute_verb({}.{}): begin txn failed: {}",
                 vc.domain,
                 vc.verb,
-                d.process_key
-            ));
-        }
+                e
+            )
+        })?;
 
-        tracing::debug!("execute_verb: routing to GENERIC executor");
+        let outcome = {
+            let scope_dyn: &mut dyn dsl_runtime::tx::TransactionScope = &mut scope;
+            self.execute_verb_in_scope(vc, ctx, scope_dyn).await
+        };
 
-        // Convert VerbCall arguments to JSON for generic executor
-        let json_args = Self::verbcall_args_to_json(&vc.arguments, ctx)?;
-        tracing::debug!(
-            "execute_verb: json_args keys={:?}",
-            json_args.keys().collect::<Vec<_>>()
-        );
-
-        // Execute via generic executor
-        let result = self
-            .generic_executor
-            .execute(runtime_verb, &json_args)
-            .await?;
-        tracing::debug!("execute_verb: generic executor returned {:?}", result);
-
-        // Handle symbol capture
-        if runtime_verb.returns.capture {
-            if let GenericExecutionResult::Uuid(uuid) = &result {
-                if let Some(name) = &runtime_verb.returns.name {
-                    ctx.bind(name, *uuid);
+        match outcome {
+            Ok(result) => {
+                scope.commit().await.map_err(|e| {
+                    anyhow!(
+                        "execute_verb({}.{}): commit failed: {}",
+                        vc.domain,
+                        vc.verb,
+                        e
+                    )
+                })?;
+                tracing::debug!("execute_verb: EXIT success {}.{}", vc.domain, vc.verb);
+                Ok(result)
+            }
+            Err(e) => {
+                if let Err(rollback_err) = scope.rollback().await {
+                    tracing::warn!(
+                        domain = %vc.domain,
+                        verb = %vc.verb,
+                        %rollback_err,
+                        "execute_verb rollback failed after op error"
+                    );
                 }
+                Err(e)
             }
         }
-
-        tracing::debug!("execute_verb: EXIT success");
-        Ok(result.to_legacy())
     }
 
     /// Convert VerbCall arguments to JSON HashMap for generic executor
@@ -1448,6 +1418,174 @@ impl DslExecutor {
         }
     }
 }
+
+// ============================================================================
+// Plugin dispatch via SemOsVerbOp (post-5c-migrate slice #80)
+// ============================================================================
+
+/// Dispatch a plugin op against an **existing** `TransactionScope`. Phase
+/// B.1 (F6 follow-on, 2026-04-22) primitive: the caller owns the
+/// transaction boundary — this function does NOT begin, commit, or roll
+/// back. Used by:
+///
+/// - [`dispatch_plugin_via_sem_os_op`] — the legacy wrapper that opens
+///   its own per-verb scope (back-compat; still the single-dispatch-site
+///   today).
+/// - Future Phase B.2: the Sequencer's stage-8 dispatch loop will open
+///   one outer scope and call this helper for every verb in the
+///   runbook, so multi-step runbooks commit atomically or roll back
+///   together.
+///
+/// The function:
+/// 1. Builds a `VerbExecutionContext` from the caller's
+///    `ExecutionContext` (copies symbols + session-scoped fields into
+///    `extensions`).
+/// 2. Converts the `VerbCall` arguments to a JSON object.
+/// 3. Calls `op.execute(args, sem_ctx, scope)`.
+/// 4. On error, returns `Err`; caller decides to commit or rollback.
+/// 5. Syncs `sem_ctx` mutations back: new symbol bindings + pending_*
+///    side channels unpacked from `sem_ctx.extensions` into the caller's
+///    `ExecutionContext.pending_*` fields.
+/// 6. Converts `VerbExecutionOutcome` back to `ExecutionResult`.
+#[cfg(feature = "database")]
+async fn dispatch_plugin_via_sem_os_op_in_scope(
+    op: &dyn sem_os_postgres::ops::SemOsVerbOp,
+    fqn: &str,
+    vc: &VerbCall,
+    ctx: &mut ExecutionContext,
+    services: &std::sync::Arc<dsl_runtime::ServiceRegistry>,
+    scope: &mut dyn dsl_runtime::tx::TransactionScope,
+) -> Result<ExecutionResult> {
+    use crate::sem_os_runtime::verb_executor_adapter as adapter;
+    use sem_os_core::principal::Principal;
+
+    // 1. Build sem_ctx from legacy ctx.
+    let mut sem_ctx = dsl_runtime::VerbExecutionContext::new(Principal::system());
+    sem_ctx.services = services.clone();
+    sem_ctx.symbols = ctx.symbols.clone();
+    sem_ctx.symbol_types = ctx.symbol_types.clone();
+    sem_ctx.execution_id = ctx.execution_id;
+
+    let mut ext_map = serde_json::Map::new();
+    if let Some(ref audit_user) = ctx.audit_user {
+        ext_map.insert(
+            "audit_user".to_string(),
+            serde_json::Value::String(audit_user.clone()),
+        );
+    }
+    if let Some(session_id) = ctx.session_id {
+        ext_map.insert(
+            "session_id".to_string(),
+            serde_json::Value::String(session_id.to_string()),
+        );
+    }
+    if let Some(group_id) = ctx.client_group_id {
+        ext_map.insert(
+            "client_group_id".to_string(),
+            serde_json::Value::String(group_id.to_string()),
+        );
+    }
+    if let Some(ref group_name) = ctx.client_group_name {
+        ext_map.insert(
+            "client_group_name".to_string(),
+            serde_json::Value::String(group_name.clone()),
+        );
+    }
+    if let Some(ref persona) = ctx.persona {
+        ext_map.insert(
+            "persona".to_string(),
+            serde_json::Value::String(persona.clone()),
+        );
+    }
+    if !ctx.session_cbu_ids.is_empty() {
+        let ids: Vec<serde_json::Value> = ctx
+            .session_cbu_ids
+            .iter()
+            .map(|u| serde_json::Value::String(u.to_string()))
+            .collect();
+        ext_map.insert("session_cbu_ids".to_string(), serde_json::Value::Array(ids));
+    }
+    sem_ctx.extensions = serde_json::Value::Object(ext_map);
+
+    // 2. Convert VerbCall args → JSON.
+    let mut args = adapter::verb_call_to_json(vc);
+
+    // 2b. Phase F.1 (2026-04-22): pre-fetch hook. Ops that need
+    //     external I/O to answer a read (bpmn.inspect being the
+    //     canonical case) implement `pre_fetch` to do that work
+    //     BEFORE the transaction scope is entered — the gRPC/HTTP
+    //     round-trip happens outside the txn, satisfying A1.
+    //
+    //     Pre-fetch returns an optional JSON object whose keys are
+    //     merged into `args` so the op's normal `execute(args, ...)`
+    //     path sees the pre-fetched data with no external I/O of
+    //     its own. Default `Ok(None)` makes this a no-op for ops
+    //     that don't need it.
+    let pre_fetch_pool = scope.pool().clone();
+    if let Some(pre_fetched) = op
+        .pre_fetch(&args, &mut sem_ctx, &pre_fetch_pool)
+        .await
+        .map_err(|e| anyhow!("sem_os_op({}) pre_fetch failed: {}", fqn, e))?
+    {
+        if let (Some(existing_obj), serde_json::Value::Object(pf_obj)) =
+            (args.as_object_mut(), pre_fetched)
+        {
+            for (k, v) in pf_obj {
+                existing_obj.insert(k, v);
+            }
+        }
+    }
+
+    // 3. Dispatch against the caller-supplied scope. No begin / commit /
+    //    rollback — transaction boundary is the caller's responsibility.
+    let outcome = op
+        .execute(&args, &mut sem_ctx, scope)
+        .await
+        .map_err(|e| anyhow!("sem_os_op({}) failed: {}", fqn, e))?;
+
+    // Phase C.1/C.3 (F7 follow-on, 2026-04-22): shadow-observe any
+    // `PendingStateAdvance` the op emitted via its `ctx.extensions`
+    // side channel. Uses the typed `peek_pending_state_advance`
+    // accessor so the Sequencer's future Phase-C.2 apply path and
+    // the dispatcher's shadow log share one contract. 72+ verbs now
+    // emit across 15 domains.
+    //
+    // Phase C.2-main (2026-04-22 late): in addition to logging the raw
+    // payload, resolve each `to_node` taxonomy token into a stable
+    // `DagNodeId` via `ob_poc_types::resolve_pending_state_advance`.
+    // The resolved UUIDs are non-destructively appended as
+    // `to_node_resolved` on each state transition. When the real C.2
+    // apply path lands (blocked on B.2b.f follow-ups around
+    // apply-via-SemOS-in-txn), it will consume the resolved ids to
+    // construct a typed `PendingStateAdvance` for persistence.
+    if let Some(advance) = dsl_runtime::domain_ops::helpers::peek_pending_state_advance(&sem_ctx) {
+        let resolved = ob_poc_types::resolve_pending_state_advance(advance);
+        tracing::debug!(
+            fqn,
+            advance = %advance,
+            resolved = %resolved,
+            "Stage 9a shadow — PendingStateAdvance emitted (raw + C.2 resolved)"
+        );
+    }
+
+    // 4. Sync sem_ctx mutations back into the caller's ExecutionContext.
+    for (name, uuid) in &sem_ctx.symbols {
+        ctx.symbols.insert(name.clone(), *uuid);
+    }
+    for (name, ty) in &sem_ctx.symbol_types {
+        ctx.symbol_types.insert(name.clone(), ty.clone());
+    }
+    adapter::apply_sem_ctx_extensions_to_exec_ctx(&sem_ctx, ctx);
+
+    // 5. Convert outcome back to legacy ExecutionResult.
+    Ok(adapter::from_verb_outcome(outcome))
+}
+
+// Phase B.2b-α (2026-04-22): the legacy `dispatch_plugin_via_sem_os_op`
+// self-scoping wrapper was removed. Plugin dispatch now always flows
+// through `DslExecutor::execute_verb_in_scope` with a caller-owned scope;
+// the per-verb scope is opened by `execute_verb_inner` until the
+// Sequencer migration (B.2b-ζ) lands an outer scope.
 
 // ============================================================================
 // Submission Execution
@@ -1595,7 +1733,9 @@ impl DslExecutor {
     ///
     /// This method ensures the verb execution participates in the caller's transaction.
     /// For CRUD verbs, it uses GenericCrudExecutor::execute_in_tx.
-    /// For plugin verbs, it calls CustomOperation::execute_in_tx if supported.
+    /// Plugin verbs cannot enlist in the caller's existing transaction — they
+    /// always own their own scope via [`dispatch_plugin_via_sem_os_op`] — so
+    /// this method rejects them.
     async fn execute_verb_in_tx(
         &self,
         vc: &VerbCall,
@@ -1609,20 +1749,17 @@ impl DslExecutor {
             .get(&vc.domain, &vc.verb)
             .ok_or_else(|| anyhow!("Unknown verb: {}.{}", vc.domain, vc.verb))?;
 
-        // Check if this is a plugin (custom operation)
+        // Plugin verbs cannot enlist in the caller's transaction — they own
+        // their own scope via `SemOsVerbOp::execute` + `PgTransactionScope`.
+        // Fail fast so the caller doesn't get silent non-transactional
+        // behaviour inside an atomic batch.
         if let RuntimeBehavior::Plugin(_handler) = &runtime_verb.behavior {
             tracing::debug!("execute_verb_in_tx: routing to PLUGIN");
-            // Dispatch to custom operations handler
-            if let Some(op) = self.custom_ops.get(&vc.domain, &vc.verb) {
-                // Call execute_in_tx - if op doesn't support it, it returns an error.
-                // This is intentional: in atomic execution, we fail fast rather than
-                // silently doing non-transactional work within an atomic batch.
-                let result = op.execute_in_tx(vc, ctx, tx).await;
-                tracing::debug!("execute_verb_in_tx: plugin returned {:?}", result.is_ok());
-                return result;
-            }
             return Err(anyhow!(
-                "Plugin {}.{} has no handler implementation",
+                "Plugin {}.{} cannot execute in a caller-owned transaction. \
+                 Plugin ops run under their own `PgTransactionScope` — use the \
+                 non-transactional `execute_verb` path, or teach the caller to \
+                 split the batch around the plugin call.",
                 vc.domain,
                 vc.verb
             ));
@@ -1661,6 +1798,107 @@ impl DslExecutor {
         }
 
         tracing::debug!("execute_verb_in_tx: EXIT success");
+        Ok(result.to_legacy())
+    }
+
+    /// Phase B.2 (F6 follow-on, 2026-04-22): scope-aware verb dispatch.
+    /// All three runtime behaviors route through this single entry point;
+    /// the caller owns the transaction boundary.
+    ///
+    /// 1. **Plugin** (`RuntimeBehavior::Plugin`) → dispatches through
+    ///    [`dispatch_plugin_via_sem_os_op_in_scope`] using the ambient scope.
+    /// 2. **Durable + `ctx.allow_durable_direct`** → dispatches through the
+    ///    same in-scope plugin primitive (invoked inside BPMN workers as
+    ///    internal service tasks that must share the worker's txn).
+    /// 3. **Durable + default** → rejected; durable verbs require
+    ///    WorkflowDispatcher, not direct execution.
+    /// 4. **Generic CRUD** → runs via `generic_executor.execute_in_tx` using
+    ///    `scope.transaction()` as the `&mut Transaction` handle.
+    ///
+    /// Post B.2b-α (2026-04-22): `execute_verb_inner` delegates here by
+    /// opening a per-verb scope; the Sequencer migration (B.2b-ζ) replaces
+    /// that per-verb scope with an outer scope threaded from stage 8.
+    pub(crate) async fn execute_verb_in_scope(
+        &self,
+        vc: &VerbCall,
+        ctx: &mut ExecutionContext,
+        scope: &mut dyn dsl_runtime::tx::TransactionScope,
+    ) -> Result<ExecutionResult> {
+        tracing::debug!("execute_verb_in_scope: ENTER {}.{}", vc.domain, vc.verb);
+
+        let runtime_verb = runtime_registry()
+            .get(&vc.domain, &vc.verb)
+            .ok_or_else(|| anyhow!("Unknown verb: {}.{}", vc.domain, vc.verb))?;
+
+        // Durable verbs: normally routed through WorkflowDispatcher. The
+        // BPMN worker path sets `ctx.allow_durable_direct` so internal
+        // service tasks can invoke durable verb implementations directly —
+        // those share the worker's ambient scope.
+        let is_durable_direct = matches!(&runtime_verb.behavior, RuntimeBehavior::Durable(_))
+            && ctx.allow_durable_direct;
+        if let RuntimeBehavior::Durable(d) = &runtime_verb.behavior {
+            if !ctx.allow_durable_direct {
+                return Err(anyhow!(
+                    "Durable verb {}.{} (process_key={}) cannot execute inside a \
+                     Sequencer-owned TransactionScope. Durable verbs require the V2 \
+                     REPL with WorkflowDispatcher.",
+                    vc.domain,
+                    vc.verb,
+                    d.process_key
+                ));
+            }
+        }
+
+        // Plugin verbs (or durable-direct treated as plugin): dispatch
+        // through the in-scope primitive.
+        if matches!(&runtime_verb.behavior, RuntimeBehavior::Plugin(_)) || is_durable_direct {
+            let fqn = format!("{}.{}", vc.domain, vc.verb);
+            let sem_os_ops = self.sem_os_ops.as_ref().ok_or_else(|| {
+                anyhow!(
+                    "Plugin {} has no SemOsVerbOp registered (SemOsVerbOpRegistry \
+                     is either absent on this executor or missing the FQN). Wire \
+                     `DslExecutor::with_sem_os_ops` at host startup.",
+                    fqn
+                )
+            })?;
+            let op = sem_os_ops.get(&fqn).ok_or_else(|| {
+                anyhow!(
+                    "Plugin {} has no SemOsVerbOp registered (SemOsVerbOpRegistry \
+                     is either absent on this executor or missing the FQN). Wire \
+                     `DslExecutor::with_sem_os_ops` at host startup.",
+                    fqn
+                )
+            })?;
+            return dispatch_plugin_via_sem_os_op_in_scope(
+                op.as_ref(),
+                &fqn,
+                vc,
+                ctx,
+                &self.service_registry,
+                scope,
+            )
+            .await;
+        }
+
+        // Generic CRUD verb: run via the generic executor using the scope's
+        // transaction handle.
+        tracing::debug!("execute_verb_in_scope: routing to GENERIC executor via scope");
+
+        let json_args = Self::verbcall_args_to_json(&vc.arguments, ctx)?;
+        let result = self
+            .generic_executor
+            .execute_in_tx(scope.transaction(), runtime_verb, &json_args)
+            .await?;
+
+        if runtime_verb.returns.capture {
+            if let GenericExecutionResult::Uuid(uuid) = &result {
+                if let Some(name) = &runtime_verb.returns.name {
+                    ctx.bind(name, *uuid);
+                }
+            }
+        }
+
+        tracing::debug!("execute_verb_in_scope: EXIT success");
         Ok(result.to_legacy())
     }
 }
@@ -1853,32 +2091,92 @@ impl DslExecutor {
         plan: &super::execution_plan::ExecutionPlan,
         ctx: &mut ExecutionContext,
     ) -> Result<Vec<ExecutionResult>> {
-        // PRE-FLIGHT: Ensure all EntityRefs have been resolved before execution
-        validate_all_resolved(plan)?;
+        use crate::sequencer_tx::PgTransactionScope;
 
+        // Phase B.2b-β (2026-04-22): thin wrapper over
+        // `execute_plan_atomic_in_scope`. Opens a `PgTransactionScope`
+        // for the plan's duration, delegates step execution to the
+        // in-scope variant, commits on Ok, rolls back on Err. The
+        // Sequencer migration (B.2b-ζ) calls `execute_plan_atomic_in_scope`
+        // directly with an outer scope owning multiple plans so each
+        // runbook step shares the same transaction.
         tracing::info!(
-            "execute_plan_atomic: starting atomic execution with {} steps",
+            "execute_plan_atomic: starting atomic execution with {} steps (self-scoped)",
             plan.steps.len()
         );
 
-        // Start a transaction
-        let mut tx = self.pool.begin().await?;
+        let mut scope = PgTransactionScope::begin(&self.pool).await?;
+
+        let outcome = {
+            let scope_dyn: &mut dyn dsl_runtime::tx::TransactionScope = &mut scope;
+            self.execute_plan_atomic_in_scope(plan, ctx, scope_dyn)
+                .await
+        };
+
+        match outcome {
+            Ok(results) => {
+                scope.commit().await?;
+                tracing::info!(
+                    "execute_plan_atomic: committed {} steps successfully",
+                    results.len()
+                );
+                Ok(results)
+            }
+            Err(e) => {
+                if let Err(rollback_err) = scope.rollback().await {
+                    tracing::warn!(
+                        %rollback_err,
+                        "execute_plan_atomic: rollback failed after step error"
+                    );
+                }
+                Err(e)
+            }
+        }
+    }
+
+    /// Phase B.2a (F6 follow-on, 2026-04-22): execute a plan atomically
+    /// inside a caller-supplied `TransactionScope`. The scope owns the
+    /// transaction boundary — this method does NOT begin, commit, or
+    /// roll back. The Sequencer (Phase B.2b) opens one outer scope for
+    /// the runbook, calls this method per step, commits at stage 9a,
+    /// and rolls back on first failure.
+    ///
+    /// Difference from [`Self::execute_plan_atomic`]:
+    /// - Does not open / commit / rollback. Caller owns the boundary.
+    /// - Dispatches plugin verbs through `execute_verb_in_scope`
+    ///   (which in turn uses `dispatch_plugin_via_sem_os_op_in_scope`).
+    /// - Generic verbs route through `scope.transaction()` instead of
+    ///   a freshly-begun `sqlx::Transaction`.
+    ///
+    /// On any step error, returns `Err` immediately — caller decides
+    /// to roll back the outer scope. Step outputs up to that point are
+    /// NOT returned to the caller (they are gone with the rollback).
+    ///
+    /// Post B.2b-β (2026-04-22): this is the canonical atomic-plan entry
+    /// point. `execute_plan_atomic` is a thin wrapper that opens a self-
+    /// scoped transaction and calls this method. The Sequencer (B.2b-ζ)
+    /// will call this directly with its outer scope, sharing a single
+    /// transaction across multiple runbook steps.
+    pub async fn execute_plan_atomic_in_scope(
+        &self,
+        plan: &super::execution_plan::ExecutionPlan,
+        ctx: &mut ExecutionContext,
+        scope: &mut dyn dsl_runtime::tx::TransactionScope,
+    ) -> Result<Vec<ExecutionResult>> {
+        validate_all_resolved(plan)?;
+
+        tracing::info!(
+            scope_id = ?scope.scope_id(),
+            "execute_plan_atomic_in_scope: starting with {} steps in caller-owned scope",
+            plan.steps.len()
+        );
 
         let mut results: Vec<ExecutionResult> = Vec::with_capacity(plan.steps.len());
 
         for (step_index, step) in plan.steps.iter().enumerate() {
-            // Clone the verb call so we can inject values
             let mut vc = step.verb_call.clone();
 
-            tracing::debug!(
-                "execute_plan_atomic: step {} verb={}.{} bind_as={:?}",
-                step_index,
-                &vc.domain,
-                &vc.verb,
-                &step.bind_as
-            );
-
-            // Inject values from previous steps
+            // Inject values from previous steps.
             for inj in &step.injections {
                 if let Some(ExecutionResult::Uuid(id)) = results.get(inj.from_step) {
                     vc.arguments.push(super::ast::Argument {
@@ -1889,30 +2187,20 @@ impl DslExecutor {
                 }
             }
 
-            // Execute the verb call within the transaction
-            let result = match self.execute_verb_in_tx(&vc, ctx, &mut tx).await {
-                Ok(r) => r,
-                Err(e) => {
-                    // Rollback on any error
+            let result = self
+                .execute_verb_in_scope(&vc, ctx, scope)
+                .await
+                .map_err(|e| {
                     tracing::error!(
-                        "execute_plan_atomic: step {} ({}.{}) failed: {}. Rolling back.",
                         step_index,
-                        vc.domain,
-                        vc.verb,
-                        e
+                        verb = format!("{}.{}", vc.domain, vc.verb).as_str(),
+                        error = %e,
+                        "execute_plan_atomic_in_scope: step failed — caller must rollback scope"
                     );
-                    tx.rollback().await?;
-                    return Err(e);
-                }
-            };
+                    e
+                })?;
 
-            tracing::debug!(
-                "execute_plan_atomic: step {} completed with result {:?}",
-                step_index,
-                result
-            );
-
-            // Handle explicit :as binding
+            // Handle :as bindings exactly as execute_plan_atomic does.
             if let Some(ref binding_name) = step.bind_as {
                 match &result {
                     ExecutionResult::Uuid(id) => {
@@ -1933,10 +2221,9 @@ impl DslExecutor {
             results.push(result);
         }
 
-        // All steps succeeded - commit the transaction
-        tx.commit().await?;
         tracing::info!(
-            "execute_plan_atomic: committed {} steps successfully",
+            scope_id = ?scope.scope_id(),
+            "execute_plan_atomic_in_scope: {} steps produced; scope still open (caller commits/rolls back)",
             results.len()
         );
 
@@ -2896,15 +3183,20 @@ mod tests {
     }
 
     #[cfg(feature = "database")]
-    #[tokio::test]
-    async fn test_executor_registry_coverage_is_clean() {
-        use sqlx::postgres::PgPoolOptions;
-
-        let pool = PgPoolOptions::new()
-            .max_connections(1)
-            .connect_lazy("postgres://localhost/nonexistent")
-            .expect("lazy pool creation should not fail");
-        let executor = DslExecutor::new(pool);
-        assert_eq!(executor.verify_registry_coverage(), Ok(()));
+    #[test]
+    fn test_sem_os_registry_has_plugin_verbs() {
+        // Post slice #80: the canonical registry lives in
+        // `sem_os_postgres::ops::build_registry()` merged with
+        // `ob_poc::domain_ops::extend_registry()`. This smoke test just
+        // asserts that the SemOS-side factory builds a non-empty registry
+        // so bin builds catch a regression where every op accidentally
+        // vanishes.
+        let mut registry = sem_os_postgres::ops::build_registry();
+        crate::domain_ops::extend_registry(&mut registry);
+        assert!(
+            registry.len() > 100,
+            "SemOsVerbOpRegistry should have >100 ops, got {}",
+            registry.len()
+        );
     }
 }

@@ -13,7 +13,7 @@ const GLEIF_API_BASE: &str = "https://api.gleif.org/api/v1";
 const RATE_LIMIT_DELAY_MS: u64 = 200; // 5 req/sec to be safe
 
 /// A discovered parent-child relationship from tree traversal
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct DiscoveredRelationship {
     pub child_lei: String,
     pub parent_lei: String,
@@ -25,7 +25,7 @@ pub struct DiscoveredRelationship {
 }
 
 /// Result of fetching a corporate tree - includes both entities and relationships
-#[derive(Debug)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct CorporateTreeResult {
     pub records: Vec<LeiRecord>,
     pub relationships: Vec<DiscoveredRelationship>,
@@ -36,7 +36,7 @@ pub struct CorporateTreeResult {
 }
 
 /// Options for controlling corporate tree traversal behavior
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct TreeFetchOptions {
     /// Maximum depth for consolidation hierarchy traversal
     pub max_depth: usize,

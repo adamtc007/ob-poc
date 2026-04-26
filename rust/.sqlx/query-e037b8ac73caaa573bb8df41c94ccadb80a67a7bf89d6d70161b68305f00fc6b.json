@@ -1,0 +1,46 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT cbu_id, name, jurisdiction, client_type, cbu_category\n        FROM \"ob-poc\".cbus\n        WHERE cbu_id = ANY($1)\n        ORDER BY name\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "cbu_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "name",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 2,
+        "name": "jurisdiction",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 3,
+        "name": "client_type",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 4,
+        "name": "cbu_category",
+        "type_info": "Varchar"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "UuidArray"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      true,
+      true,
+      true
+    ]
+  },
+  "hash": "e037b8ac73caaa573bb8df41c94ccadb80a67a7bf89d6d70161b68305f00fc6b"
+}

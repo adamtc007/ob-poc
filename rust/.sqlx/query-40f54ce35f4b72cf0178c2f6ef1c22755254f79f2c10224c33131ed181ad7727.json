@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            UPDATE \"ob-poc\".learning_candidates\n            SET status = 'rejected', reviewed_by = $2, reviewed_at = NOW()\n            WHERE fingerprint = $1 AND status = 'pending'\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "40f54ce35f4b72cf0178c2f6ef1c22755254f79f2c10224c33131ed181ad7727"
+}

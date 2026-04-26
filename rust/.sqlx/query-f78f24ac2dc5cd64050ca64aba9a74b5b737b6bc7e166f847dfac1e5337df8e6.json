@@ -1,0 +1,46 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT\n            c.cbu_id,\n            c.name as cbu_name,\n            COALESCE(\n                (SELECT COUNT(*) FILTER (WHERE r.status = 'FULFILLED') * 100 /\n                 NULLIF(COUNT(*), 0)\n                 FROM \"ob-poc\".outstanding_requests r WHERE r.cbu_id = c.cbu_id),\n                0\n            )::int as progress_percent,\n            COALESCE(\n                (SELECT status FROM \"ob-poc\".cases WHERE cbu_id = c.cbu_id\n                 ORDER BY created_at DESC LIMIT 1),\n                'NOT_STARTED'\n            ) as current_stage,\n            (SELECT COUNT(*) FROM \"ob-poc\".outstanding_requests r\n             WHERE r.cbu_id = c.cbu_id\n               AND r.status NOT IN ('FULFILLED', 'CANCELLED', 'WAIVED')\n               AND r.client_visible = true\n            )::int as outstanding_count\n        FROM \"ob-poc\".cbus c\n        WHERE c.cbu_id = ANY($1)\n        ORDER BY c.name\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "cbu_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "cbu_name",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 2,
+        "name": "progress_percent",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 3,
+        "name": "current_stage",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 4,
+        "name": "outstanding_count",
+        "type_info": "Int4"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "UuidArray"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      null,
+      null,
+      null
+    ]
+  },
+  "hash": "f78f24ac2dc5cd64050ca64aba9a74b5b737b6bc7e166f847dfac1e5337df8e6"
+}

@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE \"ob-poc\".clients SET last_login_at = now() WHERE client_id = $1",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "5e8a3da8bdc72df9592666f53f2a677c4e9d8c9439cac5ada811b9c088136f27"
+}

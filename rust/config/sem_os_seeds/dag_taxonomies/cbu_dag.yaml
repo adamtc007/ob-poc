@@ -1,0 +1,1521 @@
+# CBU Workspace — DAG Taxonomy (R-3 re-centring, v1.3 — 2026-04-24)
+#
+# ============================================================================
+# FOUNDATIONAL FRAMING (Adam's clarification, v1.3 spec §5.1):
+#
+# CBU = the money-making apparatus a commercial client has established on the
+# market. NOT a generic client-entity / fund / trading record.
+#
+#   - Parent (Allianz, BlackRock) = commercial client
+#   - CBU = what the client BUILT to deploy capital and earn
+#   - One client typically has many CBUs (each a distinct trading unit)
+#   - `cbu_category` enum = DIFFERENT SHAPES of money-making apparatus
+#     (FUND_MANDATE, CORPORATE_GROUP, INSTITUTIONAL_ACCOUNT, RETAIL_CLIENT,
+#      FAMILY_TRUST, CORRESPONDENT_BANK, INTERNAL_TEST)
+#
+# The CBU workspace OWNS the operational lifecycle — not IM, not Deal, not
+# KYC. Those workspaces CONTRIBUTE to the CBU's operational readiness; this
+# workspace aggregates them.
+#
+# ============================================================================
+# R-3 RE-CENTRING (2026-04-24):
+#
+# Pre-R-3: modelled only the discovery/validation lifecycle (5 schema states
+# DISCOVERED → VALIDATED); deferred operational lifecycle to adjacent
+# workspaces. That was wrong — a passive record model, not the active
+# trading unit.
+#
+# Post-R-3: dual lifecycle model.
+#   - Discovery lifecycle (compliance-owned): DISCOVERED → VALIDATION_PENDING
+#     → VALIDATED / VALIDATION_FAILED. Schema-backed (chk_cbu_status).
+#   - Operational lifecycle (trading+ops owned, DAG-only until Tranche 3
+#     schema migration per D-2): dormant → trade_permissioned →
+#     actively_trading → restricted / suspended / winding_down → offboarded.
+#
+# Plus V1.3 amendments applied:
+#   V1.3-2  Tollgate: cbu.operationally_active derived from KYC + Deal +
+#           IM + evidence (cross_workspace_aggregate; session-cached)
+#   V1.3-3  parent_slot: for master-feeder / umbrella-compartment hierarchy
+#   V1.3-4  expected_lifetime: long_lived; SUSPENDED states present
+#   V1.3-5  dual_lifecycle: discovery-vs-operational
+#   V1.3-8  category_gated: on investor / holding / share_class slots
+#           (fund-structure slots only activate for FUND_MANDATE)
+#
+# New slot:
+#   service_consumption (per-service-per-CBU lifecycle — custody, TA, FA,
+#   securities lending, FX, trading, reporting)
+#
+# SCHEMA LAG (per D-2): chk_cbu_status CHECK constraint stays at 5 states
+# (DISCOVERED, VALIDATION_PENDING, VALIDATED, UPDATE_PENDING_PROOF,
+#  VALIDATION_FAILED) until Tranche 3 migration window. DAG leads; schema
+# follows. Operational states modelled here but not yet writable via the
+# cbus.status column.
+#
+# PARENT DOCS:
+#   - docs/todo/catalogue-platform-refinement-v1_3.md (spec)
+#   - docs/todo/tranche-2-cbu-findings-2026-04-23.md (§7.0 foundational reframe)
+#   - docs/todo/tranche-2-cross-workspace-reconciliation-2026-04-24.md (§4.1)
+
+version: "1.0"
+workspace: cbu
+dag_id: cbu_dag
+
+# =============================================================================
+# 1. OVERALL CBU LIFECYCLE (per CBU, derived)
+# =============================================================================
+
+overall_lifecycle:
+  id: cbu_overall_lifecycle
+  scope: per_cbu
+  derived: true
+  description: >
+    Aggregate 10-phase lifecycle spanning discovery + operational life
+    of a CBU. Two linked chains: (1) discovery phases (discovered →
+    structured → evidenced → validating → validated) driven by
+    compliance; (2) operational phases (validated → configuring →
+    operationally_active → suspended / winding_down → offboarded)
+    driven by trading + ops, gated by the tollgate aggregate
+    (see §5 derived_cross_workspace_state).
+
+  phases:
+
+    - name: discovered
+      description: |
+        CBU record created from client-group research or deal intake.
+        Name + jurisdiction populated; no entity links or evidence yet.
+      derivation:
+        all_of:
+          - "cbus.status = 'DISCOVERED'"
+      progression_verbs:
+        - cbu.create
+        - cbu.create-from-client-group
+        - cbu.ensure
+      next_phase: structured
+
+    - name: structured
+      description: |
+        Commercial-client entity identified; CBU category set;
+        structural role assignments beginning (ownership, control,
+        fund manager, service providers). No evidence yet — this is
+        the "what do we know about this CBU" phase.
+      derivation:
+        all_of:
+          - "cbus.status = 'DISCOVERED'"
+          - "cbus.commercial_client_entity_id IS NOT NULL"
+        any_of:
+          - "EXISTS cbu_entity_roles WHERE cbu_id = this.cbu_id"
+          - "EXISTS cbu_entity_relationships WHERE cbu_id = this.cbu_id"
+      progression_verbs:
+        - cbu.assign-role
+        - cbu.link-structure
+        - cbu.set-category
+        - cbu-specialist-roles.assign-ownership
+        - cbu-specialist-roles.assign-control
+        - cbu-specialist-roles.assign-fund-role
+        - cbu-specialist-roles.assign-service-provider
+      next_phase: evidenced
+
+    - name: evidenced
+      description: |
+        Evidence being attached and verified (documents, attestations,
+        screenings, registry checks, manual verifications). Proofs for
+        ownership / control / UBO / formation docs accumulating.
+      derivation:
+        all_of:
+          - "cbus.status IN ('DISCOVERED', 'VALIDATION_PENDING')"
+          - "EXISTS cbu_evidence WHERE cbu_id = this.cbu_id"
+      progression_verbs:
+        - cbu.attach-evidence
+        - cbu.verify-evidence
+        - cbu.submit-for-validation
+      next_phase: validating
+
+    - name: validating
+      description: |
+        CBU submitted for validation; compliance / ops team reviewing
+        the evidence set and role structure. Validation decisions
+        pending. KYC case may be in parallel (cross-workspace).
+      derivation:
+        all_of:
+          - "cbus.status = 'VALIDATION_PENDING'"
+      progression_verbs:
+        - cbu.decide               # APPROVE → VALIDATED
+        - cbu.decide               # REJECT  → VALIDATION_FAILED
+        - cbu-specialist-roles.validate-roles
+        - cbu.request-proof-update
+        - cbu.reopen-validation
+      next_phase: "(validated | validation_failed | update_pending_proof)"
+
+    - name: validated
+      description: |
+        CBU discovery lifecycle complete. Junction point between
+        compliance-owned discovery and trading-owned operational
+        lifecycle. CBU is cleared for service provisioning but not
+        yet transacting. Feeds the operational chain below.
+      derivation:
+        all_of:
+          - "cbus.status = 'VALIDATED'"
+      progression_verbs:
+        - cbu.add-product
+        - cbu.list-subscriptions
+        - cbu-custody.setup-ssi
+      next_phase: configuring
+
+    - name: configuring
+      description: |
+        Services being provisioned (custody, TA, FA, securities
+        lending, FX, reporting). Trading profile being set up via IM
+        workspace. Billing profile being created via Deal workspace.
+        This is the "wire the apparatus up" phase.
+      derivation:
+        all_of:
+          - "cbus.status = 'VALIDATED'"
+        any_of:
+          - "EXISTS service_consumption WHERE cbu_id = this.cbu_id AND status IN ('proposed','provisioned')"
+          - "trading_profile.status IN ['DRAFT','PENDING_APPROVAL']"
+          - "EXISTS fee_billing_profiles WHERE cbu_id = this.cbu_id AND status = 'DRAFT'"
+      progression_verbs:
+        - cbu.add-product
+        - cbu-custody.setup-ssi
+      next_phase: operationally_active
+
+    - name: operationally_active
+      description: |
+        Tollgate green — CBU is permitted to transact with BNY. All
+        readiness gates (KYC approved, Deal contracted, trading
+        profile active, evidence verified, services provisioned) are
+        satisfied. The CBU is executing on its money-making purpose.
+      derivation:
+        all_of:
+          - "cbu.operationally_active = true"   # derived aggregate — see §5
+      progression_verbs:
+        - billing.calculate-period
+        - billing.generate-invoice
+      next_phase: "(suspended | winding_down)"
+
+    - name: suspended
+      description: |
+        Operational hold — regulatory, dispute, client distress, or
+        material change pending. Distinct from WINDING_DOWN (exit
+        intent). Re-entry to operationally_active possible once
+        condition resolves.
+      derivation:
+        any_of:
+          - "cbus.operational_status = 'SUSPENDED'"
+          - "EXISTS service_consumption WHERE cbu_id = this.cbu_id AND status = 'suspended' AND applies_globally = true"
+      progression_verbs:
+        - cbu.suspend
+        - cbu.reinstate
+      next_phase: "(operationally_active | winding_down)"
+
+    - name: winding_down
+      description: |
+        CBU exiting servicing. Existing positions being unwound;
+        final billing periods being invoiced; no new subscriptions
+        or trading.
+      derivation:
+        all_of:
+          - "cbus.operational_status = 'WINDING_DOWN'"
+      progression_verbs:
+        - billing.suspend-profile
+        - billing.approve-period
+      next_phase: offboarded
+
+    - name: offboarded
+      description: |
+        Terminal-positive. All services wound down; CBU retired from
+        active servicing. Record retained for regulatory retention.
+      derivation:
+        all_of:
+          - "cbus.operational_status = 'OFFBOARDED'"
+      progression_verbs: []
+      next_phase: "(archived)"
+
+    - name: update_pending_proof
+      description: |
+        Previously VALIDATED CBU has had a change that requires new
+        evidence (e.g. change in ownership, director resignation, new
+        jurisdiction). CBU temporarily off-risk for new commercial
+        work until proof refreshed.
+      derivation:
+        all_of:
+          - "cbus.status = 'UPDATE_PENDING_PROOF'"
+      progression_verbs:
+        - cbu.attach-evidence
+        - cbu.verify-evidence
+        - cbu.submit-for-validation  # → back to VALIDATION_PENDING
+      next_phase: validating
+
+    - name: validation_failed
+      description: |
+        CBU validation failed. Terminal-negative from CBU workspace
+        perspective. Upstream re-work (more evidence, reclassification,
+        or client refusal) required. Usually bundled with CANCEL at
+        the Deal level.
+      derivation:
+        all_of:
+          - "cbus.status = 'VALIDATION_FAILED'"
+      progression_verbs:
+        - cbu.reopen-validation  # → back to VALIDATION_PENDING
+      next_phase: "(terminal — or reopen to validating)"
+
+# =============================================================================
+# 2. PER-SLOT STATE MACHINES
+# =============================================================================
+
+slots:
+
+  # ---------------------------------------------------------------------------
+  # 2.1 CBU root (reconcile-existing — from schema chk_cbu_status)
+  # ---------------------------------------------------------------------------
+
+  - id: cbu
+    stateless: false
+    # R-3 re-centring (v1.3-4): CBU is a long-lived commercial entity.
+    # SUSPENDED required in operational lifecycle (via dual_lifecycle).
+    # (v1.3-3): master-feeder / umbrella-compartment hierarchy modelled
+    # via parent_slot — child CBU state cannot be operationally_active
+    # if parent is SUSPENDED or OFFBOARDED.
+    parent_slot:
+      workspace: cbu
+      slot: cbu
+      join:
+        via: cbu_entity_relationships
+        parent_fk: parent_cbu_id
+        child_fk: child_cbu_id
+    state_dependency:
+      cascade_rules:
+        - parent_state: suspended
+          child_allowed_states: [suspended]
+          cascade_on_parent_transition: true
+          default_child_state_on_cascade: suspended
+        - parent_state: offboarded
+          child_allowed_states: [offboarded, archived]
+          cascade_on_parent_transition: true
+          default_child_state_on_cascade: offboarded
+      severity: error
+    state_machine:
+      id: cbu_discovery_lifecycle
+      owner: compliance                   # v1.3-5 KYC/governance artefact
+      expected_lifetime: long_lived       # v1.3-4
+      source_entity: '"ob-poc".cbus'
+      state_column: status
+      scope: per_cbu
+      description: |
+        5-state discovery/validation lifecycle. Schema-backed via
+        chk_cbu_status CHECK constraint. This is the compliance-owned
+        half of the CBU dual lifecycle; the operational half lives in
+        dual_lifecycle below and starts at the VALIDATED junction.
+      states:
+        - id: DISCOVERED
+          entry: true
+          description: "CBU created; scope not fully determined."
+        - id: VALIDATION_PENDING
+          description: "Submitted for validation; evidence under review."
+        - id: VALIDATED
+          description: "Validation passed; hands off to operational lifecycle."
+        - id: UPDATE_PENDING_PROOF
+          description: |
+            Previously VALIDATED; a change requires fresh evidence before
+            re-approval.
+        - id: VALIDATION_FAILED
+          description: "Validation rejected; terminal unless reopen-validation."
+      transitions:
+        - from: DISCOVERED
+          to: VALIDATION_PENDING
+          via: cbu.submit-for-validation
+        - from: VALIDATION_PENDING
+          to: VALIDATED
+          via: cbu.decide
+          args: { decision: APPROVE }
+        - from: VALIDATION_PENDING
+          to: VALIDATION_FAILED
+          via: cbu.decide
+          args: { decision: REJECT }
+        - from: VALIDATED
+          to: UPDATE_PENDING_PROOF
+          via: cbu.request-proof-update
+        - from: UPDATE_PENDING_PROOF
+          to: VALIDATION_PENDING
+          via: cbu.submit-for-validation
+        - from: VALIDATION_FAILED
+          to: VALIDATION_PENDING
+          via: cbu.reopen-validation
+      # VALIDATED is junction to operational, NOT workspace-terminal.
+      # Only VALIDATION_FAILED is truly terminal within discovery.
+      terminal_states: [VALIDATION_FAILED]
+
+    # v1.3-5 dual_lifecycle: operational chain (trading+ops owned).
+    # Starts at VALIDATED junction; DAG-only until Tranche 3 schema
+    # migration adds these states to chk_cbu_status (D-2).
+    dual_lifecycle:
+      - id: cbu_operational_lifecycle
+        description: |
+          Operational trading/servicing lifecycle of the CBU. Owned by
+          trading + ops. Begins at VALIDATED junction once discovery
+          completes; operational gating is via cbu.operationally_active
+          tollgate aggregate (§5). Modelled in DAG ahead of schema
+          migration — fields below do not yet have a cbus.* column to
+          write into. Tranche 3 migration will add cbus.operational_status.
+        owner: "trading+ops"
+        junction_state_from_primary: VALIDATED
+        states:
+          - id: dormant
+            entry: true
+            description: "VALIDATED but no service consumption yet."
+          - id: trade_permissioned
+            description: "Trading profile + services provisioned; ready to transact but no first trade yet."
+          - id: actively_trading
+            description: "First trade executed; CBU making money on the street."
+          - id: restricted
+            description: "Partial trading restriction (specific markets / instruments pulled)."
+          - id: suspended
+            description: "Full operational pause — regulatory hold, dispute, client distress."
+          - id: winding_down
+            description: "Exit decision made; positions being unwound."
+          - id: offboarded
+            description: "Terminal-positive; services retired."
+          - id: archived
+            description: "Historical only; retained for regulatory retention."
+        transitions:
+          - from: dormant
+            to: trade_permissioned
+            via: "(backend: cbu.operationally_active becomes true)"
+          - from: trade_permissioned
+            to: actively_trading
+            via: "(backend: first trade executed — IM trading_activity first_trade_at set)"
+          - from: actively_trading
+            to: restricted
+            via: cbu.restrict
+          - from: restricted
+            to: actively_trading
+            via: cbu.unrestrict
+          - from: [trade_permissioned, actively_trading, restricted]
+            to: suspended
+            via: cbu.suspend
+          - from: suspended
+            to: actively_trading
+            via: cbu.reinstate
+          - from: [trade_permissioned, actively_trading, restricted, suspended]
+            to: winding_down
+            via: cbu.begin-winding-down
+          - from: winding_down
+            to: offboarded
+            via: cbu.complete-offboard
+          - from: offboarded
+            to: archived
+            via: "(backend: archival scheduler)"
+        terminal_states: [offboarded, archived]
+
+  # ---------------------------------------------------------------------------
+  # 2.2 Entity lifecycle (new state machines from schema)
+  # ---------------------------------------------------------------------------
+
+  - id: entity_proper_person
+    stateless: false
+    state_machine:
+      id: entity_proper_person_lifecycle
+      source_entity: '"ob-poc".entity_proper_persons'
+      state_column: person_state
+      scope: per_natural_person_entity
+      description: |
+        Natural-person entity state. 3 states from schema comment.
+        Applies to UBOs, directors, signatories, beneficial owners.
+      states:
+        - id: GHOST
+          entry: true
+          description: "Name-only; no identifying attributes."
+        - id: IDENTIFIED
+          description: "Has DOB / nationality / ID numbers."
+        - id: VERIFIED
+          description: "Confirmed by official documents."
+      transitions:
+        - from: GHOST
+          to: IDENTIFIED
+          via: entity.identify
+        - from: IDENTIFIED
+          to: VERIFIED
+          via: entity.verify
+      terminal_states: [VERIFIED]
+
+  - id: entity_limited_company_ubo
+    stateless: false
+    state_machine:
+      id: entity_limited_company_ubo_lifecycle
+      source_entity: '"ob-poc".entity_limited_companies'
+      state_column: ubo_status
+      scope: per_limited_company_entity
+      description: |
+        UBO discovery state for limited companies. 5 states from
+        schema comment. Tracks whether beneficial ownership has
+        been traced and categorised.
+      states:
+        - id: PENDING
+          entry: true
+          description: "UBO discovery not yet attempted."
+        - id: DISCOVERED
+          description: "Beneficial owners identified via research."
+        - id: PUBLIC_FLOAT
+          description: "Widely-held public company; no UBO lookup required."
+        - id: EXEMPT
+          description: "Regulator-exempt (state-owned, sovereign, etc.)."
+        - id: MANUAL_REQUIRED
+          description: "Automated discovery failed; manual investigation needed."
+      transitions:
+        - from: PENDING
+          to: DISCOVERED
+          via: "(backend: UBO discovery pipeline)"
+        - from: PENDING
+          to: PUBLIC_FLOAT
+          via: "(backend: listed-company check)"
+        - from: PENDING
+          to: EXEMPT
+          via: "(backend: exemption classifier)"
+        - from: PENDING
+          to: MANUAL_REQUIRED
+          via: "(backend: pipeline failure)"
+        - from: MANUAL_REQUIRED
+          to: DISCOVERED
+          via: ubo-registry.promote-to-ubo  # cross-workspace from KYC
+      terminal_states: [DISCOVERED, PUBLIC_FLOAT, EXEMPT]
+
+  # ---------------------------------------------------------------------------
+  # 2.3 CBU evidence (new state machine)
+  # ---------------------------------------------------------------------------
+
+  - id: cbu_evidence
+    stateless: false
+    state_machine:
+      id: cbu_evidence_lifecycle
+      source_entity: '"ob-poc".cbu_evidence'
+      state_column: verification_status
+      scope: per_evidence_item
+      description: |
+        Per-evidence-item lifecycle. Evidence supports CBU validation:
+        ownership proofs, formation docs, attestations, registry
+        checks, manual verifications.
+      states:
+        - id: PENDING
+          entry: true
+          description: "Evidence attached but not yet verified."
+        - id: VERIFIED
+          description: "Evidence reviewed and accepted."
+        - id: REJECTED
+          description: "Evidence rejected (insufficient, expired, fraudulent)."
+        - id: EXPIRED
+          description: "Previously VERIFIED; time-decay invalidation."
+      transitions:
+        - from: PENDING
+          to: VERIFIED
+          via: cbu.verify-evidence
+        - from: PENDING
+          to: REJECTED
+          via: cbu.verify-evidence
+          args: { decision: reject }
+        - from: VERIFIED
+          to: EXPIRED
+          via: "(backend: time-decay trigger based on evidence_type validity window)"
+        - from: EXPIRED
+          to: PENDING
+          via: cbu.attach-evidence  # re-attach refresh
+      terminal_states: [REJECTED]
+
+  # ---------------------------------------------------------------------------
+  # 2.4 Investor lifecycle (two interleaved state machines)
+  # ---------------------------------------------------------------------------
+
+  - id: investor
+    stateless: false
+    # V1.3-8 category_gated: investor register only exists for funds.
+    category_gated:
+      category_column: cbu_category
+      category_source: cbus
+      activated_by: [FUND_MANDATE]
+    state_machine:
+      id: investor_lifecycle
+      owner: "ops"
+      expected_lifetime: long_lived     # V1.3-4 (SUSPENDED present)
+      source_entity: '"ob-poc".investors'
+      state_column: (derived from investor lifecycle events + status)
+      scope: per_investor
+      description: |
+        Investor commercial lifecycle — from eligibility check through
+        active subscription to offboarding. Distinct from investor_kyc
+        (parallel; see below). This lifecycle is the
+        "can-they-invest-right-now" state.
+      states:
+        - id: DRAFT
+          entry: true
+          description: "Investor record created; eligibility not confirmed."
+        - id: ELIGIBLE
+          description: "Eligibility confirmed (qualification test passed)."
+        - id: ACTIVE
+          description: "Subscribed; holding units."
+        - id: REDEEMING
+          description: "Redemption instruction placed; awaiting settlement."
+        - id: REDEEMED
+          description: "Units = 0; account still open. Pre-offboard state."
+        - id: SUSPENDED
+          description: "Temporary hold (KYC refresh, dispute, sanctions)."
+        - id: OFFBOARDED
+          description: "Account closed; exit completed."
+      transitions:
+        - from: DRAFT
+          to: ELIGIBLE
+          via: investor.mark-eligible
+        - from: ELIGIBLE
+          to: ACTIVE
+          via: investor.activate
+          precondition: "investor_kyc.status = APPROVED"
+        - from: ACTIVE
+          to: SUSPENDED
+          via: investor.suspend
+        - from: SUSPENDED
+          to: ACTIVE
+          via: investor.reinstate
+        - from: "(ACTIVE, SUSPENDED)"
+          to: OFFBOARDED
+          via: investor.offboard
+      terminal_states: [OFFBOARDED]
+
+  - id: investor_kyc
+    stateless: false
+    # V1.3-4: no SUSPENDED state — KYC refresh semantics handled via
+    # EXPIRED / REFRESH_REQUIRED; SUSPENDED doesn't apply.
+    suspended_state_exempt: true
+    # V1.3-8 category_gated: investor KYC only runs for fund-mandate CBUs.
+    category_gated:
+      category_column: cbu_category
+      category_source: cbus
+      activated_by: [FUND_MANDATE]
+    # V1.3-6 periodic review cadence.
+    periodic_review_cadence:
+      base_window: "P2Y"
+      risk_tiered_overrides:
+        - risk_tier: HIGH
+          window: "P1Y"
+        - risk_tier: LOW
+          window: "P3Y"
+      review_scope: full
+    state_machine:
+      id: investor_kyc_lifecycle
+      owner: compliance
+      expected_lifetime: long_lived
+      source_entity: '"ob-poc".investors'
+      state_column: kyc_status
+      scope: per_investor
+      description: |
+        Per-investor KYC state, parallel to investor_lifecycle. 6
+        states from schema comment. Refresh cadence is regulatory
+        (annual high-risk, biennial low-risk). Matches KYC findings
+        V1.3-CAND-3 periodic review cadence pattern.
+      states:
+        - id: NOT_STARTED
+          entry: true
+        - id: IN_PROGRESS
+          description: "KYC evidence being collected + verified."
+        - id: APPROVED
+          description: "KYC passed; investor can be ACTIVE."
+        - id: REJECTED
+          description: "KYC failed; investor cannot be ACTIVE. Terminal."
+        - id: EXPIRED
+          description: "Approval lapsed; refresh required before new activity."
+        - id: REFRESH_REQUIRED
+          description: "Material change triggered mandatory re-KYC."
+      transitions:
+        - from: NOT_STARTED
+          to: IN_PROGRESS
+          via: investor.start-kyc
+        - from: IN_PROGRESS
+          to: APPROVED
+          via: investor.approve-kyc
+        - from: IN_PROGRESS
+          to: REJECTED
+          via: investor.reject-kyc
+        - from: APPROVED
+          to: EXPIRED
+          via: "(backend: kyc_expires_at trigger)"
+        - from: APPROVED
+          to: REFRESH_REQUIRED
+          via: investor.request-documents
+        - from: "(EXPIRED, REFRESH_REQUIRED)"
+          to: IN_PROGRESS
+          via: investor.start-kyc
+      terminal_states: [REJECTED]
+
+  # ---------------------------------------------------------------------------
+  # 2.5 Holding lifecycle
+  # ---------------------------------------------------------------------------
+
+  - id: holding
+    stateless: false
+    # V1.3-8 category_gated: holdings only exist for fund-mandate CBUs.
+    category_gated:
+      category_column: cbu_category
+      category_source: cbus
+      activated_by: [FUND_MANDATE]
+    state_machine:
+      id: holding_lifecycle
+      owner: "ops"
+      expected_lifetime: long_lived     # V1.3-4
+      source_entity: '"ob-poc".holdings'
+      state_column: holding_status
+      scope: per_holding
+      description: |
+        Per-holding lifecycle. 7 states (schema has 4; v1.3 extends
+        with RESTRICTED / PLEDGED / FROZEN per CBU findings G-8 for
+        encumbered-holdings semantics — legal locks, collateral pledges,
+        sanctions freezes). Schema migration deferred (D-2).
+      states:
+        - id: PENDING
+          entry: true
+          description: "Subscription recorded; awaiting settlement."
+        - id: ACTIVE
+          description: "Settled; units held; dividends accrue."
+        - id: SUSPENDED
+          description: "Temporary hold (dispute, KYC suspend on investor)."
+        - id: RESTRICTED
+          description: "Legal lock — court order, dispute freeze, specific restriction."
+        - id: PLEDGED
+          description: "Pledged as collateral against a loan/derivative; cannot redeem freely."
+        - id: FROZEN
+          description: "Sanctions exposure on investor; regulatory freeze."
+        - id: CLOSED
+          description: "Redemption complete; zero units."
+      transitions:
+        - from: PENDING
+          to: ACTIVE
+          via: holding.update-status
+          args: { status: ACTIVE }
+        - from: ACTIVE
+          to: SUSPENDED
+          via: holding.update-status
+          args: { status: SUSPENDED }
+        - from: SUSPENDED
+          to: ACTIVE
+          via: holding.update-status
+          args: { status: ACTIVE }
+        - from: ACTIVE
+          to: RESTRICTED
+          via: holding.restrict
+        - from: RESTRICTED
+          to: ACTIVE
+          via: holding.lift-restriction
+        - from: ACTIVE
+          to: PLEDGED
+          via: holding.pledge
+        - from: PLEDGED
+          to: ACTIVE
+          via: holding.release-pledge
+        - from: [ACTIVE, SUSPENDED, RESTRICTED, PLEDGED]
+          to: FROZEN
+          via: "(backend: sanctions hit)"
+        - from: FROZEN
+          to: ACTIVE
+          via: "(backend: sanctions cleared)"
+        - from: [ACTIVE, SUSPENDED, PENDING, RESTRICTED]
+          to: CLOSED
+          via: holding.close
+      terminal_states: [CLOSED]
+
+  # ---------------------------------------------------------------------------
+  # 2.5b Service consumption (R-3 foundational concern #3)
+  #
+  # Per-service-per-CBU lifecycle. A CBU CONSUMES services (custody, TA,
+  # FA, securities lending, FX, trading, reporting) to operate on the
+  # street. Real clients turn services on / off / wind-down over the
+  # CBU's life — service consumption is a stateful concern, not CRUD
+  # reference data. The `service_kind` categorical identifies which
+  # service; the state machine governs provisioning lifecycle per
+  # (cbu, service_kind) pair.
+  #
+  # Schema: no table yet (DAG-first per D-2). Tranche 3 migration will
+  # add a cbu_service_consumption table keyed by (cbu_id, service_kind).
+  # ---------------------------------------------------------------------------
+
+  - id: service_consumption
+    stateless: false
+    state_machine:
+      id: service_consumption_lifecycle
+      owner: "ops"
+      expected_lifetime: long_lived
+      source_entity: '"ob-poc".cbu_service_consumption'  # DAG-first; Tranche 3 migration
+      state_column: status
+      scope: per_cbu_service_kind
+      description: |
+        Per-(cbu, service_kind) provisioning lifecycle. Tracks whether
+        this CBU has this service turned on, being provisioned, suspended,
+        winding down, or retired. service_kind categorical: CUSTODY,
+        TA, FA, SEC_LENDING, FX, TRADING, REPORTING, PRICING, COLLATERAL.
+      states:
+        - id: proposed
+          entry: true
+          description: "Service identified as in scope; not yet provisioned."
+        - id: provisioned
+          description: "Accounts opened, routings configured, but not yet live."
+        - id: active
+          description: "Service live; CBU consuming it operationally."
+        - id: suspended
+          description: "Service paused (dispute, migration, regulatory hold)."
+        - id: winding_down
+          description: "Service being retired; no new activity; closeout in progress."
+        - id: retired
+          description: "Service fully retired for this CBU. Terminal."
+      transitions:
+        - from: proposed
+          to: provisioned
+          via: service-consumption.provision
+        - from: provisioned
+          to: active
+          via: service-consumption.activate
+        - from: active
+          to: suspended
+          via: service-consumption.suspend
+        - from: suspended
+          to: active
+          via: service-consumption.reinstate
+        - from: [active, suspended]
+          to: winding_down
+          via: service-consumption.begin-winddown
+        - from: winding_down
+          to: retired
+          via: service-consumption.retire
+      terminal_states: [retired]
+
+  # ---------------------------------------------------------------------------
+  # 2.5c CBU-level corporate-action event (R-6 G-9)
+  #
+  # CBU-level CA events: rename, redomiciliation, merger with another
+  # CBU, conversion between fund types. These are material events
+  # distinct from instrument-level CAs (which live in IM workspace as
+  # corporate_action_event slot per-mandate). CBU-level CAs affect
+  # the CBU itself, not positions it holds.
+  #
+  # Schema migration: new cbu_corporate_action_events table deferred
+  # to Tranche 3 per D-2.
+  # ---------------------------------------------------------------------------
+
+  - id: cbu_corporate_action
+    stateless: false
+    # V1.3-4: CA events are short-lived per-event workflows, not
+    # long-lived continuous entities. SUSPENDED doesn't apply.
+    # Flag for a follow-up: expected_lifetime should probably be
+    # ephemeral, but individual CAs can span weeks. Compromise:
+    # keep long_lived + exempt for now.
+    suspended_state_exempt: true
+    state_machine:
+      id: cbu_corporate_action_lifecycle
+      owner: compliance
+      expected_lifetime: long_lived
+      source_entity: '"ob-poc".cbu_corporate_action_events'
+      state_column: ca_status
+      scope: per_cbu_ca_event
+      description: |
+        Per-event lifecycle for CBU-level corporate actions. Types:
+        rename, redomiciliation (change of jurisdiction), merger (with
+        another CBU), conversion (fund type change), restructuring
+        (master-feeder reorg). Each event has an effective_date;
+        state machine governs pre-effective approval + post-effective
+        implementation.
+      states:
+        - id: proposed
+          entry: true
+          description: "CA event proposed; pending internal + external review."
+        - id: under_review
+          description: "Board / legal / compliance review in progress."
+        - id: approved
+          description: "Approved for execution on effective_date."
+        - id: effective
+          description: "Effective_date reached; CA is now live. Transitional."
+        - id: implemented
+          description: "Post-effective implementation complete. Terminal-positive."
+        - id: rejected
+          description: "CA rejected at review. Terminal-negative."
+        - id: withdrawn
+          description: "Proposer withdrew before decision. Terminal-negative."
+      transitions:
+        - from: proposed
+          to: under_review
+          via: cbu-ca.submit-for-review
+        - from: under_review
+          to: approved
+          via: cbu-ca.approve
+        - from: under_review
+          to: rejected
+          via: cbu-ca.reject
+        - from: [proposed, under_review]
+          to: withdrawn
+          via: cbu-ca.withdraw
+        - from: approved
+          to: effective
+          via: "(backend: effective_date reached)"
+        - from: effective
+          to: implemented
+          via: cbu-ca.mark-implemented
+      terminal_states: [implemented, rejected, withdrawn]
+
+  # ---------------------------------------------------------------------------
+  # 2.5d CBU disposition — soft-delete vs hard-delete + remediation (R-6 G-11 + G-13)
+  #
+  # Distinguishes administrative soft-delete (cbus.deleted_at) from
+  # hard-delete (row removal) from "under remediation" (post-breach
+  # enhanced monitoring). All three are material distinctions the
+  # pre-R-6 DAG collapsed.
+  # ---------------------------------------------------------------------------
+
+  - id: cbu_disposition
+    stateless: false
+    # V1.3-4: disposition states ARE the administrative hold analog —
+    # under_remediation + soft_deleted are the pause equivalents.
+    # Generic SUSPENDED not applicable.
+    suspended_state_exempt: true
+    state_machine:
+      id: cbu_disposition_lifecycle
+      owner: compliance
+      expected_lifetime: long_lived
+      source_entity: '"ob-poc".cbus'  # uses deleted_at + a new disposition_status column (Tranche 3)
+      state_column: disposition_status
+      scope: per_cbu
+      description: |
+        CBU administrative-disposition state, orthogonal to operational
+        lifecycle. Covers:
+          - active (normal)
+          - under_remediation — post-breach enhanced monitoring
+            (distinct from operational_lifecycle.suspended which is
+            OPERATIONAL pause; this is COMPLIANCE / AUDIT state)
+          - soft_deleted (cbus.deleted_at IS NOT NULL; restorable)
+          - hard_deleted — terminal, row purged for regulatory
+            retention limits (not usually reached; most soft-deletes
+            are retained indefinitely)
+      states:
+        - id: active
+          entry: true
+          description: "Normal disposition. No administrative flag."
+        - id: under_remediation
+          description: |
+            Post-breach cleanup / enhanced monitoring. Specific evidence
+            refresh required. Board-level attestation may be required
+            depending on breach severity. Exits when remediation
+            conditions satisfied.
+        - id: soft_deleted
+          description: |
+            Marked deleted but row retained (cbus.deleted_at IS NOT
+            NULL). Restorable via cbu.restore. Used for duplicates,
+            test data, records created in error.
+        - id: hard_deleted
+          description: |
+            Row physically removed. Terminal. Requires regulatory
+            retention window to have elapsed.
+      transitions:
+        - from: active
+          to: under_remediation
+          via: cbu.flag-for-remediation
+        - from: under_remediation
+          to: active
+          via: cbu.clear-remediation
+        - from: active
+          to: soft_deleted
+          via: cbu.soft-delete
+        - from: soft_deleted
+          to: active
+          via: cbu.restore
+        - from: soft_deleted
+          to: hard_deleted
+          via: cbu.hard-delete     # requires explicit authorisation + retention-window check
+      terminal_states: [hard_deleted]
+
+  # ---------------------------------------------------------------------------
+  # 2.6 Client-group entity review (new state machine)
+  # ---------------------------------------------------------------------------
+
+  - id: client_group_entity_review
+    stateless: false
+    state_machine:
+      id: client_group_entity_review_lifecycle
+      source_entity: '"ob-poc".client_group_entity'
+      state_column: review_status
+      scope: per_client_group_entity_link
+      description: |
+        Per-(client_group, entity) link review state. 4 states from
+        schema comment. Governs inclusion of an entity into a client
+        group during onboarding research.
+      states:
+        - id: pending
+          entry: true
+          description: "Entity link proposed by research; awaiting review."
+        - id: confirmed
+          description: "Entity confirmed as part of the client group."
+        - id: rejected
+          description: "Entity rejected from the client group."
+        - id: needs_update
+          description: "Source data changed; review needs redo."
+      transitions:
+        - from: pending
+          to: confirmed
+          via: "(backend: client-group researcher review — cross-workspace verb from onboarding)"
+        - from: pending
+          to: rejected
+          via: "(backend: client-group researcher review)"
+        - from: "(confirmed, rejected)"
+          to: needs_update
+          via: "(backend: source data change trigger)"
+        - from: needs_update
+          to: pending
+          via: "(backend: re-review required)"
+      terminal_states: []  # confirmed is final for ops but can always return to needs_update
+
+  # ---------------------------------------------------------------------------
+  # 2.7 Reconcile-existing (cross-workspace)
+  # ---------------------------------------------------------------------------
+
+  - id: client_group
+    stateless: false
+    state_machine: "(reconcile-existing — see instrument_matrix_dag.yaml §2.2 group.discovery_status_lifecycle; CBU workspace READS this state to determine discovery readiness)"
+
+  - id: trading_profile
+    stateless: false
+    state_machine: "(reference — see instrument_matrix_dag.yaml §2.2 trading_profile_lifecycle; CBU progression to VALIDATED is a precondition for trading_profile activation)"
+
+  - id: kyc_case
+    stateless: false
+    state_machine: "(reference — see kyc_dag.yaml §2.1 kyc_case_lifecycle; CBU.VALIDATION_PENDING often parallels kyc_case in DISCOVERY/ASSESSMENT)"
+
+  # ---------------------------------------------------------------------------
+  # 2.8 Stateless (compositional / reference / rule-entity)
+  # ---------------------------------------------------------------------------
+
+  - id: workspace_root
+    stateless: true
+    rationale: "Aggregation root over CBU domains."
+
+  - id: cbu_entity_role
+    stateless: true
+    rationale: |
+      Role assignments (cbu_entity_roles junction): ownership, control,
+      trust, fund management, service provider, signatory. Assignments
+      are added / removed; no per-assignment lifecycle. The role itself
+      is categorical reference data.
+
+  - id: cbu_entity_relationship
+    stateless: true
+    rationale: |
+      Structural relationships (cbu_entity_relationships): feeder,
+      parallel, aggregator, master, co_investment_vehicle.
+      Categorical link data; no lifecycle per edge. Links are added /
+      removed as the structure evolves.
+
+  # R-6 G-7: share_class promoted to stateful. Full subscription-
+  # availability lifecycle. Schema migration (share_classes.lifecycle_
+  # status column + CHECK) deferred to Tranche 3 per D-2.
+  - id: share_class
+    stateless: false
+    # V1.3-4: HARD_CLOSED + WINDING_DOWN cover the pause/hold semantics
+    # for share classes — generic SUSPENDED doesn't apply.
+    suspended_state_exempt: true
+    category_gated:
+      category_column: cbu_category
+      category_source: cbus
+      activated_by: [FUND_MANDATE]
+    state_machine:
+      id: share_class_lifecycle
+      owner: "ops+fund-admin"
+      expected_lifetime: long_lived
+      source_entity: '"ob-poc".share_classes'
+      state_column: lifecycle_status     # DAG-first; column added Tranche 3
+      scope: per_share_class
+      description: |
+        Share-class subscription-availability lifecycle. 6 states
+        capturing DRAFT (pre-launch) through to liquidation. A class
+        typically lives in OPEN or SOFT_CLOSED for most of its life;
+        HARD_CLOSED blocks redemptions too (rare — regulatory or
+        wind-down).
+      states:
+        - id: DRAFT
+          entry: true
+          description: "Class authored but not yet launched. No supply."
+        - id: OPEN
+          description: "Accepting new subscriptions; existing holders transact freely."
+        - id: SOFT_CLOSED
+          description: "No new subscribers; existing holders still transact."
+        - id: HARD_CLOSED
+          description: "No subs AND no redemptions (regulatory hold or wind-down)."
+        - id: WINDING_DOWN
+          description: "Redemptions being processed; no new activity. Pre-liquidation."
+        - id: LIQUIDATED
+          description: "Terminal. All holders redeemed; class retired."
+      transitions:
+        - from: DRAFT
+          to: OPEN
+          via: share-class.launch
+        - from: OPEN
+          to: SOFT_CLOSED
+          via: share-class.soft-close
+        - from: SOFT_CLOSED
+          to: OPEN
+          via: share-class.reopen
+        - from: [OPEN, SOFT_CLOSED]
+          to: HARD_CLOSED
+          via: share-class.hard-close
+        - from: HARD_CLOSED
+          to: SOFT_CLOSED
+          via: share-class.lift-hard-close
+        - from: [OPEN, SOFT_CLOSED, HARD_CLOSED]
+          to: WINDING_DOWN
+          via: share-class.begin-winddown
+        - from: WINDING_DOWN
+          to: LIQUIDATED
+          via: share-class.close     # existing verb
+      terminal_states: [LIQUIDATED]
+
+  # R-6 G-3: manco promoted to stateful. Regulatory-action cascade
+  # applies to ALL CBUs managed by this manco. Schema landed in
+  # migration 20260425_manco_regulatory_status.sql — manco state
+  # carrier table is `manco_regulatory_status` keyed by manco_entity_id.
+  - id: manco
+    stateless: false
+    state_machine:
+      id: manco_lifecycle
+      owner: compliance
+      expected_lifetime: long_lived
+      source_entity: '"ob-poc".manco_regulatory_status'
+      state_column: regulatory_status
+      scope: per_manco
+      description: |
+        Per-manco regulatory + operational state. A manco under
+        regulatory action cascades SUSPENDED to all CBUs it manages
+        (cross-slot constraint hooked via cbu_entity_roles where role
+        = fund_manager / sub_manager). Reference-data-like in v1.2;
+        R-6 promotes to stateful because regulatory-action cascade
+        is real commercial risk (Credit Suisse 2022, FTX, etc.).
+      states:
+        - id: UNDER_REVIEW
+          entry: true
+          description: "New manco being onboarded; not yet approved to manage mandates."
+        - id: APPROVED
+          description: "Manco cleared to manage new mandates."
+        - id: UNDER_INVESTIGATION
+          description: |
+            Regulatory action or internal investigation; new mandates
+            blocked; existing mandates under heightened scrutiny.
+            Propagates SUSPENDED to all managed CBUs (cascade).
+        - id: SUSPENDED
+          description: "Full operational hold — managed CBUs all SUSPENDED."
+        - id: SUNSET
+          description: "No new mandates; existing ones run to exit. Wind-down in progress."
+        - id: TERMINATED
+          description: "Terminal. All mandates transferred or wound down; manco retired."
+      transitions:
+        - from: UNDER_REVIEW
+          to: APPROVED
+          via: manco.approve
+        - from: UNDER_REVIEW
+          to: TERMINATED
+          via: manco.reject
+        - from: APPROVED
+          to: UNDER_INVESTIGATION
+          via: manco.flag-regulatory
+        - from: UNDER_INVESTIGATION
+          to: APPROVED
+          via: manco.clear-regulatory
+        - from: UNDER_INVESTIGATION
+          to: SUSPENDED
+          via: manco.suspend
+        - from: SUSPENDED
+          to: UNDER_INVESTIGATION
+          via: manco.partial-reinstate   # out of full suspension but still flagged
+        - from: [APPROVED, UNDER_INVESTIGATION, SUSPENDED]
+          to: SUNSET
+          via: manco.begin-sunset
+        - from: SUNSET
+          to: TERMINATED
+          via: manco.terminate
+      terminal_states: [TERMINATED]
+
+  - id: investor_role
+    stateless: true
+    category_gated:
+      category_column: cbu_category
+      category_source: cbus
+      activated_by: [FUND_MANDATE]
+    rationale: |
+      Investor role annotations (nominee, fund-of-funds, master-pool,
+      end-investor). Categorical; roles added / removed over time but
+      no lifecycle per assignment.
+
+  - id: legal_entity
+    stateless: true
+    rationale: |
+      Generic legal-entity reference (active/inactive). 2-state toggle;
+      no multi-state lifecycle. All substantive lifecycle lives on
+      entity_proper_persons and entity_limited_companies.
+
+  - id: edge
+    stateless: true
+    rationale: |
+      Generic typed edge between entities in the ownership/control
+      graph. upsert-only; edges represent facts, not stateful
+      processes.
+
+  - id: temporal
+    stateless: true
+    rationale: |
+      Temporal annotations (effective_from / effective_to ranges) on
+      structural edges. Reference data; no lifecycle.
+
+# =============================================================================
+# 3. CROSS-SLOT CONSTRAINTS
+# =============================================================================
+
+cross_slot_constraints:
+
+  - id: cbu_validated_requires_evidence_set_verified
+    description: |
+      CBU → VALIDATED requires ALL required cbu_evidence rows at
+      status = VERIFIED. Required set depends on kyc_scope_template.
+    rule: |
+      cbus.status = 'VALIDATED'
+        → ALL cbu_evidence WHERE cbu_id = this.cbu_id
+            AND evidence_required = true
+            .verification_status = 'VERIFIED'
+    severity: error
+
+  - id: cbu_validated_requires_commercial_client_entity
+    description: "CBU → VALIDATED requires commercial_client_entity_id set (parent legal entity identified)."
+    rule: |
+      cbus.status = 'VALIDATED'
+        → cbus.commercial_client_entity_id IS NOT NULL
+    severity: error
+
+  - id: cbu_validated_requires_uboes_in_terminal_state
+    description: |
+      CBU → VALIDATED requires all limited-company entities in the
+      ownership chain have ubo_status in terminal (DISCOVERED, PUBLIC_FLOAT, EXEMPT).
+    rule: |
+      cbus.status = 'VALIDATED'
+        → ALL entity_limited_companies WHERE entity_id IN (linked via cbu_entity_roles)
+            .ubo_status IN ('DISCOVERED', 'PUBLIC_FLOAT', 'EXEMPT')
+    severity: error
+
+  - id: investor_active_requires_kyc_approved
+    description: "investor.status = ACTIVE requires investor_kyc.status = APPROVED."
+    rule: |
+      investors.status = 'ACTIVE'
+        → investors.kyc_status = 'APPROVED'
+    severity: error
+
+  - id: holding_active_requires_investor_active
+    description: "holding.status = ACTIVE requires parent investor.status = ACTIVE."
+    rule: |
+      holdings.holding_status = 'ACTIVE'
+        → investors WHERE investor_id = holdings.investor_id
+            .status = 'ACTIVE'
+    severity: error
+
+  - id: holding_suspended_cascades_from_investor
+    description: |
+      If investor.status = SUSPENDED, all related holdings must also be
+      SUSPENDED (informational; auto-cascaded).
+    rule: |
+      investors.status = 'SUSPENDED'
+        → ALL holdings WHERE investor_id = this.investor_id
+            .holding_status IN ('SUSPENDED', 'CLOSED', 'PENDING')
+    severity: informational
+
+  - id: entity_verified_required_for_ubo_role
+    description: |
+      Entity assigned to a UBO-bearing role (ownership / control)
+      must be VERIFIED (for natural persons) or UBO-terminal (for
+      limited companies).
+    rule: |
+      cbu_entity_roles WHERE role IN ('ownership', 'control')
+        → IF entity.type = 'proper_person' THEN entity.person_state = 'VERIFIED'
+           ELSE entity_limited_companies.ubo_status IN terminal
+    severity: error
+
+  - id: cbu_update_pending_proof_blocks_new_subscriptions
+    description: |
+      A CBU in UPDATE_PENDING_PROOF cannot accept new investor
+      subscriptions (can continue servicing existing investors).
+    rule: |
+      cbus.status = 'UPDATE_PENDING_PROOF'
+        → NO NEW holdings WHERE cbu_id = this.cbu_id AND holding_status = 'PENDING'
+    severity: error
+
+  # Note: the former v1_3_candidate `cross_workspace_kyc_case_approved_
+  # for_validated` has been promoted to the new
+  # `cross_workspace_constraints:` section below (V1.3-1). It no longer
+  # lives here.
+
+  - id: investor_offboarded_requires_all_holdings_closed
+    description: "investor.status = OFFBOARDED requires all holdings CLOSED."
+    rule: |
+      investors.status = 'OFFBOARDED'
+        → ALL holdings WHERE investor_id = this.investor_id
+            .holding_status = 'CLOSED'
+    severity: error
+
+# =============================================================================
+# 4. CROSS-WORKSPACE CONSTRAINTS (V1.3-1 — Mode A blocking)
+# =============================================================================
+# Blocking gates: target transition in this workspace is blocked until
+# source state in another workspace is in the expected state. See v1.3
+# spec §2.1. Validator loads source workspace's DAG + runtime state and
+# checks at transition time.
+
+cross_workspace_constraints:
+
+  # Promoted from cross_slot_constraints (was v1_3_candidate: true).
+  - id: cbu_validated_requires_kyc_case_approved
+    description: |
+      CBU cannot transition DISCOVERY.VALIDATION_PENDING → VALIDATED
+      unless the sponsoring KYC case is APPROVED.
+    source_workspace: kyc
+    source_slot: kyc_case
+    source_state: APPROVED
+    source_predicate: "cases.sponsor_cbu_id = this_cbu.cbu_id OR cases.client_group_id = this_cbu.primary_client_group_id"
+    target_workspace: cbu
+    target_slot: cbu
+    target_transition: "VALIDATION_PENDING -> VALIDATED"
+    severity: error
+
+  # R2 (2026-04-26): cbu.service_consumption.proposed → provisioned
+  # requires the underlying service in the catalogue to be active.
+  # Closes the gap where catalogue services were stateless and there
+  # was no way to express "you cannot provision a service that isn't
+  # published yet."
+  - id: service_consumption_requires_active_service
+    description: |
+      cbu.service_consumption cannot transition proposed → provisioned
+      unless the referenced product_maintenance.service has reached
+      lifecycle_status = active in the catalogue.
+    source_workspace: product_maintenance
+    source_slot: service
+    source_state: active
+    source_predicate: "services.service_id = this_consumption.service_id"
+    target_workspace: cbu
+    target_slot: service_consumption
+    target_transition: "proposed -> provisioned"
+    severity: error
+    message: "Cannot provision a service that isn't active in the catalogue"
+
+  # R4 (2026-04-26): Deal → CBU subscription pivot. Currently a CBU could
+  # become operationally active without any signed Deal — the model
+  # permits it. Real commercial flow blocks this: a CBU cannot start
+  # subscribing to services until a Deal in CONTRACTED/ONBOARDING/ACTIVE
+  # exists for the same client_group. Closes the Layer-1 → Layer-2 pivot
+  # gap identified in the deep review.
+  - id: service_consumption_requires_deal_contracted
+    description: |
+      cbu.service_consumption cannot transition proposed → provisioned
+      unless a Deal exists in CONTRACTED/ONBOARDING/ACTIVE for the same
+      client_group as this CBU.
+    source_workspace: deal
+    source_slot: deal
+    source_state: [CONTRACTED, ONBOARDING, ACTIVE]
+    source_predicate: "deals.primary_client_group_id = this_consumption_cbu.client_group_id"
+    target_workspace: cbu
+    target_slot: service_consumption
+    target_transition: "proposed -> provisioned"
+    severity: error
+    message: "CBU cannot subscribe to services until a Deal is CONTRACTED for the client"
+
+  # Closes the four-layer chain at the L3 → L4 hop. R1 deferred this constraint
+  # to "joint slice with R2"; the dedicated final slice (post-R7e) lands it.
+  # cbu.service_consumption cannot transition provisioned → active unless the
+  # capability_binding for this (cbu, service) is LIVE — i.e. a BNY application
+  # instance is bound and live for the consumed service. This is what makes
+  # the operational chain runtime-enforced end-to-end:
+  #   Deal CONTRACTED (L1) → CBU service active service (L3) →
+  #   capability_binding LIVE on application_instance ACTIVE (L4) →
+  #   cbu.service_consumption.active.
+  - id: service_consumption_active_requires_live_binding
+    description: |
+      cbu.service_consumption cannot transition provisioned → active unless
+      the capability_binding for the consumed (cbu, service) pair is LIVE
+      and the underlying application_instance is in ACTIVE state. Without
+      this gate a CBU could be marked actively-consuming a service that has
+      no live BNY application instance to fulfil it.
+    source_workspace: lifecycle_resources
+    source_slot: capability_binding
+    source_state: LIVE
+    source_predicate: "capability_bindings.service_id = this_consumption.service_id AND EXISTS (SELECT 1 FROM \"ob-poc\".application_instances ai WHERE ai.id = capability_bindings.application_instance_id AND ai.lifecycle_status = 'ACTIVE')"
+    target_workspace: cbu
+    target_slot: service_consumption
+    target_transition: "provisioned -> active"
+    severity: error
+    message: "Cannot activate service consumption without a LIVE capability binding on an ACTIVE application instance"
+
+# =============================================================================
+# 5. DERIVED CROSS-WORKSPACE STATE (V1.3-2 — Mode B aggregation / tollgate)
+# =============================================================================
+# The canonical CBU tollgate. `cbu.operationally_active` is TRUE only
+# when every contributing workspace reports green:
+#   - KYC clearance approved
+#   - Deal contracted + billing ACTIVE
+#   - IM trading_profile in trade-permissioned or actively-trading
+#   - All required cbu_evidence verified
+#   - Service consumption provisioned for the CBU's category + products
+#
+# Per D-3: computed on-the-fly. Per OQ-2: session / workspace-context
+# cached. Invalidation triggers: any verb touching a referenced slot.
+
+derived_cross_workspace_state:
+
+  - id: cbu_operationally_active
+    description: |
+      Canonical CBU tollgate — "is this CBU permitted to transact with
+      BNY?" Aggregates readiness across all contributing workspaces.
+      The CBU is the money-making apparatus; this aggregate is the
+      gate on its purpose-in-life.
+    host_workspace: cbu
+    host_slot: cbu
+    host_state: operationally_active
+    derivation:
+      all_of:
+        # KYC case approved for the CBU's sponsoring group
+        - workspace: kyc
+          slot: kyc_case
+          predicate: |
+            EXISTS cases WHERE (sponsor_cbu_id = this_cbu.cbu_id
+              OR client_group_id = this_cbu.primary_client_group_id)
+              AND status = 'APPROVED'
+        # Deal contracted + operationally active on this CBU's group
+        - workspace: deal
+          slot: deal
+          state: [CONTRACTED, ONBOARDING, ACTIVE]
+          predicate: "deals.primary_client_group_id = this_cbu.primary_client_group_id"
+        # IM trading profile has been activated for this CBU
+        - workspace: instrument_matrix
+          slot: trading_profile
+          predicate: "trading_profiles.cbu_id = this_cbu.cbu_id AND trading_profiles.status = 'ACTIVE'"
+        # All required cbu_evidence VERIFIED
+        - workspace: cbu
+          slot: cbu_evidence
+          predicate: |
+            ALL cbu_evidence WHERE cbu_id = this_cbu.cbu_id
+              AND evidence_required = true
+              HAVE verification_status = 'VERIFIED'
+        # At least one service_consumption in active state
+        - workspace: cbu
+          slot: service_consumption
+          state: active
+          predicate: "service_consumption.cbu_id = this_cbu.cbu_id"
+    exposure:
+      visible_as: first_class_state
+      cacheable: true
+
+# =============================================================================
+# 6. PRODUCT-MODULE GATES
+# =============================================================================
+# V1.2-3 product gating. NOTE: v1.3-8 category_gated: replaces most of
+# the conditionally_on entries below (investor, share_class, etc. are
+# now gated at slot-level by cbu_category). This section retained for
+# any product-level conditional slots that remain (none in R-3).
+
+product_module_gates:
+
+  always_on:
+    - workspace_root
+    - cbu
+    - cbu_evidence
+    - cbu_entity_role
+    - cbu_entity_relationship
+    - entity_proper_person
+    - entity_limited_company_ubo
+    - legal_entity
+    - edge
+    - temporal
+    - manco
+    - client_group
+    - client_group_entity_review
+    - trading_profile
+    - kyc_case
+
+  conditionally_on:
+  # v1.3-8: fund-structure conditionals migrated to slot-level
+  # `category_gated:` fields (see investor, investor_kyc, holding,
+  # share_class, investor_role slot definitions above). Retained here
+  # as informational only.
+
+# =============================================================================
+# 7. OUT OF SCOPE (P16 three-layer + cross-workspace)
+# =============================================================================
+
+out_of_scope:
+
+  # Layer 3 operational runtime
+  - "Entity research / GLEIF LEI lookup — layer 2 (external API adapters)"
+  - "UBO discovery pipeline runs — layer 3 (batch compute against BODS / registry data)"
+  - "KYC expiry scheduler — layer 3 (cron / scheduler against kyc_expires_at)"
+  - "Evidence time-decay triggers — layer 3 (scheduled job against document validity windows)"
+  - "Holding settlement (payment rails, fund admin posting) — layer 3 (BPMN operational workflow)"
+  - "SSI setup + BIC/SWIFT configuration — layer 2 (custody integration)"
+
+  # Cross-workspace dependencies
+  - "Mandate activation on trading_profile — governed by IM workspace"
+  - "KYC case workflow (screening / workstream / case.approve) — governed by KYC workspace"
+  - "Deal contract creation + rate-card negotiation — governed by Deal workspace"
+  - "Billing profile + period lifecycle — governed by Deal workspace"
+  - "Client-group discovery + research — governed by onboarding workspace (may be reconciled into CBU in a future pass)"
+
+  # Cross-workspace constraints (v1.3 candidates)
+  - "Formal cross_workspace_constraints: KYC APPROVED → CBU VALIDATED gate (see v1.3-CAND-2)"
+  - "Formal cross_workspace_constraints: CBU VALIDATED → trading_profile activation (see v1.3-CAND-2)"
+
+# =============================================================================
+# 8. PRUNE SEMANTICS
+# =============================================================================
+# CBU prune is dominated by remediation of incorrect structure (wrong
+# role assignment, wrong entity linked, stale holding). Full CBU
+# deletion is rare — CBUs move to VALIDATION_FAILED rather than being
+# deleted. Soft-delete via cbus.deleted_at is reserved for records
+# created in error (test data, duplicates).
+
+prune_cascade_rules:
+
+  - id: cbu_delete_cascade
+    when: "cbu.delete-cascade on a CBU C (hard-delete; administrative)"
+    cascades_to:
+      - target: cbu_entity_role
+        rule: "cbu_entity_roles WHERE cbu_id = C → deleted"
+      - target: cbu_entity_relationship
+        rule: "cbu_entity_relationships WHERE cbu_id = C → deleted"
+      - target: cbu_evidence
+        rule: "cbu_evidence WHERE cbu_id = C → deleted (hard — requires explicit authorisation)"
+      - target: investor
+        rule: "investors WHERE cbu_id = C AND status IN ('DRAFT','ELIGIBLE') → deleted; ACTIVE/SUSPENDED blocks prune"
+      - target: holding
+        rule: "holdings WHERE cbu_id = C AND status IN ('PENDING','CLOSED') → deleted; ACTIVE/SUSPENDED blocks prune"
+      - target: share_class
+        rule: "share_classes WHERE cbu_id = C → deleted if no ACTIVE holdings"
+
+  - id: entity_role_removal_cascade
+    when: "cbu.remove-role removes a role assignment for entity E on CBU C"
+    cascades_to:
+      - target: cbu_evidence
+        rule: "cbu_evidence linked to entity E → manual review required (may be orphaned)"
+
+  - id: entity_unlink_cascade
+    when: "cbu.unlink-structure removes a structural relationship"
+    cascades_to:
+      - target: cbu_entity_role
+        rule: "roles tied to the removed edge → manual review (may still apply via another path)"
+
+  - id: investor_offboard_cascade
+    when: "investor.offboard on investor I"
+    cascades_to:
+      - target: holding
+        rule: "holdings WHERE investor_id = I AND status IN ('PENDING','ACTIVE','SUSPENDED') → close required before offboard completion"
+
+prune_pre_validation:
+  required_verbs:
+    - cbu.inspect               # pre-prune snapshot
+    - cbu.list-structure-links  # structural impact preview
+    - cbu.list-evidence         # evidence impact preview
+    - cbu.parties               # role / participant impact preview
+  abort_conditions:
+    - "cbu.delete-cascade when cbus.status = 'VALIDATED' (use VALIDATION_FAILED path instead)"
+    - "cbu.delete-cascade when EXISTS holdings WHERE cbu_id = C AND holding_status = 'ACTIVE' (offboard investors first)"
+    - "cbu.delete-cascade when EXISTS cases WHERE sponsor_cbu_id = C AND status NOT IN ('WITHDRAWN','DO_NOT_ONBOARD','APPROVED') (cross-workspace KYC in flight)"
+    - "cbu.delete-cascade when EXISTS deals WHERE primary_client_group_id IN (ancestors of C.commercial_client_entity_id) AND deal_status IN ('CONTRACTED','ONBOARDING','ACTIVE')"
+    - "cbu.remove-role on a role that is the last provable source of UBO chain for the CBU"

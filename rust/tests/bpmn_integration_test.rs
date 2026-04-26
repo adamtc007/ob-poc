@@ -10,7 +10,8 @@
 //!   DATABASE_URL=postgresql:///data_designer \
 //!   cargo test --features database --test bpmn_integration_test -- --ignored --nocapture
 //! ```
-#![cfg(all(feature = "database", feature = "vnext-repl"))]
+// Slice 4.2 (2026-04-22): `vnext-repl` feature removed; gate simplified to `database`.
+#![cfg(feature = "database")]
 
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -745,7 +746,7 @@ async fn b3_11_early_signal() {
 #[tokio::test]
 #[ignore]
 async fn b3_12_dispatcher_direct_routing() {
-    use ob_poc::repl::orchestrator_v2::{DslExecutionOutcome, DslExecutorV2, StubExecutor};
+    use ob_poc::sequencer::{DslExecutionOutcome, DslExecutorV2, StubExecutor};
 
     let pool = test_pool().await;
     let client = bpmn_client().await;

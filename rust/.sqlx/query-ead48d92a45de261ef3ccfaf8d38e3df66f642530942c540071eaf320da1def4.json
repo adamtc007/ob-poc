@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            UPDATE \"ob-poc\".dsl_sessions\n            SET status = 'completed', completed_at = now(), last_activity_at = now()\n            WHERE session_id = $1 AND status = 'active'\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "ead48d92a45de261ef3ccfaf8d38e3df66f642530942c540071eaf320da1def4"
+}

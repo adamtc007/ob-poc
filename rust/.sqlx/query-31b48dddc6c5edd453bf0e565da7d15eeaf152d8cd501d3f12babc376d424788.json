@@ -1,0 +1,40 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT\n                csa_id,\n                csa_type,\n                threshold_amount::float8 as \"threshold_amount: f64\",\n                threshold_currency\n               FROM \"ob-poc\".csa_agreements\n               WHERE isda_id = $1 AND is_active = true",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "csa_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "csa_type",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 2,
+        "name": "threshold_amount: f64",
+        "type_info": "Float8"
+      },
+      {
+        "ordinal": 3,
+        "name": "threshold_currency",
+        "type_info": "Varchar"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      null,
+      true
+    ]
+  },
+  "hash": "31b48dddc6c5edd453bf0e565da7d15eeaf152d8cd501d3f12babc376d424788"
+}

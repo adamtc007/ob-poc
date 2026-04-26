@@ -1,0 +1,55 @@
+# Test fixture: circular macro references for cycle detection tests
+#
+# cycle.a invokes cycle.b, cycle.b invokes cycle.a → A→B→A cycle
+
+cycle.a:
+  kind: macro
+  ui:
+    label: "Cycle A"
+    description: "Invokes B"
+    target-label: "Test"
+  routing:
+    mode-tags: []
+    operator-domain: cycle
+  target:
+    operates-on: client-ref
+  args:
+    style: keyworded
+    required:
+      x:
+        type: str
+        ui-label: "X"
+    optional: {}
+  prereqs: []
+  expands-to:
+    - invoke-macro: cycle.b
+      args:
+        x: "${arg.x}"
+  sets-state: []
+  unlocks: []
+
+cycle.b:
+  kind: macro
+  ui:
+    label: "Cycle B"
+    description: "Invokes A"
+    target-label: "Test"
+  routing:
+    mode-tags: []
+    operator-domain: cycle
+  target:
+    operates-on: client-ref
+  args:
+    style: keyworded
+    required:
+      x:
+        type: str
+        ui-label: "X"
+    optional: {}
+  prereqs: []
+  expands-to:
+    - invoke-macro: cycle.a
+      args:
+        x: "${arg.x}"
+  sets-state: []
+  unlocks: []

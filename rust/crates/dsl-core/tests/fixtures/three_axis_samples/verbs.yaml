@@ -1,0 +1,368 @@
+# 20-verb fixture for the three-axis declaration + composition pipeline.
+# Pilot P.1.f (v1.1 Tranche 1 Phase 1.6).
+#
+# Verbs chosen to cover every documented schema combination including
+# edge cases explicitly called out in v1.1 §6.2 as legitimate (P10
+# orthogonality — NOT warnings). Every verb has a valid declaration;
+# failure-mode fixtures live in a separate file so this one represents
+# the happy path.
+#
+# Coverage map (ticks filled below per verb):
+#   state_effect: preserving (10) + transition (10)
+#   external_effects: [], [observational], [emitting], [navigating],
+#                     [emitting, observational], [emitting, navigating]
+#   consequence.baseline: benign, reviewable, requires_confirmation,
+#                         requires_explicit_authorisation
+#   escalation rules: 0 (most), 1 (several), 2+ (a few), with boolean
+#                     combinators (1)
+#   transitions block: absent (preserving), 1-edge (most transitions),
+#                     2-edge (2 verbs)
+
+version: "1.0"
+
+domains:
+  fixture:
+    description: "Three-axis pilot fixture domain"
+    verbs:
+      # ================================================================
+      # Preserving verbs — 10
+      # ================================================================
+
+      # 1. Pure read. Preserving + [observational] + benign.
+      read-cbu:
+        description: "Read a CBU record"
+        behavior: crud
+        three_axis:
+          state_effect: preserving
+          external_effects: [observational]
+          consequence:
+            baseline: benign
+
+      # 2. List of instruments. Same shape as #1, different surface.
+      list-instruments:
+        description: "List instruments available in a portfolio"
+        behavior: crud
+        three_axis:
+          state_effect: preserving
+          external_effects: [observational]
+          consequence:
+            baseline: benign
+
+      # 3. Notify-operator. Preserving + [emitting] + reviewable.
+      notify-operator:
+        description: "Send a low-priority operator notification"
+        behavior: plugin
+        three_axis:
+          state_effect: preserving
+          external_effects: [emitting]
+          consequence:
+            baseline: reviewable
+
+      # 4. Export report — v1.1 §6.2 canonical example.
+      # Preserving + [emitting] + requires_explicit_authorisation.
+      # MUST pass silently (P10 orthogonality).
+      export-report:
+        description: "Export a compliance report to external recipient"
+        behavior: plugin
+        three_axis:
+          state_effect: preserving
+          external_effects: [emitting]
+          consequence:
+            baseline: requires_explicit_authorisation
+
+      # 5. Pure navigation. Preserving + [navigating] + benign.
+      focus-viewport:
+        description: "Focus the viewport on a selected CBU"
+        behavior: plugin
+        three_axis:
+          state_effect: preserving
+          external_effects: [navigating]
+          consequence:
+            baseline: benign
+
+      # 6. Audit-log query with sensitive-data escalation.
+      # Preserving + [observational] + reviewable + 1 escalation rule.
+      audit-log-query:
+        description: "Query the audit log"
+        behavior: plugin
+        args:
+          - name: sensitive
+            type: boolean
+            required: false
+        three_axis:
+          state_effect: preserving
+          external_effects: [observational]
+          consequence:
+            baseline: reviewable
+            escalation:
+              - name: sensitive_query
+                when:
+                  op: arg_eq
+                  arg: sensitive
+                  value: true
+                tier: requires_explicit_authorisation
+                reason: "sensitive audit data accessed"
+
+      # 7. Bulk send with volume escalation.
+      # Preserving + [emitting] + reviewable + 1 escalation rule.
+      bulk-send-notifications:
+        description: "Send notifications to many recipients"
+        behavior: plugin
+        args:
+          - name: count
+            type: integer
+            required: true
+        three_axis:
+          state_effect: preserving
+          external_effects: [emitting]
+          consequence:
+            baseline: reviewable
+            escalation:
+              - name: high_volume
+                when:
+                  op: arg_gt
+                  arg: count
+                  value: 100
+                tier: requires_confirmation
+                reason: "volume exceeds operator review threshold"
+
+      # 8. Send-attestation. Preserving + [emitting, observational]
+      # + requires_explicit_authorisation. Multi-effect.
+      send-attestation:
+        description: "Send a formal attestation to a regulator"
+        behavior: plugin
+        three_axis:
+          state_effect: preserving
+          external_effects: [emitting, observational]
+          consequence:
+            baseline: requires_explicit_authorisation
+
+      # 9. Drill-down. Preserving + [navigating, observational] + benign.
+      drill-down:
+        description: "Drill into a specific entity within the current scope"
+        behavior: plugin
+        three_axis:
+          state_effect: preserving
+          external_effects: [navigating, observational]
+          consequence:
+            baseline: benign
+
+      # 10. No-op edge case. Preserving + [] + benign.
+      # No external effects, no state change, low consequence — a pure
+      # internal compute.
+      validate-inputs:
+        description: "Validate inputs to a runbook; pure compute"
+        behavior: plugin
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: benign
+
+      # ================================================================
+      # Transition verbs — 10
+      # ================================================================
+
+      # 11. Reorder — v1.1 §6.2 canonical example.
+      # Transition + [] + benign (cosmetic reordering). MUST pass silently.
+      reorder-collection:
+        description: "Reorder items within a collection"
+        behavior: plugin
+        three_axis:
+          state_effect: transition
+          external_effects: []
+          consequence:
+            baseline: benign
+          transitions:
+            dag: fixture_dag
+            edges:
+              - from: unsorted
+                to: sorted
+
+      # 12. Advance draft. Transition + [] + reviewable. 1-edge.
+      advance-draft:
+        description: "Advance a draft to the submitted state"
+        behavior: plugin
+        three_axis:
+          state_effect: transition
+          external_effects: []
+          consequence:
+            baseline: reviewable
+          transitions:
+            dag: fixture_dag
+            edges:
+              - from: draft
+                to: submitted
+
+      # 13. Approve submission. Transition + [emitting]
+      # + requires_confirmation. 1-edge.
+      approve-submission:
+        description: "Approve a submitted proposal"
+        behavior: plugin
+        three_axis:
+          state_effect: transition
+          external_effects: [emitting]
+          consequence:
+            baseline: requires_confirmation
+          transitions:
+            dag: fixture_dag
+            edges:
+              - from: submitted
+                to: approved
+
+      # 14. Sanctions-apply — v1.1 §6.2 canonical example.
+      # Transition + [] + requires_explicit_authorisation.
+      # State-transition with NO external effects but highest tier —
+      # MUST pass silently (P10 orthogonality).
+      sanctions-apply:
+        description: "Apply a sanctions designation to a CBU"
+        behavior: plugin
+        three_axis:
+          state_effect: transition
+          external_effects: []
+          consequence:
+            baseline: requires_explicit_authorisation
+          transitions:
+            dag: fixture_dag
+            edges:
+              - from: pending
+                to: sanctioned
+
+      # 15. Submit-for-review with jurisdictional escalation.
+      # Transition + [emitting] + reviewable + entity-attr escalation.
+      submit-for-review:
+        description: "Submit a case for compliance review"
+        behavior: plugin
+        args:
+          - name: case_id
+            type: uuid
+            required: true
+        three_axis:
+          state_effect: transition
+          external_effects: [emitting]
+          consequence:
+            baseline: reviewable
+            escalation:
+              - name: high_risk_jurisdiction
+                when:
+                  op: entity_attr_in
+                  entity_kind: cbu
+                  attr: jurisdiction
+                  values: ["IR", "KP", "RU"]
+                tier: requires_explicit_authorisation
+                reason: "jurisdiction on high-risk sanctions watchlist"
+          transitions:
+            dag: fixture_dag
+            edges:
+              - from: draft
+                to: in_review
+
+      # 16. Archive CBU. Transition + [] + requires_confirmation. 1-edge.
+      archive-cbu:
+        description: "Archive a CBU record"
+        behavior: plugin
+        three_axis:
+          state_effect: transition
+          external_effects: []
+          consequence:
+            baseline: requires_confirmation
+          transitions:
+            dag: fixture_dag
+            edges:
+              - from: active
+                to: archived
+
+      # 17. Reject proposal. Transition + [emitting]
+      # + requires_confirmation. 1-edge.
+      reject-proposal:
+        description: "Reject a submitted proposal"
+        behavior: plugin
+        three_axis:
+          state_effect: transition
+          external_effects: [emitting]
+          consequence:
+            baseline: requires_confirmation
+          transitions:
+            dag: fixture_dag
+            edges:
+              - from: submitted
+                to: rejected
+
+      # 18. Activate-trading with capital-threshold escalation.
+      # Transition + [emitting, navigating] + requires_confirmation
+      # + 2-rule escalation (threshold + boolean combinator).
+      activate-trading:
+        description: "Activate trading for a CBU"
+        behavior: plugin
+        args:
+          - name: live_capital
+            type: decimal
+            required: true
+        three_axis:
+          state_effect: transition
+          external_effects: [emitting, navigating]
+          consequence:
+            baseline: requires_confirmation
+            escalation:
+              - name: high_capital
+                when:
+                  op: arg_gt
+                  arg: live_capital
+                  value: 10000000
+                tier: requires_explicit_authorisation
+                reason: "live capital exceeds operator sign-off threshold"
+              - name: sanctioned_jurisdiction
+                when:
+                  op: and
+                  preds:
+                    - op: entity_attr_eq
+                      entity_kind: cbu
+                      attr: sanctions_status
+                      value: listed
+                    - op: not
+                      pred:
+                        op: context_flag
+                        flag: compliance_waiver_granted
+                tier: requires_explicit_authorisation
+                reason: "activating trading on sanctioned CBU without waiver"
+          transitions:
+            dag: fixture_dag
+            edges:
+              - from: approved
+                to: active
+
+      # 19. Settle transaction. Transition + [emitting]
+      # + requires_explicit_authorisation. 2-edge.
+      settle-transaction:
+        description: "Settle a transaction (partial or complete)"
+        behavior: plugin
+        three_axis:
+          state_effect: transition
+          external_effects: [emitting]
+          consequence:
+            baseline: requires_explicit_authorisation
+          transitions:
+            dag: fixture_dag
+            edges:
+              - from: pending
+                to: partial_settled
+              - from: partial_settled
+                to: settled
+
+      # 20. Cancel running. Transition + [emitting]
+      # + requires_confirmation. 2-edge (kill + rollback).
+      cancel-running:
+        description: "Cancel a running transaction with rollback"
+        behavior: plugin
+        three_axis:
+          state_effect: transition
+          external_effects: [emitting]
+          consequence:
+            baseline: requires_confirmation
+          transitions:
+            dag: fixture_dag
+            edges:
+              - from: active
+                to: cancelling
+              - from: cancelling
+                to: cancelled

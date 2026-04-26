@@ -48,6 +48,11 @@ domains:
         returns:
           type: record
           name: legal_entity
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
 
       update:
         description: "Update a legal entity's fields"
@@ -84,6 +89,11 @@ domains:
         returns:
           type: uuid
           name: legal_entity_id
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
 
       list:
         description: "List active BNY legal entities"
@@ -104,3 +114,8 @@ domains:
         returns:
           type: record_set
           name: legal_entities
+        three_axis:
+          state_effect: preserving
+          external_effects: [observational]
+          consequence:
+            baseline: benign

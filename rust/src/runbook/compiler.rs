@@ -324,19 +324,28 @@ fn compile_macro(
     }
 
     // §6.2 Step 4: SemReg — filter expanded verbs against SemReg allowed set (INV-6).
-    // When `sem_reg_allowed_verbs` is None, SemReg filtering is skipped (graceful degradation).
-    if let Some(allowed) = sem_reg_allowed_verbs {
-        let filter_result = filter_verbs_against_allowed_set(&expanded_verbs, allowed);
-        if filter_result.has_denials() {
-            let denied = filter_result.first_denied().expect("has_denials was true");
-            return OrchestratorResponse::CompilationError(CompilationError::new(
-                CompilationErrorKind::SemRegDenied {
-                    verb: denied.verb.clone(),
-                    reason: denied.reason.clone(),
-                },
-                "sem_reg",
-            ));
-        }
+    //
+    // F17 fix (Slice 3.2, 2026-04-22): fail closed when
+    // `sem_reg_allowed_verbs` is None. Previous behaviour skipped the CCIR
+    // filter entirely, allowing runbooks to compile + execute ungoverned
+    // when SemReg was down or unconfigured. "Graceful degradation" on an
+    // authorization path is a bug — downtime is safer than bypass.
+    let Some(allowed) = sem_reg_allowed_verbs else {
+        return OrchestratorResponse::CompilationError(CompilationError::new(
+            CompilationErrorKind::EnvelopeUnavailable,
+            "sem_reg",
+        ));
+    };
+    let filter_result = filter_verbs_against_allowed_set(&expanded_verbs, allowed);
+    if filter_result.has_denials() {
+        let denied = filter_result.first_denied().expect("has_denials was true");
+        return OrchestratorResponse::CompilationError(CompilationError::new(
+            CompilationErrorKind::SemRegDenied {
+                verb: denied.verb.clone(),
+                reason: denied.reason.clone(),
+            },
+            "sem_reg",
+        ));
     }
 
     // §6.2 Step 5: write_set — derive from top-level args (INV-8).
@@ -442,19 +451,24 @@ fn compile_primitive(
         return OrchestratorResponse::ConstraintViolation(violation);
     }
 
-    // §6.2 Step 4: SemReg filter
-    if let Some(allowed) = sem_reg_allowed_verbs {
-        let filter_result = filter_verbs_against_allowed_set(&[fqn.to_string()], allowed);
-        if filter_result.has_denials() {
-            let denied = filter_result.first_denied().expect("has_denials was true");
-            return OrchestratorResponse::CompilationError(CompilationError::new(
-                CompilationErrorKind::SemRegDenied {
-                    verb: denied.verb.clone(),
-                    reason: denied.reason.clone(),
-                },
-                "sem_reg",
-            ));
-        }
+    // §6.2 Step 4: SemReg filter — fail closed when envelope unavailable
+    // (F17 / Slice 3.2, 2026-04-22).
+    let Some(allowed) = sem_reg_allowed_verbs else {
+        return OrchestratorResponse::CompilationError(CompilationError::new(
+            CompilationErrorKind::EnvelopeUnavailable,
+            "sem_reg",
+        ));
+    };
+    let filter_result = filter_verbs_against_allowed_set(&[fqn.to_string()], allowed);
+    if filter_result.has_denials() {
+        let denied = filter_result.first_denied().expect("has_denials was true");
+        return OrchestratorResponse::CompilationError(CompilationError::new(
+            CompilationErrorKind::SemRegDenied {
+                verb: denied.verb.clone(),
+                reason: denied.reason.clone(),
+            },
+            "sem_reg",
+        ));
     }
 
     // §6.2 Step 5: write_set
@@ -644,6 +658,41 @@ mod tests {
     use crate::session::unified::{ClientRef, StructureType};
     use std::collections::{HashMap, HashSet};
 
+    /// Permissive allowed-verbs set used by pre-Slice-3.2 tests. Slice 3.2
+    /// (F17) made SemReg-unavailable fail closed; tests that don't care
+    /// about SemReg-denial semantics now pass `&permissive_allowed_verbs()`
+    /// instead of `None` so the compiler proceeds past Step 4.
+    fn permissive_allowed_verbs() -> std::collections::HashSet<String> {
+        let mut s = std::collections::HashSet::new();
+        // Every verb + macro used in the compiler test fixtures.
+        for v in [
+            "structure.setup",
+            "cbu.create",
+            "cbu.delete",
+            "cbu.set-attr",
+            "entity.create",
+            "entity.ensure",
+            "entity.upsert",
+            "entity.update",
+            "structure.broken",
+            "unknown.verb",
+            "research.run",
+            "kyc-case.open",
+            "kyc-case.create",
+            "screening.run",
+            "document.request",
+            "requirement.satisfy",
+            "dummy.verb",
+            "test.verb",
+            "a.primitive",
+            "b.primitive",
+            "c.primitive",
+        ] {
+            s.insert(v.to_string());
+        }
+        s
+    }
+
     fn test_session() -> UnifiedSession {
         UnifiedSession {
             client: Some(ClientRef {
@@ -795,8 +844,8 @@ mod tests {
             &registry,
             1,
             &constraints,
-            None, // sem_reg_allowed_verbs
-            None, // verb_snapshot_pins
+            Some(&permissive_allowed_verbs()), // Slice 3.2: pre-3.2 tests used None; now fail-closed forces explicit set
+            None,                              // verb_snapshot_pins
         );
 
         assert!(resp.is_compiled(), "Expected Compiled, got {:?}", resp);
@@ -825,8 +874,8 @@ mod tests {
             &registry,
             1,
             &constraints,
-            None, // sem_reg_allowed_verbs
-            None, // verb_snapshot_pins
+            Some(&permissive_allowed_verbs()), // Slice 3.2: pre-3.2 tests used None; now fail-closed forces explicit set
+            None,                              // verb_snapshot_pins
         );
 
         assert!(
@@ -862,8 +911,8 @@ mod tests {
             &registry,
             1,
             &constraints,
-            None, // sem_reg_allowed_verbs
-            None, // verb_snapshot_pins
+            Some(&permissive_allowed_verbs()), // Slice 3.2: pre-3.2 tests used None; now fail-closed forces explicit set
+            None,                              // verb_snapshot_pins
         );
 
         assert!(resp.is_compiled());
@@ -891,8 +940,8 @@ mod tests {
             &registry,
             1,
             &constraints,
-            None, // sem_reg_allowed_verbs
-            None, // verb_snapshot_pins
+            Some(&permissive_allowed_verbs()), // Slice 3.2: pre-3.2 tests used None; now fail-closed forces explicit set
+            None,                              // verb_snapshot_pins
         );
 
         assert!(matches!(resp, OrchestratorResponse::Clarification(_)));
@@ -920,8 +969,8 @@ mod tests {
             &registry,
             1,
             &constraints,
-            None, // sem_reg_allowed_verbs
-            None, // verb_snapshot_pins
+            Some(&permissive_allowed_verbs()), // Slice 3.2: pre-3.2 tests used None; now fail-closed forces explicit set
+            None,                              // verb_snapshot_pins
         );
 
         assert!(resp.is_compiled());
@@ -954,8 +1003,8 @@ mod tests {
             &registry,
             1,
             &constraints,
-            None, // sem_reg_allowed_verbs
-            None, // verb_snapshot_pins
+            Some(&permissive_allowed_verbs()), // Slice 3.2: pre-3.2 tests used None; now fail-closed forces explicit set
+            None,                              // verb_snapshot_pins
         );
 
         assert!(
@@ -994,8 +1043,8 @@ mod tests {
             &registry,
             1,
             &constraints,
-            None, // sem_reg_allowed_verbs
-            None, // verb_snapshot_pins
+            Some(&permissive_allowed_verbs()), // Slice 3.2: pre-3.2 tests used None; now fail-closed forces explicit set
+            None,                              // verb_snapshot_pins
         );
 
         assert!(
@@ -1100,8 +1149,8 @@ mod tests {
             &registry,
             1,
             &constraints,
-            None, // sem_reg_allowed_verbs
-            None, // verb_snapshot_pins
+            Some(&permissive_allowed_verbs()), // Slice 3.2: pre-3.2 tests used None; now fail-closed forces explicit set
+            None,                              // verb_snapshot_pins
         );
 
         assert!(resp.is_compiled());
@@ -1238,9 +1287,13 @@ mod tests {
         );
     }
 
-    /// INV-7: When SemReg is unavailable (None), compilation proceeds (graceful degradation).
+    /// F17 / Slice 3.2 (2026-04-22): when SemReg envelope is unavailable
+    /// (`sem_reg_allowed_verbs = None`), compilation MUST fail closed with
+    /// `CompilationErrorKind::EnvelopeUnavailable`. Previously this test
+    /// asserted the opposite ("graceful degradation") — that was a SemOS
+    /// bypass.
     #[test]
-    fn test_semreg_unavailable_graceful_fallback() {
+    fn test_semreg_unavailable_fails_closed() {
         let registry = test_macro_registry();
         let session = test_session();
         let constraints = EffectiveConstraints::unconstrained();
@@ -1258,15 +1311,24 @@ mod tests {
             &registry,
             1,
             &constraints,
-            None, // SemReg unavailable
+            None, // SemReg unavailable — must fail closed
             None, // verb_snapshot_pins
         );
 
-        assert!(
-            resp.is_compiled(),
-            "Expected Compiled when SemReg is None (graceful degradation), got {:?}",
-            resp
-        );
+        match resp {
+            OrchestratorResponse::CompilationError(err) => {
+                assert!(
+                    matches!(err.kind, CompilationErrorKind::EnvelopeUnavailable),
+                    "Expected EnvelopeUnavailable, got {:?}",
+                    err.kind
+                );
+                assert_eq!(err.source_phase, "sem_reg");
+            }
+            other => panic!(
+                "Expected CompilationError(EnvelopeUnavailable) when SemReg is None, got {:?}",
+                other
+            ),
+        }
     }
 
     /// INV-6: Validation order — expansion error is returned BEFORE DAG is attempted.
@@ -1454,8 +1516,8 @@ mod tests {
             &registry,
             1,
             &constraints,
-            None,        // sem_reg_allowed_verbs
-            Some(&pins), // verb_snapshot_pins
+            Some(&permissive_allowed_verbs()), // Slice 3.2: pre-3.2 tests used None; now fail-closed forces explicit set
+            Some(&pins),                       // verb_snapshot_pins
         );
 
         match resp {
@@ -1499,8 +1561,8 @@ mod tests {
             &registry,
             1,
             &constraints,
-            None, // sem_reg_allowed_verbs
-            None, // verb_snapshot_pins
+            Some(&permissive_allowed_verbs()), // Slice 3.2: pre-3.2 tests used None; now fail-closed forces explicit set
+            None,                              // verb_snapshot_pins
         );
 
         match resp {

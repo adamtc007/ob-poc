@@ -1,0 +1,41 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT e.entity_id, e.name,\n                      COALESCE(lc.jurisdiction, p.jurisdiction, t.jurisdiction) as jurisdiction,\n                      et.type_code as \"entity_type!\"\n               FROM \"ob-poc\".entities e\n               JOIN \"ob-poc\".entity_types et ON e.entity_type_id = et.entity_type_id\n               JOIN \"ob-poc\".cbu_entity_roles cer ON e.entity_id = cer.entity_id\n               JOIN \"ob-poc\".roles r ON cer.role_id = r.role_id\n               LEFT JOIN \"ob-poc\".entity_limited_companies lc ON e.entity_id = lc.entity_id\n               LEFT JOIN \"ob-poc\".entity_partnerships p ON e.entity_id = p.entity_id\n               LEFT JOIN \"ob-poc\".entity_trusts t ON e.entity_id = t.entity_id\n               WHERE cer.cbu_id = $1 AND r.name = $2\n                 AND e.deleted_at IS NULL\n               LIMIT 1",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "entity_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "name",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 2,
+        "name": "jurisdiction",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 3,
+        "name": "entity_type!",
+        "type_info": "Varchar"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Text"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      null,
+      true
+    ]
+  },
+  "hash": "9bbb6b5a1705c34c3f9af6755acd8e826dc6391caef1403e782f96705baca5b5"
+}

@@ -11,9 +11,10 @@
 //! Run with:
 //! ```bash
 //! DATABASE_URL=postgresql:///data_designer \
-//!   cargo test --features "database,vnext-repl" --test bpmn_e2e_harness_test -- --ignored --nocapture
+//!   cargo test --features database --test bpmn_e2e_harness_test -- --ignored --nocapture
 //! ```
-#![cfg(all(feature = "database", feature = "vnext-repl"))]
+// Slice 4.2 (2026-04-22): `vnext-repl` feature removed; gate simplified to `database`.
+#![cfg(feature = "database")]
 
 use std::net::SocketAddr;
 use std::sync::Arc;
@@ -38,14 +39,12 @@ use ob_poc::bpmn_integration::{
     WorkflowBinding, WorkflowConfig, WorkflowConfigIndex, WorkflowDispatcher,
 };
 use ob_poc::journey::router::PackRouter;
-use ob_poc::repl::orchestrator_v2::{
-    DslExecutionOutcome, DslExecutorV2, ReplOrchestratorV2, StubExecutor,
-};
 use ob_poc::repl::runbook::{
     ConfirmPolicy, EntryStatus, ExecutionMode, GateType, InvocationRecord, Runbook, RunbookEntry,
     RunbookStatus, SlotProvenance,
 };
 use ob_poc::repl::types_v2::{ReplCommandV2, ReplStateV2, UserInputV2};
+use ob_poc::sequencer::{DslExecutionOutcome, DslExecutorV2, ReplOrchestratorV2, StubExecutor};
 
 // ---------------------------------------------------------------------------
 // BPMN model
@@ -114,6 +113,13 @@ impl BpmnTestRig {
         let engine = Arc::new(BpmnLiteEngine::new(store));
         let service = BpmnLiteService {
             engine: engine.clone(),
+            event_fanout: std::sync::Arc::new(bpmn_lite_server::event_fanout::EventFanout::new(
+                engine.clone(),
+                std::time::Duration::from_millis(50),
+            )),
+            limits: bpmn_lite_server::grpc::RequestLimits::default(),
+            metrics: std::sync::Arc::new(bpmn_lite_server::grpc::ServerMetrics::default()),
+            subscription_limiter: std::sync::Arc::new(tokio::sync::Semaphore::new(64)),
         };
 
         let listener = TcpListener::bind("[::1]:0")

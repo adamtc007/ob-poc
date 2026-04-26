@@ -1,10 +1,13 @@
 use std::sync::Arc;
+use uuid::Uuid;
 
 use bpmn_lite_core::engine::BpmnLiteEngine;
 use bpmn_lite_core::store::ProcessStore;
 use bpmn_lite_core::store_memory::MemoryStore;
+use bpmn_lite_server::event_fanout::EventFanout;
 use bpmn_lite_server::grpc::proto::bpmn_lite_server::BpmnLiteServer;
-use bpmn_lite_server::grpc::BpmnLiteService;
+use bpmn_lite_server::grpc::{BpmnLiteService, RequestLimits, ServerMetrics};
+use tokio::sync::Semaphore;
 use tonic::transport::Server;
 use tracing_subscriber::EnvFilter;
 
@@ -17,6 +20,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let addr = parse_bind_addr().parse()?;
 
     let database_url = parse_database_url();
+    #[cfg(feature = "postgres")]
+    let postgres_listener_url = database_url.clone();
+
+    let store_mode = std::env::var("BPMN_LITE_STORE").unwrap_or_else(|_| "postgres".to_string());
+    let allow_memory = store_mode.eq_ignore_ascii_case("memory");
 
     let store: Arc<dyn ProcessStore> = match database_url {
         #[cfg(feature = "postgres")]
@@ -30,18 +38,38 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
         #[cfg(not(feature = "postgres"))]
         Some(_) => {
-            tracing::warn!(
-                "--database-url / DATABASE_URL set but postgres feature not enabled, using MemoryStore"
-            );
-            Arc::new(MemoryStore::new())
+            return Err(config_error(
+                "--database-url / DATABASE_URL set but postgres feature not enabled",
+            ));
         }
         None => {
-            tracing::info!("Using MemoryStore (no database URL configured)");
-            Arc::new(MemoryStore::new())
+            if allow_memory {
+                tracing::warn!("Using MemoryStore because BPMN_LITE_STORE=memory");
+                Arc::new(MemoryStore::new())
+            } else {
+                return Err(config_error(
+                    "DATABASE_URL is required unless BPMN_LITE_STORE=memory is set",
+                ));
+            }
         }
     };
 
     let engine = Arc::new(BpmnLiteEngine::new(store.clone()));
+    let event_fanout = Arc::new(EventFanout::new(
+        engine.clone(),
+        std::time::Duration::from_millis(parse_u64_env("BPMN_LITE_EVENT_FANOUT_FALLBACK_MS", 500)),
+    ));
+    #[cfg(feature = "postgres")]
+    if let Some(url) = postgres_listener_url {
+        event_fanout.start_postgres_listener(url).await?;
+        tracing::info!("Postgres LISTEN/NOTIFY event fanout enabled");
+    }
+
+    let scheduler_owner = std::env::var("BPMN_LITE_SCHEDULER_OWNER")
+        .unwrap_or_else(|_| format!("bpmn-lite-{}", Uuid::now_v7()));
+    let tick_batch_size = parse_usize_env("BPMN_LITE_TICK_BATCH_SIZE", 128);
+    let tick_lease_ms = parse_u64_env("BPMN_LITE_TICK_LEASE_MS", 5_000);
+    let tick_interval_ms = parse_u64_env("BPMN_LITE_TICK_INTERVAL_MS", 500);
 
     // Background: reclaim stale claimed jobs (every 60s, 5min timeout)
     let reclaim_store = store.clone();
@@ -56,13 +84,17 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
     });
 
-    // Background: tick all running instances (every 500ms)
+    // Background: claim and tick a bounded batch of running instances.
     let tick_engine = engine.clone();
+    let tick_owner = scheduler_owner.clone();
     tokio::spawn(async move {
         loop {
-            tokio::time::sleep(std::time::Duration::from_millis(500)).await;
-            if let Err(e) = tick_engine.tick_all().await {
-                tracing::error!(error = %e, "tick_all failed");
+            tokio::time::sleep(std::time::Duration::from_millis(tick_interval_ms)).await;
+            if let Err(e) = tick_engine
+                .tick_claimed_batch(&tick_owner, tick_batch_size, tick_lease_ms)
+                .await
+            {
+                tracing::error!(error = %e, "scheduler tick batch failed");
             }
         }
     });
@@ -84,14 +116,57 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let service = BpmnLiteService {
         engine: engine.clone(),
+        event_fanout,
+        limits: RequestLimits::from_env(),
+        metrics: Arc::new(ServerMetrics::default()),
+        subscription_limiter: Arc::new(Semaphore::new(parse_usize_env(
+            "BPMN_LITE_MAX_EVENT_SUBSCRIPTIONS",
+            256,
+        ))),
     };
+    let max_message_bytes = parse_usize_env("BPMN_LITE_GRPC_MAX_MESSAGE_BYTES", 4 * 1024 * 1024);
 
     Server::builder()
-        .add_service(BpmnLiteServer::new(service))
+        .timeout(std::time::Duration::from_secs(parse_u64_env(
+            "BPMN_LITE_GRPC_TIMEOUT_SECS",
+            30,
+        )))
+        .concurrency_limit_per_connection(parse_usize_env(
+            "BPMN_LITE_GRPC_CONCURRENCY_PER_CONNECTION",
+            256,
+        ))
+        .add_service(
+            BpmnLiteServer::new(service)
+                .max_decoding_message_size(max_message_bytes)
+                .max_encoding_message_size(max_message_bytes),
+        )
         .serve(addr)
         .await?;
 
     Ok(())
+}
+
+fn parse_usize_env(name: &str, default: usize) -> usize {
+    std::env::var(name)
+        .ok()
+        .and_then(|value| value.parse::<usize>().ok())
+        .filter(|value| *value > 0)
+        .unwrap_or(default)
+}
+
+fn parse_u64_env(name: &str, default: u64) -> u64 {
+    std::env::var(name)
+        .ok()
+        .and_then(|value| value.parse::<u64>().ok())
+        .filter(|value| *value > 0)
+        .unwrap_or(default)
+}
+
+fn config_error(message: &str) -> Box<dyn std::error::Error> {
+    Box::new(std::io::Error::new(
+        std::io::ErrorKind::InvalidInput,
+        message.to_string(),
+    ))
 }
 
 /// Parse database URL from `--database-url <url>` CLI arg or `DATABASE_URL` env var.

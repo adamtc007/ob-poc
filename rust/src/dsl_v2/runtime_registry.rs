@@ -17,8 +17,8 @@ use tracing::{info, warn};
 use sqlx::PgPool;
 
 use super::config::types::*;
-use crate::entity_kind::canonicalize as canonicalize_entity_kind;
 use crate::templates::{TemplateDefinition, TemplateRegistry};
+use dsl_runtime::entity_kind::canonicalize as canonicalize_entity_kind;
 
 // =============================================================================
 // RUNTIME VERB DEFINITION
@@ -1155,6 +1155,8 @@ mod tests {
                 sentences: None,
                 confirm_policy: None,
                 outputs: vec![],
+                three_axis: None,
+                transition_args: None,
             },
         );
 
@@ -1358,6 +1360,8 @@ mod tests {
                 sentences: None,
                 confirm_policy: None,
                 outputs: vec![],
+                three_axis: None,
+                transition_args: None,
             },
         );
 

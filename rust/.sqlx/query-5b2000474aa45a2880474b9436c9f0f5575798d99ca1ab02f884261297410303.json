@@ -1,0 +1,100 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT\n                w.workstream_id,\n                w.case_id,\n                w.entity_id,\n                e.name as entity_name,\n                et.type_code as entity_type,\n                COALESCE(lc.jurisdiction, p.jurisdiction, t.jurisdiction) as jurisdiction,\n                w.status,\n                w.risk_rating,\n                w.is_ubo,\n                w.ownership_percentage,\n                w.requires_enhanced_dd,\n                w.discovery_reason,\n                w.discovery_depth,\n                w.discovery_source_workstream_id\n               FROM \"ob-poc\".entity_workstreams w\n               JOIN \"ob-poc\".entities e ON e.entity_id = w.entity_id\n               JOIN \"ob-poc\".entity_types et ON et.entity_type_id = e.entity_type_id\n               LEFT JOIN \"ob-poc\".entity_limited_companies lc ON lc.entity_id = e.entity_id\n               LEFT JOIN \"ob-poc\".entity_partnerships p ON p.entity_id = e.entity_id\n               LEFT JOIN \"ob-poc\".entity_trusts t ON t.entity_id = e.entity_id\n               WHERE w.case_id = $1\n                 AND e.deleted_at IS NULL\n               ORDER BY w.discovery_depth, w.created_at",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "workstream_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "case_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 2,
+        "name": "entity_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 3,
+        "name": "entity_name",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 4,
+        "name": "entity_type",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 5,
+        "name": "jurisdiction",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 6,
+        "name": "status",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 7,
+        "name": "risk_rating",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 8,
+        "name": "is_ubo",
+        "type_info": "Bool"
+      },
+      {
+        "ordinal": 9,
+        "name": "ownership_percentage",
+        "type_info": "Numeric"
+      },
+      {
+        "ordinal": 10,
+        "name": "requires_enhanced_dd",
+        "type_info": "Bool"
+      },
+      {
+        "ordinal": 11,
+        "name": "discovery_reason",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 12,
+        "name": "discovery_depth",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 13,
+        "name": "discovery_source_workstream_id",
+        "type_info": "Uuid"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      true,
+      null,
+      false,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true
+    ]
+  },
+  "hash": "5b2000474aa45a2880474b9436c9f0f5575798d99ca1ab02f884261297410303"
+}

@@ -87,6 +87,11 @@ domains:
           type: uuid
           name: registry_id
           capture: true
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
 
       promote:
         description: "Promote a UBO registry entry from CANDIDATE to IDENTIFIED"
@@ -116,6 +121,15 @@ domains:
             description: Notes on identification
         returns:
           type: record
+        three_axis:
+          state_effect: transition
+          external_effects: [emitting]
+          consequence:
+            baseline: requires_explicit_authorisation
+        transition_args:
+          entity_id_arg: registry-id
+          target_workspace: kyc
+          target_slot: kyc_ubo_registry
 
       advance:
         description: "Advance a UBO registry entry through the state machine"
@@ -155,6 +169,16 @@ domains:
             description: Notes on transition
         returns:
           type: record
+        three_axis:
+          state_effect: transition
+          external_effects: []
+          consequence:
+            baseline: reviewable
+        transition_args:
+          entity_id_arg: registry-id
+          target_state_arg: new-status
+          target_workspace: kyc
+          target_slot: kyc_ubo_registry
 
       waive:
         description: "Waive a UBO registry entry with authority and reason"
@@ -188,6 +212,11 @@ domains:
             description: Authority granting the waiver
         returns:
           type: record
+        three_axis:
+          state_effect: preserving
+          external_effects: [emitting]
+          consequence:
+            baseline: requires_confirmation
 
       reject:
         description: "Reject a UBO registry entry (terminal state)"
@@ -217,6 +246,15 @@ domains:
             description: Reason for rejection
         returns:
           type: record
+        three_axis:
+          state_effect: transition
+          external_effects: [emitting]
+          consequence:
+            baseline: requires_explicit_authorisation
+        transition_args:
+          entity_id_arg: registry-id
+          target_workspace: kyc
+          target_slot: kyc_ubo_registry
 
       expire:
         description: "Expire a UBO registry entry (terminal state)"
@@ -245,3 +283,12 @@ domains:
             description: Reason for expiry
         returns:
           type: record
+        three_axis:
+          state_effect: transition
+          external_effects: [emitting]
+          consequence:
+            baseline: requires_explicit_authorisation
+        transition_args:
+          entity_id_arg: registry-id
+          target_workspace: kyc
+          target_slot: kyc_ubo_registry

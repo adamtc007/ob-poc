@@ -55,6 +55,11 @@ domains:
         returns:
           type: record
           capture: false
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
 
       add-item:
         description: Add an item (snapshot) to an existing changeset
@@ -96,6 +101,11 @@ domains:
         returns:
           type: record
           capture: false
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
 
       remove-item:
         description: Remove an item from a changeset
@@ -128,6 +138,11 @@ domains:
         returns:
           type: record
           capture: false
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: requires_confirmation
 
       refine-item:
         description: Refine an existing changeset item (update its definition)
@@ -169,6 +184,11 @@ domains:
         returns:
           type: record
           capture: false
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
 
       # ============================================
       # Suggestions & Templates
@@ -201,6 +221,11 @@ domains:
         returns:
           type: record
           capture: false
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
 
       apply-template:
         description: Apply a changeset template to pre-populate items
@@ -233,6 +258,11 @@ domains:
         returns:
           type: record
           capture: false
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
 
       # ============================================
       # Evidence & Validation
@@ -273,6 +303,11 @@ domains:
         returns:
           type: record
           capture: false
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
 
       validate-edit:
         description: Validate a single changeset edit against guardrails
@@ -306,6 +341,11 @@ domains:
         returns:
           type: record
           capture: false
+        three_axis:
+          state_effect: preserving
+          external_effects: [observational]
+          consequence:
+            baseline: benign
 
       # ============================================
       # Cross-Referencing & Impact
@@ -338,6 +378,11 @@ domains:
         returns:
           type: record
           capture: false
+        three_axis:
+          state_effect: preserving
+          external_effects: [observational]
+          consequence:
+            baseline: benign
 
       impact-analysis:
         description: Analyze the impact of publishing a changeset
@@ -367,6 +412,11 @@ domains:
         returns:
           type: record
           capture: false
+        three_axis:
+          state_effect: preserving
+          external_effects: [observational]
+          consequence:
+            baseline: benign
 
       # ============================================
       # Conflict Resolution
@@ -407,6 +457,11 @@ domains:
         returns:
           type: record
           capture: false
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
 
       # ============================================
       # Query
@@ -439,6 +494,11 @@ domains:
         returns:
           type: record_set
           capture: false
+        three_axis:
+          state_effect: preserving
+          external_effects: [observational]
+          consequence:
+            baseline: benign
 
       get:
         description: Get detailed changeset information
@@ -468,6 +528,11 @@ domains:
         returns:
           type: record
           capture: false
+        three_axis:
+          state_effect: preserving
+          external_effects: [observational]
+          consequence:
+            baseline: benign
 
       diff:
         description: Diff two changesets or a changeset against the active snapshot set
@@ -501,3 +566,8 @@ domains:
         returns:
           type: record
           capture: false
+        three_axis:
+          state_effect: preserving
+          external_effects: [observational]
+          consequence:
+            baseline: benign

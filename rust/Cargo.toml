@@ -2,7 +2,7 @@
 name = "ob-poc"
 version = "0.1.0"
 edition = "2021"
-rust-version = "1.84"
+rust-version = "1.95"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 # All deprecated binaries removed - agentic CRUD examples are the master
@@ -26,9 +26,7 @@ sem_os_client = { path = "crates/sem_os_client" }
 sem_os_obpoc_adapter = { path = "crates/sem_os_obpoc_adapter" }
 sem_os_postgres = { path = "crates/sem_os_postgres" }
 governed_query_proc = { path = "crates/governed_query_proc" }
-
-# Auto-registration for custom operations
-inventory = "0.3"
+dsl-runtime = { path = "crates/dsl-runtime" }
 
 # Core libraries
 anyhow = "1.0"
@@ -90,6 +88,10 @@ jsonschema = "0.29"
 base64 = "0.22"
 sha2 = "0.10"
 hex = "0.4"
+# Phase F.1 (2026-04-22): BLAKE3 used for outbox idempotency-key hashing
+# in the bpmn_lite_ops refactor. Already a transitive dep via
+# ob-poc-types; direct listing here keeps the usage site explicit.
+blake3 = "1"
 
 # CLI dependencies
 clap = { version = "4.5", features = ["derive", "env"], optional = true }
@@ -187,10 +189,10 @@ name = "dsl_mcp"
 path = "src/bin/dsl_mcp.rs"
 required-features = ["mcp"]
 
-[[bin]]
-name = "dsl_api"
-path = "src/bin/dsl_api.rs"
-required-features = ["server"]
+# Slice 4.1 (2026-04-22): `dsl_api` binary retired per user decision Q2(a).
+# `ob-poc-web` is now the sole authoritative HTTP server for all production
+# traffic. `Dockerfile.api` was deleted alongside this binary — downstream
+# deployments should build `ob-poc-web` instead.
 
 [[bin]]
 name = "batch_test_harness"
@@ -209,9 +211,15 @@ database = ["dep:sqlx", "dep:bigdecimal", "dep:entity-gateway", "dep:pgvector"] 
 server = ["database", "mcp", "dep:axum", "dep:tower", "dep:tower-http"]  # REST API server with intent pipeline
 cli = ["dep:clap", "dep:colored", "dep:atty", "dep:rustyline"]  # CLI tool for DSL testing
 mcp = ["database"]  # MCP/intent pipeline for semantic verb search
-vnext-repl = ["database"]  # DEPRECATED: REPL V2 always enabled. Kept for downstream Cargo.toml compat.
+# Slice 4.2 (2026-04-22): `vnext-repl` feature removed. REPL V2 is always enabled.
+# The feature existed as an alias for `database` during the V1→V2 migration and
+# was deprecated on 2026-03-22; no remaining cfg-gate depended on it post-cleanup.
+# Slice 4.1-d (2026-04-22): `runbook-gate-vnext` feature removed. After dsl_api
+# retirement there was one consumer (ob-poc-web) and one code path (the always-on
+# gated dispatch); the feature was absorbed into default. All #[cfg(feature =
+# "runbook-gate-vnext")] attribute sites in agent_service.rs were stripped —
+# the code compiles unconditionally.
 write-set-contract = []  # Enables contract-driven write_set derivation from verb YAML metadata (INV-8)
-runbook-gate-vnext = ["database"]  # All execution paths through compile_invocation() + execute_runbook() (INV-1, INV-11)
 
 
 
@@ -226,7 +234,6 @@ members = [
     ".",
     "crates/dsl-core",
     "crates/ob-agentic",
-    "crates/ob-execution-types",
     "crates/ob-templates",
     "crates/ob-workflow",
     "crates/dsl-lsp",
@@ -249,4 +256,11 @@ members = [
     "crates/sem_os_client",
     "crates/sem_os_obpoc_adapter",
     "crates/sem_os_harness",
+
+    # Three-plane refactor — dsl-runtime (Phase 1 onwards)
+    "crates/dsl-runtime",
+
+    # Three-plane refactor harnesses (Phase 0e skeleton)
+    "crates/determinism-harness",
+    "crates/round-trip-harness",
 ]

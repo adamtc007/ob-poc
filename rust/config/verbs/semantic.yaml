@@ -30,29 +30,29 @@ domains:
           phase_tags: [stewardship]
           side_effects: facts_only
         invocation_phrases:
-        - "get onboarding state"
-        - "show stage progress for CBU"
-        - "where are we in onboarding"
-        - "what stages are complete"
-        - "derive semantic state"
-        - "onboarding progress check"
-        - "show gaps and blockers"
-        - "current onboarding status"
+          - "get onboarding state"
+          - "show stage progress for CBU"
+          - "where are we in onboarding"
+          - "what stages are complete"
+          - "derive semantic state"
+          - "onboarding progress check"
+          - "show gaps and blockers"
+          - "current onboarding status"
         behavior: plugin
         plugin:
           handler: SemanticStateOp
         args:
-        - name: cbu-id
-          type: uuid
-          required: true
-          description: "CBU to analyze"
-          lookup:
-            table: cbus
-            schema: ob-poc
-            entity_type: cbu
-            search_key: name
-            primary_key: cbu_id
-            resolution_mode: entity
+          - name: cbu-id
+            type: uuid
+            required: true
+            description: "CBU to analyze"
+            lookup:
+              table: cbus
+              schema: ob-poc
+              entity_type: cbu
+              search_key: name
+              primary_key: cbu_id
+              resolution_mode: entity
         returns:
           type: record
           capture: true
@@ -62,6 +62,12 @@ domains:
       # STAGE QUERIES
       # =========================================================================
 
+        three_axis:
+          state_effect: preserving
+          external_effects:
+            - observational
+          consequence:
+            baseline: benign
       list-stages:
         description: "List all defined semantic stages with their dependencies"
         metadata:
@@ -73,14 +79,14 @@ domains:
           phase_tags: [stewardship]
           side_effects: facts_only
         invocation_phrases:
-        - "list onboarding stages"
-        - "show all defined stages"
-        - "what stages exist"
-        - "display stage dependencies"
-        - "available onboarding stages"
-        - "stage definition overview"
-        - "get all stage definitions"
-        - "onboarding stage catalog"
+          - "list onboarding stages"
+          - "show all defined stages"
+          - "what stages exist"
+          - "display stage dependencies"
+          - "available onboarding stages"
+          - "stage definition overview"
+          - "get all stage definitions"
+          - "onboarding stage catalog"
         behavior: plugin
         plugin:
           handler: SemanticListStagesOp
@@ -90,6 +96,12 @@ domains:
           capture: true
           description: "All stage definitions in dependency order"
 
+        three_axis:
+          state_effect: preserving
+          external_effects:
+            - observational
+          consequence:
+            baseline: benign
       stages-for-product:
         description: "Get required stages for a specific product"
         metadata:
@@ -101,29 +113,29 @@ domains:
           phase_tags: [stewardship]
           side_effects: state_write
         invocation_phrases:
-        - "stages for product"
-        - "what stages does custody need"
-        - "required stages for product"
-        - "onboarding path for product"
-        - "product stage requirements"
-        - "which stages for fund accounting"
-        - "show product onboarding steps"
-        - "product specific stage list"
+          - "stages for product"
+          - "what stages does custody need"
+          - "required stages for product"
+          - "onboarding path for product"
+          - "product stage requirements"
+          - "which stages for fund accounting"
+          - "show product onboarding steps"
+          - "product specific stage list"
         behavior: plugin
         plugin:
           handler: SemanticStagesForProductOp
         args:
-        - name: product
-          type: string
-          required: true
-          description: "Product code (e.g., CUSTODY, FUND_ACCOUNTING)"
-          lookup:
-            table: products
-            schema: ob-poc
-            entity_type: product
-            search_key: product_code
-            primary_key: product_code
-            resolution_mode: reference
+          - name: product
+            type: string
+            required: true
+            description: "Product code (e.g., CUSTODY, FUND_ACCOUNTING)"
+            lookup:
+              table: products
+              schema: ob-poc
+              entity_type: product
+              search_key: product_code
+              primary_key: product_code
+              resolution_mode: reference
         returns:
           type: record_set
           capture: true
@@ -133,6 +145,12 @@ domains:
       # PROGRESS QUERIES
       # =========================================================================
 
+        three_axis:
+          state_effect: preserving
+          external_effects: &id001
+            - observational
+          consequence:
+            baseline: benign
       next-actions:
         description: "Get the next actionable stages for a CBU (unblocked, incomplete stages)"
         metadata:
@@ -144,34 +162,39 @@ domains:
           phase_tags: [stewardship]
           side_effects: state_write
         invocation_phrases:
-        - "what should I do next"
-        - "next actions for CBU"
-        - "show actionable stages"
-        - "what is unblocked"
-        - "suggest next onboarding step"
-        - "ready stages for progress"
-        - "unblocked items to work on"
-        - "next steps in onboarding"
+          - "what should I do next"
+          - "next actions for CBU"
+          - "show actionable stages"
+          - "what is unblocked"
+          - "suggest next onboarding step"
+          - "ready stages for progress"
+          - "unblocked items to work on"
+          - "next steps in onboarding"
         behavior: plugin
         plugin:
           handler: SemanticNextActionsOp
         args:
-        - name: cbu-id
-          type: uuid
-          required: true
-          description: "CBU to analyze"
-          lookup:
-            table: cbus
-            schema: ob-poc
-            entity_type: cbu
-            search_key: name
-            primary_key: cbu_id
-            resolution_mode: entity
+          - name: cbu-id
+            type: uuid
+            required: true
+            description: "CBU to analyze"
+            lookup:
+              table: cbus
+              schema: ob-poc
+              entity_type: cbu
+              search_key: name
+              primary_key: cbu_id
+              resolution_mode: entity
         returns:
           type: record_set
           capture: true
           description: "List of actionable stages with suggested verbs"
 
+        three_axis:
+          state_effect: preserving
+          external_effects: *id001
+          consequence:
+            baseline: benign
       missing-entities:
         description: "Get entities that are missing for stage completion"
         metadata:
@@ -183,33 +206,33 @@ domains:
           phase_tags: [stewardship]
           side_effects: state_write
         invocation_phrases:
-        - "what entities are missing"
-        - "missing roles for stage"
-        - "which parties need to be added"
-        - "gaps in entity setup"
-        - "incomplete entity requirements"
-        - "entities needed to proceed"
-        - "what is missing for completion"
-        - "show missing structure members"
+          - "what entities are missing"
+          - "missing roles for stage"
+          - "which parties need to be added"
+          - "gaps in entity setup"
+          - "incomplete entity requirements"
+          - "entities needed to proceed"
+          - "what is missing for completion"
+          - "show missing structure members"
         behavior: plugin
         plugin:
           handler: SemanticMissingEntitiesOp
         args:
-        - name: cbu-id
-          type: uuid
-          required: true
-          description: "CBU to analyze"
-          lookup:
-            table: cbus
-            schema: ob-poc
-            entity_type: cbu
-            search_key: name
-            primary_key: cbu_id
-            resolution_mode: entity
-        - name: stage
-          type: string
-          required: false
-          description: "Specific stage to check (omit for all stages)"
+          - name: cbu-id
+            type: uuid
+            required: true
+            description: "CBU to analyze"
+            lookup:
+              table: cbus
+              schema: ob-poc
+              entity_type: cbu
+              search_key: name
+              primary_key: cbu_id
+              resolution_mode: entity
+          - name: stage
+            type: string
+            required: false
+            description: "Specific stage to check (omit for all stages)"
         returns:
           type: record_set
           capture: true
@@ -219,6 +242,11 @@ domains:
       # PROMPT CONTEXT
       # =========================================================================
 
+        three_axis:
+          state_effect: preserving
+          external_effects: *id001
+          consequence:
+            baseline: benign
       prompt-context:
         description: "Get semantic state formatted for agent prompt injection"
         metadata:
@@ -230,30 +258,35 @@ domains:
           phase_tags: [stewardship]
           side_effects: state_write
         invocation_phrases:
-        - "get prompt context"
-        - "generate agent context"
-        - "build prompt for CBU"
-        - "semantic context for agent"
-        - "prepare onboarding summary"
-        - "context for decision support"
-        - "format state for prompt"
-        - "agent briefing for CBU"
+          - "get prompt context"
+          - "generate agent context"
+          - "build prompt for CBU"
+          - "semantic context for agent"
+          - "prepare onboarding summary"
+          - "context for decision support"
+          - "format state for prompt"
+          - "agent briefing for CBU"
         behavior: plugin
         plugin:
           handler: SemanticPromptContextOp
         args:
-        - name: cbu-id
-          type: uuid
-          required: true
-          description: "CBU to analyze"
-          lookup:
-            table: cbus
-            schema: ob-poc
-            entity_type: cbu
-            search_key: name
-            primary_key: cbu_id
-            resolution_mode: entity
+          - name: cbu-id
+            type: uuid
+            required: true
+            description: "CBU to analyze"
+            lookup:
+              table: cbus
+              schema: ob-poc
+              entity_type: cbu
+              search_key: name
+              primary_key: cbu_id
+              resolution_mode: entity
         returns:
           type: string
           capture: true
           description: "Formatted string for agent system prompt"
+        three_axis:
+          state_effect: preserving
+          external_effects: *id001
+          consequence:
+            baseline: benign

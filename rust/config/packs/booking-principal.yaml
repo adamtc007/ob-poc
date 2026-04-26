@@ -1,0 +1,40 @@
+id: booking-principal
+name: Booking Principal Clearance
+version: "1.0"
+description: >
+  Per-(deal, principal) booking-principal clearance lifecycle. Third leg
+  of Adam's deal tollgate triad (BAC + KYC + Booking Principals). Manage
+  clearance screening, approval, activation, suspension, and revocation.
+  APPROVED/ACTIVE clearances are required to gate the deal
+  KYC_CLEARANCE → CONTRACTED transition (cross-workspace compound gate
+  declared in deal_dag.yaml).
+
+invocation_phrases:
+  - "booking principal clearance"
+  - "manage booking principals"
+  - "BP clearance"
+  - "screen booking principal"
+  - "approve booking principal"
+  - "revoke booking principal"
+
+required_context:
+  - deal_id
+optional_context:
+  - cbu_id
+  - booking_principal_id
+
+workspaces:
+  - booking_principal
+
+allowed_verbs:
+  - booking-principal-clearance.create
+  - booking-principal-clearance.start-screening
+  - booking-principal-clearance.approve
+  - booking-principal-clearance.reject
+  - booking-principal-clearance.reopen
+  - booking-principal-clearance.activate
+  - booking-principal-clearance.suspend
+  - booking-principal-clearance.reinstate
+  - booking-principal-clearance.revoke
+
+forbidden_verbs: []

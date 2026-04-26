@@ -91,6 +91,11 @@ domains:
           type: uuid
           name: investor_id
           capture: true
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
 
       ensure:
         description: Create or update investor by entity_id + owning_cbu_id (idempotent)
@@ -177,6 +182,11 @@ domains:
           type: uuid
           name: investor_id
           capture: true
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
 
       read:
         description: Read investor by ID
@@ -216,6 +226,11 @@ domains:
               primary_key: investor_id
         returns:
           type: record
+        three_axis:
+          state_effect: preserving
+          external_effects: [observational]
+          consequence:
+            baseline: benign
 
       list-by-cbu:
         description: List investors for a CBU (fund)
@@ -259,6 +274,11 @@ domains:
             maps_to: lifecycle_state
         returns:
           type: record_set
+        three_axis:
+          state_effect: preserving
+          external_effects: [observational]
+          consequence:
+            baseline: benign
 
       list-by-entity:
         description: List investor records for an entity across all CBUs
@@ -298,6 +318,11 @@ domains:
               primary_key: entity_id
         returns:
           type: record_set
+        three_axis:
+          state_effect: preserving
+          external_effects: [observational]
+          consequence:
+            baseline: benign
 
       # ============================================
       # Lifecycle state transitions (plugin behavior)
@@ -342,6 +367,15 @@ domains:
             description: List of required document types
         returns:
           type: affected
+        three_axis:
+          state_effect: transition
+          external_effects: [emitting]
+          consequence:
+            baseline: reviewable
+        transition_args:
+          entity_id_arg: investor-id
+          target_workspace: cbu
+          target_slot: investor_kyc
 
       start-kyc:
         description: Transition from PENDING_DOCUMENTS to KYC_IN_PROGRESS
@@ -389,6 +423,15 @@ domains:
             description: Link to existing KYC case (optional - can create new)
         returns:
           type: affected
+        three_axis:
+          state_effect: transition
+          external_effects: [emitting]
+          consequence:
+            baseline: reviewable
+        transition_args:
+          entity_id_arg: investor-id
+          target_workspace: cbu
+          target_slot: investor_kyc
 
       approve-kyc:
         description: Transition from KYC_IN_PROGRESS to KYC_APPROVED
@@ -442,6 +485,15 @@ domains:
             required: false
         returns:
           type: affected
+        three_axis:
+          state_effect: transition
+          external_effects: [emitting]
+          consequence:
+            baseline: requires_confirmation
+        transition_args:
+          entity_id_arg: investor-id
+          target_workspace: cbu
+          target_slot: investor_kyc
 
       reject-kyc:
         description: Transition from KYC_IN_PROGRESS to KYC_REJECTED
@@ -484,6 +536,15 @@ domains:
             required: false
         returns:
           type: affected
+        three_axis:
+          state_effect: transition
+          external_effects: [emitting]
+          consequence:
+            baseline: requires_explicit_authorisation
+        transition_args:
+          entity_id_arg: investor-id
+          target_workspace: cbu
+          target_slot: investor_kyc
 
       mark-eligible:
         description: Transition from KYC_APPROVED to ELIGIBLE_TO_SUBSCRIBE
@@ -524,6 +585,15 @@ domains:
             description: List of share class IDs investor is eligible for
         returns:
           type: affected
+        three_axis:
+          state_effect: transition
+          external_effects: [emitting]
+          consequence:
+            baseline: reviewable
+        transition_args:
+          entity_id_arg: investor-id
+          target_workspace: cbu
+          target_slot: investor
 
       record-subscription:
         description: Transition from ELIGIBLE_TO_SUBSCRIBE to SUBSCRIBED
@@ -571,6 +641,11 @@ domains:
             description: Initial holding created for investor
         returns:
           type: affected
+        three_axis:
+          state_effect: preserving
+          external_effects: [emitting]
+          consequence:
+            baseline: reviewable
 
       activate:
         description: Transition from SUBSCRIBED to ACTIVE_HOLDER
@@ -607,6 +682,15 @@ domains:
               primary_key: investor_id
         returns:
           type: affected
+        three_axis:
+          state_effect: transition
+          external_effects: [emitting]
+          consequence:
+            baseline: reviewable
+        transition_args:
+          entity_id_arg: investor-id
+          target_workspace: cbu
+          target_slot: investor
 
       start-redemption:
         description: Transition from ACTIVE_HOLDER to REDEEMING
@@ -648,6 +732,11 @@ domains:
             description: Whether this is a full redemption (leads to offboarding)
         returns:
           type: affected
+        three_axis:
+          state_effect: preserving
+          external_effects: [emitting]
+          consequence:
+            baseline: reviewable
 
       complete-redemption:
         description: Complete redemption - return to ACTIVE_HOLDER or proceed to OFFBOARDED
@@ -688,6 +777,11 @@ domains:
             description: True if investor has remaining balance (stays ACTIVE_HOLDER)
         returns:
           type: affected
+        three_axis:
+          state_effect: preserving
+          external_effects: [emitting]
+          consequence:
+            baseline: reviewable
 
       offboard:
         description: Transition to OFFBOARDED (terminal state)
@@ -737,6 +831,15 @@ domains:
             required: false
         returns:
           type: affected
+        three_axis:
+          state_effect: transition
+          external_effects: [emitting]
+          consequence:
+            baseline: requires_explicit_authorisation
+        transition_args:
+          entity_id_arg: investor-id
+          target_workspace: cbu
+          target_slot: investor
 
       suspend:
         description: Suspend investor (can be done from most states)
@@ -786,6 +889,15 @@ domains:
             required: false
         returns:
           type: affected
+        three_axis:
+          state_effect: transition
+          external_effects: [emitting]
+          consequence:
+            baseline: requires_confirmation
+        transition_args:
+          entity_id_arg: investor-id
+          target_workspace: cbu
+          target_slot: investor
 
       reinstate:
         description: Reinstate suspended investor to previous state
@@ -837,6 +949,15 @@ domains:
             required: false
         returns:
           type: affected
+        three_axis:
+          state_effect: transition
+          external_effects: [emitting]
+          consequence:
+            baseline: requires_confirmation
+        transition_args:
+          entity_id_arg: investor-id
+          target_workspace: cbu
+          target_slot: investor
 
       # ============================================
       # Periodic review verbs
@@ -884,6 +1005,11 @@ domains:
             maps_to: next_review_date
         returns:
           type: affected
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
 
       # ============================================
       # Query/reporting verbs
@@ -927,6 +1053,11 @@ domains:
               primary_key: investor_id
         returns:
           type: record_set
+        three_axis:
+          state_effect: preserving
+          external_effects: [observational]
+          consequence:
+            baseline: benign
 
       count-by-state:
         description: Count investors by lifecycle state for a CBU
@@ -962,3 +1093,8 @@ domains:
               primary_key: cbu_id
         returns:
           type: record
+        three_axis:
+          state_effect: preserving
+          external_effects: [observational]
+          consequence:
+            baseline: benign

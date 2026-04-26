@@ -1,0 +1,70 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT\n                red_flag_id, case_id, workstream_id, flag_type, severity,\n                status, description, source, raised_at\n               FROM \"ob-poc\".red_flags\n               WHERE case_id = $1\n               ORDER BY raised_at DESC",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "red_flag_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "case_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 2,
+        "name": "workstream_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 3,
+        "name": "flag_type",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 4,
+        "name": "severity",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 5,
+        "name": "status",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 6,
+        "name": "description",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 7,
+        "name": "source",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 8,
+        "name": "raised_at",
+        "type_info": "Timestamptz"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      true,
+      false,
+      false,
+      false,
+      false,
+      true,
+      false
+    ]
+  },
+  "hash": "ecb22a30302ac49656c715cc92076b6ee52c6cb118f83d1032db0b549db91d5f"
+}

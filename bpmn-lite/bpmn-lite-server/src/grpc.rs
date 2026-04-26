@@ -1,11 +1,15 @@
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashMap};
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 
+use tokio::sync::Semaphore;
 use tonic::{Request, Response, Status};
 use uuid::Uuid;
 
 use bpmn_lite_core::engine::BpmnLiteEngine;
 use bpmn_lite_core::types::{ErrorClass, Value};
+
+use crate::event_fanout::EventFanout;
 
 #[allow(clippy::enum_variant_names)]
 pub mod proto {
@@ -15,8 +19,185 @@ pub mod proto {
 use proto::bpmn_lite_server::BpmnLite;
 use proto::*;
 
+#[derive(Clone, Debug)]
+pub struct RequestLimits {
+    pub max_bpmn_xml_bytes: usize,
+    pub max_payload_bytes: usize,
+    pub max_session_stack_bytes: usize,
+    pub max_orch_flags: usize,
+    pub max_string_bytes: usize,
+    pub max_task_types: usize,
+    pub max_activate_jobs: usize,
+    pub max_event_subscriptions: usize,
+    pub max_subscription_secs: u64,
+}
+
+impl Default for RequestLimits {
+    fn default() -> Self {
+        Self {
+            max_bpmn_xml_bytes: 1_000_000,
+            max_payload_bytes: 1_000_000,
+            max_session_stack_bytes: 256_000,
+            max_orch_flags: 128,
+            max_string_bytes: 512,
+            max_task_types: 128,
+            max_activate_jobs: 100,
+            max_event_subscriptions: 256,
+            max_subscription_secs: 300,
+        }
+    }
+}
+
+impl RequestLimits {
+    pub fn from_env() -> Self {
+        let defaults = Self::default();
+        Self {
+            max_bpmn_xml_bytes: read_usize_env(
+                "BPMN_LITE_MAX_BPMN_XML_BYTES",
+                defaults.max_bpmn_xml_bytes,
+            ),
+            max_payload_bytes: read_usize_env(
+                "BPMN_LITE_MAX_PAYLOAD_BYTES",
+                defaults.max_payload_bytes,
+            ),
+            max_session_stack_bytes: read_usize_env(
+                "BPMN_LITE_MAX_SESSION_STACK_BYTES",
+                defaults.max_session_stack_bytes,
+            ),
+            max_orch_flags: read_usize_env("BPMN_LITE_MAX_ORCH_FLAGS", defaults.max_orch_flags),
+            max_string_bytes: read_usize_env(
+                "BPMN_LITE_MAX_STRING_BYTES",
+                defaults.max_string_bytes,
+            ),
+            max_task_types: read_usize_env("BPMN_LITE_MAX_TASK_TYPES", defaults.max_task_types),
+            max_activate_jobs: read_usize_env(
+                "BPMN_LITE_MAX_ACTIVATE_JOBS",
+                defaults.max_activate_jobs,
+            ),
+            max_event_subscriptions: read_usize_env(
+                "BPMN_LITE_MAX_EVENT_SUBSCRIPTIONS",
+                defaults.max_event_subscriptions,
+            ),
+            max_subscription_secs: read_u64_env(
+                "BPMN_LITE_MAX_SUBSCRIPTION_SECS",
+                defaults.max_subscription_secs,
+            ),
+        }
+    }
+
+    #[allow(clippy::result_large_err)]
+    fn check_bytes(&self, field: &str, len: usize, max: usize) -> Result<(), Status> {
+        if len > max {
+            return Err(Status::resource_exhausted(format!(
+                "{} is {} bytes; max is {}",
+                field, len, max
+            )));
+        }
+        Ok(())
+    }
+
+    #[allow(clippy::result_large_err)]
+    fn check_string(&self, field: &str, value: &str) -> Result<(), Status> {
+        self.check_bytes(field, value.len(), self.max_string_bytes)
+    }
+
+    #[allow(clippy::result_large_err)]
+    fn check_orch_flags(&self, flags: &HashMap<String, ProtoValue>) -> Result<(), Status> {
+        if flags.len() > self.max_orch_flags {
+            return Err(Status::resource_exhausted(format!(
+                "orch_flags has {} entries; max is {}",
+                flags.len(),
+                self.max_orch_flags
+            )));
+        }
+        for (key, value) in flags {
+            self.check_string("orch_flags key", key)?;
+            if let Some(proto_value::Kind::StrValue(s)) = &value.kind {
+                self.check_string("orch_flags string value", s)?;
+            }
+        }
+        Ok(())
+    }
+}
+
+fn read_usize_env(name: &str, default: usize) -> usize {
+    std::env::var(name)
+        .ok()
+        .and_then(|value| value.parse::<usize>().ok())
+        .filter(|value| *value > 0)
+        .unwrap_or(default)
+}
+
+fn read_u64_env(name: &str, default: u64) -> u64 {
+    std::env::var(name)
+        .ok()
+        .and_then(|value| value.parse::<u64>().ok())
+        .filter(|value| *value > 0)
+        .unwrap_or(default)
+}
+
+#[derive(Default)]
+pub struct ServerMetrics {
+    requests_total: AtomicU64,
+    request_rejections_total: AtomicU64,
+    job_activations_total: AtomicU64,
+    job_completions_total: AtomicU64,
+    job_failures_total: AtomicU64,
+    active_subscriptions: AtomicU64,
+    subscription_rejections_total: AtomicU64,
+}
+
+impl ServerMetrics {
+    fn request_started(&self) {
+        self.requests_total.fetch_add(1, Ordering::Relaxed);
+    }
+
+    fn request_rejected(&self) {
+        self.request_rejections_total
+            .fetch_add(1, Ordering::Relaxed);
+    }
+
+    fn snapshot(&self) -> MetricsResponse {
+        MetricsResponse {
+            requests_total: self.requests_total.load(Ordering::Relaxed),
+            request_rejections_total: self.request_rejections_total.load(Ordering::Relaxed),
+            job_activations_total: self.job_activations_total.load(Ordering::Relaxed),
+            job_completions_total: self.job_completions_total.load(Ordering::Relaxed),
+            job_failures_total: self.job_failures_total.load(Ordering::Relaxed),
+            active_subscriptions: self.active_subscriptions.load(Ordering::Relaxed),
+            subscription_rejections_total: self
+                .subscription_rejections_total
+                .load(Ordering::Relaxed),
+        }
+    }
+}
+
+struct ActiveSubscriptionGuard {
+    metrics: Arc<ServerMetrics>,
+}
+
+impl ActiveSubscriptionGuard {
+    fn new(metrics: Arc<ServerMetrics>) -> Self {
+        metrics.active_subscriptions.fetch_add(1, Ordering::Relaxed);
+        Self { metrics }
+    }
+}
+
+impl Drop for ActiveSubscriptionGuard {
+    fn drop(&mut self) {
+        self.metrics
+            .active_subscriptions
+            .fetch_sub(1, Ordering::Relaxed);
+    }
+}
+
+#[derive(Clone)]
 pub struct BpmnLiteService {
     pub engine: Arc<BpmnLiteEngine>,
+    pub event_fanout: Arc<EventFanout>,
+    pub limits: RequestLimits,
+    pub metrics: Arc<ServerMetrics>,
+    pub subscription_limiter: Arc<Semaphore>,
 }
 
 // --- Proto ↔ Core conversions ---
@@ -94,7 +275,13 @@ impl BpmnLite for BpmnLiteService {
         &self,
         request: Request<CompileRequest>,
     ) -> Result<Response<CompileResponse>, Status> {
+        self.metrics.request_started();
         let req = request.into_inner();
+        self.limits.check_bytes(
+            "bpmn_xml",
+            req.bpmn_xml.len(),
+            self.limits.max_bpmn_xml_bytes,
+        )?;
         let result = self
             .engine
             .compile(&req.bpmn_xml)
@@ -119,9 +306,30 @@ impl BpmnLite for BpmnLiteService {
         &self,
         request: Request<StartRequest>,
     ) -> Result<Response<StartResponse>, Status> {
+        self.metrics.request_started();
         let req = request.into_inner();
+        self.limits.check_string("process_key", &req.process_key)?;
+        self.limits
+            .check_string("correlation_id", &req.correlation_id)?;
+        self.limits.check_bytes(
+            "domain_payload",
+            req.domain_payload.len(),
+            self.limits.max_payload_bytes,
+        )?;
+        self.limits.check_bytes(
+            "session_stack_json",
+            req.session_stack_json.len(),
+            self.limits.max_session_stack_bytes,
+        )?;
+        self.limits.check_orch_flags(&req.orch_flags)?;
         let bytecode_version = parse_bytecode_version(&req.bytecode_version)?;
         let hash = parse_hash(&req.domain_payload_hash)?;
+        let actual_hash = bpmn_lite_core::vm::compute_hash(&req.domain_payload);
+        if actual_hash != hash {
+            return Err(Status::invalid_argument(
+                "domain_payload_hash does not match domain_payload",
+            ));
+        }
         let session_stack = if req.session_stack_json.is_empty() {
             ob_poc_types::session_stack::SessionStackState::default()
         } else {
@@ -159,7 +367,13 @@ impl BpmnLite for BpmnLiteService {
         &self,
         request: Request<SignalRequest>,
     ) -> Result<Response<SignalResponse>, Status> {
+        self.metrics.request_started();
         let req = request.into_inner();
+        self.limits
+            .check_string("message_name", &req.message_name)?;
+        self.limits.check_string("msg_id", &req.msg_id)?;
+        self.limits
+            .check_bytes("payload", req.payload.len(), self.limits.max_payload_bytes)?;
         let instance_id = parse_uuid(&req.process_instance_id)?;
 
         let payload = if req.payload.is_empty() {
@@ -207,7 +421,11 @@ impl BpmnLite for BpmnLiteService {
         &self,
         request: Request<CancelRequest>,
     ) -> Result<Response<CancelResponse>, Status> {
+        self.metrics.request_started();
         let req = request.into_inner();
+        self.limits
+            .check_string("process_instance_id", &req.process_instance_id)?;
+        self.limits.check_string("reason", &req.reason)?;
         let instance_id = parse_uuid(&req.process_instance_id)?;
 
         self.engine
@@ -222,7 +440,10 @@ impl BpmnLite for BpmnLiteService {
         &self,
         request: Request<InspectRequest>,
     ) -> Result<Response<InspectResponse>, Status> {
+        self.metrics.request_started();
         let req = request.into_inner();
+        self.limits
+            .check_string("process_instance_id", &req.process_instance_id)?;
         let instance_id = parse_uuid(&req.process_instance_id)?;
 
         let inspection = self.engine.inspect(instance_id).await.map_err(engine_err)?;
@@ -298,8 +519,23 @@ impl BpmnLite for BpmnLiteService {
         &self,
         request: Request<ActivateJobsRequest>,
     ) -> Result<Response<Self::ActivateJobsStream>, Status> {
+        self.metrics.request_started();
         let req = request.into_inner();
-        let max_jobs = req.max_jobs.max(1) as usize;
+        if req.task_types.is_empty() {
+            return Err(Status::invalid_argument("task_types must not be empty"));
+        }
+        if req.task_types.len() > self.limits.max_task_types {
+            return Err(Status::resource_exhausted(format!(
+                "task_types has {} entries; max is {}",
+                req.task_types.len(),
+                self.limits.max_task_types
+            )));
+        }
+        for task_type in &req.task_types {
+            self.limits.check_string("task_type", task_type)?;
+        }
+        let requested = req.max_jobs.max(1) as usize;
+        let max_jobs = requested.min(self.limits.max_activate_jobs);
 
         let jobs = self
             .engine
@@ -308,6 +544,9 @@ impl BpmnLite for BpmnLiteService {
             .map_err(engine_err)?;
 
         let (tx, rx) = tokio::sync::mpsc::channel(jobs.len().max(1));
+        self.metrics
+            .job_activations_total
+            .fetch_add(jobs.len() as u64, Ordering::Relaxed);
 
         for job in jobs {
             let msg = JobActivationMsg {
@@ -341,7 +580,15 @@ impl BpmnLite for BpmnLiteService {
         &self,
         request: Request<CompleteJobRequest>,
     ) -> Result<Response<CompleteJobResponse>, Status> {
+        self.metrics.request_started();
         let req = request.into_inner();
+        self.limits.check_string("job_key", &req.job_key)?;
+        self.limits.check_bytes(
+            "domain_payload",
+            req.domain_payload.len(),
+            self.limits.max_payload_bytes,
+        )?;
+        self.limits.check_orch_flags(&req.orch_flags)?;
         let hash = parse_hash(&req.domain_payload_hash)?;
         let orch_flags = proto_to_orch_flags(&req.orch_flags);
 
@@ -352,6 +599,9 @@ impl BpmnLite for BpmnLiteService {
             .complete_job(&req.job_key, &req.domain_payload, hash, orch_flags)
             .await
             .map_err(engine_err)?;
+        self.metrics
+            .job_completions_total
+            .fetch_add(1, Ordering::Relaxed);
 
         // Tick the instance so the resumed fiber advances (may hit End or next ExecNative)
         self.engine
@@ -366,7 +616,11 @@ impl BpmnLite for BpmnLiteService {
         &self,
         request: Request<FailJobRequest>,
     ) -> Result<Response<FailJobResponse>, Status> {
+        self.metrics.request_started();
         let req = request.into_inner();
+        self.limits.check_string("job_key", &req.job_key)?;
+        self.limits.check_string("error_class", &req.error_class)?;
+        self.limits.check_string("message", &req.message)?;
 
         let error_class = match req.error_class.as_str() {
             "TRANSIENT" => ErrorClass::Transient,
@@ -380,6 +634,9 @@ impl BpmnLite for BpmnLiteService {
             .fail_job(&req.job_key, error_class, &req.message)
             .await
             .map_err(engine_err)?;
+        self.metrics
+            .job_failures_total
+            .fetch_add(1, Ordering::Relaxed);
 
         Ok(Response::new(FailJobResponse {}))
     }
@@ -391,9 +648,11 @@ impl BpmnLite for BpmnLiteService {
         &self,
         request: Request<SubscribeRequest>,
     ) -> Result<Response<Self::SubscribeEventsStream>, Status> {
-        use bpmn_lite_core::events::RuntimeEvent;
+        self.metrics.request_started();
 
         let req = request.into_inner();
+        self.limits
+            .check_string("process_instance_id", &req.process_instance_id)?;
         let instance_id = parse_uuid(&req.process_instance_id)?;
 
         // Verify the instance exists before starting the tail.
@@ -402,71 +661,81 @@ impl BpmnLite for BpmnLiteService {
             .await
             .map_err(engine_err)?;
 
-        let (tx, rx) = tokio::sync::mpsc::channel(64);
-        let engine = self.engine.clone();
+        let permit = self
+            .subscription_limiter
+            .clone()
+            .try_acquire_owned()
+            .map_err(|_| {
+                self.metrics.request_rejected();
+                self.metrics
+                    .subscription_rejections_total
+                    .fetch_add(1, Ordering::Relaxed);
+                Status::resource_exhausted("too many active event subscriptions")
+            })?;
 
-        // Spawn a background task that tails the event log.
-        // Polls for new events every 100ms and stops when a terminal event
-        // (Completed, Cancelled, IncidentCreated) is delivered.
+        let (tx, rx) = tokio::sync::mpsc::channel(64);
+        let event_fanout = self.event_fanout.clone();
+        let metrics = self.metrics.clone();
+        let max_subscription_secs = self.limits.max_subscription_secs;
+
+        // Own the limiter permit for the lifetime of the returned stream.
         tokio::spawn(async move {
-            let mut next_seq: u64 = 0;
+            let _permit = permit;
+            let _active_subscription = ActiveSubscriptionGuard::new(metrics);
+            let started_at = std::time::Instant::now();
+            let mut fanout_rx = match event_fanout.subscribe(instance_id).await {
+                Ok(rx) => rx,
+                Err(status) => {
+                    let _ = tx.send(Err(status)).await;
+                    return;
+                }
+            };
 
             loop {
-                let events = match engine.read_events(instance_id, next_seq).await {
-                    Ok(e) => e,
-                    Err(_) => break,
-                };
-
-                let mut terminal = false;
-
-                for (seq, event) in &events {
-                    // Check for terminal events before formatting.
-                    if matches!(
-                        event,
-                        RuntimeEvent::Completed { .. }
-                            | RuntimeEvent::Cancelled { .. }
-                            | RuntimeEvent::Terminated { .. }
-                            | RuntimeEvent::IncidentCreated { .. }
-                    ) {
-                        terminal = true;
-                    }
-
-                    let event_type = format!("{:?}", event);
-                    let event_type = event_type
-                        .split_once('{')
-                        .or_else(|| event_type.split_once(' '))
-                        .map(|(name, _)| name.trim().to_string())
-                        .unwrap_or(event_type);
-
-                    let payload_json = serde_json::to_string(&event).unwrap_or_default();
-
-                    let msg = LifecycleEvent {
-                        sequence: *seq,
-                        event_type,
-                        process_instance_id: instance_id.to_string(),
-                        payload_json,
-                    };
-
-                    if tx.send(Ok(msg)).await.is_err() {
-                        // Receiver dropped — stop tailing.
-                        return;
-                    }
-
-                    // Advance past the last delivered sequence.
-                    next_seq = seq + 1;
-                }
-
-                if terminal {
+                if started_at.elapsed() > std::time::Duration::from_secs(max_subscription_secs) {
                     break;
                 }
-
-                // No new events yet — poll again after a short delay.
-                tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
+                let remaining = std::time::Duration::from_secs(max_subscription_secs)
+                    .saturating_sub(started_at.elapsed());
+                let next = tokio::time::timeout(remaining, fanout_rx.recv()).await;
+                match next {
+                    Ok(Some(item)) => {
+                        if tx.send(item).await.is_err() {
+                            return;
+                        }
+                    }
+                    Ok(None) | Err(_) => break,
+                }
             }
         });
 
         Ok(Response::new(tokio_stream::wrappers::ReceiverStream::new(
             rx,
         )))
+    }
+
+    async fn health(
+        &self,
+        _request: Request<HealthRequest>,
+    ) -> Result<Response<HealthResponse>, Status> {
+        self.metrics.request_started();
+        match self.engine.health_check().await {
+            Ok(()) => Ok(Response::new(HealthResponse {
+                ready: true,
+                status: "ok".to_string(),
+            })),
+            Err(e) => Ok(Response::new(HealthResponse {
+                ready: false,
+                status: e.to_string(),
+            })),
+        }
+    }
+
+    async fn metrics(
+        &self,
+        _request: Request<MetricsRequest>,
+    ) -> Result<Response<MetricsResponse>, Status> {
+        self.metrics.request_started();
+        Ok(Response::new(self.metrics.snapshot()))
     }
 }

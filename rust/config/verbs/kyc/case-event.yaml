@@ -84,6 +84,11 @@ domains:
           type: uuid
           name: event_id
           capture: false
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
       list-by-case:
         description: List events for a case
         metadata:
@@ -123,3 +128,8 @@ domains:
           type: string
           required: false
           maps_to: event_type
+        three_axis:
+          state_effect: preserving
+          external_effects: [observational]
+          consequence:
+            baseline: benign

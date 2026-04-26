@@ -49,11 +49,11 @@ use crate::agent::learning::warmup::SharedLearnedData;
 use crate::database::VerbService;
 use crate::dsl_v2::macros::MacroRegistry;
 use crate::dsl_v2::runtime_registry::runtime_registry;
-use crate::entity_kind::canonicalize as canonicalize_entity_kind;
 use crate::lexicon::LexiconService;
 use crate::mcp::compound_intent::extract_compound_signals;
 use crate::mcp::macro_index::{MacroIndex, MacroResolveOutcome};
 use crate::mcp::scenario_index::{ResolvedRoute, ScenarioIndex, ScenarioResolveOutcome};
+use dsl_runtime::entity_kind::canonicalize as canonicalize_entity_kind;
 
 /// Shared lexicon service type alias
 pub type SharedLexicon = Arc<dyn LexiconService>;
@@ -623,11 +623,16 @@ impl HybridVerbSearcher {
                             | ResolvedRoute::NeedsVerbSelection { .. } => None,
                         };
                         if let Some(fqn) = route_fqn {
-                            // Scenarios are compound intents — bypass CCIR allowed_verbs
-                            // check. Macro routes are deterministic phrase matches, not
-                            // fuzzy search results. The pack's allowed_verbs (checked
-                            // downstream by pack scoring) is the correct gate.
+                            // F14 fix (2026-04-22): scenario routes MUST pass the CCIR
+                            // allowed_verbs check. Previously this path bypassed it — any
+                            // scenario-routed verb could skip SemOS gating. Other tiers
+                            // (scenario-ambiguous line ~684, macro-matched line ~725,
+                            // macro-ambiguous line ~765) already filter; this aligns the
+                            // scenario-matched path with them. The fail-open semantics of
+                            // `is_none_or` (permit when allowed_verbs is None) is handled
+                            // separately by Slice 3.2 / F17 (runbook compiler fail-closed).
                             if self.matches_entity_kind(&fqn, entity_kind)
+                                && allowed_verbs.is_none_or(|av| av.contains(&fqn))
                                 && !seen_verbs.contains(&fqn)
                             {
                                 tracing::info!(
@@ -2195,5 +2200,201 @@ mod tests {
         // No match - completely different query
         let results = searcher.search_macros("something completely different", 5);
         assert!(results.is_empty());
+    }
+
+    // =========================================================================
+    // F14 Regression Tests — SemOS tollgate: Tier -2A ScenarioIndex matched path
+    // MUST filter against allowed_verbs before returning a candidate. Before the
+    // fix this path bypassed the CCIR check, allowing scenario-routed verbs to
+    // slip past SemOS gating.
+    // =========================================================================
+
+    /// Minimal scenario YAML used by the F14 tests. One scenario that maps an
+    /// utterance to a deterministic macro FQN via `kind: macro`. Because the
+    /// scenario-matched code path pushes the route FQN as the `verb` field
+    /// (even for macro routes), we can assert on that FQN directly.
+    fn f14_scenario_yaml() -> &'static str {
+        r#"
+scenarios:
+  - id: lux-sicav-setup
+    title: Luxembourg UCITS SICAV Setup
+    modes: [onboarding, structure]
+    requires:
+      any_of: [compound_action, jurisdiction_structure_pair]
+    signals:
+      actions: [onboard, "set up", establish, launch]
+      jurisdictions: [LU]
+      nouns_any: [sicav, ucits, fund]
+    routes:
+      kind: macro
+      macro_fqn: struct.lux.ucits.sicav
+    explain:
+      summary: "Full Luxembourg UCITS SICAV setup"
+"#
+    }
+
+    fn f14_searcher() -> HybridVerbSearcher {
+        let idx = ScenarioIndex::from_yaml_str(f14_scenario_yaml()).unwrap();
+        HybridVerbSearcher::minimal().with_scenario_index(std::sync::Arc::new(idx))
+    }
+
+    /// Scenario matches, and its target FQN is in `allowed_verbs`.
+    /// Expect the verb to be returned with `ScenarioIndex` source and score 1.05.
+    #[tokio::test]
+    async fn test_f14_scenario_matched_verb_in_allowed_set_passes() {
+        let searcher = f14_searcher();
+        let mut allowed = HashSet::new();
+        allowed.insert("struct.lux.ucits.sicav".to_string());
+        allowed.insert("other.verb".to_string());
+
+        let results = searcher
+            .search(
+                "Onboard a Luxembourg SICAV",
+                None,
+                None,
+                None,
+                5,
+                Some(&allowed),
+                None,
+                None,
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(results.len(), 1, "expected single scenario match");
+        assert_eq!(results[0].verb, "struct.lux.ucits.sicav");
+        assert!(matches!(results[0].source, VerbSearchSource::ScenarioIndex));
+        assert!((results[0].score - 1.05).abs() < 0.001);
+    }
+
+    /// Scenario matches, but its target FQN is NOT in `allowed_verbs`.
+    /// **P0 regression test**: before the F14 fix this verb leaked past the
+    /// filter. After the fix, the filter rejects it at the Matched path, and
+    /// the search falls through lower tiers (which have no matches in the
+    /// minimal searcher), producing an empty result set.
+    #[tokio::test]
+    async fn test_f14_scenario_matched_verb_not_in_allowed_set_filtered() {
+        let searcher = f14_searcher();
+        let mut allowed = HashSet::new();
+        allowed.insert("some.other.verb".to_string()); // deliberately NOT the scenario FQN
+
+        let results = searcher
+            .search(
+                "Onboard a Luxembourg SICAV",
+                None,
+                None,
+                None,
+                5,
+                Some(&allowed),
+                None,
+                None,
+            )
+            .await
+            .unwrap();
+
+        assert!(
+            results.is_empty(),
+            "P0 bypass regressed: scenario-routed verb {:?} returned despite being outside \
+             allowed_verbs. This means F14 has regressed — the Tier -2A Matched path is \
+             bypassing CCIR again.",
+            results.iter().map(|r| &r.verb).collect::<Vec<_>>()
+        );
+    }
+
+    /// When `allowed_verbs` is `None`, the existing semantics (fail-open) are
+    /// preserved: the verb passes. This is intentional at the Tier -2A level —
+    /// the `is_none_or` filter passes through None. The "fail-closed on None"
+    /// semantic is out of scope for F14; see Slice 3.2 / F17 where the
+    /// runbook compiler enforces fail-closed on envelope unavailability.
+    #[tokio::test]
+    async fn test_f14_scenario_matched_with_none_allowed_verbs_passes() {
+        let searcher = f14_searcher();
+
+        let results = searcher
+            .search(
+                "Onboard a Luxembourg SICAV",
+                None,
+                None,
+                None,
+                5,
+                None, // allowed_verbs = None
+                None,
+                None,
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].verb, "struct.lux.ucits.sicav");
+    }
+
+    /// Regression test: the Tier -2A Ambiguous path already had an
+    /// `is_none_or(|av| av.contains(&fqn))` filter before F14. This test
+    /// pins that behaviour so a future refactor doesn't undo it.
+    ///
+    /// Uses a two-scenario YAML that both match "Onboard a Luxembourg SICAV"
+    /// at the same score so the resolver produces an Ambiguous outcome.
+    #[tokio::test]
+    async fn test_f14_scenario_ambiguous_path_filters_allowed_verbs() {
+        // Two identical-signal scenarios — resolver flags them ambiguous.
+        let yaml = r#"
+scenarios:
+  - id: scenario-one
+    title: Scenario One
+    modes: [onboarding]
+    requires:
+      any_of: [compound_action]
+    signals:
+      actions: [onboard]
+      jurisdictions: [LU]
+      nouns_any: [sicav]
+    routes:
+      kind: macro
+      macro_fqn: macro.scenario.one
+  - id: scenario-two
+    title: Scenario Two
+    modes: [onboarding]
+    requires:
+      any_of: [compound_action]
+    signals:
+      actions: [onboard]
+      jurisdictions: [LU]
+      nouns_any: [sicav]
+    routes:
+      kind: macro
+      macro_fqn: macro.scenario.two
+"#;
+        let idx = ScenarioIndex::from_yaml_str(yaml).unwrap();
+        let searcher = HybridVerbSearcher::minimal().with_scenario_index(std::sync::Arc::new(idx));
+
+        // Allow only scenario-two. Scenario-one must be filtered from the
+        // Ambiguous result set.
+        let mut allowed = HashSet::new();
+        allowed.insert("macro.scenario.two".to_string());
+
+        let results = searcher
+            .search(
+                "Onboard a Luxembourg SICAV",
+                None,
+                None,
+                None,
+                5,
+                Some(&allowed),
+                None,
+                None,
+            )
+            .await
+            .unwrap();
+
+        // If both scenarios reach "Matched" individually we could see either
+        // one-with-filter or two-without-filter. Assert the filter holds:
+        // anything returned must be in the allowed set.
+        for r in &results {
+            assert!(
+                allowed.contains(&r.verb),
+                "scenario verb {} leaked past allowed_verbs filter",
+                r.verb
+            );
+        }
     }
 }

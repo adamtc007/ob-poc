@@ -8,7 +8,7 @@ use std::collections::HashSet;
 
 use dsl_core::config::types::ActionClass;
 
-use crate::entity_kind::matches as entity_kind_matches;
+use dsl_runtime::entity_kind::matches as entity_kind_matches;
 
 use super::outcome::OutcomeIntent;
 use super::polarity::IntentPolarity;

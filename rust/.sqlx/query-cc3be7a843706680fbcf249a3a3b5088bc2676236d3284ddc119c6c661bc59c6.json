@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        UPDATE \"ob-poc\".outstanding_requests\n        SET status = CASE WHEN status = 'PENDING' THEN 'SUBMITTED' ELSE status END,\n            updated_at = now()\n        WHERE request_id = $1\n        ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "cc3be7a843706680fbcf249a3a3b5088bc2676236d3284ddc119c6c661bc59c6"
+}

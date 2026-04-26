@@ -20,10 +20,44 @@
 //! let csg_rules = loader.load_csg_rules()?;
 //! ```
 
+pub mod dag;
+pub mod dag_registry;
+pub mod dag_validator;
+pub mod escalation;
 pub mod loader;
+pub mod pack_loader;
 pub mod phrase_gen;
+pub mod runbook_composition;
 pub mod types;
+pub mod validator;
 
+pub use dag::{load_dags_from_dir, Dag, LoadedDag};
+pub use dag_registry::{DagRegistry, SlotKey, TransitionKey};
+pub use dag_validator::{validate_dags, DagError, DagValidationReport, DagWarning};
+pub use pack_loader::{flatten_pack_entries, load_packs_from_dir, LoadedPack};
+
+pub use escalation::{
+    compute_effective_tier, compute_effective_tier_with_trace, evaluate_predicate,
+    EvaluationContext,
+};
 pub use loader::ConfigLoader;
 pub use phrase_gen::generate_phrases;
-pub use types::*;
+pub use runbook_composition::{
+    component_a, component_b, component_c, compute_runbook_tier, compute_runbook_tier_with_trace,
+    AggregationRule, CrossScopeRule, RunbookStep, RunbookTierTrace,
+};
+pub use types::{
+    ActionClass, AppliesTo, ArgConfig, ArgType, ArgValidation, ConfirmPolicyConfig,
+    ConsequenceDeclaration, ConsequenceTier, ConstraintRule, CrudConfig, CrudOperation,
+    CsgRulesConfig, DomainConfig, DurableConfig, DurableRuntime, EscalationPredicate,
+    EscalationRule, ExternalEffect, FuzzyCheckConfig, GraphQueryConfig, GraphQueryOperation,
+    HarmClass, JurisdictionCondition, JurisdictionRule, LookupConfig, ResolutionMode,
+    ReturnTypeConfig, ReturnsConfig, RuleCondition, RuleRequirement, RuleSeverity, SearchKeyConfig,
+    SlotType, SourceOfTruth, StateEffect, ThreeAxisDeclaration, TransitionEdge, VerbBehavior,
+    VerbConfig, VerbConsumes, VerbLifecycle, VerbMetadata, VerbOutputConfig, VerbProduces,
+    VerbScope, VerbSentences, VerbStatus, VerbTier, VerbTransitions, VerbsConfig, WarningRule,
+};
+pub use validator::{
+    collect_declared_fqns, validate_pack_fqns, validate_verb, validate_verbs_config, Location,
+    PolicyWarning, StructuralError, ValidationContext, ValidationReport, WellFormednessError,
+};

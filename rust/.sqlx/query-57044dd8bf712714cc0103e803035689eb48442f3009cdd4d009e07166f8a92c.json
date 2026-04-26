@@ -1,0 +1,46 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT\n            e.entity_id,\n            e.name,\n            et.type_code as entity_type,\n            elc.jurisdiction as \"jurisdiction?\",\n            ei.identifier_value as \"lei?\"\n        FROM \"ob-poc\".entities e\n        JOIN \"ob-poc\".entity_types et ON et.entity_type_id = e.entity_type_id\n        LEFT JOIN \"ob-poc\".entity_limited_companies elc ON elc.entity_id = e.entity_id\n        LEFT JOIN \"ob-poc\".entity_identifiers ei ON ei.entity_id = e.entity_id AND ei.identifier_type = 'LEI'\n        WHERE e.entity_id = $1\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "entity_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "name",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 2,
+        "name": "entity_type",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 3,
+        "name": "jurisdiction?",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 4,
+        "name": "lei?",
+        "type_info": "Varchar"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      true,
+      true,
+      false
+    ]
+  },
+  "hash": "57044dd8bf712714cc0103e803035689eb48442f3009cdd4d009e07166f8a92c"
+}

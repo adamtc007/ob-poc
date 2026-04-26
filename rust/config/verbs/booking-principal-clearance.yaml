@@ -1,0 +1,378 @@
+# Booking Principal Clearance — verb catalogue (R3, 2026-04-26).
+#
+# Adam's three deal tollgates are BAC + KYC + Booking Principals. BAC and
+# KYC are state-machined; this domain adds the third (BP clearance) as a
+# stateful slot inside deal_dag.yaml §2.2.1.
+#
+# Per-deal-per-principal scope (Adam option (a)) — every deal must clear
+# each contributing booking principal independently. UNIQUE
+# (booking_principal_id, deal_id, cbu_id) on the carrier table enforces
+# the triple.
+#
+# Gate target: deal.deal_status KYC_CLEARANCE → CONTRACTED is blocked
+# unless every BP clearance attached to the deal is APPROVED or ACTIVE
+# (cross_workspace_constraints.deal_contracted_requires_bp_approved).
+#
+# State machine: PENDING (entry) → SCREENING → APPROVED / REJECTED →
+# ACTIVE → SUSPENDED → REVOKED (terminal). REJECTED → PENDING via
+# reopen.
+
+domains:
+  booking-principal-clearance:
+    description: Per-(deal, booking_principal) clearance lifecycle — third leg of deal tollgate
+    invocation_hints:
+      - booking principal
+      - BP clearance
+      - principal clearance
+      - clearance
+    verbs:
+
+      create:
+        description: "Create a new booking-principal clearance row for (deal, booking_principal[, cbu]) — entry state PENDING"
+        behavior: plugin
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: global
+          noun: booking-principal-clearance
+          subject_kinds: [deal]
+          phase_tags: [deal]
+          side_effects: state_write
+          harm_class: reversible
+        invocation_phrases:
+          - "create booking principal clearance"
+          - "request BP clearance"
+          - "open BP clearance"
+          - "raise booking principal clearance"
+          - "new BP clearance request"
+          - "add BP clearance to deal"
+        args:
+          - name: deal-id
+            type: uuid
+            required: true
+            maps_to: deal_id
+          - name: booking-principal-id
+            type: uuid
+            required: true
+            maps_to: booking_principal_id
+          - name: cbu-id
+            type: uuid
+            required: false
+            maps_to: cbu_id
+          - name: notes
+            type: string
+            required: false
+            maps_to: notes
+        returns:
+          type: record
+          fields:
+            - clearance_id
+            - clearance_status
+        outputs:
+          - name: clearance_id
+            type: uuid
+            entity_kind: booking-principal-clearance
+            description: ID of the newly created clearance row
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
+
+      start-screening:
+        description: "Transition clearance PENDING → SCREENING (begin sanctions / credit / regulatory screening)"
+        behavior: plugin
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: global
+          noun: booking-principal-clearance
+          subject_kinds: [deal]
+          phase_tags: [deal]
+          side_effects: state_write
+          harm_class: reversible
+        invocation_phrases:
+          - "start BP screening"
+          - "begin booking principal screening"
+          - "screen the booking principal"
+          - "kick off BP clearance screening"
+          - "initiate principal screening"
+        args:
+          - name: clearance-id
+            type: uuid
+            required: true
+            maps_to: clearance_id
+        returns:
+          type: affected
+        three_axis:
+          state_effect: transition
+          external_effects: [emitting]
+          consequence:
+            baseline: reviewable
+        transition_args:
+          entity_id_arg: clearance-id
+          target_workspace: booking_principal
+          target_slot: clearance
+
+      approve:
+        description: "Transition clearance SCREENING → APPROVED (screening passed)"
+        behavior: plugin
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: global
+          noun: booking-principal-clearance
+          subject_kinds: [deal]
+          phase_tags: [deal]
+          side_effects: state_write
+          harm_class: reversible
+        invocation_phrases:
+          - "approve BP clearance"
+          - "approve booking principal clearance"
+          - "clear the booking principal"
+          - "BP clearance approved"
+          - "pass principal screening"
+        args:
+          - name: clearance-id
+            type: uuid
+            required: true
+            maps_to: clearance_id
+          - name: notes
+            type: string
+            required: false
+            maps_to: notes
+        returns:
+          type: affected
+        three_axis:
+          state_effect: transition
+          external_effects: [emitting]
+          consequence:
+            baseline: requires_confirmation
+        transition_args:
+          entity_id_arg: clearance-id
+          target_workspace: booking_principal
+          target_slot: clearance
+
+      reject:
+        description: "Transition clearance SCREENING → REJECTED (screening failed; reopenable)"
+        behavior: plugin
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: global
+          noun: booking-principal-clearance
+          subject_kinds: [deal]
+          phase_tags: [deal]
+          side_effects: state_write
+          harm_class: reversible
+        invocation_phrases:
+          - "reject BP clearance"
+          - "reject booking principal clearance"
+          - "fail BP screening"
+          - "deny principal clearance"
+          - "BP clearance failed"
+        args:
+          - name: clearance-id
+            type: uuid
+            required: true
+            maps_to: clearance_id
+          - name: reason
+            type: string
+            required: true
+            maps_to: rejection_reason
+        returns:
+          type: affected
+        three_axis:
+          state_effect: transition
+          external_effects: [emitting]
+          consequence:
+            baseline: requires_confirmation
+        transition_args:
+          entity_id_arg: clearance-id
+          target_workspace: booking_principal
+          target_slot: clearance
+
+      reopen:
+        description: "Transition clearance REJECTED → PENDING (retry after remediation)"
+        behavior: plugin
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: global
+          noun: booking-principal-clearance
+          subject_kinds: [deal]
+          phase_tags: [deal]
+          side_effects: state_write
+          harm_class: reversible
+        invocation_phrases:
+          - "reopen BP clearance"
+          - "retry booking principal clearance"
+          - "reset BP clearance to pending"
+          - "restart principal clearance"
+        args:
+          - name: clearance-id
+            type: uuid
+            required: true
+            maps_to: clearance_id
+          - name: notes
+            type: string
+            required: false
+            maps_to: notes
+        returns:
+          type: affected
+        three_axis:
+          state_effect: transition
+          external_effects: [emitting]
+          consequence:
+            baseline: reviewable
+        transition_args:
+          entity_id_arg: clearance-id
+          target_workspace: booking_principal
+          target_slot: clearance
+
+      activate:
+        description: "Transition clearance APPROVED → ACTIVE (clearance live for this deal)"
+        behavior: plugin
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: global
+          noun: booking-principal-clearance
+          subject_kinds: [deal]
+          phase_tags: [deal]
+          side_effects: state_write
+          harm_class: reversible
+        invocation_phrases:
+          - "activate BP clearance"
+          - "activate booking principal clearance"
+          - "make BP clearance active"
+          - "go-live booking principal clearance"
+        args:
+          - name: clearance-id
+            type: uuid
+            required: true
+            maps_to: clearance_id
+        returns:
+          type: affected
+        three_axis:
+          state_effect: transition
+          external_effects: [emitting]
+          consequence:
+            baseline: requires_confirmation
+        transition_args:
+          entity_id_arg: clearance-id
+          target_workspace: booking_principal
+          target_slot: clearance
+
+      suspend:
+        description: "Transition clearance ACTIVE → SUSPENDED (regulatory hold, audit, dispute)"
+        behavior: plugin
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: global
+          noun: booking-principal-clearance
+          subject_kinds: [deal]
+          phase_tags: [deal]
+          side_effects: state_write
+          harm_class: reversible
+        invocation_phrases:
+          - "suspend BP clearance"
+          - "suspend booking principal clearance"
+          - "pause BP clearance"
+          - "hold booking principal clearance"
+          - "put BP clearance on hold"
+        args:
+          - name: clearance-id
+            type: uuid
+            required: true
+            maps_to: clearance_id
+          - name: reason
+            type: string
+            required: true
+            maps_to: suspension_reason
+        returns:
+          type: affected
+        three_axis:
+          state_effect: transition
+          external_effects: [emitting]
+          consequence:
+            baseline: requires_confirmation
+        transition_args:
+          entity_id_arg: clearance-id
+          target_workspace: booking_principal
+          target_slot: clearance
+
+      reinstate:
+        description: "Transition clearance SUSPENDED → ACTIVE (lift suspension)"
+        behavior: plugin
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: global
+          noun: booking-principal-clearance
+          subject_kinds: [deal]
+          phase_tags: [deal]
+          side_effects: state_write
+          harm_class: reversible
+        invocation_phrases:
+          - "reinstate BP clearance"
+          - "reinstate booking principal clearance"
+          - "lift BP clearance suspension"
+          - "resume BP clearance"
+          - "unsuspend booking principal clearance"
+        args:
+          - name: clearance-id
+            type: uuid
+            required: true
+            maps_to: clearance_id
+        returns:
+          type: affected
+        three_axis:
+          state_effect: transition
+          external_effects: [emitting]
+          consequence:
+            baseline: requires_confirmation
+        transition_args:
+          entity_id_arg: clearance-id
+          target_workspace: booking_principal
+          target_slot: clearance
+
+      revoke:
+        description: "Transition clearance APPROVED|ACTIVE|SUSPENDED → REVOKED (terminal — withdraw clearance)"
+        behavior: plugin
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: global
+          noun: booking-principal-clearance
+          subject_kinds: [deal]
+          phase_tags: [deal]
+          side_effects: state_write
+          harm_class: irreversible
+        invocation_phrases:
+          - "revoke BP clearance"
+          - "revoke booking principal clearance"
+          - "withdraw BP clearance"
+          - "terminate booking principal clearance"
+          - "permanently remove BP clearance"
+        args:
+          - name: clearance-id
+            type: uuid
+            required: true
+            maps_to: clearance_id
+          - name: reason
+            type: string
+            required: true
+            maps_to: notes
+        returns:
+          type: affected
+        three_axis:
+          state_effect: transition
+          external_effects: [emitting]
+          consequence:
+            baseline: requires_explicit_authorisation
+        transition_args:
+          entity_id_arg: clearance-id
+          target_workspace: booking_principal
+          target_slot: clearance

@@ -15,7 +15,7 @@ scenarios:
     steps:
       - user: ""
         expect:
-          outcome: "NoMatch"
+          outcome: "SemanticNotReady"
           run_sheet_delta: 0
 
   - name: "very_long_utterance"
@@ -23,48 +23,48 @@ scenarios:
     steps:
       - user: "This is a very long utterance that goes on and on about creating a complex fund structure for the Allianz group involving multiple sub-funds across jurisdictions including Luxembourg, Ireland, and the Cayman Islands, with various share classes and fee arrangements, custodian appointments, and transfer agent setups that need to be coordinated across multiple counterparties and service providers in the global custody network spanning Europe and Asia Pacific regions with complex netting arrangements."
         expect:
-          outcome: "NoMatch"
+          outcome: "SemanticNotReady"
 
   - name: "special_characters"
     description: "Special characters in input handled gracefully"
     steps:
       - user: "create <entity> with name=\"O'Brien & Sons (Ltd.)\" @#$%"
         expect:
-          outcome: "NoMatch"
+          outcome: "NeedsUserInput"
 
   - name: "repeated_identical_utterances"
     description: "Same utterance repeated produces same outcome (deterministic)"
     steps:
       - user: "hello world"
         expect:
-          outcome: "NoMatch"
+          outcome: "SemanticNotReady"
       - user: "hello world"
         expect:
-          outcome: "NoMatch"
+          outcome: "SemanticNotReady"
       - user: "hello world"
         expect:
-          outcome: "NoMatch"
+          outcome: "SemanticNotReady"
 
   - name: "unicode_and_accents"
     description: "Unicode characters in utterance handled"
     steps:
       - user: "créer une entité pour Société Générale"
         expect:
-          outcome: "NoMatch"
+          outcome: "SemanticNotReady"
 
   - name: "numeric_only_input"
     description: "Pure numeric input handled gracefully"
     steps:
       - user: "12345"
         expect:
-          outcome: "NoMatch"
+          outcome: "SemanticNotReady"
 
   - name: "sql_injection_attempt"
     description: "SQL-like input doesn't cause issues"
     steps:
       - user: "'; DROP TABLE users; --"
         expect:
-          outcome: "NoMatch"
+          outcome: "NeedsUserInput"
           run_sheet_delta: 0
 
   - name: "dsl_like_but_not_prefix"
@@ -72,4 +72,4 @@ scenarios:
     steps:
       - user: "(cbu.create :name \"Test\")"
         expect:
-          outcome: "NoMatch"
+          outcome: "SemanticNotReady"

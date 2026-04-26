@@ -79,6 +79,11 @@ domains:
           - name: warnings
             type: array
             description: "Non-blocking issues"
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
 
       get-metrics:
         description: Compute current metrics for a CBU without recording evaluation
@@ -138,6 +143,11 @@ domains:
           - name: days_since_last_refresh
             type: integer
             description: "Days since last KYC refresh"
+        three_axis:
+          state_effect: preserving
+          external_effects: [observational]
+          consequence:
+            baseline: benign
 
       set-threshold:
         description: Update a tollgate threshold
@@ -212,6 +222,11 @@ domains:
           description: "Weight for scoring (default 1.0)"
         returns:
           type: affected
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
 
       override:
         description: Record management override of tollgate failure
@@ -272,6 +287,11 @@ domains:
         returns:
           type: uuid
           name: override_id
+        three_axis:
+          state_effect: preserving
+          external_effects: [emitting]
+          consequence:
+            baseline: requires_explicit_authorisation
 
       list-evaluations:
         description: List tollgate evaluations for a case
@@ -319,6 +339,11 @@ domains:
           - PERIODIC_REVIEW
         returns:
           type: record_set
+        three_axis:
+          state_effect: preserving
+          external_effects: [observational]
+          consequence:
+            baseline: benign
 
       list-thresholds:
         description: List all configured thresholds
@@ -355,6 +380,11 @@ domains:
           maps_to: is_blocking
         returns:
           type: record_set
+        three_axis:
+          state_effect: preserving
+          external_effects: [observational]
+          consequence:
+            baseline: benign
 
       get-decision-readiness:
         description: |
@@ -406,6 +436,11 @@ domains:
           - name: recommended_actions
             type: array
             description: "Suggested next steps"
+        three_axis:
+          state_effect: preserving
+          external_effects: [observational]
+          consequence:
+            baseline: benign
 
       list-overrides:
         description: List overrides for a case or evaluation
@@ -442,6 +477,11 @@ domains:
           description: "Filter by case (via evaluation)"
         returns:
           type: record_set
+        three_axis:
+          state_effect: preserving
+          external_effects: [observational]
+          consequence:
+            baseline: benign
 
       expire-override:
         description: Manually expire an override
@@ -485,6 +525,11 @@ domains:
           expiry_date: "now()"
         returns:
           type: affected
+        three_axis:
+          state_effect: preserving
+          external_effects: [emitting]
+          consequence:
+            baseline: requires_explicit_authorisation
 
       # =========================================================================
       # GATE-BASED EVALUATION (KYC/UBO Computed Architecture)
@@ -544,3 +589,8 @@ domains:
           - name: evaluation_detail
             type: json
             description: "Detailed evaluation results per criterion"
+        three_axis:
+          state_effect: preserving
+          external_effects: [observational]
+          consequence:
+            baseline: benign

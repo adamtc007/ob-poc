@@ -126,6 +126,11 @@ domains:
             type: uuid
             entity_kind: billing_profile
             description: ID of the newly created billing profile
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
 
       activate-profile:
         description: "Activate a billing profile (CBU is live and generating activity)"
@@ -157,6 +162,15 @@ domains:
             maps_to: profile_id
         returns:
           type: affected
+        three_axis:
+          state_effect: transition
+          external_effects: [emitting]
+          consequence:
+            baseline: requires_confirmation
+        transition_args:
+          entity_id_arg: profile-id
+          target_workspace: deal
+          target_slot: billing_profile
 
       suspend-profile:
         description: "Suspend billing (e.g. dispute, investigation)"
@@ -192,6 +206,15 @@ domains:
             description: "Reason for suspension"
         returns:
           type: affected
+        three_axis:
+          state_effect: transition
+          external_effects: [emitting]
+          consequence:
+            baseline: requires_confirmation
+        transition_args:
+          entity_id_arg: profile-id
+          target_workspace: deal
+          target_slot: billing_profile
 
       close-profile:
         description: "Close billing profile (offboarding)"
@@ -227,6 +250,15 @@ domains:
             maps_to: effective_to
         returns:
           type: affected
+        three_axis:
+          state_effect: transition
+          external_effects: [emitting]
+          consequence:
+            baseline: requires_explicit_authorisation
+        transition_args:
+          entity_id_arg: profile-id
+          target_workspace: deal
+          target_slot: billing_profile
 
       get-profile:
         description: "Retrieve billing profile with account targets"
@@ -262,6 +294,11 @@ domains:
             maps_to: profile_id
         returns:
           type: record
+        three_axis:
+          state_effect: preserving
+          external_effects: [observational]
+          consequence:
+            baseline: benign
 
       list-profiles:
         description: "List billing profiles for a deal or CBU"
@@ -306,6 +343,11 @@ domains:
             valid_values: [PENDING, ACTIVE, SUSPENDED, CLOSED]
         returns:
           type: record_set
+        three_axis:
+          state_effect: preserving
+          external_effects: [observational]
+          consequence:
+            baseline: benign
 
       # =========================================================================
       # ACCOUNT TARGETS (Closed Loop)
@@ -382,6 +424,11 @@ domains:
           type: uuid
           name: target_id
           capture: true
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
 
       remove-account-target:
         description: "Soft-remove an account target from billing"
@@ -413,6 +460,11 @@ domains:
             maps_to: target_id
         returns:
           type: affected
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: requires_confirmation
 
       list-account-targets:
         description: "List account targets for a billing profile"
@@ -448,6 +500,11 @@ domains:
             maps_to: profile_id
         returns:
           type: record_set
+        three_axis:
+          state_effect: preserving
+          external_effects: [observational]
+          consequence:
+            baseline: benign
 
       # =========================================================================
       # FEE CALCULATION RUNS
@@ -502,6 +559,11 @@ domains:
           type: uuid
           name: period_id
           capture: true
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
 
       calculate-period:
         description: "Run fee calculation for a billing period"
@@ -536,6 +598,15 @@ domains:
             maps_to: period_id
         returns:
           type: record
+        three_axis:
+          state_effect: transition
+          external_effects: [observational]
+          consequence:
+            baseline: benign
+        transition_args:
+          entity_id_arg: period-id
+          target_workspace: deal
+          target_slot: billing_period
 
       review-period:
         description: "Mark billing period as reviewed, optionally apply adjustments"
@@ -578,6 +649,15 @@ domains:
             description: "Array of {period_line_id, adjustment_amount, reason}"
         returns:
           type: affected
+        three_axis:
+          state_effect: transition
+          external_effects: [observational]
+          consequence:
+            baseline: benign
+        transition_args:
+          entity_id_arg: period-id
+          target_workspace: deal
+          target_slot: billing_period
 
       approve-period:
         description: "Approve billing period for invoicing"
@@ -621,6 +701,15 @@ domains:
             maps_to: approved_by
         returns:
           type: affected
+        three_axis:
+          state_effect: transition
+          external_effects: [emitting]
+          consequence:
+            baseline: requires_confirmation
+        transition_args:
+          entity_id_arg: period-id
+          target_workspace: deal
+          target_slot: billing_period
 
       generate-invoice:
         description: "Generate invoice from approved billing period"
@@ -662,6 +751,15 @@ domains:
           type: uuid
           name: invoice_id
           capture: true
+        three_axis:
+          state_effect: transition
+          external_effects: [emitting]
+          consequence:
+            baseline: requires_confirmation
+        transition_args:
+          entity_id_arg: period-id
+          target_workspace: deal
+          target_slot: billing_period
 
       dispute-period:
         description: "Client disputes a billing period"
@@ -701,6 +799,15 @@ domains:
             description: "Array of period_line_ids being disputed"
         returns:
           type: affected
+        three_axis:
+          state_effect: transition
+          external_effects: [emitting]
+          consequence:
+            baseline: requires_confirmation
+        transition_args:
+          entity_id_arg: period-id
+          target_workspace: deal
+          target_slot: billing_period
 
       period-summary:
         description: "Get billing period with line-level detail"
@@ -732,6 +839,11 @@ domains:
             maps_to: period_id
         returns:
           type: record
+        three_axis:
+          state_effect: preserving
+          external_effects: [observational]
+          consequence:
+            baseline: benign
 
       revenue-summary:
         description: "Revenue summary across deals, periods, products"
@@ -775,3 +887,8 @@ domains:
             description: "Revenue to this date"
         returns:
           type: record
+        three_axis:
+          state_effect: preserving
+          external_effects: [observational]
+          consequence:
+            baseline: benign

@@ -1,0 +1,70 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT\n                sdm.delivery_id,\n                sdm.product_id,\n                p.name as \"product_name!\",\n                sdm.service_id,\n                s.name as \"service_name!\",\n                cri.instance_id as \"instance_id?\",\n                cri.instance_name as \"instance_name?\",\n                srt.name as \"resource_type_name?\",\n                sdm.delivery_status as \"delivery_status?\"\n               FROM \"ob-poc\".service_delivery_map sdm\n               JOIN \"ob-poc\".products p ON p.product_id = sdm.product_id\n               JOIN \"ob-poc\".services s ON s.service_id = sdm.service_id\n               LEFT JOIN \"ob-poc\".cbu_resource_instances cri\n                   ON cri.cbu_id = sdm.cbu_id\n                   AND cri.product_id = sdm.product_id\n                   AND cri.service_id = sdm.service_id\n               LEFT JOIN \"ob-poc\".service_resource_types srt ON srt.resource_id = cri.resource_type_id\n               WHERE sdm.cbu_id = $1\n               ORDER BY p.name, s.name, srt.name",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "delivery_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "product_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 2,
+        "name": "product_name!",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 3,
+        "name": "service_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 4,
+        "name": "service_name!",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 5,
+        "name": "instance_id?",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 6,
+        "name": "instance_name?",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 7,
+        "name": "resource_type_name?",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 8,
+        "name": "delivery_status?",
+        "type_info": "Varchar"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      true,
+      false,
+      true
+    ]
+  },
+  "hash": "3cba1eb687e393a2b307146e3c90537a02080c62d77abdb289a32b8d89441fc0"
+}

@@ -1,14 +1,16 @@
 # CLAUDE.md
 
-> **Last reviewed:** 2026-04-13
+> **Last reviewed:** 2026-04-26
 > **Frontend:** React/TypeScript (`ob-poc-ui-react/`) — Chat UI with scope panel, Inspector, Semantic OS Tab
 > **Backend:** Rust/Axum (`rust/crates/ob-poc-web/`) — Serves React + REST API
-> **Crates:** 22 active Rust crates (16 ob-poc + 6 sem_os_*)
-> **Verbs:** 1,487+ canonical verbs (1,464 base + 16 cross-workspace + 7 navigation), 24,587 intent patterns (DB-sourced)
+> **Crates:** 23 active Rust crates (17 ob-poc + 6 sem_os_*) — `dsl-runtime-macros` deleted in Phase 5c-migrate slice #80
+> **Verbs:** 1,282 canonical verbs across 134 domains (795 declared with three-axis = 62.0%); 24,587 intent patterns (DB-sourced)
 > **Macros:** 103 operator macros (22 YAML files, 18 domains, 3 composite), Tier -2B in intent pipeline
 > **MCP Tools:** ~102 tools (DSL, verbs, learning, session, batch, research, taxonomy, sem_reg, stewardship, db_introspect, session_verb_surface)
-> **Latest schema addition:** `rust/migrations/20260403_compensation_records.sql`
-> **Workspaces:** 7 (CBU, KYC, Deal, OnBoarding, ProductMaintenance, InstrumentMatrix [two-stage: group template + CBU instance], SemOsMaintenance)
+> **DAG Taxonomies:** 11 (CBU + KYC + Deal + InstrumentMatrix + BookingPrincipal + LifecycleResources + ProductMaintenance + SemOsMaintenance + SessionBootstrap + OnboardingRequest + BookSetup) — see `rust/config/sem_os_seeds/dag_taxonomies/`
+> **Latest schema additions:** `rust/migrations/20260424_tranche_2_3_dag_alignment.sql`, `rust/migrations/20260425_manco_regulatory_status.sql`, `rust/migrations/20260427_lifecycle_resources_workspace.sql`, `rust/migrations/20260428_service_lifecycle.sql`, `rust/migrations/20260429_booking_principal_clearance.sql`
+> **Workspaces:** 11 (7 domain: CBU, KYC, Deal, InstrumentMatrix, BookingPrincipal, LifecycleResources, ProductMaintenance) + (4 infrastructure: SemOsMaintenance, SessionBootstrap, OnboardingRequest, BookSetup)
+> **Catalogue spec:** `docs/todo/catalogue-platform-refinement-v1_2.md` (consolidated authoritative spec, 2026-04-26 — supersedes v1.0/v1.1/v1.3). Tranche 1 implementation complete: validator (transition_args + EXISTS predicate), Sage/REPL policies, P-G provisional designation, GatePipeline default-on, CI gate. Tranche 2 (estate reconciliation: 487 verbs to declare, 153 preserving-with-transition_args migration warnings to fix) follows.
 > **Schema Overview:** `migrations/OB_POC_SCHEMA_ENTITY_OVERVIEW.md`
 > **Embeddings:** Candle local (384-dim, BGE-small-en-v1.5) — 24,587 patterns vectorized
 
@@ -175,7 +177,7 @@ let value = map.get("key").ok_or_else(|| anyhow!("Missing key"))?;
 ```
 
 ### 5. Re-export Types at Module Boundary
-When a module uses types from another crate, re-export them for consumers.
+When a module uses types from another crate, re-export them for consumers. **Never use `pub use types::*`** — classify each type and export an explicit allowlist. Internal types stay `pub(crate)` or `#[cfg(test)]`-gated. See `dsl-core/src/config/mod.rs` and `dsl-core/src/lib.rs` for the canonical pattern (43-type config allowlist, 17-type root set).
 
 ### 6. Single DAG Identity (Observatory)
 
@@ -337,7 +339,7 @@ npm run build && npm run typecheck && npm run lint
 
 ## Feature Status
 
-**Complete (✅):** React Migration (077), V2 REPL (7-state, 320 tests), Runbook Compilation, Candle Semantic Pipeline, Agent Pipeline + PolicyGate, Solar Navigation (038), Promotion Pipeline (043), Teaching (044), Client Group Resolver (048), Workflow Task Queue (049), Transactional Execution (050), CustomOp Auto-Registration (051), Client Group Research (055), REPL Viewport Feedback (056), Verb Disambiguation UI (057), Unified Architecture (058), Playbook System (059), LSP (060/063), CBU Structure Macros (064), Unified Lookup (074), Lexicon (072), Entity Linking (073), Clarification UX (075), Inspector-First (076), Deal Record & Fee Billing (067), BPMN-Lite (all phases incl. Phase 4 PostgresProcessStore + Phase 5A Inclusive Gateway), BPMN-Lite Integration (Phase B), BPMN-Lite Authoring (Phases B-D), KYC/UBO Skeleton (S1-S2), Semantic OS (Phases 0-9 + Standalone v1.1 + Stewardship Phase 0-1), Governed Registry Authoring (v0.4, migrations 099-102), CCIR + SessionVerbSurface, Loopback Calibration (v0.3), Onboarding State View, Verb Disambiguation UX, Constellation Orphan Remediation, SemOS Grounded Action Surface, Pipeline Leak Remediation, Sage Intent Skeleton (Phase 1), Entity-First Utterance Parsing, Coder Rewrite (Phase 2), Sage-Primary Chat Narration, SemTaxonomy Three-Step, NLCI CBU Cutover, CBU Role Surface Reconciliation, Phase 0 Vocabulary Rationalization (Batches 1-3), Schema Consolidation (115-121), Domain Metadata Coverage (306/306 tables), Scenario-Based Intent Resolution (Phases 0.5-5), AffinityGraph & Diagram Generation, Discovery Pipeline (Phase 2), Utterance API Coverage Harness, Unified Session Input Cutover, Workspace-Scoped REPL Navigation, SemOS Attribute DSL + Schema Cleanup, SemOS Footprint Hydration S6, SemOS Document Governance Bootstrap (122-123), StateGraph Pipeline (Phase 0-3 substrate), Session Stack Machine Runbook Architecture (R1-R9, migrations 125-128), Unified Session Pipeline (ADR 040 — tollgates enforced, 149/149 tests, response adapter, dead code removal -4,480 lines), Derived Attribute Persistence (D0-D12 — canonical two-table model, staleness propagation, CBU projection view), SemOS-First Hub Implementation (Phases 1-7 — AttributeDefBody complete, SemOS-first write path, materialization trigger, identity resolution inverted, 7 new verbs, SemOS Maintenance workspace), Sage Proactive Narration (ADR 043 — NarrationEngine, contextual query intercept, post-execution narration, NarrationPanel React component, narration boost signal, end-to-end wiring), Verb/Noun Separation (S-expression aligned — assemble-cbu macro_selector, analyse-ubo verb_selector, action stem extractor), Instrument Matrix Two-Stage (group template + CBU instance), Session Recovery (resume with fresh scope), Two-Tier Attribute Model (AttributeVisibility External/Internal, attribute.define-internal + attribute.update-internal, migration 130, operational-tier auto-approved), BPMN-Lite Durability Fixes (transaction atomicity via atomic_start/atomic_complete, job claim timeout + reclaim, tick_all orchestrator, dedupe cache TTL pruning, 3 background housekeeping tasks), Cross-Workspace State Consistency (P1-P10 — shared atom registry with lifecycle FSM, shared fact versioning, workspace fact refs with staleness propagation, constellation replay types, remediation events with FSM, external call idempotency envelope, provider capabilities, compensation records, YAML seeds for 5 initial atoms, platform DAG derivation; 12 shared-atom verbs + 4 remediation verbs, 8 migrations, 10 cross_workspace modules, 10 macros (8 shared-atom + 2 remediation incl. batch foreach), 6 scenario routes, 24 constellation slots)
+**Complete (✅):** React Migration (077), V2 REPL (7-state, 320 tests), Runbook Compilation, Candle Semantic Pipeline, Agent Pipeline + PolicyGate, Solar Navigation (038), Promotion Pipeline (043), Teaching (044), Client Group Resolver (048), Workflow Task Queue (049), Transactional Execution (050), CustomOp Auto-Registration (051), Client Group Research (055), REPL Viewport Feedback (056), Verb Disambiguation UI (057), Unified Architecture (058), Playbook System (059), LSP (060/063), CBU Structure Macros (064), Unified Lookup (074), Lexicon (072), Entity Linking (073), Clarification UX (075), Inspector-First (076), Deal Record & Fee Billing (067), BPMN-Lite (all phases incl. Phase 4 PostgresProcessStore + Phase 5A Inclusive Gateway), BPMN-Lite Integration (Phase B), BPMN-Lite Authoring (Phases B-D), KYC/UBO Skeleton (S1-S2), Semantic OS (Phases 0-9 + Standalone v1.1 + Stewardship Phase 0-1), Governed Registry Authoring (v0.4, migrations 099-102), CCIR + SessionVerbSurface, Loopback Calibration (v0.3), Onboarding State View, Verb Disambiguation UX, Constellation Orphan Remediation, SemOS Grounded Action Surface, Pipeline Leak Remediation, Sage Intent Skeleton (Phase 1), Entity-First Utterance Parsing, Coder Rewrite (Phase 2), Sage-Primary Chat Narration, SemTaxonomy Three-Step, NLCI CBU Cutover, CBU Role Surface Reconciliation, Phase 0 Vocabulary Rationalization (Batches 1-3), Schema Consolidation (115-121), Domain Metadata Coverage (306/306 tables), Scenario-Based Intent Resolution (Phases 0.5-5), AffinityGraph & Diagram Generation, Discovery Pipeline (Phase 2), Utterance API Coverage Harness, Unified Session Input Cutover, Workspace-Scoped REPL Navigation, SemOS Attribute DSL + Schema Cleanup, SemOS Footprint Hydration S6, SemOS Document Governance Bootstrap (122-123), StateGraph Pipeline (Phase 0-3 substrate), Session Stack Machine Runbook Architecture (R1-R9, migrations 125-128), Unified Session Pipeline (ADR 040 — tollgates enforced, 149/149 tests, response adapter, dead code removal -4,480 lines), Derived Attribute Persistence (D0-D12 — canonical two-table model, staleness propagation, CBU projection view), SemOS-First Hub Implementation (Phases 1-7 — AttributeDefBody complete, SemOS-first write path, materialization trigger, identity resolution inverted, 7 new verbs, SemOS Maintenance workspace), Sage Proactive Narration (ADR 043 — NarrationEngine, contextual query intercept, post-execution narration, NarrationPanel React component, narration boost signal, end-to-end wiring), Verb/Noun Separation (S-expression aligned — assemble-cbu macro_selector, analyse-ubo verb_selector, action stem extractor), Instrument Matrix Two-Stage (group template + CBU instance), Session Recovery (resume with fresh scope), Two-Tier Attribute Model (AttributeVisibility External/Internal, attribute.define-internal + attribute.update-internal, migration 130, operational-tier auto-approved), BPMN-Lite Durability Fixes (transaction atomicity via atomic_start/atomic_complete, job claim timeout + reclaim, tick_all orchestrator, dedupe cache TTL pruning, 3 background housekeeping tasks), Cross-Workspace State Consistency (P1-P10 — shared atom registry with lifecycle FSM, shared fact versioning, workspace fact refs with staleness propagation, constellation replay types, remediation events with FSM, external call idempotency envelope, provider capabilities, compensation records, YAML seeds for 5 initial atoms, platform DAG derivation; 12 shared-atom verbs + 4 remediation verbs, 8 migrations, 10 cross_workspace modules, 10 macros (8 shared-atom + 2 remediation incl. batch foreach), 6 scenario routes, 24 constellation slots), Pub API Surface Cleanup (Tier A — 36 items tightened across 4 crates: `sem_os_postgres` sqlx_types→pub(crate), `sem_os_core` 4 internal fns→pub(crate), `dsl-core` 2 wildcard re-exports→explicit allowlists, `dsl_v2` expansion/macros/entity_deps re-exports trimmed, test-only fns cfg(test)-gated; test boundary enforcement: runbook e2e+pipeline tests rewritten as external harnesses against public API with YAML macro fixtures, source-scanning invariant tests moved internal), SemOS Execution Port (Phases 0-3 — VerbExecutionPort trait in sem_os_core, PgCrudExecutor in sem_os_postgres with 12/14 CRUD operations, ObPocVerbExecutor adapter + VerbExecutionPortStepExecutor bridge, orchestrator wired, production startup activated, execute_json compatibility shim complete across 625/625 `rust/src/domain_ops` CustomOperation impls, ob-execution-types dead crate removed; 20 active crates), **Phase 5c-migrate COMPLETE** (80 slices — 567 ops relocated to `sem_os_postgres::ops::*` via YAML-first re-implementation + 119 Pattern B ops in `rust/src/domain_ops/*` converted to `SemOsVerbOp`, all registered in single canonical `SemOsVerbOpRegistry` via `sem_os_postgres::ops::build_registry() + ob_poc::domain_ops::extend_registry()`; slice #80 deleted the `CustomOperation` trait, `CustomOpFactory`, `CustomOperationRegistry`, `inventory::collect!` registry, `#[register_custom_op]` proc-macro, `dsl-runtime-macros` crate, `dispatch_plugin_via_execute_json` fallback, `verify_plugin_verb_coverage*` helpers — net −1,030 LOC; `SemOsVerbOp` is the sole plugin-verb execution contract, dispatched through the Sequencer-owned transaction scope), **Catalogue Platform v1.3 CODE COMPLETE** (2026-04-25 — 9 DAG taxonomies authored across Tranche 2+3 (4 primary + 5 Tranche 3), 758/1245 verbs three-axis declared (60.9%), full v1.3 runtime stack landed across `dsl-core::config::dag_registry` + `dsl-runtime::cross_workspace::*` modules: DagRegistry with 5 indices (constraints/aggregates/parents/children/verb→transition), SlotStateProvider (24-row Postgres dispatch table) + SqlPredicateResolver, GateChecker (Mode A blocking), DerivedStateEvaluator + DerivedStateProjector (Mode B aggregation/tollgate), CascadePlanner + PostgresChildEntityResolver (Mode C hierarchy), TransitionArgs metadata field on VerbConfig + 87 verbs declaring it, GatePipeline bundle + `VerbExecutionPortStepExecutor::with_gate_pipeline` builder + `ReplOrchestratorV2::with_gate_pipeline` builder; pre-dispatch gate check + post-dispatch single-level cascade execution wired in `step_executor_bridge.rs`; opt-in via constructing GatePipeline at startup — currently defaults to None until ob-poc-web wires it; spec at `docs/todo/catalogue-platform-refinement-v1_3.md`)
 
 **In Progress / Parked (⚠️):** Observatory (Phases 1-7 complete — Rust backend types/projection/routes, egui WASM canvas embedded directly in ChatPage cockpit layout (always visible, center column), 5 level renderers, DAG Identity: all endpoints project from `tos.hydrated_state`, universe root node at session start with 7 workspace children + scoping verbs, canvas navigation via hover/click/double-click routes through REPL input, FlightDeck collapsed status bar, NarrationPanel wired into sidebar; Phase 8 diagrams pending), Sage/Coder GATE 5 (existing 43%, Sage+Coder 5% — vocabulary/routing work needed), Three-Step Harness (7.95% exact / 71% grounded — metadata quality is limiter), StateGraph Phase 1 reconciliation (parked pending external correction table)
 
@@ -368,32 +370,48 @@ All user input goes through unified `IntentPipeline` → `HybridVerbSearcher` �
 
 > ⚠️ **Read `docs/verb-definition-spec.md` before writing verb YAML.** Serde structs are strict. Invalid YAML silently fails to load.
 
-**Behaviors:** `crud` (generic executor), `plugin` (`#[register_custom_op]` macro), `template` (multi-statement DSL expansion)
+**Behaviors:** `crud` (generic executor), `plugin` (`SemOsVerbOp` trait), `template` (multi-statement DSL expansion)
 
-**Plugin verb pattern:**
+**Plugin verb pattern** (Phase 5c-migrate: single `SemOsVerbOp` trait under the Sequencer-owned transaction scope):
+
 ```rust
-use ob_poc_macros::register_custom_op;
-#[register_custom_op]
-pub struct MyDomainCreateOp;
+use sem_os_postgres::ops::SemOsVerbOp;
+use dsl_runtime::tx::TransactionScope;
+use dsl_runtime::{VerbExecutionContext, VerbExecutionOutcome};
+
+pub struct MyDomainCreate;
+
 #[async_trait]
-impl CustomOperation for MyDomainCreateOp {
-    fn domain(&self) -> &'static str { "my-domain" }
-    fn verb(&self) -> &'static str { "create" }
-    fn rationale(&self) -> &'static str { "Complex validation logic" }
-    #[cfg(feature = "database")]
-    async fn execute(&self, verb_call: &VerbCall, ctx: &mut ExecutionContext, pool: &PgPool) -> Result<ExecutionResult> { /* ... */ }
+impl SemOsVerbOp for MyDomainCreate {
+    fn fqn(&self) -> &str { "my-domain.create" }
+    async fn execute(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut VerbExecutionContext,
+        scope: &mut dyn TransactionScope,
+    ) -> Result<VerbExecutionOutcome> {
+        // `scope.executor()` → `&mut PgConnection` inside the ambient txn
+        // `scope.pool()` → transitional escape for legacy `&PgPool` helpers
+        // `ctx.service::<dyn X>()?` → platform service dispatch
+        /* ... */
+    }
 }
 ```
 
+**Registration** — manual, no inventory/proc-macro magic:
+- Ops living in `sem_os_postgres::ops::*` are added to `sem_os_postgres::ops::build_registry()`.
+- Ops living in `rust/src/domain_ops/*` (Pattern B — bridge to ob-poc internals) are added to `ob_poc::domain_ops::extend_registry(&mut SemOsVerbOpRegistry)`.
+- `ob-poc-web::main` builds the registry via `build_registry() + extend_registry()` and wires it into `ObPocVerbExecutor`.
+
 ```bash
 cargo x verbs check   # YAML matches DB
-cargo x verbs lint    # Tiering rules
+cargo x verbs lint    # Tiering rules (reads the canonical SemOS registry manifest)
 # After YAML changes — MUST run or new verbs won't be discoverable:
 cargo x verbs compile && DATABASE_URL="postgresql:///data_designer" \
   cargo run --release -p ob-semantic-matcher --bin populate_embeddings
 ```
 
-Verify plugin coverage: `cargo test --lib -- test_plugin_verb_coverage`
+Verify plugin coverage: `cargo test -p ob-poc --lib -- test_plugin_verb_coverage`
 
 ---
 
@@ -429,7 +447,7 @@ ob-poc/
 │   │   ├── dsl-core/           # Parser, AST, compiler (no DB)
 │   │   ├── dsl-lsp/            # LSP server + Zed extension + tree-sitter grammar
 │   │   ├── ob-agentic/         # Onboarding pipeline (Intent→Plan→DSL)
-│   │   ├── ob-poc-macros/      # Proc macros (#[register_custom_op])
+│   │   ├── ob-poc-macros/      # Proc macros (#[derive(IdType)] only)
 │   │   ├── ob-poc-web/         # Axum web server (serves React + API)
 │   │   ├── inspector-projection/ # Projection schema generation
 │   │   ├── sem_os_core/        # Canonical types, ports, service logic
@@ -442,14 +460,15 @@ ob-poc/
 │   │   ├── agent/              # Orchestrator, verb surface, onboarding state, context envelope
 │   │   ├── repl/               # V2 REPL (30 files, always enabled) + session_trace, trace_repository, session_replay
 │   │   ├── journey/            # Pack system (router, manifests, handoff)
-│   │   ├── domain_ops/         # CustomOperation implementations (~300+ ops)
+│   │   ├── domain_ops/         # Pattern B SemOsVerbOp ops that bridge to ob-poc internals (9 files, 119 ops: onboarding, bpmn_lite, template, source_loader, request, gleif, booking_principal, trading_profile + rule_evaluator utility). Registered via `extend_registry()`.
 │   │   ├── sem_reg/            # Semantic Registry + stewardship (39 files)
 │   │   ├── mcp/                # MCP tools, handlers, verb search, intent pipeline
 │   │   ├── bpmn_integration/   # ob-poc ↔ bpmn-lite wiring (12 files)
 │   │   ├── calibration/        # Loopback calibration (11 modules)
 │   │   ├── cross_workspace/   # Cross-workspace state consistency (10 modules)
 │   │   └── api/                # REST routes
-│   ├── tests/                  # Integration tests + golden corpus
+│   ├── tests/                  # External test harnesses (public API only)
+│   │   └── fixtures/macros/    # YAML macro fixtures for runbook harnesses
 │   └── scenarios/suites/       # 10 suites, 48 agentic test scenarios
 ├── migrations/                 # 128 SQLx migrations
 ├── docs/                       # Architecture docs + annexes
@@ -474,7 +493,8 @@ SEM_OS_DATABASE_URL="postgresql:///..."      # For standalone sem_os_server
 SEM_OS_JWT_SECRET=dev-secret                 # JWT for sem_os_server
 OBPOC_STRICT_SINGLE_PIPELINE=true            # PolicyGate (default: true)
 OBPOC_STRICT_SEMREG=true                     # SemReg fail-closed (default: true)
-OBPOC_ALLOW_RAW_EXECUTE=false                # Allow /execute with raw DSL
+# OBPOC_ALLOW_RAW_EXECUTE removed 2026-04-22 (Slice 3.1) — raw DSL in request
+# bodies is now always rejected; no flag can reopen the bypass.
 SAGE_FAST_PATH=1                             # Read+structure fast path
 BRAVE_SEARCH_API_KEY="..."                   # Research macros
 ```
@@ -510,9 +530,17 @@ Never `.unwrap()` in production. Use `?`, `.ok_or_else(|| anyhow!(...))`, `let S
 
 ### Backend Test Suites
 
+**Test boundary rule:** Tests are either crate-internal (`#[cfg(test)]` inside `src/`) or external harnesses (`rust/tests/`). No test crosses crate boundaries — external tests use only the crate's public API. Internal tests may access `pub(crate)` types and `include_str!` source files.
+
 ```bash
 # Unified pipeline tollgate tests (9 tests — gates + trace + adapter)
 cargo test --test unified_pipeline_tollgates
+
+# Runbook pipeline harnesses (external, public API only, YAML macro fixtures)
+cargo test --test runbook_e2e_test --test runbook_pipeline_test
+
+# Runbook source-scanning invariant tests (internal, include_str!)
+cargo test -p ob-poc --lib -- runbook::invariant_tests
 
 # Full REPL V2 suite (149 tests across 8 files)
 cargo test --test repl_v2_golden_loop --test repl_v2_phase2 --test repl_v2_phase3 \
@@ -521,6 +549,8 @@ cargo test --test repl_v2_golden_loop --test repl_v2_phase2 --test repl_v2_phase
 # Intent hit rate (needs DATABASE_URL)
 DATABASE_URL="postgresql:///data_designer" cargo test --features database --test intent_hit_rate -- --ignored --nocapture
 ```
+
+**Test fixture macros:** `rust/tests/fixtures/macros/*.yaml` — YAML macro definitions loaded by external harnesses via `load_macro_registry_from_dir`. Avoids constructing internal `MacroSchema` types in external tests.
 
 ### Chrome DevTools MCP — Live UI Testing
 
@@ -586,13 +616,14 @@ Automated browser testing via Chrome DevTools MCP. Claude Code can navigate, typ
 | When working on... | Read this annex |
 |--------------------|-----------------|
 | DSL pipeline, verb search, embeddings, intent resolution, disambiguation, teaching, promotion, scenarios, AffinityGraph, discovery | `docs/annex-dsl-and-intent.md` |
-| Semantic OS, SemReg, context resolution, ABAC, stewardship, governed authoring, CCIR, verb surface, scanner | `docs/annex-sem-os.md` |
+| Semantic OS, SemReg, context resolution, ABAC, stewardship, governed authoring, CCIR, verb surface, scanner, **v1.3 cross-workspace runtime stack** (DagRegistry, GateChecker, DerivedStateEvaluator, CascadePlanner, GatePipeline) | `docs/annex-sem-os.md` |
 | BPMN-Lite service, fiber VM, race semantics, gRPC, orchestration, bpmn_integration | `docs/annex-bpmn-lite.md` |
 | V2 REPL, packs, scoring, preconditions, context stack, golden corpus, replay tuner | `docs/annex-repl-v2.md` |
 | Macros: operator vocabulary, expansion engine, MacroIndex, lint, composite macros, state DAG, pack mapping | `docs/annex-macros.md` |
 | Contracts, deals, billing, client groups, documents, entity linking, inspector, lexicon, lookup, playbooks, transactional execution | `docs/annex-domain-features.md` |
 | React frontend details, Zed extension, LSP, ob-agentic onboarding pipeline | `docs/annex-frontend-and-tools.md` |
 | Observatory: egui WASM app, OrientationContract, GraphSceneModel, navigation verbs | `docs/observatory-implementation-plan.md` |
+| **Catalogue Platform v1.3** — DAG taxonomies, cross_workspace_constraints (Mode A blocking), derived_cross_workspace_state (Mode B aggregation/tollgate), parent_slot + state_dependency (Mode C cascade), TransitionArgs verb metadata, GatePipeline | `docs/todo/catalogue-platform-refinement-v1_3.md` |
 
 **Pre-existing annexes (unchanged):**
 
@@ -652,6 +683,10 @@ When you see these in a task, read the corresponding annex first:
 | "CCIR", "ContextEnvelope", "PruneReason", "AllowedVerbSetFingerprint", "TOCTOU" | `docs/annex-sem-os.md` |
 | "SessionVerbSurface", "verb surface", "FailClosed", "safe-harbor" | `docs/annex-sem-os.md` |
 | "GroundedActionSurface", "pipeline leak", "TOCTOU recheck" | `docs/annex-sem-os.md` |
+| "v1.3", "DagRegistry", "GateChecker", "GatePipeline", "TransitionArgs", "transition_args" | `docs/annex-sem-os.md` + `docs/todo/catalogue-platform-refinement-v1_3.md` |
+| "cross_workspace_constraints", "derived_cross_workspace_state", "parent_slot", "state_dependency", "tollgate", "operationally_active" | `docs/annex-sem-os.md` |
+| "DerivedStateEvaluator", "DerivedStateProjector", "CascadePlanner", "SqlPredicateResolver", "SlotStateProvider", "PostgresChildEntityResolver" | `docs/annex-sem-os.md` |
+| "DAG taxonomy", "dag_taxonomies", "overall_lifecycle", "dual_lifecycle", "category_gated", "periodic_review_cadence" | `docs/annex-sem-os.md` |
 | "scanner", "drift detection", "bootstrap", "seed bundle" | `docs/annex-sem-os.md` |
 | "shared atom", "cross-workspace", "staleness propagation", "constellation replay", "remediation event" | `docs/architecture/cross-workspace-state-consistency-v0.4.md` |
 | "RebuildContext", "shared fact version", "workspace fact ref", "produces_shared_facts" | `rust/src/cross_workspace/` |

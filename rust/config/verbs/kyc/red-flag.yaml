@@ -102,6 +102,11 @@ domains:
           type: uuid
           name: red_flag_id
           capture: true
+        three_axis:
+          state_effect: preserving
+          external_effects: [emitting]
+          consequence:
+            baseline: requires_confirmation
       mitigate:
         description: Mark red flag as mitigated
         metadata:
@@ -149,6 +154,15 @@ domains:
             maps_to: resolution_notes
         returns:
           type: affected
+        three_axis:
+          state_effect: transition
+          external_effects: []
+          consequence:
+            baseline: reviewable
+        transition_args:
+          entity_id_arg: red-flag-id
+          target_workspace: kyc
+          target_slot: red_flag
       waive:
         description: Waive red flag with justification
         metadata:
@@ -200,6 +214,15 @@ domains:
             maps_to: waiver_approved_by
         returns:
           type: affected
+        three_axis:
+          state_effect: transition
+          external_effects: [emitting]
+          consequence:
+            baseline: requires_confirmation
+        transition_args:
+          entity_id_arg: red-flag-id
+          target_workspace: kyc
+          target_slot: red_flag
 
       close:
         description: Close a red flag with a generic resolution outcome
@@ -247,6 +270,15 @@ domains:
             maps_to: resolution_notes
         returns:
           type: affected
+        three_axis:
+          state_effect: transition
+          external_effects: [emitting]
+          consequence:
+            baseline: requires_explicit_authorisation
+        transition_args:
+          entity_id_arg: red-flag-id
+          target_workspace: kyc
+          target_slot: red_flag
 
       dismiss:
         description: Dismiss red flag as false positive
@@ -295,6 +327,15 @@ domains:
             maps_to: resolution_notes
         returns:
           type: affected
+        three_axis:
+          state_effect: transition
+          external_effects: []
+          consequence:
+            baseline: reviewable
+        transition_args:
+          entity_id_arg: red-flag-id
+          target_workspace: kyc
+          target_slot: red_flag
       set-blocking:
         description: Set red flag as blocking the case
         metadata:
@@ -336,6 +377,15 @@ domains:
               primary_key: red_flag_id
         returns:
           type: affected
+        three_axis:
+          state_effect: transition
+          external_effects: []
+          consequence:
+            baseline: reviewable
+        transition_args:
+          entity_id_arg: red-flag-id
+          target_workspace: kyc
+          target_slot: red_flag
       list-by-case:
         description: List red flags for a case
         metadata:
@@ -381,6 +431,11 @@ domains:
             maps_to: severity
         returns:
           type: record_set
+        three_axis:
+          state_effect: preserving
+          external_effects: [observational]
+          consequence:
+            baseline: benign
       list-by-workstream:
         description: List red flags for a workstream
         metadata:
@@ -422,3 +477,8 @@ domains:
             maps_to: status
         returns:
           type: record_set
+        three_axis:
+          state_effect: preserving
+          external_effects: [observational]
+          consequence:
+            baseline: benign

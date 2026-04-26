@@ -3,9 +3,9 @@ domains:
     description: "Generic research source operations - normalization, validation, hashing"
 
     invocation_hints:
-    - "normalize research data"
-    - "validate source payload"
-    - "hash research input"
+      - "normalize research data"
+      - "validate source payload"
+      - "hash research input"
 
     verbs:
       normalize:
@@ -15,10 +15,10 @@ domains:
           config schema, produces canonical JSON with SHA-256 content hash.
           Persists the normalized payload for audit and deduplication.
         invocation_phrases:
-        - "normalize research payload"
-        - "normalize source data"
-        - "canonicalize research input"
-        - "validate and hash research data"
+          - "normalize research payload"
+          - "normalize source data"
+          - "canonicalize research input"
+          - "validate and hash research data"
         metadata:
           tier: composite
           source_of_truth: external
@@ -30,26 +30,32 @@ domains:
         plugin:
           handler: ResearchGenericNormalizeOp
         args:
-        - name: source-name
-          type: string
-          required: true
-          description: "Name of the research source (e.g., GLEIF, COMPANIES_HOUSE)"
-        - name: raw-payload
-          type: string
-          required: true
-          description: "Raw JSON payload from the external source"
+          - name: source-name
+            type: string
+            required: true
+            description: "Name of the research source (e.g., GLEIF, COMPANIES_HOUSE)"
+          - name: raw-payload
+            type: string
+            required: true
+            description: "Raw JSON payload from the external source"
         returns:
           type: record
           fields:
-          - name: payload_id
-            type: uuid
-          - name: source_name
-            type: string
-          - name: content_hash
-            type: string
-            description: "SHA-256 hash of the canonical JSON"
-          - name: canonical_payload
-            type: string
-            description: "Normalized canonical JSON"
-          - name: normalized_at
-            type: timestamp
+            - name: payload_id
+              type: uuid
+            - name: source_name
+              type: string
+            - name: content_hash
+              type: string
+              description: "SHA-256 hash of the canonical JSON"
+            - name: canonical_payload
+              type: string
+              description: "Normalized canonical JSON"
+            - name: normalized_at
+              type: timestamp
+        three_axis:
+          state_effect: preserving
+          external_effects:
+            - observational
+          consequence:
+            baseline: benign

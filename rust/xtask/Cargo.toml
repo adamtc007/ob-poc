@@ -17,7 +17,7 @@ uuid = { version = "1.0", features = ["v4"] }
 chrono = { version = "0.4", features = ["serde"] }
 reqwest = { version = "0.12", features = ["json"] }
 urlencoding = "2.1"
-ob-poc = { path = "..", features = ["database", "vnext-repl"] }
+ob-poc = { path = "..", features = ["database"] }
 sem_os_core = { path = "../crates/sem_os_core" }
 sem_os_client = { path = "../crates/sem_os_client" }
 sem_os_postgres = { path = "../crates/sem_os_postgres" }

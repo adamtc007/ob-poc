@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n                INSERT INTO \"ob-poc\".client_group_relationship_sources\n                    (relationship_id, source, source_type, confidence_score)\n                VALUES ($1, 'gleif', 'discovery', 0.80)\n                ON CONFLICT DO NOTHING\n                ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "3bc732895a29b436d12f3e478f3939dbe1dd6d5df267c75e1fe869cee55a06c6"
+}

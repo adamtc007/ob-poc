@@ -1,0 +1,23 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT \"ob-poc\".upsert_entity_alias($1, $2, NULL, 'threshold_auto')",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "upsert_entity_alias",
+        "type_info": "Int8"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Text"
+      ]
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "ae10283f60213ebad070a1afd17f83bcb1f22c4e482050be8f31cfe26de43e86"
+}

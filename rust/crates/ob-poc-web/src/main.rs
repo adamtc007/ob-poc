@@ -162,6 +162,165 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     tracing::info!("Starting OB-POC Hybrid Web Server");
 
+    // =========================================================================
+    // P.1.g — DB-free catalogue-load gate (v1.1 P3 / DoD item 7)
+    //
+    // MUST run before any DB connectivity. The catalogue validator is a
+    // pure-function library over YAML input — no DB, no HTTP. Its job is
+    // to catch structural and well-formedness errors in the verb catalogue
+    // before we bring up the rest of the stack.
+    //
+    // Rollout-mode defaults (can be tightened per-workspace later):
+    //   require_declaration = false  — un-declared verbs don't fail startup
+    //   known_dags          = empty  — P.2 populates this when the DAG
+    //                                   taxonomy YAML lands; until then,
+    //                                   `UnknownDagReference` checks skip.
+    //
+    // Hard-gate behaviour: structural + well-formedness errors abort
+    // startup. Warnings log via tracing::warn and continue.
+    //
+    // Emergency bypass: `OBPOC_CATALOGUE_VALIDATOR_STRICT=false` demotes
+    // errors to warnings. Off by default — the gate is the architectural
+    // enforcement of P3.
+    // =========================================================================
+    {
+        use ob_poc::dsl_v2::config::{
+            collect_declared_fqns, flatten_pack_entries, load_packs_from_dir, validate_pack_fqns,
+            validate_verbs_config, ValidationContext,
+        };
+        use std::collections::HashSet;
+        use std::path::PathBuf;
+        tracing::info!("Catalogue-load validator — running before DB pool init (P3)");
+        let loader_for_validation = ConfigLoader::from_env();
+        let verbs_config_for_validation = match loader_for_validation.load_verbs() {
+            Ok(c) => c,
+            Err(e) => {
+                tracing::error!("Catalogue validator: failed to load verb YAMLs: {}", e);
+                return Err(format!("catalogue-load failed pre-DB: {}", e).into());
+            }
+        };
+        let ctx = ValidationContext {
+            require_declaration: false, // rollout mode — P.3 flips per-workspace
+            ..ValidationContext::default()
+        };
+        let mut report = validate_verbs_config(&verbs_config_for_validation, &ctx);
+
+        // V1.2-5 pack-hygiene cross-check: every pack's allowed_verbs FQN
+        // must resolve to either a declared verb or a macro.
+        let packs_dir = std::env::var("OBPOC_PACKS_DIR")
+            .ok()
+            .map(PathBuf::from)
+            .unwrap_or_else(|| PathBuf::from("rust/config/packs"));
+        let macros_dir = std::env::var("OBPOC_MACROS_DIR")
+            .ok()
+            .map(PathBuf::from)
+            .unwrap_or_else(|| PathBuf::from("rust/config/verb_schemas/macros"));
+        if packs_dir.exists() {
+            let declared = collect_declared_fqns(&verbs_config_for_validation);
+            // Macro FQN collection: top-level keys marked `kind: macro`.
+            let mut macros: HashSet<String> = HashSet::new();
+            if macros_dir.exists() {
+                if let Ok(entries) = std::fs::read_dir(&macros_dir) {
+                    for entry in entries.flatten() {
+                        let p = entry.path();
+                        if p.extension().and_then(|e| e.to_str()) != Some("yaml") {
+                            continue;
+                        }
+                        let Ok(raw) = std::fs::read_to_string(&p) else {
+                            continue;
+                        };
+                        let Ok(v) = serde_yaml::from_str::<serde_yaml::Value>(&raw) else {
+                            continue;
+                        };
+                        if let Some(m) = v.as_mapping() {
+                            for (k, b) in m {
+                                if let (Some(fqn), Some(body)) = (k.as_str(), b.as_mapping()) {
+                                    if body
+                                        .get(serde_yaml::Value::String("kind".into()))
+                                        .and_then(|x| x.as_str())
+                                        == Some("macro")
+                                    {
+                                        macros.insert(fqn.to_string());
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            match load_packs_from_dir(&packs_dir) {
+                Ok(packs) => {
+                    let pack_errors =
+                        validate_pack_fqns(&declared, &macros, flatten_pack_entries(&packs));
+                    if !pack_errors.is_empty() {
+                        report.well_formedness.extend(pack_errors);
+                    }
+                }
+                Err(e) => {
+                    tracing::warn!(
+                        "Pack-hygiene check skipped — could not load packs dir {:?}: {}",
+                        packs_dir,
+                        e
+                    );
+                }
+            }
+        } else {
+            tracing::debug!(
+                "Pack-hygiene check skipped — packs dir {:?} not found",
+                packs_dir
+            );
+        }
+
+        let strict = std::env::var("OBPOC_CATALOGUE_VALIDATOR_STRICT")
+            .map(|v| v.to_lowercase() != "false")
+            .unwrap_or(true);
+        // Log warnings regardless of strict mode.
+        for w in &report.warnings {
+            tracing::warn!("catalogue warning: {}", w);
+        }
+        if !report.is_clean() {
+            let total = report.error_count();
+            if strict {
+                tracing::error!(
+                    "Catalogue validator found {} error(s) — aborting startup before DB pool.",
+                    total
+                );
+                for e in &report.structural {
+                    tracing::error!("structural: {}", e);
+                }
+                for e in &report.well_formedness {
+                    tracing::error!("well-formedness: {}", e);
+                }
+                tracing::error!(
+                    "Fix the errors or set OBPOC_CATALOGUE_VALIDATOR_STRICT=false to demote \
+                     them to warnings (not recommended — P3 invariant is the gate)."
+                );
+                return Err(format!("catalogue validator returned {} errors pre-DB", total).into());
+            } else {
+                for e in &report.structural {
+                    tracing::warn!("structural (demoted): {}", e);
+                }
+                for e in &report.well_formedness {
+                    tracing::warn!("well-formedness (demoted): {}", e);
+                }
+                tracing::warn!(
+                    "OBPOC_CATALOGUE_VALIDATOR_STRICT=false — {} errors demoted to warnings",
+                    total
+                );
+            }
+        } else {
+            tracing::info!(
+                "Catalogue validator clean ({} verbs / {} warnings) — P3 + V1.2-5 pack-hygiene gate passed.",
+                verbs_config_for_validation
+                    .domains
+                    .values()
+                    .map(|d| d.verbs.len())
+                    .sum::<usize>(),
+                report.warnings.len()
+            );
+        }
+    }
+
     // Database connection pool configuration
     // Production-ready settings for concurrent connections
     let database_url =
@@ -557,10 +716,252 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let voice_router = routes::voice::create_voice_router(pool.clone());
 
     // =========================================================================
+    // Platform service registry — trait-object injection for relocated
+    // plugin ops (Phase 5a). Host-side impls are constructed here once and
+    // threaded through every DslExecutor / step-executor bridge.
+    // =========================================================================
+    let service_registry: Arc<dsl_runtime::ServiceRegistry> = {
+        let mut builder = dsl_runtime::ServiceRegistryBuilder::new();
+
+        // dyn SemanticStateService — ontology-backed onboarding stage derivation.
+        match ob_poc::services::ObPocSemanticStateService::new(pool.clone()) {
+            Ok(svc) => {
+                builder.register::<dyn dsl_runtime::service_traits::SemanticStateService>(
+                    Arc::new(svc),
+                );
+                tracing::info!(
+                    "ServiceRegistry: registered dyn SemanticStateService (ontology-backed)"
+                );
+            }
+            Err(e) => {
+                tracing::warn!(
+                    "ServiceRegistry: dyn SemanticStateService not registered ({}); \
+                     `semantic.*` verbs will fail with actionable error at runtime",
+                    e
+                );
+            }
+        }
+
+        // dyn StewardshipDispatch — bridges plugin ops to
+        // `sem_reg::stewardship::dispatch_phase{0,1}_tool`. Registers
+        // unconditionally — stewardship is entirely in-process, no
+        // fallible construction step.
+        builder.register::<dyn dsl_runtime::service_traits::StewardshipDispatch>(Arc::new(
+            ob_poc::services::ObPocStewardshipDispatch::new(pool.clone()),
+        ));
+        tracing::info!(
+            "ServiceRegistry: registered dyn StewardshipDispatch (sem_reg::stewardship cascade)"
+        );
+
+        // dyn McpToolRegistry — used by `agent.read-mcp-tools` to
+        // enumerate the SemReg MCP tool surface. Zero construction
+        // deps; projects `SemRegToolSpec` → `McpToolSpec`.
+        builder.register::<dyn dsl_runtime::service_traits::McpToolRegistry>(Arc::new(
+            ob_poc::services::ObPocMcpToolRegistry::new(),
+        ));
+        tracing::info!(
+            "ServiceRegistry: registered dyn McpToolRegistry (sem_reg::agent::mcp_tools)"
+        );
+
+        // dyn LifecycleCatalog — used by relocated kyc_case_ops to
+        // check state-machine transitions against ob-poc's ontology
+        // (entity taxonomy singleton). Zero construction deps.
+        builder.register::<dyn dsl_runtime::service_traits::LifecycleCatalog>(Arc::new(
+            ob_poc::services::ObPocLifecycleCatalog::new(),
+        ));
+        tracing::info!("ServiceRegistry: registered dyn LifecycleCatalog (ontology taxonomy)");
+
+        // dyn AttributeIdentityService — used by relocated observation_ops
+        // (and later attribute_ops) to resolve attribute references across
+        // the legacy dictionary, operational `attribute_registry`, and
+        // SemOS-governed attribute defs.
+        builder.register::<dyn dsl_runtime::service_traits::AttributeIdentityService>(Arc::new(
+            ob_poc::services::ObPocAttributeIdentityService::new(pool.clone()),
+        ));
+        tracing::info!(
+            "ServiceRegistry: registered dyn AttributeIdentityService (dictionary + registry + SemOS)"
+        );
+
+        // dyn ConstellationRuntime — used by relocated constellation_ops to
+        // hydrate / summarise SemOS constellation maps. Bridge resolves
+        // built-in maps and walks them against persisted CBU / case state.
+        builder.register::<dyn dsl_runtime::service_traits::ConstellationRuntime>(Arc::new(
+            ob_poc::services::ObPocConstellationRuntime::new(pool.clone()),
+        ));
+        tracing::info!(
+            "ServiceRegistry: registered dyn ConstellationRuntime (sem_os_runtime maps)"
+        );
+
+        // dyn TradingProfileDocument — used by relocated trading_profile_ca_ops
+        // to load / save the matrix JSONB document on cbu_trading_profiles.
+        // Bridge delegates to `crate::trading_profile::ast_db::{load,save}_document`.
+        builder.register::<dyn dsl_runtime::service_traits::TradingProfileDocument>(Arc::new(
+            ob_poc::services::ObPocTradingProfileDocument::new(pool.clone()),
+        ));
+        tracing::info!(
+            "ServiceRegistry: registered dyn TradingProfileDocument (trading_profile::ast_db)"
+        );
+
+        // dyn SemOsContextResolver — used by relocated affinity_ops to call
+        // the 12-step SemOS context resolution pipeline. Bridge delegates to
+        // `build_sem_os_service(pool).resolve_context(...)`.
+        builder.register::<dyn dsl_runtime::service_traits::SemOsContextResolver>(Arc::new(
+            ob_poc::services::ObPocSemOsContextResolver::new(pool.clone()),
+        ));
+        tracing::info!(
+            "ServiceRegistry: registered dyn SemOsContextResolver (sem_reg::agent::mcp_tools::build_sem_os_service)"
+        );
+
+        // dyn SchemaIntrospectionAccess — used by relocated sem_os_schema_ops
+        // for the 5 structure-semantics verbs (domain.describe, entity.describe,
+        // entity.list-fields/relationships/verbs). Bridge reads from
+        // `crate::ontology`, `crate::dsl_v2::verb_registry`, and
+        // `crate::sem_reg::store::SnapshotStore`. Zero construction deps.
+        builder.register::<dyn dsl_runtime::service_traits::SchemaIntrospectionAccess>(Arc::new(
+            ob_poc::services::ObPocSchemaIntrospectionAccess::new(),
+        ));
+        tracing::info!(
+            "ServiceRegistry: registered dyn SchemaIntrospectionAccess (ontology + verb_registry + sem_reg snapshots)"
+        );
+
+        // dyn ViewService — used by relocated view_ops to dispatch all
+        // 15 `view.*` verbs. Bridge wraps `crate::session::ViewState` +
+        // `crate::taxonomy::*` (multi-consumer mega-modules that stay
+        // in ob-poc). Zero construction deps.
+        builder.register::<dyn dsl_runtime::service_traits::ViewService>(Arc::new(
+            ob_poc::services::ObPocViewService::new(),
+        ));
+        tracing::info!(
+            "ServiceRegistry: registered dyn ViewService (session::ViewState + taxonomy::*)"
+        );
+
+        // dyn SessionService — used by relocated session_ops to dispatch
+        // all 19 `session.*` verbs. Bridge wraps `crate::session::UnifiedSession`
+        // (the 10934 LOC multi-consumer session mega-module that stays in
+        // ob-poc). Pending session state crosses turns through
+        // `ctx.extensions["_pending_session"]`. Zero construction deps.
+        builder.register::<dyn dsl_runtime::service_traits::SessionService>(Arc::new(
+            ob_poc::services::ObPocSessionService::new(),
+        ));
+        tracing::info!("ServiceRegistry: registered dyn SessionService (session::UnifiedSession)");
+
+        // dyn ServicePipelineService — used by relocated service_pipeline_ops
+        // for the 16 service intent → discovery → attribute → provisioning
+        // → readiness verbs. Bridge wraps `crate::service_resources::*`
+        // (engines, orchestrators, SRDEF registry loader) which stay in
+        // ob-poc. Zero construction deps.
+        builder.register::<dyn dsl_runtime::service_traits::ServicePipelineService>(Arc::new(
+            ob_poc::services::ObPocServicePipelineService::new(),
+        ));
+        tracing::info!(
+            "ServiceRegistry: registered dyn ServicePipelineService (service_resources::*)"
+        );
+
+        // dyn PhraseService — used by relocated phrase_ops for the 9
+        // governed-phrase-authoring verbs. Bridge wraps
+        // `crate::sem_reg::store::SnapshotStore` + types/ids and the
+        // embedding-similarity SQL on `verb_pattern_embeddings` /
+        // `phrase_bank` / `session_traces`. Zero construction deps.
+        builder.register::<dyn dsl_runtime::service_traits::PhraseService>(Arc::new(
+            ob_poc::services::ObPocPhraseService::new(),
+        ));
+        tracing::info!(
+            "ServiceRegistry: registered dyn PhraseService (sem_reg::* + phrase_bank embeddings)"
+        );
+
+        // dyn AttributeService — used by relocated attribute_ops for the
+        // 16 verbs across `attribute.*`, `document.*`, and `derivation.*`.
+        // Bridge wraps `crate::sem_reg::derivation_spec`, `SnapshotStore`,
+        // `crate::sem_reg::types::*`, and `attribute_identity_service`.
+        // Returns `AttributeDispatchOutcome { outcome, bindings }` so the
+        // wrapper can apply `@attribute` bindings via `ctx.bind` for the
+        // 3 `define*` verbs. Zero construction deps.
+        builder.register::<dyn dsl_runtime::service_traits::AttributeService>(Arc::new(
+            ob_poc::services::ObPocAttributeService::new(),
+        ));
+        tracing::info!(
+            "ServiceRegistry: registered dyn AttributeService (sem_reg::* + attribute_identity_service)"
+        );
+
+        Arc::new(builder.build())
+    };
+
+    // =========================================================================
+    // Phase 5e — Outbox drainer
+    // =========================================================================
+    // Polls `public.outbox` for post-commit effects (maintenance subprocess
+    // spawn, narration synthesis, UI push, constellation broadcast, external
+    // HTTP notify), claims rows with `FOR UPDATE SKIP LOCKED`, and dispatches
+    // to per-effect-kind consumers. Spawns as a background tokio task. The
+    // returned handle is dropped on process exit (the task ends with the
+    // process); explicit `shutdown().await` would join the task on a
+    // graceful-shutdown path if we ever add one.
+    let _outbox_drainer_handle = {
+        use ob_poc::outbox::{
+            BpmnCancelConsumer, BpmnSignalConsumer, MaintenanceSpawnConsumer, NarrateConsumer,
+            OutboxDrainerConfig, OutboxDrainerImpl,
+        };
+        let mut drainer = OutboxDrainerImpl::new(pool.clone(), OutboxDrainerConfig::default());
+        drainer.register(Arc::new(MaintenanceSpawnConsumer::new()))?;
+        // Phase 5e-narration-cutover: NarrateConsumer drains rows the
+        // orchestrator emits after each turn that produced narration.
+        // Transitional log-only sink today; future WebSocket push
+        // path lands here.
+        drainer.register(Arc::new(NarrateConsumer::new()))?;
+        // Phase F.1b (Pattern B A1 remediation, 2026-04-22): BPMN-Lite
+        // fire-and-forget consumers. `bpmn.signal` and `bpmn.cancel`
+        // verbs write to public.outbox inside the ambient txn instead
+        // of calling gRPC directly. These consumers drain the rows
+        // post-commit and send the signal / cancel to the BPMN
+        // service. Failure is retryable with bounded attempts.
+        drainer.register(Arc::new(BpmnSignalConsumer::new()))?;
+        drainer.register(Arc::new(BpmnCancelConsumer::new()))?;
+        tracing::info!("OutboxDrainer: spawning background task");
+        drainer.spawn()
+    };
+
+    // =========================================================================
+    // SemOS plugin op registry — canonical home for every plugin verb
+    // implementation post-Phase-5c-migrate slice #80. Built once here and
+    // threaded into every inner executor (BPMN inner, job worker, REPL V2
+    // legacy + V2).
+    // =========================================================================
+    let sem_os_ops = {
+        let mut reg = sem_os_postgres::ops::build_registry();
+        ob_poc::domain_ops::extend_registry(&mut reg);
+        Arc::new(reg)
+    };
+    tracing::info!(
+        registered_ops = sem_os_ops.len(),
+        "SemOsVerbOpRegistry initialised"
+    );
+
+    // F3 fix (Slice 2.2): drift-check the registry against every YAML plugin
+    // verb BEFORE serving traffic. Missing registrations → panic. This is
+    // the same computation `test_plugin_verb_coverage` runs in CI, so
+    // startup and tests can never diverge on what "covered" means.
+    {
+        let missing = ob_poc::domain_ops::find_missing_plugin_ops(&sem_os_ops);
+        if !missing.is_empty() {
+            panic!(
+                "FATAL: {} YAML plugin verb(s) have no SemOsVerbOp registered. \
+                 Plugin dispatch for these verbs will hard-fail at runtime. \
+                 Wire them in `sem_os_postgres::ops::build_registry()` or \
+                 `ob_poc::domain_ops::extend_registry()`. Missing FQNs: {:?}",
+                missing.len(),
+                missing
+            );
+        }
+        tracing::info!(
+            "SemOsVerbOpRegistry coverage check passed — every YAML plugin verb has a handler"
+        );
+    }
+
+    // =========================================================================
     // BPMN-Lite Integration (before REPL V2 — determines executor)
     // =========================================================================
     type BpmnSetup = (
-        Option<Arc<dyn ob_poc::repl::orchestrator_v2::DslExecutorV2>>,
+        Option<Arc<dyn ob_poc::sequencer::DslExecutorV2>>,
         Option<Arc<ob_poc::bpmn_integration::WorkflowDispatcher>>,
         std::collections::HashSet<String>,
     );
@@ -634,8 +1035,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                                 let config_index = Arc::new(config_index);
 
                                 // Inner executor for direct verb execution
-                                let inner: Arc<dyn ob_poc::repl::orchestrator_v2::DslExecutorV2> =
-                                    Arc::new(RealDslExecutor::new(pool.clone()));
+                                let inner: Arc<dyn ob_poc::sequencer::DslExecutorV2> = Arc::new(
+                                    RealDslExecutor::new(pool.clone())
+                                        .with_services(service_registry.clone())
+                                        .with_sem_os_ops(sem_os_ops.clone()),
+                                );
 
                                 // WorkflowDispatcher — routes Direct vs Orchestrated.
                                 // Each store wraps a PgPool (cheap Arc clone), so we
@@ -656,11 +1060,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                                 // Spawn JobWorker (long-poll job activation loop)
                                 let (job_shutdown_tx, job_shutdown_rx) =
                                     tokio::sync::watch::channel(false);
-                                let worker_executor: Arc<
-                                    dyn ob_poc::repl::orchestrator_v2::DslExecutorV2,
-                                > = Arc::new(
-                                    RealDslExecutor::new(pool.clone()).allow_durable_direct(),
-                                );
+                                let worker_executor: Arc<dyn ob_poc::sequencer::DslExecutorV2> =
+                                    Arc::new(
+                                        RealDslExecutor::new(pool.clone())
+                                            .allow_durable_direct()
+                                            .with_services(service_registry.clone())
+                                            .with_sem_os_ops(sem_os_ops.clone()),
+                                    );
                                 let job_worker = JobWorker::new(
                                     format!("ob-poc-worker-{}", std::process::id()),
                                     client.clone(),
@@ -696,7 +1102,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
                                 (
                                     Some(dispatcher.clone()
-                                        as Arc<dyn ob_poc::repl::orchestrator_v2::DslExecutorV2>),
+                                        as Arc<dyn ob_poc::sequencer::DslExecutorV2>),
                                     Some(dispatcher),
                                     orchestrated_verbs,
                                 )
@@ -733,7 +1139,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // =========================================================================
     let repl_v2_orchestrator = {
         use ob_poc::journey::router::PackRouter;
-        use ob_poc::repl::orchestrator_v2::ReplOrchestratorV2;
+        use ob_poc::sequencer::ReplOrchestratorV2;
 
         // Load journey packs from config dir (if available), otherwise empty router.
         let pack_router = {
@@ -758,10 +1164,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             }
         };
 
+        // `sem_os_ops` was built at module startup above and is in scope here.
         // Legacy DslExecutor for the constructor (fallback path — never parks)
         use ob_poc::repl::executor_bridge::RealDslExecutor;
-        let legacy_executor: Arc<dyn ob_poc::repl::orchestrator_v2::DslExecutor> =
-            Arc::new(RealDslExecutor::new(pool.clone()));
+        let legacy_executor: Arc<dyn ob_poc::sequencer::DslExecutor> = Arc::new(
+            RealDslExecutor::new(pool.clone())
+                .with_services(service_registry.clone())
+                .with_sem_os_ops(sem_os_ops.clone()),
+        );
 
         // Create RunbookStore — shared store for compiled runbook artifacts.
         // INV-3: all execution must go through execute_runbook(CompiledRunbookId).
@@ -772,6 +1182,72 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             .with_runbook_store(runbook_store)
             .with_orchestrated_verbs(orchestrated_verbs);
 
+        // v1.2 Tranche 1 T1.F (DoD item 13): wire GatePipeline default-on
+        // in production. The runtime gate (GateChecker for Mode A blocking,
+        // optional CascadePlanner for Mode C) was opt-in until v1.2 §6.2;
+        // production traffic now flows through it. Soft-fail: if the
+        // catalogue or DAG registry can't load, log + continue ungated
+        // (better than refusing to start; the pre-DB-pool catalogue load
+        // gate at P.1.g already failed earlier if the catalogue was bad).
+        {
+            use dsl_runtime::cross_workspace::{
+                GateChecker, PostgresSlotStateProvider, SqlPredicateResolver,
+            };
+            use ob_poc::dsl_v2::ConfigLoader;
+            use ob_poc::runbook::{GatePipeline, HashMapVerbTransitionLookup};
+
+            let cfg_loader = ConfigLoader::from_env();
+            match (cfg_loader.load_verbs(), cfg_loader.load_dag_registry()) {
+                (Ok(verbs_cfg), Ok(registry)) => {
+                    let registry = Arc::new(registry);
+                    let provider = Arc::new(PostgresSlotStateProvider);
+                    let resolver = Arc::new(SqlPredicateResolver);
+                    let gate_checker =
+                        Arc::new(GateChecker::new(registry.clone(), provider, resolver));
+                    let verb_metadata =
+                        Arc::new(HashMapVerbTransitionLookup::from_verbs_config(&verbs_cfg));
+                    let pipeline = GatePipeline {
+                        registry,
+                        gate_checker,
+                        verb_metadata,
+                        pool: Arc::new(pool.clone()),
+                        cascade_planner: None,
+                    };
+                    orchestrator = orchestrator.with_gate_pipeline(pipeline);
+                    tracing::info!("v1.3 GatePipeline wired (default-on per v1.2 Tranche 1 T1.F)");
+                }
+                (Err(e), _) => {
+                    tracing::warn!("GatePipeline disabled — failed to load verbs config: {}", e)
+                }
+                (_, Err(e)) => {
+                    tracing::warn!("GatePipeline disabled — failed to load DAG registry: {}", e)
+                }
+            }
+        }
+
+        // Wire the VerbExecutionPort — lookup order:
+        //   1. SemOsVerbOpRegistry (post-Phase-5c-migrate slice #80: the sole
+        //      home for plugin verb implementations).
+        //   2. PgCrudExecutor (dsl-runtime-native CRUD fast path).
+        //   3. DslExecutor (fallback for graph_query, durable-direct, and
+        //      template recursion; plugin dispatch flows through the same
+        //      SemOsVerbOpRegistry via `DslExecutor::with_sem_os_ops`).
+        //
+        // Phase 3 (three-plane architecture v0.3 §13): PgCrudExecutor
+        // relocated from sem_os_postgres to dsl-runtime.
+        {
+            use dsl_runtime::PgCrudExecutor;
+            use ob_poc::sem_os_runtime::verb_executor_adapter::ObPocVerbExecutor;
+            use std::sync::Arc;
+
+            let verb_executor =
+                ObPocVerbExecutor::from_pool_with_services(pool.clone(), service_registry.clone())
+                    .with_crud_port(Arc::new(PgCrudExecutor::new(pool.clone())))
+                    .with_sem_os_ops(sem_os_ops.clone());
+            orchestrator = orchestrator.with_verb_execution_port(Arc::new(verb_executor));
+            tracing::info!("VerbExecutionPort wired with SemOsVerbOpRegistry + PgCrudExecutor");
+        }
+
         // Wire the V2 executor that supports parking (WorkflowDispatcher or RealDslExecutor)
         if let Some(ref bpmn_exec) = bpmn_executor_v2 {
             orchestrator = orchestrator.with_executor_v2(bpmn_exec.clone());
@@ -779,8 +1255,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         } else {
             // No BPMN — wire RealDslExecutor directly (it auto-impls DslExecutorV2
             // via the blanket impl, so execute_v2 maps to Completed/Failed, never Parked)
-            orchestrator =
-                orchestrator.with_executor_v2(Arc::new(RealDslExecutor::new(pool.clone())));
+            orchestrator = orchestrator.with_executor_v2(Arc::new(
+                RealDslExecutor::new(pool.clone())
+                    .with_services(service_registry.clone())
+                    .with_sem_os_ops(sem_os_ops.clone()),
+            ));
             tracing::info!("REPL V2 executor: RealDslExecutor (direct, no BPMN)");
         }
 
@@ -1056,6 +1535,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         sessions.clone(),
         sem_os_client.clone(),
         Some(repl_v2_orchestrator),
+        // F1 fix (Slice 2.1b): thread the canonical SemOS plugin op registry
+        // and platform service registry so the agent chat / legacy DSL paths
+        // dispatch plugin verbs correctly (post-Phase-5c-migrate slice #80).
+        Some(sem_os_ops.clone()),
+        Some(service_registry.clone()),
     )
     .await;
 

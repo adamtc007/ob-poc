@@ -56,6 +56,11 @@ domains:
         returns:
           type: record
           capture: false
+        three_axis:
+          state_effect: preserving
+          external_effects: [observational]
+          consequence:
+            baseline: benign
 
       # ============================================
       # Search & List
@@ -97,6 +102,11 @@ domains:
         returns:
           type: record_set
           capture: false
+        three_axis:
+          state_effect: preserving
+          external_effects: [observational]
+          consequence:
+            baseline: benign
 
       list-objects:
         description: List registered objects by type with optional filters
@@ -130,6 +140,11 @@ domains:
         returns:
           type: record_set
           capture: false
+        three_axis:
+          state_effect: preserving
+          external_effects: [observational]
+          consequence:
+            baseline: benign
 
       # ============================================
       # Context Resolution
@@ -171,6 +186,11 @@ domains:
         returns:
           type: record
           capture: false
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
 
       # ============================================
       # Verb Surface & Producers
@@ -206,6 +226,11 @@ domains:
         returns:
           type: record
           capture: false
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
 
       attribute-producers:
         description: Find which verbs produce a given attribute
@@ -234,6 +259,11 @@ domains:
         returns:
           type: record
           capture: false
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
 
       # ============================================
       # Lineage & Tracing
@@ -271,6 +301,11 @@ domains:
         returns:
           type: record
           capture: false
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
 
       regulation-trace:
         description: Trace regulatory requirements for an object
@@ -299,6 +334,11 @@ domains:
         returns:
           type: record
           capture: false
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
 
       # ============================================
       # Taxonomy Navigation
@@ -335,6 +375,11 @@ domains:
         returns:
           type: record
           capture: false
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
 
       taxonomy-members:
         description: List members of a taxonomy node
@@ -367,6 +412,11 @@ domains:
         returns:
           type: record_set
           capture: false
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
 
       classify:
         description: Classify an object against a taxonomy
@@ -399,6 +449,11 @@ domains:
         returns:
           type: record
           capture: false
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
 
       # ============================================
       # View Operations
@@ -430,6 +485,11 @@ domains:
         returns:
           type: record
           capture: false
+        three_axis:
+          state_effect: preserving
+          external_effects: [observational]
+          consequence:
+            baseline: benign
 
       apply-view:
         description: Apply a view to filter and rank verbs/attributes for a subject
@@ -462,6 +522,11 @@ domains:
         returns:
           type: record
           capture: false
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
 
       # ============================================
       # Policy Description
@@ -493,6 +558,11 @@ domains:
         returns:
           type: record
           capture: false
+        three_axis:
+          state_effect: preserving
+          external_effects: [observational]
+          consequence:
+            baseline: benign
 
       # ============================================
       # Coverage & Evidence
@@ -525,6 +595,11 @@ domains:
         returns:
           type: record
           capture: false
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
 
       evidence-freshness:
         description: Check evidence freshness for registered objects
@@ -558,6 +633,11 @@ domains:
         returns:
           type: record
           capture: false
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
 
       evidence-gaps:
         description: Identify evidence gaps in the registry
@@ -586,6 +666,11 @@ domains:
         returns:
           type: record
           capture: false
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
 
       # ============================================
       # History & Diff
@@ -626,6 +711,11 @@ domains:
         returns:
           type: record_set
           capture: false
+        three_axis:
+          state_effect: preserving
+          external_effects: [observational]
+          consequence:
+            baseline: benign
 
       snapshot-diff:
         description: Diff two snapshots of the same object
@@ -658,6 +748,11 @@ domains:
         returns:
           type: record
           capture: false
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
 
       # ============================================
       # Active Manifest
@@ -685,6 +780,11 @@ domains:
         returns:
           type: record
           capture: false
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
 
       # ============================================
       # Affinity Navigation
@@ -732,6 +832,11 @@ domains:
         returns:
           type: record
           capture: false
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
 
       verbs-for-attribute:
         description: Find all verbs that produce or consume a given attribute
@@ -771,6 +876,11 @@ domains:
         returns:
           type: record
           capture: false
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
 
       data-for-verb:
         description: Find all data assets a verb touches (tables, columns, attributes, entities)
@@ -811,6 +921,11 @@ domains:
         returns:
           type: record
           capture: false
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
 
       adjacent-verbs:
         description: Find verbs sharing data dependencies with a given verb
@@ -851,6 +966,11 @@ domains:
         returns:
           type: record
           capture: false
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
 
       governance-gaps:
         description: Identify ungoverned tables, orphan verbs, and attribute coverage gaps
@@ -891,6 +1011,11 @@ domains:
         returns:
           type: record
           capture: false
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
 
       discover-dsl:
         description: Discover a DSL chain from an utterance using affinity graph (Phase 2 stub)
@@ -935,3 +1060,8 @@ domains:
         returns:
           type: record
           capture: false
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable

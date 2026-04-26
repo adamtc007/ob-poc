@@ -727,7 +727,7 @@ impl SubjectRelationships {
 }
 
 /// Inputs used to filter and rank candidate verbs during context resolution.
-pub struct VerbFilterContext<'a> {
+pub(crate) struct VerbFilterContext<'a> {
     /// Actor context used for ABAC evaluation.
     pub actor: &'a ActorContext,
     /// Evidence mode for the current resolution.
@@ -747,7 +747,7 @@ pub struct VerbFilterContext<'a> {
 // ── Pure Scoring / Filtering Functions ────────────────────────
 
 /// Step 3: Rank views by taxonomy overlap with the subject.
-pub fn rank_views_by_overlap(
+pub(crate) fn rank_views_by_overlap(
     views: &[(SnapshotRow, ViewDefBody)],
     subject: &ResolvedSubject,
     memberships: &SubjectMemberships,
@@ -770,7 +770,7 @@ pub fn rank_views_by_overlap(
 }
 
 /// Compute overlap score between a view and a resolved subject.
-pub fn compute_view_overlap(
+pub(crate) fn compute_view_overlap(
     view: &ViewDefBody,
     subject: &ResolvedSubject,
     memberships: &SubjectMemberships,
@@ -817,7 +817,7 @@ pub fn compute_view_overlap(
 }
 
 /// Step 5: Filter and rank verbs by taxonomy + ABAC + tier + relationship edge_class.
-pub fn filter_and_rank_verbs(
+pub(crate) fn filter_and_rank_verbs(
     verb_rows: &[SnapshotRow],
     ctx: VerbFilterContext<'_>,
 ) -> (Vec<VerbCandidate>, Vec<EntityKindPrunedVerb>) {

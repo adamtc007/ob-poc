@@ -1,0 +1,26 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            SELECT phrase, verb\n            FROM \"ob-poc\".invocation_phrases\n            ORDER BY occurrence_count DESC\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "phrase",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 1,
+        "name": "verb",
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": [
+      false,
+      false
+    ]
+  },
+  "hash": "3edd6252a619eef0feade4668ec836c0240cd78c944330ae82256b75ab79a88f"
+}

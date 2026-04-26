@@ -95,6 +95,8 @@ pub enum WorkspaceKind {
     InstrumentMatrix,
     OnBoarding,
     SemOsMaintenance,
+    LifecycleResources,
+    BookingPrincipal,
 }
 
 impl WorkspaceKind {
@@ -115,6 +117,8 @@ impl WorkspaceKind {
             Self::InstrumentMatrix => "Instrument Matrix",
             Self::OnBoarding => "OnBoarding",
             Self::SemOsMaintenance => "SemOS Maintenance",
+            Self::LifecycleResources => "Lifecycle Resources",
+            Self::BookingPrincipal => "Booking Principal",
         }
     }
 
@@ -233,6 +237,26 @@ impl WorkspaceKind {
                 default_constellation_map: "registry.stewardship",
                 supports_handoff_mode: false,
             },
+            Self::LifecycleResources => WorkspaceRegistryEntry {
+                workspace_id: self.clone(),
+                display_name: self.label(),
+                constellation_families: vec!["lifecycle_resources_workspace", "platform"],
+                subject_kinds: vec![SubjectKind::Resource],
+                subject_required: false,
+                default_constellation_family: "platform",
+                default_constellation_map: "lifecycle.resources",
+                supports_handoff_mode: false,
+            },
+            Self::BookingPrincipal => WorkspaceRegistryEntry {
+                workspace_id: self.clone(),
+                display_name: self.label(),
+                constellation_families: vec!["booking_principal_workspace", "deal_governance"],
+                subject_kinds: vec![],
+                subject_required: false,
+                default_constellation_family: "deal_governance",
+                default_constellation_map: "deal.booking_principal",
+                supports_handoff_mode: false,
+            },
         }
     }
 
@@ -253,6 +277,8 @@ impl WorkspaceKind {
             Self::InstrumentMatrix,
             Self::OnBoarding,
             Self::SemOsMaintenance,
+            Self::LifecycleResources,
+            Self::BookingPrincipal,
         ]
     }
 }
@@ -451,7 +477,7 @@ pub struct WorkspaceFrame {
     /// Populated during hydration, used by pre-REPL staleness check and narration.
     /// Transient (not serialized).
     #[serde(skip)]
-    pub stale_shared_facts: Vec<crate::cross_workspace::fact_refs::StaleSharedFactRef>,
+    pub stale_shared_facts: Vec<dsl_runtime::cross_workspace::fact_refs::StaleSharedFactRef>,
 
     // --- Constraint cascade (workspace-scoped working context) ---
     // Each workspace frame carries its own constraint state.
@@ -615,7 +641,7 @@ pub struct SessionFeedback {
     /// Stale shared fact references in the current workspace (cross-workspace consistency).
     /// Non-empty when the workspace is operating against superseded shared attribute versions.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub stale_shared_facts: Vec<crate::cross_workspace::fact_refs::StaleSharedFactRef>,
+    pub stale_shared_facts: Vec<dsl_runtime::cross_workspace::fact_refs::StaleSharedFactRef>,
     #[serde(default)]
     pub scoped_verb_surface: Vec<VerbRef>,
     #[serde(default)]
@@ -833,6 +859,15 @@ impl WorkspaceKind {
             || msg.contains("stewardship")
         {
             return Some(Self::SemOsMaintenance);
+        }
+        if msg.contains("lifecycle resource")
+            || msg.contains("application instance")
+            || msg.contains("capability binding")
+        {
+            return Some(Self::LifecycleResources);
+        }
+        if msg.contains("booking principal") || msg.contains("bp clearance") {
+            return Some(Self::BookingPrincipal);
         }
         None
     }

@@ -1,0 +1,22 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT workstream_id FROM \"ob-poc\".entity_workstreams\n                   WHERE case_id = ANY($1)",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "workstream_id",
+        "type_info": "Uuid"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "UuidArray"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "7923e50d65e746b4f3e6cbc834fa1cf61d7999bd04e3ba0164776bd8429f9615"
+}

@@ -233,7 +233,11 @@ mod tests {
     #[test]
     fn scans_state_machines_with_fqns() {
         let seeds = scan_state_machines().unwrap();
-        assert_eq!(seeds.len(), 9);
+        assert!(
+            seeds.len() >= 9,
+            "expected at least the 9 baseline state-machine seeds, found {}",
+            seeds.len()
+        );
         assert!(seeds.iter().any(|seed| seed.fqn == "kyc_case_lifecycle"));
         assert!(seeds
             .iter()

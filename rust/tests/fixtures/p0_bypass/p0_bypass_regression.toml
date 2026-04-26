@@ -1,0 +1,214 @@
+# P0 Regression Fixture — F14 SemOS Tollgate Bypass on Tier -2A ScenarioIndex
+# ============================================================================
+# Slice 1.1 (2026-04-22). Source: docs/todo/three-plane-implementation-peer-review-2026-04-22.md.
+#
+# Purpose: each case exercises the Tier -2A ScenarioIndex "Matched" code path
+# in `rust/src/mcp/verb_search.rs` under a controlled `allowed_verbs` set.
+# Before the F14 fix, scenario-routed verbs bypassed the CCIR allowed_verbs
+# filter. After the fix, any scenario whose FQN is NOT in `allowed_verbs`
+# must NOT appear in the search results.
+#
+# Any case failing this fixture means the bypass has regressed.
+#
+# Fixture shape:
+#   utterance       — the raw input
+#   scenarios_yaml  — inline scenario definition(s) driving the ScenarioIndex
+#   allowed_verbs   — the CCIR-derived set
+#   expected        — "verb:<FQN>" (verb must appear), or "filtered" (must not appear)
+# ============================================================================
+
+# ── Positive cases: scenario FQN in allowed_verbs ────────────────────────────
+
+[[case]]
+name = "lux_sicav_in_allowed_passes"
+utterance = "Onboard a Luxembourg SICAV"
+scenarios_yaml = """
+scenarios:
+  - id: lux-sicav
+    title: Luxembourg SICAV
+    modes: [onboarding]
+    requires:
+      any_of: [compound_action, jurisdiction_structure_pair]
+    signals:
+      actions: [onboard]
+      jurisdictions: [LU]
+      nouns_any: [sicav]
+    routes:
+      kind: macro
+      macro_fqn: struct.lux.ucits.sicav
+"""
+allowed_verbs = ["struct.lux.ucits.sicav", "some.other.verb"]
+expected = "verb:struct.lux.ucits.sicav"
+
+[[case]]
+name = "ie_icav_in_allowed_passes"
+utterance = "set up an Irish ICAV"
+scenarios_yaml = """
+scenarios:
+  - id: ie-icav
+    title: Irish ICAV
+    modes: [onboarding]
+    requires:
+      any_of: [compound_action, jurisdiction_structure_pair]
+    signals:
+      actions: [onboard, "set up"]
+      jurisdictions: [IE]
+      nouns_any: [icav]
+    routes:
+      kind: macro
+      macro_fqn: struct.ie.ucits.icav
+"""
+allowed_verbs = ["struct.ie.ucits.icav"]
+expected = "verb:struct.ie.ucits.icav"
+
+# ── Negative cases (the P0 regression) ───────────────────────────────────────
+# Before F14 fix: the route FQN leaked through despite being outside allowed_verbs.
+# After F14 fix: the route is filtered out; results must NOT contain it.
+
+[[case]]
+name = "lux_sicav_NOT_in_allowed_filtered"
+utterance = "Onboard a Luxembourg SICAV"
+scenarios_yaml = """
+scenarios:
+  - id: lux-sicav
+    title: Luxembourg SICAV
+    modes: [onboarding]
+    requires:
+      any_of: [compound_action, jurisdiction_structure_pair]
+    signals:
+      actions: [onboard]
+      jurisdictions: [LU]
+      nouns_any: [sicav]
+    routes:
+      kind: macro
+      macro_fqn: struct.lux.ucits.sicav
+"""
+allowed_verbs = ["some.other.verb"]  # Deliberately excludes scenario FQN.
+expected = "filtered"
+
+[[case]]
+name = "ie_icav_NOT_in_allowed_filtered"
+utterance = "set up an Irish ICAV"
+scenarios_yaml = """
+scenarios:
+  - id: ie-icav
+    title: Irish ICAV
+    modes: [onboarding]
+    requires:
+      any_of: [compound_action, jurisdiction_structure_pair]
+    signals:
+      actions: [onboard, "set up"]
+      jurisdictions: [IE]
+      nouns_any: [icav]
+    routes:
+      kind: macro
+      macro_fqn: struct.ie.ucits.icav
+"""
+allowed_verbs = ["cbu.rename"]  # Deliberately unrelated.
+expected = "filtered"
+
+[[case]]
+name = "empty_allowed_verbs_filters_all"
+utterance = "Onboard a Luxembourg SICAV"
+scenarios_yaml = """
+scenarios:
+  - id: lux-sicav
+    title: Luxembourg SICAV
+    modes: [onboarding]
+    requires:
+      any_of: [compound_action, jurisdiction_structure_pair]
+    signals:
+      actions: [onboard]
+      jurisdictions: [LU]
+      nouns_any: [sicav]
+    routes:
+      kind: macro
+      macro_fqn: struct.lux.ucits.sicav
+"""
+allowed_verbs = []  # Empty set: nothing is allowed.
+expected = "filtered"
+
+# ── Preserved semantic: None allowed_verbs is fail-open (F17 Slice 3.2 scope) ─
+
+[[case]]
+name = "none_allowed_verbs_passes_fail_open"
+utterance = "Onboard a Luxembourg SICAV"
+scenarios_yaml = """
+scenarios:
+  - id: lux-sicav
+    title: Luxembourg SICAV
+    modes: [onboarding]
+    requires:
+      any_of: [compound_action, jurisdiction_structure_pair]
+    signals:
+      actions: [onboard]
+      jurisdictions: [LU]
+      nouns_any: [sicav]
+    routes:
+      kind: macro
+      macro_fqn: struct.lux.ucits.sicav
+"""
+# allowed_verbs omitted => None in Rust — existing fail-open semantic.
+# Slice 3.2 / F17 will convert this to fail-closed at the runbook compiler
+# level; the verb searcher itself preserves `is_none_or` semantics.
+expected = "verb:struct.lux.ucits.sicav"
+
+# ── Ambiguous path (already filtered pre-F14) — pin the behaviour ────────────
+
+[[case]]
+name = "ambiguous_path_filters_excluded"
+utterance = "Onboard a Luxembourg SICAV"
+scenarios_yaml = """
+scenarios:
+  - id: one
+    title: One
+    modes: [onboarding]
+    requires:
+      any_of: [compound_action]
+    signals:
+      actions: [onboard]
+      jurisdictions: [LU]
+      nouns_any: [sicav]
+    routes:
+      kind: macro
+      macro_fqn: macro.scenario.one
+  - id: two
+    title: Two
+    modes: [onboarding]
+    requires:
+      any_of: [compound_action]
+    signals:
+      actions: [onboard]
+      jurisdictions: [LU]
+      nouns_any: [sicav]
+    routes:
+      kind: macro
+      macro_fqn: macro.scenario.two
+"""
+allowed_verbs = ["macro.scenario.two"]
+expected = "verb:macro.scenario.two"
+
+# ── Non-scenario fallthrough: utterance produces no scenario match ───────────
+# Should return empty with any allowed_verbs (nothing reached post-tier filter
+# in minimal searcher; proves search doesn't crash on no-match).
+
+[[case]]
+name = "no_scenario_match_returns_empty"
+utterance = "complete unrelated query that triggers no scenarios"
+scenarios_yaml = """
+scenarios:
+  - id: lux-sicav
+    title: Luxembourg SICAV
+    modes: [onboarding]
+    requires:
+      any_of: [compound_action, jurisdiction_structure_pair]
+    signals:
+      actions: [onboard]
+      jurisdictions: [LU]
+      nouns_any: [sicav]
+    routes:
+      kind: macro
+      macro_fqn: struct.lux.ucits.sicav
+"""
+allowed_verbs = ["struct.lux.ucits.sicav"]
+expected = "filtered"

@@ -59,6 +59,12 @@ domains:
           type: record
           capture: false
 
+        three_axis:
+          state_effect: preserving
+          external_effects:
+            - observational
+          consequence:
+            baseline: benign
       entity.describe:
         description: Describe an entity type with fields, relationships, and available verbs
         metadata:
@@ -89,6 +95,12 @@ domains:
           type: record
           capture: false
 
+        three_axis:
+          state_effect: preserving
+          external_effects:
+            - observational
+          consequence:
+            baseline: benign
       entity.list-fields:
         description: List fields for an entity type from registry or ontology metadata
         metadata:
@@ -118,6 +130,12 @@ domains:
           type: record
           capture: false
 
+        three_axis:
+          state_effect: preserving
+          external_effects:
+            - observational
+          consequence:
+            baseline: benign
       entity.list-relationships:
         description: List relationships for an entity type from ontology metadata
         metadata:
@@ -146,6 +164,12 @@ domains:
           type: record
           capture: false
 
+        three_axis:
+          state_effect: preserving
+          external_effects:
+            - observational
+          consequence:
+            baseline: benign
       entity.list-verbs:
         description: List DSL verbs available for an entity type's domain
         metadata:
@@ -178,6 +202,12 @@ domains:
       # ============================================
       # Schema Introspection
       # ============================================
+        three_axis:
+          state_effect: preserving
+          external_effects:
+            - observational
+          consequence:
+            baseline: benign
       introspect:
         description: Introspect database schema (tables, columns, foreign keys)
         metadata:
@@ -220,6 +250,12 @@ domains:
       # ============================================
       # Attribute Extraction
       # ============================================
+        three_axis:
+          state_effect: preserving
+          external_effects:
+            - observational
+          consequence:
+            baseline: benign
       extract-attributes:
         description: Extract attribute definitions from schema columns
         metadata:
@@ -256,6 +292,12 @@ domains:
       # ============================================
       # Verb Extraction
       # ============================================
+        three_axis:
+          state_effect: preserving
+          external_effects:
+            - observational
+          consequence:
+            baseline: benign
       extract-verbs:
         description: Extract verb contracts from YAML config
         metadata:
@@ -294,6 +336,12 @@ domains:
       # ============================================
       # Entity Type Extraction
       # ============================================
+        three_axis:
+          state_effect: preserving
+          external_effects:
+            - observational
+          consequence:
+            baseline: benign
       extract-entities:
         description: Extract entity type definitions from schema tables
         metadata:
@@ -326,6 +374,12 @@ domains:
       # ============================================
       # Cross-Reference / Drift Detection
       # ============================================
+        three_axis:
+          state_effect: preserving
+          external_effects:
+            - observational
+          consequence:
+            baseline: benign
       cross-reference:
         description: Cross-reference schema against registry snapshots for drift detection
         metadata:
@@ -365,6 +419,12 @@ domains:
       # ============================================
       # Diagram Generation
       # ============================================
+        three_axis:
+          state_effect: preserving
+          external_effects:
+            - observational
+          consequence:
+            baseline: benign
       generate-erd:
         description: Generate an entity-relationship diagram with verb surface annotations
         metadata:
@@ -443,6 +503,12 @@ domains:
           type: record
           capture: false
 
+        three_axis:
+          state_effect: preserving
+          external_effects:
+            - observational
+          consequence:
+            baseline: benign
       generate-verb-flow:
         description: Generate a verb-flow diagram showing what data a verb touches
         metadata:
@@ -492,6 +558,12 @@ domains:
           type: record
           capture: false
 
+        three_axis:
+          state_effect: preserving
+          external_effects:
+            - observational
+          consequence:
+            baseline: benign
       generate-discovery-map:
         description: Generate a domain discovery map (Phase 2 stub)
         metadata:
@@ -536,3 +608,9 @@ domains:
         returns:
           type: record
           capture: false
+        three_axis:
+          state_effect: preserving
+          external_effects:
+            - observational
+          consequence:
+            baseline: benign

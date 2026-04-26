@@ -1,0 +1,82 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT s.ssi_id, s.ssi_name, s.ssi_type, s.status, s.cash_currency,\n                      s.safekeeping_account, s.safekeeping_bic, s.cash_account, s.cash_account_bic,\n                      s.market_id,\n                      m.mic as \"mic?\"\n               FROM \"ob-poc\".cbu_ssi s\n               LEFT JOIN \"ob-poc\".markets m ON m.market_id = s.market_id\n               WHERE s.cbu_id = $1",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "ssi_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "ssi_name",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 2,
+        "name": "ssi_type",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 3,
+        "name": "status",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 4,
+        "name": "cash_currency",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 5,
+        "name": "safekeeping_account",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 6,
+        "name": "safekeeping_bic",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 7,
+        "name": "cash_account",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 8,
+        "name": "cash_account_bic",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 9,
+        "name": "market_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 10,
+        "name": "mic?",
+        "type_info": "Varchar"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      false
+    ]
+  },
+  "hash": "bdd9def6ec58a140bb507ec0e4440d1de966d668a2987e674dc1831af323a8bf"
+}

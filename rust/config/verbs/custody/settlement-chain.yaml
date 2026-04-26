@@ -77,6 +77,11 @@ domains:
             - "reviewed:none"
           writes_tables:
             - custody.settlement_locations
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
 
       list-locations:
         description: "List settlement locations"
@@ -120,6 +125,11 @@ domains:
       # =========================================================================
       # SETTLEMENT CHAINS
       # =========================================================================
+        three_axis:
+          state_effect: preserving
+          external_effects: [observational]
+          consequence:
+            baseline: benign
 
       create-chain:
         description: "Create settlement chain for CBU"
@@ -214,6 +224,11 @@ domains:
             - "requires_scope:cbu"
           writes_tables:
             - custody.cbu_settlement_chains
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
 
       list-chains:
         description: "List settlement chains for CBU"
@@ -261,6 +276,11 @@ domains:
         lifecycle:
           reads_tables:
             - custody.cbu_settlement_chains
+        three_axis:
+          state_effect: preserving
+          external_effects: [observational]
+          consequence:
+            baseline: benign
 
       deactivate-chain:
         description: "Deactivate a settlement chain"
@@ -304,6 +324,15 @@ domains:
       # =========================================================================
       # CHAIN HOPS (INTERMEDIARIES)
       # =========================================================================
+        three_axis:
+          state_effect: transition
+          external_effects: []
+          consequence:
+            baseline: requires_confirmation
+        transition_args:
+          entity_id_arg: chain-id
+          target_workspace: instrument_matrix
+          target_slot: settlement_pattern_template
 
       add-hop:
         description: "Add intermediary hop to settlement chain"
@@ -400,6 +429,15 @@ domains:
             - custody.settlement_chain_hops
           reads_tables:
             - custody.cbu_settlement_chains
+        three_axis:
+          state_effect: transition
+          external_effects: []
+          consequence:
+            baseline: reviewable
+        transition_args:
+          entity_id_arg: chain-id
+          target_workspace: instrument_matrix
+          target_slot: settlement_pattern_template
 
       list-hops:
         description: "List hops in a settlement chain"
@@ -436,6 +474,11 @@ domains:
         lifecycle:
           reads_tables:
             - custody.settlement_chain_hops
+        three_axis:
+          state_effect: preserving
+          external_effects: [observational]
+          consequence:
+            baseline: benign
 
       remove-hop:
         description: "Remove hop from settlement chain"
@@ -476,6 +519,11 @@ domains:
       # =========================================================================
       # SETTLEMENT LOCATION PREFERENCES
       # =========================================================================
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: requires_confirmation
 
       set-location-preference:
         description: "Set preferred settlement location for market/instrument"
@@ -567,6 +615,11 @@ domains:
             - custody.cbu_settlement_location_preferences
           reads_tables:
             - custody.settlement_locations
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
 
       list-location-preferences:
         description: "List settlement location preferences for CBU"
@@ -611,6 +664,11 @@ domains:
       # =========================================================================
       # CROSS-BORDER CONFIGURATION
       # =========================================================================
+        three_axis:
+          state_effect: preserving
+          external_effects: [observational]
+          consequence:
+            baseline: benign
 
       set-cross-border:
         description: "Configure cross-border settlement routing"
@@ -721,6 +779,11 @@ domains:
             - custody.cbu_cross_border_config
           reads_tables:
             - custody.settlement_locations
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
 
       list-cross-border:
         description: "List cross-border configurations for CBU"
@@ -764,6 +827,11 @@ domains:
         lifecycle:
           reads_tables:
             - custody.cbu_cross_border_config
+        three_axis:
+          state_effect: preserving
+          external_effects: [observational]
+          consequence:
+            baseline: benign
 
       deactivate-cross-border:
         description: "Deactivate cross-border configuration"
@@ -802,3 +870,218 @@ domains:
             - "requires_scope:cbu"
           writes_tables:
             - custody.cbu_cross_border_config
+
+      # =========================================================================
+      # P.3 ADDITIONS (2026-04-23) — SETTLEMENT CHAIN LIFECYCLE TRANSITIONS
+      # Adds verbs for the 6-state settlement_pattern_lifecycle per
+      # instrument_matrix_dag.yaml. Implements Adam's pre-activation
+      # lifecycle (pass-1 Q1) + parallel_run state (pass-5 Q-E).
+      # =========================================================================
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: requires_confirmation
+
+      request-review:
+        description: "Submit a configured settlement chain for ops / treasury review"
+        invocation_phrases:
+          - "request review"
+          - "submit chain for review"
+          - "submit settlement chain"
+        metadata:
+          tier: intent
+          source_of_truth: matrix
+          scope: cbu
+          noun: settlement_chain
+          subject_kinds: [settlement-chain]
+          phase_tags: [im_configured]
+          side_effects: state_write
+          harm_class: reversible
+        behavior: plugin
+        args:
+          - name: chain
+            type: uuid
+            required: true
+        three_axis:
+          state_effect: transition
+          external_effects: []
+          consequence:
+            baseline: reviewable
+          transitions:
+            dag: instrument_matrix_dag
+            edges:
+              - from: configured
+                to: reviewed
+        transition_args:
+          entity_id_arg: chain
+          target_workspace: instrument_matrix
+          target_slot: settlement_pattern_template
+
+      enter-parallel-run:
+        description: "Enter parallel-run state — new chain runs alongside incumbent for 1-2 cycles"
+        invocation_phrases:
+          - "enter parallel run"
+          - "start parallel settlement"
+          - "shadow settlement"
+        metadata:
+          tier: intent
+          source_of_truth: matrix
+          scope: cbu
+          noun: settlement_chain
+          subject_kinds: [settlement-chain]
+          phase_tags: [parallel_run]
+          side_effects: state_write
+          harm_class: reversible
+        behavior: plugin
+        args:
+          - name: chain
+            type: uuid
+            required: true
+        three_axis:
+          state_effect: transition
+          external_effects: [emitting]
+          consequence:
+            baseline: requires_confirmation
+          transitions:
+            dag: instrument_matrix_dag
+            edges:
+              - from: reviewed
+                to: parallel_run
+
+      go-live:
+        description: "Activate chain as live (parallel_run → live)"
+        invocation_phrases:
+          - "go live on chain"
+          - "activate chain"
+          - "make settlement chain live"
+        metadata:
+          tier: intent
+          source_of_truth: matrix
+          scope: cbu
+          noun: settlement_chain
+          subject_kinds: [settlement-chain]
+          phase_tags: [active]
+          side_effects: state_write
+          harm_class: reversible
+        behavior: plugin
+        args:
+          - name: chain
+            type: uuid
+            required: true
+        three_axis:
+          state_effect: transition
+          external_effects: [emitting]
+          consequence:
+            baseline: requires_confirmation
+          transitions:
+            dag: instrument_matrix_dag
+            edges:
+              - from: parallel_run
+                to: live
+        transition_args:
+          entity_id_arg: chain
+          target_workspace: instrument_matrix
+          target_slot: settlement_pattern_template
+
+      abort-parallel-run:
+        description: "Abort parallel_run — roll back to reviewed state (issues found)"
+        invocation_phrases:
+          - "abort parallel run"
+          - "rollback parallel chain"
+          - "stop parallel settlement"
+        metadata:
+          tier: intent
+          source_of_truth: matrix
+          scope: cbu
+          noun: settlement_chain
+          subject_kinds: [settlement-chain]
+          phase_tags: [operational]
+          side_effects: state_write
+          harm_class: reversible
+        behavior: plugin
+        args:
+          - name: chain
+            type: uuid
+            required: true
+          - name: reason
+            type: string
+            required: false
+        three_axis:
+          state_effect: transition
+          external_effects: [emitting]
+          consequence:
+            baseline: requires_confirmation
+          transitions:
+            dag: instrument_matrix_dag
+            edges:
+              - from: parallel_run
+                to: reviewed
+
+      suspend:
+        description: "Suspend a live settlement chain (operational hold)"
+        invocation_phrases:
+          - "suspend chain"
+          - "suspend settlement chain"
+          - "pause chain"
+        metadata:
+          tier: intent
+          source_of_truth: matrix
+          scope: cbu
+          noun: settlement_chain
+          subject_kinds: [settlement-chain]
+          phase_tags: [operational]
+          side_effects: state_write
+          harm_class: reversible
+        behavior: plugin
+        args:
+          - name: chain
+            type: uuid
+            required: true
+          - name: reason
+            type: string
+            required: false
+        three_axis:
+          state_effect: transition
+          external_effects: [emitting]
+          consequence:
+            baseline: requires_confirmation
+          transitions:
+            dag: instrument_matrix_dag
+            edges:
+              - from: live
+                to: suspended
+        transition_args:
+          entity_id_arg: chain
+          target_workspace: instrument_matrix
+          target_slot: settlement_pattern_template
+
+      reactivate:
+        description: "Reactivate a suspended settlement chain (suspended → live)"
+        invocation_phrases:
+          - "reactivate chain"
+          - "resume settlement chain"
+        metadata:
+          tier: intent
+          source_of_truth: matrix
+          scope: cbu
+          noun: settlement_chain
+          subject_kinds: [settlement-chain]
+          phase_tags: [operational]
+          side_effects: state_write
+          harm_class: reversible
+        behavior: plugin
+        args:
+          - name: chain
+            type: uuid
+            required: true
+        three_axis:
+          state_effect: transition
+          external_effects: [emitting]
+          consequence:
+            baseline: requires_confirmation
+          transitions:
+            dag: instrument_matrix_dag
+            edges:
+              - from: suspended
+                to: live

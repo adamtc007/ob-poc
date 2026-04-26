@@ -1,0 +1,22 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            SELECT DISTINCT document_type_id\n            FROM \"ob-poc\".document_attribute_mappings\n            WHERE attribute_uuid = $1\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "document_type_id",
+        "type_info": "Uuid"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "9c2d2a0aa54c763cbdd03c57f685fadcf03baf5ba103cf3753d88d3e0187513c"
+}

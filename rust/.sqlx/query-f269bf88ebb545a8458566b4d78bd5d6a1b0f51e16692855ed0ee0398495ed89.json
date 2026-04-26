@@ -1,0 +1,20 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            SELECT COUNT(*) as \"count!\"\n            FROM \"ob-poc\".learning_candidates\n            WHERE status = 'pending'\n              AND (auto_applicable = FALSE OR risk_level != 'low')\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "count!",
+        "type_info": "Int8"
+      }
+    ],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "f269bf88ebb545a8458566b4d78bd5d6a1b0f51e16692855ed0ee0398495ed89"
+}

@@ -5,6 +5,7 @@ edition = "2021"
 
 [features]
 default = []
+database = ["postgres"]
 postgres = ["bpmn-lite-core/postgres", "dep:sqlx"]
 
 [dependencies]
