@@ -13,6 +13,7 @@ mod allianz_harness;
 mod aviva_deal_harness;
 mod bpmn_lite;
 mod calibration;
+mod dag_test;
 mod deal_harness;
 mod entity;
 mod fund_programme;
@@ -572,6 +573,48 @@ enum Command {
     Harness {
         #[command(subcommand)]
         action: HarnessAction,
+    },
+
+    /// Run the cross-workspace DAG test harness (mock + live modes).
+    ///
+    /// Live mode uses #[sqlx::test] ephemeral databases (DATABASE_URL must
+    /// point at a Postgres instance the test user can CREATE DATABASE on).
+    DagTest {
+        /// Drop test artifacts (target/harness_failures/) before running.
+        #[arg(long)]
+        reset: bool,
+        /// Run only test functions matching this substring.
+        #[arg(long)]
+        filter: Option<String>,
+        /// Skip live-mode scenarios.
+        #[arg(long)]
+        mock_only: bool,
+        /// Skip mock-mode scenarios.
+        #[arg(long)]
+        live_only: bool,
+    },
+
+    /// Cross-workspace DAG coverage report.
+    ///
+    /// Enumerates every cross_workspace_constraint, derived state, and
+    /// cascade rule across all DAG taxonomies; cross-references against
+    /// fixture YAMLs; reports per-DAG and overall coverage.
+    DagCoverage {
+        /// Restrict report to one workspace name.
+        #[arg(long)]
+        workspace: Option<String>,
+        /// Output JSON instead of human-readable text.
+        #[arg(long)]
+        json: bool,
+    },
+
+    /// Scaffold a new cross-workspace DAG fixture YAML.
+    DagFixture {
+        /// Fixture name (becomes the suite_id and filename stem).
+        name: String,
+        /// Mode for the new fixture: mock | live | both.
+        #[arg(long, default_value = "mock")]
+        mode: String,
     },
 
     /// BPMN-Lite service commands (build, test, clippy, docker, deploy)
@@ -1659,6 +1702,22 @@ fn main() -> Result<()> {
                 }
             }
         }
+        Command::DagTest {
+            reset,
+            filter,
+            mock_only,
+            live_only,
+        } => {
+            let mode = match (mock_only, live_only) {
+                (true, true) => anyhow::bail!("--mock-only and --live-only are mutually exclusive"),
+                (true, false) => dag_test::DagTestMode::MockOnly,
+                (false, true) => dag_test::DagTestMode::LiveOnly,
+                (false, false) => dag_test::DagTestMode::Both,
+            };
+            dag_test::run(&sh, mode, reset, filter)
+        }
+        Command::DagCoverage { workspace, json } => dag_test::coverage(workspace, json),
+        Command::DagFixture { name, mode } => dag_test::scaffold_fixture(&name, &mode),
         Command::BpmnLite { action } => match action {
             BpmnLiteAction::Build { release } => bpmn_lite::build(&sh, release),
             BpmnLiteAction::Test { filter } => bpmn_lite::test(&sh, filter.as_deref()),
