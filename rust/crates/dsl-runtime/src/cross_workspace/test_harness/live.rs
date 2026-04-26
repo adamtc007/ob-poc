@@ -47,10 +47,7 @@ pub struct LiveScenarioRunner {
 
 impl LiveScenarioRunner {
     /// Run a scenario YAML against the supplied per-test PgPool.
-    pub async fn run_scenario_file(
-        path: impl AsRef<Path>,
-        pool: PgPool,
-    ) -> Result<ScenarioReport> {
+    pub async fn run_scenario_file(path: impl AsRef<Path>, pool: PgPool) -> Result<ScenarioReport> {
         let path = path.as_ref();
         let text = std::fs::read_to_string(path)
             .with_context(|| format!("reading scenario file {}", path.display()))?;
@@ -188,8 +185,7 @@ impl LiveScenarioRunner {
         let mut bind_strings: Vec<Option<String>> = vec![None];
         let mut bind_kinds: Vec<BindKind> = vec![BindKind::Uuid];
 
-        let mut seen_cols: std::collections::HashSet<String> =
-            std::collections::HashSet::new();
+        let mut seen_cols: std::collections::HashSet<String> = std::collections::HashSet::new();
         seen_cols.insert(pk_col.to_string());
 
         if let Some(state) = &entry.state {
@@ -240,12 +236,12 @@ impl LiveScenarioRunner {
                 BindKind::String => q.bind(bind_strings[i].clone()),
             };
         }
-        q.execute(&self.pool)
-            .await
-            .with_context(|| format!(
+        q.execute(&self.pool).await.with_context(|| {
+            format!(
                 "inserting initial_state into {} (workspace={}, slot={}, entity={}, state={:?})",
                 table, entry.workspace, entry.slot, entry.entity, entry.state,
-            ))?;
+            )
+        })?;
         Ok(())
     }
 
@@ -334,10 +330,12 @@ impl LiveScenarioRunner {
                 .bind(id)
                 .execute(&self.pool)
                 .await
-                .with_context(|| format!(
-                    "mutating {}.{} for entity={} state={:?}",
-                    m.workspace, m.slot, m.entity, m.state
-                ))?;
+                .with_context(|| {
+                    format!(
+                        "mutating {}.{} for entity={} state={:?}",
+                        m.workspace, m.slot, m.entity, m.state
+                    )
+                })?;
         }
         Ok(())
     }
@@ -500,24 +498,28 @@ fn table_minimum_columns_owned(table: &str) -> Vec<(&'static str, JsonValue)> {
         "cbus" => vec![("name", JsonValue::String("test cbu".into()))],
         "deals" => vec![
             ("deal_name", JsonValue::String("test deal".into())),
-            ("primary_client_group_id", JsonValue::String(SENTINEL.into())),
+            (
+                "primary_client_group_id",
+                JsonValue::String(SENTINEL.into()),
+            ),
         ],
         "cases" => vec![
             ("cbu_id", JsonValue::String(SENTINEL.into())),
             ("case_ref", JsonValue::String("TEST-CASE".into())),
         ],
-        "booking_principal_clearances" => vec![
-            ("booking_principal_id", JsonValue::String(SENTINEL.into())),
-        ],
+        "booking_principal_clearances" => {
+            vec![("booking_principal_id", JsonValue::String(SENTINEL.into()))]
+        }
         // Phase 2 tables
         "cbu_trading_profiles" => vec![],
-        "cbu_service_consumption" => vec![
-            ("cbu_id", JsonValue::String(SENTINEL.into())),
-        ],
+        "cbu_service_consumption" => vec![("cbu_id", JsonValue::String(SENTINEL.into()))],
         "services" => vec![("name", JsonValue::String("test service".into()))],
         "application_instances" => vec![],
         "capability_bindings" => vec![
-            ("application_instance_id", JsonValue::String(SENTINEL.into())),
+            (
+                "application_instance_id",
+                JsonValue::String(SENTINEL.into()),
+            ),
             ("service_id", JsonValue::String(SENTINEL.into())),
         ],
         _ => vec![],

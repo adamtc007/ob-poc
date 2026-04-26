@@ -38,8 +38,8 @@ pub fn run(sh: &Shell, mode: DagTestMode, reset: bool, filter: Option<String>) -
 
     let _push = sh.push_dir(repo_root().join("rust"));
 
-    let database_url = std::env::var("DATABASE_URL")
-        .unwrap_or_else(|_| "postgresql:///postgres".into());
+    let database_url =
+        std::env::var("DATABASE_URL").unwrap_or_else(|_| "postgresql:///postgres".into());
     sh.set_var("DATABASE_URL", &database_url);
 
     if mode != DagTestMode::LiveOnly {
@@ -60,7 +60,10 @@ pub fn run(sh: &Shell, mode: DagTestMode, reset: bool, filter: Option<String>) -
     }
 
     if mode != DagTestMode::MockOnly {
-        println!("\n=== Live-mode scenarios (DATABASE_URL={}) ===", database_url);
+        println!(
+            "\n=== Live-mode scenarios (DATABASE_URL={}) ===",
+            database_url
+        );
         let mut args = vec![
             "test",
             "-p",
@@ -124,8 +127,12 @@ pub fn coverage(workspace_filter: Option<String>, json: bool) -> Result<()> {
         // parent_new_state }` aligns. parent_workspace defaults to the
         // child's workspace if omitted.
         for slot in &dag.slots {
-            let Some(dep) = &slot.state_dependency else { continue };
-            let Some(parent) = &slot.parent_slot else { continue };
+            let Some(dep) = &slot.state_dependency else {
+                continue;
+            };
+            let Some(parent) = &slot.parent_slot else {
+                continue;
+            };
             let parent_workspace = parent
                 .workspace
                 .clone()
@@ -154,7 +161,9 @@ pub fn coverage(workspace_filter: Option<String>, json: bool) -> Result<()> {
 
 /// Scaffold a new fixture YAML.
 pub fn scaffold_fixture(name: &str, mode: &str) -> Result<()> {
-    let path = repo_root().join(FIXTURES_DIR).join(format!("{}.yaml", name));
+    let path = repo_root()
+        .join(FIXTURES_DIR)
+        .join(format!("{}.yaml", name));
     if path.exists() {
         anyhow::bail!("fixture {} already exists", path.display());
     }
@@ -346,31 +355,16 @@ impl CoverageReport {
             if ws.constraints.is_empty() && ws.derived.is_empty() && ws.cascades.is_empty() {
                 continue;
             }
-            println!(
-                "── {} ─────────────────────────────────────",
-                ws.workspace
-            );
+            println!("── {} ─────────────────────────────────────", ws.workspace);
 
             for (id, ex) in &ws.constraints {
-                println!(
-                    "  [{}] constraint  {}",
-                    if *ex { "✓" } else { " " },
-                    id
-                );
+                println!("  [{}] constraint  {}", if *ex { "✓" } else { " " }, id);
             }
             for (id, ex) in &ws.derived {
-                println!(
-                    "  [{}] derived     {}",
-                    if *ex { "✓" } else { " " },
-                    id
-                );
+                println!("  [{}] derived     {}", if *ex { "✓" } else { " " }, id);
             }
             for (id, ex) in &ws.cascades {
-                println!(
-                    "  [{}] cascade     {}",
-                    if *ex { "✓" } else { " " },
-                    id
-                );
+                println!("  [{}] cascade     {}", if *ex { "✓" } else { " " }, id);
             }
 
             let ws_c_total = ws.constraints.len();
@@ -415,9 +409,24 @@ impl CoverageReport {
         }
 
         println!("OVERALL");
-        println!("  Constraints: {}/{} ({}%)", hit_c, total_c, pct(hit_c, total_c));
-        println!("  Derived:     {}/{} ({}%)", hit_d, total_d, pct(hit_d, total_d));
-        println!("  Cascades:    {}/{} ({}%)", hit_x, total_x, pct(hit_x, total_x));
+        println!(
+            "  Constraints: {}/{} ({}%)",
+            hit_c,
+            total_c,
+            pct(hit_c, total_c)
+        );
+        println!(
+            "  Derived:     {}/{} ({}%)",
+            hit_d,
+            total_d,
+            pct(hit_d, total_d)
+        );
+        println!(
+            "  Cascades:    {}/{} ({}%)",
+            hit_x,
+            total_x,
+            pct(hit_x, total_x)
+        );
     }
 }
 

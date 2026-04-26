@@ -148,14 +148,13 @@ fn parse_simple_equality(predicate: &str) -> Option<ParsedPredicate> {
     let (rhs_table, rhs_col) = split_qualified(rhs)?;
 
     // Determine which side is `this_*` (the target reference).
-    let (source_table, source_column, target_column) =
-        if rhs_table.starts_with("this_") {
-            (lhs_table, lhs_col, rhs_col)
-        } else if lhs_table.starts_with("this_") {
-            (rhs_table, rhs_col, lhs_col)
-        } else {
-            return None;
-        };
+    let (source_table, source_column, target_column) = if rhs_table.starts_with("this_") {
+        (lhs_table, lhs_col, rhs_col)
+    } else if lhs_table.starts_with("this_") {
+        (rhs_table, rhs_col, lhs_col)
+    } else {
+        return None;
+    };
 
     // Identifier hygiene: alphanumeric + underscore only.
     if !is_safe_ident(&source_table)
@@ -184,9 +183,7 @@ fn split_qualified(s: &str) -> Option<(String, String)> {
 }
 
 fn is_safe_ident(s: &str) -> bool {
-    !s.is_empty()
-        && s.chars()
-            .all(|c| c.is_ascii_alphanumeric() || c == '_')
+    !s.is_empty() && s.chars().all(|c| c.is_ascii_alphanumeric() || c == '_')
 }
 
 /// Best-effort source-PK column inference. Most ob-poc tables use
@@ -227,10 +224,8 @@ mod tests {
 
     #[test]
     fn parses_canonical_kyc_deal_predicate() {
-        let p = parse_simple_equality(
-            "cases.client_group_id = this_deal.primary_client_group_id",
-        )
-        .expect("should parse");
+        let p = parse_simple_equality("cases.client_group_id = this_deal.primary_client_group_id")
+            .expect("should parse");
         assert_eq!(p.source_table, "cases");
         assert_eq!(p.source_column, "client_group_id");
         assert_eq!(p.target_column, "primary_client_group_id");
@@ -268,20 +263,16 @@ mod tests {
     #[test]
     fn rejects_unsafe_identifiers() {
         // SQL-injection-ish identifiers blocked by is_safe_ident.
-        assert!(parse_simple_equality(
-            "cases.\"client; DROP TABLE\" = this_x.y"
-        )
-        .is_none());
+        assert!(parse_simple_equality("cases.\"client; DROP TABLE\" = this_x.y").is_none());
         assert!(parse_simple_equality("cases.col = this_x.col WHERE 1=1").is_none());
     }
 
     #[test]
     fn rejects_no_this_marker() {
         // Both sides are concrete tables — we can't tell which is the target.
-        assert!(parse_simple_equality(
-            "cases.client_group_id = client_group.client_group_id"
-        )
-        .is_none());
+        assert!(
+            parse_simple_equality("cases.client_group_id = client_group.client_group_id").is_none()
+        );
     }
 
     #[test]

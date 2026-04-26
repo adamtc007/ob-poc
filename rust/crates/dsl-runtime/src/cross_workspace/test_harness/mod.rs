@@ -51,6 +51,6 @@ pub use mocks::{MockChildEntityResolver, MockPredicateResolver, MockSlotStatePro
 pub use runner::{ScenarioReport, ScenarioRunner, StepResult};
 pub use scenario::{
     CheckTransitionOp, ChildEntry, EvaluateDerivedOp, ExpectedCascadeAction, ExpectedCondition,
-    ExpectedDerivedValue, ExpectedViolation, PlanCascadeOp, PredicateEntry, Scenario,
-    ScenarioMode, ScenarioStep, SeedDependency, StateEntry, StepExpectation,
+    ExpectedDerivedValue, ExpectedViolation, PlanCascadeOp, PredicateEntry, Scenario, ScenarioMode,
+    ScenarioStep, SeedDependency, StateEntry, StepExpectation,
 };

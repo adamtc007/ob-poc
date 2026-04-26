@@ -145,9 +145,7 @@ pub mod sql_predicate_resolver;
 pub mod test_harness;
 pub mod types;
 
-pub use derived_state::{
-    ClauseKind, ConditionResult, DerivedStateEvaluator, DerivedStateValue,
-};
+pub use derived_state::{ClauseKind, ConditionResult, DerivedStateEvaluator, DerivedStateValue};
 pub use derived_state_projector::{DerivedStateProjection, DerivedStateProjector};
 pub use gate_checker::{GateChecker, GateViolation, PredicateResolver, SameEntityResolver};
 pub use hierarchy_cascade::{

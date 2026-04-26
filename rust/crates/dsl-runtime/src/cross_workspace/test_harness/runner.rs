@@ -99,8 +99,9 @@ impl ScenarioRunner {
         // 1. Resolve entity aliases (alias name → UUID).
         let mut aliases = HashMap::new();
         for (name, uuid_str) in &scenario.entity_aliases {
-            let id = Uuid::parse_str(uuid_str)
-                .with_context(|| format!("alias '{}' = '{}' is not a valid UUID", name, uuid_str))?;
+            let id = Uuid::parse_str(uuid_str).with_context(|| {
+                format!("alias '{}' = '{}' is not a valid UUID", name, uuid_str)
+            })?;
             aliases.insert(name.clone(), id);
         }
 
@@ -280,8 +281,7 @@ impl ScenarioRunner {
                     op.slot
                 )
             })?;
-        let evaluator =
-            DerivedStateEvaluator::new(self.slot_state.clone(), self.predicate.clone());
+        let evaluator = DerivedStateEvaluator::new(self.slot_state.clone(), self.predicate.clone());
         evaluator.evaluate(derived, host_id, &self.pool).await
     }
 

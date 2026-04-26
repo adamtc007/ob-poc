@@ -21,16 +21,14 @@ use async_trait::async_trait;
 use chrono::Utc;
 use sem_os_client::SemOsClient;
 use sem_os_core::abac::AccessDecision;
-use sem_os_core::context_resolution::{
-    ContextResolutionResponse, ResolutionStage, VerbCandidate,
-};
+use sem_os_core::context_resolution::{ContextResolutionResponse, ResolutionStage, VerbCandidate};
 use sem_os_core::error::SemOsError;
 use sem_os_core::principal::Principal;
 use sem_os_core::proto::{
     BootstrapSeedBundleResponse, ChangesetDiffResponse, ChangesetImpactResponse,
-    ChangesetPublishResponse, ExportSnapshotSetResponse, GatePreviewResponse,
-    GetManifestResponse, ListChangesetsQuery, ListChangesetsResponse, ListToolSpecsResponse,
-    ResolveContextRequest, ResolveContextResponse, ToolCallRequest, ToolCallResponse,
+    ChangesetPublishResponse, ExportSnapshotSetResponse, GatePreviewResponse, GetManifestResponse,
+    ListChangesetsQuery, ListChangesetsResponse, ListToolSpecsResponse, ResolveContextRequest,
+    ResolveContextResponse, ToolCallRequest, ToolCallResponse,
 };
 use sem_os_core::types::{Changeset, GovernanceTier, TrustClass};
 use uuid::Uuid;

@@ -84,7 +84,10 @@ pub fn check_violations(
 
     // Detect unexpected actual.
     for av in actual {
-        if !expected.iter().any(|ev| ev.constraint_id == av.constraint_id) {
+        if !expected
+            .iter()
+            .any(|ev| ev.constraint_id == av.constraint_id)
+        {
             failures.push(AssertionFailure {
                 field: format!("violation[{}]", av.constraint_id),
                 expected: "absent".into(),
