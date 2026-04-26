@@ -95,6 +95,7 @@ pub enum WorkspaceKind {
     InstrumentMatrix,
     OnBoarding,
     SemOsMaintenance,
+    LifecycleResources,
 }
 
 impl WorkspaceKind {
@@ -115,6 +116,7 @@ impl WorkspaceKind {
             Self::InstrumentMatrix => "Instrument Matrix",
             Self::OnBoarding => "OnBoarding",
             Self::SemOsMaintenance => "SemOS Maintenance",
+            Self::LifecycleResources => "Lifecycle Resources",
         }
     }
 
@@ -233,6 +235,16 @@ impl WorkspaceKind {
                 default_constellation_map: "registry.stewardship",
                 supports_handoff_mode: false,
             },
+            Self::LifecycleResources => WorkspaceRegistryEntry {
+                workspace_id: self.clone(),
+                display_name: self.label(),
+                constellation_families: vec!["lifecycle_resources_workspace", "platform"],
+                subject_kinds: vec![SubjectKind::Resource],
+                subject_required: false,
+                default_constellation_family: "platform",
+                default_constellation_map: "lifecycle.resources",
+                supports_handoff_mode: false,
+            },
         }
     }
 
@@ -253,6 +265,7 @@ impl WorkspaceKind {
             Self::InstrumentMatrix,
             Self::OnBoarding,
             Self::SemOsMaintenance,
+            Self::LifecycleResources,
         ]
     }
 }
@@ -833,6 +846,12 @@ impl WorkspaceKind {
             || msg.contains("stewardship")
         {
             return Some(Self::SemOsMaintenance);
+        }
+        if msg.contains("lifecycle resource")
+            || msg.contains("application instance")
+            || msg.contains("capability binding")
+        {
+            return Some(Self::LifecycleResources);
         }
         None
     }

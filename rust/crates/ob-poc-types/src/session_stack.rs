@@ -42,6 +42,7 @@ pub enum SessionWorkspaceKind {
     InstrumentMatrix,
     OnBoarding,
     SemOsMaintenance,
+    LifecycleResources,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]

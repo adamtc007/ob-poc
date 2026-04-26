@@ -127,6 +127,9 @@ pub fn resolve_slot_table(
         // Product-maintenance workspace (R2 — service catalogue lifecycle)
         (("product_maintenance", "service"), ("services", "lifecycle_status", "service_id")),
         (("product_maintenance", "service_version"), ("service_versions", "lifecycle_status", "id")),
+        // Lifecycle Resources workspace (Tranche 4 R1)
+        (("lifecycle_resources", "application_instance"), ("application_instances", "lifecycle_status", "id")),
+        (("lifecycle_resources", "capability_binding"), ("capability_bindings", "binding_status", "id")),
     ];
     for ((ws, sl), value) in mapping {
         if *ws == workspace && *sl == slot {

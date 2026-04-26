@@ -1,0 +1,76 @@
+id: lifecycle-resources
+name: Lifecycle Resources
+version: "1.0"
+description: >
+  Layer 4 platform workspace. Govern BNY application registry entries,
+  application instances (per-environment lifecycle: PROVISIONED → ACTIVE
+  → MAINTENANCE_WINDOW / DEGRADED / OFFLINE → DECOMMISSIONED), and
+  capability bindings tying instances to product services
+  (DRAFT → PILOT → LIVE → DEPRECATED → RETIRED). Closes the gap between
+  generic capability (Layer 3) and concrete BNY system (Layer 4).
+
+invocation_phrases:
+  - "lifecycle resources"
+  - "manage application instances"
+  - "manage capability bindings"
+  - "platform resources"
+  - "BNY application catalogue"
+  - "application instance lifecycle"
+
+required_context: []
+optional_context:
+  - application_id
+  - instance_id
+
+workspaces:
+  - lifecycle_resources
+
+allowed_verbs:
+  # Application registry
+  - application.register
+  - application.update
+  - application.decommission
+  # Application instance lifecycle
+  - application-instance.provision
+  - application-instance.activate
+  - application-instance.enter-maintenance
+  - application-instance.exit-maintenance
+  - application-instance.take-offline
+  - application-instance.bring-online
+  - application-instance.decommission
+  # Capability binding lifecycle
+  - capability-binding.draft
+  - capability-binding.start-pilot
+  - capability-binding.promote-live
+  - capability-binding.abort-pilot
+  - capability-binding.deprecate
+  - capability-binding.retire
+
+forbidden_verbs: []
+
+risk_policy:
+  require_confirm_before_execute: true
+  max_steps_without_confirm: 3
+
+section_layout:
+  - title: "Application Registry"
+    verb_prefixes:
+      - "application."
+  - title: "Application Instances"
+    verb_prefixes:
+      - "application-instance."
+  - title: "Capability Bindings"
+    verb_prefixes:
+      - "capability-binding."
+
+definition_of_done:
+  - "Required application instances provisioned and ACTIVE"
+  - "Capability bindings promoted to LIVE on ACTIVE instances"
+
+progress_signals:
+  - signal: instances_active
+    description: "Application instances reached ACTIVE state"
+  - signal: bindings_live
+    description: "Capability bindings promoted to LIVE"
+
+handoff_target: null

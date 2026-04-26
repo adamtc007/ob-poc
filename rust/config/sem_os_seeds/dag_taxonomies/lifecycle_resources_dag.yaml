@@ -1,0 +1,416 @@
+# Lifecycle Resources Workspace — DAG Taxonomy (Tranche 4 R1 — 2026-04-26)
+#
+# ============================================================================
+# WORKSPACE PURPOSE (Layer 4 of the four-layer chain):
+#
+# The deep review (docs/todo/onboarding-dag-deep-review-2026-04-26.md)
+# identified a missing layer between "what generic capability does the CBU
+# consume" (custody-settlement, fund-accounting, etc. — Layer 3 in
+# product_service_taxonomy) and "which BNY system actually runs that
+# capability for this CBU" (CCC-Settlement-2.7-prod-eu, INFORM-NAV-prod-us,
+# etc. — Layer 4, this workspace).
+#
+# Layer chain:
+#   Layer 1: Deal           — commercial intent
+#   Layer 2: CBU            — money-making apparatus
+#   Layer 3: Product Service Taxonomy — generic capability
+#   Layer 4: Lifecycle Resources — concrete BNY application instances
+#
+# Lifecycle Resources answers: "for this (CBU, service) pair, which
+# physical BNY application instance is bound, and what's its lifecycle
+# status?". A binding can be DRAFT → PILOT → LIVE → DEPRECATED → RETIRED;
+# an application instance can be PROVISIONED → ACTIVE → MAINTENANCE_WINDOW
+# / DEGRADED / OFFLINE → DECOMMISSIONED.
+#
+# CBU CONSTRUCT RELATIONSHIP:
+#
+# The CBU consumes services through capability_bindings. When all bindings
+# for a CBU's required services are LIVE on ACTIVE application instances,
+# the CBU's service_consumption Layer-3 transition (proposed → provisioned)
+# can succeed. That cross-workspace constraint is staged for R4 / R7
+# (joint slice with R2 service lifecycle); this workspace just publishes
+# the source-of-truth state.
+#
+# ============================================================================
+# V1.3 CONVENTIONS APPLIED:
+#
+#   V1.3-3  parent_slot: capability_binding has parent application_instance
+#           via capability_bindings.application_instance_id.
+#   V1.3-3  state_dependency cascade: parent application_instance
+#           DECOMMISSIONED → child capability_binding RETIRED.
+#   V1.3-4  expected_lifetime: long_lived on application_instance and
+#           capability_binding (both are long-lived operational entities).
+#           OFFLINE / SUSPENDED-equivalent states declared.
+#   V1.3-1  cross_workspace_constraints: deferred to R4 (joint with R2
+#           service lifecycle). This workspace publishes the source state;
+#           consumers in cbu_dag.yaml gate on it.
+#
+# ============================================================================
+# OUT OF SCOPE (deferred):
+#
+#   - Health-check signals (DEGRADED transitions): listed as
+#     "(backend: health-check signal)"; backend layer-3 work, not modelled
+#     as DAG verbs.
+#   - Multi-level recursive cascade: v1.3 ships single-level cascade only
+#     (per catalogue-platform-refinement-v1_3.md §3.3). The
+#     application_instance.DECOMMISSIONED → capability_binding.RETIRED
+#     cascade fires one level deep, which is sufficient here (no
+#     grand-children).
+#   - service_id FK: capability_bindings.service_id is declared as plain
+#     uuid in this slice. R2 (service lifecycle) will add the FK constraint
+#     pointing to product_services.id once that table acquires a stateful
+#     lifecycle and an authoritative pkey.
+#
+# PARENT DOCS:
+#   - docs/todo/onboarding-dag-remediation-plan-2026-04-26.md (Slice R1)
+#   - docs/todo/onboarding-dag-deep-review-2026-04-26.md (gap analysis)
+#   - docs/todo/catalogue-platform-refinement-v1_3.md (v1.3 conventions)
+#   - rust/migrations/20260427_lifecycle_resources_workspace.sql
+
+version: "1.0"
+workspace: lifecycle_resources
+dag_id: lifecycle_resources_dag
+
+# =============================================================================
+# 1. OVERALL LIFECYCLE — derived per (application_instance, capability_binding)
+# =============================================================================
+
+overall_lifecycle:
+  id: lifecycle_resources_overall_lifecycle
+  scope: per_capability_binding
+  derived: true
+  description: >
+    4-phase aggregate lifecycle spanning the application instance + binding
+    pair. (1) registered — application catalogue card exists; (2) provisioned
+    — application_instance row created in PROVISIONED; (3) bound — at least
+    one capability_binding exists in DRAFT or PILOT; (4) live — binding is
+    LIVE on an ACTIVE application_instance. Decommissioning collapses to
+    "retired".
+
+  phases:
+
+    - name: registered
+      description: |
+        Application registry entry exists (vendor + owner team known).
+        No instance provisioned yet for this (application, environment) pair.
+      derivation:
+        all_of:
+          - "EXISTS applications WHERE id = this.application_id"
+        any_of:
+          - "NOT EXISTS application_instances WHERE application_id = this.application_id"
+      progression_verbs:
+        - application-instance.provision
+      next_phase: provisioned
+
+    - name: provisioned
+      description: |
+        Application instance row created (environment + label assigned).
+        Either still in PROVISIONED, or has progressed to ACTIVE without
+        any bindings yet.
+      derivation:
+        all_of:
+          - "EXISTS application_instances WHERE id = this.application_instance_id"
+          - "application_instances.lifecycle_status IN ('PROVISIONED','ACTIVE','MAINTENANCE_WINDOW','DEGRADED','OFFLINE')"
+        any_of:
+          - "NOT EXISTS capability_bindings WHERE application_instance_id = this.application_instance_id"
+      progression_verbs:
+        - application-instance.activate
+        - capability-binding.draft
+      next_phase: bound
+
+    - name: bound
+      description: |
+        At least one capability_binding exists for this instance, in DRAFT
+        or PILOT. Live promotion has not happened yet.
+      derivation:
+        all_of:
+          - "EXISTS capability_bindings WHERE application_instance_id = this.application_instance_id AND binding_status IN ('DRAFT','PILOT')"
+      progression_verbs:
+        - capability-binding.start-pilot
+        - capability-binding.promote-live
+      next_phase: live
+
+    - name: live
+      description: |
+        Binding is LIVE on an ACTIVE application_instance. Downstream
+        cbu.service_consumption can now provision this service.
+      derivation:
+        all_of:
+          - "capability_bindings.binding_status = 'LIVE'"
+          - "application_instances.lifecycle_status = 'ACTIVE'"
+      progression_verbs:
+        - capability-binding.deprecate
+      next_phase: "(retired)"
+
+    - name: retired
+      description: |
+        Binding has been retired or instance decommissioned. Terminal.
+      derivation:
+        any_of:
+          - "capability_bindings.binding_status = 'RETIRED'"
+          - "application_instances.lifecycle_status = 'DECOMMISSIONED'"
+      progression_verbs: []
+      next_phase: "(terminal)"
+
+# =============================================================================
+# 2. PER-SLOT STATE MACHINES
+# =============================================================================
+
+slots:
+
+  # ---------------------------------------------------------------------------
+  # 2.1 Workspace root (stateless)
+  # ---------------------------------------------------------------------------
+
+  - id: workspace_root
+    stateless: true
+    rationale: "Aggregation root over Lifecycle Resources domain."
+
+  # ---------------------------------------------------------------------------
+  # 2.2 Application registry card (stateless reference data)
+  # ---------------------------------------------------------------------------
+
+  - id: application
+    stateless: true
+    rationale: |
+      Catalogue entry for a BNY application (vendor, owner team, name).
+      Lifecycle is at the *instance* level — the application itself is
+      just a registry card. Adding / updating / decommissioning an
+      application registry row is administrative; no per-row state
+      machine is warranted.
+
+  # ---------------------------------------------------------------------------
+  # 2.3 Application instance (stateful)
+  # ---------------------------------------------------------------------------
+
+  - id: application_instance
+    stateless: false
+    # V1.3-4: OFFLINE + MAINTENANCE_WINDOW + DEGRADED already cover the
+    # operational pause/hold semantics for application instances.
+    # A generic SUSPENDED state would duplicate OFFLINE without adding
+    # information.
+    suspended_state_exempt: true
+    state_machine:
+      id: application_instance_lifecycle
+      owner: "ops+platform"
+      expected_lifetime: long_lived
+      source_entity: '"ob-poc".application_instances'
+      state_column: lifecycle_status
+      scope: per_application_instance
+      description: |
+        Per-instance lifecycle. PROVISIONED is the entry state (instance
+        row created but not yet serving traffic). ACTIVE is the steady
+        operating state. MAINTENANCE_WINDOW / DEGRADED / OFFLINE are
+        operational variants. DECOMMISSIONED is terminal.
+      states:
+        - id: PROVISIONED
+          entry: true
+          description: "Instance row created; not yet serving traffic."
+        - id: ACTIVE
+          description: "Instance live and healthy; serving bindings."
+        - id: MAINTENANCE_WINDOW
+          description: "Planned maintenance — traffic paused; bindings still bound."
+        - id: DEGRADED
+          description: "Health-check signal: instance impaired but partially serving."
+        - id: OFFLINE
+          description: "Operational hold — incident, security freeze, or capacity action."
+        - id: DECOMMISSIONED
+          description: "Terminal — instance retired; bindings cascaded to RETIRED."
+      transitions:
+        - from: PROVISIONED
+          to: ACTIVE
+          via: application-instance.activate
+        - from: ACTIVE
+          to: MAINTENANCE_WINDOW
+          via: application-instance.enter-maintenance
+        - from: MAINTENANCE_WINDOW
+          to: ACTIVE
+          via: application-instance.exit-maintenance
+        - from: ACTIVE
+          to: DEGRADED
+          via: "(backend: health-check signal)"
+        - from: DEGRADED
+          to: ACTIVE
+          via: "(backend: health-check signal)"
+        - from: ACTIVE
+          to: OFFLINE
+          via: application-instance.take-offline
+        - from: OFFLINE
+          to: ACTIVE
+          via: application-instance.bring-online
+        - from: [ACTIVE, OFFLINE, MAINTENANCE_WINDOW, DEGRADED]
+          to: DECOMMISSIONED
+          via: application-instance.decommission
+      terminal_states: [DECOMMISSIONED]
+
+  # ---------------------------------------------------------------------------
+  # 2.4 Capability binding (stateful, parented by application_instance)
+  # ---------------------------------------------------------------------------
+
+  - id: capability_binding
+    stateless: false
+    # V1.3-4: DEPRECATED already covers the "pause new consumers, drain
+    # existing traffic" semantics. A generic SUSPENDED would not add
+    # information beyond DEPRECATED + parent application_instance OFFLINE
+    # (which freezes the binding in practice without changing its
+    # binding_status row).
+    suspended_state_exempt: true
+    # V1.3-3 parent_slot — bindings belong to an application_instance;
+    # cascade fires when parent instance is decommissioned.
+    parent_slot:
+      workspace: lifecycle_resources
+      slot: application_instance
+      join:
+        via: capability_bindings
+        parent_fk: application_instance_id
+        child_fk: id
+    state_dependency:
+      cascade_rules:
+        - parent_state: DECOMMISSIONED
+          child_allowed_states: [RETIRED]
+          cascade_on_parent_transition: true
+          default_child_state_on_cascade: RETIRED
+      severity: error
+    state_machine:
+      id: capability_binding_lifecycle
+      owner: "ops+platform"
+      expected_lifetime: long_lived
+      source_entity: '"ob-poc".capability_bindings'
+      state_column: binding_status
+      scope: per_capability_binding
+      description: |
+        Per-(application_instance, service) binding lifecycle. DRAFT is the
+        entry state — the binding has been declared but no traffic flows.
+        PILOT runs limited load; LIVE is full production. DEPRECATED
+        signals an upcoming retirement; RETIRED is terminal.
+      states:
+        - id: DRAFT
+          entry: true
+          description: "Binding declared; no traffic; pre-pilot."
+        - id: PILOT
+          description: "Limited load; canary cohort; pilot validation."
+        - id: LIVE
+          description: "Full production traffic. Downstream service_consumption can rely on it."
+        - id: DEPRECATED
+          description: "Marked for retirement; no new consumers; existing traffic drains."
+        - id: RETIRED
+          description: "Terminal — no traffic; binding closed."
+      transitions:
+        - from: DRAFT
+          to: PILOT
+          via: capability-binding.start-pilot
+        - from: PILOT
+          to: LIVE
+          via: capability-binding.promote-live
+        - from: PILOT
+          to: DRAFT
+          via: capability-binding.abort-pilot
+        - from: LIVE
+          to: DEPRECATED
+          via: capability-binding.deprecate
+        - from: DEPRECATED
+          to: RETIRED
+          via: capability-binding.retire
+      terminal_states: [RETIRED]
+
+# =============================================================================
+# 3. CROSS-SLOT CONSTRAINTS
+# =============================================================================
+
+cross_slot_constraints:
+
+  - id: binding_live_requires_instance_active
+    description: |
+      A capability_binding can only be LIVE if its parent
+      application_instance is ACTIVE. Bindings on
+      MAINTENANCE_WINDOW / DEGRADED / OFFLINE / DECOMMISSIONED instances
+      cannot be LIVE.
+    rule: |
+      capability_bindings.binding_status = 'LIVE'
+        → application_instances WHERE id = this.application_instance_id
+            .lifecycle_status = 'ACTIVE'
+    severity: error
+
+  - id: binding_pilot_requires_instance_serving
+    description: |
+      A capability_binding cannot be in PILOT against a DECOMMISSIONED
+      or OFFLINE instance.
+    rule: |
+      capability_bindings.binding_status = 'PILOT'
+        → application_instances WHERE id = this.application_instance_id
+            .lifecycle_status IN ('PROVISIONED','ACTIVE','MAINTENANCE_WINDOW','DEGRADED')
+    severity: error
+
+# =============================================================================
+# 4. CROSS-WORKSPACE CONSTRAINTS (V1.3-1)
+# =============================================================================
+# Deferred to R4 (joint slice with R2 service lifecycle).
+# This workspace publishes capability_binding state; downstream
+# cbu.service_consumption transitions will gate on it once the service
+# lifecycle (R2) and FK linkage are in place.
+
+cross_workspace_constraints: []
+
+# =============================================================================
+# 5. DERIVED CROSS-WORKSPACE STATE (V1.3-2)
+# =============================================================================
+# None hosted here. The CBU workspace's `cbu_operationally_active`
+# tollgate (cbu_dag.yaml §5) is the canonical aggregate; once R4 lands,
+# its derivation will include a capability_binding.LIVE check sourced
+# from this workspace.
+
+derived_cross_workspace_state: []
+
+# =============================================================================
+# 6. PRODUCT-MODULE GATES
+# =============================================================================
+# Always-on. Lifecycle Resources is platform infrastructure — applies to
+# every workspace that consumes BNY systems.
+
+product_module_gates:
+  always_on:
+    - workspace_root
+    - application
+    - application_instance
+    - capability_binding
+  conditionally_on: []
+
+# =============================================================================
+# 7. OUT OF SCOPE (P16 three-layer + cross-workspace)
+# =============================================================================
+
+out_of_scope:
+  - "Health-check signals (DEGRADED transitions) — Layer 3 backend"
+  - "Capacity / autoscaling — Layer 3 platform automation"
+  - "Per-environment promotion pipelines (dev → uat → prod) — Layer 2 deployment tooling"
+  - "Service-to-instance routing tables — Layer 2 platform config"
+
+  # Cross-workspace dependencies (deferred slices)
+  - "FK from capability_bindings.service_id to product_services.id — R2"
+  - "cross_workspace_constraint: cbu.service_consumption.activate requires LIVE binding — R4"
+
+# =============================================================================
+# 8. PRUNE SEMANTICS
+# =============================================================================
+# Pruning is strict: an instance cannot be hard-deleted while bindings
+# exist; bindings cannot be hard-deleted while LIVE.
+
+prune_cascade_rules:
+
+  - id: application_decommission_cascades_bindings
+    when: "application-instance.decommission on instance I"
+    cascades_to:
+      - target: capability_binding
+        rule: "capability_bindings WHERE application_instance_id = I → forced to RETIRED"
+
+  - id: application_delete_blocked_with_instances
+    when: "application.decommission on application A"
+    cascades_to:
+      - target: application_instance
+        rule: "application.decommission rejected if EXISTS application_instances WHERE application_id = A AND lifecycle_status != 'DECOMMISSIONED' (decommission instances first)"
+
+prune_pre_validation:
+  required_verbs: []
+  abort_conditions:
+    - "application-instance.decommission while EXISTS capability_bindings WHERE application_instance_id = I AND binding_status = 'LIVE' (deprecate + retire bindings first)"
+    - "capability-binding.retire while binding_status = 'LIVE' (deprecate first)"

@@ -596,6 +596,7 @@ fn build_action_hints(workspace: &WorkspaceKind, verbs: &[VerbRef]) -> Vec<Actio
             WorkspaceKind::ProductMaintenance => "Review product taxonomy",
             WorkspaceKind::OnBoarding => "Review onboarding handoff",
             WorkspaceKind::SemOsMaintenance => "Review registry governance",
+            WorkspaceKind::LifecycleResources => "Review lifecycle resources",
         };
         hints.push(ActionHint {
             label: label.to_string(),
