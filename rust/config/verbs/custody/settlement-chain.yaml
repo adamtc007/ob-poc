@@ -329,6 +329,10 @@ domains:
           external_effects: []
           consequence:
             baseline: requires_confirmation
+        transition_args:
+          entity_id_arg: chain-id
+          target_workspace: instrument_matrix
+          target_slot: settlement_pattern_template
 
       add-hop:
         description: "Add intermediary hop to settlement chain"
@@ -430,6 +434,10 @@ domains:
           external_effects: []
           consequence:
             baseline: reviewable
+        transition_args:
+          entity_id_arg: chain-id
+          target_workspace: instrument_matrix
+          target_slot: settlement_pattern_template
 
       list-hops:
         description: "List hops in a settlement chain"
@@ -905,6 +913,10 @@ domains:
             edges:
               - from: configured
                 to: reviewed
+        transition_args:
+          entity_id_arg: chain
+          target_workspace: instrument_matrix
+          target_slot: settlement_pattern_template
 
       enter-parallel-run:
         description: "Enter parallel-run state — new chain runs alongside incumbent for 1-2 cycles"
@@ -967,6 +979,10 @@ domains:
             edges:
               - from: parallel_run
                 to: live
+        transition_args:
+          entity_id_arg: chain
+          target_workspace: instrument_matrix
+          target_slot: settlement_pattern_template
 
       abort-parallel-run:
         description: "Abort parallel_run — roll back to reviewed state (issues found)"
@@ -1035,6 +1051,10 @@ domains:
             edges:
               - from: live
                 to: suspended
+        transition_args:
+          entity_id_arg: chain
+          target_workspace: instrument_matrix
+          target_slot: settlement_pattern_template
 
       reactivate:
         description: "Reactivate a suspended settlement chain (suspended → live)"

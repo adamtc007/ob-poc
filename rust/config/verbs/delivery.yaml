@@ -267,6 +267,10 @@ domains:
             edges:
               - from: PENDING
                 to: IN_PROGRESS
+        transition_args:
+          entity_id_arg: delivery
+          target_workspace: instrument_matrix
+          target_slot: delivery
 
       cancel:
         description: "Cancel a delivery before completion"
@@ -301,3 +305,7 @@ domains:
                 to: CANCELLED
               - from: IN_PROGRESS
                 to: CANCELLED
+        transition_args:
+          entity_id_arg: delivery
+          target_workspace: instrument_matrix
+          target_slot: delivery

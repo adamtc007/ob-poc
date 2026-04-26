@@ -105,6 +105,10 @@ domains:
             edges:
               - from: configured
                 to: active
+        transition_args:
+          entity_id_arg: collateral-management
+          target_workspace: instrument_matrix
+          target_slot: collateral_management
 
       suspend:
         description: "Suspend collateral operations (operational hold)"
@@ -138,6 +142,10 @@ domains:
             edges:
               - from: active
                 to: suspended
+        transition_args:
+          entity_id_arg: collateral-management
+          target_workspace: instrument_matrix
+          target_slot: collateral_management
 
       reactivate:
         description: "Reactivate suspended collateral (suspended → active)"
@@ -168,6 +176,10 @@ domains:
             edges:
               - from: suspended
                 to: active
+        transition_args:
+          entity_id_arg: collateral-management
+          target_workspace: instrument_matrix
+          target_slot: collateral_management
 
       terminate:
         description: "Terminate collateral management (terminal)"
@@ -204,3 +216,7 @@ domains:
                 to: terminated
               - from: suspended
                 to: terminated
+        transition_args:
+          entity_id_arg: collateral-management
+          target_workspace: instrument_matrix
+          target_slot: collateral_management

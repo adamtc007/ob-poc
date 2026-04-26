@@ -265,6 +265,10 @@ domains:
           external_effects: []
           consequence:
             baseline: requires_confirmation
+        transition_args:
+          entity_id_arg: gateway-id
+          target_workspace: instrument_matrix
+          target_slot: trade_gateway
 
       activate-gateway:
         description: "Activate gateway connectivity"

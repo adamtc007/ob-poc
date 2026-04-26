@@ -187,6 +187,10 @@ domains:
             edges:
               - from: active
                 to: suspended
+        transition_args:
+          entity_id_arg: intent-id
+          target_workspace: instrument_matrix
+          target_slot: service_intent
 
       resume:
         description: "Resume a suspended service intent (suspended → active)"
@@ -217,6 +221,10 @@ domains:
             edges:
               - from: suspended
                 to: active
+        transition_args:
+          entity_id_arg: intent-id
+          target_workspace: instrument_matrix
+          target_slot: service_intent
 
       cancel:
         description: "Cancel a service intent (terminal)"
@@ -252,6 +260,10 @@ domains:
                 to: cancelled
               - from: suspended
                 to: cancelled
+        transition_args:
+          entity_id_arg: intent-id
+          target_workspace: instrument_matrix
+          target_slot: service_intent
 
   discovery:
     description: "Resource discovery operations"

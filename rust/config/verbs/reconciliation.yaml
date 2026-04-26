@@ -106,6 +106,10 @@ domains:
             edges:
               - from: draft
                 to: active
+        transition_args:
+          entity_id_arg: reconciliation
+          target_workspace: instrument_matrix
+          target_slot: reconciliation
 
       suspend:
         description: "Suspend an active reconciliation (operational hold)"
@@ -139,6 +143,10 @@ domains:
             edges:
               - from: active
                 to: suspended
+        transition_args:
+          entity_id_arg: reconciliation
+          target_workspace: instrument_matrix
+          target_slot: reconciliation
 
       reactivate:
         description: "Re-activate a suspended reconciliation (suspended → active)"
@@ -170,6 +178,10 @@ domains:
             edges:
               - from: suspended
                 to: active
+        transition_args:
+          entity_id_arg: reconciliation
+          target_workspace: instrument_matrix
+          target_slot: reconciliation
 
       retire:
         description: "Retire a reconciliation config (terminal)"
@@ -206,3 +218,7 @@ domains:
                 to: retired
               - from: suspended
                 to: retired
+        transition_args:
+          entity_id_arg: reconciliation
+          target_workspace: instrument_matrix
+          target_slot: reconciliation
