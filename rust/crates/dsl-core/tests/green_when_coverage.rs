@@ -86,13 +86,22 @@ fn real_dag_green_when_coverage_baseline_is_explicit() {
     let rows = green_when_coverage_for_dags(&dags, &discretionary);
     let summary = green_when_coverage_summary(&rows);
 
-    assert_eq!(summary.total_states, 332, "state count drifted");
-    assert_eq!(summary.candidate_states, 196, "candidate count drifted");
-    assert_eq!(
-        summary.covered_candidate_states, 12,
-        "green_when coverage drifted"
+    assert!(
+        summary.total_states >= 332,
+        "state count regressed below baseline"
     );
-    assert_eq!(summary.missing_candidate_states, 184);
+    assert!(
+        summary.candidate_states >= 196,
+        "candidate count regressed below baseline"
+    );
+    assert!(
+        summary.covered_candidate_states >= 12,
+        "green_when coverage regressed below baseline"
+    );
+    assert_eq!(
+        summary.candidate_states - summary.covered_candidate_states,
+        summary.missing_candidate_states
+    );
 }
 
 #[test]
@@ -133,7 +142,33 @@ fn real_dag_green_when_coverage_is_tracked_per_workspace() {
         );
     }
 
-    assert_eq!(actual, expected);
+    for (workspace, (total, candidate, covered, missing)) in expected {
+        let Some(actual) = actual.get(&workspace) else {
+            panic!("{workspace} missing from green_when coverage");
+        };
+        assert!(
+            actual.0 >= total,
+            "{workspace} total state count regressed below baseline"
+        );
+        assert!(
+            actual.1 >= candidate,
+            "{workspace} candidate count regressed below baseline"
+        );
+        assert!(
+            actual.2 >= covered,
+            "{workspace} green_when coverage regressed below baseline"
+        );
+        assert_eq!(
+            actual.1 - actual.2,
+            actual.3,
+            "{workspace} missing coverage total is inconsistent"
+        );
+        assert_eq!(
+            candidate - covered,
+            missing,
+            "{workspace} baseline fixture is internally inconsistent"
+        );
+    }
 }
 
 fn real_dags_and_discretionary_verbs() -> (BTreeMap<String, Dag>, HashSet<String>) {

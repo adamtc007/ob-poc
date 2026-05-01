@@ -1,13 +1,14 @@
 use std::collections::BTreeMap;
 
 use dsl_core::{
-    config::dag::PredicateBinding,
+    config::dag::{ClosureType, PredicateBinding},
     frontier::{hydrate_frontier, EntityRef, FrontierFact, GreenWhenStatus, HydrateFrontierError},
     resolver::{
         ResolvedSlot, ResolvedSource, ResolvedTemplate, ResolvedTransition, ResolverProvenance,
         SlotProvenance, VersionHash,
     },
 };
+use sem_os_core::constellation_map_def::CompletenessAssertionConfig;
 
 fn template() -> ResolvedTemplate {
     ResolvedTemplate {
@@ -78,6 +79,20 @@ fn template() -> ResolvedTemplate {
                 via: Some("review.archive".to_string()),
                 destination_green_when: None,
             },
+            ResolvedTransition {
+                slot_id: "review".to_string(),
+                from: "READY".to_string(),
+                to: "SYSTEM_EXPIRED".to_string(),
+                via: Some("(backend: retention timer)".to_string()),
+                destination_green_when: None,
+            },
+            ResolvedTransition {
+                slot_id: "review".to_string(),
+                from: "READY".to_string(),
+                to: "AUTO_CLOSED".to_string(),
+                via: None,
+                destination_green_when: None,
+            },
         ],
         version: VersionHash("test-version".to_string()),
         generated_at: "test".to_string(),
@@ -88,6 +103,13 @@ fn template() -> ResolvedTemplate {
             legacy_constellation_stack: Vec::new(),
         },
     }
+}
+
+fn template_with_slot(mut slot: ResolvedSlot) -> ResolvedTemplate {
+    let mut template = template();
+    slot.provenance = template.slots[0].provenance.clone();
+    template.slots = vec![slot];
+    template
 }
 
 fn entity(current_state: &str, facts: BTreeMap<String, Vec<FrontierFact>>) -> EntityRef {
@@ -119,6 +141,53 @@ fn hydrate_frontier_returns_green_reachable_destination_for_satisfied_postcondit
         Some("review.mark-ready")
     );
     assert_eq!(frontier.reachable[0].status, GreenWhenStatus::Green);
+}
+
+#[test]
+fn hydrate_frontier_returns_awaiting_completeness_for_open_slot_with_stale_assertion() {
+    let mut slot = template().slots.remove(0);
+    slot.closure = Some(ClosureType::Open);
+    slot.completeness_assertion = Some(CompletenessAssertionConfig {
+        predicate: Some("evidence.state = COMPLETE".to_string()),
+        description: Some("evidence population is complete".to_string()),
+        extra: BTreeMap::new(),
+    });
+    let mut template = template_with_slot(slot);
+    template.transitions[0].destination_green_when = None;
+    let facts = BTreeMap::from([(
+        "evidence".to_string(),
+        vec![FrontierFact {
+            state: Some("PENDING".to_string()),
+            attrs: BTreeMap::new(),
+        }],
+    )]);
+
+    let frontier = hydrate_frontier(entity("PENDING", facts), &template).expect("hydrates");
+
+    assert_eq!(
+        frontier.reachable[0].status,
+        GreenWhenStatus::AwaitingCompleteness(dsl_core::frontier::CompletenessAssertionStatus {
+            assertion: "evidence.state = COMPLETE".to_string(),
+            satisfied: false,
+        })
+    );
+}
+
+#[test]
+fn hydrate_frontier_returns_discretionary_for_justification_required_slot() {
+    let mut slot = template().slots.remove(0);
+    slot.justification_required = Some(true);
+    let mut template = template_with_slot(slot);
+    template.transitions[0].destination_green_when = None;
+
+    let frontier =
+        hydrate_frontier(entity("PENDING", BTreeMap::new()), &template).expect("hydrates");
+
+    assert!(matches!(
+        &frontier.reachable[0].status,
+        GreenWhenStatus::Discretionary(reason)
+            if reason.reason == "slot review requires justification"
+    ));
 }
 
 #[test]

@@ -45,6 +45,7 @@ pub struct ResolverManifest {
     pub workspace: String,
     pub composite_shape: String,
     pub version: String,
+    pub deferred_roles: Vec<String>,
     pub slots_resolved: usize,
     pub slots_with_all_required_gate_metadata: usize,
     pub slots_with_missing_gate_metadata: usize,
@@ -72,6 +73,7 @@ impl ResolverManifest {
             workspace: template.workspace.clone(),
             composite_shape: template.composite_shape.clone(),
             version: template.version.to_string(),
+            deferred_roles: template.structural_facts.deferred_roles.clone(),
             slots_resolved: template.slots.len(),
             slots_with_all_required_gate_metadata,
             slots_with_missing_gate_metadata,
@@ -86,6 +88,14 @@ impl ResolverManifest {
             self.workspace, self.composite_shape
         ));
         out.push_str(&format!("Version hash: {}\n", self.version));
+        out.push_str(&format!(
+            "Deferred roles: {}\n",
+            if self.deferred_roles.is_empty() {
+                "-".to_string()
+            } else {
+                self.deferred_roles.join(",")
+            }
+        ));
         out.push_str(&format!("Slots resolved: {}\n", self.slots_resolved));
         out.push_str(&format!(
             "Slots with all required gate metadata: {}\n",
@@ -123,7 +133,7 @@ fn row_for_slot(slot: &ResolvedSlot, options: &ManifestOptions) -> SlotManifestR
     let mut missing_fields = Vec::new();
 
     if required {
-        if slot.closure.is_none() {
+        if needs_closure(slot) && slot.closure.is_none() {
             missing_fields.push("closure".to_string());
         }
         if needs_eligibility(slot) && slot.eligibility.is_none() {
@@ -143,6 +153,10 @@ fn row_for_slot(slot: &ResolvedSlot, options: &ManifestOptions) -> SlotManifestR
         has_all_required_gate_metadata: missing_fields.is_empty(),
         missing_fields,
     }
+}
+
+fn needs_closure(slot: &ResolvedSlot) -> bool {
+    slot.id != "mandate"
 }
 
 fn needs_eligibility(slot: &ResolvedSlot) -> bool {

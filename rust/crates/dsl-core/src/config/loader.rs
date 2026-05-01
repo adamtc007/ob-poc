@@ -8,6 +8,10 @@ use tracing::info;
 
 use super::phrase_gen::generate_phrases;
 use super::types::{ArgType, CsgRulesConfig, VerbBehavior, VerbsConfig};
+use super::{
+    dag::load_dags_from_dir, dag_validator::entity_kinds_from_taxonomy_yaml,
+    validate_dags_with_context, DagValidationContext,
+};
 
 pub struct ConfigLoader {
     config_dir: String,
@@ -277,13 +281,36 @@ impl ConfigLoader {
             );
             return Ok(super::dag_registry::DagRegistry::default());
         }
-        let registry = super::dag_registry::DagRegistry::from_dir(&path)
+        let loaded = load_dags_from_dir(&path)
             .with_context(|| format!("loading DAG taxonomies from {path:?}"))?;
+        let context = self.load_dag_validation_context()?;
+        let report = validate_dags_with_context(&loaded, &context);
+        if !report.errors.is_empty() {
+            anyhow::bail!(
+                "DAG taxonomy validation failed during runtime registry load: {:#?}",
+                report.errors
+            );
+        }
+        for warning in &report.warnings {
+            tracing::warn!("DAG taxonomy validation warning: {warning}");
+        }
+        let registry = super::dag_registry::DagRegistry::from_loaded(loaded);
         tracing::info!(
             "Loaded {} DAG taxonomies into runtime registry",
             registry.len()
         );
         Ok(registry)
+    }
+
+    fn load_dag_validation_context(&self) -> Result<DagValidationContext> {
+        let taxonomy_path = std::path::Path::new(&self.config_dir)
+            .join("ontology")
+            .join("entity_taxonomy.yaml");
+        let taxonomy = std::fs::read_to_string(&taxonomy_path)
+            .with_context(|| format!("reading entity taxonomy from {taxonomy_path:?}"))?;
+        let known_entity_kinds = entity_kinds_from_taxonomy_yaml(&taxonomy)
+            .with_context(|| format!("parsing entity taxonomy from {taxonomy_path:?}"))?;
+        Ok(DagValidationContext { known_entity_kinds })
     }
 
     pub fn load_csg_rules(&self) -> Result<CsgRulesConfig> {

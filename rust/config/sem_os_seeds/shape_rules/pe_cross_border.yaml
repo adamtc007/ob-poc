@@ -2,7 +2,7 @@ shape: struct.pe.cross-border
 workspace: cbu
 extends: [base.cbu]
 structural_facts:
-  jurisdiction: "${arg.main_fund_jurisdiction.internal}"
+  jurisdiction: cross-border
   structure_type: pe
   allowed_structure_types: [pe, cross-border, parallel]
   document_bundles: [docs.bundle.private-equity-baseline]

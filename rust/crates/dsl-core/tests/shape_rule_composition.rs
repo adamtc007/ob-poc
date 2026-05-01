@@ -1,6 +1,9 @@
 use dsl_core::{
-    config::dag::{ClosureType, EligibilityConstraint},
-    resolver::{resolve_template, ResolveError, ResolvedSource, ResolverInputs},
+    config::dag::{ClosureType, EligibilityConstraint, PredicateBinding},
+    resolver::{
+        resolve_template, InsertBetween, ResolveError, ResolvedSource, ResolverInputs,
+        SlotGateMetadataRefinement,
+    },
 };
 use std::path::PathBuf;
 
@@ -9,6 +12,27 @@ fn inputs() -> ResolverInputs {
         PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../config"),
     )
     .expect("resolver inputs load")
+}
+
+fn predicate_binding(
+    entity: &str,
+    source_entity: Option<&str>,
+    replaceable: bool,
+) -> PredicateBinding {
+    PredicateBinding {
+        entity: entity.to_string(),
+        source_kind: Default::default(),
+        source_entity: source_entity.map(str::to_string),
+        state_column: None,
+        value_column: None,
+        id_column: None,
+        scope: None,
+        parent_key: None,
+        child_key: None,
+        required_universe: None,
+        replaceable_by_shape: replaceable,
+        extra: Default::default(),
+    }
 }
 
 #[test]
@@ -97,6 +121,156 @@ fn shape_rule_composition_rejects_mixed_vector_replacement_and_additive() {
         } if slot == "management_company"
             && field == "attachment_predicates"
             && shape == "struct.lux.ucits.sicav"
+    ));
+}
+
+#[test]
+fn shape_rule_composition_rejects_unsupported_state_machine_directives() {
+    let mut inputs = inputs();
+    inputs
+        .shape_rules
+        .get_mut("struct.lux.ucits.sicav")
+        .expect("leaf shape rule loaded")
+        .body
+        .insert_between
+        .push(InsertBetween {
+            from: "UPLOADED".to_string(),
+            to: "REVIEWED".to_string(),
+            via: vec!["MANUAL_REVIEW".to_string()],
+            enter_verb: None,
+            exit_verb: None,
+        });
+
+    let err = resolve_template("struct.lux.ucits.sicav", "cbu", &inputs)
+        .expect_err("unsupported directive should fail loudly");
+    assert!(matches!(
+        err,
+        ResolveError::UnsupportedShapeDirective {
+            ref shape,
+            ref directive,
+        } if shape == "struct.lux.ucits.sicav" && directive == "insert_between"
+    ));
+}
+
+#[test]
+fn shape_rule_composition_rejects_same_level_shape_conflicts() {
+    let mut inputs = inputs();
+    inputs
+        .shape_rules
+        .get_mut("struct.lux.ucits.sicav")
+        .expect("leaf shape rule loaded")
+        .body
+        .extends = vec!["base.cbu".to_string(), "regulated.fund".to_string()];
+
+    let mut base_refinement = SlotGateMetadataRefinement::default();
+    base_refinement.closure = Some(ClosureType::Open);
+    inputs
+        .shape_rules
+        .get_mut("base.cbu")
+        .expect("base rule loaded")
+        .body
+        .slots
+        .insert("management_company".to_string(), base_refinement);
+
+    let mut regulated_refinement = SlotGateMetadataRefinement::default();
+    regulated_refinement.closure = Some(ClosureType::ClosedBounded);
+    inputs
+        .shape_rules
+        .get_mut("regulated.fund")
+        .expect("regulated rule loaded")
+        .body
+        .slots
+        .insert("management_company".to_string(), regulated_refinement);
+
+    let err = resolve_template("struct.lux.ucits.sicav", "cbu", &inputs)
+        .expect_err("same-level conflict should fail");
+    assert!(matches!(
+        err,
+        ResolveError::AmbiguousShapeRefinement {
+            ref slot,
+            ref field,
+            ref sources,
+        } if slot == "management_company"
+            && field == "closure"
+            && sources == &vec!["base.cbu".to_string(), "regulated.fund".to_string()]
+    ));
+}
+
+#[test]
+fn shape_rule_composition_applies_replaceable_predicate_binding_refinement() {
+    let mut inputs = inputs();
+    let cbu = inputs
+        .dag_taxonomies
+        .get_mut("cbu")
+        .expect("cbu DAG loaded")
+        .dag
+        .slots
+        .iter_mut()
+        .find(|slot| slot.id == "cbu")
+        .expect("cbu slot loaded");
+    let dsl_core::config::dag::SlotStateMachine::Structured(machine) =
+        cbu.state_machine.as_mut().expect("cbu state machine")
+    else {
+        panic!("cbu state machine should be structured");
+    };
+    machine.predicate_bindings.push(predicate_binding(
+        "shape_bound_review",
+        Some("base_review"),
+        true,
+    ));
+
+    let refinement = inputs
+        .shape_rules
+        .get_mut("struct.lux.ucits.sicav")
+        .expect("leaf shape rule loaded")
+        .body
+        .slots
+        .entry("cbu".to_string())
+        .or_default();
+    refinement.predicate_bindings.push(predicate_binding(
+        "shape_bound_review",
+        Some("sicav_review"),
+        false,
+    ));
+
+    let template = resolve_template("struct.lux.ucits.sicav", "cbu", &inputs)
+        .expect("template resolves with predicate binding refinement");
+    let cbu = template.slot("cbu").expect("cbu slot resolved");
+    let binding = cbu
+        .predicate_bindings
+        .iter()
+        .find(|binding| binding.entity == "shape_bound_review")
+        .expect("shape-refined binding present");
+
+    assert_eq!(binding.source_entity.as_deref(), Some("sicav_review"));
+    assert_eq!(
+        cbu.provenance.field_sources.get("predicate_bindings"),
+        Some(&ResolvedSource::ShapeRule)
+    );
+}
+
+#[test]
+fn shape_rule_composition_rejects_shape_rule_cycles() {
+    let mut inputs = inputs();
+    inputs
+        .shape_rules
+        .get_mut("base.cbu")
+        .expect("base rule loaded")
+        .body
+        .extends = vec!["struct.lux.ucits.sicav".to_string()];
+
+    let err = resolve_template("struct.lux.ucits.sicav", "cbu", &inputs)
+        .expect_err("shape-rule inheritance cycle should fail");
+    assert!(matches!(
+        err,
+        ResolveError::ShapeRuleCycle { ref cycle_path }
+            if cycle_path == &vec![
+                "struct.lux.ucits.sicav".to_string(),
+                "ucits".to_string(),
+                "regulated.fund".to_string(),
+                "base.cbu".to_string(),
+                "struct.lux.ucits.sicav".to_string(),
+            ]
     ));
 }
 
@@ -295,7 +469,7 @@ fn shape_rule_composition_extracts_ie_hedge_icav_macro_facts() {
     );
     assert_eq!(
         template.structural_facts.required_roles,
-        vec!["aifm", "depositary", "prime-broker"]
+        vec!["aifm", "depositary"]
     );
     assert_eq!(
         template.structural_facts.optional_roles,
@@ -507,7 +681,7 @@ fn shape_rule_composition_extracts_us_macro_facts() {
             structure_type: "private-fund",
             allowed_structure_types: &["delaware-lp", "private-fund", "pe", "hedge"],
             document_bundles: &["docs.bundle.private-equity-baseline"],
-            trading_profile_type: "${arg.fund_type.internal}",
+            trading_profile_type: "private-fund",
             required_roles: &["general-partner", "investment-manager"],
             optional_roles: &[
                 "custodian",
@@ -581,12 +755,12 @@ fn shape_rule_composition_extracts_cross_border_macro_facts() {
     let cases = [
         Expected {
             shape: "struct.hedge.cross-border",
-            jurisdiction: "${arg.master_jurisdiction.internal}",
+            jurisdiction: "cross-border",
             structure_type: "hedge",
             allowed_structure_types: &["hedge", "cross-border", "master-feeder"],
             document_bundles: &["docs.bundle.hedge-baseline"],
             trading_profile_type: "hedge",
-            required_roles: &["aifm", "depositary", "prime-broker"],
+            required_roles: &["aifm", "depositary"],
             optional_roles: &[
                 "investment-manager",
                 "administrator",
@@ -596,7 +770,7 @@ fn shape_rule_composition_extracts_cross_border_macro_facts() {
         },
         Expected {
             shape: "struct.pe.cross-border",
-            jurisdiction: "${arg.main_fund_jurisdiction.internal}",
+            jurisdiction: "cross-border",
             structure_type: "pe",
             allowed_structure_types: &["pe", "cross-border", "parallel"],
             document_bundles: &["docs.bundle.private-equity-baseline"],

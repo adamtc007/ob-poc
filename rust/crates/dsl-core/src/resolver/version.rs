@@ -17,9 +17,17 @@ pub fn compute_version_hash(paths: &[&Path], shape: &str, workspace: &str) -> Ve
     hasher.update(shape.as_bytes());
 
     let mut sorted = paths.iter().collect::<Vec<_>>();
-    sorted.sort_by(|a, b| a.to_string_lossy().cmp(&b.to_string_lossy()));
+    sorted.sort_by(|a, b| {
+        a.to_str()
+            .expect("seed path must be valid UTF-8")
+            .cmp(b.to_str().expect("seed path must be valid UTF-8"))
+    });
     for path in sorted {
-        hasher.update(path.to_string_lossy().as_bytes());
+        hasher.update(
+            path.to_str()
+                .expect("seed path must be valid UTF-8")
+                .as_bytes(),
+        );
         if let Ok(bytes) = std::fs::read(path) {
             hasher.update(bytes);
         }

@@ -10,7 +10,7 @@ use std::{
     sync::OnceLock,
 };
 
-use anyhow::Result;
+use anyhow::{anyhow, Result};
 use chrono::{DateTime, Utc};
 use dsl_core::resolver::{resolve_template, ResolverInputs};
 use sem_os_core::{
@@ -93,6 +93,7 @@ impl ValidVerbSet {
 }
 
 static VERB_KEYWORDS: OnceLock<HashMap<String, Vec<String>>> = OnceLock::new();
+static RESOLVER_INPUTS: OnceLock<Result<ResolverInputs, String>> = OnceLock::new();
 
 // ---------------------------------------------------------------------------
 // State machine loading
@@ -158,9 +159,35 @@ pub fn load_constellation_by_id(id: &str) -> Result<ConstellationMapDefBody> {
 /// ```
 #[deprecated(note = "transitional; see D-008")]
 pub fn load_constellation_stack(id: &str) -> Result<Vec<ConstellationMapDefBody>> {
-    let inputs = ResolverInputs::default_from_cargo_manifest()?;
-    let template = resolve_template(id.to_string(), "cbu".to_string(), &inputs)?;
+    load_constellation_stack_for_workspace(id, "cbu")
+}
+
+/// Load the composed constellation stack for a session-facing constellation ID and workspace.
+///
+/// # Examples
+/// ```rust
+/// use ob_poc::sage::valid_verb_set::load_constellation_stack_for_workspace;
+///
+/// let stack = load_constellation_stack_for_workspace("struct.lux.ucits.sicav", "cbu").unwrap();
+/// assert!(stack.iter().any(|map| map.constellation == "group.ownership"));
+/// ```
+pub fn load_constellation_stack_for_workspace(
+    id: &str,
+    workspace: &str,
+) -> Result<Vec<ConstellationMapDefBody>> {
+    let inputs = cached_resolver_inputs()?;
+    let template = resolve_template(id.to_string(), workspace.to_string(), &inputs)?;
     Ok(template.generated_from.legacy_constellation_stack)
+}
+
+fn cached_resolver_inputs() -> Result<ResolverInputs> {
+    RESOLVER_INPUTS
+        .get_or_init(|| {
+            ResolverInputs::default_from_cargo_manifest().map_err(|error| error.to_string())
+        })
+        .as_ref()
+        .cloned()
+        .map_err(|error| anyhow!(error.clone()))
 }
 
 // ---------------------------------------------------------------------------

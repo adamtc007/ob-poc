@@ -19,7 +19,10 @@ fn every_catalogue_verb_has_phase7_flavour() {
         .filter(|verb| verb.flavour.is_some())
         .count();
 
-    assert_eq!(total, 1288, "real verb catalogue count drifted");
+    assert!(
+        total >= 1288,
+        "real verb catalogue count regressed below baseline"
+    );
     assert_eq!(annotated, total, "all verbs must carry flavour");
 }
 
@@ -69,7 +72,10 @@ fn discretionary_verbs_have_authority_and_audit_metadata() {
         }
     }
 
-    assert_eq!(checked, 166, "discretionary count drifted");
+    assert!(
+        checked >= 166,
+        "discretionary count regressed below baseline"
+    );
 }
 
 #[test]

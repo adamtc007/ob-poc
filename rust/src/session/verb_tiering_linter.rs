@@ -726,6 +726,7 @@ mod tests {
             outputs: vec![],
             three_axis: None,
             transition_args: None,
+            ..Default::default()
         }
     }
 
@@ -775,6 +776,7 @@ mod tests {
             outputs: vec![],
             three_axis: None,
             transition_args: None,
+            ..Default::default()
         }
     }
 
@@ -799,6 +801,7 @@ mod tests {
             outputs: vec![],
             three_axis: None,
             transition_args: None,
+            ..Default::default()
         }
     }
 

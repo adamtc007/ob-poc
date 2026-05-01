@@ -7,7 +7,7 @@ slots:
     table: deals
     pk: deal_id
     cardinality: root
-    state_machine: deal_lifecycle
+    state_machine: deal_commercial_lifecycle
     verbs:
       create: { verb: deal.create, when: empty }
       read: { verb: deal.read, when: filled }

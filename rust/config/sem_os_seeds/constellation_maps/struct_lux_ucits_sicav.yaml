@@ -1,6 +1,9 @@
 constellation: struct.lux.ucits.sicav
 description: Luxembourg UCITS SICAV onboarding constellation
 jurisdiction: LU
+legacy_stack:
+  before: [group.ownership]
+  after: [kyc.onboarding]
 slots:
   cbu:
     type: cbu
@@ -241,7 +244,6 @@ slots:
           evaluate: tollgate.evaluate
   mandate:
     type: mandate
-    closure: closed_bounded
     table: cbu_trading_profiles
     pk: profile_id
     join:

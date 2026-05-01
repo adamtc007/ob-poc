@@ -1,10 +1,10 @@
-use crate::config::dag::{ClosureType, EligibilityConstraint, RoleGuard};
+use crate::config::dag::{ClosureType, EligibilityConstraint, PredicateBinding, RoleGuard};
 use anyhow::{Context, Result};
 use sem_os_core::constellation_map_def::{AuditClass, CompletenessAssertionConfig};
 use serde::{Deserialize, Serialize};
 use serde_yaml::Value as YamlValue;
 use std::{
-    collections::BTreeMap,
+    collections::{BTreeMap, BTreeSet},
     path::{Path, PathBuf},
 };
 
@@ -140,6 +140,9 @@ pub struct SlotGateMetadataRefinement {
 
     #[serde(default)]
     pub completeness_assertion: Option<CompletenessAssertionConfig>,
+
+    #[serde(default)]
+    pub predicate_bindings: Vec<PredicateBinding>,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -225,6 +228,7 @@ pub fn load_shape_rules_from_dir(dir: &Path) -> Result<BTreeMap<String, LoadedSh
             .with_context(|| format!("cannot read shape rule {path:?}"))?;
         let body: ShapeRule = serde_yaml::from_str(&raw)
             .with_context(|| format!("failed to parse shape rule {path:?}"))?;
+        validate_shape_rule(&body, &path)?;
         out.insert(
             body.shape.clone(),
             LoadedShapeRule {
@@ -235,4 +239,151 @@ pub fn load_shape_rules_from_dir(dir: &Path) -> Result<BTreeMap<String, LoadedSh
     }
 
     Ok(out)
+}
+
+fn validate_shape_rule(body: &ShapeRule, path: &Path) -> Result<()> {
+    validate_no_placeholder(&body.shape, path, "shape")?;
+    validate_structural_fact_string(
+        body.structural_facts.jurisdiction.as_deref(),
+        path,
+        &body.shape,
+        "structural_facts.jurisdiction",
+    )?;
+    validate_structural_fact_string(
+        body.structural_facts.structure_type.as_deref(),
+        path,
+        &body.shape,
+        "structural_facts.structure_type",
+    )?;
+    validate_structural_fact_string(
+        body.structural_facts.trading_profile_type.as_deref(),
+        path,
+        &body.shape,
+        "structural_facts.trading_profile_type",
+    )?;
+    validate_structural_fact_values(
+        &body.structural_facts.allowed_structure_types,
+        path,
+        &body.shape,
+        "structural_facts.allowed_structure_types",
+    )?;
+    validate_structural_fact_values(
+        &body.structural_facts.document_bundles,
+        path,
+        &body.shape,
+        "structural_facts.document_bundles",
+    )?;
+    validate_structural_fact_values(
+        &body.structural_facts.required_roles,
+        path,
+        &body.shape,
+        "structural_facts.required_roles",
+    )?;
+    validate_structural_fact_values(
+        &body.structural_facts.optional_roles,
+        path,
+        &body.shape,
+        "structural_facts.optional_roles",
+    )?;
+    validate_structural_fact_values(
+        &body.structural_facts.deferred_roles,
+        path,
+        &body.shape,
+        "structural_facts.deferred_roles",
+    )?;
+    validate_role_partition(body, path)?;
+    Ok(())
+}
+
+fn validate_structural_fact_string(
+    value: Option<&str>,
+    path: &Path,
+    shape: &str,
+    field: &str,
+) -> Result<()> {
+    if let Some(value) = value {
+        validate_no_placeholder(value, path, &format!("{shape}.{field}"))?;
+    }
+    Ok(())
+}
+
+fn validate_structural_fact_values(
+    values: &[String],
+    path: &Path,
+    shape: &str,
+    field: &str,
+) -> Result<()> {
+    for value in values {
+        validate_no_placeholder(value, path, &format!("{shape}.{field}"))?;
+    }
+    Ok(())
+}
+
+fn validate_no_placeholder(value: &str, path: &Path, field: &str) -> Result<()> {
+    if value.contains("${arg.") {
+        anyhow::bail!(
+            "shape rule {path:?} has unresolved template placeholder in {field}: {value}"
+        );
+    }
+    Ok(())
+}
+
+fn validate_role_partition(body: &ShapeRule, path: &Path) -> Result<()> {
+    let required = body
+        .structural_facts
+        .required_roles
+        .iter()
+        .collect::<BTreeSet<_>>();
+    for role in &body.structural_facts.optional_roles {
+        if required.contains(role) {
+            anyhow::bail!(
+                "shape rule {path:?} lists role '{role}' as both required and optional for {}",
+                body.shape
+            );
+        }
+    }
+    Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::fs;
+
+    #[test]
+    fn rejects_required_optional_role_overlap() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        fs::write(
+            dir.path().join("bad.yaml"),
+            r#"
+shape: struct.bad
+structural_facts:
+  required_roles: [depositary]
+  optional_roles: [depositary]
+slots: {}
+"#,
+        )
+        .expect("write fixture");
+
+        let err = load_shape_rules_from_dir(dir.path()).expect_err("overlap is invalid");
+        assert!(err.to_string().contains("both required and optional"));
+    }
+
+    #[test]
+    fn rejects_structural_fact_placeholders() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        fs::write(
+            dir.path().join("bad.yaml"),
+            r#"
+shape: struct.bad
+structural_facts:
+  jurisdiction: "${arg.master_jurisdiction.internal}"
+slots: {}
+"#,
+        )
+        .expect("write fixture");
+
+        let err = load_shape_rules_from_dir(dir.path()).expect_err("placeholder is invalid");
+        assert!(err.to_string().contains("unresolved template placeholder"));
+    }
 }

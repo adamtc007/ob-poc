@@ -697,34 +697,14 @@ mod tests {
     use crate::config::types::{
         ArgConfig, ArgType, ConsequenceDeclaration, ConsequenceTier, EscalationPredicate,
         EscalationRule, StateEffect, ThreeAxisDeclaration, TransitionArgs, TransitionEdge,
-        VerbBehavior, VerbConfig, VerbTransitions,
+        VerbConfig, VerbTransitions,
     };
     use serde_json::json;
 
     fn bare_verb_config() -> VerbConfig {
         VerbConfig {
             description: "test verb".into(),
-            behavior: VerbBehavior::Plugin,
-            crud: None,
-            handler: None,
-            graph_query: None,
-            durable: None,
-            args: vec![],
-            returns: None,
-            produces: None,
-            consumes: vec![],
-            lifecycle: None,
-            metadata: None,
-            invocation_phrases: vec![],
-            policy: None,
-            sentences: None,
-            confirm_policy: None,
-            outputs: vec![],
-            three_axis: None,
-            transition_args: None,
-            flavour: None,
-            role_guard: None,
-            audit_class: None,
+            ..Default::default()
         }
     }
 

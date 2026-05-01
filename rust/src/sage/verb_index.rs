@@ -688,6 +688,7 @@ mod tests {
                 outputs: vec![],
                 three_axis: None,
                 transition_args: None,
+                ..Default::default()
             },
         );
         let mut registry_verbs = HashMap::new();
@@ -717,6 +718,7 @@ mod tests {
                 outputs: vec![],
                 three_axis: None,
                 transition_args: None,
+                ..Default::default()
             },
         );
         domains.insert(
@@ -824,6 +826,7 @@ mod tests {
                 outputs: vec![],
                 three_axis: None,
                 transition_args: None,
+                ..Default::default()
             },
         );
 

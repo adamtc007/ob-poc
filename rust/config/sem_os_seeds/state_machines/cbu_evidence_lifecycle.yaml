@@ -1,22 +1,22 @@
 state_machine: cbu_evidence_lifecycle
-description: CBU evidence item lifecycle — uploaded, reviewed, approved, expired
-states: [uploaded, reviewed, approved, rejected, expired]
-initial: uploaded
+description: CBU evidence item lifecycle - uploaded, reviewed, approved, expired
+states: [UPLOADED, REVIEWED, APPROVED, REJECTED, EXPIRED]
+initial: UPLOADED
 transitions:
-  - from: uploaded
-    to: reviewed
+  - from: UPLOADED
+    to: REVIEWED
     verbs: [cbu.review-evidence]
-  - from: reviewed
-    to: approved
+  - from: REVIEWED
+    to: APPROVED
     verbs: [cbu.approve-evidence]
-  - from: reviewed
-    to: rejected
+  - from: REVIEWED
+    to: REJECTED
     verbs: [cbu.reject-evidence]
-  - from: approved
-    to: expired
+  - from: APPROVED
+    to: EXPIRED
     verbs: [evidence.expire]
-  - from: expired
-    to: uploaded
+  - from: EXPIRED
+    to: UPLOADED
     verbs: [cbu.attach-evidence]
 reducer:
   overlay_sources:
@@ -40,13 +40,13 @@ reducer:
     evidence_expired:
       expr: "evidence.expiry_status = 'EXPIRED'"
   rules:
-    - state: expired
+    - state: EXPIRED
       requires: [evidence_expired]
-    - state: approved
+    - state: APPROVED
       requires: [review_complete, review_approved]
-    - state: rejected
+    - state: REJECTED
       requires: [review_complete, review_rejected]
-    - state: reviewed
+    - state: REVIEWED
       requires: [review_complete]
-    - state: uploaded
+    - state: UPLOADED
       requires: [has_uploaded_evidence]

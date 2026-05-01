@@ -1,5 +1,7 @@
 //! Frontier disclosure types for resolved SemOS DAG instances.
 
+use crate::config::predicate::CmpOp;
+
 mod hydrator;
 
 pub use hydrator::{hydrate_frontier, FrontierFact, FrontierFacts, HydrateFrontierError};
@@ -51,6 +53,41 @@ pub struct MissingFact {
 pub struct InvalidFact {
     pub entity: String,
     pub reason: String,
+    pub detail: InvalidFactDetail,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum InvalidFactDetail {
+    PredicateParseError {
+        reason: String,
+    },
+    PredicateFailureWithoutDiagnostic,
+    StateNotInSet {
+        state: String,
+        allowed: Vec<String>,
+    },
+    AttributeComparisonFailed {
+        attr: String,
+    },
+    CountThresholdFailed {
+        kind: String,
+        observed: u64,
+        op: CmpOp,
+        threshold: u64,
+    },
+    ForbiddenMemberPresent {
+        kind: String,
+        fact_id: Option<String>,
+    },
+    RecursiveFactMissingId,
+    CycleDetected {
+        entities: Vec<String>,
+    },
+    MaxDepthExceeded {
+        kind: String,
+        depth: usize,
+        max_depth: usize,
+    },
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

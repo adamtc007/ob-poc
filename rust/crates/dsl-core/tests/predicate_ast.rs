@@ -1,6 +1,7 @@
 use dsl_core::config::dag::{load_dags_from_dir, SlotStateMachine};
 use dsl_core::config::predicate::{
-    parse_green_when, EntityQualifier, EntityRef, EntitySetRef, Predicate, RelationScope,
+    parse_green_when, CmpOp, EntityQualifier, EntityRef, EntitySetRef, Predicate, RelationScope,
+    Validity,
 };
 use std::collections::BTreeSet;
 use std::path::PathBuf;
@@ -240,4 +241,53 @@ fn symbolic_attribute_threshold_fixture_is_structured() {
                 )
         )
     }));
+}
+
+#[test]
+fn count_predicate_fixture_is_structured() {
+    let ast = parse_green_when("count(cbu_evidence where state = APPROVED) >= 2")
+        .expect("count predicate parses");
+
+    let Predicate::Count {
+        set,
+        condition,
+        op,
+        threshold,
+    } = ast
+    else {
+        panic!("expected Count predicate");
+    };
+
+    assert_eq!(set.kind, "cbu_evidence");
+    assert_eq!(op, CmpOp::Ge);
+    assert_eq!(threshold, 2);
+    assert!(matches!(
+        condition.as_deref(),
+        Some(Predicate::StateIn {
+            entity: EntityRef::This,
+            state_set,
+        }) if state_set == &vec!["APPROVED".to_string()]
+    ));
+}
+
+#[test]
+fn obtained_predicate_fixture_is_structured() {
+    let ast = parse_green_when("obtained(kyc_case.state in {APPROVED, ACTIVE})")
+        .expect("obtained predicate parses");
+
+    assert!(matches!(
+        ast,
+        Predicate::Obtained {
+            entity: EntityRef::Named(ref entity),
+            validity: Validity::StateIn(ref states),
+        } if entity == "kyc_case"
+            && states == &vec!["APPROVED".to_string(), "ACTIVE".to_string()]
+    ));
+}
+
+#[test]
+fn orphaned_attached_to_scope_has_specific_parse_error() {
+    let err = parse_green_when("attached_to this clearance").expect_err("orphaned scope fails");
+
+    assert!(err.message.contains("orphaned `attached_to`"), "{err:?}");
 }

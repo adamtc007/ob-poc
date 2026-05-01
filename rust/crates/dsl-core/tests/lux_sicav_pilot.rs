@@ -24,6 +24,11 @@ fn lux_sicav_yaml() -> String {
     std::fs::read_to_string(&path).expect("Lux SICAV constellation readable")
 }
 
+fn lux_aif_raif_yaml() -> String {
+    let path = seed_path("constellation_maps/struct_lux_aif_raif.yaml");
+    std::fs::read_to_string(&path).expect("Lux AIF RAIF constellation readable")
+}
+
 #[derive(Debug, serde::Deserialize)]
 struct RawConstellationMap {
     slots: BTreeMap<String, RawConstellationSlot>,
@@ -39,6 +44,24 @@ struct RawConstellationSlot {
     cardinality_max: Option<u64>,
     #[serde(default)]
     entry_state: Option<String>,
+}
+
+fn slot_without_gate_metadata(yaml: &str, slot_id: &str) -> serde_yaml::Value {
+    let mut value: serde_yaml::Value = serde_yaml::from_str(yaml).expect("constellation parses");
+    let slots = value
+        .as_mapping_mut()
+        .and_then(|map| map.get_mut(serde_yaml::Value::String("slots".to_string())))
+        .and_then(|slots| slots.as_mapping_mut())
+        .expect("slots mapping present");
+    let slot = slots
+        .get_mut(serde_yaml::Value::String(slot_id.to_string()))
+        .unwrap_or_else(|| panic!("{slot_id} slot present"))
+        .as_mapping_mut()
+        .unwrap_or_else(|| panic!("{slot_id} slot is a mapping"));
+    for key in ["closure", "eligibility", "cardinality_max", "entry_state"] {
+        slot.remove(serde_yaml::Value::String(key.to_string()));
+    }
+    serde_yaml::Value::Mapping(slot.clone())
 }
 
 #[test]
@@ -64,7 +87,7 @@ fn cbu_dag_pilot_slots_have_gate_metadata() {
     for (slot_id, expected_kind, expected_entry_state) in [
         ("entity_proper_person", Some("person"), "GHOST"),
         ("entity_limited_company_ubo", Some("company"), "PENDING"),
-        ("cbu_evidence", None, "PENDING"),
+        ("cbu_evidence", None, "UPLOADED"),
         ("share_class", None, "DRAFT"),
     ] {
         let slot = slots
@@ -148,7 +171,21 @@ fn lux_sicav_constellation_pilot_slots_have_gate_metadata() {
     assert_eq!(investment_manager.entry_state.as_deref(), Some("empty"));
 
     let mandate = &map.slots["mandate"];
-    assert_eq!(mandate.closure, Some(ClosureType::ClosedBounded));
+    assert_eq!(mandate.closure, None);
+}
+
+#[test]
+fn lux_sicav_administrator_and_auditor_match_aif_raif_structural_blocks() {
+    let sicav = lux_sicav_yaml();
+    let aif_raif = lux_aif_raif_yaml();
+
+    for slot_id in ["administrator", "auditor"] {
+        assert_eq!(
+            slot_without_gate_metadata(&sicav, slot_id),
+            slot_without_gate_metadata(&aif_raif, slot_id),
+            "{slot_id} structural block drifted from Lux AIF RAIF baseline"
+        );
+    }
 }
 
 #[test]

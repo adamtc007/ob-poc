@@ -1,15 +1,20 @@
 use std::collections::BTreeMap;
 
 use crate::{
-    config::predicate::{
-        parse_green_when, AttrValue, CmpOp, EntityRef as PredicateEntityRef, EntitySetRef,
-        Predicate, Validity,
+    config::{
+        dag::ClosureType,
+        predicate::{
+            parse_green_when, AttrValue, CmpOp, EntityRef as PredicateEntityRef, EntitySetRef,
+            Predicate, Validity,
+        },
     },
     resolver::{ResolvedSlot, ResolvedTemplate},
 };
+use sem_os_core::constellation_map_def::Cardinality;
 
 use super::{
-    EntityRef, GreenWhenStatus, InstanceFrontier, InvalidFact, MissingFact, ReachableDestination,
+    CompletenessAssertionStatus, DiscretionaryReason, EntityRef, GreenWhenStatus, InstanceFrontier,
+    InvalidFact, InvalidFactDetail, MissingFact, ReachableDestination,
 };
 
 /// Synthetic fact set used by the Phase 3 skeleton hydrator.
@@ -28,6 +33,20 @@ pub enum HydrateFrontierError {
     SlotNotFound(String),
 }
 
+/// Hydrate the current action frontier from caller-supplied predicate facts.
+///
+/// This Phase 3 hydrator evaluates an already-resolved template against synthetic
+/// in-memory facts. It does not read substrate tables directly; the substrate
+/// reader is expected to supply `EntityRef::facts` before calling this function.
+///
+/// # Examples
+/// ```rust,ignore
+/// use dsl_core::frontier::{hydrate_frontier, EntityRef};
+///
+/// let frontier = hydrate_frontier(entity_ref, &resolved_template)?;
+/// assert_eq!(frontier.current_state, "PENDING");
+/// # Ok::<(), dsl_core::frontier::HydrateFrontierError>(())
+/// ```
 pub fn hydrate_frontier(
     entity_ref: EntityRef,
     resolved_template: &ResolvedTemplate,
@@ -42,11 +61,18 @@ pub fn hydrate_frontier(
         .filter(|transition| {
             transition.slot_id == slot.id && transition.from == entity_ref.current_state
         })
+        .filter(|transition| {
+            transition
+                .via
+                .as_deref()
+                .is_some_and(is_agent_actionable_verb)
+        })
         .map(|transition| ReachableDestination {
             destination_state: transition.to.clone(),
             via_verb: transition.via.clone(),
             status: evaluate_destination(
                 slot,
+                resolved_template,
                 &entity_ref,
                 transition.destination_green_when.as_deref(),
             ),
@@ -60,15 +86,67 @@ pub fn hydrate_frontier(
     })
 }
 
+fn is_agent_actionable_verb(via: &str) -> bool {
+    let via = via.trim();
+    !via.is_empty() && !via.starts_with('(')
+}
+
 fn evaluate_destination(
     slot: &ResolvedSlot,
+    resolved_template: &ResolvedTemplate,
+    entity_ref: &EntityRef,
+    green_when: Option<&str>,
+) -> GreenWhenStatus {
+    let aggregate_status = evaluate_green_when(slot, resolved_template, entity_ref, green_when);
+    if matches!(aggregate_status, GreenWhenStatus::Red { .. }) {
+        return aggregate_status;
+    }
+
+    if slot.justification_required == Some(true)
+        || slot.role_guard.is_some()
+        || slot.audit_class.is_some()
+    {
+        return GreenWhenStatus::Discretionary(DiscretionaryReason {
+            reason: discretionary_reason(slot),
+        });
+    }
+
+    if slot.closure == Some(ClosureType::Open) {
+        let assertion = slot
+            .completeness_assertion
+            .as_ref()
+            .and_then(|assertion| assertion.predicate.as_deref())
+            .unwrap_or("missing completeness_assertion");
+        let satisfied = slot
+            .completeness_assertion
+            .as_ref()
+            .and_then(|assertion| assertion.predicate.as_deref())
+            .is_some_and(|predicate| {
+                matches!(
+                    evaluate_green_when(slot, resolved_template, entity_ref, Some(predicate)),
+                    GreenWhenStatus::Green
+                )
+            });
+        if !satisfied {
+            return GreenWhenStatus::AwaitingCompleteness(CompletenessAssertionStatus {
+                assertion: assertion.to_string(),
+                satisfied,
+            });
+        }
+    }
+
+    GreenWhenStatus::Green
+}
+
+fn evaluate_green_when(
+    slot: &ResolvedSlot,
+    resolved_template: &ResolvedTemplate,
     entity_ref: &EntityRef,
     green_when: Option<&str>,
 ) -> GreenWhenStatus {
     let Some(green_when) = green_when.filter(|value| !value.trim().is_empty()) else {
         return GreenWhenStatus::Green;
     };
-
     let bound_entities = slot
         .predicate_bindings
         .iter()
@@ -80,6 +158,8 @@ fn evaluate_destination(
             let mut ctx = EvalContext {
                 root_entity_id: &entity_ref.entity_id,
                 current_state: &entity_ref.current_state,
+                slot,
+                resolved_template,
                 facts: &entity_ref.facts,
                 missing: Vec::new(),
                 invalid: Vec::new(),
@@ -88,10 +168,15 @@ fn evaluate_destination(
                 GreenWhenStatus::Green
             } else {
                 if ctx.missing.is_empty() && ctx.invalid.is_empty() {
-                    ctx.invalid.push(InvalidFact {
-                        entity: "predicate".to_string(),
-                        reason: "predicate evaluated false".to_string(),
-                    });
+                    debug_assert!(
+                        false,
+                        "predicate variant returned false without structured diagnostics"
+                    );
+                    ctx.invalid.push(invalid_fact(
+                        "predicate",
+                        "predicate failed without structured diagnostic",
+                        InvalidFactDetail::PredicateFailureWithoutDiagnostic,
+                    ));
                 }
                 GreenWhenStatus::Red {
                     missing: ctx.missing,
@@ -101,17 +186,38 @@ fn evaluate_destination(
         }
         Err(err) => GreenWhenStatus::Red {
             missing: Vec::new(),
-            invalid: vec![InvalidFact {
-                entity: bound_entities.join(","),
-                reason: err.to_string(),
-            }],
+            invalid: vec![invalid_fact(
+                bound_entities.join(","),
+                err.to_string(),
+                InvalidFactDetail::PredicateParseError {
+                    reason: err.to_string(),
+                },
+            )],
         },
     }
+}
+
+fn discretionary_reason(slot: &ResolvedSlot) -> String {
+    if let Some(audit_class) = &slot.audit_class {
+        return format!(
+            "slot {} requires discretionary audit class {audit_class}",
+            slot.id
+        );
+    }
+    if slot.role_guard.is_some() {
+        return format!(
+            "slot {} requires role-guarded discretionary handling",
+            slot.id
+        );
+    }
+    format!("slot {} requires justification", slot.id)
 }
 
 struct EvalContext<'a> {
     root_entity_id: &'a str,
     current_state: &'a str,
+    slot: &'a ResolvedSlot,
+    resolved_template: &'a ResolvedTemplate,
     facts: &'a FrontierFacts,
     missing: Vec<MissingFact>,
     invalid: Vec<InvalidFact>,
@@ -138,7 +244,7 @@ fn eval_predicate(
         } => eval_attr_cmp(entity, attr, *op, value, ctx, this_fact),
         Predicate::Every { set, condition } => {
             let facts = set_facts(set, ctx);
-            if has_cycle(ctx, set) {
+            if has_blocking_set_invalid(ctx, set) {
                 return false;
             }
             if facts.is_empty() {
@@ -154,14 +260,35 @@ fn eval_predicate(
         }
         Predicate::NoneExists { set, condition } => {
             let facts = set_facts(set, ctx);
-            !has_cycle(ctx, set)
-                && facts
-                    .iter()
-                    .all(|fact| !eval_predicate(condition, ctx, Some(fact)))
+            if has_blocking_set_invalid(ctx, set) {
+                return false;
+            }
+
+            let mut forbidden = false;
+            for fact in &facts {
+                let missing_len = ctx.missing.len();
+                let invalid_len = ctx.invalid.len();
+                if eval_predicate(condition, ctx, Some(fact)) {
+                    forbidden = true;
+                    let fact_id = fact.attrs.get("id").cloned();
+                    ctx.invalid.push(invalid_fact(
+                        set.kind.clone(),
+                        format!("forbidden member present: {fact_id:?}"),
+                        InvalidFactDetail::ForbiddenMemberPresent {
+                            kind: set.kind.clone(),
+                            fact_id,
+                        },
+                    ));
+                } else {
+                    ctx.missing.truncate(missing_len);
+                    ctx.invalid.truncate(invalid_len);
+                }
+            }
+            !forbidden
         }
         Predicate::AtLeastOne { set, condition } => {
             let facts = set_facts(set, ctx);
-            if has_cycle(ctx, set) {
+            if has_blocking_set_invalid(ctx, set) {
                 return false;
             }
             let matched = facts
@@ -182,7 +309,7 @@ fn eval_predicate(
             threshold,
         } => {
             let facts = set_facts(set, ctx);
-            if has_cycle(ctx, set) {
+            if has_blocking_set_invalid(ctx, set) {
                 return false;
             }
             let count = facts
@@ -193,7 +320,20 @@ fn eval_predicate(
                         .is_none_or(|condition| eval_predicate(condition, ctx, Some(fact)))
                 })
                 .count() as u64;
-            cmp_u64(count, *op, *threshold)
+            let ok = cmp_u64(count, *op, *threshold);
+            if !ok {
+                ctx.invalid.push(invalid_fact(
+                    set.kind.clone(),
+                    format!("count {count} did not satisfy {op:?} {threshold}"),
+                    InvalidFactDetail::CountThresholdFailed {
+                        kind: set.kind.clone(),
+                        observed: count,
+                        op: *op,
+                        threshold: *threshold,
+                    },
+                ));
+            }
+            ok
         }
         Predicate::Obtained { entity, validity } => match validity {
             Validity::StateIn(state_set) => eval_state_in(entity, state_set, ctx, this_fact),
@@ -205,10 +345,10 @@ fn eval_predicate(
 fn eval_exists(
     entity: &PredicateEntityRef,
     ctx: &mut EvalContext<'_>,
-    this_fact: Option<&FrontierFact>,
+    _this_fact: Option<&FrontierFact>,
 ) -> bool {
     match entity {
-        PredicateEntityRef::This => this_fact.is_some() || !ctx.current_state.is_empty(),
+        PredicateEntityRef::This => true,
         PredicateEntityRef::Named(kind)
         | PredicateEntityRef::Parent(kind)
         | PredicateEntityRef::Scoped { kind, .. } => {
@@ -237,10 +377,14 @@ fn eval_state_in(
                 .unwrap_or(ctx.current_state);
             let ok = state_set.iter().any(|allowed| allowed == state);
             if !ok {
-                ctx.invalid.push(InvalidFact {
-                    entity: "this".to_string(),
-                    reason: format!("state {state} not in {state_set:?}"),
-                });
+                ctx.invalid.push(invalid_fact(
+                    "this",
+                    format!("state {state} not in {state_set:?}"),
+                    InvalidFactDetail::StateNotInSet {
+                        state: state.to_string(),
+                        allowed: state_set.to_vec(),
+                    },
+                ));
             }
             ok
         }
@@ -261,10 +405,14 @@ fn eval_state_in(
                     .is_some_and(|state| state_set.iter().any(|allowed| allowed == state))
             });
             if !ok {
-                ctx.invalid.push(InvalidFact {
-                    entity: kind.clone(),
-                    reason: format!("no fact state in {state_set:?}"),
-                });
+                ctx.invalid.push(invalid_fact(
+                    kind.clone(),
+                    format!("no fact state in {state_set:?}"),
+                    InvalidFactDetail::StateNotInSet {
+                        state: "<none matched>".to_string(),
+                        allowed: state_set.to_vec(),
+                    },
+                ));
             }
             ok
         }
@@ -300,10 +448,13 @@ fn eval_attr_cmp(
         .iter()
         .any(|actual| cmp_string_or_number(actual, op, &expected));
     if !ok {
-        ctx.invalid.push(InvalidFact {
-            entity: entity_name(entity),
-            reason: format!("attribute {attr} did not satisfy comparison"),
-        });
+        ctx.invalid.push(invalid_fact(
+            entity_name(entity),
+            format!("attribute {attr} did not satisfy comparison"),
+            InvalidFactDetail::AttributeComparisonFailed {
+                attr: attr.to_string(),
+            },
+        ));
     }
     ok
 }
@@ -312,6 +463,12 @@ fn set_facts(set: &EntitySetRef, ctx: &mut EvalContext<'_>) -> Vec<FrontierFact>
     let Some(facts) = ctx.facts.get(&set.kind) else {
         return Vec::new();
     };
+    let Some(set_slot) = ctx.resolved_template.slot(&set.kind) else {
+        return facts.clone();
+    };
+    if !matches!(set_slot.cardinality, Some(Cardinality::Recursive)) {
+        return facts.clone();
+    }
     if !facts
         .iter()
         .any(|fact| fact.attrs.contains_key("parent_id"))
@@ -321,57 +478,97 @@ fn set_facts(set: &EntitySetRef, ctx: &mut EvalContext<'_>) -> Vec<FrontierFact>
 
     let mut out = Vec::new();
     let mut path = Vec::new();
-    collect_recursive_set(
-        &set.kind,
-        ctx.root_entity_id,
+    let mut recursive = RecursiveCollectContext {
+        kind: &set.kind,
         facts,
-        &mut path,
-        &mut out,
-        &mut ctx.invalid,
-    );
+        max_depth: set_slot.max_depth.or(ctx.slot.max_depth),
+        invalid: &mut ctx.invalid,
+    };
+    collect_recursive_set(ctx.root_entity_id, 1, &mut path, &mut out, &mut recursive);
     out
 }
 
-fn has_cycle(ctx: &EvalContext<'_>, set: &EntitySetRef) -> bool {
-    ctx.invalid
-        .iter()
-        .any(|invalid| invalid.entity == set.kind && invalid.reason.starts_with("CycleDetected"))
+fn has_blocking_set_invalid(ctx: &EvalContext<'_>, set: &EntitySetRef) -> bool {
+    ctx.invalid.iter().any(|invalid| {
+        invalid.entity == set.kind
+            && matches!(
+                invalid.detail,
+                InvalidFactDetail::CycleDetected { .. }
+                    | InvalidFactDetail::MaxDepthExceeded { .. }
+                    | InvalidFactDetail::RecursiveFactMissingId
+            )
+    })
+}
+
+struct RecursiveCollectContext<'a, 'b> {
+    kind: &'a str,
+    facts: &'a [FrontierFact],
+    max_depth: Option<usize>,
+    invalid: &'b mut Vec<InvalidFact>,
 }
 
 fn collect_recursive_set(
-    kind: &str,
     parent_id: &str,
-    facts: &[FrontierFact],
+    depth: usize,
     path: &mut Vec<String>,
     out: &mut Vec<FrontierFact>,
-    invalid: &mut Vec<InvalidFact>,
+    ctx: &mut RecursiveCollectContext<'_, '_>,
 ) {
-    for fact in facts.iter().filter(|fact| {
+    if let Some(max_depth) = ctx.max_depth {
+        if depth > max_depth {
+            ctx.invalid.push(invalid_fact(
+                ctx.kind.to_string(),
+                format!("max_depth {max_depth} exceeded at depth {depth}"),
+                InvalidFactDetail::MaxDepthExceeded {
+                    kind: ctx.kind.to_string(),
+                    depth,
+                    max_depth,
+                },
+            ));
+            return;
+        }
+    }
+
+    for fact in ctx.facts.iter().filter(|fact| {
         fact.attrs
             .get("parent_id")
             .is_some_and(|value| value == parent_id)
     }) {
         let Some(id) = fact.attrs.get("id").cloned() else {
-            invalid.push(InvalidFact {
-                entity: kind.to_string(),
-                reason: "recursive fact missing id".to_string(),
-            });
+            ctx.invalid.push(invalid_fact(
+                ctx.kind.to_string(),
+                "recursive fact missing id",
+                InvalidFactDetail::RecursiveFactMissingId,
+            ));
             continue;
         };
         if path.contains(&id) {
             let mut cycle = path.clone();
             cycle.push(id);
-            invalid.push(InvalidFact {
-                entity: kind.to_string(),
-                reason: format!("CycleDetected{{path:{cycle:?}}}"),
-            });
+            ctx.invalid.push(invalid_fact(
+                ctx.kind.to_string(),
+                format!("cycle detected: {}", cycle.join(" -> ")),
+                InvalidFactDetail::CycleDetected { entities: cycle },
+            ));
             continue;
         }
 
         out.push(fact.clone());
         path.push(id.clone());
-        collect_recursive_set(kind, &id, facts, path, out, invalid);
+        collect_recursive_set(&id, depth + 1, path, out, ctx);
         path.pop();
+    }
+}
+
+fn invalid_fact(
+    entity: impl Into<String>,
+    reason: impl Into<String>,
+    detail: InvalidFactDetail,
+) -> InvalidFact {
+    InvalidFact {
+        entity: entity.into(),
+        reason: reason.into(),
+        detail,
     }
 }
 
@@ -395,6 +592,11 @@ fn cmp_string_or_number(left: &str, op: CmpOp, right: &str) -> bool {
             CmpOp::Le => left <= right,
             CmpOp::Gt => left > right,
             CmpOp::Ge => left >= right,
+        },
+        (Ok(_), Err(_)) | (Err(_), Ok(_)) => match op {
+            CmpOp::Eq => false,
+            CmpOp::Ne => true,
+            CmpOp::Lt | CmpOp::Le | CmpOp::Gt | CmpOp::Ge => false,
         },
         _ => match op {
             CmpOp::Eq => left == right,

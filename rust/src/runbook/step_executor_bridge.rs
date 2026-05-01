@@ -622,6 +622,7 @@ mod tests {
                     target_workspace: Some("deal".into()),
                     target_slot: Some("deal".into()),
                 }),
+                ..Default::default()
             },
         );
         let mut domains = HashMap::new();

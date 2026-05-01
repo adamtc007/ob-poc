@@ -2,7 +2,7 @@ use std::collections::BTreeMap;
 
 use dsl_core::{
     config::dag::PredicateBinding,
-    frontier::{hydrate_frontier, EntityRef, FrontierFact, GreenWhenStatus},
+    frontier::{hydrate_frontier, EntityRef, FrontierFact, GreenWhenStatus, InvalidFactDetail},
     resolver::{
         ResolvedSlot, ResolvedTemplate, ResolvedTransition, ResolverProvenance, SlotProvenance,
         VersionHash,
@@ -12,7 +12,7 @@ use dsl_core::{
 const CBU_VALIDATED_GREEN_WHEN: &str = r#"
 every entity_proper_person.state = VERIFIED
 AND every entity_limited_company_ubo.state in {DISCOVERED, PUBLIC_FLOAT, EXEMPT}
-AND every mandate.state in {APPROVED, ACTIVE}
+AND every mandate.state in {approved, active}
 AND every cbu_evidence.state = APPROVED
 AND no investor_disqualifying_flag exists
 AND investment_managers.completeness = green
@@ -110,7 +110,7 @@ fn happy_facts() -> BTreeMap<String, Vec<FrontierFact>> {
                 recursive_state_fact("ubo-2", "ubo-1", "PUBLIC_FLOAT"),
             ],
         ),
-        ("mandate".to_string(), vec![state_fact("APPROVED")]),
+        ("mandate".to_string(), vec![state_fact("approved")]),
         ("cbu_evidence".to_string(), vec![state_fact("APPROVED")]),
         (
             "investment_managers".to_string(),
@@ -196,7 +196,7 @@ fn cbu_validated_fails_when_ubo_chain_has_unapproved_descendant() {
 #[test]
 fn cbu_validated_fails_when_mandate_is_not_approved_or_active() {
     let mut facts = happy_facts();
-    facts.insert("mandate".to_string(), vec![state_fact("DRAFT")]);
+    facts.insert("mandate".to_string(), vec![state_fact("draft")]);
 
     assert_red_invalid_entity(validated_status(facts), "this");
 }
@@ -228,7 +228,7 @@ fn cbu_validated_fails_when_disqualifying_flag_exists() {
         vec![state_fact("OPEN")],
     );
 
-    assert_red_with_fallback_diagnostic(validated_status(facts));
+    assert_red_forbidden_member(validated_status(facts), "investor_disqualifying_flag");
 }
 
 #[test]
@@ -253,12 +253,15 @@ fn assert_red_invalid_entity(status: GreenWhenStatus, entity: &str) {
     );
 }
 
-fn assert_red_with_fallback_diagnostic(status: GreenWhenStatus) {
+fn assert_red_forbidden_member(status: GreenWhenStatus, entity: &str) {
     let GreenWhenStatus::Red { missing, invalid } = status else {
         panic!("expected red status");
     };
     assert!(missing.is_empty(), "unexpected missing facts: {missing:?}");
     assert_eq!(invalid.len(), 1);
-    assert_eq!(invalid[0].entity, "predicate");
-    assert_eq!(invalid[0].reason, "predicate evaluated false");
+    assert_eq!(invalid[0].entity, entity);
+    assert!(matches!(
+        &invalid[0].detail,
+        InvalidFactDetail::ForbiddenMemberPresent { kind, .. } if kind == entity
+    ));
 }

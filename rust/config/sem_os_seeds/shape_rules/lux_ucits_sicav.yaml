@@ -28,9 +28,6 @@ slots:
     eligibility:
       entity_kinds: [company]
     entry_state: empty
-  mandate:
-    closure: closed_unbounded
-    entry_state: empty
   administrator:
     closure: closed_bounded
     eligibility:

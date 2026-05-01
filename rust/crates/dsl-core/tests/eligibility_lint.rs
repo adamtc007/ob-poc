@@ -62,3 +62,21 @@ fn eligibility_lint_accepts_known_entity_kind_after_shape_rule_composition() {
         report.errors
     );
 }
+
+#[test]
+fn eligibility_lint_rejects_missing_entity_taxonomy_context() {
+    let inputs = inputs();
+    let template = resolve_template("struct.lux.ucits.sicav", "cbu", &inputs)
+        .expect("Lux SICAV template resolves");
+    let report =
+        validate_resolved_template_gate_metadata(&template, &DagValidationContext::default());
+
+    assert!(report.errors.iter().any(|error| matches!(
+        error,
+        DagError::ExternalValidationContextMissing {
+            slot_id,
+            field,
+            ..
+        } if slot_id == "management_company" && field == "eligibility"
+    )));
+}

@@ -157,6 +157,35 @@ pub struct VerbConfig {
     pub transition_args: Option<TransitionArgs>,
 }
 
+impl Default for VerbConfig {
+    fn default() -> Self {
+        Self {
+            description: String::new(),
+            behavior: VerbBehavior::Plugin,
+            crud: None,
+            handler: None,
+            graph_query: None,
+            durable: None,
+            args: Vec::new(),
+            returns: None,
+            produces: None,
+            consumes: Vec::new(),
+            lifecycle: None,
+            metadata: None,
+            invocation_phrases: Vec::new(),
+            policy: None,
+            sentences: None,
+            confirm_policy: None,
+            outputs: Vec::new(),
+            three_axis: None,
+            flavour: None,
+            role_guard: None,
+            audit_class: None,
+            transition_args: None,
+        }
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum VerbFlavour {

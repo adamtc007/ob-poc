@@ -325,10 +325,15 @@ slots:
           source_kind: dag_entity
           scope: attached_to this cbu
         - entity: investor_disqualifying_flag
-          source_kind: dag_entity
+          source_kind: substrate
+          source_entity: '"ob-poc".investor_disqualifying_flags'
+          id_column: flag_id
+          parent_key: cbu_id
           scope: attached_to this cbu
         - entity: investment_managers
-          source_kind: dag_entity
+          source_kind: dsl_fact
+          source_entity: investment_manager_role_population
+          value_column: completeness
           scope: completeness assertion for investment-manager role population
       states:
         - id: DISCOVERED
@@ -341,7 +346,7 @@ slots:
           green_when: |
             every entity_proper_person.state = VERIFIED
             AND every entity_limited_company_ubo.state in {DISCOVERED, PUBLIC_FLOAT, EXEMPT}
-            AND every mandate.state in {APPROVED, ACTIVE}
+            AND every mandate.state in {approved, active}
             AND every cbu_evidence.state = APPROVED
             AND no investor_disqualifying_flag exists
             AND investment_managers.completeness = green
@@ -525,7 +530,7 @@ slots:
   - id: cbu_evidence
     stateless: false
     closure: closed_unbounded
-    entry_state: PENDING
+    entry_state: UPLOADED
     state_machine:
       id: cbu_evidence_lifecycle
       source_entity: '"ob-poc".cbu_evidence'

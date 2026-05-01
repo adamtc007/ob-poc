@@ -7,6 +7,6 @@ structural_facts:
   allowed_structure_types: [icav, hedge, qiaif]
   document_bundles: [docs.bundle.aif-baseline, docs.bundle.hedge-baseline]
   trading_profile_type: hedge
-  required_roles: [aifm, depositary, prime-broker]
+  required_roles: [aifm, depositary]
   optional_roles: [investment-manager, administrator, auditor, prime-broker, executing-broker]
 slots: {}

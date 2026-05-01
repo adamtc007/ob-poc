@@ -359,7 +359,7 @@ pub struct StateMachine {
 }
 
 /// Substrate binding for one entity kind named by a `green_when` predicate.
-#[derive(Debug, Clone, Deserialize, Serialize)]
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
 pub struct PredicateBinding {
     /// Predicate entity kind as authored, e.g. `red_flag`.
     pub entity: String,
@@ -410,7 +410,7 @@ pub struct PredicateBinding {
 }
 
 /// Universe of required rows for a `required` predicate binding.
-#[derive(Debug, Clone, Deserialize, Serialize)]
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
 pub struct PredicateRequiredUniverse {
     /// Whether the required universe is a concrete carrier or a DAG-level set.
     #[serde(default)]

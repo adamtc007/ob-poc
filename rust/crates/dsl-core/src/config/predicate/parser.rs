@@ -85,6 +85,15 @@ fn is_relation_scope_tail(part: &str) -> bool {
 }
 
 fn parse_clause(clause: &str) -> Result<Predicate, String> {
+    if clause.starts_with("attached_to ") {
+        return Err("orphaned `attached_to` scope without a preceding predicate".to_string());
+    }
+    if clause.starts_with("count(") {
+        return parse_count(clause);
+    }
+    if clause.starts_with("obtained(") {
+        return parse_obtained(clause);
+    }
     if let Some(rest) = clause.strip_prefix("every ") {
         return parse_every(rest);
     }
@@ -98,6 +107,103 @@ fn parse_clause(clause: &str) -> Result<Predicate, String> {
         return Ok(predicate);
     }
     parse_comparison(clause)
+}
+
+fn parse_count(clause: &str) -> Result<Predicate, String> {
+    let (inner, rest) = split_function_call(clause, "count")?;
+    let (op, right) = split_leading_comparison(rest)?;
+    let threshold = right
+        .parse::<u64>()
+        .map_err(|_| "count threshold must be an unsigned integer".to_string())?;
+
+    let (set_subject, condition) = if let Some((subject, condition)) = inner.split_once(" where ") {
+        (
+            subject.trim(),
+            Some(parse_count_condition(condition.trim())?),
+        )
+    } else {
+        (inner.trim(), None)
+    };
+
+    Ok(Predicate::Count {
+        set: parse_set_ref(set_subject, None)?,
+        condition: condition.map(Box::new),
+        op,
+        threshold,
+    })
+}
+
+fn split_leading_comparison(input: &str) -> Result<(CmpOp, &str), String> {
+    let input = input.trim();
+    for (token, op) in [
+        (">=", CmpOp::Ge),
+        ("<=", CmpOp::Le),
+        ("!=", CmpOp::Ne),
+        ("=", CmpOp::Eq),
+        (">", CmpOp::Gt),
+        ("<", CmpOp::Lt),
+    ] {
+        if let Some(rest) = input.strip_prefix(token) {
+            return Ok((op, rest.trim()));
+        }
+    }
+    Err("expected count comparison operator".to_string())
+}
+
+fn parse_count_condition(condition: &str) -> Result<Predicate, String> {
+    if let Ok(state_set) = parse_state_rhs(condition) {
+        return Ok(Predicate::StateIn {
+            entity: EntityRef::This,
+            state_set,
+        });
+    }
+    let (left, op, right) = split_comparison(condition)?;
+    let (_subject, attr) = split_field(left)?;
+    if attr == "state" {
+        if !matches!(op, CmpOp::Eq) {
+            return Err("state comparisons only support `=` or `in`".to_string());
+        }
+        return Ok(Predicate::StateIn {
+            entity: EntityRef::This,
+            state_set: parse_state_set(right)?,
+        });
+    }
+    Ok(Predicate::AttrCmp {
+        entity: EntityRef::This,
+        attr: attr.to_string(),
+        op,
+        value: parse_attr_value(right),
+    })
+}
+
+fn parse_obtained(clause: &str) -> Result<Predicate, String> {
+    let (inner, rest) = split_function_call(clause, "obtained")?;
+    if !rest.trim().is_empty() {
+        return Err("obtained(...) does not accept trailing text".to_string());
+    }
+
+    if let Ok((subject, state_set)) = parse_state_condition(inner) {
+        return Ok(Predicate::Obtained {
+            entity: parse_entity_ref(subject, None)?,
+            validity: super::ast::Validity::StateIn(state_set),
+        });
+    }
+
+    Ok(Predicate::Obtained {
+        entity: parse_entity_ref(inner, None)?,
+        validity: super::ast::Validity::DelegatedToEntityDag,
+    })
+}
+
+fn split_function_call<'a>(clause: &'a str, name: &str) -> Result<(&'a str, &'a str), String> {
+    let prefix = format!("{name}(");
+    let rest = clause
+        .strip_prefix(&prefix)
+        .ok_or_else(|| format!("expected `{name}(...)`"))?;
+    let close = rest
+        .find(')')
+        .ok_or_else(|| format!("missing closing `)` in {name}(...)"))?;
+    Ok((&rest[..close], rest[close + 1..].trim()))
 }
 
 fn parse_every(rest: &str) -> Result<Predicate, String> {
@@ -379,11 +485,14 @@ fn split_comparison(clause: &str) -> Result<(&str, CmpOp, &str), String> {
 }
 
 fn parse_attr_value(value: &str) -> AttrValue {
+    // Attribute value classification: quoted values are strings, unquoted
+    // numeric literals are numbers, lowercase booleans are booleans, and other
+    // tokens are symbolic atoms.
     let value = value.trim();
-    if matches!(value, "true" | "TRUE") {
+    if value == "true" {
         return AttrValue::Bool(true);
     }
-    if matches!(value, "false" | "FALSE") {
+    if value == "false" {
         return AttrValue::Bool(false);
     }
     if value.parse::<i64>().is_ok() || value.parse::<f64>().is_ok() {

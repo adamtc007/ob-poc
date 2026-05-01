@@ -111,6 +111,12 @@ pub enum DagError {
         state_id: String,
         entity_kind: String,
     },
+    PredicateBindingCarrierMissing {
+        location: DagLocation,
+        slot_id: String,
+        state_id: String,
+        entity_kind: String,
+    },
 
     // Phase 1.5B gate metadata
     OpenClosureMissingCompletenessAssertion {
@@ -121,6 +127,17 @@ pub enum DagError {
         location: DagLocation,
         slot_id: String,
         entity_kind: String,
+    },
+    ExternalValidationContextMissing {
+        location: DagLocation,
+        slot_id: String,
+        field: String,
+    },
+    EntryStateUnknown {
+        location: DagLocation,
+        slot_id: String,
+        state_machine: String,
+        entry_state: String,
     },
     GatePredicateParseError {
         location: DagLocation,
@@ -253,6 +270,16 @@ impl std::fmt::Display for DagError {
                 "{location}: slot '{slot_id}' state '{state_id}' references \
                  green_when entity '{entity_kind}' without a predicate_bindings entry"
             ),
+            Self::PredicateBindingCarrierMissing {
+                location,
+                slot_id,
+                state_id,
+                entity_kind,
+            } => write!(
+                f,
+                "{location}: slot '{slot_id}' state '{state_id}' references \
+                 green_when entity '{entity_kind}' whose predicate binding has no carrier"
+            ),
             Self::OpenClosureMissingCompletenessAssertion { location, slot_id } => write!(
                 f,
                 "{location}: slot '{slot_id}' has closure=open but no \
@@ -266,6 +293,25 @@ impl std::fmt::Display for DagError {
                 f,
                 "{location}: slot '{slot_id}' eligibility references unknown \
                  entity kind '{entity_kind}'"
+            ),
+            Self::ExternalValidationContextMissing {
+                location,
+                slot_id,
+                field,
+            } => write!(
+                f,
+                "{location}: slot '{slot_id}' cannot validate '{field}' because \
+                 external validation context is missing"
+            ),
+            Self::EntryStateUnknown {
+                location,
+                slot_id,
+                state_machine,
+                entry_state,
+            } => write!(
+                f,
+                "{location}: slot '{slot_id}' entry_state '{entry_state}' is not a \
+                 state in state_machine '{state_machine}'"
             ),
             Self::GatePredicateParseError {
                 location,
@@ -512,10 +558,17 @@ pub fn validate_resolved_template_gate_metadata(
     let slot_closures = template
         .slots
         .iter()
-        .filter_map(|slot| {
-            slot.closure
-                .clone()
-                .map(|closure| (slot.id.clone(), closure))
+        .flat_map(|slot| {
+            let Some(closure) = slot.closure.clone() else {
+                return Vec::new();
+            };
+            let mut entries = vec![(slot.id.clone(), closure.clone())];
+            entries.extend(
+                slot.predicate_bindings
+                    .iter()
+                    .map(|binding| (binding.entity.clone(), closure.clone())),
+            );
+            entries
         })
         .collect::<HashMap<_, _>>();
 
@@ -1101,6 +1154,11 @@ fn validate_green_when_predicates(workspace: &str, dag: &Dag, report: &mut DagVa
                 .iter()
                 .map(|binding| binding.entity.as_str())
                 .collect();
+            let slot_ids = dag
+                .slots
+                .iter()
+                .map(|slot| slot.id.as_str())
+                .collect::<HashSet<_>>();
             let mut referenced_entities = HashSet::new();
             collect_predicate_entity_refs(&ast, &mut referenced_entities);
             for entity_kind in referenced_entities {
@@ -1111,6 +1169,25 @@ fn validate_green_when_predicates(workspace: &str, dag: &Dag, report: &mut DagVa
                         state_id: state.id.clone(),
                         entity_kind,
                     });
+                    continue;
+                }
+                let binding = machine
+                    .predicate_bindings
+                    .iter()
+                    .find(|binding| binding.entity == entity_kind)
+                    .expect("bound entity already checked");
+                let has_carrier = binding.source_entity.is_some()
+                    || (binding.source_kind == PredicateBindingSourceKind::DagEntity
+                        && slot_ids.contains(binding.entity.as_str()));
+                if !has_carrier {
+                    report
+                        .errors
+                        .push(DagError::PredicateBindingCarrierMissing {
+                            location: location.clone(),
+                            slot_id: slot.id.clone(),
+                            state_id: state.id.clone(),
+                            entity_kind,
+                        });
                 }
             }
         }
@@ -1139,7 +1216,15 @@ fn validate_gate_metadata(
         }
 
         if let Some(EligibilityConstraint::EntityKinds { entity_kinds }) = &slot.eligibility {
-            if !context.known_entity_kinds.is_empty() {
+            if context.known_entity_kinds.is_empty() {
+                report
+                    .errors
+                    .push(DagError::ExternalValidationContextMissing {
+                        location: location.clone(),
+                        slot_id: slot.id.clone(),
+                        field: "eligibility".to_string(),
+                    });
+            } else {
                 for entity_kind in entity_kinds {
                     if !context.known_entity_kinds.contains(entity_kind) {
                         report.errors.push(DagError::EligibilityEntityKindUnknown {
@@ -1151,6 +1236,8 @@ fn validate_gate_metadata(
                 }
             }
         }
+
+        validate_entry_state(&location, slot, report);
 
         validate_gate_predicate_vector(
             &location,
@@ -1196,6 +1283,25 @@ fn validate_gate_metadata(
             report,
         );
     }
+}
+
+fn validate_entry_state(location: &DagLocation, slot: &Slot, report: &mut DagValidationReport) {
+    let Some(entry_state) = &slot.entry_state else {
+        return;
+    };
+    let Some(SlotStateMachine::Structured(machine)) = &slot.state_machine else {
+        return;
+    };
+    if machine.states.iter().any(|state| state.id == *entry_state) {
+        return;
+    }
+
+    report.errors.push(DagError::EntryStateUnknown {
+        location: location.clone(),
+        slot_id: slot.id.clone(),
+        state_machine: machine.id.clone(),
+        entry_state: entry_state.clone(),
+    });
 }
 
 fn validate_gate_predicate_vector(
@@ -1264,6 +1370,13 @@ fn validate_resolved_eligibility(
         return;
     };
     if context.known_entity_kinds.is_empty() {
+        report
+            .errors
+            .push(DagError::ExternalValidationContextMissing {
+                location: location.clone(),
+                slot_id: slot.id.clone(),
+                field: "eligibility".to_string(),
+            });
         return;
     }
 
@@ -2189,6 +2302,8 @@ slots:
           entry: true
         - id: APPROVED
           green_when: "review exists AND review.state = COMPLETE"
+  - id: review
+    stateless: false
 "#,
         );
         let mut map = BTreeMap::new();
