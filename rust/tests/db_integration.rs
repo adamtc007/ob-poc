@@ -167,11 +167,31 @@ mod db_tests {
         async fn execute_dsl(&self, dsl: &str) -> Result<ExecutionContext> {
             let ast = parse_program(dsl).map_err(|e| anyhow::anyhow!("{:?}", e))?;
             let plan = compile(&ast).map_err(|e| anyhow::anyhow!("{:?}", e))?;
-            let executor = DslExecutor::new(self.pool.clone());
+            let executor = DslExecutor::new(self.pool.clone()).with_sem_os_ops(sem_os_registry());
             let mut ctx = ExecutionContext::new();
             executor.execute_plan(&plan, &mut ctx).await?;
             Ok(ctx)
         }
+    }
+
+    /// Build the canonical `SemOsVerbOpRegistry` once per test process.
+    /// Mirrors the production wiring in `ob-poc-web::main` —
+    /// `sem_os_postgres::ops::build_registry()` plus
+    /// `ob_poc::domain_ops::extend_registry()` for the Pattern B ops that
+    /// stay in `ob-poc`. Without this, every plugin verb errors with
+    /// "no SemOsVerbOp registered" because Phase 5c-migrate slice #80
+    /// removed the implicit `inventory`-driven dispatch.
+    fn sem_os_registry() -> std::sync::Arc<sem_os_postgres::ops::SemOsVerbOpRegistry> {
+        use std::sync::OnceLock;
+        static REGISTRY: OnceLock<std::sync::Arc<sem_os_postgres::ops::SemOsVerbOpRegistry>> =
+            OnceLock::new();
+        REGISTRY
+            .get_or_init(|| {
+                let mut reg = sem_os_postgres::ops::build_registry();
+                ob_poc::domain_ops::extend_registry(&mut reg);
+                std::sync::Arc::new(reg)
+            })
+            .clone()
     }
 
     #[test]

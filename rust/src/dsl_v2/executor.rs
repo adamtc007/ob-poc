@@ -2052,8 +2052,36 @@ impl DslExecutor {
                         ctx.bind_json(binding_name, serde_json::Value::Array(records.clone()));
                     }
                     ExecutionResult::Record(record) => {
-                        // Bind single Record to json_bindings
+                        // Bind single Record to json_bindings.
                         ctx.bind_json(binding_name, record.clone());
+                        // Plugin verbs (e.g. cbu.create, kyc-case.create)
+                        // return a Record whose primary entity id field is
+                        // named after the noun: `<domain>_id` for single-word
+                        // domains (cbu → cbu_id), or sometimes the trailing
+                        // segment for multi-segment domains (kyc-case →
+                        // case_id). Try both so legacy resolvers and
+                        // downstream verbs that consume `@<binding>` see the
+                        // new entity in the symbol table.
+                        let domain = &step.verb_call.domain;
+                        let mut candidates = Vec::new();
+                        candidates.push(format!("{}_id", domain.replace('-', "_")));
+                        if let Some(noun) = domain.rsplit('-').next() {
+                            let noun_field = format!("{}_id", noun);
+                            if !candidates.contains(&noun_field) {
+                                candidates.push(noun_field);
+                            }
+                        }
+                        for id_field in candidates {
+                            if let Some(uuid) = record
+                                .get(&id_field)
+                                .and_then(|v| v.as_str())
+                                .and_then(|s| uuid::Uuid::parse_str(s).ok())
+                            {
+                                ctx.bind(binding_name, uuid);
+                                ctx.bind(&id_field, uuid);
+                                break;
+                            }
+                        }
                     }
                     _ => {}
                 }
