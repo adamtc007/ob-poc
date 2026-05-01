@@ -17,9 +17,9 @@
 use anyhow::{Context, Result};
 use clap::Subcommand;
 use dsl_core::config::{
-    collect_declared_fqns, flatten_pack_entries, load_dags_from_dir, load_packs_from_dir,
-    validate_dags, validate_pack_fqns, validate_verbs_config, ConfigLoader, ValidationContext,
-    VerbsConfig,
+    collect_declared_fqns, entity_kinds_from_taxonomy_yaml, flatten_pack_entries,
+    load_dags_from_dir, load_packs_from_dir, validate_dags_with_context, validate_pack_fqns,
+    validate_verbs_config, ConfigLoader, DagValidationContext, ValidationContext, VerbsConfig,
 };
 use std::collections::HashSet;
 use std::path::PathBuf;
@@ -128,7 +128,7 @@ async fn validate(strict_warnings: bool) -> Result<()> {
         None
     };
     let dag_report = if let Some(loaded) = &dags_loaded {
-        validate_dags(loaded)
+        validate_dags_with_context(loaded, &load_dag_validation_context()?)
     } else {
         dsl_core::config::DagValidationReport::default()
     };
@@ -234,6 +234,15 @@ async fn validate(strict_warnings: bool) -> Result<()> {
     println!("  OK");
     println!("===========================================");
     Ok(())
+}
+
+fn load_dag_validation_context() -> Result<DagValidationContext> {
+    let taxonomy_path = PathBuf::from("config/ontology/entity_taxonomy.yaml");
+    let taxonomy = std::fs::read_to_string(&taxonomy_path)
+        .with_context(|| format!("reading entity taxonomy from {taxonomy_path:?}"))?;
+    let known_entity_kinds = entity_kinds_from_taxonomy_yaml(&taxonomy)
+        .with_context(|| format!("parsing entity taxonomy from {taxonomy_path:?}"))?;
+    Ok(DagValidationContext { known_entity_kinds })
 }
 
 async fn status() -> Result<()> {

@@ -2034,3 +2034,60 @@ impl SemOsVerbOp for ReadSummary {
         Ok(VerbExecutionOutcome::Record(result))
     }
 }
+
+// ---------------------------------------------------------------------------
+// deal.update-kyc-clearance
+// ---------------------------------------------------------------------------
+//
+// Preserving update on `deals.kyc_clearance_status` — the parallel
+// substate under IN_CLEARANCE that the KYC workspace propagates back
+// to the deal when a case approval/rejection lands. Constraint
+// `deals_kyc_clearance_status_check` (migration
+// `20260429_carrier_08_deals_in_clearance_substates.sql`) caps the
+// value to `pending|in_review|approved|rejected`.
+
+const KYC_CLEARANCE_STATUSES: &[&str] = &["pending", "in_review", "approved", "rejected"];
+
+pub struct UpdateKycClearance;
+
+#[async_trait]
+impl SemOsVerbOp for UpdateKycClearance {
+    fn fqn(&self) -> &str {
+        "deal.update-kyc-clearance"
+    }
+    async fn execute(
+        &self,
+        args: &Value,
+        ctx: &mut VerbExecutionContext,
+        scope: &mut dyn TransactionScope,
+    ) -> Result<VerbExecutionOutcome> {
+        let deal_id = json_extract_uuid(args, ctx, "deal-id")?;
+        let target = json_extract_string(args, "kyc-clearance-status")?;
+
+        if !KYC_CLEARANCE_STATUSES.contains(&target.as_str()) {
+            return Err(anyhow!(
+                "Invalid kyc-clearance-status '{}'. Must be one of: {}",
+                target,
+                KYC_CLEARANCE_STATUSES.join(", ")
+            ));
+        }
+
+        let affected = sqlx::query(
+            r#"UPDATE "ob-poc".deals
+               SET kyc_clearance_status = $2,
+                   updated_at = NOW()
+               WHERE deal_id = $1"#,
+        )
+        .bind(deal_id)
+        .bind(&target)
+        .execute(scope.executor())
+        .await?
+        .rows_affected();
+
+        if affected == 0 {
+            return Err(anyhow!("Deal not found: {}", deal_id));
+        }
+
+        Ok(VerbExecutionOutcome::Affected(affected))
+    }
+}

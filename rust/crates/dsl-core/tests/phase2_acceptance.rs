@@ -18,7 +18,8 @@ fn authored_shape_rules_pass_resolved_template_gate_metadata_lints() {
         known_entity_kinds: HashSet::from([
             "cbu".to_string(),
             "company".to_string(),
-            "person".to_string(),
+            "limited_company".to_string(),
+            "proper_person".to_string(),
         ]),
     };
 

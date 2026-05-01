@@ -8,6 +8,7 @@ use crate::{
             Predicate, Validity,
         },
     },
+    parser::parse_single_verb,
     resolver::{ResolvedSlot, ResolvedTemplate},
 };
 use sem_os_core::constellation_map_def::Cardinality;
@@ -88,7 +89,10 @@ pub fn hydrate_frontier(
 
 fn is_agent_actionable_verb(via: &str) -> bool {
     let via = via.trim();
-    !via.is_empty() && !via.starts_with('(')
+    if via.is_empty() {
+        return false;
+    }
+    parse_single_verb(&format!("({via})")).is_ok()
 }
 
 fn evaluate_destination(

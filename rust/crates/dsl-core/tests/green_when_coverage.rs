@@ -16,10 +16,11 @@ fn discretionary_verbs(config: &VerbsConfig) -> HashSet<String> {
         .domains
         .iter()
         .flat_map(|(domain_name, domain)| {
-            domain.verbs.iter().filter_map(move |(verb_name, verb)| {
-                (verb.flavour == Some(VerbFlavour::Discretionary))
-                    .then(|| format!("{domain_name}.{verb_name}"))
-            })
+            domain
+                .verbs
+                .iter()
+                .filter(|(_, verb)| verb.flavour == Some(VerbFlavour::Discretionary))
+                .map(move |(verb_name, _)| format!("{domain_name}.{verb_name}"))
         })
         .collect()
 }

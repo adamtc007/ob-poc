@@ -320,6 +320,7 @@ slots:
           scope: attached_to this cbu
         - entity: mandate
           source_kind: dag_entity
+          source_entity: mandate
           scope: constellation-exposed instrument_matrix.trading_profile
         - entity: cbu_evidence
           source_kind: dag_entity
@@ -451,7 +452,7 @@ slots:
     stateless: false
     closure: closed_unbounded
     eligibility:
-      entity_kinds: [person]
+      entity_kinds: [proper_person]
     entry_state: GHOST
     state_machine:
       id: entity_proper_person_lifecycle
@@ -482,7 +483,7 @@ slots:
     stateless: false
     closure: closed_unbounded
     eligibility:
-      entity_kinds: [company]
+      entity_kinds: [limited_company]
     entry_state: PENDING
     state_machine:
       id: entity_limited_company_ubo_lifecycle
@@ -543,12 +544,15 @@ slots:
       predicate_bindings:
         - entity: evidence_blob
           source_kind: dag_entity
+          source_entity: evidence_blob
           scope: attached_to this cbu_evidence
         - entity: evidence_review
           source_kind: dag_entity
+          source_entity: evidence_review
           scope: attached_to this cbu_evidence
         - entity: evidence_expiry
           source_kind: dag_entity
+          source_entity: evidence_expiry
           scope: attached_to this cbu_evidence
       states:
         - id: UPLOADED
@@ -891,18 +895,23 @@ slots:
       predicate_bindings:
         - entity: board_review
           source_kind: dag_entity
+          source_entity: board_review
           scope: attached_to this cbu_corporate_action
         - entity: legal_review
           source_kind: dag_entity
+          source_entity: legal_review
           scope: attached_to this cbu_corporate_action
         - entity: compliance_review
           source_kind: dag_entity
+          source_entity: compliance_review
           scope: attached_to this cbu_corporate_action
         - entity: objection
           source_kind: dag_entity
+          source_entity: objection
           scope: attached_to this cbu_corporate_action
         - entity: mandatory_disclosure
           source_kind: dag_entity
+          source_entity: mandatory_disclosure
           scope: attached_to this cbu_corporate_action
           required_universe:
             source_kind: dag_entity
@@ -1177,7 +1186,7 @@ slots:
     stateless: false
     closure: closed_bounded
     eligibility:
-      entity_kinds: [company]
+      entity_kinds: [limited_company]
     cardinality_max: 1
     entry_state: UNDER_REVIEW
     state_machine:
@@ -1197,21 +1206,26 @@ slots:
       predicate_bindings:
         - entity: regulatory_licence
           source_kind: dag_entity
+          source_entity: regulatory_licence
           scope: attached_to this manco
           required_universe:
             source_kind: dag_entity
             source_entity: regulatory_licence_requirement
         - entity: investigation
           source_kind: dag_entity
+          source_entity: investigation
           scope: attached_to this manco
         - entity: periodic_review
           source_kind: dag_entity
+          source_entity: periodic_review
           scope: attached_to this manco
         - entity: credit_risk_assessment
           source_kind: dag_entity
+          source_entity: credit_risk_assessment
           scope: attached_to this manco
         - entity: operational_risk_assessment
           source_kind: dag_entity
+          source_entity: operational_risk_assessment
           scope: attached_to this manco
       states:
         - id: UNDER_REVIEW

@@ -170,21 +170,25 @@ slots:
       predicate_bindings:
         - entity: evidence_requirement
           source_kind: dag_entity
+          source_entity: evidence_requirement
           scope: attached_to this kyc_case
           required_universe:
             source_kind: dag_entity
             source_entity: evidence_requirement
         - entity: ubo_registry_entry
           source_kind: dag_entity
+          source_entity: ubo_registry_entry
           scope: attached_to this kyc_case
           required_universe:
             source_kind: dag_entity
             source_entity: ubo_registry_requirement
         - entity: red_flag
           source_kind: dag_entity
+          source_entity: red_flag
           scope: attached_to this kyc_case
         - entity: screening_run
           source_kind: dag_entity
+          source_entity: screening_run
           scope: attached_to this kyc_case
           required_universe:
             source_kind: dag_entity
@@ -475,22 +479,27 @@ slots:
       predicate_bindings:
         - entity: entity_match
           source_kind: dag_entity
+          source_entity: entity_match
           scope: attached_to this UBO
         - entity: ownership_percentage
           source_kind: dag_entity
+          source_entity: ownership_percentage
           scope: attached_to this UBO
           value_column: value
         - entity: evidence_requirement
           source_kind: dag_entity
+          source_entity: evidence_requirement
           scope: attached_to this UBO
           required_universe:
             source_kind: dag_entity
             source_entity: ubo_evidence_requirement
         - entity: ubo_taxonomy
           source_kind: dag_entity
+          source_entity: ubo_taxonomy
           scope: parent case
         - entity: red_flag
           source_kind: dag_entity
+          source_entity: red_flag
           scope: attached_to this UBO
       states:
         - id: CANDIDATE

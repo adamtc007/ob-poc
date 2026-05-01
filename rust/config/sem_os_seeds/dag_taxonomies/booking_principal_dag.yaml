@@ -147,12 +147,15 @@ slots:
       predicate_bindings:
         - entity: screening_check
           source_kind: dag_entity
+          source_entity: screening_check
           scope: attached_to this clearance
         - entity: red_flag
           source_kind: dag_entity
+          source_entity: red_flag
           scope: attached_to this clearance
         - entity: regulatory_licence
           source_kind: dag_entity
+          source_entity: regulatory_licence
           scope: attached_to this clearance
       states:
         - id: PENDING

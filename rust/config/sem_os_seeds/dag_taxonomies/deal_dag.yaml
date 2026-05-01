@@ -310,6 +310,7 @@ slots:
           scope: parent kyc_case
         - entity: booking_principal_clearance
           source_kind: dag_entity
+          source_entity: booking_principal_clearance
           scope: attached_to this deal
           required_universe:
             source_kind: dag_entity

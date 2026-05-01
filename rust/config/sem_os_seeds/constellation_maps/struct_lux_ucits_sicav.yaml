@@ -251,6 +251,8 @@ slots:
       parent_fk: cbu_id
       child_fk: profile_id
     cardinality: optional
+    closure: closed_bounded
+    cardinality_max: 1
     depends_on:
       - slot: cbu
         min_state: filled

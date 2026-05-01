@@ -235,18 +235,22 @@ slots:
       predicate_bindings:
         - entity: steward_approval
           source_kind: dag_entity
+          source_entity: steward_approval
           scope: attached_to this changeset
           required_universe:
             source_kind: dag_entity
             source_entity: steward_approval_requirement
         - entity: validation_run
           source_kind: dag_entity
+          source_entity: validation_run
           scope: attached_to this changeset
         - entity: impact_analysis
           source_kind: dag_entity
+          source_entity: impact_analysis
           scope: attached_to this changeset
         - entity: objection
           source_kind: dag_entity
+          source_entity: objection
           scope: attached_to this changeset
       states:
         - id: composing

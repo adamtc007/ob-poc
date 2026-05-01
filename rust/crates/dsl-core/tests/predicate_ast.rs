@@ -271,6 +271,22 @@ fn count_predicate_fixture_is_structured() {
 }
 
 #[test]
+fn count_predicate_allows_nested_function_like_attr_values() {
+    let ast = parse_green_when("count(evidence where evidence.source = required(foo)) >= 1")
+        .expect("count predicate with nested attr value parses");
+
+    assert!(matches!(
+        ast,
+        Predicate::Count {
+            condition: Some(_),
+            op: CmpOp::Ge,
+            threshold: 1,
+            ..
+        }
+    ));
+}
+
+#[test]
 fn obtained_predicate_fixture_is_structured() {
     let ast = parse_green_when("obtained(kyc_case.state in {APPROVED, ACTIVE})")
         .expect("obtained predicate parses");

@@ -156,7 +156,10 @@ fn row_for_slot(slot: &ResolvedSlot, options: &ManifestOptions) -> SlotManifestR
 }
 
 fn needs_closure(slot: &ResolvedSlot) -> bool {
-    slot.id != "mandate"
+    !matches!(
+        slot.closure,
+        Some(crate::config::dag::ClosureType::ClosedUnbounded)
+    )
 }
 
 fn needs_eligibility(slot: &ResolvedSlot) -> bool {
@@ -175,5 +178,5 @@ fn needs_cardinality_max(slot: &ResolvedSlot) -> bool {
     matches!(
         slot.closure,
         Some(crate::config::dag::ClosureType::ClosedBounded)
-    ) && slot.id != "mandate"
+    )
 }

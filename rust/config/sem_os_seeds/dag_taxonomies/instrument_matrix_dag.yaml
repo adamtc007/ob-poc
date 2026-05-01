@@ -554,18 +554,22 @@ slots:
       predicate_bindings:
         - entity: compliance_review
           source_kind: dag_entity
+          source_entity: compliance_review
           scope: attached_to this trading_profile
         - entity: ops_review
           source_kind: dag_entity
+          source_entity: ops_review
           scope: attached_to this trading_profile
         - entity: committee_signoff
           source_kind: dag_entity
+          source_entity: committee_signoff
           scope: attached_to this trading_profile
           required_universe:
             source_kind: dag_entity
             source_entity: committee_signoff_requirement
         - entity: objection
           source_kind: dag_entity
+          source_entity: objection
           scope: attached_to this trading_profile
       states:
         - id: DRAFT
@@ -887,15 +891,18 @@ slots:
       predicate_bindings:
         - entity: delivery_line_item
           source_kind: dag_entity
+          source_entity: delivery_line_item
           scope: attached_to this delivery
           required_universe:
             source_kind: dag_entity
             source_entity: delivery_line_item_requirement
         - entity: exception
           source_kind: dag_entity
+          source_entity: exception
           scope: attached_to this delivery
         - entity: counterparty_acknowledgement
           source_kind: dag_entity
+          source_entity: counterparty_acknowledgement
           scope: attached_to this delivery
       states:
         - id: PENDING

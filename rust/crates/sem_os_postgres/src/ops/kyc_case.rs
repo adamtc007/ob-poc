@@ -378,6 +378,177 @@ impl SemOsVerbOp for Close {
 }
 
 // ---------------------------------------------------------------------------
+// kyc-case.approve / kyc-case.reject / kyc-case.approve-with-conditions
+// ---------------------------------------------------------------------------
+//
+// Terminal-transition siblings of `kyc-case.close`. Each is a discoverable,
+// flavour-specific verb backed by the same REVIEW → terminal write path.
+// `Reject` accepts a `do-not-onboard` boolean that switches the target
+// status from REJECTED to DO_NOT_ONBOARD. `ApproveWithConditions` lands
+// the case at APPROVED (the canonical FSM has no CONDITIONAL state — see
+// state_machines/kyc_case_lifecycle.yaml) and prefixes the conditions
+// onto the case notes for downstream review; the formal CONDITIONAL
+// decision snapshot belongs in `kyc_decisions` and is left to the
+// dedicated decision verb.
+
+async fn close_with_status(
+    ctx: &mut VerbExecutionContext,
+    scope: &mut dyn TransactionScope,
+    fqn: &str,
+    case_id: Uuid,
+    target_status: &str,
+    notes: Option<String>,
+) -> Result<VerbExecutionOutcome> {
+    let row: Option<(String, Option<Uuid>, Option<String>)> = sqlx::query_as(
+        r#"SELECT status, deal_id, case_ref
+           FROM "ob-poc".cases
+           WHERE case_id = $1"#,
+    )
+    .bind(case_id)
+    .fetch_optional(scope.executor())
+    .await?;
+    let (current_status, deal_id, case_ref) =
+        row.ok_or_else(|| anyhow!("KYC case not found: {}", case_id))?;
+
+    if current_status != "REVIEW" {
+        return Err(anyhow!(
+            "KYC case {} is in status '{}', but must be in REVIEW to {}",
+            case_id,
+            current_status,
+            fqn
+        ));
+    }
+
+    let closed_at: String = sqlx::query_scalar(
+        r#"UPDATE "ob-poc".cases
+           SET status = $2,
+               closed_at = NOW(),
+               notes = COALESCE($3, notes),
+               updated_at = NOW()
+           WHERE case_id = $1
+           RETURNING to_char(closed_at, 'YYYY-MM-DD"T"HH24:MI:SS"Z"')"#,
+    )
+    .bind(case_id)
+    .bind(target_status)
+    .bind(&notes)
+    .fetch_one(scope.executor())
+    .await?;
+
+    let mut deal_gate_updated = false;
+    if target_status == "APPROVED" {
+        if let Some(did) = deal_id {
+            let event_id = Uuid::new_v4();
+            let detail = json!({
+                "case_id": case_id,
+                "case_ref": case_ref,
+                "approved_at": closed_at,
+                "gate": "KYC"
+            });
+            sqlx::query(
+                r#"INSERT INTO "ob-poc".deal_events
+                       (event_id, deal_id, event_type, subject_type, subject_id, new_value, description)
+                   VALUES ($1, $2, 'KYC_GATE_COMPLETED', 'KYC_CASE', $3, 'APPROVED', $4)"#,
+            )
+            .bind(event_id)
+            .bind(did)
+            .bind(case_id)
+            .bind(detail.to_string())
+            .execute(scope.executor())
+            .await?;
+            deal_gate_updated = true;
+        }
+    }
+
+    let to_node = format!("kyc-case:{}", target_status.to_lowercase());
+    let reason = format!(
+        "{} — REVIEW → {} (deal_gate_updated={})",
+        fqn, target_status, deal_gate_updated
+    );
+    dsl_runtime::domain_ops::helpers::emit_pending_state_advance(
+        ctx,
+        case_id,
+        &to_node,
+        "kyc-case/workstream",
+        &reason,
+    );
+
+    let result = KycCaseCloseResult {
+        case_id,
+        status: target_status.to_string(),
+        closed_at,
+        deal_gate_updated,
+    };
+    Ok(VerbExecutionOutcome::Record(serde_json::to_value(result)?))
+}
+
+pub struct Approve;
+
+#[async_trait]
+impl SemOsVerbOp for Approve {
+    fn fqn(&self) -> &str {
+        "kyc-case.approve"
+    }
+    async fn execute(
+        &self,
+        args: &Value,
+        ctx: &mut VerbExecutionContext,
+        scope: &mut dyn TransactionScope,
+    ) -> Result<VerbExecutionOutcome> {
+        let case_id = json_extract_uuid(args, ctx, "case-id")?;
+        let notes = json_extract_string_opt(args, "notes");
+        close_with_status(ctx, scope, self.fqn(), case_id, "APPROVED", notes).await
+    }
+}
+
+pub struct Reject;
+
+#[async_trait]
+impl SemOsVerbOp for Reject {
+    fn fqn(&self) -> &str {
+        "kyc-case.reject"
+    }
+    async fn execute(
+        &self,
+        args: &Value,
+        ctx: &mut VerbExecutionContext,
+        scope: &mut dyn TransactionScope,
+    ) -> Result<VerbExecutionOutcome> {
+        let case_id = json_extract_uuid(args, ctx, "case-id")?;
+        let reason = json_extract_string(args, "reason")?;
+        let do_not_onboard = args
+            .get("do-not-onboard")
+            .and_then(|v| v.as_bool())
+            .unwrap_or(false);
+        let target_status = if do_not_onboard {
+            "DO_NOT_ONBOARD"
+        } else {
+            "REJECTED"
+        };
+        close_with_status(ctx, scope, self.fqn(), case_id, target_status, Some(reason)).await
+    }
+}
+
+pub struct ApproveWithConditions;
+
+#[async_trait]
+impl SemOsVerbOp for ApproveWithConditions {
+    fn fqn(&self) -> &str {
+        "kyc-case.approve-with-conditions"
+    }
+    async fn execute(
+        &self,
+        args: &Value,
+        ctx: &mut VerbExecutionContext,
+        scope: &mut dyn TransactionScope,
+    ) -> Result<VerbExecutionOutcome> {
+        let case_id = json_extract_uuid(args, ctx, "case-id")?;
+        let conditions = json_extract_string(args, "conditions")?;
+        let notes = format!("[CONDITIONAL] {}", conditions);
+        close_with_status(ctx, scope, self.fqn(), case_id, "APPROVED", Some(notes)).await
+    }
+}
+
+// ---------------------------------------------------------------------------
 // kyc-case.summarize
 // ---------------------------------------------------------------------------
 

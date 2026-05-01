@@ -162,8 +162,10 @@ fn shape_rule_composition_rejects_same_level_shape_conflicts() {
         .body
         .extends = vec!["base.cbu".to_string(), "regulated.fund".to_string()];
 
-    let mut base_refinement = SlotGateMetadataRefinement::default();
-    base_refinement.closure = Some(ClosureType::Open);
+    let base_refinement = SlotGateMetadataRefinement {
+        closure: Some(ClosureType::Open),
+        ..Default::default()
+    };
     inputs
         .shape_rules
         .get_mut("base.cbu")
@@ -172,8 +174,10 @@ fn shape_rule_composition_rejects_same_level_shape_conflicts() {
         .slots
         .insert("management_company".to_string(), base_refinement);
 
-    let mut regulated_refinement = SlotGateMetadataRefinement::default();
-    regulated_refinement.closure = Some(ClosureType::ClosedBounded);
+    let regulated_refinement = SlotGateMetadataRefinement {
+        closure: Some(ClosureType::ClosedBounded),
+        ..Default::default()
+    };
     inputs
         .shape_rules
         .get_mut("regulated.fund")

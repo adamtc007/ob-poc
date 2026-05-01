@@ -200,9 +200,22 @@ fn split_function_call<'a>(clause: &'a str, name: &str) -> Result<(&'a str, &'a 
     let rest = clause
         .strip_prefix(&prefix)
         .ok_or_else(|| format!("expected `{name}(...)`"))?;
-    let close = rest
-        .find(')')
-        .ok_or_else(|| format!("missing closing `)` in {name}(...)"))?;
+    let mut depth = 1usize;
+    let mut close = None;
+    for (idx, ch) in rest.char_indices() {
+        match ch {
+            '(' => depth += 1,
+            ')' => {
+                depth -= 1;
+                if depth == 0 {
+                    close = Some(idx);
+                    break;
+                }
+            }
+            _ => {}
+        }
+    }
+    let close = close.ok_or_else(|| format!("missing closing `)` in {name}(...)"))?;
     Ok((&rest[..close], rest[close + 1..].trim()))
 }
 

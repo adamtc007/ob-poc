@@ -85,8 +85,12 @@ fn cbu_dag_pilot_slots_have_gate_metadata() {
     );
 
     for (slot_id, expected_kind, expected_entry_state) in [
-        ("entity_proper_person", Some("person"), "GHOST"),
-        ("entity_limited_company_ubo", Some("company"), "PENDING"),
+        ("entity_proper_person", Some("proper_person"), "GHOST"),
+        (
+            "entity_limited_company_ubo",
+            Some("limited_company"),
+            "PENDING",
+        ),
         ("cbu_evidence", None, "UPLOADED"),
         ("share_class", None, "DRAFT"),
     ] {
@@ -171,7 +175,8 @@ fn lux_sicav_constellation_pilot_slots_have_gate_metadata() {
     assert_eq!(investment_manager.entry_state.as_deref(), Some("empty"));
 
     let mandate = &map.slots["mandate"];
-    assert_eq!(mandate.closure, None);
+    assert_eq!(mandate.closure, Some(ClosureType::ClosedBounded));
+    assert_eq!(mandate.cardinality_max, Some(1));
 }
 
 #[test]

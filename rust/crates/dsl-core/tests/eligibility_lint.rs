@@ -46,9 +46,10 @@ fn eligibility_lint_accepts_known_entity_kind_after_shape_rule_composition() {
         .expect("Lux SICAV template resolves");
     let context = DagValidationContext {
         known_entity_kinds: HashSet::from([
-            "company".to_string(),
             "cbu".to_string(),
-            "person".to_string(),
+            "company".to_string(),
+            "limited_company".to_string(),
+            "proper_person".to_string(),
         ]),
     };
     let report = validate_resolved_template_gate_metadata(&template, &context);

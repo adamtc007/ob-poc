@@ -76,6 +76,7 @@ pub mod pack_answer;
 pub mod pack_select;
 pub mod partnership;
 pub mod phrase;
+pub mod red_flag;
 pub mod refdata;
 pub mod refdata_loader;
 pub mod registry;
@@ -701,6 +702,7 @@ pub fn build_registry() -> SemOsVerbOpRegistry {
     registry.register(Arc::new(deal::RequestOnboardingBatch));
     registry.register(Arc::new(deal::UpdateOnboardingStatus));
     registry.register(Arc::new(deal::ReadSummary));
+    registry.register(Arc::new(deal::UpdateKycClearance));
 
     // Phase B slice #67: cbu.* (9 plugin verbs — create, link-structure,
     // list-structure-links, unlink-structure, add-product, inspect,
@@ -808,8 +810,15 @@ pub fn build_registry() -> SemOsVerbOpRegistry {
     registry.register(Arc::new(kyc_case::Create));
     registry.register(Arc::new(kyc_case::UpdateStatus));
     registry.register(Arc::new(kyc_case::Close));
+    registry.register(Arc::new(kyc_case::Approve));
+    registry.register(Arc::new(kyc_case::Reject));
+    registry.register(Arc::new(kyc_case::ApproveWithConditions));
     registry.register(Arc::new(kyc_case::Summarize));
     registry.register(Arc::new(kyc_case::WorkstreamState));
+
+    // red-flag.* — escalation cascade per M-014 (red flag → workstream
+    // ENHANCED_DD when one is attached).
+    registry.register(Arc::new(red_flag::Escalate));
 
     // Phase B slice #61: document.* (9 plugin verbs — catalog/extract
     // + solicit + solicit-batch + upload-version + verify + reject +
