@@ -20,6 +20,7 @@ domains:
       # =========================================================================
 
       universe:
+        flavour: attribute_mutating
         description: "View all CBUs with optional filters"
         invocation_phrases:
           - "show me everything"
@@ -97,6 +98,7 @@ domains:
           consequence:
             baseline: benign
       book:
+        flavour: attribute_mutating
         description: "View all CBUs for a commercial client (book view)"
         invocation_phrases:
           - "show client book"
@@ -145,6 +147,7 @@ domains:
           consequence:
             baseline: benign
       cbu:
+        flavour: attribute_mutating
         description: "Focus on a single CBU with specified view mode"
         invocation_phrases:
           - "focus on CBU"
@@ -199,6 +202,7 @@ domains:
           consequence:
             baseline: benign
       entity-forest:
+        flavour: attribute_mutating
         description: "View entities by type/ownership filters"
         invocation_phrases:
           - "show entity tree"
@@ -251,6 +255,7 @@ domains:
           consequence:
             baseline: benign
       refine:
+        flavour: attribute_mutating
         description: "Refine current view with additional filter"
         invocation_phrases:
           - "filter the view"
@@ -304,6 +309,7 @@ domains:
           consequence:
             baseline: benign
       clear-refinements:
+        flavour: attribute_mutating
         description: "Clear refinements and return to the base view"
         invocation_phrases:
           - "clear all filters"
@@ -343,6 +349,7 @@ domains:
           consequence:
             baseline: benign
       set-selection:
+        flavour: attribute_mutating
         description: "Explicitly set selection within the current view"
         invocation_phrases:
           - "select these items"
@@ -395,6 +402,7 @@ domains:
           consequence:
             baseline: benign
       set-layout:
+        flavour: attribute_mutating
         description: "Set the layout strategy for the current view"
         invocation_phrases:
           - "change layout"
@@ -465,6 +473,7 @@ domains:
           consequence:
             baseline: benign
       zoom-in:
+        flavour: attribute_mutating
         description: "Zoom into a node, expanding it into its child taxonomy"
         invocation_phrases:
           - "zoom in"
@@ -507,6 +516,7 @@ domains:
           consequence:
             baseline: benign
       zoom-out:
+        flavour: attribute_mutating
         description: "Zoom out to the parent taxonomy"
         invocation_phrases:
           - "zoom out"
@@ -545,6 +555,7 @@ domains:
           consequence:
             baseline: benign
       navigate-back-to:
+        flavour: attribute_mutating
         description: "Navigate back to a specific breadcrumb level"
         invocation_phrases:
           - "go back to"
@@ -590,6 +601,7 @@ domains:
           consequence:
             baseline: benign
       read-breadcrumbs:
+        flavour: attribute_mutating
         description: "Read the current navigation breadcrumbs"
         invocation_phrases:
           - "show breadcrumbs"
@@ -631,6 +643,7 @@ domains:
           consequence:
             baseline: benign
       read-status:
+        flavour: attribute_mutating
         description: "Read the current view state summary"
         invocation_phrases:
           - "show current status"
@@ -666,6 +679,7 @@ domains:
           consequence:
             baseline: benign
       read-selection-info:
+        flavour: attribute_mutating
         description: "Read detailed info about the current selection"
         invocation_phrases:
           - "show selection details"

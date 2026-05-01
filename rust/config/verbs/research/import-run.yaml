@@ -11,6 +11,7 @@ domains:
 
     verbs:
       begin:
+        flavour: attribute_mutating
         description: "Begin a new graph import run with optional case linkage"
         invocation_phrases:
           - "begin import run"
@@ -86,6 +87,7 @@ domains:
           consequence:
             baseline: reviewable
       complete:
+        flavour: attribute_mutating
         description: "Mark an import run as complete with counts"
         invocation_phrases:
           - "complete import run"
@@ -123,6 +125,7 @@ domains:
           consequence:
             baseline: reviewable
       supersede:
+        flavour: attribute_mutating
         description: "Supersede an import run — soft-ends edges and logs corrections"
         invocation_phrases:
           - "supersede import run"

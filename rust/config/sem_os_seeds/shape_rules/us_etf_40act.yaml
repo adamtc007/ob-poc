@@ -1,0 +1,12 @@
+shape: struct.us.etf.40act
+workspace: cbu
+extends: [regulated.fund]
+structural_facts:
+  jurisdiction: US
+  structure_type: 40act
+  allowed_structure_types: [etf, 40act]
+  document_bundles: [docs.bundle.etf-baseline]
+  trading_profile_type: etf
+  required_roles: [investment-adviser, custodian, authorized-participant]
+  optional_roles: [sub-adviser, administrator, transfer-agent, distributor, auditor, market-maker]
+slots: {}

@@ -30,7 +30,7 @@
 # scope.
 #
 # Book-Setup's purpose: get from "we agreed to onboard this client"
-# (Deal.KYC_CLEARANCE) to "their CBUs are trade-permissioned"
+# (Deal.IN_CLEARANCE) to "their CBUs are trade-permissioned"
 # (CBU.trade_permissioned state in operational lifecycle). Downstream
 # of Deal, upstream of CBU operationally_active.
 #
@@ -380,10 +380,11 @@ cross_workspace_constraints:
       book → ready_for_deal is advisory — the Deal workspace is the
       gate for commercial progression. Informational constraint flags
       when book is ready_for_deal but no Deal exists / Deal not yet
-      at KYC_CLEARANCE.
+      at IN_CLEARANCE (Q4/Q21 (b), 2026-04-29: KYC_CLEARANCE collapsed
+      into IN_CLEARANCE compound state).
     source_workspace: deal
     source_slot: deal
-    source_state: [KYC_CLEARANCE, CONTRACTED, ONBOARDING, ACTIVE]
+    source_state: [IN_CLEARANCE, CONTRACTED]
     source_predicate: "deals.primary_client_group_id = this_book.client_group_id"
     target_workspace: book_setup
     target_slot: book

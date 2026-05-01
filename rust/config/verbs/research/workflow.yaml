@@ -18,6 +18,10 @@ domains:
       # =======================================================================
 
       record-decision:
+        flavour: discretionary
+        role_guard:
+          any_of: [compliance_admin, senior_compliance, mlro]
+        audit_class: research_workflow_record_decision
         description: "Record a research decision (Phase 1 outcome)"
         metadata:
           tier: intent
@@ -103,6 +107,10 @@ domains:
           consequence:
             baseline: reviewable
       confirm-decision:
+        flavour: discretionary
+        role_guard:
+          any_of: [compliance_admin, senior_compliance, mlro]
+        audit_class: research_workflow_confirm_decision
         description: "User confirms an ambiguous decision"
         invocation_phrases:
           - "confirm this"
@@ -139,6 +147,10 @@ domains:
           consequence:
             baseline: reviewable
       reject-decision:
+        flavour: discretionary
+        role_guard:
+          any_of: [compliance_officer, senior_compliance, mlro]
+        audit_class: research_workflow_reject_decision
         description: "User rejects a suggested decision"
         invocation_phrases:
           - "no that's wrong"
@@ -174,6 +186,7 @@ domains:
           consequence:
             baseline: reviewable
       record-action:
+        flavour: instance_adding
         description: "Record a research action (Phase 2 execution)"
         metadata:
           tier: intent
@@ -277,6 +290,7 @@ domains:
           consequence:
             baseline: reviewable
       record-correction:
+        flavour: instance_adding
         description: "Record a correction to a previous decision"
         invocation_phrases:
           - "correct this"
@@ -344,6 +358,7 @@ domains:
           consequence:
             baseline: reviewable
       record-anomaly:
+        flavour: instance_adding
         description: "Record a post-import validation anomaly"
         metadata:
           tier: intent
@@ -407,6 +422,7 @@ domains:
           consequence:
             baseline: reviewable
       resolve-anomaly:
+        flavour: attribute_mutating
         description: "Resolve an anomaly"
         metadata:
           tier: intent
@@ -456,6 +472,7 @@ domains:
           consequence:
             baseline: reviewable
       audit-trail:
+        flavour: attribute_mutating
         description: "Get research audit trail for an entity including import run history"
         invocation_phrases:
           - "show audit trail"
@@ -515,6 +532,7 @@ domains:
           consequence:
             baseline: benign
       supersession-trail:
+        flavour: attribute_mutating
         description: "Get the full supersession chain for a KYC case — import runs, corrections, stale UBO runs, reset outreach plans, stale tollgates"
         invocation_phrases:
           - "show supersession trail"
@@ -554,6 +572,7 @@ domains:
           consequence:
             baseline: benign
       pending-decisions:
+        flavour: attribute_mutating
         description: "List decisions awaiting user input"
         metadata:
           tier: diagnostics

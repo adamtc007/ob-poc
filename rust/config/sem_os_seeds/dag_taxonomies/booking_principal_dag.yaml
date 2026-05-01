@@ -144,6 +144,16 @@ slots:
         PENDING for retry. APPROVED/ACTIVE are required to gate the deal
         KYC_CLEARANCE → CONTRACTED transition (compound BAC+KYC+BP gate
         declared in deal_dag.yaml cross_workspace_constraints).
+      predicate_bindings:
+        - entity: screening_check
+          source_kind: dag_entity
+          scope: attached_to this clearance
+        - entity: red_flag
+          source_kind: dag_entity
+          scope: attached_to this clearance
+        - entity: regulatory_licence
+          source_kind: dag_entity
+          scope: attached_to this clearance
       states:
         - id: PENDING
           entry: true
@@ -152,6 +162,12 @@ slots:
           description: "Screening in progress (sanctions, credit, regulatory)."
         - id: APPROVED
           description: "Screening passed; ready to activate. Gate-eligible."
+          green_when: |
+            every screening_check exists
+            AND every screening_check.state = PASSED
+            AND no red_flag exists with state = OPEN AND attached_to this clearance
+            AND regulatory_licence exists
+            AND regulatory_licence.state = CURRENT
         - id: REJECTED
           description: "Screening failed. Reopenable to PENDING for retry."
         - id: ACTIVE

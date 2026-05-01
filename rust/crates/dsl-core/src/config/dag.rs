@@ -153,6 +153,51 @@ pub enum StateSelector {
     Set(Vec<String>),
 }
 
+/// Closure semantics for a composite slot.
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum ClosureType {
+    Open,
+    ClosedBounded,
+    ClosedUnbounded,
+}
+
+/// Candidate eligibility constraint for attaching or populating a slot.
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(untagged)]
+pub enum EligibilityConstraint {
+    /// v1: constrain by authored entity kinds.
+    EntityKinds { entity_kinds: Vec<String> },
+    /// v2: constrain by typed shape taxonomy position.
+    ShapeTaxonomyPosition { shape_taxonomy_position: String },
+}
+
+/// Role guard metadata for discretionary gate enforcement.
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+pub struct RoleGuard {
+    #[serde(default)]
+    pub any_of: Vec<String>,
+
+    #[serde(default)]
+    pub all_of: Vec<String>,
+}
+
+/// Audit classification for discretionary gate outcomes.
+pub type AuditClass = String;
+
+/// Completeness assertion metadata for open slots.
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct CompletenessAssertionConfig {
+    #[serde(default)]
+    pub predicate: Option<String>,
+
+    #[serde(default)]
+    pub description: Option<String>,
+
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, YamlValue>,
+}
+
 // =============================================================================
 // SLOTS
 // =============================================================================
@@ -174,6 +219,61 @@ pub struct Slot {
     // v1.2 product gating
     #[serde(default)]
     pub requires_products: Vec<String>,
+
+    // Phase 1.5B gate metadata
+    #[serde(default)]
+    pub closure: Option<ClosureType>,
+
+    #[serde(default)]
+    pub eligibility: Option<EligibilityConstraint>,
+
+    #[serde(default)]
+    pub cardinality_max: Option<u64>,
+
+    #[serde(default)]
+    pub entry_state: Option<String>,
+
+    #[serde(default)]
+    pub attachment_predicates: Vec<String>,
+
+    #[serde(default)]
+    pub addition_predicates: Vec<String>,
+
+    #[serde(default)]
+    pub aggregate_breach_checks: Vec<String>,
+
+    #[serde(
+        default,
+        rename = "+attachment_predicates",
+        skip_serializing_if = "Vec::is_empty"
+    )]
+    pub additive_attachment_predicates: Vec<String>,
+
+    #[serde(
+        default,
+        rename = "+addition_predicates",
+        skip_serializing_if = "Vec::is_empty"
+    )]
+    pub additive_addition_predicates: Vec<String>,
+
+    #[serde(
+        default,
+        rename = "+aggregate_breach_checks",
+        skip_serializing_if = "Vec::is_empty"
+    )]
+    pub additive_aggregate_breach_checks: Vec<String>,
+
+    #[serde(default)]
+    pub role_guard: Option<RoleGuard>,
+
+    #[serde(default)]
+    pub justification_required: Option<bool>,
+
+    #[serde(default)]
+    pub audit_class: Option<AuditClass>,
+
+    #[serde(default)]
+    pub completeness_assertion: Option<CompletenessAssertionConfig>,
 
     // v1.3 additions
     #[serde(default)]
@@ -222,6 +322,15 @@ pub struct StateMachine {
     #[serde(default)]
     pub description: Option<String>,
 
+    /// Predicate entity bindings used by `green_when` evaluation.
+    ///
+    /// These bindings tell the Frontier/evaluator how names that appear in
+    /// state predicates map onto substrate rows. The field is optional so
+    /// existing DAG YAML remains loadable while authored predicates are
+    /// migrated from free text to machine evaluation.
+    #[serde(default)]
+    pub predicate_bindings: Vec<PredicateBinding>,
+
     #[serde(default)]
     pub states: Vec<StateDef>,
 
@@ -249,6 +358,103 @@ pub struct StateMachine {
     pub extra: BTreeMap<String, YamlValue>,
 }
 
+/// Substrate binding for one entity kind named by a `green_when` predicate.
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct PredicateBinding {
+    /// Predicate entity kind as authored, e.g. `red_flag`.
+    pub entity: String,
+
+    /// Whether this binding names a concrete substrate carrier or a DAG-level entity.
+    #[serde(default)]
+    pub source_kind: PredicateBindingSourceKind,
+
+    /// Backing table or view, e.g. `"ob-poc".red_flags`.
+    #[serde(default)]
+    pub source_entity: Option<String>,
+
+    /// Column carrying the entity's lifecycle state.
+    #[serde(default)]
+    pub state_column: Option<String>,
+
+    /// Column carrying a scalar value for attribute predicates.
+    #[serde(default)]
+    pub value_column: Option<String>,
+
+    /// Primary key or stable identifier column for diagnostics.
+    #[serde(default)]
+    pub id_column: Option<String>,
+
+    /// Human-readable scope label, e.g. `attached_to this UBO`.
+    #[serde(default)]
+    pub scope: Option<String>,
+
+    /// Column on this entity that points back to the parent/current row.
+    #[serde(default)]
+    pub parent_key: Option<String>,
+
+    /// Column on the parent/current row used by `parent_key`.
+    #[serde(default)]
+    pub child_key: Option<String>,
+
+    /// Required-universe binding for `every required <entity> exists`.
+    #[serde(default)]
+    pub required_universe: Option<PredicateRequiredUniverse>,
+
+    /// Whether shape rules may replace this binding rather than tighten it.
+    #[serde(default)]
+    pub replaceable_by_shape: bool,
+
+    /// Forward-compatible metadata for schema-specific binding details.
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, YamlValue>,
+}
+
+/// Universe of required rows for a `required` predicate binding.
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct PredicateRequiredUniverse {
+    /// Whether the required universe is a concrete carrier or a DAG-level set.
+    #[serde(default)]
+    pub source_kind: PredicateBindingSourceKind,
+
+    /// Table or view that declares required entities.
+    pub source_entity: String,
+
+    /// Identifier column in the required-universe source.
+    #[serde(default)]
+    pub id_column: Option<String>,
+
+    /// Column identifying the required entity kind.
+    #[serde(default)]
+    pub required_column: Option<String>,
+
+    /// Column linking the required universe to the current parent row.
+    #[serde(default)]
+    pub parent_key: Option<String>,
+
+    /// Column on the current parent row used by `parent_key`.
+    #[serde(default)]
+    pub child_key: Option<String>,
+
+    /// Forward-compatible metadata for domain-specific required-set rules.
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, YamlValue>,
+}
+
+/// Source kind for a predicate binding.
+#[derive(Debug, Clone, Default, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum PredicateBindingSourceKind {
+    /// Concrete substrate table/view binding.
+    #[default]
+    Substrate,
+
+    /// DAG-declared entity whose carrier may be resolved later.
+    DagEntity,
+
+    /// DSL/runtime fact produced by a verb or resolver.
+    DslFact,
+}
+
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum ExpectedLifetime {
@@ -264,6 +470,15 @@ pub struct StateDef {
     pub entry: bool,
     #[serde(default)]
     pub description: Option<String>,
+    /// v1.4 (D-016, 2026-04-29): the green-switch predicate. State is
+    /// "green" when this predicate holds — entity in this state is
+    /// considered satisfied/ready. Verbs that move INTO this state are
+    /// expected to have made changes that flip the predicate true; the
+    /// destination state's green_when IS the postcondition of the
+    /// transition. Optional: states without a green_when are permissive
+    /// (no entry test).
+    #[serde(default)]
+    pub green_when: Option<String>,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -334,6 +549,10 @@ pub struct CrossWorkspaceConstraint {
 
     #[serde(default)]
     pub severity: Severity,
+
+    /// Whether shape rules may structurally replace this constraint.
+    #[serde(default)]
+    pub replaceable_by_shape: bool,
 }
 
 // =============================================================================
@@ -599,6 +818,67 @@ dag_id: example_dag
         let dag: Dag = serde_yaml::from_str(yaml).expect("parse");
         assert_eq!(dag.workspace, "example");
         assert_eq!(dag.dag_id, "example_dag");
+    }
+
+    #[test]
+    fn predicate_bindings_parse_on_state_machine() {
+        let yaml = r#"
+version: "1.0"
+workspace: example
+dag_id: example_dag
+slots:
+  - id: clearance
+    state_machine:
+      id: clearance_lifecycle
+      source_entity: '"ob-poc".booking_principal_clearances'
+      state_column: clearance_status
+      predicate_bindings:
+        - entity: screening_check
+          source_kind: substrate
+          source_entity: '"ob-poc".screenings'
+          state_column: status
+          id_column: screening_id
+          scope: attached_to this clearance
+          parent_key: clearance_id
+          child_key: id
+        - entity: evidence_requirement
+          source_kind: substrate
+          source_entity: '"ob-poc".ubo_evidence'
+          state_column: verification_status
+          required_universe:
+            source_kind: substrate
+            source_entity: '"sem_reg".evidence_requirements'
+            id_column: requirement_id
+            required_column: evidence_kind
+            parent_key: case_id
+            child_key: case_id
+      states:
+        - id: PENDING
+"#;
+        let dag: Dag = serde_yaml::from_str(yaml).expect("parse");
+        let SlotStateMachine::Structured(machine) =
+            dag.slots[0].state_machine.as_ref().expect("state machine")
+        else {
+            panic!("expected structured state machine");
+        };
+
+        assert_eq!(machine.predicate_bindings.len(), 2);
+        assert_eq!(machine.predicate_bindings[0].entity, "screening_check");
+        assert_eq!(
+            machine.predicate_bindings[0].source_kind,
+            PredicateBindingSourceKind::Substrate
+        );
+        assert_eq!(
+            machine.predicate_bindings[0].source_entity.as_deref(),
+            Some("\"ob-poc\".screenings")
+        );
+        assert_eq!(
+            machine.predicate_bindings[1]
+                .required_universe
+                .as_ref()
+                .map(|binding| binding.source_entity.as_str()),
+            Some("\"sem_reg\".evidence_requirements")
+        );
     }
 
     #[test]

@@ -10,6 +10,7 @@ domains:
       # Source of truth: catalog (seeded reference data)
 
       define-event-type:
+        flavour: attribute_mutating
         description: "Define corporate action event type"
         behavior: crud
         metadata:
@@ -78,6 +79,7 @@ domains:
             baseline: reviewable
 
       list-event-types:
+        flavour: attribute_mutating
         description: "List CA event types"
         behavior: crud
         metadata:
@@ -129,6 +131,7 @@ domains:
             baseline: benign
 
       set-preferences:
+        flavour: attribute_mutating
         description: "Set corporate action processing preferences for CBU"
         behavior: crud
         metadata:
@@ -228,6 +231,7 @@ domains:
             baseline: reviewable
 
       list-preferences:
+        flavour: attribute_mutating
         description: "List CA preferences for CBU"
         behavior: crud
         metadata:
@@ -277,6 +281,7 @@ domains:
             baseline: benign
 
       remove-preference:
+        flavour: attribute_mutating
         description: "Remove CA preference"
         behavior: crud
         metadata:
@@ -320,6 +325,7 @@ domains:
             baseline: requires_confirmation
 
       set-instruction-window:
+        flavour: attribute_mutating
         description: "Configure CA instruction deadline rules"
         behavior: crud
         metadata:
@@ -417,6 +423,7 @@ domains:
             baseline: reviewable
 
       list-instruction-windows:
+        flavour: attribute_mutating
         description: "List instruction window configurations"
         behavior: crud
         metadata:
@@ -467,6 +474,7 @@ domains:
             baseline: benign
 
       link-ca-ssi:
+        flavour: instance_adding
         description: "Link CA payment/delivery to specific SSI"
         behavior: crud
         metadata:
@@ -548,6 +556,7 @@ domains:
             baseline: reviewable
 
       list-ca-ssi-mappings:
+        flavour: attribute_mutating
         description: "List CA SSI mappings"
         behavior: crud
         metadata:

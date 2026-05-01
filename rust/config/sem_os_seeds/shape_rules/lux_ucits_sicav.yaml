@@ -1,0 +1,45 @@
+shape: struct.lux.ucits.sicav
+workspace: cbu
+extends: [ucits]
+structural_facts:
+  jurisdiction: LU
+  structure_type: ucits
+  allowed_structure_types: [sicav]
+  document_bundles: [docs.bundle.ucits-baseline]
+  trading_profile_type: ucits
+  required_roles: [management-company, depositary]
+  optional_roles: [investment-manager, administrator, auditor]
+  deferred_roles: [domiciliation-agent]
+slots:
+  management_company:
+    closure: closed_bounded
+    eligibility:
+      entity_kinds: [company]
+    cardinality_max: 1
+    entry_state: empty
+  depositary:
+    closure: closed_bounded
+    eligibility:
+      entity_kinds: [company]
+    cardinality_max: 1
+    entry_state: empty
+  investment_manager:
+    closure: closed_unbounded
+    eligibility:
+      entity_kinds: [company]
+    entry_state: empty
+  mandate:
+    closure: closed_unbounded
+    entry_state: empty
+  administrator:
+    closure: closed_bounded
+    eligibility:
+      entity_kinds: [company]
+    cardinality_max: 1
+    entry_state: empty
+  auditor:
+    closure: closed_bounded
+    eligibility:
+      entity_kinds: [company]
+    cardinality_max: 1
+    entry_state: empty

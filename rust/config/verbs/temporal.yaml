@@ -15,6 +15,7 @@ domains:
       # =========================================================================
 
       ownership-as-of:
+        flavour: attribute_mutating
         description: Get ownership relationships for an entity as of a specific date
         metadata:
           tier: intent
@@ -62,6 +63,7 @@ domains:
             baseline: benign
 
       ubo-chain-as-of:
+        flavour: attribute_mutating
         description: Trace ownership chain to UBOs as of a specific date
         metadata:
           tier: intent
@@ -118,6 +120,7 @@ domains:
       # =========================================================================
 
       cbu-relationships-as-of:
+        flavour: attribute_mutating
         description: Get all relationships (ownership, control, trust) for a CBU as of a date
         metadata:
           tier: intent
@@ -165,6 +168,7 @@ domains:
             baseline: benign
 
       cbu-roles-as-of:
+        flavour: attribute_mutating
         description: Get entity roles within a CBU as of a specific date
         metadata:
           tier: intent
@@ -212,6 +216,10 @@ domains:
             baseline: benign
 
       cbu-state-at-approval:
+        flavour: discretionary
+        role_guard:
+          any_of: [compliance_admin, senior_compliance, mlro]
+        audit_class: temporal_cbu_state_at_approval
         description: Get CBU state at the time its KYC case was approved
         metadata:
           tier: intent
@@ -258,6 +266,7 @@ domains:
       # =========================================================================
 
       relationship-history:
+        flavour: attribute_mutating
         description: Get change history for a specific relationship
         metadata:
           tier: intent
@@ -299,6 +308,7 @@ domains:
             baseline: benign
 
       entity-history:
+        flavour: attribute_mutating
         description: Get all relationship changes involving an entity
         metadata:
           tier: intent
@@ -358,6 +368,7 @@ domains:
       # =========================================================================
 
       compare-ownership:
+        flavour: attribute_mutating
         description: Compare ownership structure between two dates
         metadata:
           tier: intent

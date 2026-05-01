@@ -27,6 +27,7 @@ domains:
     verbs:
 
       configure:
+        flavour: attribute_mutating
         description: "Configure collateral management for a CBU (entry state)"
         invocation_phrases:
           - "configure collateral"
@@ -80,6 +81,7 @@ domains:
           target_workspace: instrument_matrix
           target_slot: collateral_management
       activate:
+        flavour: attribute_mutating
         description: "Activate collateral management (configured → active)"
         invocation_phrases:
           - "activate collateral"
@@ -115,6 +117,10 @@ domains:
           target_slot: collateral_management
 
       suspend:
+        flavour: discretionary
+        role_guard:
+          any_of: [compliance_officer, senior_compliance, mlro]
+        audit_class: collateral_management_suspend
         description: "Suspend collateral operations (operational hold)"
         invocation_phrases:
           - "suspend collateral"
@@ -152,6 +158,7 @@ domains:
           target_slot: collateral_management
 
       reactivate:
+        flavour: attribute_mutating
         description: "Reactivate suspended collateral (suspended → active)"
         invocation_phrases:
           - "reactivate collateral"
@@ -186,6 +193,10 @@ domains:
           target_slot: collateral_management
 
       terminate:
+        flavour: discretionary
+        role_guard:
+          any_of: [compliance_officer, senior_compliance, mlro]
+        audit_class: collateral_management_terminate
         description: "Terminate collateral management (terminal)"
         invocation_phrases:
           - "terminate collateral"

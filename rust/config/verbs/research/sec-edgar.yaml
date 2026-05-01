@@ -16,6 +16,7 @@ domains:
 
     verbs:
       search:
+        flavour: attribute_mutating
         description: Search SEC EDGAR for companies by name
         invocation_phrases:
           - "search SEC"
@@ -51,6 +52,7 @@ domains:
           consequence:
             baseline: benign
       fetch-company:
+        flavour: attribute_mutating
         description: Fetch company information from SEC EDGAR
         invocation_phrases:
           - "get SEC company"
@@ -85,6 +87,7 @@ domains:
           consequence:
             baseline: benign
       fetch-beneficial-owners:
+        flavour: attribute_mutating
         description: Fetch 13D/13G beneficial ownership filings
         invocation_phrases:
           - "get 13D filings"
@@ -134,6 +137,7 @@ domains:
           consequence:
             baseline: benign
       fetch-filings:
+        flavour: attribute_mutating
         description: Fetch recent SEC filings for a company
         invocation_phrases:
           - "get SEC filings"
@@ -173,6 +177,7 @@ domains:
           consequence:
             baseline: benign
       import-company:
+        flavour: instance_adding
         description: Import SEC company and optionally beneficial owners to database
         invocation_phrases:
           - "import from SEC"

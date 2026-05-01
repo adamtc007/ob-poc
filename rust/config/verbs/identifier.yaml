@@ -10,6 +10,7 @@ domains:
     description: External identifier management for entities (LEI, Clearstream, Tax ID, ISIN, etc.)
     verbs:
       attach:
+        flavour: instance_adding
         description: Attach an external identifier to an entity (idempotent by entity+scheme+id)
         metadata:
           tier: intent
@@ -112,6 +113,7 @@ domains:
           consequence:
             baseline: reviewable
       attach-lei:
+        flavour: instance_adding
         description: Attach LEI with GLEIF-specific metadata (convenience wrapper)
         metadata:
           tier: intent
@@ -199,6 +201,7 @@ domains:
           consequence:
             baseline: reviewable
       attach-clearstream:
+        flavour: instance_adding
         description: Attach Clearstream KV reference or account number
         metadata:
           tier: intent
@@ -273,6 +276,10 @@ domains:
           consequence:
             baseline: reviewable
       validate:
+        flavour: discretionary
+        role_guard:
+          any_of: [compliance_officer, senior_compliance, mlro]
+        audit_class: identifier_validate
         description: Mark an identifier as validated
         metadata:
           tier: intent
@@ -318,6 +325,10 @@ domains:
           consequence:
             baseline: reviewable
       invalidate:
+        flavour: discretionary
+        role_guard:
+          any_of: [compliance_officer, senior_compliance, mlro]
+        audit_class: identifier_invalidate
         description: Mark an identifier as invalid or expired
         metadata:
           tier: intent
@@ -362,6 +373,7 @@ domains:
           consequence:
             baseline: reviewable
       remove:
+        flavour: attribute_mutating
         description: Remove an identifier from an entity (hard delete)
         metadata:
           tier: intent
@@ -399,6 +411,7 @@ domains:
           consequence:
             baseline: requires_confirmation
       list-by-entity:
+        flavour: attribute_mutating
         description: List all identifiers for an entity
         metadata:
           tier: reference
@@ -447,6 +460,7 @@ domains:
           consequence:
             baseline: benign
       find-by-lei:
+        flavour: attribute_mutating
         description: Find entity by LEI
         metadata:
           tier: reference
@@ -486,6 +500,7 @@ domains:
           consequence:
             baseline: benign
       find-by-clearstream:
+        flavour: attribute_mutating
         description: Find entity by Clearstream reference
         metadata:
           tier: reference
@@ -528,6 +543,7 @@ domains:
           consequence:
             baseline: benign
       find-by-isin:
+        flavour: attribute_mutating
         description: Find entity by ISIN (for share classes/funds)
         metadata:
           tier: reference
@@ -567,6 +583,7 @@ domains:
           consequence:
             baseline: benign
       update-lei-status:
+        flavour: attribute_mutating
         description: Update LEI status after GLEIF refresh
         metadata:
           tier: intent

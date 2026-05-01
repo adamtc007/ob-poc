@@ -1,0 +1,15 @@
+version: "1.0"
+phase: "Phase 2 known-deferred"
+generated_by: "Phase 1.5B Batch 1F schema-coordination validator; reviewed during Phase 2 schema-coordination hardening"
+warnings:
+  - id: deal_lifecycle_state_machine_name_mismatch
+    severity: warning
+    source: rust/config/sem_os_seeds/constellation_maps/deal_lifecycle.yaml
+    constellation: deal.lifecycle
+    slot_id: deal
+    dag_workspace: deal
+    dag_state_machine: deal_commercial_lifecycle
+    constellation_state_machine: deal_lifecycle
+    validator_warning: SchemaCoordinationStateMachineMismatch
+    disposition: "Known-deferred during Phase 2. Strict schema-coordination validation allowlists this single mismatch; all undocumented schema-coordination warnings promote to errors."
+    sunset_commitment: "Resolve by renaming or reconciling the deal constellation state_machine reference before Phase 2 closure, or ratify a D-NNN exception before merge."

@@ -8,6 +8,7 @@ domains:
       - app binding
     verbs:
       draft:
+        flavour: instance_adding
         description: Draft a new capability binding (creates row in DRAFT state)
         invocation_phrases:
           - "draft capability binding"
@@ -61,6 +62,7 @@ domains:
             baseline: reviewable
 
       start-pilot:
+        flavour: instance_adding
         description: Start pilot — limited load, canary cohort
         invocation_phrases:
           - "start pilot for binding"
@@ -107,6 +109,7 @@ domains:
           target_slot: capability_binding
 
       promote-live:
+        flavour: attribute_mutating
         description: Promote pilot binding to LIVE — full production traffic
         invocation_phrases:
           - "promote binding to live"
@@ -153,6 +156,7 @@ domains:
           target_slot: capability_binding
 
       abort-pilot:
+        flavour: attribute_mutating
         description: Abort pilot — return binding to DRAFT (pilot did not validate)
         invocation_phrases:
           - "abort pilot"
@@ -202,6 +206,7 @@ domains:
           target_slot: capability_binding
 
       deprecate:
+        flavour: attribute_mutating
         description: Deprecate a LIVE binding — no new consumers; existing traffic drains
         invocation_phrases:
           - "deprecate capability binding"
@@ -252,6 +257,10 @@ domains:
           target_slot: capability_binding
 
       retire:
+        flavour: discretionary
+        role_guard:
+          any_of: [compliance_admin, senior_compliance, mlro]
+        audit_class: capability_binding_retire
         description: Retire a deprecated binding — terminal
         invocation_phrases:
           - "retire capability binding"

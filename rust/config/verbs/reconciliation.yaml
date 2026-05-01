@@ -29,6 +29,7 @@ domains:
     verbs:
 
       create-config:
+        flavour: instance_adding
         description: "Create new reconciliation config (entry state: draft)"
         invocation_phrases:
           - "create reconciliation config"
@@ -71,6 +72,7 @@ domains:
           consequence:
             baseline: reviewable
       activate:
+        flavour: attribute_mutating
         description: "Activate a reconciliation config (draft → active)"
         invocation_phrases:
           - "activate reconciliation"
@@ -106,6 +108,10 @@ domains:
           target_slot: reconciliation
 
       suspend:
+        flavour: discretionary
+        role_guard:
+          any_of: [compliance_officer, senior_compliance, mlro]
+        audit_class: reconciliation_suspend
         description: "Suspend an active reconciliation (operational hold)"
         invocation_phrases:
           - "suspend reconciliation"
@@ -143,6 +149,7 @@ domains:
           target_slot: reconciliation
 
       reactivate:
+        flavour: attribute_mutating
         description: "Re-activate a suspended reconciliation (suspended → active)"
         invocation_phrases:
           - "reactivate reconciliation"
@@ -178,6 +185,10 @@ domains:
           target_slot: reconciliation
 
       retire:
+        flavour: discretionary
+        role_guard:
+          any_of: [compliance_admin, senior_compliance, mlro]
+        audit_class: reconciliation_retire
         description: "Retire a reconciliation config (terminal)"
         invocation_phrases:
           - "retire reconciliation"

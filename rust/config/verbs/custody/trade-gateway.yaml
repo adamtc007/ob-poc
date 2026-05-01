@@ -8,6 +8,7 @@ domains:
       # =========================================================================
 
       define-gateway:
+        flavour: attribute_mutating
         description: "Define available trade gateway"
         metadata:
           tier: intent
@@ -82,6 +83,7 @@ domains:
             baseline: reviewable
 
       read-gateway:
+        flavour: attribute_mutating
         description: "Read gateway definition"
         metadata:
           tier: reference
@@ -125,6 +127,7 @@ domains:
             baseline: benign
 
       list-gateways:
+        flavour: attribute_mutating
         description: "List available gateways"
         metadata:
           tier: reference
@@ -172,6 +175,7 @@ domains:
             baseline: benign
 
       enable-gateway:
+        flavour: attribute_mutating
         description: "Enable gateway connectivity for CBU"
         metadata:
           tier: intent
@@ -271,6 +275,7 @@ domains:
           target_slot: trade_gateway
 
       activate-gateway:
+        flavour: attribute_mutating
         description: "Activate gateway connectivity"
         metadata:
           tier: intent
@@ -316,6 +321,10 @@ domains:
             baseline: requires_confirmation
 
       suspend-gateway:
+        flavour: discretionary
+        role_guard:
+          any_of: [compliance_officer, senior_compliance, mlro]
+        audit_class: trade_gateway_suspend_gateway
         description: "Suspend gateway connectivity"
         metadata:
           tier: intent
@@ -364,6 +373,7 @@ domains:
             baseline: reviewable
 
       list-cbu-gateways:
+        flavour: attribute_mutating
         description: "List gateway connectivity for CBU"
         metadata:
           tier: reference
@@ -417,6 +427,7 @@ domains:
             baseline: benign
 
       add-routing-rule:
+        flavour: instance_adding
         description: "Add gateway routing rule for CBU"
         metadata:
           tier: intent
@@ -529,6 +540,7 @@ domains:
             baseline: reviewable
 
       list-routing-rules:
+        flavour: attribute_mutating
         description: "List gateway routing rules for CBU"
         metadata:
           tier: reference
@@ -583,6 +595,7 @@ domains:
             baseline: benign
 
       remove-routing-rule:
+        flavour: attribute_mutating
         description: "Remove routing rule"
         metadata:
           tier: intent
@@ -623,6 +636,7 @@ domains:
             baseline: requires_confirmation
 
       set-fallback:
+        flavour: attribute_mutating
         description: "Configure fallback gateway"
         metadata:
           tier: intent
@@ -711,6 +725,7 @@ domains:
             baseline: reviewable
 
       list-fallbacks:
+        flavour: attribute_mutating
         description: "List fallback configurations"
         metadata:
           tier: reference
@@ -766,6 +781,7 @@ domains:
             baseline: benign
 
       reactivate-gateway:
+        flavour: attribute_mutating
         description: "Reactivate a suspended trade gateway (suspended → active)"
         invocation_phrases:
           - "reactivate gateway"
@@ -801,6 +817,10 @@ domains:
           target_workspace: instrument_matrix
           target_slot: trade_gateway
       retire-gateway:
+        flavour: discretionary
+        role_guard:
+          any_of: [compliance_admin, senior_compliance, mlro]
+        audit_class: trade_gateway_retire_gateway
         description: "Retire a trade gateway (terminal — broker relationship ended)"
         invocation_phrases:
           - "retire gateway"

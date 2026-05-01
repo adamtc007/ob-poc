@@ -5,6 +5,7 @@ domains:
     description: "Entity, action, and data discovery verbs for the SemTaxonomy replacement path"
     verbs:
       search-entities:
+        flavour: attribute_mutating
         description: "Search entities by free text with optional entity-type narrowing"
         metadata:
           tier: diagnostics
@@ -53,6 +54,7 @@ domains:
           consequence:
             baseline: benign
       entity-context:
+        flavour: attribute_mutating
         description: "Return activity and context signals for a single entity"
         metadata:
           tier: diagnostics
@@ -96,6 +98,7 @@ domains:
           consequence:
             baseline: benign
       entity-relationships:
+        flavour: attribute_mutating
         description: "Return relationship graph summary for an entity"
         metadata:
           tier: diagnostics
@@ -143,6 +146,7 @@ domains:
           consequence:
             baseline: benign
       cascade-research:
+        flavour: attribute_mutating
         description: "Run search, context, and relationship discovery as one read-only research pass"
         metadata:
           tier: diagnostics
@@ -186,6 +190,7 @@ domains:
           consequence:
             baseline: benign
       available-actions:
+        flavour: attribute_mutating
         description: "Show the currently available action surface for a domain and entity type"
         metadata:
           tier: diagnostics
@@ -233,6 +238,7 @@ domains:
           consequence:
             baseline: benign
       verb-detail:
+        flavour: attribute_mutating
         description: "Return the full contract for a verb"
         metadata:
           tier: diagnostics
@@ -265,6 +271,7 @@ domains:
           consequence:
             baseline: benign
       valid-transitions:
+        flavour: attribute_mutating
         description: "Return verbs whose preconditions are currently satisfiable for the grounded entity state"
         metadata:
           tier: diagnostics
@@ -307,6 +314,7 @@ domains:
           consequence:
             baseline: benign
       graph-walk:
+        flavour: attribute_mutating
         description: "Walk applicable StateGraphs for an entity and return valid and blocked transitions"
         metadata:
           tier: diagnostics
@@ -345,6 +353,7 @@ domains:
           consequence:
             baseline: benign
       inspect-data:
+        flavour: attribute_mutating
         description: "Inspect entity-scoped data for a domain and optional aspect"
         metadata:
           tier: diagnostics
@@ -397,6 +406,7 @@ domains:
           consequence:
             baseline: benign
       search-data:
+        flavour: attribute_mutating
         description: "Search data and schema-adjacent surfaces for a scoped entity"
         metadata:
           tier: diagnostics

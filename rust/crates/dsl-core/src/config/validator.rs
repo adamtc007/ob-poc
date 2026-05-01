@@ -25,7 +25,7 @@
 
 use crate::config::types::{
     ConsequenceDeclaration, ConsequenceTier, EscalationPredicate, ExternalEffect, StateEffect,
-    ThreeAxisDeclaration, VerbConfig, VerbsConfig,
+    ThreeAxisDeclaration, VerbConfig, VerbFlavour, VerbsConfig,
 };
 use std::collections::HashSet;
 
@@ -176,6 +176,15 @@ pub enum WellFormednessError {
     /// catalogue-load time prevents drift accumulation across packs
     /// workspace-wide.
     PackFqnWithoutDeclaration { pack_name: String, fqn: String },
+    /// Phase 7 gate-contract flavour annotation is missing.
+    FlavourMissing { location: Location },
+    /// `flavour: discretionary` requires role guard and audit class.
+    DiscretionaryMetadataMissing {
+        location: Location,
+        missing: Vec<&'static str>,
+    },
+    /// `flavour: tollgate` must be declarative/empty-bodied.
+    TollgateHasBody { location: Location },
 }
 
 impl std::fmt::Display for WellFormednessError {
@@ -222,6 +231,18 @@ impl std::fmt::Display for WellFormednessError {
                 f,
                 "pack '{pack_name}' references verb '{fqn}' which is not declared in any \
                  verb YAML or macro — pack entry is stale or verb is missing"
+            ),
+            Self::FlavourMissing { location } => {
+                write!(f, "{location}: missing flavour annotation (§10.13)")
+            }
+            Self::DiscretionaryMetadataMissing { location, missing } => write!(
+                f,
+                "{location}: discretionary flavour missing required metadata: {}",
+                missing.join(", ")
+            ),
+            Self::TollgateHasBody { location } => write!(
+                f,
+                "{location}: tollgate flavour requires an empty body (§2 I5)"
             ),
         }
     }
@@ -294,6 +315,8 @@ pub struct ValidationContext {
     /// missing declarations don't error (but are reported via
     /// `DeclarationIncomplete` if caller opts in).
     pub require_declaration: bool,
+    /// Whether verbs MUST carry a Phase 7 gate-contract flavour annotation.
+    pub require_flavour: bool,
 }
 
 /// Validate a single verb. Returns a report — callers aggregate across the
@@ -313,8 +336,69 @@ pub fn validate_verb(fqn: &str, verb: &VerbConfig, ctx: &ValidationContext) -> V
         }
         Some(decl) => validate_declaration(fqn, verb, decl, ctx, &mut report),
     }
+    validate_flavour(fqn, verb, ctx, &mut report);
 
     report
+}
+
+fn validate_flavour(
+    fqn: &str,
+    verb: &VerbConfig,
+    ctx: &ValidationContext,
+    report: &mut ValidationReport,
+) {
+    let Some(flavour) = verb.flavour else {
+        if ctx.require_flavour {
+            report
+                .well_formedness
+                .push(WellFormednessError::FlavourMissing {
+                    location: Location::verb(fqn),
+                });
+        }
+        return;
+    };
+
+    match flavour {
+        VerbFlavour::Discretionary => {
+            let mut missing = Vec::new();
+            if verb
+                .role_guard
+                .as_ref()
+                .is_none_or(|guard| guard.any_of.is_empty() && guard.all_of.is_empty())
+            {
+                missing.push("role_guard");
+            }
+            if verb
+                .audit_class
+                .as_ref()
+                .is_none_or(|value| value.is_empty())
+            {
+                missing.push("audit_class");
+            }
+            if !missing.is_empty() {
+                report
+                    .well_formedness
+                    .push(WellFormednessError::DiscretionaryMetadataMissing {
+                        location: Location::verb(fqn),
+                        missing,
+                    });
+            }
+        }
+        VerbFlavour::Tollgate => {
+            let has_body = verb.crud.is_some()
+                || verb.handler.is_some()
+                || verb.graph_query.is_some()
+                || verb.durable.is_some();
+            if has_body {
+                report
+                    .well_formedness
+                    .push(WellFormednessError::TollgateHasBody {
+                        location: Location::verb(fqn),
+                    });
+            }
+        }
+        VerbFlavour::AttributeMutating | VerbFlavour::InstanceAdding => {}
+    }
 }
 
 fn validate_declaration(
@@ -638,6 +722,9 @@ mod tests {
             outputs: vec![],
             three_axis: None,
             transition_args: None,
+            flavour: None,
+            role_guard: None,
+            audit_class: None,
         }
     }
 
@@ -1079,6 +1166,7 @@ mod tests {
             known_dags: known,
             known_slots: HashSet::new(),
             require_declaration: false,
+            require_flavour: false,
         };
         let r = validate_verb("test.verb", &vc, &ctx);
         assert_eq!(r.well_formedness.len(), 1);

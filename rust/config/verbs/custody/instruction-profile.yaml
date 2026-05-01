@@ -8,6 +8,7 @@ domains:
       # =========================================================================
 
       define-message-type:
+        flavour: attribute_mutating
         description: "Define instruction message type for a lifecycle event"
         metadata:
           tier: intent
@@ -77,6 +78,7 @@ domains:
             baseline: reviewable
 
       list-message-types:
+        flavour: attribute_mutating
         description: "List available message types"
         metadata:
           tier: reference
@@ -122,6 +124,7 @@ domains:
             baseline: benign
 
       create-template:
+        flavour: instance_adding
         description: "Create instruction message template"
         metadata:
           tier: intent
@@ -191,6 +194,7 @@ domains:
             baseline: reviewable
 
       read-template:
+        flavour: attribute_mutating
         description: "Read instruction template"
         metadata:
           tier: reference
@@ -232,6 +236,7 @@ domains:
             baseline: benign
 
       list-templates:
+        flavour: attribute_mutating
         description: "List instruction templates"
         metadata:
           tier: reference
@@ -274,6 +279,7 @@ domains:
             baseline: benign
 
       list-assignments:
+        flavour: attribute_mutating
         description: "List instruction template assignments for CBU"
         metadata:
           tier: reference
@@ -330,6 +336,7 @@ domains:
             baseline: benign
 
       list-field-overrides:
+        flavour: attribute_mutating
         description: "List field overrides for assignment"
         metadata:
           tier: reference

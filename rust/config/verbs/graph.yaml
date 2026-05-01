@@ -16,6 +16,7 @@ domains:
       # =========================================================================
 
       view:
+        flavour: attribute_mutating
         description: "Build full graph view from a CBU root"
         metadata:
           tier: intent
@@ -77,6 +78,7 @@ domains:
           consequence:
             baseline: benign
       focus:
+        flavour: attribute_mutating
         description: "Focus on a specific node with its immediate neighborhood"
         metadata:
           tier: intent
@@ -143,6 +145,7 @@ domains:
           consequence:
             baseline: benign
       filter:
+        flavour: attribute_mutating
         description: "Filter graph by criteria (node types, layers, roles, etc.)"
         metadata:
           tier: intent
@@ -223,6 +226,7 @@ domains:
           consequence:
             baseline: benign
       group-by:
+        flavour: attribute_mutating
         description: "Group nodes by an attribute (jurisdiction, role, type, etc.)"
         invocation_phrases:
           - "group graph by"
@@ -282,6 +286,7 @@ domains:
           consequence:
             baseline: benign
       path:
+        flavour: attribute_mutating
         description: "Find shortest path between two nodes"
         invocation_phrases:
           - "find path between"
@@ -352,6 +357,7 @@ domains:
           consequence:
             baseline: benign
       find-connected:
+        flavour: attribute_mutating
         description: "Find all nodes connected to a starting point within depth"
         metadata:
           tier: reference
@@ -417,6 +423,7 @@ domains:
           consequence:
             baseline: benign
       ancestors:
+        flavour: attribute_mutating
         description: "Find all ancestors (owners/controllers) of an entity"
         metadata:
           tier: intent
@@ -468,6 +475,7 @@ domains:
           consequence:
             baseline: benign
       descendants:
+        flavour: attribute_mutating
         description: "Find all descendants (owned/controlled entities) of an entity"
         metadata:
           tier: intent
@@ -529,6 +537,10 @@ domains:
           consequence:
             baseline: benign
       validate:
+        flavour: discretionary
+        role_guard:
+          any_of: [compliance_officer, senior_compliance, mlro]
+        audit_class: graph_validate
         description: "Validate ownership/control graph integrity for a KYC case"
         invocation_phrases:
           - "validate graph"
@@ -581,6 +593,7 @@ domains:
           consequence:
             baseline: benign
       compare:
+        flavour: attribute_mutating
         description: "Compare two graph snapshots to find differences"
         metadata:
           tier: intent

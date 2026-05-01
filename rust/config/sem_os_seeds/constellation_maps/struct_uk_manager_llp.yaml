@@ -89,4 +89,3 @@ slots:
         cardinality: optional
         depends_on: [{ slot: case, min_state: intake }]
         verbs: { evaluate: tollgate.evaluate }
-bulk_macros: [role_slots]

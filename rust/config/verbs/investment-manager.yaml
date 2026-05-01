@@ -8,6 +8,7 @@ domains:
     description: "Investment manager assignment and scope management"
     verbs:
       assign:
+        flavour: instance_adding
         description: Assign investment manager to CBU with trading scope (idempotent by cbu+manager_lei+role)
         metadata:
           tier: intent
@@ -153,6 +154,7 @@ domains:
           consequence:
             baseline: reviewable
       set-scope:
+        flavour: attribute_mutating
         description: Update scope for existing IM assignment
         metadata:
           tier: intent
@@ -210,6 +212,7 @@ domains:
           consequence:
             baseline: reviewable
       link-connectivity:
+        flavour: instance_adding
         description: Link IM assignment to instruction delivery resource
         metadata:
           tier: intent
@@ -257,6 +260,7 @@ domains:
           consequence:
             baseline: reviewable
       list:
+        flavour: attribute_mutating
         description: List IM assignments for CBU
         metadata:
           tier: reference
@@ -305,6 +309,10 @@ domains:
           consequence:
             baseline: benign
       suspend:
+        flavour: discretionary
+        role_guard:
+          any_of: [compliance_officer, senior_compliance, mlro]
+        audit_class: investment_manager_suspend
         description: Suspend an IM assignment
         metadata:
           tier: intent
@@ -344,6 +352,10 @@ domains:
           consequence:
             baseline: requires_confirmation
       terminate:
+        flavour: discretionary
+        role_guard:
+          any_of: [compliance_officer, senior_compliance, mlro]
+        audit_class: investment_manager_terminate
         description: Terminate an IM assignment
         metadata:
           tier: intent
@@ -387,6 +399,7 @@ domains:
           consequence:
             baseline: requires_confirmation
       find-for-trade:
+        flavour: attribute_mutating
         description: Find IM assignment that covers given trade characteristics
         metadata:
           tier: reference

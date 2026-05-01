@@ -16,6 +16,7 @@ domains:
       # =========================================================================
 
       create:
+        flavour: instance_adding
         description: "Create a new deal record for a sales opportunity"
         behavior: plugin
         metadata:
@@ -117,6 +118,7 @@ domains:
             baseline: reviewable
 
       read:
+        flavour: attribute_mutating
         description: "Read the primary deal record by ID"
         behavior: crud
         crud:
@@ -171,6 +173,7 @@ domains:
             baseline: benign
 
       list:
+        flavour: attribute_mutating
         description: "List deals with optional filters"
         behavior: crud
         crud:
@@ -224,6 +227,7 @@ domains:
             baseline: benign
 
       search:
+        flavour: attribute_mutating
         description: "Search deal records by name or reference"
         behavior: plugin
         metadata:
@@ -253,6 +257,7 @@ domains:
             baseline: benign
 
       update:
+        flavour: attribute_mutating
         description: "Update primary deal record fields"
         behavior: plugin
         metadata:
@@ -298,6 +303,7 @@ domains:
             baseline: reviewable
 
       update-status:
+        flavour: attribute_mutating
         description: "Transition deal status with lifecycle validation, including pre-contract KYC clearance"
         behavior: plugin
         metadata:
@@ -362,6 +368,10 @@ domains:
           target_slot: deal
 
       cancel:
+        flavour: discretionary
+        role_guard:
+          any_of: [compliance_admin, senior_compliance, mlro]
+        audit_class: deal_cancel
         description: "Cancel a deal (soft delete - sets status to CANCELLED)"
         behavior: plugin
         metadata:
@@ -409,6 +419,7 @@ domains:
       # =========================================================================
 
       add-participant:
+        flavour: instance_adding
         description: "Add a participating entity (regional LEI) to a deal"
         behavior: plugin
         metadata:
@@ -465,6 +476,7 @@ domains:
             baseline: reviewable
 
       remove-participant:
+        flavour: attribute_mutating
         description: "Remove a participant from a deal"
         behavior: plugin
         metadata:
@@ -502,6 +514,7 @@ domains:
             baseline: requires_confirmation
 
       list-participants:
+        flavour: attribute_mutating
         description: "List all participants in a deal"
         behavior: crud
         crud:
@@ -541,6 +554,7 @@ domains:
       # This establishes the DAG: Deal → Products → Rate Cards
 
       add-product:
+        flavour: instance_adding
         description: "Add a product to the deal's commercial scope"
         behavior: plugin
         metadata:
@@ -603,6 +617,7 @@ domains:
             baseline: reviewable
 
       update-product-status:
+        flavour: attribute_mutating
         description: "Update the status of a product in the deal scope"
         behavior: plugin
         metadata:
@@ -641,6 +656,7 @@ domains:
             baseline: reviewable
 
       remove-product:
+        flavour: attribute_mutating
         description: "Remove a product from the deal scope (sets status to REMOVED)"
         behavior: plugin
         metadata:
@@ -678,6 +694,7 @@ domains:
           target_slot: deal_product
 
       list-products:
+        flavour: attribute_mutating
         description: "List all products in the deal's commercial scope"
         behavior: crud
         crud:
@@ -721,6 +738,7 @@ domains:
       # =========================================================================
 
       add-contract:
+        flavour: instance_adding
         description: "Link a service contract to a deal"
         behavior: plugin
         metadata:
@@ -769,6 +787,7 @@ domains:
             baseline: reviewable
 
       remove-contract:
+        flavour: attribute_mutating
         description: "Unlink a contract from a deal"
         behavior: plugin
         metadata:
@@ -802,6 +821,7 @@ domains:
             baseline: requires_confirmation
 
       list-contracts:
+        flavour: attribute_mutating
         description: "List all contracts linked to a deal"
         behavior: crud
         crud:
@@ -839,6 +859,7 @@ domains:
       # =========================================================================
 
       create-rate-card:
+        flavour: instance_adding
         description: "Create a negotiated rate card for a product within a deal"
         behavior: plugin
         lifecycle:
@@ -919,6 +940,7 @@ domains:
             baseline: reviewable
 
       add-rate-card-line:
+        flavour: instance_adding
         description: "Add a fee line to a rate card"
         behavior: plugin
         lifecycle:
@@ -1004,6 +1026,7 @@ domains:
             baseline: reviewable
 
       update-rate-card-line:
+        flavour: attribute_mutating
         description: "Modify an existing rate card line"
         behavior: plugin
         metadata:
@@ -1049,6 +1072,7 @@ domains:
             baseline: reviewable
 
       remove-rate-card-line:
+        flavour: attribute_mutating
         description: "Remove a fee line from a rate card"
         behavior: plugin
         metadata:
@@ -1077,6 +1101,7 @@ domains:
             baseline: requires_confirmation
 
       list-rate-card-lines:
+        flavour: attribute_mutating
         description: "List all fee lines for a rate card"
         behavior: crud
         crud:
@@ -1129,6 +1154,7 @@ domains:
       # =========================================================================
 
       propose-rate-card:
+        flavour: attribute_mutating
         description: "Submit rate card for client review"
         behavior: plugin
         lifecycle:
@@ -1172,6 +1198,7 @@ domains:
           target_slot: deal_rate_card
 
       counter-rate-card:
+        flavour: attribute_mutating
         description: "Client counter-offer - creates new version via clone"
         behavior: plugin
         lifecycle:
@@ -1217,6 +1244,10 @@ domains:
           target_slot: deal_rate_card
 
       agree-rate-card:
+        flavour: discretionary
+        role_guard:
+          any_of: [compliance_admin, senior_compliance, mlro]
+        audit_class: deal_agree_rate_card
         description: "Finalise rate card - both parties agree. Lines become immutable."
         behavior: plugin
         lifecycle:
@@ -1258,6 +1289,7 @@ domains:
           target_slot: deal_rate_card
 
       list-rate-cards:
+        flavour: attribute_mutating
         description: "List all rate cards for a deal with status"
         behavior: crud
         crud:
@@ -1303,6 +1335,7 @@ domains:
             baseline: benign
 
       list-active-rate-cards:
+        flavour: attribute_mutating
         description: "List only the currently AGREED rate cards for a deal"
         behavior: crud
         crud:
@@ -1336,6 +1369,7 @@ domains:
             baseline: benign
 
       list-rate-card-history:
+        flavour: attribute_mutating
         description: "Show rate card supersession chain history"
         behavior: crud
         crud:
@@ -1377,6 +1411,7 @@ domains:
       # =========================================================================
 
       add-sla:
+        flavour: instance_adding
         description: "Add a service level agreement to a deal"
         behavior: plugin
         metadata:
@@ -1453,6 +1488,7 @@ domains:
             baseline: reviewable
 
       remove-sla:
+        flavour: attribute_mutating
         description: "Remove an SLA from a deal"
         behavior: crud
         crud:
@@ -1486,6 +1522,7 @@ domains:
             baseline: requires_confirmation
 
       list-slas:
+        flavour: attribute_mutating
         description: "List SLAs for a deal"
         behavior: crud
         crud:
@@ -1523,6 +1560,7 @@ domains:
       # =========================================================================
 
       add-document:
+        flavour: instance_adding
         description: "Link a document to a deal"
         behavior: plugin
         metadata:
@@ -1567,6 +1605,7 @@ domains:
             baseline: reviewable
 
       update-document-status:
+        flavour: attribute_mutating
         description: "Update document status (e.g. DRAFT → SIGNED → EXECUTED)"
         behavior: plugin
         metadata:
@@ -1610,6 +1649,7 @@ domains:
           target_slot: deal_document
 
       list-documents:
+        flavour: attribute_mutating
         description: "List all documents linked to a deal"
         behavior: crud
         crud:
@@ -1647,6 +1687,7 @@ domains:
       # =========================================================================
 
       add-ubo-assessment:
+        flavour: instance_adding
         description: "Link an entity's UBO assessment to a deal"
         behavior: plugin
         metadata:
@@ -1686,6 +1727,7 @@ domains:
             baseline: reviewable
 
       update-ubo-assessment:
+        flavour: attribute_mutating
         description: "Update UBO assessment status and risk rating"
         behavior: plugin
         metadata:
@@ -1734,6 +1776,7 @@ domains:
       # =========================================================================
 
       request-onboarding:
+        flavour: attribute_mutating
         description: "Create onboarding request for an existing CBU - handoff from Sales to Ops after KYC clearance and contracting"
         behavior: plugin
         lifecycle:
@@ -1832,6 +1875,7 @@ domains:
             baseline: reviewable
 
       request-onboarding-batch:
+        flavour: attribute_mutating
         description: "Batch onboarding request - multiple existing CBUs to multiple products after KYC clearance and contracting"
         behavior: plugin
         lifecycle:
@@ -1884,6 +1928,7 @@ domains:
             baseline: reviewable
 
       update-onboarding-status:
+        flavour: attribute_mutating
         description: "Update onboarding request status"
         behavior: plugin
         metadata:
@@ -1927,6 +1972,7 @@ domains:
           target_slot: deal_onboarding_request
 
       list-onboarding-requests:
+        flavour: attribute_mutating
         description: "List onboarding requests for a deal"
         behavior: crud
         crud:
@@ -1971,6 +2017,7 @@ domains:
       # =========================================================================
 
       read-summary:
+        flavour: attribute_mutating
         description: "Read full deal summary with linked entities, status, and progress"
         behavior: plugin
         metadata:
@@ -2014,6 +2061,7 @@ domains:
             baseline: benign
 
       read-timeline:
+        flavour: attribute_mutating
         description: "Read the deal event timeline for audit trail"
         behavior: crud
         crud:
@@ -2074,7 +2122,8 @@ domains:
             baseline: benign
 
       submit-for-bac:
-        description: "Submit deal to Business Acceptance Committee for internal commercial approval"
+        flavour: attribute_mutating
+        description: "Submit deal to Business Acceptance Committee — writes deal_status='IN_CLEARANCE' and bac_status='in_review' (Q21 (b) substate model)"
         behavior: plugin
         metadata:
           tier: intent
@@ -2109,7 +2158,11 @@ domains:
           target_slot: deal
 
       bac-approve:
-        description: "BAC approval decision — advances deal past internal commercial gate"
+        flavour: discretionary
+        role_guard:
+          any_of: [compliance_officer, senior_compliance, mlro]
+        audit_class: deal_bac_approve
+        description: "BAC approval decision — sets deals.bac_status='approved' (parallel substate of IN_CLEARANCE; CONTRACTED gated on bac_status AND kyc_clearance_status)"
         behavior: plugin
         metadata:
           tier: intent
@@ -2143,7 +2196,11 @@ domains:
           target_slot: deal
 
       bac-reject:
-        description: "BAC rejection — terminal-negative decision; deal moves to REJECTED"
+        flavour: discretionary
+        role_guard:
+          any_of: [compliance_officer, senior_compliance, mlro]
+        audit_class: deal_bac_reject
+        description: "BAC rejection — sets deals.bac_status='rejected'; if KYC has not also rejected, deal_status remains IN_CLEARANCE pending KYC outcome; otherwise deal moves to REJECTED"
         behavior: plugin
         metadata:
           tier: intent
@@ -2180,7 +2237,47 @@ domains:
           target_workspace: deal
           target_slot: deal
 
+      update-kyc-clearance:
+        flavour: attribute_mutating
+        description: "Propagate KYC case outcome to deals.kyc_clearance_status — preserving verb invoked from the KYC workspace's case approval/rejection handler. The parallel substate of IN_CLEARANCE complementing bac_status."
+        behavior: plugin
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: global
+          noun: deal
+          subject_kinds: [deal]
+          phase_tags: [deal]
+          side_effects: state_write
+          harm_class: reversible
+        invocation_phrases:
+          - "update KYC clearance"
+          - "propagate KYC outcome to deal"
+          - "set KYC clearance status"
+          - "sync KYC case decision into deal"
+        args:
+          - name: deal-id
+            type: uuid
+            required: true
+            maps_to: deal_id
+          - name: kyc-clearance-status
+            type: string
+            required: true
+            maps_to: kyc_clearance_status
+            description: "One of pending|in_review|approved|rejected"
+        returns:
+          type: affected
+        three_axis:
+          state_effect: preserving
+          external_effects: [observational]
+          consequence:
+            baseline: benign
+
       submit-for-pricing-approval:
+        flavour: discretionary
+        role_guard:
+          any_of: [compliance_admin, senior_compliance, mlro]
+        audit_class: deal_submit_for_pricing_approval
         description: "Submit rate card to pricing committee for internal approval (bespoke / discount threshold / new jurisdiction)"
         behavior: plugin
         metadata:
@@ -2215,6 +2312,10 @@ domains:
           target_slot: deal_rate_card
 
       pricing-approve:
+        flavour: discretionary
+        role_guard:
+          any_of: [compliance_officer, senior_compliance, mlro]
+        audit_class: deal_pricing_approve
         description: "Pricing committee approval of rate card — advances to ready-to-propose"
         behavior: plugin
         metadata:
@@ -2248,6 +2349,10 @@ domains:
           target_slot: deal_rate_card
 
       pricing-reject:
+        flavour: discretionary
+        role_guard:
+          any_of: [compliance_officer, senior_compliance, mlro]
+        audit_class: deal_pricing_reject
         description: "Pricing committee rejection — rate card returns to DRAFT for revision"
         behavior: plugin
         metadata:
@@ -2285,6 +2390,10 @@ domains:
           target_slot: deal_rate_card
 
       mark-lost:
+        flavour: discretionary
+        role_guard:
+          any_of: [compliance_admin, senior_compliance, mlro]
+        audit_class: deal_mark_lost
         description: "Mark deal as lost (competitor won)"
         behavior: plugin
         metadata:
@@ -2323,6 +2432,10 @@ domains:
           target_slot: deal
 
       mark-withdrawn:
+        flavour: discretionary
+        role_guard:
+          any_of: [compliance_admin, senior_compliance, mlro]
+        audit_class: deal_mark_withdrawn
         description: "Mark deal as withdrawn (client walked away)"
         behavior: plugin
         metadata:
@@ -2360,6 +2473,10 @@ domains:
           target_slot: deal
 
       reject:
+        flavour: discretionary
+        role_guard:
+          any_of: [compliance_officer, senior_compliance, mlro]
+        audit_class: deal_reject
         description: "Reject deal (terminal-negative; internal decision)"
         behavior: plugin
         metadata:
@@ -2397,6 +2514,10 @@ domains:
           target_slot: deal
 
       suspend:
+        flavour: discretionary
+        role_guard:
+          any_of: [compliance_officer, senior_compliance, mlro]
+        audit_class: deal_suspend
         description: "Suspend active deal (operational hold; restorable)"
         behavior: plugin
         metadata:
@@ -2434,6 +2555,7 @@ domains:
           target_slot: deal
 
       reinstate:
+        flavour: attribute_mutating
         description: "Reinstate suspended deal back to active"
         behavior: plugin
         metadata:
@@ -2467,6 +2589,10 @@ domains:
           target_slot: deal
 
       begin-winding-down:
+        flavour: discretionary
+        role_guard:
+          any_of: [compliance_admin, senior_compliance, mlro]
+        audit_class: deal_begin_winding_down
         description: "Begin deal winding down — exit intent from active servicing"
         behavior: plugin
         metadata:
@@ -2500,6 +2626,7 @@ domains:
           target_slot: deal
 
       start-sla-remediation:
+        flavour: instance_adding
         description: "Begin remediation of a breached SLA (transition BREACHED → IN_REMEDIATION)"
         behavior: plugin
         metadata:
@@ -2533,6 +2660,7 @@ domains:
           target_slot: deal_sla
 
       resolve-sla-breach:
+        flavour: attribute_mutating
         description: "Resolve SLA breach (remediation complete; transition to RESOLVED)"
         behavior: plugin
         metadata:
@@ -2566,6 +2694,10 @@ domains:
           target_slot: deal_sla
 
       waive-sla-breach:
+        flavour: discretionary
+        role_guard:
+          any_of: [compliance_admin, senior_compliance, mlro]
+        audit_class: deal_waive_sla_breach
         description: "Waive SLA breach (client concession; breach not pursued)"
         behavior: plugin
         metadata:

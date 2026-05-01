@@ -6,6 +6,7 @@ domains:
     description: "Reference data bulk loading operations"
     verbs:
       load-markets:
+        flavour: instance_adding
         description: Load markets from YAML file into custody.markets table
         metadata:
           tier: intent
@@ -45,6 +46,7 @@ domains:
           consequence:
             baseline: reviewable
       load-instrument-classes:
+        flavour: instance_adding
         description: Load instrument class taxonomy from YAML into custody.instrument_classes
         metadata:
           tier: intent
@@ -83,6 +85,7 @@ domains:
           consequence:
             baseline: reviewable
       load-subcustodians:
+        flavour: instance_adding
         description: Load subcustodian network from YAML into custody.subcustodian_network
         metadata:
           tier: intent
@@ -121,6 +124,7 @@ domains:
           consequence:
             baseline: reviewable
       load-sla-templates:
+        flavour: instance_adding
         description: Load SLA templates from YAML into ob-poc.sla_templates
         metadata:
           tier: intent
@@ -159,6 +163,7 @@ domains:
           consequence:
             baseline: reviewable
       load-all:
+        flavour: instance_adding
         description: Load all reference data from directory
         metadata:
           tier: intent

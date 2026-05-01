@@ -161,6 +161,14 @@ async fn service_intent_supersede(pool: &PgPool, args: &Value) -> Result<VerbExe
     .fetch_optional(pool)
     .await?
     .ok_or_else(|| anyhow!("Intent not found: {intent_id}"))?;
+    // FIXME(R.1-cleanup): This UPDATE writes service_intents.status = 'superseded'.
+    // Per Q3 (b) of the 2026-04-29 refactor decisions, supersession should create a
+    // new service_intents row rather than UPDATE the status column. M-026 DAG does
+    // not declare 'superseded' as a state. Reframe this function as `intent_supersede`
+    // → `INSERT INTO service_intents (...) VALUES (...) RETURNING intent_id`,
+    // preserving the prior row and the new row's relationship via a supersedes_id FK.
+    //
+    // Decision log: D-002.
     sqlx::query(
         r#"UPDATE "ob-poc".service_intents SET status = 'superseded' WHERE intent_id = $1"#,
     )

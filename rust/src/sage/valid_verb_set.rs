@@ -12,6 +12,7 @@ use std::{
 
 use anyhow::Result;
 use chrono::{DateTime, Utc};
+use dsl_core::resolver::{resolve_template, ResolverInputs};
 use sem_os_core::{
     constellation_map_def::{
         Cardinality, ConstellationMapDefBody, DependencyEntry as CoreDependencyEntry,
@@ -147,9 +148,6 @@ pub fn load_constellation_by_id(id: &str) -> Result<ConstellationMapDefBody> {
 
 /// Load the composed constellation stack for a session-facing constellation ID.
 ///
-/// Struct constellations compose the ownership, structure, and KYC maps so the
-/// valid verb surface reflects the full onboarding business plane.
-///
 /// # Examples
 /// ```rust
 /// use ob_poc::sage::valid_verb_set::load_constellation_stack;
@@ -158,18 +156,11 @@ pub fn load_constellation_by_id(id: &str) -> Result<ConstellationMapDefBody> {
 /// assert!(stack.iter().any(|map| map.constellation == "group.ownership"));
 /// assert!(stack.iter().any(|map| map.constellation == "kyc.onboarding"));
 /// ```
+#[deprecated(note = "transitional; see D-008")]
 pub fn load_constellation_stack(id: &str) -> Result<Vec<ConstellationMapDefBody>> {
-    let ids: Vec<&str> = if id.starts_with("struct.") {
-        vec!["group.ownership", id, "kyc.onboarding"]
-    } else {
-        vec![id]
-    };
-
-    let mut stack = Vec::new();
-    for constellation_id in ids {
-        stack.push(load_constellation_by_id(constellation_id)?);
-    }
-    Ok(stack)
+    let inputs = ResolverInputs::default_from_cargo_manifest()?;
+    let template = resolve_template(id.to_string(), "cbu".to_string(), &inputs)?;
+    Ok(template.generated_from.legacy_constellation_stack)
 }
 
 // ---------------------------------------------------------------------------
@@ -760,7 +751,6 @@ fn to_core_constellation_map(map: ConstellationMapDef) -> ConstellationMapDefBod
             .into_iter()
             .map(|(name, slot)| (name, to_core_slot(slot)))
             .collect(),
-        bulk_macros: map.bulk_macros,
     }
 }
 
@@ -836,6 +826,20 @@ fn to_core_slot(slot: RuntimeSlotDef) -> CoreSlotDef {
             .map(|(name, child)| (name, to_core_slot(child)))
             .collect(),
         max_depth: slot.max_depth,
+        closure: None,
+        eligibility: None,
+        cardinality_max: None,
+        entry_state: None,
+        attachment_predicates: Vec::new(),
+        addition_predicates: Vec::new(),
+        aggregate_breach_checks: Vec::new(),
+        additive_attachment_predicates: Vec::new(),
+        additive_addition_predicates: Vec::new(),
+        additive_aggregate_breach_checks: Vec::new(),
+        role_guard: None,
+        justification_required: None,
+        audit_class: None,
+        completeness_assertion: None,
     }
 }
 
@@ -957,6 +961,7 @@ mod tests {
     }
 
     #[test]
+    #[allow(deprecated)]
     fn test_semos_scope_hit_rate() {
         use crate::sage::constrained_match::resolve_constrained;
 
@@ -1768,6 +1773,7 @@ mod tests {
     #[cfg(feature = "database")]
     #[tokio::test]
     #[ignore]
+    #[allow(deprecated)]
     async fn test_semos_scope_hit_rate_seeded_db() -> Result<()> {
         use std::{sync::Arc, time::Instant};
 

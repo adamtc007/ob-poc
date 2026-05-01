@@ -3,6 +3,7 @@ domains:
     description: "Product catalog operations (read-only - products are reference data)"
     verbs:
       read:
+        flavour: attribute_mutating
         description: Read a product by ID or code
         metadata:
           tier: reference
@@ -53,6 +54,7 @@ domains:
             baseline: benign
 
       list:
+        flavour: attribute_mutating
         description: List products with optional filters
         metadata:
           tier: reference

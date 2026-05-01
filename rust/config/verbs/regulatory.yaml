@@ -6,6 +6,7 @@ domains:
     description: "Entity regulatory registration management (multi-regulator)"
     verbs:
       add:
+        flavour: instance_adding
         description: "Add regulatory registration for an entity (idempotent by entity+regulator+type)"
         metadata:
           tier: intent
@@ -86,6 +87,7 @@ domains:
           consequence:
             baseline: reviewable
       list:
+        flavour: attribute_mutating
         description: "List regulatory registrations for an entity"
         metadata:
           tier: reference
@@ -129,6 +131,7 @@ domains:
           consequence:
             baseline: benign
       verify:
+        flavour: attribute_mutating
         description: "Verify a regulatory registration"
         metadata:
           tier: intent
@@ -185,6 +188,7 @@ domains:
           consequence:
             baseline: reviewable
       remove:
+        flavour: attribute_mutating
         description: "Remove/withdraw registration"
         metadata:
           tier: intent
@@ -233,6 +237,7 @@ domains:
     description: "Entity regulatory status queries"
     verbs:
       check:
+        flavour: attribute_mutating
         description: "Check entity's overall regulatory status"
         metadata:
           tier: diagnostics

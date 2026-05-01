@@ -7,6 +7,7 @@ domains:
 
     verbs:
       allocate:
+        flavour: attribute_mutating
         description: |
           Allocate shares to a shareholder. Creates holding record.
           Validates total allocations don't exceed issued_shares.
@@ -82,6 +83,7 @@ domains:
             baseline: reviewable
 
       transfer:
+        flavour: attribute_mutating
         description: Transfer shares between shareholders (creates movement records)
         metadata:
           tier: intent
@@ -153,6 +155,7 @@ domains:
             baseline: reviewable
 
       reconcile:
+        flavour: attribute_mutating
         description: |
           Verify capital structure reconciliation:
           - SUM(holdings.units) = issued_shares
@@ -209,6 +212,7 @@ domains:
             baseline: reviewable
 
       get-ownership-chain:
+        flavour: attribute_mutating
         description: |
           Traverse ownership upward from entity to all terminus points.
           Computes indirect ownership percentages multiplicatively.
@@ -257,6 +261,7 @@ domains:
             baseline: benign
 
       issue-shares:
+        flavour: attribute_mutating
         description: Issue additional shares (increases issued_shares)
         metadata:
           tier: intent
@@ -306,6 +311,7 @@ domains:
             baseline: reviewable
 
       cancel-shares:
+        flavour: attribute_mutating
         description: Cancel/buyback shares (decreases issued_shares)
         metadata:
           tier: intent
@@ -355,6 +361,7 @@ domains:
             baseline: requires_confirmation
 
       list-by-issuer:
+        flavour: attribute_mutating
         description: List all share classes for an issuing entity
         metadata:
           tier: reference
@@ -397,6 +404,7 @@ domains:
             baseline: benign
 
       list-shareholders:
+        flavour: attribute_mutating
         description: List all shareholders for a share class
         metadata:
           tier: reference

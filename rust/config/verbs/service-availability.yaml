@@ -10,6 +10,7 @@ domains:
 
     verbs:
       set:
+        flavour: attribute_mutating
         description: "Set three-lane service availability for a booking principal × service combination"
         behavior: plugin
         lifecycle:
@@ -66,6 +67,7 @@ domains:
           consequence:
             baseline: reviewable
       list:
+        flavour: attribute_mutating
         description: "List active service availability for a booking principal"
         behavior: plugin
         metadata:
@@ -95,6 +97,7 @@ domains:
           consequence:
             baseline: benign
       list-by-principal:
+        flavour: attribute_mutating
         description: "List service availability grouped by principal"
         behavior: plugin
         metadata:

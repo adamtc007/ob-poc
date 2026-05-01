@@ -24,6 +24,7 @@ domains:
       # Composition
       # ============================================
       compose:
+        flavour: attribute_mutating
         description: Create a new changeset for authoring registry changes
         metadata:
           tier: diagnostics
@@ -62,6 +63,7 @@ domains:
             baseline: reviewable
 
       add-item:
+        flavour: instance_adding
         description: Add an item (snapshot) to an existing changeset
         metadata:
           tier: diagnostics
@@ -108,6 +110,7 @@ domains:
             baseline: reviewable
 
       remove-item:
+        flavour: attribute_mutating
         description: Remove an item from a changeset
         metadata:
           tier: diagnostics
@@ -145,6 +148,7 @@ domains:
             baseline: requires_confirmation
 
       refine-item:
+        flavour: attribute_mutating
         description: Refine an existing changeset item (update its definition)
         metadata:
           tier: diagnostics
@@ -194,6 +198,7 @@ domains:
       # Suggestions & Templates
       # ============================================
       suggest:
+        flavour: attribute_mutating
         description: Get AI suggestions for a changeset (fill gaps, improve completeness)
         metadata:
           tier: diagnostics
@@ -228,6 +233,7 @@ domains:
             baseline: reviewable
 
       apply-template:
+        flavour: attribute_mutating
         description: Apply a changeset template to pre-populate items
         metadata:
           tier: diagnostics
@@ -268,6 +274,7 @@ domains:
       # Evidence & Validation
       # ============================================
       attach-basis:
+        flavour: instance_adding
         description: Attach evidence basis to a changeset item
         metadata:
           tier: diagnostics
@@ -310,6 +317,7 @@ domains:
             baseline: reviewable
 
       validate-edit:
+        flavour: attribute_mutating
         description: Validate a single changeset edit against guardrails
         metadata:
           tier: diagnostics
@@ -351,6 +359,7 @@ domains:
       # Cross-Referencing & Impact
       # ============================================
       cross-reference:
+        flavour: attribute_mutating
         description: Cross-reference changeset items against existing registry
         metadata:
           tier: diagnostics
@@ -385,6 +394,7 @@ domains:
             baseline: benign
 
       impact-analysis:
+        flavour: attribute_mutating
         description: Analyze the impact of publishing a changeset
         metadata:
           tier: diagnostics
@@ -422,6 +432,7 @@ domains:
       # Conflict Resolution
       # ============================================
       resolve-conflict:
+        flavour: attribute_mutating
         description: Resolve a detected conflict in a changeset
         metadata:
           tier: diagnostics
@@ -467,6 +478,7 @@ domains:
       # Query
       # ============================================
       list:
+        flavour: attribute_mutating
         description: List changesets with optional status filter
         metadata:
           tier: diagnostics
@@ -501,6 +513,7 @@ domains:
             baseline: benign
 
       get:
+        flavour: attribute_mutating
         description: Get detailed changeset information
         metadata:
           tier: diagnostics
@@ -535,6 +548,7 @@ domains:
             baseline: benign
 
       diff:
+        flavour: attribute_mutating
         description: Diff two changesets or a changeset against the active snapshot set
         metadata:
           tier: diagnostics

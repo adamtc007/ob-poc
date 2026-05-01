@@ -13,6 +13,7 @@ domains:
 
     verbs:
       compute:
+        flavour: attribute_mutating
         description: "Compute per-prong coverage for a UBO determination run"
         invocation_phrases:
         - "compute coverage"

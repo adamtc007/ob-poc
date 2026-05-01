@@ -3,6 +3,7 @@ domains:
     description: Attribute observations from various sources
     verbs:
       record:
+        flavour: instance_adding
         description: Record an attribute observation
         metadata:
           tier: intent
@@ -103,6 +104,7 @@ domains:
           consequence:
             baseline: reviewable
       record-from-document:
+        flavour: attribute_mutating
         description: Record observation extracted from a document
         metadata:
           tier: intent
@@ -164,6 +166,7 @@ domains:
           consequence:
             baseline: reviewable
       supersede:
+        flavour: attribute_mutating
         description: Supersede an observation with a newer one
         metadata:
           tier: intent
@@ -213,6 +216,7 @@ domains:
           consequence:
             baseline: reviewable
       list-for-entity:
+        flavour: attribute_mutating
         description: List all observations for an entity
         metadata:
           tier: reference
@@ -259,6 +263,7 @@ domains:
           consequence:
             baseline: benign
       list-for-attribute:
+        flavour: attribute_mutating
         description: List observations of a specific attribute for an entity
         metadata:
           tier: reference
@@ -315,6 +320,7 @@ domains:
           consequence:
             baseline: benign
       get-current:
+        flavour: attribute_mutating
         description: Get current best observation for an attribute
         metadata:
           tier: reference
@@ -356,6 +362,7 @@ domains:
           consequence:
             baseline: benign
       reconcile:
+        flavour: attribute_mutating
         description: Compare observations for an attribute and auto-create discrepancies
         metadata:
           tier: intent
@@ -410,6 +417,7 @@ domains:
           consequence:
             baseline: reviewable
       verify-allegations:
+        flavour: attribute_mutating
         description: Batch verify pending allegations against observations
         metadata:
           tier: intent

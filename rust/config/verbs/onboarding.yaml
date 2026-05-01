@@ -3,6 +3,7 @@ domains:
     description: "Automated onboarding orchestration"
     verbs:
       auto-complete:
+        flavour: attribute_mutating
         description: "Automatically progress onboarding by generating and executing DSL for missing entities"
         metadata:
           tier: intent

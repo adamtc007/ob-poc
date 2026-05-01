@@ -15,6 +15,7 @@ domains:
       # =========================================================================
 
       create-profile:
+        flavour: instance_adding
         description: "Create a fee billing profile - bridges commercial to operational"
         behavior: plugin
         lifecycle:
@@ -133,6 +134,7 @@ domains:
             baseline: reviewable
 
       activate-profile:
+        flavour: attribute_mutating
         description: "Activate a billing profile (CBU is live and generating activity)"
         behavior: plugin
         metadata:
@@ -173,6 +175,10 @@ domains:
           target_slot: billing_profile
 
       suspend-profile:
+        flavour: discretionary
+        role_guard:
+          any_of: [compliance_officer, senior_compliance, mlro]
+        audit_class: billing_suspend_profile
         description: "Suspend billing (e.g. dispute, investigation)"
         behavior: plugin
         metadata:
@@ -217,6 +223,10 @@ domains:
           target_slot: billing_profile
 
       close-profile:
+        flavour: discretionary
+        role_guard:
+          any_of: [compliance_admin, senior_compliance, mlro]
+        audit_class: billing_close_profile
         description: "Close billing profile (offboarding)"
         behavior: plugin
         metadata:
@@ -261,6 +271,7 @@ domains:
           target_slot: billing_profile
 
       get-profile:
+        flavour: attribute_mutating
         description: "Retrieve billing profile with account targets"
         behavior: crud
         crud:
@@ -301,6 +312,7 @@ domains:
             baseline: benign
 
       list-profiles:
+        flavour: attribute_mutating
         description: "List billing profiles for a deal or CBU"
         behavior: crud
         crud:
@@ -354,6 +366,7 @@ domains:
       # =========================================================================
 
       add-account-target:
+        flavour: instance_adding
         description: "Link a CBU resource instance (account) to a billing profile"
         behavior: plugin
         lifecycle:
@@ -431,6 +444,7 @@ domains:
             baseline: reviewable
 
       remove-account-target:
+        flavour: attribute_mutating
         description: "Soft-remove an account target from billing"
         behavior: plugin
         metadata:
@@ -467,6 +481,7 @@ domains:
             baseline: requires_confirmation
 
       list-account-targets:
+        flavour: attribute_mutating
         description: "List account targets for a billing profile"
         behavior: crud
         crud:
@@ -511,6 +526,7 @@ domains:
       # =========================================================================
 
       create-period:
+        flavour: instance_adding
         description: "Create a billing period for calculation"
         behavior: plugin
         lifecycle:
@@ -566,6 +582,7 @@ domains:
             baseline: reviewable
 
       calculate-period:
+        flavour: attribute_mutating
         description: "Run fee calculation for a billing period"
         behavior: plugin
         lifecycle:
@@ -609,6 +626,7 @@ domains:
           target_slot: billing_period
 
       review-period:
+        flavour: attribute_mutating
         description: "Mark billing period as reviewed, optionally apply adjustments"
         behavior: plugin
         lifecycle:
@@ -660,6 +678,10 @@ domains:
           target_slot: billing_period
 
       approve-period:
+        flavour: discretionary
+        role_guard:
+          any_of: [compliance_officer, senior_compliance, mlro]
+        audit_class: billing_approve_period
         description: "Approve billing period for invoicing"
         behavior: plugin
         lifecycle:
@@ -712,6 +734,7 @@ domains:
           target_slot: billing_period
 
       generate-invoice:
+        flavour: attribute_mutating
         description: "Generate invoice from approved billing period"
         behavior: plugin
         lifecycle:
@@ -762,6 +785,7 @@ domains:
           target_slot: billing_period
 
       dispute-period:
+        flavour: attribute_mutating
         description: "Client disputes a billing period"
         behavior: plugin
         metadata:
@@ -810,6 +834,7 @@ domains:
           target_slot: billing_period
 
       period-summary:
+        flavour: attribute_mutating
         description: "Get billing period with line-level detail"
         behavior: plugin
         metadata:
@@ -846,6 +871,7 @@ domains:
             baseline: benign
 
       revenue-summary:
+        flavour: attribute_mutating
         description: "Revenue summary across deals, periods, products"
         behavior: plugin
         metadata:

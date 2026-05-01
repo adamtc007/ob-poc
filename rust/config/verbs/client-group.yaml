@@ -27,6 +27,7 @@ domains:
       # ============================================================================
 
       create:
+        flavour: instance_adding
         description: "Create a new client group root record"
         behavior: crud
         crud:
@@ -70,6 +71,7 @@ domains:
           consequence:
             baseline: reviewable
       read:
+        flavour: attribute_mutating
         description: "Read the root client group record"
         behavior: crud
         crud:
@@ -108,6 +110,7 @@ domains:
           consequence:
             baseline: benign
       update:
+        flavour: attribute_mutating
         description: "Update the root client group record"
         behavior: crud
         crud:
@@ -161,6 +164,7 @@ domains:
           consequence:
             baseline: reviewable
       entity-manage:
+        flavour: attribute_mutating
         description: >
           Consolidated entity lifecycle verb — add, remove, confirm, or reject
           an entity's membership in a client group. The action arg selects the operation.
@@ -221,6 +225,7 @@ domains:
           consequence:
             baseline: reviewable
       entity-add:
+        flavour: attribute_mutating
         description: "Add an entity to this client group's universe"
         invocation_phrases:
           - "add entity to client group"
@@ -281,6 +286,7 @@ domains:
           consequence:
             baseline: reviewable
       entity-remove:
+        flavour: attribute_mutating
         description: "Remove an entity from this client group (or mark historical)"
         invocation_phrases:
           - "remove entity from group"
@@ -335,6 +341,7 @@ domains:
           consequence:
             baseline: requires_confirmation
       list-entities:
+        flavour: attribute_mutating
         description: "List all entities in this client group"
         behavior: plugin
         handler: ClientGroupEntityListOp
@@ -384,6 +391,7 @@ domains:
       # ============================================================================
 
       tag-add:
+        flavour: attribute_mutating
         description: "Add a shorthand tag to an entity within client context"
         behavior: plugin
         handler: ClientGroupTagAddOp
@@ -442,6 +450,7 @@ domains:
           consequence:
             baseline: reviewable
       tag-remove:
+        flavour: attribute_mutating
         description: "Remove a shorthand tag"
         invocation_phrases:
           - "remove tag from entity"
@@ -477,6 +486,7 @@ domains:
           consequence:
             baseline: reviewable
       list-tags:
+        flavour: attribute_mutating
         description: "List tags for entities in client group"
         behavior: plugin
         handler: ClientGroupTagListOp
@@ -530,6 +540,7 @@ domains:
       # ============================================================================
 
       search-entities:
+        flavour: attribute_mutating
         description: "Search entities by shorthand tags (Candle-assisted fuzzy search)"
         behavior: plugin
         handler: ClientGroupSearchOp
@@ -600,6 +611,7 @@ domains:
           consequence:
             baseline: benign
       discover-entities:
+        flavour: attribute_mutating
         description: "Discover entities that might belong to this client (onboarding)"
         behavior: plugin
         handler: ClientGroupDiscoverEntitiesOp
@@ -654,6 +666,7 @@ domains:
           consequence:
             baseline: benign
       confirm-entity:
+        flavour: attribute_mutating
         description: "Confirm a suspected entity as belonging to client"
         behavior: plugin
         handler: ClientGroupConfirmEntityOp
@@ -707,6 +720,10 @@ domains:
           consequence:
             baseline: reviewable
       reject-entity:
+        flavour: discretionary
+        role_guard:
+          any_of: [compliance_officer, senior_compliance, mlro]
+        audit_class: client_group_reject_entity
         description: "Mark a suspected entity as NOT belonging to client"
         invocation_phrases:
           - "reject entity from group"
@@ -764,6 +781,7 @@ domains:
           consequence:
             baseline: reviewable
       assign-role:
+        flavour: instance_adding
         description: "Assign a role to an entity within the client group context"
         behavior: plugin
         handler: ClientGroupAssignRoleOp
@@ -847,6 +865,7 @@ domains:
           consequence:
             baseline: reviewable
       remove-role:
+        flavour: attribute_mutating
         description: "Remove a role assignment from an entity"
         invocation_phrases:
           - "remove role from entity"
@@ -882,6 +901,7 @@ domains:
           consequence:
             baseline: reviewable
       list-roles:
+        flavour: attribute_mutating
         description: "List role assignments for entities in a client group"
         behavior: plugin
         handler: ClientGroupListRolesOp
@@ -939,6 +959,7 @@ domains:
             baseline: benign
 
       list-parties:
+        flavour: attribute_mutating
         description: "List all parties (entities with roles) in a client group"
         behavior: plugin
         handler: ClientGroupPartiesOp
@@ -990,6 +1011,7 @@ domains:
       # ============================================================================
 
       add-relationship:
+        flavour: instance_adding
         description: "Add a provisional ownership/control edge between entities"
         behavior: plugin
         handler: ClientGroupAddRelationshipOp
@@ -1053,6 +1075,7 @@ domains:
           consequence:
             baseline: reviewable
       list-relationships:
+        flavour: attribute_mutating
         description: "List ownership/control relationships in a client group"
         behavior: plugin
         handler: ClientGroupListRelationshipsOp
@@ -1108,6 +1131,7 @@ domains:
       # ============================================================================
 
       add-ownership-source:
+        flavour: instance_adding
         description: "Add an ownership source/allegation for a relationship"
         behavior: plugin
         handler: ClientGroupAddOwnershipSourceOp
@@ -1171,6 +1195,7 @@ domains:
           consequence:
             baseline: reviewable
       verify-ownership:
+        flavour: attribute_mutating
         description: "Mark an ownership source as verified"
         behavior: plugin
         handler: ClientGroupVerifyOwnershipOp
@@ -1208,6 +1233,7 @@ domains:
           consequence:
             baseline: reviewable
       set-canonical:
+        flavour: attribute_mutating
         description: "Designate a source as the canonical value for a relationship"
         behavior: plugin
         handler: ClientGroupSetCanonicalOp
@@ -1246,6 +1272,7 @@ domains:
           consequence:
             baseline: reviewable
       list-unverified:
+        flavour: attribute_mutating
         description: "List unverified ownership allegations needing review"
         behavior: plugin
         handler: ClientGroupListUnverifiedOp
@@ -1287,6 +1314,7 @@ domains:
             baseline: benign
 
       list-discrepancies:
+        flavour: attribute_mutating
         description: "List ownership relationships with conflicting source values"
         behavior: plugin
         handler: ClientGroupListDiscrepanciesOp
@@ -1333,6 +1361,7 @@ domains:
       # ============================================================================
 
       start-discovery:
+        flavour: instance_adding
         description: "Start discovery process for a client group"
         behavior: plugin
         handler: ClientGroupStartDiscoveryOp
@@ -1380,6 +1409,7 @@ domains:
           consequence:
             baseline: reviewable
       complete-discovery:
+        flavour: attribute_mutating
         description: "Mark discovery process as complete"
         behavior: plugin
         handler: ClientGroupCompleteDiscoveryOp

@@ -3,6 +3,7 @@ domains:
     description: Risk indicators and issues requiring attention
     verbs:
       raise:
+        flavour: instance_adding
         description: Raise a new red flag
         metadata:
           tier: intent
@@ -107,7 +108,95 @@ domains:
           external_effects: [emitting]
           consequence:
             baseline: requires_confirmation
+      escalate:
+        flavour: discretionary
+        role_guard:
+          any_of: [compliance_officer, senior_compliance, mlro]
+        audit_class: red_flag_escalate
+        description: Escalate red flag — raises severity tier (entity-workstream → ENHANCED_DD; case → REFERRED) per M-014 transition rules
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: cbu
+          noun: red_flag
+          tags: [kyc]
+          phase_tags: [kyc]
+          side_effects: state_write
+        invocation_phrases:
+          - "escalate red flag"
+          - "raise flag severity"
+          - "escalate compliance risk"
+          - "promote flag to enhanced DD"
+          - "escalate the flag"
+        behavior: plugin
+        handler: RedFlagEscalateOp
+        emits_event: red-flag.escalated
+        args:
+          - name: red-flag-id
+            type: uuid
+            required: true
+            maps_to: red_flag_id
+          - name: reason
+            type: string
+            required: true
+            maps_to: reason
+        returns:
+          type: affected
+        three_axis:
+          state_effect: transition
+          external_effects: [emitting]
+          consequence:
+            baseline: requires_explicit_authorisation
+        transition_args:
+          entity_id_arg: red-flag-id
+          target_workspace: kyc
+          target_slot: red_flag
+      update-rating:
+        flavour: attribute_mutating
+        description: Update red flag severity rating without changing lifecycle state — preserving update for risk re-assessment
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: cbu
+          noun: red_flag
+          tags: [kyc]
+          phase_tags: [kyc]
+          side_effects: state_write
+        invocation_phrases:
+          - "update flag rating"
+          - "change red flag severity"
+          - "re-rate red flag"
+          - "adjust flag severity"
+        behavior: crud
+        crud:
+          operation: update
+          table: red_flags
+          schema: kyc
+          where: red_flag_id
+        emits_event: red-flag.rating-updated
+        args:
+          - name: red-flag-id
+            type: uuid
+            required: true
+            maps_to: red_flag_id
+          - name: severity
+            type: string
+            required: true
+            maps_to: severity
+            valid_values:
+              - LOW
+              - MEDIUM
+              - HIGH
+              - CRITICAL
+        returns:
+          type: affected
+        three_axis:
+          state_effect: preserving
+          external_effects: [emitting]
+          consequence:
+            baseline: reviewable
       mitigate:
+        flavour: attribute_mutating
         description: Mark red flag as mitigated
         metadata:
           tier: intent
@@ -164,6 +253,10 @@ domains:
           target_workspace: kyc
           target_slot: red_flag
       waive:
+        flavour: discretionary
+        role_guard:
+          any_of: [compliance_admin, senior_compliance, mlro]
+        audit_class: red_flag_waive
         description: Waive red flag with justification
         metadata:
           tier: intent
@@ -225,6 +318,10 @@ domains:
           target_slot: red_flag
 
       close:
+        flavour: discretionary
+        role_guard:
+          any_of: [compliance_admin, senior_compliance, mlro]
+        audit_class: red_flag_close
         description: Close a red flag with a generic resolution outcome
         metadata:
           tier: intent
@@ -281,6 +378,7 @@ domains:
           target_slot: red_flag
 
       dismiss:
+        flavour: attribute_mutating
         description: Dismiss red flag as false positive
         metadata:
           tier: intent
@@ -337,6 +435,7 @@ domains:
           target_workspace: kyc
           target_slot: red_flag
       set-blocking:
+        flavour: attribute_mutating
         description: Set red flag as blocking the case
         metadata:
           tier: intent
@@ -387,6 +486,7 @@ domains:
           target_workspace: kyc
           target_slot: red_flag
       list-by-case:
+        flavour: attribute_mutating
         description: List red flags for a case
         metadata:
           tier: reference
@@ -437,6 +537,7 @@ domains:
           consequence:
             baseline: benign
       list-by-workstream:
+        flavour: attribute_mutating
         description: List red flags for a workstream
         metadata:
           tier: reference

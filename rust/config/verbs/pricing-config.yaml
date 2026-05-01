@@ -8,6 +8,7 @@ domains:
     description: "Pricing source configuration management"
     verbs:
       set:
+        flavour: attribute_mutating
         description: Set pricing source for instrument class
         invocation_phrases:
           - "set pricing config"
@@ -151,6 +152,7 @@ domains:
           consequence:
             baseline: reviewable
       link-resource:
+        flavour: instance_adding
         description: Link pricing config to pricing feed resource
         invocation_phrases:
           - "link pricing resource"
@@ -200,6 +202,7 @@ domains:
           consequence:
             baseline: reviewable
       list:
+        flavour: attribute_mutating
         description: List pricing configurations for CBU
         invocation_phrases:
           - "list pricing configs"
@@ -254,6 +257,7 @@ domains:
           consequence:
             baseline: benign
       remove:
+        flavour: attribute_mutating
         description: Remove pricing configuration
         invocation_phrases:
           - "remove pricing config"
@@ -292,6 +296,7 @@ domains:
           consequence:
             baseline: requires_confirmation
       deactivate:
+        flavour: attribute_mutating
         description: Deactivate pricing configuration
         invocation_phrases:
           - "deactivate pricing config"
@@ -333,6 +338,7 @@ domains:
           consequence:
             baseline: reviewable
       find-for-instrument:
+        flavour: attribute_mutating
         description: Find pricing source for given instrument characteristics
         invocation_phrases:
           - "find pricing for instrument"
@@ -391,6 +397,7 @@ domains:
           consequence:
             baseline: benign
       set-valuation-schedule:
+        flavour: attribute_mutating
         description: "Set position valuation frequency and timing"
         invocation_phrases:
           - "set valuation schedule"
@@ -486,6 +493,7 @@ domains:
           consequence:
             baseline: reviewable
       list-valuation-schedules:
+        flavour: attribute_mutating
         description: "List valuation schedules for CBU"
         invocation_phrases:
           - "list valuation schedules"
@@ -538,6 +546,7 @@ domains:
           consequence:
             baseline: benign
       set-fallback-chain:
+        flavour: attribute_mutating
         description: "Define multi-source pricing fallback chain"
         invocation_phrases:
           - "set pricing fallback chain"
@@ -624,6 +633,7 @@ domains:
           consequence:
             baseline: reviewable
       list-fallback-chains:
+        flavour: attribute_mutating
         description: "List pricing fallback chains for CBU"
         invocation_phrases:
           - "list fallback chains"
@@ -676,6 +686,7 @@ domains:
           consequence:
             baseline: benign
       set-stale-policy:
+        flavour: attribute_mutating
         description: "Configure stale price handling policy"
         invocation_phrases:
           - "set stale price policy"
@@ -754,6 +765,7 @@ domains:
           consequence:
             baseline: reviewable
       list-stale-policies:
+        flavour: attribute_mutating
         description: "List stale price policies for CBU"
         invocation_phrases:
           - "list stale price policies"
@@ -806,6 +818,7 @@ domains:
           consequence:
             baseline: benign
       set-nav-threshold:
+        flavour: attribute_mutating
         description: "Set NAV impact alert threshold"
         invocation_phrases:
           - "set NAV threshold"
@@ -885,6 +898,7 @@ domains:
           consequence:
             baseline: reviewable
       list-nav-thresholds:
+        flavour: attribute_mutating
         description: "List NAV impact thresholds for CBU"
         invocation_phrases:
           - "list NAV thresholds"

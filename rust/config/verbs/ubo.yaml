@@ -3,6 +3,7 @@ domains:
     description: UBO ownership and control chain management
     verbs:
       add-ownership:
+        flavour: instance_adding
         description: Add ownership relationship between entities (idempotent by owner+owned)
         invocation_phrases:
           - "add ownership"
@@ -130,6 +131,7 @@ domains:
           consequence:
             baseline: reviewable
       snapshot.capture:
+        flavour: attribute_mutating
         description: |
           Capture a deterministic snapshot of a UBO determination run.
           Serializes computed candidates and ownership chains into JSONB
@@ -180,6 +182,7 @@ domains:
           consequence:
             baseline: reviewable
       snapshot.diff:
+        flavour: attribute_mutating
         description: |
           Compare two UBO determination snapshots by run_id.
           Returns added, removed, and changed candidates between
@@ -231,6 +234,7 @@ domains:
           consequence:
             baseline: benign
       update-ownership:
+        flavour: attribute_mutating
         description: Update ownership percentage or end date
         invocation_phrases:
           - "update ownership"
@@ -283,6 +287,7 @@ domains:
           consequence:
             baseline: reviewable
       add-trust-role:
+        flavour: instance_adding
         description: Add trust role relationship (settlor, trustee, beneficiary, protector)
         invocation_phrases:
           - "add trust role"
@@ -374,6 +379,7 @@ domains:
           consequence:
             baseline: reviewable
       end-relationship:
+        flavour: attribute_mutating
         description: End any entity relationship by ID (soft delete - sets effective_to date)
         invocation_phrases:
           - "end relationship"
@@ -424,6 +430,7 @@ domains:
           consequence:
             baseline: reviewable
       delete-relationship:
+        flavour: attribute_mutating
         description: Hard delete any entity relationship by ID (generic fallback)
         invocation_phrases:
           - "delete relationship"
@@ -468,6 +475,7 @@ domains:
           consequence:
             baseline: requires_confirmation
       list-owners:
+        flavour: attribute_mutating
         description: List owners of an entity as of a specific date
         invocation_phrases:
           - "list owners"
@@ -519,6 +527,7 @@ domains:
           consequence:
             baseline: benign
       list-owned:
+        flavour: attribute_mutating
         description: List entities owned by an entity (what does this entity own)
         invocation_phrases:
           - "list owned entities"
@@ -562,6 +571,7 @@ domains:
           consequence:
             baseline: benign
       list-ubos:
+        flavour: attribute_mutating
         description: List UBO candidates for a CBU (natural persons with ≥25% ownership)
         invocation_phrases:
           - "list UBOs"
@@ -613,6 +623,7 @@ domains:
           consequence:
             baseline: benign
       list-owners-of:
+        flavour: attribute_mutating
         description: List ownership relationships where entity is the owned party
         invocation_phrases:
           - "list by subject"
@@ -656,6 +667,7 @@ domains:
           consequence:
             baseline: benign
       trace-chains:
+        flavour: attribute_mutating
         description: Trace all ownership and control chains to natural persons for a CBU or client
         invocation_phrases:
           - "trace UBO chains"
@@ -734,6 +746,7 @@ domains:
           consequence:
             baseline: benign
       compute-chains:
+        flavour: attribute_mutating
         description: Compute UBO ownership chains for entities linked to a KYC case
         invocation_phrases:
           - "compute UBO chains"
@@ -797,6 +810,7 @@ domains:
           consequence:
             baseline: benign
       mark-deceased:
+        flavour: attribute_mutating
         description: Mark a person as deceased and cascade effects to ownership/control relationships
         invocation_phrases:
           - "mark as deceased"
@@ -842,6 +856,7 @@ domains:
           consequence:
             baseline: requires_confirmation
       convergence-supersede:
+        flavour: attribute_mutating
         description: Atomically supersede an ownership relationship with a new one in the convergence model
         invocation_phrases:
           - "supersede ownership"
@@ -910,6 +925,10 @@ domains:
           consequence:
             baseline: requires_confirmation
       transfer-control:
+        flavour: discretionary
+        role_guard:
+          any_of: [compliance_admin, senior_compliance, mlro]
+        audit_class: ubo_transfer_control
         description: Transfer control relationship from one entity to another
         invocation_phrases:
           - "transfer control"
@@ -995,6 +1014,10 @@ domains:
           consequence:
             baseline: requires_explicit_authorisation
       waive-verification:
+        flavour: discretionary
+        role_guard:
+          any_of: [compliance_admin, senior_compliance, mlro]
+        audit_class: ubo_waive_verification
         description: Waive verification requirement for a relationship with documented justification
         invocation_phrases:
           - "waive verification"
@@ -1067,6 +1090,7 @@ domains:
           consequence:
             baseline: requires_confirmation
       mark-terminus:
+        flavour: attribute_mutating
         description: Mark an entity as a UBO chain terminus (ownership tracing stops here)
         invocation_phrases:
           - "mark chain terminus"

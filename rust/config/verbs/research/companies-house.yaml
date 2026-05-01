@@ -14,6 +14,7 @@ domains:
 
     verbs:
       search:
+        flavour: attribute_mutating
         description: Search UK Companies House for companies by name
         invocation_phrases:
           - "search Companies House"
@@ -54,6 +55,7 @@ domains:
           consequence:
             baseline: benign
       fetch-company:
+        flavour: attribute_mutating
         description: Fetch company profile from Companies House
         invocation_phrases:
           - "get UK company"
@@ -88,6 +90,7 @@ domains:
           consequence:
             baseline: benign
       fetch-psc:
+        flavour: attribute_mutating
         description: Fetch Persons with Significant Control from Companies House
         invocation_phrases:
           - "get PSCs"
@@ -128,6 +131,7 @@ domains:
           consequence:
             baseline: benign
       fetch-officers:
+        flavour: attribute_mutating
         description: Fetch officers (directors, secretaries) from Companies House
         invocation_phrases:
           - "get UK directors"
@@ -167,6 +171,7 @@ domains:
           consequence:
             baseline: benign
       import-company:
+        flavour: instance_adding
         description: Import company and optionally PSC/officers to database
         invocation_phrases:
           - "import from Companies House"

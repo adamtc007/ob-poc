@@ -3,6 +3,7 @@ domains:
     description: Fund share class management and investor registry (Clearstream-style)
     verbs:
       create:
+        flavour: instance_adding
         description: Create a new share class for a fund CBU (idempotent by cbu+name)
         behavior: crud
         metadata:
@@ -154,6 +155,7 @@ domains:
           consequence:
             baseline: reviewable
       ensure:
+        flavour: instance_adding
         description: Create or update share class by ISIN
         behavior: crud
         metadata:
@@ -304,6 +306,7 @@ domains:
           consequence:
             baseline: reviewable
       update-nav:
+        flavour: attribute_mutating
         description: Update NAV for a share class
         behavior: crud
         metadata:
@@ -355,6 +358,7 @@ domains:
           consequence:
             baseline: reviewable
       read:
+        flavour: attribute_mutating
         description: Read a share class by ID
         behavior: crud
         metadata:
@@ -397,6 +401,7 @@ domains:
           consequence:
             baseline: benign
       list:
+        flavour: attribute_mutating
         description: List share classes for a fund
         behavior: crud
         metadata:
@@ -443,6 +448,7 @@ domains:
           consequence:
             baseline: benign
       close:
+        flavour: attribute_mutating
         description: Close a share class to new subscriptions
         behavior: crud
         metadata:
@@ -493,6 +499,7 @@ domains:
           target_slot: share_class
 
       launch:
+        flavour: attribute_mutating
         description: "Launch share class from DRAFT to OPEN (accepting subscriptions)"
         behavior: plugin
         metadata:
@@ -527,6 +534,7 @@ domains:
           target_slot: share_class
 
       soft-close:
+        flavour: attribute_mutating
         description: "Soft-close share class (no new subscriptions; existing holders transact)"
         behavior: plugin
         metadata:
@@ -561,6 +569,7 @@ domains:
           target_slot: share_class
 
       reopen:
+        flavour: attribute_mutating
         description: "Reopen soft-closed share class back to accepting subscriptions"
         behavior: plugin
         metadata:
@@ -594,6 +603,10 @@ domains:
           target_slot: share_class
 
       hard-close:
+        flavour: discretionary
+        role_guard:
+          any_of: [compliance_admin, senior_compliance, mlro]
+        audit_class: share_class_hard_close
         description: "Hard-close share class (no subscriptions AND no redemptions — regulatory / wind-down)"
         behavior: plugin
         metadata:
@@ -631,6 +644,7 @@ domains:
           target_slot: share_class
 
       lift-hard-close:
+        flavour: attribute_mutating
         description: "Lift hard-close on share class back to soft-closed"
         behavior: plugin
         metadata:
@@ -664,6 +678,10 @@ domains:
           target_slot: share_class
 
       begin-winddown:
+        flavour: discretionary
+        role_guard:
+          any_of: [compliance_admin, senior_compliance, mlro]
+        audit_class: share_class_begin_winddown
         description: "Begin share-class wind-down (pre-liquidation)"
         behavior: plugin
         metadata:

@@ -7,6 +7,7 @@ domains:
       # ═══════════════════════════════════════════════════════════════════════════
 
       create:
+        flavour: instance_adding
         description: Create an outstanding request (generic)
         metadata:
           tier: intent
@@ -100,6 +101,7 @@ domains:
             baseline: reviewable
 
       list:
+        flavour: attribute_mutating
         description: List outstanding requests
         metadata:
           tier: reference
@@ -169,6 +171,7 @@ domains:
             baseline: benign
 
       overdue:
+        flavour: attribute_mutating
         description: List overdue requests
         metadata:
           tier: intent
@@ -226,6 +229,7 @@ domains:
       # ═══════════════════════════════════════════════════════════════════════════
 
       fulfill:
+        flavour: attribute_mutating
         description: Mark request as fulfilled
         metadata:
           tier: intent
@@ -286,6 +290,7 @@ domains:
             baseline: reviewable
 
       cancel:
+        flavour: attribute_mutating
         description: Cancel a pending request
         metadata:
           tier: intent
@@ -330,6 +335,7 @@ domains:
             baseline: requires_confirmation
 
       extend:
+        flavour: attribute_mutating
         description: Extend request due date
         metadata:
           tier: intent
@@ -379,6 +385,7 @@ domains:
             baseline: reviewable
 
       remind:
+        flavour: attribute_mutating
         description: Send reminder for pending request
         metadata:
           tier: intent
@@ -430,6 +437,10 @@ domains:
             baseline: reviewable
 
       escalate:
+        flavour: discretionary
+        role_guard:
+          any_of: [compliance_officer, senior_compliance, mlro]
+        audit_class: request_escalate
         description: Escalate overdue request
         metadata:
           tier: intent
@@ -478,6 +489,10 @@ domains:
             baseline: reviewable
 
       waive:
+        flavour: discretionary
+        role_guard:
+          any_of: [compliance_admin, senior_compliance, mlro]
+        audit_class: request_waive
         description: Waive a request requirement
         metadata:
           tier: intent

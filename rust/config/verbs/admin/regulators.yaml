@@ -6,6 +6,7 @@ domains:
     description: "Regulators reference data management"
     verbs:
       list:
+        flavour: attribute_mutating
         description: "List recognized regulators"
         metadata:
           tier: reference
@@ -53,6 +54,7 @@ domains:
           consequence:
             baseline: benign
       read:
+        flavour: attribute_mutating
         description: "Get regulator by code"
         metadata:
           tier: reference
@@ -90,6 +92,7 @@ domains:
           consequence:
             baseline: benign
       create:
+        flavour: instance_adding
         description: "Add new recognized regulator (idempotent by code)"
         metadata:
           tier: intent
@@ -151,6 +154,7 @@ domains:
           consequence:
             baseline: reviewable
       update:
+        flavour: attribute_mutating
         description: "Update regulator"
         metadata:
           tier: intent
@@ -199,6 +203,7 @@ domains:
           consequence:
             baseline: reviewable
       deactivate:
+        flavour: attribute_mutating
         description: "Deactivate regulator"
         metadata:
           tier: intent
@@ -241,6 +246,7 @@ domains:
     description: "Regulatory tiers reference data"
     verbs:
       list:
+        flavour: attribute_mutating
         description: "List regulatory tiers"
         metadata:
           tier: reference
@@ -275,6 +281,7 @@ domains:
           consequence:
             baseline: benign
       read:
+        flavour: attribute_mutating
         description: "Get tier by code"
         metadata:
           tier: reference

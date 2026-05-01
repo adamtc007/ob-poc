@@ -957,7 +957,7 @@ slots:
 
         // Deal should have its KYC-clearance constraint indexed.
         let deal_constraints =
-            r.constraints_for_transition("deal", "deal", "KYC_CLEARANCE", "CONTRACTED");
+            r.constraints_for_transition("deal", "deal", "IN_CLEARANCE", "CONTRACTED");
         assert!(
             deal_constraints
                 .iter()
@@ -983,15 +983,15 @@ slots:
             "deal.cancel should have a transition into CANCELLED"
         );
 
-        // deal.bac-approve (added in R-5) should index a single
-        // BAC_APPROVAL → KYC_CLEARANCE transition.
+        // deal.bac-approve is now an IN_CLEARANCE substate transition:
+        // deal_status remains IN_CLEARANCE while bac_status moves forward.
         let bac_hits = r.transitions_for_verb("deal.bac-approve");
         assert_eq!(
             bac_hits.len(),
             1,
             "expected deal.bac-approve once: {bac_hits:?}"
         );
-        assert_eq!(bac_hits[0].from_state, "BAC_APPROVAL");
-        assert_eq!(bac_hits[0].to_state, "KYC_CLEARANCE");
+        assert_eq!(bac_hits[0].from_state, "IN_CLEARANCE");
+        assert_eq!(bac_hits[0].to_state, "IN_CLEARANCE");
     }
 }

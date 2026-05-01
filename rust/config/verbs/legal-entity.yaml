@@ -9,6 +9,7 @@ domains:
 
     verbs:
       create:
+        flavour: instance_adding
         description: "Create a new BNY legal entity"
         behavior: plugin
         metadata:
@@ -55,6 +56,7 @@ domains:
             baseline: reviewable
 
       update:
+        flavour: attribute_mutating
         description: "Update a legal entity's fields"
         behavior: plugin
         metadata:
@@ -96,6 +98,7 @@ domains:
             baseline: reviewable
 
       list:
+        flavour: attribute_mutating
         description: "List active BNY legal entities"
         behavior: plugin
         metadata:

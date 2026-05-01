@@ -1,0 +1,12 @@
+shape: struct.hedge.cross-border
+workspace: cbu
+extends: [regulated.fund]
+structural_facts:
+  jurisdiction: "${arg.master_jurisdiction.internal}"
+  structure_type: hedge
+  allowed_structure_types: [hedge, cross-border, master-feeder]
+  document_bundles: [docs.bundle.hedge-baseline]
+  trading_profile_type: hedge
+  required_roles: [aifm, depositary, prime-broker]
+  optional_roles: [investment-manager, administrator, auditor, prime-broker]
+slots: {}

@@ -9,6 +9,10 @@ domains:
     invocation_hints: []
     verbs:
       submit-for-review:
+        flavour: discretionary
+        role_guard:
+          any_of: [compliance_officer, senior_compliance, mlro]
+        audit_class: cbu_ca_submit_for_review
         description: "Submit CBU-level CA event for board / legal / compliance review"
         behavior: plugin
         metadata:
@@ -42,6 +46,10 @@ domains:
           target_slot: cbu_corporate_action
 
       approve:
+        flavour: discretionary
+        role_guard:
+          any_of: [compliance_officer, senior_compliance, mlro]
+        audit_class: cbu_ca_approve
         description: "Approve CBU-level CA event (board / legal / compliance sign-off)"
         behavior: plugin
         metadata:
@@ -75,6 +83,10 @@ domains:
           target_slot: cbu_corporate_action
 
       reject:
+        flavour: discretionary
+        role_guard:
+          any_of: [compliance_officer, senior_compliance, mlro]
+        audit_class: cbu_ca_reject
         description: "Reject CBU-level CA event (terminal-negative)"
         behavior: plugin
         metadata:
@@ -111,6 +123,7 @@ domains:
           target_slot: cbu_corporate_action
 
       withdraw:
+        flavour: attribute_mutating
         description: "Withdraw CBU-level CA event before decision (proposer retracts)"
         behavior: plugin
         metadata:
@@ -144,6 +157,7 @@ domains:
           target_slot: cbu_corporate_action
 
       mark-implemented:
+        flavour: attribute_mutating
         description: "Mark CBU-level CA event as implemented (post-effective; terminal-positive)"
         behavior: plugin
         metadata:

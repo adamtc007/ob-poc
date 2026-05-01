@@ -3,6 +3,7 @@ domains:
     description: Entity role reference data (DIRECTOR, UBO, SHAREHOLDER, etc.)
     verbs:
       ensure:
+        flavour: instance_adding
         description: Create or update a role
         metadata:
           tier: intent
@@ -48,6 +49,7 @@ domains:
           consequence:
             baseline: reviewable
       read:
+        flavour: attribute_mutating
         description: Read a role by name
         metadata:
           tier: reference
@@ -85,6 +87,7 @@ domains:
           consequence:
             baseline: benign
       list:
+        flavour: attribute_mutating
         description: List all roles
         metadata:
           tier: reference
@@ -118,6 +121,7 @@ domains:
           consequence:
             baseline: benign
       delete:
+        flavour: attribute_mutating
         description: Delete a role
         metadata:
           tier: intent

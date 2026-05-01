@@ -18,8 +18,10 @@ pub mod compiler;
 pub mod config;
 pub mod dag;
 pub mod diagnostics;
+pub mod frontier;
 pub mod ops;
 pub mod parser;
+pub mod resolver;
 pub mod viewport_parser;
 
 // Re-export commonly used types

@@ -9,6 +9,7 @@ domains:
     invocation_hints: []
     verbs:
       create:
+        flavour: instance_adding
         description: "Create a new client book (scope: client_group_id). Starts book-setup journey."
         behavior: plugin
         metadata:
@@ -47,6 +48,7 @@ domains:
           target_slot: book
 
       select-structure:
+        flavour: attribute_mutating
         description: "Select jurisdiction-specific structure template for the book (e.g. struct.lux.ucits.sicav)"
         behavior: plugin
         metadata:
@@ -85,6 +87,7 @@ domains:
           target_slot: book
 
       mark-ready:
+        flavour: attribute_mutating
         description: "Mark book as ready-for-deal (terminal-positive in book-setup journey)"
         behavior: plugin
         metadata:
@@ -119,6 +122,10 @@ domains:
           target_slot: book
 
       abandon:
+        flavour: discretionary
+        role_guard:
+          any_of: [compliance_admin, senior_compliance, mlro]
+        audit_class: book_abandon
         description: "Abandon book-setup journey (pre-contract)"
         behavior: plugin
         metadata:

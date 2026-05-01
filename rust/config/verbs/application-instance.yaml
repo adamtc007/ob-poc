@@ -8,6 +8,7 @@ domains:
       - deployment
     verbs:
       provision:
+        flavour: instance_adding
         description: Provision a new application instance (creates row in PROVISIONED state)
         invocation_phrases:
           - "provision application instance"
@@ -66,6 +67,7 @@ domains:
             baseline: reviewable
 
       activate:
+        flavour: attribute_mutating
         description: Activate a provisioned (or offline / maintenance) instance — transition to ACTIVE
         invocation_phrases:
           - "activate application instance"
@@ -117,6 +119,7 @@ domains:
           target_slot: application_instance
 
       enter-maintenance:
+        flavour: attribute_mutating
         description: Enter maintenance window — pause traffic without retiring bindings
         invocation_phrases:
           - "enter maintenance window"
@@ -172,6 +175,7 @@ domains:
           target_slot: application_instance
 
       exit-maintenance:
+        flavour: attribute_mutating
         description: Exit maintenance window — return instance to ACTIVE
         invocation_phrases:
           - "exit maintenance window"
@@ -223,6 +227,7 @@ domains:
           target_slot: application_instance
 
       take-offline:
+        flavour: attribute_mutating
         description: Take instance OFFLINE (operational hold — incident, security freeze, capacity action)
         invocation_phrases:
           - "take instance offline"
@@ -278,6 +283,7 @@ domains:
           target_slot: application_instance
 
       bring-online:
+        flavour: attribute_mutating
         description: Bring an OFFLINE instance back to ACTIVE
         invocation_phrases:
           - "bring instance online"
@@ -329,6 +335,10 @@ domains:
           target_slot: application_instance
 
       decommission:
+        flavour: discretionary
+        role_guard:
+          any_of: [compliance_officer, senior_compliance, mlro]
+        audit_class: application_instance_decommission
         description: Decommission an instance — terminal transition; cascades bindings to RETIRED
         invocation_phrases:
           - "decommission application instance"

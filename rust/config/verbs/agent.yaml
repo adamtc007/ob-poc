@@ -25,6 +25,7 @@ domains:
       # Lifecycle Operations
       # ============================================
       start:
+        flavour: instance_adding
         description: Start agent mode with a specific task
         metadata:
           tier: intent
@@ -87,6 +88,7 @@ domains:
           consequence:
             baseline: reviewable
       pause:
+        flavour: attribute_mutating
         description: Pause the running agent loop
         metadata:
           tier: intent
@@ -118,6 +120,7 @@ domains:
           consequence:
             baseline: reviewable
       resume:
+        flavour: attribute_mutating
         description: Resume a paused agent loop
         metadata:
           tier: intent
@@ -149,6 +152,7 @@ domains:
           consequence:
             baseline: reviewable
       stop:
+        flavour: attribute_mutating
         description: Stop the agent loop completely
         metadata:
           tier: intent
@@ -183,6 +187,10 @@ domains:
           consequence:
             baseline: reviewable
       confirm-decision:
+        flavour: discretionary
+        role_guard:
+          any_of: [compliance_admin, senior_compliance, mlro]
+        audit_class: agent_confirm_decision
         description: Confirm the current checkpoint decision
         metadata:
           tier: intent
@@ -225,6 +233,10 @@ domains:
           consequence:
             baseline: reviewable
       reject-decision:
+        flavour: discretionary
+        role_guard:
+          any_of: [compliance_officer, senior_compliance, mlro]
+        audit_class: agent_reject_decision
         description: Reject a checkpoint and skip this decision
         metadata:
           tier: intent
@@ -264,6 +276,10 @@ domains:
           consequence:
             baseline: reviewable
       select-decision-option:
+        flavour: discretionary
+        role_guard:
+          any_of: [compliance_admin, senior_compliance, mlro]
+        audit_class: agent_select_decision_option
         description: Select a specific candidate from checkpoint options
         metadata:
           tier: intent
@@ -307,6 +323,7 @@ domains:
           consequence:
             baseline: benign
       read-status:
+        flavour: attribute_mutating
         description: Read current agent status
         metadata:
           tier: diagnostics
@@ -345,6 +362,7 @@ domains:
           consequence:
             baseline: benign
       read-history:
+        flavour: attribute_mutating
         description: Read agent decision and action history for current session
         metadata:
           tier: intent
@@ -385,6 +403,7 @@ domains:
           consequence:
             baseline: benign
       set-selection-threshold:
+        flavour: attribute_mutating
         description: Set confidence thresholds for auto-selection
         metadata:
           tier: intent
@@ -427,6 +446,7 @@ domains:
           consequence:
             baseline: reviewable
       set-execution-mode:
+        flavour: attribute_mutating
         description: Set the agent execution mode
         metadata:
           tier: intent
@@ -467,6 +487,7 @@ domains:
           consequence:
             baseline: reviewable
       set-authoring-mode:
+        flavour: attribute_mutating
         description: Set the authoring mode boundary
         metadata:
           tier: intent
@@ -517,6 +538,7 @@ domains:
           consequence:
             baseline: reviewable
       teach:
+        flavour: attribute_mutating
         description: Teach a phrase→verb mapping to improve intent recognition
         metadata:
           tier: intent
@@ -570,6 +592,7 @@ domains:
           consequence:
             baseline: reviewable
       unteach:
+        flavour: attribute_mutating
         description: Remove a previously taught phrase→verb mapping
         metadata:
           tier: intent
@@ -620,6 +643,7 @@ domains:
           consequence:
             baseline: reviewable
       read-teaching-status:
+        flavour: attribute_mutating
         description: Read recently taught patterns and their embedding status
         metadata:
           tier: diagnostics
@@ -671,6 +695,7 @@ domains:
           consequence:
             baseline: benign
       read-mode:
+        flavour: attribute_mutating
         description: Read the current agent operating mode (Research or Governed)
         metadata:
           tier: diagnostics
@@ -705,6 +730,7 @@ domains:
           consequence:
             baseline: benign
       read-policy:
+        flavour: attribute_mutating
         description: Read the current PolicyGate configuration and active policy snapshot
         metadata:
           tier: diagnostics
@@ -738,6 +764,7 @@ domains:
           consequence:
             baseline: benign
       list-tools:
+        flavour: attribute_mutating
         description: List available MCP tool specifications from the registry
         metadata:
           tier: diagnostics
@@ -787,6 +814,7 @@ domains:
           consequence:
             baseline: benign
       read-telemetry-summary:
+        flavour: attribute_mutating
         description: Read intent event telemetry for hit-rate analysis and pipeline health
         metadata:
           tier: diagnostics
@@ -835,6 +863,7 @@ domains:
           consequence:
             baseline: benign
       activate-teaching:
+        flavour: attribute_mutating
         description: Activate taught patterns by generating embeddings for semantic search
         metadata:
           tier: intent

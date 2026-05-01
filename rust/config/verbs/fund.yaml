@@ -7,6 +7,7 @@ domains:
       # =========================================================================
 
       create:
+        flavour: instance_adding
         description: Create a fund structure or share class using a fund-type discriminator
         invocation_phrases:
           - "create umbrella fund"
@@ -271,6 +272,7 @@ domains:
           consequence:
             baseline: reviewable
       ensure:
+        flavour: instance_adding
         description: Create or update a fund structure or share class using a fund-type discriminator
         invocation_phrases:
           - "ensure umbrella exists"
@@ -480,6 +482,7 @@ domains:
           consequence:
             baseline: reviewable
       link-feeder:
+        flavour: instance_adding
         description: Link an existing feeder fund to a master fund (idempotent by parent+child+type)
         invocation_phrases:
           - "link feeder to master"
@@ -546,6 +549,7 @@ domains:
           consequence:
             baseline: reviewable
       add-to-umbrella:
+        flavour: instance_adding
         description: Add an existing sub-fund to an umbrella (idempotent by parent+child+type)
         invocation_phrases:
           - "add to umbrella"
@@ -608,6 +612,7 @@ domains:
           consequence:
             baseline: reviewable
       add-share-class:
+        flavour: instance_adding
         description: Add a share class to a sub-fund (idempotent by parent+child+type)
         invocation_phrases:
           - "add share class to fund"
@@ -673,6 +678,7 @@ domains:
           consequence:
             baseline: reviewable
       list-subfunds:
+        flavour: attribute_mutating
         description: List all sub-funds within an umbrella
         invocation_phrases:
           - "list sub-funds"
@@ -724,6 +730,7 @@ domains:
           consequence:
             baseline: benign
       list-share-classes:
+        flavour: attribute_mutating
         description: List all share classes for a sub-fund
         invocation_phrases:
           - "list share classes"
@@ -778,6 +785,7 @@ domains:
           consequence:
             baseline: benign
       list-feeders:
+        flavour: attribute_mutating
         description: List all feeder funds for a master
         invocation_phrases:
           - "list feeder funds"
@@ -826,6 +834,7 @@ domains:
           consequence:
             baseline: benign
       upsert-vehicle:
+        flavour: attribute_mutating
         description: Create or update fund vehicle metadata for an existing fund entity.
         invocation_phrases:
           - "create fund vehicle"
@@ -928,6 +937,7 @@ domains:
           consequence:
             baseline: reviewable
       read-vehicle:
+        flavour: attribute_mutating
         description: Read fund vehicle metadata by fund entity ID.
         invocation_phrases:
           - "get fund vehicle"
@@ -968,6 +978,7 @@ domains:
           consequence:
             baseline: benign
       delete-vehicle:
+        flavour: attribute_mutating
         description: Delete fund vehicle metadata from a fund entity.
         invocation_phrases:
           - "delete fund vehicle"
@@ -1008,6 +1019,7 @@ domains:
           consequence:
             baseline: requires_confirmation
       list-by-manager:
+        flavour: attribute_mutating
         description: List all funds managed by an entity.
         invocation_phrases:
           - "funds by manager"
@@ -1047,6 +1059,7 @@ domains:
           consequence:
             baseline: benign
       list-by-vehicle-type:
+        flavour: attribute_mutating
         description: List all funds of a specific vehicle type.
         invocation_phrases:
           - "list all SICAVs"
@@ -1101,6 +1114,7 @@ domains:
           consequence:
             baseline: benign
       upsert-compartment:
+        flavour: attribute_mutating
         description: Create or update a compartment under an umbrella fund.
         invocation_phrases:
           - "create compartment"
@@ -1169,6 +1183,7 @@ domains:
           consequence:
             baseline: reviewable
       read-compartment:
+        flavour: attribute_mutating
         description: Read compartment details by ID.
         invocation_phrases:
           - "get compartment"
@@ -1202,6 +1217,7 @@ domains:
           consequence:
             baseline: benign
       delete-compartment:
+        flavour: attribute_mutating
         description: Delete a compartment.
         invocation_phrases:
           - "delete compartment"
@@ -1236,6 +1252,7 @@ domains:
           consequence:
             baseline: requires_confirmation
       list-compartments-by-umbrella:
+        flavour: attribute_mutating
         description: List all compartments under an umbrella fund.
         invocation_phrases:
           - "list compartments"
@@ -1280,6 +1297,7 @@ domains:
           consequence:
             baseline: benign
       add-investment:
+        flavour: instance_adding
         description: Record a fund's investment in another fund (idempotent by investor+investee)
         invocation_phrases:
           - "add fund investment"
@@ -1367,6 +1385,7 @@ domains:
           consequence:
             baseline: reviewable
       update-investment:
+        flavour: attribute_mutating
         description: Update investment allocation percentage
         invocation_phrases:
           - "update investment"
@@ -1412,6 +1431,7 @@ domains:
           consequence:
             baseline: reviewable
       end-investment:
+        flavour: attribute_mutating
         description: End/redeem a fund investment
         invocation_phrases:
           - "end investment"
@@ -1453,6 +1473,7 @@ domains:
           consequence:
             baseline: reviewable
       list-investments:
+        flavour: attribute_mutating
         description: List all investments made by a fund (what does this FoF hold)
         invocation_phrases:
           - "list fund investments"
@@ -1497,6 +1518,7 @@ domains:
           consequence:
             baseline: benign
       list-investors:
+        flavour: attribute_mutating
         description: List all fund investors in a fund (who holds this fund)
         invocation_phrases:
           - "list fund investors"

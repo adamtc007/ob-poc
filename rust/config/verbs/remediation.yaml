@@ -7,6 +7,7 @@ domains:
     - open remediations
     verbs:
       list-open:
+        flavour: attribute_mutating
         description: List unresolved remediation events, optionally filtered by entity or workspace
         behavior: plugin
         handler: RemediationListOpenOp
@@ -46,6 +47,7 @@ domains:
             baseline: benign
 
       defer:
+        flavour: attribute_mutating
         description: Explicitly accept divergence from a superseded shared attribute version
         behavior: plugin
         handler: RemediationDeferOp
@@ -84,6 +86,10 @@ domains:
             baseline: requires_confirmation
 
       revoke-deferral:
+        flavour: discretionary
+        role_guard:
+          any_of: [compliance_admin, senior_compliance, mlro]
+        audit_class: remediation_revoke_deferral
         description: Re-open a previously deferred remediation event
         behavior: plugin
         handler: RemediationRevokeDeferralOp
@@ -117,6 +123,7 @@ domains:
             baseline: requires_confirmation
 
       confirm-external-correction:
+        flavour: attribute_mutating
         description: Record that a manual external correction has been confirmed by the provider
         behavior: plugin
         handler: RemediationConfirmExternalOp

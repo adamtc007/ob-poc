@@ -3,6 +3,10 @@ domains:
     description: Periodic access review and attestation
     verbs:
       create-campaign:
+        flavour: discretionary
+        role_guard:
+          any_of: [compliance_officer, senior_compliance, mlro]
+        audit_class: access_review_create_campaign
         description: Create access review campaign
         metadata:
           tier: intent
@@ -72,6 +76,10 @@ domains:
           consequence:
             baseline: reviewable
       populate-campaign:
+        flavour: discretionary
+        role_guard:
+          any_of: [compliance_officer, senior_compliance, mlro]
+        audit_class: access_review_populate_campaign
         description: Populate campaign with review items based on scope
         metadata:
           tier: intent
@@ -110,6 +118,10 @@ domains:
           consequence:
             baseline: reviewable
       launch-campaign:
+        flavour: discretionary
+        role_guard:
+          any_of: [compliance_officer, senior_compliance, mlro]
+        audit_class: access_review_launch_campaign
         description: Launch campaign and notify reviewers
         metadata:
           tier: intent
@@ -142,6 +154,10 @@ domains:
           consequence:
             baseline: requires_confirmation
       confirm-access:
+        flavour: discretionary
+        role_guard:
+          any_of: [compliance_officer, senior_compliance, mlro]
+        audit_class: access_review_confirm_access
         description: Confirm access is appropriate
         metadata:
           tier: intent
@@ -181,6 +197,10 @@ domains:
           consequence:
             baseline: reviewable
       revoke-access:
+        flavour: discretionary
+        role_guard:
+          any_of: [compliance_officer, senior_compliance, mlro]
+        audit_class: access_review_revoke_access
         description: Revoke access - ends the membership
         metadata:
           tier: intent
@@ -219,6 +239,10 @@ domains:
           consequence:
             baseline: requires_confirmation
       extend-access:
+        flavour: discretionary
+        role_guard:
+          any_of: [compliance_officer, senior_compliance, mlro]
+        audit_class: access_review_extend_access
         description: Extend access with new end date
         metadata:
           tier: intent
@@ -262,6 +286,10 @@ domains:
           consequence:
             baseline: reviewable
       escalate-item:
+        flavour: discretionary
+        role_guard:
+          any_of: [compliance_officer, senior_compliance, mlro]
+        audit_class: access_review_escalate_item
         description: Escalate item for senior review
         metadata:
           tier: intent
@@ -311,6 +339,10 @@ domains:
           consequence:
             baseline: reviewable
       bulk-confirm:
+        flavour: discretionary
+        role_guard:
+          any_of: [compliance_officer, senior_compliance, mlro]
+        audit_class: access_review_bulk_confirm
         description: Confirm multiple items at once
         metadata:
           tier: intent
@@ -341,6 +373,10 @@ domains:
           consequence:
             baseline: reviewable
       confirm-all-clean:
+        flavour: discretionary
+        role_guard:
+          any_of: [compliance_officer, senior_compliance, mlro]
+        audit_class: access_review_confirm_all_clean
         description: Confirm all unflagged items for reviewer
         metadata:
           tier: intent
@@ -372,6 +408,10 @@ domains:
           consequence:
             baseline: reviewable
       attest:
+        flavour: discretionary
+        role_guard:
+          any_of: [compliance_officer, senior_compliance, mlro]
+        audit_class: access_review_attest
         description: Formal attestation of reviews with digital signature
         metadata:
           tier: intent
@@ -424,6 +464,10 @@ domains:
           consequence:
             baseline: requires_explicit_authorisation
       process-deadline:
+        flavour: discretionary
+        role_guard:
+          any_of: [compliance_officer, senior_compliance, mlro]
+        audit_class: access_review_process_deadline
         description: Handle items past deadline
         metadata:
           tier: intent
@@ -463,6 +507,10 @@ domains:
           consequence:
             baseline: reviewable
       send-reminders:
+        flavour: discretionary
+        role_guard:
+          any_of: [compliance_officer, senior_compliance, mlro]
+        audit_class: access_review_send_reminders
         description: Send reminder emails to reviewers with pending items
         metadata:
           tier: intent
@@ -494,6 +542,7 @@ domains:
           consequence:
             baseline: reviewable
       my-pending:
+        flavour: attribute_mutating
         description: Get my pending review items
         metadata:
           tier: intent
@@ -542,6 +591,7 @@ domains:
           consequence:
             baseline: benign
       campaign-status:
+        flavour: attribute_mutating
         description: Get campaign details with review items
         metadata:
           tier: intent
@@ -581,6 +631,7 @@ domains:
           consequence:
             baseline: benign
       list-items:
+        flavour: attribute_mutating
         description: List review items for a campaign
         metadata:
           tier: intent
@@ -624,6 +675,7 @@ domains:
           consequence:
             baseline: benign
       audit-report:
+        flavour: attribute_mutating
         description: List attestations for audit trail
         metadata:
           tier: intent
@@ -663,6 +715,7 @@ domains:
           consequence:
             baseline: benign
       list-flagged:
+        flavour: attribute_mutating
         description: List items with detected issues
         metadata:
           tier: intent

@@ -1,0 +1,12 @@
+shape: struct.us.private-fund.delaware-lp
+workspace: cbu
+extends: [base.cbu]
+structural_facts:
+  jurisdiction: US
+  structure_type: private-fund
+  allowed_structure_types: [delaware-lp, private-fund, pe, hedge]
+  document_bundles: [docs.bundle.private-equity-baseline]
+  trading_profile_type: "${arg.fund_type.internal}"
+  required_roles: [general-partner, investment-manager]
+  optional_roles: [custodian, administrator, prime-broker, auditor, legal-counsel, tax-advisor]
+slots: {}

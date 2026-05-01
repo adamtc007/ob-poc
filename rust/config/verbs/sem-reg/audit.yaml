@@ -22,6 +22,7 @@ domains:
       # Plan Management
       # ============================================
       create-plan:
+        flavour: instance_adding
         description: Create a new agent plan with goal and assumptions
         metadata:
           tier: diagnostics
@@ -60,6 +61,7 @@ domains:
           consequence:
             baseline: reviewable
       add-plan-step:
+        flavour: instance_adding
         description: Add a step to an existing agent plan
         metadata:
           tier: diagnostics
@@ -101,6 +103,7 @@ domains:
           consequence:
             baseline: reviewable
       validate-plan:
+        flavour: attribute_mutating
         description: Validate an agent plan (check all steps have valid verbs and snapshots)
         metadata:
           tier: diagnostics
@@ -135,6 +138,7 @@ domains:
           consequence:
             baseline: benign
       execute-plan-step:
+        flavour: attribute_mutating
         description: Execute a specific step in an agent plan
         metadata:
           tier: diagnostics
@@ -176,6 +180,10 @@ domains:
           consequence:
             baseline: reviewable
       record-decision:
+        flavour: discretionary
+        role_guard:
+          any_of: [compliance_admin, senior_compliance, mlro]
+        audit_class: audit_record_decision
         description: Record an agent decision with snapshot manifest provenance
         metadata:
           tier: diagnostics
@@ -219,6 +227,7 @@ domains:
           consequence:
             baseline: reviewable
       record-escalation:
+        flavour: attribute_mutating
         description: Record an escalation to a human reviewer
         metadata:
           tier: diagnostics
@@ -262,6 +271,7 @@ domains:
           consequence:
             baseline: reviewable
       record-disambiguation:
+        flavour: attribute_mutating
         description: Record a disambiguation prompt and selected choice
         metadata:
           tier: diagnostics
@@ -308,6 +318,7 @@ domains:
           consequence:
             baseline: reviewable
       record-observation:
+        flavour: attribute_mutating
         description: Record an observation on a subject entity
         metadata:
           tier: diagnostics

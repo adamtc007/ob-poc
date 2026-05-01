@@ -3,6 +3,7 @@ domains:
     description: Entity relationship edge management with end-and-insert semantics
     verbs:
       upsert:
+        flavour: attribute_mutating
         description: Upsert entity relationship edge with natural key lookup and provenance
         invocation_phrases:
         - "upsert edge"

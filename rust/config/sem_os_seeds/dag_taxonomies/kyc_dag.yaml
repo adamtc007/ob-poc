@@ -91,8 +91,8 @@ overall_lifecycle:
           - "ALL entity_workstreams.status IN ('ASSESS', 'COMPLETE', 'ENHANCED_DD')"
       progression_verbs:
         - kyc-case.set-risk-rating
-        - ubo-registry.promote-to-ubo
-        - red-flag.resolve
+        - ubo-registry.promote
+        - red-flag.close
       next_phase: review
 
     - name: review
@@ -167,6 +167,28 @@ slots:
         11-state KYC case lifecycle. Lifted (reconcile-existing) from
         existing rust/config/sem_os_seeds/state_machines/kyc_case_lifecycle.yaml.
         Schema-backed via cases.status CHECK constraint.
+      predicate_bindings:
+        - entity: evidence_requirement
+          source_kind: dag_entity
+          scope: attached_to this kyc_case
+          required_universe:
+            source_kind: dag_entity
+            source_entity: evidence_requirement
+        - entity: ubo_registry_entry
+          source_kind: dag_entity
+          scope: attached_to this kyc_case
+          required_universe:
+            source_kind: dag_entity
+            source_entity: ubo_registry_requirement
+        - entity: red_flag
+          source_kind: dag_entity
+          scope: attached_to this kyc_case
+        - entity: screening_run
+          source_kind: dag_entity
+          scope: attached_to this kyc_case
+          required_universe:
+            source_kind: dag_entity
+            source_entity: screening_requirement
       states:
         - id: INTAKE
           entry: true
@@ -179,6 +201,14 @@ slots:
           description: "Committee / compliance sign-off in progress."
         - id: APPROVED
           description: "Case approved; CBU cleared for onboarding."
+          green_when: |
+            every evidence_requirement exists
+            AND every evidence_requirement.state = VERIFIED
+            AND every ubo_registry_entry exists
+            AND every ubo_registry_entry.state in {APPROVED, WAIVED}
+            AND no red_flag exists with state = OPEN
+            AND every screening_run exists
+            AND every screening_run.state = CLEAN
         - id: REJECTED
           description: "Case rejected; CBU cannot onboard under this case."
         - id: BLOCKED
@@ -202,12 +232,16 @@ slots:
         - from: ASSESSMENT
           to: REVIEW
           via: kyc-case.update-status
+        # REVIEW → APPROVED: kyc-case.approve verb runs while REVIEW is
+        # green; its handler makes the changes that satisfy APPROVED's
+        # green_when. The destination state's green_when IS the
+        # postcondition (state-node green-switch model, v1.4).
         - from: REVIEW
           to: APPROVED
-          via: case.approve
+          via: kyc-case.approve
         - from: REVIEW
           to: REJECTED
-          via: case.reject
+          via: kyc-case.reject
         - from: "(any non-terminal)"
           to: BLOCKED
           via: kyc-case.escalate
@@ -216,7 +250,7 @@ slots:
           via: kyc-case.close
         - from: "(any non-terminal)"
           to: DO_NOT_ONBOARD
-          via: case.reject (with do-not-onboard flag)
+          via: kyc-case.reject (with do-not-onboard flag)
         - from: "(any non-terminal)"
           to: REFER_TO_REGULATOR
           via: kyc-case.escalate
@@ -269,10 +303,10 @@ slots:
           via: screening-ops.full
         - from: screening_complete
           to: evidence_collected
-          via: evidence.link
+          via: evidence.attach-document
         - from: evidence_collected
           to: verified
-          via: evidence.verify
+          via: evidence.mark-verified
         - from: verified
           to: approved
           via: entity-workstream.close
@@ -319,7 +353,7 @@ slots:
           via: entity-workstream.add
         - from: COLLECT
           to: VERIFY
-          via: evidence.verify
+          via: evidence.mark-verified
         - from: VERIFY
           to: SCREEN
           via: screening-ops.full
@@ -340,7 +374,7 @@ slots:
           via: kyc-case.escalate
         - from: "(any non-terminal)"
           to: PROHIBITED
-          via: case.reject (cascading)
+          via: kyc-case.reject (cascading)
       terminal_states: [COMPLETE, PROHIBITED]
 
   - id: screening
@@ -417,10 +451,10 @@ slots:
       transitions:
         - from: PENDING
           to: VERIFIED
-          via: evidence.verify
+          via: evidence.mark-verified
         - from: PENDING
           to: REJECTED
-          via: evidence.reject
+          via: evidence.mark-rejected
         - from: VERIFIED
           to: EXPIRED
           via: "(time-decay)"
@@ -438,20 +472,56 @@ slots:
       description: |
         UBO promotion lifecycle within a KYC case. 9 states tracking
         the UBO's journey from candidate through formal declaration.
+      predicate_bindings:
+        - entity: entity_match
+          source_kind: dag_entity
+          scope: attached_to this UBO
+        - entity: ownership_percentage
+          source_kind: dag_entity
+          scope: attached_to this UBO
+          value_column: value
+        - entity: evidence_requirement
+          source_kind: dag_entity
+          scope: attached_to this UBO
+          required_universe:
+            source_kind: dag_entity
+            source_entity: ubo_evidence_requirement
+        - entity: ubo_taxonomy
+          source_kind: dag_entity
+          scope: parent case
+        - entity: red_flag
+          source_kind: dag_entity
+          scope: attached_to this UBO
       states:
         - id: CANDIDATE
           entry: true
           description: "Identified as potential UBO."
         - id: IDENTIFIED
           description: "Formally identified as UBO."
+          green_when: |
+            entity_match exists
+            AND entity_match.state = THRESHOLD_PASSED
+            AND ownership_percentage exists
+            AND ownership_percentage.value >= registration_threshold
         - id: PROVABLE
           description: "Evidence path exists to prove UBO status."
+          green_when: |
+            every required evidence_requirement exists for this UBO
         - id: PROVED
           description: "Evidence collected and verified."
+          green_when: |
+            every required evidence_requirement exists for this UBO
+            AND every required evidence_requirement.state = VERIFIED
         - id: REVIEWED
           description: "Reviewed by compliance."
         - id: APPROVED
           description: "Approved as UBO in the case."
+          green_when: |
+            every required evidence_requirement exists for this UBO
+            AND every required evidence_requirement.state = VERIFIED
+            AND ubo_taxonomy exists for parent case
+            AND ubo_taxonomy.state = COMPLETE
+            AND no red_flag exists with state = OPEN AND attached_to this UBO
         - id: WAIVED
           description: "Waived — compliance accepts non-UBO outcome."
         - id: REJECTED
@@ -459,21 +529,25 @@ slots:
         - id: EXPIRED
           description: "Stale; periodic review required."
       transitions:
+        # State-node green-switch model (v1.4): each transition's
+        # destination state declares its green_when predicate. Verbs
+        # run while source is green and make changes that satisfy
+        # the destination's green_when.
         - from: CANDIDATE
           to: IDENTIFIED
-          via: ubo-registry.verify
+          via: ubo-registry.promote
         - from: IDENTIFIED
           to: PROVABLE
-          via: ubo-registry.verify
+          via: ubo-registry.advance
         - from: PROVABLE
           to: PROVED
-          via: evidence.verify
+          via: ubo-registry.advance
         - from: PROVED
           to: REVIEWED
           via: "(compliance review)"
         - from: REVIEWED
           to: APPROVED
-          via: ubo-registry.approve
+          via: ubo-registry.advance
         - from: REVIEWED
           to: WAIVED
           via: "(compliance waiver)"
@@ -485,7 +559,7 @@ slots:
           via: "(time-decay)"
         - from: EXPIRED
           to: CANDIDATE
-          via: ubo-registry.expire + ubo-registry.discover
+          via: "(periodic review: ubo-registry.expire then re-enter as candidate)"
       terminal_states: [APPROVED, WAIVED, REJECTED]
 
   - id: kyc_ubo_evidence
@@ -513,13 +587,13 @@ slots:
           via: doc-request.verify
         - from: RECEIVED
           to: VERIFIED
-          via: evidence.verify
+          via: evidence.mark-verified
         - from: RECEIVED
           to: REJECTED
-          via: evidence.reject
+          via: evidence.mark-rejected
         - from: "(any non-terminal)"
           to: WAIVED
-          via: evidence.waive
+          via: evidence.mark-waived
         - from: VERIFIED
           to: EXPIRED
           via: "(time-decay)"
@@ -552,7 +626,7 @@ slots:
           via: red-flag.escalate
         - from: UNDER_REVIEW
           to: MITIGATED
-          via: red-flag.resolve
+          via: red-flag.close
         - from: UNDER_REVIEW
           to: WAIVED
           via: red-flag.waive
@@ -564,7 +638,7 @@ slots:
           via: "(case progression)"
         - from: BLOCKING
           to: MITIGATED
-          via: red-flag.resolve
+          via: red-flag.close
       terminal_states: [CLOSED]
 
   - id: doc_request
@@ -600,13 +674,13 @@ slots:
           via: "(compliance review)"
         - from: UNDER_REVIEW
           to: VERIFIED
-          via: evidence.verify
+          via: evidence.mark-verified
         - from: UNDER_REVIEW
           to: REJECTED
-          via: evidence.reject
+          via: evidence.mark-rejected
         - from: "(any non-terminal)"
           to: WAIVED
-          via: evidence.waive
+          via: evidence.mark-waived
         - from: "(VERIFIED, REJECTED)"
           to: EXPIRED
           via: "(time-decay)"
@@ -656,22 +730,32 @@ slots:
       source_entity: '"ob-poc".kyc_decisions'
       state_column: status
       description: "Final KYC decision (4 states)."
+      predicate_bindings:
+        - entity: kyc_case
+          source_kind: dag_entity
+          scope: parent kyc_case
       states:
         - id: PENDING_REVIEW
           entry: true
         - id: CLEARED
+          green_when: |
+            parent kyc_case exists
+            AND parent kyc_case.state = APPROVED
         - id: REJECTED
         - id: CONDITIONAL
       transitions:
+        # PENDING_REVIEW → CLEARED: kyc-case.approve drives this; the
+        # destination state's green_when expresses the test (parent
+        # kyc_case.status = APPROVED).
         - from: PENDING_REVIEW
           to: CLEARED
-          via: case.approve
+          via: kyc-case.approve
         - from: PENDING_REVIEW
           to: REJECTED
-          via: case.reject
+          via: kyc-case.reject
         - from: PENDING_REVIEW
           to: CONDITIONAL
-          via: case.approve-with-conditions
+          via: kyc-case.approve-with-conditions
       terminal_states: [CLEARED, REJECTED, CONDITIONAL]
 
   - id: kyc_service_agreement

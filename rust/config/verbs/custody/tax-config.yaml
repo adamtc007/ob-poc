@@ -8,6 +8,7 @@ domains:
       # =========================================================================
 
       define-jurisdiction:
+        flavour: attribute_mutating
         description: "Define tax jurisdiction with withholding rates"
         metadata:
           tier: intent
@@ -87,6 +88,7 @@ domains:
             baseline: reviewable
 
       list-jurisdictions:
+        flavour: attribute_mutating
         description: "List tax jurisdictions"
         metadata:
           tier: reference
@@ -134,6 +136,7 @@ domains:
             baseline: benign
 
       set-treaty-rate:
+        flavour: attribute_mutating
         description: "Set bilateral tax treaty rate"
         metadata:
           tier: intent
@@ -245,6 +248,7 @@ domains:
             baseline: reviewable
 
       list-treaty-rates:
+        flavour: attribute_mutating
         description: "List treaty rates for jurisdiction pair"
         metadata:
           tier: reference
@@ -294,6 +298,7 @@ domains:
             baseline: benign
 
       set-tax-status:
+        flavour: attribute_mutating
         description: "Set CBU tax status for jurisdiction"
         metadata:
           tier: intent
@@ -418,6 +423,7 @@ domains:
             baseline: reviewable
 
       list-tax-status:
+        flavour: attribute_mutating
         description: "List tax status for CBU"
         metadata:
           tier: diagnostics
@@ -467,6 +473,7 @@ domains:
             baseline: benign
 
       set-reclaim-config:
+        flavour: attribute_mutating
         description: "Configure tax reclaim processing"
         metadata:
           tier: intent
@@ -576,6 +583,7 @@ domains:
             baseline: reviewable
 
       list-reclaim-configs:
+        flavour: attribute_mutating
         description: "List reclaim configurations for CBU"
         metadata:
           tier: reference
@@ -625,6 +633,7 @@ domains:
             baseline: benign
 
       deactivate-reclaim:
+        flavour: attribute_mutating
         description: "Deactivate reclaim configuration"
         metadata:
           tier: intent
@@ -673,6 +682,7 @@ domains:
             baseline: requires_confirmation
 
       set-reporting:
+        flavour: attribute_mutating
         description: "Set tax reporting obligation"
         metadata:
           tier: intent
@@ -792,6 +802,7 @@ domains:
             baseline: reviewable
 
       list-reporting:
+        flavour: attribute_mutating
         description: "List tax reporting obligations for CBU"
         metadata:
           tier: reference

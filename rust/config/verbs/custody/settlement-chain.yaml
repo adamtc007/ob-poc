@@ -8,6 +8,7 @@ domains:
       # =========================================================================
 
       define-location:
+        flavour: attribute_mutating
         description: "Define settlement location (CSD/ICSD)"
         invocation_phrases:
           - "define settlement location"
@@ -84,6 +85,7 @@ domains:
             baseline: reviewable
 
       list-locations:
+        flavour: attribute_mutating
         description: "List settlement locations"
         invocation_phrases:
           - "list settlement locations"
@@ -132,6 +134,7 @@ domains:
             baseline: benign
 
       create-chain:
+        flavour: instance_adding
         description: "Create settlement chain for CBU"
         invocation_phrases:
           - "create settlement chain"
@@ -231,6 +234,7 @@ domains:
             baseline: reviewable
 
       list-chains:
+        flavour: attribute_mutating
         description: "List settlement chains for CBU"
         invocation_phrases:
           - "list settlement chains"
@@ -283,6 +287,7 @@ domains:
             baseline: benign
 
       deactivate-chain:
+        flavour: attribute_mutating
         description: "Deactivate a settlement chain"
         invocation_phrases:
           - "deactivate settlement chain"
@@ -335,6 +340,7 @@ domains:
           target_slot: settlement_pattern_template
 
       add-hop:
+        flavour: instance_adding
         description: "Add intermediary hop to settlement chain"
         invocation_phrases:
           - "add settlement hop"
@@ -440,6 +446,7 @@ domains:
           target_slot: settlement_pattern_template
 
       list-hops:
+        flavour: attribute_mutating
         description: "List hops in a settlement chain"
         invocation_phrases:
           - "list settlement hops"
@@ -481,6 +488,7 @@ domains:
             baseline: benign
 
       remove-hop:
+        flavour: attribute_mutating
         description: "Remove hop from settlement chain"
         invocation_phrases:
           - "remove settlement hop"
@@ -526,6 +534,7 @@ domains:
             baseline: requires_confirmation
 
       set-location-preference:
+        flavour: attribute_mutating
         description: "Set preferred settlement location for market/instrument"
         invocation_phrases:
           - "set settlement preference"
@@ -622,6 +631,7 @@ domains:
             baseline: reviewable
 
       list-location-preferences:
+        flavour: attribute_mutating
         description: "List settlement location preferences for CBU"
         invocation_phrases:
           - "list settlement preferences"
@@ -671,6 +681,7 @@ domains:
             baseline: benign
 
       set-cross-border:
+        flavour: attribute_mutating
         description: "Configure cross-border settlement routing"
         invocation_phrases:
           - "set cross-border routing"
@@ -786,6 +797,7 @@ domains:
             baseline: reviewable
 
       list-cross-border:
+        flavour: attribute_mutating
         description: "List cross-border configurations for CBU"
         invocation_phrases:
           - "list cross-border configs"
@@ -834,6 +846,7 @@ domains:
             baseline: benign
 
       deactivate-cross-border:
+        flavour: attribute_mutating
         description: "Deactivate cross-border configuration"
         invocation_phrases:
           - "deactivate cross-border"
@@ -884,6 +897,10 @@ domains:
             baseline: requires_confirmation
 
       request-review:
+        flavour: discretionary
+        role_guard:
+          any_of: [compliance_officer, senior_compliance, mlro]
+        audit_class: settlement_chain_request_review
         description: "Submit a configured settlement chain for ops / treasury review"
         invocation_phrases:
           - "request review"
@@ -919,6 +936,7 @@ domains:
           target_slot: settlement_pattern_template
 
       enter-parallel-run:
+        flavour: attribute_mutating
         description: "Enter parallel-run state — new chain runs alongside incumbent for 1-2 cycles"
         invocation_phrases:
           - "enter parallel run"
@@ -954,6 +972,7 @@ domains:
           target_workspace: instrument_matrix
           target_slot: settlement_pattern_template
       go-live:
+        flavour: attribute_mutating
         description: "Activate chain as live (parallel_run → live)"
         invocation_phrases:
           - "go live on chain"
@@ -989,6 +1008,7 @@ domains:
           target_slot: settlement_pattern_template
 
       abort-parallel-run:
+        flavour: attribute_mutating
         description: "Abort parallel_run — roll back to reviewed state (issues found)"
         invocation_phrases:
           - "abort parallel run"
@@ -1027,6 +1047,10 @@ domains:
           target_workspace: instrument_matrix
           target_slot: settlement_pattern_template
       suspend:
+        flavour: discretionary
+        role_guard:
+          any_of: [compliance_officer, senior_compliance, mlro]
+        audit_class: settlement_chain_suspend
         description: "Suspend a live settlement chain (operational hold)"
         invocation_phrases:
           - "suspend chain"
@@ -1065,6 +1089,7 @@ domains:
           target_slot: settlement_pattern_template
 
       reactivate:
+        flavour: attribute_mutating
         description: "Reactivate a suspended settlement chain (suspended → live)"
         invocation_phrases:
           - "reactivate chain"

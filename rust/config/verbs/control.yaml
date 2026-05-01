@@ -3,6 +3,7 @@ domains:
     description: Control relationships (distinct from ownership) - voting rights, board control, veto powers
     verbs:
       add:
+        flavour: instance_adding
         description: Add a control relationship between entities (idempotent by controller+controlled+type)
         invocation_phrases:
           - "add control relationship"
@@ -102,6 +103,7 @@ domains:
           consequence:
             baseline: reviewable
       end:
+        flavour: attribute_mutating
         description: End a control relationship
         invocation_phrases:
           - "end control relationship"
@@ -151,6 +153,7 @@ domains:
           consequence:
             baseline: reviewable
       list-controllers:
+        flavour: attribute_mutating
         description: List who controls an entity
         invocation_phrases:
           - "list controllers"
@@ -199,6 +202,7 @@ domains:
           consequence:
             baseline: benign
       list-controlled:
+        flavour: attribute_mutating
         description: List what an entity controls
         invocation_phrases:
           - "list controlled entities"
@@ -252,6 +256,7 @@ domains:
           consequence:
             baseline: benign
       analyze:
+        flavour: attribute_mutating
         description: |
           Comprehensive control analysis for any entity type.
           Routes to appropriate analyzer based on entity_type.
@@ -323,6 +328,7 @@ domains:
           consequence:
             baseline: benign
       build-graph:
+        flavour: attribute_mutating
         description: |
           Build full control graph for a CBU.
           Nodes: entities, persons, positions
@@ -390,6 +396,7 @@ domains:
           consequence:
             baseline: benign
       identify-ubos:
+        flavour: attribute_mutating
         description: |
           Identify all UBOs for a CBU across all control vectors:
           - Ownership ≥25% (direct or indirect)
@@ -467,6 +474,7 @@ domains:
           consequence:
             baseline: benign
       show-board-controller:
+        flavour: attribute_mutating
         description: |
           Show the computed board controller for a CBU.
           Returns the natural person or entity that controls the board,
@@ -541,6 +549,7 @@ domains:
           consequence:
             baseline: benign
       recompute-board-controller:
+        flavour: attribute_mutating
         description: |
           Recompute the board controller for a CBU.
           Traverses ownership/control graph, analyzes board compositions,
@@ -610,6 +619,7 @@ domains:
           consequence:
             baseline: reviewable
       set-board-controller:
+        flavour: attribute_mutating
         description: |
           Manually set the board controller for a CBU.
           Creates an override that takes precedence over computed values.
@@ -687,6 +697,10 @@ domains:
           consequence:
             baseline: requires_confirmation
       clear-board-controller-override:
+        flavour: discretionary
+        role_guard:
+          any_of: [senior_compliance, mlro, executive, board]
+        audit_class: control_clear_board_controller_override
         description: |
           Clear a manual board controller override.
           Returns to computed value.
@@ -739,6 +753,7 @@ domains:
           consequence:
             baseline: requires_confirmation
       import-psc-register:
+        flavour: instance_adding
         description: |
           Import board controller data from a PSC (Persons with Significant Control) register.
           Supports UK Companies House PSC format.
@@ -813,6 +828,7 @@ domains:
           consequence:
             baseline: benign
       compute-controllers:
+        flavour: attribute_mutating
         description: |
           Compute governance controllers for a case entity.
           Loads CONTROL and MANAGEMENT edges, applies priority ordering,
@@ -877,6 +893,7 @@ domains:
           consequence:
             baseline: benign
       import-gleif-control:
+        flavour: instance_adding
         description: |
           Import control data from GLEIF (Global LEI Foundation).
           Uses the LEI-RR (Relationship Record) data for parent/child control.

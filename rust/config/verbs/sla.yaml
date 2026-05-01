@@ -9,6 +9,7 @@ domains:
     verbs:
       # === Template Operations (read-only reference data) ===
       list-templates:
+        flavour: attribute_mutating
         description: List available SLA templates
         invocation_phrases:
           - "list SLA templates"
@@ -63,6 +64,7 @@ domains:
           consequence:
             baseline: benign
       read-template:
+        flavour: attribute_mutating
         description: Read SLA template by code
         invocation_phrases:
           - "read SLA template"
@@ -103,6 +105,7 @@ domains:
           consequence:
             baseline: benign
       commit:
+        flavour: attribute_mutating
         description: Create SLA commitment for CBU (idempotent by cbu+template+profile)
         invocation_phrases:
           - "commit SLA"
@@ -209,6 +212,7 @@ domains:
           consequence:
             baseline: reviewable
       bind:
+        flavour: instance_adding
         description: Bind SLA commitment to a target object
         invocation_phrases:
           - "bind SLA"
@@ -294,6 +298,7 @@ domains:
           consequence:
             baseline: reviewable
       list-commitments:
+        flavour: attribute_mutating
         description: List SLA commitments for CBU
         invocation_phrases:
           - "list SLA commitments"
@@ -343,6 +348,10 @@ domains:
           consequence:
             baseline: benign
       suspend-commitment:
+        flavour: discretionary
+        role_guard:
+          any_of: [compliance_officer, senior_compliance, mlro]
+        audit_class: sla_suspend_commitment
         description: Suspend an SLA commitment
         invocation_phrases:
           - "suspend SLA"
@@ -385,6 +394,7 @@ domains:
           consequence:
             baseline: reviewable
       record-measurement:
+        flavour: instance_adding
         description: Record SLA measurement for period
         invocation_phrases:
           - "record SLA measurement"
@@ -467,6 +477,7 @@ domains:
           consequence:
             baseline: reviewable
       list-measurements:
+        flavour: attribute_mutating
         description: List measurements for SLA commitment
         invocation_phrases:
           - "list SLA measurements"
@@ -517,6 +528,7 @@ domains:
           consequence:
             baseline: benign
       report-breach:
+        flavour: instance_adding
         description: Report SLA breach
         invocation_phrases:
           - "report SLA breach"
@@ -598,6 +610,7 @@ domains:
           consequence:
             baseline: reviewable
       update-remediation:
+        flavour: attribute_mutating
         description: Update breach remediation status
         invocation_phrases:
           - "update remediation"
@@ -655,6 +668,7 @@ domains:
           consequence:
             baseline: reviewable
       resolve-breach:
+        flavour: attribute_mutating
         description: Mark breach as resolved
         invocation_phrases:
           - "resolve SLA breach"
@@ -696,6 +710,10 @@ domains:
           consequence:
             baseline: reviewable
       escalate-breach:
+        flavour: discretionary
+        role_guard:
+          any_of: [compliance_officer, senior_compliance, mlro]
+        audit_class: sla_escalate_breach
         description: Escalate breach
         invocation_phrases:
           - "escalate SLA breach"
@@ -739,6 +757,7 @@ domains:
           consequence:
             baseline: reviewable
       list-open-breaches:
+        flavour: attribute_mutating
         description: List open breaches for CBU
         invocation_phrases:
           - "list open SLA breaches"

@@ -1,0 +1,12 @@
+shape: struct.uk.private-equity.lp
+workspace: cbu
+extends: [base.cbu]
+structural_facts:
+  jurisdiction: UK
+  structure_type: pe
+  allowed_structure_types: [lp, pe]
+  document_bundles: [docs.bundle.private-equity-baseline]
+  trading_profile_type: pe
+  required_roles: [general-partner]
+  optional_roles: [aifm, depositary, administrator, auditor, legal-counsel]
+slots: {}

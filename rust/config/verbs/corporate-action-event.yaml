@@ -28,6 +28,7 @@ domains:
     verbs:
 
       attach:
+        flavour: instance_adding
         description: "Attach a CA event to a mandate (entry state: election_pending)"
         invocation_phrases:
           - "attach CA event"
@@ -81,6 +82,7 @@ domains:
           target_workspace: instrument_matrix
           target_slot: corporate_action_event
       elect:
+        flavour: attribute_mutating
         description: "Make an election on a pending CA event"
         invocation_phrases:
           - "elect corporate action"

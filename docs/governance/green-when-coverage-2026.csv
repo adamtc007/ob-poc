@@ -1,0 +1,333 @@
+workspace,dag_id,slot_id,state_id,candidate,has_green_when,coverage_status,exclusion_reason,inbound_verbs,source_file
+book_setup,book_setup_dag,book,abandoned,false,false,excluded,discretionary_destination,book.abandon,rust/config/sem_os_seeds/dag_taxonomies/book_setup_dag.yaml
+book_setup,book_setup_dag,book,cbus_scaffolded,true,false,missing,,cbu.create,rust/config/sem_os_seeds/dag_taxonomies/book_setup_dag.yaml
+book_setup,book_setup_dag,book,entities_provisioned,true,false,missing,,macro: structure.* invokes entity.create series,rust/config/sem_os_seeds/dag_taxonomies/book_setup_dag.yaml
+book_setup,book_setup_dag,book,mandates_defined,true,false,missing,,mandate.create,rust/config/sem_os_seeds/dag_taxonomies/book_setup_dag.yaml
+book_setup,book_setup_dag,book,parties_assigned,true,false,missing,,cbu.assign-role,rust/config/sem_os_seeds/dag_taxonomies/book_setup_dag.yaml
+book_setup,book_setup_dag,book,proposed,false,false,excluded,entry_state,,rust/config/sem_os_seeds/dag_taxonomies/book_setup_dag.yaml
+book_setup,book_setup_dag,book,ready_for_deal,true,false,missing,,book.mark-ready,rust/config/sem_os_seeds/dag_taxonomies/book_setup_dag.yaml
+book_setup,book_setup_dag,book,structure_chosen,true,false,missing,,book.select-structure,rust/config/sem_os_seeds/dag_taxonomies/book_setup_dag.yaml
+booking_principal,booking_principal_dag,clearance,ACTIVE,true,false,missing,,booking-principal-clearance.activate|booking-principal-clearance.reinstate,rust/config/sem_os_seeds/dag_taxonomies/booking_principal_dag.yaml
+booking_principal,booking_principal_dag,clearance,APPROVED,false,true,excluded,discretionary_destination,booking-principal-clearance.approve,rust/config/sem_os_seeds/dag_taxonomies/booking_principal_dag.yaml
+booking_principal,booking_principal_dag,clearance,PENDING,false,false,excluded,entry_state,booking-principal-clearance.reopen,rust/config/sem_os_seeds/dag_taxonomies/booking_principal_dag.yaml
+booking_principal,booking_principal_dag,clearance,REJECTED,false,false,excluded,discretionary_destination,booking-principal-clearance.reject,rust/config/sem_os_seeds/dag_taxonomies/booking_principal_dag.yaml
+booking_principal,booking_principal_dag,clearance,REVOKED,false,false,excluded,discretionary_destination,booking-principal-clearance.revoke,rust/config/sem_os_seeds/dag_taxonomies/booking_principal_dag.yaml
+booking_principal,booking_principal_dag,clearance,SCREENING,true,false,missing,,booking-principal-clearance.start-screening,rust/config/sem_os_seeds/dag_taxonomies/booking_principal_dag.yaml
+booking_principal,booking_principal_dag,clearance,SUSPENDED,false,false,excluded,discretionary_destination,booking-principal-clearance.suspend,rust/config/sem_os_seeds/dag_taxonomies/booking_principal_dag.yaml
+catalogue,catalogue_dag,proposal,COMMITTED,false,false,excluded,discretionary_destination,catalogue.commit-verb-declaration,rust/config/sem_os_seeds/dag_taxonomies/catalogue_dag.yaml
+catalogue,catalogue_dag,proposal,DRAFT,false,false,excluded,entry_state,catalogue.reopen-proposal,rust/config/sem_os_seeds/dag_taxonomies/catalogue_dag.yaml
+catalogue,catalogue_dag,proposal,REJECTED,true,false,missing,,catalogue.reject-proposal,rust/config/sem_os_seeds/dag_taxonomies/catalogue_dag.yaml
+catalogue,catalogue_dag,proposal,ROLLED_BACK,true,false,missing,,catalogue.rollback-verb-declaration,rust/config/sem_os_seeds/dag_taxonomies/catalogue_dag.yaml
+catalogue,catalogue_dag,proposal,STAGED,true,false,missing,,catalogue.stage-proposal,rust/config/sem_os_seeds/dag_taxonomies/catalogue_dag.yaml
+cbu,cbu_dag,cbu,DISCOVERED,false,false,excluded,entry_state,,rust/config/sem_os_seeds/dag_taxonomies/cbu_dag.yaml
+cbu,cbu_dag,cbu,UPDATE_PENDING_PROOF,true,false,missing,,cbu.request-proof-update,rust/config/sem_os_seeds/dag_taxonomies/cbu_dag.yaml
+cbu,cbu_dag,cbu,VALIDATED,false,true,excluded,discretionary_destination,cbu.decide,rust/config/sem_os_seeds/dag_taxonomies/cbu_dag.yaml
+cbu,cbu_dag,cbu,VALIDATION_FAILED,false,false,excluded,discretionary_destination,cbu.decide,rust/config/sem_os_seeds/dag_taxonomies/cbu_dag.yaml
+cbu,cbu_dag,cbu,VALIDATION_PENDING,true,false,missing,,cbu.reopen-validation|cbu.submit-for-validation,rust/config/sem_os_seeds/dag_taxonomies/cbu_dag.yaml
+cbu,cbu_dag,cbu_corporate_action,approved,false,true,excluded,discretionary_destination,cbu-ca.approve,rust/config/sem_os_seeds/dag_taxonomies/cbu_dag.yaml
+cbu,cbu_dag,cbu_corporate_action,effective,true,false,missing,,backend: effective_date reached,rust/config/sem_os_seeds/dag_taxonomies/cbu_dag.yaml
+cbu,cbu_dag,cbu_corporate_action,implemented,true,false,missing,,cbu-ca.mark-implemented,rust/config/sem_os_seeds/dag_taxonomies/cbu_dag.yaml
+cbu,cbu_dag,cbu_corporate_action,proposed,false,false,excluded,entry_state,,rust/config/sem_os_seeds/dag_taxonomies/cbu_dag.yaml
+cbu,cbu_dag,cbu_corporate_action,rejected,false,false,excluded,discretionary_destination,cbu-ca.reject,rust/config/sem_os_seeds/dag_taxonomies/cbu_dag.yaml
+cbu,cbu_dag,cbu_corporate_action,under_review,false,false,excluded,discretionary_destination,cbu-ca.submit-for-review,rust/config/sem_os_seeds/dag_taxonomies/cbu_dag.yaml
+cbu,cbu_dag,cbu_corporate_action,withdrawn,true,false,missing,,cbu-ca.withdraw,rust/config/sem_os_seeds/dag_taxonomies/cbu_dag.yaml
+cbu,cbu_dag,cbu_disposition,active,false,false,excluded,entry_state,cbu.clear-remediation|cbu.restore,rust/config/sem_os_seeds/dag_taxonomies/cbu_dag.yaml
+cbu,cbu_dag,cbu_disposition,hard_deleted,false,false,excluded,discretionary_destination,cbu.hard-delete,rust/config/sem_os_seeds/dag_taxonomies/cbu_dag.yaml
+cbu,cbu_dag,cbu_disposition,soft_deleted,true,false,missing,,cbu.soft-delete,rust/config/sem_os_seeds/dag_taxonomies/cbu_dag.yaml
+cbu,cbu_dag,cbu_disposition,under_remediation,true,false,missing,,cbu.flag-for-remediation,rust/config/sem_os_seeds/dag_taxonomies/cbu_dag.yaml
+cbu,cbu_dag,cbu_evidence,APPROVED,true,true,covered,,cbu.approve-evidence,rust/config/sem_os_seeds/dag_taxonomies/cbu_dag.yaml
+cbu,cbu_dag,cbu_evidence,EXPIRED,true,true,covered,,backend: time-decay trigger based on evidence_type validity window,rust/config/sem_os_seeds/dag_taxonomies/cbu_dag.yaml
+cbu,cbu_dag,cbu_evidence,REJECTED,true,false,missing,,cbu.reject-evidence,rust/config/sem_os_seeds/dag_taxonomies/cbu_dag.yaml
+cbu,cbu_dag,cbu_evidence,REVIEWED,true,true,covered,,cbu.review-evidence,rust/config/sem_os_seeds/dag_taxonomies/cbu_dag.yaml
+cbu,cbu_dag,cbu_evidence,UPLOADED,false,true,excluded,entry_state,cbu.attach-evidence,rust/config/sem_os_seeds/dag_taxonomies/cbu_dag.yaml
+cbu,cbu_dag,client_group_entity_review,confirmed,true,false,missing,,backend: client-group researcher review — cross-workspace verb from onboarding,rust/config/sem_os_seeds/dag_taxonomies/cbu_dag.yaml
+cbu,cbu_dag,client_group_entity_review,needs_update,true,false,missing,,backend: source data change trigger,rust/config/sem_os_seeds/dag_taxonomies/cbu_dag.yaml
+cbu,cbu_dag,client_group_entity_review,pending,false,false,excluded,entry_state,backend: re-review required,rust/config/sem_os_seeds/dag_taxonomies/cbu_dag.yaml
+cbu,cbu_dag,client_group_entity_review,rejected,true,false,missing,,backend: client-group researcher review,rust/config/sem_os_seeds/dag_taxonomies/cbu_dag.yaml
+cbu,cbu_dag,entity_limited_company_ubo,DISCOVERED,true,false,missing,,backend: UBO discovery pipeline|ubo-registry.promote-to-ubo,rust/config/sem_os_seeds/dag_taxonomies/cbu_dag.yaml
+cbu,cbu_dag,entity_limited_company_ubo,EXEMPT,true,false,missing,,backend: exemption classifier,rust/config/sem_os_seeds/dag_taxonomies/cbu_dag.yaml
+cbu,cbu_dag,entity_limited_company_ubo,MANUAL_REQUIRED,true,false,missing,,backend: pipeline failure,rust/config/sem_os_seeds/dag_taxonomies/cbu_dag.yaml
+cbu,cbu_dag,entity_limited_company_ubo,PENDING,false,false,excluded,entry_state,,rust/config/sem_os_seeds/dag_taxonomies/cbu_dag.yaml
+cbu,cbu_dag,entity_limited_company_ubo,PUBLIC_FLOAT,true,false,missing,,backend: listed-company check,rust/config/sem_os_seeds/dag_taxonomies/cbu_dag.yaml
+cbu,cbu_dag,entity_proper_person,GHOST,false,false,excluded,entry_state,,rust/config/sem_os_seeds/dag_taxonomies/cbu_dag.yaml
+cbu,cbu_dag,entity_proper_person,IDENTIFIED,true,false,missing,,entity.identify,rust/config/sem_os_seeds/dag_taxonomies/cbu_dag.yaml
+cbu,cbu_dag,entity_proper_person,VERIFIED,true,false,missing,,entity.verify,rust/config/sem_os_seeds/dag_taxonomies/cbu_dag.yaml
+cbu,cbu_dag,holding,ACTIVE,true,false,missing,,backend: sanctions cleared|holding.lift-restriction|holding.release-pledge|holding.update-status,rust/config/sem_os_seeds/dag_taxonomies/cbu_dag.yaml
+cbu,cbu_dag,holding,CLOSED,false,false,excluded,discretionary_destination,holding.close,rust/config/sem_os_seeds/dag_taxonomies/cbu_dag.yaml
+cbu,cbu_dag,holding,FROZEN,true,false,missing,,backend: sanctions hit,rust/config/sem_os_seeds/dag_taxonomies/cbu_dag.yaml
+cbu,cbu_dag,holding,PENDING,false,false,excluded,entry_state,,rust/config/sem_os_seeds/dag_taxonomies/cbu_dag.yaml
+cbu,cbu_dag,holding,PLEDGED,true,false,missing,,holding.pledge,rust/config/sem_os_seeds/dag_taxonomies/cbu_dag.yaml
+cbu,cbu_dag,holding,RESTRICTED,true,false,missing,,holding.restrict,rust/config/sem_os_seeds/dag_taxonomies/cbu_dag.yaml
+cbu,cbu_dag,holding,SUSPENDED,true,false,missing,,holding.update-status,rust/config/sem_os_seeds/dag_taxonomies/cbu_dag.yaml
+cbu,cbu_dag,investor,ACTIVE,true,false,missing,,investor.activate|investor.reinstate,rust/config/sem_os_seeds/dag_taxonomies/cbu_dag.yaml
+cbu,cbu_dag,investor,DRAFT,false,false,excluded,entry_state,,rust/config/sem_os_seeds/dag_taxonomies/cbu_dag.yaml
+cbu,cbu_dag,investor,ELIGIBLE,true,false,missing,,investor.mark-eligible,rust/config/sem_os_seeds/dag_taxonomies/cbu_dag.yaml
+cbu,cbu_dag,investor,OFFBOARDED,false,false,excluded,discretionary_destination,investor.offboard,rust/config/sem_os_seeds/dag_taxonomies/cbu_dag.yaml
+cbu,cbu_dag,investor,SUSPENDED,false,false,excluded,discretionary_destination,investor.suspend,rust/config/sem_os_seeds/dag_taxonomies/cbu_dag.yaml
+cbu,cbu_dag,investor_kyc,APPROVED,false,false,excluded,discretionary_destination,investor.approve-kyc,rust/config/sem_os_seeds/dag_taxonomies/cbu_dag.yaml
+cbu,cbu_dag,investor_kyc,EXPIRED,true,false,missing,,backend: kyc_expires_at trigger,rust/config/sem_os_seeds/dag_taxonomies/cbu_dag.yaml
+cbu,cbu_dag,investor_kyc,IN_PROGRESS,true,false,missing,,investor.start-kyc,rust/config/sem_os_seeds/dag_taxonomies/cbu_dag.yaml
+cbu,cbu_dag,investor_kyc,NOT_STARTED,false,false,excluded,entry_state,,rust/config/sem_os_seeds/dag_taxonomies/cbu_dag.yaml
+cbu,cbu_dag,investor_kyc,REFRESH_REQUIRED,true,false,missing,,investor.request-documents,rust/config/sem_os_seeds/dag_taxonomies/cbu_dag.yaml
+cbu,cbu_dag,investor_kyc,REJECTED,false,false,excluded,discretionary_destination,investor.reject-kyc,rust/config/sem_os_seeds/dag_taxonomies/cbu_dag.yaml
+cbu,cbu_dag,manco,APPROVED,true,true,covered,,manco.approve|manco.clear-regulatory,rust/config/sem_os_seeds/dag_taxonomies/cbu_dag.yaml
+cbu,cbu_dag,manco,SUNSET,false,false,excluded,discretionary_destination,manco.begin-sunset,rust/config/sem_os_seeds/dag_taxonomies/cbu_dag.yaml
+cbu,cbu_dag,manco,SUSPENDED,false,false,excluded,discretionary_destination,manco.suspend,rust/config/sem_os_seeds/dag_taxonomies/cbu_dag.yaml
+cbu,cbu_dag,manco,TERMINATED,false,false,excluded,discretionary_destination,manco.reject|manco.terminate,rust/config/sem_os_seeds/dag_taxonomies/cbu_dag.yaml
+cbu,cbu_dag,manco,UNDER_INVESTIGATION,true,false,missing,,manco.flag-regulatory|manco.partial-reinstate,rust/config/sem_os_seeds/dag_taxonomies/cbu_dag.yaml
+cbu,cbu_dag,manco,UNDER_REVIEW,false,false,excluded,entry_state,,rust/config/sem_os_seeds/dag_taxonomies/cbu_dag.yaml
+cbu,cbu_dag,service_consumption,active,true,false,missing,,service-consumption.activate|service-consumption.reinstate,rust/config/sem_os_seeds/dag_taxonomies/cbu_dag.yaml
+cbu,cbu_dag,service_consumption,proposed,false,false,excluded,entry_state,,rust/config/sem_os_seeds/dag_taxonomies/cbu_dag.yaml
+cbu,cbu_dag,service_consumption,provisioned,true,false,missing,,service-consumption.provision,rust/config/sem_os_seeds/dag_taxonomies/cbu_dag.yaml
+cbu,cbu_dag,service_consumption,retired,false,false,excluded,discretionary_destination,service-consumption.retire,rust/config/sem_os_seeds/dag_taxonomies/cbu_dag.yaml
+cbu,cbu_dag,service_consumption,suspended,false,false,excluded,discretionary_destination,service-consumption.suspend,rust/config/sem_os_seeds/dag_taxonomies/cbu_dag.yaml
+cbu,cbu_dag,service_consumption,winding_down,false,false,excluded,discretionary_destination,service-consumption.begin-winddown,rust/config/sem_os_seeds/dag_taxonomies/cbu_dag.yaml
+cbu,cbu_dag,share_class,DRAFT,false,false,excluded,entry_state,,rust/config/sem_os_seeds/dag_taxonomies/cbu_dag.yaml
+cbu,cbu_dag,share_class,HARD_CLOSED,false,false,excluded,discretionary_destination,share-class.hard-close,rust/config/sem_os_seeds/dag_taxonomies/cbu_dag.yaml
+cbu,cbu_dag,share_class,LIQUIDATED,true,false,missing,,share-class.close,rust/config/sem_os_seeds/dag_taxonomies/cbu_dag.yaml
+cbu,cbu_dag,share_class,OPEN,true,false,missing,,share-class.launch|share-class.reopen,rust/config/sem_os_seeds/dag_taxonomies/cbu_dag.yaml
+cbu,cbu_dag,share_class,SOFT_CLOSED,true,false,missing,,share-class.lift-hard-close|share-class.soft-close,rust/config/sem_os_seeds/dag_taxonomies/cbu_dag.yaml
+cbu,cbu_dag,share_class,WINDING_DOWN,false,false,excluded,discretionary_destination,share-class.begin-winddown,rust/config/sem_os_seeds/dag_taxonomies/cbu_dag.yaml
+deal,deal_dag,billing_period,APPROVED,false,false,excluded,discretionary_destination,billing.approve-period,rust/config/sem_os_seeds/dag_taxonomies/deal_dag.yaml
+deal,deal_dag,billing_period,CALCULATED,true,false,missing,,billing.calculate-period,rust/config/sem_os_seeds/dag_taxonomies/deal_dag.yaml
+deal,deal_dag,billing_period,DISPUTED,true,false,missing,,billing.dispute-period,rust/config/sem_os_seeds/dag_taxonomies/deal_dag.yaml
+deal,deal_dag,billing_period,INVOICED,true,false,missing,,billing.generate-invoice,rust/config/sem_os_seeds/dag_taxonomies/deal_dag.yaml
+deal,deal_dag,billing_period,PENDING,false,false,excluded,entry_state,,rust/config/sem_os_seeds/dag_taxonomies/deal_dag.yaml
+deal,deal_dag,billing_period,REVIEWED,true,false,missing,,billing.review-period,rust/config/sem_os_seeds/dag_taxonomies/deal_dag.yaml
+deal,deal_dag,billing_profile,ACTIVE,true,false,missing,,billing.activate-profile,rust/config/sem_os_seeds/dag_taxonomies/deal_dag.yaml
+deal,deal_dag,billing_profile,CLOSED,false,false,excluded,discretionary_destination,billing.close-profile,rust/config/sem_os_seeds/dag_taxonomies/deal_dag.yaml
+deal,deal_dag,billing_profile,DRAFT,false,false,excluded,entry_state,,rust/config/sem_os_seeds/dag_taxonomies/deal_dag.yaml
+deal,deal_dag,billing_profile,SUSPENDED,false,false,excluded,discretionary_destination,billing.suspend-profile,rust/config/sem_os_seeds/dag_taxonomies/deal_dag.yaml
+deal,deal_dag,deal,CANCELLED,false,false,excluded,discretionary_destination,deal.cancel,rust/config/sem_os_seeds/dag_taxonomies/deal_dag.yaml
+deal,deal_dag,deal,CONTRACTED,true,true,covered,,deal.add-contract|deal.update-status,rust/config/sem_os_seeds/dag_taxonomies/deal_dag.yaml
+deal,deal_dag,deal,IN_CLEARANCE,true,false,missing,,deal.bac-approve|deal.bac-reject|deal.submit-for-bac|deal.update-kyc-clearance,rust/config/sem_os_seeds/dag_taxonomies/deal_dag.yaml
+deal,deal_dag,deal,LOST,false,false,excluded,discretionary_destination,deal.mark-lost,rust/config/sem_os_seeds/dag_taxonomies/deal_dag.yaml
+deal,deal_dag,deal,NEGOTIATING,true,false,missing,,deal.create-rate-card|deal.update-status,rust/config/sem_os_seeds/dag_taxonomies/deal_dag.yaml
+deal,deal_dag,deal,PROSPECT,false,false,excluded,entry_state,,rust/config/sem_os_seeds/dag_taxonomies/deal_dag.yaml
+deal,deal_dag,deal,QUALIFYING,true,false,missing,,deal.create|deal.update-status,rust/config/sem_os_seeds/dag_taxonomies/deal_dag.yaml
+deal,deal_dag,deal,REJECTED,false,false,excluded,discretionary_destination,deal.bac-reject|deal.reject,rust/config/sem_os_seeds/dag_taxonomies/deal_dag.yaml
+deal,deal_dag,deal,WITHDRAWN,false,false,excluded,discretionary_destination,deal.mark-withdrawn,rust/config/sem_os_seeds/dag_taxonomies/deal_dag.yaml
+deal,deal_dag,deal_document,ARCHIVED,true,false,missing,,deal.update-document-status,rust/config/sem_os_seeds/dag_taxonomies/deal_dag.yaml
+deal,deal_dag,deal_document,DRAFT,false,false,excluded,entry_state,,rust/config/sem_os_seeds/dag_taxonomies/deal_dag.yaml
+deal,deal_dag,deal_document,EXECUTED,true,false,missing,,deal.update-document-status,rust/config/sem_os_seeds/dag_taxonomies/deal_dag.yaml
+deal,deal_dag,deal_document,SIGNED,true,false,missing,,deal.update-document-status,rust/config/sem_os_seeds/dag_taxonomies/deal_dag.yaml
+deal,deal_dag,deal_document,SUPERSEDED,true,false,missing,,deal.update-document-status,rust/config/sem_os_seeds/dag_taxonomies/deal_dag.yaml
+deal,deal_dag,deal_document,UNDER_REVIEW,true,false,missing,,deal.update-document-status,rust/config/sem_os_seeds/dag_taxonomies/deal_dag.yaml
+deal,deal_dag,deal_onboarding_request,BLOCKED,true,false,missing,,deal.update-onboarding-status,rust/config/sem_os_seeds/dag_taxonomies/deal_dag.yaml
+deal,deal_dag,deal_onboarding_request,CANCELLED,true,false,missing,,deal.update-onboarding-status,rust/config/sem_os_seeds/dag_taxonomies/deal_dag.yaml
+deal,deal_dag,deal_onboarding_request,COMPLETED,true,false,missing,,deal.update-onboarding-status,rust/config/sem_os_seeds/dag_taxonomies/deal_dag.yaml
+deal,deal_dag,deal_onboarding_request,IN_PROGRESS,true,false,missing,,deal.update-onboarding-status,rust/config/sem_os_seeds/dag_taxonomies/deal_dag.yaml
+deal,deal_dag,deal_onboarding_request,PENDING,false,false,excluded,entry_state,,rust/config/sem_os_seeds/dag_taxonomies/deal_dag.yaml
+deal,deal_dag,deal_product,AGREED,true,false,missing,,deal.agree-rate-card|deal.update-product-status,rust/config/sem_os_seeds/dag_taxonomies/deal_dag.yaml
+deal,deal_dag,deal_product,DECLINED,true,false,missing,,deal.update-product-status,rust/config/sem_os_seeds/dag_taxonomies/deal_dag.yaml
+deal,deal_dag,deal_product,NEGOTIATING,true,false,missing,,deal.update-product-status,rust/config/sem_os_seeds/dag_taxonomies/deal_dag.yaml
+deal,deal_dag,deal_product,PROPOSED,false,false,excluded,entry_state,,rust/config/sem_os_seeds/dag_taxonomies/deal_dag.yaml
+deal,deal_dag,deal_product,REMOVED,true,false,missing,,deal.remove-product,rust/config/sem_os_seeds/dag_taxonomies/deal_dag.yaml
+deal,deal_dag,deal_rate_card,AGREED,false,false,excluded,discretionary_destination,deal.agree-rate-card,rust/config/sem_os_seeds/dag_taxonomies/deal_dag.yaml
+deal,deal_dag,deal_rate_card,APPROVED_INTERNALLY,false,false,excluded,discretionary_destination,deal.pricing-approve,rust/config/sem_os_seeds/dag_taxonomies/deal_dag.yaml
+deal,deal_dag,deal_rate_card,CANCELLED,true,false,missing,,implicit: rate card removed or deal cancelled,rust/config/sem_os_seeds/dag_taxonomies/deal_dag.yaml
+deal,deal_dag,deal_rate_card,COUNTER_PROPOSED,true,false,missing,,deal.counter-rate-card,rust/config/sem_os_seeds/dag_taxonomies/deal_dag.yaml
+deal,deal_dag,deal_rate_card,DRAFT,false,false,excluded,entry_state,deal.pricing-reject,rust/config/sem_os_seeds/dag_taxonomies/deal_dag.yaml
+deal,deal_dag,deal_rate_card,PENDING_INTERNAL_APPROVAL,false,false,excluded,discretionary_destination,deal.submit-for-pricing-approval,rust/config/sem_os_seeds/dag_taxonomies/deal_dag.yaml
+deal,deal_dag,deal_rate_card,PROPOSED,true,false,missing,,deal.propose-rate-card,rust/config/sem_os_seeds/dag_taxonomies/deal_dag.yaml
+deal,deal_dag,deal_rate_card,SUPERSEDED,true,false,missing,,backend: new AGREED for same (deal|contract|product),rust/config/sem_os_seeds/dag_taxonomies/deal_dag.yaml
+deal,deal_dag,deal_sla,ACTIVE,true,false,missing,,backend: deal.CONTRACTED|backend: remediation complete; return to monitoring,rust/config/sem_os_seeds/dag_taxonomies/deal_dag.yaml
+deal,deal_dag,deal_sla,BREACHED,true,false,missing,,backend: SLA measurement fails threshold,rust/config/sem_os_seeds/dag_taxonomies/deal_dag.yaml
+deal,deal_dag,deal_sla,IN_REMEDIATION,true,false,missing,,deal.start-sla-remediation,rust/config/sem_os_seeds/dag_taxonomies/deal_dag.yaml
+deal,deal_dag,deal_sla,NEGOTIATED,false,false,excluded,entry_state,,rust/config/sem_os_seeds/dag_taxonomies/deal_dag.yaml
+deal,deal_dag,deal_sla,RESOLVED,true,false,missing,,deal.resolve-sla-breach,rust/config/sem_os_seeds/dag_taxonomies/deal_dag.yaml
+deal,deal_dag,deal_sla,WAIVED,false,false,excluded,discretionary_destination,deal.waive-sla-breach,rust/config/sem_os_seeds/dag_taxonomies/deal_dag.yaml
+deal,deal_dag,deal_ubo_assessment,BLOCKED,true,false,missing,,deal.update-ubo-assessment,rust/config/sem_os_seeds/dag_taxonomies/deal_dag.yaml
+deal,deal_dag,deal_ubo_assessment,COMPLETED,true,false,missing,,deal.update-ubo-assessment,rust/config/sem_os_seeds/dag_taxonomies/deal_dag.yaml
+deal,deal_dag,deal_ubo_assessment,IN_PROGRESS,true,false,missing,,deal.update-ubo-assessment,rust/config/sem_os_seeds/dag_taxonomies/deal_dag.yaml
+deal,deal_dag,deal_ubo_assessment,PENDING,false,false,excluded,entry_state,,rust/config/sem_os_seeds/dag_taxonomies/deal_dag.yaml
+deal,deal_dag,deal_ubo_assessment,REQUIRES_EDD,true,false,missing,,deal.update-ubo-assessment,rust/config/sem_os_seeds/dag_taxonomies/deal_dag.yaml
+instrument_matrix,instrument_matrix_dag,collateral_management,active,true,false,missing,,collateral-management.activate|collateral-management.reactivate,rust/config/sem_os_seeds/dag_taxonomies/instrument_matrix_dag.yaml
+instrument_matrix,instrument_matrix_dag,collateral_management,configured,false,false,excluded,entry_state,,rust/config/sem_os_seeds/dag_taxonomies/instrument_matrix_dag.yaml
+instrument_matrix,instrument_matrix_dag,collateral_management,suspended,false,false,excluded,discretionary_destination,collateral-management.suspend,rust/config/sem_os_seeds/dag_taxonomies/instrument_matrix_dag.yaml
+instrument_matrix,instrument_matrix_dag,collateral_management,terminated,false,false,excluded,discretionary_destination,collateral-management.terminate,rust/config/sem_os_seeds/dag_taxonomies/instrument_matrix_dag.yaml
+instrument_matrix,instrument_matrix_dag,corporate_action_event,default_applied,true,false,missing,,automatic trigger at cutoff,rust/config/sem_os_seeds/dag_taxonomies/instrument_matrix_dag.yaml
+instrument_matrix,instrument_matrix_dag,corporate_action_event,elected,true,false,missing,,corporate-action-event.elect,rust/config/sem_os_seeds/dag_taxonomies/instrument_matrix_dag.yaml
+instrument_matrix,instrument_matrix_dag,corporate_action_event,election_pending,false,false,excluded,entry_state,,rust/config/sem_os_seeds/dag_taxonomies/instrument_matrix_dag.yaml
+instrument_matrix,instrument_matrix_dag,delivery,CANCELLED,true,false,missing,,delivery.cancel,rust/config/sem_os_seeds/dag_taxonomies/instrument_matrix_dag.yaml
+instrument_matrix,instrument_matrix_dag,delivery,DELIVERED,true,true,covered,,delivery.complete,rust/config/sem_os_seeds/dag_taxonomies/instrument_matrix_dag.yaml
+instrument_matrix,instrument_matrix_dag,delivery,FAILED,true,false,missing,,delivery.fail,rust/config/sem_os_seeds/dag_taxonomies/instrument_matrix_dag.yaml
+instrument_matrix,instrument_matrix_dag,delivery,IN_PROGRESS,true,false,missing,,delivery.start,rust/config/sem_os_seeds/dag_taxonomies/instrument_matrix_dag.yaml
+instrument_matrix,instrument_matrix_dag,delivery,PENDING,false,false,excluded,entry_state,,rust/config/sem_os_seeds/dag_taxonomies/instrument_matrix_dag.yaml
+instrument_matrix,instrument_matrix_dag,group,complete,true,false,missing,,discovery confirmed signal (backend),rust/config/sem_os_seeds/dag_taxonomies/instrument_matrix_dag.yaml
+instrument_matrix,instrument_matrix_dag,group,failed,true,false,missing,,research fault signal (backend),rust/config/sem_os_seeds/dag_taxonomies/instrument_matrix_dag.yaml
+instrument_matrix,instrument_matrix_dag,group,in_progress,true,false,missing,,refresh trigger|research pipeline kick-off (upstream trigger)|retry trigger,rust/config/sem_os_seeds/dag_taxonomies/instrument_matrix_dag.yaml
+instrument_matrix,instrument_matrix_dag,group,not_started,false,false,excluded,entry_state,,rust/config/sem_os_seeds/dag_taxonomies/instrument_matrix_dag.yaml
+instrument_matrix,instrument_matrix_dag,group,stale,true,false,missing,,time-decay trigger,rust/config/sem_os_seeds/dag_taxonomies/instrument_matrix_dag.yaml
+instrument_matrix,instrument_matrix_dag,reconciliation,active,true,false,missing,,reconciliation.activate|reconciliation.reactivate,rust/config/sem_os_seeds/dag_taxonomies/instrument_matrix_dag.yaml
+instrument_matrix,instrument_matrix_dag,reconciliation,draft,false,false,excluded,entry_state,,rust/config/sem_os_seeds/dag_taxonomies/instrument_matrix_dag.yaml
+instrument_matrix,instrument_matrix_dag,reconciliation,retired,false,false,excluded,discretionary_destination,reconciliation.retire,rust/config/sem_os_seeds/dag_taxonomies/instrument_matrix_dag.yaml
+instrument_matrix,instrument_matrix_dag,reconciliation,suspended,false,false,excluded,discretionary_destination,reconciliation.suspend,rust/config/sem_os_seeds/dag_taxonomies/instrument_matrix_dag.yaml
+instrument_matrix,instrument_matrix_dag,service_intent,active,false,false,excluded,entry_state,service-intent.resume,rust/config/sem_os_seeds/dag_taxonomies/instrument_matrix_dag.yaml
+instrument_matrix,instrument_matrix_dag,service_intent,cancelled,false,false,excluded,discretionary_destination,service-intent.cancel,rust/config/sem_os_seeds/dag_taxonomies/instrument_matrix_dag.yaml
+instrument_matrix,instrument_matrix_dag,service_intent,suspended,false,false,excluded,discretionary_destination,service-intent.suspend,rust/config/sem_os_seeds/dag_taxonomies/instrument_matrix_dag.yaml
+instrument_matrix,instrument_matrix_dag,service_resource,activated,true,false,missing,,service-resource.activate|service-resource.reactivate,rust/config/sem_os_seeds/dag_taxonomies/instrument_matrix_dag.yaml
+instrument_matrix,instrument_matrix_dag,service_resource,decommissioned,false,false,excluded,discretionary_destination,service-resource.decommission,rust/config/sem_os_seeds/dag_taxonomies/instrument_matrix_dag.yaml
+instrument_matrix,instrument_matrix_dag,service_resource,provisioned,false,false,excluded,entry_state,,rust/config/sem_os_seeds/dag_taxonomies/instrument_matrix_dag.yaml
+instrument_matrix,instrument_matrix_dag,service_resource,suspended,false,false,excluded,discretionary_destination,service-resource.suspend,rust/config/sem_os_seeds/dag_taxonomies/instrument_matrix_dag.yaml
+instrument_matrix,instrument_matrix_dag,settlement_pattern_template,configured,true,false,missing,,settlement-chain.add-hop|settlement-chain.define-location,rust/config/sem_os_seeds/dag_taxonomies/instrument_matrix_dag.yaml
+instrument_matrix,instrument_matrix_dag,settlement_pattern_template,deactivated,true,false,missing,,settlement-chain.deactivate-chain,rust/config/sem_os_seeds/dag_taxonomies/instrument_matrix_dag.yaml
+instrument_matrix,instrument_matrix_dag,settlement_pattern_template,draft,false,false,excluded,entry_state,,rust/config/sem_os_seeds/dag_taxonomies/instrument_matrix_dag.yaml
+instrument_matrix,instrument_matrix_dag,settlement_pattern_template,live,true,false,missing,,settlement-chain.go-live|settlement-chain.reactivate,rust/config/sem_os_seeds/dag_taxonomies/instrument_matrix_dag.yaml
+instrument_matrix,instrument_matrix_dag,settlement_pattern_template,parallel_run,true,false,missing,,settlement-chain.enter-parallel-run,rust/config/sem_os_seeds/dag_taxonomies/instrument_matrix_dag.yaml
+instrument_matrix,instrument_matrix_dag,settlement_pattern_template,reviewed,true,false,missing,,settlement-chain.abort-parallel-run|settlement-chain.request-review,rust/config/sem_os_seeds/dag_taxonomies/instrument_matrix_dag.yaml
+instrument_matrix,instrument_matrix_dag,settlement_pattern_template,suspended,false,false,excluded,discretionary_destination,settlement-chain.suspend,rust/config/sem_os_seeds/dag_taxonomies/instrument_matrix_dag.yaml
+instrument_matrix,instrument_matrix_dag,trade_gateway,active,true,false,missing,,trade-gateway.activate-gateway|trade-gateway.reactivate-gateway,rust/config/sem_os_seeds/dag_taxonomies/instrument_matrix_dag.yaml
+instrument_matrix,instrument_matrix_dag,trade_gateway,defined,false,false,excluded,entry_state,,rust/config/sem_os_seeds/dag_taxonomies/instrument_matrix_dag.yaml
+instrument_matrix,instrument_matrix_dag,trade_gateway,enabled,true,false,missing,,trade-gateway.enable-gateway,rust/config/sem_os_seeds/dag_taxonomies/instrument_matrix_dag.yaml
+instrument_matrix,instrument_matrix_dag,trade_gateway,retired,false,false,excluded,discretionary_destination,trade-gateway.retire-gateway,rust/config/sem_os_seeds/dag_taxonomies/instrument_matrix_dag.yaml
+instrument_matrix,instrument_matrix_dag,trade_gateway,suspended,false,false,excluded,discretionary_destination,trade-gateway.suspend-gateway,rust/config/sem_os_seeds/dag_taxonomies/instrument_matrix_dag.yaml
+instrument_matrix,instrument_matrix_dag,trading_activity,dormant,true,false,missing,,backend: last_trade_at + dormancy_window < now,rust/config/sem_os_seeds/dag_taxonomies/instrument_matrix_dag.yaml
+instrument_matrix,instrument_matrix_dag,trading_activity,never_traded,false,false,excluded,entry_state,,rust/config/sem_os_seeds/dag_taxonomies/instrument_matrix_dag.yaml
+instrument_matrix,instrument_matrix_dag,trading_activity,suspended,true,false,missing,,backend: trading_profile.SUSPENDED triggers mirror,rust/config/sem_os_seeds/dag_taxonomies/instrument_matrix_dag.yaml
+instrument_matrix,instrument_matrix_dag,trading_activity,trading,true,false,missing,,backend: first trade posted — event from settlement pipeline|backend: new trade posted|backend: trading_profile.reactivate triggers mirror,rust/config/sem_os_seeds/dag_taxonomies/instrument_matrix_dag.yaml
+instrument_matrix,instrument_matrix_dag,trading_profile,ACTIVE,false,false,excluded,discretionary_destination,trading-profile.go-live|trading-profile.reactivate,rust/config/sem_os_seeds/dag_taxonomies/instrument_matrix_dag.yaml
+instrument_matrix,instrument_matrix_dag,trading_profile,APPROVED,true,true,covered,,trading-profile.abort-parallel-run|trading-profile.approve,rust/config/sem_os_seeds/dag_taxonomies/instrument_matrix_dag.yaml
+instrument_matrix,instrument_matrix_dag,trading_profile,ARCHIVED,true,false,missing,,trading-profile.archive,rust/config/sem_os_seeds/dag_taxonomies/instrument_matrix_dag.yaml
+instrument_matrix,instrument_matrix_dag,trading_profile,DRAFT,false,false,excluded,entry_state,trading-profile.create-draft,rust/config/sem_os_seeds/dag_taxonomies/instrument_matrix_dag.yaml
+instrument_matrix,instrument_matrix_dag,trading_profile,PARALLEL_RUN,true,false,missing,,trading-profile.enter-parallel-run,rust/config/sem_os_seeds/dag_taxonomies/instrument_matrix_dag.yaml
+instrument_matrix,instrument_matrix_dag,trading_profile,REJECTED,false,false,excluded,discretionary_destination,trading-profile.reject,rust/config/sem_os_seeds/dag_taxonomies/instrument_matrix_dag.yaml
+instrument_matrix,instrument_matrix_dag,trading_profile,SUBMITTED,true,false,missing,,trading-profile.submit,rust/config/sem_os_seeds/dag_taxonomies/instrument_matrix_dag.yaml
+instrument_matrix,instrument_matrix_dag,trading_profile,SUPERSEDED,false,false,excluded,discretionary_destination,trading-profile.supersede,rust/config/sem_os_seeds/dag_taxonomies/instrument_matrix_dag.yaml
+instrument_matrix,instrument_matrix_dag,trading_profile,SUSPENDED,false,false,excluded,discretionary_destination,trading-profile.suspend,rust/config/sem_os_seeds/dag_taxonomies/instrument_matrix_dag.yaml
+instrument_matrix,instrument_matrix_dag,trading_profile_template,available,false,false,excluded,entry_state,,rust/config/sem_os_seeds/dag_taxonomies/instrument_matrix_dag.yaml
+instrument_matrix,instrument_matrix_dag,trading_profile_template,unavailable,false,false,excluded,discretionary_destination,trading-profile.retire-template,rust/config/sem_os_seeds/dag_taxonomies/instrument_matrix_dag.yaml
+kyc,kyc_dag,doc_request,DRAFT,false,false,excluded,entry_state,,rust/config/sem_os_seeds/dag_taxonomies/kyc_dag.yaml
+kyc,kyc_dag,doc_request,EXPIRED,true,false,missing,,time-decay,rust/config/sem_os_seeds/dag_taxonomies/kyc_dag.yaml
+kyc,kyc_dag,doc_request,RECEIVED,true,false,missing,,doc-request.verify,rust/config/sem_os_seeds/dag_taxonomies/kyc_dag.yaml
+kyc,kyc_dag,doc_request,REJECTED,false,false,excluded,discretionary_destination,evidence.mark-rejected,rust/config/sem_os_seeds/dag_taxonomies/kyc_dag.yaml
+kyc,kyc_dag,doc_request,REQUESTED,true,false,missing,,doc-request.send,rust/config/sem_os_seeds/dag_taxonomies/kyc_dag.yaml
+kyc,kyc_dag,doc_request,REQUIRED,true,false,missing,,doc-request.create,rust/config/sem_os_seeds/dag_taxonomies/kyc_dag.yaml
+kyc,kyc_dag,doc_request,UNDER_REVIEW,true,false,missing,,compliance review,rust/config/sem_os_seeds/dag_taxonomies/kyc_dag.yaml
+kyc,kyc_dag,doc_request,VERIFIED,true,false,missing,,evidence.mark-verified,rust/config/sem_os_seeds/dag_taxonomies/kyc_dag.yaml
+kyc,kyc_dag,doc_request,WAIVED,false,false,excluded,discretionary_destination,evidence.mark-waived,rust/config/sem_os_seeds/dag_taxonomies/kyc_dag.yaml
+kyc,kyc_dag,entity_kyc,approved,true,false,missing,,entity-workstream.close,rust/config/sem_os_seeds/dag_taxonomies/kyc_dag.yaml
+kyc,kyc_dag,entity_kyc,empty,true,false,missing,,backend: entity lookup / GLEIF import,rust/config/sem_os_seeds/dag_taxonomies/kyc_dag.yaml
+kyc,kyc_dag,entity_kyc,evidence_collected,true,false,missing,,evidence.attach-document,rust/config/sem_os_seeds/dag_taxonomies/kyc_dag.yaml
+kyc,kyc_dag,entity_kyc,filled,true,false,missing,,skeleton.build,rust/config/sem_os_seeds/dag_taxonomies/kyc_dag.yaml
+kyc,kyc_dag,entity_kyc,placeholder,false,false,excluded,entry_state,,rust/config/sem_os_seeds/dag_taxonomies/kyc_dag.yaml
+kyc,kyc_dag,entity_kyc,screening_complete,true,false,missing,,screening-ops.full,rust/config/sem_os_seeds/dag_taxonomies/kyc_dag.yaml
+kyc,kyc_dag,entity_kyc,verified,true,false,missing,,evidence.mark-verified,rust/config/sem_os_seeds/dag_taxonomies/kyc_dag.yaml
+kyc,kyc_dag,entity_kyc,workstream_open,true,false,missing,,entity-workstream.add,rust/config/sem_os_seeds/dag_taxonomies/kyc_dag.yaml
+kyc,kyc_dag,entity_workstream,ASSESS,true,false,missing,,backend: screenings cleared,rust/config/sem_os_seeds/dag_taxonomies/kyc_dag.yaml
+kyc,kyc_dag,entity_workstream,BLOCKED,true,false,missing,,entity-workstream.update-status,rust/config/sem_os_seeds/dag_taxonomies/kyc_dag.yaml
+kyc,kyc_dag,entity_workstream,COLLECT,true,false,missing,,entity-workstream.add,rust/config/sem_os_seeds/dag_taxonomies/kyc_dag.yaml
+kyc,kyc_dag,entity_workstream,COMPLETE,true,false,missing,,entity-workstream.close,rust/config/sem_os_seeds/dag_taxonomies/kyc_dag.yaml
+kyc,kyc_dag,entity_workstream,ENHANCED_DD,false,false,excluded,discretionary_destination,red-flag.escalate,rust/config/sem_os_seeds/dag_taxonomies/kyc_dag.yaml
+kyc,kyc_dag,entity_workstream,PENDING,false,false,excluded,entry_state,,rust/config/sem_os_seeds/dag_taxonomies/kyc_dag.yaml
+kyc,kyc_dag,entity_workstream,PROHIBITED,true,false,missing,,kyc-case.reject (cascading),rust/config/sem_os_seeds/dag_taxonomies/kyc_dag.yaml
+kyc,kyc_dag,entity_workstream,REFERRED,false,false,excluded,discretionary_destination,kyc-case.escalate,rust/config/sem_os_seeds/dag_taxonomies/kyc_dag.yaml
+kyc,kyc_dag,entity_workstream,SCREEN,true,false,missing,,screening-ops.full,rust/config/sem_os_seeds/dag_taxonomies/kyc_dag.yaml
+kyc,kyc_dag,entity_workstream,VERIFY,true,false,missing,,evidence.mark-verified,rust/config/sem_os_seeds/dag_taxonomies/kyc_dag.yaml
+kyc,kyc_dag,kyc_case,APPROVED,false,true,excluded,discretionary_destination,kyc-case.approve,rust/config/sem_os_seeds/dag_taxonomies/kyc_dag.yaml
+kyc,kyc_dag,kyc_case,ASSESSMENT,true,false,missing,,kyc-case.update-status,rust/config/sem_os_seeds/dag_taxonomies/kyc_dag.yaml
+kyc,kyc_dag,kyc_case,BLOCKED,false,false,excluded,discretionary_destination,kyc-case.escalate,rust/config/sem_os_seeds/dag_taxonomies/kyc_dag.yaml
+kyc,kyc_dag,kyc_case,DISCOVERY,true,false,missing,,kyc-case.reopen (for periodic review)|kyc-case.update-status,rust/config/sem_os_seeds/dag_taxonomies/kyc_dag.yaml
+kyc,kyc_dag,kyc_case,DO_NOT_ONBOARD,true,false,missing,,kyc-case.reject (with do-not-onboard flag),rust/config/sem_os_seeds/dag_taxonomies/kyc_dag.yaml
+kyc,kyc_dag,kyc_case,EXPIRED,false,false,excluded,source_only_state,,rust/config/sem_os_seeds/dag_taxonomies/kyc_dag.yaml
+kyc,kyc_dag,kyc_case,INTAKE,false,false,excluded,entry_state,,rust/config/sem_os_seeds/dag_taxonomies/kyc_dag.yaml
+kyc,kyc_dag,kyc_case,REFER_TO_REGULATOR,false,false,excluded,discretionary_destination,kyc-case.escalate,rust/config/sem_os_seeds/dag_taxonomies/kyc_dag.yaml
+kyc,kyc_dag,kyc_case,REJECTED,false,false,excluded,discretionary_destination,kyc-case.reject,rust/config/sem_os_seeds/dag_taxonomies/kyc_dag.yaml
+kyc,kyc_dag,kyc_case,REVIEW,true,false,missing,,kyc-case.update-status,rust/config/sem_os_seeds/dag_taxonomies/kyc_dag.yaml
+kyc,kyc_dag,kyc_case,WITHDRAWN,false,false,excluded,discretionary_destination,kyc-case.close,rust/config/sem_os_seeds/dag_taxonomies/kyc_dag.yaml
+kyc,kyc_dag,kyc_decision,CLEARED,false,true,excluded,discretionary_destination,kyc-case.approve,rust/config/sem_os_seeds/dag_taxonomies/kyc_dag.yaml
+kyc,kyc_dag,kyc_decision,CONDITIONAL,false,false,excluded,discretionary_destination,kyc-case.approve-with-conditions,rust/config/sem_os_seeds/dag_taxonomies/kyc_dag.yaml
+kyc,kyc_dag,kyc_decision,PENDING_REVIEW,false,false,excluded,entry_state,,rust/config/sem_os_seeds/dag_taxonomies/kyc_dag.yaml
+kyc,kyc_dag,kyc_decision,REJECTED,false,false,excluded,discretionary_destination,kyc-case.reject,rust/config/sem_os_seeds/dag_taxonomies/kyc_dag.yaml
+kyc,kyc_dag,kyc_service_agreement,ACTIVE,true,false,missing,,kyc-agreement.update (status=ACTIVE),rust/config/sem_os_seeds/dag_taxonomies/kyc_dag.yaml
+kyc,kyc_dag,kyc_service_agreement,DRAFT,false,false,excluded,entry_state,,rust/config/sem_os_seeds/dag_taxonomies/kyc_dag.yaml
+kyc,kyc_dag,kyc_service_agreement,SUSPENDED,true,false,missing,,kyc-agreement.update (status=SUSPENDED),rust/config/sem_os_seeds/dag_taxonomies/kyc_dag.yaml
+kyc,kyc_dag,kyc_service_agreement,TERMINATED,true,false,missing,,kyc-agreement.delete,rust/config/sem_os_seeds/dag_taxonomies/kyc_dag.yaml
+kyc,kyc_dag,kyc_ubo_evidence,EXPIRED,true,false,missing,,time-decay,rust/config/sem_os_seeds/dag_taxonomies/kyc_dag.yaml
+kyc,kyc_dag,kyc_ubo_evidence,RECEIVED,true,false,missing,,doc-request.verify,rust/config/sem_os_seeds/dag_taxonomies/kyc_dag.yaml
+kyc,kyc_dag,kyc_ubo_evidence,REJECTED,false,false,excluded,discretionary_destination,evidence.mark-rejected,rust/config/sem_os_seeds/dag_taxonomies/kyc_dag.yaml
+kyc,kyc_dag,kyc_ubo_evidence,REQUESTED,true,false,missing,,doc-request.send,rust/config/sem_os_seeds/dag_taxonomies/kyc_dag.yaml
+kyc,kyc_dag,kyc_ubo_evidence,REQUIRED,false,false,excluded,entry_state,,rust/config/sem_os_seeds/dag_taxonomies/kyc_dag.yaml
+kyc,kyc_dag,kyc_ubo_evidence,VERIFIED,true,false,missing,,evidence.mark-verified,rust/config/sem_os_seeds/dag_taxonomies/kyc_dag.yaml
+kyc,kyc_dag,kyc_ubo_evidence,WAIVED,false,false,excluded,discretionary_destination,evidence.mark-waived,rust/config/sem_os_seeds/dag_taxonomies/kyc_dag.yaml
+kyc,kyc_dag,kyc_ubo_registry,APPROVED,true,true,covered,,ubo-registry.advance,rust/config/sem_os_seeds/dag_taxonomies/kyc_dag.yaml
+kyc,kyc_dag,kyc_ubo_registry,CANDIDATE,false,false,excluded,entry_state,periodic review: ubo-registry.expire then re-enter as candidate,rust/config/sem_os_seeds/dag_taxonomies/kyc_dag.yaml
+kyc,kyc_dag,kyc_ubo_registry,EXPIRED,true,false,missing,,time-decay,rust/config/sem_os_seeds/dag_taxonomies/kyc_dag.yaml
+kyc,kyc_dag,kyc_ubo_registry,IDENTIFIED,true,true,covered,,ubo-registry.promote,rust/config/sem_os_seeds/dag_taxonomies/kyc_dag.yaml
+kyc,kyc_dag,kyc_ubo_registry,PROVABLE,true,true,covered,,ubo-registry.advance,rust/config/sem_os_seeds/dag_taxonomies/kyc_dag.yaml
+kyc,kyc_dag,kyc_ubo_registry,PROVED,true,true,covered,,ubo-registry.advance,rust/config/sem_os_seeds/dag_taxonomies/kyc_dag.yaml
+kyc,kyc_dag,kyc_ubo_registry,REJECTED,true,false,missing,,ubo-registry.reject,rust/config/sem_os_seeds/dag_taxonomies/kyc_dag.yaml
+kyc,kyc_dag,kyc_ubo_registry,REVIEWED,true,false,missing,,compliance review,rust/config/sem_os_seeds/dag_taxonomies/kyc_dag.yaml
+kyc,kyc_dag,kyc_ubo_registry,WAIVED,true,false,missing,,compliance waiver,rust/config/sem_os_seeds/dag_taxonomies/kyc_dag.yaml
+kyc,kyc_dag,outreach_request,CLOSED,true,false,missing,,request.close,rust/config/sem_os_seeds/dag_taxonomies/kyc_dag.yaml
+kyc,kyc_dag,outreach_request,DRAFT,false,false,excluded,entry_state,,rust/config/sem_os_seeds/dag_taxonomies/kyc_dag.yaml
+kyc,kyc_dag,outreach_request,EXPIRED,true,false,missing,,cutoff passed,rust/config/sem_os_seeds/dag_taxonomies/kyc_dag.yaml
+kyc,kyc_dag,outreach_request,PENDING,true,false,missing,,request.create,rust/config/sem_os_seeds/dag_taxonomies/kyc_dag.yaml
+kyc,kyc_dag,outreach_request,REMINDED,true,false,missing,,request.remind,rust/config/sem_os_seeds/dag_taxonomies/kyc_dag.yaml
+kyc,kyc_dag,outreach_request,RESPONDED,true,false,missing,,request.record-response,rust/config/sem_os_seeds/dag_taxonomies/kyc_dag.yaml
+kyc,kyc_dag,outreach_request,SENT,true,false,missing,,request.send,rust/config/sem_os_seeds/dag_taxonomies/kyc_dag.yaml
+kyc,kyc_dag,red_flag,BLOCKING,true,false,missing,,red-flag.update-rating,rust/config/sem_os_seeds/dag_taxonomies/kyc_dag.yaml
+kyc,kyc_dag,red_flag,CLOSED,true,false,missing,,case progression,rust/config/sem_os_seeds/dag_taxonomies/kyc_dag.yaml
+kyc,kyc_dag,red_flag,MITIGATED,false,false,excluded,discretionary_destination,red-flag.close,rust/config/sem_os_seeds/dag_taxonomies/kyc_dag.yaml
+kyc,kyc_dag,red_flag,OPEN,false,false,excluded,entry_state,,rust/config/sem_os_seeds/dag_taxonomies/kyc_dag.yaml
+kyc,kyc_dag,red_flag,UNDER_REVIEW,false,false,excluded,discretionary_destination,red-flag.escalate,rust/config/sem_os_seeds/dag_taxonomies/kyc_dag.yaml
+kyc,kyc_dag,red_flag,WAIVED,false,false,excluded,discretionary_destination,red-flag.waive,rust/config/sem_os_seeds/dag_taxonomies/kyc_dag.yaml
+kyc,kyc_dag,screening,CLEAR,true,false,missing,,backend: no hits,rust/config/sem_os_seeds/dag_taxonomies/kyc_dag.yaml
+kyc,kyc_dag,screening,ERROR,true,false,missing,,backend: provider error,rust/config/sem_os_seeds/dag_taxonomies/kyc_dag.yaml
+kyc,kyc_dag,screening,EXPIRED,true,false,missing,,time-decay trigger,rust/config/sem_os_seeds/dag_taxonomies/kyc_dag.yaml
+kyc,kyc_dag,screening,HIT_CONFIRMED,true,false,missing,,screening.confirm,rust/config/sem_os_seeds/dag_taxonomies/kyc_dag.yaml
+kyc,kyc_dag,screening,HIT_DISMISSED,true,false,missing,,screening.dismiss,rust/config/sem_os_seeds/dag_taxonomies/kyc_dag.yaml
+kyc,kyc_dag,screening,HIT_PENDING_REVIEW,true,false,missing,,screening.record-hit,rust/config/sem_os_seeds/dag_taxonomies/kyc_dag.yaml
+kyc,kyc_dag,screening,PENDING,false,false,excluded,entry_state,screening-ops.refresh|screening-ops.retry,rust/config/sem_os_seeds/dag_taxonomies/kyc_dag.yaml
+kyc,kyc_dag,screening,RUNNING,true,false,missing,,screening-ops.start,rust/config/sem_os_seeds/dag_taxonomies/kyc_dag.yaml
+kyc,kyc_dag,ubo_evidence,EXPIRED,true,false,missing,,time-decay,rust/config/sem_os_seeds/dag_taxonomies/kyc_dag.yaml
+kyc,kyc_dag,ubo_evidence,PENDING,false,false,excluded,entry_state,evidence.require,rust/config/sem_os_seeds/dag_taxonomies/kyc_dag.yaml
+kyc,kyc_dag,ubo_evidence,REJECTED,false,false,excluded,discretionary_destination,evidence.mark-rejected,rust/config/sem_os_seeds/dag_taxonomies/kyc_dag.yaml
+kyc,kyc_dag,ubo_evidence,VERIFIED,true,false,missing,,evidence.mark-verified,rust/config/sem_os_seeds/dag_taxonomies/kyc_dag.yaml
+lifecycle_resources,lifecycle_resources_dag,application_instance,ACTIVE,true,false,missing,,application-instance.activate|application-instance.bring-online|application-instance.exit-maintenance|backend: health-check signal,rust/config/sem_os_seeds/dag_taxonomies/lifecycle_resources_dag.yaml
+lifecycle_resources,lifecycle_resources_dag,application_instance,DECOMMISSIONED,false,false,excluded,discretionary_destination,application-instance.decommission,rust/config/sem_os_seeds/dag_taxonomies/lifecycle_resources_dag.yaml
+lifecycle_resources,lifecycle_resources_dag,application_instance,DEGRADED,true,false,missing,,backend: health-check signal,rust/config/sem_os_seeds/dag_taxonomies/lifecycle_resources_dag.yaml
+lifecycle_resources,lifecycle_resources_dag,application_instance,MAINTENANCE_WINDOW,true,false,missing,,application-instance.enter-maintenance,rust/config/sem_os_seeds/dag_taxonomies/lifecycle_resources_dag.yaml
+lifecycle_resources,lifecycle_resources_dag,application_instance,OFFLINE,true,false,missing,,application-instance.take-offline,rust/config/sem_os_seeds/dag_taxonomies/lifecycle_resources_dag.yaml
+lifecycle_resources,lifecycle_resources_dag,application_instance,PROVISIONED,false,false,excluded,entry_state,,rust/config/sem_os_seeds/dag_taxonomies/lifecycle_resources_dag.yaml
+lifecycle_resources,lifecycle_resources_dag,capability_binding,DEPRECATED,true,false,missing,,capability-binding.deprecate,rust/config/sem_os_seeds/dag_taxonomies/lifecycle_resources_dag.yaml
+lifecycle_resources,lifecycle_resources_dag,capability_binding,DRAFT,false,false,excluded,entry_state,capability-binding.abort-pilot,rust/config/sem_os_seeds/dag_taxonomies/lifecycle_resources_dag.yaml
+lifecycle_resources,lifecycle_resources_dag,capability_binding,LIVE,true,false,missing,,capability-binding.promote-live,rust/config/sem_os_seeds/dag_taxonomies/lifecycle_resources_dag.yaml
+lifecycle_resources,lifecycle_resources_dag,capability_binding,PILOT,true,false,missing,,capability-binding.start-pilot,rust/config/sem_os_seeds/dag_taxonomies/lifecycle_resources_dag.yaml
+lifecycle_resources,lifecycle_resources_dag,capability_binding,RETIRED,false,false,excluded,discretionary_destination,capability-binding.retire,rust/config/sem_os_seeds/dag_taxonomies/lifecycle_resources_dag.yaml
+product_maintenance,product_service_taxonomy_dag,service,active,true,false,missing,,backend: changeset.publish includes this service,rust/config/sem_os_seeds/dag_taxonomies/product_service_taxonomy_dag.yaml
+product_maintenance,product_service_taxonomy_dag,service,deprecated,false,false,excluded,discretionary_destination,service.deprecate,rust/config/sem_os_seeds/dag_taxonomies/product_service_taxonomy_dag.yaml
+product_maintenance,product_service_taxonomy_dag,service,draft,true,false,missing,,service.define|service.propose-revision,rust/config/sem_os_seeds/dag_taxonomies/product_service_taxonomy_dag.yaml
+product_maintenance,product_service_taxonomy_dag,service,retired,false,false,excluded,discretionary_destination,service.retire,rust/config/sem_os_seeds/dag_taxonomies/product_service_taxonomy_dag.yaml
+product_maintenance,product_service_taxonomy_dag,service,ungoverned,false,false,excluded,entry_state,,rust/config/sem_os_seeds/dag_taxonomies/product_service_taxonomy_dag.yaml
+product_maintenance,product_service_taxonomy_dag,service_version,drafted,false,false,excluded,entry_state,,rust/config/sem_os_seeds/dag_taxonomies/product_service_taxonomy_dag.yaml
+product_maintenance,product_service_taxonomy_dag,service_version,published,false,false,excluded,discretionary_destination,service-version.publish,rust/config/sem_os_seeds/dag_taxonomies/product_service_taxonomy_dag.yaml
+product_maintenance,product_service_taxonomy_dag,service_version,retired,false,false,excluded,discretionary_destination,service-version.retire,rust/config/sem_os_seeds/dag_taxonomies/product_service_taxonomy_dag.yaml
+product_maintenance,product_service_taxonomy_dag,service_version,reviewed,false,false,excluded,discretionary_destination,service-version.submit-for-review,rust/config/sem_os_seeds/dag_taxonomies/product_service_taxonomy_dag.yaml
+product_maintenance,product_service_taxonomy_dag,service_version,superseded,true,false,missing,,backend: new published version of same service,rust/config/sem_os_seeds/dag_taxonomies/product_service_taxonomy_dag.yaml
+semos_maintenance,semos_maintenance_dag,attribute_def,active,true,false,missing,,backend: changeset.publish includes this attribute,rust/config/sem_os_seeds/dag_taxonomies/semos_maintenance_dag.yaml
+semos_maintenance,semos_maintenance_dag,attribute_def,deprecated,true,false,missing,,attribute.deprecate,rust/config/sem_os_seeds/dag_taxonomies/semos_maintenance_dag.yaml
+semos_maintenance,semos_maintenance_dag,attribute_def,draft,true,false,missing,,attribute.define|attribute.propose-revision,rust/config/sem_os_seeds/dag_taxonomies/semos_maintenance_dag.yaml
+semos_maintenance,semos_maintenance_dag,attribute_def,retired,true,false,missing,,attribute.retire,rust/config/sem_os_seeds/dag_taxonomies/semos_maintenance_dag.yaml
+semos_maintenance,semos_maintenance_dag,attribute_def,ungoverned,false,false,excluded,entry_state,,rust/config/sem_os_seeds/dag_taxonomies/semos_maintenance_dag.yaml
+semos_maintenance,semos_maintenance_dag,changeset,approved,true,true,covered,,changeset.approve,rust/config/sem_os_seeds/dag_taxonomies/semos_maintenance_dag.yaml
+semos_maintenance,semos_maintenance_dag,changeset,composing,false,false,excluded,entry_state,,rust/config/sem_os_seeds/dag_taxonomies/semos_maintenance_dag.yaml
+semos_maintenance,semos_maintenance_dag,changeset,published,true,false,missing,,changeset.publish,rust/config/sem_os_seeds/dag_taxonomies/semos_maintenance_dag.yaml
+semos_maintenance,semos_maintenance_dag,changeset,rejected,true,false,missing,,changeset.reject,rust/config/sem_os_seeds/dag_taxonomies/semos_maintenance_dag.yaml
+semos_maintenance,semos_maintenance_dag,changeset,reviewing,true,false,missing,,changeset.enter-review,rust/config/sem_os_seeds/dag_taxonomies/semos_maintenance_dag.yaml
+semos_maintenance,semos_maintenance_dag,changeset,submitted,true,false,missing,,changeset.submit,rust/config/sem_os_seeds/dag_taxonomies/semos_maintenance_dag.yaml
+semos_maintenance,semos_maintenance_dag,derivation_spec,active,true,false,missing,,derivation.activate|derivation.recompute-stale,rust/config/sem_os_seeds/dag_taxonomies/semos_maintenance_dag.yaml
+semos_maintenance,semos_maintenance_dag,derivation_spec,draft,false,false,excluded,entry_state,,rust/config/sem_os_seeds/dag_taxonomies/semos_maintenance_dag.yaml
+semos_maintenance,semos_maintenance_dag,derivation_spec,stale,true,false,missing,,backend: upstream attribute version bump,rust/config/sem_os_seeds/dag_taxonomies/semos_maintenance_dag.yaml
+semos_maintenance,semos_maintenance_dag,phrase_authoring,collision_checked,true,false,missing,,phrase.check-collision,rust/config/sem_os_seeds/dag_taxonomies/semos_maintenance_dag.yaml
+semos_maintenance,semos_maintenance_dag,phrase_authoring,deferred,true,false,missing,,phrase.defer,rust/config/sem_os_seeds/dag_taxonomies/semos_maintenance_dag.yaml
+semos_maintenance,semos_maintenance_dag,phrase_authoring,proposed,false,false,excluded,entry_state,phrase.propose|phrase.reactivate,rust/config/sem_os_seeds/dag_taxonomies/semos_maintenance_dag.yaml
+semos_maintenance,semos_maintenance_dag,phrase_authoring,published,true,false,missing,,phrase.approve-proposal,rust/config/sem_os_seeds/dag_taxonomies/semos_maintenance_dag.yaml
+semos_maintenance,semos_maintenance_dag,phrase_authoring,quality_checked,true,false,missing,,phrase.check-quality,rust/config/sem_os_seeds/dag_taxonomies/semos_maintenance_dag.yaml
+semos_maintenance,semos_maintenance_dag,phrase_authoring,refined,true,false,missing,,phrase.request-refinement,rust/config/sem_os_seeds/dag_taxonomies/semos_maintenance_dag.yaml
+semos_maintenance,semos_maintenance_dag,phrase_authoring,rejected,true,false,missing,,phrase.reject-proposal,rust/config/sem_os_seeds/dag_taxonomies/semos_maintenance_dag.yaml
+semos_maintenance,semos_maintenance_dag,phrase_authoring,reviewed,true,false,missing,,phrase.submit-for-review,rust/config/sem_os_seeds/dag_taxonomies/semos_maintenance_dag.yaml
+semos_maintenance,semos_maintenance_dag,service_resource_def,complete,true,false,missing,,service-resource.mark-complete,rust/config/sem_os_seeds/dag_taxonomies/semos_maintenance_dag.yaml
+semos_maintenance,semos_maintenance_dag,service_resource_def,gaps_found,true,false,missing,,service-resource.check-attribute-gaps,rust/config/sem_os_seeds/dag_taxonomies/semos_maintenance_dag.yaml
+semos_maintenance,semos_maintenance_dag,service_resource_def,synced,true,false,missing,,service-resource.sync-definitions,rust/config/sem_os_seeds/dag_taxonomies/semos_maintenance_dag.yaml
+semos_maintenance,semos_maintenance_dag,service_resource_def,unsynced,false,false,excluded,entry_state,,rust/config/sem_os_seeds/dag_taxonomies/semos_maintenance_dag.yaml

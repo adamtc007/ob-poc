@@ -9,6 +9,7 @@ domains:
     invocation_hints: []
     verbs:
       provision:
+        flavour: instance_adding
         description: "Provision a service for a CBU (proposed → provisioned; accounts opened, routings set)"
         behavior: plugin
         metadata:
@@ -43,6 +44,7 @@ domains:
           target_slot: service_consumption
 
       activate:
+        flavour: attribute_mutating
         description: "Activate service for operational use (provisioned → active)"
         behavior: plugin
         metadata:
@@ -76,6 +78,10 @@ domains:
           target_slot: service_consumption
 
       suspend:
+        flavour: discretionary
+        role_guard:
+          any_of: [compliance_officer, senior_compliance, mlro]
+        audit_class: service_consumption_suspend
         description: "Suspend service for CBU (service pause; restorable)"
         behavior: plugin
         metadata:
@@ -113,6 +119,7 @@ domains:
           target_slot: service_consumption
 
       reinstate:
+        flavour: attribute_mutating
         description: "Reinstate suspended service back to active"
         behavior: plugin
         metadata:
@@ -146,6 +153,10 @@ domains:
           target_slot: service_consumption
 
       begin-winddown:
+        flavour: discretionary
+        role_guard:
+          any_of: [compliance_admin, senior_compliance, mlro]
+        audit_class: service_consumption_begin_winddown
         description: "Begin service wind-down for CBU (exit intent)"
         behavior: plugin
         metadata:
@@ -179,6 +190,10 @@ domains:
           target_slot: service_consumption
 
       retire:
+        flavour: discretionary
+        role_guard:
+          any_of: [compliance_admin, senior_compliance, mlro]
+        audit_class: service_consumption_retire
         description: "Retire service consumption (terminal-positive after winddown)"
         behavior: plugin
         metadata:

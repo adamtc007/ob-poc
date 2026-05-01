@@ -9,6 +9,7 @@ domains:
       # Core CRUD operations
       # ============================================
       create:
+        flavour: instance_adding
         description: Create a new investor record (starts in ENQUIRY state)
         metadata:
           tier: intent
@@ -98,6 +99,7 @@ domains:
             baseline: reviewable
 
       ensure:
+        flavour: instance_adding
         description: Create or update investor by entity_id + owning_cbu_id (idempotent)
         metadata:
           tier: intent
@@ -189,6 +191,7 @@ domains:
             baseline: reviewable
 
       read:
+        flavour: attribute_mutating
         description: Read investor by ID
         metadata:
           tier: reference
@@ -233,6 +236,7 @@ domains:
             baseline: benign
 
       list-by-cbu:
+        flavour: attribute_mutating
         description: List investors for a CBU (fund)
         metadata:
           tier: reference
@@ -281,6 +285,7 @@ domains:
             baseline: benign
 
       list-by-entity:
+        flavour: attribute_mutating
         description: List investor records for an entity across all CBUs
         metadata:
           tier: reference
@@ -329,6 +334,7 @@ domains:
       # These use plugin handlers to validate transitions
       # ============================================
       request-documents:
+        flavour: attribute_mutating
         description: Transition from ENQUIRY to PENDING_DOCUMENTS
         metadata:
           tier: intent
@@ -378,6 +384,7 @@ domains:
           target_slot: investor_kyc
 
       start-kyc:
+        flavour: instance_adding
         description: Transition from PENDING_DOCUMENTS to KYC_IN_PROGRESS
         metadata:
           tier: intent
@@ -434,6 +441,10 @@ domains:
           target_slot: investor_kyc
 
       approve-kyc:
+        flavour: discretionary
+        role_guard:
+          any_of: [compliance_officer, senior_compliance, mlro]
+        audit_class: investor_approve_kyc
         description: Transition from KYC_IN_PROGRESS to KYC_APPROVED
         metadata:
           tier: intent
@@ -496,6 +507,10 @@ domains:
           target_slot: investor_kyc
 
       reject-kyc:
+        flavour: discretionary
+        role_guard:
+          any_of: [compliance_officer, senior_compliance, mlro]
+        audit_class: investor_reject_kyc
         description: Transition from KYC_IN_PROGRESS to KYC_REJECTED
         metadata:
           tier: intent
@@ -547,6 +562,7 @@ domains:
           target_slot: investor_kyc
 
       mark-eligible:
+        flavour: attribute_mutating
         description: Transition from KYC_APPROVED to ELIGIBLE_TO_SUBSCRIBE
         metadata:
           tier: intent
@@ -596,6 +612,7 @@ domains:
           target_slot: investor
 
       record-subscription:
+        flavour: attribute_mutating
         description: Transition from ELIGIBLE_TO_SUBSCRIBE to SUBSCRIBED
         metadata:
           tier: intent
@@ -648,6 +665,7 @@ domains:
             baseline: reviewable
 
       activate:
+        flavour: attribute_mutating
         description: Transition from SUBSCRIBED to ACTIVE_HOLDER
         metadata:
           tier: intent
@@ -693,6 +711,7 @@ domains:
           target_slot: investor
 
       start-redemption:
+        flavour: instance_adding
         description: Transition from ACTIVE_HOLDER to REDEEMING
         metadata:
           tier: intent
@@ -739,6 +758,7 @@ domains:
             baseline: reviewable
 
       complete-redemption:
+        flavour: attribute_mutating
         description: Complete redemption - return to ACTIVE_HOLDER or proceed to OFFBOARDED
         metadata:
           tier: intent
@@ -788,6 +808,10 @@ domains:
           target_workspace: cbu
           target_slot: investor
       offboard:
+        flavour: discretionary
+        role_guard:
+          any_of: [compliance_admin, senior_compliance, mlro]
+        audit_class: investor_offboard
         description: Transition to OFFBOARDED (terminal state)
         metadata:
           tier: intent
@@ -846,6 +870,10 @@ domains:
           target_slot: investor
 
       suspend:
+        flavour: discretionary
+        role_guard:
+          any_of: [compliance_officer, senior_compliance, mlro]
+        audit_class: investor_suspend
         description: Suspend investor (can be done from most states)
         metadata:
           tier: intent
@@ -904,6 +932,7 @@ domains:
           target_slot: investor
 
       reinstate:
+        flavour: attribute_mutating
         description: Reinstate suspended investor to previous state
         metadata:
           tier: intent
@@ -967,6 +996,10 @@ domains:
       # Periodic review verbs
       # ============================================
       schedule-review:
+        flavour: discretionary
+        role_guard:
+          any_of: [compliance_officer, senior_compliance, mlro]
+        audit_class: investor_schedule_review
         description: Schedule periodic KYC review
         metadata:
           tier: intent
@@ -1019,6 +1052,7 @@ domains:
       # Query/reporting verbs
       # ============================================
       get-lifecycle-history:
+        flavour: attribute_mutating
         description: Get lifecycle state change history for an investor
         metadata:
           tier: reference
@@ -1064,6 +1098,7 @@ domains:
             baseline: benign
 
       count-by-state:
+        flavour: attribute_mutating
         description: Count investors by lifecycle state for a CBU
         metadata:
           tier: diagnostics

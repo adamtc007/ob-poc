@@ -24,9 +24,11 @@ pub mod dag;
 pub mod dag_registry;
 pub mod dag_validator;
 pub mod escalation;
+pub mod green_when_coverage;
 pub mod loader;
 pub mod pack_loader;
 pub mod phrase_gen;
+pub mod predicate;
 pub mod runbook_composition;
 pub mod tier_gate;
 pub mod types;
@@ -34,7 +36,17 @@ pub mod validator;
 
 pub use dag::{load_dags_from_dir, Dag, LoadedDag};
 pub use dag_registry::{DagRegistry, SlotKey, TransitionKey};
-pub use dag_validator::{validate_dags, DagError, DagValidationReport, DagWarning};
+pub use dag_validator::{
+    entity_kinds_from_taxonomy_yaml, validate_constellation_map_dir_schema_coordination,
+    validate_constellation_map_dir_schema_coordination_strict,
+    validate_constellation_map_schema_coordination, validate_dags, validate_dags_with_context,
+    validate_resolved_template_gate_metadata, DagError, DagValidationContext, DagValidationReport,
+    DagWarning, SchemaCoordinationKnownDeferred,
+};
+pub use green_when_coverage::{
+    green_when_coverage_for_dag, green_when_coverage_for_dags, green_when_coverage_summary,
+    GreenWhenCoverageRow, GreenWhenCoverageSummary, GreenWhenExclusionReason,
+};
 pub use pack_loader::{flatten_pack_entries, load_packs_from_dir, LoadedPack};
 
 pub use escalation::{
@@ -56,8 +68,9 @@ pub use types::{
     HarmClass, JurisdictionCondition, JurisdictionRule, LookupConfig, ResolutionMode,
     ReturnTypeConfig, ReturnsConfig, RuleCondition, RuleRequirement, RuleSeverity, SearchKeyConfig,
     SlotType, SourceOfTruth, StateEffect, ThreeAxisDeclaration, TransitionEdge, VerbBehavior,
-    VerbConfig, VerbConsumes, VerbLifecycle, VerbMetadata, VerbOutputConfig, VerbProduces,
-    VerbScope, VerbSentences, VerbStatus, VerbTier, VerbTransitions, VerbsConfig, WarningRule,
+    VerbConfig, VerbConsumes, VerbFlavour, VerbLifecycle, VerbMetadata, VerbOutputConfig,
+    VerbProduces, VerbRoleGuard, VerbScope, VerbSentences, VerbStatus, VerbTier, VerbTransitions,
+    VerbsConfig, WarningRule,
 };
 pub use validator::{
     collect_declared_fqns, validate_pack_fqns, validate_verb, validate_verbs_config, Location,

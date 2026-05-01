@@ -1,0 +1,52 @@
+state_machine: cbu_evidence_lifecycle
+description: CBU evidence item lifecycle — uploaded, reviewed, approved, expired
+states: [uploaded, reviewed, approved, rejected, expired]
+initial: uploaded
+transitions:
+  - from: uploaded
+    to: reviewed
+    verbs: [cbu.review-evidence]
+  - from: reviewed
+    to: approved
+    verbs: [cbu.approve-evidence]
+  - from: reviewed
+    to: rejected
+    verbs: [cbu.reject-evidence]
+  - from: approved
+    to: expired
+    verbs: [evidence.expire]
+  - from: expired
+    to: uploaded
+    verbs: [cbu.attach-evidence]
+reducer:
+  overlay_sources:
+    evidence:
+      table: cbu_evidence
+      join: evidence_id
+      provides: [verification_status, review_status, expiry_status]
+    review:
+      table: cbu_evidence_reviews
+      join: evidence_id
+      provides: [review_status, decision]
+  conditions:
+    has_uploaded_evidence:
+      expr: "evidence.verification_status IS NOT NULL"
+    review_complete:
+      expr: "review.review_status = 'COMPLETE'"
+    review_approved:
+      expr: "review.decision = 'APPROVED'"
+    review_rejected:
+      expr: "review.decision = 'REJECTED'"
+    evidence_expired:
+      expr: "evidence.expiry_status = 'EXPIRED'"
+  rules:
+    - state: expired
+      requires: [evidence_expired]
+    - state: approved
+      requires: [review_complete, review_approved]
+    - state: rejected
+      requires: [review_complete, review_rejected]
+    - state: reviewed
+      requires: [review_complete]
+    - state: uploaded
+      requires: [has_uploaded_evidence]

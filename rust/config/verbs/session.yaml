@@ -25,6 +25,7 @@ domains:
       # ============================================
 
       start:
+        flavour: instance_adding
         description: Start a new session or resume a previous one with fresh state
         behavior: plugin
         handler: SessionStartOp
@@ -75,6 +76,7 @@ domains:
       # ============================================
 
       load-universe:
+        flavour: instance_adding
         description: Load all CBUs (optionally filtered by client)
         behavior: plugin
         handler: SessionLoadUniverseOp
@@ -118,6 +120,7 @@ domains:
             baseline: benign
 
       load-galaxy:
+        flavour: instance_adding
         description: Load all CBUs in a region/jurisdiction (Galaxy = regional)
         behavior: plugin
         handler: SessionLoadGalaxyOp
@@ -166,6 +169,7 @@ domains:
             baseline: benign
 
       load-cluster:
+        flavour: instance_adding
         description: Load all CBUs under a GROUP entity (apex of ownership hierarchy)
         behavior: plugin
         handler: SessionLoadClusterOp
@@ -278,6 +282,7 @@ domains:
             baseline: benign
 
       load-system:
+        flavour: instance_adding
         description: Load a single CBU (Solar System = CBU container)
         behavior: plugin
         handler: SessionLoadSystemOp
@@ -326,6 +331,7 @@ domains:
       # ============================================
 
       filter-jurisdiction:
+        flavour: attribute_mutating
         description: Narrow session to only CBUs in a specific jurisdiction
         behavior: plugin
         handler: SessionFilterJurisdictionOp
@@ -367,6 +373,7 @@ domains:
       # ============================================
 
       unload-system:
+        flavour: attribute_mutating
         description: Remove a single CBU from the session
         behavior: plugin
         handler: SessionUnloadSystemOp
@@ -409,6 +416,7 @@ domains:
             baseline: reviewable
 
       clear:
+        flavour: attribute_mutating
         description: Remove all CBUs from session
         invocation_phrases:
         - "clear session"
@@ -446,6 +454,7 @@ domains:
       # ============================================
 
       undo:
+        flavour: attribute_mutating
         description: Rollback to previous session state
         invocation_phrases:
         - "undo"
@@ -479,6 +488,7 @@ domains:
             baseline: reviewable
 
       redo:
+        flavour: attribute_mutating
         description: Re-apply undone state change
         invocation_phrases:
         - "redo"
@@ -516,6 +526,7 @@ domains:
       # ============================================
 
       info:
+        flavour: attribute_mutating
         description: Get session summary
         invocation_phrases:
         - "session info"
@@ -549,6 +560,7 @@ domains:
             baseline: benign
 
       list:
+        flavour: attribute_mutating
         description: List loaded CBUs
         invocation_phrases:
         - "show loaded CBUs"
@@ -594,6 +606,7 @@ domains:
       # ============================================
 
       set-client:
+        flavour: attribute_mutating
         description: "Set client group context for entity resolution"
         behavior: plugin
         handler: SessionSetClientOp
@@ -649,6 +662,7 @@ domains:
             baseline: benign
 
       set-persona:
+        flavour: attribute_mutating
         description: "Set persona context for tag filtering"
         behavior: plugin
         handler: SessionSetPersonaOp
@@ -696,6 +710,7 @@ domains:
       # ============================================
 
       set-structure:
+        flavour: attribute_mutating
         description: "Set current structure (CBU) context for subsequent operations"
         behavior: plugin
         handler: SessionSetStructureOp
@@ -748,6 +763,7 @@ domains:
             baseline: benign
 
       set-case:
+        flavour: attribute_mutating
         description: "Set current KYC case context for subsequent operations"
         behavior: plugin
         handler: SessionSetCaseOp
@@ -793,6 +809,7 @@ domains:
             baseline: benign
 
       set-mandate:
+        flavour: attribute_mutating
         description: "Set current mandate (trading profile) context for subsequent operations"
         behavior: plugin
         handler: SessionSetMandateOp
@@ -843,6 +860,7 @@ domains:
       # ============================================
 
       load-deal:
+        flavour: instance_adding
         description: "Load a deal into session context for taxonomy visualization"
         behavior: plugin
         handler: SessionLoadDealOp
@@ -896,6 +914,7 @@ domains:
             baseline: benign
 
       unload-deal:
+        flavour: attribute_mutating
         description: "Clear deal context from session"
         behavior: plugin
         handler: SessionUnloadDealOp

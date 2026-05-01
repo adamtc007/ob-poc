@@ -551,6 +551,22 @@ slots:
         active, plus superseded terminal state for version-replacement
         audit. ACTIVE state projects into CBU tollgate (§5 cross-
         workspace aggregate).
+      predicate_bindings:
+        - entity: compliance_review
+          source_kind: dag_entity
+          scope: attached_to this trading_profile
+        - entity: ops_review
+          source_kind: dag_entity
+          scope: attached_to this trading_profile
+        - entity: committee_signoff
+          source_kind: dag_entity
+          scope: attached_to this trading_profile
+          required_universe:
+            source_kind: dag_entity
+            source_entity: committee_signoff_requirement
+        - entity: objection
+          source_kind: dag_entity
+          scope: attached_to this trading_profile
       states:
         - id: DRAFT
           entry: true
@@ -559,6 +575,14 @@ slots:
           description: "Submitted for compliance / ops review."
         - id: APPROVED
           description: "Approved but not yet activated. Ready for parallel run."
+          green_when: |
+            compliance_review exists
+            AND compliance_review.state = COMPLETE
+            AND ops_review exists
+            AND ops_review.state = COMPLETE
+            AND every required committee_signoff exists
+            AND every required committee_signoff.state = SIGNED
+            AND no objection exists with state = OPEN
         - id: PARALLEL_RUN
           description: "Running shadow alongside incumbent (or empty for new mandate)."
         - id: ACTIVE
@@ -860,6 +884,19 @@ slots:
         NOTE: this is borderline operational under the what-vs-how rule
         (pass 3 addendum §9.4). Kept as-is per A-1 v3 because schema is
         authoritative — flag for potential future refactor out of IM.
+      predicate_bindings:
+        - entity: delivery_line_item
+          source_kind: dag_entity
+          scope: attached_to this delivery
+          required_universe:
+            source_kind: dag_entity
+            source_entity: delivery_line_item_requirement
+        - entity: exception
+          source_kind: dag_entity
+          scope: attached_to this delivery
+        - entity: counterparty_acknowledgement
+          source_kind: dag_entity
+          scope: attached_to this delivery
       states:
         - id: PENDING
           entry: true
@@ -868,6 +905,12 @@ slots:
           description: "Delivery under way."
         - id: DELIVERED
           description: "Delivery complete."
+          green_when: |
+            every delivery_line_item exists
+            AND every delivery_line_item.state = CONFIRMED_RECEIVED
+            AND no exception exists with state = OPEN
+            AND counterparty_acknowledgement exists
+            AND counterparty_acknowledgement.state = RECEIVED
         - id: FAILED
           description: "Delivery failed."
         - id: CANCELLED

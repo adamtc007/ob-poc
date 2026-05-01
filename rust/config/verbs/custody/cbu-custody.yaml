@@ -9,6 +9,7 @@ domains:
       # For authoring/editing, use trading-profile:* verbs instead.
 
       list-universe:
+        flavour: attribute_mutating
         description: List CBU's traded universe (read from operational tables)
         behavior: crud
         metadata:
@@ -51,6 +52,7 @@ domains:
             baseline: benign
 
       list-ssis:
+        flavour: attribute_mutating
         description: List SSIs for a CBU (read from operational tables)
         behavior: crud
         metadata:
@@ -102,6 +104,7 @@ domains:
             baseline: benign
 
       list-booking-rules:
+        flavour: attribute_mutating
         description: List booking rules for a CBU (read from operational tables)
         behavior: crud
         metadata:
@@ -150,6 +153,7 @@ domains:
             baseline: benign
 
       list-agent-overrides:
+        flavour: attribute_mutating
         description: List agent overrides for an SSI
         behavior: crud
         metadata:
@@ -199,6 +203,7 @@ domains:
             baseline: benign
 
       derive-required-coverage:
+        flavour: attribute_mutating
         description: Compare universe to booking rules, find gaps
         behavior: plugin
         handler: derive_required_coverage
@@ -238,6 +243,7 @@ domains:
             baseline: reviewable
 
       validate-booking-coverage:
+        flavour: attribute_mutating
         description: Validate that all universe entries have matching booking rules
         behavior: plugin
         handler: validate_booking_coverage
@@ -282,6 +288,7 @@ domains:
             baseline: benign
 
       lookup-ssi:
+        flavour: attribute_mutating
         description: Find SSI for given trade characteristics (simulate ALERT lookup)
         behavior: plugin
         handler: lookup_ssi_for_trade
@@ -347,6 +354,7 @@ domains:
             baseline: benign
 
       setup-ssi:
+        flavour: attribute_mutating
         description: Bulk import SSIs from SSI_ONBOARDING document
         behavior: plugin
         handler: setup_ssi_from_document

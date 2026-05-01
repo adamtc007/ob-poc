@@ -23,6 +23,7 @@ domains:
       # Health Queries
       # ============================================
       health-pending:
+        flavour: attribute_mutating
         description: Check pending changeset health (counts by status)
         metadata:
           tier: diagnostics
@@ -54,6 +55,7 @@ domains:
           consequence:
             baseline: benign
       health-stale-dryruns:
+        flavour: attribute_mutating
         description: Check for stale dry-run results older than threshold
         metadata:
           tier: diagnostics
@@ -88,6 +90,7 @@ domains:
           consequence:
             baseline: benign
       cleanup:
+        flavour: attribute_mutating
         description: Run retention cleanup on old rejected/failed changesets
         metadata:
           tier: diagnostics
@@ -122,6 +125,7 @@ domains:
           consequence:
             baseline: reviewable
       bootstrap-seeds:
+        flavour: attribute_mutating
         description: Bootstrap seed bundles into the registry
         metadata:
           tier: diagnostics
@@ -155,6 +159,7 @@ domains:
           consequence:
             baseline: reviewable
       drain-outbox:
+        flavour: attribute_mutating
         description: Check outbox event queue status and trigger flush
         metadata:
           tier: diagnostics
@@ -189,6 +194,7 @@ domains:
           consequence:
             baseline: benign
       reindex-embeddings:
+        flavour: attribute_mutating
         description: Trigger embedding reindex by spawning populate_embeddings binary
         metadata:
           tier: diagnostics
@@ -227,6 +233,7 @@ domains:
           consequence:
             baseline: reviewable
       validate-schema-sync:
+        flavour: attribute_mutating
         description: Validate that schema and registry are in sync (drift detection)
         metadata:
           tier: diagnostics

@@ -28,6 +28,7 @@ domains:
     verbs:
 
       create:
+        flavour: instance_adding
         description: "Create a new booking-principal clearance row for (deal, booking_principal[, cbu]) — entry state PENDING"
         behavior: plugin
         metadata:
@@ -80,6 +81,7 @@ domains:
             baseline: reviewable
 
       start-screening:
+        flavour: instance_adding
         description: "Transition clearance PENDING → SCREENING (begin sanctions / credit / regulatory screening)"
         behavior: plugin
         metadata:
@@ -115,6 +117,10 @@ domains:
           target_slot: clearance
 
       approve:
+        flavour: discretionary
+        role_guard:
+          any_of: [compliance_officer, senior_compliance, mlro]
+        audit_class: booking_principal_clearance_approve
         description: "Transition clearance SCREENING → APPROVED (screening passed)"
         behavior: plugin
         metadata:
@@ -154,6 +160,10 @@ domains:
           target_slot: clearance
 
       reject:
+        flavour: discretionary
+        role_guard:
+          any_of: [compliance_officer, senior_compliance, mlro]
+        audit_class: booking_principal_clearance_reject
         description: "Transition clearance SCREENING → REJECTED (screening failed; reopenable)"
         behavior: plugin
         metadata:
@@ -193,6 +203,7 @@ domains:
           target_slot: clearance
 
       reopen:
+        flavour: attribute_mutating
         description: "Transition clearance REJECTED → PENDING (retry after remediation)"
         behavior: plugin
         metadata:
@@ -231,6 +242,7 @@ domains:
           target_slot: clearance
 
       activate:
+        flavour: attribute_mutating
         description: "Transition clearance APPROVED → ACTIVE (clearance live for this deal)"
         behavior: plugin
         metadata:
@@ -265,6 +277,10 @@ domains:
           target_slot: clearance
 
       suspend:
+        flavour: discretionary
+        role_guard:
+          any_of: [compliance_officer, senior_compliance, mlro]
+        audit_class: booking_principal_clearance_suspend
         description: "Transition clearance ACTIVE → SUSPENDED (regulatory hold, audit, dispute)"
         behavior: plugin
         metadata:
@@ -304,6 +320,7 @@ domains:
           target_slot: clearance
 
       reinstate:
+        flavour: attribute_mutating
         description: "Transition clearance SUSPENDED → ACTIVE (lift suspension)"
         behavior: plugin
         metadata:
@@ -339,6 +356,10 @@ domains:
           target_slot: clearance
 
       revoke:
+        flavour: discretionary
+        role_guard:
+          any_of: [compliance_admin, senior_compliance, mlro]
+        audit_class: booking_principal_clearance_revoke
         description: "Transition clearance APPROVED|ACTIVE|SUSPENDED → REVOKED (terminal — withdraw clearance)"
         behavior: plugin
         metadata:

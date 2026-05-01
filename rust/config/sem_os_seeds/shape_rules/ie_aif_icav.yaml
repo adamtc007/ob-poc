@@ -1,0 +1,12 @@
+shape: struct.ie.aif.icav
+workspace: cbu
+extends: [regulated.fund]
+structural_facts:
+  jurisdiction: IE
+  structure_type: aif
+  allowed_structure_types: [icav, aif]
+  document_bundles: [docs.bundle.aif-baseline]
+  trading_profile_type: aif
+  required_roles: [aifm, depositary]
+  optional_roles: [investment-manager, administrator, auditor, prime-broker, company-secretary]
+slots: {}

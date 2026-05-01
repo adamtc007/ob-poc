@@ -3,6 +3,7 @@ domains:
     description: Instrument class with industry taxonomy mappings
     verbs:
       ensure:
+        flavour: instance_adding
         description: Create or update instrument class with CFI/SMPG/ISDA mappings
         metadata:
           tier: intent
@@ -86,6 +87,7 @@ domains:
           consequence:
             baseline: reviewable
       read:
+        flavour: attribute_mutating
         description: Read instrument class by code
         metadata:
           tier: reference
@@ -121,6 +123,7 @@ domains:
           consequence:
             baseline: benign
       list:
+        flavour: attribute_mutating
         description: List instrument classes with filters
         metadata:
           tier: reference

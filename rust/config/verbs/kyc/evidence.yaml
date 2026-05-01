@@ -11,6 +11,7 @@ domains:
 
     verbs:
       create-requirement:
+        flavour: instance_adding
         description: "Create a new evidence requirement for a UBO registry entry"
         invocation_phrases:
           - "require evidence"
@@ -68,6 +69,7 @@ domains:
             baseline: reviewable
 
       attach-document:
+        flavour: instance_adding
         description: "Link a document to an evidence record"
         invocation_phrases:
           - "link evidence"
@@ -108,6 +110,7 @@ domains:
             baseline: reviewable
 
       mark-verified:
+        flavour: attribute_mutating
         description: "Verify (QA approve) an evidence record"
         invocation_phrases:
           - "verify evidence"
@@ -150,6 +153,10 @@ domains:
           target_slot: ubo_evidence
 
       mark-rejected:
+        flavour: discretionary
+        role_guard:
+          any_of: [compliance_officer, senior_compliance, mlro]
+        audit_class: evidence_mark_rejected
         description: "Reject an evidence record (clears document link for re-submission)"
         invocation_phrases:
           - "reject evidence"
@@ -188,6 +195,10 @@ domains:
           target_slot: ubo_evidence
 
       mark-waived:
+        flavour: discretionary
+        role_guard:
+          any_of: [compliance_admin, senior_compliance, mlro]
+        audit_class: evidence_mark_waived
         description: "Waive an evidence requirement with documented authority"
         invocation_phrases:
           - "waive evidence"

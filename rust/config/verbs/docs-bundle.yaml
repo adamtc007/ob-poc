@@ -12,6 +12,7 @@ domains:
       # Apply Bundle (creates document requirements)
       # ========================================================================
       apply:
+        flavour: attribute_mutating
         description: Apply a document bundle to a CBU, creating document requirements
         behavior: plugin
         invocation_phrases:
@@ -93,6 +94,7 @@ domains:
           consequence:
             baseline: reviewable
       list-applied:
+        flavour: attribute_mutating
         description: List document bundles applied to a CBU
         behavior: plugin
         invocation_phrases:
@@ -137,6 +139,7 @@ domains:
           consequence:
             baseline: benign
       list-available:
+        flavour: attribute_mutating
         description: List all available document bundles
         behavior: plugin
         invocation_phrases:

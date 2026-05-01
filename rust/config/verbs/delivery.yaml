@@ -3,6 +3,7 @@ domains:
     description: Service delivery tracking operations
     verbs:
       record:
+        flavour: attribute_mutating
         description: Record a service delivery for a CBU (upsert by cbu+product+service)
         invocation_phrases:
         - "record service delivery"
@@ -85,6 +86,7 @@ domains:
             baseline: reviewable
 
       complete:
+        flavour: attribute_mutating
         description: Mark a service delivery as complete
         invocation_phrases:
         - "complete service delivery"
@@ -163,6 +165,7 @@ domains:
             baseline: reviewable
 
       fail:
+        flavour: attribute_mutating
         description: Mark a service delivery as failed
         invocation_phrases:
         - "fail service delivery"
@@ -239,6 +242,7 @@ domains:
             baseline: reviewable
 
       start:
+        flavour: instance_adding
         description: "Start a pending delivery (PENDING → IN_PROGRESS)"
         invocation_phrases:
           - "start delivery"
@@ -273,6 +277,7 @@ domains:
           target_slot: delivery
 
       cancel:
+        flavour: attribute_mutating
         description: "Cancel a delivery before completion"
         invocation_phrases:
           - "cancel delivery"

@@ -232,6 +232,22 @@ slots:
         (reconcile-existing from state_machines/changeset_lifecycle.yaml).
         The canonical governance ceremony: compose → submit → review →
         approve/reject → publish.
+      predicate_bindings:
+        - entity: steward_approval
+          source_kind: dag_entity
+          scope: attached_to this changeset
+          required_universe:
+            source_kind: dag_entity
+            source_entity: steward_approval_requirement
+        - entity: validation_run
+          source_kind: dag_entity
+          scope: attached_to this changeset
+        - entity: impact_analysis
+          source_kind: dag_entity
+          scope: attached_to this changeset
+        - entity: objection
+          source_kind: dag_entity
+          scope: attached_to this changeset
       states:
         - id: composing
           entry: true
@@ -242,6 +258,14 @@ slots:
           description: "Human stewards reviewing the proposed changes."
         - id: approved
           description: "Stewards approved; awaiting publish trigger."
+          green_when: |
+            every required steward_approval exists
+            AND every required steward_approval.state = APPROVED
+            AND validation_run exists
+            AND validation_run.state = PASSED
+            AND impact_analysis exists
+            AND impact_analysis.state = REVIEWED
+            AND no objection exists with state = BLOCKING
         - id: published
           description: "Published to registry; consumers see the change."
         - id: rejected

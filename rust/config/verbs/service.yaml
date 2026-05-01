@@ -3,6 +3,7 @@ domains:
     description: "Service catalog operations — lifecycle governance (R2) plus read access."
     verbs:
       define:
+        flavour: attribute_mutating
         description: Promote an ungoverned service into the governed draft state
         invocation_phrases:
           - "define service"
@@ -59,6 +60,7 @@ domains:
           target_slot: service
 
       propose-revision:
+        flavour: attribute_mutating
         description: Move an active service back to draft for revision
         invocation_phrases:
           - "propose service revision"
@@ -114,6 +116,10 @@ domains:
           target_slot: service
 
       deprecate:
+        flavour: discretionary
+        role_guard:
+          any_of: [compliance_admin, senior_compliance, mlro]
+        audit_class: service_deprecate
         description: Mark an active service as deprecated
         invocation_phrases:
           - "deprecate service"
@@ -168,6 +174,10 @@ domains:
           target_slot: service
 
       retire:
+        flavour: discretionary
+        role_guard:
+          any_of: [compliance_admin, senior_compliance, mlro]
+        audit_class: service_retire
         description: Retire a deprecated service (terminal)
         invocation_phrases:
           - "retire service"
@@ -221,6 +231,7 @@ domains:
           target_slot: service
 
       list-versions:
+        flavour: attribute_mutating
         description: List versions for a service
         invocation_phrases:
           - "list service versions"
@@ -261,6 +272,7 @@ domains:
             baseline: benign
 
       show:
+        flavour: attribute_mutating
         description: Show full service detail including lifecycle status
         invocation_phrases:
           - "show service"
@@ -301,6 +313,7 @@ domains:
             baseline: benign
 
       read:
+        flavour: attribute_mutating
         description: Read a service by ID or code
         metadata:
           tier: reference
@@ -349,6 +362,7 @@ domains:
             baseline: benign
 
       list:
+        flavour: attribute_mutating
         description: List services with optional filters
         metadata:
           tier: reference
@@ -400,6 +414,7 @@ domains:
             baseline: benign
 
       list-by-product:
+        flavour: attribute_mutating
         description: List services for a product
         metadata:
           tier: reference

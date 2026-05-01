@@ -248,4 +248,3 @@ slots:
     depends_on:
       [{ slot: cbu, min_state: filled }, { slot: case, min_state: intake }]
     verbs: { create: mandate.create }
-bulk_macros: [role_slots]

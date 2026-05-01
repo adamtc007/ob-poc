@@ -9,6 +9,7 @@ domains:
 
     verbs:
       create:
+        flavour: instance_adding
         description: "Create a new booking location (jurisdictional perimeter)"
         behavior: plugin
         metadata:
@@ -54,6 +55,7 @@ domains:
             baseline: reviewable
 
       update:
+        flavour: attribute_mutating
         description: "Update a booking location's fields"
         behavior: plugin
         metadata:
@@ -89,6 +91,7 @@ domains:
             baseline: reviewable
 
       list:
+        flavour: attribute_mutating
         description: "List all booking locations"
         behavior: plugin
         metadata:

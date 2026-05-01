@@ -26,6 +26,7 @@ domains:
     verbs:
 
       propose-verb-declaration:
+        flavour: attribute_mutating
         description: "Stage a new or updated verb declaration for review"
         invocation_phrases:
           - "propose verb change"
@@ -69,6 +70,10 @@ domains:
           target_slot: proposal
 
       commit-verb-declaration:
+        flavour: discretionary
+        role_guard:
+          any_of: [compliance_admin, senior_compliance, mlro]
+        audit_class: catalogue_commit_verb_declaration
         description: "Promote a staged proposal to the authoritative catalogue"
         invocation_phrases:
           - "commit verb change"
@@ -102,6 +107,7 @@ domains:
           target_slot: proposal
 
       rollback-verb-declaration:
+        flavour: attribute_mutating
         description: "Discard a staged proposal (revert to prior authoritative state)"
         invocation_phrases:
           - "rollback catalogue proposal"
@@ -135,6 +141,7 @@ domains:
           target_slot: proposal
 
       list-proposals:
+        flavour: attribute_mutating
         description: "List pending and recently-committed verb-declaration proposals"
         invocation_phrases:
           - "list proposals"

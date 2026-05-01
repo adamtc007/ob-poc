@@ -8,6 +8,7 @@ domains:
     - shared atom consumers
     verbs:
       register:
+        flavour: instance_adding
         description: Register a new shared atom declaration. Enters Draft state.
         behavior: plugin
         handler: SharedAtomRegisterOp
@@ -56,6 +57,7 @@ domains:
             baseline: reviewable
 
       activate:
+        flavour: attribute_mutating
         description: Promote a shared atom from Draft to Active. Propagation enforcement begins.
         behavior: plugin
         handler: SharedAtomActivateOp
@@ -90,6 +92,7 @@ domains:
             baseline: reviewable
 
       deprecate:
+        flavour: attribute_mutating
         description: Mark a shared atom as deprecated. Still enforced but no new consumers allowed.
         behavior: plugin
         handler: SharedAtomDeprecateOp
@@ -123,6 +126,10 @@ domains:
             baseline: reviewable
 
       retire:
+        flavour: discretionary
+        role_guard:
+          any_of: [compliance_admin, senior_compliance, mlro]
+        audit_class: shared_atom_retire
         description: Remove a shared atom from active enforcement. Historical records retained.
         behavior: plugin
         handler: SharedAtomRetireOp
@@ -156,6 +163,7 @@ domains:
             baseline: requires_explicit_authorisation
 
       list:
+        flavour: attribute_mutating
         description: List all shared atoms, optionally filtered by lifecycle status
         behavior: plugin
         handler: SharedAtomListOp
@@ -192,6 +200,7 @@ domains:
             baseline: benign
 
       list-consumers:
+        flavour: attribute_mutating
         description: Show discovered consumers of a shared atom from verb footprint analysis
         behavior: plugin
         handler: SharedAtomListConsumersOp
@@ -228,6 +237,7 @@ domains:
             baseline: benign
 
       replay-constellation:
+        flavour: attribute_mutating
         description: Replay a consuming constellation from the top after a shared fact supersession
         behavior: plugin
         handler: SharedAtomReplayConstellationOp
@@ -272,6 +282,7 @@ domains:
             baseline: reviewable
 
       acknowledge-shared-update:
+        flavour: attribute_mutating
         description: Acknowledge a shared fact supersession for an in-flight entity, advancing the consumer ref to current
         behavior: plugin
         handler: SharedAtomAcknowledgeOp

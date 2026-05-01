@@ -8,6 +8,7 @@ domains:
       # =========================================================================
 
       create:
+        flavour: instance_adding
         description: "Create a new team with delegated authority"
         invocation_phrases:
           - "create team"
@@ -77,6 +78,7 @@ domains:
           consequence:
             baseline: reviewable
       read:
+        flavour: attribute_mutating
         description: "Read team details"
         invocation_phrases:
           - "show team"
@@ -121,6 +123,7 @@ domains:
           consequence:
             baseline: benign
       archive:
+        flavour: attribute_mutating
         description: "Archive team (soft delete)"
         invocation_phrases:
           - "archive team"
@@ -175,6 +178,7 @@ domains:
           consequence:
             baseline: reviewable
       add-member:
+        flavour: instance_adding
         description: "Add user to team with role"
         invocation_phrases:
           - "add team member"
@@ -245,6 +249,7 @@ domains:
           consequence:
             baseline: reviewable
       remove-member:
+        flavour: attribute_mutating
         description: "Remove user from team (specific role)"
         invocation_phrases:
           - "remove team member"
@@ -302,6 +307,7 @@ domains:
           consequence:
             baseline: requires_confirmation
       update-member:
+        flavour: attribute_mutating
         description: "Update member's role key"
         invocation_phrases:
           - "update team member"
@@ -343,6 +349,7 @@ domains:
           consequence:
             baseline: reviewable
       transfer-member:
+        flavour: attribute_mutating
         description: "Move user from one team to another (end old, create new)"
         invocation_phrases:
           - "transfer team member"
@@ -407,6 +414,7 @@ domains:
           consequence:
             baseline: reviewable
       add-governance-member:
+        flavour: instance_adding
         description: "Add governance member with optional legal appointment link"
         invocation_phrases:
           - "add governance member"
@@ -479,6 +487,7 @@ domains:
           consequence:
             baseline: reviewable
       verify-governance-access:
+        flavour: attribute_mutating
         description: "Audit governance access against legal appointments"
         invocation_phrases:
           - "verify governance access"
@@ -521,6 +530,7 @@ domains:
           consequence:
             baseline: benign
       add-cbu-access:
+        flavour: instance_adding
         description: "Add CBU to team's explicit access list"
         invocation_phrases:
           - "grant CBU access"
@@ -569,6 +579,7 @@ domains:
           consequence:
             baseline: reviewable
       remove-cbu-access:
+        flavour: attribute_mutating
         description: "Remove CBU from team's access"
         invocation_phrases:
           - "revoke CBU access"
@@ -613,6 +624,7 @@ domains:
           consequence:
             baseline: requires_confirmation
       grant-service:
+        flavour: attribute_mutating
         description: "Grant service entitlement to team"
         invocation_phrases:
           - "grant service to team"
@@ -669,6 +681,10 @@ domains:
           consequence:
             baseline: reviewable
       revoke-service:
+        flavour: discretionary
+        role_guard:
+          any_of: [compliance_admin, senior_compliance, mlro]
+        audit_class: team_revoke_service
         description: "Revoke service entitlement"
         invocation_phrases:
           - "revoke service from team"
@@ -719,6 +735,7 @@ domains:
           consequence:
             baseline: requires_confirmation
       list-members:
+        flavour: attribute_mutating
         description: "List team members"
         invocation_phrases:
           - "list team members"
@@ -762,6 +779,7 @@ domains:
           consequence:
             baseline: benign
       list-cbus:
+        flavour: attribute_mutating
         description: "List CBUs team can access"
         invocation_phrases:
           - "list team CBUs"
@@ -814,6 +832,7 @@ domains:
 
     verbs:
       create:
+        flavour: instance_adding
         description: "Create portal user"
         invocation_phrases:
           - "create user"
@@ -873,6 +892,10 @@ domains:
           consequence:
             baseline: reviewable
       suspend:
+        flavour: discretionary
+        role_guard:
+          any_of: [compliance_officer, senior_compliance, mlro]
+        audit_class: user_suspend
         description: "Suspend user access"
         invocation_phrases:
           - "suspend user"
@@ -912,6 +935,7 @@ domains:
           consequence:
             baseline: requires_confirmation
       reactivate:
+        flavour: attribute_mutating
         description: "Reactivate suspended user"
         invocation_phrases:
           - "reactivate user"
@@ -951,6 +975,7 @@ domains:
           consequence:
             baseline: requires_confirmation
       offboard:
+        flavour: attribute_mutating
         description: "Offboard user completely (left company)"
         invocation_phrases:
           - "offboard user"
@@ -1005,6 +1030,7 @@ domains:
           consequence:
             baseline: reviewable
       list-teams:
+        flavour: attribute_mutating
         description: "List user's team memberships"
         invocation_phrases:
           - "list user teams"
@@ -1042,6 +1068,7 @@ domains:
           consequence:
             baseline: benign
       list-cbus:
+        flavour: attribute_mutating
         description: "List all CBUs user can access"
         invocation_phrases:
           - "list user CBUs"
@@ -1086,6 +1113,7 @@ domains:
           consequence:
             baseline: benign
       check-access:
+        flavour: attribute_mutating
         description: "Check user access to specific CBU"
         invocation_phrases:
           - "check user access"

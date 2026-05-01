@@ -3,6 +3,7 @@ domains:
     description: Derived attribute recomputation and lifecycle management
     verbs:
       recompute-stale:
+        flavour: attribute_mutating
         description: Recompute stale derived values from the canonical queue in dependency-depth order
         metadata:
           tier: intent

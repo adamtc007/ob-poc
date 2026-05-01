@@ -3,6 +3,7 @@ domains:
     description: Unified reference data CRUD across operational reference domains
     verbs:
       ensure:
+        flavour: instance_adding
         description: Create or update a reference data record for the requested domain
         metadata:
           tier: intent
@@ -91,6 +92,7 @@ domains:
           consequence:
             baseline: reviewable
       read:
+        flavour: attribute_mutating
         description: Read a reference data record for the requested domain
         metadata:
           tier: reference
@@ -129,6 +131,7 @@ domains:
           consequence:
             baseline: benign
       list:
+        flavour: attribute_mutating
         description: List reference data records for the requested domain
         metadata:
           tier: reference
@@ -169,6 +172,7 @@ domains:
           consequence:
             baseline: benign
       deactivate:
+        flavour: attribute_mutating
         description: Deactivate or remove a reference data record for the requested domain
         metadata:
           tier: intent

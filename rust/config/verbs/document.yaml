@@ -23,6 +23,7 @@ domains:
       # Document Solicitation (outbound tasks)
       # ========================================================================
       solicit:
+        flavour: instance_adding
         description: Solicit a single document from an entity and track through to fulfillment
         behavior: durable
         durable:
@@ -147,6 +148,7 @@ domains:
             baseline: reviewable
 
       solicit-batch:
+        flavour: instance_adding
         description: Solicit multiple documents from an entity and track through to fulfillment
         behavior: durable
         durable:
@@ -236,6 +238,7 @@ domains:
       # KYC Request Tracking (merged from doc-request)
       # ========================================================================
       create-request:
+        flavour: instance_adding
         description: Create a document request for a KYC workstream.
         metadata:
           tier: intent
@@ -334,6 +337,7 @@ domains:
             baseline: reviewable
 
       mark-requested:
+        flavour: attribute_mutating
         description: Mark a document request as formally requested.
         metadata:
           tier: intent
@@ -384,6 +388,7 @@ domains:
             baseline: reviewable
 
       mark-received:
+        flavour: attribute_mutating
         description: Record receipt against a document request.
         metadata:
           tier: intent
@@ -447,6 +452,7 @@ domains:
             baseline: reviewable
 
       verify-request:
+        flavour: attribute_mutating
         description: Verify a document request as satisfied by a valid document.
         metadata:
           tier: intent
@@ -505,6 +511,10 @@ domains:
             baseline: benign
 
       reject-request:
+        flavour: discretionary
+        role_guard:
+          any_of: [compliance_officer, senior_compliance, mlro]
+        audit_class: document_reject_request
         description: Reject a document request submission.
         metadata:
           tier: intent
@@ -558,6 +568,10 @@ domains:
             baseline: requires_explicit_authorisation
 
       waive-request:
+        flavour: discretionary
+        role_guard:
+          any_of: [compliance_admin, senior_compliance, mlro]
+        audit_class: document_waive_request
         description: Waive a document request requirement.
         metadata:
           tier: intent
@@ -610,6 +624,7 @@ domains:
             baseline: requires_confirmation
 
       list-requests-by-workstream:
+        flavour: attribute_mutating
         description: List document requests for a workstream.
         metadata:
           tier: reference
@@ -662,6 +677,7 @@ domains:
       # Document Cataloging (legacy)
       # ========================================================================
       catalog:
+        flavour: attribute_mutating
         description: Catalog a document with type lookup (legacy - prefer document.create)
         behavior: plugin
         invocation_phrases:
@@ -719,6 +735,7 @@ domains:
             baseline: reviewable
 
       extract:
+        flavour: attribute_mutating
         description: Extract data from document using AI/OCR
         behavior: plugin
         invocation_phrases:
@@ -755,6 +772,7 @@ domains:
       # Document Creation (for internal/API sources)
       # ========================================================================
       create:
+        flavour: instance_adding
         description: Create a document record (Layer B - logical identity)
         behavior: crud
         invocation_phrases:
@@ -834,6 +852,7 @@ domains:
             baseline: reviewable
 
       upload-version:
+        flavour: instance_adding
         description: Upload a new version of a document (Layer C - immutable submission)
         behavior: plugin
         invocation_phrases:
@@ -895,6 +914,7 @@ domains:
       # QA / Verification
       # ========================================================================
       verify:
+        flavour: attribute_mutating
         description: QA approves a document version
         behavior: plugin
         invocation_phrases:
@@ -944,6 +964,10 @@ domains:
             baseline: benign
 
       reject:
+        flavour: discretionary
+        role_guard:
+          any_of: [compliance_officer, senior_compliance, mlro]
+        audit_class: document_reject
         description: QA rejects a document version with reason code
         behavior: plugin
         invocation_phrases:
@@ -1023,6 +1047,7 @@ domains:
             baseline: requires_explicit_authorisation
 
       start-qa:
+        flavour: instance_adding
         description: Move document version to QA queue
         behavior: crud
         invocation_phrases:
@@ -1066,6 +1091,7 @@ domains:
       # Queries
       # ========================================================================
       get:
+        flavour: attribute_mutating
         description: Get document with latest version status
         invocation_phrases:
           - "get document details"
@@ -1104,6 +1130,7 @@ domains:
             baseline: benign
 
       list-versions:
+        flavour: attribute_mutating
         description: List all versions of a document
         invocation_phrases:
           - "list document versions"
@@ -1141,6 +1168,7 @@ domains:
             baseline: benign
 
       for-entity:
+        flavour: attribute_mutating
         description: List all documents for an entity
         behavior: crud
         invocation_phrases:
@@ -1197,6 +1225,7 @@ domains:
             baseline: reviewable
 
       missing-for-entity:
+        flavour: attribute_mutating
         description: List missing document requirements for an entity
         behavior: plugin
         invocation_phrases:
@@ -1261,6 +1290,7 @@ domains:
             baseline: reviewable
 
       compute-requirements:
+        flavour: attribute_mutating
         description: Compute governed document requirement matrix for an entity
         behavior: plugin
         invocation_phrases:

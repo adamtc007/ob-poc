@@ -10,6 +10,7 @@ domains:
 
     verbs:
       create:
+        flavour: instance_adding
         description: "Create a new ruleset (starts in draft status)"
         behavior: plugin
         metadata:
@@ -55,6 +56,10 @@ domains:
           consequence:
             baseline: reviewable
       publish:
+        flavour: discretionary
+        role_guard:
+          any_of: [compliance_officer, senior_compliance, mlro]
+        audit_class: ruleset_publish
         description: "Publish a draft ruleset (validates field dictionary, checks temporal overlap)"
         behavior: plugin
         lifecycle:
@@ -88,6 +93,7 @@ domains:
           consequence:
             baseline: requires_confirmation
       retire:
+        flavour: attribute_mutating
         description: "Retire an active ruleset"
         behavior: plugin
         metadata:

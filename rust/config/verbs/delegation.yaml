@@ -3,6 +3,7 @@ domains:
     description: Service provider delegation chains - ManCo to sub-advisor, administrator to sub-contractor
     verbs:
       add:
+        flavour: instance_adding
         description: Add a delegation relationship (idempotent by delegator+delegate+scope+cbu)
         invocation_phrases:
           - "add delegation"
@@ -107,6 +108,7 @@ domains:
           consequence:
             baseline: reviewable
       end:
+        flavour: attribute_mutating
         description: End a delegation
         invocation_phrases:
           - "end delegation"
@@ -148,6 +150,7 @@ domains:
           consequence:
             baseline: reviewable
       list-delegates:
+        flavour: attribute_mutating
         description: List who an entity delegates to
         invocation_phrases:
           - "list delegates"
@@ -192,6 +195,7 @@ domains:
           consequence:
             baseline: benign
       list-delegations-received:
+        flavour: attribute_mutating
         description: List delegations an entity has received
         invocation_phrases:
           - "list delegations received"

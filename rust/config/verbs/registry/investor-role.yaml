@@ -54,6 +54,7 @@ domains:
       # Core operations
       # ============================================
       set:
+        flavour: attribute_mutating
         description: |
           Set or update the investor role profile for a holder-issuer relationship.
           Creates a new temporal version if effective_from differs from existing record.
@@ -241,6 +242,7 @@ domains:
             baseline: reviewable
 
       read:
+        flavour: attribute_mutating
         description: |
           Read the current (active) role profile for a holder-issuer relationship.
           Returns the profile where effective_to IS NULL (current version).
@@ -297,6 +299,7 @@ domains:
             baseline: benign
 
       read-as-of:
+        flavour: attribute_mutating
         description: |
           Read the role profile as of a specific historical date (point-in-time query).
 
@@ -357,6 +360,7 @@ domains:
             baseline: benign
 
       list-by-issuer:
+        flavour: attribute_mutating
         description: |
           List all current role profiles for an issuer (fund/vehicle).
 
@@ -416,6 +420,7 @@ domains:
             baseline: benign
 
       list-by-holder:
+        flavour: attribute_mutating
         description: |
           List all current role profiles for a holder across all issuers.
 
@@ -461,6 +466,7 @@ domains:
             baseline: benign
 
       history:
+        flavour: attribute_mutating
         description: |
           Get all historical versions of a role profile for a holder-issuer relationship.
 
@@ -521,6 +527,7 @@ domains:
       # Convenience verbs for common patterns
       # ============================================
       mark-as-nominee:
+        flavour: attribute_mutating
         description: |
           Mark a holder as a nominee (custodian, nominee company, etc.).
 
@@ -591,6 +598,7 @@ domains:
             baseline: reviewable
 
       mark-as-fof:
+        flavour: attribute_mutating
         description: |
           Mark a holder as a fund-of-funds intermediary.
 
@@ -665,6 +673,7 @@ domains:
             baseline: reviewable
 
       mark-as-master-pool:
+        flavour: attribute_mutating
         description: |
           Mark a holder as a master pooling vehicle (master fund in master-feeder structure).
 
@@ -743,6 +752,7 @@ domains:
             baseline: reviewable
 
       mark-as-end-investor:
+        flavour: attribute_mutating
         description: |
           Mark a holder as an end investor (terminal beneficial owner).
 

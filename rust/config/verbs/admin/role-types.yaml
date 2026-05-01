@@ -6,6 +6,7 @@ domains:
     description: "Role types reference data management"
     verbs:
       list:
+        flavour: attribute_mutating
         description: "List all role types"
         metadata:
           tier: reference
@@ -49,6 +50,7 @@ domains:
           consequence:
             baseline: benign
       read:
+        flavour: attribute_mutating
         description: "Get role type by code"
         metadata:
           tier: reference
@@ -86,6 +88,7 @@ domains:
           consequence:
             baseline: benign
       create:
+        flavour: instance_adding
         description: "Create new role type (idempotent by code)"
         metadata:
           tier: intent
@@ -167,6 +170,7 @@ domains:
           consequence:
             baseline: reviewable
       update:
+        flavour: attribute_mutating
         description: "Update role type"
         metadata:
           tier: intent
@@ -223,6 +227,7 @@ domains:
           consequence:
             baseline: reviewable
       deactivate:
+        flavour: attribute_mutating
         description: "Deactivate a role type"
         metadata:
           tier: intent

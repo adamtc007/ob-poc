@@ -11,6 +11,7 @@ domains:
 
     verbs:
       list:
+        flavour: attribute_mutating
         description: List all available research sources
         invocation_phrases:
           - "list research sources"
@@ -37,6 +38,7 @@ domains:
           consequence:
             baseline: benign
       info:
+        flavour: attribute_mutating
         description: Get information about a specific research source
         invocation_phrases:
           - "tell me about this source"
@@ -71,6 +73,7 @@ domains:
           consequence:
             baseline: benign
       search:
+        flavour: attribute_mutating
         description: Search a specific source for entities by name
         invocation_phrases:
           - "search source for"
@@ -119,6 +122,7 @@ domains:
           consequence:
             baseline: benign
       fetch:
+        flavour: attribute_mutating
         description: Fetch entity data from a source by its key
         invocation_phrases:
           - "fetch from source"
@@ -162,6 +166,7 @@ domains:
           consequence:
             baseline: benign
       find-for-jurisdiction:
+        flavour: attribute_mutating
         description: Find the best source for a jurisdiction and data type
         invocation_phrases:
           - "which source for"

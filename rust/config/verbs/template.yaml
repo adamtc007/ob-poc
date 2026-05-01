@@ -3,6 +3,7 @@ domains:
     description: Template invocation and batch execution operations
     verbs:
       invoke:
+        flavour: attribute_mutating
         description: Invoke a single template with parameters
         metadata:
           tier: intent
@@ -45,6 +46,7 @@ domains:
           consequence:
             baseline: reviewable
       batch:
+        flavour: attribute_mutating
         description: Execute template in batch over query results
         metadata:
           tier: intent

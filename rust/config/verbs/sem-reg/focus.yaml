@@ -24,6 +24,7 @@ domains:
       # Focus State
       # ============================================
       get:
+        flavour: attribute_mutating
         description: Get the current focus state (what object the agent is working on)
         metadata:
           tier: diagnostics
@@ -55,6 +56,7 @@ domains:
           consequence:
             baseline: benign
       set:
+        flavour: attribute_mutating
         description: Set the focus state to a specific registry object
         metadata:
           tier: diagnostics
@@ -97,6 +99,7 @@ domains:
           consequence:
             baseline: benign
       render:
+        flavour: attribute_mutating
         description: Render the current focus context (computes ShowPacket with all viewports)
         metadata:
           tier: diagnostics
@@ -128,6 +131,7 @@ domains:
           consequence:
             baseline: benign
       viewport:
+        flavour: attribute_mutating
         description: Compute a single viewport by kind (Focus Summary, Inspector, Diff, Gates)
         metadata:
           tier: diagnostics
@@ -169,6 +173,7 @@ domains:
           consequence:
             baseline: benign
       diff:
+        flavour: attribute_mutating
         description: Compute a structured diff between predecessor and current draft
         metadata:
           tier: diagnostics
@@ -207,6 +212,7 @@ domains:
           consequence:
             baseline: benign
       capture-manifest:
+        flavour: attribute_mutating
         description: Capture and persist a ViewportManifest snapshot of the current focus
         metadata:
           tier: diagnostics

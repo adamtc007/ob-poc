@@ -3,6 +3,7 @@ domains:
     description: Audit trail for KYC case activities
     verbs:
       log:
+        flavour: instance_adding
         description: Log a case event
         metadata:
           tier: intent
@@ -90,6 +91,7 @@ domains:
           consequence:
             baseline: reviewable
       list-by-case:
+        flavour: attribute_mutating
         description: List events for a case
         metadata:
           tier: reference

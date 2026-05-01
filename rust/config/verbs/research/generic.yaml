@@ -9,6 +9,7 @@ domains:
 
     verbs:
       normalize:
+        flavour: attribute_mutating
         description: |
           Normalize a raw research payload from an external source.
           Takes a source name and raw JSON payload, validates against

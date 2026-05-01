@@ -13,6 +13,7 @@ domains:
       # Group Discovery
       # ========================================================================
       group.derive:
+        flavour: attribute_mutating
         description: |
           Derive CBU groups from governance controller (board appointment/control) with MANCO_ROLE fallback.
           Creates groups and memberships based on computed control signals.
@@ -50,6 +51,7 @@ domains:
             baseline: reviewable
 
       group.list:
+        flavour: attribute_mutating
         description: |
           List all governance controller groups with summary information.
           Includes CBU counts and names for each group.
@@ -94,6 +96,7 @@ domains:
             baseline: benign
 
       group.cbus:
+        flavour: attribute_mutating
         description: |
           Get all CBUs in a governance controller group.
           Returns CBU details including fund entity and membership source.
@@ -131,6 +134,7 @@ domains:
             baseline: benign
 
       group.for-cbu:
+        flavour: attribute_mutating
         description: |
           Find the governance controller group for a specific CBU.
           Returns controller details and group information.
@@ -171,6 +175,7 @@ domains:
       # Primary Governance Controller
       # ========================================================================
       primary-controller:
+        flavour: attribute_mutating
         description: |
           Get the primary governance controller for an issuer.
           Returns single deterministic winner based on: board rights > voting control > significant influence.
@@ -230,6 +235,7 @@ domains:
       # Control Chain Traversal
       # ========================================================================
       control-chain:
+        flavour: attribute_mutating
         description: |
           Trace the shareholding control chain upward from a controller.
           Returns the chain of controlling entities up to the ultimate parent.
@@ -275,6 +281,7 @@ domains:
       # Group Management
       # ========================================================================
       group.create:
+        flavour: instance_adding
         description: |
           Create a new CBU group manually.
           Use for groups that can't be auto-derived from control signals.
@@ -352,6 +359,7 @@ domains:
             baseline: reviewable
 
       group.add-member:
+        flavour: attribute_mutating
         description: Add a CBU to a governance controller group
         behavior: crud
         invocation_phrases:
@@ -409,6 +417,7 @@ domains:
             baseline: reviewable
 
       group.remove-member:
+        flavour: attribute_mutating
         description: Remove a CBU from a governance controller group (sets effective_to)
         behavior: crud
         invocation_phrases:
@@ -454,6 +463,7 @@ domains:
       # Composite Queries
       # ========================================================================
       book.summary:
+        flavour: attribute_mutating
         description: |
           Get a comprehensive summary of a governance controller "book".
           Includes group info, all CBUs, and control chain.
@@ -498,6 +508,10 @@ domains:
             baseline: benign
 
       approve:
+        flavour: discretionary
+        role_guard:
+          any_of: [compliance_officer, senior_compliance, mlro]
+        audit_class: manco_approve
         description: "Approve manco for managing mandates (new-manco onboarding)"
         behavior: plugin
         metadata:
@@ -531,6 +545,10 @@ domains:
           target_slot: manco
 
       reject:
+        flavour: discretionary
+        role_guard:
+          any_of: [compliance_officer, senior_compliance, mlro]
+        audit_class: manco_reject
         description: "Reject manco onboarding (terminal-negative)"
         behavior: plugin
         metadata:
@@ -567,6 +585,7 @@ domains:
           target_slot: manco
 
       flag-regulatory:
+        flavour: attribute_mutating
         description: "Flag manco for regulatory investigation (transitions APPROVED → UNDER_INVESTIGATION)"
         behavior: plugin
         metadata:
@@ -604,6 +623,7 @@ domains:
           target_slot: manco
 
       clear-regulatory:
+        flavour: attribute_mutating
         description: "Clear manco from regulatory investigation (back to APPROVED)"
         behavior: plugin
         metadata:
@@ -637,6 +657,10 @@ domains:
           target_slot: manco
 
       suspend:
+        flavour: discretionary
+        role_guard:
+          any_of: [compliance_officer, senior_compliance, mlro]
+        audit_class: manco_suspend
         description: "Fully suspend manco — cascades SUSPENDED to all managed CBUs"
         behavior: plugin
         metadata:
@@ -674,6 +698,7 @@ domains:
           target_slot: manco
 
       partial-reinstate:
+        flavour: attribute_mutating
         description: "Partially reinstate suspended manco (returns to UNDER_INVESTIGATION)"
         behavior: plugin
         metadata:
@@ -707,6 +732,10 @@ domains:
           target_slot: manco
 
       begin-sunset:
+        flavour: discretionary
+        role_guard:
+          any_of: [compliance_admin, senior_compliance, mlro]
+        audit_class: manco_begin_sunset
         description: "Begin manco sunset (no new mandates; existing run to exit)"
         behavior: plugin
         metadata:
@@ -740,6 +769,10 @@ domains:
           target_slot: manco
 
       terminate:
+        flavour: discretionary
+        role_guard:
+          any_of: [compliance_officer, senior_compliance, mlro]
+        audit_class: manco_terminate
         description: "Terminate manco (all mandates transferred or wound down)"
         behavior: plugin
         metadata:
@@ -779,6 +812,7 @@ domains:
       - ownership
     verbs:
       control-links.compute:
+        flavour: attribute_mutating
         description: |
           Compute control links from holdings.
           Materializes shareholding control relationships for efficient queries.
@@ -821,6 +855,7 @@ domains:
             baseline: benign
 
       control-links.list:
+        flavour: attribute_mutating
         description: |
           List holding control links for an issuer or holder.
           Shows all shareholdings that establish control/influence.
@@ -885,6 +920,7 @@ domains:
       # Governance Bridges (data source → governance signals)
       # ========================================================================
       bridge.manco-roles:
+        flavour: attribute_mutating
         description: |
           Bridge MANAGEMENT_COMPANY role assignments to BOARD_APPOINTMENT special rights.
           Enables governance controller to fire for CBUs with ManCo roles assigned.
@@ -920,6 +956,7 @@ domains:
             baseline: reviewable
 
       bridge.gleif-fund-managers:
+        flavour: attribute_mutating
         description: |
           Bridge GLEIF IS_FUND_MANAGED_BY relationships to BOARD_APPOINTMENT special rights.
           Run after GLEIF import to enable governance controller for fund entities.
@@ -955,6 +992,7 @@ domains:
             baseline: reviewable
 
       bridge.bods-ownership:
+        flavour: attribute_mutating
         description: |
           Bridge BODS ownership statements to kyc.holdings.
           Run after BODS import to enable governance controller from ownership percentages.
@@ -995,6 +1033,7 @@ domains:
       # MASTER MACRO: Full governance refresh pipeline
       # ========================================================================
       refresh:
+        flavour: attribute_mutating
         description: |
           Full governance refresh pipeline. Runs all bridges then derives groups.
 

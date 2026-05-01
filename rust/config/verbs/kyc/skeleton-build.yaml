@@ -3,6 +3,7 @@ domains:
     description: KYC skeleton build pipeline — orchestrates the full ownership discovery and validation sequence
     verbs:
       build:
+        flavour: attribute_mutating
         description: Run the full skeleton build pipeline for a KYC case
         invocation_phrases:
         - "build skeleton"

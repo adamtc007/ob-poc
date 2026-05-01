@@ -8,6 +8,7 @@ domains:
     description: "Cash sweep and STIF configuration management"
     verbs:
       configure:
+        flavour: attribute_mutating
         description: Configure cash sweep for currency
         metadata:
           tier: intent
@@ -126,6 +127,7 @@ domains:
             baseline: reviewable
 
       link-resource:
+        flavour: instance_adding
         description: Link sweep config to cash management resource
         metadata:
           tier: intent
@@ -173,6 +175,7 @@ domains:
             baseline: reviewable
 
       list:
+        flavour: attribute_mutating
         description: List cash sweep configurations for CBU
         metadata:
           tier: reference
@@ -220,6 +223,7 @@ domains:
             baseline: benign
 
       update-threshold:
+        flavour: attribute_mutating
         description: Update sweep threshold amount
         metadata:
           tier: intent
@@ -261,6 +265,7 @@ domains:
             baseline: reviewable
 
       update-timing:
+        flavour: attribute_mutating
         description: Update sweep timing
         metadata:
           tier: intent
@@ -315,6 +320,7 @@ domains:
             baseline: reviewable
 
       change-vehicle:
+        flavour: attribute_mutating
         description: Change sweep investment vehicle
         metadata:
           tier: intent
@@ -379,6 +385,10 @@ domains:
                 reason: "Non-standard cash-sweep vehicle — risk profile differs from approved STIF/MMF defaults."
 
       suspend:
+        flavour: discretionary
+        role_guard:
+          any_of: [compliance_officer, senior_compliance, mlro]
+        audit_class: cash_sweep_suspend
         description: Suspend cash sweep
         metadata:
           tier: intent
@@ -418,6 +428,7 @@ domains:
             baseline: requires_confirmation
 
       reactivate:
+        flavour: attribute_mutating
         description: Reactivate cash sweep
         metadata:
           tier: intent
@@ -457,6 +468,7 @@ domains:
             baseline: requires_confirmation
 
       remove:
+        flavour: attribute_mutating
         description: Remove cash sweep configuration
         metadata:
           tier: intent

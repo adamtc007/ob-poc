@@ -1,0 +1,12 @@
+shape: struct.uk.authorised.ltaf
+workspace: cbu
+extends: [regulated.fund]
+structural_facts:
+  jurisdiction: UK
+  structure_type: uk-authorised
+  allowed_structure_types: [ltaf, uk-authorised]
+  document_bundles: [docs.bundle.uk-authorised-baseline, docs.bundle.ltaf-baseline]
+  trading_profile_type: ltaf
+  required_roles: [authorised-corporate-director, depositary]
+  optional_roles: [investment-manager, administrator, auditor, valuation-agent]
+slots: {}

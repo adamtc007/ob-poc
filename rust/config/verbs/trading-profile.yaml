@@ -12,6 +12,7 @@ domains:
       - markets
     verbs:
       import:
+        flavour: instance_adding
         description: Import a trading profile document from YAML/JSON file or inline content
         behavior: plugin
         handler: import_trading_profile
@@ -85,6 +86,7 @@ domains:
             baseline: reviewable
 
       read:
+        flavour: attribute_mutating
         description: Read a trading profile by ID
         behavior: crud
         invocation_phrases:
@@ -127,6 +129,7 @@ domains:
             baseline: benign
 
       get-active:
+        flavour: attribute_mutating
         description: Get the active trading profile for a CBU
         behavior: plugin
         handler: get_active_trading_profile
@@ -168,6 +171,7 @@ domains:
             baseline: benign
 
       list-versions:
+        flavour: attribute_mutating
         description: List all versions of trading profiles for a CBU
         invocation_phrases:
           - "list trading profile versions"
@@ -214,6 +218,10 @@ domains:
             baseline: benign
 
       activate:
+        flavour: discretionary
+        role_guard:
+          any_of: [compliance_admin, senior_compliance, mlro]
+        audit_class: trading_profile_activate
         description: |
           DEPRECATED — use trading-profile.go-live instead.
 
@@ -274,6 +282,7 @@ domains:
           target_workspace: instrument_matrix
           target_slot: trading_profile
       materialize:
+        flavour: attribute_mutating
         description: Materialize trading profile to operational tables (universe, SSIs, booking rules)
         behavior: plugin
         handler: materialize_trading_profile
@@ -333,6 +342,7 @@ domains:
             baseline: reviewable
 
       diff:
+        flavour: attribute_mutating
         description: Compare two trading profile versions
         invocation_phrases:
           - "diff trading profiles"
@@ -379,6 +389,7 @@ domains:
             baseline: benign
 
       create-draft:
+        flavour: instance_adding
         description: Create a new draft trading profile for a CBU (use clone-to to copy from existing)
         invocation_phrases:
           - "create draft profile"
@@ -429,6 +440,7 @@ domains:
             baseline: reviewable
 
       clone-to:
+        flavour: attribute_mutating
         description: Clone a trading profile to another CBU, creating a new DRAFT profile
         invocation_phrases:
           - "clone profile to CBU"
@@ -494,6 +506,7 @@ domains:
             baseline: reviewable
 
       create-new-version:
+        flavour: instance_adding
         description: Create a new draft version from the current ACTIVE profile. Used when modifying a live trading matrix.
         invocation_phrases:
           - "create new profile version"
@@ -549,6 +562,7 @@ domains:
             baseline: reviewable
 
       add-component:
+        flavour: instance_adding
         description: Add a component to the trading profile document
         invocation_phrases:
           - "add component to trading profile"
@@ -766,6 +780,7 @@ domains:
             baseline: reviewable
 
       remove-component:
+        flavour: attribute_mutating
         description: Remove a component from the trading profile document
         invocation_phrases:
           - "remove component from trading profile"
@@ -828,6 +843,7 @@ domains:
             baseline: requires_confirmation
 
       set-base-currency:
+        flavour: attribute_mutating
         description: Set base currency for trading profile
         invocation_phrases:
           - "set base currency"
@@ -872,6 +888,7 @@ domains:
             baseline: reviewable
 
       link-csa-ssi:
+        flavour: instance_adding
         description: Link CSA to collateral SSI in standing instructions
         invocation_phrases:
           - "link CSA to SSI"
@@ -916,6 +933,7 @@ domains:
             baseline: reviewable
 
       update-im-scope:
+        flavour: attribute_mutating
         description: Update scope for existing IM mandate
         invocation_phrases:
           - "update IM scope"
@@ -965,6 +983,10 @@ domains:
             baseline: reviewable
 
       validate-go-live-ready:
+        flavour: discretionary
+        role_guard:
+          any_of: [compliance_officer, senior_compliance, mlro]
+        audit_class: trading_profile_validate_go_live_ready
         description: Full validation for production readiness
         invocation_phrases:
           - "validate go live ready"
@@ -1006,6 +1028,7 @@ domains:
             baseline: benign
 
       validate-universe-coverage:
+        flavour: attribute_mutating
         description: Validate all universe entries have required SSIs and booking rules
         invocation_phrases:
           - "validate universe coverage"
@@ -1052,6 +1075,7 @@ domains:
             baseline: benign
 
       submit:
+        flavour: attribute_mutating
         description: Submit a validated trading profile for client review (transitions VALIDATED -> PENDING_REVIEW)
         invocation_phrases:
           - "submit profile for approval"
@@ -1117,6 +1141,10 @@ domains:
           target_slot: trading_profile
 
       approve:
+        flavour: discretionary
+        role_guard:
+          any_of: [compliance_officer, senior_compliance, mlro]
+        audit_class: trading_profile_approve
         description: Approve a pending trading profile, activating it (transitions PENDING_REVIEW -> ACTIVE)
         invocation_phrases:
           - "approve trading profile"
@@ -1165,6 +1193,10 @@ domains:
           target_slot: trading_profile
 
       reject:
+        flavour: discretionary
+        role_guard:
+          any_of: [compliance_officer, senior_compliance, mlro]
+        audit_class: trading_profile_reject
         description: Reject a pending trading profile (transitions PENDING_REVIEW -> DRAFT with rejection reason)
         invocation_phrases:
           - "reject trading profile"
@@ -1213,6 +1245,7 @@ domains:
           target_slot: trading_profile
 
       archive:
+        flavour: attribute_mutating
         description: Archive a trading profile (soft delete, transitions to ARCHIVED status)
         invocation_phrases:
           - "archive trading profile"
@@ -1266,6 +1299,7 @@ domains:
           target_workspace: instrument_matrix
           target_slot: trading_profile
       ca.enable-event-types:
+        flavour: attribute_mutating
         description: Enable CA event types for this trading profile
         invocation_phrases:
           - "enable corporate action types"
@@ -1309,6 +1343,7 @@ domains:
             baseline: reviewable
 
       ca.disable-event-types:
+        flavour: attribute_mutating
         description: Disable CA event types for this trading profile
         invocation_phrases:
           - "disable corporate action types"
@@ -1348,6 +1383,7 @@ domains:
             baseline: reviewable
 
       ca.set-notification-policy:
+        flavour: attribute_mutating
         description: Configure CA notification settings
         invocation_phrases:
           - "set CA notification policy"
@@ -1396,6 +1432,7 @@ domains:
             baseline: reviewable
 
       ca.set-election-policy:
+        flavour: attribute_mutating
         description: Configure who makes CA elections and requirements
         invocation_phrases:
           - "set CA election policy"
@@ -1451,6 +1488,7 @@ domains:
             baseline: reviewable
 
       ca.set-default-option:
+        flavour: attribute_mutating
         description: Set default election for specific event type
         invocation_phrases:
           - "set default CA option"
@@ -1500,6 +1538,7 @@ domains:
             baseline: reviewable
 
       ca.remove-default-option:
+        flavour: attribute_mutating
         description: Remove default election for specific event type
         invocation_phrases:
           - "remove default CA option"
@@ -1538,6 +1577,7 @@ domains:
             baseline: requires_confirmation
 
       ca.add-cutoff-rule:
+        flavour: attribute_mutating
         description: Add deadline cutoff rule for market/depository
         invocation_phrases:
           - "add CA cutoff rule"
@@ -1599,6 +1639,7 @@ domains:
             baseline: reviewable
 
       ca.remove-cutoff-rule:
+        flavour: attribute_mutating
         description: Remove cutoff rule by market/depository
         invocation_phrases:
           - "remove CA cutoff rule"
@@ -1640,6 +1681,7 @@ domains:
             baseline: requires_confirmation
 
       ca.link-proceeds-ssi:
+        flavour: attribute_mutating
         description: Map CA proceeds to settlement instruction
         invocation_phrases:
           - "link proceeds SSI"
@@ -1690,6 +1732,7 @@ domains:
             baseline: reviewable
 
       ca.remove-proceeds-ssi:
+        flavour: attribute_mutating
         description: Remove CA proceeds SSI mapping
         invocation_phrases:
           - "remove proceeds SSI"
@@ -1734,6 +1777,7 @@ domains:
             baseline: requires_confirmation
 
       ca.get-policy:
+        flavour: attribute_mutating
         description: Get current CA policy configuration from trading profile
         invocation_phrases:
           - "get CA policy"
@@ -1776,6 +1820,7 @@ domains:
       # =========================================================================
 
       enter-parallel-run:
+        flavour: attribute_mutating
         description: "Enter parallel_run state (approved → parallel_run)"
         invocation_phrases:
           - "enter parallel run"
@@ -1811,6 +1856,10 @@ domains:
           target_workspace: instrument_matrix
           target_slot: trading_profile
       go-live:
+        flavour: discretionary
+        role_guard:
+          any_of: [compliance_admin, senior_compliance, mlro]
+        audit_class: trading_profile_go_live
         description: "Go-live on a mandate (parallel_run → active)"
         invocation_phrases:
           - "go live"
@@ -1846,6 +1895,7 @@ domains:
           target_slot: trading_profile
 
       abort-parallel-run:
+        flavour: attribute_mutating
         description: "Abort parallel run — roll back to approved"
         invocation_phrases:
           - "abort parallel run"
@@ -1883,6 +1933,10 @@ domains:
           target_workspace: instrument_matrix
           target_slot: trading_profile
       suspend:
+        flavour: discretionary
+        role_guard:
+          any_of: [compliance_officer, senior_compliance, mlro]
+        audit_class: trading_profile_suspend
         description: "Suspend active mandate (operational hold)"
         invocation_phrases:
           - "suspend mandate"
@@ -1920,6 +1974,10 @@ domains:
           target_slot: trading_profile
 
       reactivate:
+        flavour: discretionary
+        role_guard:
+          any_of: [compliance_admin, senior_compliance, mlro]
+        audit_class: trading_profile_reactivate
         description: "Reactivate a suspended mandate (suspended → active)"
         invocation_phrases:
           - "reactivate mandate"
@@ -1954,6 +2012,10 @@ domains:
           target_slot: trading_profile
 
       supersede:
+        flavour: discretionary
+        role_guard:
+          any_of: [compliance_admin, senior_compliance, mlro]
+        audit_class: trading_profile_supersede
         description: "Supersede active version with newer version (active → superseded)"
         invocation_phrases:
           - "supersede mandate"
@@ -1996,6 +2058,10 @@ domains:
           target_workspace: instrument_matrix
           target_slot: trading_profile
       retire-template:
+        flavour: discretionary
+        role_guard:
+          any_of: [compliance_admin, senior_compliance, mlro]
+        audit_class: trading_profile_retire_template
         description: "Retire a template (available → unavailable)"
         invocation_phrases:
           - "retire template"
@@ -2033,6 +2099,7 @@ domains:
           target_workspace: instrument_matrix
           target_slot: trading_profile
       add-instrument-class:
+        flavour: instance_adding
         description: "Add instrument class to trading profile / template"
         invocation_phrases:
           - "add instrument class"
@@ -2064,6 +2131,7 @@ domains:
             baseline: reviewable
 
       remove-instrument-class:
+        flavour: attribute_mutating
         description: "Remove instrument class from trading profile / template (no cascade)"
         invocation_phrases:
           - "remove instrument class"
@@ -2092,6 +2160,7 @@ domains:
             baseline: requires_confirmation
 
       add-market:
+        flavour: instance_adding
         description: "Add market to trading profile / template"
         invocation_phrases:
           - "add market"
@@ -2120,6 +2189,7 @@ domains:
             baseline: reviewable
 
       remove-market:
+        flavour: attribute_mutating
         description: "Remove market from trading profile / template (no cascade)"
         invocation_phrases:
           - "remove market"
@@ -2148,6 +2218,7 @@ domains:
             baseline: requires_confirmation
 
       add-counterparty-type:
+        flavour: instance_adding
         description: "Add counterparty type to template"
         metadata:
           tier: intent
@@ -2173,6 +2244,10 @@ domains:
             baseline: reviewable
 
       publish-template-version:
+        flavour: discretionary
+        role_guard:
+          any_of: [compliance_officer, senior_compliance, mlro]
+        audit_class: trading_profile_publish_template_version
         description: "Publish a new template version as default for cloning"
         metadata:
           tier: intent
@@ -2195,6 +2270,7 @@ domains:
             baseline: requires_explicit_authorisation
 
       list-components:
+        flavour: attribute_mutating
         description: "List all components of a trading profile / template"
         invocation_phrases:
           - "list components"
@@ -2228,6 +2304,10 @@ domains:
       # =========================================================================
 
       prune-asset-family:
+        flavour: discretionary
+        role_guard:
+          any_of: [compliance_admin, senior_compliance, mlro]
+        audit_class: trading_profile_prune_asset_family
         description: "Prune asset family from profile/template with cascade"
         metadata:
           tier: intent
@@ -2261,6 +2341,10 @@ domains:
             baseline: requires_explicit_authorisation
 
       prune-market:
+        flavour: discretionary
+        role_guard:
+          any_of: [compliance_admin, senior_compliance, mlro]
+        audit_class: trading_profile_prune_market
         description: "Prune market from profile/template with cascade"
         metadata:
           tier: intent
@@ -2290,6 +2374,10 @@ domains:
             baseline: requires_explicit_authorisation
 
       prune-instrument-class:
+        flavour: discretionary
+        role_guard:
+          any_of: [compliance_admin, senior_compliance, mlro]
+        audit_class: trading_profile_prune_instrument_class
         description: "Prune single instrument class with cascade"
         metadata:
           tier: intent
@@ -2319,6 +2407,10 @@ domains:
             baseline: requires_explicit_authorisation
 
       prune-counterparty:
+        flavour: discretionary
+        role_guard:
+          any_of: [compliance_admin, senior_compliance, mlro]
+        audit_class: trading_profile_prune_counterparty
         description: "Prune specific counterparty from CBU mandate with cascade"
         metadata:
           tier: intent
@@ -2348,6 +2440,10 @@ domains:
             baseline: requires_explicit_authorisation
 
       prune-counterparty-type:
+        flavour: discretionary
+        role_guard:
+          any_of: [compliance_admin, senior_compliance, mlro]
+        audit_class: trading_profile_prune_counterparty_type
         description: "Prune counterparty type (all counterparties of category)"
         metadata:
           tier: intent
@@ -2377,6 +2473,7 @@ domains:
             baseline: requires_explicit_authorisation
 
       prune-impact:
+        flavour: attribute_mutating
         description: "Read-only impact analysis before invoking a destructive prune"
         invocation_phrases:
           - "prune impact"
@@ -2413,6 +2510,7 @@ domains:
             baseline: benign
 
       sync-from-template:
+        flavour: attribute_mutating
         description: "Sync a CBU mandate from its group template (adopt forward-only template changes)"
         invocation_phrases:
           - "sync from template"
@@ -2446,6 +2544,7 @@ domains:
             baseline: requires_confirmation
 
       restrict:
+        flavour: attribute_mutating
         description: "Apply partial trading restriction to mandate (pull specific markets / instruments)"
         behavior: plugin
         metadata:
@@ -2484,6 +2583,7 @@ domains:
           target_slot: trading_profile
 
       lift-restriction:
+        flavour: attribute_mutating
         description: "Lift trading-profile restriction (restore full mandate scope)"
         behavior: plugin
         metadata:

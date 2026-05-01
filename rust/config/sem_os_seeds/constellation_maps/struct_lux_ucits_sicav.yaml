@@ -15,6 +15,11 @@ slots:
   management_company:
     type: entity
     entity_kinds: [company]
+    closure: closed_bounded
+    eligibility:
+      entity_kinds: [company]
+    cardinality_max: 1
+    entry_state: empty
     join:
       via: cbu_entity_roles
       parent_fk: cbu_id
@@ -50,6 +55,11 @@ slots:
   depositary:
     type: entity
     entity_kinds: [company]
+    closure: closed_bounded
+    eligibility:
+      entity_kinds: [company]
+    cardinality_max: 1
+    entry_state: empty
     join:
       via: cbu_entity_roles
       parent_fk: cbu_id
@@ -81,6 +91,10 @@ slots:
   investment_manager:
     type: entity
     entity_kinds: [company]
+    closure: closed_unbounded
+    eligibility:
+      entity_kinds: [company]
+    entry_state: empty
     join:
       via: cbu_entity_roles
       parent_fk: cbu_id
@@ -103,6 +117,76 @@ slots:
       resolve:
         verb: entity.resolve-placeholder
         when: [empty, placeholder]
+  administrator:
+    type: entity
+    entity_kinds: [company]
+    closure: closed_bounded
+    eligibility:
+      entity_kinds: [company]
+    cardinality_max: 1
+    entry_state: empty
+    join:
+      via: cbu_entity_roles
+      parent_fk: cbu_id
+      child_fk: entity_id
+      filter_column: role
+      filter_value: administrator
+    cardinality: optional
+    depends_on: [cbu]
+    placeholder: Administrator TBD
+    state_machine: entity_kyc_lifecycle
+    overlays: [entity_ref, workstream, screenings, evidence, red_flags, doc_requests]
+    verbs:
+      ensure:
+        verb: entity.ensure-or-placeholder
+        when: empty
+      assign:
+        verb: cbu.assign-role
+        when: placeholder
+      search:
+        verb: party.search
+        when: [placeholder, filled]
+      add:
+        verb: party.add
+        when: empty
+      show:
+        verb: entity.read
+        when: filled
+  auditor:
+    type: entity
+    entity_kinds: [company]
+    closure: closed_bounded
+    eligibility:
+      entity_kinds: [company]
+    cardinality_max: 1
+    entry_state: empty
+    join:
+      via: cbu_entity_roles
+      parent_fk: cbu_id
+      child_fk: entity_id
+      filter_column: role
+      filter_value: auditor
+    cardinality: optional
+    depends_on: [cbu]
+    placeholder: Auditor TBD
+    state_machine: entity_kyc_lifecycle
+    overlays: [entity_ref, workstream, screenings, evidence, red_flags, doc_requests]
+    verbs:
+      ensure:
+        verb: entity.ensure-or-placeholder
+        when: empty
+      assign:
+        verb: cbu.assign-role
+        when: placeholder
+      search:
+        verb: party.search
+        when: [placeholder, filled]
+      add:
+        verb: party.add
+        when: empty
+      show:
+        verb: entity.read
+        when: filled
   ownership_chain:
     type: entity_graph
     entity_kinds: [person, company]
@@ -157,6 +241,7 @@ slots:
           evaluate: tollgate.evaluate
   mandate:
     type: mandate
+    closure: closed_bounded
     table: cbu_trading_profiles
     pk: profile_id
     join:
@@ -171,5 +256,3 @@ slots:
         min_state: intake
     verbs:
       create: mandate.create
-bulk_macros:
-  - role_slots

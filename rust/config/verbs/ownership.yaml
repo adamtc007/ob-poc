@@ -13,6 +13,7 @@ domains:
       # --------------------------------------------------------------------------
 
       compute:
+        flavour: attribute_mutating
         description: Derive ownership snapshots from register holdings
         invocation_phrases:
           - "compute ownership"
@@ -78,6 +79,7 @@ domains:
             baseline: benign
 
       snapshot.list:
+        flavour: attribute_mutating
         description: List ownership snapshots for an issuer
         invocation_phrases:
           - "list ownership snapshots"
@@ -149,6 +151,7 @@ domains:
             baseline: reviewable
 
       snapshot.get:
+        flavour: attribute_mutating
         description: Get a specific ownership snapshot
         invocation_phrases:
           - "get ownership snapshot"
@@ -192,6 +195,7 @@ domains:
       # --------------------------------------------------------------------------
 
       list-control-positions:
+        flavour: attribute_mutating
         description: Get control positions for an issuer (who controls what %)
         invocation_phrases:
           - "who has control"
@@ -262,6 +266,7 @@ domains:
             baseline: benign
 
       find-controller:
+        flavour: attribute_mutating
         description: Find who controls an issuer (>50% voting or board majority)
         invocation_phrases:
           - "find controller"
@@ -314,6 +319,7 @@ domains:
       # --------------------------------------------------------------------------
 
       right.add-to-class:
+        flavour: instance_adding
         description: Add a special right attached to a share class
         invocation_phrases:
           - "add class right"
@@ -432,6 +438,7 @@ domains:
             baseline: reviewable
 
       right.add-to-holder:
+        flavour: instance_adding
         description: Add a special right attached to a specific holder (side letter)
         invocation_phrases:
           - "add holder right"
@@ -566,6 +573,7 @@ domains:
             baseline: reviewable
 
       right.end:
+        flavour: attribute_mutating
         description: End a special right (set effective_to date)
         invocation_phrases:
           - "end special right"
@@ -609,6 +617,7 @@ domains:
             baseline: reviewable
 
       right.list-for-issuer:
+        flavour: attribute_mutating
         description: List all special rights for an issuer
         invocation_phrases:
           - "list issuer rights"
@@ -656,6 +665,7 @@ domains:
             baseline: reviewable
 
       right.list-for-holder:
+        flavour: attribute_mutating
         description: List all special rights held by an entity
         invocation_phrases:
           - "list holder rights"
@@ -707,6 +717,7 @@ domains:
       # --------------------------------------------------------------------------
 
       reconcile:
+        flavour: attribute_mutating
         description: Compare ownership from different sources
         invocation_phrases:
           - "reconcile ownership"
@@ -790,6 +801,7 @@ domains:
             baseline: reviewable
 
       reconcile.findings:
+        flavour: attribute_mutating
         description: List findings from a reconciliation run
         invocation_phrases:
           - "show reconciliation findings"
@@ -854,6 +866,7 @@ domains:
             baseline: reviewable
 
       reconcile.resolve-finding:
+        flavour: attribute_mutating
         description: Resolve a reconciliation finding
         invocation_phrases:
           - "resolve finding"
@@ -913,6 +926,7 @@ domains:
             baseline: reviewable
 
       reconcile.list-runs:
+        flavour: attribute_mutating
         description: List reconciliation runs for an issuer
         invocation_phrases:
           - "list reconciliation runs"
@@ -971,6 +985,7 @@ domains:
       # --------------------------------------------------------------------------
 
       analyze-gaps:
+        flavour: attribute_mutating
         description: Analyze ownership gaps for an issuer
         invocation_phrases:
           - "find missing ownership"
@@ -1023,6 +1038,7 @@ domains:
             baseline: benign
 
       trace-chain:
+        flavour: attribute_mutating
         description: Trace ownership chain from one entity to another
         invocation_phrases:
           - "trace from entity to entity"

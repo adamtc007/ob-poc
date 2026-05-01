@@ -3,6 +3,7 @@ domains:
     description: Investor position management in share classes (supports both TA KYC-as-a-Service and UBO intra-group holdings)
     verbs:
       create:
+        flavour: instance_adding
         description: Create a new investor holding in a share class (idempotent by share_class+investor)
         metadata:
           tier: intent
@@ -74,6 +75,7 @@ domains:
             baseline: reviewable
 
       create-for-investor:
+        flavour: instance_adding
         description: Create holding linked to an investor record (for TA KYC-as-a-Service)
         metadata:
           tier: intent
@@ -177,6 +179,7 @@ domains:
             baseline: reviewable
 
       ensure:
+        flavour: instance_adding
         description: Ensure investor holding exists (upsert)
         metadata:
           tier: intent
@@ -286,6 +289,7 @@ domains:
             baseline: reviewable
 
       update-units:
+        flavour: attribute_mutating
         description: Update holding units (for position adjustments)
         metadata:
           tier: intent
@@ -337,6 +341,7 @@ domains:
             baseline: reviewable
 
       update-status:
+        flavour: attribute_mutating
         description: Update holding status
         metadata:
           tier: intent
@@ -397,6 +402,7 @@ domains:
           target_slot: holding
 
       read:
+        flavour: attribute_mutating
         description: Read a holding by ID
         metadata:
           tier: reference
@@ -439,6 +445,7 @@ domains:
             baseline: benign
 
       list-by-share-class:
+        flavour: attribute_mutating
         description: List holdings for a share class
         metadata:
           tier: reference
@@ -489,6 +496,7 @@ domains:
             baseline: benign
 
       list-by-investor:
+        flavour: attribute_mutating
         description: List holdings for an investor across all share classes
         metadata:
           tier: reference
@@ -531,6 +539,7 @@ domains:
             baseline: benign
 
       list-by-investor-record:
+        flavour: attribute_mutating
         description: List holdings for an investor record (TA workflow)
         metadata:
           tier: reference
@@ -573,6 +582,10 @@ domains:
             baseline: benign
 
       close:
+        flavour: discretionary
+        role_guard:
+          any_of: [compliance_admin, senior_compliance, mlro]
+        audit_class: holding_close
         description: Close a holding (mark as inactive)
         metadata:
           tier: intent
@@ -623,6 +636,7 @@ domains:
           target_slot: holding
 
       restrict:
+        flavour: attribute_mutating
         description: "Apply legal restriction to holding (court order / dispute freeze)"
         behavior: plugin
         metadata:
@@ -662,6 +676,7 @@ domains:
           target_slot: holding
 
       lift-restriction:
+        flavour: attribute_mutating
         description: "Lift legal restriction from holding"
         behavior: plugin
         metadata:
@@ -695,6 +710,7 @@ domains:
           target_slot: holding
 
       pledge:
+        flavour: attribute_mutating
         description: "Pledge holding as collateral against a loan / derivative exposure"
         behavior: plugin
         metadata:
@@ -733,6 +749,7 @@ domains:
           target_slot: holding
 
       release-pledge:
+        flavour: attribute_mutating
         description: "Release pledge on holding (collateral no longer required)"
         behavior: plugin
         metadata:

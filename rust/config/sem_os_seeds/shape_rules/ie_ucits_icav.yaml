@@ -1,0 +1,12 @@
+shape: struct.ie.ucits.icav
+workspace: cbu
+extends: [ucits]
+structural_facts:
+  jurisdiction: IE
+  structure_type: ucits
+  allowed_structure_types: [icav, ucits]
+  document_bundles: [docs.bundle.ucits-baseline]
+  trading_profile_type: ucits
+  required_roles: [management-company, depositary]
+  optional_roles: [investment-manager, administrator, auditor, company-secretary, legal-counsel]
+slots: {}

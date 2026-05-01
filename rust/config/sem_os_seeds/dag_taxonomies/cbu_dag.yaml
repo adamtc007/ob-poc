@@ -271,6 +271,11 @@ slots:
 
   - id: cbu
     stateless: false
+    closure: closed_bounded
+    eligibility:
+      entity_kinds: [cbu]
+    cardinality_max: 1
+    entry_state: DISCOVERED
     # R-3 re-centring (v1.3-4): CBU is a long-lived commercial entity.
     # SUSPENDED required in operational lifecycle (via dual_lifecycle).
     # (v1.3-3): master-feeder / umbrella-compartment hierarchy modelled
@@ -306,6 +311,25 @@ slots:
         chk_cbu_status CHECK constraint. This is the compliance-owned
         half of the CBU dual lifecycle; the operational half lives in
         dual_lifecycle below and starts at the VALIDATED junction.
+      predicate_bindings:
+        - entity: entity_proper_person
+          source_kind: dag_entity
+          scope: attached_to this cbu
+        - entity: entity_limited_company_ubo
+          source_kind: dag_entity
+          scope: attached_to this cbu
+        - entity: mandate
+          source_kind: dag_entity
+          scope: constellation-exposed instrument_matrix.trading_profile
+        - entity: cbu_evidence
+          source_kind: dag_entity
+          scope: attached_to this cbu
+        - entity: investor_disqualifying_flag
+          source_kind: dag_entity
+          scope: attached_to this cbu
+        - entity: investment_managers
+          source_kind: dag_entity
+          scope: completeness assertion for investment-manager role population
       states:
         - id: DISCOVERED
           entry: true
@@ -314,6 +338,13 @@ slots:
           description: "Submitted for validation; evidence under review."
         - id: VALIDATED
           description: "Validation passed; hands off to operational lifecycle."
+          green_when: |
+            every entity_proper_person.state = VERIFIED
+            AND every entity_limited_company_ubo.state in {DISCOVERED, PUBLIC_FLOAT, EXEMPT}
+            AND every mandate.state in {APPROVED, ACTIVE}
+            AND every cbu_evidence.state = APPROVED
+            AND no investor_disqualifying_flag exists
+            AND investment_managers.completeness = green
         - id: UPDATE_PENDING_PROOF
           description: |
             Previously VALIDATED; a change requires fresh evidence before
@@ -413,6 +444,10 @@ slots:
 
   - id: entity_proper_person
     stateless: false
+    closure: closed_unbounded
+    eligibility:
+      entity_kinds: [person]
+    entry_state: GHOST
     state_machine:
       id: entity_proper_person_lifecycle
       source_entity: '"ob-poc".entity_proper_persons'
@@ -440,6 +475,10 @@ slots:
 
   - id: entity_limited_company_ubo
     stateless: false
+    closure: closed_unbounded
+    eligibility:
+      entity_kinds: [company]
+    entry_state: PENDING
     state_machine:
       id: entity_limited_company_ubo_lifecycle
       source_entity: '"ob-poc".entity_limited_companies'
@@ -485,6 +524,8 @@ slots:
 
   - id: cbu_evidence
     stateless: false
+    closure: closed_unbounded
+    entry_state: PENDING
     state_machine:
       id: cbu_evidence_lifecycle
       source_entity: '"ob-poc".cbu_evidence'
@@ -494,31 +535,57 @@ slots:
         Per-evidence-item lifecycle. Evidence supports CBU validation:
         ownership proofs, formation docs, attestations, registry
         checks, manual verifications.
+      predicate_bindings:
+        - entity: evidence_blob
+          source_kind: dag_entity
+          scope: attached_to this cbu_evidence
+        - entity: evidence_review
+          source_kind: dag_entity
+          scope: attached_to this cbu_evidence
+        - entity: evidence_expiry
+          source_kind: dag_entity
+          scope: attached_to this cbu_evidence
       states:
-        - id: PENDING
+        - id: UPLOADED
           entry: true
-          description: "Evidence attached but not yet verified."
-        - id: VERIFIED
+          description: "Evidence uploaded and linked; review not complete."
+          green_when: |
+            evidence_blob exists
+        - id: REVIEWED
+          description: "Evidence reviewed; approval decision pending."
+          green_when: |
+            evidence_review exists
+            AND evidence_review.state = COMPLETE
+        - id: APPROVED
           description: "Evidence reviewed and accepted."
+          green_when: |
+            evidence_review exists
+            AND evidence_review.state = APPROVED
+            AND evidence_expiry.status = CURRENT
         - id: REJECTED
           description: "Evidence rejected (insufficient, expired, fraudulent)."
         - id: EXPIRED
-          description: "Previously VERIFIED; time-decay invalidation."
+          description: "Previously APPROVED; time-decay invalidation."
+          green_when: |
+            evidence_expiry.status = EXPIRED
       transitions:
-        - from: PENDING
-          to: VERIFIED
-          via: cbu.verify-evidence
-        - from: PENDING
+        - from: UPLOADED
+          to: REVIEWED
+          via: cbu.review-evidence
+        - from: REVIEWED
+          to: APPROVED
+          via: cbu.approve-evidence
+        - from: REVIEWED
           to: REJECTED
-          via: cbu.verify-evidence
+          via: cbu.reject-evidence
           args: { decision: reject }
-        - from: VERIFIED
+        - from: APPROVED
           to: EXPIRED
           via: "(backend: time-decay trigger based on evidence_type validity window)"
         - from: EXPIRED
-          to: PENDING
+          to: UPLOADED
           via: cbu.attach-evidence  # re-attach refresh
-      terminal_states: [REJECTED]
+      terminal_states: [APPROVED, REJECTED]
 
   # ---------------------------------------------------------------------------
   # 2.4 Investor lifecycle (two interleaved state machines)
@@ -551,10 +618,9 @@ slots:
           description: "Eligibility confirmed (qualification test passed)."
         - id: ACTIVE
           description: "Subscribed; holding units."
-        - id: REDEEMING
-          description: "Redemption instruction placed; awaiting settlement."
-        - id: REDEEMED
-          description: "Units = 0; account still open. Pre-offboard state."
+        # REDEEMING + REDEEMED removed 2026-04-29 (D-003) — orphan states with
+        # zero transitions reaching or leaving them. Redemption flow re-modelled
+        # later if BNY-style redemption lifecycle is needed.
         - id: SUSPENDED
           description: "Temporary hold (KYC refresh, dispute, sanctions)."
         - id: OFFBOARDED
@@ -817,6 +883,25 @@ slots:
         (master-feeder reorg). Each event has an effective_date;
         state machine governs pre-effective approval + post-effective
         implementation.
+      predicate_bindings:
+        - entity: board_review
+          source_kind: dag_entity
+          scope: attached_to this cbu_corporate_action
+        - entity: legal_review
+          source_kind: dag_entity
+          scope: attached_to this cbu_corporate_action
+        - entity: compliance_review
+          source_kind: dag_entity
+          scope: attached_to this cbu_corporate_action
+        - entity: objection
+          source_kind: dag_entity
+          scope: attached_to this cbu_corporate_action
+        - entity: mandatory_disclosure
+          source_kind: dag_entity
+          scope: attached_to this cbu_corporate_action
+          required_universe:
+            source_kind: dag_entity
+            source_entity: mandatory_disclosure_requirement
       states:
         - id: proposed
           entry: true
@@ -825,6 +910,16 @@ slots:
           description: "Board / legal / compliance review in progress."
         - id: approved
           description: "Approved for execution on effective_date."
+          green_when: |
+            board_review exists
+            AND board_review.state = COMPLETE
+            AND legal_review exists
+            AND legal_review.state = COMPLETE
+            AND compliance_review exists
+            AND compliance_review.state = COMPLETE
+            AND no objection exists with state = OPEN
+            AND every mandatory_disclosure exists
+            AND every mandatory_disclosure.state = LODGED
         - id: effective
           description: "Effective_date reached; CA is now live. Transitional."
         - id: implemented
@@ -1009,6 +1104,8 @@ slots:
   # status column + CHECK) deferred to Tranche 3 per D-2.
   - id: share_class
     stateless: false
+    closure: closed_unbounded
+    entry_state: DRAFT
     # V1.3-4: HARD_CLOSED + WINDING_DOWN cover the pause/hold semantics
     # for share classes — generic SUSPENDED doesn't apply.
     suspended_state_exempt: true
@@ -1073,6 +1170,11 @@ slots:
   # carrier table is `manco_regulatory_status` keyed by manco_entity_id.
   - id: manco
     stateless: false
+    closure: closed_bounded
+    eligibility:
+      entity_kinds: [company]
+    cardinality_max: 1
+    entry_state: UNDER_REVIEW
     state_machine:
       id: manco_lifecycle
       owner: compliance
@@ -1087,12 +1189,41 @@ slots:
         = fund_manager / sub_manager). Reference-data-like in v1.2;
         R-6 promotes to stateful because regulatory-action cascade
         is real commercial risk (Credit Suisse 2022, FTX, etc.).
+      predicate_bindings:
+        - entity: regulatory_licence
+          source_kind: dag_entity
+          scope: attached_to this manco
+          required_universe:
+            source_kind: dag_entity
+            source_entity: regulatory_licence_requirement
+        - entity: investigation
+          source_kind: dag_entity
+          scope: attached_to this manco
+        - entity: periodic_review
+          source_kind: dag_entity
+          scope: attached_to this manco
+        - entity: credit_risk_assessment
+          source_kind: dag_entity
+          scope: attached_to this manco
+        - entity: operational_risk_assessment
+          source_kind: dag_entity
+          scope: attached_to this manco
       states:
         - id: UNDER_REVIEW
           entry: true
           description: "New manco being onboarded; not yet approved to manage mandates."
         - id: APPROVED
           description: "Manco cleared to manage new mandates."
+          green_when: |
+            every regulatory_licence exists
+            AND every regulatory_licence.state = CURRENT
+            AND no investigation exists with state = OPEN
+            AND periodic_review exists
+            AND periodic_review.state = COMPLETE
+            AND credit_risk_assessment exists
+            AND credit_risk_assessment.state in {WITHIN_LIMITS, LOW}
+            AND operational_risk_assessment exists
+            AND operational_risk_assessment.state in {WITHIN_LIMITS, LOW}
         - id: UNDER_INVESTIGATION
           description: |
             Regulatory action or internal investigation; new mandates
@@ -1171,12 +1302,12 @@ cross_slot_constraints:
   - id: cbu_validated_requires_evidence_set_verified
     description: |
       CBU → VALIDATED requires ALL required cbu_evidence rows at
-      status = VERIFIED. Required set depends on kyc_scope_template.
+      status = APPROVED. Required set depends on kyc_scope_template.
     rule: |
       cbus.status = 'VALIDATED'
         → ALL cbu_evidence WHERE cbu_id = this.cbu_id
             AND evidence_required = true
-            .verification_status = 'VERIFIED'
+            .verification_status = 'APPROVED'
     severity: error
 
   - id: cbu_validated_requires_commercial_client_entity
@@ -1353,7 +1484,7 @@ cross_workspace_constraints:
 #   - KYC clearance approved
 #   - Deal contracted + billing ACTIVE
 #   - IM trading_profile in trade-permissioned or actively-trading
-#   - All required cbu_evidence verified
+#   - All required cbu_evidence approved
 #   - Service consumption provisioned for the CBU's category + products
 #
 # Per D-3: computed on-the-fly. Per OQ-2: session / workspace-context
@@ -1388,13 +1519,13 @@ derived_cross_workspace_state:
         - workspace: instrument_matrix
           slot: trading_profile
           predicate: "trading_profiles.cbu_id = this_cbu.cbu_id AND trading_profiles.status = 'ACTIVE'"
-        # All required cbu_evidence VERIFIED
+        # All required cbu_evidence APPROVED
         - workspace: cbu
           slot: cbu_evidence
           predicate: |
             ALL cbu_evidence WHERE cbu_id = this_cbu.cbu_id
               AND evidence_required = true
-              HAVE verification_status = 'VERIFIED'
+              HAVE verification_status = 'APPROVED'
         # At least one service_consumption in active state
         - workspace: cbu
           slot: service_consumption

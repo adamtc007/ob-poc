@@ -14,6 +14,7 @@ domains:
 
     verbs:
       create:
+        flavour: instance_adding
         description: "Create a service intent for a CBU"
         metadata:
           tier: intent
@@ -76,6 +77,7 @@ domains:
             baseline: reviewable
 
       list:
+        flavour: attribute_mutating
         description: "List all service intents for a CBU"
         metadata:
           tier: diagnostics
@@ -114,6 +116,7 @@ domains:
             baseline: benign
 
       supersede:
+        flavour: attribute_mutating
         description: "Supersede an existing service intent with new options"
         metadata:
           tier: intent
@@ -156,6 +159,10 @@ domains:
             baseline: requires_confirmation
 
       suspend:
+        flavour: discretionary
+        role_guard:
+          any_of: [compliance_officer, senior_compliance, mlro]
+        audit_class: service_intent_suspend
         description: "Suspend an active service intent (temporary hold)"
         invocation_phrases:
           - "suspend service intent"
@@ -193,6 +200,7 @@ domains:
           target_slot: service_intent
 
       resume:
+        flavour: attribute_mutating
         description: "Resume a suspended service intent (suspended → active)"
         invocation_phrases:
           - "resume service intent"
@@ -227,6 +235,10 @@ domains:
           target_slot: service_intent
 
       cancel:
+        flavour: discretionary
+        role_guard:
+          any_of: [compliance_admin, senior_compliance, mlro]
+        audit_class: service_intent_cancel
         description: "Cancel a service intent (terminal)"
         invocation_phrases:
           - "cancel service intent"
@@ -270,6 +282,7 @@ domains:
 
     verbs:
       run:
+        flavour: attribute_mutating
         description: "Run resource discovery - determines required SRDEFs from service intents"
         metadata:
           tier: composite
@@ -309,6 +322,7 @@ domains:
             baseline: reviewable
 
       explain:
+        flavour: attribute_mutating
         description: "Explain why specific SRDEFs were discovered"
         metadata:
           tier: diagnostics
@@ -351,6 +365,7 @@ domains:
 
     verbs:
       rollup:
+        flavour: attribute_mutating
         description: "Roll up attribute requirements from discovered SRDEFs"
         metadata:
           tier: composite
@@ -389,6 +404,7 @@ domains:
             baseline: reviewable
 
       populate:
+        flavour: attribute_mutating
         description: "Auto-populate attribute values from available sources"
         metadata:
           tier: composite
@@ -431,6 +447,7 @@ domains:
             baseline: reviewable
 
       gaps:
+        flavour: attribute_mutating
         description: "Show attribute gaps - required values that are missing"
         metadata:
           tier: diagnostics
@@ -473,6 +490,7 @@ domains:
             baseline: reviewable
 
       set:
+        flavour: attribute_mutating
         description: "Set an attribute value manually"
         metadata:
           tier: intent
@@ -525,6 +543,7 @@ domains:
 
     verbs:
       run:
+        flavour: attribute_mutating
         description: "Run provisioning orchestrator - creates resources for ready SRDEFs"
         metadata:
           tier: composite
@@ -567,6 +586,7 @@ domains:
             baseline: reviewable
 
       status:
+        flavour: attribute_mutating
         description: "Check provisioning request status"
         metadata:
           tier: diagnostics
@@ -604,6 +624,7 @@ domains:
 
     verbs:
       compute:
+        flavour: attribute_mutating
         description: "Compute service readiness - determines 'good to transact' status"
         metadata:
           tier: composite
@@ -646,6 +667,7 @@ domains:
             baseline: reviewable
 
       explain:
+        flavour: attribute_mutating
         description: "Explain blocking reasons for a service"
         metadata:
           tier: diagnostics
@@ -697,6 +719,7 @@ domains:
 
     verbs:
       full:
+        flavour: attribute_mutating
         description: "Run the entire pipeline: discovery -> rollup -> populate -> provision -> readiness"
         metadata:
           tier: composite

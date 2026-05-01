@@ -3,6 +3,7 @@ domains:
     description: "Service-version lifecycle (R2) — per-version drafted → reviewed → published → superseded → retired."
     verbs:
       draft:
+        flavour: instance_adding
         description: Draft a new version of a service
         invocation_phrases:
           - "draft service version"
@@ -61,6 +62,10 @@ domains:
             baseline: reviewable
 
       submit-for-review:
+        flavour: discretionary
+        role_guard:
+          any_of: [compliance_officer, senior_compliance, mlro]
+        audit_class: service_version_submit_for_review
         description: Submit a drafted service version for review
         invocation_phrases:
           - "submit service version for review"
@@ -109,6 +114,10 @@ domains:
           target_slot: service_version
 
       publish:
+        flavour: discretionary
+        role_guard:
+          any_of: [compliance_officer, senior_compliance, mlro]
+        audit_class: service_version_publish
         description: Publish a reviewed service version
         invocation_phrases:
           - "publish service version"
@@ -157,6 +166,10 @@ domains:
           target_slot: service_version
 
       retire:
+        flavour: discretionary
+        role_guard:
+          any_of: [compliance_admin, senior_compliance, mlro]
+        audit_class: service_version_retire
         description: Retire a service version (terminal)
         invocation_phrases:
           - "retire service version"
@@ -205,6 +218,7 @@ domains:
           target_slot: service_version
 
       update:
+        flavour: attribute_mutating
         description: Update a drafted service version's spec or notes
         invocation_phrases:
           - "update service version"
@@ -249,6 +263,7 @@ domains:
             baseline: reviewable
 
       compare:
+        flavour: attribute_mutating
         description: Compare two versions of a service
         invocation_phrases:
           - "compare service versions"

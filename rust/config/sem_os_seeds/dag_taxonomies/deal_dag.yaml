@@ -125,26 +125,38 @@ overall_lifecycle:
         - deal.agree-rate-card
         - deal.add-rate-card-line
         - deal.update-rate-card-line
-      next_phase: kyc_clearance
+      next_phase: in_clearance
 
-    - name: kyc_clearance
+    - name: in_clearance
       description: |
-        At least one AGREED rate card on the deal. Awaiting group-level
-        KYC clearance (cross-workspace gate). UBO assessments pending.
+        Compound clearance gate (Q4 + Q21 (b), 2026-04-29). Replaces the
+        former separate BAC_APPROVAL + KYC_CLEARANCE phases. IN_CLEARANCE
+        is a single deal_status with two parallel substate columns:
+        deals.bac_status (BAC commercial approval) and
+        deals.kyc_clearance_status (cross-workspace KYC approval).
+        Transition to CONTRACTED requires BOTH substates = 'approved'
+        AND BP clearance per V1.3-1 cross_workspace_constraints.
       derivation:
         all_of:
-          - "deals.deal_status = 'KYC_CLEARANCE'"
+          - "deals.deal_status = 'IN_CLEARANCE'"
           - "EXISTS deal_rate_cards WHERE status = 'AGREED'"
         any_of:
+          - "deals.bac_status IN ('pending','in_review','approved')"
+          - "deals.kyc_clearance_status IN ('pending','in_review','approved')"
           - "EXISTS deal_ubo_assessments WHERE assessment_status IN ('PENDING','IN_PROGRESS')"
           - "cases.status IN ('DISCOVERY','ASSESSMENT','REVIEW') WHERE client_group_id = this.primary_client_group_id"
       progression_verbs:
+        - deal.submit-for-bac
+        - deal.bac-approve
+        - deal.bac-reject
+        - deal.update-kyc-clearance
         - deal.add-ubo-assessment
         - deal.update-ubo-assessment
-        - deal.update-status  # → contracted once kyc cleared
+        - deal.update-status  # → contracted once both substates cleared
       next_phase: contracted
       # NOTE: transition to 'contracted' requires cross-workspace
-      # cases.status = 'APPROVED'. See §3 cross_slot_constraints.
+      # cases.status = 'APPROVED' AND deals.bac_status = 'approved' AND
+      # deals.kyc_clearance_status = 'approved'. See §4 cross_workspace_constraints.
 
     - name: contracted
       description: |
@@ -269,16 +281,50 @@ slots:
       scope: per_deal
       description: |
         Commercial lifecycle (sales + BAC owned). 9 primary states:
-        PROSPECT → QUALIFYING → NEGOTIATING → BAC_APPROVAL →
-        KYC_CLEARANCE → CONTRACTED (junction to operational dual).
+        PROSPECT → QUALIFYING → NEGOTIATING → IN_CLEARANCE →
+        CONTRACTED (junction to operational dual).
         Terminal-negative split: LOST / REJECTED / WITHDRAWN /
         CANCELLED (G-3 granularity).
 
-        R-5 additions (schema lag per D-2):
-          BAC_APPROVAL — Business Acceptance Committee review
+        Q4 + Q21 (b) amendment (2026-04-29, D-004): the former
+        BAC_APPROVAL and KYC_CLEARANCE states are collapsed into a
+        single IN_CLEARANCE state with two parallel substate columns
+        on deals (bac_status, kyc_clearance_status). The substates run
+        in parallel — BAC commercial approval and KYC clearance gate
+        CONTRACTED jointly. Encoded as columns rather than nested
+        substate_machines because the DAG schema does not yet support
+        nested state machines.
+
+        R-5 additions retained:
           LOST / REJECTED / WITHDRAWN — distinct terminal-negative
           reasons (was all CANCELLED)
-          SUSPENDED — moved to dual_lifecycle (operational chain)
+          SUSPENDED — lives in dual_lifecycle (operational chain)
+      predicate_bindings:
+        - entity: deal
+          source_kind: substrate
+          source_entity: '"ob-poc".deals'
+          state_column: deal_status
+          id_column: deal_id
+        - entity: kyc_case
+          source_kind: dag_entity
+          scope: parent kyc_case
+        - entity: booking_principal_clearance
+          source_kind: dag_entity
+          scope: attached_to this deal
+          required_universe:
+            source_kind: dag_entity
+            source_entity: booking_principal_clearance_requirement
+        - entity: deal_contract
+          source_kind: dag_entity
+          scope: attached_to this deal
+        - entity: deal_rate_card
+          source_kind: substrate
+          source_entity: '"ob-poc".deal_rate_cards'
+          state_column: status
+          id_column: rate_card_id
+          scope: attached_to this deal
+          parent_key: deal_id
+          child_key: deal_id
       states:
         - id: PROSPECT
           entry: true
@@ -287,20 +333,31 @@ slots:
           description: "Participants added; product shortlist forming."
         - id: NEGOTIATING
           description: "Active rate-card negotiation chain."
-        - id: BAC_APPROVAL
+        - id: IN_CLEARANCE
           description: |
-            Awaiting Business Acceptance Committee approval — internal
-            commercial review. Required for revenue above threshold,
-            new jurisdictions, non-standard pricing, credit exposure.
-            Separate from client-side rate-card AGREED and from
-            contract SIGNED.
-        - id: KYC_CLEARANCE
-          description: "BAC approved; awaiting cross-workspace group KYC clearance."
+            Compound clearance phase. Two parallel substate columns:
+              deals.bac_status ∈ (pending, in_review, approved, rejected)
+              deals.kyc_clearance_status ∈ (pending, in_review, approved, rejected)
+            Transition to CONTRACTED requires both substates = approved
+            AND every booking-principal clearance APPROVED/ACTIVE
+            (cross-workspace gates). Replaces the prior separate
+            BAC_APPROVAL + KYC_CLEARANCE states (D-004, 2026-04-29).
         - id: CONTRACTED
           description: |
             Commercial lifecycle terminal-positive. Junction to the
             operational dual_lifecycle chain (ONBOARDING → ACTIVE →
             SUSPENDED / WINDING_DOWN → OFFBOARDED).
+          green_when: |
+            deal.bac_status = approved
+            AND deal.kyc_clearance_status = approved
+            AND parent kyc_case exists
+            AND parent kyc_case.state = APPROVED
+            AND every booking_principal_clearance exists
+            AND every booking_principal_clearance.state in {APPROVED, ACTIVE}
+            AND deal_contract exists
+            AND deal_contract.state in {DRAFT, EXECUTED}
+            AND every deal_rate_card exists
+            AND at least one deal_rate_card.state = AGREED
         # Terminal-negative outcomes (G-3 granularity)
         - id: LOST
           description: "Terminal-negative: competitor won the deal."
@@ -317,33 +374,35 @@ slots:
         - from: QUALIFYING
           to: NEGOTIATING
           via: [deal.update-status, deal.create-rate-card]
-        # G-1 BAC gate inserted between NEGOTIATING and KYC_CLEARANCE
+        # IN_CLEARANCE entry — submit-for-bac sets bac_status='in_review'
+        # and seeds kyc_clearance_status='pending'.
         - from: NEGOTIATING
-          to: BAC_APPROVAL
+          to: IN_CLEARANCE
           via: deal.submit-for-bac
           precondition: "at least one deal_rate_card in AGREED"
-        - from: BAC_APPROVAL
-          to: KYC_CLEARANCE
-          via: deal.bac-approve
-        - from: BAC_APPROVAL
-          to: REJECTED
-          via: deal.bac-reject
-        - from: KYC_CLEARANCE
+        # IN_CLEARANCE substate transitions write to deals.bac_status /
+        # deals.kyc_clearance_status, NOT to deals.deal_status. The deal
+        # remains in IN_CLEARANCE while substates progress.
+        - from: IN_CLEARANCE
+          to: IN_CLEARANCE
+          via: [deal.bac-approve, deal.bac-reject, deal.update-kyc-clearance]
+          description: "Substate transitions — deal_status unchanged."
+        - from: IN_CLEARANCE
           to: CONTRACTED
           via: [deal.update-status, deal.add-contract]
-          precondition: "group KYC case status = APPROVED (V1.3-1 cross-workspace)"
-        - from: KYC_CLEARANCE
+          precondition: "deals.bac_status = 'approved' AND deals.kyc_clearance_status = 'approved' AND group KYC case status = APPROVED (V1.3-1 cross-workspace)"
+        - from: IN_CLEARANCE
           to: REJECTED
-          via: deal.reject
-          precondition: "KYC failed (case.status = REJECTED or DO_NOT_ONBOARD)"
+          via: [deal.bac-reject, deal.reject]
+          precondition: "deals.bac_status = 'rejected' OR deals.kyc_clearance_status = 'rejected' OR KYC failed (case.status = REJECTED or DO_NOT_ONBOARD)"
         # G-3 terminal-negative granularity
-        - from: [PROSPECT, QUALIFYING, NEGOTIATING, BAC_APPROVAL, KYC_CLEARANCE]
+        - from: [PROSPECT, QUALIFYING, NEGOTIATING, IN_CLEARANCE]
           to: LOST
           via: deal.mark-lost
-        - from: [PROSPECT, QUALIFYING, NEGOTIATING, BAC_APPROVAL, KYC_CLEARANCE]
+        - from: [PROSPECT, QUALIFYING, NEGOTIATING, IN_CLEARANCE]
           to: WITHDRAWN
           via: deal.mark-withdrawn
-        - from: [PROSPECT, QUALIFYING, NEGOTIATING, BAC_APPROVAL, KYC_CLEARANCE]
+        - from: [PROSPECT, QUALIFYING, NEGOTIATING, IN_CLEARANCE]
           to: CANCELLED
           via: deal.cancel
       terminal_states: [CONTRACTED, LOST, REJECTED, WITHDRAWN, CANCELLED]
@@ -910,6 +969,21 @@ cross_slot_constraints:
         → EXISTS deal_rate_cards WHERE deal_id = this.deal_id AND status = 'AGREED'
     severity: error
 
+  # Q21 (b) (2026-04-29, D-004): intra-deal BAC substate gate. BAC
+  # commercial approval is a parallel substate of IN_CLEARANCE,
+  # encoded as deals.bac_status. CONTRACTED requires bac_status =
+  # 'approved'. Lives in cross_slot_constraints (intra-DAG) rather
+  # than cross_workspace_constraints because both source and target
+  # are within the deal workspace.
+  - id: deal_contracted_requires_bac_approved
+    description: |
+      Deal → CONTRACTED requires deals.bac_status = 'approved'. Third
+      leg of the IN_CLEARANCE compound gate (BAC + KYC + BP).
+    rule: |
+      deals.deal_status = 'CONTRACTED'
+        → deals.bac_status = 'approved'
+    severity: error
+
   # Note: the former v1_3_candidate `deal_contracted_requires_kyc_clearance`
   # has been promoted to the new `cross_workspace_constraints:` section
   # below (V1.3-1 Mode A). It no longer lives here.
@@ -1003,19 +1077,25 @@ cross_workspace_constraints:
 
   - id: deal_contracted_requires_kyc_approved
     description: |
-      Deal cannot progress KYC_CLEARANCE → CONTRACTED unless the
+      Deal cannot progress IN_CLEARANCE → CONTRACTED unless the
       client-group KYC case is APPROVED in the KYC workspace.
+      Q4/Q21 (b) (2026-04-29, D-004): retargeted to IN_CLEARANCE.
     source_workspace: kyc
     source_slot: kyc_case
     source_state: APPROVED
     source_predicate: "cases.client_group_id = this_deal.primary_client_group_id"
     target_workspace: deal
     target_slot: deal
-    target_transition: "KYC_CLEARANCE -> CONTRACTED"
+    target_transition: "IN_CLEARANCE -> CONTRACTED"
     severity: error
 
+  # Q21 (b) (2026-04-29, D-004): the intra-deal BAC substate gate
+  # lives in §3 cross_slot_constraints (deal_contracted_requires_bac_approved)
+  # because both source and target are within the deal workspace.
+  # See cross_slot_constraints above.
+
   # R3.5 (2026-04-26): compound BAC+KYC+BP gate — third leg.
-  # Deal cannot progress KYC_CLEARANCE → CONTRACTED unless every
+  # Deal cannot progress IN_CLEARANCE → CONTRACTED unless every
   # booking-principal clearance attached to this deal is APPROVED or
   # ACTIVE. BP was hoisted into its own workspace (booking_principal_dag)
   # specifically so this gate can be expressed inter-workspace and
@@ -1025,13 +1105,14 @@ cross_workspace_constraints:
       Deal → CONTRACTED requires every booking-principal clearance
       attached to this deal to be in APPROVED or ACTIVE state. Third
       leg of Adam's deal tollgate triad (BAC + KYC + BP).
+      Q4/Q21 (b) (2026-04-29, D-004): retargeted to IN_CLEARANCE.
     source_workspace: booking_principal
     source_slot: clearance
     source_state: [APPROVED, ACTIVE]
     source_predicate: "booking_principal_clearances.deal_id = this_deal.deal_id"
     target_workspace: deal
     target_slot: deal
-    target_transition: "KYC_CLEARANCE -> CONTRACTED"
+    target_transition: "IN_CLEARANCE -> CONTRACTED"
     severity: error
 
 

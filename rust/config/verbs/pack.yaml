@@ -13,6 +13,7 @@ domains:
 
     verbs:
       select:
+        flavour: attribute_mutating
         description: Select a journey pack for the current session
         behavior: plugin
         handler: PackSelectOp
@@ -57,6 +58,7 @@ domains:
             baseline: benign
 
       answer:
+        flavour: attribute_mutating
         description: Record an answer to a pack question
         behavior: plugin
         handler: PackAnswerOp

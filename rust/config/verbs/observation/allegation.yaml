@@ -3,6 +3,7 @@ domains:
     description: Client allegations - unverified claims that start the KYC process
     verbs:
       record:
+        flavour: instance_adding
         description: Record a client allegation about an entity attribute
         metadata:
           tier: intent
@@ -103,6 +104,7 @@ domains:
           consequence:
             baseline: reviewable
       verify:
+        flavour: attribute_mutating
         description: Mark allegation as verified by an observation
         metadata:
           tier: intent
@@ -166,6 +168,7 @@ domains:
           consequence:
             baseline: reviewable
       contradict:
+        flavour: attribute_mutating
         description: Mark allegation as contradicted by evidence
         metadata:
           tier: intent
@@ -229,6 +232,7 @@ domains:
           consequence:
             baseline: reviewable
       mark-partial:
+        flavour: attribute_mutating
         description: Mark allegation as partially verified
         metadata:
           tier: intent
@@ -288,6 +292,7 @@ domains:
           consequence:
             baseline: reviewable
       list-by-entity:
+        flavour: attribute_mutating
         description: List allegations for an entity
         metadata:
           tier: reference
@@ -334,6 +339,7 @@ domains:
           consequence:
             baseline: benign
       list-pending:
+        flavour: attribute_mutating
         description: List pending allegations for a CBU
         metadata:
           tier: reference

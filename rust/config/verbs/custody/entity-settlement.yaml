@@ -3,6 +3,7 @@ domains:
     description: Entity settlement identity and SSIs (counterparty data from ALERT)
     verbs:
       set-identity:
+        flavour: attribute_mutating
         description: Set primary settlement identity for an entity
         metadata:
           tier: intent
@@ -66,6 +67,7 @@ domains:
           consequence:
             baseline: reviewable
       add-ssi:
+        flavour: instance_adding
         description: Add counterparty SSI (idempotent by entity+counterparty_bic+market+currency)
         metadata:
           tier: intent
@@ -173,6 +175,7 @@ domains:
           consequence:
             baseline: reviewable
       remove-ssi:
+        flavour: attribute_mutating
         description: Remove a counterparty SSI
         metadata:
           tier: intent

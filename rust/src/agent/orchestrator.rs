@@ -1507,6 +1507,7 @@ fn agent_halt_phase(outcome: &OrchestratorOutcome) -> Option<i16> {
 }
 
 #[cfg(feature = "database")]
+#[allow(deprecated)]
 pub async fn legacy_handle_utterance(
     ctx: &OrchestratorContext,
     utterance: &str,
@@ -1751,6 +1752,7 @@ pub async fn legacy_handle_utterance(
         if let (Some(group_id), Some(c_name)) = (scope_group_id, constellation_name) {
             use crate::sage::constrained_match::resolve_constrained_hybrid;
             use crate::sage::session_context::load_entity_states_for_group;
+            #[allow(deprecated)]
             use crate::sage::valid_verb_set::{
                 compute_valid_verb_set_for_constellations, load_constellation_stack,
             };

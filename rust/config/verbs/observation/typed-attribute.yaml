@@ -3,6 +3,7 @@ domains:
     description: Typed attribute value persistence for non-CBU entities
     verbs:
       record:
+        flavour: instance_adding
         description: Record a typed attribute value for an entity
         metadata:
           tier: intent
@@ -79,6 +80,7 @@ domains:
           consequence:
             baseline: reviewable
       get:
+        flavour: attribute_mutating
         description: Read the current typed attribute value for an entity
         metadata:
           tier: reference
@@ -114,6 +116,7 @@ domains:
           consequence:
             baseline: benign
       list-for-entity:
+        flavour: attribute_mutating
         description: List all typed attribute values for an entity
         metadata:
           tier: reference

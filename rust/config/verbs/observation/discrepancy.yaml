@@ -3,6 +3,7 @@ domains:
     description: Observation discrepancies - conflicts between attribute observations
     verbs:
       record:
+        flavour: instance_adding
         description: Record a discrepancy between observations
         metadata:
           tier: intent
@@ -117,6 +118,7 @@ domains:
           consequence:
             baseline: reviewable
       resolve:
+        flavour: attribute_mutating
         description: Resolve a discrepancy
         metadata:
           tier: intent
@@ -184,6 +186,10 @@ domains:
           consequence:
             baseline: reviewable
       escalate:
+        flavour: discretionary
+        role_guard:
+          any_of: [compliance_officer, senior_compliance, mlro]
+        audit_class: discrepancy_escalate
         description: Escalate a discrepancy
         metadata:
           tier: intent
@@ -232,6 +238,7 @@ domains:
           consequence:
             baseline: reviewable
       list-open:
+        flavour: attribute_mutating
         description: List open discrepancies
         metadata:
           tier: reference

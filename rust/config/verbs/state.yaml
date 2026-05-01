@@ -8,6 +8,7 @@ domains:
       - list state overrides
     verbs:
       derive:
+        flavour: attribute_mutating
         description: Compute reducer state for a single slot
         behavior: plugin
         handler: StateDeriveOp
@@ -60,6 +61,7 @@ domains:
           consequence:
             baseline: benign
       diagnose:
+        flavour: attribute_mutating
         description: Compute a full reducer trace for a single slot
         behavior: plugin
         handler: StateDiagnoseOp
@@ -112,6 +114,7 @@ domains:
           consequence:
             baseline: benign
       derive-all:
+        flavour: attribute_mutating
         description: Compute reducer state across all discovered slots for a constellation
         behavior: plugin
         handler: StateDeriveAllOp
@@ -158,6 +161,7 @@ domains:
           consequence:
             baseline: benign
       blocked-why:
+        flavour: attribute_mutating
         description: Explain why a verb is blocked for a slot
         behavior: plugin
         handler: StateBlockedWhyOp
@@ -213,6 +217,7 @@ domains:
           consequence:
             baseline: benign
       check-consistency:
+        flavour: attribute_mutating
         description: Run reducer consistency checks across discovered slots
         behavior: plugin
         handler: StateCheckConsistencyOp
@@ -259,6 +264,10 @@ domains:
           consequence:
             baseline: benign
       override:
+        flavour: discretionary
+        role_guard:
+          any_of: [senior_compliance, mlro, executive, board]
+        audit_class: state_override
         description: Create a manual reducer override for a slot
         behavior: plugin
         handler: StateOverrideOp
@@ -329,6 +338,10 @@ domains:
           consequence:
             baseline: requires_confirmation
       revoke-override:
+        flavour: discretionary
+        role_guard:
+          any_of: [senior_compliance, mlro, executive, board]
+        audit_class: state_revoke_override
         description: Revoke a reducer override
         behavior: plugin
         handler: StateRevokeOverrideOp
@@ -374,6 +387,7 @@ domains:
           consequence:
             baseline: requires_confirmation
       list-overrides:
+        flavour: attribute_mutating
         description: List active reducer overrides for a CBU
         behavior: plugin
         handler: StateListOverridesOp

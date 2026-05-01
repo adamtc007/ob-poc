@@ -10,6 +10,7 @@ domains:
 
     verbs:
       record:
+        flavour: attribute_mutating
         description: "Record a new client-principal-offering relationship"
         behavior: plugin
         lifecycle:
@@ -65,6 +66,10 @@ domains:
           consequence:
             baseline: reviewable
       terminate:
+        flavour: discretionary
+        role_guard:
+          any_of: [compliance_officer, senior_compliance, mlro]
+        audit_class: client_principal_relationship_terminate
         description: "Terminate an active client-principal relationship"
         behavior: plugin
         metadata:
@@ -94,6 +99,7 @@ domains:
           consequence:
             baseline: requires_confirmation
       list:
+        flavour: attribute_mutating
         description: "List client-principal relationships with optional status filter"
         behavior: plugin
         metadata:
@@ -134,6 +140,7 @@ domains:
           consequence:
             baseline: benign
       cross-sell-check:
+        flavour: attribute_mutating
         description: "Check cross-sell opportunities — compare existing offerings against available offerings"
         behavior: plugin
         lifecycle:

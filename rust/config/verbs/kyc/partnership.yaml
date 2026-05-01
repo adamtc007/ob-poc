@@ -12,6 +12,7 @@ domains:
 
     verbs:
       add-partner:
+        flavour: instance_adding
         description: Add a partner to the partnership with capital commitment
         metadata:
           tier: intent
@@ -122,6 +123,7 @@ domains:
             baseline: reviewable
 
       record-contribution:
+        flavour: attribute_mutating
         description: Record capital contribution (drawdown)
         metadata:
           tier: intent
@@ -181,6 +183,7 @@ domains:
             baseline: reviewable
 
       record-distribution:
+        flavour: attribute_mutating
         description: Record distribution to partner
         metadata:
           tier: intent
@@ -239,6 +242,7 @@ domains:
             baseline: reviewable
 
       withdraw-partner:
+        flavour: attribute_mutating
         description: Record partner withdrawal/exit
         metadata:
           tier: intent
@@ -294,6 +298,7 @@ domains:
             baseline: requires_confirmation
 
       list-partners:
+        flavour: attribute_mutating
         description: List all partners in a partnership
         metadata:
           tier: reference
@@ -345,6 +350,7 @@ domains:
             baseline: benign
 
       reconcile:
+        flavour: attribute_mutating
         description: |
           Reconcile partnership capital:
           - Verify profit shares sum to 100%
@@ -411,6 +417,7 @@ domains:
             baseline: reviewable
 
       analyze-control:
+        flavour: attribute_mutating
         description: |
           Analyze control structure of partnership for UBO identification.
           GPs have presumptive control regardless of capital percentage.

@@ -29,6 +29,7 @@ domains:
       # Instrument type operations
       # ============================================
       set-instrument-type:
+        flavour: attribute_mutating
         description: |
           Set the instrument type classification for a share class.
 
@@ -95,6 +96,7 @@ domains:
           consequence:
             baseline: reviewable
       link-to-compartment:
+        flavour: instance_adding
         description: |
           Link a share class to a fund compartment.
 
@@ -149,6 +151,7 @@ domains:
           consequence:
             baseline: reviewable
       unlink-from-compartment:
+        flavour: attribute_mutating
         description: |
           Remove share class from compartment (set compartment_id to NULL).
 
@@ -192,6 +195,7 @@ domains:
           consequence:
             baseline: reviewable
       list-by-compartment:
+        flavour: attribute_mutating
         description: |
           List all share classes in a compartment.
 

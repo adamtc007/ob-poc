@@ -11,6 +11,7 @@ domains:
 
     verbs:
       create:
+        flavour: instance_adding
         description: "Create a new UBO registry allegation"
         invocation_phrases:
           - "create ubo allegation"
@@ -94,6 +95,10 @@ domains:
             baseline: reviewable
 
       promote:
+        flavour: discretionary
+        role_guard:
+          any_of: [compliance_admin, senior_compliance, mlro]
+        audit_class: ubo_registry_promote
         description: "Promote a UBO registry entry from CANDIDATE to IDENTIFIED"
         invocation_phrases:
           - "promote ubo candidate"
@@ -132,6 +137,7 @@ domains:
           target_slot: kyc_ubo_registry
 
       advance:
+        flavour: attribute_mutating
         description: "Advance a UBO registry entry through the state machine"
         invocation_phrases:
           - "advance ubo status"
@@ -181,6 +187,10 @@ domains:
           target_slot: kyc_ubo_registry
 
       waive:
+        flavour: discretionary
+        role_guard:
+          any_of: [compliance_admin, senior_compliance, mlro]
+        audit_class: ubo_registry_waive
         description: "Waive a UBO registry entry with authority and reason"
         invocation_phrases:
           - "waive ubo requirement"
@@ -219,6 +229,10 @@ domains:
             baseline: requires_confirmation
 
       reject:
+        flavour: discretionary
+        role_guard:
+          any_of: [compliance_officer, senior_compliance, mlro]
+        audit_class: ubo_registry_reject
         description: "Reject a UBO registry entry (terminal state)"
         invocation_phrases:
           - "reject ubo"
@@ -257,6 +271,10 @@ domains:
           target_slot: kyc_ubo_registry
 
       expire:
+        flavour: discretionary
+        role_guard:
+          any_of: [compliance_admin, senior_compliance, mlro]
+        audit_class: ubo_registry_expire
         description: "Expire a UBO registry entry (terminal state)"
         invocation_phrases:
           - "expire ubo entry"

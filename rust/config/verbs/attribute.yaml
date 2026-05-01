@@ -7,6 +7,7 @@ domains:
 
     verbs:
       define:
+        flavour: attribute_mutating
         description: "Define a new governed attribute in the registry and SemOS"
         metadata:
           tier: intent
@@ -88,6 +89,7 @@ domains:
             baseline: reviewable
 
       define-derived:
+        flavour: attribute_mutating
         description: "Define a derived attribute with its governed computation recipe"
         metadata:
           tier: intent
@@ -160,6 +162,7 @@ domains:
             baseline: reviewable
 
       define-internal:
+        flavour: attribute_mutating
         description: "Define an internal/system attribute with lightweight governance"
         metadata:
           tier: intent
@@ -230,6 +233,7 @@ domains:
             baseline: reviewable
 
       update-internal:
+        flavour: attribute_mutating
         description: "Update metadata on an internal/system attribute (lightweight, no changeset)"
         metadata:
           tier: intent
@@ -286,6 +290,7 @@ domains:
             baseline: reviewable
 
       classify:
+        flavour: attribute_mutating
         description: "Assign or reassign taxonomy category for an attribute"
         metadata:
           tier: intent
@@ -324,6 +329,7 @@ domains:
             baseline: reviewable
 
       set-evidence-grade:
+        flavour: attribute_mutating
         description: "Set or change the evidence grade sensitivity classification for an attribute"
         metadata:
           tier: intent
@@ -358,6 +364,7 @@ domains:
             baseline: reviewable
 
       deprecate:
+        flavour: attribute_mutating
         description: "Mark an attribute as deprecated without deleting operational references"
         metadata:
           tier: intent
@@ -399,6 +406,7 @@ domains:
           target_slot: attribute_def
 
       inspect:
+        flavour: attribute_mutating
         description: "Show full attribute definition including governance state, evidence grade, derivation recipe, and observation statistics"
         metadata:
           tier: reference
@@ -430,6 +438,7 @@ domains:
             baseline: benign
 
       update:
+        flavour: attribute_mutating
         description: "Update an existing attribute"
         metadata:
           tier: intent
@@ -477,6 +486,7 @@ domains:
           consequence:
             baseline: reviewable
       read:
+        flavour: attribute_mutating
         description: "Read an attribute by semantic ID"
         metadata:
           tier: reference
@@ -513,6 +523,7 @@ domains:
             baseline: benign
 
       list:
+        flavour: attribute_mutating
         description: "List attributes, optionally filtered by category or domain"
         metadata:
           tier: reference
@@ -552,6 +563,7 @@ domains:
             baseline: benign
 
       map-to-document:
+        flavour: attribute_mutating
         description: "Map attribute to document type (source or sink relationship)"
         metadata:
           tier: intent
@@ -641,6 +653,7 @@ domains:
             baseline: reviewable
 
       unmap-from-document:
+        flavour: attribute_mutating
         description: "Remove attribute mapping from document type"
         metadata:
           tier: intent
@@ -692,6 +705,7 @@ domains:
             baseline: reviewable
 
       list-sources:
+        flavour: attribute_mutating
         description: "List all document types that provide (source) a given attribute"
         metadata:
           tier: reference
@@ -724,6 +738,7 @@ domains:
             baseline: benign
 
       list-sinks:
+        flavour: attribute_mutating
         description: "List all document types that require (sink) a given attribute"
         metadata:
           tier: reference
@@ -756,6 +771,7 @@ domains:
             baseline: benign
 
       trace-lineage:
+        flavour: attribute_mutating
         description: "Show complete lineage for an attribute - sources, sinks, and resources that require it"
         metadata:
           tier: intent
@@ -788,6 +804,7 @@ domains:
             baseline: benign
 
       list-by-document:
+        flavour: attribute_mutating
         description: "List all attributes linked to a document type"
         metadata:
           tier: reference
@@ -825,6 +842,7 @@ domains:
             baseline: benign
 
       check-coverage:
+        flavour: attribute_mutating
         description: "Check attribute coverage for a document type - what's mapped vs what's required"
         metadata:
           tier: diagnostics
@@ -857,6 +875,7 @@ domains:
             baseline: benign
 
       bridge-to-semos:
+        flavour: attribute_mutating
         description: Publish SemOS AttributeDef snapshots for store attributes that lack governance
         metadata:
           tier: intent

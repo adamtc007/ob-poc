@@ -3,6 +3,7 @@ domains:
     description: SMPG/ALERT security type codes
     verbs:
       ensure:
+        flavour: instance_adding
         description: Create or update ALERT security type
         metadata:
           tier: intent
@@ -61,6 +62,7 @@ domains:
           consequence:
             baseline: reviewable
       list:
+        flavour: attribute_mutating
         description: List security types for an instrument class
         metadata:
           tier: reference

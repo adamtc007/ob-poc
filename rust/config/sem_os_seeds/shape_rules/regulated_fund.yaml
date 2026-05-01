@@ -1,0 +1,4 @@
+shape: regulated.fund
+workspace: cbu
+extends: [base.cbu]
+slots: {}

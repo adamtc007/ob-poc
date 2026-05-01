@@ -11,6 +11,7 @@ domains:
       # Requirement Creation
       # ========================================================================
       create:
+        flavour: instance_adding
         description: Create a document requirement for an entity
         behavior: crud
         invocation_phrases:
@@ -106,6 +107,7 @@ domains:
           consequence:
             baseline: reviewable
       create-set:
+        flavour: instance_adding
         description: Create multiple document requirements for an entity
         behavior: plugin
         invocation_phrases:
@@ -166,6 +168,10 @@ domains:
           consequence:
             baseline: reviewable
       waive:
+        flavour: discretionary
+        role_guard:
+          any_of: [compliance_admin, senior_compliance, mlro]
+        audit_class: requirement_waive
         description: Waive a document requirement (manual override)
         behavior: crud
         invocation_phrases:
@@ -215,6 +221,7 @@ domains:
           consequence:
             baseline: reviewable
       mark-expired:
+        flavour: attribute_mutating
         description: Mark a requirement as expired (document validity lapsed)
         behavior: crud
         invocation_phrases:
@@ -259,6 +266,7 @@ domains:
           consequence:
             baseline: reviewable
       reset:
+        flavour: attribute_mutating
         description: Reset a requirement to missing (for re-collection)
         behavior: crud
         invocation_phrases:
@@ -307,6 +315,7 @@ domains:
           consequence:
             baseline: reviewable
       get:
+        flavour: attribute_mutating
         description: Get a requirement by ID
         behavior: crud
         invocation_phrases:
@@ -345,6 +354,7 @@ domains:
           consequence:
             baseline: benign
       list-for-entity:
+        flavour: attribute_mutating
         description: List all requirements for an entity
         behavior: crud
         invocation_phrases:
@@ -388,6 +398,7 @@ domains:
           consequence:
             baseline: benign
       list-for-workflow:
+        flavour: attribute_mutating
         description: List all requirements for a workflow instance
         behavior: crud
         invocation_phrases:
@@ -421,6 +432,7 @@ domains:
           consequence:
             baseline: benign
       list-outstanding:
+        flavour: attribute_mutating
         description: List unsatisfied requirements for a workflow
         behavior: plugin
         invocation_phrases:
@@ -472,6 +484,7 @@ domains:
           consequence:
             baseline: benign
       list-with-status:
+        flavour: attribute_mutating
         description: Get requirements with latest version status (joined view)
         behavior: crud
         invocation_phrases:

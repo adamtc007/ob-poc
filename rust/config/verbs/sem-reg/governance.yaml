@@ -25,6 +25,7 @@ domains:
       # Stewardship-Delegated Ops
       # ============================================
       gate-precheck:
+        flavour: attribute_mutating
         description: Gate precheck before submitting a changeset for review
         metadata:
           tier: diagnostics
@@ -59,6 +60,10 @@ domains:
             baseline: reviewable
 
       submit-for-review:
+        flavour: discretionary
+        role_guard:
+          any_of: [compliance_officer, senior_compliance, mlro]
+        audit_class: governance_submit_for_review
         description: Submit a changeset for human review
         metadata:
           tier: diagnostics
@@ -93,6 +98,10 @@ domains:
             baseline: requires_confirmation
 
       record-review:
+        flavour: discretionary
+        role_guard:
+          any_of: [compliance_officer, senior_compliance, mlro]
+        audit_class: governance_record_review
         description: Record a review decision (approve/reject) on a changeset
         metadata:
           tier: diagnostics
@@ -138,6 +147,10 @@ domains:
       # CoreService-Delegated Ops
       # ============================================
       validate:
+        flavour: discretionary
+        role_guard:
+          any_of: [compliance_officer, senior_compliance, mlro]
+        audit_class: governance_validate
         description: Validate a changeset (Stage 1 artifact integrity)
         metadata:
           tier: diagnostics
@@ -172,6 +185,7 @@ domains:
             baseline: requires_confirmation
 
       dry-run:
+        flavour: attribute_mutating
         description: Dry-run a changeset (Stage 2 scratch schema validation)
         metadata:
           tier: diagnostics
@@ -208,6 +222,7 @@ domains:
             baseline: benign
 
       plan-publish:
+        flavour: attribute_mutating
         description: Plan a publish operation (diff preview against active snapshot set)
         metadata:
           tier: diagnostics
@@ -241,6 +256,10 @@ domains:
             baseline: requires_confirmation
 
       publish:
+        flavour: discretionary
+        role_guard:
+          any_of: [compliance_officer, senior_compliance, mlro]
+        audit_class: governance_publish
         description: Publish a validated changeset to the active snapshot set
         metadata:
           tier: diagnostics
@@ -279,6 +298,10 @@ domains:
           target_slot: changeset
 
       publish-batch:
+        flavour: discretionary
+        role_guard:
+          any_of: [compliance_officer, senior_compliance, mlro]
+        audit_class: governance_publish_batch
         description: Batch publish multiple changesets in topological order
         metadata:
           tier: diagnostics
@@ -317,6 +340,10 @@ domains:
           target_slot: changeset
 
       rollback:
+        flavour: discretionary
+        role_guard:
+          any_of: [compliance_admin, senior_compliance, mlro]
+        audit_class: governance_rollback
         description: Rollback the active snapshot set to a previous version
         metadata:
           tier: diagnostics

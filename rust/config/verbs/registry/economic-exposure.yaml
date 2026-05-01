@@ -52,6 +52,7 @@ domains:
       # Look-Through Computation
       # ============================================
       compute:
+        flavour: attribute_mutating
         description: |
           Compute economic exposure from a root entity through ownership chains.
 
@@ -159,6 +160,7 @@ domains:
           consequence:
             baseline: benign
       summary:
+        flavour: attribute_mutating
         description: |
           Get aggregated economic exposure summary for an issuer.
 
@@ -260,6 +262,7 @@ domains:
 
     verbs:
       upsert:
+        flavour: attribute_mutating
         description: |
           Set control and disclosure thresholds for an issuer.
 
@@ -372,6 +375,7 @@ domains:
           consequence:
             baseline: reviewable
       read:
+        flavour: attribute_mutating
         description: |
           Read the current control/disclosure thresholds for an issuer.
 

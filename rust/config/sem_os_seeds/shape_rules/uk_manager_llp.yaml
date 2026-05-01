@@ -1,0 +1,11 @@
+shape: struct.uk.manager.llp
+workspace: cbu
+extends: [base.cbu]
+structural_facts:
+  jurisdiction: UK
+  structure_type: manager
+  allowed_structure_types: [llp, manager]
+  document_bundles: [docs.bundle.manager-baseline]
+  required_roles: [designated-member]
+  optional_roles: [compliance-officer, mlro, auditor]
+slots: {}

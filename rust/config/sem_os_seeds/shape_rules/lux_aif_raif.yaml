@@ -1,0 +1,12 @@
+shape: struct.lux.aif.raif
+workspace: cbu
+extends: [regulated.fund]
+structural_facts:
+  jurisdiction: LU
+  structure_type: aif
+  allowed_structure_types: [raif]
+  document_bundles: [docs.bundle.aif-baseline]
+  trading_profile_type: aif
+  required_roles: [aifm, depositary]
+  optional_roles: [investment-manager, administrator, auditor, prime-broker]
+slots: {}

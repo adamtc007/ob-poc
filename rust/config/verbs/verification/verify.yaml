@@ -6,6 +6,7 @@ domains:
       # Pattern Detection
       # ============================================
       detect-patterns:
+        flavour: attribute_mutating
         description: Run adversarial pattern detection on CBU (circular ownership, layering, nominees, opacity)
         metadata:
           tier: intent
@@ -53,6 +54,7 @@ domains:
           consequence:
             baseline: benign
       detect-evasion:
+        flavour: attribute_mutating
         description: Analyze doc_request history for evasion signals (delays, selective response, changing explanations)
         metadata:
           tier: intent
@@ -94,6 +96,7 @@ domains:
           consequence:
             baseline: benign
       challenge:
+        flavour: instance_adding
         description: Raise formal verification challenge requiring client response
         metadata:
           tier: intent
@@ -209,6 +212,7 @@ domains:
           consequence:
             baseline: reviewable
       respond-to-challenge:
+        flavour: attribute_mutating
         description: Record client response to verification challenge
         metadata:
           tier: intent
@@ -264,6 +268,7 @@ domains:
           consequence:
             baseline: reviewable
       resolve-challenge:
+        flavour: attribute_mutating
         description: Resolve verification challenge (accept/reject/escalate)
         metadata:
           tier: intent
@@ -334,6 +339,7 @@ domains:
           consequence:
             baseline: reviewable
       list-challenges:
+        flavour: attribute_mutating
         description: List verification challenges for CBU or case
         metadata:
           tier: reference
@@ -393,6 +399,10 @@ domains:
           consequence:
             baseline: benign
       escalate:
+        flavour: discretionary
+        role_guard:
+          any_of: [compliance_officer, senior_compliance, mlro]
+        audit_class: verify_escalate
         description: Escalate verification issue to higher authority
         metadata:
           tier: intent
@@ -480,6 +490,7 @@ domains:
           consequence:
             baseline: reviewable
       resolve-escalation:
+        flavour: attribute_mutating
         description: Record escalation decision
         metadata:
           tier: intent
@@ -544,6 +555,7 @@ domains:
           consequence:
             baseline: reviewable
       list-escalations:
+        flavour: attribute_mutating
         description: List escalations for CBU
         metadata:
           tier: reference
@@ -602,6 +614,7 @@ domains:
           consequence:
             baseline: benign
       calculate-confidence:
+        flavour: attribute_mutating
         description: Aggregate confidence score across observations for entity/attribute
         metadata:
           tier: diagnostics
@@ -644,6 +657,7 @@ domains:
           consequence:
             baseline: benign
       get-status:
+        flavour: attribute_mutating
         description: Get comprehensive verification status report for CBU
         metadata:
           tier: diagnostics
@@ -683,6 +697,7 @@ domains:
           consequence:
             baseline: benign
       verify-against-registry:
+        flavour: attribute_mutating
         description: Check entity against external registry (GLEIF, Companies House)
         metadata:
           tier: intent
@@ -730,6 +745,7 @@ domains:
           consequence:
             baseline: reviewable
       assert:
+        flavour: attribute_mutating
         description: Declarative gate - assert minimum confidence threshold for CBU/entity
         metadata:
           tier: intent
@@ -793,6 +809,7 @@ domains:
           consequence:
             baseline: reviewable
       record-pattern:
+        flavour: instance_adding
         description: Manually record a detected pattern
         metadata:
           tier: intent
@@ -883,6 +900,7 @@ domains:
           consequence:
             baseline: reviewable
       resolve-pattern:
+        flavour: attribute_mutating
         description: Resolve or dismiss a detected pattern
         metadata:
           tier: intent
@@ -943,6 +961,7 @@ domains:
           consequence:
             baseline: reviewable
       list-patterns:
+        flavour: attribute_mutating
         description: List detected patterns for CBU
         metadata:
           tier: reference

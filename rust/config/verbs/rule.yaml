@@ -10,6 +10,7 @@ domains:
 
     verbs:
       add:
+        flavour: instance_adding
         description: "Add a new rule to a ruleset (validates JSON condition and effect structures)"
         behavior: plugin
         lifecycle:
@@ -73,6 +74,7 @@ domains:
           consequence:
             baseline: reviewable
       update:
+        flavour: attribute_mutating
         description: "Update an existing rule's fields"
         behavior: plugin
         metadata:
@@ -117,6 +119,7 @@ domains:
           consequence:
             baseline: reviewable
       disable:
+        flavour: attribute_mutating
         description: "Disable a rule (soft delete — sets kind to 'disabled')"
         behavior: plugin
         metadata:

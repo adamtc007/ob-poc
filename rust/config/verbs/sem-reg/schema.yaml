@@ -31,6 +31,7 @@ domains:
       # Structure Semantics
       # ============================================
       domain.describe:
+        flavour: attribute_mutating
         description: Describe a data-management domain from structure semantics
         metadata:
           tier: diagnostics
@@ -66,6 +67,7 @@ domains:
           consequence:
             baseline: benign
       entity.describe:
+        flavour: attribute_mutating
         description: Describe an entity type with fields, relationships, and available verbs
         metadata:
           tier: intent
@@ -102,6 +104,7 @@ domains:
           consequence:
             baseline: benign
       entity.list-fields:
+        flavour: attribute_mutating
         description: List fields for an entity type from registry or ontology metadata
         metadata:
           tier: diagnostics
@@ -137,6 +140,7 @@ domains:
           consequence:
             baseline: benign
       entity.list-relationships:
+        flavour: attribute_mutating
         description: List relationships for an entity type from ontology metadata
         metadata:
           tier: diagnostics
@@ -171,6 +175,7 @@ domains:
           consequence:
             baseline: benign
       entity.list-verbs:
+        flavour: attribute_mutating
         description: List DSL verbs available for an entity type's domain
         metadata:
           tier: diagnostics
@@ -209,6 +214,7 @@ domains:
           consequence:
             baseline: benign
       introspect:
+        flavour: attribute_mutating
         description: Introspect database schema (tables, columns, foreign keys)
         metadata:
           tier: diagnostics
@@ -257,6 +263,7 @@ domains:
           consequence:
             baseline: benign
       extract-attributes:
+        flavour: attribute_mutating
         description: Extract attribute definitions from schema columns
         metadata:
           tier: diagnostics
@@ -299,6 +306,7 @@ domains:
           consequence:
             baseline: benign
       extract-verbs:
+        flavour: attribute_mutating
         description: Extract verb contracts from YAML config
         metadata:
           tier: diagnostics
@@ -343,6 +351,7 @@ domains:
           consequence:
             baseline: benign
       extract-entities:
+        flavour: attribute_mutating
         description: Extract entity type definitions from schema tables
         metadata:
           tier: diagnostics
@@ -381,6 +390,7 @@ domains:
           consequence:
             baseline: benign
       cross-reference:
+        flavour: attribute_mutating
         description: Cross-reference schema against registry snapshots for drift detection
         metadata:
           tier: diagnostics
@@ -426,6 +436,7 @@ domains:
           consequence:
             baseline: benign
       generate-erd:
+        flavour: attribute_mutating
         description: Generate an entity-relationship diagram with verb surface annotations
         metadata:
           tier: intent
@@ -510,6 +521,7 @@ domains:
           consequence:
             baseline: benign
       generate-verb-flow:
+        flavour: attribute_mutating
         description: Generate a verb-flow diagram showing what data a verb touches
         metadata:
           tier: intent
@@ -565,6 +577,7 @@ domains:
           consequence:
             baseline: benign
       generate-discovery-map:
+        flavour: attribute_mutating
         description: Generate a domain discovery map (Phase 2 stub)
         metadata:
           tier: intent

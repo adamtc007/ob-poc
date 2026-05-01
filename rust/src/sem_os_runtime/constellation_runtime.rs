@@ -37,8 +37,6 @@ pub enum ConstellationError {
 /// Standard result type for constellation runtime operations.
 pub type ConstellationResult<T> = Result<T, ConstellationError>;
 
-const SUPPORTED_BULK_MACROS: &[&str] = &["role_slots"];
-
 /// Raw constellation map definition loaded from YAML.
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct ConstellationMapDef {
@@ -46,8 +44,6 @@ pub struct ConstellationMapDef {
     pub description: Option<String>,
     pub jurisdiction: String,
     pub slots: BTreeMap<String, SlotDef>,
-    #[serde(default)]
-    pub bulk_macros: Vec<String>,
 }
 
 /// Raw slot definition loaded from YAML.
@@ -340,7 +336,6 @@ pub struct ValidatedConstellationMap {
     pub slot_index: HashMap<String, ResolvedSlot>,
     pub state_machines: HashMap<String, RuntimeStateMachine>,
     pub map_revision: String,
-    pub bulk_macros: Vec<String>,
 }
 
 /// Raw hydration bundle collected before normalization.
@@ -597,7 +592,6 @@ pub fn validate_constellation_map(
     let mut flattened = Vec::new();
     flatten_validated_slots(&definition.slots, &mut flattened, None, Vec::new(), 0);
     let known_verbs = load_known_verbs_for_validation()?;
-    validate_bulk_macros(definition)?;
 
     let root_count = flattened
         .iter()
@@ -649,7 +643,6 @@ pub fn validate_constellation_map(
         slot_index,
         state_machines,
         map_revision: String::new(),
-        bulk_macros: definition.bulk_macros.clone(),
     })
 }
 
@@ -1133,18 +1126,6 @@ fn validate_flattened_slot(
     Ok(())
 }
 
-fn validate_bulk_macros(definition: &ConstellationMapDef) -> ConstellationResult<()> {
-    for bulk_macro in &definition.bulk_macros {
-        if !SUPPORTED_BULK_MACROS.contains(&bulk_macro.as_str()) {
-            return Err(ConstellationError::Validation(format!(
-                "constellation '{}' references unsupported bulk macro '{}'",
-                definition.constellation, bulk_macro
-            )));
-        }
-    }
-    Ok(())
-}
-
 fn load_known_verbs_for_validation() -> ConstellationResult<HashSet<String>> {
     let mut known = HashSet::new();
     for verb in crate::dsl_v2::runtime_registry::runtime_registry().all_verbs() {
@@ -1324,7 +1305,6 @@ fn build_core_grounding_model(map: &ValidatedConstellationMap) -> ConstellationM
         description: map.description.clone(),
         jurisdiction: map.jurisdiction.clone(),
         slots: rebuild_authored_slot_tree(map),
-        bulk_macros: map.bulk_macros.clone(),
     };
     let state_machines = map
         .state_machines
@@ -1471,6 +1451,20 @@ fn core_slot_def_from_public(
             .collect(),
         children,
         max_depth: definition.max_depth,
+        closure: None,
+        eligibility: None,
+        cardinality_max: None,
+        entry_state: None,
+        attachment_predicates: Vec::new(),
+        addition_predicates: Vec::new(),
+        aggregate_breach_checks: Vec::new(),
+        additive_attachment_predicates: Vec::new(),
+        additive_addition_predicates: Vec::new(),
+        additive_aggregate_breach_checks: Vec::new(),
+        role_guard: None,
+        justification_required: None,
+        audit_class: None,
+        completeness_assertion: None,
     }
 }
 
@@ -1543,7 +1537,7 @@ fn compile_overlay_sql(slot: &ResolvedSlot) -> String {
 }
 
 fn compile_role_batch_query(map: &ValidatedConstellationMap) -> BTreeMap<String, String> {
-    let role_slots = map
+    let role_join_slots = map
         .slots_ordered
         .iter()
         .filter(|slot| {
@@ -1557,11 +1551,11 @@ fn compile_role_batch_query(map: &ValidatedConstellationMap) -> BTreeMap<String,
         })
         .collect::<Vec<_>>();
 
-    if role_slots.len() < 2 {
+    if role_join_slots.len() < 2 {
         return BTreeMap::new();
     }
 
-    let filters = role_slots
+    let filters = role_join_slots
         .iter()
         .filter_map(|slot| {
             slot.def.join.as_ref().and_then(|join| {
@@ -1573,7 +1567,7 @@ fn compile_role_batch_query(map: &ValidatedConstellationMap) -> BTreeMap<String,
         .collect::<Vec<_>>()
         .join(", ");
 
-    role_slots
+    role_join_slots
         .into_iter()
         .map(|slot| {
             (
@@ -1619,28 +1613,5 @@ slots:
         assert!(error
             .to_string()
             .contains("unknown verb 'nonexistent.verb'"));
-    }
-
-    #[test]
-    fn test_validate_constellation_map_rejects_unknown_bulk_macro() {
-        let definition = parse_map(
-            r#"
-constellation: demo
-jurisdiction: LU
-slots:
-  cbu:
-    type: cbu
-    table: cbus
-    pk: cbu_id
-    cardinality: root
-bulk_macros: [unknown_bulk]
-"#,
-        );
-
-        let error =
-            validate_constellation_map(&definition).expect_err("should reject dead bulk macro");
-        assert!(error
-            .to_string()
-            .contains("unsupported bulk macro 'unknown_bulk'"));
     }
 }

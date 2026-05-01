@@ -122,6 +122,18 @@ pub struct VerbConfig {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub three_axis: Option<ThreeAxisDeclaration>,
 
+    /// Gate-contract flavour classification (§10.13).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub flavour: Option<VerbFlavour>,
+
+    /// Required for `flavour: discretionary`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub role_guard: Option<VerbRoleGuard>,
+
+    /// Required for `flavour: discretionary`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub audit_class: Option<String>,
+
     /// V1.3 runtime gate-hook metadata (R-runtime, 2026-04-25).
     ///
     /// Tells the verb-dispatch hook which args carry the entity_id and
@@ -143,6 +155,23 @@ pub struct VerbConfig {
     /// Verbs with `transition_args` get exact (from, to) resolution.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub transition_args: Option<TransitionArgs>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum VerbFlavour {
+    AttributeMutating,
+    InstanceAdding,
+    Tollgate,
+    Discretionary,
+}
+
+#[derive(Debug, Clone, Default, PartialEq, Eq, Deserialize, Serialize)]
+pub struct VerbRoleGuard {
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub any_of: Vec<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub all_of: Vec<String>,
 }
 
 /// V1.3 runtime gate-hook metadata. See `VerbConfig::transition_args`.

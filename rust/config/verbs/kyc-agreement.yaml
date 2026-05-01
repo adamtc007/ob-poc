@@ -6,6 +6,7 @@ domains:
     description: "KYC service agreement management for sponsor relationships"
     verbs:
       create:
+        flavour: instance_adding
         description: "Create KYC service agreement with sponsor (idempotent by sponsor+reference)"
         metadata:
           tier: intent
@@ -90,6 +91,7 @@ domains:
             baseline: reviewable
 
       read:
+        flavour: attribute_mutating
         description: "Get service agreement details"
         metadata:
           tier: reference
@@ -130,6 +132,7 @@ domains:
             baseline: benign
 
       list:
+        flavour: attribute_mutating
         description: "List service agreements for a sponsor"
         metadata:
           tier: reference
@@ -171,6 +174,7 @@ domains:
             baseline: benign
 
       update-status:
+        flavour: attribute_mutating
         description: "Update agreement status"
         metadata:
           tier: intent

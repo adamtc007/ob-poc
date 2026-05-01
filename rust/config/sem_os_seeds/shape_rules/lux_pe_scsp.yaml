@@ -1,0 +1,12 @@
+shape: struct.lux.pe.scsp
+workspace: cbu
+extends: [base.cbu]
+structural_facts:
+  jurisdiction: LU
+  structure_type: pe
+  allowed_structure_types: [scsp, pe]
+  document_bundles: [docs.bundle.private-equity-baseline]
+  trading_profile_type: pe
+  required_roles: [general-partner]
+  optional_roles: [aifm, depositary, administrator, auditor, legal-counsel]
+slots: {}

@@ -20,10 +20,14 @@
 //! - PeriodicReviewCadenceInconsistent
 //! - ValidityWindowWithoutExpiredState
 //!
-//! Pure function library — no DB, no IO. Takes in-memory DAG structs.
+//! Core checks are pure function library — no DB. Directory convenience
+//! helpers are limited to reading authored YAML into those pure checks.
 
 use crate::config::dag::*;
+use crate::config::predicate::{parse_green_when, EntityRef, EntitySetRef, Predicate};
+use crate::resolver::{ResolvedSlot, ResolvedTemplate};
 use std::collections::{BTreeMap, HashMap, HashSet};
+use std::path::Path;
 
 // ---------------------------------------------------------------------------
 // Error + warning taxonomy
@@ -92,6 +96,68 @@ pub enum DagError {
     CategoryGatedMutuallyExclusiveGates {
         location: DagLocation,
         slot_id: String,
+    },
+
+    // V1.4 green_when predicate parsing
+    GreenWhenParseError {
+        location: DagLocation,
+        slot_id: String,
+        state_id: String,
+        reason: String,
+    },
+    GreenWhenUnboundEntity {
+        location: DagLocation,
+        slot_id: String,
+        state_id: String,
+        entity_kind: String,
+    },
+
+    // Phase 1.5B gate metadata
+    OpenClosureMissingCompletenessAssertion {
+        location: DagLocation,
+        slot_id: String,
+    },
+    EligibilityEntityKindUnknown {
+        location: DagLocation,
+        slot_id: String,
+        entity_kind: String,
+    },
+    GatePredicateParseError {
+        location: DagLocation,
+        slot_id: String,
+        field: String,
+        predicate_index: usize,
+        reason: String,
+    },
+    AdditivePredicateSigilForbidden {
+        location: DagLocation,
+        slot_id: String,
+        field: String,
+    },
+    SchemaCoordinationSlotFieldDrift {
+        location: DagLocation,
+        slot_id: String,
+        field: String,
+        dag_workspace: String,
+    },
+    SchemaCoordinationStateMachineMismatch {
+        location: DagLocation,
+        slot_id: String,
+        dag_workspace: String,
+        dag_state_machine: String,
+        constellation_state_machine: String,
+    },
+    ResolvedClosureUniversalQuantifierInvalid {
+        location: DagLocation,
+        slot_id: String,
+        field: String,
+        predicate_index: usize,
+        quantified_slot: String,
+        closure: ClosureType,
+    },
+    SchemaCoordinationParseError {
+        location: DagLocation,
+        reason: String,
     },
 }
 
@@ -167,6 +233,103 @@ impl std::fmt::Display for DagError {
                 "{location}: slot '{slot_id}' category_gated has both activated_by \
                  and deactivated_by — mutually exclusive"
             ),
+            Self::GreenWhenParseError {
+                location,
+                slot_id,
+                state_id,
+                reason,
+            } => write!(
+                f,
+                "{location}: slot '{slot_id}' state '{state_id}' has invalid \
+                 green_when predicate — {reason}"
+            ),
+            Self::GreenWhenUnboundEntity {
+                location,
+                slot_id,
+                state_id,
+                entity_kind,
+            } => write!(
+                f,
+                "{location}: slot '{slot_id}' state '{state_id}' references \
+                 green_when entity '{entity_kind}' without a predicate_bindings entry"
+            ),
+            Self::OpenClosureMissingCompletenessAssertion { location, slot_id } => write!(
+                f,
+                "{location}: slot '{slot_id}' has closure=open but no \
+                 completeness_assertion"
+            ),
+            Self::EligibilityEntityKindUnknown {
+                location,
+                slot_id,
+                entity_kind,
+            } => write!(
+                f,
+                "{location}: slot '{slot_id}' eligibility references unknown \
+                 entity kind '{entity_kind}'"
+            ),
+            Self::GatePredicateParseError {
+                location,
+                slot_id,
+                field,
+                predicate_index,
+                reason,
+            } => write!(
+                f,
+                "{location}: slot '{slot_id}' {field}[{predicate_index}] is not a \
+                 valid predicate — {reason}"
+            ),
+            Self::AdditivePredicateSigilForbidden {
+                location,
+                slot_id,
+                field,
+            } => write!(
+                f,
+                "{location}: slot '{slot_id}' uses '{field}', but + vector \
+                 composition is only valid in shape-rule files"
+            ),
+            Self::SchemaCoordinationSlotFieldDrift {
+                location,
+                slot_id,
+                field,
+                dag_workspace,
+            } => write!(
+                f,
+                "{location}: slot '{slot_id}' also exists in DAG workspace \
+                 '{dag_workspace}' and both schemas declare '{field}'. Error in \
+                 Phase 2 unless explicitly documented as known-deferred."
+            ),
+            Self::SchemaCoordinationStateMachineMismatch {
+                location,
+                slot_id,
+                dag_workspace,
+                dag_state_machine,
+                constellation_state_machine,
+            } => write!(
+                f,
+                "{location}: slot '{slot_id}' also exists in DAG workspace \
+                 '{dag_workspace}' with state_machine '{dag_state_machine}', but \
+                 constellation declares '{constellation_state_machine}'. Error in \
+                 Phase 2 unless explicitly documented as known-deferred."
+            ),
+            Self::ResolvedClosureUniversalQuantifierInvalid {
+                location,
+                slot_id,
+                field,
+                predicate_index,
+                quantified_slot,
+                closure,
+            } => write!(
+                f,
+                "{location}: slot '{slot_id}' {field}[{predicate_index}] universally \
+                 quantifies over '{quantified_slot}' with closure={closure:?}; use an \
+                 aggregate-only predicate form for unbounded/open slots"
+            ),
+            Self::SchemaCoordinationParseError { location, reason } => {
+                write!(
+                    f,
+                    "{location}: failed to parse constellation map — {reason}"
+                )
+            }
         }
     }
 }
@@ -188,6 +351,21 @@ pub enum DagWarning {
     ValidityWindowWithoutExpiredState {
         location: DagLocation,
         evidence_type_id: String,
+    },
+
+    // Phase 1.5B schema-coordination warning surface (D-011).
+    SchemaCoordinationSlotFieldDrift {
+        location: DagLocation,
+        slot_id: String,
+        field: String,
+        dag_workspace: String,
+    },
+    SchemaCoordinationStateMachineMismatch {
+        location: DagLocation,
+        slot_id: String,
+        dag_workspace: String,
+        dag_state_machine: String,
+        constellation_state_machine: String,
     },
 }
 
@@ -218,6 +396,29 @@ impl std::fmt::Display for DagWarning {
                  but the evidence state machine has no EXPIRED state. \
                  Validity-window expiration has no state to transition into. (V1.3-6)"
             ),
+            Self::SchemaCoordinationSlotFieldDrift {
+                location,
+                slot_id,
+                field,
+                dag_workspace,
+            } => write!(
+                f,
+                "{location}: constellation slot '{slot_id}' also sets gate metadata \
+                 field '{field}' declared by DAG workspace '{dag_workspace}'. \
+                 Warning only until Phase 2 per D-011."
+            ),
+            Self::SchemaCoordinationStateMachineMismatch {
+                location,
+                slot_id,
+                dag_workspace,
+                dag_state_machine,
+                constellation_state_machine,
+            } => write!(
+                f,
+                "{location}: constellation slot '{slot_id}' references state_machine \
+                 '{constellation_state_machine}' but DAG workspace '{dag_workspace}' \
+                 declares '{dag_state_machine}'. Warning only until Phase 2 per D-011."
+            ),
         }
     }
 }
@@ -237,6 +438,29 @@ impl DagValidationReport {
     }
 }
 
+/// Optional external indexes for validator checks whose data lives outside DAG YAML.
+#[derive(Debug, Default, Clone)]
+pub struct DagValidationContext {
+    pub known_entity_kinds: HashSet<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub enum SchemaCoordinationKnownDeferred {
+    SlotFieldDrift {
+        source_name: String,
+        slot_id: String,
+        field: String,
+        dag_workspace: String,
+    },
+    StateMachineMismatch {
+        source_name: String,
+        slot_id: String,
+        dag_workspace: String,
+        dag_state_machine: String,
+        constellation_state_machine: String,
+    },
+}
+
 // ---------------------------------------------------------------------------
 // Validator entry point
 // ---------------------------------------------------------------------------
@@ -245,6 +469,14 @@ impl DagValidationReport {
 /// (cross_workspace_constraints, derived_cross_workspace_state, parent_slot
 /// into other workspaces) can be resolved.
 pub fn validate_dags(loaded: &BTreeMap<String, LoadedDag>) -> DagValidationReport {
+    validate_dags_with_context(loaded, &DagValidationContext::default())
+}
+
+/// Validate all loaded DAGs using optional external context.
+pub fn validate_dags_with_context(
+    loaded: &BTreeMap<String, LoadedDag>,
+    context: &DagValidationContext,
+) -> DagValidationReport {
     let mut report = DagValidationReport::default();
 
     // Index: workspace -> (slot_id -> Slot ref) and state_machine state_ids.
@@ -256,6 +488,8 @@ pub fn validate_dags(loaded: &BTreeMap<String, LoadedDag>) -> DagValidationRepor
         validate_parent_slots(ws, &ld.dag, &index, &mut report);
         validate_dual_lifecycles(ws, &ld.dag, &mut report);
         validate_category_gated(ws, &ld.dag, &mut report);
+        validate_green_when_predicates(ws, &ld.dag, &mut report);
+        validate_gate_metadata(ws, &ld.dag, context, &mut report);
 
         // Warnings
         validate_long_lived_suspended_convention(ws, &ld.dag, &mut report);
@@ -267,6 +501,251 @@ pub fn validate_dags(loaded: &BTreeMap<String, LoadedDag>) -> DagValidationRepor
     detect_derivation_cycles(loaded, &mut report);
 
     report
+}
+
+/// Validate gate metadata after DAG, constellation-map, and shape-rule composition.
+pub fn validate_resolved_template_gate_metadata(
+    template: &ResolvedTemplate,
+    context: &DagValidationContext,
+) -> DagValidationReport {
+    let mut report = DagValidationReport::default();
+    let slot_closures = template
+        .slots
+        .iter()
+        .filter_map(|slot| {
+            slot.closure
+                .clone()
+                .map(|closure| (slot.id.clone(), closure))
+        })
+        .collect::<HashMap<_, _>>();
+
+    for slot in &template.slots {
+        let location = DagLocation {
+            workspace: template.workspace.clone(),
+            path: format!(
+                "resolved_template.{}.slots.{}",
+                template.composite_shape, slot.id
+            ),
+        };
+
+        validate_resolved_open_closure(&location, slot, &mut report);
+        validate_resolved_eligibility(&location, slot, context, &mut report);
+        validate_resolved_predicate_vector(
+            &location,
+            slot,
+            "attachment_predicates",
+            &slot.attachment_predicates,
+            &slot_closures,
+            &mut report,
+        );
+        validate_resolved_predicate_vector(
+            &location,
+            slot,
+            "addition_predicates",
+            &slot.addition_predicates,
+            &slot_closures,
+            &mut report,
+        );
+        validate_resolved_predicate_vector(
+            &location,
+            slot,
+            "aggregate_breach_checks",
+            &slot.aggregate_breach_checks,
+            &slot_closures,
+            &mut report,
+        );
+
+        if let Some(predicate) = slot
+            .completeness_assertion
+            .as_ref()
+            .and_then(|assertion| assertion.predicate.as_ref())
+        {
+            validate_resolved_predicate_text(
+                &location,
+                slot,
+                "completeness_assertion.predicate",
+                0,
+                predicate,
+                &slot_closures,
+                &mut report,
+            );
+        }
+    }
+
+    report
+}
+
+/// Parse `config/ontology/entity_taxonomy.yaml`-style YAML into known entity kinds.
+pub fn entity_kinds_from_taxonomy_yaml(yaml: &str) -> Result<HashSet<String>, serde_yaml::Error> {
+    #[derive(serde::Deserialize)]
+    struct EntityTaxonomy {
+        #[serde(default)]
+        entities: BTreeMap<String, serde_yaml::Value>,
+    }
+
+    let parsed: EntityTaxonomy = serde_yaml::from_str(yaml)?;
+    Ok(parsed.entities.into_keys().collect())
+}
+
+/// Validate one constellation map's schema coordination against loaded DAGs.
+///
+/// This intentionally parses a lightweight raw YAML shape instead of depending
+/// on `sem_os_core::constellation_map_def`, keeping `dsl-core` dependency-free.
+pub fn validate_constellation_map_schema_coordination(
+    loaded: &BTreeMap<String, LoadedDag>,
+    source_name: &str,
+    yaml: &str,
+) -> DagValidationReport {
+    let mut report = DagValidationReport::default();
+    let map = match serde_yaml::from_str::<RawConstellationMap>(yaml) {
+        Ok(map) => map,
+        Err(err) => {
+            report.errors.push(DagError::SchemaCoordinationParseError {
+                location: DagLocation {
+                    workspace: "constellation".to_string(),
+                    path: source_name.to_string(),
+                },
+                reason: err.to_string(),
+            });
+            return report;
+        }
+    };
+
+    validate_raw_constellation_map_schema_coordination(loaded, source_name, &map, &mut report);
+    report
+}
+
+/// Validate a directory of constellation map YAML files against loaded DAGs.
+pub fn validate_constellation_map_dir_schema_coordination(
+    loaded: &BTreeMap<String, LoadedDag>,
+    dir: &Path,
+) -> std::io::Result<DagValidationReport> {
+    let mut report = DagValidationReport::default();
+    for entry in std::fs::read_dir(dir)? {
+        let path = entry?.path();
+        let is_yaml = path
+            .extension()
+            .and_then(|ext| ext.to_str())
+            .is_some_and(|ext| matches!(ext, "yaml" | "yml"));
+        if !is_yaml {
+            continue;
+        }
+        let contents = std::fs::read_to_string(&path)?;
+        let source_name = path
+            .file_name()
+            .and_then(|name| name.to_str())
+            .unwrap_or("<unknown>");
+        let map_report =
+            validate_constellation_map_schema_coordination(loaded, source_name, &contents);
+        report.errors.extend(map_report.errors);
+        report.warnings.extend(map_report.warnings);
+    }
+    Ok(report)
+}
+
+pub fn validate_constellation_map_dir_schema_coordination_strict(
+    loaded: &BTreeMap<String, LoadedDag>,
+    dir: &Path,
+    known_deferred: &[SchemaCoordinationKnownDeferred],
+) -> std::io::Result<DagValidationReport> {
+    let mut report = validate_constellation_map_dir_schema_coordination(loaded, dir)?;
+    harden_schema_coordination_warnings(&mut report, known_deferred);
+    Ok(report)
+}
+
+pub fn harden_schema_coordination_warnings(
+    report: &mut DagValidationReport,
+    known_deferred: &[SchemaCoordinationKnownDeferred],
+) {
+    let known_deferred = known_deferred.iter().cloned().collect::<HashSet<_>>();
+    let mut retained_warnings = Vec::new();
+    for warning in std::mem::take(&mut report.warnings) {
+        match schema_coordination_known_deferred_key(&warning) {
+            Some(key) if known_deferred.contains(&key) => retained_warnings.push(warning),
+            Some(_) => report
+                .errors
+                .push(schema_coordination_warning_to_error(warning)),
+            None => retained_warnings.push(warning),
+        }
+    }
+    report.warnings = retained_warnings;
+}
+
+fn schema_coordination_known_deferred_key(
+    warning: &DagWarning,
+) -> Option<SchemaCoordinationKnownDeferred> {
+    match warning {
+        DagWarning::SchemaCoordinationSlotFieldDrift {
+            location,
+            slot_id,
+            field,
+            dag_workspace,
+        } => Some(SchemaCoordinationKnownDeferred::SlotFieldDrift {
+            source_name: schema_coordination_source_name(location),
+            slot_id: slot_id.clone(),
+            field: field.clone(),
+            dag_workspace: dag_workspace.clone(),
+        }),
+        DagWarning::SchemaCoordinationStateMachineMismatch {
+            location,
+            slot_id,
+            dag_workspace,
+            dag_state_machine,
+            constellation_state_machine,
+        } => Some(SchemaCoordinationKnownDeferred::StateMachineMismatch {
+            source_name: schema_coordination_source_name(location),
+            slot_id: slot_id.clone(),
+            dag_workspace: dag_workspace.clone(),
+            dag_state_machine: dag_state_machine.clone(),
+            constellation_state_machine: constellation_state_machine.clone(),
+        }),
+        DagWarning::LongLivedSlotMissingSuspended { .. }
+        | DagWarning::PeriodicReviewCadenceWithoutRereviewTransition { .. }
+        | DagWarning::ValidityWindowWithoutExpiredState { .. } => None,
+    }
+}
+
+fn schema_coordination_warning_to_error(warning: DagWarning) -> DagError {
+    match warning {
+        DagWarning::SchemaCoordinationSlotFieldDrift {
+            location,
+            slot_id,
+            field,
+            dag_workspace,
+        } => DagError::SchemaCoordinationSlotFieldDrift {
+            location,
+            slot_id,
+            field,
+            dag_workspace,
+        },
+        DagWarning::SchemaCoordinationStateMachineMismatch {
+            location,
+            slot_id,
+            dag_workspace,
+            dag_state_machine,
+            constellation_state_machine,
+        } => DagError::SchemaCoordinationStateMachineMismatch {
+            location,
+            slot_id,
+            dag_workspace,
+            dag_state_machine,
+            constellation_state_machine,
+        },
+        DagWarning::LongLivedSlotMissingSuspended { .. }
+        | DagWarning::PeriodicReviewCadenceWithoutRereviewTransition { .. }
+        | DagWarning::ValidityWindowWithoutExpiredState { .. } => {
+            unreachable!("only schema-coordination warnings are promoted")
+        }
+    }
+}
+
+fn schema_coordination_source_name(location: &DagLocation) -> String {
+    location
+        .path
+        .split_once(":slots.")
+        .map(|(source, _)| source)
+        .unwrap_or(&location.path)
+        .to_string()
 }
 
 // ---------------------------------------------------------------------------
@@ -588,6 +1067,386 @@ fn validate_category_gated(workspace: &str, dag: &Dag, report: &mut DagValidatio
     }
 }
 
+fn validate_green_when_predicates(workspace: &str, dag: &Dag, report: &mut DagValidationReport) {
+    for slot in &dag.slots {
+        let Some(SlotStateMachine::Structured(machine)) = slot.state_machine.as_ref() else {
+            continue;
+        };
+        for state in &machine.states {
+            let Some(predicate) = &state.green_when else {
+                continue;
+            };
+            if predicate.trim().is_empty() {
+                continue;
+            }
+            let location = DagLocation {
+                workspace: workspace.to_string(),
+                path: format!("slots.{}.states.{}.green_when", slot.id, state.id),
+            };
+            let ast = match parse_green_when(predicate) {
+                Ok(ast) => ast,
+                Err(err) => {
+                    report.errors.push(DagError::GreenWhenParseError {
+                        location,
+                        slot_id: slot.id.clone(),
+                        state_id: state.id.clone(),
+                        reason: err.to_string(),
+                    });
+                    continue;
+                }
+            };
+
+            let bound_entities: HashSet<&str> = machine
+                .predicate_bindings
+                .iter()
+                .map(|binding| binding.entity.as_str())
+                .collect();
+            let mut referenced_entities = HashSet::new();
+            collect_predicate_entity_refs(&ast, &mut referenced_entities);
+            for entity_kind in referenced_entities {
+                if !bound_entities.contains(entity_kind.as_str()) {
+                    report.errors.push(DagError::GreenWhenUnboundEntity {
+                        location: location.clone(),
+                        slot_id: slot.id.clone(),
+                        state_id: state.id.clone(),
+                        entity_kind,
+                    });
+                }
+            }
+        }
+    }
+}
+
+fn validate_gate_metadata(
+    workspace: &str,
+    dag: &Dag,
+    context: &DagValidationContext,
+    report: &mut DagValidationReport,
+) {
+    for slot in &dag.slots {
+        let location = DagLocation {
+            workspace: workspace.to_string(),
+            path: format!("slots.{}", slot.id),
+        };
+
+        if slot.closure == Some(ClosureType::Open) && slot.completeness_assertion.is_none() {
+            report
+                .errors
+                .push(DagError::OpenClosureMissingCompletenessAssertion {
+                    location: location.clone(),
+                    slot_id: slot.id.clone(),
+                });
+        }
+
+        if let Some(EligibilityConstraint::EntityKinds { entity_kinds }) = &slot.eligibility {
+            if !context.known_entity_kinds.is_empty() {
+                for entity_kind in entity_kinds {
+                    if !context.known_entity_kinds.contains(entity_kind) {
+                        report.errors.push(DagError::EligibilityEntityKindUnknown {
+                            location: location.clone(),
+                            slot_id: slot.id.clone(),
+                            entity_kind: entity_kind.clone(),
+                        });
+                    }
+                }
+            }
+        }
+
+        validate_gate_predicate_vector(
+            &location,
+            &slot.id,
+            "attachment_predicates",
+            &slot.attachment_predicates,
+            report,
+        );
+        validate_gate_predicate_vector(
+            &location,
+            &slot.id,
+            "addition_predicates",
+            &slot.addition_predicates,
+            report,
+        );
+        validate_gate_predicate_vector(
+            &location,
+            &slot.id,
+            "aggregate_breach_checks",
+            &slot.aggregate_breach_checks,
+            report,
+        );
+
+        reject_additive_predicate_vector(
+            &location,
+            &slot.id,
+            "+attachment_predicates",
+            &slot.additive_attachment_predicates,
+            report,
+        );
+        reject_additive_predicate_vector(
+            &location,
+            &slot.id,
+            "+addition_predicates",
+            &slot.additive_addition_predicates,
+            report,
+        );
+        reject_additive_predicate_vector(
+            &location,
+            &slot.id,
+            "+aggregate_breach_checks",
+            &slot.additive_aggregate_breach_checks,
+            report,
+        );
+    }
+}
+
+fn validate_gate_predicate_vector(
+    location: &DagLocation,
+    slot_id: &str,
+    field: &str,
+    predicates: &[String],
+    report: &mut DagValidationReport,
+) {
+    for (idx, predicate) in predicates.iter().enumerate() {
+        if predicate.trim().is_empty() {
+            continue;
+        }
+        if let Err(err) = parse_green_when(predicate) {
+            report.errors.push(DagError::GatePredicateParseError {
+                location: location.clone(),
+                slot_id: slot_id.to_string(),
+                field: field.to_string(),
+                predicate_index: idx,
+                reason: err.to_string(),
+            });
+        }
+    }
+}
+
+fn reject_additive_predicate_vector(
+    location: &DagLocation,
+    slot_id: &str,
+    field: &str,
+    predicates: &[String],
+    report: &mut DagValidationReport,
+) {
+    if !predicates.is_empty() {
+        report
+            .errors
+            .push(DagError::AdditivePredicateSigilForbidden {
+                location: location.clone(),
+                slot_id: slot_id.to_string(),
+                field: field.to_string(),
+            });
+    }
+}
+
+fn validate_resolved_open_closure(
+    location: &DagLocation,
+    slot: &ResolvedSlot,
+    report: &mut DagValidationReport,
+) {
+    if slot.closure == Some(ClosureType::Open) && slot.completeness_assertion.is_none() {
+        report
+            .errors
+            .push(DagError::OpenClosureMissingCompletenessAssertion {
+                location: location.clone(),
+                slot_id: slot.id.clone(),
+            });
+    }
+}
+
+fn validate_resolved_eligibility(
+    location: &DagLocation,
+    slot: &ResolvedSlot,
+    context: &DagValidationContext,
+    report: &mut DagValidationReport,
+) {
+    let Some(EligibilityConstraint::EntityKinds { entity_kinds }) = &slot.eligibility else {
+        return;
+    };
+    if context.known_entity_kinds.is_empty() {
+        return;
+    }
+
+    for entity_kind in entity_kinds {
+        if !context.known_entity_kinds.contains(entity_kind) {
+            report.errors.push(DagError::EligibilityEntityKindUnknown {
+                location: location.clone(),
+                slot_id: slot.id.clone(),
+                entity_kind: entity_kind.clone(),
+            });
+        }
+    }
+}
+
+fn validate_resolved_predicate_vector(
+    location: &DagLocation,
+    slot: &ResolvedSlot,
+    field: &str,
+    predicates: &[String],
+    slot_closures: &HashMap<String, ClosureType>,
+    report: &mut DagValidationReport,
+) {
+    for (idx, predicate) in predicates.iter().enumerate() {
+        validate_resolved_predicate_text(
+            location,
+            slot,
+            field,
+            idx,
+            predicate,
+            slot_closures,
+            report,
+        );
+    }
+}
+
+fn validate_resolved_predicate_text(
+    location: &DagLocation,
+    slot: &ResolvedSlot,
+    field: &str,
+    predicate_index: usize,
+    predicate: &str,
+    slot_closures: &HashMap<String, ClosureType>,
+    report: &mut DagValidationReport,
+) {
+    if predicate.trim().is_empty() {
+        return;
+    }
+    let Ok(parsed) = parse_green_when(predicate) else {
+        return;
+    };
+
+    reject_unbounded_universal_quantifiers(
+        location,
+        slot,
+        field,
+        predicate_index,
+        &parsed,
+        slot_closures,
+        report,
+    );
+}
+
+fn reject_unbounded_universal_quantifiers(
+    location: &DagLocation,
+    slot: &ResolvedSlot,
+    field: &str,
+    predicate_index: usize,
+    predicate: &Predicate,
+    slot_closures: &HashMap<String, ClosureType>,
+    report: &mut DagValidationReport,
+) {
+    match predicate {
+        Predicate::And(items) => {
+            for item in items {
+                reject_unbounded_universal_quantifiers(
+                    location,
+                    slot,
+                    field,
+                    predicate_index,
+                    item,
+                    slot_closures,
+                    report,
+                );
+            }
+        }
+        Predicate::Every { set, condition } => {
+            if let Some(closure @ (ClosureType::ClosedUnbounded | ClosureType::Open)) =
+                slot_closures.get(&set.kind)
+            {
+                report
+                    .errors
+                    .push(DagError::ResolvedClosureUniversalQuantifierInvalid {
+                        location: location.clone(),
+                        slot_id: slot.id.clone(),
+                        field: field.to_string(),
+                        predicate_index,
+                        quantified_slot: set.kind.clone(),
+                        closure: closure.clone(),
+                    });
+            }
+            reject_unbounded_universal_quantifiers(
+                location,
+                slot,
+                field,
+                predicate_index,
+                condition,
+                slot_closures,
+                report,
+            );
+        }
+        Predicate::NoneExists { condition, .. } | Predicate::AtLeastOne { condition, .. } => {
+            reject_unbounded_universal_quantifiers(
+                location,
+                slot,
+                field,
+                predicate_index,
+                condition,
+                slot_closures,
+                report,
+            );
+        }
+        Predicate::Count { condition, .. } => {
+            if let Some(condition) = condition {
+                reject_unbounded_universal_quantifiers(
+                    location,
+                    slot,
+                    field,
+                    predicate_index,
+                    condition,
+                    slot_closures,
+                    report,
+                );
+            }
+        }
+        Predicate::Exists { .. }
+        | Predicate::StateIn { .. }
+        | Predicate::AttrCmp { .. }
+        | Predicate::Obtained { .. } => {}
+    }
+}
+
+fn collect_predicate_entity_refs(predicate: &Predicate, out: &mut HashSet<String>) {
+    match predicate {
+        Predicate::And(items) => {
+            for item in items {
+                collect_predicate_entity_refs(item, out);
+            }
+        }
+        Predicate::Exists { entity }
+        | Predicate::StateIn { entity, .. }
+        | Predicate::AttrCmp { entity, .. }
+        | Predicate::Obtained { entity, .. } => collect_entity_ref(entity, out),
+        Predicate::Every { set, condition }
+        | Predicate::NoneExists { set, condition }
+        | Predicate::AtLeastOne { set, condition } => {
+            collect_entity_set_ref(set, out);
+            collect_predicate_entity_refs(condition, out);
+        }
+        Predicate::Count { set, condition, .. } => {
+            collect_entity_set_ref(set, out);
+            if let Some(condition) = condition {
+                collect_predicate_entity_refs(condition, out);
+            }
+        }
+    }
+}
+
+fn collect_entity_ref(entity: &EntityRef, out: &mut HashSet<String>) {
+    match entity {
+        EntityRef::This => {}
+        EntityRef::Named(kind) | EntityRef::Parent(kind) => {
+            out.insert(kind.clone());
+        }
+        EntityRef::Scoped { kind, .. } => {
+            out.insert(kind.clone());
+        }
+    }
+}
+
+fn collect_entity_set_ref(set: &EntitySetRef, out: &mut HashSet<String>) {
+    out.insert(set.kind.clone());
+}
+
 fn validate_long_lived_suspended_convention(
     workspace: &str,
     dag: &Dag,
@@ -711,6 +1570,235 @@ fn validate_validity_window_expired_state(
                         path: format!("evidence_types[{}]", ev.id),
                     },
                     evidence_type_id: ev.id.clone(),
+                });
+        }
+    }
+}
+
+#[derive(Debug, serde::Deserialize)]
+struct RawConstellationMap {
+    #[serde(default)]
+    constellation: Option<String>,
+    #[serde(default)]
+    slots: BTreeMap<String, RawConstellationSlot>,
+}
+
+#[derive(Debug, Default, serde::Deserialize)]
+struct RawConstellationSlot {
+    #[serde(default)]
+    state_machine: Option<String>,
+    #[serde(default)]
+    closure: Option<serde_yaml::Value>,
+    #[serde(default)]
+    eligibility: Option<serde_yaml::Value>,
+    #[serde(default)]
+    cardinality_max: Option<serde_yaml::Value>,
+    #[serde(default)]
+    entry_state: Option<serde_yaml::Value>,
+    #[serde(default)]
+    attachment_predicates: Vec<String>,
+    #[serde(default)]
+    addition_predicates: Vec<String>,
+    #[serde(default)]
+    aggregate_breach_checks: Vec<String>,
+    #[serde(default, rename = "+attachment_predicates")]
+    additive_attachment_predicates: Vec<String>,
+    #[serde(default, rename = "+addition_predicates")]
+    additive_addition_predicates: Vec<String>,
+    #[serde(default, rename = "+aggregate_breach_checks")]
+    additive_aggregate_breach_checks: Vec<String>,
+    #[serde(default)]
+    role_guard: Option<serde_yaml::Value>,
+    #[serde(default)]
+    justification_required: Option<serde_yaml::Value>,
+    #[serde(default)]
+    audit_class: Option<serde_yaml::Value>,
+    #[serde(default)]
+    completeness_assertion: Option<serde_yaml::Value>,
+}
+
+fn validate_raw_constellation_map_schema_coordination(
+    loaded: &BTreeMap<String, LoadedDag>,
+    source_name: &str,
+    map: &RawConstellationMap,
+    report: &mut DagValidationReport,
+) {
+    let constellation = map
+        .constellation
+        .as_deref()
+        .unwrap_or("<unknown-constellation>");
+    for (slot_id, slot) in &map.slots {
+        let location = DagLocation {
+            workspace: constellation.to_string(),
+            path: format!("{source_name}:slots.{slot_id}"),
+        };
+
+        validate_constellation_gate_predicate_vector(
+            &location,
+            slot_id,
+            "attachment_predicates",
+            &slot.attachment_predicates,
+            report,
+        );
+        validate_constellation_gate_predicate_vector(
+            &location,
+            slot_id,
+            "addition_predicates",
+            &slot.addition_predicates,
+            report,
+        );
+        validate_constellation_gate_predicate_vector(
+            &location,
+            slot_id,
+            "aggregate_breach_checks",
+            &slot.aggregate_breach_checks,
+            report,
+        );
+        reject_additive_predicate_vector(
+            &location,
+            slot_id,
+            "+attachment_predicates",
+            &slot.additive_attachment_predicates,
+            report,
+        );
+        reject_additive_predicate_vector(
+            &location,
+            slot_id,
+            "+addition_predicates",
+            &slot.additive_addition_predicates,
+            report,
+        );
+        reject_additive_predicate_vector(
+            &location,
+            slot_id,
+            "+aggregate_breach_checks",
+            &slot.additive_aggregate_breach_checks,
+            report,
+        );
+
+        for (dag_workspace, ld) in loaded {
+            let Some(dag_slot) = ld.dag.slots.iter().find(|dag_slot| dag_slot.id == *slot_id)
+            else {
+                continue;
+            };
+            warn_gate_field_drift(&location, slot_id, dag_workspace, dag_slot, slot, report);
+            warn_state_machine_mismatch(&location, slot_id, dag_workspace, dag_slot, slot, report);
+        }
+    }
+}
+
+fn validate_constellation_gate_predicate_vector(
+    location: &DagLocation,
+    slot_id: &str,
+    field: &str,
+    predicates: &[String],
+    report: &mut DagValidationReport,
+) {
+    validate_gate_predicate_vector(location, slot_id, field, predicates, report);
+}
+
+fn warn_state_machine_mismatch(
+    location: &DagLocation,
+    slot_id: &str,
+    dag_workspace: &str,
+    dag_slot: &Slot,
+    constellation_slot: &RawConstellationSlot,
+    report: &mut DagValidationReport,
+) {
+    let Some(constellation_state_machine) = &constellation_slot.state_machine else {
+        return;
+    };
+    let Some(SlotStateMachine::Structured(dag_state_machine)) = &dag_slot.state_machine else {
+        return;
+    };
+    if dag_state_machine.id != *constellation_state_machine {
+        report
+            .warnings
+            .push(DagWarning::SchemaCoordinationStateMachineMismatch {
+                location: location.clone(),
+                slot_id: slot_id.to_string(),
+                dag_workspace: dag_workspace.to_string(),
+                dag_state_machine: dag_state_machine.id.clone(),
+                constellation_state_machine: constellation_state_machine.clone(),
+            });
+    }
+}
+
+fn warn_gate_field_drift(
+    location: &DagLocation,
+    slot_id: &str,
+    dag_workspace: &str,
+    dag_slot: &Slot,
+    constellation_slot: &RawConstellationSlot,
+    report: &mut DagValidationReport,
+) {
+    let checks = [
+        (
+            "closure",
+            dag_slot.closure.is_some(),
+            constellation_slot.closure.is_some(),
+        ),
+        (
+            "eligibility",
+            dag_slot.eligibility.is_some(),
+            constellation_slot.eligibility.is_some(),
+        ),
+        (
+            "cardinality_max",
+            dag_slot.cardinality_max.is_some(),
+            constellation_slot.cardinality_max.is_some(),
+        ),
+        (
+            "entry_state",
+            dag_slot.entry_state.is_some(),
+            constellation_slot.entry_state.is_some(),
+        ),
+        (
+            "attachment_predicates",
+            !dag_slot.attachment_predicates.is_empty(),
+            !constellation_slot.attachment_predicates.is_empty(),
+        ),
+        (
+            "addition_predicates",
+            !dag_slot.addition_predicates.is_empty(),
+            !constellation_slot.addition_predicates.is_empty(),
+        ),
+        (
+            "aggregate_breach_checks",
+            !dag_slot.aggregate_breach_checks.is_empty(),
+            !constellation_slot.aggregate_breach_checks.is_empty(),
+        ),
+        (
+            "role_guard",
+            dag_slot.role_guard.is_some(),
+            constellation_slot.role_guard.is_some(),
+        ),
+        (
+            "justification_required",
+            dag_slot.justification_required.is_some(),
+            constellation_slot.justification_required.is_some(),
+        ),
+        (
+            "audit_class",
+            dag_slot.audit_class.is_some(),
+            constellation_slot.audit_class.is_some(),
+        ),
+        (
+            "completeness_assertion",
+            dag_slot.completeness_assertion.is_some(),
+            constellation_slot.completeness_assertion.is_some(),
+        ),
+    ];
+
+    for (field, dag_sets_field, constellation_sets_field) in checks {
+        if dag_sets_field && constellation_sets_field {
+            report
+                .warnings
+                .push(DagWarning::SchemaCoordinationSlotFieldDrift {
+                    location: location.clone(),
+                    slot_id: slot_id.to_string(),
+                    field: field.to_string(),
+                    dag_workspace: dag_workspace.to_string(),
                 });
         }
     }
@@ -1026,6 +2114,91 @@ slots:
             .errors
             .iter()
             .any(|e| matches!(e, DagError::CategoryGatedMutuallyExclusiveGates { .. })));
+    }
+
+    #[test]
+    fn malformed_green_when_errors() {
+        let dag = ws_dag(
+            r#"
+workspace: demo
+dag_id: demo
+slots:
+  - id: widget
+    stateless: false
+    state_machine:
+      id: widget_lifecycle
+      states:
+        - id: DRAFT
+          entry: true
+        - id: APPROVED
+          green_when: "every required"
+"#,
+        );
+        let mut map = BTreeMap::new();
+        map.insert("demo".to_string(), dag);
+        let report = validate_dags(&map);
+        assert!(report
+            .errors
+            .iter()
+            .any(|e| matches!(e, DagError::GreenWhenParseError { .. })));
+    }
+
+    #[test]
+    fn green_when_unbound_entity_errors() {
+        let dag = ws_dag(
+            r#"
+workspace: demo
+dag_id: demo
+slots:
+  - id: widget
+    stateless: false
+    state_machine:
+      id: widget_lifecycle
+      states:
+        - id: DRAFT
+          entry: true
+        - id: APPROVED
+          green_when: "review exists AND review.state = COMPLETE"
+"#,
+        );
+        let mut map = BTreeMap::new();
+        map.insert("demo".to_string(), dag);
+        let report = validate_dags(&map);
+        assert!(report
+            .errors
+            .iter()
+            .any(|e| matches!(e, DagError::GreenWhenUnboundEntity { entity_kind, .. } if entity_kind == "review")));
+    }
+
+    #[test]
+    fn green_when_bound_entity_is_clean() {
+        let dag = ws_dag(
+            r#"
+workspace: demo
+dag_id: demo
+slots:
+  - id: widget
+    stateless: false
+    state_machine:
+      id: widget_lifecycle
+      predicate_bindings:
+        - entity: review
+          source_kind: dag_entity
+      states:
+        - id: DRAFT
+          entry: true
+        - id: APPROVED
+          green_when: "review exists AND review.state = COMPLETE"
+"#,
+        );
+        let mut map = BTreeMap::new();
+        map.insert("demo".to_string(), dag);
+        let report = validate_dags(&map);
+        assert!(
+            report.errors.is_empty(),
+            "expected no validation errors, got {:#?}",
+            report.errors
+        );
     }
 
     #[test]

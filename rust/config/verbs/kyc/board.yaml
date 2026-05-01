@@ -7,6 +7,7 @@ domains:
 
     verbs:
       appoint:
+        flavour: attribute_mutating
         description: Appoint a person to a board position
         metadata:
           tier: intent
@@ -133,6 +134,7 @@ domains:
             baseline: reviewable
 
       resign:
+        flavour: attribute_mutating
         description: Record resignation/removal from board
         metadata:
           tier: intent
@@ -182,6 +184,7 @@ domains:
             baseline: reviewable
 
       list-by-entity:
+        flavour: attribute_mutating
         description: List current board composition for an entity
         metadata:
           tier: reference
@@ -230,6 +233,7 @@ domains:
             baseline: benign
 
       list-by-person:
+        flavour: attribute_mutating
         description: List all board positions held by a person
         metadata:
           tier: reference
@@ -278,6 +282,7 @@ domains:
             baseline: benign
 
       grant-appointment-right:
+        flavour: attribute_mutating
         description: Record an appointment right from SHA/articles
         metadata:
           tier: intent
@@ -409,6 +414,10 @@ domains:
             baseline: reviewable
 
       revoke-appointment-right:
+        flavour: discretionary
+        role_guard:
+          any_of: [compliance_admin, senior_compliance, mlro]
+        audit_class: board_revoke_appointment_right
         description: Revoke an appointment right
         metadata:
           tier: intent
@@ -458,6 +467,7 @@ domains:
             baseline: reviewable
 
       list-appointment-rights:
+        flavour: attribute_mutating
         description: List who has appointment rights over an entity's board
         metadata:
           tier: reference
@@ -506,6 +516,7 @@ domains:
             baseline: benign
 
       list-rights-held:
+        flavour: attribute_mutating
         description: List appointment rights held by an entity
         metadata:
           tier: reference
@@ -554,6 +565,7 @@ domains:
             baseline: benign
 
       analyze-control:
+        flavour: attribute_mutating
         description: |
           Analyze board control - who controls the board through:
           - Majority of appointments

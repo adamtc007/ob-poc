@@ -11,6 +11,7 @@ domains:
 
     verbs:
       create:
+        flavour: instance_adding
         description: "Create a new booking principal (legal entity + booking location envelope)"
         behavior: plugin
         lifecycle:
@@ -69,6 +70,7 @@ domains:
             baseline: reviewable
 
       update:
+        flavour: attribute_mutating
         description: "Update a booking principal's fields"
         behavior: plugin
         metadata:
@@ -106,6 +108,7 @@ domains:
             baseline: reviewable
 
       retire:
+        flavour: attribute_mutating
         description: "Retire a booking principal (checks active relationships first)"
         behavior: plugin
         metadata:
@@ -139,6 +142,7 @@ domains:
             baseline: requires_confirmation
 
       evaluate:
+        flavour: attribute_mutating
         description: "Run full eligibility evaluation — snapshot client profile, gather rules, merge by boundary, check delivery, pin audit record"
         behavior: plugin
         lifecycle:
@@ -205,6 +209,7 @@ domains:
             baseline: reviewable
 
       select:
+        flavour: attribute_mutating
         description: "Record selection of a principal from an evaluation"
         behavior: plugin
         lifecycle:
@@ -242,6 +247,7 @@ domains:
             baseline: reviewable
 
       explain:
+        flavour: attribute_mutating
         description: "Retrieve full explain payload and audit trail for an evaluation"
         behavior: plugin
         metadata:
@@ -279,6 +285,7 @@ domains:
             baseline: benign
 
       coverage-matrix:
+        flavour: attribute_mutating
         description: "Generate coverage matrix showing principal × jurisdiction × service availability"
         behavior: plugin
         metadata:
@@ -311,6 +318,7 @@ domains:
             baseline: benign
 
       gap-report:
+        flavour: attribute_mutating
         description: "Generate gap report across regulatory, commercial, and operational boundaries"
         behavior: plugin
         metadata:
@@ -335,6 +343,7 @@ domains:
             baseline: benign
 
       impact-analysis:
+        flavour: attribute_mutating
         description: "Analyse impact of retiring a booking principal on active client relationships"
         behavior: plugin
         metadata:

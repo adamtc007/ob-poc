@@ -24,6 +24,7 @@ domains:
       # Object Description
       # ============================================
       describe-object:
+        flavour: attribute_mutating
         description: Describe a registered object by FQN (attribute, verb, entity type, policy, view)
         metadata:
           tier: diagnostics
@@ -66,6 +67,7 @@ domains:
       # Search & List
       # ============================================
       search:
+        flavour: attribute_mutating
         description: Search registry objects by keyword or pattern
         metadata:
           tier: diagnostics
@@ -109,6 +111,7 @@ domains:
             baseline: benign
 
       list-objects:
+        flavour: attribute_mutating
         description: List registered objects by type with optional filters
         metadata:
           tier: diagnostics
@@ -150,6 +153,7 @@ domains:
       # Context Resolution
       # ============================================
       resolve-context:
+        flavour: attribute_mutating
         description: Resolve full context for a subject (verbs, attributes, policies, governance signals)
         metadata:
           tier: intent
@@ -196,6 +200,7 @@ domains:
       # Verb Surface & Producers
       # ============================================
       verb-surface:
+        flavour: attribute_mutating
         description: Get the verb surface for a view or entity type
         metadata:
           tier: diagnostics
@@ -233,6 +238,7 @@ domains:
             baseline: reviewable
 
       attribute-producers:
+        flavour: attribute_mutating
         description: Find which verbs produce a given attribute
         metadata:
           tier: diagnostics
@@ -269,6 +275,7 @@ domains:
       # Lineage & Tracing
       # ============================================
       lineage:
+        flavour: attribute_mutating
         description: Trace lineage for an object (forward impact or reverse provenance)
         metadata:
           tier: diagnostics
@@ -308,6 +315,7 @@ domains:
             baseline: reviewable
 
       regulation-trace:
+        flavour: attribute_mutating
         description: Trace regulatory requirements for an object
         metadata:
           tier: diagnostics
@@ -344,6 +352,7 @@ domains:
       # Taxonomy Navigation
       # ============================================
       taxonomy-tree:
+        flavour: attribute_mutating
         description: Get taxonomy tree structure
         metadata:
           tier: diagnostics
@@ -382,6 +391,7 @@ domains:
             baseline: reviewable
 
       taxonomy-members:
+        flavour: attribute_mutating
         description: List members of a taxonomy node
         metadata:
           tier: diagnostics
@@ -419,6 +429,7 @@ domains:
             baseline: reviewable
 
       classify:
+        flavour: attribute_mutating
         description: Classify an object against a taxonomy
         metadata:
           tier: diagnostics
@@ -459,6 +470,7 @@ domains:
       # View Operations
       # ============================================
       describe-view:
+        flavour: attribute_mutating
         description: Describe a view definition (verb surface + attribute prominence)
         metadata:
           tier: diagnostics
@@ -492,6 +504,7 @@ domains:
             baseline: benign
 
       apply-view:
+        flavour: attribute_mutating
         description: Apply a view to filter and rank verbs/attributes for a subject
         metadata:
           tier: intent
@@ -532,6 +545,7 @@ domains:
       # Policy Description
       # ============================================
       describe-policy:
+        flavour: attribute_mutating
         description: Describe a policy rule definition
         metadata:
           tier: diagnostics
@@ -568,6 +582,7 @@ domains:
       # Coverage & Evidence
       # ============================================
       coverage-report:
+        flavour: attribute_mutating
         description: Generate coverage report for registry (tier distribution, completeness)
         metadata:
           tier: diagnostics
@@ -602,6 +617,7 @@ domains:
             baseline: reviewable
 
       evidence-freshness:
+        flavour: attribute_mutating
         description: Check evidence freshness for registered objects
         metadata:
           tier: diagnostics
@@ -640,6 +656,7 @@ domains:
             baseline: reviewable
 
       evidence-gaps:
+        flavour: attribute_mutating
         description: Identify evidence gaps in the registry
         metadata:
           tier: diagnostics
@@ -676,6 +693,7 @@ domains:
       # History & Diff
       # ============================================
       snapshot-history:
+        flavour: attribute_mutating
         description: Get snapshot history for an object (all versions over time)
         metadata:
           tier: diagnostics
@@ -718,6 +736,7 @@ domains:
             baseline: benign
 
       snapshot-diff:
+        flavour: attribute_mutating
         description: Diff two snapshots of the same object
         metadata:
           tier: diagnostics
@@ -758,6 +777,7 @@ domains:
       # Active Manifest
       # ============================================
       active-manifest:
+        flavour: attribute_mutating
         description: Get the active snapshot set manifest
         metadata:
           tier: diagnostics
@@ -790,6 +810,7 @@ domains:
       # Affinity Navigation
       # ============================================
       verbs-for-table:
+        flavour: attribute_mutating
         description: Find all verbs that read, write, or reference a database table
         metadata:
           tier: intent
@@ -839,6 +860,7 @@ domains:
             baseline: reviewable
 
       verbs-for-attribute:
+        flavour: attribute_mutating
         description: Find all verbs that produce or consume a given attribute
         metadata:
           tier: intent
@@ -883,6 +905,7 @@ domains:
             baseline: reviewable
 
       data-for-verb:
+        flavour: attribute_mutating
         description: Find all data assets a verb touches (tables, columns, attributes, entities)
         metadata:
           tier: intent
@@ -928,6 +951,7 @@ domains:
             baseline: reviewable
 
       adjacent-verbs:
+        flavour: attribute_mutating
         description: Find verbs sharing data dependencies with a given verb
         metadata:
           tier: intent
@@ -973,6 +997,7 @@ domains:
             baseline: reviewable
 
       governance-gaps:
+        flavour: attribute_mutating
         description: Identify ungoverned tables, orphan verbs, and attribute coverage gaps
         metadata:
           tier: intent
@@ -1018,6 +1043,7 @@ domains:
             baseline: reviewable
 
       discover-dsl:
+        flavour: attribute_mutating
         description: Discover a DSL chain from an utterance using affinity graph (Phase 2 stub)
         metadata:
           tier: intent

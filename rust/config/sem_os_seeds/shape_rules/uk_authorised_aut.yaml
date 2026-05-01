@@ -1,0 +1,12 @@
+shape: struct.uk.authorised.aut
+workspace: cbu
+extends: [regulated.fund]
+structural_facts:
+  jurisdiction: UK
+  structure_type: uk-authorised
+  allowed_structure_types: [aut, uk-authorised]
+  document_bundles: [docs.bundle.uk-authorised-baseline]
+  trading_profile_type: uk-authorised
+  required_roles: [authorised-fund-manager, trustee]
+  optional_roles: [investment-manager, administrator, auditor]
+slots: {}

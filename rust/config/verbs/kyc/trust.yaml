@@ -7,6 +7,7 @@ domains:
 
     verbs:
       record-provision:
+        flavour: attribute_mutating
         description: Record a provision from the trust deed affecting control or benefit
         metadata:
           tier: intent
@@ -147,6 +148,7 @@ domains:
             baseline: reviewable
 
       update-provision:
+        flavour: attribute_mutating
         description: Update an existing trust provision
         metadata:
           tier: intent
@@ -210,6 +212,7 @@ domains:
             baseline: reviewable
 
       end-provision:
+        flavour: attribute_mutating
         description: End/revoke a trust provision
         metadata:
           tier: intent
@@ -254,6 +257,7 @@ domains:
             baseline: reviewable
 
       list-provisions:
+        flavour: attribute_mutating
         description: List all provisions for a trust
         metadata:
           tier: reference
@@ -304,6 +308,7 @@ domains:
             baseline: benign
 
       list-by-holder:
+        flavour: attribute_mutating
         description: List all trust provisions held by an entity
         metadata:
           tier: reference
@@ -351,6 +356,7 @@ domains:
             baseline: benign
 
       analyze-control:
+        flavour: attribute_mutating
         description: |
           Analyze trust control vectors:
           - Trustee with absolute discretion = control
@@ -408,6 +414,7 @@ domains:
             baseline: benign
 
       identify-ubos:
+        flavour: attribute_mutating
         description: |
           Identify UBOs from trust structure:
             - Fixed interest beneficiaries >= 25%
@@ -463,6 +470,7 @@ domains:
             baseline: reviewable
 
       classify:
+        flavour: attribute_mutating
         description: |
           Classify trust type based on provisions:
             - DISCRETIONARY: Trustee has absolute discretion over distributions

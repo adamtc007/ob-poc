@@ -9,6 +9,7 @@ domains:
       - portfolio
     verbs:
       create:
+        flavour: instance_adding
         description: Create a new Client Business Unit (idempotent by fund-entity-id if provided)
         invocation_phrases:
           - "create CBU"
@@ -133,6 +134,7 @@ domains:
           consequence:
             baseline: reviewable
       read:
+        flavour: attribute_mutating
         description: Read a CBU by ID
         invocation_phrases:
           - "read CBU"
@@ -178,6 +180,7 @@ domains:
           consequence:
             baseline: benign
       rename:
+        flavour: attribute_mutating
         description: Rename a CBU
         invocation_phrases:
           - "rename CBU"
@@ -227,6 +230,7 @@ domains:
             baseline: reviewable
 
       update:
+        flavour: attribute_mutating
         description: Update ad hoc CBU attributes
         invocation_phrases:
           - "update CBU"
@@ -271,6 +275,7 @@ domains:
             baseline: reviewable
 
       set-jurisdiction:
+        flavour: attribute_mutating
         description: Set CBU jurisdiction
         invocation_phrases:
           - "set CBU jurisdiction"
@@ -324,6 +329,7 @@ domains:
             baseline: reviewable
 
       set-client-type:
+        flavour: attribute_mutating
         description: Set CBU client type
         invocation_phrases:
           - "set CBU client type"
@@ -370,6 +376,7 @@ domains:
             baseline: reviewable
 
       set-commercial-client:
+        flavour: attribute_mutating
         description: Set commercial client entity for a CBU
         invocation_phrases:
           - "set commercial client"
@@ -420,6 +427,10 @@ domains:
           consequence:
             baseline: reviewable
       delete:
+        flavour: discretionary
+        role_guard:
+          any_of: [compliance_admin, senior_compliance, mlro]
+        audit_class: cbu_delete
         description: Delete a CBU (fails if has dependencies - use delete-cascade for full cleanup)
         invocation_phrases:
           - "delete CBU"
@@ -466,6 +477,10 @@ domains:
             baseline: requires_explicit_authorisation
 
       delete-cascade:
+        flavour: discretionary
+        role_guard:
+          any_of: [compliance_admin, senior_compliance, mlro]
+        audit_class: cbu_delete_cascade
         description: Delete a CBU and all related data (entities, roles, documents, etc.)
         invocation_phrases:
           - "delete CBU and all dependencies"
@@ -518,6 +533,7 @@ domains:
           consequence:
             baseline: requires_explicit_authorisation
       list:
+        flavour: attribute_mutating
         description: List CBUs with optional filters
         invocation_phrases:
           - "list CBUs"
@@ -583,6 +599,7 @@ domains:
           consequence:
             baseline: benign
       ensure:
+        flavour: instance_adding
         description: Create or update a CBU by natural key
         invocation_phrases:
           - "ensure CBU exists"
@@ -662,6 +679,7 @@ domains:
           consequence:
             baseline: reviewable
       submit-for-validation:
+        flavour: attribute_mutating
         description: Move a CBU into validation review
         invocation_phrases:
           - "submit CBU for validation"
@@ -716,6 +734,7 @@ domains:
           target_workspace: cbu
           target_slot: cbu
       assign-role:
+        flavour: instance_adding
         description: Assign a role to an entity within a CBU
         invocation_phrases:
           - "assign role to entity"
@@ -813,6 +832,7 @@ domains:
           consequence:
             baseline: reviewable
       link-structure:
+        flavour: instance_adding
         description: Persist a parent-child structure link between two CBUs
         invocation_phrases:
           - "link CBU structure"
@@ -876,6 +896,7 @@ domains:
           consequence:
             baseline: reviewable
       list-structure-links:
+        flavour: attribute_mutating
         description: List persisted structure links for a parent or child CBU
         invocation_phrases:
           - "list CBU structure links"
@@ -937,6 +958,7 @@ domains:
           consequence:
             baseline: benign
       unlink-structure:
+        flavour: attribute_mutating
         description: Terminate an active parent-child structure link between two CBUs
         invocation_phrases:
           - "unlink CBU structure"
@@ -968,6 +990,7 @@ domains:
           consequence:
             baseline: requires_confirmation
       remove-role:
+        flavour: attribute_mutating
         description: Remove a specific role from an entity within a CBU
         invocation_phrases:
           - "remove role from CBU"
@@ -1030,6 +1053,7 @@ domains:
           consequence:
             baseline: requires_confirmation
       parties:
+        flavour: attribute_mutating
         description: List all parties (entities with their roles) for a CBU
         invocation_phrases:
           - "show parties in CBU"
@@ -1078,6 +1102,7 @@ domains:
           consequence:
             baseline: benign
       set-category:
+        flavour: attribute_mutating
         description: Set CBU relationship category (FUND_MANDATE, CORPORATE_GROUP, etc.)
         invocation_phrases:
           - "set CBU category"
@@ -1136,6 +1161,7 @@ domains:
           consequence:
             baseline: reviewable
       inspect:
+        flavour: attribute_mutating
         description: Inspect full CBU structure including entities, roles, documents, screenings
         invocation_phrases:
           - "inspect CBU"
@@ -1189,6 +1215,7 @@ domains:
             baseline: benign
 
       add-product:
+        flavour: instance_adding
         description: Add a product to a CBU (creates service_delivery_map entries for all services)
         invocation_phrases:
           - "add product to CBU"
@@ -1252,6 +1279,7 @@ domains:
             baseline: reviewable
 
       remove-product:
+        flavour: attribute_mutating
         description: Remove a product from a CBU (deletes service_delivery_map entries)
         invocation_phrases:
           - "remove product from CBU"
@@ -1309,6 +1337,7 @@ domains:
             baseline: requires_confirmation
 
       list-subscriptions:
+        flavour: attribute_mutating
         description: List products currently subscribed on a CBU.
         invocation_phrases:
           - "what products is cbu subscribed to"
@@ -1352,6 +1381,10 @@ domains:
             baseline: benign
 
       decide:
+        flavour: discretionary
+        role_guard:
+          any_of: [compliance_officer, senior_compliance, mlro]
+        audit_class: cbu_decide
         description: Record KYC/AML decision for CBU collective state (entities, UBOs, documents)
         invocation_phrases:
           - "record KYC decision"
@@ -1444,6 +1477,7 @@ domains:
           target_workspace: cbu
           target_slot: cbu
       request-proof-update:
+        flavour: attribute_mutating
         description: Mark a validated CBU as requiring updated proof
         invocation_phrases:
           - "request proof update"
@@ -1496,6 +1530,7 @@ domains:
           target_workspace: cbu
           target_slot: cbu
       reopen-validation:
+        flavour: attribute_mutating
         description: Reopen validation for a CBU that previously failed
         invocation_phrases:
           - "reopen validation"
@@ -1548,6 +1583,7 @@ domains:
           target_workspace: cbu
           target_slot: cbu
       attach-evidence:
+        flavour: instance_adding
         description: Attach evidence (document or attestation) to CBU
         invocation_phrases:
           - "attach evidence to CBU"
@@ -1631,6 +1667,7 @@ domains:
           consequence:
             baseline: reviewable
       verify-evidence:
+        flavour: attribute_mutating
         description: Mark evidence as verified or rejected
         invocation_phrases:
           - "verify CBU evidence"
@@ -1692,6 +1729,7 @@ domains:
           target_workspace: cbu
           target_slot: cbu_evidence
       list-evidence:
+        flavour: attribute_mutating
         description: List evidence for a CBU
         invocation_phrases:
           - "list CBU evidence"
@@ -1746,6 +1784,7 @@ domains:
 
       # BULK CBU CREATION FROM CLIENT GROUP (DSL GENERATOR / MACRO)
       create-from-client-group:
+        flavour: instance_adding
         description: Generate DSL batch to create CBUs from client group entities (stages in runbook)
         invocation_phrases:
           - "create CBUs from client group"
@@ -1841,6 +1880,10 @@ domains:
             baseline: reviewable
 
       suspend:
+        flavour: discretionary
+        role_guard:
+          any_of: [compliance_officer, senior_compliance, mlro]
+        audit_class: cbu_suspend
         description: "Suspend CBU operational lifecycle (operational hold — regulatory, dispute, client distress)"
         behavior: plugin
         metadata:
@@ -1881,6 +1924,7 @@ domains:
           target_slot: cbu
 
       reinstate:
+        flavour: attribute_mutating
         description: "Reinstate suspended CBU back to operationally active"
         behavior: plugin
         metadata:
@@ -1916,6 +1960,7 @@ domains:
           target_slot: cbu
 
       restrict:
+        flavour: attribute_mutating
         description: "Apply partial trading restriction to CBU (specific markets / instruments pulled)"
         behavior: plugin
         metadata:
@@ -1955,6 +2000,7 @@ domains:
           target_slot: cbu
 
       unrestrict:
+        flavour: attribute_mutating
         description: "Lift trading restriction from CBU (restore full mandate scope)"
         behavior: plugin
         metadata:
@@ -1989,6 +2035,10 @@ domains:
           target_slot: cbu
 
       begin-winding-down:
+        flavour: discretionary
+        role_guard:
+          any_of: [compliance_admin, senior_compliance, mlro]
+        audit_class: cbu_begin_winding_down
         description: "Begin CBU winding-down — exit intent, no new activity, unwind positions"
         behavior: plugin
         metadata:
@@ -2028,6 +2078,10 @@ domains:
           target_slot: cbu
 
       complete-offboard:
+        flavour: discretionary
+        role_guard:
+          any_of: [compliance_admin, senior_compliance, mlro]
+        audit_class: cbu_complete_offboard
         description: "Complete CBU offboarding — terminal-positive transition to offboarded state"
         behavior: plugin
         metadata:
@@ -2062,6 +2116,7 @@ domains:
           target_slot: cbu
 
       soft-delete:
+        flavour: attribute_mutating
         description: "Soft-delete CBU (disposition: sets deleted_at; restorable)"
         behavior: plugin
         metadata:
@@ -2100,6 +2155,7 @@ domains:
           target_slot: cbu_disposition
 
       restore:
+        flavour: attribute_mutating
         description: "Restore soft-deleted CBU back to active disposition"
         behavior: plugin
         metadata:
@@ -2134,6 +2190,10 @@ domains:
           target_slot: cbu_disposition
 
       hard-delete:
+        flavour: discretionary
+        role_guard:
+          any_of: [compliance_admin, senior_compliance, mlro]
+        audit_class: cbu_hard_delete
         description: "Permanently remove CBU row (terminal; regulatory retention window required)"
         behavior: plugin
         metadata:
@@ -2167,6 +2227,7 @@ domains:
           target_slot: cbu_disposition
 
       flag-for-remediation:
+        flavour: attribute_mutating
         description: "Flag CBU for post-breach remediation / enhanced monitoring"
         behavior: plugin
         metadata:
@@ -2205,6 +2266,7 @@ domains:
           target_slot: cbu_disposition
 
       clear-remediation:
+        flavour: attribute_mutating
         description: "Clear remediation flag from CBU (remediation conditions satisfied)"
         behavior: plugin
         metadata:

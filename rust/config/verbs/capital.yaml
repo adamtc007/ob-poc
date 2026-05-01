@@ -14,6 +14,7 @@ domains:
       # --------------------------------------------------------------------------
 
       share-class.create:
+        flavour: attribute_mutating
         description: Create a new share class for an issuer
         invocation_phrases:
           - "create share class"
@@ -109,6 +110,7 @@ domains:
           consequence:
             baseline: requires_confirmation
       share-class.add-identifier:
+        flavour: instance_adding
         description: Add an identifier (ISIN, SEDOL, etc.) to a share class
         invocation_phrases:
           - "add share class identifier"
@@ -177,6 +179,7 @@ domains:
           consequence:
             baseline: reviewable
       share-class.list:
+        flavour: attribute_mutating
         description: List share classes for an issuer
         invocation_phrases:
           - "show share classes"
@@ -218,6 +221,7 @@ domains:
           consequence:
             baseline: benign
       share-class.get-supply:
+        flavour: attribute_mutating
         description: Get current supply state for a share class
         invocation_phrases:
           - "get share supply"
@@ -262,6 +266,7 @@ domains:
           consequence:
             baseline: benign
       issue.initial:
+        flavour: attribute_mutating
         description: Initial issuance of shares (incorporation/fund launch)
         invocation_phrases:
           - "initial share issuance"
@@ -314,6 +319,7 @@ domains:
           consequence:
             baseline: requires_confirmation
       issue.new:
+        flavour: attribute_mutating
         description: Subsequent issuance (capital raise)
         invocation_phrases:
           - "secondary issuance"
@@ -368,6 +374,7 @@ domains:
           consequence:
             baseline: requires_confirmation
       split:
+        flavour: attribute_mutating
         description: Stock split (e.g., 2:1 doubles shares)
         invocation_phrases:
           - "stock split"
@@ -421,6 +428,7 @@ domains:
           consequence:
             baseline: requires_confirmation
       buyback:
+        flavour: attribute_mutating
         description: Share buyback into treasury
         invocation_phrases:
           - "share buyback"
@@ -473,6 +481,7 @@ domains:
           consequence:
             baseline: requires_confirmation
       cancel:
+        flavour: attribute_mutating
         description: Permanent share cancellation
         invocation_phrases:
           - "cancel shares"
@@ -525,6 +534,7 @@ domains:
           consequence:
             baseline: requires_confirmation
       dilution.grant-options:
+        flavour: attribute_mutating
         description: Grant stock options to a holder
         invocation_phrases:
           - "grant stock options"
@@ -611,6 +621,7 @@ domains:
           consequence:
             baseline: requires_confirmation
       dilution.issue-warrant:
+        flavour: attribute_mutating
         description: Issue warrants to an investor
         invocation_phrases:
           - "issue warrant"
@@ -680,6 +691,7 @@ domains:
           consequence:
             baseline: requires_confirmation
       dilution.create-safe:
+        flavour: attribute_mutating
         description: Create a SAFE (Simple Agreement for Future Equity)
         invocation_phrases:
           - "create SAFE"
@@ -748,6 +760,7 @@ domains:
           consequence:
             baseline: requires_confirmation
       dilution.create-convertible-note:
+        flavour: attribute_mutating
         description: Create a convertible note
         invocation_phrases:
           - "create convertible note"
@@ -817,6 +830,7 @@ domains:
           consequence:
             baseline: requires_confirmation
       dilution.exercise:
+        flavour: attribute_mutating
         description: Exercise options/warrants and convert to shares
         invocation_phrases:
           - "exercise options"
@@ -868,6 +882,7 @@ domains:
           consequence:
             baseline: requires_confirmation
       dilution.forfeit:
+        flavour: attribute_mutating
         description: Forfeit/cancel unvested or unexercised instruments
         invocation_phrases:
           - "forfeit options"
@@ -909,6 +924,7 @@ domains:
           consequence:
             baseline: requires_confirmation
       dilution.list:
+        flavour: attribute_mutating
         description: List dilution instruments for an issuer
         invocation_phrases:
           - "list dilution instruments"
@@ -969,6 +985,7 @@ domains:
           consequence:
             baseline: benign
       dilution.get-summary:
+        flavour: attribute_mutating
         description: Get dilution summary for an issuer
         invocation_phrases:
           - "dilution summary"
@@ -1013,6 +1030,7 @@ domains:
           consequence:
             baseline: benign
       control-config.set:
+        flavour: attribute_mutating
         description: Set control thresholds for an issuer
         invocation_phrases:
           - "set control configuration"
@@ -1108,6 +1126,7 @@ domains:
           consequence:
             baseline: reviewable
       control-config.get:
+        flavour: attribute_mutating
         description: Get control configuration for an issuer
         invocation_phrases:
           - "get control configuration"
@@ -1153,6 +1172,7 @@ domains:
           consequence:
             baseline: benign
       cap-table:
+        flavour: attribute_mutating
         description: Get full cap table for an issuer
         invocation_phrases:
           - "show cap table"
@@ -1215,6 +1235,7 @@ domains:
           consequence:
             baseline: benign
       holders:
+        flavour: attribute_mutating
         description: List all holders for an issuer with ownership percentages
         invocation_phrases:
           - "list shareholders"

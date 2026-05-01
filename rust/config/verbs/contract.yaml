@@ -14,6 +14,7 @@ domains:
       # =========================================================================
 
       create:
+        flavour: instance_adding
         description: "Create a new legal contract for a client"
         behavior: crud
         crud:
@@ -80,6 +81,7 @@ domains:
           consequence:
             baseline: reviewable
       get:
+        flavour: attribute_mutating
         description: "Get contract details by ID"
         behavior: crud
         crud:
@@ -118,6 +120,7 @@ domains:
           consequence:
             baseline: benign
       list:
+        flavour: attribute_mutating
         description: "List contracts, optionally filtered by client"
         behavior: crud
         crud:
@@ -162,6 +165,7 @@ domains:
           consequence:
             baseline: benign
       update:
+        flavour: attribute_mutating
         description: "Update contract details"
         behavior: crud
         crud:
@@ -205,6 +209,10 @@ domains:
           consequence:
             baseline: reviewable
       terminate:
+        flavour: discretionary
+        role_guard:
+          any_of: [compliance_officer, senior_compliance, mlro]
+        audit_class: contract_terminate
         description: "Terminate a contract"
         behavior: crud
         crud:
@@ -254,6 +262,7 @@ domains:
           consequence:
             baseline: requires_confirmation
       add-product:
+        flavour: instance_adding
         description: "Add a product to a contract with rate card"
         behavior: crud
         crud:
@@ -306,6 +315,7 @@ domains:
           consequence:
             baseline: reviewable
       remove-product:
+        flavour: attribute_mutating
         description: "Remove a product from a contract"
         behavior: crud
         crud:
@@ -343,6 +353,7 @@ domains:
           consequence:
             baseline: requires_confirmation
       list-products:
+        flavour: attribute_mutating
         description: "List products for a contract"
         behavior: crud
         crud:
@@ -381,6 +392,7 @@ domains:
           consequence:
             baseline: benign
       create-rate-card:
+        flavour: instance_adding
         description: "Create a new rate card"
         behavior: crud
         crud:
@@ -434,6 +446,7 @@ domains:
           consequence:
             baseline: reviewable
       list-rate-cards:
+        flavour: attribute_mutating
         description: "List all rate cards"
         behavior: crud
         crud:
@@ -468,6 +481,7 @@ domains:
           consequence:
             baseline: benign
       subscribe:
+        flavour: instance_adding
         description: "Subscribe a CBU to a contract+product (onboarding gate)"
         behavior: crud
         crud:
@@ -521,6 +535,7 @@ domains:
           consequence:
             baseline: reviewable
       unsubscribe:
+        flavour: attribute_mutating
         description: "Unsubscribe a CBU from a contract+product"
         behavior: crud
         crud:
@@ -561,6 +576,7 @@ domains:
           consequence:
             baseline: requires_confirmation
       list-subscriptions:
+        flavour: attribute_mutating
         description: "List CBU subscriptions, optionally filtered"
         behavior: crud
         crud:
@@ -606,6 +622,7 @@ domains:
           consequence:
             baseline: benign
       for-client:
+        flavour: attribute_mutating
         description: "Get the active contract for a client"
         behavior: crud
         crud:

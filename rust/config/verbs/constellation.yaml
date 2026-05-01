@@ -6,6 +6,7 @@ domains:
       - constellation summary
     verbs:
       hydrate:
+        flavour: attribute_mutating
         description: Hydrate a full constellation with reducer states and action surfaces
         behavior: plugin
         handler: ConstellationHydrateOp
@@ -47,6 +48,7 @@ domains:
           consequence:
             baseline: benign
       summary:
+        flavour: attribute_mutating
         description: Constellation summary counts
         behavior: plugin
         handler: ConstellationSummaryOp

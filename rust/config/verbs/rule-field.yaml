@@ -9,6 +9,7 @@ domains:
 
     verbs:
       register:
+        flavour: instance_adding
         description: "Register a new field in the rule field dictionary (unknown fields fail at ruleset publish)"
         behavior: plugin
         metadata:
@@ -54,6 +55,7 @@ domains:
           consequence:
             baseline: reviewable
       list:
+        flavour: attribute_mutating
         description: "List all registered fields in the rule field dictionary"
         behavior: plugin
         metadata:

@@ -14,6 +14,7 @@ domains:
       # =========================================================================
 
       add:
+        flavour: instance_adding
         description: "Add a product overlay to matrix entries"
         metadata:
           tier: intent
@@ -125,6 +126,7 @@ domains:
             baseline: reviewable
 
       remove:
+        flavour: attribute_mutating
         description: "Remove a product overlay"
         metadata:
           tier: intent
@@ -162,6 +164,10 @@ domains:
             baseline: requires_confirmation
 
       suspend:
+        flavour: discretionary
+        role_guard:
+          any_of: [compliance_officer, senior_compliance, mlro]
+        audit_class: matrix_overlay_suspend
         description: "Suspend a product overlay"
         metadata:
           tier: intent
@@ -201,6 +207,7 @@ domains:
             baseline: requires_confirmation
 
       activate:
+        flavour: attribute_mutating
         description: "Activate a suspended overlay"
         metadata:
           tier: intent
@@ -240,6 +247,7 @@ domains:
             baseline: reviewable
 
       list:
+        flavour: attribute_mutating
         description: "List overlays for a CBU"
         metadata:
           tier: reference
@@ -290,6 +298,7 @@ domains:
             baseline: benign
 
       list-by-subscription:
+        flavour: attribute_mutating
         description: "List overlays for a product subscription"
         metadata:
           tier: reference
@@ -331,6 +340,7 @@ domains:
             baseline: benign
 
       effective-matrix:
+        flavour: attribute_mutating
         description: "Get effective matrix with all product overlays"
         metadata:
           tier: intent
@@ -399,6 +409,7 @@ domains:
             baseline: benign
 
       unified-gaps:
+        flavour: attribute_mutating
         description: "Get all gaps from both lifecycle and service domains"
         metadata:
           tier: intent
@@ -452,6 +463,7 @@ domains:
             baseline: benign
 
       compare-products:
+        flavour: attribute_mutating
         description: "Compare what different products add to a matrix entry"
         metadata:
           tier: intent

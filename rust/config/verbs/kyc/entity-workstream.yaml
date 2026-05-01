@@ -3,6 +3,7 @@ domains:
     description: Per-entity workstream within a KYC case
     verbs:
       create:
+        flavour: instance_adding
         description: Create a new entity workstream (idempotent by case+entity)
         invocation_phrases:
         - "create workstream"
@@ -102,6 +103,7 @@ domains:
           consequence:
             baseline: reviewable
       update-status:
+        flavour: attribute_mutating
         description: Update workstream status
         invocation_phrases:
         - "update workstream status"
@@ -160,6 +162,7 @@ domains:
           consequence:
             baseline: reviewable
       block:
+        flavour: attribute_mutating
         description: Block workstream with reason
         invocation_phrases:
         - "block workstream"
@@ -211,6 +214,7 @@ domains:
           consequence:
             baseline: reviewable
       complete:
+        flavour: attribute_mutating
         description: Mark workstream as complete
         invocation_phrases:
         - "complete workstream"
@@ -268,6 +272,10 @@ domains:
           consequence:
             baseline: reviewable
       escalate-dd:
+        flavour: discretionary
+        role_guard:
+          any_of: [compliance_officer, senior_compliance, mlro]
+        audit_class: entity_workstream_escalate_dd
         description: Escalate workstream to enhanced due diligence
         invocation_phrases:
         - "escalate due diligence"
@@ -313,6 +321,7 @@ domains:
           consequence:
             baseline: reviewable
       set-ubo:
+        flavour: attribute_mutating
         description: Mark workstream entity as UBO
         invocation_phrases:
         - "mark as ubo"
@@ -359,6 +368,7 @@ domains:
           consequence:
             baseline: reviewable
       list-by-case:
+        flavour: attribute_mutating
         description: List workstreams for a case
         invocation_phrases:
         - "list workstreams"
@@ -401,6 +411,7 @@ domains:
           consequence:
             baseline: benign
       read:
+        flavour: attribute_mutating
         description: Read workstream details
         invocation_phrases:
         - "read workstream"
@@ -439,6 +450,7 @@ domains:
           consequence:
             baseline: benign
       state:
+        flavour: attribute_mutating
         description: Get workstream state with embedded awaiting requests, checks, and documents
         invocation_phrases:
         - "workstream state"

@@ -11,6 +11,7 @@ domains:
 
     verbs:
       drill:
+        flavour: attribute_mutating
         description: "Drill into a focused object — opens deeper level"
         behavior: plugin
         handler: NavDrillOp
@@ -48,6 +49,7 @@ domains:
             baseline: benign
 
       zoom-out:
+        flavour: attribute_mutating
         description: "Semantic zoom out — go up one level"
         behavior: plugin
         handler: NavZoomOutOp
@@ -76,6 +78,7 @@ domains:
             baseline: benign
 
       select:
+        flavour: attribute_mutating
         description: "Set semantic focus to a specific entity or object"
         behavior: plugin
         handler: NavSelectOp
@@ -107,6 +110,7 @@ domains:
             baseline: benign
 
       set-cluster-type:
+        flavour: attribute_mutating
         description: "Change cluster grouping mode (jurisdiction, client, risk, product)"
         behavior: plugin
         handler: NavSetClusterTypeOp
@@ -137,6 +141,7 @@ domains:
           consequence:
             baseline: benign
       set-lens:
+        flavour: attribute_mutating
         description: "Change observation lens (overlay, depth probe, filters)"
         behavior: plugin
         handler: NavSetLensOp
@@ -173,6 +178,7 @@ domains:
           consequence:
             baseline: benign
       history-back:
+        flavour: attribute_mutating
         description: "Navigate back in history — replay previous OrientationContract"
         behavior: plugin
         handler: NavHistoryBackOp
@@ -200,6 +206,7 @@ domains:
             baseline: benign
 
       history-forward:
+        flavour: attribute_mutating
         description: "Navigate forward in history"
         behavior: plugin
         handler: NavHistoryForwardOp

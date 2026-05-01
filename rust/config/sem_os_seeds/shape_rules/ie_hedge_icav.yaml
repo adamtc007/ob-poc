@@ -1,0 +1,12 @@
+shape: struct.ie.hedge.icav
+workspace: cbu
+extends: [regulated.fund]
+structural_facts:
+  jurisdiction: IE
+  structure_type: aif
+  allowed_structure_types: [icav, hedge, qiaif]
+  document_bundles: [docs.bundle.aif-baseline, docs.bundle.hedge-baseline]
+  trading_profile_type: hedge
+  required_roles: [aifm, depositary, prime-broker]
+  optional_roles: [investment-manager, administrator, auditor, prime-broker, executing-broker]
+slots: {}

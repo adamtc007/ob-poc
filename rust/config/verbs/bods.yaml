@@ -3,6 +3,7 @@ domains:
     description: Beneficial Ownership Data Standard (BODS) integration for UBO discovery
     verbs:
       discover-ubos:
+        flavour: attribute_mutating
         description: Discover Ultimate Beneficial Owners for an entity using GLEIF + BODS data
         invocation_phrases:
           - "discover UBOs"
@@ -48,6 +49,7 @@ domains:
           consequence:
             baseline: benign
       import:
+        flavour: instance_adding
         description: Bulk import BODS statements from data dump
         invocation_phrases:
           - "import from BODS"
@@ -99,6 +101,7 @@ domains:
           consequence:
             baseline: benign
       link-entity:
+        flavour: instance_adding
         description: Link a local entity to a BODS entity statement
         metadata:
           tier: intent
@@ -167,6 +170,7 @@ domains:
           consequence:
             baseline: reviewable
       get-statement:
+        flavour: attribute_mutating
         description: Get a BODS statement by ID
         invocation_phrases:
           - "get BODS statement"
@@ -206,6 +210,7 @@ domains:
           consequence:
             baseline: benign
       list-by-entity:
+        flavour: attribute_mutating
         description: List BODS statements linked to an entity
         metadata:
           tier: reference
@@ -249,6 +254,7 @@ domains:
           consequence:
             baseline: benign
       find-by-lei:
+        flavour: attribute_mutating
         description: Find BODS entity statement by LEI
         metadata:
           tier: reference
@@ -289,6 +295,7 @@ domains:
           consequence:
             baseline: benign
       list-persons:
+        flavour: attribute_mutating
         description: List person statements with beneficial ownership
         metadata:
           tier: reference
@@ -332,6 +339,7 @@ domains:
           consequence:
             baseline: benign
       list-ownership:
+        flavour: attribute_mutating
         description: List ownership statements for an entity
         metadata:
           tier: reference
@@ -378,6 +386,7 @@ domains:
           consequence:
             baseline: benign
       sync-from-gleif:
+        flavour: attribute_mutating
         description: Sync BODS data from GLEIF reporting exceptions
         metadata:
           tier: composite

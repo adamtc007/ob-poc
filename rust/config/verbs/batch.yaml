@@ -3,6 +3,7 @@ domains:
     description: Batch execution control operations for DSL-native batch processing
     verbs:
       pause:
+        flavour: attribute_mutating
         description: Pause the current batch execution
         metadata:
           tier: intent
@@ -36,6 +37,7 @@ domains:
           consequence:
             baseline: reviewable
       resume:
+        flavour: attribute_mutating
         description: Resume a paused batch execution
         metadata:
           tier: intent
@@ -68,6 +70,7 @@ domains:
           consequence:
             baseline: reviewable
       continue:
+        flavour: attribute_mutating
         description: Continue batch execution for N more items
         metadata:
           tier: intent
@@ -105,6 +108,7 @@ domains:
           consequence:
             baseline: reviewable
       skip:
+        flavour: attribute_mutating
         description: Skip the current batch item
         metadata:
           tier: intent
@@ -141,6 +145,7 @@ domains:
           consequence:
             baseline: reviewable
       abort:
+        flavour: attribute_mutating
         description: Abort the current batch execution
         metadata:
           tier: intent
@@ -178,6 +183,7 @@ domains:
           consequence:
             baseline: requires_confirmation
       status:
+        flavour: attribute_mutating
         description: Get the current batch execution status
         metadata:
           tier: diagnostics
@@ -211,6 +217,7 @@ domains:
           consequence:
             baseline: benign
       add-products:
+        flavour: instance_adding
         description: Add products to multiple CBUs in bulk
         metadata:
           tier: intent

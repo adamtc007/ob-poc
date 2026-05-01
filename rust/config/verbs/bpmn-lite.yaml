@@ -9,6 +9,7 @@ domains:
 
     verbs:
       compile:
+        flavour: attribute_mutating
         description: "Compile BPMN XML to bytecode via bpmn-lite"
         behavior: plugin
         metadata:
@@ -37,6 +38,7 @@ domains:
           consequence:
             baseline: benign
       start:
+        flavour: instance_adding
         description: "Start a BPMN process instance"
         behavior: plugin
         metadata:
@@ -69,6 +71,7 @@ domains:
           consequence:
             baseline: reviewable
       signal:
+        flavour: attribute_mutating
         description: "Send a signal to a running BPMN process instance"
         behavior: plugin
         metadata:
@@ -103,6 +106,7 @@ domains:
           consequence:
             baseline: reviewable
       cancel:
+        flavour: attribute_mutating
         description: "Cancel a running BPMN process instance"
         behavior: plugin
         metadata:
@@ -134,6 +138,7 @@ domains:
           consequence:
             baseline: requires_confirmation
       inspect:
+        flavour: attribute_mutating
         description: "Inspect a running BPMN process instance"
         behavior: plugin
         metadata:

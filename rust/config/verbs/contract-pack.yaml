@@ -9,6 +9,7 @@ domains:
 
     verbs:
       create:
+        flavour: instance_adding
         description: "Create a new contract pack"
         behavior: plugin
         metadata:
@@ -48,6 +49,7 @@ domains:
           consequence:
             baseline: reviewable
       read:
+        flavour: attribute_mutating
         description: "Read a contract pack by ID"
         behavior: crud
         metadata:
@@ -81,6 +83,7 @@ domains:
           consequence:
             baseline: benign
       add-template:
+        flavour: instance_adding
         description: "Add a template to a contract pack"
         behavior: plugin
         lifecycle:

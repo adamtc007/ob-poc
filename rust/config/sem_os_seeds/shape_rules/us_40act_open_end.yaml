@@ -1,0 +1,12 @@
+shape: struct.us.40act.open-end
+workspace: cbu
+extends: [regulated.fund]
+structural_facts:
+  jurisdiction: US
+  structure_type: 40act
+  allowed_structure_types: [40act, open-end, mutual-fund]
+  document_bundles: [docs.bundle.us-40act-baseline]
+  trading_profile_type: 40act
+  required_roles: [investment-adviser, custodian]
+  optional_roles: [sub-adviser, administrator, transfer-agent, distributor, auditor, legal-counsel]
+slots: {}

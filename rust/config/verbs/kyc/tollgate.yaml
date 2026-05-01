@@ -13,6 +13,7 @@ domains:
 
     verbs:
       evaluate:
+        flavour: attribute_mutating
         description: |
           Run tollgate evaluation for a case.
           Computes all metrics and compares against thresholds.
@@ -86,6 +87,7 @@ domains:
             baseline: reviewable
 
       get-metrics:
+        flavour: attribute_mutating
         description: Compute current metrics for a CBU without recording evaluation
         metadata:
           tier: reference
@@ -150,6 +152,7 @@ domains:
             baseline: benign
 
       set-threshold:
+        flavour: attribute_mutating
         description: Update a tollgate threshold
         metadata:
           tier: intent
@@ -229,6 +232,10 @@ domains:
             baseline: reviewable
 
       override:
+        flavour: discretionary
+        role_guard:
+          any_of: [senior_compliance, mlro, executive, board]
+        audit_class: tollgate_override
         description: Record management override of tollgate failure
         metadata:
           tier: intent
@@ -294,6 +301,7 @@ domains:
             baseline: requires_explicit_authorisation
 
       list-evaluations:
+        flavour: attribute_mutating
         description: List tollgate evaluations for a case
         metadata:
           tier: reference
@@ -346,6 +354,7 @@ domains:
             baseline: benign
 
       list-thresholds:
+        flavour: attribute_mutating
         description: List all configured thresholds
         metadata:
           tier: reference
@@ -387,6 +396,7 @@ domains:
             baseline: benign
 
       get-decision-readiness:
+        flavour: attribute_mutating
         description: |
           Summary view of decision readiness:
             - What's blocking?
@@ -443,6 +453,7 @@ domains:
             baseline: benign
 
       list-overrides:
+        flavour: attribute_mutating
         description: List overrides for a case or evaluation
         metadata:
           tier: reference
@@ -484,6 +495,10 @@ domains:
             baseline: benign
 
       expire-override:
+        flavour: discretionary
+        role_guard:
+          any_of: [senior_compliance, mlro, executive, board]
+        audit_class: tollgate_expire_override
         description: Manually expire an override
         metadata:
           tier: intent
@@ -536,6 +551,7 @@ domains:
       # =========================================================================
 
       check-gate:
+        flavour: attribute_mutating
         description: "Check a named tollgate gate against case state and coverage data"
         invocation_phrases:
         - "check tollgate gate"

@@ -18,6 +18,7 @@ domains:
       # =======================================================================
 
       create-request:
+        flavour: instance_adding
         description: "Create an outreach request"
         invocation_phrases:
           - "create outreach request"
@@ -93,6 +94,7 @@ domains:
           consequence:
             baseline: reviewable
       mark-sent:
+        flavour: attribute_mutating
         description: "Mark request as sent"
         metadata:
           tier: intent
@@ -135,6 +137,7 @@ domains:
           consequence:
             baseline: reviewable
       send-reminder:
+        flavour: attribute_mutating
         description: "Mark that a reminder was sent"
         metadata:
           tier: intent
@@ -177,6 +180,7 @@ domains:
           consequence:
             baseline: reviewable
       record-response:
+        flavour: attribute_mutating
         description: "Record response to outreach request"
         invocation_phrases:
           - "record the response"
@@ -221,6 +225,7 @@ domains:
           consequence:
             baseline: reviewable
       close-request:
+        flavour: attribute_mutating
         description: "Close an outreach request"
         metadata:
           tier: intent
@@ -271,6 +276,7 @@ domains:
           consequence:
             baseline: reviewable
       list-pending:
+        flavour: attribute_mutating
         description: "List pending outreach requests"
         metadata:
           tier: diagnostics
@@ -318,6 +324,7 @@ domains:
           consequence:
             baseline: benign
       list-overdue:
+        flavour: attribute_mutating
         description: "List overdue outreach requests"
         invocation_phrases:
           - "what's overdue"
@@ -348,6 +355,7 @@ domains:
           consequence:
             baseline: benign
       get-request:
+        flavour: attribute_mutating
         description: "Get details of a specific request"
         metadata:
           tier: diagnostics
@@ -390,6 +398,7 @@ domains:
           consequence:
             baseline: benign
       plan-generate:
+        flavour: attribute_mutating
         description: "Generate outreach plan from coverage gaps and UBO candidates"
         invocation_phrases:
           - "generate outreach plan"
