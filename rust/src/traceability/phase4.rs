@@ -315,7 +315,7 @@ pub fn evaluate_phase4_within_phase2(
 ///
 /// assert_eq!(
 ///     fallback_reason_code_for_trace(Some("pattern mismatch forced fallback")),
-///     Some("pattern_mismatch")
+///     Some("pattern_mismatch".to_string())
 /// );
 /// ```
 pub fn fallback_reason_code_for_trace(reason: Option<&str>) -> Option<String> {

@@ -1,0 +1,7 @@
+error: IdType requires a tuple struct with exactly one field: struct MyId(Uuid)
+ --> tests/trybuild/id_type_non_tuple.rs:7:1
+  |
+7 | / pub struct BadId {
+8 | |     inner: Uuid,
+9 | | }
+  | |_^

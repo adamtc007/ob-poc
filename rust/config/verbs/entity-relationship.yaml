@@ -1,0 +1,100 @@
+domains:
+  entity-relationship:
+    description: Entity relationship graph operations
+    verbs:
+      upsert:
+        flavour: attribute_mutating
+        description: Upsert a structural ownership, control, or trust relationship between two entities
+        invocation_phrases:
+          - "upsert entity relationship"
+          - "record entity relationship"
+          - "update entity relationship"
+          - "record ownership relationship"
+          - "record control relationship"
+          - "record trust relationship"
+        behavior: plugin
+        handler: EntityRelationshipUpsertOp
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: global
+          noun: entity_relationship
+          tags: [relationship, write, entity_graph, onboarding]
+          phase_tags: [onboarding]
+          side_effects: state_write
+        args:
+          - name: from-entity-id
+            type: uuid
+            required: true
+            lookup:
+              table: entities
+              entity_type: entity
+              schema: ob-poc
+              search_key: name
+              primary_key: entity_id
+          - name: to-entity-id
+            type: uuid
+            required: true
+            lookup:
+              table: entities
+              entity_type: entity
+              schema: ob-poc
+              search_key: name
+              primary_key: entity_id
+          - name: relationship-type
+            type: string
+            required: true
+            description: ownership, control, trust_role, employment, or management
+          - name: percentage
+            type: string
+            required: false
+          - name: ownership-type
+            type: string
+            required: false
+          - name: control-type
+            type: string
+            required: false
+          - name: trust-role
+            type: string
+            required: false
+          - name: trust-interest-type
+            type: string
+            required: false
+          - name: trust-class-description
+            type: string
+            required: false
+          - name: is-regulated
+            type: boolean
+            required: false
+          - name: regulatory-jurisdiction
+            type: string
+            required: false
+          - name: effective-from
+            type: date
+            required: false
+          - name: effective-to
+            type: date
+            required: false
+          - name: source
+            type: string
+            required: false
+          - name: confidence
+            type: string
+            required: false
+          - name: notes
+            type: string
+            required: false
+          - name: created-by
+            type: uuid
+            required: false
+        writes:
+          - table: entity_relationships
+            column: relationship_type
+        returns:
+          type: record
+          fields: [relationship_id, from_entity_id, to_entity_id, relationship_type]
+        three_axis:
+          state_effect: preserving
+          external_effects: [emitting]
+          consequence:
+            baseline: requires_confirmation

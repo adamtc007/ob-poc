@@ -1,0 +1,35 @@
+domains:
+  cbu-role:
+    description: CBU role maintenance operations
+    verbs:
+      terminate:
+        flavour: attribute_mutating
+        description: Terminate or remove all CBU entity roles for a CBU
+        invocation_phrases:
+          - "terminate cbu roles"
+          - "remove all cbu roles"
+        behavior: plugin
+        handler: CbuRoleTerminateOp
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: cbu
+          internal: true
+          noun: cbu_role
+          phase_tags: [archive]
+          side_effects: state_write
+        args:
+          - name: cbu-id
+            type: uuid
+            required: true
+          - name: hard-delete
+            type: boolean
+            required: false
+            default: false
+        returns:
+          type: affected
+        three_axis:
+          state_effect: preserving
+          external_effects: [emitting]
+          consequence:
+            baseline: requires_confirmation

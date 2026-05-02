@@ -386,7 +386,7 @@ slots:
         # remains in IN_CLEARANCE while substates progress.
         - from: IN_CLEARANCE
           to: IN_CLEARANCE
-          via: [deal.bac-approve, deal.bac-reject, deal.update-kyc-clearance]
+          via: [deal.bac-mark-in-review, deal.bac-approve, deal.bac-reject, deal.kyc-mark-in-review, deal.update-kyc-clearance]
           description: "Substate transitions — deal_status unchanged."
         - from: IN_CLEARANCE
           to: CONTRACTED
@@ -543,8 +543,14 @@ slots:
         - id: AGREED
           description: "Both sides agreed. At most one AGREED per (deal, contract, product)."
         - id: SUPERSEDED
+          entry_via:
+            trigger:
+              name: idx_deal_rate_cards_one_agreed
           description: "Superseded by newer AGREED. Terminal; history."
         - id: CANCELLED
+          entry_via:
+            cascade:
+              parent: deal.cancel
           description: "Withdrawn before agreement. Terminal."
       transitions:
         # G-2 internal approval path

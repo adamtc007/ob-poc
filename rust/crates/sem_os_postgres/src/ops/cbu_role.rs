@@ -22,6 +22,7 @@ use dsl_runtime::domain_ops::helpers::{
     json_extract_bool_opt, json_extract_string, json_extract_string_opt, json_extract_uuid,
     json_extract_uuid_opt,
 };
+use dsl_runtime::service_traits::SemOsChildDispatcher;
 use dsl_runtime::tx::TransactionScope;
 use dsl_runtime::{VerbExecutionContext, VerbExecutionOutcome};
 
@@ -35,6 +36,30 @@ async fn get_role_id(scope: &mut dyn TransactionScope, role_name: &str) -> Resul
             .await?;
     row.map(|(id,)| id)
         .ok_or_else(|| anyhow!("Role '{}' not found in taxonomy", role_name))
+}
+
+async fn upsert_entity_relationship(
+    parent_fqn: &str,
+    args: &Value,
+    ctx: &mut VerbExecutionContext,
+    scope: &mut dyn TransactionScope,
+) -> Result<Uuid> {
+    let dispatcher = ctx.service::<dyn SemOsChildDispatcher>()?;
+    let outcome = dispatcher
+        .dispatch_child(parent_fqn, "entity-relationship.upsert", args, ctx, scope)
+        .await?;
+    let VerbExecutionOutcome::Record(record) = outcome else {
+        return Err(anyhow!(
+            "entity-relationship.upsert returned non-record outcome for {parent_fqn}"
+        ));
+    };
+    let relationship_id = record
+        .get("relationship_id")
+        .and_then(Value::as_str)
+        .ok_or_else(|| anyhow!("entity-relationship.upsert did not return relationship_id"))?;
+    relationship_id.parse::<Uuid>().map_err(|err| {
+        anyhow!("entity-relationship.upsert returned invalid relationship_id: {err}")
+    })
 }
 
 pub struct AssignOwnership;
@@ -90,26 +115,17 @@ impl SemOsVerbOp for AssignOwnership {
         .await?;
 
         let percentage_display = percentage.to_string();
-        let rel_result: Uuid = sqlx::query_scalar(
-            r#"INSERT INTO "ob-poc".entity_relationships
-               (from_entity_id, to_entity_id, relationship_type, percentage,
-                ownership_type, effective_from, source, confidence, created_at, updated_at)
-               VALUES ($1, $2, 'ownership', $3, $4, $5, 'cbu.assign-ownership', 'HIGH', NOW(), NOW())
-               ON CONFLICT (from_entity_id, to_entity_id, relationship_type, effective_from)
-                   WHERE effective_from IS NOT NULL
-               DO UPDATE SET
-                   percentage = EXCLUDED.percentage,
-                   ownership_type = EXCLUDED.ownership_type,
-                   updated_at = NOW()
-               RETURNING relationship_id"#,
-        )
-        .bind(owner_entity_id)
-        .bind(owned_entity_id)
-        .bind(Some(&percentage))
-        .bind(&ownership_type)
-        .bind(effective_from)
-        .fetch_one(scope.executor())
-        .await?;
+        let rel_args = json!({
+            "from-entity-id": owner_entity_id,
+            "to-entity-id": owned_entity_id,
+            "relationship-type": "ownership",
+            "percentage": percentage_display,
+            "ownership-type": ownership_type,
+            "effective-from": effective_from.map(|date| date.to_string()),
+            "source": "cbu.assign-ownership",
+            "confidence": "HIGH"
+        });
+        let rel_result = upsert_entity_relationship(self.fqn(), &rel_args, ctx, scope).await?;
 
         ctx.bind("cbu_entity_role", role_result);
         // Phase C.3 rollout: ownership edge recorded. Subject is the
@@ -177,24 +193,16 @@ impl SemOsVerbOp for AssignControl {
         .fetch_one(scope.executor())
         .await?;
 
-        let rel_result: Uuid = sqlx::query_scalar(
-            r#"INSERT INTO "ob-poc".entity_relationships
-               (from_entity_id, to_entity_id, relationship_type, control_type,
-                effective_from, source, confidence, created_at, updated_at)
-               VALUES ($1, $2, 'control', $3, $4, 'cbu.assign-control', 'HIGH', NOW(), NOW())
-               ON CONFLICT (from_entity_id, to_entity_id, relationship_type, effective_from)
-                   WHERE effective_from IS NOT NULL
-               DO UPDATE SET
-                   control_type = EXCLUDED.control_type,
-                   updated_at = NOW()
-               RETURNING relationship_id"#,
-        )
-        .bind(controller_entity_id)
-        .bind(controlled_entity_id)
-        .bind(&control_type)
-        .bind(appointment_date)
-        .fetch_one(scope.executor())
-        .await?;
+        let rel_args = json!({
+            "from-entity-id": controller_entity_id,
+            "to-entity-id": controlled_entity_id,
+            "relationship-type": "control",
+            "control-type": control_type,
+            "effective-from": appointment_date.map(|date| date.to_string()),
+            "source": "cbu.assign-control",
+            "confidence": "HIGH"
+        });
+        let rel_result = upsert_entity_relationship(self.fqn(), &rel_args, ctx, scope).await?;
 
         ctx.bind("cbu_entity_role", role_result);
         dsl_runtime::domain_ops::helpers::emit_pending_state_advance(
@@ -241,7 +249,7 @@ impl SemOsVerbOp for AssignTrustRole {
         let class_description = json_extract_string_opt(args, "class-description");
 
         let role_id = get_role_id(scope, &role).await?;
-        let relationship_type = match role.as_str() {
+        let trust_role = match role.as_str() {
             "SETTLOR" => "trust_settlor",
             "TRUSTEE" => "trust_trustee",
             "PROTECTOR" => "trust_protector",
@@ -272,29 +280,18 @@ impl SemOsVerbOp for AssignTrustRole {
         .fetch_one(scope.executor())
         .await?;
 
-        let rel_result: Uuid = sqlx::query_scalar(
-            r#"INSERT INTO "ob-poc".entity_relationships
-               (from_entity_id, to_entity_id, relationship_type, percentage,
-                trust_interest_type, trust_class_description, source, confidence,
-                created_at, updated_at)
-               VALUES ($1, $2, $3, $4, $5, $6, 'cbu.assign-trust-role', 'HIGH', NOW(), NOW())
-               ON CONFLICT (from_entity_id, to_entity_id, relationship_type)
-                   WHERE effective_from IS NULL AND effective_to IS NULL
-               DO UPDATE SET
-                   percentage = EXCLUDED.percentage,
-                   trust_interest_type = EXCLUDED.trust_interest_type,
-                   trust_class_description = EXCLUDED.trust_class_description,
-                   updated_at = NOW()
-               RETURNING relationship_id"#,
-        )
-        .bind(participant_entity_id)
-        .bind(trust_entity_id)
-        .bind(relationship_type)
-        .bind(&interest_percentage)
-        .bind(interest_type)
-        .bind(class_description)
-        .fetch_one(scope.executor())
-        .await?;
+        let rel_args = json!({
+            "from-entity-id": participant_entity_id,
+            "to-entity-id": trust_entity_id,
+            "relationship-type": "trust_role",
+            "percentage": interest_percentage.as_ref().map(ToString::to_string),
+            "trust-role": trust_role,
+            "trust-interest-type": interest_type,
+            "trust-class-description": class_description,
+            "source": "cbu.assign-trust-role",
+            "confidence": "HIGH"
+        });
+        let rel_result = upsert_entity_relationship(self.fqn(), &rel_args, ctx, scope).await?;
 
         ctx.bind("cbu_entity_role", role_result);
         dsl_runtime::domain_ops::helpers::emit_pending_state_advance(
@@ -370,29 +367,17 @@ impl SemOsVerbOp for AssignFundRole {
                 "MANAGEMENT_COMPANY" | "INVESTMENT_MANAGER" => "management",
                 _ => "fund_role",
             };
-            let rel: Uuid = sqlx::query_scalar(
-                r#"INSERT INTO "ob-poc".entity_relationships
-                   (from_entity_id, to_entity_id, relationship_type, percentage,
-                    is_regulated, regulatory_jurisdiction, source, confidence,
-                    created_at, updated_at)
-                   VALUES ($1, $2, $3, $4, $5, $6, 'cbu.assign-fund-role', 'HIGH', NOW(), NOW())
-                   ON CONFLICT (from_entity_id, to_entity_id, relationship_type)
-                       WHERE effective_from IS NULL AND effective_to IS NULL
-                   DO UPDATE SET
-                       percentage = EXCLUDED.percentage,
-                       is_regulated = EXCLUDED.is_regulated,
-                       regulatory_jurisdiction = EXCLUDED.regulatory_jurisdiction,
-                       updated_at = NOW()
-                   RETURNING relationship_id"#,
-            )
-            .bind(entity_id)
-            .bind(fund_id)
-            .bind(relationship_type)
-            .bind(&investment_percentage)
-            .bind(is_regulated)
-            .bind(regulatory_jurisdiction)
-            .fetch_one(scope.executor())
-            .await?;
+            let rel_args = json!({
+                "from-entity-id": entity_id,
+                "to-entity-id": fund_id,
+                "relationship-type": relationship_type,
+                "percentage": investment_percentage.as_ref().map(ToString::to_string),
+                "is-regulated": is_regulated,
+                "regulatory-jurisdiction": regulatory_jurisdiction,
+                "source": "cbu.assign-fund-role",
+                "confidence": "HIGH"
+            });
+            let rel = upsert_entity_relationship(self.fqn(), &rel_args, ctx, scope).await?;
             Some(rel)
         } else {
             None
@@ -554,6 +539,58 @@ impl SemOsVerbOp for AssignSignatory {
             "role_id": role_result,
             "message": format!("Assigned signatory role {} to {}", role, person_entity_id)
         })))
+    }
+}
+
+pub struct Terminate;
+
+#[async_trait]
+impl SemOsVerbOp for Terminate {
+    fn fqn(&self) -> &str {
+        "cbu-role.terminate"
+    }
+
+    async fn execute(
+        &self,
+        args: &Value,
+        ctx: &mut VerbExecutionContext,
+        scope: &mut dyn TransactionScope,
+    ) -> Result<VerbExecutionOutcome> {
+        let cbu_id = json_extract_uuid(args, ctx, "cbu-id")?;
+        let hard_delete = json_extract_bool_opt(args, "hard-delete").unwrap_or(false);
+        let affected = if hard_delete {
+            sqlx::query(r#"DELETE FROM "ob-poc".cbu_entity_roles WHERE cbu_id = $1"#)
+                .bind(cbu_id)
+                .execute(scope.executor())
+                .await?
+                .rows_affected()
+        } else {
+            sqlx::query(
+                r#"
+                UPDATE "ob-poc".cbu_entity_roles
+                SET effective_to = CURRENT_DATE,
+                    updated_at = NOW()
+                WHERE cbu_id = $1
+                  AND effective_to IS NULL
+                "#,
+            )
+            .bind(cbu_id)
+            .execute(scope.executor())
+            .await?
+            .rows_affected()
+        };
+
+        if affected > 0 {
+            dsl_runtime::domain_ops::helpers::emit_pending_state_advance(
+                ctx,
+                cbu_id,
+                "cbu-role:terminated",
+                "cbu/role-graph",
+                "cbu-role.terminate",
+            );
+        }
+
+        Ok(VerbExecutionOutcome::Affected(affected))
     }
 }
 

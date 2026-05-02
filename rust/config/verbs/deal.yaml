@@ -1196,6 +1196,10 @@ domains:
           entity_id_arg: rate-card-id
           target_workspace: deal
           target_slot: deal_rate_card
+        writes:
+          - table: deal_rate_cards
+            column: status
+            value: PROPOSED
 
       counter-rate-card:
         flavour: attribute_mutating
@@ -1242,6 +1246,13 @@ domains:
           entity_id_arg: rate-card-id
           target_workspace: deal
           target_slot: deal_rate_card
+        writes:
+          - table: deal_rate_cards
+            column: status
+            value: COUNTER_OFFERED
+          - table: deal_rate_cards
+            column: status
+            value: SUPERSEDED
 
       agree-rate-card:
         flavour: discretionary
@@ -1287,6 +1298,10 @@ domains:
           entity_id_arg: rate-card-id
           target_workspace: deal
           target_slot: deal_rate_card
+        writes:
+          - table: deal_rate_cards
+            column: status
+            value: AGREED
 
       list-rate-cards:
         flavour: attribute_mutating
@@ -1970,6 +1985,10 @@ domains:
           target_state_arg: request-status
           target_workspace: deal
           target_slot: deal_onboarding_request
+        writes:
+          - table: deal_onboarding_requests
+            column: request_status
+            value: COMPLETED
 
       list-onboarding-requests:
         flavour: attribute_mutating
@@ -2156,6 +2175,50 @@ domains:
           entity_id_arg: deal-id
           target_workspace: deal
           target_slot: deal
+        writes:
+          - table: deals
+            column: deal_status
+            value: IN_CLEARANCE
+          - table: deals
+            column: bac_status
+            value: in_review
+          - table: deals
+            column: kyc_clearance_status
+            value: pending
+
+      bac-mark-in-review:
+        flavour: attribute_mutating
+        description: "Mark BAC clearance as in review — sets deals.bac_status='in_review' while preserving deal_status=IN_CLEARANCE"
+        behavior: plugin
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: global
+          noun: deal
+          subject_kinds: [deal]
+          phase_tags: [deal]
+          side_effects: state_write
+          harm_class: reversible
+        invocation_phrases:
+          - "mark BAC in review"
+          - "start BAC review"
+          - "set BAC clearance in review"
+        args:
+          - name: deal-id
+            type: uuid
+            required: true
+            maps_to: deal_id
+        returns:
+          type: affected
+        three_axis:
+          state_effect: preserving
+          external_effects: [emitting]
+          consequence:
+            baseline: benign
+        writes:
+          - table: deals
+            column: bac_status
+            value: in_review
 
       bac-approve:
         flavour: discretionary
@@ -2194,13 +2257,17 @@ domains:
           entity_id_arg: deal-id
           target_workspace: deal
           target_slot: deal
+        writes:
+          - table: deals
+            column: bac_status
+            value: approved
 
       bac-reject:
         flavour: discretionary
         role_guard:
           any_of: [compliance_officer, senior_compliance, mlro]
         audit_class: deal_bac_reject
-        description: "BAC rejection — sets deals.bac_status='rejected'; if KYC has not also rejected, deal_status remains IN_CLEARANCE pending KYC outcome; otherwise deal moves to REJECTED"
+        description: "BAC rejection — sets deals.bac_status='rejected' while preserving deal_status=IN_CLEARANCE; terminal rejection is driven by deal.reject"
         behavior: plugin
         metadata:
           tier: intent
@@ -2236,6 +2303,44 @@ domains:
           entity_id_arg: deal-id
           target_workspace: deal
           target_slot: deal
+        writes:
+          - table: deals
+            column: bac_status
+            value: rejected
+
+      kyc-mark-in-review:
+        flavour: attribute_mutating
+        description: "Mark deal KYC clearance as in review — sets deals.kyc_clearance_status='in_review' while preserving deal_status=IN_CLEARANCE"
+        behavior: plugin
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: global
+          noun: deal
+          subject_kinds: [deal]
+          phase_tags: [deal]
+          side_effects: state_write
+          harm_class: reversible
+        invocation_phrases:
+          - "mark deal KYC in review"
+          - "start deal KYC clearance review"
+          - "set KYC clearance in review"
+        args:
+          - name: deal-id
+            type: uuid
+            required: true
+            maps_to: deal_id
+        returns:
+          type: affected
+        three_axis:
+          state_effect: preserving
+          external_effects: [emitting]
+          consequence:
+            baseline: benign
+        writes:
+          - table: deals
+            column: kyc_clearance_status
+            value: in_review
 
       update-kyc-clearance:
         flavour: attribute_mutating
@@ -2272,6 +2377,13 @@ domains:
           external_effects: [observational]
           consequence:
             baseline: benign
+        writes:
+          - table: deals
+            column: kyc_clearance_status
+            value: approved
+          - table: deals
+            column: kyc_clearance_status
+            value: rejected
 
       submit-for-pricing-approval:
         flavour: discretionary

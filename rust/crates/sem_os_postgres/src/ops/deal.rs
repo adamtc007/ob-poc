@@ -101,12 +101,15 @@ fn is_valid_deal_status_transition(from: &str, to: &str) -> bool {
             | ("PROSPECT", "CANCELLED")
             | ("QUALIFYING", "NEGOTIATING")
             | ("QUALIFYING", "CANCELLED")
-            | ("NEGOTIATING", "KYC_CLEARANCE")
+            | ("NEGOTIATING", "IN_CLEARANCE")
             | ("NEGOTIATING", "QUALIFYING")
             | ("NEGOTIATING", "CANCELLED")
-            | ("KYC_CLEARANCE", "CONTRACTED")
-            | ("KYC_CLEARANCE", "NEGOTIATING")
-            | ("KYC_CLEARANCE", "CANCELLED")
+            | ("IN_CLEARANCE", "CONTRACTED")
+            | ("IN_CLEARANCE", "NEGOTIATING")
+            | ("IN_CLEARANCE", "REJECTED")
+            | ("IN_CLEARANCE", "LOST")
+            | ("IN_CLEARANCE", "WITHDRAWN")
+            | ("IN_CLEARANCE", "CANCELLED")
             | ("CONTRACTED", "ONBOARDING")
             | ("CONTRACTED", "CANCELLED")
             | ("ONBOARDING", "ACTIVE")
@@ -114,6 +117,28 @@ fn is_valid_deal_status_transition(from: &str, to: &str) -> bool {
             | ("ACTIVE", "WINDING_DOWN")
             | ("WINDING_DOWN", "OFFBOARDED")
     )
+}
+
+async fn deal_has_approved_clearance_substates(
+    scope: &mut dyn TransactionScope,
+    deal_id: Uuid,
+) -> Result<bool> {
+    let is_clear: bool = sqlx::query_scalar(
+        r#"
+        SELECT EXISTS(
+            SELECT 1
+            FROM "ob-poc".deals
+            WHERE deal_id = $1
+              AND bac_status = 'approved'
+              AND kyc_clearance_status = 'approved'
+        )
+        "#,
+    )
+    .bind(deal_id)
+    .fetch_one(scope.executor())
+    .await?;
+
+    Ok(is_clear)
 }
 
 async fn deal_has_group_approved_kyc_clearance(
@@ -375,12 +400,17 @@ impl SemOsVerbOp for UpdateStatus {
             ));
         }
 
-        if new_status == "CONTRACTED"
-            && !deal_has_group_approved_kyc_clearance(scope, deal_id).await?
-        {
-            return Err(anyhow!(
-                "Deal cannot move to CONTRACTED until the primary client group has APPROVED KYC clearance"
-            ));
+        if new_status == "CONTRACTED" {
+            if !deal_has_approved_clearance_substates(scope, deal_id).await? {
+                return Err(anyhow!(
+                    "Deal cannot move to CONTRACTED until BAC and KYC clearance substates are approved"
+                ));
+            }
+            if !deal_has_group_approved_kyc_clearance(scope, deal_id).await? {
+                return Err(anyhow!(
+                    "Deal cannot move to CONTRACTED until the primary client group has APPROVED KYC clearance"
+                ));
+            }
         }
 
         let timestamp_column = match new_status.as_str() {
@@ -444,6 +474,222 @@ impl SemOsVerbOp for UpdateStatus {
         };
         Ok(VerbExecutionOutcome::Record(serde_json::to_value(result)?))
     }
+}
+
+// =============================================================================
+// deal.submit-for-bac / BAC substate writers
+// =============================================================================
+
+const BAC_CLEARANCE_STATUSES: &[&str] = &["pending", "in_review", "approved", "rejected"];
+
+/// Submit a negotiating deal into the D-004 IN_CLEARANCE substate model.
+pub struct SubmitForBac;
+
+#[async_trait]
+impl SemOsVerbOp for SubmitForBac {
+    fn fqn(&self) -> &str {
+        "deal.submit-for-bac"
+    }
+
+    async fn execute(
+        &self,
+        args: &Value,
+        ctx: &mut VerbExecutionContext,
+        scope: &mut dyn TransactionScope,
+    ) -> Result<VerbExecutionOutcome> {
+        let deal_id = json_extract_uuid(args, ctx, "deal-id")?;
+
+        let affected = sqlx::query(
+            r#"
+            UPDATE "ob-poc".deals
+            SET deal_status = 'IN_CLEARANCE',
+                bac_status = 'in_review',
+                kyc_clearance_status = 'pending',
+                updated_at = NOW()
+            WHERE deal_id = $1
+              AND deal_status = 'NEGOTIATING'
+            "#,
+        )
+        .bind(deal_id)
+        .execute(scope.executor())
+        .await?
+        .rows_affected();
+
+        if affected == 0 {
+            let current_status: Option<String> =
+                sqlx::query_scalar(r#"SELECT deal_status FROM "ob-poc".deals WHERE deal_id = $1"#)
+                    .bind(deal_id)
+                    .fetch_optional(scope.executor())
+                    .await?;
+            let Some(current_status) = current_status else {
+                return Err(anyhow!("Deal not found: {}", deal_id));
+            };
+            return Err(anyhow!(
+                "deal.submit-for-bac requires deal_status NEGOTIATING; current status is {}",
+                current_status
+            ));
+        }
+
+        sqlx::query(
+            r#"
+            INSERT INTO "ob-poc".deal_events (
+                deal_id, event_type, subject_type, subject_id, old_value, new_value, description
+            )
+            VALUES (
+                $1, 'STATUS_CHANGED', 'DEAL', $1, 'NEGOTIATING', 'IN_CLEARANCE',
+                'Submitted for BAC; seeded bac_status=in_review and kyc_clearance_status=pending'
+            )
+            "#,
+        )
+        .bind(deal_id)
+        .execute(scope.executor())
+        .await?;
+
+        dsl_runtime::domain_ops::helpers::emit_pending_state_advance(
+            ctx,
+            deal_id,
+            "deal:in_clearance",
+            "deal/lifecycle",
+            "deal.submit-for-bac — NEGOTIATING → IN_CLEARANCE",
+        );
+
+        Ok(VerbExecutionOutcome::Affected(affected))
+    }
+}
+
+/// Mark the BAC clearance substate as in review while preserving deal status.
+pub struct BacMarkInReview;
+
+#[async_trait]
+impl SemOsVerbOp for BacMarkInReview {
+    fn fqn(&self) -> &str {
+        "deal.bac-mark-in-review"
+    }
+
+    async fn execute(
+        &self,
+        args: &Value,
+        ctx: &mut VerbExecutionContext,
+        scope: &mut dyn TransactionScope,
+    ) -> Result<VerbExecutionOutcome> {
+        update_bac_status(args, ctx, scope, "in_review", None).await
+    }
+}
+
+/// Mark the BAC clearance substate as approved while preserving deal status.
+pub struct BacApprove;
+
+#[async_trait]
+impl SemOsVerbOp for BacApprove {
+    fn fqn(&self) -> &str {
+        "deal.bac-approve"
+    }
+
+    async fn execute(
+        &self,
+        args: &Value,
+        ctx: &mut VerbExecutionContext,
+        scope: &mut dyn TransactionScope,
+    ) -> Result<VerbExecutionOutcome> {
+        update_bac_status(args, ctx, scope, "approved", None).await
+    }
+}
+
+/// Mark the BAC clearance substate as rejected while preserving deal status.
+pub struct BacReject;
+
+#[async_trait]
+impl SemOsVerbOp for BacReject {
+    fn fqn(&self) -> &str {
+        "deal.bac-reject"
+    }
+
+    async fn execute(
+        &self,
+        args: &Value,
+        ctx: &mut VerbExecutionContext,
+        scope: &mut dyn TransactionScope,
+    ) -> Result<VerbExecutionOutcome> {
+        let reason = json_extract_string_opt(args, "reason");
+        update_bac_status(args, ctx, scope, "rejected", reason.as_deref()).await
+    }
+}
+
+async fn update_bac_status(
+    args: &Value,
+    ctx: &mut VerbExecutionContext,
+    scope: &mut dyn TransactionScope,
+    target: &str,
+    reason: Option<&str>,
+) -> Result<VerbExecutionOutcome> {
+    if !BAC_CLEARANCE_STATUSES.contains(&target) {
+        return Err(anyhow!(
+            "Invalid bac_status '{}'. Must be one of: {}",
+            target,
+            BAC_CLEARANCE_STATUSES.join(", ")
+        ));
+    }
+
+    let deal_id = json_extract_uuid(args, ctx, "deal-id")?;
+    let affected = sqlx::query(
+        r#"
+        UPDATE "ob-poc".deals
+        SET bac_status = $2,
+            updated_at = NOW()
+        WHERE deal_id = $1
+          AND deal_status = 'IN_CLEARANCE'
+        "#,
+    )
+    .bind(deal_id)
+    .bind(target)
+    .execute(scope.executor())
+    .await?
+    .rows_affected();
+
+    if affected == 0 {
+        let current_status: Option<String> =
+            sqlx::query_scalar(r#"SELECT deal_status FROM "ob-poc".deals WHERE deal_id = $1"#)
+                .bind(deal_id)
+                .fetch_optional(scope.executor())
+                .await?;
+        let Some(current_status) = current_status else {
+            return Err(anyhow!("Deal not found: {}", deal_id));
+        };
+        return Err(anyhow!(
+            "BAC substate updates require deal_status IN_CLEARANCE; current status is {}",
+            current_status
+        ));
+    }
+
+    let description = match reason {
+        Some(reason) if !reason.is_empty() => format!("BAC substate set to {target}: {reason}"),
+        Some(_) | None => format!("BAC substate set to {target}"),
+    };
+
+    sqlx::query(
+        r#"
+        INSERT INTO "ob-poc".deal_events (
+            deal_id, event_type, subject_type, subject_id, new_value, description
+        )
+        VALUES ($1, 'BAC_STATUS_CHANGED', 'DEAL', $1, $2, $3)
+        "#,
+    )
+    .bind(deal_id)
+    .bind(target)
+    .bind(&description)
+    .execute(scope.executor())
+    .await?;
+
+    let advance_reason = format!("deal BAC substate -> {target}");
+    dsl_runtime::domain_ops::helpers::emit_pending_state_advance(
+        ctx,
+        deal_id,
+        "deal:in_clearance",
+        "deal/lifecycle",
+        &advance_reason,
+    );
+
+    Ok(VerbExecutionOutcome::Affected(affected))
 }
 
 // =============================================================================
@@ -2048,6 +2294,23 @@ impl SemOsVerbOp for ReadSummary {
 
 const KYC_CLEARANCE_STATUSES: &[&str] = &["pending", "in_review", "approved", "rejected"];
 
+pub struct KycMarkInReview;
+
+#[async_trait]
+impl SemOsVerbOp for KycMarkInReview {
+    fn fqn(&self) -> &str {
+        "deal.kyc-mark-in-review"
+    }
+    async fn execute(
+        &self,
+        args: &Value,
+        ctx: &mut VerbExecutionContext,
+        scope: &mut dyn TransactionScope,
+    ) -> Result<VerbExecutionOutcome> {
+        update_kyc_clearance_status(args, ctx, scope, "in_review").await
+    }
+}
+
 pub struct UpdateKycClearance;
 
 #[async_trait]
@@ -2061,33 +2324,116 @@ impl SemOsVerbOp for UpdateKycClearance {
         ctx: &mut VerbExecutionContext,
         scope: &mut dyn TransactionScope,
     ) -> Result<VerbExecutionOutcome> {
-        let deal_id = json_extract_uuid(args, ctx, "deal-id")?;
         let target = json_extract_string(args, "kyc-clearance-status")?;
+        update_kyc_clearance_status(args, ctx, scope, &target).await
+    }
+}
 
-        if !KYC_CLEARANCE_STATUSES.contains(&target.as_str()) {
-            return Err(anyhow!(
-                "Invalid kyc-clearance-status '{}'. Must be one of: {}",
-                target,
-                KYC_CLEARANCE_STATUSES.join(", ")
-            ));
-        }
+async fn update_kyc_clearance_status(
+    args: &Value,
+    ctx: &mut VerbExecutionContext,
+    scope: &mut dyn TransactionScope,
+    target: &str,
+) -> Result<VerbExecutionOutcome> {
+    if !KYC_CLEARANCE_STATUSES.contains(&target) {
+        return Err(anyhow!(
+            "Invalid kyc-clearance-status '{}'. Must be one of: {}",
+            target,
+            KYC_CLEARANCE_STATUSES.join(", ")
+        ));
+    }
 
-        let affected = sqlx::query(
-            r#"UPDATE "ob-poc".deals
-               SET kyc_clearance_status = $2,
-                   updated_at = NOW()
-               WHERE deal_id = $1"#,
-        )
-        .bind(deal_id)
-        .bind(&target)
-        .execute(scope.executor())
-        .await?
-        .rows_affected();
+    let deal_id = json_extract_uuid(args, ctx, "deal-id")?;
+    let affected = sqlx::query(
+        r#"
+        UPDATE "ob-poc".deals
+        SET kyc_clearance_status = $2,
+            updated_at = NOW()
+        WHERE deal_id = $1
+          AND deal_status = 'IN_CLEARANCE'
+        "#,
+    )
+    .bind(deal_id)
+    .bind(target)
+    .execute(scope.executor())
+    .await?
+    .rows_affected();
 
-        if affected == 0 {
+    if affected == 0 {
+        let current_status: Option<String> =
+            sqlx::query_scalar(r#"SELECT deal_status FROM "ob-poc".deals WHERE deal_id = $1"#)
+                .bind(deal_id)
+                .fetch_optional(scope.executor())
+                .await?;
+        let Some(current_status) = current_status else {
             return Err(anyhow!("Deal not found: {}", deal_id));
-        }
+        };
+        return Err(anyhow!(
+            "KYC clearance substate updates require deal_status IN_CLEARANCE; current status is {}",
+            current_status
+        ));
+    }
 
-        Ok(VerbExecutionOutcome::Affected(affected))
+    sqlx::query(
+        r#"
+        INSERT INTO "ob-poc".deal_events (
+            deal_id, event_type, subject_type, subject_id, new_value, description
+        )
+        VALUES ($1, 'KYC_CLEARANCE_STATUS_CHANGED', 'DEAL', $1, $2, $3)
+        "#,
+    )
+    .bind(deal_id)
+    .bind(target)
+    .bind(format!("KYC clearance substate set to {target}"))
+    .execute(scope.executor())
+    .await?;
+
+    let advance_reason = format!("deal KYC clearance substate -> {target}");
+    dsl_runtime::domain_ops::helpers::emit_pending_state_advance(
+        ctx,
+        deal_id,
+        "deal:in_clearance",
+        "deal/lifecycle",
+        &advance_reason,
+    );
+
+    Ok(VerbExecutionOutcome::Affected(affected))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn d004_deal_status_transitions_use_in_clearance() {
+        assert!(is_valid_deal_status_transition(
+            "NEGOTIATING",
+            "IN_CLEARANCE"
+        ));
+        assert!(is_valid_deal_status_transition(
+            "IN_CLEARANCE",
+            "CONTRACTED"
+        ));
+        assert!(is_valid_deal_status_transition("IN_CLEARANCE", "REJECTED"));
+        assert!(!is_valid_deal_status_transition(
+            "NEGOTIATING",
+            "KYC_CLEARANCE"
+        ));
+        assert!(!is_valid_deal_status_transition(
+            "KYC_CLEARANCE",
+            "CONTRACTED"
+        ));
+    }
+
+    #[test]
+    fn bac_status_values_match_migration_constraint() {
+        assert_eq!(
+            BAC_CLEARANCE_STATUSES,
+            ["pending", "in_review", "approved", "rejected"]
+        );
+        assert_eq!(
+            KYC_CLEARANCE_STATUSES,
+            ["pending", "in_review", "approved", "rejected"]
+        );
     }
 }

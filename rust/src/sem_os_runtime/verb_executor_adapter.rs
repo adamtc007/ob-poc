@@ -571,6 +571,7 @@ fn ast_node_to_json_value(node: &AstNode) -> serde_json::Value {
     match node {
         AstNode::Literal(Literal::String(s), _) => serde_json::Value::String(s.clone()),
         AstNode::Literal(Literal::Integer(i), _) => serde_json::Value::Number((*i).into()),
+        AstNode::Literal(Literal::Decimal(d), _) => serde_json::Value::String(d.to_string()),
         AstNode::Literal(Literal::Boolean(b), _) => serde_json::Value::Bool(*b),
         AstNode::Literal(Literal::Uuid(u), _) => serde_json::Value::String(u.to_string()),
         AstNode::Literal(Literal::Null, _) => serde_json::Value::Null,
@@ -579,9 +580,24 @@ fn ast_node_to_json_value(node: &AstNode) -> serde_json::Value {
             // detect `@foo` by prefix.
             serde_json::Value::String(format!("@{}", name))
         }
-        // Anything else: stringify the Debug repr so the caller at least
-        // sees something — matches build_verb_call's lossy fallback.
-        other => serde_json::Value::String(format!("{:?}", other)),
+        AstNode::EntityRef {
+            resolved_key,
+            value,
+            ..
+        } => serde_json::Value::String(resolved_key.clone().unwrap_or_else(|| value.clone())),
+        AstNode::List { items, .. } => {
+            serde_json::Value::Array(items.iter().map(ast_node_to_json_value).collect::<Vec<_>>())
+        }
+        AstNode::Map { entries, .. } => {
+            let mut map = serde_json::Map::new();
+            for (key, value) in entries {
+                map.insert(key.clone(), ast_node_to_json_value(value));
+            }
+            serde_json::Value::Object(map)
+        }
+        // Nested calls are not valid primitive plugin arguments at this stage.
+        // Preserve the legacy lossy fallback so existing error paths stay stable.
+        AstNode::Nested(vc) => serde_json::Value::String(format!("{vc:?}")),
     }
 }
 

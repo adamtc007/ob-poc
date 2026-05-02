@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict D08NJJMTcm0AuA1d35m1KJcGbljGN92Wdl3356HU8y8FyQc0H1apX42IUj6ZEEk
+\restrict 70LEJzJuuBaIAXPJoI0l5uyCbc0Mm8gE0kRveb66raRV5rsUPWTBpT2gYsT7OCB
 
 -- Dumped from database version 18.1 (Homebrew)
 -- Dumped by pg_dump version 18.1 (Homebrew)
@@ -8878,6 +8878,8 @@ CREATE TABLE "ob-poc".cbu_service_consumption (
     retired_at timestamp with time zone,
     created_at timestamp with time zone DEFAULT (now() AT TIME ZONE 'utc'::text),
     updated_at timestamp with time zone DEFAULT (now() AT TIME ZONE 'utc'::text),
+    service_id uuid,
+    onboarding_request_id uuid,
     CONSTRAINT cbu_service_consumption_service_kind_check CHECK (((service_kind)::text = ANY (ARRAY[('CUSTODY'::character varying)::text, ('TA'::character varying)::text, ('FA'::character varying)::text, ('SEC_LENDING'::character varying)::text, ('FX'::character varying)::text, ('TRADING'::character varying)::text, ('REPORTING'::character varying)::text, ('PRICING'::character varying)::text, ('COLLATERAL'::character varying)::text]))),
     CONSTRAINT cbu_service_consumption_status_check CHECK (((status)::text = ANY (ARRAY[('proposed'::character varying)::text, ('provisioned'::character varying)::text, ('active'::character varying)::text, ('suspended'::character varying)::text, ('winding_down'::character varying)::text, ('retired'::character varying)::text])))
 );
@@ -8887,7 +8889,7 @@ CREATE TABLE "ob-poc".cbu_service_consumption (
 -- Name: TABLE cbu_service_consumption; Type: COMMENT; Schema: ob-poc; Owner: -
 --
 
-COMMENT ON TABLE "ob-poc".cbu_service_consumption IS 'Per-(cbu, service_kind) service provisioning lifecycle (R-3). CBU consumes services to operate on the street; this table tracks which services are in which state for each CBU.';
+COMMENT ON TABLE "ob-poc".cbu_service_consumption IS 'Operational layer: per-(cbu, service_kind) provisioning lifecycle. State machine M-039, 6 states (proposed, provisioned, active, suspended, winding_down, retired). Distinct from service_intents (M-026) which models intent at the (cbu, product/service) grain. service_id + onboarding_request_id close S-15 (Deal→Ops handoff attribution).';
 
 
 --
@@ -8976,7 +8978,9 @@ CREATE TABLE "ob-poc".cbu_settlement_chains (
     effective_date date,
     notes text,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
-    updated_at timestamp with time zone DEFAULT now() NOT NULL
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    lifecycle_status text,
+    CONSTRAINT cbu_settlement_chains_lifecycle_status_check CHECK (((lifecycle_status IS NULL) OR (lifecycle_status = ANY (ARRAY['draft'::text, 'configured'::text, 'reviewed'::text, 'parallel_run'::text, 'live'::text, 'suspended'::text, 'deactivated'::text]))))
 );
 
 
@@ -9299,7 +9303,7 @@ CREATE TABLE "ob-poc".cbu_trading_profiles (
     group_id uuid,
     is_template boolean DEFAULT false NOT NULL,
     template_id uuid,
-    CONSTRAINT cbu_trading_profiles_status_check CHECK (((status)::text = ANY (ARRAY[('DRAFT'::character varying)::text, ('VALIDATED'::character varying)::text, ('PENDING_REVIEW'::character varying)::text, ('ACTIVE'::character varying)::text, ('SUPERSEDED'::character varying)::text, ('ARCHIVED'::character varying)::text])))
+    CONSTRAINT cbu_trading_profiles_status_check CHECK (((status)::text = ANY ((ARRAY['DRAFT'::character varying, 'SUBMITTED'::character varying, 'APPROVED'::character varying, 'PARALLEL_RUN'::character varying, 'ACTIVE'::character varying, 'SUSPENDED'::character varying, 'REJECTED'::character varying, 'SUPERSEDED'::character varying, 'ARCHIVED'::character varying])::text[])))
 );
 
 
@@ -9417,9 +9421,11 @@ CREATE TABLE "ob-poc".cbus (
     operational_status character varying(30),
     disposition_status character varying(30) DEFAULT 'active'::character varying,
     book_id uuid,
+    cbu_discovery_state character varying(30) DEFAULT 'PENDING'::character varying NOT NULL,
     CONSTRAINT chk_cbu_category CHECK (((cbu_category IS NULL) OR ((cbu_category)::text = ANY (ARRAY[('FUND_MANDATE'::character varying)::text, ('CORPORATE_GROUP'::character varying)::text, ('INSTITUTIONAL_ACCOUNT'::character varying)::text, ('RETAIL_CLIENT'::character varying)::text, ('FAMILY_TRUST'::character varying)::text, ('CORRESPONDENT_BANK'::character varying)::text, ('INTERNAL_TEST'::character varying)::text])))),
+    CONSTRAINT chk_cbu_discovery_state CHECK (((cbu_discovery_state)::text = ANY (ARRAY['PENDING'::text, 'DISCOVERING'::text, 'ROLLUP'::text, 'POPULATE'::text, 'PROVISION'::text, 'READY'::text, 'FAILED'::text, 'BLOCKED'::text]))),
     CONSTRAINT chk_cbu_disposition_status CHECK (((disposition_status)::text = ANY (ARRAY[('active'::character varying)::text, ('under_remediation'::character varying)::text, ('soft_deleted'::character varying)::text, ('hard_deleted'::character varying)::text]))),
-    CONSTRAINT chk_cbu_operational_status CHECK (((operational_status IS NULL) OR ((operational_status)::text = ANY (ARRAY[('dormant'::character varying)::text, ('trade_permissioned'::character varying)::text, ('actively_trading'::character varying)::text, ('restricted'::character varying)::text, ('suspended'::character varying)::text, ('winding_down'::character varying)::text, ('offboarded'::character varying)::text, ('archived'::character varying)::text])))),
+    CONSTRAINT chk_cbu_operational_status CHECK (((operational_status IS NULL) OR ((operational_status)::text = ANY ((ARRAY['dormant'::character varying, 'trade_permissioned'::character varying, 'actively_trading'::character varying, 'restricted'::character varying, 'suspended'::character varying, 'winding_down'::character varying, 'offboarded'::character varying, 'archived'::character varying])::text[])))),
     CONSTRAINT chk_cbu_status CHECK (((status)::text = ANY (ARRAY[('DISCOVERED'::character varying)::text, ('VALIDATION_PENDING'::character varying)::text, ('VALIDATED'::character varying)::text, ('UPDATE_PENDING_PROOF'::character varying)::text, ('VALIDATION_FAILED'::character varying)::text])))
 );
 
@@ -9485,6 +9491,13 @@ COMMENT ON COLUMN "ob-poc".cbus.disposition_status IS 'Administrative dispositio
 --
 
 COMMENT ON COLUMN "ob-poc".cbus.book_id IS 'Parent client_book (T3-B). Groups CBUs under one commercial client. NULL for CBUs predating book-setup workspace introduction.';
+
+
+--
+-- Name: COLUMN cbus.cbu_discovery_state; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON COLUMN "ob-poc".cbus.cbu_discovery_state IS 'SemOS-visible service discovery/provisioning pipeline state. PENDING | DISCOVERING | ROLLUP | POPULATE | PROVISION | READY | FAILED | BLOCKED';
 
 
 --
@@ -10628,7 +10641,7 @@ CREATE TABLE "ob-poc".deal_slas (
     effective_to date,
     created_at timestamp with time zone DEFAULT now(),
     sla_status character varying(30) DEFAULT 'NEGOTIATED'::character varying NOT NULL,
-    CONSTRAINT deal_slas_sla_status_check CHECK (((sla_status)::text = ANY (ARRAY[('NEGOTIATED'::character varying)::text, ('ACTIVE'::character varying)::text, ('BREACHED'::character varying)::text, ('IN_REMEDIATION'::character varying)::text, ('RESOLVED'::character varying)::text, ('WAIVED'::character varying)::text])))
+    CONSTRAINT deal_slas_sla_status_check CHECK (((sla_status IS NULL) OR ((sla_status)::text = ANY ((ARRAY['NEGOTIATED'::character varying, 'ACTIVE'::character varying, 'BREACHED'::character varying, 'IN_REMEDIATION'::character varying, 'RESOLVED'::character varying, 'WAIVED'::character varying])::text[]))))
 );
 
 
@@ -10725,7 +10738,13 @@ CREATE TABLE "ob-poc".deals (
     rm_entity_id uuid,
     coverage_banker_entity_id uuid,
     parent_deal_id uuid,
-    CONSTRAINT deals_status_check CHECK (((deal_status)::text = ANY (ARRAY[('PROSPECT'::character varying)::text, ('QUALIFYING'::character varying)::text, ('NEGOTIATING'::character varying)::text, ('BAC_APPROVAL'::character varying)::text, ('KYC_CLEARANCE'::character varying)::text, ('CONTRACTED'::character varying)::text, ('ONBOARDING'::character varying)::text, ('ACTIVE'::character varying)::text, ('SUSPENDED'::character varying)::text, ('WINDING_DOWN'::character varying)::text, ('OFFBOARDED'::character varying)::text, ('CANCELLED'::character varying)::text, ('LOST'::character varying)::text, ('REJECTED'::character varying)::text, ('WITHDRAWN'::character varying)::text])))
+    operational_status text,
+    bac_status text,
+    kyc_clearance_status text,
+    CONSTRAINT deals_bac_status_check CHECK (((bac_status IS NULL) OR (bac_status = ANY (ARRAY['pending'::text, 'in_review'::text, 'approved'::text, 'rejected'::text])))),
+    CONSTRAINT deals_kyc_clearance_status_check CHECK (((kyc_clearance_status IS NULL) OR (kyc_clearance_status = ANY (ARRAY['pending'::text, 'in_review'::text, 'approved'::text, 'rejected'::text])))),
+    CONSTRAINT deals_operational_status_check CHECK (((operational_status IS NULL) OR (operational_status = ANY (ARRAY['ONBOARDING'::text, 'ACTIVE'::text, 'SUSPENDED'::text, 'WINDING_DOWN'::text, 'OFFBOARDED'::text])))),
+    CONSTRAINT deals_status_check CHECK (((deal_status)::text = ANY ((ARRAY['PROSPECT'::character varying, 'QUALIFYING'::character varying, 'NEGOTIATING'::character varying, 'IN_CLEARANCE'::character varying, 'CONTRACTED'::character varying, 'LOST'::character varying, 'REJECTED'::character varying, 'WITHDRAWN'::character varying, 'CANCELLED'::character varying])::text[])))
 );
 
 
@@ -16234,7 +16253,7 @@ CREATE TABLE "ob-poc".service_intents (
 -- Name: TABLE service_intents; Type: COMMENT; Schema: ob-poc; Owner: -
 --
 
-COMMENT ON TABLE "ob-poc".service_intents IS 'CBU subscription to product/service combinations. Input to resource discovery.';
+COMMENT ON TABLE "ob-poc".service_intents IS 'Intent layer: per-(cbu, product/service) intent declarations. State machine M-026, 3 states (active, suspended, cancelled). Distinct from cbu_service_consumption (M-039) which models per-(cbu, service_kind) operational lifecycle.';
 
 
 --
@@ -27764,6 +27783,20 @@ CREATE INDEX idx_cbu_service_consumption_cbu ON "ob-poc".cbu_service_consumption
 
 
 --
+-- Name: idx_cbu_service_consumption_onboarding_request; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_cbu_service_consumption_onboarding_request ON "ob-poc".cbu_service_consumption USING btree (onboarding_request_id);
+
+
+--
+-- Name: idx_cbu_service_consumption_service; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_cbu_service_consumption_service ON "ob-poc".cbu_service_consumption USING btree (service_id);
+
+
+--
 -- Name: idx_cbu_service_consumption_status; Type: INDEX; Schema: ob-poc; Owner: -
 --
 
@@ -31666,7 +31699,7 @@ CREATE UNIQUE INDEX idx_trading_profiles_one_active ON "ob-poc".cbu_trading_prof
 -- Name: idx_trading_profiles_one_working_version; Type: INDEX; Schema: ob-poc; Owner: -
 --
 
-CREATE UNIQUE INDEX idx_trading_profiles_one_working_version ON "ob-poc".cbu_trading_profiles USING btree (cbu_id) WHERE ((status)::text = ANY (ARRAY[('DRAFT'::character varying)::text, ('VALIDATED'::character varying)::text, ('PENDING_REVIEW'::character varying)::text]));
+CREATE UNIQUE INDEX idx_trading_profiles_one_working_version ON "ob-poc".cbu_trading_profiles USING btree (cbu_id) WHERE ((status)::text = ANY ((ARRAY['DRAFT'::character varying, 'SUBMITTED'::character varying, 'APPROVED'::character varying, 'PARALLEL_RUN'::character varying])::text[]));
 
 
 --
@@ -34133,6 +34166,22 @@ ALTER TABLE ONLY "ob-poc".cbu_resource_instances
 
 ALTER TABLE ONLY "ob-poc".cbu_service_consumption
     ADD CONSTRAINT cbu_service_consumption_cbu_fk FOREIGN KEY (cbu_id) REFERENCES "ob-poc".cbus(cbu_id) ON DELETE CASCADE;
+
+
+--
+-- Name: cbu_service_consumption cbu_service_consumption_onboarding_request_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".cbu_service_consumption
+    ADD CONSTRAINT cbu_service_consumption_onboarding_request_id_fkey FOREIGN KEY (onboarding_request_id) REFERENCES "ob-poc".deal_onboarding_requests(request_id) ON DELETE SET NULL;
+
+
+--
+-- Name: cbu_service_consumption cbu_service_consumption_service_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".cbu_service_consumption
+    ADD CONSTRAINT cbu_service_consumption_service_id_fkey FOREIGN KEY (service_id) REFERENCES "ob-poc".services(service_id) ON DELETE SET NULL;
 
 
 --
@@ -37795,5 +37844,5 @@ ALTER TABLE ONLY sem_reg_authoring.validation_reports
 -- PostgreSQL database dump complete
 --
 
-\unrestrict D08NJJMTcm0AuA1d35m1KJcGbljGN92Wdl3356HU8y8FyQc0H1apX42IUj6ZEEk
+\unrestrict 70LEJzJuuBaIAXPJoI0l5uyCbc0Mm8gE0kRveb66raRV5rsUPWTBpT2gYsT7OCB
 

@@ -382,6 +382,10 @@ domains:
           entity_id_arg: investor-id
           target_workspace: cbu
           target_slot: investor_kyc
+        writes:
+          - table: investors
+            column: kyc_status
+            value: REFRESH_REQUIRED
 
       start-kyc:
         flavour: instance_adding
@@ -439,6 +443,10 @@ domains:
           entity_id_arg: investor-id
           target_workspace: cbu
           target_slot: investor_kyc
+        writes:
+          - table: investors
+            column: kyc_status
+            value: IN_PROGRESS
 
       approve-kyc:
         flavour: discretionary
@@ -505,6 +513,10 @@ domains:
           entity_id_arg: investor-id
           target_workspace: cbu
           target_slot: investor_kyc
+        writes:
+          - table: investors
+            column: kyc_status
+            value: APPROVED
 
       reject-kyc:
         flavour: discretionary
@@ -560,6 +572,10 @@ domains:
           entity_id_arg: investor-id
           target_workspace: cbu
           target_slot: investor_kyc
+        writes:
+          - table: investors
+            column: kyc_status
+            value: REJECTED
 
       mark-eligible:
         flavour: attribute_mutating
@@ -610,6 +626,10 @@ domains:
           entity_id_arg: investor-id
           target_workspace: cbu
           target_slot: investor
+        writes:
+          - table: investors
+            column: lifecycle_state
+            value: ELIGIBLE_TO_SUBSCRIBE
 
       record-subscription:
         flavour: attribute_mutating

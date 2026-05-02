@@ -244,7 +244,9 @@ mod tests {
             .any(|seed| seed.fqn == "client_group_lifecycle"));
         assert!(seeds.iter().any(|seed| seed.fqn == "screening_lifecycle"));
         assert!(seeds.iter().any(|seed| seed.fqn == "document_lifecycle"));
-        assert!(seeds.iter().any(|seed| seed.fqn == "deal_lifecycle"));
+        assert!(seeds
+            .iter()
+            .any(|seed| seed.fqn == "deal_commercial_lifecycle"));
         assert!(seeds
             .iter()
             .any(|seed| seed.fqn == "trading_profile_lifecycle"));

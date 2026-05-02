@@ -17,6 +17,8 @@
 //! - `client-group.entity-manage` — Consolidated entity lifecycle (dispatch by action)
 //! - `client-group.entity-add` — Add entity to group membership
 //! - `client-group.entity-remove` — Remove entity (or mark historical)
+//! - `client-group.link-cbu` — Link active entity memberships to a CBU
+//! - `client-group.unlink-cbu` — Unlink active entity memberships from a CBU
 //! - `client-group.list-entities` — List entities in group with tags
 //! - `client-group.tag-add` — Add shorthand tag to entity
 //! - `client-group.tag-remove` — Remove tag
@@ -209,6 +211,104 @@ impl SemOsVerbOp for EntityAdd {
         );
 
         Ok(VerbExecutionOutcome::Uuid(id))
+    }
+}
+
+// =============================================================================
+// client-group.link-cbu
+// =============================================================================
+
+pub struct LinkCbu;
+
+#[async_trait]
+impl SemOsVerbOp for LinkCbu {
+    fn fqn(&self) -> &str {
+        "client-group.link-cbu"
+    }
+
+    async fn execute(
+        &self,
+        args: &Value,
+        ctx: &mut VerbExecutionContext,
+        scope: &mut dyn TransactionScope,
+    ) -> Result<VerbExecutionOutcome> {
+        let cbu_id = json_extract_uuid(args, ctx, "cbu-id")?;
+        let entity_id = json_extract_uuid(args, ctx, "entity-id")?;
+
+        let affected = sqlx::query(
+            r#"
+            UPDATE "ob-poc".client_group_entity
+            SET cbu_id = $1, updated_at = NOW()
+            WHERE entity_id = $2
+              AND membership_type NOT IN ('historical', 'rejected')
+              AND cbu_id IS NULL
+            "#,
+        )
+        .bind(cbu_id)
+        .bind(entity_id)
+        .execute(scope.executor())
+        .await?
+        .rows_affected();
+
+        if affected > 0 {
+            dsl_runtime::domain_ops::helpers::emit_pending_state_advance(
+                ctx,
+                entity_id,
+                "client-group-membership:cbu-linked",
+                "client-group/membership",
+                &format!(
+                    "client-group.link-cbu — entity {} linked to CBU {}",
+                    entity_id, cbu_id
+                ),
+            );
+        }
+
+        Ok(VerbExecutionOutcome::Affected(affected))
+    }
+}
+
+// =============================================================================
+// client-group.unlink-cbu
+// =============================================================================
+
+pub struct UnlinkCbu;
+
+#[async_trait]
+impl SemOsVerbOp for UnlinkCbu {
+    fn fqn(&self) -> &str {
+        "client-group.unlink-cbu"
+    }
+
+    async fn execute(
+        &self,
+        args: &Value,
+        ctx: &mut VerbExecutionContext,
+        scope: &mut dyn TransactionScope,
+    ) -> Result<VerbExecutionOutcome> {
+        let cbu_id = json_extract_uuid(args, ctx, "cbu-id")?;
+        let affected = sqlx::query(
+            r#"
+            UPDATE "ob-poc".client_group_entity
+            SET cbu_id = NULL, updated_at = NOW()
+            WHERE cbu_id = $1
+            "#,
+        )
+        .bind(cbu_id)
+        .execute(scope.executor())
+        .await?
+        .rows_affected();
+
+        if affected > 0 {
+            dsl_runtime::domain_ops::helpers::emit_pending_state_advance(
+                ctx,
+                cbu_id,
+                "client-group-membership:cbu-unlinked",
+                "client-group/membership",
+                &format!("client-group.unlink-cbu — CBU {} unlinked", cbu_id),
+            );
+        }
+
+        Ok(VerbExecutionOutcome::Affected(affected))
     }
 }
 

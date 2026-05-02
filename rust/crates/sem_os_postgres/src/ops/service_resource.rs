@@ -95,8 +95,40 @@ impl SemOsVerbOp for Provision {
         }
 
         let instance_id = Uuid::new_v4();
-        let row: (Uuid,) = sqlx::query_as(
-            r#"WITH ins AS (
+        let row: (Uuid,) = if product_id.is_some() && service_id.is_some() {
+            sqlx::query_as(
+                r#"WITH ins AS (
+                INSERT INTO "ob-poc".cbu_resource_instances
+                (instance_id, cbu_id, product_id, service_id, resource_type_id,
+                 instance_url, instance_identifier, instance_name, status)
+                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'PENDING')
+                ON CONFLICT ON CONSTRAINT cbu_resource_instances_cbu_product_service_resource_key
+                DO NOTHING
+                RETURNING instance_id
+            )
+            SELECT instance_id FROM ins
+            UNION ALL
+            SELECT instance_id FROM "ob-poc".cbu_resource_instances
+            WHERE cbu_id = $2
+              AND product_id = $3
+              AND service_id = $4
+              AND resource_type_id = $5
+            AND NOT EXISTS (SELECT 1 FROM ins)
+            LIMIT 1"#,
+            )
+            .bind(instance_id)
+            .bind(cbu_id)
+            .bind(product_id)
+            .bind(service_id)
+            .bind(resource_type_id)
+            .bind(&instance_url)
+            .bind(&instance_identifier)
+            .bind(&instance_name)
+            .fetch_one(scope.executor())
+            .await?
+        } else {
+            sqlx::query_as(
+                r#"WITH ins AS (
                 INSERT INTO "ob-poc".cbu_resource_instances
                 (instance_id, cbu_id, product_id, service_id, resource_type_id,
                  instance_url, instance_identifier, instance_name, status)
@@ -110,17 +142,18 @@ impl SemOsVerbOp for Provision {
             WHERE instance_url = $6
             AND NOT EXISTS (SELECT 1 FROM ins)
             LIMIT 1"#,
-        )
-        .bind(instance_id)
-        .bind(cbu_id)
-        .bind(product_id)
-        .bind(service_id)
-        .bind(resource_type_id)
-        .bind(&instance_url)
-        .bind(&instance_identifier)
-        .bind(&instance_name)
-        .fetch_one(scope.executor())
-        .await?;
+            )
+            .bind(instance_id)
+            .bind(cbu_id)
+            .bind(product_id)
+            .bind(service_id)
+            .bind(resource_type_id)
+            .bind(&instance_url)
+            .bind(&instance_identifier)
+            .bind(&instance_name)
+            .fetch_one(scope.executor())
+            .await?
+        };
 
         let result_id = row.0;
         for dep in depends_on_refs {

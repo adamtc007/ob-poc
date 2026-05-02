@@ -189,6 +189,7 @@ pub fn derive_replay_verdict(
 ///     situation_signature_hash: None,
 ///     template_id: None,
 ///     template_version: None,
+///     is_synthetic: false,
 ///     surface_versions: SurfaceVersions::default(),
 ///     trace_payload: serde_json::json!({
 ///         "phase_3": { "phase4_candidate_set": ["kyc-case.create"] },
@@ -251,6 +252,7 @@ pub fn compare_trace_records(
 ///     situation_signature_hash: None,
 ///     template_id: None,
 ///     template_version: None,
+///     is_synthetic: false,
 ///     surface_versions: SurfaceVersions::default(),
 ///     trace_payload: serde_json::json!({
 ///         "phase_3": { "phase4_candidate_set": ["case.open"] },

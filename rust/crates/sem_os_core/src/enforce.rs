@@ -240,7 +240,14 @@ mod tests {
             change_rationale: None,
             created_by: "test".into(),
             approved_by: None,
-            definition: serde_json::json!({"fqn": "test.attr"}),
+            definition: serde_json::json!({
+                "fqn": "test.attr",
+                "name": "Test Attribute",
+                "description": "Test attribute used by enforcement unit tests",
+                "domain": "test",
+                "data_type": "string",
+                "evidence_grade": "none"
+            }),
             created_at: chrono::Utc::now(),
         }
     }

@@ -583,7 +583,7 @@ impl Phase2Artifacts {
     /// use ob_poc::traceability::Phase2Artifacts;
     ///
     /// let payload = Phase2Artifacts::new(None, None).payload_or_unavailable("example");
-    /// assert_eq!(payload["source"], "example");
+    /// assert_eq!(payload["entrypoint"], "example");
     /// ```
     pub fn payload_or_unavailable(&self, source: &str) -> serde_json::Value {
         if self.is_unavailable() {

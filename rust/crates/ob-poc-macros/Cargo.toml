@@ -13,3 +13,4 @@ proc-macro2 = "1"
 
 [dev-dependencies]
 trybuild = "1"
+uuid = "1"

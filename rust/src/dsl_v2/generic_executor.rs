@@ -492,8 +492,10 @@ impl GenericCrudExecutor {
                 // Convert attrs to args format
                 let mut args: HashMap<String, JsonValue> = HashMap::new();
                 for (k, v) in attrs {
-                    // Convert snake_case to kebab-case for arg names
-                    let arg_name = k.replace('_', "-");
+                    let arg_name = match k.as_str() {
+                        "company_name" | "partnership_name" | "trust_name" => "name".to_string(),
+                        _ => k.replace('_', "-"),
+                    };
                     args.insert(arg_name, v.clone());
                 }
                 if domain == "entity" {
@@ -2045,7 +2047,7 @@ impl GenericCrudExecutor {
         let entity_id = Uuid::new_v4();
 
         // Get entity name - for proper_persons, constructed from first/last name
-        let entity_name = if type_code == "PROPER_PERSON" {
+        let entity_name = if type_code == "PROPER_PERSON" || type_code == "PROPER_PERSON_NATURAL" {
             let first = args
                 .get("first-name")
                 .and_then(|v| v.as_str())
@@ -2168,22 +2170,20 @@ impl GenericCrudExecutor {
         if let Some(name_column) = self.infer_extension_name_column(&extension_table) {
             let quoted = format!("\"{}\"", name_column);
             if !columns.iter().any(|column| column == &quoted) {
-                if let Some(name) = args.get("name").and_then(|value| value.as_str()) {
-                    columns.push(quoted);
-                    placeholders.push(format!("${}", idx));
-                    bind_values.push(SqlValue::String(name.to_string()));
-                }
-            }
-        }
-
-        if let Some(name_column) = self.infer_extension_name_column(&extension_table) {
-            let quoted = format!("\"{}\"", name_column);
-            if !columns.iter().any(|column| column == &quoted) {
-                if let Some(name) = args.get("name").and_then(|value| value.as_str()) {
-                    columns.push(quoted);
-                    placeholders.push(format!("${}", idx));
-                    bind_values.push(SqlValue::String(name.to_string()));
-                }
+                let name = args
+                    .get("name")
+                    .and_then(|value| value.as_str())
+                    .ok_or_else(|| {
+                        anyhow!(
+                            "entity.create for {} requires :name because {}.{} is NOT NULL",
+                            type_code,
+                            extension_table,
+                            name_column
+                        )
+                    })?;
+                columns.push(quoted);
+                placeholders.push(format!("${}", idx));
+                bind_values.push(SqlValue::String(name.to_string()));
             }
         }
 
@@ -2241,7 +2241,7 @@ impl GenericCrudExecutor {
             .unwrap_or_else(|| type_row.try_get("table_name").unwrap_or_default());
 
         // Get entity name - for proper_persons, constructed from first/last name
-        let entity_name = if type_code == "PROPER_PERSON" {
+        let entity_name = if type_code == "PROPER_PERSON" || type_code == "PROPER_PERSON_NATURAL" {
             let first = args
                 .get("first-name")
                 .and_then(|v| v.as_str())
@@ -2342,12 +2342,21 @@ impl GenericCrudExecutor {
         if let Some(name_column) = self.infer_extension_name_column(&extension_table) {
             let quoted = format!("\"{}\"", name_column);
             if !columns.iter().any(|column| column == &quoted) {
-                if let Some(name) = args.get("name").and_then(|value| value.as_str()) {
-                    columns.push(quoted.clone());
-                    placeholders.push(format!("${}", idx));
-                    update_cols.push(format!("{quoted} = EXCLUDED.{quoted}"));
-                    bind_values.push(SqlValue::String(name.to_string()));
-                }
+                let name = args
+                    .get("name")
+                    .and_then(|value| value.as_str())
+                    .ok_or_else(|| {
+                        anyhow!(
+                            "entity.ensure for {} requires :name because {}.{} is NOT NULL",
+                            type_code,
+                            extension_table,
+                            name_column
+                        )
+                    })?;
+                columns.push(quoted.clone());
+                placeholders.push(format!("${}", idx));
+                update_cols.push(format!("{quoted} = EXCLUDED.{quoted}"));
+                bind_values.push(SqlValue::String(name.to_string()));
             }
         }
 
@@ -3280,7 +3289,7 @@ impl GenericCrudExecutor {
 
         let entity_id = Uuid::new_v4();
 
-        let entity_name = if type_code == "PROPER_PERSON" {
+        let entity_name = if type_code == "PROPER_PERSON" || type_code == "PROPER_PERSON_NATURAL" {
             let first = args
                 .get("first-name")
                 .and_then(|v| v.as_str())
@@ -3388,6 +3397,26 @@ impl GenericCrudExecutor {
             }
         }
 
+        if let Some(name_column) = self.infer_extension_name_column(&extension_table) {
+            let quoted = format!("\"{}\"", name_column);
+            if !columns.iter().any(|column| column == &quoted) {
+                let name = args
+                    .get("name")
+                    .and_then(|value| value.as_str())
+                    .ok_or_else(|| {
+                        anyhow!(
+                            "entity.create for {} requires :name because {}.{} is NOT NULL",
+                            type_code,
+                            extension_table,
+                            name_column
+                        )
+                    })?;
+                columns.push(quoted);
+                placeholders.push(format!("${}", idx));
+                bind_values.push(SqlValue::String(name.to_string()));
+            }
+        }
+
         let ext_sql = format!(
             r#"INSERT INTO "{}"."{}" ({}) VALUES ({})"#,
             crud.schema,
@@ -3433,7 +3462,7 @@ impl GenericCrudExecutor {
             .clone()
             .unwrap_or_else(|| type_row.try_get("table_name").unwrap_or_default());
 
-        let entity_name = if type_code == "PROPER_PERSON" {
+        let entity_name = if type_code == "PROPER_PERSON" || type_code == "PROPER_PERSON_NATURAL" {
             let first = args
                 .get("first-name")
                 .and_then(|v| v.as_str())
@@ -3530,12 +3559,21 @@ impl GenericCrudExecutor {
         if let Some(name_column) = self.infer_extension_name_column(&extension_table) {
             let quoted = format!("\"{}\"", name_column);
             if !columns.iter().any(|column| column == &quoted) {
-                if let Some(name) = args.get("name").and_then(|value| value.as_str()) {
-                    columns.push(quoted.clone());
-                    placeholders.push(format!("${}", idx));
-                    update_cols.push(format!("{quoted} = EXCLUDED.{quoted}"));
-                    bind_values.push(SqlValue::String(name.to_string()));
-                }
+                let name = args
+                    .get("name")
+                    .and_then(|value| value.as_str())
+                    .ok_or_else(|| {
+                        anyhow!(
+                            "entity.ensure for {} requires :name because {}.{} is NOT NULL",
+                            type_code,
+                            extension_table,
+                            name_column
+                        )
+                    })?;
+                columns.push(quoted.clone());
+                placeholders.push(format!("${}", idx));
+                update_cols.push(format!("{quoted} = EXCLUDED.{quoted}"));
+                bind_values.push(SqlValue::String(name.to_string()));
             }
         }
 

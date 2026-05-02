@@ -5,7 +5,9 @@
 //! string and the target entity_id, which source row's state should we
 //! look up?" Most v1.3 cross-workspace constraints use a single shape:
 //!
-//!     `{source_table}.{source_column} = this_{slot_alias}.{target_column}`
+//! ```text
+//! {source_table}.{source_column} = this_{slot_alias}.{target_column}
+//! ```
 //!
 //! e.g.:
 //!   `cases.client_group_id = this_deal.primary_client_group_id`

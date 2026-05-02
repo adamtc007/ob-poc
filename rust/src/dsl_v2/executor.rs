@@ -1172,7 +1172,7 @@ impl DslExecutor {
     /// # Examples
     ///
     /// ```rust,no_run
-    /// # use ob_poc::dsl_v2::executor::DslExecutor;
+    /// # use ob_poc::dsl_v2::execution::DslExecutor;
     /// # use sqlx::PgPool;
     /// # fn demo(pool: PgPool) {
     /// let executor = DslExecutor::new(pool);
@@ -1202,6 +1202,15 @@ impl DslExecutor {
     /// `execute_verb` will reject any verb that resolves to `RuntimeBehavior::Plugin`.
     #[cfg(feature = "database")]
     pub fn with_sem_os_ops(mut self, ops: std::sync::Arc<SemOsVerbOpRegistry>) -> Self {
+        if self.service_registry.is_empty() {
+            let mut services = dsl_runtime::ServiceRegistryBuilder::new();
+            services.register::<dyn dsl_runtime::service_traits::SemOsChildDispatcher>(
+                std::sync::Arc::new(sem_os_postgres::ops::RegistryChildDispatcher::new(
+                    ops.clone(),
+                )),
+            );
+            self.service_registry = std::sync::Arc::new(services.build());
+        }
         self.sem_os_ops = Some(ops);
         self
     }
@@ -2772,6 +2781,20 @@ impl DslExecutor {
                 };
 
                 let mut op_attrs = attrs.clone();
+                if domain == "entity" {
+                    op_attrs = attrs
+                        .iter()
+                        .map(|(key, value)| {
+                            let arg_name = match key.as_str() {
+                                "company_name" | "partnership_name" | "trust_name" => {
+                                    "name".to_string()
+                                }
+                                _ => key.replace('_', "-"),
+                            };
+                            (arg_name, value.clone())
+                        })
+                        .collect();
+                }
                 if domain == "entity" {
                     op_attrs.insert(
                         "entity-type".to_string(),

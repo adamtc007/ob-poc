@@ -38,8 +38,10 @@ pub mod board;
 pub mod bods;
 pub mod capital;
 pub mod cbu;
+pub mod cbu_group;
 pub mod cbu_role;
 pub mod changeset;
+pub mod child_dispatcher;
 pub mod client_group;
 pub mod constellation;
 pub mod control;
@@ -47,6 +49,7 @@ pub mod control_compute;
 pub mod coverage_compute;
 pub mod custody;
 pub mod deal;
+pub mod delivery;
 pub mod dilution;
 pub mod discovery;
 pub mod docs_bundle;
@@ -55,6 +58,7 @@ pub mod economic_exposure;
 pub mod edge;
 pub mod entity;
 pub mod entity_query;
+pub mod entity_relationship;
 pub mod evidence;
 pub mod focus;
 pub mod governance;
@@ -110,6 +114,7 @@ pub mod ubo_registry;
 pub mod verify;
 pub mod view;
 
+pub use child_dispatcher::RegistryChildDispatcher;
 pub use registry::SemOsVerbOpRegistry;
 
 /// Build the canonical [`SemOsVerbOpRegistry`] with every op currently
@@ -411,6 +416,8 @@ pub fn build_registry() -> SemOsVerbOpRegistry {
     registry.register(Arc::new(entity::ResolvePlaceholder));
     registry.register(Arc::new(entity::ListPlaceholders));
     registry.register(Arc::new(entity::PlaceholderSummary));
+    registry.register(Arc::new(entity::Deactivate));
+    registry.register(Arc::new(entity_relationship::Upsert));
 
     // Phase B slice #26: trading-matrix domain (3 plugin verbs —
     // IM find-for-trade, pricing-config find-for-instrument, SLA
@@ -678,6 +685,10 @@ pub fn build_registry() -> SemOsVerbOpRegistry {
     registry.register(Arc::new(deal::Search));
     registry.register(Arc::new(deal::Update));
     registry.register(Arc::new(deal::UpdateStatus));
+    registry.register(Arc::new(deal::SubmitForBac));
+    registry.register(Arc::new(deal::BacMarkInReview));
+    registry.register(Arc::new(deal::BacApprove));
+    registry.register(Arc::new(deal::BacReject));
     registry.register(Arc::new(deal::Cancel));
     registry.register(Arc::new(deal::AddParticipant));
     registry.register(Arc::new(deal::RemoveParticipant));
@@ -702,7 +713,11 @@ pub fn build_registry() -> SemOsVerbOpRegistry {
     registry.register(Arc::new(deal::RequestOnboardingBatch));
     registry.register(Arc::new(deal::UpdateOnboardingStatus));
     registry.register(Arc::new(deal::ReadSummary));
+    registry.register(Arc::new(deal::KycMarkInReview));
     registry.register(Arc::new(deal::UpdateKycClearance));
+
+    registry.register(Arc::new(delivery::Record));
+    registry.register(Arc::new(cbu_group::RemoveMember));
 
     // Phase B slice #67: cbu.* (9 plugin verbs — create, link-structure,
     // list-structure-links, unlink-structure, add-product, inspect,
@@ -724,6 +739,8 @@ pub fn build_registry() -> SemOsVerbOpRegistry {
     // SemOsVerbOp::execute, keeping the multi-action API intact.
     registry.register(Arc::new(client_group::EntityManage));
     registry.register(Arc::new(client_group::EntityAdd));
+    registry.register(Arc::new(client_group::LinkCbu));
+    registry.register(Arc::new(client_group::UnlinkCbu));
     registry.register(Arc::new(client_group::EntityRemove));
     registry.register(Arc::new(client_group::ListEntities));
     registry.register(Arc::new(client_group::TagAdd));
@@ -813,6 +830,7 @@ pub fn build_registry() -> SemOsVerbOpRegistry {
     registry.register(Arc::new(kyc_case::Approve));
     registry.register(Arc::new(kyc_case::Reject));
     registry.register(Arc::new(kyc_case::ApproveWithConditions));
+    registry.register(Arc::new(kyc_case::Escalate));
     registry.register(Arc::new(kyc_case::Summarize));
     registry.register(Arc::new(kyc_case::WorkstreamState));
 
@@ -920,6 +938,7 @@ pub fn build_registry() -> SemOsVerbOpRegistry {
     registry.register(Arc::new(cbu_role::AssignFundRole));
     registry.register(Arc::new(cbu_role::AssignServiceProvider));
     registry.register(Arc::new(cbu_role::AssignSignatory));
+    registry.register(Arc::new(cbu_role::Terminate));
     registry.register(Arc::new(cbu_role::ValidateRoles));
 
     // Phase B slice #52: trading-profile.ca.* (11 plugin verbs — matrix
@@ -996,5 +1015,25 @@ pub trait SemOsVerbOp: Send + Sync {
         _pool: &sqlx::PgPool,
     ) -> Result<Option<serde_json::Value>> {
         Ok(None)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::build_registry;
+
+    #[test]
+    fn deal_substate_writer_ops_are_registered() {
+        let registry = build_registry();
+        for fqn in [
+            "deal.submit-for-bac",
+            "deal.bac-mark-in-review",
+            "deal.bac-approve",
+            "deal.bac-reject",
+            "deal.kyc-mark-in-review",
+            "deal.update-kyc-clearance",
+        ] {
+            assert!(registry.has(fqn), "{fqn} should be registered");
+        }
     }
 }

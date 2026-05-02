@@ -103,6 +103,15 @@ pub struct VerbConfig {
     #[serde(default)]
     pub outputs: Vec<VerbOutputConfig>,
 
+    /// Reportable state writes performed by this verb.
+    ///
+    /// This is optional metadata for reachability validators. Plugin
+    /// implementations remain the runtime source of behavior, while `writes`
+    /// lets offline checks prove that DAG preconditions have a registered
+    /// writer.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub writes: Vec<VerbWriteConfig>,
+
     /// Three-axis semantic declaration (Catalogue Platform Refinement v1.1 P1).
     /// Optional during pilot rollout so existing un-declared verb YAMLs still
     /// parse. Validator requires a declaration when the verb is within a
@@ -177,6 +186,7 @@ impl Default for VerbConfig {
             sentences: None,
             confirm_policy: None,
             outputs: Vec::new(),
+            writes: Vec::new(),
             three_axis: None,
             flavour: None,
             role_guard: None,
@@ -184,6 +194,20 @@ impl Default for VerbConfig {
             transition_args: None,
         }
     }
+}
+
+/// Declarative write tuple used by DAG reachability validation.
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
+pub struct VerbWriteConfig {
+    /// Carrier table written by the verb, for example `deals`.
+    pub table: String,
+
+    /// Column written by the verb, for example `deal_status`.
+    pub column: String,
+
+    /// Fixed value written by the verb when the value is known statically.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub value: Option<String>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize)]

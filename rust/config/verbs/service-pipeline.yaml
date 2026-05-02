@@ -71,10 +71,18 @@ domains:
           name: intent_id
           capture: true
         three_axis:
-          state_effect: preserving
-          external_effects: []
+          state_effect: transition
+          external_effects: [emitting]
           consequence:
             baseline: reviewable
+        transition_args:
+          entity_id_arg: cbu-id
+          target_workspace: cbu
+          target_slot: cbu_discovery_state
+        writes:
+          - table: cbus
+            column: cbu_discovery_state
+            value: PENDING
 
       list:
         flavour: attribute_mutating
@@ -146,6 +154,10 @@ domains:
         returns:
           type: uuid
           name: new_intent_id
+        writes:
+          - table: cbus
+            column: cbu_discovery_state
+            value: PENDING
 
       # =========================================================================
       # P.3 ADDITIONS (2026-04-23) — SERVICE-INTENT LIFECYCLE TRANSITIONS
@@ -316,10 +328,21 @@ domains:
           type: record
           name: discovery_result
         three_axis:
-          state_effect: preserving
-          external_effects: []
+          state_effect: transition
+          external_effects: [emitting]
           consequence:
             baseline: reviewable
+        transition_args:
+          entity_id_arg: cbu-id
+          target_workspace: cbu
+          target_slot: cbu_discovery_state
+        writes:
+          - table: cbus
+            column: cbu_discovery_state
+            value: DISCOVERING
+          - table: cbus
+            column: cbu_discovery_state
+            value: ROLLUP
 
       explain:
         flavour: attribute_mutating
@@ -398,10 +421,18 @@ domains:
           type: record
           name: rollup_result
         three_axis:
-          state_effect: preserving
-          external_effects: []
+          state_effect: transition
+          external_effects: [emitting]
           consequence:
             baseline: reviewable
+        transition_args:
+          entity_id_arg: cbu-id
+          target_workspace: cbu
+          target_slot: cbu_discovery_state
+        writes:
+          - table: cbus
+            column: cbu_discovery_state
+            value: ROLLUP
 
       populate:
         flavour: attribute_mutating
@@ -441,10 +472,18 @@ domains:
           type: record
           name: population_result
         three_axis:
-          state_effect: preserving
-          external_effects: []
+          state_effect: transition
+          external_effects: [emitting]
           consequence:
             baseline: reviewable
+        transition_args:
+          entity_id_arg: cbu-id
+          target_workspace: cbu
+          target_slot: cbu_discovery_state
+        writes:
+          - table: cbus
+            column: cbu_discovery_state
+            value: POPULATE
 
       gaps:
         flavour: attribute_mutating
@@ -484,10 +523,24 @@ domains:
           type: record_set
           name: gaps
         three_axis:
-          state_effect: preserving
-          external_effects: []
+          state_effect: transition
+          external_effects: [emitting]
           consequence:
             baseline: reviewable
+        transition_args:
+          entity_id_arg: cbu-id
+          target_workspace: cbu
+          target_slot: cbu_discovery_state
+        writes:
+          - table: cbus
+            column: cbu_discovery_state
+            value: PROVISION
+          - table: cbus
+            column: cbu_discovery_state
+            value: READY
+          - table: cbus
+            column: cbu_discovery_state
+            value: BLOCKED
 
       set:
         flavour: attribute_mutating
@@ -533,10 +586,21 @@ domains:
           type: affected
           name: rows
         three_axis:
-          state_effect: preserving
-          external_effects: []
+          state_effect: transition
+          external_effects: [emitting]
           consequence:
             baseline: reviewable
+        transition_args:
+          entity_id_arg: cbu-id
+          target_workspace: cbu
+          target_slot: cbu_discovery_state
+        writes:
+          - table: cbus
+            column: cbu_discovery_state
+            value: READY
+          - table: cbus
+            column: cbu_discovery_state
+            value: BLOCKED
 
   provisioning:
     description: "Resource provisioning operations"
@@ -580,10 +644,24 @@ domains:
           type: record
           name: provisioning_result
         three_axis:
-          state_effect: preserving
-          external_effects: []
+          state_effect: transition
+          external_effects: [emitting]
           consequence:
             baseline: reviewable
+        transition_args:
+          entity_id_arg: cbu-id
+          target_workspace: cbu
+          target_slot: cbu_discovery_state
+        writes:
+          - table: cbus
+            column: cbu_discovery_state
+            value: DISCOVERING
+          - table: cbus
+            column: cbu_discovery_state
+            value: READY
+          - table: cbus
+            column: cbu_discovery_state
+            value: BLOCKED
 
       status:
         flavour: attribute_mutating

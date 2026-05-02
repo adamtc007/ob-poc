@@ -470,6 +470,8 @@ pub struct StateDef {
     pub entry: bool,
     #[serde(default)]
     pub description: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub entry_via: Option<EntryVia>,
     /// v1.4 (D-016, 2026-04-29): the green-switch predicate. State is
     /// "green" when this predicate holds — entity in this state is
     /// considered satisfied/ready. Verbs that move INTO this state are
@@ -479,6 +481,16 @@ pub struct StateDef {
     /// (no entry test).
     #[serde(default)]
     pub green_when: Option<String>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum EntryVia {
+    Verb,
+    Cascade { parent: String },
+    Trigger { name: String },
+    Scheduler { name: String },
+    Signal { source: String },
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -1016,6 +1028,48 @@ slots:
         assert_eq!(dual.len(), 1);
         assert_eq!(dual[0].junction_state_from_primary, "CONTRACTED");
         assert_eq!(dual[0].owner.as_deref(), Some("ops"));
+    }
+
+    #[test]
+    fn state_entry_via_parses() {
+        let yaml = r#"
+workspace: deal
+dag_id: deal_dag
+slots:
+  - id: deal_rate_card
+    stateless: false
+    state_machine:
+      id: deal_rate_card_lifecycle
+      states:
+        - id: DRAFT
+          entry: true
+          entry_via: verb
+        - id: SUPERSEDED
+          entry_via:
+            trigger:
+              name: idx_deal_rate_cards_one_agreed
+        - id: CANCELLED
+          entry_via:
+            cascade:
+              parent: deal.cancel
+"#;
+        let dag: Dag = serde_yaml::from_str(yaml).expect("parse");
+        let Some(SlotStateMachine::Structured(sm)) = &dag.slots[0].state_machine else {
+            panic!("expected structured state machine");
+        };
+        assert_eq!(sm.states[0].entry_via, Some(EntryVia::Verb));
+        assert_eq!(
+            sm.states[1].entry_via,
+            Some(EntryVia::Trigger {
+                name: "idx_deal_rate_cards_one_agreed".to_string()
+            })
+        );
+        assert_eq!(
+            sm.states[2].entry_via,
+            Some(EntryVia::Cascade {
+                parent: "deal.cancel".to_string()
+            })
+        );
     }
 
     #[test]

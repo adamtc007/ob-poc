@@ -21,16 +21,8 @@ domains:
           noun: delivery
           phase_tags: [trading]
           side_effects: state_write
-        behavior: crud
-        crud:
-          operation: upsert
-          table: service_delivery_map
-          schema: ob-poc
-          returning: delivery_id
-          conflict_keys:
-          - cbu_id
-          - product_id
-          - service_id
+        behavior: plugin
+        handler: DeliveryRecordOp
         args:
         - name: cbu-id
           type: uuid
@@ -52,6 +44,10 @@ domains:
             entity_type: product
             code_column: product_code
             id_column: product_id
+        - name: product-id
+          type: uuid
+          required: false
+          maps_to: product_id
         - name: service
           type: lookup
           required: true
@@ -62,6 +58,10 @@ domains:
             entity_type: service
             code_column: service_code
             id_column: service_id
+        - name: service-id
+          type: uuid
+          required: false
+          maps_to: service_id
         - name: instance-id
           type: uuid
           required: false

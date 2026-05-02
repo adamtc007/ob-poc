@@ -225,8 +225,8 @@ pub const STATUS_FLIP_VERBS: &[SimpleStatusConfig] = &[
     SimpleStatusConfig {
         fqn: "cbu-ca.submit-for-review",
         table: "cbu_corporate_action_events",
-        pk_col: "id",
-        state_col: "status",
+        pk_col: "event_id",
+        state_col: "ca_status",
         target_state: "under_review",
         entity_arg: "event-id",
         timestamp: None,
@@ -234,8 +234,8 @@ pub const STATUS_FLIP_VERBS: &[SimpleStatusConfig] = &[
     SimpleStatusConfig {
         fqn: "cbu-ca.approve",
         table: "cbu_corporate_action_events",
-        pk_col: "id",
-        state_col: "status",
+        pk_col: "event_id",
+        state_col: "ca_status",
         target_state: "approved",
         entity_arg: "event-id",
         timestamp: None,
@@ -243,8 +243,8 @@ pub const STATUS_FLIP_VERBS: &[SimpleStatusConfig] = &[
     SimpleStatusConfig {
         fqn: "cbu-ca.reject",
         table: "cbu_corporate_action_events",
-        pk_col: "id",
-        state_col: "status",
+        pk_col: "event_id",
+        state_col: "ca_status",
         target_state: "rejected",
         entity_arg: "event-id",
         timestamp: None,
@@ -252,8 +252,8 @@ pub const STATUS_FLIP_VERBS: &[SimpleStatusConfig] = &[
     SimpleStatusConfig {
         fqn: "cbu-ca.withdraw",
         table: "cbu_corporate_action_events",
-        pk_col: "id",
-        state_col: "status",
+        pk_col: "event_id",
+        state_col: "ca_status",
         target_state: "withdrawn",
         entity_arg: "event-id",
         timestamp: None,
@@ -261,40 +261,13 @@ pub const STATUS_FLIP_VERBS: &[SimpleStatusConfig] = &[
     SimpleStatusConfig {
         fqn: "cbu-ca.mark-implemented",
         table: "cbu_corporate_action_events",
-        pk_col: "id",
-        state_col: "status",
+        pk_col: "event_id",
+        state_col: "ca_status",
         target_state: "implemented",
         entity_arg: "event-id",
         timestamp: None,
     },
     // ── deal.* ───────────────────────────────────────────────────────────────
-    SimpleStatusConfig {
-        fqn: "deal.submit-for-bac",
-        table: "deals",
-        pk_col: "deal_id",
-        state_col: "deal_status",
-        target_state: "BAC_APPROVAL",
-        entity_arg: "deal-id",
-        timestamp: None,
-    },
-    SimpleStatusConfig {
-        fqn: "deal.bac-approve",
-        table: "deals",
-        pk_col: "deal_id",
-        state_col: "deal_status",
-        target_state: "KYC_CLEARANCE",
-        entity_arg: "deal-id",
-        timestamp: None,
-    },
-    SimpleStatusConfig {
-        fqn: "deal.bac-reject",
-        table: "deals",
-        pk_col: "deal_id",
-        state_col: "deal_status",
-        target_state: "REJECTED",
-        entity_arg: "deal-id",
-        timestamp: None,
-    },
     SimpleStatusConfig {
         fqn: "deal.reject",
         table: "deals",
@@ -326,7 +299,7 @@ pub const STATUS_FLIP_VERBS: &[SimpleStatusConfig] = &[
         fqn: "deal.suspend",
         table: "deals",
         pk_col: "deal_id",
-        state_col: "deal_status",
+        state_col: "operational_status",
         target_state: "SUSPENDED",
         entity_arg: "deal-id",
         timestamp: None,
@@ -335,7 +308,7 @@ pub const STATUS_FLIP_VERBS: &[SimpleStatusConfig] = &[
         fqn: "deal.reinstate",
         table: "deals",
         pk_col: "deal_id",
-        state_col: "deal_status",
+        state_col: "operational_status",
         target_state: "ACTIVE",
         entity_arg: "deal-id",
         timestamp: None,
@@ -344,7 +317,7 @@ pub const STATUS_FLIP_VERBS: &[SimpleStatusConfig] = &[
         fqn: "deal.begin-winding-down",
         table: "deals",
         pk_col: "deal_id",
-        state_col: "deal_status",
+        state_col: "operational_status",
         target_state: "WINDING_DOWN",
         entity_arg: "deal-id",
         timestamp: None,
@@ -645,7 +618,7 @@ pub const STATUS_FLIP_VERBS: &[SimpleStatusConfig] = &[
     SimpleStatusConfig {
         fqn: "share-class.launch",
         table: "share_classes",
-        pk_col: "share_class_id",
+        pk_col: "id",
         state_col: "lifecycle_status",
         target_state: "OPEN",
         entity_arg: "share-class-id",
@@ -654,7 +627,7 @@ pub const STATUS_FLIP_VERBS: &[SimpleStatusConfig] = &[
     SimpleStatusConfig {
         fqn: "share-class.soft-close",
         table: "share_classes",
-        pk_col: "share_class_id",
+        pk_col: "id",
         state_col: "lifecycle_status",
         target_state: "SOFT_CLOSED",
         entity_arg: "share-class-id",
@@ -663,7 +636,7 @@ pub const STATUS_FLIP_VERBS: &[SimpleStatusConfig] = &[
     SimpleStatusConfig {
         fqn: "share-class.reopen",
         table: "share_classes",
-        pk_col: "share_class_id",
+        pk_col: "id",
         state_col: "lifecycle_status",
         target_state: "OPEN",
         entity_arg: "share-class-id",
@@ -672,7 +645,7 @@ pub const STATUS_FLIP_VERBS: &[SimpleStatusConfig] = &[
     SimpleStatusConfig {
         fqn: "share-class.hard-close",
         table: "share_classes",
-        pk_col: "share_class_id",
+        pk_col: "id",
         state_col: "lifecycle_status",
         target_state: "HARD_CLOSED",
         entity_arg: "share-class-id",
@@ -681,7 +654,7 @@ pub const STATUS_FLIP_VERBS: &[SimpleStatusConfig] = &[
     SimpleStatusConfig {
         fqn: "share-class.lift-hard-close",
         table: "share_classes",
-        pk_col: "share_class_id",
+        pk_col: "id",
         state_col: "lifecycle_status",
         target_state: "SOFT_CLOSED",
         entity_arg: "share-class-id",
@@ -690,7 +663,7 @@ pub const STATUS_FLIP_VERBS: &[SimpleStatusConfig] = &[
     SimpleStatusConfig {
         fqn: "share-class.begin-winddown",
         table: "share_classes",
-        pk_col: "share_class_id",
+        pk_col: "id",
         state_col: "lifecycle_status",
         target_state: "WINDING_DOWN",
         entity_arg: "share-class-id",
@@ -791,7 +764,7 @@ pub const STATUS_FLIP_VERBS: &[SimpleStatusConfig] = &[
     // ── service-intent.* (3) ─────────────────────────────────────────────────
     SimpleStatusConfig {
         fqn: "service-intent.suspend",
-        table: "cbu_service_intent",
+        table: "service_intents",
         pk_col: "intent_id",
         state_col: "status",
         target_state: "suspended",
@@ -800,7 +773,7 @@ pub const STATUS_FLIP_VERBS: &[SimpleStatusConfig] = &[
     },
     SimpleStatusConfig {
         fqn: "service-intent.resume",
-        table: "cbu_service_intent",
+        table: "service_intents",
         pk_col: "intent_id",
         state_col: "status",
         target_state: "active",
@@ -809,7 +782,7 @@ pub const STATUS_FLIP_VERBS: &[SimpleStatusConfig] = &[
     },
     SimpleStatusConfig {
         fqn: "service-intent.cancel",
-        table: "cbu_service_intent",
+        table: "service_intents",
         pk_col: "intent_id",
         state_col: "status",
         target_state: "cancelled",
@@ -869,7 +842,7 @@ pub const STATUS_FLIP_VERBS: &[SimpleStatusConfig] = &[
         fqn: "settlement-chain.request-review",
         table: "cbu_settlement_chains",
         pk_col: "chain_id",
-        state_col: "status",
+        state_col: "lifecycle_status",
         target_state: "reviewed",
         entity_arg: "chain",
         timestamp: None,
@@ -878,7 +851,7 @@ pub const STATUS_FLIP_VERBS: &[SimpleStatusConfig] = &[
         fqn: "settlement-chain.enter-parallel-run",
         table: "cbu_settlement_chains",
         pk_col: "chain_id",
-        state_col: "status",
+        state_col: "lifecycle_status",
         target_state: "parallel_run",
         entity_arg: "chain",
         timestamp: None,
@@ -887,7 +860,7 @@ pub const STATUS_FLIP_VERBS: &[SimpleStatusConfig] = &[
         fqn: "settlement-chain.go-live",
         table: "cbu_settlement_chains",
         pk_col: "chain_id",
-        state_col: "status",
+        state_col: "lifecycle_status",
         target_state: "live",
         entity_arg: "chain",
         timestamp: None,
@@ -896,7 +869,7 @@ pub const STATUS_FLIP_VERBS: &[SimpleStatusConfig] = &[
         fqn: "settlement-chain.abort-parallel-run",
         table: "cbu_settlement_chains",
         pk_col: "chain_id",
-        state_col: "status",
+        state_col: "lifecycle_status",
         target_state: "reviewed",
         entity_arg: "chain",
         timestamp: None,
@@ -905,7 +878,7 @@ pub const STATUS_FLIP_VERBS: &[SimpleStatusConfig] = &[
         fqn: "settlement-chain.suspend",
         table: "cbu_settlement_chains",
         pk_col: "chain_id",
-        state_col: "status",
+        state_col: "lifecycle_status",
         target_state: "suspended",
         entity_arg: "chain",
         timestamp: None,
@@ -914,7 +887,7 @@ pub const STATUS_FLIP_VERBS: &[SimpleStatusConfig] = &[
         fqn: "settlement-chain.reactivate",
         table: "cbu_settlement_chains",
         pk_col: "chain_id",
-        state_col: "status",
+        state_col: "lifecycle_status",
         target_state: "live",
         entity_arg: "chain",
         timestamp: None,
@@ -999,7 +972,7 @@ pub const STATUS_FLIP_VERBS: &[SimpleStatusConfig] = &[
     SimpleStatusConfig {
         fqn: "holding.restrict",
         table: "holdings",
-        pk_col: "holding_id",
+        pk_col: "id",
         state_col: "holding_status",
         target_state: "RESTRICTED",
         entity_arg: "holding-id",
@@ -1008,7 +981,7 @@ pub const STATUS_FLIP_VERBS: &[SimpleStatusConfig] = &[
     SimpleStatusConfig {
         fqn: "holding.lift-restriction",
         table: "holdings",
-        pk_col: "holding_id",
+        pk_col: "id",
         state_col: "holding_status",
         target_state: "ACTIVE",
         entity_arg: "holding-id",
@@ -1017,7 +990,7 @@ pub const STATUS_FLIP_VERBS: &[SimpleStatusConfig] = &[
     SimpleStatusConfig {
         fqn: "holding.pledge",
         table: "holdings",
-        pk_col: "holding_id",
+        pk_col: "id",
         state_col: "holding_status",
         target_state: "PLEDGED",
         entity_arg: "holding-id",
@@ -1026,7 +999,7 @@ pub const STATUS_FLIP_VERBS: &[SimpleStatusConfig] = &[
     SimpleStatusConfig {
         fqn: "holding.release-pledge",
         table: "holdings",
-        pk_col: "holding_id",
+        pk_col: "id",
         state_col: "holding_status",
         target_state: "ACTIVE",
         entity_arg: "holding-id",
@@ -1079,5 +1052,44 @@ pub fn register_simple_status_ops(registry: &mut sem_os_postgres::ops::SemOsVerb
     use std::sync::Arc;
     for cfg in STATUS_FLIP_VERBS {
         registry.register(Arc::new(SimpleStatusOp::new(cfg.clone())));
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn cbu_ca_status_configs_match_carrier_schema() {
+        let expected = [
+            ("cbu-ca.submit-for-review", "under_review"),
+            ("cbu-ca.approve", "approved"),
+            ("cbu-ca.reject", "rejected"),
+            ("cbu-ca.withdraw", "withdrawn"),
+            ("cbu-ca.mark-implemented", "implemented"),
+        ];
+
+        for (fqn, target_state) in expected {
+            let cfg = STATUS_FLIP_VERBS
+                .iter()
+                .find(|cfg| cfg.fqn == fqn)
+                .expect("cbu-ca SimpleStatusConfig should exist");
+
+            assert_eq!(cfg.table, "cbu_corporate_action_events");
+            assert_eq!(cfg.pk_col, "event_id");
+            assert_eq!(cfg.state_col, "ca_status");
+            assert_eq!(cfg.target_state, target_state);
+            assert_eq!(cfg.entity_arg, "event-id");
+        }
+    }
+
+    #[test]
+    fn deal_bac_substate_verbs_are_not_simple_status_ops() {
+        for fqn in ["deal.submit-for-bac", "deal.bac-approve", "deal.bac-reject"] {
+            assert!(
+                STATUS_FLIP_VERBS.iter().all(|cfg| cfg.fqn != fqn),
+                "{fqn} must be a dedicated SemOsVerbOp because it writes substates"
+            );
+        }
     }
 }

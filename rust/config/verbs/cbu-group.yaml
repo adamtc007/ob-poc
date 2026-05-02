@@ -1,0 +1,35 @@
+domains:
+  cbu-group:
+    description: CBU group membership operations
+    verbs:
+      remove-member:
+        flavour: attribute_mutating
+        description: Remove or terminate CBU group memberships for a CBU
+        invocation_phrases:
+          - "remove cbu from group"
+          - "terminate cbu group membership"
+        behavior: plugin
+        handler: CbuGroupRemoveMemberOp
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: cbu
+          internal: true
+          noun: cbu_group_member
+          phase_tags: [archive]
+          side_effects: state_write
+        args:
+          - name: cbu-id
+            type: uuid
+            required: true
+          - name: hard-delete
+            type: boolean
+            required: false
+            default: false
+        returns:
+          type: affected
+        three_axis:
+          state_effect: preserving
+          external_effects: [emitting]
+          consequence:
+            baseline: requires_confirmation

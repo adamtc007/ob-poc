@@ -34,6 +34,13 @@ fn load_structure_registry() -> MacroRegistry {
     load_macro_registry_from_dir(&fixture_dir()).expect("fixture macros must load")
 }
 
+fn permissive_allowed_verbs() -> HashSet<String> {
+    ["cbu.create", "entity.create"]
+        .into_iter()
+        .map(str::to_string)
+        .collect()
+}
+
 fn test_session() -> UnifiedSession {
     UnifiedSession {
         client: Some(ClientRef {
@@ -125,6 +132,7 @@ async fn test_primitive_verb_round_trip() {
     let registry = MacroRegistry::new();
     let session = test_session();
     let constraints = EffectiveConstraints::unconstrained();
+    let allowed_verbs = permissive_allowed_verbs();
 
     let classification = VerbClassification::Primitive {
         fqn: "cbu.create".to_string(),
@@ -141,7 +149,7 @@ async fn test_primitive_verb_round_trip() {
         &registry,
         1,
         &constraints,
-        None,
+        Some(&allowed_verbs),
         None,
     );
 
@@ -197,6 +205,7 @@ async fn test_macro_compiles_and_executes() {
     let session = test_session();
     let verb_index = VerbConfigIndex::empty();
     let constraints = EffectiveConstraints::unconstrained();
+    let allowed_verbs = permissive_allowed_verbs();
     let classification = classify_verb("structure.setup", &verb_index, &registry);
 
     let mut args = BTreeMap::new();
@@ -210,7 +219,7 @@ async fn test_macro_compiles_and_executes() {
         &registry,
         1,
         &constraints,
-        None,
+        Some(&allowed_verbs),
         None,
     );
 

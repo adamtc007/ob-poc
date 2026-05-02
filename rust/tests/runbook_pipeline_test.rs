@@ -29,6 +29,13 @@ fn load_fixture_registry() -> MacroRegistry {
     load_macro_registry_from_dir(&fixture_dir()).expect("fixture macros must load")
 }
 
+fn permissive_allowed_verbs() -> HashSet<String> {
+    ["cbu.create", "entity.create"]
+        .into_iter()
+        .map(str::to_string)
+        .collect()
+}
+
 fn test_session() -> UnifiedSession {
     UnifiedSession {
         client: Some(ClientRef {
@@ -129,6 +136,7 @@ async fn compile_and_execute(
     let session = test_session();
     let verb_index = VerbConfigIndex::empty();
     let classification = classify_verb(macro_name, &verb_index, registry);
+    let allowed_verbs = permissive_allowed_verbs();
 
     let resp = compile_verb(
         Uuid::new_v4(),
@@ -138,7 +146,7 @@ async fn compile_and_execute(
         registry,
         1,
         constraints,
-        None,
+        Some(&allowed_verbs),
         None,
     );
 
@@ -291,6 +299,7 @@ async fn replay_determinism() {
     let session = test_session();
     let verb_index = VerbConfigIndex::empty();
     let constraints = EffectiveConstraints::unconstrained();
+    let allowed_verbs = permissive_allowed_verbs();
 
     let mut args = BTreeMap::new();
     args.insert("name".to_string(), "Determinism Test".to_string());
@@ -305,7 +314,7 @@ async fn replay_determinism() {
         &registry,
         1,
         &constraints,
-        None,
+        Some(&allowed_verbs),
         None,
     );
     let resp2 = compile_verb(
@@ -316,7 +325,7 @@ async fn replay_determinism() {
         &registry,
         1,
         &constraints,
-        None,
+        Some(&allowed_verbs),
         None,
     );
 
@@ -627,6 +636,7 @@ async fn primitive_verb_compile_and_execute() {
     let registry = MacroRegistry::new();
     let session = test_session();
     let constraints = EffectiveConstraints::unconstrained();
+    let allowed_verbs = permissive_allowed_verbs();
 
     let classification = VerbClassification::Primitive {
         fqn: "cbu.create".to_string(),
@@ -642,7 +652,7 @@ async fn primitive_verb_compile_and_execute() {
         &registry,
         1,
         &constraints,
-        None,
+        Some(&allowed_verbs),
         None,
     );
     assert!(resp.is_compiled());
@@ -709,6 +719,7 @@ fn compile_invocation_end_to_end() {
     let constraints = EffectiveConstraints::unconstrained();
     let mut args = BTreeMap::new();
     args.insert("name".to_string(), "E2E Fund".to_string());
+    let allowed_verbs = permissive_allowed_verbs();
 
     let resp = ob_poc::runbook::compile_invocation(
         Uuid::new_v4(),
@@ -719,7 +730,7 @@ fn compile_invocation_end_to_end() {
         &verb_index,
         &constraints,
         1,
-        None,
+        Some(&allowed_verbs),
         None,
     );
 

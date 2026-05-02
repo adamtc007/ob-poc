@@ -15,6 +15,21 @@ mod template_batch_tests {
 
     use ob_poc::dsl_v2::execution::{DslExecutor, ExecutionContext};
 
+    fn sem_os_registry() -> std::sync::Arc<sem_os_postgres::ops::SemOsVerbOpRegistry> {
+        use std::sync::OnceLock;
+
+        static REGISTRY: OnceLock<std::sync::Arc<sem_os_postgres::ops::SemOsVerbOpRegistry>> =
+            OnceLock::new();
+
+        REGISTRY
+            .get_or_init(|| {
+                let mut registry = sem_os_postgres::ops::build_registry();
+                ob_poc::domain_ops::extend_registry(&mut registry);
+                std::sync::Arc::new(registry)
+            })
+            .clone()
+    }
+
     // =========================================================================
     // TEST INFRASTRUCTURE
     // =========================================================================
@@ -174,7 +189,7 @@ mod template_batch_tests {
         let db = TestDb::new().await?;
         let _entity_ids = db.seed_test_entities().await?;
 
-        let executor = DslExecutor::new(db.pool.clone());
+        let executor = DslExecutor::new(db.pool.clone()).with_sem_os_ops(sem_os_registry());
         let mut ctx = ExecutionContext::new();
 
         // Query entities by name pattern
@@ -203,7 +218,7 @@ mod template_batch_tests {
         let db = TestDb::new().await?;
         let _entity_ids = db.seed_test_entities().await?;
 
-        let executor = DslExecutor::new(db.pool.clone());
+        let executor = DslExecutor::new(db.pool.clone()).with_sem_os_ops(sem_os_registry());
         let mut ctx = ExecutionContext::new();
 
         // Query with limit
@@ -233,7 +248,7 @@ mod template_batch_tests {
     async fn test_template_invoke_basic() -> Result<()> {
         let db = TestDb::new().await?;
 
-        let executor = DslExecutor::new(db.pool.clone());
+        let executor = DslExecutor::new(db.pool.clone()).with_sem_os_ops(sem_os_registry());
         let mut ctx = ExecutionContext::new();
 
         // Invoke a simple template - use proper map syntax without dots in keys
@@ -290,7 +305,7 @@ mod template_batch_tests {
             }
         };
 
-        let executor = DslExecutor::new(db.pool.clone());
+        let executor = DslExecutor::new(db.pool.clone()).with_sem_os_ops(sem_os_registry());
         let mut ctx = ExecutionContext::new();
 
         // Full batch execution: query -> batch
@@ -342,7 +357,7 @@ mod template_batch_tests {
     async fn test_batch_pause_verb() -> Result<()> {
         let db = TestDb::new().await?;
 
-        let executor = DslExecutor::new(db.pool.clone());
+        let executor = DslExecutor::new(db.pool.clone()).with_sem_os_ops(sem_os_registry());
         let mut ctx = ExecutionContext::new();
 
         let dsl = r#"(batch.pause)"#;
@@ -360,7 +375,7 @@ mod template_batch_tests {
     async fn test_batch_resume_verb() -> Result<()> {
         let db = TestDb::new().await?;
 
-        let executor = DslExecutor::new(db.pool.clone());
+        let executor = DslExecutor::new(db.pool.clone()).with_sem_os_ops(sem_os_registry());
         let mut ctx = ExecutionContext::new();
 
         let dsl = r#"(batch.resume)"#;
@@ -382,7 +397,7 @@ mod template_batch_tests {
     async fn test_batch_status_verb() -> Result<()> {
         let db = TestDb::new().await?;
 
-        let executor = DslExecutor::new(db.pool.clone());
+        let executor = DslExecutor::new(db.pool.clone()).with_sem_os_ops(sem_os_registry());
         let mut ctx = ExecutionContext::new();
 
         let dsl = r#"(batch.status)"#;
@@ -404,7 +419,7 @@ mod template_batch_tests {
     async fn test_batch_abort_verb() -> Result<()> {
         let db = TestDb::new().await?;
 
-        let executor = DslExecutor::new(db.pool.clone());
+        let executor = DslExecutor::new(db.pool.clone()).with_sem_os_ops(sem_os_registry());
         let mut ctx = ExecutionContext::new();
 
         let dsl = r#"(batch.abort :reason "Test abort")"#;
@@ -422,7 +437,7 @@ mod template_batch_tests {
     async fn test_batch_skip_verb() -> Result<()> {
         let db = TestDb::new().await?;
 
-        let executor = DslExecutor::new(db.pool.clone());
+        let executor = DslExecutor::new(db.pool.clone()).with_sem_os_ops(sem_os_registry());
         let mut ctx = ExecutionContext::new();
 
         let dsl = r#"(batch.skip :reason "Invalid data")"#;
@@ -440,7 +455,7 @@ mod template_batch_tests {
     async fn test_batch_continue_verb() -> Result<()> {
         let db = TestDb::new().await?;
 
-        let executor = DslExecutor::new(db.pool.clone());
+        let executor = DslExecutor::new(db.pool.clone()).with_sem_os_ops(sem_os_registry());
         let mut ctx = ExecutionContext::new();
 
         let dsl = r#"(batch.continue :count 10)"#;
@@ -479,7 +494,7 @@ mod template_batch_tests {
         .execute(&db.pool)
         .await?;
 
-        let executor = DslExecutor::new(db.pool.clone());
+        let executor = DslExecutor::new(db.pool.clone()).with_sem_os_ops(sem_os_registry());
         let mut ctx = ExecutionContext::new();
 
         // Add products using the batch verb
@@ -534,7 +549,7 @@ mod template_batch_tests {
             cbu_ids.push(cbu_id);
         }
 
-        let executor = DslExecutor::new(db.pool.clone());
+        let executor = DslExecutor::new(db.pool.clone()).with_sem_os_ops(sem_os_registry());
         let mut ctx = ExecutionContext::new();
 
         // Format UUIDs as list

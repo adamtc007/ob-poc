@@ -1122,3 +1122,33 @@ domains:
           external_effects: [observational]
           consequence:
             baseline: benign
+
+      deactivate:
+        flavour: attribute_mutating
+        description: Soft-delete an entity
+        invocation_phrases:
+          - "deactivate entity"
+          - "soft delete entity"
+          - "mark entity inactive"
+        behavior: plugin
+        handler: EntityDeactivateOp
+        metadata:
+          tier: intent
+          source_of_truth: entity
+          scope: global
+          noun: entity
+          tags: [lifecycle, deletion]
+          phase_tags: [archive]
+          side_effects: state_write
+        args:
+          - name: entity-id
+            type: uuid
+            required: true
+            maps_to: entity_id
+        returns:
+          type: affected
+        three_axis:
+          state_effect: preserving
+          external_effects: [emitting]
+          consequence:
+            baseline: requires_confirmation

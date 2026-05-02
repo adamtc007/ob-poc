@@ -220,7 +220,7 @@ pub fn evaluate_phase5_agent(
 /// use uuid::Uuid;
 ///
 /// let runbook = Runbook::new(Uuid::nil());
-/// assert_eq!(build_repl_execution_shape_kind(&runbook), Some("singleton"));
+/// assert_eq!(build_repl_execution_shape_kind(&runbook), None);
 /// ```
 pub fn build_repl_execution_shape_kind(
     runbook: &crate::repl::runbook::Runbook,

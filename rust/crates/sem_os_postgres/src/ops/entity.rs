@@ -10,6 +10,7 @@
 //!   `list-placeholders`, `placeholder-summary`) — stub entity used
 //!   during progressive refinement / macro expansion; resolved to a
 //!   real entity later via `PlaceholderResolver`.
+//! - `deactivate` — soft-delete an entity by setting `deleted_at`.
 
 use anyhow::{anyhow, Result};
 use async_trait::async_trait;
@@ -227,6 +228,50 @@ impl SemOsVerbOp for Identify {
 
         ctx.bind("entity", entity_id);
         Ok(VerbExecutionOutcome::Uuid(entity_id))
+    }
+}
+
+// ── entity.deactivate ─────────────────────────────────────────────────────────
+
+pub struct Deactivate;
+
+#[async_trait]
+impl SemOsVerbOp for Deactivate {
+    fn fqn(&self) -> &str {
+        "entity.deactivate"
+    }
+
+    async fn execute(
+        &self,
+        args: &Value,
+        ctx: &mut VerbExecutionContext,
+        scope: &mut dyn TransactionScope,
+    ) -> Result<VerbExecutionOutcome> {
+        let entity_id = json_extract_uuid(args, ctx, "entity-id")?;
+        let affected = sqlx::query(
+            r#"
+            UPDATE "ob-poc".entities
+            SET deleted_at = NOW(), updated_at = NOW()
+            WHERE entity_id = $1
+              AND deleted_at IS NULL
+            "#,
+        )
+        .bind(entity_id)
+        .execute(scope.executor())
+        .await?
+        .rows_affected();
+
+        if affected > 0 {
+            dsl_runtime::domain_ops::helpers::emit_pending_state_advance(
+                ctx,
+                entity_id,
+                "entity:deactivated",
+                "entity/identity",
+                "entity.deactivate",
+            );
+        }
+
+        Ok(VerbExecutionOutcome::Affected(affected))
     }
 }
 

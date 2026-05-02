@@ -361,6 +361,7 @@ pub fn synthesize_chain(
 ///     reads_from: vec![],
 ///     writes_to: vec![],
 ///     outputs: vec![],
+///     produces_shared_facts: vec![],
 /// };
 /// let prompts = generate_disambiguation(&verb, None);
 /// assert!(!prompts.is_empty());

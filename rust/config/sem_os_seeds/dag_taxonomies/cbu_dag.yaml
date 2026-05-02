@@ -445,6 +445,78 @@ slots:
         terminal_states: [offboarded, archived]
 
   # ---------------------------------------------------------------------------
+  # 2.1a Service discovery/provisioning pipeline state
+  # ---------------------------------------------------------------------------
+
+  - id: cbu_discovery_state
+    stateless: false
+    # V1.3-4: no SUSPENDED state — this slot is a bounded setup pipeline.
+    # Pauses and failed readiness are represented as BLOCKED/FAILED rather
+    # than an operational suspension state.
+    suspended_state_exempt: true
+    closure: closed_bounded
+    eligibility:
+      entity_kinds: [cbu]
+    cardinality_max: 1
+    entry_state: PENDING
+    state_machine:
+      id: cbu_service_discovery_pipeline
+      owner: stewardship
+      expected_lifetime: long_lived
+      source_entity: '"ob-poc".cbus'
+      state_column: cbu_discovery_state
+      scope: per_cbu
+      description: |
+        SemOS-visible service discovery/provisioning pipeline state.
+        This slot tracks the CBU-owned pipeline from service intent
+        declaration through resource discovery, attribute collection,
+        provisioning, and readiness.
+      states:
+        - id: PENDING
+          entry: true
+          description: "Service intent exists or is pending; discovery has not started."
+        - id: DISCOVERING
+          description: "Resource discovery is resolving required SRDEFs."
+        - id: ROLLUP
+          description: "Discovered SRDEF attribute requirements are being rolled up."
+        - id: POPULATE
+          description: "Required attribute values are being populated."
+        - id: PROVISION
+          description: "Provisioning requests and resource instances are being created."
+        - id: READY
+          description: "Service resource readiness is green for this CBU."
+        - id: FAILED
+          description: "The pipeline failed during execution and needs operator intervention."
+        - id: BLOCKED
+          description: "Readiness or provisioning is blocked by missing requirements."
+      transitions:
+        - from: [PENDING, FAILED, BLOCKED]
+          to: PENDING
+          via: [service-intent.create, service-intent.supersede]
+        - from: PENDING
+          to: DISCOVERING
+          via: discovery.run
+        - from: DISCOVERING
+          to: ROLLUP
+          via: [discovery.run, attributes.rollup]
+        - from: ROLLUP
+          to: POPULATE
+          via: attributes.populate
+        - from: POPULATE
+          to: PROVISION
+          via: provisioning.run
+        - from: [PROVISION, BLOCKED]
+          to: READY
+          via: [provisioning.run, readiness.compute, pipeline.full]
+        - from: [PROVISION, READY]
+          to: BLOCKED
+          via: [provisioning.run, readiness.compute, pipeline.full]
+        - from: [DISCOVERING, ROLLUP, POPULATE, PROVISION]
+          to: FAILED
+          via: [discovery.run, attributes.rollup, attributes.populate, provisioning.run, readiness.compute, pipeline.full]
+      terminal_states: []
+
+  # ---------------------------------------------------------------------------
   # 2.2 Entity lifecycle (new state machines from schema)
   # ---------------------------------------------------------------------------
 
@@ -694,6 +766,9 @@ slots:
         - id: REJECTED
           description: "KYC failed; investor cannot be ACTIVE. Terminal."
         - id: EXPIRED
+          entry_via:
+            trigger:
+              name: kyc_expires_at
           description: "Approval lapsed; refresh required before new activity."
         - id: REFRESH_REQUIRED
           description: "Material change triggered mandatory re-KYC."

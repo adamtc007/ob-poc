@@ -20,6 +20,21 @@ mod materialize_tests {
     use sqlx::PgPool;
     use uuid::Uuid;
 
+    fn sem_os_registry() -> std::sync::Arc<sem_os_postgres::ops::SemOsVerbOpRegistry> {
+        use std::sync::OnceLock;
+
+        static REGISTRY: OnceLock<std::sync::Arc<sem_os_postgres::ops::SemOsVerbOpRegistry>> =
+            OnceLock::new();
+
+        REGISTRY
+            .get_or_init(|| {
+                let mut registry = sem_os_postgres::ops::build_registry();
+                ob_poc::domain_ops::extend_registry(&mut registry);
+                std::sync::Arc::new(registry)
+            })
+            .clone()
+    }
+
     // =========================================================================
     // TEST INFRASTRUCTURE
     // =========================================================================
@@ -54,7 +69,7 @@ mod materialize_tests {
         async fn execute_dsl(&self, dsl: &str) -> Result<ExecutionContext> {
             let ast = parse_program(dsl).map_err(|e| anyhow::anyhow!("{:?}", e))?;
             let plan = compile(&ast)?;
-            let executor = DslExecutor::new(self.pool.clone());
+            let executor = DslExecutor::new(self.pool.clone()).with_sem_os_ops(sem_os_registry());
             let mut ctx = ExecutionContext::new();
             executor.execute_plan(&plan, &mut ctx).await?;
             Ok(ctx)

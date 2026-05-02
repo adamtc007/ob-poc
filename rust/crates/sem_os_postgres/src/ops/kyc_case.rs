@@ -548,6 +548,65 @@ impl SemOsVerbOp for ApproveWithConditions {
     }
 }
 
+pub struct Escalate;
+
+#[async_trait]
+impl SemOsVerbOp for Escalate {
+    fn fqn(&self) -> &str {
+        "kyc-case.escalate"
+    }
+
+    async fn execute(
+        &self,
+        args: &Value,
+        ctx: &mut VerbExecutionContext,
+        scope: &mut dyn TransactionScope,
+    ) -> Result<VerbExecutionOutcome> {
+        let case_id = json_extract_uuid(args, ctx, "case-id")?;
+        let escalation_level = json_extract_string(args, "escalation-level")?;
+        let notes = json_extract_string_opt(args, "notes");
+
+        const VALID_ESCALATION_LEVELS: &[&str] =
+            &["STANDARD", "SENIOR_COMPLIANCE", "EXECUTIVE", "BOARD"];
+        if !VALID_ESCALATION_LEVELS.contains(&escalation_level.as_str()) {
+            return Err(anyhow!(
+                "Invalid escalation level '{}'. Must be one of: {}",
+                escalation_level,
+                VALID_ESCALATION_LEVELS.join(", ")
+            ));
+        }
+
+        let affected = sqlx::query(
+            r#"UPDATE "ob-poc".cases
+               SET escalation_level = $2,
+                   notes = COALESCE($3, notes),
+                   last_activity_at = NOW(),
+                   updated_at = NOW()
+               WHERE case_id = $1"#,
+        )
+        .bind(case_id)
+        .bind(&escalation_level)
+        .bind(&notes)
+        .execute(scope.executor())
+        .await?
+        .rows_affected();
+
+        if affected == 0 {
+            return Err(anyhow!("KYC case not found: {}", case_id));
+        }
+
+        dsl_runtime::domain_ops::helpers::emit_pending_state_advance(
+            ctx,
+            case_id,
+            "kyc-case:escalated",
+            "kyc-case/workstream",
+            &format!("kyc-case.escalate — escalation_level={}", escalation_level),
+        );
+
+        Ok(VerbExecutionOutcome::Affected(affected))
+    }
+}
+
 // ---------------------------------------------------------------------------
 // kyc-case.summarize
 // ---------------------------------------------------------------------------

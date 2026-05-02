@@ -16,6 +16,7 @@
 
 use anyhow::{Context, Result};
 use clap::Subcommand;
+use dsl_core::config::dag::{EntryVia, SlotStateMachine};
 use dsl_core::config::{
     collect_declared_fqns, entity_kinds_from_taxonomy_yaml, flatten_pack_entries,
     load_dags_from_dir, load_packs_from_dir, validate_dags_with_context, validate_pack_fqns,
@@ -42,6 +43,8 @@ pub enum ReconcileAction {
         /// Operation name — scaffolded but not executed in pilot
         op: String,
     },
+    /// Report DAG/SemOS hygiene drift without failing the validation gate.
+    HygieneReport,
 }
 
 pub async fn run(action: ReconcileAction) -> Result<()> {
@@ -49,6 +52,7 @@ pub async fn run(action: ReconcileAction) -> Result<()> {
         ReconcileAction::Validate { strict_warnings } => validate(strict_warnings).await,
         ReconcileAction::Status => status().await,
         ReconcileAction::Batch { op } => batch(op).await,
+        ReconcileAction::HygieneReport => hygiene_report().await,
     }
 }
 
@@ -174,6 +178,7 @@ async fn validate(strict_warnings: bool) -> Result<()> {
     let struct_n = report.structural.len();
     let wf_n = report.well_formedness.len() + pack_errors.len() + dag_report.errors.len();
     let warn_n = report.warnings.len() + dag_report.warnings.len();
+    let hygiene_failures = hygiene_failure_summary()?;
 
     println!();
     println!("Structural errors:           {struct_n}");
@@ -188,6 +193,7 @@ async fn validate(strict_warnings: bool) -> Result<()> {
         report.warnings.len(),
         dag_report.warnings.len()
     );
+    println!("Hygiene drift errors:        {}", hygiene_failures.len());
 
     if struct_n > 0 {
         println!("\nStructural errors:");
@@ -222,8 +228,15 @@ async fn validate(strict_warnings: bool) -> Result<()> {
             println!("  ~ {w}");
         }
     }
+    if !hygiene_failures.is_empty() {
+        println!("\nHygiene drift errors:");
+        for failure in &hygiene_failures {
+            println!("  ✗ {failure}");
+        }
+    }
 
-    let failed = struct_n > 0 || wf_n > 0 || (strict_warnings && warn_n > 0);
+    let failed =
+        struct_n > 0 || wf_n > 0 || !hygiene_failures.is_empty() || (strict_warnings && warn_n > 0);
     if failed {
         println!("\n===========================================");
         println!("  FAILED");
@@ -243,6 +256,651 @@ fn load_dag_validation_context() -> Result<DagValidationContext> {
     let known_entity_kinds = entity_kinds_from_taxonomy_yaml(&taxonomy)
         .with_context(|| format!("parsing entity taxonomy from {taxonomy_path:?}"))?;
     Ok(DagValidationContext { known_entity_kinds })
+}
+
+#[derive(Debug, Clone)]
+struct SimpleStatusEntry {
+    line: usize,
+    fqn: String,
+    table: String,
+    pk_col: String,
+    state_col: String,
+    target_state: String,
+}
+
+#[derive(Debug, Default)]
+struct TableSchema {
+    columns: HashSet<String>,
+    checks: std::collections::HashMap<String, HashSet<String>>,
+}
+
+async fn hygiene_report() -> Result<()> {
+    println!("===========================================");
+    println!("  cargo x reconcile hygiene-report");
+    println!("===========================================\n");
+
+    let cfg = load_catalogue()?;
+    let declared = collect_declared_fqns(&cfg);
+    let mut registry = sem_os_postgres::ops::build_registry();
+    ob_poc::domain_ops::extend_registry(&mut registry);
+    let registered: HashSet<String> = registry.manifest().into_iter().collect();
+
+    let simple_status = load_simple_status_entries()?;
+    let schema = load_schema_tables()?;
+    let dag_refs = collect_dag_verb_refs()?;
+    let writer_index = collect_writer_index(&cfg, &simple_status);
+
+    println!("Inputs:");
+    println!("  declared YAML verbs:      {}", declared.len());
+    println!("  registered SemOs ops:     {}", registered.len());
+    println!("  SimpleStatus configs:     {}", simple_status.len());
+    println!("  DAG verb references:      {}", dag_refs.len());
+    println!("  schema tables loaded:     {}", schema.len());
+
+    println!("\nSimpleStatus drift findings:");
+    let mut simple_findings = Vec::new();
+    for entry in &simple_status {
+        match schema.get(&entry.table) {
+            None => simple_findings.push(format!(
+                "{} at simple_status_op.rs:{}: table '{}' not found",
+                entry.fqn, entry.line, entry.table
+            )),
+            Some(table) => {
+                if !table.columns.contains(&entry.pk_col) {
+                    simple_findings.push(format!(
+                        "{} at simple_status_op.rs:{}: pk_col '{}' not found on '{}'",
+                        entry.fqn, entry.line, entry.pk_col, entry.table
+                    ));
+                }
+                if !table.columns.contains(&entry.state_col) {
+                    simple_findings.push(format!(
+                        "{} at simple_status_op.rs:{}: state_col '{}' not found on '{}'",
+                        entry.fqn, entry.line, entry.state_col, entry.table
+                    ));
+                    continue;
+                }
+                if let Some(allowed) = table.checks.get(&entry.state_col) {
+                    if !allowed.contains(&entry.target_state) {
+                        simple_findings.push(format!(
+                            "{} at simple_status_op.rs:{}: target_state '{}' not allowed by '{}.{}' CHECK {:?}",
+                            entry.fqn,
+                            entry.line,
+                            entry.target_state,
+                            entry.table,
+                            entry.state_col,
+                            sorted_set(allowed)
+                        ));
+                    }
+                }
+            }
+        }
+    }
+    if simple_findings.is_empty() {
+        println!("  none");
+    } else {
+        for finding in &simple_findings {
+            println!("  - {finding}");
+        }
+    }
+
+    println!("\nDAG references without YAML declaration:");
+    let missing_yaml: Vec<_> = dag_refs
+        .iter()
+        .filter(|fqn| !declared.contains(*fqn))
+        .cloned()
+        .collect();
+    print_limited(&missing_yaml, 50);
+
+    println!("\nDAG references without registered SemOs op:");
+    let missing_runtime: Vec<_> = dag_refs
+        .iter()
+        .filter(|fqn| {
+            declared.contains(*fqn)
+                && !registered.contains(*fqn)
+                && verb_behavior(&cfg, fqn).is_some_and(|behavior| {
+                    matches!(behavior, dsl_core::config::VerbBehavior::Plugin)
+                })
+        })
+        .cloned()
+        .collect();
+    print_limited(&missing_runtime, 50);
+
+    println!("\nPlugin YAML declarations without registered SemOs op:");
+    let mut plugin_missing = Vec::new();
+    for (domain, dblock) in &cfg.domains {
+        for (verb, vblock) in &dblock.verbs {
+            if matches!(vblock.behavior, dsl_core::config::VerbBehavior::Plugin) {
+                let fqn = format!("{domain}.{verb}");
+                if !registered.contains(&fqn) {
+                    plugin_missing.push(fqn);
+                }
+            }
+        }
+    }
+    plugin_missing.sort();
+    print_limited(&plugin_missing, 100);
+
+    println!("\nDeal substate closure:");
+    let deal_required_writes = [
+        ("deals", "bac_status", "in_review"),
+        ("deals", "bac_status", "approved"),
+        ("deals", "bac_status", "rejected"),
+        ("deals", "kyc_clearance_status", "pending"),
+        ("deals", "kyc_clearance_status", "in_review"),
+        ("deals", "kyc_clearance_status", "approved"),
+        ("deals", "kyc_clearance_status", "rejected"),
+    ];
+    let mut deal_closure_missing = Vec::new();
+    for (table, column, value) in deal_required_writes {
+        let key = (table.to_string(), column.to_string(), value.to_string());
+        match writer_index.get(&key) {
+            Some(writers) if !writers.is_empty() => {
+                println!("  OK {table}.{column} = {value}: {}", writers.join(", "));
+            }
+            Some(_) | None => {
+                let finding = format!("{table}.{column} = {value}");
+                println!("  MISSING {finding}");
+                deal_closure_missing.push(finding);
+            }
+        }
+    }
+
+    println!("\nSummary:");
+    println!("  SimpleStatus drift findings: {}", simple_findings.len());
+    println!("  DAG refs missing YAML:        {}", missing_yaml.len());
+    println!("  DAG refs missing runtime:     {}", missing_runtime.len());
+    println!("  plugin YAML missing runtime:  {}", plugin_missing.len());
+    println!(
+        "  deal substate closure gaps:   {}",
+        deal_closure_missing.len()
+    );
+    println!("\nReport-only: this command exits zero by design.");
+    Ok(())
+}
+
+fn collect_writer_index(
+    cfg: &VerbsConfig,
+    simple_status: &[SimpleStatusEntry],
+) -> std::collections::HashMap<(String, String, String), Vec<String>> {
+    let mut index = std::collections::HashMap::<(String, String, String), Vec<String>>::new();
+
+    for entry in simple_status {
+        index
+            .entry((
+                entry.table.clone(),
+                entry.state_col.clone(),
+                entry.target_state.clone(),
+            ))
+            .or_default()
+            .push(entry.fqn.clone());
+    }
+
+    for (domain, dblock) in &cfg.domains {
+        for (verb, vblock) in &dblock.verbs {
+            let fqn = format!("{domain}.{verb}");
+            for write in &vblock.writes {
+                let Some(value) = &write.value else {
+                    continue;
+                };
+                index
+                    .entry((write.table.clone(), write.column.clone(), value.clone()))
+                    .or_default()
+                    .push(fqn.clone());
+            }
+        }
+    }
+
+    for writers in index.values_mut() {
+        writers.sort();
+        writers.dedup();
+    }
+
+    index
+}
+
+fn hygiene_failure_summary() -> Result<Vec<String>> {
+    let cfg = load_catalogue()?;
+    let declared = collect_declared_fqns(&cfg);
+    let mut registry = sem_os_postgres::ops::build_registry();
+    ob_poc::domain_ops::extend_registry(&mut registry);
+    let registered: HashSet<String> = registry.manifest().into_iter().collect();
+
+    let simple_status = load_simple_status_entries()?;
+    let schema = load_schema_tables()?;
+    let dag_refs = collect_dag_verb_refs()?;
+    let writer_index = collect_writer_index(&cfg, &simple_status);
+    let mut failures = Vec::new();
+
+    failures.extend(simple_status_drift_failures(&simple_status, &schema));
+
+    for fqn in dag_refs.iter().filter(|fqn| !declared.contains(*fqn)) {
+        failures.push(format!("{fqn}: DAG reference has no YAML declaration"));
+    }
+
+    for fqn in dag_refs.iter().filter(|fqn| {
+        declared.contains(*fqn)
+            && !registered.contains(*fqn)
+            && verb_behavior(&cfg, fqn)
+                .is_some_and(|behavior| matches!(behavior, dsl_core::config::VerbBehavior::Plugin))
+    }) {
+        failures.push(format!(
+            "{fqn}: DAG references plugin verb without registered SemOs op"
+        ));
+    }
+
+    for (domain, dblock) in &cfg.domains {
+        for (verb, vblock) in &dblock.verbs {
+            if matches!(vblock.behavior, dsl_core::config::VerbBehavior::Plugin) {
+                let fqn = format!("{domain}.{verb}");
+                if !registered.contains(&fqn) {
+                    failures.push(format!(
+                        "{fqn}: plugin YAML declaration has no registered SemOs op"
+                    ));
+                }
+            }
+        }
+    }
+
+    for (table, column, value) in [
+        ("deals", "bac_status", "in_review"),
+        ("deals", "bac_status", "approved"),
+        ("deals", "bac_status", "rejected"),
+        ("deals", "kyc_clearance_status", "pending"),
+        ("deals", "kyc_clearance_status", "in_review"),
+        ("deals", "kyc_clearance_status", "approved"),
+        ("deals", "kyc_clearance_status", "rejected"),
+    ] {
+        let key = (table.to_string(), column.to_string(), value.to_string());
+        if writer_index
+            .get(&key)
+            .is_none_or(|writers| writers.is_empty())
+        {
+            failures.push(format!("{table}.{column} = {value}: no declared writer"));
+        }
+    }
+
+    failures.extend(entry_via_consistency_failures()?);
+    failures.extend(cascade_source_scan_failures()?);
+
+    failures.sort();
+    Ok(failures)
+}
+
+fn simple_status_drift_failures(
+    simple_status: &[SimpleStatusEntry],
+    schema: &std::collections::HashMap<String, TableSchema>,
+) -> Vec<String> {
+    let mut failures = Vec::new();
+    for entry in simple_status {
+        match schema.get(&entry.table) {
+            None => failures.push(format!(
+                "{}: SimpleStatus table '{}' not found",
+                entry.fqn, entry.table
+            )),
+            Some(table) => {
+                if !table.columns.contains(&entry.pk_col) {
+                    failures.push(format!(
+                        "{}: SimpleStatus pk_col '{}.{}' not found",
+                        entry.fqn, entry.table, entry.pk_col
+                    ));
+                }
+                if !table.columns.contains(&entry.state_col) {
+                    failures.push(format!(
+                        "{}: SimpleStatus state_col '{}.{}' not found",
+                        entry.fqn, entry.table, entry.state_col
+                    ));
+                    continue;
+                }
+                if let Some(allowed) = table.checks.get(&entry.state_col) {
+                    if !allowed.contains(&entry.target_state) {
+                        failures.push(format!(
+                            "{}: SimpleStatus target_state '{}' not allowed by '{}.{}' CHECK",
+                            entry.fqn, entry.target_state, entry.table, entry.state_col
+                        ));
+                    }
+                }
+            }
+        }
+    }
+    failures
+}
+
+fn entry_via_consistency_failures() -> Result<Vec<String>> {
+    let dags = load_dags_from_dir(&PathBuf::from("config/sem_os_seeds/dag_taxonomies"))
+        .context("loading DAG taxonomies for entry_via hygiene")?;
+    let scoped = ["deal", "cbu", "instrument_matrix", "lifecycle_resources"];
+    let cfg = load_catalogue()?;
+    let declared = collect_declared_fqns(&cfg);
+    let mut failures = Vec::new();
+
+    for (_path, loaded) in dags {
+        let dag = loaded.dag;
+        if !scoped.contains(&dag.workspace.as_str()) {
+            continue;
+        }
+        for slot in &dag.slots {
+            let Some(SlotStateMachine::Structured(machine)) = &slot.state_machine else {
+                continue;
+            };
+            let mut incoming = std::collections::HashSet::new();
+            for transition in &machine.transitions {
+                incoming.insert(transition.to.clone());
+            }
+            for state in &machine.states {
+                let location = format!("{}.{}.{}", dag.workspace, slot.id, state.id);
+                if !state.entry && !incoming.contains(&state.id) && state.entry_via.is_none() {
+                    failures.push(format!(
+                        "{location}: state has no incoming transition and no entry_via"
+                    ));
+                }
+                match &state.entry_via {
+                    Some(EntryVia::Verb) if !incoming.contains(&state.id) => {
+                        failures.push(format!(
+                            "{location}: entry_via verb requires an incoming transition"
+                        ));
+                    }
+                    Some(EntryVia::Cascade { parent }) => {
+                        if parent.trim().is_empty() {
+                            failures.push(format!("{location}: entry_via cascade parent is empty"));
+                        } else if !declared.contains(parent) {
+                            failures.push(format!(
+                                "{location}: entry_via cascade parent '{parent}' is not a declared verb"
+                            ));
+                        }
+                    }
+                    Some(EntryVia::Trigger { name }) if name.trim().is_empty() => {
+                        failures.push(format!("{location}: entry_via trigger name is empty"));
+                    }
+                    Some(EntryVia::Scheduler { name }) if name.trim().is_empty() => {
+                        failures.push(format!("{location}: entry_via scheduler name is empty"));
+                    }
+                    Some(EntryVia::Signal { source }) if source.trim().is_empty() => {
+                        failures.push(format!("{location}: entry_via signal source is empty"));
+                    }
+                    Some(EntryVia::Verb)
+                    | Some(EntryVia::Trigger { .. })
+                    | Some(EntryVia::Scheduler { .. })
+                    | Some(EntryVia::Signal { .. }) => {}
+                    None => {}
+                }
+            }
+        }
+    }
+
+    Ok(failures)
+}
+
+fn cascade_source_scan_failures() -> Result<Vec<String>> {
+    let mut failures = Vec::new();
+    let cbu_src = std::fs::read_to_string("crates/sem_os_postgres/src/ops/cbu.rs")
+        .context("reading cbu cascade parent source")?;
+    let role_src = std::fs::read_to_string("crates/sem_os_postgres/src/ops/cbu_role.rs")
+        .context("reading cbu role cascade parent source")?;
+
+    for finding in scan_forbidden_mutations(
+        source_section(&cbu_src, "// cbu.create", "// cbu.link-structure"),
+        "cbu.create",
+        &[
+            "cbu_entity_roles",
+            "client_group_entity",
+            "entity_relationships",
+        ],
+    ) {
+        failures.push(finding);
+    }
+    for finding in scan_forbidden_mutations(
+        source_section(&cbu_src, "// cbu.add-product", "// cbu.inspect"),
+        "cbu.add-product",
+        &["service_delivery_map", "cbu_resource_instances"],
+    ) {
+        failures.push(finding);
+    }
+    for finding in scan_forbidden_mutations(
+        source_section(&cbu_src, "// cbu.decide", "// cbu.delete-cascade"),
+        "cbu.decide",
+        &["cases"],
+    ) {
+        failures.push(finding);
+    }
+    for finding in scan_forbidden_mutations(
+        source_section(&cbu_src, "// cbu.delete-cascade", ""),
+        "cbu.delete-cascade",
+        &[
+            "client_group_entity",
+            "cbu_group_members",
+            "cbu_structure_links",
+            "entities",
+            "cbu_entity_roles",
+        ],
+    ) {
+        failures.push(finding);
+    }
+    for finding in scan_forbidden_mutations(
+        &role_src,
+        "cbu.assign-ownership/control/trust-role",
+        &["entity_relationships"],
+    ) {
+        failures.push(finding);
+    }
+
+    Ok(failures)
+}
+
+fn source_section<'a>(source: &'a str, start_marker: &str, end_marker: &str) -> &'a str {
+    let Some(start) = source.find(start_marker) else {
+        return "";
+    };
+    let rest = &source[start..];
+    if end_marker.is_empty() {
+        return rest;
+    }
+    rest.find(end_marker)
+        .map(|end| &rest[..end])
+        .unwrap_or(rest)
+}
+
+fn scan_forbidden_mutations(section: &str, parent_fqn: &str, tables: &[&str]) -> Vec<String> {
+    let collapsed = section.split_whitespace().collect::<Vec<_>>().join(" ");
+    let upper = collapsed.to_ascii_uppercase();
+    let mut failures = Vec::new();
+    for table in tables {
+        let quoted = format!("\"OB-POC\".{table}").to_ascii_uppercase();
+        let unquoted = table.to_ascii_uppercase();
+        for op in ["INSERT INTO", "UPDATE", "DELETE FROM"] {
+            if upper.contains(&format!("{op} {quoted}"))
+                || upper.contains(&format!("{op} {unquoted}"))
+            {
+                failures.push(format!(
+                    "{parent_fqn}: direct off-carrier {op} on {table}; use registry child dispatch"
+                ));
+            }
+        }
+    }
+    failures
+}
+
+fn verb_behavior<'a>(
+    cfg: &'a VerbsConfig,
+    fqn: &str,
+) -> Option<&'a dsl_core::config::VerbBehavior> {
+    let (domain, verb) = fqn.rsplit_once('.')?;
+    cfg.domains
+        .get(domain)
+        .and_then(|domain_config| domain_config.verbs.get(verb))
+        .map(|verb_config| &verb_config.behavior)
+}
+
+fn load_simple_status_entries() -> Result<Vec<SimpleStatusEntry>> {
+    let path = PathBuf::from("src/domain_ops/simple_status_op.rs");
+    let raw = std::fs::read_to_string(&path).with_context(|| format!("reading {path:?}"))?;
+    let field_re =
+        regex::Regex::new(r#"(?m)^\s*(fqn|table|pk_col|state_col|target_state):\s*"([^"]+)""#)?;
+    let mut entries = Vec::new();
+    let mut in_block = false;
+    let mut start_line = 0usize;
+    let mut block = String::new();
+
+    for (idx, line) in raw.lines().enumerate() {
+        if line.contains("SimpleStatusConfig {") {
+            in_block = true;
+            start_line = idx + 1;
+            block.clear();
+        }
+        if in_block {
+            block.push_str(line);
+            block.push('\n');
+            if line.trim() == "}," {
+                let mut fields = std::collections::HashMap::new();
+                for cap in field_re.captures_iter(&block) {
+                    fields.insert(cap[1].to_string(), cap[2].to_string());
+                }
+                if let (Some(fqn), Some(table), Some(pk_col), Some(state_col), Some(target_state)) = (
+                    fields.get("fqn"),
+                    fields.get("table"),
+                    fields.get("pk_col"),
+                    fields.get("state_col"),
+                    fields.get("target_state"),
+                ) {
+                    entries.push(SimpleStatusEntry {
+                        line: start_line,
+                        fqn: fqn.clone(),
+                        table: table.clone(),
+                        pk_col: pk_col.clone(),
+                        state_col: state_col.clone(),
+                        target_state: target_state.clone(),
+                    });
+                }
+                in_block = false;
+            }
+        }
+    }
+
+    Ok(entries)
+}
+
+fn load_schema_tables() -> Result<std::collections::HashMap<String, TableSchema>> {
+    let mut paths = vec![PathBuf::from("../migrations/master-schema.sql")];
+    let rust_migrations = PathBuf::from("migrations");
+    if rust_migrations.exists() {
+        for entry in std::fs::read_dir(&rust_migrations)
+            .with_context(|| format!("reading migration dir {rust_migrations:?}"))?
+        {
+            let entry = entry?;
+            let path = entry.path();
+            if path.extension().and_then(|ext| ext.to_str()) == Some("sql")
+                && path.file_name().and_then(|name| name.to_str()) != Some("master-schema.sql")
+            {
+                paths.push(path);
+            }
+        }
+    }
+
+    let create_re =
+        regex::Regex::new(r#"^CREATE TABLE (?:IF NOT EXISTS )?"ob-poc"\.([A-Za-z0-9_]+) \("#)?;
+    let column_re = regex::Regex::new(r#"^\s+"?([A-Za-z_][A-Za-z0-9_]*)"?\s+[^,]+,?\s*$"#)?;
+    let quoted_value_re = regex::Regex::new(r#"'([^']+)'"#)?;
+
+    let mut tables = std::collections::HashMap::<String, TableSchema>::new();
+    for path in paths {
+        let raw = std::fs::read_to_string(&path).with_context(|| format!("reading {path:?}"))?;
+        parse_schema_sql(&raw, &create_re, &column_re, &quoted_value_re, &mut tables);
+    }
+
+    Ok(tables)
+}
+
+fn parse_schema_sql(
+    raw: &str,
+    create_re: &regex::Regex,
+    column_re: &regex::Regex,
+    quoted_value_re: &regex::Regex,
+    tables: &mut std::collections::HashMap<String, TableSchema>,
+) {
+    let mut current: Option<(String, TableSchema)> = None;
+
+    for line in raw.lines() {
+        if let Some(cap) = create_re.captures(line) {
+            current = Some((cap[1].to_string(), TableSchema::default()));
+            continue;
+        }
+
+        if let Some((name, table)) = current.as_mut() {
+            let trimmed = line.trim();
+            if trimmed == ");" {
+                tables.insert(name.clone(), std::mem::take(table));
+                current = None;
+                continue;
+            }
+            if trimmed.starts_with("CONSTRAINT") {
+                if let Some(column) = table
+                    .columns
+                    .iter()
+                    .find(|column| line.contains(&format!("({column})::text")))
+                    .cloned()
+                {
+                    let values: HashSet<String> = quoted_value_re
+                        .captures_iter(line)
+                        .map(|cap| cap[1].to_string())
+                        .collect();
+                    if !values.is_empty() {
+                        table.checks.insert(column, values);
+                    }
+                }
+                continue;
+            }
+            if let Some(cap) = column_re.captures(line) {
+                let column = cap[1].to_string();
+                if column != "CONSTRAINT" {
+                    table.columns.insert(column);
+                }
+            }
+        }
+    }
+}
+
+fn collect_dag_verb_refs() -> Result<HashSet<String>> {
+    let mut refs = HashSet::new();
+    let path = PathBuf::from("config/sem_os_seeds/dag_taxonomies");
+    let verb_re = regex::Regex::new(r#"\b[a-z][a-z0-9-]*\.[a-z][a-z0-9-]*\b"#)?;
+
+    for entry in std::fs::read_dir(&path).with_context(|| format!("reading {path:?}"))? {
+        let entry = entry?;
+        let file_path = entry.path();
+        if file_path.extension().and_then(|ext| ext.to_str()) != Some("yaml") {
+            continue;
+        }
+        let raw = std::fs::read_to_string(&file_path)
+            .with_context(|| format!("reading DAG taxonomy {file_path:?}"))?;
+        for line in raw.lines() {
+            if !line.contains("via:") {
+                continue;
+            }
+            for cap in verb_re.captures_iter(line) {
+                refs.insert(cap[0].to_string());
+            }
+        }
+    }
+
+    Ok(refs)
+}
+
+fn sorted_set(values: &HashSet<String>) -> Vec<String> {
+    let mut out: Vec<_> = values.iter().cloned().collect();
+    out.sort();
+    out
+}
+
+fn print_limited(values: &[String], limit: usize) {
+    if values.is_empty() {
+        println!("  none");
+        return;
+    }
+    for value in values.iter().take(limit) {
+        println!("  - {value}");
+    }
+    if values.len() > limit {
+        println!("  ... {} more", values.len() - limit);
+    }
 }
 
 async fn status() -> Result<()> {
@@ -339,4 +997,109 @@ async fn batch(op: String) -> Result<()> {
          shape only — no mutations performed."
     );
     Ok(())
+}
+
+#[cfg(test)]
+mod hygiene_tests {
+    use super::*;
+
+    fn entry(
+        fqn: &str,
+        table: &str,
+        pk_col: &str,
+        state_col: &str,
+        target_state: &str,
+    ) -> SimpleStatusEntry {
+        SimpleStatusEntry {
+            line: 1,
+            fqn: fqn.to_string(),
+            table: table.to_string(),
+            pk_col: pk_col.to_string(),
+            state_col: state_col.to_string(),
+            target_state: target_state.to_string(),
+        }
+    }
+
+    fn table(columns: &[&str], check_col: &str, values: &[&str]) -> TableSchema {
+        TableSchema {
+            columns: columns.iter().map(|value| (*value).to_string()).collect(),
+            checks: std::collections::HashMap::from([(
+                check_col.to_string(),
+                values.iter().map(|value| (*value).to_string()).collect(),
+            )]),
+        }
+    }
+
+    #[test]
+    fn simple_status_drift_detects_missing_table() {
+        let failures = simple_status_drift_failures(
+            &[entry("x.y", "missing_table", "id", "status", "ACTIVE")],
+            &std::collections::HashMap::new(),
+        );
+
+        assert!(failures[0].contains("table 'missing_table' not found"));
+    }
+
+    #[test]
+    fn simple_status_drift_detects_missing_pk_column() {
+        let schema = std::collections::HashMap::from([(
+            "things".to_string(),
+            table(&["id", "status"], "status", &["ACTIVE"]),
+        )]);
+        let failures = simple_status_drift_failures(
+            &[entry("x.y", "things", "thing_id", "status", "ACTIVE")],
+            &schema,
+        );
+
+        assert!(failures[0].contains("pk_col 'things.thing_id' not found"));
+    }
+
+    #[test]
+    fn simple_status_drift_detects_missing_state_column() {
+        let schema = std::collections::HashMap::from([(
+            "things".to_string(),
+            table(&["id", "status"], "status", &["ACTIVE"]),
+        )]);
+        let failures = simple_status_drift_failures(
+            &[entry("x.y", "things", "id", "lifecycle_status", "ACTIVE")],
+            &schema,
+        );
+
+        assert!(failures[0].contains("state_col 'things.lifecycle_status' not found"));
+    }
+
+    #[test]
+    fn simple_status_drift_detects_invalid_target_value() {
+        let schema = std::collections::HashMap::from([(
+            "things".to_string(),
+            table(&["id", "status"], "status", &["ACTIVE"]),
+        )]);
+        let failures = simple_status_drift_failures(
+            &[entry("x.y", "things", "id", "status", "BROKEN")],
+            &schema,
+        );
+
+        assert!(failures[0].contains("target_state 'BROKEN' not allowed"));
+    }
+
+    #[test]
+    fn cascade_scan_detects_direct_off_carrier_mutation() {
+        let section = r##"
+            sqlx::query(r#"UPDATE "ob-poc".entity_relationships SET updated_at = now()"#);
+        "##;
+        let failures = scan_forbidden_mutations(section, "parent.verb", &["entity_relationships"]);
+
+        assert_eq!(failures.len(), 1);
+        assert!(failures[0].contains("parent.verb"));
+    }
+
+    #[test]
+    fn cascade_scan_allows_child_dispatch_without_direct_mutation() {
+        let section = r#"
+            dispatch_child_verb(self.fqn(), "entity-relationship.upsert", &args, ctx, scope).await?;
+        "#;
+        let failures = scan_forbidden_mutations(section, "parent.verb", &["entity_relationships"]);
+
+        assert!(failures.is_empty());
+    }
 }

@@ -20,6 +20,20 @@ mod tests {
         Ok(PgPool::connect(&database_url).await?)
     }
 
+    fn sem_os_registry() -> std::sync::Arc<sem_os_postgres::ops::SemOsVerbOpRegistry> {
+        use std::sync::OnceLock;
+
+        static REGISTRY: OnceLock<std::sync::Arc<sem_os_postgres::ops::SemOsVerbOpRegistry>> =
+            OnceLock::new();
+        REGISTRY
+            .get_or_init(|| {
+                let mut registry = sem_os_postgres::ops::build_registry();
+                ob_poc::domain_ops::extend_registry(&mut registry);
+                std::sync::Arc::new(registry)
+            })
+            .clone()
+    }
+
     #[tokio::test]
     async fn cbu_delete_sets_deleted_at_and_hides_row() -> Result<()> {
         let pool = test_pool().await?;
@@ -116,7 +130,7 @@ mod tests {
     #[tokio::test]
     async fn cbu_delete_cascade_soft_deletes_root_rows() -> Result<()> {
         let pool = test_pool().await?;
-        let executor = DslExecutor::new(pool.clone());
+        let executor = DslExecutor::new(pool.clone()).with_sem_os_ops(sem_os_registry());
         let mut ctx = ExecutionContext::new();
 
         let cbu_id = Uuid::new_v4();

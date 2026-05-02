@@ -524,6 +524,11 @@ domains:
             required: false
             default: true
             description: Also delete entities linked only to this CBU
+          - name: hard-delete
+            type: boolean
+            required: false
+            default: true
+            description: Use hard cleanup for child tables. Set false for semantic termination.
         returns:
           type: record
           description: Summary of deleted records by table
@@ -982,6 +987,10 @@ domains:
           - name: reason
             type: string
             required: true
+          - name: hard-delete
+            type: boolean
+            required: false
+            default: false
         returns:
           type: affected
         three_axis:

@@ -28,6 +28,7 @@ use dsl_runtime::domain_ops::helpers::{
     json_extract_bool_opt, json_extract_int_opt, json_extract_string, json_extract_string_opt,
     json_extract_uuid, json_extract_uuid_opt,
 };
+use dsl_runtime::service_traits::SemOsChildDispatcher;
 use dsl_runtime::tx::TransactionScope;
 use dsl_runtime::{VerbExecutionContext, VerbExecutionOutcome};
 
@@ -64,6 +65,30 @@ fn parse_optional_date(value: Option<String>, arg_name: &str) -> Result<Option<N
                 .map_err(|err| anyhow::anyhow!("invalid {} '{}': {}", arg_name, raw, err))
         })
         .transpose()
+}
+
+async fn dispatch_child_verb(
+    parent_fqn: &str,
+    child_fqn: &str,
+    child_args: &Value,
+    ctx: &mut VerbExecutionContext,
+    scope: &mut dyn TransactionScope,
+) -> Result<VerbExecutionOutcome> {
+    let dispatcher = ctx.service::<dyn SemOsChildDispatcher>()?;
+    dispatcher
+        .dispatch_child(parent_fqn, child_fqn, child_args, ctx, scope)
+        .await
+}
+
+fn affected_count(outcome: VerbExecutionOutcome) -> i64 {
+    match outcome {
+        VerbExecutionOutcome::Affected(count) => count as i64,
+        VerbExecutionOutcome::Record(record) => record
+            .get("affected")
+            .and_then(|value| value.as_i64())
+            .unwrap_or(0),
+        _ => 0,
+    }
 }
 
 fn normalize_relationship_type(raw: &str) -> String {
@@ -156,63 +181,28 @@ impl SemOsVerbOp for Create {
         .await?;
 
         if let Some(fund_id) = fund_entity_id {
-            let asset_owner_role_id: Option<Uuid> = sqlx::query_scalar(
-                r#"SELECT role_id FROM "ob-poc".roles WHERE name = 'ASSET_OWNER'"#,
-            )
-            .fetch_optional(scope.executor())
-            .await?;
+            let role_args = serde_json::json!({
+                "cbu-id": cbu_id,
+                "entity-id": fund_id,
+                "role": "ASSET_OWNER"
+            });
+            dispatch_child_verb(self.fqn(), "cbu.assign-fund-role", &role_args, ctx, scope).await?;
 
-            if let Some(role_id) = asset_owner_role_id {
-                sqlx::query(
-                    r#"
-                    INSERT INTO "ob-poc".cbu_entity_roles (cbu_id, entity_id, role_id)
-                    VALUES ($1, $2, $3)
-                    ON CONFLICT (cbu_id, entity_id, role_id) DO NOTHING
-                    "#,
-                )
-                .bind(cbu_id)
-                .bind(fund_id)
-                .bind(role_id)
-                .execute(scope.executor())
+            let link_args = serde_json::json!({
+                "cbu-id": cbu_id,
+                "entity-id": fund_id
+            });
+            dispatch_child_verb(self.fqn(), "client-group.link-cbu", &link_args, ctx, scope)
                 .await?;
-            }
-
-            sqlx::query(
-                r#"
-                UPDATE "ob-poc".client_group_entity
-                SET cbu_id = $1, updated_at = NOW()
-                WHERE entity_id = $2
-                  AND membership_type NOT IN ('historical', 'rejected')
-                  AND cbu_id IS NULL
-                "#,
-            )
-            .bind(cbu_id)
-            .bind(fund_id)
-            .execute(scope.executor())
-            .await?;
         }
 
         if let Some(manco_id) = manco_entity_id {
-            let manco_role_id: Option<Uuid> = sqlx::query_scalar(
-                r#"SELECT role_id FROM "ob-poc".roles WHERE name = 'MANAGEMENT_COMPANY'"#,
-            )
-            .fetch_optional(scope.executor())
-            .await?;
-
-            if let Some(role_id) = manco_role_id {
-                sqlx::query(
-                    r#"
-                    INSERT INTO "ob-poc".cbu_entity_roles (cbu_id, entity_id, role_id)
-                    VALUES ($1, $2, $3)
-                    ON CONFLICT (cbu_id, entity_id, role_id) DO NOTHING
-                    "#,
-                )
-                .bind(cbu_id)
-                .bind(manco_id)
-                .bind(role_id)
-                .execute(scope.executor())
-                .await?;
-            }
+            let role_args = serde_json::json!({
+                "cbu-id": cbu_id,
+                "entity-id": manco_id,
+                "role": "MANAGEMENT_COMPANY"
+            });
+            dispatch_child_verb(self.fqn(), "cbu.assign-fund-role", &role_args, ctx, scope).await?;
         }
 
         let skipped_reason: Option<&str> = if is_new {
@@ -711,9 +701,16 @@ impl SemOsVerbOp for UnlinkStructure {
     ) -> Result<VerbExecutionOutcome> {
         let link_id = json_extract_uuid(args, ctx, "link-id")?;
         let reason = json_extract_string(args, "reason")?;
+        let hard_delete = json_extract_bool_opt(args, "hard-delete").unwrap_or(false);
 
-        let result = sqlx::query(
-            r#"
+        let result = if hard_delete {
+            sqlx::query(r#"DELETE FROM "ob-poc".cbu_structure_links WHERE link_id = $1"#)
+                .bind(link_id)
+                .execute(scope.executor())
+                .await?
+        } else {
+            sqlx::query(
+                r#"
             UPDATE "ob-poc".cbu_structure_links
             SET status = 'TERMINATED',
                 terminated_at = NOW(),
@@ -722,11 +719,12 @@ impl SemOsVerbOp for UnlinkStructure {
             WHERE link_id = $1
               AND status = 'ACTIVE'
             "#,
-        )
-        .bind(link_id)
-        .bind(reason)
-        .execute(scope.executor())
-        .await?;
+            )
+            .bind(link_id)
+            .bind(reason)
+            .execute(scope.executor())
+            .await?
+        };
 
         Ok(VerbExecutionOutcome::Affected(result.rows_affected()))
     }
@@ -856,24 +854,29 @@ impl SemOsVerbOp for AddProduct {
         let mut delivery_skipped: i64 = 0;
 
         for svc in &services {
-            let delivery_id = Uuid::new_v4();
-            let result = sqlx::query(
-                r#"INSERT INTO "ob-poc".service_delivery_map
-                   (delivery_id, cbu_id, product_id, service_id, delivery_status)
-                   VALUES ($1, $2, $3, $4, 'PENDING')
-                   ON CONFLICT (cbu_id, product_id, service_id) DO NOTHING"#,
+            let existed: bool = sqlx::query_scalar(
+                r#"SELECT EXISTS(
+                   SELECT 1 FROM "ob-poc".service_delivery_map
+                   WHERE cbu_id = $1 AND product_id = $2 AND service_id = $3
+                )"#,
             )
-            .bind(delivery_id)
             .bind(cbu_id)
             .bind(product_id)
             .bind(svc.0)
-            .execute(scope.executor())
+            .fetch_one(scope.executor())
             .await?;
 
-            if result.rows_affected() > 0 {
-                delivery_created += 1;
-            } else {
+            let delivery_args = serde_json::json!({
+                "cbu-id": cbu_id,
+                "product-id": product_id,
+                "service-id": svc.0
+            });
+            dispatch_child_verb(self.fqn(), "delivery.record", &delivery_args, ctx, scope).await?;
+
+            if existed {
                 delivery_skipped += 1;
+            } else {
+                delivery_created += 1;
             }
         }
 
@@ -894,35 +897,48 @@ impl SemOsVerbOp for AddProduct {
         .await?;
 
         for sr in &service_resources {
-            let instance_id = Uuid::new_v4();
-            let instance_url = format!(
-                "urn:ob-poc:{}:{}:{}",
-                cbu_name.to_lowercase().replace(' ', "-"),
-                sr.2.as_deref().unwrap_or("unknown"),
-                &instance_id.to_string()[..8]
-            );
-
-            let result = sqlx::query(
-                r#"INSERT INTO "ob-poc".cbu_resource_instances
-                   (instance_id, cbu_id, product_id, service_id, resource_type_id,
-                    instance_url, instance_name, status)
-                   VALUES ($1, $2, $3, $4, $5, $6, $7, 'PENDING')
-                   ON CONFLICT (cbu_id, product_id, service_id, resource_type_id) DO NOTHING"#,
+            let resource_code = sr.2.as_deref().ok_or_else(|| {
+                anyhow::anyhow!(
+                    "cbu.add-product: service resource {} has no resource_code",
+                    sr.1
+                )
+            })?;
+            let existed: bool = sqlx::query_scalar(
+                r#"SELECT EXISTS(
+                   SELECT 1 FROM "ob-poc".cbu_resource_instances
+                   WHERE cbu_id = $1
+                     AND product_id = $2
+                     AND service_id = $3
+                     AND resource_type_id = $4
+                )"#,
             )
-            .bind(instance_id)
             .bind(cbu_id)
             .bind(product_id)
             .bind(sr.0)
             .bind(sr.1)
-            .bind(&instance_url)
-            .bind(&sr.3)
-            .execute(scope.executor())
+            .fetch_one(scope.executor())
             .await?;
 
-            if result.rows_affected() > 0 {
-                resource_created += 1;
-            } else {
+            let resource_args = serde_json::json!({
+                "cbu-id": cbu_id,
+                "product-id": product_id,
+                "service-id": sr.0,
+                "resource-type": resource_code,
+                "instance-name": sr.3
+            });
+            dispatch_child_verb(
+                self.fqn(),
+                "service-resource.provision",
+                &resource_args,
+                ctx,
+                scope,
+            )
+            .await?;
+
+            if existed {
                 resource_skipped += 1;
+            } else {
+                resource_created += 1;
             }
         }
 
@@ -1276,22 +1292,48 @@ impl SemOsVerbOp for Decide {
         .execute(scope.executor())
         .await?;
 
-        let should_close = matches!(decision.as_str(), "APPROVED" | "REJECTED");
-        if should_close {
-            sqlx::query(
-                r#"UPDATE "ob-poc".cases SET status = $1, closed_at = now(), last_activity_at = now() WHERE case_id = $2"#,
-            )
-            .bind(new_case_status)
-            .bind(case_id)
-            .execute(scope.executor())
-            .await?;
-        } else {
-            sqlx::query(
-                r#"UPDATE "ob-poc".cases SET escalation_level = 'SENIOR_COMPLIANCE', last_activity_at = now() WHERE case_id = $1"#,
-            )
-            .bind(case_id)
-            .execute(scope.executor())
-            .await?;
+        let current_case_status: String =
+            sqlx::query_scalar(r#"SELECT status FROM "ob-poc".cases WHERE case_id = $1"#)
+                .bind(case_id)
+                .fetch_optional(scope.executor())
+                .await?
+                .ok_or_else(|| anyhow::anyhow!("KYC case not found: {}", case_id))?;
+
+        match decision.as_str() {
+            "APPROVED" | "REJECTED" => {
+                let child_args = serde_json::json!({
+                    "case-id": case_id,
+                    "status": new_case_status,
+                    "notes": rationale
+                });
+                dispatch_child_verb(self.fqn(), "kyc-case.close", &child_args, ctx, scope).await?;
+            }
+            "REFERRED" => {
+                if current_case_status != "REVIEW" {
+                    let status_args = serde_json::json!({
+                        "case-id": case_id,
+                        "status": new_case_status,
+                        "notes": escalation_reason
+                    });
+                    dispatch_child_verb(
+                        self.fqn(),
+                        "kyc-case.update-status",
+                        &status_args,
+                        ctx,
+                        scope,
+                    )
+                    .await?;
+                }
+
+                let escalate_args = serde_json::json!({
+                    "case-id": case_id,
+                    "escalation-level": "SENIOR_COMPLIANCE",
+                    "notes": escalation_reason
+                });
+                dispatch_child_verb(self.fqn(), "kyc-case.escalate", &escalate_args, ctx, scope)
+                    .await?;
+            }
+            _ => return Err(anyhow::anyhow!("Invalid decision: {}", decision)),
         }
 
         let snapshot_id = Uuid::new_v4();
@@ -1346,6 +1388,7 @@ impl SemOsVerbOp for DeleteCascade {
     ) -> Result<VerbExecutionOutcome> {
         let cbu_id = json_extract_uuid(args, ctx, "cbu-id")?;
         let delete_entities = json_extract_bool_opt(args, "delete-entities").unwrap_or(true);
+        let hard_delete = json_extract_bool_opt(args, "hard-delete").unwrap_or(true);
 
         let cbu: (String,) = sqlx::query_as(
             r#"SELECT name FROM "ob-poc".cbus WHERE cbu_id = $1 AND deleted_at IS NULL"#,
@@ -1358,42 +1401,54 @@ impl SemOsVerbOp for DeleteCascade {
         let cbu_name = cbu.0;
         let mut deleted_counts: HashMap<String, i64> = HashMap::new();
 
-        let result = sqlx::query(
-            r#"UPDATE "ob-poc".client_group_entity
-               SET cbu_id = NULL, updated_at = NOW()
-               WHERE cbu_id = $1"#,
+        let child_args = serde_json::json!({ "cbu-id": cbu_id });
+        let result = dispatch_child_verb(
+            self.fqn(),
+            "client-group.unlink-cbu",
+            &child_args,
+            ctx,
+            scope,
         )
-        .bind(cbu_id)
-        .execute(scope.executor())
         .await?;
         deleted_counts.insert(
             "client_group_entity_unlinked".to_string(),
-            result.rows_affected() as i64,
+            affected_count(result),
         );
 
-        let result = sqlx::query(
-            r#"DELETE FROM "ob-poc".cbu_group_members
-               WHERE cbu_id = $1"#,
+        let child_args = serde_json::json!({
+            "cbu-id": cbu_id,
+            "hard-delete": hard_delete
+        });
+        let result = dispatch_child_verb(
+            self.fqn(),
+            "cbu-group.remove-member",
+            &child_args,
+            ctx,
+            scope,
         )
-        .bind(cbu_id)
-        .execute(scope.executor())
         .await?;
-        deleted_counts.insert(
-            "cbu_group_members".to_string(),
-            result.rows_affected() as i64,
-        );
+        deleted_counts.insert("cbu_group_members".to_string(), affected_count(result));
 
-        let result = sqlx::query(
-            r#"DELETE FROM "ob-poc".cbu_structure_links
+        let structure_link_ids: Vec<Uuid> = sqlx::query_scalar(
+            r#"SELECT link_id FROM "ob-poc".cbu_structure_links
                WHERE parent_cbu_id = $1 OR child_cbu_id = $1"#,
         )
         .bind(cbu_id)
-        .execute(scope.executor())
+        .fetch_all(scope.executor())
         .await?;
-        deleted_counts.insert(
-            "cbu_structure_links".to_string(),
-            result.rows_affected() as i64,
-        );
+        let mut structure_links_affected = 0;
+        for link_id in structure_link_ids {
+            let child_args = serde_json::json!({
+                "link-id": link_id,
+                "reason": "cbu.delete-cascade",
+                "hard-delete": hard_delete
+            });
+            let result =
+                dispatch_child_verb(self.fqn(), "cbu.unlink-structure", &child_args, ctx, scope)
+                    .await?;
+            structure_links_affected += affected_count(result);
+        }
+        deleted_counts.insert("cbu_structure_links".to_string(), structure_links_affected);
 
         let mut entities_deleted: i64 = 0;
         let mut entities_preserved: i64 = 0;
@@ -1435,28 +1490,22 @@ impl SemOsVerbOp for DeleteCascade {
             entities_preserved = shared_count.unwrap_or(0);
 
             for entity_id in &exclusive_entities {
-                let _ = sqlx::query(
-                    r#"UPDATE "ob-poc".entities
-                       SET deleted_at = NOW(), updated_at = NOW()
-                       WHERE entity_id = $1
-                         AND deleted_at IS NULL"#,
-                )
-                .bind(entity_id)
-                .execute(scope.executor())
-                .await;
+                let child_args = serde_json::json!({ "entity-id": entity_id });
+                let _ =
+                    dispatch_child_verb(self.fqn(), "entity.deactivate", &child_args, ctx, scope)
+                        .await?;
             }
 
             entities_deleted = exclusive_entities.len() as i64;
         }
 
-        let result = sqlx::query(r#"DELETE FROM "ob-poc".cbu_entity_roles WHERE cbu_id = $1"#)
-            .bind(cbu_id)
-            .execute(scope.executor())
-            .await?;
-        deleted_counts.insert(
-            "cbu_entity_roles".to_string(),
-            result.rows_affected() as i64,
-        );
+        let child_args = serde_json::json!({
+            "cbu-id": cbu_id,
+            "hard-delete": hard_delete
+        });
+        let result =
+            dispatch_child_verb(self.fqn(), "cbu-role.terminate", &child_args, ctx, scope).await?;
+        deleted_counts.insert("cbu_entity_roles".to_string(), affected_count(result));
 
         let result = sqlx::query(
             r#"UPDATE "ob-poc".cbus

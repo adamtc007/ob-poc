@@ -7,7 +7,7 @@
 /// # Examples
 ///
 /// ```
-/// use ob_poc::entity_kind::canonicalize;
+/// use dsl_runtime::entity_kind::canonicalize;
 ///
 /// assert_eq!(canonicalize("kyc_case"), "kyc-case");
 /// assert_eq!(canonicalize("client_group"), "client-group");
@@ -38,7 +38,7 @@ pub fn canonicalize(kind: &str) -> String {
 /// # Examples
 ///
 /// ```
-/// use ob_poc::entity_kind::matches;
+/// use dsl_runtime::entity_kind::matches;
 ///
 /// assert!(matches("kyc_case", "kyc-case"));
 /// assert!(matches("organization", "company"));
