@@ -149,7 +149,14 @@ export interface DealTaxonomyNode {
     | "onboarding";
   label: string;
   children?: DealTaxonomyNode[];
-  data?: DealSummary | DealProductSummary | RateCardSummary | RateCardLineSummary | DealParticipantSummary | DealContractSummary | OnboardingRequestSummary;
+  data?:
+    | DealSummary
+    | DealProductSummary
+    | RateCardSummary
+    | RateCardLineSummary
+    | DealParticipantSummary
+    | DealContractSummary
+    | OnboardingRequestSummary;
   expanded?: boolean;
   childCount?: number;
 }

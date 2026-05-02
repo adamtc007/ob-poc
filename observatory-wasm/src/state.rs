@@ -13,10 +13,10 @@ use crate::canvas::layout::LayoutCache;
 // ── Thread-local mailboxes for React↔egui communication ──
 
 thread_local! {
-    pub static SCENE_MAILBOX: RefCell<Option<GraphSceneModel>> = RefCell::new(None);
-    pub static LEVEL_MAILBOX: RefCell<Option<ViewLevel>> = RefCell::new(None);
+    pub static SCENE_MAILBOX: RefCell<Option<GraphSceneModel>> = const { RefCell::new(None) };
+    pub static LEVEL_MAILBOX: RefCell<Option<ViewLevel>> = const { RefCell::new(None) };
     pub static ACTION_CALLBACK: RefCell<Option<js_sys::Function>> = RefCell::new(None);
-    pub static EGUI_CTX: RefCell<Option<egui::Context>> = RefCell::new(None);
+    pub static EGUI_CTX: RefCell<Option<egui::Context>> = const { RefCell::new(None) };
 }
 
 // ── Observation Frame (client-owned) ──
@@ -101,6 +101,7 @@ impl ActiveTransition {
 
 /// Minimal eframe::App — just the constellation canvas.
 /// All structural UI (headers, viewports, dashboard) lives in React.
+#[derive(Default)]
 pub struct CanvasApp {
     pub scene: Option<GraphSceneModel>,
     pub render_cache: Option<LayoutCache>,
@@ -108,19 +109,6 @@ pub struct CanvasApp {
     pub camera: ObservationFrame,
     pub interaction: InteractionState,
     pub transition: Option<ActiveTransition>,
-}
-
-impl Default for CanvasApp {
-    fn default() -> Self {
-        Self {
-            scene: None,
-            render_cache: None,
-            current_level: ViewLevel::default(),
-            camera: ObservationFrame::default(),
-            interaction: InteractionState::default(),
-            transition: None,
-        }
-    }
 }
 
 impl eframe::App for CanvasApp {

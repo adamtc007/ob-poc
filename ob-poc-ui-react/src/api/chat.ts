@@ -168,7 +168,8 @@ export const chatApi = {
         role: "assistant",
         content: backend.welcome_message,
         timestamp: session.created_at,
-        session_feedback: backend.session_feedback as unknown as ChatMessage["session_feedback"],
+        session_feedback:
+          backend.session_feedback as unknown as ChatMessage["session_feedback"],
         decision_packet: {
           id: backend.decision.packet_id,
           kind: "clarification",
@@ -191,7 +192,8 @@ export const chatApi = {
         // and decision_packet from the creation response
         const first = session.messages[0];
         if (!first.session_feedback && backend.session_feedback) {
-          first.session_feedback = backend.session_feedback as unknown as ChatMessage["session_feedback"];
+          first.session_feedback =
+            backend.session_feedback as unknown as ChatMessage["session_feedback"];
         }
         if (!first.decision_packet) {
           first.decision_packet = initialMessage.decision_packet;
@@ -200,7 +202,8 @@ export const chatApi = {
     }
 
     if (backend.session_feedback) {
-      session.initial_session_feedback = backend.session_feedback as unknown as ChatSession["initial_session_feedback"];
+      session.initial_session_feedback =
+        backend.session_feedback as unknown as ChatSession["initial_session_feedback"];
     }
 
     // Store session ID locally for listing
@@ -280,11 +283,17 @@ export const chatApi = {
             });
             messages.push(wsResp.message);
           } catch (e) {
-            console.warn("[resume] Workspace selection failed, user will pick manually:", e);
+            console.warn(
+              "[resume] Workspace selection failed, user will pick manually:",
+              e,
+            );
           }
         }
       } catch (e) {
-        console.warn("[resume] Scope resolution failed, user will pick manually:", e);
+        console.warn(
+          "[resume] Scope resolution failed, user will pick manually:",
+          e,
+        );
       }
     }
 
@@ -327,7 +336,9 @@ export const chatApi = {
         session.updated_at = new Date().toISOString();
         session.last_message_preview = request.message.slice(0, 100);
         // Save scope context for session recovery (group + workspace)
-        const feedback = response.session_feedback as Record<string, unknown> | undefined;
+        const feedback = response.session_feedback as
+          | Record<string, unknown>
+          | undefined;
         if (feedback?.tos) {
           const tos = feedback.tos as Record<string, unknown>;
           if (tos.workspace && typeof tos.workspace === "string") {
@@ -335,7 +346,10 @@ export const chatApi = {
           }
         }
         // Extract group name from scope-related decision prompts
-        if (response.decision?.kind === "clarify_workspace" && response.message) {
+        if (
+          response.decision?.kind === "clarify_workspace" &&
+          response.message
+        ) {
           const match = response.message.match(/Scope set to (.+?)\./);
           if (match) {
             session.client_group_name = match[1];
@@ -443,7 +457,10 @@ export const chatApi = {
     if (reply.selected_option !== undefined) {
       // selected_option is the choice ID (e.g. "1", "2") — convert to 0-indexed.
       const index = parseInt(reply.selected_option, 10);
-      userReply = { action: "select", index: isNaN(index) ? 0 : index - 1 };
+      userReply = {
+        action: "select",
+        index: Number.isNaN(index) ? 0 : index - 1,
+      };
     } else if (reply.freeform_response !== undefined) {
       userReply = { action: "type_exact", text: reply.freeform_response };
     } else if (reply.confirmed !== undefined) {
@@ -496,7 +513,9 @@ export const chatApi = {
       // Unified pipeline response — use buildAssistantMessage for full mapping
       const chatResp = raw.response as Record<string, unknown>;
       const msg = buildAssistantMessage(sessionId, chatResp);
-      const verbs: VerbProfile[] = ((chatResp.available_verbs as VerbProfile[]) || []).map((v) => ({
+      const verbs: VerbProfile[] = (
+        (chatResp.available_verbs as VerbProfile[]) || []
+      ).map((v) => ({
         fqn: v.fqn,
         domain: v.domain,
         description: v.description,
@@ -597,12 +616,6 @@ export const chatApi = {
       surface_fingerprint: response.surface_fingerprint,
       totalRegistry: response.filter_summary?.total_registry,
     };
-  },
-
-  /** Get WebSocket URL for streaming */
-  getStreamUrl(sessionId: string): string {
-    const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-    return `${protocol}//${window.location.host}/api/session/${sessionId}/stream`;
   },
 };
 

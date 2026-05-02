@@ -24,7 +24,11 @@ import { DealTaxonomyTree, DealDetailPane } from "./components";
 import type { DealTaxonomyNode, DealViewMode } from "../../types/deal";
 
 /** View mode configuration */
-const VIEW_MODES: { id: DealViewMode; label: string; icon: React.ElementType }[] = [
+const VIEW_MODES: {
+  id: DealViewMode;
+  label: string;
+  icon: React.ElementType;
+}[] = [
   { id: "COMMERCIAL", label: "Commercial", icon: BarChart3 },
   { id: "FINANCIAL", label: "Financial", icon: DollarSign },
   { id: "STATUS", label: "Status", icon: Activity },
@@ -34,6 +38,7 @@ export function DealPage() {
   const { dealId } = useParams<{ dealId: string }>();
   const navigate = useNavigate();
   const [viewMode, setViewMode] = useState<DealViewMode>("COMMERCIAL");
+  const activeDealId = dealId ?? "";
   const [selectedNode, setSelectedNode] = useState<DealTaxonomyNode | null>(
     null,
   );
@@ -44,9 +49,9 @@ export function DealPage() {
     isLoading,
     error,
   } = useQuery({
-    queryKey: queryKeys.deals.graph(dealId || "", viewMode),
-    queryFn: () => dealApi.getDealGraph(dealId!, viewMode),
-    enabled: !!dealId,
+    queryKey: queryKeys.deals.graph(activeDealId, viewMode),
+    queryFn: () => dealApi.getDealGraph(activeDealId, viewMode),
+    enabled: activeDealId.length > 0,
   });
 
   const handleBack = useCallback(() => {
@@ -102,6 +107,7 @@ export function DealPage() {
       <header className="flex items-center justify-between border-b border-[var(--border-primary)] bg-[var(--bg-secondary)] px-4 py-3">
         <div className="flex items-center gap-3">
           <button
+            type="button"
             onClick={handleBack}
             className="p-1.5 rounded-md hover:bg-[var(--bg-hover)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors"
             title="Go back"
@@ -123,6 +129,7 @@ export function DealPage() {
         <div className="flex items-center gap-1 bg-[var(--bg-tertiary)] rounded-lg p-1">
           {VIEW_MODES.map(({ id, label, icon: Icon }) => (
             <button
+              type="button"
               key={id}
               onClick={() => setViewMode(id)}
               className={cn(

@@ -45,8 +45,14 @@ function App() {
                 </ErrorBoundary>
               }
             />
-            <Route path="semantic-os" element={<Navigate to="/chat" replace />} />
-            <Route path="semantic-os/:sessionId" element={<Navigate to="/chat" replace />} />
+            <Route
+              path="semantic-os"
+              element={<Navigate to="/chat" replace />}
+            />
+            <Route
+              path="semantic-os/:sessionId"
+              element={<Navigate to="/chat" replace />}
+            />
 
             {/* Observatory full-screen option */}
             <Route

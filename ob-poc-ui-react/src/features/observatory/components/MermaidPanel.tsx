@@ -37,6 +37,7 @@ export function MermaidPanel({ sessionId }: Props) {
   return (
     <div className="border-t border-[var(--border-primary)]">
       <button
+        type="button"
         onClick={() => setCollapsed((c) => !c)}
         className="flex items-center gap-2 w-full px-3 py-1.5 text-xs font-medium text-[var(--text-primary)] hover:bg-[var(--bg-hover)]"
       >
@@ -54,6 +55,7 @@ export function MermaidPanel({ sessionId }: Props) {
           <div className="flex gap-1 mb-2">
             {(Object.keys(DIAGRAM_LABELS) as DiagramType[]).map((type) => (
               <button
+                type="button"
                 key={type}
                 onClick={() => setActiveDiagram(type)}
                 className={`px-2 py-0.5 text-[10px] rounded font-medium ${

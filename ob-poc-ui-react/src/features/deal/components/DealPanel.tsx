@@ -71,6 +71,7 @@ export function DealPanel({ sessionId, onUnloadDeal }: DealPanelProps) {
         </span>
         {onUnloadDeal && (
           <button
+            type="button"
             onClick={onUnloadDeal}
             className="p-1 rounded hover:bg-[var(--bg-hover)] text-[var(--text-muted)] hover:text-[var(--text-primary)]"
             title="Unload deal"
@@ -80,6 +81,7 @@ export function DealPanel({ sessionId, onUnloadDeal }: DealPanelProps) {
         )}
       </div>
       <button
+        type="button"
         onClick={handleNavigate}
         className="w-full flex items-center gap-2 p-2 rounded-md bg-[var(--bg-tertiary)] hover:bg-[var(--bg-hover)] transition-colors group"
       >

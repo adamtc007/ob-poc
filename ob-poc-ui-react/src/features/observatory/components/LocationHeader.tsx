@@ -47,7 +47,9 @@ export function LocationHeader({ orientation, sessionId }: Props) {
       await chatApi.sendMessage(sessionId, {
         message: `nav.set-lens overlay ${newMode}`,
       });
-      queryClient.invalidateQueries({ queryKey: queryKeys.observatory.all(sessionId) });
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.observatory.all(sessionId),
+      });
     } catch (err) {
       console.error("Overlay toggle failed:", err);
     } finally {
@@ -81,6 +83,7 @@ export function LocationHeader({ orientation, sessionId }: Props) {
           {enabledActions} actions
         </span>
         <button
+          type="button"
           onClick={handleOverlayToggle}
           disabled={toggling}
           className={`px-2 py-0.5 text-[10px] font-medium rounded border ${

@@ -3,7 +3,7 @@
 //! platform DAG derivation, and v1.3 cross-workspace runtime mechanisms.
 //!
 //! See:
-//!   `docs/architecture/cross-workspace-state-consistency-v0.4.md`
+//!   `docs/annex-cross-workspace-state-consistency.md`
 //!   `docs/todo/catalogue-platform-refinement-v1_3.md`
 //!
 //! # V1.3 runtime mechanisms (2026-04-25)

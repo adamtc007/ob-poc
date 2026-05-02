@@ -2,8 +2,8 @@
  * EmptyState - Reusable empty state component
  */
 
-import type { ReactNode } from 'react';
-import { cn } from '../lib/utils';
+import type { ReactNode } from "react";
+import { cn } from "../lib/utils";
 
 interface EmptyStateProps {
   icon?: ReactNode;
@@ -13,14 +13,21 @@ interface EmptyStateProps {
   className?: string;
 }
 
-export function EmptyState({ icon, title, description, action, className }: EmptyStateProps) {
+export function EmptyState({
+  icon,
+  title,
+  description,
+  action,
+  className,
+}: EmptyStateProps) {
   return (
-    <div className={cn('flex flex-col items-center justify-center py-12 text-center', className)}>
-      {icon && (
-        <div className="mb-4 text-[var(--text-muted)]">
-          {icon}
-        </div>
+    <div
+      className={cn(
+        "flex flex-col items-center justify-center py-12 text-center",
+        className,
       )}
+    >
+      {icon && <div className="mb-4 text-[var(--text-muted)]">{icon}</div>}
       <h3 className="text-lg font-medium text-[var(--text-primary)]">
         {title}
       </h3>
@@ -29,11 +36,7 @@ export function EmptyState({ icon, title, description, action, className }: Empt
           {description}
         </p>
       )}
-      {action && (
-        <div className="mt-4">
-          {action}
-        </div>
-      )}
+      {action && <div className="mt-4">{action}</div>}
     </div>
   );
 }

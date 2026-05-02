@@ -7,6 +7,13 @@ description = "Observatory — egui constellation canvas, embedded in React shel
 [lib]
 crate-type = ["cdylib", "rlib"]
 
+[features]
+default = []
+# Zed/rust-analyzer applies the repo-level `database` feature to every Cargo
+# project it indexes. The WASM crate has no database code; this no-op feature
+# keeps metadata resolution working without changing the WASM dependency graph.
+database = []
+
 [dependencies]
 # Shared types (WASM-safe, no tokio/prost)
 ob-poc-types = { path = "../rust/crates/ob-poc-types" }

@@ -32,6 +32,7 @@ import type { SessionFeedback } from "../../api/replV2";
 
 export function ChatPage() {
   const { sessionId } = useParams<{ sessionId?: string }>();
+  const activeSessionId = sessionId ?? "";
   const navigate = useNavigate();
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const [selectedCbu, setSelectedCbu] = useState<CbuSummary | null>(null);
@@ -47,33 +48,33 @@ export function ChatPage() {
 
   // Fetch session if ID is provided
   const { data, isLoading, error } = useQuery({
-    queryKey: queryKeys.chat.session(sessionId || ""),
-    queryFn: () => chatApi.getSession(sessionId!),
-    enabled: !!sessionId,
+    queryKey: queryKeys.chat.session(activeSessionId),
+    queryFn: () => chatApi.getSession(activeSessionId),
+    enabled: activeSessionId.length > 0,
   });
   const sessionMissing = isSessionMissingError(error);
 
   const { data: scopeData } = useQuery({
-    queryKey: queryKeys.scope(sessionId || ""),
-    queryFn: () => scopeApi.getScope(sessionId!),
-    enabled: !!sessionId,
+    queryKey: queryKeys.scope(activeSessionId),
+    queryFn: () => scopeApi.getScope(activeSessionId),
+    enabled: activeSessionId.length > 0,
     retry: (failureCount, err) =>
       !isSessionMissingError(err) && failureCount < 2,
   });
 
   // Observatory orientation for Flight Deck + canvas
   const { data: orientation } = useQuery({
-    queryKey: queryKeys.observatory.orientation(sessionId!),
-    queryFn: () => observatoryApi.getOrientation(sessionId!),
-    enabled: !!sessionId,
+    queryKey: queryKeys.observatory.orientation(activeSessionId),
+    queryFn: () => observatoryApi.getOrientation(activeSessionId),
+    enabled: activeSessionId.length > 0,
     refetchInterval: 5000,
   });
 
   // Graph scene for embedded egui canvas
   const { data: graphScene } = useQuery({
-    queryKey: queryKeys.observatory.graphScene(sessionId!),
-    queryFn: () => observatoryApi.getGraphScene(sessionId!),
-    enabled: !!sessionId,
+    queryKey: queryKeys.observatory.graphScene(activeSessionId),
+    queryFn: () => observatoryApi.getGraphScene(activeSessionId),
+    enabled: activeSessionId.length > 0,
     refetchInterval: 5000,
   });
 
@@ -86,16 +87,31 @@ export function ChatPage() {
       if (!sessionId) return;
 
       // Workspace node click — send label as utterance for tollgate processing
-      const nodeId = action.type === "drill" || action.type === "select_node" || action.type === "anchor_node"
-        ? action.node_id : undefined;
-      if (nodeId?.startsWith("workspace:") && (action.type === "drill" || action.type === "select_node")) {
+      const nodeId =
+        action.type === "drill" ||
+        action.type === "select_node" ||
+        action.type === "anchor_node"
+          ? action.node_id
+          : undefined;
+      if (
+        nodeId?.startsWith("workspace:") &&
+        (action.type === "drill" || action.type === "select_node")
+      ) {
         const label = nodeId.replace("workspace:", "");
         try {
-          const response = await chatApi.sendMessage(sessionId, { message: label });
+          const response = await chatApi.sendMessage(sessionId, {
+            message: label,
+          });
           addMessage(response.message);
-          queryClient.invalidateQueries({ queryKey: queryKeys.observatory.all(sessionId) });
-          queryClient.invalidateQueries({ queryKey: queryKeys.scope(sessionId) });
-          queryClient.invalidateQueries({ queryKey: queryKeys.constellation.all });
+          queryClient.invalidateQueries({
+            queryKey: queryKeys.observatory.all(sessionId),
+          });
+          queryClient.invalidateQueries({
+            queryKey: queryKeys.scope(sessionId),
+          });
+          queryClient.invalidateQueries({
+            queryKey: queryKeys.constellation.all,
+          });
         } catch (err) {
           console.error("Workspace selection failed:", err);
         }
@@ -114,7 +130,10 @@ export function ChatPage() {
           verb = "nav.zoom-out";
           break;
         case "navigate_history":
-          verb = action.direction === "back" ? "nav.history-back" : "nav.history-forward";
+          verb =
+            action.direction === "back"
+              ? "nav.history-back"
+              : "nav.history-forward";
           break;
         case "select_node":
           verb = "nav.select";
@@ -128,15 +147,20 @@ export function ChatPage() {
       }
 
       if (!verb) return;
-      const message = args && Object.keys(args).length > 0
-        ? `${verb} ${Object.values(args).join(" ")}`
-        : verb;
+      const message =
+        args && Object.keys(args).length > 0
+          ? `${verb} ${Object.values(args).join(" ")}`
+          : verb;
 
       try {
         await chatApi.sendMessage(sessionId, { message });
-        queryClient.invalidateQueries({ queryKey: queryKeys.observatory.all(sessionId) });
+        queryClient.invalidateQueries({
+          queryKey: queryKeys.observatory.all(sessionId),
+        });
         queryClient.invalidateQueries({ queryKey: queryKeys.scope(sessionId) });
-        queryClient.invalidateQueries({ queryKey: queryKeys.constellation.all });
+        queryClient.invalidateQueries({
+          queryKey: queryKeys.constellation.all,
+        });
       } catch (err) {
         console.error("Canvas navigation failed:", err);
       }
@@ -165,19 +189,18 @@ export function ChatPage() {
     }
   }, [data, sessionId, setCurrentSession]);
 
-  useEffect(() => {
+  const effectiveSelectedCbu = useMemo(() => {
     if (!scopeData?.cbus?.length) {
-      setSelectedCbu(null);
-      return;
+      return null;
     }
-
-    setSelectedCbu((current) => {
-      if (current && scopeData.cbus.some((cbu) => cbu.id === current.id)) {
-        return current;
-      }
-      return scopeData.cbus[0] ?? null;
-    });
-  }, [scopeData]);
+    if (
+      selectedCbu &&
+      scopeData.cbus.some((cbu) => cbu.id === selectedCbu.id)
+    ) {
+      return selectedCbu;
+    }
+    return scopeData.cbus[0] ?? null;
+  }, [scopeData, selectedCbu]);
 
   // Fetch verb surface when session loads
   useEffect(() => {
@@ -233,13 +256,17 @@ export function ChatPage() {
         if (content.includes("Session ID:")) {
           const match = content.match(/Session ID: ([0-9a-f-]{36})/);
           if (match?.[1] && match[1] !== sessionId) {
-            queryClient.invalidateQueries({ queryKey: queryKeys.chat.sessions() });
+            queryClient.invalidateQueries({
+              queryKey: queryKeys.chat.sessions(),
+            });
             navigate(`/chat/${match[1]}`);
             setStreaming(false);
             return;
           }
         }
-      } catch { /* ignore parse errors */ }
+      } catch {
+        /* ignore parse errors */
+      }
       if (response.available_verbs?.length) {
         setAvailableVerbs(
           response.available_verbs,
@@ -295,10 +322,10 @@ export function ChatPage() {
         );
       }
       queryClient.invalidateQueries({
-        queryKey: queryKeys.chat.session(sessionId!),
+        queryKey: queryKeys.chat.session(activeSessionId),
       });
       queryClient.invalidateQueries({
-        queryKey: queryKeys.scope(sessionId!),
+        queryKey: queryKeys.scope(activeSessionId),
       });
       queryClient.invalidateQueries({
         queryKey: queryKeys.constellation.all,
@@ -355,8 +382,13 @@ export function ChatPage() {
     (message: string) => {
       if (message === "New Session" || message === "session.start") {
         chatApi.createSession().then((newSession) => {
-          queryClient.invalidateQueries({ queryKey: queryKeys.chat.sessions() });
-          queryClient.setQueryData(queryKeys.chat.session(newSession.id), newSession);
+          queryClient.invalidateQueries({
+            queryKey: queryKeys.chat.sessions(),
+          });
+          queryClient.setQueryData(
+            queryKeys.chat.session(newSession.id),
+            newSession,
+          );
           navigate(`/chat/${newSession.id}`);
         });
         return;
@@ -445,7 +477,9 @@ export function ChatPage() {
             ) : error ? (
               <div className="flex h-full items-center justify-center">
                 <p className="text-sm text-[var(--accent-red)]">
-                  {error instanceof Error ? error.message : "Failed to load session"}
+                  {error instanceof Error
+                    ? error.message
+                    : "Failed to load session"}
                 </p>
               </div>
             ) : currentSession ? (
@@ -483,22 +517,27 @@ export function ChatPage() {
               discoverySelectionMutation.isPending
             }
             placeholder={
-              sessionId ? "Type a message..." : "Select or create a session first"
+              sessionId
+                ? "Type a message..."
+                : "Select or create a session first"
             }
           />
 
           {/* Panels below input (scrollable) */}
-          <div className="border-t border-[var(--border-primary)] overflow-auto" style={{ maxHeight: "40%" }}>
+          <div
+            className="border-t border-[var(--border-primary)] overflow-auto"
+            style={{ maxHeight: "40%" }}
+          >
             {sessionId && <DealPanel sessionId={sessionId} />}
 
             <ScopePanel
               sessionId={sessionId}
-              selectedCbuId={selectedCbu?.id ?? null}
+              selectedCbuId={effectiveSelectedCbu?.id ?? null}
               onSelectCbu={setSelectedCbu}
             />
 
             <ConstellationPanel
-              selectedCbu={selectedCbu}
+              selectedCbu={effectiveSelectedCbu}
               sessionFeedback={latestSessionFeedback}
               className="min-h-0"
               onPromptAgent={handleSend}
@@ -516,7 +555,12 @@ export function ChatPage() {
             {sessionId && (
               <div className="flex items-center gap-2 border-t border-[var(--border-primary)] px-3 py-2">
                 <button
-                  onClick={showRunbookPlan ? () => setShowRunbookPlan(false) : handleCompileRunbook}
+                  type="button"
+                  onClick={
+                    showRunbookPlan
+                      ? () => setShowRunbookPlan(false)
+                      : handleCompileRunbook
+                  }
                   className="flex items-center gap-1.5 rounded px-2.5 py-1.5 text-xs font-medium text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] border border-[var(--border-secondary)]"
                 >
                   <BookOpen size={14} />
@@ -531,16 +575,26 @@ export function ChatPage() {
                   sessionId={sessionId}
                   onApproved={() => {
                     if (sessionId) {
-                      queryClient.invalidateQueries({ queryKey: queryKeys.chat.session(sessionId) });
-                      queryClient.invalidateQueries({ queryKey: queryKeys.constellation.all });
+                      queryClient.invalidateQueries({
+                        queryKey: queryKeys.chat.session(sessionId),
+                      });
+                      queryClient.invalidateQueries({
+                        queryKey: queryKeys.constellation.all,
+                      });
                     }
                   }}
                   onCancelled={() => setShowRunbookPlan(false)}
                   onCompleted={() => {
                     if (sessionId) {
-                      queryClient.invalidateQueries({ queryKey: queryKeys.chat.session(sessionId) });
-                      queryClient.invalidateQueries({ queryKey: queryKeys.constellation.all });
-                      queryClient.invalidateQueries({ queryKey: queryKeys.scope(sessionId) });
+                      queryClient.invalidateQueries({
+                        queryKey: queryKeys.chat.session(sessionId),
+                      });
+                      queryClient.invalidateQueries({
+                        queryKey: queryKeys.constellation.all,
+                      });
+                      queryClient.invalidateQueries({
+                        queryKey: queryKeys.scope(sessionId),
+                      });
                     }
                   }}
                 />

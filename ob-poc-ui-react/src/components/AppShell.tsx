@@ -2,15 +2,21 @@
  * App Shell - Main layout with sidebar navigation
  */
 
-import { Outlet, NavLink } from 'react-router-dom';
-import { Search, MessageSquare, Settings, ChevronLeft, ChevronRight } from 'lucide-react';
-import { useState } from 'react';
-import { cn } from '../lib/utils';
+import { useState } from "react";
+import { NavLink, Outlet } from "react-router-dom";
+import {
+  ChevronLeft,
+  ChevronRight,
+  MessageSquare,
+  Search,
+  Settings,
+} from "lucide-react";
+import { cn } from "../lib/utils";
 
 const navItems = [
-  { to: '/inspector', icon: Search, label: 'Inspector' },
-  { to: '/chat', icon: MessageSquare, label: 'Chat' },
-  { to: '/settings', icon: Settings, label: 'Settings' },
+  { to: "/inspector", icon: Search, label: "Inspector" },
+  { to: "/chat", icon: MessageSquare, label: "Chat" },
+  { to: "/settings", icon: Settings, label: "Settings" },
 ];
 
 export function AppShell() {
@@ -21,8 +27,8 @@ export function AppShell() {
       {/* Sidebar */}
       <aside
         className={cn(
-          'flex flex-col border-r border-[var(--border-primary)] bg-[var(--bg-secondary)] transition-all duration-200',
-          collapsed ? 'w-16' : 'w-56'
+          "flex flex-col border-r border-[var(--border-primary)] bg-[var(--bg-secondary)] transition-all duration-200",
+          collapsed ? "w-16" : "w-56",
         )}
       >
         {/* Logo */}
@@ -42,10 +48,10 @@ export function AppShell() {
               to={to}
               className={({ isActive }) =>
                 cn(
-                  'flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors',
+                  "flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors",
                   isActive
-                    ? 'bg-[var(--accent-blue)]/10 text-[var(--accent-blue)]'
-                    : 'text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)]'
+                    ? "bg-[var(--accent-blue)]/10 text-[var(--accent-blue)]"
+                    : "text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)]",
                 )
               }
             >
@@ -57,6 +63,7 @@ export function AppShell() {
 
         {/* Collapse toggle */}
         <button
+          type="button"
           onClick={() => setCollapsed(!collapsed)}
           className="flex h-10 items-center justify-center border-t border-[var(--border-primary)] text-[var(--text-muted)] hover:text-[var(--text-primary)]"
         >

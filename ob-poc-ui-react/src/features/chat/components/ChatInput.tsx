@@ -2,9 +2,9 @@
  * ChatInput - Message input component with streaming support
  */
 
-import { useState, useRef, useEffect } from 'react';
-import { Send, Square, Paperclip } from 'lucide-react';
-import { cn } from '../../../lib/utils';
+import { useState, useRef, useEffect } from "react";
+import { Send, Square, Paperclip } from "lucide-react";
+import { cn } from "../../../lib/utils";
 
 interface ChatInputProps {
   onSend: (message: string) => void;
@@ -20,17 +20,17 @@ export function ChatInput({
   onCancel,
   isStreaming = false,
   disabled = false,
-  placeholder = 'Type a message...',
+  placeholder = "Type a message...",
   className,
 }: ChatInputProps) {
-  const [value, setValue] = useState('');
+  const [value, setValue] = useState("");
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   // Auto-resize textarea
   useEffect(() => {
     const textarea = textareaRef.current;
     if (textarea) {
-      textarea.style.height = 'auto';
+      textarea.style.height = "auto";
       textarea.style.height = `${Math.min(textarea.scrollHeight, 200)}px`;
     }
   }, [value]);
@@ -39,13 +39,13 @@ export function ChatInput({
     e.preventDefault();
     if (value.trim() && !disabled && !isStreaming) {
       onSend(value.trim());
-      setValue('');
+      setValue("");
     }
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     // Submit on Enter (without Shift)
-    if (e.key === 'Enter' && !e.shiftKey) {
+    if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
       handleSubmit(e);
     }
@@ -55,8 +55,8 @@ export function ChatInput({
     <form
       onSubmit={handleSubmit}
       className={cn(
-        'border-t border-[var(--border-primary)] bg-[var(--bg-secondary)] p-4',
-        className
+        "border-t border-[var(--border-primary)] bg-[var(--bg-secondary)] p-4",
+        className,
       )}
     >
       <div className="flex items-end gap-2">
@@ -81,9 +81,9 @@ export function ChatInput({
             disabled={disabled}
             rows={1}
             className={cn(
-              'w-full resize-none rounded-lg border border-[var(--border-primary)] bg-[var(--bg-tertiary)] px-4 py-2.5 pr-12 text-sm text-[var(--text-primary)] placeholder-[var(--text-muted)]',
-              'focus:border-[var(--accent-blue)] focus:outline-none focus:ring-1 focus:ring-[var(--accent-blue)]',
-              'disabled:opacity-50 disabled:cursor-not-allowed'
+              "w-full resize-none rounded-lg border border-[var(--border-primary)] bg-[var(--bg-tertiary)] px-4 py-2.5 pr-12 text-sm text-[var(--text-primary)] placeholder-[var(--text-muted)]",
+              "focus:border-[var(--accent-blue)] focus:outline-none focus:ring-1 focus:ring-[var(--accent-blue)]",
+              "disabled:opacity-50 disabled:cursor-not-allowed",
             )}
           />
         </div>
@@ -103,9 +103,9 @@ export function ChatInput({
             type="submit"
             disabled={!value.trim() || disabled}
             className={cn(
-              'rounded-lg bg-[var(--accent-blue)] p-2.5 text-white transition-colors',
-              'hover:bg-[var(--accent-blue)]/80',
-              'disabled:opacity-50 disabled:cursor-not-allowed'
+              "rounded-lg bg-[var(--accent-blue)] p-2.5 text-white transition-colors",
+              "hover:bg-[var(--accent-blue)]/80",
+              "disabled:opacity-50 disabled:cursor-not-allowed",
             )}
             title="Send message (Enter)"
           >
@@ -118,7 +118,9 @@ export function ChatInput({
       <div className="mt-2 flex items-center justify-between text-xs text-[var(--text-muted)]">
         <span>Press Enter to send, Shift+Enter for new line</span>
         {isStreaming && (
-          <span className="text-[var(--accent-yellow)]">Generating response...</span>
+          <span className="text-[var(--accent-yellow)]">
+            Generating response...
+          </span>
         )}
       </div>
     </form>

@@ -22,6 +22,7 @@ import { useState } from "react";
 
 export function InspectorPage() {
   const { projectionId } = useParams<{ projectionId?: string }>();
+  const activeProjectionId = projectionId ?? "";
   const [showPolicyPanel, setShowPolicyPanel] = useState(false);
   const {
     setProjection,
@@ -35,9 +36,9 @@ export function InspectorPage() {
 
   // Fetch projection if ID is provided
   const { data, isLoading, error } = useQuery({
-    queryKey: queryKeys.projections.detail(projectionId || ""),
-    queryFn: () => projectionsApi.get(projectionId!),
-    enabled: !!projectionId,
+    queryKey: queryKeys.projections.detail(activeProjectionId),
+    queryFn: () => projectionsApi.get(activeProjectionId),
+    enabled: activeProjectionId.length > 0,
   });
 
   // Regenerate mutation
@@ -45,7 +46,7 @@ export function InspectorPage() {
     mutationFn: () => {
       if (!projection) throw new Error("No projection to regenerate");
       return projectionsApi.generate({
-        snapshot_id: projectionId!, // Use projection ID as snapshot ID for now
+        snapshot_id: activeProjectionId, // Use projection ID as snapshot ID for now
         policy,
       });
     },
@@ -156,6 +157,7 @@ export function InspectorPage() {
             />
           </div>
           <button
+            type="button"
             onClick={() => setShowPolicyPanel(!showPolicyPanel)}
             className={cn(
               "rounded p-1.5 transition-colors",

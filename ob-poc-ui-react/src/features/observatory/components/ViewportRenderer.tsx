@@ -19,7 +19,11 @@ interface Props {
   sessionId?: string;
 }
 
-export function ViewportRenderer({ showPacket, orientation, sessionId }: Props) {
+export function ViewportRenderer({
+  showPacket,
+  orientation,
+  sessionId,
+}: Props) {
   if (!showPacket) {
     return (
       <div className="p-3 text-xs text-[var(--text-secondary)]">
@@ -50,8 +54,7 @@ function ViewportCard({
   sessionId?: string;
 }) {
   const kind = (viewport.kind as string) ?? "unknown";
-  const title =
-    kind.charAt(0).toUpperCase() + kind.slice(1).replace(/_/g, " ");
+  const title = kind.charAt(0).toUpperCase() + kind.slice(1).replace(/_/g, " ");
   const data = viewport.data as Record<string, unknown> | undefined;
 
   const KNOWN_KINDS = [
@@ -93,8 +96,7 @@ function ViewportCard({
 
 function FocusView({ data }: { data: Record<string, unknown> | undefined }) {
   if (!data) return null;
-  const objects =
-    (data.objects as Array<Record<string, unknown>>) ?? [];
+  const objects = (data.objects as Array<Record<string, unknown>>) ?? [];
   return (
     <div className="space-y-1.5">
       {objects.map((obj, i) => (
@@ -122,18 +124,18 @@ function ObjectView({ data }: { data: Record<string, unknown> | undefined }) {
           </summary>
           <div className="mt-1 ml-2 space-y-0.5">
             {obj.definition
-              ? Object.entries(
-                obj.definition as Record<string, unknown>,
-              ).map(([k, v]) => (
-                <div key={k} className="flex gap-2">
-                  <span className="text-[var(--text-muted)] shrink-0">
-                    {k}:
-                  </span>
-                  <span className="text-[var(--text-primary)]">
-                    {String(v)}
-                  </span>
-                </div>
-              ))
+              ? Object.entries(obj.definition as Record<string, unknown>).map(
+                  ([k, v]) => (
+                    <div key={k} className="flex gap-2">
+                      <span className="text-[var(--text-muted)] shrink-0">
+                        {k}:
+                      </span>
+                      <span className="text-[var(--text-primary)]">
+                        {String(v)}
+                      </span>
+                    </div>
+                  ),
+                )
               : null}
           </div>
         </details>
@@ -215,6 +217,7 @@ function ActionPalette({ actions }: { actions: ActionDescriptor[] }) {
       <div className="p-2 flex flex-wrap gap-1">
         {enabled.map((a) => (
           <button
+            type="button"
             key={a.action_id}
             className="px-2 py-1 text-[10px] rounded bg-[var(--bg-active)] text-[var(--text-primary)] hover:bg-[var(--bg-hover)]"
             title={a.action_id}

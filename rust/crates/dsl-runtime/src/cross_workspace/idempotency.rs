@@ -3,7 +3,7 @@
 //! Wraps any verb that calls a third-party system, providing first-run vs.
 //! rebuild branching based on the external_call_log.
 //!
-//! See: docs/architecture/cross-workspace-state-consistency-v0.4.md §4.5, §5.4
+//! See: docs/annex-cross-workspace-state-consistency.md §4.5, §5.4
 
 use anyhow::Result;
 use chrono::{DateTime, Utc};

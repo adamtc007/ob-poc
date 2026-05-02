@@ -34,9 +34,7 @@ pub fn paint(
         LayoutStrategy::DeterministicOrbital => {
             system::paint(painter, transform, scene, cache, app)
         }
-        LayoutStrategy::HierarchicalGraph => {
-            planet::paint(painter, transform, scene, cache, app)
-        }
+        LayoutStrategy::HierarchicalGraph => planet::paint(painter, transform, scene, cache, app),
         LayoutStrategy::TreeDag => core::paint(painter, transform, scene, cache, app),
         LayoutStrategy::StructuredPanels => {
             // Surface is structured panels, not canvas — show indicator

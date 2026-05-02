@@ -2,23 +2,23 @@
  * PolicyControls - LOD, depth, and chamber filter controls
  */
 
-import { useInspectorStore } from '../../../stores/inspector';
-import type { LodTier } from '../../../types/projection';
-import { cn } from '../../../lib/utils';
+import { useInspectorStore } from "../../../stores/inspector";
+import type { LodTier } from "../../../types/projection";
+import { cn } from "../../../lib/utils";
 
 const LOD_LABELS: Record<LodTier, string> = {
-  0: 'Minimal',
-  1: 'Summary',
-  2: 'Standard',
-  3: 'Full',
+  0: "Minimal",
+  1: "Summary",
+  2: "Standard",
+  3: "Full",
 };
 
 const CHAMBERS = [
-  { id: 'cbu', label: 'CBU' },
-  { id: 'entity', label: 'Entity' },
-  { id: 'trading', label: 'Trading' },
-  { id: 'kyc', label: 'KYC' },
-  { id: 'custody', label: 'Custody' },
+  { id: "cbu", label: "CBU" },
+  { id: "entity", label: "Entity" },
+  { id: "trading", label: "Trading" },
+  { id: "kyc", label: "KYC" },
+  { id: "custody", label: "Custody" },
 ];
 
 interface PolicyControlsProps {
@@ -26,26 +26,30 @@ interface PolicyControlsProps {
   onRegenerate?: () => void;
 }
 
-export function PolicyControls({ className, onRegenerate }: PolicyControlsProps) {
+export function PolicyControls({
+  className,
+  onRegenerate,
+}: PolicyControlsProps) {
   const { policy, setLod, setMaxDepth, toggleChamber } = useInspectorStore();
 
   return (
-    <div className={cn('space-y-4', className)}>
+    <div className={cn("space-y-4", className)}>
       {/* LOD Selector */}
-      <div>
-        <label className="block text-xs font-medium text-[var(--text-secondary)] mb-2">
+      <fieldset>
+        <legend className="block text-xs font-medium text-[var(--text-secondary)] mb-2">
           Level of Detail
-        </label>
+        </legend>
         <div className="flex gap-1">
           {([0, 1, 2, 3] as LodTier[]).map((lod) => (
             <button
+              type="button"
               key={lod}
               onClick={() => setLod(lod)}
               className={cn(
-                'flex-1 rounded px-2 py-1.5 text-xs transition-colors',
+                "flex-1 rounded px-2 py-1.5 text-xs transition-colors",
                 policy.lod === lod
-                  ? 'bg-[var(--accent-blue)] text-white'
-                  : 'bg-[var(--bg-tertiary)] text-[var(--text-secondary)] hover:bg-[var(--bg-hover)]'
+                  ? "bg-[var(--accent-blue)] text-white"
+                  : "bg-[var(--bg-tertiary)] text-[var(--text-secondary)] hover:bg-[var(--bg-hover)]",
               )}
               title={LOD_LABELS[lod]}
             >
@@ -56,14 +60,18 @@ export function PolicyControls({ className, onRegenerate }: PolicyControlsProps)
         <p className="mt-1 text-xs text-[var(--text-muted)]">
           {LOD_LABELS[policy.lod]}
         </p>
-      </div>
+      </fieldset>
 
       {/* Depth Slider */}
       <div>
-        <label className="block text-xs font-medium text-[var(--text-secondary)] mb-2">
+        <label
+          htmlFor="inspector-max-depth"
+          className="block text-xs font-medium text-[var(--text-secondary)] mb-2"
+        >
           Max Depth: {policy.max_depth}
         </label>
         <input
+          id="inspector-max-depth"
           type="range"
           min={1}
           max={10}
@@ -78,31 +86,33 @@ export function PolicyControls({ className, onRegenerate }: PolicyControlsProps)
       </div>
 
       {/* Chamber Toggles */}
-      <div>
-        <label className="block text-xs font-medium text-[var(--text-secondary)] mb-2">
+      <fieldset>
+        <legend className="block text-xs font-medium text-[var(--text-secondary)] mb-2">
           Chambers
-        </label>
+        </legend>
         <div className="flex flex-wrap gap-1.5">
           {CHAMBERS.map(({ id, label }) => (
             <button
+              type="button"
               key={id}
               onClick={() => toggleChamber(id)}
               className={cn(
-                'rounded px-2 py-1 text-xs transition-colors',
+                "rounded px-2 py-1 text-xs transition-colors",
                 policy.chambers.includes(id)
-                  ? 'bg-[var(--accent-blue)]/20 text-[var(--accent-blue)] border border-[var(--accent-blue)]/30'
-                  : 'bg-[var(--bg-tertiary)] text-[var(--text-muted)] border border-transparent hover:bg-[var(--bg-hover)]'
+                  ? "bg-[var(--accent-blue)]/20 text-[var(--accent-blue)] border border-[var(--accent-blue)]/30"
+                  : "bg-[var(--bg-tertiary)] text-[var(--text-muted)] border border-transparent hover:bg-[var(--bg-hover)]",
               )}
             >
               {label}
             </button>
           ))}
         </div>
-      </div>
+      </fieldset>
 
       {/* Regenerate button */}
       {onRegenerate && (
         <button
+          type="button"
           onClick={onRegenerate}
           className="w-full rounded-lg bg-[var(--accent-blue)] px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-[var(--accent-blue)]/80"
         >

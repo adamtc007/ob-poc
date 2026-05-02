@@ -88,10 +88,7 @@ pub fn paint_controls(
                 painter.circle_stroke(
                     focus_screen,
                     radius + 4.0,
-                    Stroke::new(
-                        1.0,
-                        Color32::from_rgba_premultiplied(139, 92, 246, 80),
-                    ),
+                    Stroke::new(1.0, Color32::from_rgba_premultiplied(139, 92, 246, 80)),
                 );
 
                 // Request continuous repaint for animation
@@ -167,10 +164,8 @@ pub fn paint_controls(
                 let clicked = ui.input(|i| i.pointer.any_click());
                 if clicked && minimap_rect.contains(pointer_pos) {
                     // Inverse transform: minimap screen pos → world pos
-                    let inverse_transform = egui::emath::RectTransform::from_to(
-                        minimap_rect.shrink(4.0),
-                        scene_bounds,
-                    );
+                    let inverse_transform =
+                        egui::emath::RectTransform::from_to(minimap_rect.shrink(4.0), scene_bounds);
                     let world_pos = inverse_transform.transform_pos(pointer_pos);
                     action = Some(ObservatoryAction::Pan {
                         // Pan action expects deltas, but we want to set absolute position.

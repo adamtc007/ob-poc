@@ -4,9 +4,10 @@
 //! - Tier 0 (top): focused entity (largest, centered)
 //! - Tier 1: direct relationships, evenly spaced horizontally
 //! - Tier 2+: deeper relationships, placed under their parents
-//! Horizontal spacing: 120px per node, centered per tier.
-//! Vertical spacing: 150px between tiers.
-//! Edges drawn with directional arrows. Labels on nodes, badges rendered.
+//!
+//! Horizontal spacing: 120px per node, centered per tier. Vertical spacing:
+//! 150px between tiers. Edges are drawn with directional arrows; labels and
+//! badges are rendered on nodes.
 
 use egui::{Color32, Painter, Pos2, Stroke, Vec2};
 
@@ -114,8 +115,7 @@ fn paint_node(
 
     // Badges (right of node)
     for (bi, badge) in node.badges.iter().enumerate() {
-        let badge_pos =
-            screen_pos + Vec2::new(radius + 4.0, -radius + (bi as f32 * 14.0));
+        let badge_pos = screen_pos + Vec2::new(radius + 4.0, -radius + (bi as f32 * 14.0));
         painter.text(
             badge_pos,
             egui::Align2::LEFT_CENTER,
@@ -150,15 +150,9 @@ fn paint_edge(
     let tgt_pos = transform.transform_pos(cache.nodes[geom.target_idx].center);
 
     let edge_color = match edge.edge_type {
-        ob_poc_types::graph_scene::SceneEdgeType::Dependency => {
-            Color32::from_rgb(245, 158, 11)
-        }
-        ob_poc_types::graph_scene::SceneEdgeType::Ownership => {
-            Color32::from_rgb(139, 92, 246)
-        }
-        ob_poc_types::graph_scene::SceneEdgeType::Control => {
-            Color32::from_rgb(59, 130, 246)
-        }
+        ob_poc_types::graph_scene::SceneEdgeType::Dependency => Color32::from_rgb(245, 158, 11),
+        ob_poc_types::graph_scene::SceneEdgeType::Ownership => Color32::from_rgb(139, 92, 246),
+        ob_poc_types::graph_scene::SceneEdgeType::Control => Color32::from_rgb(59, 130, 246),
         _ => Color32::from_rgb(100, 116, 139),
     };
 
@@ -170,7 +164,11 @@ fn paint_edge(
     let perp = Vec2::new(-dir.y, dir.x);
     let arrow_size = 7.0;
     // Pull arrow back from target center by approximate node radius
-    let target_radius = if nodes[geom.target_idx].depth == 0 { 28.0 } else { 14.0 };
+    let target_radius = if nodes[geom.target_idx].depth == 0 {
+        28.0
+    } else {
+        14.0
+    };
     let arrow_tip = tgt_pos - dir * target_radius;
     let arrow_base = arrow_tip - dir * arrow_size;
 
@@ -186,10 +184,7 @@ fn paint_edge(
 
     // Edge label at midpoint
     if let Some(ref label) = edge.label {
-        let mid = Pos2::new(
-            (src_pos.x + tgt_pos.x) / 2.0,
-            (src_pos.y + tgt_pos.y) / 2.0,
-        );
+        let mid = Pos2::new((src_pos.x + tgt_pos.x) / 2.0, (src_pos.y + tgt_pos.y) / 2.0);
         painter.text(
             mid + Vec2::new(8.0, 0.0),
             egui::Align2::LEFT_CENTER,

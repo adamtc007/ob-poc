@@ -27,6 +27,7 @@ export function Breadcrumbs({ className }: BreadcrumbsProps) {
       {/* Back/Forward buttons */}
       <div className="flex items-center gap-1">
         <button
+          type="button"
           onClick={goBack}
           disabled={!canGoBack()}
           className={cn(
@@ -40,6 +41,7 @@ export function Breadcrumbs({ className }: BreadcrumbsProps) {
           <ChevronLeft size={18} />
         </button>
         <button
+          type="button"
           onClick={goForward}
           disabled={!canGoForward()}
           className={cn(
@@ -65,6 +67,7 @@ export function Breadcrumbs({ className }: BreadcrumbsProps) {
               />
             )}
             <button
+              type="button"
               onClick={() => focusNode(crumb.nodeId, crumb.label)}
               className={cn(
                 "rounded px-1.5 py-0.5 text-sm truncate max-w-[150px] transition-colors",

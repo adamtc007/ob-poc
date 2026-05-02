@@ -11,7 +11,7 @@
  * - Preconditions eligibility indicator (greyed out if not met)
  */
 
-import { useState, useMemo, useEffect, useRef } from 'react';
+import { useState, useMemo, useEffect, useRef } from "react";
 import {
   ArrowLeft,
   ChevronDown,
@@ -22,9 +22,9 @@ import {
   Shield,
   ShieldAlert,
   Terminal,
-} from 'lucide-react';
-import { useChatStore } from '../../../stores/chat';
-import type { VerbProfile } from '../../../types/chat';
+} from "lucide-react";
+import { useChatStore } from "../../../stores/chat";
+import type { VerbProfile } from "../../../types/chat";
 
 interface VerbBrowserProps {
   className?: string;
@@ -37,12 +37,14 @@ function TierBadge({ tier }: { tier: string }) {
   if (!tier) return null;
 
   const colors: Record<string, string> = {
-    governed: 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30',
-    operational: 'bg-sky-500/15 text-sky-400 border-sky-500/30',
-    proof: 'bg-amber-500/15 text-amber-400 border-amber-500/30',
+    governed: "bg-emerald-500/15 text-emerald-400 border-emerald-500/30",
+    operational: "bg-sky-500/15 text-sky-400 border-sky-500/30",
+    proof: "bg-amber-500/15 text-amber-400 border-amber-500/30",
   };
 
-  const color = colors[tier.toLowerCase()] ?? 'bg-gray-500/15 text-gray-400 border-gray-500/30';
+  const color =
+    colors[tier.toLowerCase()] ??
+    "bg-gray-500/15 text-gray-400 border-gray-500/30";
 
   return (
     <span
@@ -67,6 +69,7 @@ function VerbItem({
   return (
     <div className="group">
       <button
+        type="button"
         onClick={() => onSelect(verb)}
         onContextMenu={(e) => {
           e.preventDefault();
@@ -74,8 +77,8 @@ function VerbItem({
         }}
         className={`w-full text-left px-2 py-1.5 rounded text-xs transition-colors ${
           isEligible
-            ? 'hover:bg-[var(--bg-tertiary)]'
-            : 'opacity-50 hover:bg-[var(--bg-tertiary)]'
+            ? "hover:bg-[var(--bg-tertiary)]"
+            : "opacity-50 hover:bg-[var(--bg-tertiary)]"
         }`}
         title={
           isEligible
@@ -85,11 +88,19 @@ function VerbItem({
       >
         <div className="flex items-center gap-1.5">
           {isEligible ? (
-            <Code2 size={11} className="flex-shrink-0 text-[var(--accent-blue)]" />
+            <Code2
+              size={11}
+              className="flex-shrink-0 text-[var(--accent-blue)]"
+            />
           ) : (
-            <ShieldAlert size={11} className="flex-shrink-0 text-[var(--text-muted)]" />
+            <ShieldAlert
+              size={11}
+              className="flex-shrink-0 text-[var(--text-muted)]"
+            />
           )}
-          <span className={`font-mono truncate ${isEligible ? 'text-[var(--text-primary)]' : 'text-[var(--text-muted)]'}`}>
+          <span
+            className={`font-mono truncate ${isEligible ? "text-[var(--text-primary)]" : "text-[var(--text-muted)]"}`}
+          >
             {verb.fqn}
           </span>
           <div className="ml-auto flex-shrink-0">
@@ -99,7 +110,9 @@ function VerbItem({
         <div className="text-[10px] text-[var(--text-muted)] mt-0.5 truncate pl-4">
           {verb.description}
           {!isEligible && (
-            <span className="ml-1 text-[var(--accent-orange)]">(preconditions not met)</span>
+            <span className="ml-1 text-[var(--accent-orange)]">
+              (preconditions not met)
+            </span>
           )}
         </div>
       </button>
@@ -115,11 +128,13 @@ function VerbItem({
               className="flex items-center gap-1 text-[10px] py-0.5"
             >
               <span
-                className={`font-mono ${arg.required ? 'text-[var(--accent-orange)]' : 'text-[var(--text-muted)]'}`}
+                className={`font-mono ${arg.required ? "text-[var(--accent-orange)]" : "text-[var(--text-muted)]"}`}
               >
                 :{arg.name}
               </span>
-              <span className="text-[var(--text-muted)]">&lt;{arg.arg_type}&gt;</span>
+              <span className="text-[var(--text-muted)]">
+                &lt;{arg.arg_type}&gt;
+              </span>
               {arg.required && (
                 <span className="text-[var(--accent-red)] text-[9px]">*</span>
               )}
@@ -143,12 +158,15 @@ function DomainCard({
 }) {
   return (
     <button
+      type="button"
       onClick={onClick}
       className="w-full flex items-center gap-2 px-3 py-2 rounded text-sm text-left hover:bg-[var(--bg-tertiary)] transition-colors"
     >
       <Layers size={14} className="flex-shrink-0 text-[var(--accent-purple)]" />
       <div className="flex-1 min-w-0">
-        <div className="font-medium text-[var(--text-primary)] truncate">{domain}</div>
+        <div className="font-medium text-[var(--text-primary)] truncate">
+          {domain}
+        </div>
       </div>
       <span className="text-xs text-[var(--text-muted)]">{count}</span>
       <ChevronRight size={14} className="text-[var(--text-muted)]" />
@@ -168,7 +186,7 @@ function DomainVerbList({
   onSelect: (verb: VerbProfile) => void;
   onBack: () => void;
 }) {
-  const [search, setSearch] = useState('');
+  const [search, setSearch] = useState("");
 
   const filtered = useMemo(() => {
     if (!search) return verbs;
@@ -188,6 +206,7 @@ function DomainVerbList({
       {/* Header with back */}
       <div className="flex items-center gap-2 px-2 py-1.5 border-b border-[var(--border-primary)]">
         <button
+          type="button"
           onClick={onBack}
           className="p-1 hover:bg-[var(--bg-tertiary)] rounded"
         >
@@ -239,11 +258,14 @@ function DomainVerbList({
   );
 }
 
-export function VerbBrowser({ className = '', onVerbSubmit }: VerbBrowserProps) {
+export function VerbBrowser({
+  className = "",
+  onVerbSubmit,
+}: VerbBrowserProps) {
   const { availableVerbs, verbSurfaceMeta, setInputValue } = useChatStore();
   const [isExpanded, setIsExpanded] = useState(false);
   const [selectedDomain, setSelectedDomain] = useState<string | null>(null);
-  const [domainSearch, setDomainSearch] = useState('');
+  const [domainSearch, setDomainSearch] = useState("");
   const hasAutoExpanded = useRef(false);
 
   // Auto-expand when verbs first arrive
@@ -299,7 +321,7 @@ export function VerbBrowser({ className = '', onVerbSubmit }: VerbBrowserProps) 
 
   // Get verbs for selected domain
   const selectedVerbs = selectedDomain
-    ? domains.find(([d]) => d === selectedDomain)?.[1] ?? []
+    ? (domains.find(([d]) => d === selectedDomain)?.[1] ?? [])
     : [];
 
   // Build filter description for the summary banner
@@ -312,6 +334,7 @@ export function VerbBrowser({ className = '', onVerbSubmit }: VerbBrowserProps) 
       {/* Header */}
       <div className="flex items-center justify-between px-3 py-2 border-b border-[var(--border-primary)]">
         <button
+          type="button"
           onClick={() => {
             setIsExpanded(!isExpanded);
             if (!isExpanded) setSelectedDomain(null);
@@ -334,8 +357,8 @@ export function VerbBrowser({ className = '', onVerbSubmit }: VerbBrowserProps) 
       </div>
 
       {/* Content */}
-      {isExpanded && (
-        selectedDomain ? (
+      {isExpanded &&
+        (selectedDomain ? (
           /* Stage 2: Domain verb list */
           <DomainVerbList
             domain={selectedDomain}
@@ -398,8 +421,7 @@ export function VerbBrowser({ className = '', onVerbSubmit }: VerbBrowserProps) 
               {totalCount} verbs across {domains.length} domains
             </div>
           </div>
-        )
-      )}
+        ))}
     </div>
   );
 }

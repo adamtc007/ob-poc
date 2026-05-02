@@ -2,7 +2,7 @@
 //!
 //! Regulatory audit trail for every external correction triggered by
 //! constellation replay.
-//! See: docs/architecture/cross-workspace-state-consistency-v0.4.md §6.5
+//! See: docs/annex-cross-workspace-state-consistency.md §6.5
 
 use anyhow::Result;
 use chrono::{DateTime, Utc};

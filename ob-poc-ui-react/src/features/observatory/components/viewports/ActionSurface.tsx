@@ -23,9 +23,7 @@ interface Props {
 export function ActionSurface({ data, sessionId }: Props) {
   if (!data || typeof data !== "object") {
     return (
-      <div className="text-xs text-[var(--text-secondary)]">
-        No action data
-      </div>
+      <div className="text-xs text-[var(--text-secondary)]">No action data</div>
     );
   }
 
@@ -69,6 +67,7 @@ export function ActionSurface({ data, sessionId }: Props) {
                   </td>
                   <td className="py-1 text-right">
                     <button
+                      type="button"
                       onClick={() => handleInvoke(a.verb_fqn)}
                       disabled={!sessionId}
                       className="px-2 py-0.5 rounded text-[10px] font-medium bg-[var(--bg-active)] text-[var(--text-primary)] hover:bg-[var(--bg-hover)] disabled:opacity-40 disabled:cursor-not-allowed"

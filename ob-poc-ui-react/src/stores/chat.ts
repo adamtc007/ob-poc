@@ -4,14 +4,14 @@
  * State management for the Agent Chat UI using Zustand.
  */
 
-import { create } from 'zustand';
+import { create } from "zustand";
 import type {
   ChatSession,
   ChatSessionSummary,
   ChatMessage,
   DecisionPacket,
   VerbProfile,
-} from '../types/chat';
+} from "../types/chat";
 
 /** Surface metadata from SessionVerbSurface */
 export interface VerbSurfaceMeta {
@@ -81,11 +81,11 @@ const initialState: ChatState = {
   currentSession: null,
   isLoadingSessions: false,
   isStreaming: false,
-  streamingContent: '',
+  streamingContent: "",
   pendingDecision: null,
   availableVerbs: [],
   verbSurfaceMeta: null,
-  inputValue: '',
+  inputValue: "",
   error: null,
 };
 
@@ -94,12 +94,13 @@ export const useChatStore = create<ChatState & ChatActions>((set, get) => ({
 
   setSessions: (sessions) => set({ sessions }),
 
-  setCurrentSession: (currentSession) => set({
-    currentSession,
-    pendingDecision: null,
-    streamingContent: '',
-    isStreaming: false,
-  }),
+  setCurrentSession: (currentSession) =>
+    set({
+      currentSession,
+      pendingDecision: null,
+      streamingContent: "",
+      isStreaming: false,
+    }),
 
   setLoadingSessions: (isLoadingSessions) => set({ isLoadingSessions }),
 
@@ -127,8 +128,8 @@ export const useChatStore = create<ChatState & ChatActions>((set, get) => ({
     set({
       currentSession: {
         ...currentSession,
-        messages: currentSession.messages.map(m =>
-          m.id === messageId ? { ...m, ...updates } : m
+        messages: currentSession.messages.map((m) =>
+          m.id === messageId ? { ...m, ...updates } : m,
         ),
       },
     });
@@ -137,18 +138,19 @@ export const useChatStore = create<ChatState & ChatActions>((set, get) => ({
   setStreaming: (isStreaming) => set({ isStreaming }),
 
   appendStreamingContent: (content) => {
-    set(state => ({ streamingContent: state.streamingContent + content }));
+    set((state) => ({ streamingContent: state.streamingContent + content }));
   },
 
-  clearStreamingContent: () => set({ streamingContent: '' }),
+  clearStreamingContent: () => set({ streamingContent: "" }),
 
   setPendingDecision: (pendingDecision) => set({ pendingDecision }),
 
-  setAvailableVerbs: (availableVerbs, meta) => set({ availableVerbs, verbSurfaceMeta: meta ?? null }),
+  setAvailableVerbs: (availableVerbs, meta) =>
+    set({ availableVerbs, verbSurfaceMeta: meta ?? null }),
 
   setInputValue: (inputValue) => set({ inputValue }),
 
-  clearInput: () => set({ inputValue: '' }),
+  clearInput: () => set({ inputValue: "" }),
 
   setError: (error) => set({ error }),
 

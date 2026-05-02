@@ -5,7 +5,6 @@
 > codebase in the Instrument Matrix region.
 > **Source prompt:** `docs/todo/instrument-matrix-pilot-prompt.md`
 > **Reference spec:** `docs/todo/catalogue-platform-refinement-v1_0.md` (v1.0)
-> **Skeleton predecessor:** `docs/todo/instrument-matrix-pilot-plan-skeleton-2026-04-22.md`
 > **Workspace target:** Instrument Matrix (pilot scope confirmed 2026-04-22)
 > **P-G convention for pilot:** Adam-as-authority. Pilot tier decisions are
 > explicitly **provisional**, flagged for re-review when the mechanism scales

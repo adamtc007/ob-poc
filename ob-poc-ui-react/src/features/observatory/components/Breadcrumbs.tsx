@@ -68,6 +68,7 @@ export function Breadcrumbs({ history, cursor, sessionId }: Props) {
     <div className="flex items-center gap-1 px-4 py-1 text-xs border-b border-[var(--border-primary)] overflow-x-auto">
       {/* Back / Forward buttons */}
       <button
+        type="button"
         onClick={handleBack}
         disabled={!canGoBack}
         className={`px-1 py-0.5 rounded text-sm ${
@@ -80,6 +81,7 @@ export function Breadcrumbs({ history, cursor, sessionId }: Props) {
         &larr;
       </button>
       <button
+        type="button"
         onClick={handleForward}
         disabled={!canGoForward}
         className={`px-1 py-0.5 rounded text-sm ${
@@ -97,10 +99,9 @@ export function Breadcrumbs({ history, cursor, sessionId }: Props) {
       {/* Breadcrumb entries */}
       {history.map((entry, i) => (
         <span key={i} className="flex items-center gap-1 shrink-0">
-          {i > 0 && (
-            <span className="text-[var(--text-muted)]">&rsaquo;</span>
-          )}
+          {i > 0 && <span className="text-[var(--text-muted)]">&rsaquo;</span>}
           <button
+            type="button"
             onClick={() => handleEntryClick(entry)}
             className={`px-1.5 py-0.5 rounded ${
               i === currentIndex

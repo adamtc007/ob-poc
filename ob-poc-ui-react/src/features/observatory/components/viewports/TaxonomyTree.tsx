@@ -30,9 +30,7 @@ export function TaxonomyTree({ data }: Props) {
 
   if (nodes.length === 0) {
     return (
-      <div className="text-xs text-[var(--text-secondary)]">
-        Empty taxonomy
-      </div>
+      <div className="text-xs text-[var(--text-secondary)]">Empty taxonomy</div>
     );
   }
 
@@ -52,7 +50,8 @@ function TaxonomyNodeView({
   node: TaxonomyNode;
   depth: number;
 }) {
-  const hasChildren = node.children && node.children.length > 0;
+  const children = node.children ?? [];
+  const hasChildren = children.length > 0;
 
   if (!hasChildren) {
     return (
@@ -85,7 +84,7 @@ function TaxonomyNodeView({
         )}
       </summary>
       <div className="mt-0.5">
-        {node.children!.map((child, i) => (
+        {children.map((child, i) => (
           <TaxonomyNodeView
             key={child.id ?? i}
             node={child}

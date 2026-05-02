@@ -51,6 +51,7 @@ function TabButton({
   const isActive = tab === activeTab;
   return (
     <button
+      type="button"
       onClick={onClick}
       className={`
         flex items-center gap-2 px-4 py-2 rounded-lg transition-colors
@@ -82,6 +83,7 @@ function CbuCard({
 }) {
   return (
     <button
+      type="button"
       onClick={onClick}
       className={`w-full p-4 rounded-lg border text-left transition-all ${
         isSelected
@@ -319,7 +321,7 @@ function TradingMatrixTab({
     error: matrixError,
   } = useQuery({
     queryKey: ["trading-matrix", selectedCbuId],
-    queryFn: () => getTradingMatrix(selectedCbuId!),
+    queryFn: () => getTradingMatrix(selectedCbuId ?? ""),
     enabled: !!selectedCbuId,
   });
 
@@ -334,10 +336,14 @@ function TradingMatrixTab({
       {cbus.length > 1 && (
         <div className="flex-shrink-0 p-3 border-b border-[var(--border-primary)] bg-[var(--bg-secondary)]">
           <div className="flex items-center gap-3">
-            <label className="text-sm text-[var(--text-muted)]">
+            <label
+              htmlFor="trading-matrix-cbu"
+              className="text-sm text-[var(--text-muted)]"
+            >
               Structure:
             </label>
             <select
+              id="trading-matrix-cbu"
               value={selectedCbuId || ""}
               onChange={(e) => setSelectedCbuId(e.target.value)}
               className="flex-1 max-w-xs px-3 py-1.5 rounded-lg bg-[var(--bg-primary)] border border-[var(--border-primary)] text-[var(--text-primary)] text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent-blue)]/50"
@@ -398,12 +404,13 @@ function TradingMatrixTab({
 
 export function ViewportPage() {
   const { sessionId } = useParams<{ sessionId: string }>();
+  const activeSessionId = sessionId ?? "";
   const [activeTab, setActiveTab] = useState<ViewTab>("structures");
 
   const { data, isLoading, error, refetch, isRefetching } = useQuery({
-    queryKey: queryKeys.scope(sessionId || ""),
-    queryFn: () => scopeApi.getScope(sessionId!),
-    enabled: !!sessionId,
+    queryKey: queryKeys.scope(activeSessionId),
+    queryFn: () => scopeApi.getScope(activeSessionId),
+    enabled: activeSessionId.length > 0,
     refetchInterval: 5000,
   });
 
@@ -466,6 +473,7 @@ export function ViewportPage() {
         {/* Actions */}
         <div className="flex items-center gap-2">
           <button
+            type="button"
             onClick={() => refetch()}
             disabled={isRefetching}
             className="p-2 hover:bg-[var(--bg-tertiary)] rounded-lg transition-colors"
@@ -477,6 +485,7 @@ export function ViewportPage() {
             />
           </button>
           <button
+            type="button"
             onClick={handleClose}
             className="p-2 hover:bg-[var(--bg-tertiary)] rounded-lg transition-colors"
             title="Close window"

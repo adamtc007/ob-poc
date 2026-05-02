@@ -19,14 +19,26 @@ interface Props {
   onAction: (action: ObservatoryAction) => void;
 }
 
+interface ObservatoryWasmModule {
+  on_action(callback: (json: string) => void): void;
+  set_scene(sceneJson: string): void;
+  set_view_level(viewLevel: ViewLevel): void;
+  start_canvas(canvasId: string): Promise<void>;
+}
+
+declare global {
+  interface Window {
+    __observatory_wasm?: ObservatoryWasmModule;
+  }
+}
+
 // Module-level WASM state (singleton — canvas is initialized once)
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-let wasmModule: any = null;
+let wasmModule: ObservatoryWasmModule | null = null;
 let wasmReady = false;
 let wasmLoading = false;
 
 /** Load the WASM module via dynamic script injection (bypasses Vite bundler). */
-async function loadWasmModule(): Promise<any> {
+async function loadWasmModule(): Promise<ObservatoryWasmModule> {
   if (wasmModule) return wasmModule;
   if (wasmLoading) {
     // Wait for the in-flight load
@@ -54,8 +66,13 @@ async function loadWasmModule(): Promise<any> {
 
   return new Promise((resolve, reject) => {
     const onReady = () => {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      wasmModule = (window as any).__observatory_wasm;
+      if (!window.__observatory_wasm) {
+        wasmLoading = false;
+        window.removeEventListener("observatory-wasm-ready", onReady);
+        reject(new Error("WASM ready event fired without module"));
+        return;
+      }
+      wasmModule = window.__observatory_wasm;
       wasmLoading = false;
       window.removeEventListener("observatory-wasm-ready", onReady);
       resolve(wasmModule);
@@ -86,15 +103,21 @@ export function ConstellationCanvas({
 }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const actionCallbackRef = useRef(onAction);
-  actionCallbackRef.current = onAction;
   const [ready, setReady] = useState(wasmReady);
+
+  useEffect(() => {
+    actionCallbackRef.current = onAction;
+  }, [onAction]);
 
   // Initialize WASM canvas
   useEffect(() => {
     let cancelled = false;
 
     async function init() {
-      if (wasmReady) { setReady(true); return; }
+      if (wasmReady) {
+        setReady(true);
+        return;
+      }
       try {
         const wasm = await loadWasmModule();
         if (cancelled) return;

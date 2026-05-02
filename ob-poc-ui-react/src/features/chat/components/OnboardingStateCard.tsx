@@ -45,6 +45,7 @@ const dotColors: Record<LayerState, string> = {
 export function OnboardingStateCard({ message, onVerbClick }: Props) {
   const state = message.onboarding_state;
   if (!state) return null;
+  const resetHint = state.context_reset_hint;
 
   return (
     <div className="mt-2 rounded-lg border border-indigo-200 bg-indigo-50 p-3">
@@ -90,16 +91,15 @@ export function OnboardingStateCard({ message, onVerbClick }: Props) {
       )}
 
       {/* Context reset hint */}
-      {state.context_reset_hint && (
+      {resetHint && (
         <div className="mt-2 rounded bg-yellow-50 p-2 text-xs text-yellow-800">
-          {state.context_reset_hint.message}
+          {resetHint.message}
           <button
-            onClick={() =>
-              onVerbClick?.(state.context_reset_hint!.reset_utterance)
-            }
+            type="button"
+            onClick={() => onVerbClick?.(resetHint.reset_utterance)}
             className="ml-1 font-medium underline"
           >
-            {state.context_reset_hint.reset_utterance}
+            {resetHint.reset_utterance}
           </button>
         </div>
       )}
@@ -191,6 +191,7 @@ function VerbButton({
   const isRevert = variant === "revert";
   return (
     <button
+      type="button"
       onClick={() => onVerbClick?.(verb.suggested_utterance)}
       title={verb.reason}
       className={`rounded px-2 py-0.5 text-[11px] font-medium transition-colors ${
@@ -211,6 +212,9 @@ function CbuCard({
   cbu: CbuStateCardType;
   onVerbClick?: (utterance: string) => void;
 }) {
+  const nextAction = cbu.next_action;
+  const revertAction = cbu.revert_action;
+
   return (
     <div className="flex items-center gap-2 rounded bg-white px-2 py-1.5">
       {/* Progress ring */}
@@ -257,24 +261,26 @@ function CbuCard({
       </div>
 
       {/* Next action */}
-      {cbu.next_action && (
+      {nextAction && (
         <button
-          onClick={() => onVerbClick?.(cbu.next_action!.suggested_utterance)}
-          title={cbu.next_action.reason}
+          type="button"
+          onClick={() => onVerbClick?.(nextAction.suggested_utterance)}
+          title={nextAction.reason}
           className="shrink-0 rounded bg-indigo-600 px-2 py-0.5 text-[10px] font-medium text-white hover:bg-indigo-700"
         >
-          {cbu.next_action.label}
+          {nextAction.label}
         </button>
       )}
 
       {/* Revert action */}
-      {cbu.revert_action && (
+      {revertAction && (
         <button
-          onClick={() => onVerbClick?.(cbu.revert_action!.suggested_utterance)}
-          title={cbu.revert_action.reason}
+          type="button"
+          onClick={() => onVerbClick?.(revertAction.suggested_utterance)}
+          title={revertAction.reason}
           className="shrink-0 rounded border border-gray-300 px-2 py-0.5 text-[10px] text-gray-500 hover:bg-gray-50"
         >
-          {cbu.revert_action.label}
+          {revertAction.label}
         </button>
       )}
     </div>

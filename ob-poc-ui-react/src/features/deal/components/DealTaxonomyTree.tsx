@@ -211,10 +211,25 @@ function TreeNode({
   const handleSelect = useCallback(() => {
     onSelectNode(node);
   }, [node, onSelectNode]);
+  const handleKeyDown = useCallback(
+    (e: React.KeyboardEvent<HTMLDivElement>) => {
+      if (e.key === "Enter") {
+        handleSelect();
+      } else if (e.key === " ") {
+        e.preventDefault();
+        if (hasChildren) {
+          toggleExpanded(node.id);
+        }
+      }
+    },
+    [handleSelect, hasChildren, node.id, toggleExpanded],
+  );
 
   return (
     <div>
       <div
+        role="button"
+        tabIndex={0}
         className={cn(
           "flex items-center gap-1 px-2 py-1.5 cursor-pointer rounded-md transition-colors",
           isSelected
@@ -223,9 +238,11 @@ function TreeNode({
         )}
         style={{ paddingLeft: `${depth * 16 + 8}px` }}
         onClick={handleSelect}
+        onKeyDown={handleKeyDown}
       >
         {hasChildren ? (
           <button
+            type="button"
             onClick={handleToggle}
             className="p-0.5 hover:bg-[var(--bg-tertiary)] rounded"
           >
@@ -248,7 +265,7 @@ function TreeNode({
       </div>
       {hasChildren && isExpanded && (
         <div>
-          {node.children!.map((child) => (
+          {(node.children ?? []).map((child) => (
             <TreeNode
               key={child.id}
               node={child}

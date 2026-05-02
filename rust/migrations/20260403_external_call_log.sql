@@ -1,6 +1,6 @@
 -- Cross-Workspace State Consistency: Phase 7 — External Call Log
 -- Records every third-party interaction. Enables idempotency on replay.
--- See: docs/architecture/cross-workspace-state-consistency-v0.4.md §6.4
+-- See: docs/annex-cross-workspace-state-consistency.md §6.4
 
 CREATE TABLE IF NOT EXISTS "ob-poc".external_call_log (
     id                  UUID PRIMARY KEY DEFAULT gen_random_uuid(),

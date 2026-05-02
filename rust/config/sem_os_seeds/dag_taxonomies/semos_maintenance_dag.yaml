@@ -556,7 +556,7 @@ slots:
 
   - id: shared_atom
     stateless: false
-    state_machine: "(reconcile-existing — shared_atom_registry lifecycle: Draft → Active → Deprecated → Retired — lives in docs/architecture/cross-workspace-state-consistency-v0.4.md)"
+    state_machine: "(reconcile-existing — shared_atom_registry lifecycle: Draft → Active → Deprecated → Retired — lives in docs/annex-cross-workspace-state-consistency.md)"
 
   - id: remediation_event
     stateless: false

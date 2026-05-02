@@ -86,14 +86,6 @@ export const queryKeys = {
       ["observatory", "diagram", sessionId, type] as const,
   },
 
-  // Semantic OS
-  semOs: {
-    all: ["semOs"] as const,
-    sessions: () => [...queryKeys.semOs.all, "sessions"] as const,
-    session: (id: string) => [...queryKeys.semOs.all, "session", id] as const,
-    context: () => [...queryKeys.semOs.all, "context"] as const,
-  },
-
   // Deals
   deals: {
     all: ["deals"] as const,

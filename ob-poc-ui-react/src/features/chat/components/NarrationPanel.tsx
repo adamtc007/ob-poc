@@ -1,4 +1,4 @@
-import React from "react";
+import type React from "react";
 import type {
   NarrationPayload,
   NarrationGap,
@@ -24,6 +24,7 @@ export const NarrationPanel: React.FC<NarrationPanelProps> = ({
 }) => {
   if (narration.verbosity === "silent") return null;
 
+  const workspaceTransition = narration.workspace_transition;
   const hasGaps =
     narration.required_gaps.length > 0 || narration.optional_gaps.length > 0;
   const allComplete = !hasGaps && narration.verbosity === "full";
@@ -79,14 +80,13 @@ export const NarrationPanel: React.FC<NarrationPanelProps> = ({
         )}
 
       {/* Optional gaps (only in Full mode) */}
-      {narration.verbosity === "full" &&
-        narration.optional_gaps.length > 0 && (
-          <GapSection
-            title="Optional"
-            gaps={narration.optional_gaps}
-            onSendMessage={onSendMessage}
-          />
-        )}
+      {narration.verbosity === "full" && narration.optional_gaps.length > 0 && (
+        <GapSection
+          title="Optional"
+          gaps={narration.optional_gaps}
+          onSendMessage={onSendMessage}
+        />
+      )}
 
       {/* Suggested next actions */}
       {narration.suggested_next.length > 0 &&
@@ -116,7 +116,7 @@ export const NarrationPanel: React.FC<NarrationPanelProps> = ({
       )}
 
       {/* Workspace transition suggestion */}
-      {narration.workspace_transition && (
+      {workspaceTransition && (
         <div
           style={{
             marginTop: "10px",
@@ -132,18 +132,17 @@ export const NarrationPanel: React.FC<NarrationPanelProps> = ({
           <span style={{ fontSize: "16px" }}>{"\u27A1"}</span>
           <div style={{ flex: 1 }}>
             <div style={{ fontWeight: 600, color: "#1565c0" }}>
-              Next: {narration.workspace_transition.target_label}
+              Next: {workspaceTransition.target_label}
             </div>
             <div style={{ fontSize: "12px", color: "#757575" }}>
-              {narration.workspace_transition.reason}
+              {workspaceTransition.reason}
             </div>
           </div>
           {onSendMessage && (
             <button
+              type="button"
               onClick={() =>
-                onSendMessage(
-                  narration.workspace_transition!.suggested_utterance,
-                )
+                onSendMessage(workspaceTransition.suggested_utterance)
               }
               style={{
                 padding: "6px 16px",
@@ -226,6 +225,7 @@ const GapSection: React.FC<{
         )}
         {onSendMessage && (
           <button
+            type="button"
             onClick={() => onSendMessage(gap.suggested_utterance)}
             style={{
               marginLeft: "auto",
@@ -266,6 +266,7 @@ const SuggestedActions: React.FC<{
     <div style={{ display: "flex", flexWrap: "wrap", gap: "6px" }}>
       {actions.map((action, i) => (
         <button
+          type="button"
           key={i}
           onClick={() => onSendMessage?.(action.utterance)}
           style={{

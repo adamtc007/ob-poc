@@ -941,7 +941,7 @@ All 6 macros are wired into the `semos-maintenance` pack (`allowed_verbs`) and t
 
 ## Cross-Workspace State Consistency
 
-**Architecture doc:** `docs/architecture/cross-workspace-state-consistency-v0.4.md`
+**Architecture doc:** `docs/annex-cross-workspace-state-consistency.md`
 
 When a shared fact (LEI, jurisdiction, fund structure type) is mutated in its owning workspace, consuming workspaces silently drift. The cross-workspace consistency mechanism detects drift, propagates staleness, and enables constellation replay.
 

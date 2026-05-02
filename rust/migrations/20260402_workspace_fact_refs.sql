@@ -1,7 +1,7 @@
 -- Cross-Workspace State Consistency: Phase 3 — Workspace Fact Refs
 -- Consumption-state projection (INV-2). Tracks which version of a shared
 -- fact each consuming workspace last acknowledged or built against.
--- See: docs/architecture/cross-workspace-state-consistency-v0.4.md §6.3
+-- See: docs/annex-cross-workspace-state-consistency.md §6.3
 
 CREATE TABLE IF NOT EXISTS "ob-poc".workspace_fact_refs (
     id                  UUID PRIMARY KEY DEFAULT gen_random_uuid(),

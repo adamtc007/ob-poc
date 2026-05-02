@@ -35,7 +35,7 @@ python gleif_extract_allianz.py
 
 ## Related Documentation
 
-See `/docs/architecture/OWNERSHIP-DATA-SOURCE-ARCHITECTURE.md` for:
+See `/docs/annex-ownership-data-source.md` for:
 - GLEIF API reference
 - Data source hierarchy
 - Multi-source reconciliation strategy

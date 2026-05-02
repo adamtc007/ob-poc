@@ -58,7 +58,10 @@ export const observatoryApi = {
     sessionId: string,
     verb: string,
     args: Record<string, unknown>,
-  ): Promise<{ orientation: OrientationContract; graph_scene: GraphSceneModel }> {
+  ): Promise<{
+    orientation: OrientationContract;
+    graph_scene: GraphSceneModel;
+  }> {
     return api.post<{
       orientation: OrientationContract;
       graph_scene: GraphSceneModel;

@@ -150,10 +150,7 @@ fn paint_edge(
     let src_bottom = Pos2::new(src_pos.x, src_pos.y + NODE_HEIGHT / 2.0);
     let tgt_top = Pos2::new(tgt_pos.x, tgt_pos.y - NODE_HEIGHT / 2.0);
 
-    painter.line_segment(
-        [src_bottom, tgt_top],
-        Stroke::new(stroke_width, edge_color),
-    );
+    painter.line_segment([src_bottom, tgt_top], Stroke::new(stroke_width, edge_color));
 
     // Arrow head at target
     let dir = (tgt_top - src_bottom).normalized();

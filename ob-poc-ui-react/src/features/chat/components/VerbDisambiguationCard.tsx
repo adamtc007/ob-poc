@@ -27,7 +27,7 @@ const kindColors: Record<string, string> = {
 
 export function VerbDisambiguationCard({ message, onSelect }: Props) {
   const detail = message.verb_disambiguation_detail;
-  if (!detail || !detail.options?.length) return null;
+  if (!detail?.options?.length) return null;
 
   return (
     <div className="mt-2 rounded-lg border border-amber-200 bg-amber-50 p-3">
@@ -71,6 +71,7 @@ function VerbOptionRow({
   // This is deterministic: click "1" → server picks option[0] → done.
   return (
     <button
+      type="button"
       onClick={() => onSelect?.(String(index + 1))}
       className="w-full rounded-md border border-amber-200 bg-white p-2 text-left transition-colors hover:border-amber-400 hover:bg-amber-50"
     >

@@ -2,19 +2,19 @@
  * Settings Page
  */
 
-import { Moon, Sun, Monitor } from 'lucide-react';
-import { cn } from '../../lib/utils';
-import { useState } from 'react';
+import { Moon, Sun, Monitor } from "lucide-react";
+import { cn } from "../../lib/utils";
+import { useState } from "react";
 
-type Theme = 'light' | 'dark' | 'system';
+type Theme = "light" | "dark" | "system";
 
 export function SettingsPage() {
-  const [theme, setTheme] = useState<Theme>('dark');
+  const [theme, setTheme] = useState<Theme>("dark");
 
   const themeOptions = [
-    { value: 'light' as const, icon: Sun, label: 'Light' },
-    { value: 'dark' as const, icon: Moon, label: 'Dark' },
-    { value: 'system' as const, icon: Monitor, label: 'System' },
+    { value: "light" as const, icon: Sun, label: "Light" },
+    { value: "dark" as const, icon: Moon, label: "Dark" },
+    { value: "system" as const, icon: Monitor, label: "System" },
   ];
 
   return (
@@ -36,29 +36,30 @@ export function SettingsPage() {
           <div className="mt-4 flex gap-3">
             {themeOptions.map(({ value, icon: Icon, label }) => (
               <button
+                type="button"
                 key={value}
                 onClick={() => setTheme(value)}
                 className={cn(
-                  'flex flex-col items-center gap-2 rounded-lg border p-4 transition-colors',
+                  "flex flex-col items-center gap-2 rounded-lg border p-4 transition-colors",
                   theme === value
-                    ? 'border-[var(--accent-blue)] bg-[var(--accent-blue)]/10'
-                    : 'border-[var(--border-primary)] bg-[var(--bg-secondary)] hover:border-[var(--border-secondary)]'
+                    ? "border-[var(--accent-blue)] bg-[var(--accent-blue)]/10"
+                    : "border-[var(--border-primary)] bg-[var(--bg-secondary)] hover:border-[var(--border-secondary)]",
                 )}
               >
                 <Icon
                   size={24}
                   className={
                     theme === value
-                      ? 'text-[var(--accent-blue)]'
-                      : 'text-[var(--text-secondary)]'
+                      ? "text-[var(--accent-blue)]"
+                      : "text-[var(--text-secondary)]"
                   }
                 />
                 <span
                   className={cn(
-                    'text-sm',
+                    "text-sm",
                     theme === value
-                      ? 'text-[var(--accent-blue)]'
-                      : 'text-[var(--text-secondary)]'
+                      ? "text-[var(--accent-blue)]"
+                      : "text-[var(--text-secondary)]",
                   )}
                 >
                   {label}
@@ -79,10 +80,16 @@ export function SettingsPage() {
 
           <div className="mt-4 space-y-4">
             <div>
-              <label className="block text-sm font-medium text-[var(--text-primary)]">
+              <label
+                htmlFor="default-lod-level"
+                className="block text-sm font-medium text-[var(--text-primary)]"
+              >
                 Default LOD Level
               </label>
-              <select className="mt-1 w-full rounded-lg border border-[var(--border-primary)] bg-[var(--bg-secondary)] px-3 py-2 text-[var(--text-primary)]">
+              <select
+                id="default-lod-level"
+                className="mt-1 w-full rounded-lg border border-[var(--border-primary)] bg-[var(--bg-secondary)] px-3 py-2 text-[var(--text-primary)]"
+              >
                 <option value="0">0 - Minimal</option>
                 <option value="1">1 - Summary</option>
                 <option value="2">2 - Standard</option>
@@ -91,10 +98,14 @@ export function SettingsPage() {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-[var(--text-primary)]">
+              <label
+                htmlFor="default-max-depth"
+                className="block text-sm font-medium text-[var(--text-primary)]"
+              >
                 Default Max Depth
               </label>
               <input
+                id="default-max-depth"
                 type="range"
                 min="1"
                 max="10"
@@ -122,12 +133,12 @@ export function SettingsPage() {
             <table className="w-full text-sm">
               <tbody className="divide-y divide-[var(--border-primary)]">
                 {[
-                  { key: '↑ / ↓', action: 'Navigate tree' },
-                  { key: '← / →', action: 'Collapse / Expand node' },
-                  { key: 'Enter', action: 'Focus selected node' },
-                  { key: 'Backspace', action: 'Go back' },
-                  { key: '/', action: 'Open search' },
-                  { key: '1-4', action: 'Set LOD level' },
+                  { key: "↑ / ↓", action: "Navigate tree" },
+                  { key: "← / →", action: "Collapse / Expand node" },
+                  { key: "Enter", action: "Focus selected node" },
+                  { key: "Backspace", action: "Go back" },
+                  { key: "/", action: "Open search" },
+                  { key: "1-4", action: "Set LOD level" },
                 ].map(({ key, action }) => (
                   <tr key={key}>
                     <td className="px-4 py-2">
@@ -155,10 +166,14 @@ export function SettingsPage() {
           </p>
 
           <div className="mt-4">
-            <label className="block text-sm font-medium text-[var(--text-primary)]">
+            <label
+              htmlFor="api-base-url"
+              className="block text-sm font-medium text-[var(--text-primary)]"
+            >
               API Base URL
             </label>
             <input
+              id="api-base-url"
               type="text"
               defaultValue="/api"
               className="mt-1 w-full rounded-lg border border-[var(--border-primary)] bg-[var(--bg-secondary)] px-3 py-2 text-[var(--text-primary)]"

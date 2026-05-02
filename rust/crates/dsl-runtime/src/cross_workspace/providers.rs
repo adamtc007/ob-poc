@@ -1,7 +1,7 @@
 //! Repository for the `provider_capabilities` reference data table.
 //!
 //! Per-provider, per-operation correction classification for replay behaviour.
-//! See: docs/architecture/cross-workspace-state-consistency-v0.4.md §4.6, §6.7
+//! See: docs/annex-cross-workspace-state-consistency.md §4.6, §6.7
 
 use anyhow::Result;
 use serde::{Deserialize, Serialize};

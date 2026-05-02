@@ -1,6 +1,6 @@
 -- Cross-Workspace State Consistency: Phase 9 — Compensation Records
 -- Regulatory audit trail for every external correction triggered by replay.
--- See: docs/architecture/cross-workspace-state-consistency-v0.4.md §6.5
+-- See: docs/annex-cross-workspace-state-consistency.md §6.5
 
 CREATE TABLE IF NOT EXISTS "ob-poc".compensation_records (
     id                  UUID PRIMARY KEY DEFAULT gen_random_uuid(),

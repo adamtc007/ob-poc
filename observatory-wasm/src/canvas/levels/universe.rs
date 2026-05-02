@@ -46,10 +46,10 @@ pub fn paint(
         if member_positions.is_empty() {
             continue;
         }
-        let cx: f32 = member_positions.iter().map(|p| p.0).sum::<f32>()
-            / member_positions.len() as f32;
-        let cy: f32 = member_positions.iter().map(|p| p.1).sum::<f32>()
-            / member_positions.len() as f32;
+        let cx: f32 =
+            member_positions.iter().map(|p| p.0).sum::<f32>() / member_positions.len() as f32;
+        let cy: f32 =
+            member_positions.iter().map(|p| p.1).sum::<f32>() / member_positions.len() as f32;
         let max_dist = member_positions
             .iter()
             .map(|p| ((p.0 - cx).powi(2) + (p.1 - cy).powi(2)).sqrt())
@@ -61,10 +61,7 @@ pub fn paint(
         painter.circle_stroke(
             screen_center,
             screen_r,
-            Stroke::new(
-                1.0,
-                Color32::from_rgba_premultiplied(100, 116, 139, 30),
-            ),
+            Stroke::new(1.0, Color32::from_rgba_premultiplied(100, 116, 139, 30)),
         );
         // Group label
         painter.text(
@@ -169,7 +166,7 @@ fn paint_edge(
     let tgt_pos = transform.transform_pos(cache.nodes[geom.target_idx].center);
 
     // Thin cross-cluster edges
-    let alpha = ((edge.weight * 80.0) as u8).max(40).min(120);
+    let alpha = ((edge.weight * 80.0) as u8).clamp(40, 120);
     painter.line_segment(
         [src_pos, tgt_pos],
         Stroke::new(
@@ -180,10 +177,7 @@ fn paint_edge(
 
     // Edge label at midpoint
     if let Some(ref label) = edge.label {
-        let mid = Pos2::new(
-            (src_pos.x + tgt_pos.x) / 2.0,
-            (src_pos.y + tgt_pos.y) / 2.0,
-        );
+        let mid = Pos2::new((src_pos.x + tgt_pos.x) / 2.0, (src_pos.y + tgt_pos.y) / 2.0);
         painter.text(
             mid,
             egui::Align2::CENTER_CENTER,

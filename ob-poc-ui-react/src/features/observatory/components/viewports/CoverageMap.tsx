@@ -17,7 +17,10 @@ interface Props {
   data: unknown;
 }
 
-const STATUS_STYLES: Record<string, { bg: string; text: string; label: string }> = {
+const STATUS_STYLES: Record<
+  string,
+  { bg: string; text: string; label: string }
+> = {
   governed: {
     bg: "bg-emerald-500/20 border-emerald-500/40",
     text: "text-emerald-400",

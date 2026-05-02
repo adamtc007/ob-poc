@@ -60,10 +60,8 @@ fn paint_dashed_boundary(painter: &Painter, transform: &egui::emath::RectTransfo
     let color = Color32::from_rgba_premultiplied(71, 85, 105, 60);
 
     for i in 0..dash_count {
-        let angle_start =
-            (i as f32 / dash_count as f32) * std::f32::consts::TAU;
-        let angle_end = angle_start
-            + (dash_fraction / dash_count as f32) * std::f32::consts::TAU;
+        let angle_start = (i as f32 / dash_count as f32) * std::f32::consts::TAU;
+        let angle_end = angle_start + (dash_fraction / dash_count as f32) * std::f32::consts::TAU;
 
         let p1 = Pos2::new(
             center.x + angle_start.cos() * screen_radius,
@@ -163,15 +161,9 @@ fn paint_edge(
     let tgt_pos = transform.transform_pos(cache.nodes[geom.target_idx].center);
 
     let edge_color = match edge.edge_type {
-        ob_poc_types::graph_scene::SceneEdgeType::Dependency => {
-            Color32::from_rgb(245, 158, 11)
-        }
-        ob_poc_types::graph_scene::SceneEdgeType::Ownership => {
-            Color32::from_rgb(139, 92, 246)
-        }
-        ob_poc_types::graph_scene::SceneEdgeType::Control => {
-            Color32::from_rgb(59, 130, 246)
-        }
+        ob_poc_types::graph_scene::SceneEdgeType::Dependency => Color32::from_rgb(245, 158, 11),
+        ob_poc_types::graph_scene::SceneEdgeType::Ownership => Color32::from_rgb(139, 92, 246),
+        ob_poc_types::graph_scene::SceneEdgeType::Control => Color32::from_rgb(59, 130, 246),
         ob_poc_types::graph_scene::SceneEdgeType::SharedEntity => {
             Color32::from_rgba_premultiplied(100, 116, 139, 80)
         }
@@ -183,10 +175,7 @@ fn paint_edge(
 
     // Edge label at midpoint
     if let Some(ref label) = edge.label {
-        let mid = Pos2::new(
-            (src_pos.x + tgt_pos.x) / 2.0,
-            (src_pos.y + tgt_pos.y) / 2.0,
-        );
+        let mid = Pos2::new((src_pos.x + tgt_pos.x) / 2.0, (src_pos.y + tgt_pos.y) / 2.0);
         painter.text(
             mid,
             egui::Align2::CENTER_CENTER,

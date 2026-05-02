@@ -2,8 +2,8 @@
  * Utility functions
  */
 
-import { clsx, type ClassValue } from 'clsx';
-import { twMerge } from 'tailwind-merge';
+import { clsx, type ClassValue } from "clsx";
+import { twMerge } from "tailwind-merge";
 
 /** Merge Tailwind classes with clsx */
 export function cn(...inputs: ClassValue[]) {
@@ -14,9 +14,9 @@ export function cn(...inputs: ClassValue[]) {
 export function formatDate(dateString: string): string {
   const date = new Date(dateString);
   return date.toLocaleDateString(undefined, {
-    year: 'numeric',
-    month: 'short',
-    day: 'numeric',
+    year: "numeric",
+    month: "short",
+    day: "numeric",
   });
 }
 
@@ -24,8 +24,8 @@ export function formatDate(dateString: string): string {
 export function formatTime(dateString: string): string {
   const date = new Date(dateString);
   return date.toLocaleTimeString(undefined, {
-    hour: '2-digit',
-    minute: '2-digit',
+    hour: "2-digit",
+    minute: "2-digit",
   });
 }
 
@@ -37,7 +37,7 @@ export function formatDateTime(dateString: string): string {
 /** Truncate a string with ellipsis */
 export function truncate(str: string, maxLength: number): string {
   if (str.length <= maxLength) return str;
-  return str.slice(0, maxLength - 3) + '...';
+  return `${str.slice(0, maxLength - 3)}...`;
 }
 
 /** Generate a unique ID */
@@ -48,7 +48,7 @@ export function generateId(): string {
 /** Debounce a function */
 export function debounce<T extends (...args: unknown[]) => unknown>(
   fn: T,
-  delay: number
+  delay: number,
 ): (...args: Parameters<T>) => void {
   let timeoutId: ReturnType<typeof setTimeout>;
   return (...args: Parameters<T>) => {
@@ -60,28 +60,28 @@ export function debounce<T extends (...args: unknown[]) => unknown>(
 /** Get entity type color */
 export function getEntityColor(entityType: string): string {
   const colors: Record<string, string> = {
-    cbu: 'var(--entity-cbu)',
-    fund: 'var(--entity-fund)',
-    person: 'var(--entity-person)',
-    company: 'var(--entity-company)',
-    document: 'var(--entity-document)',
+    cbu: "var(--entity-cbu)",
+    fund: "var(--entity-fund)",
+    person: "var(--entity-person)",
+    company: "var(--entity-company)",
+    document: "var(--entity-document)",
   };
-  return colors[entityType.toLowerCase()] || 'var(--text-secondary)';
+  return colors[entityType.toLowerCase()] || "var(--text-secondary)";
 }
 
 /** Get kind icon name (for Lucide) */
 export function getKindIcon(kind: string): string {
   const icons: Record<string, string> = {
-    cbu: 'building-2',
-    fund: 'wallet',
-    entity: 'user',
-    person: 'user',
-    company: 'building',
-    document: 'file-text',
-    holding: 'coins',
-    control: 'git-branch',
-    trading_profile: 'line-chart',
-    isda: 'file-signature',
+    cbu: "building-2",
+    fund: "wallet",
+    entity: "user",
+    person: "user",
+    company: "building",
+    document: "file-text",
+    holding: "coins",
+    control: "git-branch",
+    trading_profile: "line-chart",
+    isda: "file-signature",
   };
-  return icons[kind.toLowerCase()] || 'circle';
+  return icons[kind.toLowerCase()] || "circle";
 }

@@ -4,13 +4,13 @@
  * State management for the Inspector UI using Zustand.
  */
 
-import { create } from 'zustand';
+import { create } from "zustand";
 import type {
   InspectorProjection,
   ProjectionNode,
   LodTier,
   ProjectionPolicy,
-} from '../types/projection';
+} from "../types/projection";
 
 /** Navigation history entry */
 interface HistoryEntry {
@@ -85,7 +85,7 @@ interface InspectorActions {
 const DEFAULT_POLICY: ProjectionPolicy = {
   lod: 1,
   max_depth: 3,
-  chambers: ['cbu', 'entity', 'trading'],
+  chambers: ["cbu", "entity", "trading"],
 };
 
 const initialState: InspectorState = {
@@ -98,7 +98,7 @@ const initialState: InspectorState = {
   history: [],
   historyIndex: -1,
   policy: DEFAULT_POLICY,
-  searchQuery: '',
+  searchQuery: "",
   searchResults: [],
 };
 
@@ -115,7 +115,10 @@ function findNode(node: ProjectionNode, nodeId: string): ProjectionNode | null {
 }
 
 /** Collect all node IDs in the tree */
-function collectNodeIds(node: ProjectionNode, ids: Set<string> = new Set()): Set<string> {
+function collectNodeIds(
+  node: ProjectionNode,
+  ids: Set<string> = new Set(),
+): Set<string> {
   ids.add(node.id);
   if (node.children) {
     for (const child of node.children) {
@@ -125,142 +128,150 @@ function collectNodeIds(node: ProjectionNode, ids: Set<string> = new Set()): Set
   return ids;
 }
 
-export const useInspectorStore = create<InspectorState & InspectorActions>((set, get) => ({
-  ...initialState,
+export const useInspectorStore = create<InspectorState & InspectorActions>(
+  (set, get) => ({
+    ...initialState,
 
-  setProjection: (projection) => {
-    const rootId = projection.root.id;
-    set({
-      projection,
-      focusedNodeId: rootId,
-      expandedNodes: new Set([rootId]),
-      selectedNodeId: null,
-      history: [{ nodeId: rootId, label: projection.root.label, timestamp: Date.now() }],
-      historyIndex: 0,
-      error: null,
-    });
-  },
-
-  setLoading: (isLoading) => set({ isLoading }),
-  setError: (error) => set({ error, isLoading: false }),
-
-  focusNode: (nodeId, label) => {
-    const { history, historyIndex } = get();
-    // Truncate forward history and add new entry
-    const newHistory = history.slice(0, historyIndex + 1);
-    newHistory.push({ nodeId, label, timestamp: Date.now() });
-
-    set({
-      focusedNodeId: nodeId,
-      history: newHistory,
-      historyIndex: newHistory.length - 1,
-      expandedNodes: new Set([...get().expandedNodes, nodeId]),
-    });
-  },
-
-  goBack: () => {
-    const { history, historyIndex } = get();
-    if (historyIndex > 0) {
-      const newIndex = historyIndex - 1;
+    setProjection: (projection) => {
+      const rootId = projection.root.id;
       set({
-        historyIndex: newIndex,
-        focusedNodeId: history[newIndex].nodeId,
+        projection,
+        focusedNodeId: rootId,
+        expandedNodes: new Set([rootId]),
+        selectedNodeId: null,
+        history: [
+          {
+            nodeId: rootId,
+            label: projection.root.label,
+            timestamp: Date.now(),
+          },
+        ],
+        historyIndex: 0,
+        error: null,
       });
-    }
-  },
+    },
 
-  goForward: () => {
-    const { history, historyIndex } = get();
-    if (historyIndex < history.length - 1) {
-      const newIndex = historyIndex + 1;
+    setLoading: (isLoading) => set({ isLoading }),
+    setError: (error) => set({ error, isLoading: false }),
+
+    focusNode: (nodeId, label) => {
+      const { history, historyIndex } = get();
+      // Truncate forward history and add new entry
+      const newHistory = history.slice(0, historyIndex + 1);
+      newHistory.push({ nodeId, label, timestamp: Date.now() });
+
       set({
-        historyIndex: newIndex,
-        focusedNodeId: history[newIndex].nodeId,
+        focusedNodeId: nodeId,
+        history: newHistory,
+        historyIndex: newHistory.length - 1,
+        expandedNodes: new Set([...get().expandedNodes, nodeId]),
       });
-    }
-  },
+    },
 
-  canGoBack: () => get().historyIndex > 0,
-  canGoForward: () => get().historyIndex < get().history.length - 1,
+    goBack: () => {
+      const { history, historyIndex } = get();
+      if (historyIndex > 0) {
+        const newIndex = historyIndex - 1;
+        set({
+          historyIndex: newIndex,
+          focusedNodeId: history[newIndex].nodeId,
+        });
+      }
+    },
 
-  toggleExpanded: (nodeId) => {
-    const { expandedNodes } = get();
-    const newExpanded = new Set(expandedNodes);
-    if (newExpanded.has(nodeId)) {
+    goForward: () => {
+      const { history, historyIndex } = get();
+      if (historyIndex < history.length - 1) {
+        const newIndex = historyIndex + 1;
+        set({
+          historyIndex: newIndex,
+          focusedNodeId: history[newIndex].nodeId,
+        });
+      }
+    },
+
+    canGoBack: () => get().historyIndex > 0,
+    canGoForward: () => get().historyIndex < get().history.length - 1,
+
+    toggleExpanded: (nodeId) => {
+      const { expandedNodes } = get();
+      const newExpanded = new Set(expandedNodes);
+      if (newExpanded.has(nodeId)) {
+        newExpanded.delete(nodeId);
+      } else {
+        newExpanded.add(nodeId);
+      }
+      set({ expandedNodes: newExpanded });
+    },
+
+    expandNode: (nodeId) => {
+      const { expandedNodes } = get();
+      set({ expandedNodes: new Set([...expandedNodes, nodeId]) });
+    },
+
+    collapseNode: (nodeId) => {
+      const { expandedNodes } = get();
+      const newExpanded = new Set(expandedNodes);
       newExpanded.delete(nodeId);
-    } else {
-      newExpanded.add(nodeId);
-    }
-    set({ expandedNodes: newExpanded });
-  },
+      set({ expandedNodes: newExpanded });
+    },
 
-  expandNode: (nodeId) => {
-    const { expandedNodes } = get();
-    set({ expandedNodes: new Set([...expandedNodes, nodeId]) });
-  },
+    expandAll: () => {
+      const { projection } = get();
+      if (projection) {
+        const allIds = collectNodeIds(projection.root);
+        set({ expandedNodes: allIds });
+      }
+    },
 
-  collapseNode: (nodeId) => {
-    const { expandedNodes } = get();
-    const newExpanded = new Set(expandedNodes);
-    newExpanded.delete(nodeId);
-    set({ expandedNodes: newExpanded });
-  },
+    collapseAll: () => {
+      const { projection } = get();
+      if (projection) {
+        // Keep only root expanded
+        set({ expandedNodes: new Set([projection.root.id]) });
+      }
+    },
 
-  expandAll: () => {
-    const { projection } = get();
-    if (projection) {
-      const allIds = collectNodeIds(projection.root);
-      set({ expandedNodes: allIds });
-    }
-  },
+    selectNode: (nodeId) => set({ selectedNodeId: nodeId }),
 
-  collapseAll: () => {
-    const { projection } = get();
-    if (projection) {
-      // Keep only root expanded
-      set({ expandedNodes: new Set([projection.root.id]) });
-    }
-  },
+    setLod: (lod) => {
+      const { policy } = get();
+      set({ policy: { ...policy, lod } });
+    },
 
-  selectNode: (nodeId) => set({ selectedNodeId: nodeId }),
+    setMaxDepth: (max_depth) => {
+      const { policy } = get();
+      set({ policy: { ...policy, max_depth } });
+    },
 
-  setLod: (lod) => {
-    const { policy } = get();
-    set({ policy: { ...policy, lod } });
-  },
+    toggleChamber: (chamber) => {
+      const { policy } = get();
+      const chambers = policy.chambers.includes(chamber)
+        ? policy.chambers.filter((c) => c !== chamber)
+        : [...policy.chambers, chamber];
+      set({ policy: { ...policy, chambers } });
+    },
 
-  setMaxDepth: (max_depth) => {
-    const { policy } = get();
-    set({ policy: { ...policy, max_depth } });
-  },
+    setSearchQuery: (searchQuery) => {
+      // TODO: Implement search with Fuse.js
+      set({ searchQuery, searchResults: [] });
+    },
 
-  toggleChamber: (chamber) => {
-    const { policy } = get();
-    const chambers = policy.chambers.includes(chamber)
-      ? policy.chambers.filter(c => c !== chamber)
-      : [...policy.chambers, chamber];
-    set({ policy: { ...policy, chambers } });
-  },
+    clearSearch: () => set({ searchQuery: "", searchResults: [] }),
 
-  setSearchQuery: (searchQuery) => {
-    // TODO: Implement search with Fuse.js
-    set({ searchQuery, searchResults: [] });
-  },
+    getNodeById: (nodeId) => {
+      const { projection } = get();
+      if (!projection) return null;
+      return findNode(projection.root, nodeId);
+    },
 
-  clearSearch: () => set({ searchQuery: '', searchResults: [] }),
+    getBreadcrumbs: () => {
+      const { history, historyIndex } = get();
+      return history.slice(0, historyIndex + 1);
+    },
 
-  getNodeById: (nodeId) => {
-    const { projection } = get();
-    if (!projection) return null;
-    return findNode(projection.root, nodeId);
-  },
-
-  getBreadcrumbs: () => {
-    const { history, historyIndex } = get();
-    return history.slice(0, historyIndex + 1);
-  },
-
-  reset: () => set(initialState),
-}));
+    reset: () => set(initialState),
+  }),
+);
 
 export default useInspectorStore;

@@ -39,14 +39,18 @@ export function isSessionMissingError(error: unknown): boolean {
 
   const body = error.body;
   if (typeof body === "string") {
-    return body.toLowerCase().includes("session")
-      && body.toLowerCase().includes("not found");
+    return (
+      body.toLowerCase().includes("session") &&
+      body.toLowerCase().includes("not found")
+    );
   }
   if (body && typeof body === "object") {
     const maybeError = (body as { error?: unknown }).error;
     if (typeof maybeError === "string") {
-      return maybeError.toLowerCase().includes("session")
-        && maybeError.toLowerCase().includes("not found");
+      return (
+        maybeError.toLowerCase().includes("session") &&
+        maybeError.toLowerCase().includes("not found")
+      );
     }
   }
   return false;

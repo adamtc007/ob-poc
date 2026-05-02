@@ -1,6 +1,6 @@
 -- Cross-Workspace State Consistency: Phase 1 — Shared Atom Registry
 -- Declares shared atoms and their ownership/lifecycle state.
--- See: docs/architecture/cross-workspace-state-consistency-v0.4.md §6.1
+-- See: docs/annex-cross-workspace-state-consistency.md §6.1
 
 CREATE TABLE IF NOT EXISTS "ob-poc".shared_atom_registry (
     id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),

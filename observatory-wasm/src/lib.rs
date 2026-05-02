@@ -55,8 +55,7 @@ pub fn set_scene(json: &str) {
 #[cfg(target_arch = "wasm32")]
 #[wasm_bindgen]
 pub fn set_view_level(level: &str) {
-    if let Ok(vl) =
-        serde_json::from_str::<ob_poc_types::galaxy::ViewLevel>(&format!("\"{level}\""))
+    if let Ok(vl) = serde_json::from_str::<ob_poc_types::galaxy::ViewLevel>(&format!("\"{level}\""))
     {
         state::LEVEL_MAILBOX.with(|m| {
             *m.borrow_mut() = Some(vl);

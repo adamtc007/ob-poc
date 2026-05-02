@@ -4,7 +4,7 @@
 //! the affected constellation is replayed from the top. Upsert semantics
 //! guarantee unchanged state is a no-op; changed state flows through correctly.
 //!
-//! See: docs/architecture/cross-workspace-state-consistency-v0.4.md §4.3, §5.2
+//! See: docs/annex-cross-workspace-state-consistency.md §4.3, §5.2
 
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};

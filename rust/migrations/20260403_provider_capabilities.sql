@@ -1,6 +1,6 @@
 -- Cross-Workspace State Consistency: Phase 8 — Provider Capabilities
 -- Reference data classifying third-party provider operations for replay behaviour.
--- See: docs/architecture/cross-workspace-state-consistency-v0.4.md §6.7
+-- See: docs/annex-cross-workspace-state-consistency.md §6.7
 
 CREATE TABLE IF NOT EXISTS "ob-poc".provider_capabilities (
     id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),

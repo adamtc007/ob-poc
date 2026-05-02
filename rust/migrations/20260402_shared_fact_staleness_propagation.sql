@@ -1,7 +1,7 @@
 -- Cross-Workspace State Consistency: Phase 4 — Staleness Propagation
 -- Three-stage post-commit propagation from superseded shared attribute versions
 -- through consumer references.
--- See: docs/architecture/cross-workspace-state-consistency-v0.4.md §4.2, §5.1
+-- See: docs/annex-cross-workspace-state-consistency.md §4.2, §5.1
 --
 -- Extends the existing derived attribute staleness pattern:
 --   propagate_derived_chain_staleness() → propagate_shared_fact_staleness()

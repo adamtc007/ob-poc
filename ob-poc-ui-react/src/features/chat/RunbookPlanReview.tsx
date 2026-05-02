@@ -51,7 +51,9 @@ interface RunbookPlanReviewProps {
 const statusIcon: Record<PlanStepStatus, React.ReactNode> = {
   pending: <Clock size={16} className="text-[var(--text-muted)]" />,
   ready: <Play size={16} className="text-[var(--accent-blue)]" />,
-  executing: <Loader size={16} className="animate-spin text-[var(--accent-yellow)]" />,
+  executing: (
+    <Loader size={16} className="animate-spin text-[var(--accent-yellow)]" />
+  ),
   succeeded: <CheckCircle size={16} className="text-[var(--accent-green)]" />,
   failed: <XCircle size={16} className="text-[var(--accent-red)]" />,
   skipped: <SkipForward size={16} className="text-[var(--text-muted)]" />,
@@ -76,11 +78,17 @@ const workspaceBadgeColors: Record<string, string> = {
 };
 
 function workspaceBadge(workspace: string) {
-  const colors = workspaceBadgeColors[workspace] ?? "bg-gray-100 text-gray-700 border-gray-300";
+  const colors =
+    workspaceBadgeColors[workspace] ??
+    "bg-gray-100 text-gray-700 border-gray-300";
   return colors;
 }
 
-function isForwardRef(binding: EntityBinding): binding is { kind: "forward_ref"; source_step: number; output_field: string } {
+function isForwardRef(binding: EntityBinding): binding is {
+  kind: "forward_ref";
+  source_step: number;
+  output_field: string;
+} {
   return binding.kind === "forward_ref";
 }
 
@@ -127,7 +135,7 @@ function StepRow({
         "relative flex gap-3 rounded-lg border p-3 transition-colors",
         isActive
           ? "border-[var(--accent-blue)] bg-[var(--accent-blue)]/5"
-          : "border-[var(--border-primary)] bg-[var(--bg-secondary)]"
+          : "border-[var(--border-primary)] bg-[var(--bg-secondary)]",
       )}
     >
       {/* Sequence number + status icon */}
@@ -145,7 +153,7 @@ function StepRow({
           <span
             className={cn(
               "inline-block rounded border px-1.5 py-0.5 text-xs font-medium",
-              workspaceBadge(step.workspace)
+              workspaceBadge(step.workspace),
             )}
           >
             {step.workspace}
@@ -185,7 +193,15 @@ function StepRow({
 /** Narration result displayed after a step executes. */
 function StepNarrationCard({ result }: { result: Record<string, unknown> }) {
   const narration = result.narration as
-    | { outcome: string; what_changed?: string; state_now?: string; what_next?: string[]; error?: string; recovery_hint?: string; reason?: string }
+    | {
+        outcome: string;
+        what_changed?: string;
+        state_now?: string;
+        what_next?: string[];
+        error?: string;
+        recovery_hint?: string;
+        reason?: string;
+      }
     | undefined;
 
   if (!narration) {
@@ -197,10 +213,11 @@ function StepNarrationCard({ result }: { result: Record<string, unknown> }) {
           "rounded border px-3 py-2 text-sm",
           success
             ? "border-green-200 bg-green-50 text-green-800"
-            : "border-red-200 bg-red-50 text-red-800"
+            : "border-red-200 bg-red-50 text-red-800",
         )}
       >
-        Step {String(result.step_seq ?? "?")} — {success ? "Succeeded" : "Failed"}
+        Step {String(result.step_seq ?? "?")} —{" "}
+        {success ? "Succeeded" : "Failed"}
         {result.error ? (
           <span className="block text-xs mt-1">{String(result.error)}</span>
         ) : null}
@@ -260,14 +277,14 @@ function AggregateSummary({
 
   return (
     <div className="rounded-lg border border-indigo-200 bg-indigo-50 p-4 space-y-2">
-      <div className="text-sm font-semibold text-indigo-900">
-        Plan Complete
-      </div>
+      <div className="text-sm font-semibold text-indigo-900">Plan Complete</div>
       <div className="flex gap-4 text-xs text-indigo-700">
         <span>{total} total steps</span>
         <span className="text-green-700">{succeeded} succeeded</span>
         {failed > 0 && <span className="text-red-700">{failed} failed</span>}
-        {skipped > 0 && <span className="text-gray-600">{skipped} skipped</span>}
+        {skipped > 0 && (
+          <span className="text-gray-600">{skipped} skipped</span>
+        )}
       </div>
       {stepResults.length > 0 && (
         <div className="space-y-1 pt-1">
@@ -370,7 +387,10 @@ export function RunbookPlanReview({
 
       // Check if plan is now completed
       const status = await runbookPlanApi.getRunbookStatus(sessionId);
-      const key = typeof status.status === "string" ? status.status : (status.status as RunbookPlanStatus).status;
+      const key =
+        typeof status.status === "string"
+          ? status.status
+          : (status.status as RunbookPlanStatus).status;
       if (key === "completed") {
         onCompleted?.();
       }
@@ -408,7 +428,8 @@ export function RunbookPlanReview({
   const isCompleted = statusKey === "completed";
   const isCancelled = statusKey === "cancelled";
   const isFailed = statusKey === "failed";
-  const canApprove = statusKey === "compiled" || statusKey === "awaiting_approval";
+  const canApprove =
+    statusKey === "compiled" || statusKey === "awaiting_approval";
   const canExecute = isApproved || isExecuting;
   const canCancel = canApprove || canExecute;
 
@@ -416,7 +437,9 @@ export function RunbookPlanReview({
   const cursor =
     isExecuting && "cursor" in plan.status
       ? (plan.status as { cursor: number }).cursor
-      : plan.steps.findIndex((s) => s.status === "pending" || s.status === "ready");
+      : plan.steps.findIndex(
+          (s) => s.status === "pending" || s.status === "ready",
+        );
 
   // Collect forward-reference bindings for summary display
   const forwardRefs = plan.steps.filter((s) => isForwardRef(s.subject_binding));
@@ -440,7 +463,7 @@ export function RunbookPlanReview({
             isApproved && "bg-blue-50 text-blue-800 border-blue-200",
             isCompleted && "bg-green-50 text-green-800 border-green-200",
             isCancelled && "bg-gray-50 text-gray-600 border-gray-200",
-            isFailed && "bg-red-50 text-red-800 border-red-200"
+            isFailed && "bg-red-50 text-red-800 border-red-200",
           )}
         >
           {statusKey.replace(/_/g, " ")}
@@ -461,7 +484,10 @@ export function RunbookPlanReview({
                 output_field: string;
               };
               return (
-                <div key={s.seq} className="flex items-center gap-2 text-xs text-indigo-700">
+                <div
+                  key={s.seq}
+                  className="flex items-center gap-2 text-xs text-indigo-700"
+                >
                   <span>Step #{s.seq}</span>
                   <ArrowRight size={10} />
                   <span className="font-mono">
@@ -480,11 +506,7 @@ export function RunbookPlanReview({
         <div className="absolute left-[22px] top-4 bottom-4 w-px bg-[var(--border-primary)]" />
 
         {plan.steps.map((step) => (
-          <StepRow
-            key={step.seq}
-            step={step}
-            isActive={cursor === step.seq}
-          />
+          <StepRow key={step.seq} step={step} isActive={cursor === step.seq} />
         ))}
       </div>
 
@@ -517,6 +539,7 @@ export function RunbookPlanReview({
         <div className="flex gap-2 pt-1">
           {canApprove && (
             <button
+              type="button"
               onClick={handleApprove}
               disabled={actionLoading}
               className="flex-1 rounded bg-[var(--accent-green)] px-4 py-2 text-sm font-medium text-white hover:bg-[var(--accent-green)]/80 disabled:opacity-50"
@@ -527,6 +550,7 @@ export function RunbookPlanReview({
 
           {canExecute && (
             <button
+              type="button"
               onClick={handleExecuteNext}
               disabled={actionLoading}
               className="flex-1 flex items-center justify-center gap-1.5 rounded bg-[var(--accent-blue)] px-4 py-2 text-sm font-medium text-white hover:bg-[var(--accent-blue)]/80 disabled:opacity-50"
@@ -542,6 +566,7 @@ export function RunbookPlanReview({
 
           {canCancel && (
             <button
+              type="button"
               onClick={handleCancel}
               disabled={actionLoading}
               className="flex items-center gap-1.5 rounded border border-[var(--border-secondary)] px-4 py-2 text-sm text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] disabled:opacity-50"

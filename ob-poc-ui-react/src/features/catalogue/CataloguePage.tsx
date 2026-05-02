@@ -61,6 +61,7 @@ export function CataloguePage() {
         <div className="flex gap-1 mb-3">
           {FILTER_OPTIONS.map((opt) => (
             <button
+              type="button"
               key={opt.value}
               onClick={() => setFilter(opt.value)}
               className={`px-2 py-1 text-xs rounded ${
@@ -181,7 +182,7 @@ export function CataloguePage() {
                   key={tier}
                   tier={tier}
                   count={n}
-                  total={tierQuery.data!.total_verbs}
+                  total={tierQuery.data.total_verbs}
                 />
               ))}
             </div>
@@ -202,17 +203,15 @@ export function CataloguePage() {
                   .map(([domain, tiers]) => (
                     <tr key={domain} className="border-b border-gray-100">
                       <td className="py-1 font-mono">{domain}</td>
+                      <td className="py-1 text-right">{tiers.benign ?? "·"}</td>
                       <td className="py-1 text-right">
-                        {tiers["benign"] ?? "·"}
+                        {tiers.reviewable ?? "·"}
                       </td>
                       <td className="py-1 text-right">
-                        {tiers["reviewable"] ?? "·"}
+                        {tiers.requires_confirmation ?? "·"}
                       </td>
                       <td className="py-1 text-right">
-                        {tiers["requires_confirmation"] ?? "·"}
-                      </td>
-                      <td className="py-1 text-right">
-                        {tiers["requires_explicit_authorisation"] ?? "·"}
+                        {tiers.requires_explicit_authorisation ?? "·"}
                       </td>
                     </tr>
                   ))}
@@ -237,6 +236,7 @@ function ProposalRow({
   return (
     <li>
       <button
+        type="button"
         onClick={onSelect}
         className={`w-full text-left px-2 py-2 rounded text-sm ${
           isSelected ? "bg-blue-100" : "hover:bg-gray-50"
@@ -300,9 +300,7 @@ function TierBar({
       </div>
       <div className="w-full bg-gray-100 rounded-full h-2">
         <div
-          className={`h-2 rounded-full ${
-            tierColors[tier] ?? "bg-gray-400"
-          }`}
+          className={`h-2 rounded-full ${tierColors[tier] ?? "bg-gray-400"}`}
           style={{ width: `${pct}%` }}
         />
       </div>

@@ -92,7 +92,6 @@ Residual full-suite failures are environment-dependent integration issues rather
 
 Peer-review bundle for the execution set:
 
-- `artifacts/semos-recon-remediation-review-2026-03-21.tar.gz`
 
 ### Attribute Identity + Derivation Reconciliation State (2026-03-24)
 

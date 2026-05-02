@@ -374,16 +374,6 @@ export const replV2Api = {
   },
 
   /**
-   * Read the current top-of-stack session feedback.
-   * GET /api/constellation/context?session_id=:id
-   */
-  async getSessionContext(sessionId: string): Promise<SessionFeedback> {
-    return api.get<SessionFeedback>("/constellation/context", {
-      session_id: sessionId,
-    });
-  },
-
-  /**
    * Push a new workspace context onto the session stack.
    * POST /api/session/push
    */

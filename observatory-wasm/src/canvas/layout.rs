@@ -154,7 +154,9 @@ pub fn compute_positions(scene: &GraphSceneModel) -> Vec<(f32, f32)> {
             bounded_fruchterman_reingold(&scene.nodes, &scene.edges)
         }
         LayoutStrategy::DeterministicOrbital => compute_orbital_positions(&scene.nodes),
-        LayoutStrategy::HierarchicalGraph => compute_hierarchical_positions(&scene.nodes, &scene.edges),
+        LayoutStrategy::HierarchicalGraph => {
+            compute_hierarchical_positions(&scene.nodes, &scene.edges)
+        }
         LayoutStrategy::TreeDag => compute_tree_layout(&scene.nodes, &scene.edges),
         LayoutStrategy::StructuredPanels => positions_from_hints_or_orbital(&scene.nodes),
     }
@@ -332,9 +334,11 @@ fn compute_hierarchical_positions(nodes: &[SceneNode], edges: &[SceneEdge]) -> V
     }
 
     let mut visited = vec![false; nodes.len()];
-    let horizontal_gap = 140.0f32;
-    let vertical_gap = 150.0f32;
-    let mut cursor_x = -((roots.len().saturating_sub(1) as f32) * horizontal_gap) / 2.0;
+    let spacing = HierarchySpacing {
+        horizontal_gap: 140.0,
+        vertical_gap: 150.0,
+    };
+    let mut cursor_x = -((roots.len().saturating_sub(1) as f32) * spacing.horizontal_gap) / 2.0;
 
     for &root in &roots {
         assign_hierarchy_positions(
@@ -344,23 +348,25 @@ fn compute_hierarchical_positions(nodes: &[SceneNode], edges: &[SceneEdge]) -> V
             &children,
             &mut positions,
             &mut visited,
-            horizontal_gap,
-            vertical_gap,
+            spacing,
         );
-        cursor_x += horizontal_gap;
+        cursor_x += spacing.horizontal_gap;
     }
 
     for (idx, done) in visited.iter().enumerate() {
         if !done {
-            positions[idx] = (
-                cursor_x,
-                nodes[idx].depth as f32 * vertical_gap,
-            );
-            cursor_x += horizontal_gap;
+            positions[idx] = (cursor_x, nodes[idx].depth as f32 * spacing.vertical_gap);
+            cursor_x += spacing.horizontal_gap;
         }
     }
 
     positions
+}
+
+#[derive(Clone, Copy)]
+struct HierarchySpacing {
+    horizontal_gap: f32,
+    vertical_gap: f32,
 }
 
 fn assign_hierarchy_positions(
@@ -370,8 +376,7 @@ fn assign_hierarchy_positions(
     children: &[Vec<usize>],
     positions: &mut [(f32, f32)],
     visited: &mut [bool],
-    horizontal_gap: f32,
-    vertical_gap: f32,
+    spacing: HierarchySpacing,
 ) {
     if visited[idx] {
         return;
@@ -384,19 +389,18 @@ fn assign_hierarchy_positions(
         return;
     }
 
-    let total_width = (child_count.saturating_sub(1) as f32) * horizontal_gap;
+    let total_width = (child_count.saturating_sub(1) as f32) * spacing.horizontal_gap;
     let start_x = x - total_width / 2.0;
 
     for (offset, child_idx) in children[idx].iter().enumerate() {
         assign_hierarchy_positions(
             *child_idx,
-            start_x + offset as f32 * horizontal_gap,
-            y + vertical_gap,
+            start_x + offset as f32 * spacing.horizontal_gap,
+            y + spacing.vertical_gap,
             children,
             positions,
             visited,
-            horizontal_gap,
-            vertical_gap,
+            spacing,
         );
     }
 }
@@ -747,7 +751,9 @@ fn bounded_fruchterman_reingold(nodes: &[SceneNode], edges: &[SceneEdge]) -> Vec
 mod tests {
     use super::*;
     use ob_poc_types::galaxy::ViewLevel;
-    use ob_poc_types::graph_scene::{DrillTarget, GraphSceneModel, LayoutStrategy, SceneBadge, SceneEdgeType};
+    use ob_poc_types::graph_scene::{
+        DrillTarget, GraphSceneModel, LayoutStrategy, SceneBadge, SceneEdgeType,
+    };
 
     fn node(id: &str, depth: usize) -> SceneNode {
         SceneNode {

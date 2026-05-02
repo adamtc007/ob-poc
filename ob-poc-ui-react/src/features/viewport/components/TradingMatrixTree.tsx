@@ -125,11 +125,23 @@ function TreeNode({
   const handleSelect = () => {
     onSelect(node);
   };
+  const handleRowKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
+    if (e.key === "Enter") {
+      handleSelect();
+    } else if (e.key === " ") {
+      e.preventDefault();
+      if (hasChildren) {
+        onToggle(nodeKey);
+      }
+    }
+  };
 
   return (
     <div className="select-none">
       {/* Node row */}
       <div
+        role="button"
+        tabIndex={0}
         className={`
           flex items-center gap-1 py-1 px-2 rounded cursor-pointer
           hover:bg-gray-700/50 transition-colors
@@ -138,9 +150,11 @@ function TreeNode({
         style={{ paddingLeft: `${depth * 16 + 4}px` }}
         onClick={handleSelect}
         onDoubleClick={handleToggle}
+        onKeyDown={handleRowKeyDown}
       >
         {/* Expand/collapse toggle */}
         <button
+          type="button"
           onClick={handleToggle}
           className={`
             w-5 h-5 flex items-center justify-center rounded
@@ -488,7 +502,7 @@ export function TradingMatrixTree({
   }
 
   // No data state
-  if (!data || !data.children.length) {
+  if (!data?.children.length) {
     return (
       <div className="flex items-center justify-center h-full text-gray-500">
         <p>No trading matrix data available</p>

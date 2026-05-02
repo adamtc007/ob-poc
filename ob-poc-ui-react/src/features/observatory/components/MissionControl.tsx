@@ -6,11 +6,7 @@ import { useQuery } from "@tanstack/react-query";
 import { observatoryApi } from "../../../api/observatory";
 import { queryKeys } from "../../../lib/query";
 
-interface Props {
-  sessionId: string;
-}
-
-export function MissionControl({ sessionId: _sessionId }: Props) {
+export function MissionControl() {
   const { data: health } = useQuery({
     queryKey: queryKeys.observatory.health(),
     queryFn: () => observatoryApi.getHealth(),

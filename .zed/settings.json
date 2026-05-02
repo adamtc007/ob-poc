@@ -1,8 +1,35 @@
 {
+  "file_scan_exclusions": [
+    "**/.git",
+    "**/node_modules",
+    "**/target",
+    "**/dist",
+    "artifacts",
+    "static/pkg",
+    "observatory-wasm/pkg",
+    "rust/crates/dsl-lsp/tree-sitter-dsl/node_modules",
+    "rust/crates/dsl-lsp/zed-extension/grammars/**/node_modules",
+  ],
   "file_types": {
     "DSL": ["dsl", "obl", "onboard", "obdsl"],
   },
   "lsp": {
+    "eslint": {
+      "settings": {
+        "workingDirectories": [
+          {
+            "directory": "./ob-poc-ui-react",
+            "changeProcessCWD": true,
+          },
+        ],
+        "validate": [
+          "javascript",
+          "javascriptreact",
+          "typescript",
+          "typescriptreact",
+        ],
+      },
+    },
     "rust-analyzer": {
       "initialization_options": {
         "cargo": {
@@ -28,6 +55,24 @@
   "languages": {
     "DSL": {
       "language_servers": ["dsl-lsp"],
+    },
+    "JavaScript": {
+      "language_servers": ["eslint", "vtsls", "!biome", "..."],
+      "code_actions_on_format": {
+        "source.fixAll.eslint": true,
+      },
+    },
+    "TypeScript": {
+      "language_servers": ["eslint", "vtsls", "!biome", "..."],
+      "code_actions_on_format": {
+        "source.fixAll.eslint": true,
+      },
+    },
+    "TSX": {
+      "language_servers": ["eslint", "vtsls", "!biome", "..."],
+      "code_actions_on_format": {
+        "source.fixAll.eslint": true,
+      },
     },
   },
   "inline_completions": {

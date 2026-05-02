@@ -1,6 +1,6 @@
 -- Cross-Workspace State Consistency: Phase 6 — Remediation Events
 -- Lifecycle entity tracking the resolution of a shared attribute supersession.
--- See: docs/architecture/cross-workspace-state-consistency-v0.4.md §4.7, §6.6
+-- See: docs/annex-cross-workspace-state-consistency.md §4.7, §6.6
 
 CREATE TABLE IF NOT EXISTS "ob-poc".remediation_events (
     id                              UUID PRIMARY KEY DEFAULT gen_random_uuid(),

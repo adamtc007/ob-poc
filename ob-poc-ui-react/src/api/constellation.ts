@@ -107,7 +107,10 @@ export const constellationApi = {
   async resolveContext(
     context: ConstellationContextRef,
   ): Promise<ResolvedConstellationContext> {
-    return api.post<ResolvedConstellationContext>("/constellation/resolve", context);
+    return api.post<ResolvedConstellationContext>(
+      "/constellation/resolve",
+      context,
+    );
   },
 
   async hydrateContext(params: {

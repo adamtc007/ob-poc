@@ -377,5 +377,10 @@ scraper/data/
 scrapers/output/
 scrapers/*/output/
 
+# Generated frontend/WASM outputs and review snapshots
+ob-poc-ui-react/dist/
+static/pkg/
+artifacts/peer_review/
+
 # Package lock files (npm)
 **/package-lock.json

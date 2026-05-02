@@ -4,7 +4,7 @@
  * API calls for inspector projections.
  */
 
-import { api } from './client';
+import { api } from "./client";
 import type {
   InspectorProjection,
   ProjectionListItem,
@@ -12,7 +12,7 @@ import type {
   ProjectionNode,
   ChildrenResponse,
   ValidationResult,
-} from '../types/projection';
+} from "../types/projection";
 
 export interface GenerateProjectionRequest {
   snapshot_id: string;
@@ -22,7 +22,7 @@ export interface GenerateProjectionRequest {
 export const projectionsApi = {
   /** List all projections */
   list(): Promise<ProjectionListItem[]> {
-    return api.get<ProjectionListItem[]>('/projections');
+    return api.get<ProjectionListItem[]>("/projections");
   },
 
   /** Get a full projection by ID */
@@ -32,29 +32,31 @@ export const projectionsApi = {
 
   /** Get a single node from a projection */
   getNode(projectionId: string, nodeId: string): Promise<ProjectionNode> {
-    return api.get<ProjectionNode>(`/projections/${projectionId}/nodes/${nodeId}`);
+    return api.get<ProjectionNode>(
+      `/projections/${projectionId}/nodes/${nodeId}`,
+    );
   },
 
   /** Get paginated children of a node */
   getNodeChildren(
     projectionId: string,
     nodeId: string,
-    params?: { offset?: number; limit?: number }
+    params?: { offset?: number; limit?: number },
   ): Promise<ChildrenResponse> {
     return api.get<ChildrenResponse>(
       `/projections/${projectionId}/nodes/${nodeId}/children`,
-      params
+      params,
     );
   },
 
   /** Generate a new projection from a snapshot */
   generate(request: GenerateProjectionRequest): Promise<InspectorProjection> {
-    return api.post<InspectorProjection>('/projections/generate', request);
+    return api.post<InspectorProjection>("/projections/generate", request);
   },
 
   /** Validate a projection */
   validate(projection: InspectorProjection): Promise<ValidationResult> {
-    return api.post<ValidationResult>('/projections/validate', projection);
+    return api.post<ValidationResult>("/projections/validate", projection);
   },
 };
 

@@ -76,6 +76,7 @@ export function FlightDeck({ orientation, onSendMessage }: FlightDeckProps) {
   if (collapsed) {
     return (
       <button
+        type="button"
         onClick={() => setCollapsed(false)}
         className="flex items-center gap-2 px-3 py-1.5 text-xs border-b border-[var(--border-primary)] bg-[var(--bg-secondary)] hover:bg-[var(--bg-hover)] w-full text-left"
       >
@@ -88,7 +89,9 @@ export function FlightDeck({ orientation, onSendMessage }: FlightDeckProps) {
           {orientation.focus_identity.business_label}
         </span>
         <span className="text-[var(--text-muted)]">·</span>
-        <span className={`${modeStyle.text} uppercase text-[10px] font-semibold`}>
+        <span
+          className={`${modeStyle.text} uppercase text-[10px] font-semibold`}
+        >
           {orientation.session_mode}
         </span>
         <span className="text-[var(--text-muted)] ml-auto">
@@ -102,6 +105,7 @@ export function FlightDeck({ orientation, onSendMessage }: FlightDeckProps) {
     <div className="border-b border-[var(--border-primary)] bg-[var(--bg-secondary)]">
       {/* Collapse toggle */}
       <button
+        type="button"
         onClick={() => setCollapsed(true)}
         className="flex items-center gap-1 px-3 py-1 text-[10px] text-[var(--text-muted)] hover:text-[var(--text-secondary)] w-full"
       >
@@ -123,7 +127,10 @@ export function FlightDeck({ orientation, onSendMessage }: FlightDeckProps) {
           <FocusBar orientation={orientation} onSendMessage={onSendMessage} />
 
           {/* 3. Instruments (lens controls) */}
-          <Instruments orientation={orientation} onSendMessage={onSendMessage} />
+          <Instruments
+            orientation={orientation}
+            onSendMessage={onSendMessage}
+          />
 
           {/* 4. Actions */}
           <Actions
@@ -156,6 +163,7 @@ function AltitudeLadder({
 
         return (
           <button
+            type="button"
             key={level}
             onClick={() => {
               if (active) return;
@@ -245,6 +253,7 @@ function NavButton({
 }) {
   return (
     <button
+      type="button"
       onClick={onClick}
       title={title}
       className="p-1 rounded text-[var(--text-muted)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-secondary)]"
@@ -276,16 +285,12 @@ function Instruments({
       <Chip
         label="Active"
         active={overlay === "active_only"}
-        onClick={() =>
-          onSendMessage("nav.set-lens overlay active_only")
-        }
+        onClick={() => onSendMessage("nav.set-lens overlay active_only")}
       />
       <Chip
         label="Drafts"
         active={overlay === "draft_overlay"}
-        onClick={() =>
-          onSendMessage("nav.set-lens overlay draft_overlay")
-        }
+        onClick={() => onSendMessage("nav.set-lens overlay draft_overlay")}
       />
 
       <Divider />
@@ -301,11 +306,11 @@ function Instruments({
               onSendMessage(
                 depthProbe === probe
                   ? "nav.set-lens"
-                  : `nav.set-lens depth_probe ${probe}`
+                  : `nav.set-lens depth_probe ${probe}`,
               )
             }
           />
-        )
+        ),
       )}
 
       <Divider />
@@ -334,6 +339,7 @@ function Chip({
 }) {
   return (
     <button
+      type="button"
       onClick={onClick}
       className={`px-1.5 py-0.5 rounded text-[10px] font-medium transition-colors ${
         active
@@ -347,9 +353,7 @@ function Chip({
 }
 
 function Divider() {
-  return (
-    <span className="w-px h-3 bg-[var(--border-secondary)] mx-0.5" />
-  );
+  return <span className="w-px h-3 bg-[var(--border-secondary)] mx-0.5" />;
 }
 
 // ── Actions ──────────────────────────────────────────────────
@@ -370,6 +374,7 @@ function Actions({
     <div className="flex flex-wrap items-center gap-1">
       {top.map((action) => (
         <button
+          type="button"
           key={action.action_id}
           onClick={() => {
             if (action.enabled) onSendMessage(action.action_id);
@@ -378,7 +383,7 @@ function Actions({
           title={
             action.enabled
               ? action.action_id
-              : action.disabled_reason ?? "Not available"
+              : (action.disabled_reason ?? "Not available")
           }
           className={`flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] border transition-colors ${
             action.enabled

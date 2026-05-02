@@ -4,7 +4,7 @@
 //! NOT persisted. Computed at boot and after registry changes.
 //! At O(50) shared atoms × O(1,464) verbs, this is trivially fast.
 //!
-//! See: docs/architecture/cross-workspace-state-consistency-v0.4.md §3.2
+//! See: docs/annex-cross-workspace-state-consistency.md §3.2
 
 use std::collections::{HashMap, HashSet};
 

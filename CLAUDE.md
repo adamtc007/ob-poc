@@ -471,8 +471,8 @@ ob-poc/
 │   │   └── fixtures/macros/    # YAML macro fixtures for runbook harnesses
 │   └── scenarios/suites/       # 10 suites, 48 agentic test scenarios
 ├── migrations/                 # 128 SQLx migrations
-├── docs/                       # Architecture docs + annexes
-├── ai-thoughts/                # ADRs and design docs
+├── docs/                       # Current architecture truth + appendices
+├── ai-thoughts/                # Historical design notes referenced by code/docs; not authoritative
 └── artifacts/                  # Calibration packs, footprints, peer review
 ```
 
@@ -640,7 +640,9 @@ Automated browser testing via Chrome DevTools MCP. Claude Code can navigate, typ
 | Research workflows | `docs/research-agent-annex.md` |
 | V2 REPL invariants | `docs/INVARIANT-VERIFICATION.md` |
 
-### AI-Thoughts (Design Decisions)
+### AI-Thoughts (Historical Notes)
+
+These files are transitory historical notes. Use them for implementation background only; canonical architecture truth lives in this file, `docs/semos_arhitecture.md`, and the annexes listed above.
 
 | Topic | Document |
 |-------|----------|
@@ -688,7 +690,7 @@ When you see these in a task, read the corresponding annex first:
 | "DerivedStateEvaluator", "DerivedStateProjector", "CascadePlanner", "SqlPredicateResolver", "SlotStateProvider", "PostgresChildEntityResolver" | `docs/annex-sem-os.md` |
 | "DAG taxonomy", "dag_taxonomies", "overall_lifecycle", "dual_lifecycle", "category_gated", "periodic_review_cadence" | `docs/annex-sem-os.md` |
 | "scanner", "drift detection", "bootstrap", "seed bundle" | `docs/annex-sem-os.md` |
-| "shared atom", "cross-workspace", "staleness propagation", "constellation replay", "remediation event" | `docs/architecture/cross-workspace-state-consistency-v0.4.md` |
+| "shared atom", "cross-workspace", "staleness propagation", "constellation replay", "remediation event" | `docs/annex-cross-workspace-state-consistency.md` |
 | "RebuildContext", "shared fact version", "workspace fact ref", "produces_shared_facts" | `rust/src/cross_workspace/` |
 | "BPMN", "bpmn-lite", "fiber VM", "orchestration", "durable workflow" | `docs/annex-bpmn-lite.md` |
 | "race", "boundary timer", "cancel", "ghost signal", "terminate" | `docs/annex-bpmn-lite.md` |

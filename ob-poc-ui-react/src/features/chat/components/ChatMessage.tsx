@@ -366,6 +366,7 @@ export function ChatMessage({
 }: ChatMessageProps) {
   const isUser = message.role === "user";
   const isSystem = message.role === "system";
+  const decisionPacket = message.decision_packet;
 
   return (
     <div className={cn("flex gap-3", isUser && "flex-row-reverse")}>
@@ -444,20 +445,15 @@ export function ChatMessage({
 
         {/* Verb disambiguation — rich "did you mean?" with context */}
         {message.verb_disambiguation_detail && (
-          <VerbDisambiguationCard
-            message={message}
-            onSelect={onSendMessage}
-          />
+          <VerbDisambiguationCard message={message} onSelect={onSendMessage} />
         )}
 
         {/* Decision packet (fallback for non-verb disambiguation) */}
-        {message.decision_packet && !message.verb_disambiguation_detail && (
+        {decisionPacket && !message.verb_disambiguation_detail && (
           <div className="mt-2">
             <DecisionCard
-              packet={message.decision_packet}
-              onReply={(reply) =>
-                onDecisionReply?.(message.decision_packet!.id, reply)
-              }
+              packet={decisionPacket}
+              onReply={(reply) => onDecisionReply?.(decisionPacket.id, reply)}
             />
           </div>
         )}

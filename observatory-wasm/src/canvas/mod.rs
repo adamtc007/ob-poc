@@ -15,8 +15,7 @@ use crate::state::CanvasApp;
 /// Render the central constellation canvas. Returns action on interaction.
 pub fn render(ui: &mut Ui, app: &mut CanvasApp) -> Option<ObservatoryAction> {
     let available = ui.available_size();
-    let (response, painter) =
-        ui.allocate_painter(available, egui::Sense::click_and_drag());
+    let (response, painter) = ui.allocate_painter(available, egui::Sense::click_and_drag());
 
     // ── Background (depth-encoded, with transition blending) ──
     let colors = ob_poc_types::galaxy::DepthColors::default();
@@ -213,11 +212,15 @@ fn paint_node_tooltip(
                     let state_str = node.state.as_deref().unwrap_or("—");
                     ui.horizontal(|ui| {
                         badge(ui, &type_str, egui::Color32::from_rgb(99, 102, 241));
-                        badge(ui, state_str, if node.blocking {
-                            egui::Color32::from_rgb(239, 68, 68)
-                        } else {
-                            egui::Color32::from_rgb(34, 197, 94)
-                        });
+                        badge(
+                            ui,
+                            state_str,
+                            if node.blocking {
+                                egui::Color32::from_rgb(239, 68, 68)
+                            } else {
+                                egui::Color32::from_rgb(34, 197, 94)
+                            },
+                        );
                     });
 
                     ui.add_space(4.0);
@@ -250,9 +253,11 @@ fn paint_node_tooltip(
                     }
 
                     // Connected edges
-                    let edges: Vec<_> = scene.edges.iter().filter(|e| {
-                        e.source == node.id || e.target == node.id
-                    }).collect();
+                    let edges: Vec<_> = scene
+                        .edges
+                        .iter()
+                        .filter(|e| e.source == node.id || e.target == node.id)
+                        .collect();
                     if !edges.is_empty() {
                         ui.add_space(4.0);
                         ui.separator();
@@ -263,7 +268,11 @@ fn paint_node_tooltip(
                                 .color(egui::Color32::from_rgb(156, 163, 175)),
                         );
                         for edge in edges.iter().take(6) {
-                            let peer = if edge.source == node.id { &edge.target } else { &edge.source };
+                            let peer = if edge.source == node.id {
+                                &edge.target
+                            } else {
+                                &edge.source
+                            };
                             let label = edge.label.as_deref().unwrap_or("");
                             let dir = if edge.source == node.id { "→" } else { "←" };
                             ui.label(
@@ -282,7 +291,11 @@ fn paint_node_tooltip(
                     }
 
                     // Drill targets
-                    let drills: Vec<_> = scene.drill_targets.iter().filter(|d| d.node_id == node.id).collect();
+                    let drills: Vec<_> = scene
+                        .drill_targets
+                        .iter()
+                        .filter(|d| d.node_id == node.id)
+                        .collect();
                     if !drills.is_empty() {
                         ui.add_space(4.0);
                         ui.separator();
@@ -294,9 +307,12 @@ fn paint_node_tooltip(
                         );
                         for d in &drills {
                             ui.label(
-                                egui::RichText::new(format!("  ⬇ {} → {:?}", d.drill_label, d.target_level))
-                                    .size(10.0)
-                                    .color(egui::Color32::from_rgb(129, 140, 248)),
+                                egui::RichText::new(format!(
+                                    "  ⬇ {} → {:?}",
+                                    d.drill_label, d.target_level
+                                ))
+                                .size(10.0)
+                                .color(egui::Color32::from_rgb(129, 140, 248)),
                             );
                         }
                     }
@@ -311,9 +327,9 @@ fn paint_node_tooltip(
                         } else {
                             "Click to select"
                         })
-                            .size(9.0)
-                            .italics()
-                            .color(egui::Color32::from_rgb(107, 114, 128)),
+                        .size(9.0)
+                        .italics()
+                        .color(egui::Color32::from_rgb(107, 114, 128)),
                     );
                 });
         });
@@ -331,18 +347,15 @@ fn resolve_drill_target(
 }
 
 fn badge(ui: &mut egui::Ui, text: &str, color: egui::Color32) {
-    let bg = egui::Color32::from_rgba_premultiplied(color.r() / 4, color.g() / 4, color.b() / 4, 200);
+    let bg =
+        egui::Color32::from_rgba_premultiplied(color.r() / 4, color.g() / 4, color.b() / 4, 200);
     egui::Frame::NONE
         .fill(bg)
         .corner_radius(3.0)
         .inner_margin(egui::Margin::symmetric(5, 1))
         .stroke(egui::Stroke::new(0.5, color))
         .show(ui, |ui| {
-            ui.label(
-                egui::RichText::new(text)
-                    .size(10.0)
-                    .color(color),
-            );
+            ui.label(egui::RichText::new(text).size(10.0).color(color));
         });
 }
 
@@ -381,8 +394,7 @@ pub(crate) fn camera_world_rect(
     let base_width = world_bounds.width().max(200.0);
     let base_height = world_bounds.height().max(200.0);
     let world_width = (base_width.max(base_height * aspect) * margin) / camera.zoom.max(0.05);
-    let world_height =
-        (base_height.max(base_width / aspect) * margin) / camera.zoom.max(0.05);
+    let world_height = (base_height.max(base_width / aspect) * margin) / camera.zoom.max(0.05);
     egui::Rect::from_center_size(
         egui::Pos2::new(camera.pan_x, camera.pan_y),
         Vec2::new(world_width, world_height),
@@ -398,7 +410,8 @@ mod tests {
     use super::resolve_drill_target;
     use ob_poc_types::galaxy::ViewLevel;
     use ob_poc_types::graph_scene::{
-        DrillTarget, GraphSceneModel, LayoutStrategy, SceneEdge, SceneGroup, SceneNode, SceneNodeType,
+        DrillTarget, GraphSceneModel, LayoutStrategy, SceneEdge, SceneGroup, SceneNode,
+        SceneNodeType,
     };
 
     fn scene_with_drill_targets() -> GraphSceneModel {

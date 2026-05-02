@@ -34,16 +34,8 @@ pub fn paint(
     // ── Paint nodes ──
     for (i, node) in nodes.iter().enumerate() {
         let screen_pos = transform.transform_pos(cache.nodes[i].center);
-        let is_selected = app
-            .interaction
-            .selected_node
-            .as_deref()
-            == Some(&node.id);
-        let is_hovered = app
-            .interaction
-            .hovered_node
-            .as_deref()
-            == Some(&node.id);
+        let is_selected = app.interaction.selected_node.as_deref() == Some(&node.id);
+        let is_hovered = app.interaction.hovered_node.as_deref() == Some(&node.id);
 
         paint_node(painter, screen_pos, node, is_selected, is_hovered);
     }
@@ -87,11 +79,7 @@ fn paint_node(
     // Progress arc (if > 0) — simplified as full ring for now
     if node.progress > 0 && node.progress < 100 {
         let progress_color = Color32::from_rgb(34, 197, 94);
-        painter.circle_stroke(
-            screen_pos,
-            radius + 2.0,
-            Stroke::new(2.0, progress_color),
-        );
+        painter.circle_stroke(screen_pos, radius + 2.0, Stroke::new(2.0, progress_color));
     }
 
     // Blocking indicator
@@ -126,8 +114,8 @@ fn paint_edge(
 
     let edge_color = match edge.edge_type {
         ob_poc_types::graph_scene::SceneEdgeType::Dependency => Color32::from_rgb(245, 158, 11), // amber
-        ob_poc_types::graph_scene::SceneEdgeType::Ownership => Color32::from_rgb(139, 92, 246),  // purple
-        ob_poc_types::graph_scene::SceneEdgeType::Control => Color32::from_rgb(59, 130, 246),    // blue
+        ob_poc_types::graph_scene::SceneEdgeType::Ownership => Color32::from_rgb(139, 92, 246), // purple
+        ob_poc_types::graph_scene::SceneEdgeType::Control => Color32::from_rgb(59, 130, 246), // blue
         _ => Color32::from_rgb(71, 85, 105), // slate
     };
 
@@ -136,10 +124,7 @@ fn paint_edge(
 
     // Edge label at midpoint
     if let Some(ref label) = edge.label {
-        let mid = Pos2::new(
-            (src_pos.x + tgt_pos.x) / 2.0,
-            (src_pos.y + tgt_pos.y) / 2.0,
-        );
+        let mid = Pos2::new((src_pos.x + tgt_pos.x) / 2.0, (src_pos.y + tgt_pos.y) / 2.0);
         painter.text(
             mid,
             egui::Align2::CENTER_CENTER,
@@ -153,16 +138,16 @@ fn paint_edge(
 /// Color for a node based on its type and state.
 fn node_color(node: &SceneNode) -> Color32 {
     match node.state.as_deref() {
-        Some("complete") => Color32::from_rgb(34, 197, 94),   // green
-        Some("filled") => Color32::from_rgb(59, 130, 246),    // blue
-        Some("blocked") => Color32::from_rgb(239, 68, 68),    // red
-        Some("empty") => Color32::from_rgb(71, 85, 105),      // slate
+        Some("complete") => Color32::from_rgb(34, 197, 94), // green
+        Some("filled") => Color32::from_rgb(59, 130, 246),  // blue
+        Some("blocked") => Color32::from_rgb(239, 68, 68),  // red
+        Some("empty") => Color32::from_rgb(71, 85, 105),    // slate
         _ => match node.node_type {
-            SceneNodeType::Cbu => Color32::from_rgb(139, 92, 246),       // purple
-            SceneNodeType::Entity => Color32::from_rgb(59, 130, 246),    // blue
-            SceneNodeType::Case => Color32::from_rgb(245, 158, 11),      // amber
-            SceneNodeType::Tollgate => Color32::from_rgb(239, 68, 68),   // red
-            _ => Color32::from_rgb(100, 116, 139),                       // gray
+            SceneNodeType::Cbu => Color32::from_rgb(139, 92, 246), // purple
+            SceneNodeType::Entity => Color32::from_rgb(59, 130, 246), // blue
+            SceneNodeType::Case => Color32::from_rgb(245, 158, 11), // amber
+            SceneNodeType::Tollgate => Color32::from_rgb(239, 68, 68), // red
+            _ => Color32::from_rgb(100, 116, 139),                 // gray
         },
     }
 }

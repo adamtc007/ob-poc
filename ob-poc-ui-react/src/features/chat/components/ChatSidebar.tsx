@@ -4,7 +4,14 @@
 
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useNavigate, useParams } from "react-router-dom";
-import { Plus, MessageSquare, Trash2, Loader2, PanelLeftOpen, PanelLeftClose } from "lucide-react";
+import {
+  Plus,
+  MessageSquare,
+  Trash2,
+  Loader2,
+  PanelLeftOpen,
+  PanelLeftClose,
+} from "lucide-react";
 import { useState } from "react";
 import { chatApi } from "../../../api/chat";
 import { queryKeys, queryClient } from "../../../lib/query";
@@ -86,8 +93,14 @@ export function ChatSidebar({ className }: ChatSidebarProps) {
 
   if (!expanded) {
     return (
-      <div className={cn("flex flex-col w-10 flex-shrink-0 border-r border-[var(--border-primary)] bg-[var(--bg-secondary)] items-center py-2 gap-1", className)}>
+      <div
+        className={cn(
+          "flex flex-col w-10 flex-shrink-0 border-r border-[var(--border-primary)] bg-[var(--bg-secondary)] items-center py-2 gap-1",
+          className,
+        )}
+      >
         <button
+          type="button"
           onClick={() => setExpanded(true)}
           className="rounded p-1.5 text-[var(--text-muted)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)]"
           title="Show sessions"
@@ -95,6 +108,7 @@ export function ChatSidebar({ className }: ChatSidebarProps) {
           <PanelLeftOpen size={16} />
         </button>
         <button
+          type="button"
           onClick={() => createMutation.mutate()}
           disabled={createMutation.isPending}
           className="rounded p-1.5 text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)] disabled:opacity-50"
@@ -109,6 +123,7 @@ export function ChatSidebar({ className }: ChatSidebarProps) {
         <div className="flex-1 overflow-auto flex flex-col items-center gap-1 mt-1">
           {(sessions ?? []).map((session: ChatSessionSummary) => (
             <button
+              type="button"
               key={session.id}
               onClick={() => handleSessionClick(session)}
               className={cn(
@@ -117,7 +132,11 @@ export function ChatSidebar({ className }: ChatSidebarProps) {
                   ? "bg-[var(--accent-blue)]/10 text-[var(--accent-blue)]"
                   : "text-[var(--text-muted)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)]",
               )}
-              title={session.client_group_name || session.title || `Session ${session.id.slice(0, 8)}`}
+              title={
+                session.client_group_name ||
+                session.title ||
+                `Session ${session.id.slice(0, 8)}`
+              }
             >
               <MessageSquare size={14} />
             </button>
@@ -128,11 +147,19 @@ export function ChatSidebar({ className }: ChatSidebarProps) {
   }
 
   return (
-    <div className={cn("flex flex-col w-56 flex-shrink-0 border-r border-[var(--border-primary)] bg-[var(--bg-secondary)]", className)}>
+    <div
+      className={cn(
+        "flex flex-col w-56 flex-shrink-0 border-r border-[var(--border-primary)] bg-[var(--bg-secondary)]",
+        className,
+      )}
+    >
       <div className="flex items-center justify-between border-b border-[var(--border-primary)] px-3 py-2">
-        <h2 className="text-sm font-semibold text-[var(--text-primary)]">Sessions</h2>
+        <h2 className="text-sm font-semibold text-[var(--text-primary)]">
+          Sessions
+        </h2>
         <div className="flex items-center gap-1">
           <button
+            type="button"
             onClick={() => createMutation.mutate()}
             disabled={createMutation.isPending}
             className="rounded p-1 text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)] disabled:opacity-50"
@@ -145,6 +172,7 @@ export function ChatSidebar({ className }: ChatSidebarProps) {
             )}
           </button>
           <button
+            type="button"
             onClick={() => setExpanded(false)}
             className="rounded p-1 text-[var(--text-muted)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)]"
             title="Collapse"
@@ -163,6 +191,7 @@ export function ChatSidebar({ className }: ChatSidebarProps) {
           <div className="space-y-0.5">
             {sessions.map((session: ChatSessionSummary) => (
               <button
+                type="button"
                 key={session.id}
                 onClick={() => handleSessionClick(session)}
                 className={cn(
@@ -180,10 +209,12 @@ export function ChatSidebar({ className }: ChatSidebarProps) {
                       : session.title || `Session ${session.id.slice(0, 8)}`}
                   </p>
                   <p className="text-[10px] text-[var(--text-muted)]">
-                    {formatDate(session.updated_at)} · {session.message_count} msgs
+                    {formatDate(session.updated_at)} · {session.message_count}{" "}
+                    msgs
                   </p>
                 </div>
                 <button
+                  type="button"
                   onClick={(e) => handleDelete(e, session.id)}
                   className="opacity-0 group-hover:opacity-100 rounded p-0.5 text-[var(--text-muted)] hover:bg-[var(--bg-tertiary)] hover:text-[var(--accent-red)]"
                   title="Delete session"
@@ -197,6 +228,7 @@ export function ChatSidebar({ className }: ChatSidebarProps) {
           <div className="py-6 text-center text-xs text-[var(--text-muted)]">
             <p>No sessions yet</p>
             <button
+              type="button"
               onClick={() => createMutation.mutate()}
               className="mt-1 text-[var(--accent-blue)] hover:underline"
             >

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import {
   AlertTriangle,
@@ -53,22 +53,30 @@ function stateBadgeClass(state: string, blocking: boolean): string {
   }
 }
 
-function slotIconForType(slotType: string) {
+function SlotTypeIcon({
+  slotType,
+  className,
+  size,
+}: {
+  slotType: string;
+  className?: string;
+  size: number;
+}) {
   switch (slotType) {
-    case "cbu":
-      return Building2;
-    case "entity":
-      return User;
-    case "entity_graph":
-      return Network;
     case "case":
-      return FileText;
-    case "tollgate":
-      return ShieldCheck;
+      return <FileText size={size} className={className} />;
+    case "cbu":
+      return <Building2 size={size} className={className} />;
+    case "entity":
+      return <User size={size} className={className} />;
+    case "entity_graph":
+      return <Network size={size} className={className} />;
     case "mandate":
-      return Briefcase;
+      return <Briefcase size={size} className={className} />;
+    case "tollgate":
+      return <ShieldCheck size={size} className={className} />;
     default:
-      return Circle;
+      return <Circle size={size} className={className} />;
   }
 }
 
@@ -173,7 +181,6 @@ function SlotTreeRow({
   const [open, setOpen] = useState(true);
   const hasChildren = slot.children.length > 0;
   const selected = selectedPath === slot.path;
-  const SlotIcon = slotIconForType(slot.slot_type);
 
   return (
     <div>
@@ -211,7 +218,8 @@ function SlotTreeRow({
           className="min-w-0 flex-1 text-left"
         >
           <div className="flex items-center gap-2">
-            <SlotIcon
+            <SlotTypeIcon
+              slotType={slot.slot_type}
               size={14}
               className="flex-shrink-0 text-[var(--text-muted)]"
             />
@@ -777,82 +785,79 @@ export function ConstellationPanel({
   className?: string;
   onPromptAgent?: (prompt: string) => void;
 }) {
-  const [caseIdDraft, setCaseIdDraft] = useState("");
-  const [caseIdApplied, setCaseIdApplied] = useState<string | undefined>(
-    undefined,
-  );
+  const [caseIdSelection, setCaseIdSelection] = useState<
+    string | null | undefined
+  >(undefined);
   const [selectedSlotPath, setSelectedSlotPath] = useState<string | null>(null);
 
   const sessionHydrated =
-    (sessionFeedback?.tos?.hydrated_constellation as HydratedConstellation | undefined) ??
-    undefined;
+    (sessionFeedback?.tos?.hydrated_constellation as
+      | HydratedConstellation
+      | undefined) ?? undefined;
   const sessionSummary = sessionFeedback?.tos?.progress_summary;
   const sessionAllSlots = useMemo(
     () => flattenSlots(sessionHydrated?.slots ?? []),
     [sessionHydrated],
   );
   const sessionSelectedSlot = useMemo(() => {
-    const fromPath = findSlotByPath(sessionHydrated?.slots ?? [], selectedSlotPath);
+    const fromPath = findSlotByPath(
+      sessionHydrated?.slots ?? [],
+      selectedSlotPath,
+    );
     return fromPath ?? sessionAllSlots[0] ?? null;
   }, [selectedSlotPath, sessionAllSlots, sessionHydrated]);
+  const selectedCbuId = selectedCbu?.id ?? "";
+
+  const casesQuery = useQuery({
+    queryKey: queryKeys.constellation.cases(selectedCbuId),
+    queryFn: () => constellationApi.getCases(selectedCbuId),
+    enabled: selectedCbuId.length > 0,
+    staleTime: 30_000,
+  });
+
+  const effectiveCaseId = useMemo(() => {
+    const cases = casesQuery.data ?? [];
+    if (caseIdSelection === null || cases.length === 0) {
+      return undefined;
+    }
+    if (
+      caseIdSelection &&
+      cases.some((item) => item.case_id === caseIdSelection)
+    ) {
+      return caseIdSelection;
+    }
+    return cases[0]?.case_id;
+  }, [caseIdSelection, casesQuery.data]);
 
   const constellationQuery = useQuery({
     queryKey: queryKeys.constellation.detail(
-      selectedCbu?.id ?? "",
-      caseIdApplied,
+      selectedCbuId,
+      effectiveCaseId,
       DEFAULT_MAP_NAME,
     ),
     queryFn: () =>
-      constellationApi.getConstellation(selectedCbu!.id, {
-        caseId: caseIdApplied,
+      constellationApi.getConstellation(selectedCbuId, {
+        caseId: effectiveCaseId,
         mapName: DEFAULT_MAP_NAME,
       }),
-    enabled: !!selectedCbu?.id,
+    enabled: selectedCbuId.length > 0,
     staleTime: 2000,
   });
 
   const summaryQuery = useQuery({
     queryKey: queryKeys.constellation.summary(
-      selectedCbu?.id ?? "",
-      caseIdApplied,
+      selectedCbuId,
+      effectiveCaseId,
       DEFAULT_MAP_NAME,
     ),
     queryFn: () =>
-      constellationApi.getSummary(selectedCbu!.id, {
-        caseId: caseIdApplied,
+      constellationApi.getSummary(selectedCbuId, {
+        caseId: effectiveCaseId,
         mapName: DEFAULT_MAP_NAME,
       }),
-    enabled: !!selectedCbu?.id,
+    enabled: selectedCbuId.length > 0,
     staleTime: 2000,
   });
-
-  const casesQuery = useQuery({
-    queryKey: queryKeys.constellation.cases(selectedCbu?.id ?? ""),
-    queryFn: () => constellationApi.getCases(selectedCbu!.id),
-    enabled: !!selectedCbu?.id,
-    staleTime: 30_000,
-  });
-
-  useEffect(() => {
-    const cases = casesQuery.data ?? [];
-
-    if (cases.length === 0) {
-      setCaseIdDraft("");
-      setCaseIdApplied(undefined);
-      return;
-    }
-
-    const stillValid = caseIdApplied
-      ? cases.some((item) => item.case_id === caseIdApplied)
-      : false;
-
-    if (stillValid) {
-      return;
-    }
-
-    setCaseIdDraft(cases[0].case_id);
-    setCaseIdApplied(cases[0].case_id);
-  }, [caseIdApplied, casesQuery.data, selectedCbu?.id]);
 
   const allSlots = useMemo(
     () => flattenSlots(constellationQuery.data?.slots ?? []),
@@ -868,9 +873,10 @@ export function ConstellationPanel({
   }, [allSlots, constellationQuery.data, selectedSlotPath]);
   const selectedCase = useMemo(
     () =>
-      (casesQuery.data ?? []).find((item) => item.case_id === caseIdApplied) ??
-      null,
-    [caseIdApplied, casesQuery.data],
+      (casesQuery.data ?? []).find(
+        (item) => item.case_id === effectiveCaseId,
+      ) ?? null,
+    [effectiveCaseId, casesQuery.data],
   );
 
   const refreshAll = async () => {
@@ -895,41 +901,53 @@ export function ConstellationPanel({
                 {sessionFeedback?.tos.workspace.replaceAll("_", " ")}
               </div>
               <div className="mt-1 text-xs text-[var(--text-muted)]">
-                {sessionFeedback?.tos.constellation_family} • {sessionFeedback?.tos.constellation_map}
+                {sessionFeedback?.tos.constellation_family} •{" "}
+                {sessionFeedback?.tos.constellation_map}
               </div>
               {sessionFeedback?.stale_warning && (
                 <div className="mt-2 rounded-lg border border-[var(--accent-yellow)]/30 bg-[var(--accent-yellow)]/10 px-3 py-2 text-xs text-[var(--accent-yellow)]">
-                  Restored frame may be stale. Re-hydrate before relying on pronouns for writes.
+                  Restored frame may be stale. Re-hydrate before relying on
+                  pronouns for writes.
                 </div>
               )}
               {/* Stack navigation indicator */}
-              {sessionFeedback && (sessionFeedback.stack_depth > 1 || sessionFeedback.tos_is_peek) && (
-                <div className="mt-2 flex items-center gap-2 text-xs text-[var(--text-muted)]">
-                  <Layers size={12} />
-                  <span>Stack depth: {sessionFeedback.stack_depth}</span>
-                  {sessionFeedback.tos_is_peek && (
-                    <span className="inline-flex items-center gap-0.5 rounded bg-indigo-50 px-1.5 py-0.5 text-[10px] font-medium text-indigo-700 border border-indigo-200">
-                      <Eye size={10} /> PEEK
-                    </span>
-                  )}
-                  {sessionFeedback.stack_depth > 1 && (
-                    <button
-                      onClick={() => onPromptAgent?.("session.pop")}
-                      className="ml-auto flex items-center gap-1 rounded border border-[var(--border-secondary)] px-1.5 py-0.5 text-[10px] hover:bg-[var(--bg-hover)]"
-                    >
-                      <ArrowLeftFromLine size={10} />
-                      Pop
-                    </button>
-                  )}
-                </div>
-              )}
+              {sessionFeedback &&
+                (sessionFeedback.stack_depth > 1 ||
+                  sessionFeedback.tos_is_peek) && (
+                  <div className="mt-2 flex items-center gap-2 text-xs text-[var(--text-muted)]">
+                    <Layers size={12} />
+                    <span>Stack depth: {sessionFeedback.stack_depth}</span>
+                    {sessionFeedback.tos_is_peek && (
+                      <span className="inline-flex items-center gap-0.5 rounded bg-indigo-50 px-1.5 py-0.5 text-[10px] font-medium text-indigo-700 border border-indigo-200">
+                        <Eye size={10} /> PEEK
+                      </span>
+                    )}
+                    {sessionFeedback.stack_depth > 1 && (
+                      <button
+                        type="button"
+                        onClick={() => onPromptAgent?.("session.pop")}
+                        className="ml-auto flex items-center gap-1 rounded border border-[var(--border-secondary)] px-1.5 py-0.5 text-[10px] hover:bg-[var(--bg-hover)]"
+                      >
+                        <ArrowLeftFromLine size={10} />
+                        Pop
+                      </button>
+                    )}
+                  </div>
+                )}
             </div>
           </div>
           {sessionSummary && (
             <div className="mt-3 grid grid-cols-3 gap-2">
               <SummaryMetric label="Slots" value={sessionSummary.total_slots} />
-              <SummaryMetric label="Complete" value={`${sessionSummary.completion_pct}%`} />
-              <SummaryMetric label="Blocking" value={sessionSummary.blocking_slots} emphasis={sessionSummary.blocking_slots > 0} />
+              <SummaryMetric
+                label="Complete"
+                value={`${sessionSummary.completion_pct}%`}
+              />
+              <SummaryMetric
+                label="Blocking"
+                value={sessionSummary.blocking_slots}
+                emphasis={sessionSummary.blocking_slots > 0}
+              />
             </div>
           )}
         </div>
@@ -960,7 +978,11 @@ export function ConstellationPanel({
             <SlotInspector
               slot={sessionSelectedSlot}
               hydrated={sessionHydrated}
-              cbuName={selectedCbu?.name ?? sessionFeedback?.tos.workspace ?? "session context"}
+              cbuName={
+                selectedCbu?.name ??
+                sessionFeedback?.tos.workspace ??
+                "session context"
+              }
               onPromptAgent={onPromptAgent}
             />
           </div>
@@ -987,11 +1009,15 @@ export function ConstellationPanel({
             <div className="mt-3 space-y-1.5">
               {workspaces.map((ws) => (
                 <button
+                  type="button"
                   key={ws.workspace}
                   onClick={() => onPromptAgent?.(ws.label)}
                   className="w-full flex items-start gap-3 rounded-lg border border-[var(--border-primary)] bg-[var(--bg-primary)] px-3 py-2.5 text-left hover:bg-[var(--bg-hover)] transition-colors"
                 >
-                  <Waypoints size={14} className="mt-0.5 text-[var(--accent-blue)] shrink-0" />
+                  <Waypoints
+                    size={14}
+                    className="mt-0.5 text-[var(--accent-blue)] shrink-0"
+                  />
                   <div className="min-w-0">
                     <div className="text-sm font-medium text-[var(--text-primary)]">
                       {ws.label}
@@ -1017,6 +1043,7 @@ export function ConstellationPanel({
               <div className="flex flex-wrap gap-1">
                 {verbs.map((v) => (
                   <button
+                    type="button"
                     key={v.verb_fqn}
                     onClick={() => onPromptAgent?.(v.display_name)}
                     className="px-2 py-1 rounded text-xs border border-[var(--border-secondary)] text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] transition-colors"
@@ -1050,8 +1077,8 @@ export function ConstellationPanel({
             </div>
             <div className="mt-1 text-xs text-[var(--text-muted)]">
               {DEFAULT_MAP_NAME}
-              {caseIdApplied
-                ? ` • linked clearance case ${caseIdApplied}`
+              {effectiveCaseId
+                ? ` • linked clearance case ${effectiveCaseId}`
                 : " • structure-only operating view"}
             </div>
             {constellationQuery.dataUpdatedAt > 0 && (
@@ -1081,11 +1108,10 @@ export function ConstellationPanel({
 
         <div className="mt-3 flex gap-2">
           <select
-            value={caseIdDraft}
+            value={effectiveCaseId ?? ""}
             onChange={(event) => {
               const nextValue = event.target.value;
-              setCaseIdDraft(nextValue);
-              setCaseIdApplied(nextValue || undefined);
+              setCaseIdSelection(nextValue || null);
             }}
             className="min-w-0 flex-1 rounded-lg border border-[var(--border-primary)] bg-[var(--bg-primary)] px-3 py-2 text-sm text-[var(--text-primary)] outline-none ring-0"
           >
@@ -1099,8 +1125,7 @@ export function ConstellationPanel({
           <button
             type="button"
             onClick={() => {
-              setCaseIdDraft("");
-              setCaseIdApplied(undefined);
+              setCaseIdSelection(null);
             }}
             className="rounded-lg border border-[var(--border-primary)] px-3 py-2 text-sm text-[var(--text-secondary)]"
           >

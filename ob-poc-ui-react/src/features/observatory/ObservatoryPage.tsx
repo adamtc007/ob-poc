@@ -24,43 +24,44 @@ type Tab = "observe" | "session_stack" | "mission_control";
 
 export function ObservatoryPage() {
   const { sessionId } = useParams<{ sessionId: string }>();
+  const activeSessionId = sessionId ?? "";
   const [activeTab, setActiveTab] = useState<Tab>("observe");
 
   // Fetch orientation
   const { data: orientation } = useQuery({
-    queryKey: queryKeys.observatory.orientation(sessionId!),
-    queryFn: () => observatoryApi.getOrientation(sessionId!),
-    enabled: !!sessionId,
+    queryKey: queryKeys.observatory.orientation(activeSessionId),
+    queryFn: () => observatoryApi.getOrientation(activeSessionId),
+    enabled: activeSessionId.length > 0,
     refetchInterval: 5000,
   });
 
   // Fetch show packet (for viewports)
   const { data: showPacket } = useQuery({
-    queryKey: queryKeys.observatory.showPacket(sessionId!),
-    queryFn: () => observatoryApi.getShowPacket(sessionId!),
-    enabled: !!sessionId,
+    queryKey: queryKeys.observatory.showPacket(activeSessionId),
+    queryFn: () => observatoryApi.getShowPacket(activeSessionId),
+    enabled: activeSessionId.length > 0,
     refetchInterval: 5000,
   });
 
   // Fetch graph scene (for constellation canvas)
   const { data: graphScene } = useQuery({
-    queryKey: queryKeys.observatory.graphScene(sessionId!),
-    queryFn: () => observatoryApi.getGraphScene(sessionId!),
-    enabled: !!sessionId,
+    queryKey: queryKeys.observatory.graphScene(activeSessionId),
+    queryFn: () => observatoryApi.getGraphScene(activeSessionId),
+    enabled: activeSessionId.length > 0,
   });
 
   const { data: sessionStackGraph } = useQuery({
-    queryKey: queryKeys.observatory.sessionStackGraph(sessionId!),
-    queryFn: () => observatoryApi.getSessionStackGraph(sessionId!),
-    enabled: !!sessionId,
+    queryKey: queryKeys.observatory.sessionStackGraph(activeSessionId),
+    queryFn: () => observatoryApi.getSessionStackGraph(activeSessionId),
+    enabled: activeSessionId.length > 0,
     refetchInterval: 5000,
   });
 
   // Fetch navigation history (includes cursor position)
   const { data: navHistoryData } = useQuery({
-    queryKey: queryKeys.observatory.navHistory(sessionId!),
-    queryFn: () => observatoryApi.getNavigationHistory(sessionId!),
-    enabled: !!sessionId,
+    queryKey: queryKeys.observatory.navHistory(activeSessionId),
+    queryFn: () => observatoryApi.getNavigationHistory(activeSessionId),
+    enabled: activeSessionId.length > 0,
   });
 
   // Handle action from egui canvas
@@ -105,9 +106,10 @@ export function ObservatoryPage() {
 
       // Route through the standard REPL input path — single input surface.
       // Same path FlightDeck and chat text use. No bespoke /navigate endpoint.
-      const message = args && Object.keys(args).length > 0
-        ? `${verb} ${Object.values(args).join(" ")}`
-        : verb;
+      const message =
+        args && Object.keys(args).length > 0
+          ? `${verb} ${Object.values(args).join(" ")}`
+          : verb;
 
       try {
         await chatApi.sendMessage(sessionId, { message });
@@ -162,9 +164,7 @@ export function ObservatoryPage() {
                   queryKey: queryKeys.observatory.all(sessionId),
                 });
               })
-              .catch((err: unknown) =>
-                console.error("Zoom out failed:", err),
-              );
+              .catch((err: unknown) => console.error("Zoom out failed:", err));
           }
           e.preventDefault();
           break;
@@ -213,6 +213,7 @@ export function ObservatoryPage() {
       {/* Tab bar */}
       <div className="flex items-center gap-1 border-b border-[var(--border-primary)] px-3 py-1">
         <button
+          type="button"
           onClick={() => setActiveTab("observe")}
           className={`px-3 py-1 text-xs font-medium rounded ${
             activeTab === "observe"
@@ -223,6 +224,7 @@ export function ObservatoryPage() {
           Observe
         </button>
         <button
+          type="button"
           onClick={() => setActiveTab("session_stack")}
           className={`px-3 py-1 text-xs font-medium rounded ${
             activeTab === "session_stack"
@@ -233,6 +235,7 @@ export function ObservatoryPage() {
           Session Stack
         </button>
         <button
+          type="button"
           onClick={() => setActiveTab("mission_control")}
           className={`px-3 py-1 text-xs font-medium rounded ${
             activeTab === "mission_control"
@@ -303,7 +306,7 @@ export function ObservatoryPage() {
           </div>
         </div>
       ) : (
-        <MissionControl sessionId={sessionId} />
+        <MissionControl />
       )}
     </div>
   );

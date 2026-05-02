@@ -1,7 +1,7 @@
 -- Cross-Workspace State Consistency: Phase 2 — Shared Fact Versions
 -- Versioned fact store for shared atoms. One row per entity × atom × version.
 -- This is the AUTHORITATIVE source of truth (INV-1, INV-2).
--- See: docs/architecture/cross-workspace-state-consistency-v0.4.md §6.2
+-- See: docs/annex-cross-workspace-state-consistency.md §6.2
 
 CREATE TABLE IF NOT EXISTS "ob-poc".shared_fact_versions (
     id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),

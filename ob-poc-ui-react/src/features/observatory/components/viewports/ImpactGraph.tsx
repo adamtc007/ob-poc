@@ -24,9 +24,7 @@ const SEVERITY_STYLES: Record<string, string> = {
 export function ImpactGraph({ data }: Props) {
   if (!data || typeof data !== "object") {
     return (
-      <div className="text-xs text-[var(--text-secondary)]">
-        No impact data
-      </div>
+      <div className="text-xs text-[var(--text-secondary)]">No impact data</div>
     );
   }
 
@@ -44,11 +42,10 @@ export function ImpactGraph({ data }: Props) {
   return (
     <div className="space-y-1.5">
       {entries.map((entry, i) => {
-        const style =
-          SEVERITY_STYLES[entry.severity] ?? SEVERITY_STYLES["info"];
+        const style = SEVERITY_STYLES[entry.severity] ?? SEVERITY_STYLES.info;
         return (
           <div
-            key={i}
+            key={`${entry.entity_type ?? "entity"}-${entry.entity_name}-${entry.severity}-${i}`}
             className={`flex items-center gap-2 px-2 py-1.5 rounded border text-xs ${style}`}
           >
             <div className="flex-1 min-w-0">

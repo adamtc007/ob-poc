@@ -41,6 +41,7 @@ function CbuItem({
 }) {
   return (
     <button
+      type="button"
       onClick={onClick}
       className={`w-full flex items-center gap-2 px-3 py-2 rounded text-sm text-left transition-colors ${
         isSelected
@@ -117,6 +118,7 @@ function CbuDetailView({
       {/* Header with back button */}
       <div className="flex items-center gap-2 px-3 py-2 border-b border-[var(--border-primary)]">
         <button
+          type="button"
           onClick={onBack}
           className="p-1 hover:bg-[var(--bg-tertiary)] rounded"
         >
@@ -179,11 +181,12 @@ export function ScopePanel({
 }: ScopePanelProps) {
   const [isExpanded, setIsExpanded] = useState(true);
   const [selectedCbu, setSelectedCbu] = useState<CbuSummary | null>(null);
+  const activeSessionId = sessionId ?? "";
 
   const { data, isLoading, error } = useQuery({
-    queryKey: queryKeys.scope(sessionId || ""),
-    queryFn: () => scopeApi.getScope(sessionId!),
-    enabled: !!sessionId,
+    queryKey: queryKeys.scope(activeSessionId),
+    queryFn: () => scopeApi.getScope(activeSessionId),
+    enabled: activeSessionId.length > 0,
     refetchInterval: (query) =>
       isSessionMissingError(query.state.error) ? false : 5000,
     retry: (failureCount, err) =>
@@ -240,6 +243,7 @@ export function ScopePanel({
       {/* Header */}
       <div className="flex items-center justify-between px-3 py-2 border-b border-[var(--border-primary)]">
         <button
+          type="button"
           onClick={() => setIsExpanded(!isExpanded)}
           className="flex items-center gap-2 hover:bg-[var(--bg-tertiary)] rounded px-1 py-0.5 -ml-1"
         >
@@ -265,6 +269,7 @@ export function ScopePanel({
             />
           )}
           <button
+            type="button"
             onClick={handlePopOut}
             className="p-1 hover:bg-[var(--bg-tertiary)] rounded"
             title="Open in new window"
