@@ -25,6 +25,8 @@ pub struct SeedBundle {
     pub state_machines: Vec<StateMachineSeed>,
     #[serde(default)]
     pub state_graphs: Vec<StateGraphSeed>,
+    #[serde(default)]
+    pub dag_taxonomies: Vec<DagTaxonomySeed>,
     pub attributes: Vec<AttributeSeed>,
     pub entity_types: Vec<EntityTypeSeed>,
     pub taxonomies: Vec<TaxonomySeed>,
@@ -61,6 +63,7 @@ impl SeedBundle {
     ///     constellation_maps: vec![],
     ///     state_machines: vec![],
     ///     state_graphs: vec![],
+    ///     dag_taxonomies: vec![],
     ///     attributes: vec![],
     ///     entity_types: vec![],
     ///     taxonomies: vec![],
@@ -85,6 +88,7 @@ impl SeedBundle {
             constellation_maps: Vec<&'a ConstellationMapSeed>,
             state_machines: Vec<&'a StateMachineSeed>,
             state_graphs: Vec<&'a StateGraphSeed>,
+            dag_taxonomies: Vec<&'a DagTaxonomySeed>,
             attributes: Vec<&'a AttributeSeed>,
             entity_types: Vec<&'a EntityTypeSeed>,
             taxonomies: Vec<&'a TaxonomySeed>,
@@ -116,6 +120,9 @@ impl SeedBundle {
 
         let mut sg: Vec<&StateGraphSeed> = bundle.state_graphs.iter().collect();
         sg.sort_by_key(|s| &s.fqn);
+
+        let mut dt: Vec<&DagTaxonomySeed> = bundle.dag_taxonomies.iter().collect();
+        dt.sort_by_key(|s| &s.fqn);
 
         let mut at: Vec<&AttributeSeed> = bundle.attributes.iter().collect();
         at.sort_by_key(|s| &s.fqn);
@@ -152,6 +159,7 @@ impl SeedBundle {
             constellation_maps: cm,
             state_machines: sm,
             state_graphs: sg,
+            dag_taxonomies: dt,
             attributes: at,
             entity_types: et,
             taxonomies: tx,
@@ -208,6 +216,12 @@ pub struct StateMachineSeed {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct StateGraphSeed {
+    pub fqn: String,
+    pub payload: serde_json::Value,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DagTaxonomySeed {
     pub fqn: String,
     pub payload: serde_json::Value,
 }
@@ -295,6 +309,7 @@ mod tests {
             constellation_maps: vec![],
             state_machines: vec![],
             state_graphs: vec![],
+            dag_taxonomies: vec![],
             attributes: attrs.to_vec(),
             entity_types: vec![],
             taxonomies: vec![],
@@ -355,6 +370,7 @@ mod tests {
             constellation_maps: vec![],
             state_machines: vec![],
             state_graphs: vec![],
+            dag_taxonomies: vec![],
             attributes: vec![make_attr("cbu.name")],
             entity_types: vec![EntityTypeSeed {
                 fqn: "cbu".into(),
@@ -399,6 +415,7 @@ mod tests {
         assert!(restored.constellation_maps.is_empty());
         assert!(restored.state_machines.is_empty());
         assert!(restored.state_graphs.is_empty());
+        assert!(restored.dag_taxonomies.is_empty());
         assert_eq!(restored.attributes.len(), 1);
         assert_eq!(restored.entity_types.len(), 1);
         assert_eq!(restored.taxonomies.len(), 1);
@@ -441,6 +458,11 @@ mod tests {
             serde_json::to_value(StateGraphSeed {
                 fqn: "s.g".into(),
                 payload: json!(23),
+            })
+            .unwrap(),
+            serde_json::to_value(DagTaxonomySeed {
+                fqn: "d.t".into(),
+                payload: json!(24),
             })
             .unwrap(),
             serde_json::to_value(EntityTypeSeed {

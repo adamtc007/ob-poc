@@ -2,7 +2,7 @@ name: "Deal CONTRACTED compound tollgate"
 suite_id: "deal_contracted_tollgate"
 description: |
   Verify Adam's three deal tollgates compose: deal cannot transition
-  KYC_CLEARANCE → CONTRACTED unless BOTH the KYC case is APPROVED
+  IN_CLEARANCE → CONTRACTED unless BOTH the KYC case is APPROVED
   AND every booking-principal clearance is APPROVED/ACTIVE.
 
   Walks: blocked-by-both → mutate KYC → blocked-by-BP → mutate BP → green.
@@ -13,7 +13,7 @@ entity_aliases:
   bpc-1:  "00000000-0000-0000-0000-000000000003"
 
 initial_state:
-  - { workspace: deal,              slot: deal,      entity: "deal-1", state: "KYC_CLEARANCE" }
+  - { workspace: deal,              slot: deal,      entity: "deal-1", state: "IN_CLEARANCE" }
   - { workspace: kyc,               slot: kyc_case,  entity: "case-1", state: "REVIEW" }
   - { workspace: booking_principal, slot: clearance, entity: "bpc-1",  state: "PENDING" }
 
@@ -29,7 +29,7 @@ steps:
       workspace: deal
       slot: deal
       entity: "deal-1"
-      from: "KYC_CLEARANCE"
+      from: "IN_CLEARANCE"
       to: "CONTRACTED"
     expect:
       violations:
@@ -46,7 +46,7 @@ steps:
       workspace: deal
       slot: deal
       entity: "deal-1"
-      from: "KYC_CLEARANCE"
+      from: "IN_CLEARANCE"
       to: "CONTRACTED"
     expect:
       violations:
@@ -60,7 +60,7 @@ steps:
       workspace: deal
       slot: deal
       entity: "deal-1"
-      from: "KYC_CLEARANCE"
+      from: "IN_CLEARANCE"
       to: "CONTRACTED"
     expect:
       violations: []

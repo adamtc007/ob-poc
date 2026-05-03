@@ -54,6 +54,7 @@ pub fn build_seed_bundle_with_metadata(
     let constellation_maps = pipeline_seeds::scan_constellation_maps().unwrap_or_default();
     let state_machines = pipeline_seeds::scan_state_machines().unwrap_or_default();
     let state_graphs = pipeline_seeds::scan_state_graphs().unwrap_or_default();
+    let dag_taxonomies = pipeline_seeds::scan_dag_taxonomies().unwrap_or_default();
 
     // 2. Enrich with DomainMetadata if available
     if let Some(meta) = domain_metadata {
@@ -134,6 +135,7 @@ pub fn build_seed_bundle_with_metadata(
         constellation_maps,
         state_machines,
         state_graphs,
+        dag_taxonomies,
         attributes,
         entity_types,
         taxonomies,
@@ -232,6 +234,7 @@ mod tests {
         assert!(!bundle.constellation_maps.is_empty());
         assert!(!bundle.state_machines.is_empty());
         assert!(!bundle.state_graphs.is_empty());
+        assert!(!bundle.dag_taxonomies.is_empty());
         assert!(!bundle.attributes.is_empty());
         assert!(!bundle.taxonomies.is_empty());
         assert!(!bundle.policies.is_empty());

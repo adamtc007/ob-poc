@@ -20,8 +20,10 @@ use dsl_core::config::dag::{EntryVia, SlotStateMachine};
 use dsl_core::config::{
     collect_declared_fqns, entity_kinds_from_taxonomy_yaml, flatten_pack_entries,
     load_dags_from_dir, load_packs_from_dir, validate_dags_with_context, validate_pack_fqns,
-    validate_verbs_config, ConfigLoader, DagValidationContext, ValidationContext, VerbsConfig,
+    validate_verbs_config, ConfigLoader, DagValidationContext, LoadedPack, ValidationContext,
+    VerbsConfig,
 };
+use std::collections::BTreeMap;
 use std::collections::HashSet;
 use std::path::PathBuf;
 
@@ -152,14 +154,14 @@ async fn validate(strict_warnings: bool) -> Result<()> {
 
     let ctx = ValidationContext {
         require_declaration: false,
-        known_slots,
+        known_slots: known_slots.clone(),
         ..ValidationContext::default()
     };
     let report = validate_verbs_config(&cfg, &ctx);
 
     // V1.2-5 — pack-hygiene cross-check.
     let packs_dir = PathBuf::from("config/packs");
-    let pack_errors = if packs_dir.exists() {
+    let (pack_errors, pack_workspace_errors) = if packs_dir.exists() {
         let declared = collect_declared_fqns(&cfg);
         let macros = collect_macro_fqns();
         let packs =
@@ -170,22 +172,28 @@ async fn validate(strict_warnings: bool) -> Result<()> {
             declared.len(),
             macros.len()
         );
-        validate_pack_fqns(&declared, &macros, flatten_pack_entries(&packs))
+        let fqn_errors = validate_pack_fqns(&declared, &macros, flatten_pack_entries(&packs));
+        let workspace_errors = validate_pack_workspaces_against_dags(&packs, &known_slots);
+        (fqn_errors, workspace_errors)
     } else {
-        Vec::new()
+        (Vec::new(), Vec::new())
     };
 
     let struct_n = report.structural.len();
-    let wf_n = report.well_formedness.len() + pack_errors.len() + dag_report.errors.len();
+    let wf_n = report.well_formedness.len()
+        + pack_errors.len()
+        + pack_workspace_errors.len()
+        + dag_report.errors.len();
     let warn_n = report.warnings.len() + dag_report.warnings.len();
     let hygiene_failures = hygiene_failure_summary()?;
 
     println!();
     println!("Structural errors:           {struct_n}");
     println!(
-        "Well-formedness errors:      {wf_n}  ({} three-axis + {} pack-hygiene + {} cross-DAG)",
+        "Well-formedness errors:      {wf_n}  ({} three-axis + {} pack-hygiene + {} pack-workspace + {} cross-DAG)",
         report.well_formedness.len(),
         pack_errors.len(),
+        pack_workspace_errors.len(),
         dag_report.errors.len()
     );
     println!(
@@ -210,6 +218,12 @@ async fn validate(strict_warnings: bool) -> Result<()> {
     if !pack_errors.is_empty() {
         println!("\nWell-formedness errors (pack hygiene — V1.2-5):");
         for e in &pack_errors {
+            println!("  ✗ {e}");
+        }
+    }
+    if !pack_workspace_errors.is_empty() {
+        println!("\nWell-formedness errors (pack workspace alignment):");
+        for e in &pack_workspace_errors {
             println!("  ✗ {e}");
         }
     }
@@ -568,16 +582,12 @@ fn simple_status_drift_failures(
 fn entry_via_consistency_failures() -> Result<Vec<String>> {
     let dags = load_dags_from_dir(&PathBuf::from("config/sem_os_seeds/dag_taxonomies"))
         .context("loading DAG taxonomies for entry_via hygiene")?;
-    let scoped = ["deal", "cbu", "instrument_matrix", "lifecycle_resources"];
     let cfg = load_catalogue()?;
     let declared = collect_declared_fqns(&cfg);
     let mut failures = Vec::new();
 
     for (_path, loaded) in dags {
         let dag = loaded.dag;
-        if !scoped.contains(&dag.workspace.as_str()) {
-            continue;
-        }
         for slot in &dag.slots {
             let Some(SlotStateMachine::Structured(machine)) = &slot.state_machine else {
                 continue;
@@ -888,6 +898,50 @@ fn sorted_set(values: &HashSet<String>) -> Vec<String> {
     let mut out: Vec<_> = values.iter().cloned().collect();
     out.sort();
     out
+}
+
+fn validate_pack_workspaces_against_dags(
+    packs: &BTreeMap<String, LoadedPack>,
+    known_slots: &HashSet<(String, String)>,
+) -> Vec<String> {
+    let dag_workspaces: HashSet<&str> = known_slots
+        .iter()
+        .map(|(workspace, _slot)| workspace.as_str())
+        .collect();
+    let aliases = [
+        ("on_boarding", "onboarding_request"),
+        ("sem_os_maintenance", "semos_maintenance"),
+    ];
+    let mut failures = Vec::new();
+
+    for pack in packs.values() {
+        for workspace in &pack.workspaces {
+            if dag_workspaces.contains(workspace.as_str()) {
+                continue;
+            }
+            if let Some((_, canonical)) = aliases
+                .iter()
+                .find(|(legacy, _canonical)| workspace == legacy)
+            {
+                failures.push(format!(
+                    "{}: pack '{}' uses legacy workspace '{}'; use DAG workspace '{}'",
+                    pack.source_path.display(),
+                    pack.name,
+                    workspace,
+                    canonical
+                ));
+            } else {
+                failures.push(format!(
+                    "{}: pack '{}' references workspace '{}' with no DAG taxonomy",
+                    pack.source_path.display(),
+                    pack.name,
+                    workspace
+                ));
+            }
+        }
+    }
+
+    failures
 }
 
 fn print_limited(values: &[String], limit: usize) {

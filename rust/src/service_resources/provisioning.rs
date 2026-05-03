@@ -56,38 +56,53 @@ impl<'a> ProvisioningOrchestrator<'a> {
 
         let mut result = ProvisioningOrchestratorResult::default();
 
+        let mut discoveries_by_srdef: HashMap<String, Vec<&SrdefDiscoveryReason>> = HashMap::new();
+        for discovery in &discoveries {
+            discoveries_by_srdef
+                .entry(discovery.srdef_id.clone())
+                .or_default()
+                .push(discovery);
+        }
+
         for srdef_id in sorted {
-            // Skip if already provisioned and active
-            if existing_instances.contains_key(&srdef_id) {
-                let status = existing_instances.get(&srdef_id).unwrap();
-                if status == "ACTIVE" {
+            let Some(srdef_discoveries) = discoveries_by_srdef.get(&srdef_id) else {
+                continue;
+            };
+
+            for discovery in srdef_discoveries {
+                let instance_key =
+                    discovery_instance_key(&srdef_id, discovery.parameters.as_ref())?;
+                if existing_instances
+                    .get(&instance_key)
+                    .is_some_and(|status| status == "ACTIVE")
+                {
                     result.already_active += 1;
                     continue;
                 }
-            }
 
-            // Check readiness
-            match self.check_srdef_readiness(cbu_id, &srdef_id).await? {
-                SrdefReadinessResult::Ready { attrs } => {
-                    // Create provisioning request
-                    match self
-                        .create_provisioning_request(cbu_id, &srdef_id, attrs)
-                        .await
-                    {
-                        Ok(request_id) => {
-                            result.requests_created += 1;
-                            result.created_request_ids.push(request_id);
-                        }
-                        Err(e) => {
-                            warn!("Failed to create request for {}: {}", srdef_id, e);
-                            result.errors.push(format!("{}: {}", srdef_id, e));
+                // Check readiness
+                match self.check_srdef_readiness(cbu_id, &srdef_id).await? {
+                    SrdefReadinessResult::Ready { attrs } => {
+                        // Create provisioning request
+                        match self
+                            .create_provisioning_request(cbu_id, discovery, attrs)
+                            .await
+                        {
+                            Ok(request_id) => {
+                                result.requests_created += 1;
+                                result.created_request_ids.push(request_id);
+                            }
+                            Err(e) => {
+                                warn!("Failed to create request for {}: {}", srdef_id, e);
+                                result.errors.push(format!("{}: {}", srdef_id, e));
+                            }
                         }
                     }
-                }
-                SrdefReadinessResult::NotReady { reason } => {
-                    debug!("SRDEF {} not ready: {}", srdef_id, reason);
-                    result.not_ready += 1;
-                    result.not_ready_reasons.push((srdef_id.clone(), reason));
+                    SrdefReadinessResult::NotReady { reason } => {
+                        debug!("SRDEF {} not ready: {}", srdef_id, reason);
+                        result.not_ready += 1;
+                        result.not_ready_reasons.push((srdef_id.clone(), reason));
+                    }
                 }
             }
         }
@@ -102,9 +117,12 @@ impl<'a> ProvisioningOrchestrator<'a> {
 
     /// Get existing resource instances for a CBU
     async fn get_existing_instances(&self, cbu_id: Uuid) -> Result<HashMap<String, String>> {
-        let rows: Vec<(String, String)> = sqlx::query_as(
+        let rows: Vec<(String, String, JsonValue)> = sqlx::query_as(
             r#"
-            SELECT COALESCE(srdef_id, '') as srdef_id, status
+            SELECT
+                COALESCE(srdef_id, '') as srdef_id,
+                status,
+                COALESCE(instance_config->'parameters', '{}'::jsonb) AS parameters
             FROM "ob-poc".cbu_resource_instances
             WHERE cbu_id = $1 AND srdef_id IS NOT NULL
             "#,
@@ -113,7 +131,11 @@ impl<'a> ProvisioningOrchestrator<'a> {
         .fetch_all(self.pool)
         .await?;
 
-        Ok(rows.into_iter().collect())
+        rows.into_iter()
+            .map(|(srdef_id, status, parameters)| {
+                discovery_instance_key(&srdef_id, Some(&parameters)).map(|key| (key, status))
+            })
+            .collect()
     }
 
     /// Check if an SRDEF is ready to provision
@@ -205,15 +227,18 @@ impl<'a> ProvisioningOrchestrator<'a> {
     async fn create_provisioning_request(
         &self,
         cbu_id: Uuid,
-        srdef_id: &str,
+        discovery: &SrdefDiscoveryReason,
         attrs: HashMap<String, JsonValue>,
     ) -> Result<Uuid> {
+        let srdef_id = &discovery.srdef_id;
+        let parameters = discovery.parameters.clone().unwrap_or_else(|| json!({}));
         // Get SRDEF details
         let srdef = self.service.get_srdef_by_id(srdef_id).await?;
         let owner_system = srdef
             .as_ref()
             .map(|s| s.owner.clone())
             .unwrap_or_else(|| "UNKNOWN".to_string());
+        let (product_id, service_id) = self.get_intent_context(discovery).await?;
 
         // Create the instance first (in PENDING state)
         let instance_id = Uuid::new_v4();
@@ -222,14 +247,27 @@ impl<'a> ProvisioningOrchestrator<'a> {
         sqlx::query(
             r#"
             INSERT INTO "ob-poc".cbu_resource_instances
-                (instance_id, cbu_id, srdef_id, instance_url, status)
-            VALUES ($1, $2, $3, $4, 'PENDING')
+                (instance_id, cbu_id, product_id, service_id, resource_type_id,
+                 srdef_id, instance_url, instance_config, market_id, currency,
+                 counterparty_entity_id, status)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, 'PENDING')
             "#,
         )
         .bind(instance_id)
         .bind(cbu_id)
+        .bind(product_id)
+        .bind(service_id)
+        .bind(discovery.resource_type_id)
         .bind(srdef_id)
         .bind(&instance_url)
+        .bind(json!({
+            "parameters": parameters.clone(),
+            "discovery_id": discovery.discovery_id,
+            "triggered_by_intents": discovery.triggered_by_intents,
+        }))
+        .bind(uuid_parameter(&parameters, "market_id"))
+        .bind(string_parameter(&parameters, "currency"))
+        .bind(uuid_parameter(&parameters, "counterparty_entity_id"))
         .execute(self.pool)
         .await?;
 
@@ -241,12 +279,23 @@ impl<'a> ProvisioningOrchestrator<'a> {
             requested_by: RequestedBy::System,
             request_payload: ProvisioningPayload {
                 attrs: json!(attrs),
-                bind_to: None,
+                bind_to: Some(json!({
+                    "discovery_id": discovery.discovery_id,
+                    "parameters": parameters.clone(),
+                    "product_id": product_id,
+                    "service_id": service_id,
+                    "resource_type_id": discovery.resource_type_id,
+                })),
                 evidence_refs: None,
-                idempotency_key: Some(format!("{}:{}:{}", cbu_id, srdef_id, instance_id)),
+                idempotency_key: Some(format!(
+                    "{}:{}:{}",
+                    cbu_id,
+                    srdef_id,
+                    serde_json::to_string(&parameters)?
+                )),
             },
             owner_system,
-            parameters: None,
+            parameters: Some(parameters.clone()),
         };
 
         let request_id = self.service.create_provisioning_request(&request).await?;
@@ -261,6 +310,7 @@ impl<'a> ProvisioningOrchestrator<'a> {
                     "srdef_id": srdef_id,
                     "attrs": attrs,
                     "instance_id": instance_id,
+                    "parameters": parameters,
                 }),
                 None,
             )
@@ -281,6 +331,71 @@ impl<'a> ProvisioningOrchestrator<'a> {
 
         Ok(request_id)
     }
+
+    async fn get_intent_context(
+        &self,
+        discovery: &SrdefDiscoveryReason,
+    ) -> Result<(Option<Uuid>, Option<Uuid>)> {
+        let Some(intent_id) = first_triggered_intent_id(&discovery.triggered_by_intents) else {
+            return Ok((None, None));
+        };
+
+        let row: Option<(Uuid, Uuid)> = sqlx::query_as(
+            r#"SELECT product_id, service_id
+               FROM "ob-poc".service_intents
+               WHERE intent_id = $1"#,
+        )
+        .bind(intent_id)
+        .fetch_optional(self.pool)
+        .await?;
+
+        Ok(row
+            .map(|(product_id, service_id)| (Some(product_id), Some(service_id)))
+            .unwrap_or((None, None)))
+    }
+}
+
+fn discovery_instance_key(srdef_id: &str, parameters: Option<&JsonValue>) -> Result<String> {
+    let parameters = parameters.cloned().unwrap_or_else(|| json!({}));
+    Ok(format!(
+        "{}:{}",
+        srdef_id,
+        serde_json::to_string(&parameters)?
+    ))
+}
+
+fn first_triggered_intent_id(triggered_by_intents: &JsonValue) -> Option<Uuid> {
+    triggered_by_intents
+        .as_array()
+        .and_then(|intents| intents.first())
+        .and_then(JsonValue::as_str)
+        .and_then(|raw| Uuid::parse_str(raw).ok())
+}
+
+fn json_array_contains_uuid(values: &JsonValue, target: Uuid) -> bool {
+    values.as_array().is_some_and(|items| {
+        items
+            .iter()
+            .any(|item| json_value_uuid(item) == Some(target))
+    })
+}
+
+fn json_value_uuid(value: &JsonValue) -> Option<Uuid> {
+    value.as_str().and_then(|raw| Uuid::parse_str(raw).ok())
+}
+
+fn uuid_parameter(parameters: &JsonValue, key: &str) -> Option<Uuid> {
+    parameters
+        .get(key)
+        .and_then(JsonValue::as_str)
+        .and_then(|raw| Uuid::parse_str(raw).ok())
+}
+
+fn string_parameter(parameters: &JsonValue, key: &str) -> Option<String> {
+    parameters
+        .get(key)
+        .and_then(JsonValue::as_str)
+        .map(ToOwned::to_owned)
 }
 
 enum SrdefReadinessResult {
@@ -332,8 +447,10 @@ impl<'a> ReadinessEngine<'a> {
 
         // Get active discoveries
         let discoveries = self.service.get_active_discoveries(cbu_id).await?;
-        let discovered_srdefs: HashSet<String> =
-            discoveries.iter().map(|d| d.srdef_id.clone()).collect();
+        let discovered_keys: HashSet<String> = discoveries
+            .iter()
+            .map(|d| discovery_instance_key(&d.srdef_id, d.parameters.as_ref()))
+            .collect::<Result<HashSet<_>>>()?;
 
         // Get active instances
         let instances = self.get_active_instances(cbu_id).await?;
@@ -363,45 +480,73 @@ impl<'a> ReadinessEngine<'a> {
             let mut active_srids: Vec<String> = Vec::new();
 
             for srdef_id in &required_srdefs {
-                // Check if discovered
-                if !discovered_srdefs.contains(srdef_id) {
-                    blocking_reasons.push(BlockingReason {
-                        reason_type: BlockingReasonType::MissingSrdef,
-                        srdef_id: Some(srdef_id.clone()),
-                        details: json!({}),
-                        explain: format!("SRDEF {} not discovered", srdef_id),
-                    });
-                    continue;
-                }
+                let relevant_discoveries: Vec<&SrdefDiscoveryReason> = discoveries
+                    .iter()
+                    .filter(|d| {
+                        d.srdef_id == *srdef_id
+                            && json_array_contains_uuid(&d.triggered_by_intents, intent.intent_id)
+                    })
+                    .collect();
 
-                // Check instance status
-                match instances.get(srdef_id) {
-                    Some((srid, status)) if status == "ACTIVE" => {
-                        active_srids.push(srid.clone());
-                    }
-                    Some((_, status)) if status == "PROVISIONING" || status == "PENDING" => {
-                        blocking_reasons.push(BlockingReason {
-                            reason_type: BlockingReasonType::PendingProvisioning,
-                            srdef_id: Some(srdef_id.clone()),
-                            details: json!({ "status": status }),
-                            explain: format!("SRDEF {} provisioning in progress", srdef_id),
-                        });
-                    }
-                    Some((_, status)) if status == "FAILED" => {
-                        blocking_reasons.push(BlockingReason {
-                            reason_type: BlockingReasonType::FailedProvisioning,
-                            srdef_id: Some(srdef_id.clone()),
-                            details: json!({ "status": status }),
-                            explain: format!("SRDEF {} provisioning failed", srdef_id),
-                        });
-                    }
-                    _ => {
+                if relevant_discoveries.is_empty() {
+                    if !discoveries.iter().any(|d| d.srdef_id == *srdef_id) {
                         blocking_reasons.push(BlockingReason {
                             reason_type: BlockingReasonType::MissingSrdef,
                             srdef_id: Some(srdef_id.clone()),
                             details: json!({}),
-                            explain: format!("No instance for SRDEF {}", srdef_id),
+                            explain: format!("SRDEF {} not discovered", srdef_id),
                         });
+                    }
+                    continue;
+                }
+
+                for discovery in relevant_discoveries {
+                    let key = discovery_instance_key(srdef_id, discovery.parameters.as_ref())?;
+                    if !discovered_keys.contains(&key) {
+                        blocking_reasons.push(BlockingReason {
+                            reason_type: BlockingReasonType::MissingSrdef,
+                            srdef_id: Some(srdef_id.clone()),
+                            details: json!({ "parameters": discovery.parameters.clone() }),
+                            explain: format!("SRDEF {} not discovered", srdef_id),
+                        });
+                        continue;
+                    }
+
+                    // Check instance status at the discovered dimensional grain.
+                    match instances.get(&key) {
+                        Some((srid, status)) if status == "ACTIVE" => {
+                            active_srids.push(srid.clone());
+                        }
+                        Some((_, status)) if status == "PROVISIONING" || status == "PENDING" => {
+                            blocking_reasons.push(BlockingReason {
+                                reason_type: BlockingReasonType::PendingProvisioning,
+                                srdef_id: Some(srdef_id.clone()),
+                                details: json!({
+                                    "status": status,
+                                    "parameters": discovery.parameters.clone(),
+                                }),
+                                explain: format!("SRDEF {} provisioning in progress", srdef_id),
+                            });
+                        }
+                        Some((_, status)) if status == "FAILED" => {
+                            blocking_reasons.push(BlockingReason {
+                                reason_type: BlockingReasonType::FailedProvisioning,
+                                srdef_id: Some(srdef_id.clone()),
+                                details: json!({
+                                    "status": status,
+                                    "parameters": discovery.parameters.clone(),
+                                }),
+                                explain: format!("SRDEF {} provisioning failed", srdef_id),
+                            });
+                        }
+                        _ => {
+                            blocking_reasons.push(BlockingReason {
+                                reason_type: BlockingReasonType::MissingSrdef,
+                                srdef_id: Some(srdef_id.clone()),
+                                details: json!({ "parameters": discovery.parameters.clone() }),
+                                explain: format!("No instance for SRDEF {}", srdef_id),
+                            });
+                        }
                     }
                 }
 
@@ -494,9 +639,13 @@ impl<'a> ReadinessEngine<'a> {
         &self,
         cbu_id: Uuid,
     ) -> Result<HashMap<String, (String, String)>> {
-        let rows: Vec<(String, String, String)> = sqlx::query_as(
+        let rows: Vec<(String, String, String, JsonValue)> = sqlx::query_as(
             r#"
-            SELECT COALESCE(srdef_id, ''), instance_url, status
+            SELECT
+                COALESCE(srdef_id, ''),
+                instance_url,
+                status,
+                COALESCE(instance_config->'parameters', '{}'::jsonb) AS parameters
             FROM "ob-poc".cbu_resource_instances
             WHERE cbu_id = $1 AND srdef_id IS NOT NULL
             "#,
@@ -505,7 +654,11 @@ impl<'a> ReadinessEngine<'a> {
         .fetch_all(self.pool)
         .await?;
 
-        Ok(rows.into_iter().map(|(s, u, st)| (s, (u, st))).collect())
+        rows.into_iter()
+            .map(|(srdef_id, url, status, parameters)| {
+                discovery_instance_key(&srdef_id, Some(&parameters)).map(|key| (key, (url, status)))
+            })
+            .collect()
     }
 
     /// Get missing required attributes for an SRDEF

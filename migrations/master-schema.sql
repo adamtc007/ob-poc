@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict 70LEJzJuuBaIAXPJoI0l5uyCbc0Mm8gE0kRveb66raRV5rsUPWTBpT2gYsT7OCB
+\restrict IJviuesUUAKyxFGqeNOcWZvdbT6xMYFladzCElDebGV3eiuS2gdPgNCPOa0frvL
 
 -- Dumped from database version 18.1 (Homebrew)
 -- Dumped by pg_dump version 18.1 (Homebrew)
@@ -327,7 +327,8 @@ CREATE TYPE sem_reg.object_type AS ENUM (
     'document_type_def',
     'observation_def',
     'derivation_spec',
-    'phrase_mapping'
+    'phrase_mapping',
+    'dag_taxonomy'
 );
 
 
@@ -19205,23 +19206,29 @@ COMMENT ON VIEW "ob-poc".v_cbu_readiness_summary IS 'Summary of readiness per CB
 --
 
 CREATE VIEW "ob-poc".v_cbu_service_gaps AS
- WITH cbu_products AS (
-         SELECT DISTINCT c.cbu_id,
+ WITH active_intents AS (
+         SELECT DISTINCT si.cbu_id,
             c.name AS cbu_name,
-            p.product_id,
+            si.product_id,
             p.product_code,
-            p.name AS product_name
-           FROM ("ob-poc".cbus c
-             LEFT JOIN "ob-poc".products p ON ((p.product_id = c.product_id)))
-          WHERE ((p.product_id IS NOT NULL) AND (p.is_active = true))
-        ), required_resources AS (
-         SELECT cp.cbu_id,
-            cp.cbu_name,
-            cp.product_code,
-            cp.product_name,
-            s.service_id,
+            p.name AS product_name,
+            si.service_id,
             s.service_code,
-            s.name AS service_name,
+            s.name AS service_name
+           FROM ((("ob-poc".service_intents si
+             JOIN "ob-poc".cbus c ON ((c.cbu_id = si.cbu_id)))
+             JOIN "ob-poc".products p ON ((p.product_id = si.product_id)))
+             JOIN "ob-poc".services s ON ((s.service_id = si.service_id)))
+          WHERE ((si.status = 'active'::text) AND (p.is_active = true) AND (s.is_active = true))
+        ), required_resources AS (
+         SELECT ai.cbu_id,
+            ai.cbu_name,
+            ai.product_id,
+            ai.product_code,
+            ai.product_name,
+            ai.service_id,
+            ai.service_code,
+            ai.service_name,
             ps.is_mandatory,
             srt.resource_id AS resource_type_id,
             srt.resource_code,
@@ -19232,10 +19239,9 @@ CREATE VIEW "ob-poc".v_cbu_service_gaps AS
             srt.per_currency,
             srt.per_counterparty,
             COALESCE(src.is_required, true) AS is_required
-           FROM ((((cbu_products cp
-             JOIN "ob-poc".product_services ps ON ((ps.product_id = cp.product_id)))
-             JOIN "ob-poc".services s ON (((s.service_id = ps.service_id) AND (s.is_active = true))))
-             JOIN "ob-poc".service_resource_capabilities src ON (((src.service_id = s.service_id) AND (src.is_active = true))))
+           FROM (((active_intents ai
+             JOIN "ob-poc".product_services ps ON (((ps.product_id = ai.product_id) AND (ps.service_id = ai.service_id))))
+             JOIN "ob-poc".service_resource_capabilities src ON (((src.service_id = ai.service_id) AND (src.is_active = true))))
              JOIN "ob-poc".service_resource_types srt ON (((srt.resource_id = src.resource_id) AND (srt.is_active = true))))
           WHERE (COALESCE(src.is_required, true) = true)
         )
@@ -19252,12 +19258,20 @@ CREATE VIEW "ob-poc".v_cbu_service_gaps AS
     location_type,
     per_market,
     per_currency,
-    per_counterparty
+    per_counterparty,
+    is_required
    FROM required_resources rr
   WHERE (NOT (EXISTS ( SELECT 1
            FROM "ob-poc".cbu_resource_instances cri
-          WHERE ((cri.cbu_id = rr.cbu_id) AND (cri.resource_type_id = rr.resource_type_id) AND ((cri.status)::text = ANY (ARRAY[('PENDING'::character varying)::text, ('ACTIVE'::character varying)::text, ('PROVISIONED'::character varying)::text]))))))
+          WHERE ((cri.cbu_id = rr.cbu_id) AND (cri.product_id = rr.product_id) AND (cri.service_id = rr.service_id) AND (cri.resource_type_id = rr.resource_type_id) AND ((cri.status)::text = ANY ((ARRAY['PENDING'::character varying, 'PROVISIONING'::character varying, 'ACTIVE'::character varying])::text[]))))))
   ORDER BY cbu_name, product_code, service_code, resource_code;
+
+
+--
+-- Name: VIEW v_cbu_service_gaps; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON VIEW "ob-poc".v_cbu_service_gaps IS 'Shows missing required service resources for active CBU product service intents.';
 
 
 --
@@ -23059,14 +23073,6 @@ ALTER TABLE ONLY "ob-poc".cbu_resource_instances
 
 
 --
--- Name: cbu_resource_instances cbu_resource_instances_cbu_product_service_resource_key; Type: CONSTRAINT; Schema: ob-poc; Owner: -
---
-
-ALTER TABLE ONLY "ob-poc".cbu_resource_instances
-    ADD CONSTRAINT cbu_resource_instances_cbu_product_service_resource_key UNIQUE (cbu_id, product_id, service_id, resource_type_id);
-
-
---
 -- Name: cbu_resource_instances cbu_resource_instances_instance_url_key; Type: CONSTRAINT; Schema: ob-poc; Owner: -
 --
 
@@ -26709,6 +26715,13 @@ CREATE INDEX case_import_runs_idx_cir_case ON "ob-poc".case_import_runs USING bt
 --
 
 CREATE UNIQUE INDEX cases_cbu_type_active_uniq ON "ob-poc".cases USING btree (cbu_id, case_type) WHERE (closed_at IS NULL);
+
+
+--
+-- Name: cbu_resource_instances_cbu_product_service_resource_dim_key; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE UNIQUE INDEX cbu_resource_instances_cbu_product_service_resource_dim_key ON "ob-poc".cbu_resource_instances USING btree (cbu_id, product_id, service_id, resource_type_id, market_id, currency, counterparty_entity_id) NULLS NOT DISTINCT WHERE ((product_id IS NOT NULL) AND (service_id IS NOT NULL) AND (resource_type_id IS NOT NULL));
 
 
 --
@@ -37844,5 +37857,5 @@ ALTER TABLE ONLY sem_reg_authoring.validation_reports
 -- PostgreSQL database dump complete
 --
 
-\unrestrict 70LEJzJuuBaIAXPJoI0l5uyCbc0Mm8gE0kRveb66raRV5rsUPWTBpT2gYsT7OCB
+\unrestrict IJviuesUUAKyxFGqeNOcWZvdbT6xMYFladzCElDebGV3eiuS2gdPgNCPOa0frvL
 

@@ -173,6 +173,7 @@ async fn test_projection_watermark_advances(client: &dyn SemOsClient, pool: &PgP
         constellation_maps: vec![],
         state_machines: vec![],
         state_graphs: vec![],
+        dag_taxonomies: vec![],
         attributes: vec![],
         entity_types,
         taxonomies,

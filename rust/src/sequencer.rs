@@ -7739,7 +7739,7 @@ templates:
           cbu-id: "{answers.cbu_id}"
           product-id: "{context.product_id}"
 workspaces:
-  - on_boarding
+  - onboarding_request
 definition_of_done:
   - "Onboarding handoff submitted"
 "#

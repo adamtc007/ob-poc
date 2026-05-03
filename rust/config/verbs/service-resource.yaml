@@ -265,6 +265,27 @@ domains:
               schema: ob-poc
               search_key: name
               primary_key: service_id
+          - name: market-id
+            type: uuid
+            required: false
+            lookup:
+              table: markets
+              entity_type: market
+              schema: custody
+              search_key: mic
+              primary_key: market_id
+          - name: currency
+            type: string
+            required: false
+          - name: counterparty-entity-id
+            type: uuid
+            required: false
+            lookup:
+              table: entities
+              entity_type: entity
+              schema: ob-poc
+              search_key: name
+              primary_key: entity_id
           - name: config
             type: json
             required: false

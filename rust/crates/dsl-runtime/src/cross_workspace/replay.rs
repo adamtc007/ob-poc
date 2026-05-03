@@ -110,7 +110,7 @@ mod tests {
             prior_version: 1,
             new_version: 2,
             source_workspace: "kyc".to_string(),
-            target_workspace: "on_boarding".to_string(),
+            target_workspace: "onboarding_request".to_string(),
             target_constellation_family: "onboarding_workspace".to_string(),
             entity_id: Uuid::nil(),
             initiated_at: Utc::now(),

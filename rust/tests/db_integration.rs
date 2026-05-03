@@ -141,6 +141,97 @@ mod db_tests {
             .ok();
 
             sqlx::query(
+                r#"DELETE FROM "ob-poc".provisioning_events WHERE request_id IN
+                   (SELECT request_id FROM "ob-poc".provisioning_requests WHERE cbu_id IN
+                    (SELECT cbu_id FROM "ob-poc".cbus WHERE name LIKE $1))"#,
+            )
+            .bind(&pattern)
+            .execute(&self.pool)
+            .await
+            .ok();
+
+            sqlx::query(
+                r#"DELETE FROM "ob-poc".provisioning_requests WHERE cbu_id IN
+                   (SELECT cbu_id FROM "ob-poc".cbus WHERE name LIKE $1)"#,
+            )
+            .bind(&pattern)
+            .execute(&self.pool)
+            .await
+            .ok();
+
+            sqlx::query(
+                r#"DELETE FROM "ob-poc".service_readiness WHERE cbu_id IN
+                   (SELECT cbu_id FROM "ob-poc".cbus WHERE name LIKE $1)"#,
+            )
+            .bind(&pattern)
+            .execute(&self.pool)
+            .await
+            .ok();
+
+            sqlx::query(
+                r#"DELETE FROM "ob-poc".cbu_unified_attr_requirements WHERE cbu_id IN
+                   (SELECT cbu_id FROM "ob-poc".cbus WHERE name LIKE $1)"#,
+            )
+            .bind(&pattern)
+            .execute(&self.pool)
+            .await
+            .ok();
+
+            sqlx::query(
+                r#"DELETE FROM "ob-poc".srdef_discovery_reasons WHERE cbu_id IN
+                   (SELECT cbu_id FROM "ob-poc".cbus WHERE name LIKE $1)"#,
+            )
+            .bind(&pattern)
+            .execute(&self.pool)
+            .await
+            .ok();
+
+            sqlx::query(
+                r#"DELETE FROM "ob-poc".service_intents WHERE cbu_id IN
+                   (SELECT cbu_id FROM "ob-poc".cbus WHERE name LIKE $1)"#,
+            )
+            .bind(&pattern)
+            .execute(&self.pool)
+            .await
+            .ok();
+
+            sqlx::query(
+                r#"DELETE FROM "ob-poc".cbu_matrix_product_overlay WHERE cbu_id IN
+                   (SELECT cbu_id FROM "ob-poc".cbus WHERE name LIKE $1)"#,
+            )
+            .bind(&pattern)
+            .execute(&self.pool)
+            .await
+            .ok();
+
+            sqlx::query(
+                r#"DELETE FROM "ob-poc".cbu_product_subscriptions WHERE cbu_id IN
+                   (SELECT cbu_id FROM "ob-poc".cbus WHERE name LIKE $1)"#,
+            )
+            .bind(&pattern)
+            .execute(&self.pool)
+            .await
+            .ok();
+
+            sqlx::query(
+                r#"DELETE FROM "ob-poc".cbu_resource_instances WHERE cbu_id IN
+                   (SELECT cbu_id FROM "ob-poc".cbus WHERE name LIKE $1)"#,
+            )
+            .bind(&pattern)
+            .execute(&self.pool)
+            .await
+            .ok();
+
+            sqlx::query(
+                r#"DELETE FROM "ob-poc".service_delivery_map WHERE cbu_id IN
+                   (SELECT cbu_id FROM "ob-poc".cbus WHERE name LIKE $1)"#,
+            )
+            .bind(&pattern)
+            .execute(&self.pool)
+            .await
+            .ok();
+
+            sqlx::query(
                 r#"DELETE FROM "ob-poc".cbu_entity_roles WHERE cbu_id IN
                    (SELECT cbu_id FROM "ob-poc".cbus WHERE name LIKE $1)"#,
             )
@@ -832,6 +923,42 @@ slots:
         Ok(count.unwrap_or(0))
     }
 
+    /// Helper: Count active service intents for a CBU
+    async fn count_service_intents(pool: &PgPool, cbu_id: Uuid) -> Result<i64> {
+        let count: Option<i64> = sqlx::query_scalar(
+            r#"SELECT COUNT(*) FROM "ob-poc".service_intents
+               WHERE cbu_id = $1 AND status = 'active'"#,
+        )
+        .bind(cbu_id)
+        .fetch_one(pool)
+        .await?;
+        Ok(count.unwrap_or(0))
+    }
+
+    /// Helper: Count active product subscriptions for a CBU
+    async fn count_product_subscriptions(pool: &PgPool, cbu_id: Uuid) -> Result<i64> {
+        let count: Option<i64> = sqlx::query_scalar(
+            r#"SELECT COUNT(*) FROM "ob-poc".cbu_product_subscriptions
+               WHERE cbu_id = $1 AND status = 'ACTIVE'"#,
+        )
+        .bind(cbu_id)
+        .fetch_one(pool)
+        .await?;
+        Ok(count.unwrap_or(0))
+    }
+
+    /// Helper: Count active SRDEF discoveries for a CBU
+    async fn count_srdef_discoveries(pool: &PgPool, cbu_id: Uuid) -> Result<i64> {
+        let count: Option<i64> = sqlx::query_scalar(
+            r#"SELECT COUNT(*) FROM "ob-poc".srdef_discovery_reasons
+               WHERE cbu_id = $1 AND superseded_at IS NULL"#,
+        )
+        .bind(cbu_id)
+        .fetch_one(pool)
+        .await?;
+        Ok(count.unwrap_or(0))
+    }
+
     /// Helper: Get CBU product_id
     async fn get_cbu_product_id(pool: &PgPool, cbu_id: Uuid) -> Result<Option<Uuid>> {
         let product_id: Option<Uuid> =
@@ -889,12 +1016,22 @@ slots:
         // service_delivery_map is the source of truth for CBU->Product relationships
         // A CBU can have multiple products, tracked via service_delivery_map
 
-        // Verify service delivery entries created (should match product's service count)
+        // Verify product subscription, service delivery, and service intents were created.
         let expected_services = get_product_service_count(&db.pool, "Custody").await?;
+        assert_eq!(
+            count_product_subscriptions(&db.pool, cbu_id).await?,
+            1,
+            "Should create one active product subscription"
+        );
         let actual_deliveries = count_service_deliveries(&db.pool, cbu_id).await?;
         assert_eq!(
             actual_deliveries, expected_services,
             "Should create one delivery entry per service"
+        );
+        assert_eq!(
+            count_service_intents(&db.pool, cbu_id).await?,
+            expected_services,
+            "Should create one active service intent per product service"
         );
         assert!(
             actual_deliveries >= 10,
@@ -930,15 +1067,27 @@ slots:
         db.execute_dsl(&add_product_dsl).await?;
 
         let first_count = count_service_deliveries(&db.pool, cbu_id).await?;
+        let first_intents = count_service_intents(&db.pool, cbu_id).await?;
+        let first_subscriptions = count_product_subscriptions(&db.pool, cbu_id).await?;
 
         // Add same product again (should be idempotent)
         db.execute_dsl(&add_product_dsl).await?;
 
         let second_count = count_service_deliveries(&db.pool, cbu_id).await?;
+        let second_intents = count_service_intents(&db.pool, cbu_id).await?;
+        let second_subscriptions = count_product_subscriptions(&db.pool, cbu_id).await?;
 
         assert_eq!(
             first_count, second_count,
             "Re-running add-product should not duplicate entries"
+        );
+        assert_eq!(
+            first_intents, second_intents,
+            "Re-running add-product should not duplicate service intents"
+        );
+        assert_eq!(
+            first_subscriptions, second_subscriptions,
+            "Re-running add-product should not duplicate subscriptions"
         );
 
         // Cleanup
@@ -1040,6 +1189,70 @@ slots:
             .bind(cbu_id)
             .execute(&db.pool)
             .await?;
+        db.cleanup().await?;
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_cbu_add_product_drives_product_service_resource_lifecycle() -> Result<()> {
+        let db = TestDb::new().await?;
+
+        let dsl = format!(
+            r#"(cbu.create :name "{}" :client-type "fund" :jurisdiction "LU" :as @cbu)"#,
+            db.name("ProductServiceResourceLifecycleCBU")
+        );
+        let ctx = db.execute_dsl(&dsl).await?;
+        let cbu_id = ctx.resolve("cbu").unwrap();
+
+        let add_dsl = format!(
+            r#"(cbu.add-product :cbu-id "{}" :product "CUSTODY")"#,
+            cbu_id
+        );
+        db.execute_dsl(&add_dsl).await?;
+
+        let expected_services = get_product_service_count(&db.pool, "Custody").await?;
+        assert_eq!(count_product_subscriptions(&db.pool, cbu_id).await?, 1);
+        assert_eq!(
+            count_service_intents(&db.pool, cbu_id).await?,
+            expected_services
+        );
+        assert!(
+            count_srdef_discoveries(&db.pool, cbu_id).await? > 0,
+            "cbu.add-product should run SRDEF discovery for the derived service intents"
+        );
+
+        sqlx::query(
+            r#"UPDATE "ob-poc".service_intents
+               SET options = $2
+               WHERE cbu_id = $1"#,
+        )
+        .bind(cbu_id)
+        .bind(serde_json::json!({
+            "markets": [{"market": "XLUX"}],
+            "currencies": ["EUR"],
+            "counterparties": []
+        }))
+        .execute(&db.pool)
+        .await?;
+
+        let discovery_dsl = format!(r#"(discovery.run :cbu-id "{}")"#, cbu_id);
+        db.execute_dsl(&discovery_dsl).await?;
+
+        let market_parameter_count: i64 = sqlx::query_scalar(
+            r#"SELECT COUNT(*)
+               FROM "ob-poc".srdef_discovery_reasons
+               WHERE cbu_id = $1
+                 AND superseded_at IS NULL
+                 AND parameters->>'market' = 'XLUX'"#,
+        )
+        .bind(cbu_id)
+        .fetch_one(&db.pool)
+        .await?;
+        assert!(
+            market_parameter_count > 0,
+            "market-scoped service resources should retain intent options as discovery parameters"
+        );
+
         db.cleanup().await?;
         Ok(())
     }

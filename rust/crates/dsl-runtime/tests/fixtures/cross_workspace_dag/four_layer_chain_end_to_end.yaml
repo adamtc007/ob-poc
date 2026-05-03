@@ -22,7 +22,7 @@ entity_aliases:
   binding-1: "00000000-0000-0000-0000-000000000055"
 
 initial_state:
-  - { workspace: deal,                slot: deal,                 entity: "deal-1",    state: "KYC_CLEARANCE" }
+  - { workspace: deal,                slot: deal,                 entity: "deal-1",    state: "IN_CLEARANCE" }
   - { workspace: kyc,                 slot: kyc_case,             entity: "case-1",    state: "APPROVED" }
   - { workspace: booking_principal,   slot: clearance,            entity: "bpc-1",     state: "ACTIVE" }
   - { workspace: cbu,                 slot: service_consumption,  entity: "consume-1", state: "proposed" }
@@ -52,7 +52,7 @@ steps:
       workspace: deal
       slot: deal
       entity: "deal-1"
-      from: "KYC_CLEARANCE"
+      from: "IN_CLEARANCE"
       to: "CONTRACTED"
     expect:
       violations: []

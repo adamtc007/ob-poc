@@ -85,7 +85,7 @@ steps:
   # ────────────────────────────────────────────────────────────────────────
   # PHASE 1: Deal created. No products, no CBU yet.
   # ────────────────────────────────────────────────────────────────────────
-  - name: "P1: deal in PROSPECT, no L1 gates fire (only KYC_CLEARANCE→CONTRACTED is gated)"
+  - name: "P1: deal in PROSPECT, no L1 gates fire (only IN_CLEARANCE→CONTRACTED is gated)"
     check_transition:
       workspace: deal
       slot: deal
@@ -107,9 +107,9 @@ steps:
       - { workspace: deal, slot: deal_product, entity: "product-custody", state: "AGREED" }
       - { workspace: deal, slot: deal_product, entity: "product-fa",      state: "AGREED" }
 
-  # Advance deal through BAC_APPROVAL → KYC_CLEARANCE.
+  # Advance deal into the compound clearance state.
   - mutate:
-      - { workspace: deal, slot: deal, entity: "deal-1", state: "KYC_CLEARANCE" }
+      - { workspace: deal, slot: deal, entity: "deal-1", state: "IN_CLEARANCE" }
 
   # ────────────────────────────────────────────────────────────────────────
   # PHASE 3: Deal CONTRACTED — compound BAC+KYC+BP tollgate fires.
@@ -119,7 +119,7 @@ steps:
       workspace: deal
       slot: deal
       entity: "deal-1"
-      from: "KYC_CLEARANCE"
+      from: "IN_CLEARANCE"
       to: "CONTRACTED"
     expect:
       violations:
@@ -135,7 +135,7 @@ steps:
       workspace: deal
       slot: deal
       entity: "deal-1"
-      from: "KYC_CLEARANCE"
+      from: "IN_CLEARANCE"
       to: "CONTRACTED"
     expect:
       violations: []

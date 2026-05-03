@@ -221,7 +221,7 @@ impl SemOsVerbOp for ReplayConstellation {
             prior_version: held_version,
             new_version: current_version,
             source_workspace: atom.owner_workspace.clone(),
-            target_workspace: "on_boarding".to_string(),
+            target_workspace: "onboarding_request".to_string(),
             target_constellation_family: constellation_family.clone(),
             entity_id,
             initiated_at: Utc::now(),

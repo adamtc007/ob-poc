@@ -28,6 +28,8 @@ struct PackYaml {
     #[serde(default)]
     id: Option<String>,
     #[serde(default)]
+    workspaces: Vec<String>,
+    #[serde(default)]
     allowed_verbs: Vec<String>,
 }
 
@@ -36,6 +38,7 @@ struct PackYaml {
 pub struct LoadedPack {
     pub name: String,
     pub source_path: PathBuf,
+    pub workspaces: Vec<String>,
     pub allowed_verbs: Vec<String>,
 }
 
@@ -79,6 +82,7 @@ pub fn load_packs_from_dir(packs_dir: &Path) -> Result<BTreeMap<String, LoadedPa
             LoadedPack {
                 name,
                 source_path: path,
+                workspaces: pack.workspaces,
                 allowed_verbs: pack.allowed_verbs,
             },
         );
@@ -111,7 +115,11 @@ mod tests {
 
         let p1 = packs_dir.join("foo.yaml");
         let mut f = fs::File::create(&p1).unwrap();
-        writeln!(f, "id: foo\nallowed_verbs:\n  - a.one\n  - a.two\n").unwrap();
+        writeln!(
+            f,
+            "id: foo\nworkspaces:\n  - cbu\nallowed_verbs:\n  - a.one\n  - a.two\n"
+        )
+        .unwrap();
 
         let p2 = packs_dir.join("bar.yaml");
         let mut f = fs::File::create(&p2).unwrap();
@@ -119,6 +127,7 @@ mod tests {
 
         let packs = load_packs_from_dir(packs_dir).unwrap();
         assert_eq!(packs.len(), 2);
+        assert_eq!(packs["foo"].workspaces, vec!["cbu"]);
         assert_eq!(packs["foo"].allowed_verbs, vec!["a.one", "a.two"]);
         // Bar had no `id`, falls back to filename stem.
         assert_eq!(packs["bar"].allowed_verbs, vec!["b.three"]);

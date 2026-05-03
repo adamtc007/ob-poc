@@ -1225,7 +1225,7 @@ domains:
 
       add-product:
         flavour: instance_adding
-        description: Add a product to a CBU (creates service_delivery_map entries for all services)
+        description: Add a product to a CBU and derive service intents for its service-resource lifecycle
         invocation_phrases:
           - "add product to CBU"
           - "assign product to structure"
@@ -1278,9 +1278,17 @@ domains:
               schema: ob-poc
               search_key: product_code
               primary_key: product_code
+          - name: config
+            type: json
+            required: false
+            description: Product subscription configuration and default service options
+          - name: options
+            type: json
+            required: false
+            description: Explicit service intent options overriding derived CBU matrix options
         returns:
           type: affected
-          description: Number of service delivery entries created
+          description: Number of subscription, delivery, and service intent entries created
         three_axis:
           state_effect: preserving
           external_effects: []

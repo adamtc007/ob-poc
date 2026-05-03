@@ -21,6 +21,8 @@ srdefs:
 
     # Which services trigger this SRDEF
     triggered_by_services:
+      - SAFEKEEPING
+      - SETTLEMENT
       - CUSTODY_SAFEKEEPING
       - CUSTODY_SETTLEMENT
       - PRIME_BROKERAGE
@@ -74,6 +76,9 @@ srdefs:
     owner: CUSTODY
 
     triggered_by_services:
+      - SAFEKEEPING
+      - SETTLEMENT
+      - CASH_MGMT
       - CUSTODY_SAFEKEEPING
       - CUSTODY_SETTLEMENT
       - CASH_MANAGEMENT
@@ -110,6 +115,7 @@ srdefs:
     owner: CUSTODY
 
     triggered_by_services:
+      - SETTLEMENT
       - CUSTODY_SETTLEMENT
 
     attributes:

@@ -20,7 +20,7 @@
 use anyhow::Result;
 use async_trait::async_trait;
 use chrono::NaiveDate;
-use serde_json::Value;
+use serde_json::{json, Map, Value};
 use std::collections::HashMap;
 use uuid::Uuid;
 
@@ -89,6 +89,86 @@ fn affected_count(outcome: VerbExecutionOutcome) -> i64 {
             .unwrap_or(0),
         _ => 0,
     }
+}
+
+fn merge_json_object(target: &mut Map<String, Value>, source: Option<&Value>) {
+    let Some(source) = source.and_then(Value::as_object) else {
+        return;
+    };
+    for (key, value) in source {
+        target.insert(key.clone(), value.clone());
+    }
+}
+
+async fn cbu_matrix_options(cbu_id: Uuid, scope: &mut dyn TransactionScope) -> Result<Value> {
+    let options: Option<Value> = sqlx::query_scalar(
+        r#"
+        WITH matrix AS (
+            SELECT *
+            FROM "ob-poc".v_cbu_matrix_effective
+            WHERE cbu_id = $1
+        )
+        SELECT jsonb_build_object(
+            'markets',
+            COALESCE(
+                jsonb_agg(DISTINCT jsonb_build_object(
+                    'market_id', market_id,
+                    'market', market,
+                    'market_name', market_name
+                )) FILTER (WHERE market_id IS NOT NULL),
+                '[]'::jsonb
+            ),
+            'currencies',
+            COALESCE(
+                (
+                    SELECT jsonb_agg(DISTINCT currency)
+                    FROM matrix m
+                    CROSS JOIN LATERAL unnest(m.currencies) AS currency
+                    WHERE currency IS NOT NULL
+                ),
+                '[]'::jsonb
+            ),
+            'counterparties',
+            COALESCE(
+                jsonb_agg(DISTINCT jsonb_build_object(
+                    'counterparty_entity_id', counterparty_entity_id,
+                    'counterparty', counterparty_name
+                )) FILTER (WHERE counterparty_entity_id IS NOT NULL),
+                '[]'::jsonb
+            ),
+            'instrument_classes',
+            COALESCE(
+                jsonb_agg(DISTINCT jsonb_build_object(
+                    'instrument_class_id', instrument_class_id,
+                    'instrument_class', instrument_class,
+                    'instrument_class_name', instrument_class_name
+                )) FILTER (WHERE instrument_class_id IS NOT NULL),
+                '[]'::jsonb
+            )
+        )
+        FROM matrix
+        "#,
+    )
+    .bind(cbu_id)
+    .fetch_optional(scope.executor())
+    .await?;
+
+    Ok(options.unwrap_or_else(|| json!({})))
+}
+
+async fn derive_service_intent_options(
+    cbu_id: Uuid,
+    product_config: Option<&Value>,
+    service_config: Option<&Value>,
+    requested_options: Option<&Value>,
+    scope: &mut dyn TransactionScope,
+) -> Result<Value> {
+    let mut merged = Map::new();
+    merge_json_object(&mut merged, service_config);
+    merge_json_object(&mut merged, Some(&cbu_matrix_options(cbu_id, scope).await?));
+    merge_json_object(&mut merged, product_config);
+    merge_json_object(&mut merged, requested_options);
+    Ok(Value::Object(merged))
 }
 
 fn normalize_relationship_type(raw: &str) -> String {
@@ -734,7 +814,7 @@ impl SemOsVerbOp for UnlinkStructure {
 // cbu.add-product
 // =============================================================================
 
-/// Add a product to a CBU by creating service_delivery_map and cbu_resource_instances entries.
+/// Add a product to a CBU by creating a subscription and service intents.
 pub struct AddProduct;
 
 #[async_trait]
@@ -750,6 +830,9 @@ impl SemOsVerbOp for AddProduct {
         scope: &mut dyn TransactionScope,
     ) -> Result<VerbExecutionOutcome> {
         let product_name = json_extract_string(args, "product")?;
+        let requested_options = args.get("options");
+        let subscription_config = args.get("config");
+        let subscription_config_value = subscription_config.cloned().unwrap_or_else(|| json!({}));
         let cbu_id_arg = args
             .get("cbu-id")
             .ok_or_else(|| anyhow::anyhow!("cbu.add-product: Missing required argument :cbu-id"))?;
@@ -815,8 +898,14 @@ impl SemOsVerbOp for AddProduct {
             })?
         };
 
-        let product_row: Option<(Uuid, String, String)> = sqlx::query_as(
-            r#"SELECT product_id, name, product_code FROM "ob-poc".products WHERE product_code = $1"#,
+        let product_row: Option<(Uuid, String, Option<String>)> = sqlx::query_as(
+            r#"SELECT product_id, name, product_code
+               FROM "ob-poc".products
+               WHERE (product_code = $1 OR LOWER(name) = LOWER($1))
+                 AND is_active = true
+               ORDER BY CASE WHEN product_code = $1 THEN 0 ELSE 1 END,
+                        product_code NULLS LAST
+               LIMIT 1"#,
         )
         .bind(&product_name)
         .fetch_optional(scope.executor())
@@ -830,9 +919,42 @@ impl SemOsVerbOp for AddProduct {
         })?;
 
         let product_id = product.0;
+        let product_code = product.2.unwrap_or_else(|| product.1.clone());
 
-        let services: Vec<(Uuid, String)> = sqlx::query_as(
-            r#"SELECT ps.service_id, s.name as service_name
+        let subscription_existed: bool = sqlx::query_scalar(
+            r#"SELECT EXISTS(
+               SELECT 1
+               FROM "ob-poc".cbu_product_subscriptions
+               WHERE cbu_id = $1 AND product_id = $2 AND status = 'ACTIVE'
+            )"#,
+        )
+        .bind(cbu_id)
+        .bind(product_id)
+        .fetch_one(scope.executor())
+        .await?;
+
+        let subscription_id: Uuid = sqlx::query_scalar(
+            r#"
+            INSERT INTO "ob-poc".cbu_product_subscriptions
+                (cbu_id, product_id, status, config)
+            VALUES ($1, $2, 'ACTIVE', COALESCE($3, '{}'::jsonb))
+            ON CONFLICT (cbu_id, product_id)
+            DO UPDATE SET
+                status = 'ACTIVE',
+                effective_to = NULL,
+                config = COALESCE(EXCLUDED.config, "ob-poc".cbu_product_subscriptions.config),
+                updated_at = NOW()
+            RETURNING subscription_id
+            "#,
+        )
+        .bind(cbu_id)
+        .bind(product_id)
+        .bind(&subscription_config_value)
+        .fetch_one(scope.executor())
+        .await?;
+
+        let services: Vec<(Uuid, String, Option<Value>)> = sqlx::query_as(
+            r#"SELECT ps.service_id, s.name as service_name, ps.configuration
                FROM "ob-poc".product_services ps
                JOIN "ob-poc".services s ON ps.service_id = s.service_id
                WHERE ps.product_id = $1
@@ -852,6 +974,8 @@ impl SemOsVerbOp for AddProduct {
 
         let mut delivery_created: i64 = 0;
         let mut delivery_skipped: i64 = 0;
+        let mut intents_created: i64 = 0;
+        let mut intents_updated: i64 = 0;
 
         for svc in &services {
             let existed: bool = sqlx::query_scalar(
@@ -878,84 +1002,72 @@ impl SemOsVerbOp for AddProduct {
             } else {
                 delivery_created += 1;
             }
-        }
 
-        let mut resource_created: i64 = 0;
-        let mut resource_skipped: i64 = 0;
-        let service_resources: Vec<(Uuid, Uuid, Option<String>, String)> = sqlx::query_as(
-            r#"SELECT src.service_id, src.resource_id, srt.resource_code, srt.name as resource_name
-               FROM "ob-poc".service_resource_capabilities src
-               JOIN "ob-poc".service_resource_types srt ON src.resource_id = srt.resource_id
-               WHERE src.service_id IN (
-                   SELECT service_id FROM "ob-poc".product_services WHERE product_id = $1
-               )
-               AND src.is_active = true
-               ORDER BY src.service_id, srt.name"#,
-        )
-        .bind(product_id)
-        .fetch_all(scope.executor())
-        .await?;
-
-        for sr in &service_resources {
-            let resource_code = sr.2.as_deref().ok_or_else(|| {
-                anyhow::anyhow!(
-                    "cbu.add-product: service resource {} has no resource_code",
-                    sr.1
-                )
-            })?;
-            let existed: bool = sqlx::query_scalar(
+            let intent_existed: bool = sqlx::query_scalar(
                 r#"SELECT EXISTS(
-                   SELECT 1 FROM "ob-poc".cbu_resource_instances
+                   SELECT 1 FROM "ob-poc".service_intents
                    WHERE cbu_id = $1
                      AND product_id = $2
                      AND service_id = $3
-                     AND resource_type_id = $4
+                     AND status = 'active'
                 )"#,
             )
             .bind(cbu_id)
             .bind(product_id)
-            .bind(sr.0)
-            .bind(sr.1)
+            .bind(svc.0)
             .fetch_one(scope.executor())
             .await?;
 
-            let resource_args = serde_json::json!({
+            let options = derive_service_intent_options(
+                cbu_id,
+                Some(&subscription_config_value),
+                svc.2.as_ref(),
+                requested_options,
+                scope,
+            )
+            .await?;
+            let intent_args = json!({
                 "cbu-id": cbu_id,
                 "product-id": product_id,
-                "service-id": sr.0,
-                "resource-type": resource_code,
-                "instance-name": sr.3
+                "service-id": svc.0,
+                "options": options
             });
             dispatch_child_verb(
                 self.fqn(),
-                "service-resource.provision",
-                &resource_args,
+                "service-intent.create",
+                &intent_args,
                 ctx,
                 scope,
             )
             .await?;
 
-            if existed {
-                resource_skipped += 1;
+            if intent_existed {
+                intents_updated += 1;
             } else {
-                resource_created += 1;
+                intents_created += 1;
             }
         }
+
+        let discovery_args = json!({ "cbu-id": cbu_id });
+        dispatch_child_verb(self.fqn(), "discovery.run", &discovery_args, ctx, scope).await?;
 
         tracing::info!(
             cbu_id = %cbu_id,
             cbu_name = %cbu_name,
-            product = %product_name,
+            product = %product_code,
+            subscription_id = %subscription_id,
+            subscription_created = !subscription_existed,
             services_total = services.len(),
             delivery_entries_created = delivery_created,
             delivery_entries_skipped = delivery_skipped,
-            resource_instances_created = resource_created,
-            resource_instances_skipped = resource_skipped,
+            service_intents_created = intents_created,
+            service_intents_updated = intents_updated,
             "cbu.add-product completed"
         );
 
         Ok(VerbExecutionOutcome::Affected(
-            (delivery_created + resource_created) as u64,
+            ((if subscription_existed { 0 } else { 1 }) + delivery_created + intents_created)
+                as u64,
         ))
     }
 }

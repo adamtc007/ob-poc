@@ -101,6 +101,7 @@ pub enum ObjectType {
     ConstellationMap,
     StateMachine,
     StateGraph,
+    DagTaxonomy,
     TaxonomyDef,
     TaxonomyNode,
     MembershipRule,

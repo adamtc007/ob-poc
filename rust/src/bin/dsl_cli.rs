@@ -24,6 +24,7 @@ use colored::Colorize;
 use std::io::{self, Read};
 use std::path::PathBuf;
 use std::process::ExitCode;
+use std::sync::Arc;
 
 use tracing_subscriber::EnvFilter;
 
@@ -34,6 +35,13 @@ use ob_poc::dsl_v2::tooling::{
     registry, Severity, ValidationClientType as ClientType, ValidationContext,
     ValidationRustStyleFormatter as RustStyleFormatter, VerbBehavior,
 };
+
+#[cfg(feature = "database")]
+fn sem_os_ops_registry() -> Arc<sem_os_postgres::ops::SemOsVerbOpRegistry> {
+    let mut registry = sem_os_postgres::ops::build_registry();
+    ob_poc::domain_ops::extend_registry(&mut registry);
+    Arc::new(registry)
+}
 
 #[derive(Parser)]
 #[command(name = "dsl_cli")]
@@ -1171,7 +1179,7 @@ async fn cmd_execute(
         println!();
     }
 
-    let executor = DslExecutor::new(pool);
+    let executor = DslExecutor::new(pool).with_sem_os_ops(sem_os_ops_registry());
     let mut exec_ctx = ExecutionContext::default();
 
     // Execute the entire plan
@@ -1550,7 +1558,7 @@ async fn cmd_generate(
             println!();
         }
 
-        let executor = DslExecutor::new(pool);
+        let executor = DslExecutor::new(pool).with_sem_os_ops(sem_os_ops_registry());
         let mut exec_ctx = ExecutionContext::default();
 
         match executor.execute_plan(&plan, &mut exec_ctx).await {
@@ -2054,7 +2062,9 @@ async fn cmd_repl(
         println!("{} Event infrastructure initialized", "✓".green());
     }
 
-    let executor = DslExecutor::new(pool.clone()).with_events(events.clone());
+    let executor = DslExecutor::new(pool.clone())
+        .with_events(events.clone())
+        .with_sem_os_ops(sem_os_ops_registry());
 
     // Parse CBU ID if provided
     let cbu_uuid = if let Some(id) = &cbu_id {

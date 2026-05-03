@@ -175,45 +175,110 @@ impl<'a> ResourceDiscoveryEngine<'a> {
         srdef: &super::srdef_loader::LoadedSrdef,
         options: &JsonValue,
     ) -> Result<Vec<JsonValue>> {
-        let mut params = Vec::new();
+        let mut dimensions = Vec::new();
 
         if srdef.per_market {
-            // Extract markets from options
-            if let Some(markets) = options.get("markets").and_then(|m| m.as_array()) {
-                for market in markets {
-                    params.push(json!({ "market": market }));
+            dimensions.push(parameter_values(
+                options,
+                "markets",
+                &[("market_id", "market_id"), ("market", "market")],
+            ));
+        }
+        if srdef.per_currency {
+            let currencies = parameter_values(options, "currencies", &[("currency", "currency")]);
+            if currencies == vec![json!({})] {
+                if let Some(currency) = options.get("settlement_currency") {
+                    dimensions.push(vec![json!({ "currency": currency })]);
+                } else {
+                    dimensions.push(currencies);
                 }
             } else {
-                // Default: single instance without market parameter
-                params.push(json!({}));
+                dimensions.push(currencies);
             }
-        } else if srdef.per_currency {
-            // Extract currencies from options
-            if let Some(currencies) = options.get("currencies").and_then(|c| c.as_array()) {
-                for currency in currencies {
-                    params.push(json!({ "currency": currency }));
+        }
+        if srdef.per_counterparty {
+            dimensions.push(parameter_values(
+                options,
+                "counterparties",
+                &[
+                    ("counterparty_entity_id", "counterparty_entity_id"),
+                    ("counterparty", "counterparty"),
+                ],
+            ));
+        }
+
+        if dimensions.is_empty() {
+            return Ok(vec![json!({})]);
+        }
+
+        let mut params = vec![json!({})];
+        for dimension in dimensions {
+            let mut next = Vec::new();
+            for base in &params {
+                for value in &dimension {
+                    next.push(merge_parameter_objects(base, value));
                 }
-            } else if let Some(currency) = options.get("settlement_currency") {
-                params.push(json!({ "currency": currency }));
-            } else {
-                params.push(json!({}));
             }
-        } else if srdef.per_counterparty {
-            // Extract counterparties from options
-            if let Some(counterparties) = options.get("counterparties").and_then(|c| c.as_array()) {
-                for cp in counterparties {
-                    params.push(json!({ "counterparty": cp }));
-                }
-            } else {
-                params.push(json!({}));
-            }
-        } else {
-            // Non-parameterized: single instance
-            params.push(json!({}));
+            params = next;
         }
 
         Ok(params)
     }
+}
+
+fn parameter_values(
+    options: &JsonValue,
+    option_key: &str,
+    object_fields: &[(&str, &str)],
+) -> Vec<JsonValue> {
+    let Some(values) = options.get(option_key).and_then(JsonValue::as_array) else {
+        return vec![json!({})];
+    };
+
+    let mut params = Vec::new();
+    for value in values {
+        if let Some(raw) = value.as_str() {
+            let key = object_fields
+                .last()
+                .map(|(_, target_key)| *target_key)
+                .unwrap_or(option_key);
+            params.push(json!({ key: raw }));
+            continue;
+        }
+
+        if let Some(object) = value.as_object() {
+            let mut param = serde_json::Map::new();
+            for (source_key, target_key) in object_fields {
+                if let Some(field_value) = object.get(*source_key) {
+                    param.insert((*target_key).to_string(), field_value.clone());
+                }
+            }
+            if !param.is_empty() {
+                params.push(JsonValue::Object(param));
+            }
+        }
+    }
+
+    if params.is_empty() {
+        vec![json!({})]
+    } else {
+        params
+    }
+}
+
+fn merge_parameter_objects(left: &JsonValue, right: &JsonValue) -> JsonValue {
+    let mut merged = serde_json::Map::new();
+    if let Some(object) = left.as_object() {
+        for (key, value) in object {
+            merged.insert(key.clone(), value.clone());
+        }
+    }
+    if let Some(object) = right.as_object() {
+        for (key, value) in object {
+            merged.insert(key.clone(), value.clone());
+        }
+    }
+    JsonValue::Object(merged)
 }
 
 /// Information about a discovered SRDEF

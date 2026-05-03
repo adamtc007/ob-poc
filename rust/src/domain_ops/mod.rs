@@ -207,8 +207,8 @@ pub mod rule_evaluator;
 // CustomOps-era delegation helpers that became orphaned when slice #80
 // deleted the `CustomOperation` trait. All callers routed through
 // `dispatch_plugin_via_sem_os_op` or direct service traits afterwards.
-// Phase 5a composite-blocker #17 — sem_os_maintenance_ops relocated to
-// `dsl-runtime::domain_ops::sem_os_maintenance_ops`. Pure clean lift —
+// Phase 5a composite-blocker #17 — SemOS maintenance ops relocated to
+// `dsl-runtime::domain_ops::maintenance`. Pure clean lift —
 // the spec's "ob-poc-adapter destination" matrix tag turned out wrong
 // (same as team_ops slice #16). 7 ops (health-pending, health-stale-
 // dryruns, cleanup, bootstrap-seeds, drain-outbox, reindex-embeddings,

@@ -82,7 +82,7 @@ pub mod affinity_graph_cache;
 // Phase 5c-migrate Phase B slice #6: sem_os_changeset_ops → `sem_os_postgres::ops::changeset`.
 // Phase 5c-migrate Phase B slice #6: sem_os_focus_ops → `sem_os_postgres::ops::focus`.
 // Phase 5c-migrate Phase B slice #6: sem_os_governance_ops → `sem_os_postgres::ops::governance`.
-// Phase 5c-migrate Phase B slice #7: sem_os_maintenance_ops → `sem_os_postgres::ops::maintenance`.
+// Phase 5c-migrate Phase B slice #7: SemOS maintenance ops → `sem_os_postgres::ops::maintenance`.
 // Phase 5c-migrate Phase B slice #6: sem_os_registry_ops → `sem_os_postgres::ops::registry_ops`.
 // Phase 5c-migrate Phase B slice #15: sem_os_schema_ops → `sem_os_postgres::ops::schema`.
 // Phase 5c-migrate Phase B slice #8: semantic_ops → `sem_os_postgres::ops::semantic`.

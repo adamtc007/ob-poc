@@ -16,6 +16,8 @@ srdefs:
     owner: SWIFT
 
     triggered_by_services:
+      - SETTLEMENT
+      - CORP_ACTIONS
       - CUSTODY_SETTLEMENT
       - CORPORATE_ACTIONS
       - PROXY_VOTING

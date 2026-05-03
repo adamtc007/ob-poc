@@ -53,6 +53,10 @@ impl SemOsVerbOp for Provision {
         let instance_name = json_extract_string_opt(args, "instance-name");
         let product_id = json_extract_uuid_opt(args, ctx, "product-id");
         let mut service_id = json_extract_uuid_opt(args, ctx, "service-id");
+        let market_id = json_extract_uuid_opt(args, ctx, "market-id");
+        let currency = json_extract_string_opt(args, "currency");
+        let counterparty_entity_id = json_extract_uuid_opt(args, ctx, "counterparty-entity-id");
+        let instance_config = args.get("config").cloned().unwrap_or_else(|| json!({}));
         let depends_on_refs: Vec<Uuid> = args
             .get("depends-on")
             .and_then(|v| v.as_array())
@@ -94,54 +98,53 @@ impl SemOsVerbOp for Provision {
             service_id = services.into_iter().next();
         }
 
-        let instance_id = Uuid::new_v4();
-        let row: (Uuid,) = if product_id.is_some() && service_id.is_some() {
-            sqlx::query_as(
-                r#"WITH ins AS (
-                INSERT INTO "ob-poc".cbu_resource_instances
-                (instance_id, cbu_id, product_id, service_id, resource_type_id,
-                 instance_url, instance_identifier, instance_name, status)
-                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'PENDING')
-                ON CONFLICT ON CONSTRAINT cbu_resource_instances_cbu_product_service_resource_key
-                DO NOTHING
-                RETURNING instance_id
+        let existing_instance_id: Option<Uuid> = if product_id.is_some() && service_id.is_some() {
+            sqlx::query_scalar(
+                r#"SELECT instance_id
+                   FROM "ob-poc".cbu_resource_instances
+                   WHERE cbu_id = $1
+                     AND product_id = $2
+                     AND service_id = $3
+                     AND resource_type_id = $4
+                     AND market_id IS NOT DISTINCT FROM $5
+                     AND currency IS NOT DISTINCT FROM $6
+                     AND counterparty_entity_id IS NOT DISTINCT FROM $7
+                   ORDER BY created_at DESC
+                   LIMIT 1"#,
             )
-            SELECT instance_id FROM ins
-            UNION ALL
-            SELECT instance_id FROM "ob-poc".cbu_resource_instances
-            WHERE cbu_id = $2
-              AND product_id = $3
-              AND service_id = $4
-              AND resource_type_id = $5
-            AND NOT EXISTS (SELECT 1 FROM ins)
-            LIMIT 1"#,
-            )
-            .bind(instance_id)
             .bind(cbu_id)
             .bind(product_id)
             .bind(service_id)
             .bind(resource_type_id)
-            .bind(&instance_url)
-            .bind(&instance_identifier)
-            .bind(&instance_name)
-            .fetch_one(scope.executor())
+            .bind(market_id)
+            .bind(&currency)
+            .bind(counterparty_entity_id)
+            .fetch_optional(scope.executor())
             .await?
         } else {
+            None
+        };
+
+        let row: (Uuid,) = if let Some(existing_instance_id) = existing_instance_id {
+            (existing_instance_id,)
+        } else {
+            let instance_id = Uuid::new_v4();
             sqlx::query_as(
                 r#"WITH ins AS (
-                INSERT INTO "ob-poc".cbu_resource_instances
-                (instance_id, cbu_id, product_id, service_id, resource_type_id,
-                 instance_url, instance_identifier, instance_name, status)
-                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'PENDING')
-                ON CONFLICT (instance_url) DO NOTHING
-                RETURNING instance_id
-            )
-            SELECT instance_id FROM ins
-            UNION ALL
-            SELECT instance_id FROM "ob-poc".cbu_resource_instances
-            WHERE instance_url = $6
-            AND NOT EXISTS (SELECT 1 FROM ins)
-            LIMIT 1"#,
+                    INSERT INTO "ob-poc".cbu_resource_instances
+                    (instance_id, cbu_id, product_id, service_id, resource_type_id,
+                     instance_url, instance_identifier, instance_name, instance_config,
+                     market_id, currency, counterparty_entity_id, status)
+                    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, 'PENDING')
+                    ON CONFLICT (instance_url) DO NOTHING
+                    RETURNING instance_id
+                )
+                SELECT instance_id FROM ins
+                UNION ALL
+                SELECT instance_id FROM "ob-poc".cbu_resource_instances
+                WHERE instance_url = $6
+                AND NOT EXISTS (SELECT 1 FROM ins)
+                LIMIT 1"#,
             )
             .bind(instance_id)
             .bind(cbu_id)
@@ -151,6 +154,10 @@ impl SemOsVerbOp for Provision {
             .bind(&instance_url)
             .bind(&instance_identifier)
             .bind(&instance_name)
+            .bind(&instance_config)
+            .bind(market_id)
+            .bind(&currency)
+            .bind(counterparty_entity_id)
             .fetch_one(scope.executor())
             .await?
         };

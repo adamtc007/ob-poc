@@ -25,7 +25,7 @@
 # entity authorised to book the deal on behalf of the bank — BNY itself,
 # a sub-custodian, or a delegated counterparty. Each principal must clear
 # screening (sanctions, credit, regulatory) per deal before that deal can
-# transition KYC_CLEARANCE → CONTRACTED. A CBU does not directly own
+# transition IN_CLEARANCE → CONTRACTED. A CBU does not directly own
 # clearances — they hang off the deal that contracts the CBU.
 #
 # Scope: per-(deal, principal) — Adam's option (a) decision. NOT
@@ -37,7 +37,7 @@
 # V1.3 CONVENTIONS APPLIED:
 #
 #   V1.3-1  cross_workspace_constraints: BP APPROVED/ACTIVE → deal
-#           KYC_CLEARANCE → CONTRACTED (declared in deal_dag.yaml as the
+#           IN_CLEARANCE → CONTRACTED (declared in deal_dag.yaml as the
 #           target side; this workspace owns the source slot).
 #   V1.3-4  expected_lifetime: long_lived (SUSPENDED state present).
 #
@@ -142,7 +142,7 @@ slots:
         PENDING (entry) → SCREENING → APPROVED / REJECTED → ACTIVE →
         SUSPENDED → REVOKED (terminal). REJECTED can be reopened back to
         PENDING for retry. APPROVED/ACTIVE are required to gate the deal
-        KYC_CLEARANCE → CONTRACTED transition (compound BAC+KYC+BP gate
+        IN_CLEARANCE → CONTRACTED transition (compound BAC+KYC+BP gate
         declared in deal_dag.yaml cross_workspace_constraints).
       predicate_bindings:
         - entity: screening_check

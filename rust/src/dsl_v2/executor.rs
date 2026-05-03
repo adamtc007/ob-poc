@@ -1209,6 +1209,9 @@ impl DslExecutor {
                     ops.clone(),
                 )),
             );
+            services.register::<dyn dsl_runtime::service_traits::ServicePipelineService>(
+                std::sync::Arc::new(crate::services::ObPocServicePipelineService::new()),
+            );
             self.service_registry = std::sync::Arc::new(services.build());
         }
         self.sem_os_ops = Some(ops);

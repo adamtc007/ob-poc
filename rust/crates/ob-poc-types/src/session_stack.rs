@@ -41,7 +41,9 @@ pub enum SessionWorkspaceKind {
     Cbu,
     Kyc,
     InstrumentMatrix,
+    #[serde(rename = "onboarding_request")]
     OnBoarding,
+    #[serde(rename = "semos_maintenance")]
     SemOsMaintenance,
     LifecycleResources,
     BookingPrincipal,

@@ -24,7 +24,7 @@ initial_state:
   - workspace: deal
     slot: deal
     entity: "deal-1"
-    state: "KYC_CLEARANCE"
+    state: "IN_CLEARANCE"
     attrs:
       # primary_client_group_id is the bridge column the KYC predicate
       # joins on (cases.client_group_id = this_deal.primary_client_group_id).
@@ -62,7 +62,7 @@ steps:
       workspace: deal
       slot: deal
       entity: "deal-1"
-      from: "KYC_CLEARANCE"
+      from: "IN_CLEARANCE"
       to: "CONTRACTED"
     expect:
       violations:
@@ -79,7 +79,7 @@ steps:
       workspace: deal
       slot: deal
       entity: "deal-1"
-      from: "KYC_CLEARANCE"
+      from: "IN_CLEARANCE"
       to: "CONTRACTED"
     expect:
       violations:
@@ -93,7 +93,7 @@ steps:
       workspace: deal
       slot: deal
       entity: "deal-1"
-      from: "KYC_CLEARANCE"
+      from: "IN_CLEARANCE"
       to: "CONTRACTED"
     expect:
       violations: []

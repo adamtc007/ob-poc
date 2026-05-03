@@ -6,7 +6,7 @@ description: >
   of Adam's deal tollgate triad (BAC + KYC + Booking Principals). Manage
   clearance screening, approval, activation, suspension, and revocation.
   APPROVED/ACTIVE clearances are required to gate the deal
-  KYC_CLEARANCE → CONTRACTED transition (cross-workspace compound gate
+  IN_CLEARANCE → CONTRACTED transition (cross-workspace compound gate
   declared in deal_dag.yaml).
 
 invocation_phrases:

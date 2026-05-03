@@ -28,7 +28,7 @@ optional_context:
   - default_contract
 
 workspaces:
-  - on_boarding
+  - onboarding_request
 
 allowed_verbs:
   - deal.read

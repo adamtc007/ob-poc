@@ -10,8 +10,8 @@ use std::path::{Path, PathBuf};
 
 use anyhow::{Context, Result};
 use sem_os_core::seeds::{
-    ConstellationFamilySeed, ConstellationMapSeed, MacroDefSeed, StateGraphSeed, StateMachineSeed,
-    UniverseSeed,
+    ConstellationFamilySeed, ConstellationMapSeed, DagTaxonomySeed, MacroDefSeed,
+    StateGraphSeed, StateMachineSeed, UniverseSeed,
 };
 
 fn repo_rust_root() -> PathBuf {
@@ -184,6 +184,26 @@ pub fn scan_state_graphs() -> Result<Vec<StateGraphSeed>> {
     Ok(seeds)
 }
 
+/// Scan DAG taxonomy YAML into Sem OS `DagTaxonomySeed` objects.
+pub fn scan_dag_taxonomies() -> Result<Vec<DagTaxonomySeed>> {
+    let dir = repo_rust_root().join("config/sem_os_seeds/dag_taxonomies");
+    let mut seeds = Vec::new();
+    for (_path, value) in read_yaml_files(&dir)? {
+        let Some(fqn) = value
+            .get("dag_id")
+            .or_else(|| value.get("workspace"))
+            .and_then(serde_yaml::Value::as_str)
+            .map(str::to_string)
+        else {
+            continue;
+        };
+        let payload = with_fqn(yaml_to_json(value)?, &fqn);
+        seeds.push(DagTaxonomySeed { fqn, payload });
+    }
+    seeds.sort_by(|left, right| left.fqn.cmp(&right.fqn));
+    Ok(seeds)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -258,5 +278,12 @@ mod tests {
         let seeds = scan_state_graphs().unwrap();
         assert!(!seeds.is_empty());
         assert!(seeds.iter().any(|seed| seed.fqn == "stategraph.entity"));
+    }
+
+    #[test]
+    fn scans_dag_taxonomies_with_fqns() {
+        let seeds = scan_dag_taxonomies().unwrap();
+        assert!(!seeds.is_empty());
+        assert!(seeds.iter().any(|seed| seed.fqn == "cbu_dag"));
     }
 }

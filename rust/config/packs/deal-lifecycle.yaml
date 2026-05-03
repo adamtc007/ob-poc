@@ -27,7 +27,7 @@ optional_context:
 
 workspaces:
   - deal
-  - on_boarding
+  - onboarding_request
 
 allowed_verbs:
   - deal.create

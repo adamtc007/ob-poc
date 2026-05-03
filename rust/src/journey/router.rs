@@ -409,7 +409,7 @@ name: Onboarding Request
 version: "1.0"
 description: Hand off a contracted deal into onboarding for an existing CBU
 workspaces:
-  - on_boarding
+  - onboarding_request
 invocation_phrases:
   - "onboarding request"
   - "request onboarding for this deal"
@@ -565,7 +565,7 @@ invocation_phrases:
         let router = make_router();
 
         // "onboard a new client" only matches onboarding-request pack,
-        // which is restricted to on_boarding workspace — should NoMatch in KYC
+        // which is restricted to onboarding_request workspace — should NoMatch in KYC
         match router.route_for_workspace("onboard a new client", &WorkspaceKind::Kyc) {
             PackRouteOutcome::NoMatch => {}
             other => panic!("Expected NoMatch outside workspace, got {:?}", other),

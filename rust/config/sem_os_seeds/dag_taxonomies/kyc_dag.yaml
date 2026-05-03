@@ -223,6 +223,9 @@ slots:
           description: "Hard-stop terminal — refusal with compliance hold."
         # Additional valid states from case lifecycle YAML:
         - id: EXPIRED
+          entry_via:
+            scheduler:
+              name: case-validity-expiry
           description: "Case timed out (external — e.g. document validity lapsed)."
         - id: REFER_TO_REGULATOR
           description: "Escalated to external authority."

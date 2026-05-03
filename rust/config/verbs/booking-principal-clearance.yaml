@@ -9,7 +9,7 @@
 # (booking_principal_id, deal_id, cbu_id) on the carrier table enforces
 # the triple.
 #
-# Gate target: deal.deal_status KYC_CLEARANCE → CONTRACTED is blocked
+# Gate target: deal.deal_status IN_CLEARANCE → CONTRACTED is blocked
 # unless every BP clearance attached to the deal is APPROVED or ACTIVE
 # (cross_workspace_constraints.deal_contracted_requires_bp_approved).
 #

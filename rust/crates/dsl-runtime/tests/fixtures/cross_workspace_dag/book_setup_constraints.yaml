@@ -5,7 +5,7 @@ description: |
   - book_cbus_scaffolded_requires_kyc_case_in_progress (KYC must be at
     least DISCOVERY before book → cbus_scaffolded)
   - book_ready_requires_deal_contracted_gate (advisory: book →
-    ready_for_deal flagged when no Deal in KYC_CLEARANCE+)
+    ready_for_deal flagged when no Deal in IN_CLEARANCE+)
 
 mode: mock
 
@@ -67,9 +67,9 @@ steps:
           severity: "warning"
 
   - mutate:
-      - { workspace: deal, slot: deal, entity: "deal-1", state: "KYC_CLEARANCE" }
+      - { workspace: deal, slot: deal, entity: "deal-1", state: "IN_CLEARANCE" }
 
-  - name: "succeeds: Deal at KYC_CLEARANCE"
+  - name: "succeeds: Deal at IN_CLEARANCE"
     check_transition:
       workspace: book_setup
       slot: book

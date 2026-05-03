@@ -28,7 +28,7 @@ optional_context:
 
 workspaces:
   - kyc
-  - on_boarding
+  - onboarding_request
 
 allowed_verbs:
   - kyc-case.create

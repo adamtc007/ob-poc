@@ -296,7 +296,7 @@ pub fn build_registry() -> SemOsVerbOpRegistry {
     registry.register(Arc::new(registry_ops::ListObjects));
     registry.register(Arc::new(registry_ops::ActiveManifest));
 
-    // Phase B slice #7: sem_os_maintenance domain (direct-sqlx Category B).
+    // Phase B slice #7: SemOS maintenance domain (direct-sqlx Category B).
     registry.register(Arc::new(maintenance::HealthPending));
     registry.register(Arc::new(maintenance::HealthStaleDryruns));
     registry.register(Arc::new(maintenance::Cleanup));

@@ -515,13 +515,13 @@ fn suggest_workspace_transition(current: &str) -> Option<WorkspaceTransition> {
             reason: "Deal agreed — configure trading matrix".into(),
             suggested_utterance: "switch to Instrument Matrix".into(),
         }),
-        "on_boarding" => Some(WorkspaceTransition {
+        "onboarding_request" => Some(WorkspaceTransition {
             target_workspace: "cbu".into(),
             target_label: "CBU".into(),
             reason: "Onboarding request complete — set up fund structures".into(),
             suggested_utterance: "switch to CBU workspace".into(),
         }),
-        // instrument_matrix, product_maintenance, sem_os_maintenance — no natural successor
+        // instrument_matrix, product_maintenance, semos_maintenance — no natural successor
         _ => None,
     }
 }

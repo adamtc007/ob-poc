@@ -19,7 +19,7 @@ optional_context:
   - changeset_id
 
 workspaces:
-  - sem_os_maintenance
+  - semos_maintenance
 
 allowed_verbs:
   - changeset.compose

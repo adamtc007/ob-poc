@@ -15,9 +15,12 @@ srdefs:
     owner: IAM
 
     triggered_by_services:
+      - SAFEKEEPING
+      - SETTLEMENT
       - CUSTODY_SAFEKEEPING
       - CUSTODY_SETTLEMENT
       - REPORTING
+      - CORP_ACTIONS
       - CORPORATE_ACTIONS
 
     attributes:

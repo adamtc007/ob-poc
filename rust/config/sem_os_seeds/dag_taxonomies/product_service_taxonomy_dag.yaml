@@ -3,15 +3,14 @@
 # ============================================================================
 # WORKSPACE PURPOSE:
 #
-# Product-Service-Taxonomy is the CATALOG-EXPLORATION workspace.
-# Read-only navigation over the design-time product → service →
-# servicing-resource → attribute dictionary taxonomy. This is how
-# a user browses "what products exist, what services they include,
-# what resources power those services, what attributes those
-# resources require."
+# Product-Service-Taxonomy is the PRODUCT-MAINTENANCE workspace.
+# It supports read navigation over the design-time product → service →
+# servicing-resource → attribute dictionary taxonomy, and governed
+# service/service-version authoring for authorised admin actors.
 #
-# Pack profile: 11 allowed_verbs (all list/read) + 4 forbidden_verbs
-# (blocks any mutations). Pure exploration.
+# Pack profile: list/read verbs for exploration plus governed service
+# and service-version lifecycle verbs. CBU-specific resource provisioning
+# remains forbidden here.
 #
 # ============================================================================
 # CBU CONSTRUCT RELATIONSHIP:
@@ -29,11 +28,10 @@
 # ============================================================================
 # WORKSPACE SHAPE:
 #
-# This is a READ workspace. No state transitions, no authoring. The
-# governed authoring of product/service/resource definitions happens
-# in the SemOsMaintenance workspace (via attribute_def +
-# service_resource_def lifecycles). This workspace exposes the
-# published state of that registry for consumers.
+# This workspace owns product/service taxonomy navigation and governed
+# service/service-version lifecycle. SemOsMaintenance still governs
+# lower-level registry artefacts such as attributes, derivations, phrases,
+# and service_resource_def definitions.
 #
 # No stateful slots on the workspace itself — all data is sourced
 # from SemOsMaintenance's published artefacts.

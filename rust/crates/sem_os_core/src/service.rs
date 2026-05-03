@@ -1137,6 +1137,12 @@ impl CoreService for CoreServiceImpl {
             )
             .chain(
                 bundle
+                    .dag_taxonomies
+                    .iter()
+                    .map(|s| (ObjectType::DagTaxonomy, s.fqn.as_str(), &s.payload)),
+            )
+            .chain(
+                bundle
                     .attributes
                     .iter()
                     .map(|s| (ObjectType::AttributeDef, s.fqn.as_str(), &s.payload)),
