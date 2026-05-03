@@ -892,7 +892,9 @@ impl ReplOrchestratorV2 {
             ReplStateV2::WorkspaceSelection { .. } => {
                 self.handle_workspace_selection(session, input).await
             }
-            ReplStateV2::JourneySelection { .. } => self.handle_journey_selection(session, input),
+            ReplStateV2::JourneySelection { .. } => {
+                self.handle_journey_selection(session, input).await
+            }
             ReplStateV2::InPack { .. } => self.handle_in_pack(session, input).await,
             ReplStateV2::Clarifying { .. } => self.handle_clarifying(session, input),
             ReplStateV2::SentencePlayback { .. } => self.handle_sentence_playback(session, input),
@@ -1549,7 +1551,7 @@ impl ReplOrchestratorV2 {
                         } else {
                             return self.invalid_input(
                                 session,
-                                "I didn't recognise that workspace. Try: CBU, KYC, Deal, OnBoarding, Product Maintenance, or Instrument Matrix.",
+                                "I didn't recognise that workspace. Try: CBU, KYC, Deal, OnBoarding, Product Maintenance, Catalogue, or Instrument Matrix.",
                             );
                         }
                     }
@@ -1558,7 +1560,7 @@ impl ReplOrchestratorV2 {
             _ => {
                 return self.invalid_input(
                     session,
-                    "Please select a workspace: CBU, KYC, Deal, OnBoarding, Product Maintenance, or Instrument Matrix.",
+                    "Please select a workspace: CBU, KYC, Deal, OnBoarding, Product Maintenance, Catalogue, or Instrument Matrix.",
                 );
             }
         };
@@ -1660,6 +1662,22 @@ impl ReplOrchestratorV2 {
         if lower.contains("product") || lower.contains("service") || lower.contains("taxonomy") {
             return Some(WorkspaceKind::ProductMaintenance);
         }
+        if lower.contains("catalogue")
+            || lower.contains("catalog")
+            || lower.contains("verb declaration")
+            || lower.contains("verb proposal")
+        {
+            return Some(WorkspaceKind::Catalogue);
+        }
+        if lower.contains("lifecycle resource")
+            || lower.contains("application instance")
+            || lower.contains("capability binding")
+        {
+            return Some(WorkspaceKind::LifecycleResources);
+        }
+        if lower.contains("booking principal") || lower.contains("bp clearance") {
+            return Some(WorkspaceKind::BookingPrincipal);
+        }
         if lower.contains("instrument") || lower.contains("matrix") || lower.contains("trading") {
             return Some(WorkspaceKind::InstrumentMatrix);
         }
@@ -1688,7 +1706,7 @@ impl ReplOrchestratorV2 {
     ) -> Option<WorkspaceKind> {
         let trimmed = input.trim();
         let index: usize = trimmed.parse().ok()?;
-        if index == 0 || index > 7 {
+        if index == 0 {
             return None;
         }
         // Match against the workspace options stored in the state
@@ -1699,7 +1717,7 @@ impl ReplOrchestratorV2 {
         }
     }
 
-    fn handle_journey_selection(
+    async fn handle_journey_selection(
         &self,
         session: &mut ReplSessionV2,
         input: UserInputV2,
@@ -1707,7 +1725,7 @@ impl ReplOrchestratorV2 {
         match input {
             UserInputV2::SelectPack { pack_id } => self.activate_pack_by_id(session, &pack_id),
             UserInputV2::Message { content } => {
-                let Some(workspace) = session.active_workspace.as_ref() else {
+                let Some(workspace) = session.active_workspace.clone() else {
                     return self
                         .invalid_input(session, "Select a workspace before choosing a journey.");
                 };
@@ -1724,7 +1742,7 @@ impl ReplOrchestratorV2 {
                             None
                         };
                         let pack_id = pack_id.or_else(|| {
-                            let packs = self.pack_router.list_packs_for_workspace(workspace);
+                            let packs = self.pack_router.list_packs_for_workspace(&workspace);
                             packs.get(idx - 1).map(|p| p.pack_id.clone())
                         });
                         if let Some(pid) = pack_id {
@@ -1733,8 +1751,18 @@ impl ReplOrchestratorV2 {
                     }
                 }
 
+                if crate::agent::narration_engine::is_contextual_query(&content) {
+                    if let Some(narration_resp) = self.handle_contextual_query(session, &content) {
+                        return narration_resp;
+                    }
+                }
+
+                if Self::is_pre_pack_read_only_query(&content) {
+                    return self.propose_for_input(session, &content).await;
+                }
+
                 // Route via PackRouter (phrase matching).
-                match self.pack_router.route_for_workspace(&content, workspace) {
+                match self.pack_router.route_for_workspace(&content, &workspace) {
                     PackRouteOutcome::Matched(manifest, hash) => {
                         let pack_id = manifest.id.clone();
                         let pack_name = manifest.name.clone();
@@ -1770,7 +1798,7 @@ impl ReplOrchestratorV2 {
                         }
                     }
                     PackRouteOutcome::NoMatch => {
-                        let packs = self.pack_router.list_packs_for_workspace(workspace);
+                        let packs = self.pack_router.list_packs_for_workspace(&workspace);
                         session.set_state(ReplStateV2::JourneySelection {
                             candidates: Some(packs.clone()),
                         });
@@ -1791,6 +1819,35 @@ impl ReplOrchestratorV2 {
             }
             _ => self.invalid_input(session, "Please select or describe a journey."),
         }
+    }
+
+    fn is_pre_pack_read_only_query(content: &str) -> bool {
+        let lower = content.trim().to_lowercase();
+        let read_signal = [
+            "read", "inspect", "show", "view", "describe", "details", "detail", "list",
+        ]
+        .iter()
+        .any(|signal| lower.contains(signal));
+        let write_signal = [
+            "create",
+            "add",
+            "assign",
+            "update",
+            "delete",
+            "remove",
+            "set",
+            "approve",
+            "reject",
+            "submit",
+            "commit",
+            "rollback",
+            "provision",
+            "activate",
+            "run",
+        ]
+        .iter()
+        .any(|signal| lower.contains(signal));
+        read_signal && !write_signal
     }
 
     async fn handle_in_pack(
@@ -2603,7 +2660,8 @@ impl ReplOrchestratorV2 {
             }
         }
 
-        if !succeeded {
+        let scope_has_cbus = !session.cbu_ids.is_empty();
+        if !succeeded && !scope_has_cbus {
             tracing::info!(
                 "session.load-cluster had no CBUs for group {} — proceeding with empty scope",
                 group_name
@@ -2620,7 +2678,7 @@ impl ReplOrchestratorV2 {
             kind: ReplResponseKindV2::WorkspaceOptions {
                 workspaces: workspaces.clone(),
             },
-            message: if succeeded {
+            message: if succeeded || scope_has_cbus {
                 format!(
                     "Scope set to {}. Which workspace would you like to enter?",
                     group_name
@@ -2639,11 +2697,6 @@ impl ReplOrchestratorV2 {
         }
     }
 
-    /// Complete scope gate for infrastructure sessions (no client group).
-    ///
-    /// Sets the nil-UUID scope sentinel, jumps directly to
-    /// `JourneySelection` with workspace pinned to `SemOsMaintenance`,
-    /// and returns the available packs for that workspace.
     async fn try_session_start(
         &self,
         content: &str,
@@ -2794,22 +2847,20 @@ impl ReplOrchestratorV2 {
     ) -> ReplResponseV2 {
         // Set scope to nil UUID — marks this as an infrastructure session.
         session.set_client_scope(Uuid::nil());
+        session.name = Some("SemOS Infrastructure".to_string());
 
-        // Pin workspace to SemOS Maintenance — skip WorkspaceSelection tollgate.
-        session.set_workspace_root(WorkspaceKind::SemOsMaintenance);
-        session.set_state(ReplStateV2::JourneySelection { candidates: None });
-
-        let packs = self
-            .pack_router
-            .list_packs_for_workspace(&WorkspaceKind::SemOsMaintenance);
+        let workspaces = self.infrastructure_workspace_options();
+        session.set_state(ReplStateV2::WorkspaceSelection {
+            workspaces: workspaces.clone(),
+        });
 
         ReplResponseV2 {
             state: session.state.clone(),
-            kind: ReplResponseKindV2::JourneyOptions {
-                packs: packs.clone(),
+            kind: ReplResponseKindV2::WorkspaceOptions {
+                workspaces: workspaces.clone(),
             },
             message: "SemOS Infrastructure session - no client group required.\n\
-                      Which journey would you like to start?"
+                      Which maintenance workspace would you like to enter?"
                 .to_string(),
             runbook_summary: None,
             step_count: 0,
@@ -2817,6 +2868,41 @@ impl ReplOrchestratorV2 {
             narration: None,
             trace_id: None,
         }
+    }
+
+    fn infrastructure_workspace_options(&self) -> Vec<WorkspaceOption> {
+        vec![
+            WorkspaceOption {
+                workspace: WorkspaceKind::SemOsMaintenance,
+                label: WorkspaceKind::SemOsMaintenance.label().to_string(),
+                description: "Manage SemOS registry governance — changesets, attributes, verbs, schemas"
+                    .to_string(),
+            },
+            WorkspaceOption {
+                workspace: WorkspaceKind::Catalogue,
+                label: WorkspaceKind::Catalogue.label().to_string(),
+                description: "Governed catalogue authorship and verb proposal lifecycle"
+                    .to_string(),
+            },
+            WorkspaceOption {
+                workspace: WorkspaceKind::ProductMaintenance,
+                label: WorkspaceKind::ProductMaintenance.label().to_string(),
+                description:
+                    "Design-time product, service, servicing-resource, and resource dictionary taxonomy"
+                        .to_string(),
+            },
+            WorkspaceOption {
+                workspace: WorkspaceKind::LifecycleResources,
+                label: WorkspaceKind::LifecycleResources.label().to_string(),
+                description: "Platform resources, application instances, and capability bindings"
+                    .to_string(),
+            },
+            WorkspaceOption {
+                workspace: WorkspaceKind::BookingPrincipal,
+                label: WorkspaceKind::BookingPrincipal.label().to_string(),
+                description: "Booking principal clearance governance".to_string(),
+            },
+        ]
     }
 
     fn workspace_options(&self) -> Vec<WorkspaceOption> {
@@ -2827,6 +2913,12 @@ impl ReplOrchestratorV2 {
                 description:
                     "Design-time product, service, servicing-resource, and resource dictionary taxonomy"
                         .to_string(),
+            },
+            WorkspaceOption {
+                workspace: WorkspaceKind::Catalogue,
+                label: WorkspaceKind::Catalogue.label().to_string(),
+                description: "Governed catalogue authorship and verb proposal lifecycle"
+                    .to_string(),
             },
             WorkspaceOption {
                 workspace: WorkspaceKind::Deal,

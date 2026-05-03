@@ -21,18 +21,21 @@ export class ApiError extends Error {
 }
 
 async function handleResponse<T>(response: Response): Promise<T> {
+  const text = await response.text();
+
   if (!response.ok) {
     let body: unknown;
-    try {
-      body = await response.json();
-    } catch {
-      body = await response.text();
+    if (text) {
+      try {
+        body = JSON.parse(text);
+      } catch {
+        body = text;
+      }
     }
     throw new ApiError(response.status, response.statusText, body);
   }
 
   // Handle empty responses
-  const text = await response.text();
   if (!text) {
     return undefined as T;
   }

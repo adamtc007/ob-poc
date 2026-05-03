@@ -169,9 +169,9 @@ export interface OnboardingLayer {
   progress_pct: number;
   summary?: string;
   forward_verbs: SuggestedVerb[];
-  revert_verbs: SuggestedVerb[];
-  blocked_verbs: BlockedVerb[];
-  unreachable_verbs: UnreachableVerb[];
+  revert_verbs?: SuggestedVerb[];
+  blocked_verbs?: BlockedVerb[];
+  unreachable_verbs?: UnreachableVerb[];
 }
 
 export interface SuggestedVerb {
@@ -403,11 +403,11 @@ export type ActionPriority = "critical" | "recommended" | "optional";
 /** Proactive narration — computed after state-changing actions. */
 export interface NarrationPayload {
   progress?: string;
-  delta: SlotDelta[];
-  required_gaps: NarrationGap[];
-  optional_gaps: NarrationGap[];
-  suggested_next: SuggestedAction[];
-  blockers: NarrationBlocker[];
+  delta?: SlotDelta[];
+  required_gaps?: NarrationGap[];
+  optional_gaps?: NarrationGap[];
+  suggested_next?: SuggestedAction[];
+  blockers?: NarrationBlocker[];
   workspace_transition?: WorkspaceTransition;
   verbosity: NarrationVerbosity;
 }

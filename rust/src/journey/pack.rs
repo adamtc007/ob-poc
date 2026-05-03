@@ -606,4 +606,14 @@ templates:
         assert_eq!(deserialized.version, pack.version);
         assert_eq!(deserialized.templates.len(), pack.templates.len());
     }
+
+    #[test]
+    fn test_repo_pack_manifests_parse_strictly() {
+        let packs_dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("config/packs");
+        let packs = load_packs_from_dir(&packs_dir).unwrap();
+
+        assert!(!packs.is_empty());
+        assert!(packs.iter().any(|(pack, _)| pack.id == "cbu-maintenance"));
+        assert!(packs.iter().any(|(pack, _)| pack.id == "catalogue"));
+    }
 }

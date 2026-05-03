@@ -46,6 +46,8 @@ export function OnboardingStateCard({ message, onVerbClick }: Props) {
   const state = message.onboarding_state;
   if (!state) return null;
   const resetHint = state.context_reset_hint;
+  const layers = state.layers ?? [];
+  const cbuCards = state.cbu_cards ?? [];
 
   return (
     <div className="mt-2 rounded-lg border border-indigo-200 bg-indigo-50 p-3">
@@ -66,7 +68,7 @@ export function OnboardingStateCard({ message, onVerbClick }: Props) {
 
       {/* DAG Timeline */}
       <div className="space-y-1">
-        {state.layers.map((layer) => (
+        {layers.map((layer) => (
           <LayerRow
             key={layer.index}
             layer={layer}
@@ -77,13 +79,13 @@ export function OnboardingStateCard({ message, onVerbClick }: Props) {
       </div>
 
       {/* CBU Cards */}
-      {state.cbu_cards.length > 0 && (
+      {cbuCards.length > 0 && (
         <div className="mt-3 border-t border-indigo-200 pt-2">
           <div className="mb-1 text-xs font-medium text-indigo-700">
             Linked CBU Status
           </div>
           <div className="space-y-1">
-            {state.cbu_cards.map((cbu) => (
+            {cbuCards.map((cbu) => (
               <CbuCard key={cbu.cbu_id} cbu={cbu} onVerbClick={onVerbClick} />
             ))}
           </div>
@@ -116,6 +118,9 @@ function LayerRow({
   isActive: boolean;
   onVerbClick?: (utterance: string) => void;
 }) {
+  const forwardVerbs = layer.forward_verbs ?? [];
+  const revertVerbs = layer.revert_verbs ?? [];
+
   return (
     <div
       className={`rounded-md border p-2 ${
@@ -154,18 +159,18 @@ function LayerRow({
       </div>
 
       {/* Forward verbs — advance state */}
-      {isActive && layer.forward_verbs.length > 0 && (
+      {isActive && forwardVerbs.length > 0 && (
         <div className="mt-1.5 flex flex-wrap gap-1 pl-4">
-          {layer.forward_verbs.map((verb, idx) => (
+          {forwardVerbs.map((verb, idx) => (
             <VerbButton key={idx} verb={verb} onVerbClick={onVerbClick} />
           ))}
         </div>
       )}
 
       {/* Revert verbs — back up state */}
-      {isActive && layer.revert_verbs.length > 0 && (
+      {isActive && revertVerbs.length > 0 && (
         <div className="mt-1 flex flex-wrap gap-1 pl-4">
-          {layer.revert_verbs.map((verb, idx) => (
+          {revertVerbs.map((verb, idx) => (
             <VerbButton
               key={idx}
               verb={verb}
@@ -214,6 +219,11 @@ function CbuCard({
 }) {
   const nextAction = cbu.next_action;
   const revertAction = cbu.revert_action;
+  const phases = cbu.phases ?? {
+    has_case: false,
+    has_screening: false,
+    screening_complete: false,
+  };
 
   return (
     <div className="flex items-center gap-2 rounded bg-white px-2 py-1.5">
@@ -252,9 +262,9 @@ function CbuCard({
               {cbu.lifecycle_state}
             </span>
           )}
-          {cbu.phases.case_status && (
+          {phases.case_status && (
             <span className="rounded bg-blue-50 px-1 py-0.5 text-[10px] text-blue-700">
-              {cbu.phases.case_status}
+              {phases.case_status}
             </span>
           )}
         </div>

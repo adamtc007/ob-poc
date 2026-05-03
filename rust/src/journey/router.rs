@@ -11,7 +11,7 @@
 use std::path::Path;
 use std::sync::Arc;
 
-use crate::journey::pack::{load_packs_from_dir, PackLoadError, PackManifest};
+use crate::journey::pack::{load_pack_from_file, PackLoadError, PackManifest};
 use crate::repl::types_v2::{PackCandidate, WorkspaceKind};
 
 // ---------------------------------------------------------------------------
@@ -58,7 +58,7 @@ impl PackRouter {
 
     /// Load packs from a directory and create a router.
     pub fn load(config_dir: &Path) -> Result<Self, PackLoadError> {
-        let loaded = load_packs_from_dir(config_dir)?;
+        let loaded = load_valid_packs_from_dir(config_dir)?;
         let packs = loaded.into_iter().map(|(m, h)| (Arc::new(m), h)).collect();
         Ok(Self {
             packs,
@@ -332,6 +332,49 @@ impl PackRouter {
     }
 }
 
+fn load_valid_packs_from_dir(dir: &Path) -> Result<Vec<(PackManifest, String)>, PackLoadError> {
+    let mut packs = Vec::new();
+    let entries = std::fs::read_dir(dir).map_err(|e| PackLoadError::Io {
+        path: dir.display().to_string(),
+        source: e,
+    })?;
+
+    for entry in entries {
+        let entry = match entry {
+            Ok(entry) => entry,
+            Err(e) => {
+                tracing::warn!(
+                    path = %dir.display(),
+                    error = %e,
+                    "Skipping unreadable journey pack directory entry"
+                );
+                continue;
+            }
+        };
+        let path = entry.path();
+        let Some(ext) = path.extension().and_then(|ext| ext.to_str()) else {
+            continue;
+        };
+        if ext != "yaml" && ext != "yml" {
+            continue;
+        }
+
+        match load_pack_from_file(&path) {
+            Ok(pack) => packs.push(pack),
+            Err(e) => {
+                tracing::warn!(
+                    path = %path.display(),
+                    error = %e,
+                    "Skipping malformed journey pack"
+                );
+            }
+        }
+    }
+
+    packs.sort_by(|a, b| a.0.id.cmp(&b.0.id));
+    Ok(packs)
+}
+
 // ---------------------------------------------------------------------------
 // PackRouteOutcome
 // ---------------------------------------------------------------------------
@@ -357,6 +400,7 @@ pub enum PackRouteOutcome {
 mod tests {
     use super::*;
     use crate::journey::pack::load_pack_from_bytes;
+    use std::fs;
 
     fn onboarding_yaml() -> &'static str {
         r#"
@@ -640,5 +684,21 @@ invocation_phrases:
 
         // Unknown hash returns None.
         assert!(router.get_pack_by_hash("nonexistent-hash").is_none());
+    }
+
+    #[test]
+    fn test_load_skips_malformed_pack_without_dropping_valid_packs() {
+        let dir = tempfile::TempDir::new().unwrap();
+        fs::write(dir.path().join("valid.yaml"), kyc_case_yaml()).unwrap();
+        fs::write(
+            dir.path().join("bad.yaml"),
+            "id: bad\nname: Bad\nversion: '1'\ndescription: bad\nworkspaces:\n  - not_a_workspace\n",
+        )
+        .unwrap();
+
+        let router = PackRouter::load(dir.path()).unwrap();
+
+        assert_eq!(router.pack_count(), 1);
+        assert!(router.get_pack("kyc-case").is_some());
     }
 }

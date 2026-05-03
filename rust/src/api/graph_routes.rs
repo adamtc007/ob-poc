@@ -24,6 +24,7 @@ use serde::{Deserialize, Serialize};
 use sqlx::PgPool;
 use uuid::Uuid;
 
+use crate::api::observatory_routes::ReplSessionStore;
 use crate::api::SessionStore;
 use crate::database::{LayoutOverrideView, PgGraphRepository, VisualizationRepository};
 use crate::graph::{
@@ -978,6 +979,7 @@ pub fn create_graph_router(pool: PgPool) -> Router {
 pub struct SessionGraphState {
     pub pool: PgPool,
     pub sessions: SessionStore,
+    pub repl_sessions: Option<ReplSessionStore>,
 }
 
 /// Response for session graph endpoint
@@ -1108,43 +1110,89 @@ async fn get_session_scope_graph(
     Query(params): Query<GraphQuery>,
     State(state): State<SessionGraphState>,
 ) -> Result<Json<MultiCbuGraphResponse>, (StatusCode, String)> {
-    // Get session and extract CBU IDs + affected entities from run_sheet
-    let (cbu_ids, affected_entity_ids, view_mode_hint) = {
-        let sessions = state.sessions.read().await;
-        let session = sessions.get(&session_id).ok_or_else(|| {
+    // Prefer REPL V2: it is the canonical interactive session model. Fall
+    // back to UnifiedSession only for legacy sessions and execution bridge data.
+    let repl_data = if let Some(repl_sessions) = &state.repl_sessions {
+        let sessions = repl_sessions.read().await;
+        sessions.get(&session_id).map(|session| {
+            let scope_name = session.name.clone().or_else(|| {
+                session
+                    .workspace_stack
+                    .last()
+                    .and_then(|frame| frame.session_scope.client_group_name.clone())
+            });
             (
-                StatusCode::NOT_FOUND,
-                format!("Session {} not found", session_id),
+                session.cbu_ids.clone(),
+                scope_name,
+                session.runbook.client_group_id.is_some(),
             )
-        })?;
-
-        // Get all CBU IDs from session context
-        let cbu_ids = session.context.cbu_ids.clone();
-
-        // Get affected entity IDs from recent run_sheet entries (for highlighting)
-        let affected: Vec<Uuid> = session
-            .run_sheet
-            .entries
-            .iter()
-            .filter(|e| e.status == crate::session::EntryStatus::Executed)
-            .flat_map(|e| e.affected_entities.iter().copied())
-            .collect();
-
-        let view_mode = session.context.view_mode.clone();
-
-        (cbu_ids, affected, view_mode)
+        })
+    } else {
+        None
     };
 
+    let (cbu_ids, affected_entity_ids, view_mode_hint, scope_name, scope_selected) =
+        if let Some((cbu_ids, scope_name, scope_selected)) = repl_data {
+            let sessions = state.sessions.read().await;
+            let (affected, view_mode) = sessions
+                .get(&session_id)
+                .map(|session| {
+                    let affected: Vec<Uuid> = session
+                        .run_sheet
+                        .entries
+                        .iter()
+                        .filter(|e| e.status == crate::session::EntryStatus::Executed)
+                        .flat_map(|e| e.affected_entities.iter().copied())
+                        .collect();
+                    (affected, session.context.view_mode.clone())
+                })
+                .unwrap_or_default();
+            (cbu_ids, affected, view_mode, scope_name, scope_selected)
+        } else {
+            let sessions = state.sessions.read().await;
+            let session = sessions.get(&session_id).ok_or_else(|| {
+                (
+                    StatusCode::NOT_FOUND,
+                    format!("Session {} not found", session_id),
+                )
+            })?;
+
+            let affected: Vec<Uuid> = session
+                .run_sheet
+                .entries
+                .iter()
+                .filter(|e| e.status == crate::session::EntryStatus::Executed)
+                .flat_map(|e| e.affected_entities.iter().copied())
+                .collect();
+            let scope_name = session
+                .client
+                .as_ref()
+                .map(|client| client.display_name.clone());
+
+            (
+                session.context.cbu_ids.clone(),
+                affected,
+                session.context.view_mode.clone(),
+                scope_name,
+                session.client.is_some(),
+            )
+        };
+
     if cbu_ids.is_empty() {
+        let message = if scope_selected {
+            match scope_name {
+                Some(name) => format!("Scope set to {name}; no CBUs in scope yet."),
+                None => "Scope is set; no CBUs in scope yet.".to_string(),
+            }
+        } else {
+            "No client group selected. Start by choosing a client group to work with.".to_string()
+        };
         return Ok(Json(MultiCbuGraphResponse {
             graph: None,
             cbu_ids: vec![],
             cbu_count: 0,
             affected_entity_ids: vec![],
-            error: Some(
-                "No client group selected. Start by choosing a client group to work with."
-                    .to_string(),
-            ),
+            error: Some(message),
         }));
     }
 
@@ -1218,8 +1266,16 @@ async fn get_session_scope_graph(
 ///
 /// This router shares session state with the REPL and taxonomy navigation,
 /// providing a unified view of the current context.
-pub fn create_session_graph_router(pool: PgPool, sessions: SessionStore) -> Router {
-    let state = SessionGraphState { pool, sessions };
+pub fn create_session_graph_router(
+    pool: PgPool,
+    sessions: SessionStore,
+    repl_sessions: Option<ReplSessionStore>,
+) -> Router {
+    let state = SessionGraphState {
+        pool,
+        sessions,
+        repl_sessions,
+    };
 
     Router::new()
         .route("/api/session/:session_id/graph", get(get_session_graph))

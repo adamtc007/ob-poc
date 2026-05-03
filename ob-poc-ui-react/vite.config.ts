@@ -18,6 +18,10 @@ export default defineConfig({
         target: "http://localhost:3000",
         changeOrigin: true,
       },
+      "/observatory/pkg": {
+        target: "http://localhost:3000",
+        changeOrigin: true,
+      },
     },
   },
 });

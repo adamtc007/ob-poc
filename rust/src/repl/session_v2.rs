@@ -1030,6 +1030,7 @@ fn workspace_kind_to_shared(
 
     match workspace {
         WorkspaceKind::ProductMaintenance => SessionWorkspaceKind::ProductMaintenance,
+        WorkspaceKind::Catalogue => SessionWorkspaceKind::Catalogue,
         WorkspaceKind::Deal => SessionWorkspaceKind::Deal,
         WorkspaceKind::Cbu => SessionWorkspaceKind::Cbu,
         WorkspaceKind::Kyc => SessionWorkspaceKind::Kyc,

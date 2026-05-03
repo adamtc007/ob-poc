@@ -1604,7 +1604,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         // Graph visualization (legacy CBU endpoints)
         .merge(create_graph_router(pool.clone()))
         // Session-scoped graph (shares state with REPL and taxonomy)
-        .merge(create_session_graph_router(pool.clone(), sessions.clone()))
+        .merge(create_session_graph_router(
+            pool.clone(),
+            sessions.clone(),
+            Some(repl_session_store.clone()),
+        ))
         // Galaxy navigation - universe view and cluster detail
         .merge(create_universe_router(pool.clone()))
         // Constellation graph hydration API for UI feedback and debugging

@@ -25,8 +25,12 @@ export const NarrationPanel: React.FC<NarrationPanelProps> = ({
   if (narration.verbosity === "silent") return null;
 
   const workspaceTransition = narration.workspace_transition;
-  const hasGaps =
-    narration.required_gaps.length > 0 || narration.optional_gaps.length > 0;
+  const delta = narration.delta ?? [];
+  const requiredGaps = narration.required_gaps ?? [];
+  const optionalGaps = narration.optional_gaps ?? [];
+  const suggestedNext = narration.suggested_next ?? [];
+  const blockers = narration.blockers ?? [];
+  const hasGaps = requiredGaps.length > 0 || optionalGaps.length > 0;
   const allComplete = !hasGaps && narration.verbosity === "full";
 
   return (
@@ -60,47 +64,43 @@ export const NarrationPanel: React.FC<NarrationPanelProps> = ({
       )}
 
       {/* Slot deltas (what just changed) */}
-      {narration.delta.length > 0 && (
+      {delta.length > 0 && (
         <div style={{ marginBottom: "8px" }}>
-          {narration.delta.map((d, i) => (
+          {delta.map((d, i) => (
             <DeltaBadge key={i} delta={d} />
           ))}
         </div>
       )}
 
       {/* Required gaps */}
-      {narration.verbosity !== "light" &&
-        narration.required_gaps.length > 0 && (
+      {narration.verbosity !== "light" && requiredGaps.length > 0 && (
           <GapSection
             title="Required"
-            gaps={narration.required_gaps}
+            gaps={requiredGaps}
             critical
             onSendMessage={onSendMessage}
           />
         )}
 
       {/* Optional gaps (only in Full mode) */}
-      {narration.verbosity === "full" && narration.optional_gaps.length > 0 && (
+      {narration.verbosity === "full" && optionalGaps.length > 0 && (
         <GapSection
           title="Optional"
-          gaps={narration.optional_gaps}
+          gaps={optionalGaps}
           onSendMessage={onSendMessage}
         />
       )}
 
       {/* Suggested next actions */}
-      {narration.suggested_next.length > 0 &&
-        narration.verbosity !== "light" && (
+      {suggestedNext.length > 0 && narration.verbosity !== "light" && (
           <SuggestedActions
-            actions={narration.suggested_next}
+            actions={suggestedNext}
             onSendMessage={onSendMessage}
           />
         )}
 
       {/* Blockers */}
-      {narration.blockers.length > 0 && (
-        <BlockerList blockers={narration.blockers} />
-      )}
+      {blockers.length > 0 && <BlockerList blockers={blockers} />}
 
       {/* Completion + workspace transition */}
       {allComplete && (

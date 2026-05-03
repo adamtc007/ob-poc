@@ -594,6 +594,7 @@ fn build_action_hints(workspace: &WorkspaceKind, verbs: &[VerbRef]) -> Vec<Actio
             WorkspaceKind::Kyc => "Review clearance state",
             WorkspaceKind::InstrumentMatrix => "Review matrix readiness",
             WorkspaceKind::ProductMaintenance => "Review product taxonomy",
+            WorkspaceKind::Catalogue => "Review catalogue proposals",
             WorkspaceKind::OnBoarding => "Review onboarding handoff",
             WorkspaceKind::SemOsMaintenance => "Review registry governance",
             WorkspaceKind::LifecycleResources => "Review lifecycle resources",

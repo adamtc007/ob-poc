@@ -1,22 +1,57 @@
-# Catalogue workspace pack — P.8 prototype (2026-04-23)
+# Catalogue workspace pack - governed authorship pilot (2026-04-23)
 #
-# Lightweight Catalogue workspace per pilot plan §P.8. Proves the
-# P9 hypothesis (Catalogue workspace is a normal SemOS workspace) for
-# Instrument Matrix only. Four authorship verbs wrapped around a
-# filesystem staging store. NO Observatory integration, NO Sage
-# wiring, NO full Tranche-3 authorship library.
+# Catalogue is a normal SemOS workspace. This pack exposes the governed
+# authorship verbs that stage, commit, roll back, and inspect verb
+# declaration proposals.
 
 id: catalogue
+name: Catalogue Authoring
 version: "1.0"
-workspaces: [catalogue]
-display_name: "Catalogue Authoring (Pilot P.8)"
 description: >
-  Minimal authorship surface for proposing, committing, and rolling
-  back verb declarations against the Instrument Matrix catalogue.
-  Staging is filesystem-backed at rust/config/verb_staging/.
+  Govern verb catalogue proposals. Stage verb declaration changes, review
+  pending proposals, commit approved declarations, and roll back staged work.
+
+invocation_phrases:
+  - "catalogue authoring"
+  - "catalogue workspace"
+  - "verb catalogue"
+  - "propose verb change"
+  - "list catalogue proposals"
+  - "commit verb change"
+
+required_context: []
+optional_context:
+  - proposal_id
+
+workspaces:
+  - catalogue
 
 allowed_verbs:
   - catalogue.propose-verb-declaration
   - catalogue.commit-verb-declaration
   - catalogue.rollback-verb-declaration
   - catalogue.list-proposals
+
+forbidden_verbs: []
+
+risk_policy:
+  require_confirm_before_execute: true
+  max_steps_without_confirm: 3
+
+section_layout:
+  - title: "Catalogue Proposals"
+    verb_prefixes:
+      - "catalogue."
+
+definition_of_done:
+  - "Proposal state is visible"
+  - "Committed changes have approval evidence"
+  - "Rollback actions include a reason"
+
+progress_signals:
+  - signal: proposal_staged
+    description: "A verb declaration proposal has been staged"
+  - signal: proposal_committed
+    description: "A proposal has been committed to the catalogue"
+
+handoff_target: null

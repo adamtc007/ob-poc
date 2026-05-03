@@ -89,6 +89,7 @@ pub struct PackCandidate {
 #[serde(rename_all = "snake_case")]
 pub enum WorkspaceKind {
     ProductMaintenance,
+    Catalogue,
     Deal,
     Cbu,
     Kyc,
@@ -111,6 +112,7 @@ impl WorkspaceKind {
     pub fn label(&self) -> &'static str {
         match self {
             Self::ProductMaintenance => "Product Maintenance",
+            Self::Catalogue => "Catalogue",
             Self::Deal => "Deal",
             Self::Cbu => "CBU",
             Self::Kyc => "KYC",
@@ -146,6 +148,16 @@ impl WorkspaceKind {
                 subject_required: false,
                 default_constellation_family: "product_service_taxonomy",
                 default_constellation_map: "product.service.resource.taxonomy",
+                supports_handoff_mode: false,
+            },
+            Self::Catalogue => WorkspaceRegistryEntry {
+                workspace_id: self.clone(),
+                display_name: self.label(),
+                constellation_families: vec!["registry_governance"],
+                subject_kinds: vec![],
+                subject_required: false,
+                default_constellation_family: "registry_governance",
+                default_constellation_map: "registry.stewardship",
                 supports_handoff_mode: false,
             },
             Self::Deal => WorkspaceRegistryEntry {
@@ -271,6 +283,7 @@ impl WorkspaceKind {
     pub fn all() -> Vec<Self> {
         vec![
             Self::ProductMaintenance,
+            Self::Catalogue,
             Self::Deal,
             Self::Cbu,
             Self::Kyc,
@@ -833,6 +846,13 @@ impl WorkspaceKind {
             || msg.contains("resource dictionary")
         {
             return Some(Self::ProductMaintenance);
+        }
+        if msg.contains("catalogue")
+            || msg.contains("catalog")
+            || msg.contains("verb declaration")
+            || msg.contains("verb proposal")
+        {
+            return Some(Self::Catalogue);
         }
         if msg.contains("deal") || msg.contains("contract") || msg.contains("rate card") {
             return Some(Self::Deal);

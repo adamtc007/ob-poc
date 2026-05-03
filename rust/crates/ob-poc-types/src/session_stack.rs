@@ -36,6 +36,7 @@ pub struct SessionScopeState {
 #[serde(rename_all = "snake_case")]
 pub enum SessionWorkspaceKind {
     ProductMaintenance,
+    Catalogue,
     Deal,
     Cbu,
     Kyc,
