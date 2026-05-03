@@ -10,8 +10,8 @@ use std::path::{Path, PathBuf};
 
 use anyhow::{Context, Result};
 use sem_os_core::seeds::{
-    ConstellationFamilySeed, ConstellationMapSeed, DagTaxonomySeed, MacroDefSeed,
-    StateGraphSeed, StateMachineSeed, UniverseSeed,
+    ConstellationFamilySeed, ConstellationMapSeed, DagTaxonomySeed, MacroDefSeed, StateGraphSeed,
+    StateMachineSeed, UniverseSeed,
 };
 
 fn repo_rust_root() -> PathBuf {

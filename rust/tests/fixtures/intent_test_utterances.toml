@@ -3427,7 +3427,7 @@ notes = "MacroIndex aliases needed for exact match; attribute verbs are valid fa
 difficulty = "medium"
 expected_tier = "macro_index"
 expected_route_target = "governance.bootstrap-attribute-registry"
-workspace = "sem_os_maintenance"
+workspace = "semos_maintenance"
 
 [[test]]
 utterance = "Define the service resource dictionary"
@@ -3438,7 +3438,7 @@ notes = "MacroIndex aliases needed for exact match; service-resource verbs are v
 difficulty = "hard"
 expected_tier = "macro_index"
 expected_route_target = "governance.define-service-dictionary"
-workspace = "sem_os_maintenance"
+workspace = "semos_maintenance"
 
 [[test]]
 utterance = "Run the full publish pipeline"
@@ -3449,7 +3449,7 @@ notes = "MacroIndex aliases needed for exact match; governance.publish-batch is 
 difficulty = "medium"
 expected_tier = "macro_index"
 expected_route_target = "governance.full-publish-pipeline"
-workspace = "sem_os_maintenance"
+workspace = "semos_maintenance"
 
 [[test]]
 utterance = "Reconcile the registry"
@@ -3459,7 +3459,7 @@ category = "macro_match"
 difficulty = "medium"
 expected_tier = "macro_index"
 expected_route_target = "governance.reconcile-registry"
-workspace = "sem_os_maintenance"
+workspace = "semos_maintenance"
 
 # ── Attribute seed macros ────────────────────────────────────────────────
 
@@ -3471,7 +3471,7 @@ category = "macro_match"
 difficulty = "hard"
 expected_tier = "macro_index"
 expected_route_target = "attribute.seed-domain"
-workspace = "sem_os_maintenance"
+workspace = "semos_maintenance"
 
 [[test]]
 utterance = "Seed derived attributes"
@@ -3481,7 +3481,7 @@ category = "macro_match"
 difficulty = "hard"
 expected_tier = "macro_index"
 expected_route_target = "attribute.seed-derived"
-workspace = "sem_os_maintenance"
+workspace = "semos_maintenance"
 
 # ============================================================================
 # CONTEXTUAL QUERY TESTS (ADR 043 Phase 2)

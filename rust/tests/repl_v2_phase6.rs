@@ -89,7 +89,7 @@ description: "Test pack with no templates or required questions"
 invocation_phrases:
   - "freeform test"
 workspaces:
-  - on_boarding
+  - onboarding_request
 required_context: []
 optional_context: []
 allowed_verbs: []
@@ -118,7 +118,7 @@ description: "Pack that only allows session.load-cbu"
 invocation_phrases:
   - "restricted test"
 workspaces:
-  - on_boarding
+  - onboarding_request
 required_context: []
 optional_context: []
 allowed_verbs:
@@ -149,7 +149,7 @@ description: "Pack that hands off to target-pack"
 invocation_phrases:
   - "source pack"
 workspaces:
-  - on_boarding
+  - onboarding_request
 handoff_target: target-pack
 required_context: []
 optional_context: []
@@ -179,7 +179,7 @@ description: "Receives handoff"
 invocation_phrases:
   - "target pack"
 workspaces:
-  - on_boarding
+  - onboarding_request
 required_context: []
 optional_context: []
 allowed_verbs: []
@@ -208,7 +208,7 @@ description: "Pack with handoff to nonexistent target"
 invocation_phrases:
   - "dangling pack"
 workspaces:
-  - on_boarding
+  - onboarding_request
 handoff_target: nonexistent-pack
 required_context: []
 optional_context: []

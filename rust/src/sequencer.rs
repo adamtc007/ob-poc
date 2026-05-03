@@ -2994,6 +2994,21 @@ impl ReplOrchestratorV2 {
         }
 
         let scope_has_cbus = !session.cbu_ids.is_empty();
+        if !succeeded {
+            if let Some(entry) = session
+                .runbook
+                .entries
+                .iter_mut()
+                .find(|e| e.id == entry_id)
+            {
+                entry.status = EntryStatus::Completed;
+                entry.result = Some(serde_json::json!({
+                    "accepted": true,
+                    "scope_has_cbus": scope_has_cbus,
+                    "warning": "session.load-cluster did not complete through the execution gate; scope accepted by the bootstrap fallback",
+                }));
+            }
+        }
         if !succeeded && !scope_has_cbus {
             tracing::info!(
                 "session.load-cluster had no CBUs for group {} — proceeding with empty scope",
@@ -7000,6 +7015,12 @@ impl ReplOrchestratorV2 {
             .iter()
             .map(|(k, v)| (k.clone(), v.clone()))
             .collect();
+        let sem_reg_allowed_verbs = session
+            .pending_sem_os_envelope
+            .as_ref()
+            .filter(|envelope| !envelope.is_unavailable())
+            .map(|envelope| &envelope.allowed_verbs)
+            .or(constraints.allowed_verbs.as_ref());
         let response = compile_verb(
             session.id,
             &classification,
@@ -7008,7 +7029,7 @@ impl ReplOrchestratorV2 {
             macro_registry,
             version,
             &constraints,
-            None, // sem_reg_allowed_verbs — resolved upstream by orchestrator
+            sem_reg_allowed_verbs,
             None, // verb_snapshot_pins — TODO: wire SemReg snapshot resolution
         );
 

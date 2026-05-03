@@ -113,7 +113,7 @@ description: "Test pack with no templates or required questions"
 invocation_phrases:
   - "freeform test"
 workspaces:
-  - on_boarding
+  - onboarding_request
 required_context: []
 optional_context: []
 allowed_verbs: []
