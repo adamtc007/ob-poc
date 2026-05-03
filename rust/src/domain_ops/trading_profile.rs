@@ -10,6 +10,7 @@
 //! - "ob-poc".ssi_booking_rules (NOTE: specificity_score is GENERATED - never insert it)
 //! - "ob-poc".isda_agreements
 //! - "ob-poc".csa_agreements
+//! - "ob-poc".cbu_im_assignments
 //! - "ob-poc".subcustodian_network
 //!
 //! Phase 5c-migrate Phase B Pattern B slice #79: ported from
@@ -34,8 +35,9 @@ use dsl_runtime::tx::TransactionScope;
 use dsl_runtime::{VerbExecutionContext, VerbExecutionOutcome};
 
 use crate::trading_profile::{
-    ast_db, document_ops, resolve::resolve_entity_ref, BookingRule, IsdaAgreementConfig,
-    MaterializationResult, StandingInstruction, TradingProfileDocument, TradingProfileImport,
+    ast_db, document_ops, resolve::resolve_entity_ref, BookingRule, EntityRefType,
+    InvestmentManagerMandate, IsdaAgreementConfig, MaterializationResult, StandingInstruction,
+    TradingProfileDocument, TradingProfileImport,
 };
 use ob_poc_types::trading_matrix::{
     categories, BookingMatchCriteria, TradingMatrixNodeId, TradingMatrixOp,
@@ -295,8 +297,15 @@ impl SemOsVerbOp for TradingProfileMaterialize {
 
         let force = json_extract_bool_opt(args, "force").unwrap_or(false);
 
-        let sections: Vec<String> = json_extract_string_list_opt(args, "sections")
-            .unwrap_or_else(|| vec!["universe".into(), "ssis".into(), "booking_rules".into()]);
+        let sections: Vec<String> =
+            json_extract_string_list_opt(args, "sections").unwrap_or_else(|| {
+                vec![
+                    "universe".into(),
+                    "ssis".into(),
+                    "booking_rules".into(),
+                    "investment_managers".into(),
+                ]
+            });
 
         // Load the profile document
         let row = sqlx::query!(
@@ -345,6 +354,12 @@ impl SemOsVerbOp for TradingProfileMaterialize {
                 result.records_created.insert(
                     "ssi_booking_rules".to_string(),
                     document.booking_rules.len() as i32,
+                );
+            }
+            if sections.contains(&"investment_managers".to_string()) {
+                result.records_created.insert(
+                    "cbu_im_assignments".to_string(),
+                    document.investment_managers.len() as i32,
                 );
             }
             result.duration_ms = start.elapsed().as_millis() as i64;
@@ -485,6 +500,20 @@ impl SemOsVerbOp for TradingProfileMaterialize {
                     .sections_materialized
                     .push("corporate_actions".to_string());
             }
+        }
+
+        if sections.contains(&"investment_managers".to_string()) {
+            let (created, updated) =
+                materialize_investment_managers(&mut tx, cbu_id, profile_id, &document).await?;
+            result
+                .records_created
+                .insert("cbu_im_assignments".to_string(), created);
+            result
+                .records_updated
+                .insert("cbu_im_assignments".to_string(), updated);
+            result
+                .sections_materialized
+                .push("investment_managers".to_string());
         }
 
         tx.commit().await?;
@@ -1002,6 +1031,172 @@ async fn materialize_isda_agreements(
     }
 
     Ok(created)
+}
+
+// =============================================================================
+// INVESTMENT MANAGER MATERIALIZATION
+// =============================================================================
+
+#[cfg(feature = "database")]
+async fn materialize_investment_managers(
+    tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
+    cbu_id: Uuid,
+    profile_id: Uuid,
+    document: &TradingProfileDocument,
+) -> Result<(i32, i32)> {
+    let mut created = 0;
+    let mut updated = 0;
+
+    for mandate in &document.investment_managers {
+        let instruction_method = mandate
+            .instruction_method
+            .as_deref()
+            .ok_or_else(|| {
+                anyhow::anyhow!(
+                    "IM mandate {} missing instruction_method",
+                    mandate.manager.value
+                )
+            })?
+            .to_ascii_uppercase();
+        let manager_role = normalize_im_role(&mandate.role);
+        let manager_entity_id = manager_entity_id(mandate)?;
+        let manager_lei = manager_lei(mandate);
+        let manager_bic = manager_bic(mandate);
+        let manager_name = manager_name(mandate);
+
+        let existing_assignment_id: Option<Uuid> = sqlx::query_scalar(
+            r#"SELECT assignment_id
+               FROM "ob-poc".cbu_im_assignments
+               WHERE cbu_id = $1
+                 AND profile_id = $2
+                 AND manager_role = $3
+                 AND manager_lei IS NOT DISTINCT FROM $4
+                 AND manager_bic IS NOT DISTINCT FROM $5
+                 AND manager_name IS NOT DISTINCT FROM $6
+               ORDER BY created_at
+               LIMIT 1"#,
+        )
+        .bind(cbu_id)
+        .bind(profile_id)
+        .bind(&manager_role)
+        .bind(&manager_lei)
+        .bind(&manager_bic)
+        .bind(&manager_name)
+        .fetch_optional(&mut **tx)
+        .await?;
+
+        if let Some(assignment_id) = existing_assignment_id {
+            sqlx::query(
+                r#"UPDATE "ob-poc".cbu_im_assignments
+                   SET manager_entity_id = $2,
+                       manager_lei = $3,
+                       manager_bic = $4,
+                       manager_name = $5,
+                       priority = $6,
+                       scope_all = $7,
+                       scope_markets = $8,
+                       scope_instrument_classes = $9,
+                       instruction_method = $10,
+                       instruction_resource_id = COALESCE($11, instruction_resource_id),
+                       can_trade = $12,
+                       can_settle = $13,
+                       status = 'ACTIVE',
+                       updated_at = NOW()
+                   WHERE assignment_id = $1"#,
+            )
+            .bind(assignment_id)
+            .bind(manager_entity_id)
+            .bind(&manager_lei)
+            .bind(&manager_bic)
+            .bind(&manager_name)
+            .bind(mandate.priority)
+            .bind(mandate.scope.all)
+            .bind(&mandate.scope.mics)
+            .bind(&mandate.scope.instrument_classes)
+            .bind(&instruction_method)
+            .bind(mandate.instruction_resource_id)
+            .bind(mandate.can_trade)
+            .bind(mandate.can_settle)
+            .execute(&mut **tx)
+            .await?;
+            updated += 1;
+        } else {
+            sqlx::query(
+                r#"INSERT INTO "ob-poc".cbu_im_assignments
+                   (assignment_id, cbu_id, profile_id, manager_entity_id, manager_lei,
+                    manager_bic, manager_name, manager_role, priority, scope_all,
+                    scope_markets, scope_instrument_classes, instruction_method,
+                    instruction_resource_id, can_trade, can_settle, status)
+                   VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13,
+                           $14, $15, $16, 'ACTIVE')"#,
+            )
+            .bind(Uuid::new_v4())
+            .bind(cbu_id)
+            .bind(profile_id)
+            .bind(manager_entity_id)
+            .bind(&manager_lei)
+            .bind(&manager_bic)
+            .bind(&manager_name)
+            .bind(&manager_role)
+            .bind(mandate.priority)
+            .bind(mandate.scope.all)
+            .bind(&mandate.scope.mics)
+            .bind(&mandate.scope.instrument_classes)
+            .bind(&instruction_method)
+            .bind(mandate.instruction_resource_id)
+            .bind(mandate.can_trade)
+            .bind(mandate.can_settle)
+            .execute(&mut **tx)
+            .await?;
+            created += 1;
+        }
+    }
+
+    Ok((created, updated))
+}
+
+fn normalize_im_role(role: &str) -> String {
+    match role.to_ascii_uppercase().as_str() {
+        "SUB_ADVISOR" | "OVERLAY_MANAGER" | "TRANSITION_MANAGER" | "EXECUTION_BROKER" => {
+            role.to_ascii_uppercase()
+        }
+        "ADVISORY" | "DISCRETIONARY" | "INVESTMENT_MANAGER" => "INVESTMENT_MANAGER".to_string(),
+        _ => "INVESTMENT_MANAGER".to_string(),
+    }
+}
+
+fn manager_entity_id(mandate: &InvestmentManagerMandate) -> Result<Option<Uuid>> {
+    if mandate.manager.ref_type == EntityRefType::Uuid {
+        Ok(Some(Uuid::parse_str(&mandate.manager.value)?))
+    } else {
+        Ok(None)
+    }
+}
+
+fn manager_lei(mandate: &InvestmentManagerMandate) -> Option<String> {
+    if mandate.manager.ref_type == EntityRefType::Lei {
+        Some(mandate.manager.value.clone())
+    } else {
+        None
+    }
+}
+
+fn manager_bic(mandate: &InvestmentManagerMandate) -> Option<String> {
+    mandate.manager_bic.clone().or_else(|| {
+        if mandate.manager.ref_type == EntityRefType::Bic {
+            Some(mandate.manager.value.clone())
+        } else {
+            None
+        }
+    })
+}
+
+fn manager_name(mandate: &InvestmentManagerMandate) -> Option<String> {
+    if mandate.manager.ref_type == EntityRefType::Name {
+        Some(mandate.manager.value.clone())
+    } else {
+        None
+    }
 }
 
 // =============================================================================
@@ -2229,7 +2424,12 @@ impl SemOsVerbOp for TradingProfileAddImMandate {
         let scope_instrument_classes =
             json_extract_string_list_opt(args, "scope-instrument-classes");
 
-        let _instruction_method = json_extract_string_opt(args, "instruction-method");
+        let instruction_method = json_extract_string_opt(args, "instruction-method");
+
+        let instruction_resource_id =
+            json_extract_uuid_opt(args, ctx, "instruction-resource-id").map(|id| id.to_string());
+
+        let manager_bic_arg = json_extract_string_opt(args, "manager-bic");
 
         let can_trade = json_extract_bool_opt(args, "can-trade").unwrap_or(true);
 
@@ -2254,6 +2454,14 @@ impl SemOsVerbOp for TradingProfileAddImMandate {
             None
         };
 
+        let manager_bic = manager_bic_arg.or_else(|| {
+            if manager_ref_type == "BIC" {
+                Some(manager_ref.clone())
+            } else {
+                None
+            }
+        });
+
         // Apply operation to AST and save
         let doc = ast_db::apply_and_save(
             &pool,
@@ -2263,8 +2471,11 @@ impl SemOsVerbOp for TradingProfileAddImMandate {
                 manager_entity_id,
                 manager_name: manager_ref.clone(),
                 manager_lei,
+                manager_bic,
                 priority,
                 role: role.clone(),
+                instruction_method,
+                instruction_resource_id,
                 can_trade,
                 can_settle,
                 scope_instrument_classes: scope_instrument_classes.unwrap_or_default(),
@@ -2647,6 +2858,8 @@ impl SemOsVerbOp for TradingProfileApprove {
             )
             .await?;
         }
+
+        materialize_investment_managers(&mut tx, cbu_id, profile_id, &document).await?;
 
         // Commit transaction
         tx.commit().await?;

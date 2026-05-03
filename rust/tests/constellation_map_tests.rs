@@ -43,6 +43,27 @@ mod tests {
     }
 
     #[test]
+    fn trading_streetside_exposes_investment_manager_assignment() {
+        let map = load_builtin_constellation_map("trading.streetside").unwrap();
+        let slot = map.slot_index.get("investment_manager_assignment").unwrap();
+
+        assert_eq!(slot.def.table.as_deref(), Some("cbu_im_assignments"));
+        assert_eq!(slot.def.pk.as_deref(), Some("assignment_id"));
+        assert_eq!(
+            slot.def.verbs["assign"].verb_fqn(),
+            "investment-manager.assign"
+        );
+        assert_eq!(
+            slot.def.verbs["link_connectivity"].verb_fqn(),
+            "investment-manager.link-connectivity"
+        );
+        assert_eq!(
+            slot.def.verbs["find_for_trade"].verb_fqn(),
+            "investment-manager.find-for-trade"
+        );
+    }
+
+    #[test]
     fn recursive_slot_has_max_depth() {
         let map = load_builtin_constellation_map("struct.lux.ucits.sicav").unwrap();
         let slot = map.slot_index.get("ownership_chain").unwrap();

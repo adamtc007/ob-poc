@@ -68,6 +68,14 @@ allowed_verbs:
   - trading-profile.archive
   - trading-profile.validate-go-live-ready
   - trading-profile.validate-universe-coverage
+  # Investment manager assignment and instruction routing
+  - investment-manager.assign
+  - investment-manager.set-scope
+  - investment-manager.link-connectivity
+  - investment-manager.list
+  - investment-manager.suspend
+  - investment-manager.terminate
+  - investment-manager.find-for-trade
   # Corporate action policy
   - trading-profile.ca.get-policy
   - trading-profile.ca.set-election-policy

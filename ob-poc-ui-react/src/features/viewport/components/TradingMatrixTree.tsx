@@ -381,8 +381,22 @@ function NodeDetailPanel({ node }: NodeDetailPanelProps) {
     case "investment_manager_mandate":
       fields.push({ label: "Mandate ID", value: nodeType.mandate_id });
       fields.push({ label: "Manager", value: nodeType.manager_name });
+      if (nodeType.manager_lei)
+        fields.push({ label: "LEI", value: nodeType.manager_lei });
+      if (nodeType.manager_bic)
+        fields.push({ label: "BIC", value: nodeType.manager_bic });
       fields.push({ label: "Role", value: nodeType.role });
       fields.push({ label: "Priority", value: nodeType.priority.toString() });
+      if (nodeType.instruction_method)
+        fields.push({
+          label: "Instruction Method",
+          value: nodeType.instruction_method,
+        });
+      if (nodeType.instruction_resource_id)
+        fields.push({
+          label: "Instruction Resource",
+          value: nodeType.instruction_resource_id,
+        });
       fields.push({
         label: "Can Trade",
         value: nodeType.can_trade ? "Yes" : "No",

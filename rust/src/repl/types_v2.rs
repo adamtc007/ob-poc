@@ -223,8 +223,8 @@ impl WorkspaceKind {
                 constellation_families: vec![
                     "instrument_workspace",
                     "instrument_template",
-                    "trading_permission",
-                    "lifecycle",
+                    "trading_streetside",
+                    "trading_mandate",
                 ],
                 subject_kinds: vec![
                     SubjectKind::Matrix,
@@ -232,8 +232,8 @@ impl WorkspaceKind {
                     SubjectKind::ClientGroup,
                 ],
                 subject_required: false,
-                default_constellation_family: "trading_permission",
-                default_constellation_map: "cbu.trading.matrix",
+                default_constellation_family: "trading_streetside",
+                default_constellation_map: "trading.streetside",
                 supports_handoff_mode: true,
             },
             Self::OnBoarding => WorkspaceRegistryEntry {
@@ -1131,6 +1131,15 @@ mod tests {
         let json = serde_json::to_string(&input).unwrap();
         assert!(json.contains("\"type\":\"select_pack\""));
         assert!(json.contains("onboarding-request"));
+    }
+
+    #[test]
+    fn instrument_matrix_defaults_to_trading_streetside() {
+        let entry = WorkspaceKind::InstrumentMatrix.registry_entry();
+
+        assert_eq!(entry.default_constellation_family, "trading_streetside");
+        assert_eq!(entry.default_constellation_map, "trading.streetside");
+        assert!(entry.constellation_families.contains(&"trading_streetside"));
     }
 
     #[test]

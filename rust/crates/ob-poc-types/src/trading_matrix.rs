@@ -528,10 +528,19 @@ pub enum TradingMatrixNodeType {
         /// Manager LEI
         #[serde(skip_serializing_if = "Option::is_none")]
         manager_lei: Option<String>,
+        /// Manager BIC used for instruction routing
+        #[serde(skip_serializing_if = "Option::is_none")]
+        manager_bic: Option<String>,
         /// Priority (lower = higher priority)
         priority: i32,
         /// Role (e.g., "DISCRETIONARY", "ADVISORY")
         role: String,
+        /// Instruction method used to route manager instructions
+        #[serde(skip_serializing_if = "Option::is_none")]
+        instruction_method: Option<String>,
+        /// Linked CBU resource instance for the instruction route
+        #[serde(skip_serializing_if = "Option::is_none")]
+        instruction_resource_id: Option<String>,
         /// Whether can trade
         can_trade: bool,
         /// Whether can settle
@@ -1087,8 +1096,11 @@ pub enum TradingMatrixOp {
         manager_entity_id: String,
         manager_name: String,
         manager_lei: Option<String>,
+        manager_bic: Option<String>,
         priority: i32,
         role: String, // e.g., "DISCRETIONARY", "ADVISORY"
+        instruction_method: Option<String>,
+        instruction_resource_id: Option<String>,
         can_trade: bool,
         can_settle: bool,
         /// Scope constraints (optional)

@@ -2,6 +2,7 @@
 
 use anyhow::{anyhow, Result};
 use serde_json::{json, Value};
+use sqlx::Row;
 use uuid::Uuid;
 
 use super::core::ToolHandlers;
@@ -846,6 +847,41 @@ impl ToolHandlers {
         .await?
         .unwrap_or(0);
 
+        let im_rows = sqlx::query(
+            r#"SELECT manager_name, manager_lei, manager_bic, manager_role,
+                      instruction_method, instruction_resource_id, status
+               FROM "ob-poc".cbu_im_assignments
+               WHERE cbu_id = $1
+               ORDER BY priority, manager_name NULLS LAST, manager_lei NULLS LAST"#,
+        )
+        .bind(cbu_id)
+        .fetch_all(&self.pool)
+        .await?;
+        let investment_managers: Vec<Value> = im_rows
+            .iter()
+            .map(|row| {
+                let instruction_resource_id: Option<Uuid> =
+                    row.try_get("instruction_resource_id").ok();
+                json!({
+                    "manager_name": row.try_get::<Option<String>, _>("manager_name").ok().flatten(),
+                    "manager_lei": row.try_get::<Option<String>, _>("manager_lei").ok().flatten(),
+                    "manager_bic": row.try_get::<Option<String>, _>("manager_bic").ok().flatten(),
+                    "manager_role": row.try_get::<String, _>("manager_role").unwrap_or_default(),
+                    "instruction_method": row.try_get::<String, _>("instruction_method").unwrap_or_default(),
+                    "instruction_resource_id": instruction_resource_id.map(|id| id.to_string()),
+                    "status": row.try_get::<Option<String>, _>("status").ok().flatten(),
+                })
+            })
+            .collect();
+        let im_count = investment_managers.len() as i64;
+        let missing_im_connectivity = investment_managers
+            .iter()
+            .filter(|manager| {
+                let method = manager["instruction_method"].as_str().unwrap_or_default();
+                method != "MANUAL" && manager["instruction_resource_id"].is_null()
+            })
+            .count() as i64;
+
         // Get instrument classes in universe
         let instrument_classes: Vec<String> = sqlx::query_scalar!(
             r#"
@@ -886,7 +922,11 @@ impl ToolHandlers {
         });
 
         // Determine completeness
-        let is_complete = universe_count > 0 && ssi_count > 0 && rule_count > 0;
+        let is_complete = universe_count > 0
+            && ssi_count > 0
+            && rule_count > 0
+            && im_count > 0
+            && missing_im_connectivity == 0;
 
         Ok(json!({
             "success": true,
@@ -902,6 +942,9 @@ impl ToolHandlers {
                 "booking_rules": rule_count,
                 "settlement_chains": chain_count,
                 "isda_agreements": isda_count,
+                "investment_managers": im_count,
+                "investment_manager_connectivity_gaps": missing_im_connectivity,
+                "investment_manager_assignments": investment_managers,
                 "is_complete": is_complete
             },
             "endpoints": {

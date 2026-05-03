@@ -640,6 +640,46 @@ slots:
           via: trading-profile.archive
       terminal_states: [ARCHIVED, SUPERSEDED]
 
+  - id: investment_manager_assignment
+    constellation: trading.streetside
+    stateless: false
+    state_machine:
+      id: investment_manager_assignment_lifecycle
+      owner: "trading+ops"
+      expected_lifetime: long_lived
+      source_entity: '"ob-poc".cbu_im_assignments'
+      state_column: status
+      scope: per_cbu_profile_manager
+      description: |
+        Materialized CBU investment-manager assignment and instruction
+        route. The trading profile remains the source-of-truth document;
+        materialization writes this slot so Sage and operations can answer
+        who may instruct BNY, by which method, and through which resource.
+      states:
+        - id: ACTIVE
+          entry: true
+          description: "Manager assignment is live for the CBU/profile scope."
+        - id: SUSPENDED
+          description: "Manager assignment is temporarily paused."
+        - id: TERMINATED
+          description: "Manager assignment has ended."
+      transitions:
+        - from: ACTIVE
+          to: SUSPENDED
+          via: investment-manager.suspend
+        - from: [ACTIVE, SUSPENDED]
+          to: TERMINATED
+          via: investment-manager.terminate
+      terminal_states: [TERMINATED]
+      verbs:
+        - investment-manager.assign
+        - investment-manager.set-scope
+        - investment-manager.link-connectivity
+        - investment-manager.list
+        - investment-manager.suspend
+        - investment-manager.terminate
+        - investment-manager.find-for-trade
+
   # R-4 NEW: trading_activity — per-CBU signal slot tracking first-trade
   # event + dormancy detection. Projects INTO CBU tollgate aggregate
   # (cbu.operationally_active). Not a stored table in current schema;

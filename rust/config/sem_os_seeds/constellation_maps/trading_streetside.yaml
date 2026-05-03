@@ -63,6 +63,22 @@ slots:
       overlay_effective: { verb: matrix-overlay.effective-matrix, when: filled }
       overlay_gaps: { verb: matrix-overlay.unified-gaps, when: filled }
       overlay_compare: { verb: matrix-overlay.compare-products, when: filled }
+  investment_manager_assignment:
+    type: entity
+    entity_kinds: [entity]
+    table: cbu_im_assignments
+    pk: assignment_id
+    join: { via: cbu_im_assignments, parent_fk: cbu_id, child_fk: assignment_id }
+    cardinality: optional
+    depends_on: [trading_profile]
+    verbs:
+      assign: { verb: investment-manager.assign, when: [empty, filled] }
+      set_scope: { verb: investment-manager.set-scope, when: filled }
+      link_connectivity: { verb: investment-manager.link-connectivity, when: filled }
+      list: { verb: investment-manager.list, when: [empty, filled] }
+      suspend: { verb: investment-manager.suspend, when: filled }
+      terminate: { verb: investment-manager.terminate, when: filled }
+      find_for_trade: { verb: investment-manager.find-for-trade, when: filled }
   custody:
     type: entity
     entity_kinds: [cbu]

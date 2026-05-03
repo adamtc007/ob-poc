@@ -750,6 +750,9 @@ domains:
           - name: manager-ref-type
             type: string
             required: false
+          - name: manager-bic
+            type: string
+            required: false
           - name: role
             type: string
             required: false
@@ -764,6 +767,10 @@ domains:
             required: false
           - name: instruction-method
             type: string
+            required: false
+            valid_values: [SWIFT, CTM, FIX, API, ALERT, MANUAL]
+          - name: instruction-resource-id
+            type: uuid
             required: false
           - name: can-trade
             type: boolean

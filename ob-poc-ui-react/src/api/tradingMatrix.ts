@@ -133,8 +133,11 @@ export type TradingMatrixNodeType =
       manager_entity_id: string;
       manager_name: string;
       manager_lei?: string;
+      manager_bic?: string;
       priority: number;
       role: string;
+      instruction_method?: string;
+      instruction_resource_id?: string;
       can_trade: boolean;
       can_settle: boolean;
     }

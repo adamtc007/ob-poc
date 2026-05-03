@@ -149,6 +149,12 @@ pub struct InvestmentManagerMandate {
     #[serde(default)]
     pub instruction_method: Option<String>,
 
+    #[serde(default)]
+    pub manager_bic: Option<String>,
+
+    #[serde(default)]
+    pub instruction_resource_id: Option<Uuid>,
+
     #[serde(default = "default_true")]
     pub can_trade: bool,
 

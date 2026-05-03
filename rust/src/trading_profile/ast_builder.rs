@@ -269,8 +269,11 @@ pub fn apply_op(doc: &mut TradingMatrixDocument, op: TradingMatrixOp) -> AstBuil
             manager_entity_id,
             manager_name,
             manager_lei,
+            manager_bic,
             priority,
             role,
+            instruction_method,
+            instruction_resource_id,
             can_trade,
             can_settle,
             scope_instrument_classes,
@@ -282,8 +285,11 @@ pub fn apply_op(doc: &mut TradingMatrixDocument, op: TradingMatrixOp) -> AstBuil
             &manager_entity_id,
             &manager_name,
             manager_lei.as_deref(),
+            manager_bic.as_deref(),
             priority,
             &role,
+            instruction_method.as_deref(),
+            instruction_resource_id.as_deref(),
             can_trade,
             can_settle,
             scope_instrument_classes,
@@ -1179,8 +1185,11 @@ pub fn add_im_mandate(
     manager_entity_id: &str,
     manager_name: &str,
     manager_lei: Option<&str>,
+    manager_bic: Option<&str>,
     priority: i32,
     role: &str,
+    instruction_method: Option<&str>,
+    instruction_resource_id: Option<&str>,
     can_trade: bool,
     can_settle: bool,
     _scope_instrument_classes: Vec<String>,
@@ -1206,8 +1215,11 @@ pub fn add_im_mandate(
             manager_entity_id: manager_entity_id.to_string(),
             manager_name: manager_name.to_string(),
             manager_lei: manager_lei.map(|s| s.to_string()),
+            manager_bic: manager_bic.map(|s| s.to_string()),
             priority,
             role: role.to_string(),
+            instruction_method: instruction_method.map(|s| s.to_string()),
+            instruction_resource_id: instruction_resource_id.map(|s| s.to_string()),
             can_trade,
             can_settle,
         },
@@ -1597,6 +1609,50 @@ mod tests {
             result,
             Err(AstBuildError::NodeAlreadyExists { .. })
         ));
+    }
+
+    #[test]
+    fn test_add_im_mandate_preserves_instruction_fields() {
+        let mut doc = create_document("cbu-123", "Test CBU");
+
+        apply_op(
+            &mut doc,
+            TradingMatrixOp::AddImMandate {
+                manager_id: "im-001".to_string(),
+                manager_entity_id: "entity-001".to_string(),
+                manager_name: "Example IM".to_string(),
+                manager_lei: Some("5493001KJTIIGC8Y1R12".to_string()),
+                manager_bic: Some("EXAMGB2LXXX".to_string()),
+                priority: 10,
+                role: "INVESTMENT_MANAGER".to_string(),
+                instruction_method: Some("SWIFT".to_string()),
+                instruction_resource_id: Some("resource-001".to_string()),
+                can_trade: true,
+                can_settle: true,
+                scope_instrument_classes: vec!["EQUITY".to_string()],
+                scope_markets: vec!["XLON".to_string()],
+                scope_currencies: vec!["GBP".to_string()],
+            },
+        )
+        .unwrap();
+
+        let managers = doc
+            .find_by_id(&TradingMatrixNodeId::category(categories::MANAGERS))
+            .unwrap();
+        let node = &managers.children[0];
+        match &node.node_type {
+            TradingMatrixNodeType::InvestmentManagerMandate {
+                manager_bic,
+                instruction_method,
+                instruction_resource_id,
+                ..
+            } => {
+                assert_eq!(manager_bic.as_deref(), Some("EXAMGB2LXXX"));
+                assert_eq!(instruction_method.as_deref(), Some("SWIFT"));
+                assert_eq!(instruction_resource_id.as_deref(), Some("resource-001"));
+            }
+            other => panic!("unexpected node type: {other:?}"),
+        }
     }
 
     #[test]

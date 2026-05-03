@@ -290,19 +290,20 @@ pub async fn clone_to_draft(
     let hash = compute_document_hash(&doc);
     let profile_id = Uuid::new_v4();
 
-    sqlx::query!(
+    sqlx::query(
         r#"
         INSERT INTO "ob-poc".cbu_trading_profiles
-            (profile_id, cbu_id, version, status, document, document_hash, notes)
-        VALUES ($1, $2, $3, 'DRAFT', $4, $5, $6)
+            (profile_id, cbu_id, template_id, version, status, document, document_hash, notes)
+        VALUES ($1, $2, $3, $4, 'DRAFT', $5, $6, $7)
         "#,
-        profile_id,
-        target_cbu_id,
-        version,
-        doc_json,
-        hash,
-        notes,
     )
+    .bind(profile_id)
+    .bind(target_cbu_id)
+    .bind(source_profile_id)
+    .bind(version)
+    .bind(doc_json)
+    .bind(hash)
+    .bind(notes)
     .execute(pool)
     .await?;
 

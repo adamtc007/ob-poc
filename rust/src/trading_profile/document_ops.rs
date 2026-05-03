@@ -815,6 +815,8 @@ pub async fn add_im_mandate(
     scope_mics: Option<Vec<String>>,
     scope_instrument_classes: Option<Vec<String>>,
     instruction_method: Option<String>,
+    manager_bic: Option<String>,
+    instruction_resource_id: Option<Uuid>,
     can_trade: bool,
     can_settle: bool,
 ) -> Result<Value, DocumentOpError> {
@@ -845,7 +847,7 @@ pub async fn add_im_mandate(
         priority,
         manager: EntityRef {
             ref_type,
-            value: manager_ref,
+            value: manager_ref.clone(),
         },
         role,
         scope: ManagerScope {
@@ -854,6 +856,14 @@ pub async fn add_im_mandate(
             instrument_classes: scope_instrument_classes.unwrap_or_default(),
         },
         instruction_method,
+        manager_bic: manager_bic.or_else(|| {
+            if manager_ref_type == "BIC" {
+                Some(manager_ref.clone())
+            } else {
+                None
+            }
+        }),
+        instruction_resource_id,
         can_trade,
         can_settle,
     };
