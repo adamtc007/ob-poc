@@ -82,6 +82,30 @@ pub fn repl_to_chat_response(resp: ReplResponseV2, session_id: Uuid) -> ChatResp
             ));
         }
 
+        ReplResponseKindV2::ConstellationMapOptions { ref options } => {
+            let choices = options
+                .iter()
+                .enumerate()
+                .map(|(i, option)| UserChoice {
+                    id: format!("{}", i + 1),
+                    label: option.label.clone(),
+                    description: format!(
+                        "{} | {} | {}",
+                        option.constellation_map, option.jurisdiction, option.description
+                    ),
+                    is_escape: false,
+                })
+                .collect();
+            chat.decision = Some(build_decision(
+                &format!("cbu-map-{session_id}"),
+                DecisionKind::ClarifyWorkspace,
+                session_id,
+                &resp.message,
+                choices,
+                "cbu_constellation_map_gate",
+            ));
+        }
+
         ReplResponseKindV2::JourneyOptions { ref packs } => {
             let choices = packs
                 .iter()
@@ -183,9 +207,9 @@ fn repl_state_to_session_state(state: &ReplStateV2) -> SessionStateEnum {
         ReplStateV2::ScopeGate { .. } | ReplStateV2::WorkspaceSelection { .. } => {
             SessionStateEnum::New
         }
-        ReplStateV2::JourneySelection { .. } | ReplStateV2::InPack { .. } => {
-            SessionStateEnum::Scoped
-        }
+        ReplStateV2::ConstellationMapSelection { .. }
+        | ReplStateV2::JourneySelection { .. }
+        | ReplStateV2::InPack { .. } => SessionStateEnum::Scoped,
         ReplStateV2::Clarifying { .. } => SessionStateEnum::PendingValidation,
         ReplStateV2::SentencePlayback { .. } | ReplStateV2::RunbookEditing => {
             SessionStateEnum::ReadyToExecute
@@ -239,7 +263,9 @@ fn default_trace(reason: &str) -> DecisionTrace {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::repl::types_v2::{PackCandidate, WorkspaceKind, WorkspaceOption};
+    use crate::repl::types_v2::{
+        ConstellationMapOption, PackCandidate, WorkspaceKind, WorkspaceOption,
+    };
 
     #[test]
     fn scope_required_maps_to_decision() {
@@ -296,6 +322,34 @@ mod tests {
         assert!(matches!(d.kind, DecisionKind::ClarifyWorkspace));
         assert_eq!(d.choices.len(), 2);
         assert_eq!(d.choices[0].label, "CBU");
+    }
+
+    #[test]
+    fn constellation_map_options_maps_to_decision() {
+        let resp = ReplResponseV2 {
+            state: ReplStateV2::ConstellationMapSelection { options: vec![] },
+            kind: ReplResponseKindV2::ConstellationMapOptions {
+                options: vec![ConstellationMapOption {
+                    constellation_map: "struct.ie.ucits.icav".to_string(),
+                    constellation_family: "ie_icav".to_string(),
+                    label: "Ireland UCITS ICAV".to_string(),
+                    description: "Ireland UCITS ICAV onboarding constellation".to_string(),
+                    jurisdiction: "IE".to_string(),
+                }],
+            },
+            message: "Choose the CBU structure DAG.".to_string(),
+            runbook_summary: None,
+            step_count: 0,
+            session_feedback: None,
+            narration: None,
+            trace_id: None,
+        };
+        let chat = repl_to_chat_response(resp, Uuid::nil());
+        let decision = chat.decision.expect("constellation map decision");
+        assert!(matches!(decision.kind, DecisionKind::ClarifyWorkspace));
+        assert_eq!(decision.choices.len(), 1);
+        assert_eq!(decision.choices[0].label, "Ireland UCITS ICAV");
+        assert!(matches!(chat.session_state, SessionStateEnum::Scoped));
     }
 
     #[test]

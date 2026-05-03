@@ -10,7 +10,8 @@ use uuid::Uuid;
 
 use super::proposal_engine::StepProposal;
 use super::types_v2::{
-    PackCandidate, ReplStateV2, SessionFeedback, VerbCandidate, WorkspaceOption,
+    ConstellationMapOption, PackCandidate, ReplStateV2, SessionFeedback, VerbCandidate,
+    WorkspaceOption,
 };
 
 // ---------------------------------------------------------------------------
@@ -66,6 +67,11 @@ pub enum ReplResponseKindV2 {
 
     /// User needs to select a workspace after scope resolution.
     WorkspaceOptions { workspaces: Vec<WorkspaceOption> },
+
+    /// User needs to select the CBU structure constellation map before hydration.
+    ConstellationMapOptions {
+        options: Vec<ConstellationMapOption>,
+    },
 
     /// Available journey packs for selection.
     JourneyOptions { packs: Vec<PackCandidate> },

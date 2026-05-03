@@ -34,6 +34,7 @@ import { cn } from "../../../lib/utils";
 import type { SessionFeedback } from "../../../api/replV2";
 
 const DEFAULT_MAP_NAME = "struct.lux.ucits.sicav";
+const UNSELECTED_CBU_MAP_NAME = "cbu.structure.unselected";
 
 function stateBadgeClass(state: string, blocking: boolean): string {
   if (blocking) {
@@ -807,6 +808,10 @@ export function ConstellationPanel({
     return fromPath ?? sessionAllSlots[0] ?? null;
   }, [selectedSlotPath, sessionAllSlots, sessionHydrated]);
   const selectedCbuId = selectedCbu?.id ?? "";
+  const sessionMapName = sessionFeedback?.tos.constellation_map;
+  const mapSelectionPending = sessionMapName === UNSELECTED_CBU_MAP_NAME;
+  const activeMapName =
+    sessionMapName && !mapSelectionPending ? sessionMapName : DEFAULT_MAP_NAME;
 
   const casesQuery = useQuery({
     queryKey: queryKeys.constellation.cases(selectedCbuId),
@@ -833,14 +838,14 @@ export function ConstellationPanel({
     queryKey: queryKeys.constellation.detail(
       selectedCbuId,
       effectiveCaseId,
-      DEFAULT_MAP_NAME,
+      activeMapName,
     ),
     queryFn: () =>
       constellationApi.getConstellation(selectedCbuId, {
         caseId: effectiveCaseId,
-        mapName: DEFAULT_MAP_NAME,
+        mapName: activeMapName,
       }),
-    enabled: selectedCbuId.length > 0,
+    enabled: selectedCbuId.length > 0 && !mapSelectionPending,
     staleTime: 2000,
   });
 
@@ -848,14 +853,14 @@ export function ConstellationPanel({
     queryKey: queryKeys.constellation.summary(
       selectedCbuId,
       effectiveCaseId,
-      DEFAULT_MAP_NAME,
+      activeMapName,
     ),
     queryFn: () =>
       constellationApi.getSummary(selectedCbuId, {
         caseId: effectiveCaseId,
-        mapName: DEFAULT_MAP_NAME,
+        mapName: activeMapName,
       }),
-    enabled: selectedCbuId.length > 0,
+    enabled: selectedCbuId.length > 0 && !mapSelectionPending,
     staleTime: 2000,
   });
 

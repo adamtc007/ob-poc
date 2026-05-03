@@ -22,6 +22,10 @@ import { api } from "./client";
 export type ReplStateV2 =
   | { state: "scope_gate"; pending_input?: string }
   | { state: "workspace_selection"; workspaces: WorkspaceOption[] }
+  | {
+      state: "constellation_map_selection";
+      options: ConstellationMapOption[];
+    }
   | { state: "journey_selection"; candidates?: PackCandidate[] }
   | {
       state: "in_pack";
@@ -74,6 +78,14 @@ export interface WorkspaceOption {
   workspace: WorkspaceKind;
   label: string;
   description: string;
+}
+
+export interface ConstellationMapOption {
+  constellation_map: string;
+  constellation_family: string;
+  label: string;
+  description: string;
+  jurisdiction: string;
 }
 
 export type SubjectKind =
@@ -212,6 +224,7 @@ export interface ReplResponseV2 {
 export type ReplResponseKindV2 =
   | { kind: "scope_required"; prompt: string }
   | { kind: "workspace_options"; workspaces: WorkspaceOption[] }
+  | { kind: "constellation_map_options"; options: ConstellationMapOption[] }
   | { kind: "journey_options"; packs: PackCandidate[] }
   | { kind: "question"; field: string; prompt: string; answer_kind: string }
   | {
@@ -306,6 +319,10 @@ export type InputRequestV2 =
   | {
       type: "select_workspace";
       workspace: WorkspaceKind;
+    }
+  | {
+      type: "select_constellation_map";
+      constellation_map: string;
     };
 
 /** Response for session creation */
@@ -493,6 +510,17 @@ export const replV2Api = {
     return this.sendInput(sessionId, {
       type: "select_workspace",
       workspace,
+    });
+  },
+
+  /** Select a CBU structure constellation map before hydration */
+  async selectConstellationMap(
+    sessionId: string,
+    constellationMap: string,
+  ): Promise<ReplResponseV2> {
+    return this.sendInput(sessionId, {
+      type: "select_constellation_map",
+      constellation_map: constellationMap,
     });
   },
 

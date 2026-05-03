@@ -132,11 +132,11 @@ async fn select_scope_transitions_to_workspace_selection() {
 }
 
 // ---------------------------------------------------------------------------
-// Test 4: SelectWorkspace transitions to JourneySelection
+// Test 4: CBU SelectWorkspace transitions to constellation map selection
 // ---------------------------------------------------------------------------
 
 #[tokio::test]
-async fn select_workspace_transitions_to_journey_selection() {
+async fn cbu_select_workspace_transitions_to_constellation_map_selection() {
     let orch = make_orchestrator();
     let id = orch.create_session().await;
 
@@ -163,13 +163,16 @@ async fn select_workspace_transitions_to_journey_selection() {
         .unwrap();
 
     assert!(
-        matches!(resp.kind, ReplResponseKindV2::JourneyOptions { .. }),
-        "Expected JourneyOptions after workspace selection, got: {:?}",
+        matches!(
+            resp.kind,
+            ReplResponseKindV2::ConstellationMapOptions { .. }
+        ),
+        "Expected ConstellationMapOptions after CBU workspace selection, got: {:?}",
         resp.kind
     );
     assert!(
-        matches!(resp.state, ReplStateV2::JourneySelection { .. }),
-        "Should be in JourneySelection"
+        matches!(resp.state, ReplStateV2::ConstellationMapSelection { .. }),
+        "Should be in ConstellationMapSelection"
     );
 }
 

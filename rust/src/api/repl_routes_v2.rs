@@ -96,6 +96,9 @@ pub enum InputRequestV2 {
     /// User selected a workspace.
     SelectWorkspace { workspace: WorkspaceKind },
 
+    /// User selected a CBU structure constellation map.
+    SelectConstellationMap { constellation_map: String },
+
     /// User approves a human-gated runbook entry.
     Approve {
         entry_id: Uuid,
@@ -183,6 +186,9 @@ impl From<InputRequestV2> for UserInputV2 {
             },
             InputRequestV2::SelectWorkspace { workspace } => {
                 UserInputV2::SelectWorkspace { workspace }
+            }
+            InputRequestV2::SelectConstellationMap { constellation_map } => {
+                UserInputV2::SelectConstellationMap { constellation_map }
             }
             InputRequestV2::Approve {
                 entry_id,

@@ -1,8 +1,9 @@
-//! V2 State Machine Types — 7-State REPL
+//! V2 State Machine Types — REPL state model
 //!
-//! Defines the new state machine:
-//! ScopeGate → WorkspaceSelection → JourneySelection → InPack → Clarifying →
-//! SentencePlayback → RunbookEditing → Executing
+//! Defines the state machine:
+//! ScopeGate → WorkspaceSelection → optional ConstellationMapSelection →
+//! JourneySelection → InPack → Clarifying → SentencePlayback →
+//! RunbookEditing → Executing
 //!
 //! Also defines `UserInputV2` — the conversational input model.
 //! All answers are free-text `Message` input; no picker/form gates.
@@ -16,10 +17,10 @@ use uuid::Uuid;
 use crate::sem_os_runtime::constellation_runtime::HydratedConstellation;
 
 // ---------------------------------------------------------------------------
-// ReplStateV2 — 7-state machine
+// ReplStateV2 — session state machine
 // ---------------------------------------------------------------------------
 
-/// The seven states of the v2 REPL pipeline.
+/// The states of the v2 REPL pipeline.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "state", rename_all = "snake_case")]
 pub enum ReplStateV2 {
@@ -33,6 +34,12 @@ pub enum ReplStateV2 {
 
     /// User has selected a client scope and must now choose a workspace.
     WorkspaceSelection { workspaces: Vec<WorkspaceOption> },
+
+    /// CBU workspace selected; user must choose the structure constellation map
+    /// before the DAG is hydrated.
+    ConstellationMapSelection {
+        options: Vec<ConstellationMapOption>,
+    },
 
     /// User has scope, now choosing a journey pack.
     JourneySelection {
@@ -302,6 +309,16 @@ pub struct WorkspaceOption {
     pub workspace: WorkspaceKind,
     pub label: String,
     pub description: String,
+}
+
+/// A selectable CBU structure constellation map.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct ConstellationMapOption {
+    pub constellation_map: String,
+    pub constellation_family: String,
+    pub label: String,
+    pub description: String,
+    pub jurisdiction: String,
 }
 
 /// Session scope anchored on a client group.
@@ -1006,6 +1023,9 @@ pub enum UserInputV2 {
 
     /// User selected a workspace after scope resolution.
     SelectWorkspace { workspace: WorkspaceKind },
+
+    /// User selected a CBU structure constellation map.
+    SelectConstellationMap { constellation_map: String },
 
     /// User approves a human-gated entry.
     Approve {

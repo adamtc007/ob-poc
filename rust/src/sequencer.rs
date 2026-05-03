@@ -9,7 +9,8 @@
 //! |---------------------|-----------------|------------------------|-------------------------|
 //! | ScopeGate           | Message         | try_resolve_scope()    | WorkspaceSelection or ScopeGate |
 //! | ScopeGate           | SelectScope     | set_scope()            | WorkspaceSelection      |
-//! | WorkspaceSelection  | SelectWorkspace | set_workspace()        | JourneySelection        |
+//! | WorkspaceSelection  | SelectWorkspace | set_workspace()        | JourneySelection or ConstellationMapSelection |
+//! | ConstellationMapSelection | Message/SelectConstellationMap | set_constellation_map() | JourneySelection        |
 //! | JourneySelection    | Message         | route_pack()           | InPack or JourneySelection |
 //! | JourneySelection    | SelectPack      | activate_pack()        | InPack                  |
 //! | InPack              | Message         | handle_in_pack_msg()   | SentencePlayback or InPack |
@@ -28,6 +29,8 @@ use anyhow::Context as _;
 use serde::{Deserialize, Serialize};
 use tokio::sync::RwLock;
 use uuid::Uuid;
+
+const CBU_STRUCTURE_UNSELECTED_MAP: &str = "cbu.structure.unselected";
 
 use crate::dsl_v2::macros::MacroRegistry;
 use crate::journey::handoff::PackHandoff;
@@ -54,7 +57,7 @@ use crate::repl::sentence_gen::SentenceGenerator;
 use crate::repl::session_v2::{MessageRole, ReplSessionV2};
 use crate::repl::types::{MatchContext, MatchOutcome};
 use crate::repl::types_v2::{
-    ConstellationContextRef, ExecutionProgress, ReplCommandV2, ReplStateV2,
+    ConstellationContextRef, ConstellationMapOption, ExecutionProgress, ReplCommandV2, ReplStateV2,
     ResolvedConstellationContext, SessionFeedback, SubjectKind, UserInputV2, WorkspaceFrame,
     WorkspaceKind, WorkspaceOption, WorkspaceStateView,
 };
@@ -892,6 +895,10 @@ impl ReplOrchestratorV2 {
             ReplStateV2::WorkspaceSelection { .. } => {
                 self.handle_workspace_selection(session, input).await
             }
+            ReplStateV2::ConstellationMapSelection { options } => {
+                self.handle_constellation_map_selection(session, input, options)
+                    .await
+            }
             ReplStateV2::JourneySelection { .. } => {
                 self.handle_journey_selection(session, input).await
             }
@@ -1579,6 +1586,28 @@ impl ReplOrchestratorV2 {
             }
         }
 
+        if workspace == WorkspaceKind::Cbu {
+            if let Some(tos) = session.workspace_stack.last_mut() {
+                tos.constellation_family = "cbu_workspace".to_string();
+                tos.constellation_map = CBU_STRUCTURE_UNSELECTED_MAP.to_string();
+            }
+            let options = Self::cbu_constellation_map_options();
+            session.set_state(ReplStateV2::ConstellationMapSelection {
+                options: options.clone(),
+            });
+            return ReplResponseV2 {
+                state: session.state.clone(),
+                kind: ReplResponseKindV2::ConstellationMapOptions { options },
+                message: "CBU workspace selected. Choose the fund or structure DAG to hydrate."
+                    .to_string(),
+                runbook_summary: None,
+                step_count: session.runbook.entries.len(),
+                session_feedback: Some(session.build_session_feedback(false)),
+                narration: None,
+                trace_id: None,
+            };
+        }
+
         // Hydrate the constellation immediately — the DAG exists from this point.
         // With subject_id set, this hydrates the real slot tree for the CBU, not an empty stub.
         #[cfg(feature = "database")]
@@ -1715,6 +1744,310 @@ impl ReplOrchestratorV2 {
         } else {
             None
         }
+    }
+
+    async fn handle_constellation_map_selection(
+        &self,
+        session: &mut ReplSessionV2,
+        input: UserInputV2,
+        options: Vec<ConstellationMapOption>,
+    ) -> ReplResponseV2 {
+        let Some(option) = Self::resolve_constellation_map_selection(&input, &options) else {
+            session.set_state(ReplStateV2::ConstellationMapSelection {
+                options: options.clone(),
+            });
+            return ReplResponseV2 {
+                state: session.state.clone(),
+                kind: ReplResponseKindV2::ConstellationMapOptions { options },
+                message: "Choose a specific CBU structure DAG. Use one of the listed options."
+                    .to_string(),
+                runbook_summary: None,
+                step_count: session.runbook.entries.len(),
+                session_feedback: Some(session.build_session_feedback(false)),
+                narration: None,
+                trace_id: None,
+            };
+        };
+
+        if let Some(tos) = session.workspace_stack.last_mut() {
+            tos.constellation_family = option.constellation_family.clone();
+            tos.constellation_map = option.constellation_map.clone();
+        }
+
+        #[cfg(feature = "database")]
+        if let Some(pool) = self.pool() {
+            tracing::info!(
+                constellation_map = %option.constellation_map,
+                "About to hydrate CBU TOS after constellation map selection"
+            );
+            match self.rehydrate_tos(pool, session).await {
+                Ok(hydrated) => {
+                    session.hydrate_tos(hydrated);
+                    tracing::info!(
+                        constellation_map = %option.constellation_map,
+                        "CBU constellation hydration succeeded after map selection"
+                    );
+                }
+                Err(e) => {
+                    tracing::error!(
+                        constellation_map = %option.constellation_map,
+                        error = %e,
+                        "CBU constellation hydration failed after map selection"
+                    );
+                }
+            }
+        }
+
+        session.set_state(ReplStateV2::JourneySelection { candidates: None });
+        let workspace = WorkspaceKind::Cbu;
+        let packs = self.pack_router.list_packs_for_workspace(&workspace);
+        ReplResponseV2 {
+            state: session.state.clone(),
+            kind: ReplResponseKindV2::JourneyOptions {
+                packs: packs.clone(),
+            },
+            message: format!(
+                "{} DAG selected. Which journey would you like to start?",
+                option.label
+            ),
+            runbook_summary: None,
+            step_count: session.runbook.entries.len(),
+            session_feedback: Some(session.build_session_feedback(false)),
+            narration: None,
+            trace_id: None,
+        }
+    }
+
+    fn resolve_constellation_map_selection(
+        input: &UserInputV2,
+        options: &[ConstellationMapOption],
+    ) -> Option<ConstellationMapOption> {
+        match input {
+            UserInputV2::SelectConstellationMap { constellation_map } => options
+                .iter()
+                .find(|option| option.constellation_map == *constellation_map)
+                .cloned(),
+            UserInputV2::Message { content } => {
+                let trimmed = content.trim();
+                if let Ok(index) = trimmed.parse::<usize>() {
+                    return index
+                        .checked_sub(1)
+                        .and_then(|idx| options.get(idx))
+                        .cloned();
+                }
+
+                let normalized = Self::normalize_constellation_choice(trimmed);
+                if normalized.is_empty() {
+                    return None;
+                }
+
+                let mut scored = options
+                    .iter()
+                    .filter_map(|option| {
+                        let score = Self::score_constellation_option(&normalized, option);
+                        (score > 0).then_some((score, option))
+                    })
+                    .collect::<Vec<_>>();
+                scored.sort_by(|(left, _), (right, _)| right.cmp(left));
+                match scored.as_slice() {
+                    [(score, option), rest @ ..]
+                        if rest
+                            .first()
+                            .is_none_or(|(next_score, _)| next_score < score) =>
+                    {
+                        Some((*option).clone())
+                    }
+                    _ => None,
+                }
+            }
+            _ => None,
+        }
+    }
+
+    fn normalize_constellation_choice(value: &str) -> String {
+        value
+            .chars()
+            .map(|ch| {
+                if ch.is_ascii_alphanumeric() {
+                    ch.to_ascii_lowercase()
+                } else {
+                    ' '
+                }
+            })
+            .collect::<String>()
+            .split_whitespace()
+            .collect::<Vec<_>>()
+            .join(" ")
+    }
+
+    fn score_constellation_option(input: &str, option: &ConstellationMapOption) -> i32 {
+        let searchable = Self::normalize_constellation_choice(&format!(
+            "{} {} {} {} {}",
+            option.constellation_map,
+            option.constellation_family,
+            option.label,
+            option.description,
+            option.jurisdiction
+        ));
+        if searchable == input {
+            return 100;
+        }
+        if searchable.contains(input) {
+            return 50 + input.split_whitespace().count() as i32;
+        }
+
+        input
+            .split_whitespace()
+            .filter(|token| {
+                searchable
+                    .split_whitespace()
+                    .any(|candidate| candidate == *token)
+            })
+            .count() as i32
+    }
+
+    fn cbu_constellation_map_options() -> Vec<ConstellationMapOption> {
+        [
+            (
+                "struct.lux.ucits.sicav",
+                "lu_ucits",
+                "Luxembourg UCITS SICAV",
+                "Luxembourg UCITS SICAV onboarding constellation",
+                "LU",
+            ),
+            (
+                "struct.lux.aif.raif",
+                "operating",
+                "Luxembourg AIF RAIF",
+                "Luxembourg AIF RAIF onboarding constellation",
+                "LU",
+            ),
+            (
+                "struct.lux.pe.scsp",
+                "operating",
+                "Luxembourg PE SCSp",
+                "Luxembourg private equity SCSp onboarding constellation",
+                "LU",
+            ),
+            (
+                "struct.ie.ucits.icav",
+                "ie_icav",
+                "Ireland UCITS ICAV",
+                "Ireland UCITS ICAV onboarding constellation",
+                "IE",
+            ),
+            (
+                "struct.ie.aif.icav",
+                "ie_icav",
+                "Ireland AIF ICAV",
+                "Ireland AIF ICAV onboarding constellation",
+                "IE",
+            ),
+            (
+                "struct.ie.hedge.icav",
+                "ie_icav",
+                "Ireland Hedge ICAV",
+                "Ireland hedge ICAV onboarding constellation",
+                "IE",
+            ),
+            (
+                "struct.us.40act.open-end",
+                "us_40act",
+                "US 40 Act Open-End",
+                "United States 40 Act open-end onboarding constellation",
+                "US",
+            ),
+            (
+                "struct.us.40act.closed-end",
+                "us_40act",
+                "US 40 Act Closed-End",
+                "United States 40 Act closed-end onboarding constellation",
+                "US",
+            ),
+            (
+                "struct.us.etf.40act",
+                "us_40act",
+                "US 40 Act ETF",
+                "United States 40 Act ETF onboarding constellation",
+                "US",
+            ),
+            (
+                "struct.us.private-fund.delaware-lp",
+                "operating",
+                "US Private Fund Delaware LP",
+                "United States private fund Delaware LP onboarding constellation",
+                "US",
+            ),
+            (
+                "struct.hedge.cross-border",
+                "cross_border_hedge",
+                "Cross-Border Hedge",
+                "Cross-border hedge master-feeder onboarding constellation",
+                "MULTI",
+            ),
+            (
+                "struct.pe.cross-border",
+                "cross_border_pe",
+                "Cross-Border Private Equity",
+                "Cross-border private equity parallel-fund onboarding constellation",
+                "MULTI",
+            ),
+            (
+                "struct.uk.manager.llp",
+                "operating",
+                "UK Manager LLP",
+                "United Kingdom manager LLP onboarding constellation",
+                "UK",
+            ),
+            (
+                "struct.uk.private-equity.lp",
+                "operating",
+                "UK Private Equity LP",
+                "United Kingdom private equity LP onboarding constellation",
+                "UK",
+            ),
+            (
+                "struct.uk.authorised.oeic",
+                "uk_auth",
+                "UK Authorised OEIC",
+                "United Kingdom authorised OEIC onboarding constellation",
+                "UK",
+            ),
+            (
+                "struct.uk.authorised.aut",
+                "uk_auth",
+                "UK Authorised Unit Trust",
+                "United Kingdom authorised unit trust onboarding constellation",
+                "UK",
+            ),
+            (
+                "struct.uk.authorised.acs",
+                "uk_auth",
+                "UK Authorised ACS",
+                "United Kingdom authorised ACS onboarding constellation",
+                "UK",
+            ),
+            (
+                "struct.uk.authorised.ltaf",
+                "uk_auth",
+                "UK Authorised LTAF",
+                "United Kingdom authorised LTAF onboarding constellation",
+                "UK",
+            ),
+        ]
+        .into_iter()
+        .map(
+            |(constellation_map, constellation_family, label, description, jurisdiction)| {
+                ConstellationMapOption {
+                    constellation_map: constellation_map.to_string(),
+                    constellation_family: constellation_family.to_string(),
+                    label: label.to_string(),
+                    description: description.to_string(),
+                    jurisdiction: jurisdiction.to_string(),
+                }
+            },
+        )
+        .collect()
     }
 
     async fn handle_journey_selection(
@@ -6938,6 +7271,9 @@ fn input_trace_text(input: &UserInputV2) -> Option<String> {
         UserInputV2::SelectWorkspace { workspace } => {
             Some(format!("select_workspace:{}", workspace.label()))
         }
+        UserInputV2::SelectConstellationMap { constellation_map } => {
+            Some(format!("select_constellation_map:{constellation_map}"))
+        }
         UserInputV2::Approve {
             entry_id,
             approved_by,
@@ -6979,14 +7315,15 @@ fn repl_parent_trace_id(session: &ReplSessionV2, input: &UserInputV2) -> Option<
         | UserInputV2::SelectProposal { .. }
         | UserInputV2::SelectEntity { .. }
         | UserInputV2::SelectScope { .. }
+        | UserInputV2::SelectConstellationMap { .. }
         | UserInputV2::Approve { .. }
         | UserInputV2::RejectGate { .. }
         | UserInputV2::Edit { .. }
         | UserInputV2::Command { .. } => session.pending_trace_id,
         UserInputV2::Message { .. } => match session.state {
-            ReplStateV2::Clarifying { .. } | ReplStateV2::SentencePlayback { .. } => {
-                session.pending_trace_id
-            }
+            ReplStateV2::ConstellationMapSelection { .. }
+            | ReplStateV2::Clarifying { .. }
+            | ReplStateV2::SentencePlayback { .. } => session.pending_trace_id,
             _ => None,
         },
     }
@@ -7009,6 +7346,7 @@ fn update_repl_trace_lineage(
     session.pending_trace_id = match response.kind {
         ReplResponseKindV2::ScopeRequired { .. }
         | ReplResponseKindV2::WorkspaceOptions { .. }
+        | ReplResponseKindV2::ConstellationMapOptions { .. }
         | ReplResponseKindV2::JourneyOptions { .. }
         | ReplResponseKindV2::Question { .. }
         | ReplResponseKindV2::SentencePlayback { .. }
@@ -7028,6 +7366,7 @@ fn repl_response_needs_follow_up(response: &ReplResponseV2) -> bool {
         response.kind,
         ReplResponseKindV2::ScopeRequired { .. }
             | ReplResponseKindV2::WorkspaceOptions { .. }
+            | ReplResponseKindV2::ConstellationMapOptions { .. }
             | ReplResponseKindV2::JourneyOptions { .. }
             | ReplResponseKindV2::Question { .. }
             | ReplResponseKindV2::SentencePlayback { .. }
@@ -7046,6 +7385,7 @@ fn classify_repl_trace_outcome(response: &ReplResponseV2) -> crate::traceability
         ReplResponseKindV2::Parked { .. }
         | ReplResponseKindV2::ScopeRequired { .. }
         | ReplResponseKindV2::WorkspaceOptions { .. }
+        | ReplResponseKindV2::ConstellationMapOptions { .. }
         | ReplResponseKindV2::Question { .. }
         | ReplResponseKindV2::SentencePlayback { .. }
         | ReplResponseKindV2::Clarification { .. }
@@ -7475,6 +7815,115 @@ definition_of_done:
             ReplResponseKindV2::WorkspaceOptions { .. }
         ));
         assert!(resp.message.contains("Allianz"));
+    }
+
+    #[tokio::test]
+    async fn test_cbu_workspace_requires_constellation_map_selection() {
+        let orch = make_orchestrator();
+        let id = orch.create_session().await;
+
+        orch.process(
+            id,
+            UserInputV2::SelectScope {
+                group_id: Uuid::new_v4(),
+                group_name: "Allianz".to_string(),
+            },
+        )
+        .await
+        .unwrap();
+
+        let resp = orch
+            .process(
+                id,
+                UserInputV2::SelectWorkspace {
+                    workspace: WorkspaceKind::Cbu,
+                },
+            )
+            .await
+            .unwrap();
+
+        assert!(matches!(
+            resp.kind,
+            ReplResponseKindV2::ConstellationMapOptions { .. }
+        ));
+        assert!(matches!(
+            resp.state,
+            ReplStateV2::ConstellationMapSelection { .. }
+        ));
+        let session = orch.get_session(id).await.unwrap();
+        let tos = session.workspace_stack.last().unwrap();
+        assert_eq!(tos.constellation_map, CBU_STRUCTURE_UNSELECTED_MAP);
+    }
+
+    #[tokio::test]
+    async fn test_cbu_constellation_map_selection_sets_tos_before_journey() {
+        let orch = make_orchestrator();
+        let id = orch.create_session().await;
+
+        orch.process(
+            id,
+            UserInputV2::SelectScope {
+                group_id: Uuid::new_v4(),
+                group_name: "Allianz".to_string(),
+            },
+        )
+        .await
+        .unwrap();
+        orch.process(
+            id,
+            UserInputV2::SelectWorkspace {
+                workspace: WorkspaceKind::Cbu,
+            },
+        )
+        .await
+        .unwrap();
+
+        let resp = orch
+            .process(
+                id,
+                UserInputV2::SelectConstellationMap {
+                    constellation_map: "struct.ie.ucits.icav".to_string(),
+                },
+            )
+            .await
+            .unwrap();
+
+        assert!(matches!(
+            resp.kind,
+            ReplResponseKindV2::JourneyOptions { .. }
+        ));
+        assert!(matches!(resp.state, ReplStateV2::JourneySelection { .. }));
+        let session = orch.get_session(id).await.unwrap();
+        let tos = session.workspace_stack.last().unwrap();
+        assert_eq!(tos.constellation_map, "struct.ie.ucits.icav");
+        assert_eq!(tos.constellation_family, "ie_icav");
+    }
+
+    #[test]
+    fn test_all_authored_cbu_structure_maps_are_selectable() {
+        let configured = ReplOrchestratorV2::cbu_constellation_map_options()
+            .into_iter()
+            .map(|option| option.constellation_map)
+            .collect::<std::collections::BTreeSet<_>>();
+        let seed_dir = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("config/sem_os_seeds/constellation_maps");
+        let authored = std::fs::read_dir(seed_dir)
+            .unwrap()
+            .filter_map(Result::ok)
+            .filter_map(|entry| {
+                let path = entry.path();
+                let filename = path.file_name()?.to_str()?;
+                if !filename.starts_with("struct_") {
+                    return None;
+                }
+                let yaml = std::fs::read_to_string(path).ok()?;
+                yaml.lines()
+                    .find_map(|line| line.strip_prefix("constellation: "))
+                    .map(ToString::to_string)
+            })
+            .collect::<std::collections::BTreeSet<_>>();
+
+        assert_eq!(configured, authored);
     }
 
     #[tokio::test]

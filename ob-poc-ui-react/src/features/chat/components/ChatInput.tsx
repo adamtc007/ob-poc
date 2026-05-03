@@ -73,6 +73,8 @@ export function ChatInput({
         {/* Textarea */}
         <div className="relative flex-1">
           <textarea
+            id="chat-message-input"
+            name="chat-message"
             ref={textareaRef}
             value={value}
             onChange={(e) => setValue(e.target.value)}
