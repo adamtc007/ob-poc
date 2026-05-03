@@ -255,7 +255,7 @@ pub struct ReplOrchestratorV2 {
     /// V1.3 cross-workspace gate-check pipeline. When set, each verb
     /// dispatched via VerbExecutionPort is gate-checked against the
     /// loaded DAG taxonomies before execution. See
-    /// `docs/todo/catalogue-platform-refinement-v1_3.md` §3.3.
+    /// `docs/backlog/catalogue-platform-refinement-v1_3.md` §3.3.
     gate_pipeline: Option<crate::runbook::step_executor_bridge::GatePipeline>,
 }
 

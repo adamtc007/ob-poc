@@ -78,9 +78,8 @@
 #   semantics.
 #
 # PARENT DOCS:
-#   - docs/todo/catalogue-platform-refinement-v1_3.md (spec)
-#   - docs/todo/instrument-matrix-pilot-findings-2026-04-23.md §10 (addendum)
-#   - docs/todo/tranche-2-cross-workspace-reconciliation-2026-04-24.md §4.2
+#   - docs/backlog/catalogue-platform-refinement-v1_3.md (spec)
+#   - docs/backlog/tranche-2-cross-workspace-reconciliation-2026-04-24.md §4.2
 
 version: "1.0"
 workspace: instrument_matrix
@@ -1247,10 +1246,7 @@ product_module_gates:
   # Slots with explicit product gates (3 new slots from pass 3/7)
   # See slots[].product_gates above for full declarations.
 
-  # Other slots are always-on under the current pack surface. Future
-  # refinement (v1.1 candidate) would add product gates per the §6
-  # product-module map in
-  # docs/todo/instrument-matrix-dag-workspace-diagram-2026-04-23.md.
+  # Other slots are always-on under the current pack surface.
 
   always_on:
     - workspace_root

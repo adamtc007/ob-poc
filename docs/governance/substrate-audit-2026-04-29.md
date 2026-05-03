@@ -1,7 +1,7 @@
 # Entity / DB / DAG / DSL Substrate Audit — 2026-04-29
 
 > **Scope:** Substrate layer of `ob-poc` — platform-level entity schema, DB tables that materialise it, the twelve workspace DAG taxonomies that declare entity state templates, and DSL verb-to-entity bindings. Specific focus on the onboarding business path.
-> **Reference context (NOT subject of audit):** `docs/todo/catalogue-platform-refinement-v1_2.md` for the eleven-workspace ontology and the `transition_args:` pattern.
+> **Reference context (NOT subject of audit):** `docs/backlog/catalogue-platform-refinement-v1_2.md` for the eleven-workspace ontology and the `transition_args:` pattern.
 > **Out of scope:** Three-axis verb declarations, tier classifications, validator behaviour, escalation DSL, runbook composition, R.1–R.9 reconciliation activity, or any catalogue-layer concerns.
 > **Output consumer:** Sandbox Claude session for gap analysis and remediation recommendation.
 

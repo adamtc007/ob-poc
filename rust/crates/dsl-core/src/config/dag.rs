@@ -12,7 +12,7 @@
 //! so that DAG authors can experiment without breaking the loader
 //! (matches pack_loader's rollout philosophy).
 //!
-//! See `docs/todo/catalogue-platform-refinement-v1_3.md` for the
+//! See `docs/backlog/catalogue-platform-refinement-v1_3.md` for the
 //! authoritative schema definition.
 
 use anyhow::{Context, Result};

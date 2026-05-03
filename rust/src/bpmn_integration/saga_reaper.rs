@@ -5,7 +5,7 @@
 //! `StartProcess` has already been issued to the bpmn-server, the
 //! bpmn-server holds a live process instance with no ob-poc-side trail.
 //!
-//! Design doc: `docs/todo/bpmn-start-saga-reaper-design-2026-04-22.md`.
+//! Design doc: `docs/backlog/bpmn-start-saga-reaper-design-2026-04-22.md`.
 //!
 //! # Status
 //!

@@ -4,8 +4,8 @@
 > **Produced:** 2026-04-18.
 > **Granularity:** one row per file. Per-op breakdown deferred to Phase 6 (round-trip per op).
 > **Related:**
-> - `docs/todo/three-plane-architecture-v0.3.md` — destination spec (authoritative)
-> - `docs/todo/three-plane-architecture-implementation-plan-v0.1.md` — implementation plan (decisions §10)
+> - `docs/backlog/three-plane-architecture-v0.3.md` — destination spec (authoritative)
+> - `docs/backlog/three-plane-architecture-implementation-plan-v0.1.md` — implementation plan (decisions §10)
 > - Decision **D8** — A1 violation blocks Phase 5. The **A1** column is a hard gate, not a data point.
 > - Decision **D7** — alternate step-executors consolidate at Phase 5b.
 
@@ -400,7 +400,7 @@ The 4 violations cluster into **two architectural patterns**:
 
 **Guardrails to prevent compromise drift** (non-negotiable per user: "make sure we don't lose the final fix — it's a compromise"):
 
-1. **Dedicated ledger file:** `docs/todo/pattern-b-a1-remediation-ledger.md` — 39 ops tracked (1 Pattern A + 38 Pattern B). Each row moves to CLOSED only when verified. Ledger file **retained in repo permanently** as historical record.
+1. **Dedicated ledger file:** `docs/backlog/pattern-b-a1-remediation-ledger.md` — 39 ops tracked (1 Pattern A + 38 Pattern B). Each row moves to CLOSED only when verified. Ledger file **retained in repo permanently** as historical record.
 2. **Phase 6 hard dependency:** CRUD dissolution (the most visible deletion-win phase) cannot start until the ledger's Phase 5f section reads CLOSED. This is deliberate leverage — Phase 6 is politically wanted, so 5f cannot be skipped.
 3. **Workspace lint L4:** post-Phase 5f, forbids any `reqwest::`, `tokio::process::`, `tonic::*` call inside `execute_json` / `execute` bodies of any `CustomOperation` impl. Escape hatch requires `#[allow(external_effects_in_verb)]` + ledger reference.
 4. **DoD item 19:** three-plane refactor is not Done until ledger is CLOSED and L4 is green. Added to implementation plan §10.6.

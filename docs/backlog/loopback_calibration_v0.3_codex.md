@@ -17,7 +17,7 @@ This implementation plan assumes the following are fully implemented and operati
 
 | Prerequisite | Source | What "complete" means |
 |-------------|--------|----------------------|
-| Constellation remediation pack (all 5 phases) | `TODO_constellation_remediation_pack.md` | 23 broken macro-verb references resolved, 845 missing SemOS footprints populated, 69 invocation phrase collisions eliminated, `verb_concepts.yaml` at 30%+ coverage, 34 orphan footprints removed |
+| Constellation remediation pack (all 5 phases) | Completed remediation pack | 23 broken macro-verb references resolved, 845 missing SemOS footprints populated, 69 invocation phrase collisions eliminated, `verb_concepts.yaml` at 30%+ coverage, 34 orphan footprints removed |
 | `utterance_traces` table | Kernel §13 | Schema deployed with hoisted canonical columns per Kernel §13 storage schema |
 | `is_synthetic` column on `utterance_traces` | This document §7.4 | `ALTER TABLE "ob-poc".utterance_traces ADD COLUMN is_synthetic BOOLEAN NOT NULL DEFAULT false;` |
 | Phases 0–4 instrumented | Kernel §3 | Each phase emits trace segments; `UtteranceTrace` records persist to DB on every utterance |
@@ -1692,7 +1692,7 @@ pub async fn generate_utterance_family(
     // let cleaned = response.trim().trim_start_matches("```json").trim_end_matches("```");
     // let utterances: Vec<GeneratedUtterance> = serde_json::from_str(cleaned)?;
 
-    todo!("Wire to actual LLM client in the repo")
+    unimplemented!("Wire to actual LLM client in the repo")
 }
 ```
 
@@ -1845,7 +1845,7 @@ pub async fn ensure_fixtures(
     //    - Session context pointing at the fixture entity
     //    - So that referential utterances ("freeze it") have an antecedent
 
-    todo!("Wire to actual entity creation/update functions in the repo")
+    unimplemented!("Wire to actual entity creation/update functions in the repo")
 }
 
 /// Reset fixture states after a calibration run.
@@ -1856,7 +1856,7 @@ pub async fn reset_fixtures(
     scenario: &CalibrationScenario,
 ) -> Result<()> {
     // Reset each entity to its scenario-defined state
-    todo!("Wire to actual entity state reset functions")
+    unimplemented!("Wire to actual entity state reset functions")
 }
 ```
 
@@ -1900,7 +1900,7 @@ pub async fn execute_calibration_utterance(
 
     // 4. Return the trace_id
 
-    todo!("Wire to actual pipeline entry point — find handle_utterance() or equivalent")
+    unimplemented!("Wire to actual pipeline entry point — find handle_utterance() or equivalent")
 }
 
 /// Load an UtteranceTrace from the DB by trace_id.
@@ -2960,7 +2960,7 @@ async fn main() -> anyhow::Result<()> {
 - All new code goes in `rust/src/calibration/` module.
 - All new binaries go in `rust/src/bin/`.
 - All migrations go in `migrations/` with sequential numbering.
-- Functions marked `todo!("Wire to actual...")` require finding the real entry point in the existing codebase and calling it — do NOT reimplement pipeline logic.
+- Functions marked `unimplemented!("Wire to actual...")` require finding the real entry point in the existing codebase and calling it — do NOT reimplement pipeline logic.
 
 ---
 

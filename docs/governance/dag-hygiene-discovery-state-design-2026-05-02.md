@@ -1,6 +1,6 @@
 # DAG Hygiene Discovery State Design - 2026-05-02
 
-Status: Phase 4.a design packet for `docs/todo/DAG_REACHABILITY_SEMOS_HYGIENE_PLAN_2026-05-02.md`.
+Status: Implemented design packet retained as governance evidence.
 
 ## Proposed State Slot
 

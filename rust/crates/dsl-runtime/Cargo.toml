@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2021"
 description = "DSL verb execution runtime — the data plane of the three-plane architecture. Owns VerbExecutionPort, VerbExecutionContext/Outcome, CrudExecutionPort, and the metadata-CRUD interpreter."
 
-# Phase 2 note — see docs/todo/three-plane-architecture-implementation-plan-v0.1.md §3:
+# Phase 2 note — see docs/backlog/three-plane-architecture-implementation-plan-v0.1.md §3:
 #   Phase 2 moved VerbExecutionContext/Outcome/SideEffects/Result and
 #   CrudExecutionPort from sem_os_core into this crate. The sem_os_core dep
 #   is STILL present (not yet removed) because dsl-runtime references

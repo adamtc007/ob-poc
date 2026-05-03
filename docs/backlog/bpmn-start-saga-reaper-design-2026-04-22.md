@@ -4,7 +4,7 @@
 > **Scope:** close the orphan-instance window left open by the F.1d Pattern-B
 > remediation of `bpmn.start`.
 > **Owner:** three-plane refactor / BPMN integration.
-> **Cross-refs:** `docs/todo/pattern-b-a1-remediation-ledger.md` §F.1 saga
+> **Cross-refs:** `docs/backlog/pattern-b-a1-remediation-ledger.md` §F.1 saga
 > follow-ups, `rust/src/domain_ops/bpmn_lite_ops.rs` (BpmnStart docstring).
 
 ---

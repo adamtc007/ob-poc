@@ -7,7 +7,7 @@
 > **Original status:** DRAFT — peer review pending (Adam, 2026-04-24).
 > **Date:** 2026-04-24 (v1.3 draft, post-Tranche-2).
 > **Prior versions:** v1.0 (2026-04-18), v1.1 (2026-04-22), v1.2 (2026-04-23),
-> all retained in `/docs/todo/`.
+> all retained in `/docs/backlog/`.
 >
 > **v1.3 changes from v1.2:** 7 amendments codifying patterns that
 > recurred across the 4 Tranche 2 workspace DAGs (IM pilot + KYC +

@@ -37,7 +37,7 @@
 # V1.3 adopted conventions: minimal (workspace is transitional).
 #
 # PARENT DOCS:
-#   - docs/todo/catalogue-platform-refinement-v1_3.md
+#   - docs/backlog/catalogue-platform-refinement-v1_3.md
 #   - rust/config/packs/session-bootstrap.yaml
 
 version: "1.0"

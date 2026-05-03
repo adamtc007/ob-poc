@@ -15,7 +15,7 @@
 //! - CBU state keys - dag_state (structure.exists, case.approved, etc.)
 //!
 //! See: ai-thoughts/036-session-rip-and-replace.md
-//! See: rust/src/mcp/TODO_UNIFIED_ARCHITECTURE.md
+//! See: rust/src/mcp/CLAUDE_CODE_TASK_unified_intent_pipeline.md
 
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};

@@ -4,7 +4,7 @@
 //!
 //! See:
 //!   `docs/annex-cross-workspace-state-consistency.md`
-//!   `docs/todo/catalogue-platform-refinement-v1_3.md`
+//!   `docs/backlog/catalogue-platform-refinement-v1_3.md`
 //!
 //! # V1.3 runtime mechanisms (2026-04-25)
 //!

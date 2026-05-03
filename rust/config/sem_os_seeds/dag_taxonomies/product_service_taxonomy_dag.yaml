@@ -40,7 +40,7 @@
 # V1.3 conventions: minimal — read-only workspace.
 #
 # PARENT DOCS:
-#   - docs/todo/catalogue-platform-refinement-v1_3.md
+#   - docs/backlog/catalogue-platform-refinement-v1_3.md
 #   - semos_maintenance_dag.yaml (the governed source)
 #   - rust/config/packs/product-service-taxonomy.yaml
 

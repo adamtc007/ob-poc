@@ -3,7 +3,7 @@
 //!
 //! Mixed backends: health queries, cleanup, bootstrap signal, outbox
 //! status, reindex-embeddings (outbox-queued, Pattern A A1 remediation
-//! per Phase 0g — `docs/todo/pattern-b-a1-remediation-ledger.md` §2),
+//! per Phase 0g — `docs/backlog/pattern-b-a1-remediation-ledger.md` §2),
 //! and schema-sync validation. All writes go through `scope.executor()`
 //! so they participate in the Sequencer-owned txn. Allowed in Governed
 //! mode only.

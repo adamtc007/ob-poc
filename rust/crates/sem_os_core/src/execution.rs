@@ -1,6 +1,6 @@
 //! Empty — execution types moved to `dsl_runtime` in Phase 2.
 //!
-//! Per `docs/todo/three-plane-architecture-implementation-plan-v0.1.md`
+//! Per `docs/backlog/three-plane-architecture-implementation-plan-v0.1.md`
 //! §3 Phase 2, every type that was formerly here now lives in
 //! `dsl_runtime`:
 //!

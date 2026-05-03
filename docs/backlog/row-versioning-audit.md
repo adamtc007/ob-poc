@@ -3,7 +3,7 @@
 > **Purpose:** ground-truth inventory of entity tables requiring `row_version bigint` per Decision D1. Input to Stream 2 batched migrations.
 > **Created:** 2026-04-18
 > **Decisions:** D1 (explicit `row_version bigint` everywhere), D2 (per-entity-group batched rollout over ~2 weeks), Q1 (pre-lands ahead of Phase 0 gate — parallel stream).
-> **Related:** `docs/todo/three-plane-architecture-v0.3.md` §10.5 (StateGateHash input set); `docs/todo/three-plane-architecture-implementation-plan-v0.1.md` §4 (Stream 2 critical-path parallel).
+> **Related:** `docs/backlog/three-plane-architecture-v0.3.md` §10.5 (StateGateHash input set); `docs/backlog/three-plane-architecture-implementation-plan-v0.1.md` §4 (Stream 2 critical-path parallel).
 
 ---
 

@@ -158,7 +158,7 @@ Macros are constellation-scoped shorthand for multi-step state transitions. They
 - ScenarioIndex fires unconditionally (not gated by `has_compound`), with G3 score bypass for exact `phrases_any` matches
 - Tier -2A/-2B results bypass CCIR `allowed_verbs` — macro routes are deterministic, pack's allowed_verbs is the correct gate
 - Entity ambiguity gate deferred — macros resolve without entity context
-- Spec: `docs/todo/GOVERNED_PHRASE_AUTHORING_v1.0.md` (v1.2) — ADR 041
+- Spec: `docs/backlog/GOVERNED_PHRASE_AUTHORING_v1.0.md` (v1.2) — ADR 041
 
 ### Governed Phrase Authoring (2026-03-28)
 
@@ -171,7 +171,7 @@ SemOS-governed phrase feedback loop — AI observes session utterance misses, pr
 - 9 phrase.* verbs: observe-misses, coverage-report, check-collisions, propose, batch-propose, review-proposals, approve, reject, defer
 - AI proposal pipeline: 5-signal confidence scoring (frequency, breadth, collision_safety, rephrase_confirmation, wrong_match_severity), risk-tiered approval routing (critical/elevated/standard)
 - `phrase_authoring` slot in `registry.stewardship` constellation with verb gates
-- Spec: `docs/todo/GOVERNED_PHRASE_AUTHORING_v1.0.md` (v1.2)
+- Spec: `docs/backlog/GOVERNED_PHRASE_AUTHORING_v1.0.md` (v1.2)
 
 ### Attribute DSL + Phase 4 Schema State (2026-03-24)
 

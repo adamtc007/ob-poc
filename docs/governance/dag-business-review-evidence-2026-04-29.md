@@ -3,7 +3,7 @@
 > **Scope:** Structured evidence base for business-correctness review of declared entity state machines across the twelve DAG taxonomies in `rust/config/sem_os_seeds/dag_taxonomies/`.
 > **Output consumer:** Adam (BNY custody-banking domain expert) — uses this document to make business verdicts on each state machine.
 > **What this document is NOT:** business verdicts, recommended changes, severity classifications, schema remediation proposals, or relitigation of v1.2 / substrate-audit-2026-04-29.
-> **Reference context (NOT under review):** `docs/todo/catalogue-platform-refinement-v1_2.md`, `docs/governance/substrate-audit-2026-04-29.md`.
+> **Reference context (NOT under review):** `docs/backlog/catalogue-platform-refinement-v1_2.md`, `docs/governance/substrate-audit-2026-04-29.md`.
 > **Output discipline:** Tiered per resumption guidance — Section 1 fields A–E (states, transitions, cross-workspace constraints, carrier evidence) are populated for every state machine; fields F–J (verb impl summaries, code-path write sites, migration history, tests, internal docs) are presented as evidence pointers citing substrate-audit IDs (S-1..S-28) and migration filenames rather than inlined deep extracts. Section 3 (DAG-vs-code consistency) is partially populated from substrate-audit findings; full code-grep pass deferred.
 
 ---
@@ -235,7 +235,7 @@ A condensed block per subsection:
 
 **I — Test fixtures.** Not gathered.
 
-**J — Internal documentation.** DAG header references `semos_maintenance_dag.yaml` (the governed source for service-definition authoring) and `docs/todo/catalogue-platform-refinement-v1_3.md`.
+**J — Internal documentation.** DAG header references `semos_maintenance_dag.yaml` (the governed source for service-definition authoring) and `docs/backlog/catalogue-platform-refinement-v1_3.md`.
 
 #### M-003 — product_maintenance.service_version
 
@@ -340,7 +340,7 @@ A condensed block per subsection:
 
 **I — Test fixtures.** Not gathered.
 
-**J — Internal documentation.** DAG header references `docs/todo/onboarding-dag-remediation-plan-2026-04-26.md (Slice R3 + R3.5)`, `docs/todo/onboarding-dag-deep-review-2026-04-26.md (Finding 3.7)`, `docs/todo/catalogue-platform-refinement-v1_3.md`.
+**J — Internal documentation.** DAG header references `docs/backlog/catalogue-platform-refinement-v1_3.md`; completed onboarding review/remediation todo docs were removed after implementation.
 
 ---
 
@@ -395,7 +395,7 @@ A condensed block per subsection:
 
 **I — Test fixtures.** Not gathered.
 
-**J — Internal documentation.** DAG header references `docs/todo/onboarding-dag-remediation-plan-2026-04-26.md (Slice R1)`, `docs/todo/onboarding-dag-deep-review-2026-04-26.md`, `docs/todo/catalogue-platform-refinement-v1_3.md`.
+**J — Internal documentation.** DAG header references `docs/backlog/catalogue-platform-refinement-v1_3.md`; completed onboarding review/remediation todo docs were removed after implementation.
 
 #### M-006 — lifecycle_resources.capability_binding
 
@@ -504,7 +504,7 @@ A condensed block per subsection:
 
 **I — Test fixtures.** Not gathered.
 
-**J — Internal documentation.** DAG header references `docs/todo/catalogue-platform-refinement-v1_3.md` and `docs/todo/tranche-3-semos-maintenance-findings-2026-04-24.md`.
+**J — Internal documentation.** DAG header references `docs/backlog/catalogue-platform-refinement-v1_3.md`.
 
 ---
 
@@ -561,7 +561,7 @@ A condensed block per subsection:
 
 **I — Test fixtures.** Not gathered.
 
-**J — Documentation.** DAG header `kyc_dag.yaml` (top); cited parents `docs/todo/tranche-2-kyc-kickoff-2026-04-23.md`, `docs/todo/catalogue-platform-refinement-v1_2.md`, `docs/todo/instrument-matrix-pilot-findings-2026-04-23.md`.
+**J — Documentation.** DAG header `kyc_dag.yaml` (top); cited parent `docs/backlog/catalogue-platform-refinement-v1_2.md`; completed kickoff/pilot reports were removed from implementation cleanup.
 
 #### M-008 — kyc.entity_kyc
 
@@ -1181,7 +1181,7 @@ Cross-slot constraints (intra-DAG) involving this slot: `mandate_requires_valida
 
 **I — Tests.** Not gathered.
 
-**J — Documentation.** DAG header references `docs/todo/catalogue-platform-refinement-v1_3.md`, `docs/todo/tranche-2-cbu-findings-2026-04-23.md (§7.0 foundational reframe)`, `docs/todo/tranche-2-cross-workspace-reconciliation-2026-04-24.md (§4.1)`.
+**J — Documentation.** DAG header references `docs/backlog/catalogue-platform-refinement-v1_3.md` and `docs/backlog/tranche-2-cross-workspace-reconciliation-2026-04-24.md (§4.1)`. Completed CBU findings reports were removed from implementation cleanup.
 
 **Derived cross-workspace state hosted on this slot:** `cbu_operationally_active` (host_slot: cbu, host_state: operationally_active). Aggregates 5 sources:
 - kyc.kyc_case.status = APPROVED (M-007).
@@ -1844,7 +1844,7 @@ Cross-slot constraints (intra-DAG): `deal_contracted_requires_agreed_rate_card`,
 
 **F.** `changeset.submit`, `changeset.enter-review`, `changeset.approve`, `changeset.reject`, `changeset.publish`.
 
-**G–J.** DAG header references CLAUDE.md §SemOS Maintenance workspace, `docs/annex-sem-os.md`, `docs/todo/catalogue-platform-refinement-v1_3.md`.
+**G–J.** DAG header references CLAUDE.md §SemOS Maintenance workspace, `docs/annex-sem-os.md`, `docs/backlog/catalogue-platform-refinement-v1_3.md`.
 
 #### M-057 — semos_maintenance.attribute_def (external — primary)
 

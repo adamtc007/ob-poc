@@ -1,6 +1,6 @@
 # DAG Reachability — SemOS-Canonical Reconciliation — 2026-05-02
 
-> **Companion to:** `docs/governance/dag-reachability-audit-2026-05-02.md` (the original audit) and `docs/todo/P0_dag_reachability_remediation.md` (the remediation plan).
+> **Companion to:** `docs/governance/dag-reachability-audit-2026-05-02.md` (the original audit).
 > **Brief:** Architectural review approved the audit's findings and severity calibration but identified that the bottom-up framing leaves three structural concerns under-addressed. The discovery pipeline analysis materially understates the problem. This refinement re-categorises the seven findings into six concern classes and does a **full scan** within each class, not just the cases the original audit happened to surface.
 > **Authority:** Adam Cearns, provisional.
 > **Status:** Audit refinement only. No code, DSL, or DB changes in this slice. The remediation plan is not updated by this slice; it will be re-sliced once the refinement lands.
@@ -358,7 +358,7 @@ The deepest finding remains Class D. The discovery pipeline being in architectur
 - Verb YAMLs: `rust/config/verbs/{deal,cbu,trading-profile*,service*,discovery,provisioning*,readiness*,pipeline*,attributes,attribute}.yaml`
 - Validator entry point: `rust/xtask/src/reconcile.rs` and `rust/xtask/src/main.rs`
 - Predicate parser (already in tree): `rust/crates/dsl-core/src/config/predicate/parser.rs`
-- Companion documents: `docs/governance/dag-reachability-audit-2026-05-02.md`, `docs/todo/P0_dag_reachability_remediation.md`
+- Companion documents: `docs/governance/dag-reachability-audit-2026-05-02.md`
 
 ---
 
@@ -374,7 +374,7 @@ The deepest finding remains Class D. The discovery pipeline being in architectur
 - Spec 4 mechanical validator checks that make the closure axiom CI-enforceable
 
 **Does not:**
-- Update the remediation plan (`docs/todo/P0_dag_reachability_remediation.md`). That re-slicing is a follow-on once this refinement lands and Adam signs off.
+- Transient remediation plans were removed after implementation; future findings should open a fresh dated plan.
 - Implement any of the changes. Validator extension, deal substate verbs, cascade-pattern refactors, discovery state slot — all separate slices.
 - Re-litigate D1, D2, D4, D5. D3 reframed via Class D, not re-decided.
 - Audit macros, scenarios, or composite expansions (out of scope per Adam directive).

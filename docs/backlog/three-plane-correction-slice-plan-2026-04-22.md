@@ -1,6 +1,6 @@
 # Three-Plane Correction Slice & Test Plan (2026-04-22)
 
-**Source review:** `docs/todo/three-plane-implementation-peer-review-2026-04-22.md`
+**Source review:** `docs/backlog/three-plane-implementation-peer-review-2026-04-22.md`
 **Scope:** P0 bypass fixes + F1/F2/F3 structural corrections + F16-F22 bypass / dead-code / hygiene.
 **Explicitly deferred (see `three-plane-v0.3-wiring-followon-2026-04-22.md`):** F5 envelope wiring, F6
 single-dispatch invariant, F7 PendingStateAdvance pipeline, F8 TOCTOU, F9 row-versioning, F10
@@ -71,7 +71,7 @@ propagation.
 - `Dockerfile`, `docker-compose.yml`, any deploy scripts
 - `rust/xtask/src/deploy.rs` and any `cargo x deploy`-adjacent surface
 
-**Output:** `docs/todo/runbook-gate-vnext-deployment-audit-2026-04-22.md` — table of deployment × feature-on/off.
+**Output:** `docs/backlog/runbook-gate-vnext-deployment-audit-2026-04-22.md` — table of deployment × feature-on/off.
 
 **Acceptance criteria for Slice 4.1 to proceed:** every production and staging deployment has
 `runbook-gate-vnext` ON. If any deployment has it OFF, 4.1 is blocked until that deployment is

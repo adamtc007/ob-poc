@@ -1,6 +1,6 @@
 # KYC/UBO Wiring Verification — Supplement to TODO v0.5
 
-**Purpose:** The main TODO (KYC_UBO_TODO_v0.5.md) covers verbs, handlers, migrations, and tests. This supplement covers the **downstream wiring** — everything that consumes or renders the data those handlers produce. Without these checks, the backend works but nothing else does.
+**Purpose:** The main KYC UBO implementation plan covered verbs, handlers, migrations, and tests. This supplement covers the **downstream wiring** — everything that consumes or renders the data those handlers produce. Without these checks, the backend works but nothing else does.
 
 **When to run:** After each Phase in the main TODO, run the corresponding wiring checks below.
 

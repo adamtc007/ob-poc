@@ -1,8 +1,8 @@
 # Three-Plane v0.3 Wiring Follow-On Plan (2026-04-22)
 
 **Prerequisite:** `three-plane-correction-slice-plan-2026-04-22.md` complete.
-**Source review:** `docs/todo/three-plane-implementation-peer-review-2026-04-22.md` findings F5-F10.
-**Spec:** `docs/todo/three-plane-architecture-v0.3.md` §§8.4, 10.3, 10.5, 10.7, 17.
+**Source review:** `docs/backlog/three-plane-implementation-peer-review-2026-04-22.md` findings F5-F10.
+**Spec:** `docs/backlog/three-plane-architecture-v0.3.md` §§8.4, 10.3, 10.5, 10.7, 17.
 
 ## Phase-by-phase status (updated 2026-04-22 late-session, post-rollout)
 
@@ -13,7 +13,7 @@
 | **C** — PendingStateAdvance (F7) | 5c-migrate state-advance | **PATTERN COMPLETE + ROLLOUT SUBSTANTIVELY COMPLETE: 72 verbs emitting across 15 domains.** Shared `emit_pending_state_advance` + `emit_pending_state_advance_batch` (multi-entity fan-out) + `peek/take_pending_state_advance` accessors ready. Families with full coverage: cbu, entity, kyc_case, deal, screening, client_group, investor (11), document, tollgate, cbu_role, billing, capital, ownership, partnership, outreach, custody, remediation, trading_profile_ca (10 via save wrapper). Remaining verbs = edge cases (cron ticks, recompute sweeps, cache-only mutations) that need case-by-case evaluation, not mechanical rollout. **Apply-in-txn (C.2 main) needs B.2b first.** | 12cc4dc1, e632270a, 2d174449, 607a3b80, 0fdeab11, ea612b31, 4ed2dd65, 1f5f235e, b6c697b8, 7429f46d, 5adc441f |
 | **D** — TOCTOU + row-version (F8, F9) | 5d | **D.1 STAGED + D.3 SCAFFOLD LANDED (2026-04-22 late-session).** D.1: SQL ready at `rust/migrations/20260422_row_version_entity_tables.sql` with real table names (`cases`, `client_group`); NOT yet applied (needs operator approval). D.3: `rust/src/toctou_recheck.rs` landed with `verify_toctou(envelope, workspace_snapshot_id, provider)` + `RowVersionProvider` trait + feature-gated SQL impl + 4 unit tests green. Activates the moment D.2 is applied AND real envelopes are constructed at stage 6. | 91aea971, 4ad61f29 |
 | **E** — dual-schema YAML (F10) | Phase 6 | **SCAFFOLD PRESENT; R-SWEEP NOT STARTED.** `rust/crates/round-trip-harness/` + `rust/crates/determinism-harness/` both exist with meta-tests green (6 + 4). YAML schema extensions (`runtime_schema:` / `catalogue_schema:`) + per-verb effect-equivalence proofs remain the 4-8 week effort. | — |
-| **F** — Pattern B A1 (F11) | 5f | **CLOSED 2026-04-22 late-session (37/37 ops across 6 files).** `SemOsVerbOp::pre_fetch(&args, &mut ctx, &sqlx::PgPool)` trait hook added — HTTP/gRPC/subprocess calls that need to produce read-only results now run OUTSIDE the txn scope and merge their result into args. Phase-by-phase: F.1 (§3.1 bpmn_lite) 5/5 CLOSED (BpmnInspect + BpmnCompile + BpmnStart via pre_fetch; BpmnSignal + BpmnCancel via outbox); F.2 (§3.2 source_loader) 12/12 CLOSED; F.3 (§3.3 gleif) 17/17 CLOSED (10 read ops + 1 dispatcher via pre_fetch, 6 write-interleaved ops via GleifEnrichmentService fetch/persist split). L4 workspace lint Layer 1 + `--taint` mode green with empty GRANDFATHERED array. **BpmnStart saga reaper design doc + prototype scaffolded** (`docs/todo/bpmn-start-saga-reaper-design-2026-04-22.md` + `rust/src/bpmn_integration/saga_reaper.rs`, 5 tests green) — not gating; production wiring is the next ~1 week of work. | 66b6398b, d57a91be, 0cc4c834, 3760c60f, 94fc11b6, fcc28bdd, 7ee94150, 19ef5035, 3228458f, 6cdbbda1, fddaf9ab |
+| **F** — Pattern B A1 (F11) | 5f | **CLOSED 2026-04-22 late-session (37/37 ops across 6 files).** `SemOsVerbOp::pre_fetch(&args, &mut ctx, &sqlx::PgPool)` trait hook added — HTTP/gRPC/subprocess calls that need to produce read-only results now run OUTSIDE the txn scope and merge their result into args. Phase-by-phase: F.1 (§3.1 bpmn_lite) 5/5 CLOSED (BpmnInspect + BpmnCompile + BpmnStart via pre_fetch; BpmnSignal + BpmnCancel via outbox); F.2 (§3.2 source_loader) 12/12 CLOSED; F.3 (§3.3 gleif) 17/17 CLOSED (10 read ops + 1 dispatcher via pre_fetch, 6 write-interleaved ops via GleifEnrichmentService fetch/persist split). L4 workspace lint Layer 1 + `--taint` mode green with empty GRANDFATHERED array. **BpmnStart saga reaper design doc + prototype scaffolded** (`docs/backlog/bpmn-start-saga-reaper-design-2026-04-22.md` + `rust/src/bpmn_integration/saga_reaper.rs`, 5 tests green) — not gating; production wiring is the next ~1 week of work. | 66b6398b, d57a91be, 0cc4c834, 3760c60f, 94fc11b6, fcc28bdd, 7ee94150, 19ef5035, 3228458f, 6cdbbda1, fddaf9ab |
 
 ## Scope
 
@@ -463,7 +463,7 @@ R-sweep through ~100 candidate CRUD verbs. For each: verify dual-schema YAML, ru
 
 ## Phase F — Pattern B A1 remediation (F11)
 
-**Source ledger:** `docs/todo/pattern-b-a1-remediation-ledger.md` already exists. Use it as the
+**Source ledger:** `docs/backlog/pattern-b-a1-remediation-ledger.md` already exists. Use it as the
 authoritative work list.
 
 ### Slice F.1 — `bpmn_lite_ops` (5 ops, gRPC)

@@ -33,7 +33,7 @@
 # entity state — it references Deal and CBU.
 #
 # PARENT DOCS:
-#   - docs/todo/catalogue-platform-refinement-v1_3.md
+#   - docs/backlog/catalogue-platform-refinement-v1_3.md
 #   - deal_dag.yaml §2.2 deal_onboarding_request slot (owning workspace)
 #   - rust/config/packs/onboarding-request.yaml
 

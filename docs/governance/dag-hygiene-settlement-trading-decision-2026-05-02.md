@@ -2,7 +2,7 @@
 
 Date: 2026-05-02
 
-Scope: Phase 2.c of `docs/todo/DAG_REACHABILITY_SEMOS_HYGIENE_PLAN_2026-05-02.md`.
+Scope: Implemented settlement/trading decision packet retained as governance evidence.
 
 ## Summary
 

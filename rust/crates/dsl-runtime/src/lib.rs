@@ -1,12 +1,12 @@
 //! DSL runtime — the execution plane of the three-plane architecture.
 //!
-//! See `docs/todo/three-plane-architecture-v0.3.md` §7.1 for the scope
+//! See `docs/backlog/three-plane-architecture-v0.3.md` §7.1 for the scope
 //! split between this crate, `sem_os_*` (control plane), and `ob-poc`
 //! (composition plane).
 //!
 //! # Current state
 //!
-//! Per `docs/todo/three-plane-architecture-implementation-plan-v0.1.md`
+//! Per `docs/backlog/three-plane-architecture-implementation-plan-v0.1.md`
 //! §3 Phase 2, this crate owns:
 //!
 //! - `VerbExecutionPort` trait (moved from sem_os_core in Phase 1).

@@ -226,27 +226,6 @@ async fn test_screening_requires_workstream() {
 // REPL / INCREMENTAL EDITING TESTS
 // =============================================================================
 
-/// Test BindingContext::from_ast extracts bindings correctly
-/// TODO: Implement BindingContext::from_ast method in dsl-core
-#[test]
-#[ignore = "BindingContext::from_ast not yet implemented"]
-fn test_binding_context_from_ast() {
-    // This test requires BindingContext::from_ast which is not yet implemented.
-    // The method would extract binding info from AST by looking up verb produces
-    // in the registry.
-    todo!("Implement BindingContext::from_ast");
-}
-
-/// Test BindingContext merge for REPL scenario
-/// TODO: Implement BindingContext::from_ast method in dsl-core
-#[test]
-#[ignore = "BindingContext::from_ast not yet implemented"]
-fn test_binding_context_merge_for_repl() {
-    // This test requires BindingContext::from_ast which is not yet implemented.
-    // It would test merging executed context with pending context from new DSL.
-    todo!("Implement BindingContext::from_ast");
-}
-
 /// Test available_types for verb satisfaction checking
 #[test]
 fn test_available_types_for_verb_satisfaction() {

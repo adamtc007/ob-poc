@@ -3,7 +3,7 @@
 > **Status:** Final. Approved as architecture specification.
 > **Date:** 2026-04-22 (v1.1 amendment)
 > **Prior versions:** v0.1 through v0.9 (see revision history in companion log). v1.0 (2026-04-18, `catalogue-platform-refinement-v1_0.md`) retained as historical record.
-> **v1.1 changes from v1.0:** three factual corrections surfaced by the Instrument Matrix pilot plan's codebase reading (`docs/todo/instrument-matrix-pilot-plan-2026-04-22.md` §1.9). All three update state-of-ob-poc claims that v1.0 wrote from architectural specification rather than direct code reading. **No principle (P1–P15), tranche DoD, or decision gate is modified.**
+> **v1.1 changes from v1.0:** three factual corrections surfaced by the Instrument Matrix pilot plan's codebase reading. All three update state-of-ob-poc claims that v1.0 wrote from architectural specification rather than direct code reading. **No principle (P1–P15), tranche DoD, or decision gate is modified.**
 >   1. §4.1 "what exists" — the `CustomOperation` trait was deleted 2026-04-22 in Phase 5c-migrate slice #80. Surface is now `SemOsVerbOp` across two registries (~686 impls total; v1.0's figure of 625 was accurate at authoring time but is now stale).
 >   2. P4 — softened from present-tense "the declared DAG taxonomy is a governed projection artefact" to acknowledge the taxonomy is currently only **partially** present. P4 names the architectural end-state; §4.2 is the accurate statement of current state.
 >   3. §4.2 — refined "declared DAG taxonomies" absence claim to reflect that Instrument Matrix has one state machine (`trading_profile_lifecycle`) declared today; the artefact is partially present for that workspace and absent elsewhere.

@@ -176,7 +176,7 @@ Recommendation: ship the migration as a **comment-only / annotation migration** 
 
 ### B3 — v1.3 spec versioning conflict
 
-`docs/todo/catalogue-platform-refinement-v1_3.md` already exists (52KB, dated 2026-04-24, marked SUPERSEDED on 2026-04-26 when v1.2 absorbed its amendments). Its existing `P16` is about three-layer state stratification — different from TODO §7's proposed `P16 = Carrier Completeness`.
+`docs/backlog/catalogue-platform-refinement-v1_3.md` already exists (52KB, dated 2026-04-24, marked SUPERSEDED on 2026-04-26 when v1.2 absorbed its amendments). Its existing `P16` is about three-layer state stratification — different from TODO §7's proposed `P16 = Carrier Completeness`.
 
 Per the project's CLAUDE.md: "Catalogue spec: `catalogue-platform-refinement-v1_2.md` (consolidated authoritative spec, 2026-04-26 — supersedes v1.0/v1.1/v1.3)."
 

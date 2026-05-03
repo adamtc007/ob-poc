@@ -16,10 +16,10 @@ scope_statement: |
 criteria:
   - id: matrix-reviewed
     description: "Phase 0a ownership matrix reviewed and approved; A1 clarification done"
-    check_command: "test -f docs/todo/phase-0a-ownership-matrix.md && grep -q 'A1 clarification pass (completed' docs/todo/phase-0a-ownership-matrix.md"
+    check_command: "test -f docs/backlog/phase-0a-ownership-matrix.md && grep -q 'A1 clarification pass (completed' docs/backlog/phase-0a-ownership-matrix.md"
     status: passed
     signed_by: adamtc007
-    evidence: "docs/todo/phase-0a-ownership-matrix.md §9"
+    evidence: "docs/backlog/phase-0a-ownership-matrix.md §9"
     closed_at: 2026-04-18T12:00:00Z
 
   - id: envelope-types-compile
@@ -79,8 +79,8 @@ criteria:
     closed_at: 2026-04-18T13:25:00Z
 
   - id: row-version-audit-complete
-    description: "docs/todo/row-versioning-audit.md lists every affected entity table with per-table decision"
-    check_command: "test -f docs/todo/row-versioning-audit.md"
+    description: "docs/backlog/row-versioning-audit.md lists every affected entity table with per-table decision"
+    check_command: "test -f docs/backlog/row-versioning-audit.md"
     status: passed
     signed_by: adamtc007
     evidence: "42 high-priority gate-surface tables identified across 6 migration groups (A–F). Zero existing row_version coverage. Batched D2 rollout plan in §3. Stream 2 kickoff unblocked."
@@ -88,7 +88,7 @@ criteria:
 
   - id: pattern-a-closed
     description: "Phase 0g: MaintenanceReindexEmbeddingsOp subprocess moved to OutboxDraft; ledger row CLOSED"
-    check_command: "grep -A 2 'sem_os_maintenance_ops.rs' docs/todo/pattern-b-a1-remediation-ledger.md | grep -q 'CLOSED'"
+    check_command: "grep -A 2 'sem_os_maintenance_ops.rs' docs/backlog/pattern-b-a1-remediation-ledger.md | grep -q 'CLOSED'"
     status: passed
     signed_by: adamtc007
     evidence: "Rewrote MaintenanceReindexEmbeddingsOp::{execute, execute_json} to INSERT public.outbox row with effect_kind='maintenance_spawn' via shared enqueue_reindex_embeddings() helper. Zero tokio::process/Command::new/reqwest/http::/hyper:: matches in file (verified via grep). cargo build clean. Ledger §2.1 row CLOSED. Drainer consumption deferred to Phase 5e — documented transitional behaviour (queued vs success)."

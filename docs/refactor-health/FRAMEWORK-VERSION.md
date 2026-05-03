@@ -5,7 +5,7 @@
 **Last amended:** 2026-04-18
 
 Scope: drift control framework for the three-plane architecture refactor. See
-`docs/todo/three-plane-drift-control-framework.md` for the full spec.
+`docs/backlog/three-plane-drift-control-framework.md` for the full spec.
 
 ## Version log
 

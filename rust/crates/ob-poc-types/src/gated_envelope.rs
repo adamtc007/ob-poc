@@ -1,7 +1,7 @@
 //! Gated verb envelope and execution outcome — the bi-plane boundary types.
 //!
 //! Phase 0b deliverable for the three-plane architecture refactor. See
-//! `docs/todo/three-plane-architecture-v0.3.md` §10.3 and Appendix A.
+//! `docs/backlog/three-plane-architecture-v0.3.md` §10.3 and Appendix A.
 //!
 //! ## Purpose
 //!

@@ -12,8 +12,6 @@
 # baseline to requires_confirmation at minimum (P.3 tier review).
 #
 # Companion docs:
-#   - docs/todo/instrument-matrix-dag-workspace-diagram-2026-04-23.md
-#   - docs/todo/instrument-matrix-dag-im-sanity-review-pass7-2026-04-23.md
 #   - rust/config/sem_os_seeds/dag_taxonomies/instrument_matrix_dag.yaml
 #
 # Existing companion macros:

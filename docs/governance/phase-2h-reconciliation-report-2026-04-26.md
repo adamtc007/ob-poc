@@ -265,8 +265,8 @@ Based on what this activity revealed:
 | Tier-decision record | `docs/governance/tier-decisions-2026-04-26.md` |
 | Phase 2.G coherence findings | `docs/governance/phase-2g-coherence-findings-2026-04-26.md` |
 | Phase 2.H reconciliation report (this) | `docs/governance/phase-2h-reconciliation-report-2026-04-26.md` |
-| v1.2 spec (consolidated) | `docs/todo/catalogue-platform-refinement-v1_2.md` |
-| Reconciliation review (independent) | `docs/todo/full-catalogue-reconciliation-review-2026-04-26.md` |
+| v1.2 spec (consolidated) | `docs/backlog/catalogue-platform-refinement-v1_2.md` |
+| Reconciliation review (independent) | Completed; transient todo report removed after implementation. |
 
 ## 8. Activity timeline (this session)
 

@@ -444,7 +444,7 @@ Severity: Medium — existing ledger; surface the link.
 
 Status: Direct-import grep in `rust/src/domain_ops/` finds `reqwest`/`tonic::`/`Command` imports in
 `gleif_ops.rs`, `request_ops.rs`, `source_loader_ops.rs`, `bpmn_lite_ops.rs` (indirect paths via
-service helpers also exist). `docs/todo/pattern-b-a1-remediation-ledger.md` scopes Phase 5f.
+service helpers also exist). `docs/backlog/pattern-b-a1-remediation-ledger.md` scopes Phase 5f.
 Remediation Phase 2 should explicitly defer these files, not rewrite them.
 
 ### F12. Session serialization must be preserved (v0.3 §8.7)

@@ -52,9 +52,7 @@
 #     APPROVED/ACTIVE).
 #
 # PARENT DOCS:
-#   - docs/todo/onboarding-dag-remediation-plan-2026-04-26.md (Slice R3 + R3.5)
-#   - docs/todo/onboarding-dag-deep-review-2026-04-26.md (Finding 3.7)
-#   - docs/todo/catalogue-platform-refinement-v1_3.md (v1.3 conventions)
+#   - docs/backlog/catalogue-platform-refinement-v1_3.md (v1.3 conventions)
 #   - rust/migrations/20260429_booking_principal_clearance.sql
 
 version: "1.0"
@@ -254,4 +252,3 @@ out_of_scope:
 # Authored by: claude (Tranche 4 R3.5), 2026-04-26.
 # Hoisted from deal_dag (R3) into standalone workspace per Adam's option (a).
 # Compound BAC+KYC+BP gate now expressible as v1.3 cross_workspace_constraint.
-# See docs/todo/onboarding-dag-remediation-plan-2026-04-26.md Slice R3 + R3.5.

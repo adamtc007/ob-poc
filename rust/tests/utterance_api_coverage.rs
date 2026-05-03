@@ -14,7 +14,7 @@
 //!
 //! Environment:
 //!   UTTERANCE_API_BASE_URL      Base URL for ob-poc-web (default: http://127.0.0.1:3002)
-//!   UTTERANCE_FIXTURE_PATH      TOML fixture path (default: ../docs/todo/intent_test_utterances.toml,
+//!   UTTERANCE_FIXTURE_PATH      TOML fixture path (default: ../docs/backlog/intent_test_utterances.toml,
 //!                               fallback: tests/fixtures/intent_test_utterances.toml)
 //!   UTTERANCE_OUTPUT_DIR        Output directory (default: target/utterance-api-coverage)
 //!   UTTERANCE_ACTOR_ID          Header x-obpoc-actor-id (default: coverage-bot)
@@ -130,7 +130,7 @@ fn finalize_bucket(map: HashMap<String, (usize, usize)>) -> BTreeMap<String, Buc
 
 fn default_fixture_path() -> PathBuf {
     let root = Path::new(env!("CARGO_MANIFEST_DIR"));
-    let docs_path = root.join("../docs/todo/intent_test_utterances.toml");
+    let docs_path = root.join("../docs/backlog/intent_test_utterances.toml");
     if docs_path.exists() {
         docs_path
     } else {

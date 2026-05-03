@@ -4,10 +4,10 @@
 > **Created:** 2026-04-18
 > **Scope:** all drift dimensions across the 21-week, 7-phase three-plane refactor. Cross-cuts every phase.
 > **Companion artefacts:**
-> - `docs/todo/three-plane-architecture-v0.3.md` (destination)
-> - `docs/todo/three-plane-architecture-implementation-plan-v0.1.md` (phases, decisions)
-> - `docs/todo/phase-0a-ownership-matrix.md` (file-level classification)
-> - `docs/todo/pattern-b-a1-remediation-ledger.md` (39-op remediation tracker)
+> - `docs/backlog/three-plane-architecture-v0.3.md` (destination)
+> - `docs/backlog/three-plane-architecture-implementation-plan-v0.1.md` (phases, decisions)
+> - `docs/backlog/phase-0a-ownership-matrix.md` (file-level classification)
+> - `docs/backlog/pattern-b-a1-remediation-ledger.md` (39-op remediation tracker)
 >
 > This framework supplements, not supersedes, the above. If any conflict arises, this framework governs *process*; the others govern *substance*.
 
@@ -1169,7 +1169,7 @@ scope_statement: |
 criteria:
   - id: matrix-reviewed
     description: "Phase 0a ownership matrix reviewed and approved"
-    check_command: "test -f docs/todo/phase-0a-ownership-matrix.md"
+    check_command: "test -f docs/backlog/phase-0a-ownership-matrix.md"
     status: pending
   - id: envelope-types-compile
     description: "GatedVerbEnvelope + PendingStateAdvance + TransactionScope + OutboxDraft + StateGateHash compile-only in ob-poc-types"
@@ -1192,8 +1192,8 @@ criteria:
     check_command: "cargo build -p round-trip-harness"
     status: pending
   - id: row-version-audit-complete
-    description: "docs/todo/row-versioning-audit.md lists every affected entity table"
-    check_command: "test -f docs/todo/row-versioning-audit.md"
+    description: "docs/backlog/row-versioning-audit.md lists every affected entity table"
+    check_command: "test -f docs/backlog/row-versioning-audit.md"
     status: pending
   - id: framework-active
     description: "Phase 0h framework live — lints, baselines, gate YAMLs in place"

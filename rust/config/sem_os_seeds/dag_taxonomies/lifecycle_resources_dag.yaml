@@ -3,8 +3,7 @@
 # ============================================================================
 # WORKSPACE PURPOSE (Layer 4 of the four-layer chain):
 #
-# The deep review (docs/todo/onboarding-dag-deep-review-2026-04-26.md)
-# identified a missing layer between "what generic capability does the CBU
+# A completed onboarding review identified a missing layer between "what generic capability does the CBU
 # consume" (custody-settlement, fund-accounting, etc. — Layer 3 in
 # product_service_taxonomy) and "which BNY system actually runs that
 # capability for this CBU" (CCC-Settlement-2.7-prod-eu, INFORM-NAV-prod-us,
@@ -62,9 +61,7 @@
 #     lifecycle and an authoritative pkey.
 #
 # PARENT DOCS:
-#   - docs/todo/onboarding-dag-remediation-plan-2026-04-26.md (Slice R1)
-#   - docs/todo/onboarding-dag-deep-review-2026-04-26.md (gap analysis)
-#   - docs/todo/catalogue-platform-refinement-v1_3.md (v1.3 conventions)
+#   - docs/backlog/catalogue-platform-refinement-v1_3.md (v1.3 conventions)
 #   - rust/migrations/20260427_lifecycle_resources_workspace.sql
 
 version: "1.0"

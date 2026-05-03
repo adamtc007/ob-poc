@@ -17,9 +17,7 @@
 #   mandate gate (v1.3 amendment candidate, not formalized here).
 #
 # PARENT DOCS:
-#   - docs/todo/tranche-2-kyc-kickoff-2026-04-23.md
-#   - docs/todo/catalogue-platform-refinement-v1_2.md
-#   - docs/todo/instrument-matrix-pilot-findings-2026-04-23.md
+#   - docs/backlog/catalogue-platform-refinement-v1_2.md
 
 version: "1.0"
 workspace: kyc

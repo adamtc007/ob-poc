@@ -3,7 +3,7 @@
 > **Status:** Final. Approved as architecture specification.
 > **Date:** 2026-04-23 (v1.2 amendment, post-pilot)
 > **Prior versions:** v1.0 (2026-04-18, historical), v1.1 (2026-04-22),
-> all retained in `/docs/todo/`.
+> all retained in `/docs/backlog/`.
 > **v1.2 changes from v1.1:** 10 amendments codifying what the
 > Instrument Matrix pilot (`instrument-matrix-pilot-findings-2026-04-23.md`)
 > validated, discovered, or corrected. Does NOT modify any existing

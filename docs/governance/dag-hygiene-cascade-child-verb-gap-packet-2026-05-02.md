@@ -1,6 +1,6 @@
 # DAG Hygiene Cascade Child Verb Gap Packet - 2026-05-02
 
-Scope: Tranche A1 of `docs/todo/DAG_REACHABILITY_PHASE_5_TO_8_CLOSEOUT_PLAN_2026-05-02.md`.
+Scope: Implemented cascade child-verb gap packet retained as governance evidence.
 
 Purpose: identify which Phase 5 cascade refactors can proceed using existing registered verbs, and where Adam approval is required before adding child verbs.
 

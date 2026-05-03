@@ -13,7 +13,7 @@
 //! row); for set-of-rows or computed cardinality we'd extend with a
 //! richer signature later.
 //!
-//! See: docs/todo/catalogue-platform-refinement-v1_3.md §3.3
+//! See: docs/backlog/catalogue-platform-refinement-v1_3.md §3.3
 //! (runtime impact for V1.3-1 + V1.3-2)
 
 use anyhow::{anyhow, Result};

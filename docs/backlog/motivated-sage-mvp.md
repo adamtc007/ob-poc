@@ -216,7 +216,7 @@ pub fn hydrate_constellation(
     // 2. Compare to target state from goal frame
     // 3. Set gap status: AtTarget if equal, Deferred if in deferred set,
     //    Reachable or Blocked determined by compute_frontier
-    todo!()
+    unimplemented!()
 }
 
 /// Compute the feasible frontier from hydrated nodes.
@@ -238,7 +238,7 @@ pub fn compute_frontier(
     // 2. Check preconditions via injected function
     // 3. Classify as actionable or blocked
     // 4. Compute progress metrics
-    todo!()
+    unimplemented!()
 }
 ```
 
@@ -318,7 +318,7 @@ pub fn render_motivation_prompt(
     //   If multiple actions are available, recommend the highest-priority one.
     //   If all paths are blocked, report blockers and summarise what is needed.
     
-    todo!()
+    unimplemented!()
 }
 ```
 

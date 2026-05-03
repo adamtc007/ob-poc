@@ -200,7 +200,7 @@ Invariant test referencing the cfg:
 
 Docs:
 
-- `docs/todo/phase-2.5-dispatch-audit.md` — multiple historical references; can stay as-is.
+- `docs/backlog/phase-2.5-dispatch-audit.md` — multiple historical references; can stay as-is.
 
 ---
 

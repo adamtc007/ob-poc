@@ -3,7 +3,7 @@
 > **Date:** 2026-04-29 (post-refactor session).
 > **Audience:** Adam (peer review), with the post-refactor model in mind.
 > **Purpose:** consolidated read of the onboarding-side DAG taxonomies, their slot state machines, the DSL verbs that operate on each slot, and the green-switch tollgate predicates that gate progression. Use as a thinking aid; not a spec.
-> **Authoritative spec:** `docs/todo/catalogue-platform-refinement-v1_4.md` (v1.4 DRAFT, this session). Earlier versions in archive.
+> **Authoritative spec:** `docs/backlog/catalogue-platform-refinement-v1_4.md` (v1.4 DRAFT, this session). Earlier versions in archive.
 > **Decision log:** `docs/governance/decision-log-2026-04-refactor.md` (D-001..D-017).
 > **Snapshot scope:** the 8 DAGs in the onboarding/CBU/Deal/Product-Service/Resource thread.
 

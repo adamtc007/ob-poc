@@ -21,10 +21,6 @@
 # mandate). P.4 tier review may adjust per specific classification.
 #
 # Companion docs:
-#   - docs/todo/instrument-matrix-dag-im-sanity-review-pass7-2026-04-23.md
-#     (overall lifecycle, amendments replay full flow)
-#   - docs/todo/instrument-matrix-dag-workspace-diagram-2026-04-23.md §4
-#     (cross-slot interaction rules — inform cascade semantics)
 #   - rust/config/sem_os_seeds/dag_taxonomies/instrument_matrix_dag.yaml
 #     (cross_slot_constraints — formal cascade rules)
 

@@ -996,7 +996,7 @@ When a shared fact (LEI, jurisdiction, fund structure type) is mutated in its ow
 
 ## Catalogue Platform v1.3 — Cross-Workspace Runtime Stack (2026-04-25)
 
-> **Spec:** `docs/todo/catalogue-platform-refinement-v1_3.md`
+> **Spec:** `docs/backlog/catalogue-platform-refinement-v1_3.md`
 > **Status:** CODE COMPLETE — opt-in via `ReplOrchestratorV2::with_gate_pipeline`
 
 The v1.3 stack adds runtime enforcement of cross-workspace semantics

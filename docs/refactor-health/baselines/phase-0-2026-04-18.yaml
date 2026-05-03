@@ -106,7 +106,7 @@ decisions_honoured:
   D8_no_new_a1_violations: true            # Phase 0b introduced no new A1 violations
   D9_determinism_harness_every_pr: null    # harness not yet live
   D10_separate_outbox_table: null          # public.outbox migration deferred to Phase 0d
-  D11_pattern_b_ledger_exists: true        # /docs/todo/pattern-b-a1-remediation-ledger.md
+  D11_pattern_b_ledger_exists: true        # /docs/backlog/pattern-b-a1-remediation-ledger.md
 
 invariants_honoured:
   closed_loop_rehydrate_after_writes: true     # pre-existing writes_since_push mechanism
@@ -116,7 +116,7 @@ invariants_honoured:
   no_external_effects_in_verb_bodies_except_ledgered: partial  # 4 A1 violations, all ledgered
 
 phase_0_completion:
-  0a_ownership_matrix: complete    # docs/todo/phase-0a-ownership-matrix.md
+  0a_ownership_matrix: complete    # docs/backlog/phase-0a-ownership-matrix.md
   0a_a1_clarification: complete    # §9 of matrix document
   0b_envelope_types: complete      # rust/crates/ob-poc-types/src/gated_envelope.rs (1032 lines, 19 tests)
   0c_state_gate_hash_spec: partial # encoding implemented; vectors frozen at Phase 0c review

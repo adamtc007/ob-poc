@@ -3,7 +3,7 @@
 > **Phase:** v1.5 follow-on — post Phase 5c-migrate, post v1.5b governance remediation.
 > **Scope:** Trace utterance → DSL → SemOsVerbOp → DB for four flows (Deal, CBU creation, Product+InstrumentMatrix attachment, Service+Resource discovery), then audit each flow's DAG taxonomy for state-reachability gaps.
 > **Authority:** Adam (provisional, per `tier-assignment-authority-provisional.md`).
-> **Status:** Findings only. Remediation plan in `docs/todo/P0_dag_reachability_remediation.md`. Code edits land separately and reference both documents.
+> **Status:** Findings retained as governance evidence. The remediation campaign has been implemented; transient plan files were removed from completion cleanup.
 > **Method:** Direct verbs only. A state X is "reachable" iff at least one verb declares `transition_args.target_state: X`, OR is `behavior: crud` writing X to the carrier's status column with a fixed value, OR is registered in `simple_status_op.rs::STATUS_FLIP_VERBS` with `target_state: X`. Macros, scenarios, plugin side-effects, and trigger-driven transitions are explicitly excluded — they are tracked as separate findings.
 
 ---

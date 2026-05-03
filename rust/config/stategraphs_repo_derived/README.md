@@ -14,5 +14,5 @@ Use this directory only when one of the following becomes available:
 2. an explicit edge-by-edge correction table that differs from the checked-in graph set
 
 Until then, the repo-derived reconciliation pack is:
-- [repo_derived_reconciliation_report.md](/Users/adamtc007/Developer/ob-poc/docs/todo/repo_derived_reconciliation_report.md)
-- [repo_derived_graph_correction_table.md](/Users/adamtc007/Developer/ob-poc/docs/todo/repo_derived_graph_correction_table.md)
+- [repo_derived_reconciliation_report.md](/Users/adamtc007/Developer/ob-poc/docs/backlog/repo_derived_reconciliation_report.md)
+- [repo_derived_graph_correction_table.md](/Users/adamtc007/Developer/ob-poc/docs/backlog/repo_derived_graph_correction_table.md)
