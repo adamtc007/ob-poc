@@ -37,10 +37,19 @@ allowed_verbs:
   - service.list-by-product
   - service.list-versions
   - service.show
+  - service-option.list-by-service
+  - service-option.read
+  - service.declare-option
+  - service.constrain-option-values
+  - service.bind-option-source
+  - service.deprecate-option
+  - product-service.override-option
   - service-resource.list
   - service-resource.read
   - service-resource.list-by-service
   - service-resource.list-attributes
+  - service-resource.declare-eligibility
+  - service-resource.declare-fanout-rule
   - attribute.list
   - attribute.read
   # R2 (2026-04-26) — service + service-version governance verbs.
@@ -119,6 +128,11 @@ templates:
         args:
           service-id: "{answers.service_id}"
 
+      - verb: service-option.list-by-service
+        when: "service_id"
+        args:
+          service-id: "{answers.service_id}"
+
   - template_id: resource-first-taxonomy
     when_to_use: "Explore taxonomy starting from a servicing resource"
     steps:
@@ -142,6 +156,7 @@ section_layout:
   - title: "Services"
     verb_prefixes:
       - "service."
+      - "service-option."
   - title: "Resources"
     verb_prefixes:
       - "service-resource."
@@ -149,6 +164,7 @@ section_layout:
 
 definition_of_done:
   - "Product to service mapping can be inspected"
+  - "Service option definitions and product-service overrides can be inspected"
   - "Service to servicing-resource mapping can be inspected"
   - "Resource attribute dictionary can be inspected"
 

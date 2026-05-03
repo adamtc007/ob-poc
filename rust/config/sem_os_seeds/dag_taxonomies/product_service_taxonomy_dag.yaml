@@ -216,6 +216,94 @@ slots:
       terminal_states: [retired]
     suspended_state_exempt: true
 
+  - id: service_option
+    stateless: false
+    parent_slot:
+      workspace: product_maintenance
+      slot: service_version
+      join:
+        via: service_option_defs
+        parent_fk: id
+        child_fk: service_version_id
+    state_machine:
+      id: service_option_lifecycle
+      owner: stewards
+      expected_lifetime: long_lived
+      source_entity: '"ob-poc".service_option_defs'
+      state_column: lifecycle_status
+      scope: per_service_option
+      description: |
+        Version-scoped option definitions for service activation. Options
+        are design-time catalogue records: product-service overrides and
+        runtime CBU bindings reference them, but do not own their lifecycle.
+      states:
+        - id: drafted
+          entry: true
+          description: "Option drafted; not yet active for runtime binding."
+        - id: active
+          description: "Published for runtime binding."
+        - id: deprecated
+          description: "Still readable for history, no new binding expected."
+        - id: retired
+          description: "Terminal; no longer available."
+      transitions:
+        - from: drafted
+          to: active
+          via: service.declare-option
+        - from: active
+          to: deprecated
+          via: service.deprecate-option
+        - from: deprecated
+          to: retired
+          via: "(backend: catalogue retirement)"
+      terminal_states: [retired]
+    suspended_state_exempt: true
+
+  - id: product_service_condition
+    stateless: true
+    rationale: |
+      Design-time predicates for conditional product-service option
+      applicability. Execution uses structured predicate JSONB; predicate_dsl
+      is governance-readable context.
+
+  - id: product_service_option_override
+    stateless: true
+    parent_slot:
+      workspace: product_maintenance
+      slot: service_option
+      join:
+        via: product_service_option_overrides
+        parent_fk: service_option_def_id
+        child_fk: override_id
+    rationale: |
+      Product-specific default/allowed/source overrides for generic service
+      options. Effective dating is row-level until product_versions exists.
+
+  - id: service_resource_option_constraint
+    stateless: true
+    parent_slot:
+      workspace: product_maintenance
+      slot: service_option
+      join:
+        via: service_resource_option_constraints
+        parent_fk: service_option_def_id
+        child_fk: constraint_id
+    rationale: |
+      Eligibility matrix connecting service option values to resource types.
+
+  - id: service_resource_fanout_rule
+    stateless: true
+    parent_slot:
+      workspace: product_maintenance
+      slot: service_option
+      join:
+        via: service_resource_fanout_rules
+        parent_fk: service_option_def_id
+        child_fk: fanout_rule_id
+    rationale: |
+      Design-time rules defining whether resources are shared or materialized
+      per option value.
+
   - id: service_resource
     stateless: true
     rationale: |

@@ -932,6 +932,62 @@ slots:
           via: service-consumption.retire
       terminal_states: [retired]
 
+  - id: cbu_service_option_binding
+    stateless: false
+    # Coherence lifecycle, not an operational lifecycle; SUSPENDED is not
+    # semantically meaningful for an option binding.
+    suspended_state_exempt: true
+    parent_slot:
+      workspace: cbu
+      slot: service_consumption
+      join:
+        via: cbu_service_option_bindings
+        parent_fk: service_id
+        child_fk: binding_id
+    state_machine:
+      id: cbu_service_option_binding_lifecycle
+      owner: "ops"
+      expected_lifetime: long_lived
+      source_entity: '"ob-poc".cbu_service_option_bindings'
+      state_column: coherence_status
+      scope: per_cbu_service_option
+      description: |
+        Runtime bound option value for a CBU's service subscription. The
+        lifecycle tracks source coherence, not business activation state.
+      states:
+        - id: clean
+          entry: true
+          description: "Binding is current for its source version."
+        - id: dirty
+          description: "Underlying source changed; binding needs recompute."
+        - id: stale
+          description: "Historical/superseded binding retained for replay."
+      transitions:
+        - from: clean
+          to: dirty
+          via: cbu.dirty-flag-bindings
+        - from: dirty
+          to: clean
+          via: cbu.recompute-bindings
+        - from: [clean, dirty]
+          to: stale
+          via: cbu.override-option-binding
+      terminal_states: [stale]
+
+  - id: cbu_resource_instance_option_lineage
+    stateless: true
+    parent_slot:
+      workspace: cbu
+      slot: cbu_service_option_binding
+      join:
+        via: cbu_resource_instance_option_lineage
+        parent_fk: binding_id
+        child_fk: lineage_id
+    rationale: |
+      Reverse lineage from a materialized service resource instance back to
+      the service option binding that contributed eligibility, fan-out, or
+      attribute source values.
+
   # ---------------------------------------------------------------------------
   # 2.5c CBU-level corporate-action event (R-6 G-9)
   #

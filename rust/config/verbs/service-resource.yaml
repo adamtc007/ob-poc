@@ -1363,3 +1363,115 @@ domains:
           entity_id_arg: instance-id
           target_workspace: instrument_matrix
           target_slot: service_resource
+
+      declare-eligibility:
+        flavour: attribute_mutating
+        description: Declare option-value eligibility for a service resource
+        invocation_phrases:
+          - "declare service resource eligibility"
+          - "set resource eligibility for option"
+        behavior: plugin
+        metadata:
+          tier: intent
+          source_of_truth: catalog
+          scope: global
+          noun: service_resource
+          subject_kinds: [service-resource, service-option]
+          tags: [service-options, eligibility, catalogue]
+          phase_tags: [service-options]
+          side_effects: state_write
+          harm_class: reversible
+        args:
+          - name: service-id
+            type: uuid
+            required: false
+          - name: service
+            type: string
+            required: false
+          - name: resource-id
+            type: uuid
+            required: false
+          - name: resource
+            type: string
+            required: false
+          - name: service-option-def-id
+            type: uuid
+            required: false
+          - name: option-key
+            type: string
+            required: false
+          - name: supported-values
+            type: json
+            required: true
+          - name: match-operator
+            type: string
+            required: false
+          - name: priority
+            type: integer
+            required: false
+          - name: is-required-for-coverage
+            type: boolean
+            required: false
+        returns:
+          type: uuid
+        three_axis:
+          state_effect: preserving
+          external_effects: [emitting]
+          consequence:
+            baseline: requires_confirmation
+
+      declare-fanout-rule:
+        flavour: attribute_mutating
+        description: Declare how a service resource fans out from option values
+        invocation_phrases:
+          - "declare service resource fanout"
+          - "set resource fanout rule"
+        behavior: plugin
+        metadata:
+          tier: intent
+          source_of_truth: catalog
+          scope: global
+          noun: service_resource
+          subject_kinds: [service-resource, service-option]
+          tags: [service-options, fanout, catalogue]
+          phase_tags: [service-options]
+          side_effects: state_write
+          harm_class: reversible
+        args:
+          - name: service-id
+            type: uuid
+            required: false
+          - name: service
+            type: string
+            required: false
+          - name: resource-id
+            type: uuid
+            required: false
+          - name: resource
+            type: string
+            required: false
+          - name: service-option-def-id
+            type: uuid
+            required: false
+          - name: fanout-axis
+            type: string
+            required: true
+          - name: fanout-mode
+            type: string
+            required: false
+          - name: group-by-policy
+            type: json
+            required: false
+          - name: shared-when-null
+            type: boolean
+            required: false
+          - name: priority
+            type: integer
+            required: false
+        returns:
+          type: uuid
+        three_axis:
+          state_effect: preserving
+          external_effects: [emitting]
+          consequence:
+            baseline: requires_confirmation

@@ -42,6 +42,12 @@ allowed_verbs:
   - cbu.add-product
   - cbu.remove-product
   - cbu.list-subscriptions
+  - cbu.bind-service-options
+  - cbu.override-option-binding
+  - cbu.validate-option-coverage
+  - cbu.dirty-flag-bindings
+  - cbu.recompute-bindings
+  - cbu.compute-resource-fanout
   - entity.create
   - entity.read
   - entity.list
@@ -98,6 +104,10 @@ optional_questions:
     answer_kind: enum
     default: "depositary"
 
+  - field: service_id
+    prompt: "Which service should option coverage target?"
+    answer_kind: string
+
 stop_rules:
   - "CBU created"
   - "Entity added"
@@ -137,6 +147,9 @@ section_layout:
     verb_prefixes:
       - "trading-profile."
       - "cbu.assign-product"
+      - "cbu.bind-service-options"
+      - "cbu.validate-option-coverage"
+      - "cbu.compute-resource-fanout"
 
 definition_of_done:
   - "CBU created with correct jurisdiction"

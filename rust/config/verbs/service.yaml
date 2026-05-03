@@ -464,3 +464,189 @@ domains:
           external_effects: [observational]
           consequence:
             baseline: benign
+
+      declare-option:
+        flavour: attribute_mutating
+        description: Declare or update a version-scoped service option definition
+        invocation_phrases:
+          - "declare service option"
+          - "add service option"
+          - "define service option"
+        behavior: plugin
+        metadata:
+          tier: intent
+          source_of_truth: catalog
+          scope: global
+          noun: service_option
+          subject_kinds: [service, service-option]
+          tags: [service-options, catalogue, write]
+          phase_tags: [service-options]
+          side_effects: state_write
+          harm_class: reversible
+        args:
+          - name: service-id
+            type: uuid
+            required: false
+          - name: service
+            type: string
+            required: false
+          - name: service-version-id
+            type: uuid
+            required: false
+          - name: option-key
+            type: string
+            required: true
+          - name: option-kind
+            type: string
+            required: false
+          - name: allowed-values
+            type: json
+            required: false
+          - name: default-value
+            type: json
+            required: false
+          - name: is-required
+            type: boolean
+            required: false
+          - name: fanout-axis
+            type: string
+            required: false
+          - name: source-kind
+            type: string
+            required: false
+          - name: source-path
+            type: string
+            required: false
+        returns:
+          type: uuid
+        three_axis:
+          state_effect: preserving
+          external_effects: [emitting]
+          consequence:
+            baseline: requires_confirmation
+
+      constrain-option-values:
+        flavour: attribute_mutating
+        description: Set allowed values on a service option definition
+        invocation_phrases:
+          - "constrain service option values"
+          - "set allowed service option values"
+        behavior: plugin
+        metadata:
+          tier: intent
+          source_of_truth: catalog
+          scope: global
+          noun: service_option
+          subject_kinds: [service-option]
+          tags: [service-options, catalogue, write]
+          phase_tags: [service-options]
+          side_effects: state_write
+          harm_class: reversible
+        args:
+          - name: service-option-def-id
+            type: uuid
+            required: false
+          - name: service-id
+            type: uuid
+            required: false
+          - name: service
+            type: string
+            required: false
+          - name: option-key
+            type: string
+            required: false
+          - name: allowed-values
+            type: json
+            required: true
+        returns:
+          type: affected
+        three_axis:
+          state_effect: preserving
+          external_effects: [emitting]
+          consequence:
+            baseline: requires_confirmation
+
+      bind-option-source:
+        flavour: attribute_mutating
+        description: Bind a service option definition to a source kind and path
+        invocation_phrases:
+          - "bind service option source"
+          - "set service option source"
+        behavior: plugin
+        metadata:
+          tier: intent
+          source_of_truth: catalog
+          scope: global
+          noun: service_option
+          subject_kinds: [service-option]
+          tags: [service-options, source-policy, catalogue]
+          phase_tags: [service-options]
+          side_effects: state_write
+          harm_class: reversible
+        args:
+          - name: service-option-def-id
+            type: uuid
+            required: false
+          - name: service-id
+            type: uuid
+            required: false
+          - name: service
+            type: string
+            required: false
+          - name: option-key
+            type: string
+            required: false
+          - name: source-kind
+            type: string
+            required: true
+          - name: source-path
+            type: string
+            required: false
+          - name: fallback-policy
+            type: json
+            required: false
+        returns:
+          type: affected
+        three_axis:
+          state_effect: preserving
+          external_effects: [emitting]
+          consequence:
+            baseline: requires_confirmation
+
+      deprecate-option:
+        flavour: attribute_mutating
+        description: Deprecate a service option definition
+        invocation_phrases:
+          - "deprecate service option"
+          - "retire service option definition"
+        behavior: plugin
+        metadata:
+          tier: intent
+          source_of_truth: catalog
+          scope: global
+          noun: service_option
+          subject_kinds: [service-option]
+          tags: [service-options, catalogue, lifecycle]
+          phase_tags: [service-options]
+          side_effects: state_write
+          harm_class: reversible
+        args:
+          - name: service-option-def-id
+            type: uuid
+            required: false
+          - name: service-id
+            type: uuid
+            required: false
+          - name: service
+            type: string
+            required: false
+          - name: option-key
+            type: string
+            required: false
+        returns:
+          type: affected
+        three_axis:
+          state_effect: preserving
+          external_effects: [emitting]
+          consequence:
+            baseline: requires_confirmation

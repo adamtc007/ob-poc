@@ -112,3 +112,28 @@ slots:
       # ── Client group extras ─────────────────────────────────────────
       cg_add_ownership_source: { verb: client-group.add-ownership-source, when: filled }
       cg_list_tags: client-group.list-tags
+  cbu_service_option_binding:
+    type: entity
+    entity_kinds: [cbu_service_option_binding]
+    table: cbu_service_option_bindings
+    pk: binding_id
+    join: { via: cbu_service_option_bindings, parent_fk: cbu_id, child_fk: binding_id }
+    cardinality: optional
+    depends_on: [workspace_root]
+    verbs:
+      bind: { verb: cbu.bind-service-options, when: filled }
+      override: { verb: cbu.override-option-binding, when: filled }
+      validate_coverage: { verb: cbu.validate-option-coverage, when: filled }
+      dirty_flag: { verb: cbu.dirty-flag-bindings, when: filled }
+      recompute: { verb: cbu.recompute-bindings, when: filled }
+      compute_fanout: { verb: cbu.compute-resource-fanout, when: filled }
+  cbu_resource_instance_option_lineage:
+    type: entity
+    entity_kinds: [cbu_resource_instance_option_lineage]
+    table: cbu_resource_instance_option_lineage
+    pk: lineage_id
+    join: { via: cbu_resource_instance_option_lineage, parent_fk: binding_id, child_fk: lineage_id }
+    cardinality: optional
+    depends_on: [cbu_service_option_binding]
+    verbs:
+      compute_fanout: { verb: cbu.compute-resource-fanout, when: filled }

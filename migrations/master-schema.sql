@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict IJviuesUUAKyxFGqeNOcWZvdbT6xMYFladzCElDebGV3eiuS2gdPgNCPOa0frvL
+\restrict 5ImYrC9bmjhxgNqVITJldKRTKpIDHpl8yugkrdmjdH7rfNgse2mCCqbH5YPYJhi
 
 -- Dumped from database version 18.1 (Homebrew)
 -- Dumped by pg_dump version 18.1 (Homebrew)
@@ -7029,6 +7029,38 @@ CREATE TABLE "ob-poc".access_review_items (
 
 
 --
+-- Name: activation_runs; Type: TABLE; Schema: ob-poc; Owner: -
+--
+
+CREATE TABLE "ob-poc".activation_runs (
+    activation_run_id uuid DEFAULT uuidv7() NOT NULL,
+    cbu_id uuid NOT NULL,
+    product_id uuid,
+    run_kind text NOT NULL,
+    status text DEFAULT 'started'::text NOT NULL,
+    triggered_by text,
+    started_at timestamp with time zone DEFAULT now() NOT NULL,
+    completed_at timestamp with time zone,
+    failed_at timestamp with time zone,
+    failure_reason text,
+    input_snapshot jsonb DEFAULT '{}'::jsonb NOT NULL,
+    result_summary jsonb DEFAULT '{}'::jsonb NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT activation_runs_run_kind_check CHECK ((run_kind = ANY (ARRAY['bind_options'::text, 'validate_coverage'::text, 'compute_fanout'::text, 'activate'::text, 'replay'::text]))),
+    CONSTRAINT activation_runs_status_check CHECK ((status = ANY (ARRAY['started'::text, 'succeeded'::text, 'failed'::text, 'cancelled'::text]))),
+    CONSTRAINT activation_runs_terminal_timestamp_check CHECK ((((status = 'succeeded'::text) AND (completed_at IS NOT NULL) AND (failed_at IS NULL)) OR ((status = 'failed'::text) AND (failed_at IS NOT NULL)) OR (status = ANY (ARRAY['started'::text, 'cancelled'::text]))))
+);
+
+
+--
+-- Name: TABLE activation_runs; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON TABLE "ob-poc".activation_runs IS 'Runtime anchor for option binding, validation, fan-out, activation, and replay. Provides a stable activation_run_id for deterministic historical replay.';
+
+
+--
 -- Name: failures; Type: TABLE; Schema: ob-poc; Owner: -
 --
 
@@ -8789,6 +8821,30 @@ CREATE TABLE "ob-poc".cbu_product_subscriptions (
 
 
 --
+-- Name: cbu_resource_instance_option_lineage; Type: TABLE; Schema: ob-poc; Owner: -
+--
+
+CREATE TABLE "ob-poc".cbu_resource_instance_option_lineage (
+    lineage_id uuid DEFAULT uuidv7() NOT NULL,
+    resource_instance_id uuid CONSTRAINT cbu_resource_instance_option_line_resource_instance_id_not_null NOT NULL,
+    binding_id uuid NOT NULL,
+    contribution_type text NOT NULL,
+    fanout_axis text,
+    fanout_value jsonb,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT cbu_resource_instance_option_lineage_contribution_type_check CHECK ((contribution_type = ANY (ARRAY['eligibility'::text, 'fanout'::text, 'attribute_source'::text]))),
+    CONSTRAINT cbu_resource_instance_option_lineage_fanout_axis_check CHECK (((fanout_axis IS NULL) OR (fanout_axis = ANY (ARRAY['none'::text, 'market'::text, 'currency'::text, 'counterparty'::text, 'account'::text, 'fund'::text, 'share_class'::text, 'legal_entity'::text, 'instruction_channel'::text, 'jurisdiction'::text, 'booking_principal'::text]))))
+);
+
+
+--
+-- Name: TABLE cbu_resource_instance_option_lineage; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON TABLE "ob-poc".cbu_resource_instance_option_lineage IS 'Reverse lineage from materialized resource instances to the option bindings that justified eligibility, fan-out, or attribute source values.';
+
+
+--
 -- Name: cbu_resource_instances; Type: TABLE; Schema: ob-poc; Owner: -
 --
 
@@ -8891,6 +8947,53 @@ CREATE TABLE "ob-poc".cbu_service_consumption (
 --
 
 COMMENT ON TABLE "ob-poc".cbu_service_consumption IS 'Operational layer: per-(cbu, service_kind) provisioning lifecycle. State machine M-039, 6 states (proposed, provisioned, active, suspended, winding_down, retired). Distinct from service_intents (M-026) which models intent at the (cbu, product/service) grain. service_id + onboarding_request_id close S-15 (Deal→Ops handoff attribution).';
+
+
+--
+-- Name: cbu_service_option_bindings; Type: TABLE; Schema: ob-poc; Owner: -
+--
+
+CREATE TABLE "ob-poc".cbu_service_option_bindings (
+    binding_id uuid DEFAULT uuidv7() NOT NULL,
+    cbu_id uuid NOT NULL,
+    product_id uuid,
+    service_id uuid NOT NULL,
+    service_version_id uuid NOT NULL,
+    service_option_def_id uuid NOT NULL,
+    option_key text NOT NULL,
+    value jsonb NOT NULL,
+    source_kind text NOT NULL,
+    source_ref jsonb,
+    source_version text,
+    value_hash text NOT NULL,
+    coherence_status text DEFAULT 'clean'::text NOT NULL,
+    is_locked boolean DEFAULT false NOT NULL,
+    valid_from timestamp with time zone DEFAULT now() NOT NULL,
+    valid_to timestamp with time zone,
+    supersedes_binding_id uuid,
+    activation_run_id uuid,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT cbu_service_option_bindings_coherence_status_check CHECK ((coherence_status = ANY (ARRAY['clean'::text, 'dirty'::text, 'stale'::text]))),
+    CONSTRAINT cbu_service_option_bindings_not_self_superseded_check CHECK (((supersedes_binding_id IS NULL) OR (supersedes_binding_id <> binding_id))),
+    CONSTRAINT cbu_service_option_bindings_source_kind_check CHECK ((source_kind = ANY (ARRAY['derived'::text, 'cbu_profile'::text, 'instrument_matrix'::text, 'legal_entity'::text, 'document'::text, 'product_option'::text, 'manual'::text, 'option_binding'::text]))),
+    CONSTRAINT cbu_service_option_bindings_valid_range_check CHECK (((valid_to IS NULL) OR (valid_to > valid_from))),
+    CONSTRAINT cbu_service_option_bindings_value_hash_check CHECK ((value_hash ~ '^[a-f0-9]{64}$'::text))
+);
+
+
+--
+-- Name: TABLE cbu_service_option_bindings; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON TABLE "ob-poc".cbu_service_option_bindings IS 'Versioned runtime option bindings for a CBU service. Rows supersede rather than overwrite so activation replay can target historical source versions.';
+
+
+--
+-- Name: COLUMN cbu_service_option_bindings.value_hash; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON COLUMN "ob-poc".cbu_service_option_bindings.value_hash IS 'SHA-256 over canonical JSON. Canonicalization is implemented in application code and tested for key-order stability.';
 
 
 --
@@ -15108,6 +15211,61 @@ ALTER SEQUENCE "ob-poc".phrase_observation_state_id_seq OWNED BY "ob-poc".phrase
 
 
 --
+-- Name: product_service_conditions; Type: TABLE; Schema: ob-poc; Owner: -
+--
+
+CREATE TABLE "ob-poc".product_service_conditions (
+    condition_id uuid DEFAULT uuidv7() NOT NULL,
+    condition_key text NOT NULL,
+    description text,
+    predicate jsonb NOT NULL,
+    predicate_dsl text,
+    lifecycle_status text DEFAULT 'active'::text NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT product_service_conditions_lifecycle_status_check CHECK ((lifecycle_status = ANY (ARRAY['draft'::text, 'active'::text, 'deprecated'::text, 'retired'::text])))
+);
+
+
+--
+-- Name: TABLE product_service_conditions; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON TABLE "ob-poc".product_service_conditions IS 'Structured predicates for conditional product-service and option applicability. predicate_dsl is governance/readability text; predicate JSONB is execution input.';
+
+
+--
+-- Name: product_service_option_overrides; Type: TABLE; Schema: ob-poc; Owner: -
+--
+
+CREATE TABLE "ob-poc".product_service_option_overrides (
+    override_id uuid DEFAULT uuidv7() NOT NULL,
+    product_id uuid NOT NULL,
+    service_id uuid NOT NULL,
+    service_option_def_id uuid NOT NULL,
+    default_value_override jsonb,
+    allowed_values_override jsonb,
+    is_required_override boolean,
+    source_precedence_override jsonb,
+    activation_condition_ref uuid,
+    effective_from timestamp with time zone DEFAULT now() NOT NULL,
+    effective_to timestamp with time zone,
+    supersedes_override_id uuid,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT product_service_option_overrides_effective_range_check CHECK (((effective_to IS NULL) OR (effective_to > effective_from))),
+    CONSTRAINT product_service_option_overrides_not_self_superseded_check CHECK (((supersedes_override_id IS NULL) OR (supersedes_override_id <> override_id)))
+);
+
+
+--
+-- Name: TABLE product_service_option_overrides; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON TABLE "ob-poc".product_service_option_overrides IS 'Product-context overrides for service options. Product-level versioning is deferred; v1 uses row-level effective dating and supersession.';
+
+
+--
 -- Name: product_services; Type: TABLE; Schema: ob-poc; Owner: -
 --
 
@@ -15763,7 +15921,12 @@ CREATE TABLE "ob-poc".resource_attribute_requirements (
     constraints jsonb DEFAULT '{}'::jsonb,
     evidence_policy jsonb DEFAULT '{}'::jsonb,
     condition_expression text,
-    CONSTRAINT resource_attribute_requirements_requirement_type_check CHECK ((requirement_type = ANY (ARRAY['required'::text, 'optional'::text, 'conditional'::text])))
+    source_kind text,
+    source_fallback text[],
+    derivation_input_type text,
+    derivation_input_ref jsonb,
+    CONSTRAINT resource_attribute_requirements_requirement_type_check CHECK ((requirement_type = ANY (ARRAY['required'::text, 'optional'::text, 'conditional'::text]))),
+    CONSTRAINT resource_attribute_requirements_source_kind_check CHECK (((source_kind IS NULL) OR (source_kind = ANY (ARRAY['derived'::text, 'cbu_profile'::text, 'cbu'::text, 'instrument_matrix'::text, 'legal_entity'::text, 'entity'::text, 'document'::text, 'product_option'::text, 'manual'::text, 'option_binding'::text]))))
 );
 
 
@@ -15778,7 +15941,7 @@ COMMENT ON COLUMN "ob-poc".resource_attribute_requirements.requirement_type IS '
 -- Name: COLUMN resource_attribute_requirements.source_policy; Type: COMMENT; Schema: ob-poc; Owner: -
 --
 
-COMMENT ON COLUMN "ob-poc".resource_attribute_requirements.source_policy IS 'Ordered list of acceptable sources for this attribute value';
+COMMENT ON COLUMN "ob-poc".resource_attribute_requirements.source_policy IS 'Deprecated compatibility JSONB. Prefer source_kind, source_fallback, derivation_input_type, and derivation_input_ref.';
 
 
 --
@@ -15793,6 +15956,34 @@ COMMENT ON COLUMN "ob-poc".resource_attribute_requirements.constraints IS 'Type/
 --
 
 COMMENT ON COLUMN "ob-poc".resource_attribute_requirements.evidence_policy IS 'What evidence is required: {requires_document: true, min_confidence: 0.9}';
+
+
+--
+-- Name: COLUMN resource_attribute_requirements.source_kind; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON COLUMN "ob-poc".resource_attribute_requirements.source_kind IS 'Structured primary source classification for this resource attribute. Compatibility values cbu/entity remain until source_policy retirement.';
+
+
+--
+-- Name: COLUMN resource_attribute_requirements.source_fallback; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON COLUMN "ob-poc".resource_attribute_requirements.source_fallback IS 'Structured fallback source kinds, preserving the old source_policy order after the primary source_kind.';
+
+
+--
+-- Name: COLUMN resource_attribute_requirements.derivation_input_type; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON COLUMN "ob-poc".resource_attribute_requirements.derivation_input_type IS 'Optional derivation input type, e.g. option_binding, when source_kind is derived.';
+
+
+--
+-- Name: COLUMN resource_attribute_requirements.derivation_input_ref; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON COLUMN "ob-poc".resource_attribute_requirements.derivation_input_ref IS 'Optional derivation input reference metadata, e.g. option binding key/path.';
 
 
 --
@@ -16289,6 +16480,46 @@ Reporting:
 
 
 --
+-- Name: service_option_defs; Type: TABLE; Schema: ob-poc; Owner: -
+--
+
+CREATE TABLE "ob-poc".service_option_defs (
+    service_option_def_id uuid DEFAULT uuidv7() NOT NULL,
+    service_id uuid NOT NULL,
+    service_version_id uuid NOT NULL,
+    option_key text NOT NULL,
+    option_kind text NOT NULL,
+    allowed_values jsonb,
+    default_value jsonb,
+    is_required boolean DEFAULT false NOT NULL,
+    is_fanout_driver boolean DEFAULT false NOT NULL,
+    fanout_axis text DEFAULT 'none'::text NOT NULL,
+    default_source_kind text NOT NULL,
+    source_path text,
+    fallback_policy jsonb DEFAULT '[]'::jsonb NOT NULL,
+    override_policy text DEFAULT 'allowed_with_reason'::text NOT NULL,
+    lifecycle_status text DEFAULT 'drafted'::text NOT NULL,
+    description text,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT service_option_defs_default_source_kind_check CHECK ((default_source_kind = ANY (ARRAY['derived'::text, 'cbu_profile'::text, 'instrument_matrix'::text, 'legal_entity'::text, 'document'::text, 'product_option'::text, 'manual'::text, 'option_binding'::text]))),
+    CONSTRAINT service_option_defs_fallback_policy_array_check CHECK ((jsonb_typeof(fallback_policy) = 'array'::text)),
+    CONSTRAINT service_option_defs_fanout_axis_check CHECK ((fanout_axis = ANY (ARRAY['none'::text, 'market'::text, 'currency'::text, 'counterparty'::text, 'account'::text, 'fund'::text, 'share_class'::text, 'legal_entity'::text, 'instruction_channel'::text, 'jurisdiction'::text, 'booking_principal'::text]))),
+    CONSTRAINT service_option_defs_fanout_driver_axis_check CHECK ((is_fanout_driver OR (fanout_axis = 'none'::text))),
+    CONSTRAINT service_option_defs_lifecycle_status_check CHECK ((lifecycle_status = ANY (ARRAY['drafted'::text, 'active'::text, 'deprecated'::text, 'retired'::text]))),
+    CONSTRAINT service_option_defs_option_kind_check CHECK ((option_kind = ANY (ARRAY['single_choice'::text, 'multi_choice'::text, 'range'::text, 'boolean'::text, 'structured'::text, 'string'::text]))),
+    CONSTRAINT service_option_defs_override_policy_check CHECK ((override_policy = ANY (ARRAY['forbidden'::text, 'allowed_with_reason'::text, 'allowed'::text, 'requires_approval'::text])))
+);
+
+
+--
+-- Name: TABLE service_option_defs; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON TABLE "ob-poc".service_option_defs IS 'Design-time service option declarations. Each option is scoped to a service version so historical activation replay remains deterministic.';
+
+
+--
 -- Name: service_resource_capabilities; Type: TABLE; Schema: ob-poc; Owner: -
 --
 
@@ -16312,6 +16543,63 @@ CREATE TABLE "ob-poc".service_resource_capabilities (
 --
 
 COMMENT ON COLUMN "ob-poc".service_resource_capabilities.is_required IS 'Whether this resource is required for the service to function';
+
+
+--
+-- Name: service_resource_fanout_rules; Type: TABLE; Schema: ob-poc; Owner: -
+--
+
+CREATE TABLE "ob-poc".service_resource_fanout_rules (
+    fanout_rule_id uuid DEFAULT uuidv7() NOT NULL,
+    service_id uuid NOT NULL,
+    resource_id uuid NOT NULL,
+    service_option_def_id uuid,
+    fanout_axis text NOT NULL,
+    fanout_mode text NOT NULL,
+    group_by_policy jsonb DEFAULT '{}'::jsonb NOT NULL,
+    shared_when_null boolean DEFAULT true NOT NULL,
+    priority integer DEFAULT 100 NOT NULL,
+    is_active boolean DEFAULT true NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT service_resource_fanout_rules_fanout_axis_check CHECK ((fanout_axis = ANY (ARRAY['none'::text, 'market'::text, 'currency'::text, 'counterparty'::text, 'account'::text, 'fund'::text, 'share_class'::text, 'legal_entity'::text, 'instruction_channel'::text, 'jurisdiction'::text, 'booking_principal'::text]))),
+    CONSTRAINT service_resource_fanout_rules_fanout_mode_check CHECK ((fanout_mode = ANY (ARRAY['per_value'::text, 'shared'::text, 'grouped'::text, 'conditional'::text]))),
+    CONSTRAINT service_resource_fanout_rules_group_by_policy_object_check CHECK ((jsonb_typeof(group_by_policy) = 'object'::text))
+);
+
+
+--
+-- Name: TABLE service_resource_fanout_rules; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON TABLE "ob-poc".service_resource_fanout_rules IS 'Materialisation rules: whether a resource fans out per option value, remains shared, groups values, or follows conditional policy.';
+
+
+--
+-- Name: service_resource_option_constraints; Type: TABLE; Schema: ob-poc; Owner: -
+--
+
+CREATE TABLE "ob-poc".service_resource_option_constraints (
+    constraint_id uuid DEFAULT uuidv7() NOT NULL,
+    service_id uuid NOT NULL,
+    resource_id uuid NOT NULL,
+    service_option_def_id uuid CONSTRAINT service_resource_option_constrai_service_option_def_id_not_null NOT NULL,
+    supported_values jsonb DEFAULT '{}'::jsonb NOT NULL,
+    match_operator text DEFAULT 'intersect'::text NOT NULL,
+    priority integer DEFAULT 100 NOT NULL,
+    is_required_for_coverage boolean DEFAULT false CONSTRAINT service_resource_option_const_is_required_for_coverage_not_null NOT NULL,
+    is_active boolean DEFAULT true NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT service_resource_option_constraints_match_operator_check CHECK ((match_operator = ANY (ARRAY['exact'::text, 'subset'::text, 'superset'::text, 'intersect'::text])))
+);
+
+
+--
+-- Name: TABLE service_resource_option_constraints; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON TABLE "ob-poc".service_resource_option_constraints IS 'Eligibility constraints: which option values a service resource can serve. This formalises service_resource_capabilities.supported_options.';
 
 
 --
@@ -16416,6 +16704,42 @@ COMMENT ON COLUMN "ob-poc".service_resource_types.resource_purpose IS 'Semantic 
 
 
 --
+-- Name: service_versions; Type: TABLE; Schema: ob-poc; Owner: -
+--
+
+CREATE TABLE "ob-poc".service_versions (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    service_id uuid NOT NULL,
+    version character varying(20) NOT NULL,
+    lifecycle_status character varying(20) DEFAULT 'drafted'::character varying NOT NULL,
+    spec jsonb,
+    drafted_at timestamp with time zone DEFAULT (now() AT TIME ZONE 'utc'::text),
+    reviewed_at timestamp with time zone,
+    published_at timestamp with time zone,
+    superseded_at timestamp with time zone,
+    retired_at timestamp with time zone,
+    notes text,
+    created_at timestamp with time zone DEFAULT (now() AT TIME ZONE 'utc'::text),
+    updated_at timestamp with time zone DEFAULT (now() AT TIME ZONE 'utc'::text),
+    CONSTRAINT service_versions_lifecycle_status_check CHECK (((lifecycle_status)::text = ANY ((ARRAY['drafted'::character varying, 'reviewed'::character varying, 'published'::character varying, 'superseded'::character varying, 'retired'::character varying])::text[])))
+);
+
+
+--
+-- Name: TABLE service_versions; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON TABLE "ob-poc".service_versions IS 'Per-version lifecycle for service catalogue entries (R2). Each service may have many versions; each version progresses through drafted → reviewed → published → superseded → retired. The current published version is the one consumed by downstream workspaces.';
+
+
+--
+-- Name: COLUMN service_versions.lifecycle_status; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON COLUMN "ob-poc".service_versions.lifecycle_status IS 'Per-version lifecycle: drafted (entry) → reviewed → published → superseded → retired (terminal).';
+
+
+--
 -- Name: services; Type: TABLE; Schema: ob-poc; Owner: -
 --
 
@@ -16429,8 +16753,17 @@ CREATE TABLE "ob-poc".services (
     service_category character varying(100),
     sla_definition jsonb,
     is_active boolean DEFAULT true,
-    lifecycle_tags text[] DEFAULT '{}'::text[]
+    lifecycle_tags text[] DEFAULT '{}'::text[],
+    lifecycle_status character varying(20) DEFAULT 'ungoverned'::character varying NOT NULL,
+    CONSTRAINT services_lifecycle_status_check CHECK (((lifecycle_status)::text = ANY ((ARRAY['ungoverned'::character varying, 'draft'::character varying, 'active'::character varying, 'deprecated'::character varying, 'retired'::character varying])::text[])))
 );
+
+
+--
+-- Name: COLUMN services.lifecycle_status; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON COLUMN "ob-poc".services.lifecycle_status IS 'Service catalogue lifecycle (R2). 5 states: ungoverned (entry), draft, active (published in changeset), deprecated, retired (terminal). Cross-workspace constraint in cbu_dag.yaml requires active for cbu.service_consumption.proposed → provisioned.';
 
 
 --
@@ -22505,6 +22838,14 @@ ALTER TABLE ONLY "ob-poc".access_review_items
 
 
 --
+-- Name: activation_runs activation_runs_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".activation_runs
+    ADD CONSTRAINT activation_runs_pkey PRIMARY KEY (activation_run_id);
+
+
+--
 -- Name: appointment_rights appointment_rights_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
 --
 
@@ -23065,6 +23406,14 @@ ALTER TABLE ONLY "ob-poc".cbu_relationship_verification
 
 
 --
+-- Name: cbu_resource_instance_option_lineage cbu_resource_instance_option_lineage_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".cbu_resource_instance_option_lineage
+    ADD CONSTRAINT cbu_resource_instance_option_lineage_pkey PRIMARY KEY (lineage_id);
+
+
+--
 -- Name: cbu_resource_instances cbu_resource_instances_cbu_id_resource_type_id_instance_ide_key; Type: CONSTRAINT; Schema: ob-poc; Owner: -
 --
 
@@ -23102,6 +23451,14 @@ ALTER TABLE ONLY "ob-poc".cbu_service_consumption
 
 ALTER TABLE ONLY "ob-poc".cbu_service_consumption
     ADD CONSTRAINT cbu_service_consumption_unique_kind UNIQUE (cbu_id, service_kind);
+
+
+--
+-- Name: cbu_service_option_bindings cbu_service_option_bindings_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".cbu_service_option_bindings
+    ADD CONSTRAINT cbu_service_option_bindings_pkey PRIMARY KEY (binding_id);
 
 
 --
@@ -25145,6 +25502,30 @@ ALTER TABLE ONLY "ob-poc".service_resource_types
 
 
 --
+-- Name: product_service_conditions product_service_conditions_condition_key_key; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".product_service_conditions
+    ADD CONSTRAINT product_service_conditions_condition_key_key UNIQUE (condition_key);
+
+
+--
+-- Name: product_service_conditions product_service_conditions_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".product_service_conditions
+    ADD CONSTRAINT product_service_conditions_pkey PRIMARY KEY (condition_id);
+
+
+--
+-- Name: product_service_option_overrides product_service_option_overrides_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".product_service_option_overrides
+    ADD CONSTRAINT product_service_option_overrides_pkey PRIMARY KEY (override_id);
+
+
+--
 -- Name: product_services product_services_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
 --
 
@@ -25577,6 +25958,22 @@ ALTER TABLE ONLY "ob-poc".service_intents
 
 
 --
+-- Name: service_option_defs service_option_defs_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".service_option_defs
+    ADD CONSTRAINT service_option_defs_pkey PRIMARY KEY (service_option_def_id);
+
+
+--
+-- Name: service_option_defs service_option_defs_service_version_id_option_key_key; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".service_option_defs
+    ADD CONSTRAINT service_option_defs_service_version_id_option_key_key UNIQUE (service_version_id, option_key);
+
+
+--
 -- Name: service_resource_capabilities service_resource_capabilities_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
 --
 
@@ -25593,6 +25990,22 @@ ALTER TABLE ONLY "ob-poc".service_resource_capabilities
 
 
 --
+-- Name: service_resource_fanout_rules service_resource_fanout_rules_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".service_resource_fanout_rules
+    ADD CONSTRAINT service_resource_fanout_rules_pkey PRIMARY KEY (fanout_rule_id);
+
+
+--
+-- Name: service_resource_option_constraints service_resource_option_constraints_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".service_resource_option_constraints
+    ADD CONSTRAINT service_resource_option_constraints_pkey PRIMARY KEY (constraint_id);
+
+
+--
 -- Name: service_resource_types service_resource_types_name_key; Type: CONSTRAINT; Schema: ob-poc; Owner: -
 --
 
@@ -25606,6 +26019,22 @@ ALTER TABLE ONLY "ob-poc".service_resource_types
 
 ALTER TABLE ONLY "ob-poc".service_resource_types
     ADD CONSTRAINT service_resource_types_pkey PRIMARY KEY (resource_id);
+
+
+--
+-- Name: service_versions service_versions_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".service_versions
+    ADD CONSTRAINT service_versions_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: service_versions service_versions_service_id_version_key; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".service_versions
+    ADD CONSTRAINT service_versions_service_id_version_key UNIQUE (service_id, version);
 
 
 --
@@ -26844,6 +27273,13 @@ CREATE INDEX holding_control_links_idx_control_links_issuer ON "ob-poc".holding_
 
 
 --
+-- Name: idx_activation_runs_cbu_started; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_activation_runs_cbu_started ON "ob-poc".activation_runs USING btree (cbu_id, started_at DESC);
+
+
+--
 -- Name: idx_agent_events_corrected; Type: INDEX; Schema: ob-poc; Owner: -
 --
 
@@ -27761,6 +28197,20 @@ CREATE INDEX idx_cbu_rel_verif_status ON "ob-poc".cbu_relationship_verification 
 
 
 --
+-- Name: idx_cbu_resource_instance_option_lineage_binding; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_cbu_resource_instance_option_lineage_binding ON "ob-poc".cbu_resource_instance_option_lineage USING btree (binding_id);
+
+
+--
+-- Name: idx_cbu_resource_instance_option_lineage_dedupe; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE UNIQUE INDEX idx_cbu_resource_instance_option_lineage_dedupe ON "ob-poc".cbu_resource_instance_option_lineage USING btree (resource_instance_id, binding_id, contribution_type, COALESCE(fanout_axis, ''::text), COALESCE(fanout_value, 'null'::jsonb));
+
+
+--
 -- Name: idx_cbu_resource_instances_counterparty; Type: INDEX; Schema: ob-poc; Owner: -
 --
 
@@ -27814,6 +28264,34 @@ CREATE INDEX idx_cbu_service_consumption_service ON "ob-poc".cbu_service_consump
 --
 
 CREATE INDEX idx_cbu_service_consumption_status ON "ob-poc".cbu_service_consumption USING btree (status);
+
+
+--
+-- Name: idx_cbu_service_option_bindings_current; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE UNIQUE INDEX idx_cbu_service_option_bindings_current ON "ob-poc".cbu_service_option_bindings USING btree (cbu_id, service_id, service_option_def_id) WHERE (valid_to IS NULL);
+
+
+--
+-- Name: idx_cbu_service_option_bindings_run; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_cbu_service_option_bindings_run ON "ob-poc".cbu_service_option_bindings USING btree (activation_run_id) WHERE (activation_run_id IS NOT NULL);
+
+
+--
+-- Name: idx_cbu_service_option_bindings_source; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_cbu_service_option_bindings_source ON "ob-poc".cbu_service_option_bindings USING btree (source_kind, coherence_status);
+
+
+--
+-- Name: idx_cbu_service_option_bindings_source_ref; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_cbu_service_option_bindings_source_ref ON "ob-poc".cbu_service_option_bindings USING gin (source_ref jsonb_path_ops) WHERE (source_ref IS NOT NULL);
 
 
 --
@@ -30750,6 +31228,20 @@ CREATE UNIQUE INDEX idx_phrase_blocklist_unique ON "ob-poc".phrase_blocklist USI
 
 
 --
+-- Name: idx_product_service_option_overrides_condition; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_product_service_option_overrides_condition ON "ob-poc".product_service_option_overrides USING btree (activation_condition_ref) WHERE (activation_condition_ref IS NOT NULL);
+
+
+--
+-- Name: idx_product_service_option_overrides_current; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE UNIQUE INDEX idx_product_service_option_overrides_current ON "ob-poc".product_service_option_overrides USING btree (product_id, service_id, service_option_def_id) WHERE (effective_to IS NULL);
+
+
+--
 -- Name: idx_products_is_active; Type: INDEX; Schema: ob-poc; Owner: -
 --
 
@@ -31282,6 +31774,48 @@ CREATE INDEX idx_service_intents_status ON "ob-poc".service_intents USING btree 
 
 
 --
+-- Name: idx_service_option_defs_service; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_service_option_defs_service ON "ob-poc".service_option_defs USING btree (service_id);
+
+
+--
+-- Name: idx_service_option_defs_version_status; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_service_option_defs_version_status ON "ob-poc".service_option_defs USING btree (service_version_id, lifecycle_status);
+
+
+--
+-- Name: idx_service_resource_fanout_rules_active; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE UNIQUE INDEX idx_service_resource_fanout_rules_active ON "ob-poc".service_resource_fanout_rules USING btree (service_id, resource_id, fanout_axis, COALESCE(service_option_def_id, '00000000-0000-0000-0000-000000000000'::uuid)) WHERE (is_active = true);
+
+
+--
+-- Name: idx_service_resource_fanout_rules_option; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_service_resource_fanout_rules_option ON "ob-poc".service_resource_fanout_rules USING btree (service_option_def_id, priority) WHERE (service_option_def_id IS NOT NULL);
+
+
+--
+-- Name: idx_service_resource_option_constraints_active; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE UNIQUE INDEX idx_service_resource_option_constraints_active ON "ob-poc".service_resource_option_constraints USING btree (service_id, resource_id, service_option_def_id, match_operator) WHERE (is_active = true);
+
+
+--
+-- Name: idx_service_resource_option_constraints_option; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_service_resource_option_constraints_option ON "ob-poc".service_resource_option_constraints USING btree (service_option_def_id, priority);
+
+
+--
 -- Name: idx_service_resource_types_dict_group; Type: INDEX; Schema: ob-poc; Owner: -
 --
 
@@ -31324,10 +31858,31 @@ CREATE INDEX idx_service_resource_types_srdef ON "ob-poc".service_resource_types
 
 
 --
+-- Name: idx_service_versions_service_id; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_service_versions_service_id ON "ob-poc".service_versions USING btree (service_id);
+
+
+--
+-- Name: idx_service_versions_status; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_service_versions_status ON "ob-poc".service_versions USING btree (lifecycle_status);
+
+
+--
 -- Name: idx_services_is_active; Type: INDEX; Schema: ob-poc; Owner: -
 --
 
 CREATE INDEX idx_services_is_active ON "ob-poc".services USING btree (is_active);
+
+
+--
+-- Name: idx_services_lifecycle_status; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_services_lifecycle_status ON "ob-poc".services USING btree (lifecycle_status);
 
 
 --
@@ -33350,6 +33905,22 @@ ALTER TABLE ONLY "ob-poc".access_review_items
 
 
 --
+-- Name: activation_runs activation_runs_cbu_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".activation_runs
+    ADD CONSTRAINT activation_runs_cbu_id_fkey FOREIGN KEY (cbu_id) REFERENCES "ob-poc".cbus(cbu_id) ON DELETE CASCADE;
+
+
+--
+-- Name: activation_runs activation_runs_product_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".activation_runs
+    ADD CONSTRAINT activation_runs_product_id_fkey FOREIGN KEY (product_id) REFERENCES "ob-poc".products(product_id);
+
+
+--
 -- Name: appointment_rights appointment_rights_holder_entity_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
 --
 
@@ -34118,6 +34689,22 @@ ALTER TABLE ONLY "ob-poc".cbu_relationship_verification
 
 
 --
+-- Name: cbu_resource_instance_option_lineage cbu_resource_instance_option_lineage_binding_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".cbu_resource_instance_option_lineage
+    ADD CONSTRAINT cbu_resource_instance_option_lineage_binding_id_fkey FOREIGN KEY (binding_id) REFERENCES "ob-poc".cbu_service_option_bindings(binding_id) ON DELETE CASCADE;
+
+
+--
+-- Name: cbu_resource_instance_option_lineage cbu_resource_instance_option_lineage_resource_instance_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".cbu_resource_instance_option_lineage
+    ADD CONSTRAINT cbu_resource_instance_option_lineage_resource_instance_id_fkey FOREIGN KEY (resource_instance_id) REFERENCES "ob-poc".cbu_resource_instances(instance_id) ON DELETE CASCADE;
+
+
+--
 -- Name: cbu_resource_instances cbu_resource_instances_cbu_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
 --
 
@@ -34195,6 +34782,62 @@ ALTER TABLE ONLY "ob-poc".cbu_service_consumption
 
 ALTER TABLE ONLY "ob-poc".cbu_service_consumption
     ADD CONSTRAINT cbu_service_consumption_service_id_fkey FOREIGN KEY (service_id) REFERENCES "ob-poc".services(service_id) ON DELETE SET NULL;
+
+
+--
+-- Name: cbu_service_option_bindings cbu_service_option_bindings_activation_run_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".cbu_service_option_bindings
+    ADD CONSTRAINT cbu_service_option_bindings_activation_run_id_fkey FOREIGN KEY (activation_run_id) REFERENCES "ob-poc".activation_runs(activation_run_id);
+
+
+--
+-- Name: cbu_service_option_bindings cbu_service_option_bindings_cbu_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".cbu_service_option_bindings
+    ADD CONSTRAINT cbu_service_option_bindings_cbu_id_fkey FOREIGN KEY (cbu_id) REFERENCES "ob-poc".cbus(cbu_id) ON DELETE CASCADE;
+
+
+--
+-- Name: cbu_service_option_bindings cbu_service_option_bindings_product_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".cbu_service_option_bindings
+    ADD CONSTRAINT cbu_service_option_bindings_product_id_fkey FOREIGN KEY (product_id) REFERENCES "ob-poc".products(product_id);
+
+
+--
+-- Name: cbu_service_option_bindings cbu_service_option_bindings_service_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".cbu_service_option_bindings
+    ADD CONSTRAINT cbu_service_option_bindings_service_id_fkey FOREIGN KEY (service_id) REFERENCES "ob-poc".services(service_id) ON DELETE CASCADE;
+
+
+--
+-- Name: cbu_service_option_bindings cbu_service_option_bindings_service_option_def_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".cbu_service_option_bindings
+    ADD CONSTRAINT cbu_service_option_bindings_service_option_def_id_fkey FOREIGN KEY (service_option_def_id) REFERENCES "ob-poc".service_option_defs(service_option_def_id);
+
+
+--
+-- Name: cbu_service_option_bindings cbu_service_option_bindings_service_version_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".cbu_service_option_bindings
+    ADD CONSTRAINT cbu_service_option_bindings_service_version_id_fkey FOREIGN KEY (service_version_id) REFERENCES "ob-poc".service_versions(id);
+
+
+--
+-- Name: cbu_service_option_bindings cbu_service_option_bindings_supersedes_binding_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".cbu_service_option_bindings
+    ADD CONSTRAINT cbu_service_option_bindings_supersedes_binding_id_fkey FOREIGN KEY (supersedes_binding_id) REFERENCES "ob-poc".cbu_service_option_bindings(binding_id);
 
 
 --
@@ -36654,6 +37297,46 @@ ALTER TABLE ONLY "ob-poc".phrase_bank
 
 
 --
+-- Name: product_service_option_overrides product_service_option_overrides_activation_condition_ref_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".product_service_option_overrides
+    ADD CONSTRAINT product_service_option_overrides_activation_condition_ref_fkey FOREIGN KEY (activation_condition_ref) REFERENCES "ob-poc".product_service_conditions(condition_id);
+
+
+--
+-- Name: product_service_option_overrides product_service_option_overrides_product_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".product_service_option_overrides
+    ADD CONSTRAINT product_service_option_overrides_product_id_fkey FOREIGN KEY (product_id) REFERENCES "ob-poc".products(product_id) ON DELETE CASCADE;
+
+
+--
+-- Name: product_service_option_overrides product_service_option_overrides_service_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".product_service_option_overrides
+    ADD CONSTRAINT product_service_option_overrides_service_id_fkey FOREIGN KEY (service_id) REFERENCES "ob-poc".services(service_id) ON DELETE CASCADE;
+
+
+--
+-- Name: product_service_option_overrides product_service_option_overrides_service_option_def_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".product_service_option_overrides
+    ADD CONSTRAINT product_service_option_overrides_service_option_def_id_fkey FOREIGN KEY (service_option_def_id) REFERENCES "ob-poc".service_option_defs(service_option_def_id) ON DELETE CASCADE;
+
+
+--
+-- Name: product_service_option_overrides product_service_option_overrides_supersedes_override_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".product_service_option_overrides
+    ADD CONSTRAINT product_service_option_overrides_supersedes_override_id_fkey FOREIGN KEY (supersedes_override_id) REFERENCES "ob-poc".product_service_option_overrides(override_id);
+
+
+--
 -- Name: product_services product_services_product_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
 --
 
@@ -36998,6 +37681,22 @@ ALTER TABLE ONLY "ob-poc".service_intents
 
 
 --
+-- Name: service_option_defs service_option_defs_service_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".service_option_defs
+    ADD CONSTRAINT service_option_defs_service_id_fkey FOREIGN KEY (service_id) REFERENCES "ob-poc".services(service_id) ON DELETE CASCADE;
+
+
+--
+-- Name: service_option_defs service_option_defs_service_version_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".service_option_defs
+    ADD CONSTRAINT service_option_defs_service_version_id_fkey FOREIGN KEY (service_version_id) REFERENCES "ob-poc".service_versions(id) ON DELETE CASCADE;
+
+
+--
 -- Name: service_resource_capabilities service_resource_capabilities_resource_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
 --
 
@@ -37011,6 +37710,62 @@ ALTER TABLE ONLY "ob-poc".service_resource_capabilities
 
 ALTER TABLE ONLY "ob-poc".service_resource_capabilities
     ADD CONSTRAINT service_resource_capabilities_service_id_fkey FOREIGN KEY (service_id) REFERENCES "ob-poc".services(service_id) ON DELETE CASCADE;
+
+
+--
+-- Name: service_resource_fanout_rules service_resource_fanout_rules_resource_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".service_resource_fanout_rules
+    ADD CONSTRAINT service_resource_fanout_rules_resource_id_fkey FOREIGN KEY (resource_id) REFERENCES "ob-poc".service_resource_types(resource_id) ON DELETE CASCADE;
+
+
+--
+-- Name: service_resource_fanout_rules service_resource_fanout_rules_service_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".service_resource_fanout_rules
+    ADD CONSTRAINT service_resource_fanout_rules_service_id_fkey FOREIGN KEY (service_id) REFERENCES "ob-poc".services(service_id) ON DELETE CASCADE;
+
+
+--
+-- Name: service_resource_fanout_rules service_resource_fanout_rules_service_option_def_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".service_resource_fanout_rules
+    ADD CONSTRAINT service_resource_fanout_rules_service_option_def_id_fkey FOREIGN KEY (service_option_def_id) REFERENCES "ob-poc".service_option_defs(service_option_def_id) ON DELETE CASCADE;
+
+
+--
+-- Name: service_resource_option_constraints service_resource_option_constraints_resource_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".service_resource_option_constraints
+    ADD CONSTRAINT service_resource_option_constraints_resource_id_fkey FOREIGN KEY (resource_id) REFERENCES "ob-poc".service_resource_types(resource_id) ON DELETE CASCADE;
+
+
+--
+-- Name: service_resource_option_constraints service_resource_option_constraints_service_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".service_resource_option_constraints
+    ADD CONSTRAINT service_resource_option_constraints_service_id_fkey FOREIGN KEY (service_id) REFERENCES "ob-poc".services(service_id) ON DELETE CASCADE;
+
+
+--
+-- Name: service_resource_option_constraints service_resource_option_constraints_service_option_def_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".service_resource_option_constraints
+    ADD CONSTRAINT service_resource_option_constraints_service_option_def_id_fkey FOREIGN KEY (service_option_def_id) REFERENCES "ob-poc".service_option_defs(service_option_def_id) ON DELETE CASCADE;
+
+
+--
+-- Name: service_versions service_versions_service_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".service_versions
+    ADD CONSTRAINT service_versions_service_id_fkey FOREIGN KEY (service_id) REFERENCES "ob-poc".services(service_id) ON DELETE CASCADE;
 
 
 --
@@ -37857,5 +38612,5 @@ ALTER TABLE ONLY sem_reg_authoring.validation_reports
 -- PostgreSQL database dump complete
 --
 
-\unrestrict IJviuesUUAKyxFGqeNOcWZvdbT6xMYFladzCElDebGV3eiuS2gdPgNCPOa0frvL
+\unrestrict 5ImYrC9bmjhxgNqVITJldKRTKpIDHpl8yugkrdmjdH7rfNgse2mCCqbH5YPYJhi
 

@@ -1,0 +1,63 @@
+domains:
+  product-service:
+    description: "Product-service catalogue relationship operations."
+    verbs:
+      override-option:
+        flavour: attribute_mutating
+        description: Declare a product-specific override for a service option
+        invocation_phrases:
+          - "override product service option"
+          - "set product option override"
+          - "override service option for product"
+        behavior: plugin
+        metadata:
+          tier: intent
+          source_of_truth: catalog
+          scope: global
+          noun: product_service
+          subject_kinds: [product-service, service-option]
+          tags: [service-options, override, catalogue]
+          phase_tags: [service-options]
+          side_effects: state_write
+          harm_class: reversible
+        args:
+          - name: product-id
+            type: uuid
+            required: false
+          - name: product
+            type: string
+            required: false
+          - name: service-id
+            type: uuid
+            required: false
+          - name: service
+            type: string
+            required: false
+          - name: service-option-def-id
+            type: uuid
+            required: false
+          - name: option-key
+            type: string
+            required: false
+          - name: default-value-override
+            type: json
+            required: false
+          - name: allowed-values-override
+            type: json
+            required: false
+          - name: is-required-override
+            type: boolean
+            required: false
+          - name: source-precedence-override
+            type: json
+            required: false
+          - name: activation-condition-ref
+            type: uuid
+            required: false
+        returns:
+          type: uuid
+        three_axis:
+          state_effect: preserving
+          external_effects: [emitting]
+          consequence:
+            baseline: requires_confirmation

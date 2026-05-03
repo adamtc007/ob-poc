@@ -27,7 +27,7 @@ slots:
     type: entity
     entity_kinds: [resource_type]
     table: service_resource_types
-    pk: resource_type_id
+    pk: resource_id
     join: { via: service_resource_capabilities, parent_fk: service_id, child_fk: resource_id }
     cardinality: optional
     depends_on: [service]
@@ -36,6 +36,51 @@ slots:
       list: { verb: service-resource.list, when: [empty, filled] }
       list_by_service: { verb: service-resource.list-by-service, when: [empty, filled] }
       list_attributes: { verb: service-resource.list-attributes, when: [empty, filled] }
+  service_option:
+    type: entity
+    entity_kinds: [service_option]
+    table: service_option_defs
+    pk: service_option_def_id
+    join: { via: service_option_defs, parent_fk: service_id, child_fk: service_option_def_id }
+    cardinality: optional
+    depends_on: [service]
+    verbs:
+      read: { verb: service-option.read, when: filled }
+      list_by_service: { verb: service-option.list-by-service, when: [empty, filled] }
+      declare: { verb: service.declare-option, when: [empty, filled] }
+      constrain_values: { verb: service.constrain-option-values, when: filled }
+      bind_source: { verb: service.bind-option-source, when: filled }
+      deprecate: { verb: service.deprecate-option, when: filled }
+  product_service_option_override:
+    type: entity
+    entity_kinds: [product_service_option_override]
+    table: product_service_option_overrides
+    pk: override_id
+    join: { via: product_service_option_overrides, parent_fk: service_option_def_id, child_fk: override_id }
+    cardinality: optional
+    depends_on: [product, service_option]
+    verbs:
+      override: { verb: product-service.override-option, when: [empty, filled] }
+  service_resource_option_constraint:
+    type: entity
+    entity_kinds: [service_resource_option_constraint]
+    table: service_resource_option_constraints
+    pk: constraint_id
+    join: { via: service_resource_option_constraints, parent_fk: service_option_def_id, child_fk: constraint_id }
+    cardinality: optional
+    depends_on: [service_option, service_resource]
+    verbs:
+      declare: { verb: service-resource.declare-eligibility, when: [empty, filled] }
+  service_resource_fanout_rule:
+    type: entity
+    entity_kinds: [service_resource_fanout_rule]
+    table: service_resource_fanout_rules
+    pk: fanout_rule_id
+    join: { via: service_resource_fanout_rules, parent_fk: service_option_def_id, child_fk: fanout_rule_id }
+    cardinality: optional
+    depends_on: [service_option, service_resource]
+    verbs:
+      declare: { verb: service-resource.declare-fanout-rule, when: [empty, filled] }
   resource_dictionary:
     type: entity
     entity_kinds: [attribute]

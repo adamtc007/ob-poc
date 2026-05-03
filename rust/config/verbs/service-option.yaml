@@ -1,0 +1,76 @@
+domains:
+  service-option:
+    description: "Service option catalogue definitions and read access."
+    verbs:
+      list-by-service:
+        flavour: attribute_mutating
+        description: List option definitions for a service version
+        invocation_phrases:
+          - "show service options"
+          - "list options for service"
+          - "show custody settlement options"
+        behavior: plugin
+        metadata:
+          tier: reference
+          source_of_truth: catalog
+          scope: global
+          noun: service_option
+          subject_kinds: [service-option]
+          tags: [service-options, catalogue, read]
+          phase_tags: [service-options]
+          side_effects: facts_only
+        args:
+          - name: service-id
+            type: uuid
+            required: false
+          - name: service
+            type: string
+            required: false
+          - name: service-version-id
+            type: uuid
+            required: false
+        returns:
+          type: record_set
+        three_axis:
+          state_effect: preserving
+          external_effects: [observational]
+          consequence:
+            baseline: benign
+
+      read:
+        flavour: attribute_mutating
+        description: Read one service option definition
+        invocation_phrases:
+          - "read service option"
+          - "inspect service option"
+          - "show option definition"
+        behavior: plugin
+        metadata:
+          tier: reference
+          source_of_truth: catalog
+          scope: global
+          noun: service_option
+          subject_kinds: [service-option]
+          tags: [service-options, catalogue, read]
+          phase_tags: [service-options]
+          side_effects: facts_only
+        args:
+          - name: service-option-def-id
+            type: uuid
+            required: false
+          - name: service-id
+            type: uuid
+            required: false
+          - name: service
+            type: string
+            required: false
+          - name: option-key
+            type: string
+            required: false
+        returns:
+          type: record
+        three_axis:
+          state_effect: preserving
+          external_effects: [observational]
+          consequence:
+            baseline: benign

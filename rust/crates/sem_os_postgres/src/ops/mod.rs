@@ -93,6 +93,7 @@ pub mod research_workflow;
 pub mod schema;
 pub mod screening;
 pub mod semantic;
+pub mod service_options;
 pub mod service_pipeline;
 pub mod service_resource;
 pub mod session;
@@ -955,6 +956,23 @@ pub fn build_registry() -> SemOsVerbOpRegistry {
     registry.register(Arc::new(trading_profile_ca::RemoveProceedsSsi));
     registry.register(Arc::new(trading_profile_ca::GetPolicy));
 
+    // Service options v0.2 framework.
+    registry.register(Arc::new(service_options::ListByService));
+    registry.register(Arc::new(service_options::Read));
+    registry.register(Arc::new(service_options::DeclareOption));
+    registry.register(Arc::new(service_options::ConstrainOptionValues));
+    registry.register(Arc::new(service_options::BindOptionSource));
+    registry.register(Arc::new(service_options::DeprecateOption));
+    registry.register(Arc::new(service_options::OverrideOption));
+    registry.register(Arc::new(service_options::DeclareEligibility));
+    registry.register(Arc::new(service_options::DeclareFanoutRule));
+    registry.register(Arc::new(service_options::BindServiceOptions));
+    registry.register(Arc::new(service_options::OverrideOptionBinding));
+    registry.register(Arc::new(service_options::ValidateOptionCoverage));
+    registry.register(Arc::new(service_options::DirtyFlagBindings));
+    registry.register(Arc::new(service_options::RecomputeBindings));
+    registry.register(Arc::new(service_options::ComputeResourceFanout));
+
     registry
 }
 
@@ -1032,6 +1050,30 @@ mod tests {
             "deal.bac-reject",
             "deal.kyc-mark-in-review",
             "deal.update-kyc-clearance",
+        ] {
+            assert!(registry.has(fqn), "{fqn} should be registered");
+        }
+    }
+
+    #[test]
+    fn service_option_framework_ops_are_registered() {
+        let registry = build_registry();
+        for fqn in [
+            "service-option.list-by-service",
+            "service-option.read",
+            "service.declare-option",
+            "service.constrain-option-values",
+            "service.bind-option-source",
+            "service.deprecate-option",
+            "product-service.override-option",
+            "service-resource.declare-eligibility",
+            "service-resource.declare-fanout-rule",
+            "cbu.bind-service-options",
+            "cbu.override-option-binding",
+            "cbu.validate-option-coverage",
+            "cbu.dirty-flag-bindings",
+            "cbu.recompute-bindings",
+            "cbu.compute-resource-fanout",
         ] {
             assert!(registry.has(fqn), "{fqn} should be registered");
         }

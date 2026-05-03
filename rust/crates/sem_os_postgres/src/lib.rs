@@ -17,6 +17,7 @@ pub mod authoring;
 pub mod cleanup;
 pub mod constellation_hydration;
 pub mod ops;
+pub mod service_options;
 pub(crate) mod sqlx_types;
 pub mod store;
 

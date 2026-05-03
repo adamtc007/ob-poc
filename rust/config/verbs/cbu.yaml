@@ -2316,3 +2316,230 @@ domains:
           entity_id_arg: cbu-id
           target_workspace: cbu
           target_slot: cbu_disposition
+
+      bind-service-options:
+        flavour: attribute_mutating
+        description: Bind current service options for a CBU service subscription
+        invocation_phrases:
+          - "bind service options"
+          - "bind CBU service options"
+          - "set CBU service option bindings"
+        behavior: plugin
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: cbu
+          noun: cbu_service_option_binding
+          subject_kinds: [cbu, service-option]
+          tags: [service-options, binding, runtime]
+          phase_tags: [service-options]
+          side_effects: state_write
+          harm_class: reversible
+        args:
+          - name: cbu-id
+            type: uuid
+            required: true
+          - name: product-id
+            type: uuid
+            required: false
+          - name: service-id
+            type: uuid
+            required: false
+          - name: service
+            type: string
+            required: false
+          - name: options
+            type: json
+            required: false
+          - name: activation-run-id
+            type: uuid
+            required: false
+        returns:
+          type: record
+        three_axis:
+          state_effect: preserving
+          external_effects: [emitting]
+          consequence:
+            baseline: requires_confirmation
+
+      override-option-binding:
+        flavour: attribute_mutating
+        description: Supersede one CBU option binding with a manual value
+        invocation_phrases:
+          - "override CBU option binding"
+          - "override service option binding"
+        behavior: plugin
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: cbu
+          noun: cbu_service_option_binding
+          subject_kinds: [cbu, service-option]
+          tags: [service-options, binding, runtime]
+          phase_tags: [service-options]
+          side_effects: state_write
+          harm_class: reversible
+        args:
+          - name: cbu-id
+            type: uuid
+            required: true
+          - name: product-id
+            type: uuid
+            required: false
+          - name: service-id
+            type: uuid
+            required: false
+          - name: service
+            type: string
+            required: false
+          - name: service-option-def-id
+            type: uuid
+            required: false
+          - name: option-key
+            type: string
+            required: false
+          - name: value
+            type: json
+            required: true
+        returns:
+          type: uuid
+        three_axis:
+          state_effect: preserving
+          external_effects: [emitting]
+          consequence:
+            baseline: requires_confirmation
+
+      validate-option-coverage:
+        flavour: attribute_mutating
+        description: Validate required service option bindings for a CBU service
+        invocation_phrases:
+          - "validate service option coverage"
+          - "check CBU service option coverage"
+        behavior: plugin
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: cbu
+          noun: cbu_service_option_binding
+          subject_kinds: [cbu, service-option]
+          tags: [service-options, validation, runtime]
+          phase_tags: [service-options]
+          side_effects: facts_only
+        args:
+          - name: cbu-id
+            type: uuid
+            required: true
+          - name: service-id
+            type: uuid
+            required: false
+          - name: service
+            type: string
+            required: false
+        returns:
+          type: record
+        three_axis:
+          state_effect: preserving
+          external_effects: [observational]
+          consequence:
+            baseline: benign
+
+      dirty-flag-bindings:
+        flavour: attribute_mutating
+        description: Mark current CBU option bindings dirty after source changes
+        invocation_phrases:
+          - "dirty flag option bindings"
+          - "mark service option bindings dirty"
+        behavior: plugin
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: cbu
+          noun: cbu_service_option_binding
+          subject_kinds: [cbu, service-option]
+          tags: [service-options, dirty-flag, runtime]
+          phase_tags: [service-options]
+          side_effects: state_write
+          harm_class: reversible
+        args:
+          - name: cbu-id
+            type: uuid
+            required: true
+          - name: service-id
+            type: uuid
+            required: false
+          - name: source-kind
+            type: string
+            required: false
+        returns:
+          type: affected
+        three_axis:
+          state_effect: preserving
+          external_effects: [emitting]
+          consequence:
+            baseline: requires_confirmation
+
+      recompute-bindings:
+        flavour: attribute_mutating
+        description: Mark dirty CBU option bindings clean after recomputation
+        invocation_phrases:
+          - "recompute service option bindings"
+          - "clean dirty option bindings"
+        behavior: plugin
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: cbu
+          noun: cbu_service_option_binding
+          subject_kinds: [cbu, service-option]
+          tags: [service-options, recompute, runtime]
+          phase_tags: [service-options]
+          side_effects: state_write
+          harm_class: reversible
+        args:
+          - name: cbu-id
+            type: uuid
+            required: true
+          - name: service-id
+            type: uuid
+            required: false
+        returns:
+          type: affected
+        three_axis:
+          state_effect: preserving
+          external_effects: [emitting]
+          consequence:
+            baseline: requires_confirmation
+
+      compute-resource-fanout:
+        flavour: attribute_mutating
+        description: Compute the resource fan-out plan from CBU option bindings
+        invocation_phrases:
+          - "compute resource fanout"
+          - "show resource fanout plan"
+        behavior: plugin
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: cbu
+          noun: cbu_resource_instance_option_lineage
+          subject_kinds: [cbu, service-resource]
+          tags: [service-options, fanout, runtime]
+          phase_tags: [service-options]
+          side_effects: facts_only
+        args:
+          - name: cbu-id
+            type: uuid
+            required: true
+          - name: service-id
+            type: uuid
+            required: false
+          - name: service
+            type: string
+            required: false
+        returns:
+          type: record_set
+        three_axis:
+          state_effect: preserving
+          external_effects: [observational]
+          consequence:
+            baseline: benign
