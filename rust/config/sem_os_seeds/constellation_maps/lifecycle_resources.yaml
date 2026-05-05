@@ -1,0 +1,68 @@
+constellation: lifecycle.resources
+description: >
+  Layer 4 lifecycle resources workspace — BNY application instances and
+  capability bindings that back product service capabilities.
+jurisdiction: ALL
+slots:
+  workspace_root:
+    type: cbu
+    entity_kinds: [application]
+    table: applications
+    pk: id
+    cardinality: root
+    verbs:
+      application_register: { verb: application.register, when: [empty, filled] }
+      application_update: { verb: application.update, when: filled }
+      application_decommission: { verb: application.decommission, when: filled }
+      instance_provision: { verb: application-instance.provision, when: filled }
+      instance_activate: { verb: application-instance.activate, when: filled }
+      instance_enter_maintenance: { verb: application-instance.enter-maintenance, when: filled }
+      instance_exit_maintenance: { verb: application-instance.exit-maintenance, when: filled }
+      instance_take_offline: { verb: application-instance.take-offline, when: filled }
+      instance_bring_online: { verb: application-instance.bring-online, when: filled }
+      instance_decommission: { verb: application-instance.decommission, when: filled }
+      binding_draft: { verb: capability-binding.draft, when: filled }
+      binding_start_pilot: { verb: capability-binding.start-pilot, when: filled }
+      binding_promote_live: { verb: capability-binding.promote-live, when: filled }
+      binding_abort_pilot: { verb: capability-binding.abort-pilot, when: filled }
+      binding_deprecate: { verb: capability-binding.deprecate, when: filled }
+      binding_retire: { verb: capability-binding.retire, when: filled }
+  application_instance:
+    type: entity
+    entity_kinds: [application_instance]
+    table: application_instances
+    pk: id
+    join: { via: application_instances, parent_fk: application_id, child_fk: id }
+    cardinality: optional
+    depends_on: [workspace_root]
+    state_machine: application_instance_lifecycle
+    verbs:
+      provision: { verb: application-instance.provision, when: [empty, filled] }
+      activate: { verb: application-instance.activate, when: PROVISIONED }
+      enter_maintenance: { verb: application-instance.enter-maintenance, when: ACTIVE }
+      exit_maintenance: { verb: application-instance.exit-maintenance, when: MAINTENANCE_WINDOW }
+      take_offline: { verb: application-instance.take-offline, when: ACTIVE }
+      bring_online: { verb: application-instance.bring-online, when: OFFLINE }
+      decommission: { verb: application-instance.decommission, when: [ACTIVE, OFFLINE, MAINTENANCE_WINDOW, DEGRADED] }
+  capability_binding:
+    type: entity
+    entity_kinds: [capability_binding]
+    table: capability_bindings
+    pk: id
+    join: { via: capability_bindings, parent_fk: application_instance_id, child_fk: id }
+    cardinality: optional
+    depends_on: [application_instance]
+    state_machine: capability_binding_lifecycle
+    state_dependency:
+      cascade_rules:
+        - parent_state: DECOMMISSIONED
+          child_allowed_states: [RETIRED]
+          cascade_on_parent_transition: true
+          default_child_state_on_cascade: RETIRED
+    verbs:
+      draft: { verb: capability-binding.draft, when: [empty, filled] }
+      start_pilot: { verb: capability-binding.start-pilot, when: DRAFT }
+      promote_live: { verb: capability-binding.promote-live, when: PILOT }
+      abort_pilot: { verb: capability-binding.abort-pilot, when: PILOT }
+      deprecate: { verb: capability-binding.deprecate, when: LIVE }
+      retire: { verb: capability-binding.retire, when: DEPRECATED }

@@ -575,6 +575,7 @@ struct DiscoveryRow {
     discovery_id: Uuid,
     srdef_id: String,
     resource_type_id: Option<Uuid>,
+    srdef_snapshot_id: Option<Uuid>,
     parameters: Value,
     triggered_by_intents: Value,
     owner_system: Option<String>,
@@ -642,6 +643,7 @@ async fn load_active_discoveries(
             d.discovery_id,
             d.srdef_id,
             d.resource_type_id,
+            srt.srdef_snapshot_id,
             COALESCE(d.parameters, '{}'::jsonb) AS parameters,
             COALESCE(d.triggered_by_intents, '[]'::jsonb) AS triggered_by_intents,
             srt.owner AS owner_system,
@@ -677,6 +679,7 @@ async fn load_active_discoveries(
             discovery_id: row.get("discovery_id"),
             srdef_id: row.get("srdef_id"),
             resource_type_id: row.get("resource_type_id"),
+            srdef_snapshot_id: row.get("srdef_snapshot_id"),
             parameters: row.get("parameters"),
             triggered_by_intents: row.get("triggered_by_intents"),
             owner_system: row.get("owner_system"),
@@ -734,9 +737,10 @@ async fn insert_slice(
              owner_principal_fqn, application_id, application_instance_id,
              l4_binding_required, l4_binding_status, l4_blocking_reason,
              blocking_reason)
-        VALUES ($1, $2, $3, $4, $5, $6, $2, $7, $8, $9, $10, $11, $12, $13, $14, $14)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $15)
         ON CONFLICT (data_request_id, srdef_id, parameters) DO UPDATE
         SET discovery_snapshot_id = EXCLUDED.discovery_snapshot_id,
+            srdef_snapshot_id = EXCLUDED.srdef_snapshot_id,
             application_id = EXCLUDED.application_id,
             application_instance_id = EXCLUDED.application_instance_id,
             l4_binding_required = EXCLUDED.l4_binding_required,
@@ -752,6 +756,7 @@ async fn insert_slice(
     .bind(cbu_id)
     .bind(&discovery.srdef_id)
     .bind(discovery.resource_type_id)
+    .bind(discovery.srdef_snapshot_id)
     .bind(&discovery.parameters)
     .bind(&discovery.owner_system)
     .bind(&discovery.owner_principal_fqn)

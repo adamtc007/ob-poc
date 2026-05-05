@@ -22,6 +22,7 @@ slots:
       get_slice: onboarding.get-slice
       get_slice_attrs: onboarding.get-slice-attrs
       confirm_provisioning_result: service-resource.confirm-provisioning-result
+      get_provisioning_status: service-resource.get-provisioning-status
       provisioning_run: { verb: provisioning.run, when: filled }
       provisioning_status: provisioning.status
       readiness_compute: { verb: readiness.compute, when: filled }
@@ -58,8 +59,21 @@ slots:
       list: onboarding.list-slices
       get: onboarding.get-slice
       attrs: onboarding.get-slice-attrs
+      provisioning_status: service-resource.get-provisioning-status
       cancel: { verb: onboarding.cancel-slice, when: [collecting, ready, dispatched, awaiting_owner, failed] }
       confirm_provisioning_result: { verb: service-resource.confirm-provisioning-result, when: [dispatched, awaiting_owner] }
+  onboarding_data_request_discovery:
+    type: entity
+    entity_kinds: [onboarding_data_request_discovery]
+    table: onboarding_data_request_discoveries
+    pk: discovery_snapshot_id
+    join: { via: onboarding_data_request_discoveries, parent_fk: data_request_id, child_fk: discovery_snapshot_id }
+    cardinality: optional
+    depends_on:
+      - slot: onboarding_data_request
+        min_state: collecting
+    verbs:
+      list: onboarding.get-data-request
   onboarding_data_request_attr:
     type: entity
     entity_kinds: [onboarding_data_request_attr]
@@ -73,6 +87,33 @@ slots:
     state_machine: onboarding_data_request_attr_lifecycle
     verbs:
       list: onboarding.get-slice-attrs
+  provisioning_request:
+    type: entity
+    entity_kinds: [provisioning_request]
+    table: provisioning_requests
+    pk: request_id
+    join: { via: onboarding_data_request_slices, parent_fk: slice_id, child_fk: provisioning_request_id }
+    cardinality: optional
+    depends_on:
+      - slot: onboarding_data_request_slice
+        min_state: dispatched
+    state_machine: provisioning_request_lifecycle
+    verbs:
+      get_status: service-resource.get-provisioning-status
+      confirm_result: { verb: service-resource.confirm-provisioning-result, when: [sent, ack] }
+  cbu_resource_instance:
+    type: entity
+    entity_kinds: [cbu_resource_instance]
+    table: cbu_resource_instances
+    pk: instance_id
+    join: { via: onboarding_data_request_slices, parent_fk: slice_id, child_fk: cbu_resource_instance_id }
+    cardinality: optional
+    depends_on:
+      - slot: onboarding_data_request_slice
+        min_state: awaiting_owner
+    state_machine: cbu_resource_instance_lifecycle
+    verbs:
+      get_status: service-resource.get-provisioning-status
   resource_owner_principal:
     type: entity
     entity_kinds: [resource_owner_principal]

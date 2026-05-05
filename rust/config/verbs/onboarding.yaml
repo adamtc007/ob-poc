@@ -98,6 +98,10 @@ domains:
           external_effects: [emitting]
           consequence:
             baseline: reviewable
+        transition_args:
+          entity_id_arg: onboarding-request-id
+          target_workspace: onboarding_request
+          target_slot: onboarding_data_request
 
       dispatch-ready-slices:
         flavour: attribute_mutating
@@ -112,8 +116,14 @@ domains:
           side_effects: outbox_write
         invocation_phrases:
           - "dispatch ready onboarding slices"
+          - "dispatch the ready slices"
           - "send ready resource owner requests"
+          - "send the ready resource owner requests"
+          - "send out the ready owner requests"
+          - "forward ready owner requests"
           - "dispatch resource owner data requests"
+          - "release ready slices to resource owners"
+          - "kick off ready owner provisioning"
         behavior: plugin
         handler: DispatchReadySlicesOp
         args:
@@ -127,9 +137,16 @@ domains:
           external_effects: [emitting]
           consequence:
             baseline: requires_confirmation
+        transition_args:
+          entity_id_arg: data-request-id
+          target_workspace: onboarding_request
+          target_slot: onboarding_data_request
 
       cancel-data-request:
         flavour: discretionary
+        role_guard:
+          any_of: [onboarding_admin, ops_admin, mlro]
+        audit_class: onboarding_data_request_cancel
         description: "Cancel all open slices for an onboarding data request"
         metadata:
           tier: intent
@@ -155,9 +172,16 @@ domains:
           external_effects: [emitting]
           consequence:
             baseline: requires_confirmation
+        transition_args:
+          entity_id_arg: data-request-id
+          target_workspace: onboarding_request
+          target_slot: onboarding_data_request
 
       cancel-slice:
         flavour: discretionary
+        role_guard:
+          any_of: [onboarding_admin, ops_admin, mlro]
+        audit_class: onboarding_data_request_slice_cancel
         description: "Cancel one open onboarding data request slice"
         metadata:
           tier: intent
@@ -183,6 +207,10 @@ domains:
           external_effects: [emitting]
           consequence:
             baseline: requires_confirmation
+        transition_args:
+          entity_id_arg: slice-id
+          target_workspace: onboarding_request
+          target_slot: onboarding_data_request_slice
 
       get-data-request:
         flavour: attribute_mutating

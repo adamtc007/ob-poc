@@ -217,6 +217,22 @@ pub enum VerbSurfaceComposition {
         fingerprint: Option<String>,
         pruned_count: usize,
     },
+    /// SemOS responded AND a pack is active. Surface is the **union**
+    /// of SemOS legal verbs with the pack's `allowed_verbs`. The pack
+    /// is additive — it ADDS verbs the pack journey expects to be
+    /// reachable that SemOS may have state-gated out (e.g. lifecycle
+    /// verbs whose preconditions haven't been met yet but which the
+    /// pack explicitly authorises for the user to discuss). Pack
+    /// allowed_verbs ALWAYS appear in the surface even when SemOS
+    /// would deny them, because the pack journey is authoritative for
+    /// what the user is encouraged to do at this stage.
+    SemOsAvailableWithPack {
+        legal_verbs: Vec<String>,
+        pack_id: String,
+        pack_verbs: Vec<String>,
+        fingerprint: Option<String>,
+        pruned_count: usize,
+    },
     /// SemOS responded but with a deny-all verdict. The surface is
     /// the (typically empty) verb set the deny-all envelope still
     /// permits — usually safe-harbor verbs.
@@ -249,6 +265,29 @@ impl VerbSurfaceComposition {
                 fingerprint: fingerprint.unwrap_or_default(),
                 pruned_count,
             },
+            Self::SemOsAvailableWithPack {
+                legal_verbs,
+                pack_verbs,
+                fingerprint,
+                pruned_count,
+                ..
+            } => {
+                // Union — pack additively whitelists verbs the pack
+                // journey explicitly authorises, even when SemOS has
+                // state-gated them out.
+                let mut seen: std::collections::HashSet<String> = std::collections::HashSet::new();
+                let mut union: Vec<String> = Vec::with_capacity(legal_verbs.len() + pack_verbs.len());
+                for v in legal_verbs.into_iter().chain(pack_verbs.into_iter()) {
+                    if seen.insert(v.clone()) {
+                        union.push(v);
+                    }
+                }
+                VerbSurfaceOutput {
+                    allowed_verbs: union,
+                    fingerprint: fingerprint.unwrap_or_default(),
+                    pruned_count,
+                }
+            }
             Self::SemOsDenyAll { legal_verbs } => VerbSurfaceOutput {
                 allowed_verbs: legal_verbs,
                 fingerprint: String::new(),
@@ -741,6 +780,54 @@ mod tests {
         assert_eq!(out.allowed_verbs, vec!["session.info".to_string()]);
         assert!(out.fingerprint.is_empty(), "deny-all has no fingerprint");
         assert_eq!(out.pruned_count, 0);
+    }
+
+    #[test]
+    fn stage_4_sem_os_with_pack_unions_surfaces() {
+        let comp = VerbSurfaceComposition::SemOsAvailableWithPack {
+            legal_verbs: vec![
+                "cbu.create".into(),
+                "cbu.read".into(),
+                "deal.read".into(),
+                "agent.start".into(),
+            ],
+            pack_id: "onboarding-request".into(),
+            pack_verbs: vec![
+                "deal.read".into(),
+                "cbu.read".into(),
+                "onboarding.compile-data-request".into(),
+            ],
+            fingerprint: Some("v1:abc".into()),
+            pruned_count: 9,
+        };
+        let out = comp.run();
+        // Union — both SemOS legal verbs AND pack's allowed_verbs appear,
+        // deduplicated. Pack additively whitelists state-gated verbs.
+        assert_eq!(out.allowed_verbs.len(), 5);
+        assert!(out.allowed_verbs.contains(&"cbu.read".into()));
+        assert!(out.allowed_verbs.contains(&"deal.read".into()));
+        assert!(out.allowed_verbs.contains(&"cbu.create".into()));
+        assert!(out.allowed_verbs.contains(&"agent.start".into()));
+        assert!(out.allowed_verbs.contains(&"onboarding.compile-data-request".into()));
+        assert_eq!(out.fingerprint, "v1:abc");
+        assert_eq!(out.pruned_count, 9);
+    }
+
+    #[test]
+    fn stage_4_sem_os_with_pack_dedupes_overlap() {
+        let comp = VerbSurfaceComposition::SemOsAvailableWithPack {
+            legal_verbs: vec!["cbu.read".into(), "deal.read".into()],
+            pack_id: "onboarding-request".into(),
+            pack_verbs: vec!["cbu.read".into(), "deal.read".into()],
+            fingerprint: Some("v1:xyz".into()),
+            pruned_count: 5,
+        };
+        let out = comp.run();
+        // Full overlap → 2 verbs (deduped)
+        assert_eq!(out.allowed_verbs.len(), 2);
+        assert!(out.allowed_verbs.contains(&"cbu.read".into()));
+        assert!(out.allowed_verbs.contains(&"deal.read".into()));
+        assert_eq!(out.fingerprint, "v1:xyz");
     }
 
     #[test]

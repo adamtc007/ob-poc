@@ -1,0 +1,64 @@
+state_machine: application_instance_lifecycle
+description: Layer 4 application instance operational lifecycle
+states: [PROVISIONED, ACTIVE, MAINTENANCE_WINDOW, DEGRADED, OFFLINE, DECOMMISSIONED]
+initial: PROVISIONED
+transitions:
+  - from: PROVISIONED
+    to: ACTIVE
+    verbs: [application-instance.activate]
+  - from: ACTIVE
+    to: MAINTENANCE_WINDOW
+    verbs: [application-instance.enter-maintenance]
+  - from: MAINTENANCE_WINDOW
+    to: ACTIVE
+    verbs: [application-instance.exit-maintenance]
+  - from: ACTIVE
+    to: OFFLINE
+    verbs: [application-instance.take-offline]
+  - from: OFFLINE
+    to: ACTIVE
+    verbs: [application-instance.bring-online]
+  - from: ACTIVE
+    to: DECOMMISSIONED
+    verbs: [application-instance.decommission]
+  - from: OFFLINE
+    to: DECOMMISSIONED
+    verbs: [application-instance.decommission]
+  - from: MAINTENANCE_WINDOW
+    to: DECOMMISSIONED
+    verbs: [application-instance.decommission]
+  - from: DEGRADED
+    to: DECOMMISSIONED
+    verbs: [application-instance.decommission]
+reducer:
+  overlay_sources:
+    application_instance:
+      table: application_instances
+      join: id
+      provides: [lifecycle_status]
+  conditions:
+    is_provisioned:
+      expr: "application_instance.lifecycle_status = 'PROVISIONED'"
+    is_active:
+      expr: "application_instance.lifecycle_status = 'ACTIVE'"
+    is_maintenance:
+      expr: "application_instance.lifecycle_status = 'MAINTENANCE_WINDOW'"
+    is_degraded:
+      expr: "application_instance.lifecycle_status = 'DEGRADED'"
+    is_offline:
+      expr: "application_instance.lifecycle_status = 'OFFLINE'"
+    is_decommissioned:
+      expr: "application_instance.lifecycle_status = 'DECOMMISSIONED'"
+  rules:
+    - state: DECOMMISSIONED
+      requires: [is_decommissioned]
+    - state: OFFLINE
+      requires: [is_offline]
+    - state: DEGRADED
+      requires: [is_degraded]
+    - state: MAINTENANCE_WINDOW
+      requires: [is_maintenance]
+    - state: ACTIVE
+      requires: [is_active]
+    - state: PROVISIONED
+      requires: []

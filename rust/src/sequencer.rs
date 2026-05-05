@@ -4329,6 +4329,21 @@ impl ReplOrchestratorV2 {
                     crate::sequencer_stages::VerbSurfaceComposition::SemOsDenyAll {
                         legal_verbs: phase2.legal_verbs_or_empty.clone().into_iter().collect(),
                     }
+                } else if let Some(ref pack) = session.staged_pack {
+                    tracing::debug!(
+                        session_id = %session.id,
+                        pack_id = %pack.id,
+                        pack_verb_count = pack.allowed_verbs.len(),
+                        sem_os_verb_count = phase2.legal_verbs_or_empty.len(),
+                        "REPL: SemOS available + pack active — intersecting surfaces"
+                    );
+                    crate::sequencer_stages::VerbSurfaceComposition::SemOsAvailableWithPack {
+                        legal_verbs: phase2.legal_verbs_or_empty.clone().into_iter().collect(),
+                        pack_id: pack.id.to_string(),
+                        pack_verbs: pack.allowed_verbs.to_vec(),
+                        fingerprint: phase2.fingerprint(),
+                        pruned_count: phase2.pruned_verb_count(),
+                    }
                 } else {
                     crate::sequencer_stages::VerbSurfaceComposition::SemOsAvailable {
                         legal_verbs: phase2.legal_verbs_or_empty.clone().into_iter().collect(),

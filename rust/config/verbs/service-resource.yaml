@@ -368,6 +368,51 @@ domains:
           external_effects: [emitting]
           consequence:
             baseline: reviewable
+        transition_args:
+          entity_id_arg: provisioning-request-id
+          target_workspace: onboarding_request
+          target_slot: provisioning_request
+
+      get-provisioning-status:
+        flavour: attribute_mutating
+        description: Read provisioning and resource-instance status for a data-request slice
+        metadata:
+          tier: reference
+          source_of_truth: operational
+          scope: cbu
+          noun: service_resource
+          phase_tags: [onboarding]
+          side_effects: facts_only
+        invocation_phrases:
+          - "get provisioning status for this slice"
+          - "get slice provisioning status"
+          - "show slice provisioning status"
+          - "show resource provisioning status for this slice"
+          - "check activation status for this slice"
+          - "show owner provisioning result for this slice"
+          - "read service resource activation status by slice"
+          - "what is the provisioning status of this slice"
+          - "owner side activation status for this onboarding slice"
+          - "slice owner provisioning status"
+        behavior: plugin
+        handler: GetProvisioningStatusOp
+        args:
+          - name: slice-id
+            type: uuid
+            required: true
+            lookup:
+              table: onboarding_data_request_slices
+              schema: ob-poc
+              search_key: slice_id
+              primary_key: slice_id
+              entity_type: onboarding_data_request_slice
+        returns:
+          type: record
+        three_axis:
+          state_effect: preserving
+          external_effects: [observational]
+          consequence:
+            baseline: benign
 
       read-resource-owner:
         flavour: attribute_mutating

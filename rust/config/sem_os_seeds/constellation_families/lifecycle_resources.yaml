@@ -1,0 +1,21 @@
+fqn: family.lifecycle_resources
+family_id: lifecycle_resources
+label: Lifecycle Resources
+description: Layer 4 application-instance and capability-binding workspace.
+domain_id: lifecycle_resources
+selection_rules:
+  - condition: "true"
+    target_constellation: lifecycle.resources
+    priority: 65
+constellation_refs:
+  - constellation_id: lifecycle.resources
+    label: Lifecycle Resources
+    jurisdiction: ALL
+    entity_kind: application
+    triggers: [application, lifecycle, instance, capability, binding]
+candidate_jurisdictions: [ALL]
+candidate_entity_kinds: [application, application_instance, capability_binding]
+grounding_threshold:
+  required_input_keys: []
+  requires_entity_instance: false
+  allows_draft_instance: true

@@ -122,6 +122,56 @@ slots:
       onboarding_get_slice: onboarding.get-slice
       onboarding_get_slice_attrs: onboarding.get-slice-attrs
       resource_confirm_provisioning_result: service-resource.confirm-provisioning-result
+      resource_get_provisioning_status: service-resource.get-provisioning-status
+      provisioning_status: provisioning.status
+  onboarding_data_request:
+    type: entity
+    entity_kinds: [onboarding_data_request]
+    table: onboarding_data_requests
+    pk: data_request_id
+    join: { via: onboarding_data_requests, parent_fk: cbu_id, child_fk: data_request_id }
+    cardinality: optional
+    depends_on: [workspace_root]
+    state_machine: onboarding_data_request_lifecycle
+    verbs:
+      list: onboarding.list-data-requests
+      get: onboarding.get-data-request
+  onboarding_data_request_slice:
+    type: entity
+    entity_kinds: [onboarding_data_request_slice]
+    table: onboarding_data_request_slices
+    pk: slice_id
+    join: { via: onboarding_data_request_slices, parent_fk: data_request_id, child_fk: slice_id }
+    cardinality: optional
+    depends_on: [onboarding_data_request]
+    state_machine: onboarding_data_request_slice_lifecycle
+    verbs:
+      list: onboarding.list-slices
+      get: onboarding.get-slice
+      attrs: onboarding.get-slice-attrs
+      provisioning_status: service-resource.get-provisioning-status
+  provisioning_request:
+    type: entity
+    entity_kinds: [provisioning_request]
+    table: provisioning_requests
+    pk: request_id
+    join: { via: onboarding_data_request_slices, parent_fk: slice_id, child_fk: provisioning_request_id }
+    cardinality: optional
+    depends_on: [onboarding_data_request_slice]
+    state_machine: provisioning_request_lifecycle
+    verbs:
+      get_status: service-resource.get-provisioning-status
+  cbu_resource_instance:
+    type: entity
+    entity_kinds: [cbu_resource_instance]
+    table: cbu_resource_instances
+    pk: instance_id
+    join: { via: onboarding_data_request_slices, parent_fk: slice_id, child_fk: cbu_resource_instance_id }
+    cardinality: optional
+    depends_on: [onboarding_data_request_slice]
+    state_machine: cbu_resource_instance_lifecycle
+    verbs:
+      get_status: service-resource.get-provisioning-status
   cbu_service_option_binding:
     type: entity
     entity_kinds: [cbu_service_option_binding]

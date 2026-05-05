@@ -1,0 +1,44 @@
+state_machine: service_resource_def_governance_lifecycle
+description: Service resource definition catalogue governance lifecycle
+states: [draft, active, deprecated, retired]
+initial: draft
+transitions:
+  - from: draft
+    to: active
+    verbs: [governance.publish, service-resource.sync-definitions]
+  - from: active
+    to: deprecated
+    verbs: [governance.record-review]
+  - from: deprecated
+    to: active
+    verbs: [governance.record-review]
+  - from: deprecated
+    to: retired
+    verbs: [governance.record-review]
+  - from: active
+    to: retired
+    verbs: [governance.record-review]
+reducer:
+  overlay_sources:
+    srdef:
+      table: service_resource_types
+      join: resource_id
+      provides: [governance_status]
+  conditions:
+    is_draft:
+      expr: "srdef.governance_status = 'draft'"
+    is_active:
+      expr: "srdef.governance_status = 'active'"
+    is_deprecated:
+      expr: "srdef.governance_status = 'deprecated'"
+    is_retired:
+      expr: "srdef.governance_status = 'retired'"
+  rules:
+    - state: retired
+      requires: [is_retired]
+    - state: deprecated
+      requires: [is_deprecated]
+    - state: active
+      requires: [is_active]
+    - state: draft
+      requires: []

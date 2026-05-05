@@ -3775,3 +3775,155 @@ category = "natural"
 difficulty = "hard"
 workspace = "kyc"
 notes = "Partnership capital structure"
+
+# ============================================================================
+# ONBOARDING DATA REQUEST LIFECYCLE -- service-resource data dictionary (v0.5)
+# ============================================================================
+
+[[test]]
+utterance = "compile onboarding data request"
+expected_verb = "onboarding.compile-data-request"
+category = "direct"
+difficulty = "easy"
+workspace = "onboarding_request"
+notes = "Exact invocation phrase"
+
+[[test]]
+utterance = "build the service resource data dictionary"
+expected_verb = "onboarding.compile-data-request"
+category = "natural"
+difficulty = "medium"
+workspace = "onboarding_request"
+
+[[test]]
+utterance = "freeze onboarding resource requirements for this handoff"
+expected_verb = "onboarding.compile-data-request"
+category = "natural"
+difficulty = "medium"
+workspace = "onboarding_request"
+
+[[test]]
+utterance = "dispatch ready onboarding slices to resource owners"
+expected_verb = "onboarding.dispatch-ready-slices"
+category = "direct"
+difficulty = "easy"
+workspace = "onboarding_request"
+
+[[test]]
+utterance = "send the ready resource owner requests"
+expected_verb = "onboarding.dispatch-ready-slices"
+category = "natural"
+difficulty = "medium"
+workspace = "onboarding_request"
+
+[[test]]
+utterance = "list onboarding data requests"
+expected_verb = "onboarding.list-data-requests"
+category = "direct"
+difficulty = "easy"
+workspace = "onboarding_request"
+
+[[test]]
+utterance = "show resource owner data requests"
+expected_verb = "onboarding.list-data-requests"
+category = "natural"
+difficulty = "medium"
+workspace = "onboarding_request"
+
+[[test]]
+utterance = "list onboarding data request slices"
+expected_verb = "onboarding.list-slices"
+category = "direct"
+difficulty = "easy"
+workspace = "onboarding_request"
+
+[[test]]
+utterance = "show resource owner slices"
+expected_verb = "onboarding.list-slices"
+category = "natural"
+difficulty = "medium"
+workspace = "onboarding_request"
+
+[[test]]
+utterance = "get onboarding data request"
+expected_verb = "onboarding.get-data-request"
+category = "direct"
+difficulty = "easy"
+workspace = "onboarding_request"
+
+[[test]]
+utterance = "read one onboarding data request slice"
+expected_verb = "onboarding.get-slice"
+category = "direct"
+difficulty = "easy"
+workspace = "onboarding_request"
+
+[[test]]
+utterance = "cancel onboarding data request"
+expected_verb = "onboarding.cancel-data-request"
+category = "direct"
+difficulty = "easy"
+workspace = "onboarding_request"
+
+[[test]]
+utterance = "stand down all resource owner requests"
+expected_verb = "onboarding.cancel-data-request"
+category = "natural"
+difficulty = "medium"
+workspace = "onboarding_request"
+
+[[test]]
+utterance = "cancel onboarding data request slice"
+expected_verb = "onboarding.cancel-slice"
+category = "direct"
+difficulty = "easy"
+workspace = "onboarding_request"
+
+[[test]]
+utterance = "stand down this resource owner request"
+expected_verb = "onboarding.cancel-slice"
+category = "natural"
+difficulty = "medium"
+workspace = "onboarding_request"
+
+[[test]]
+utterance = "confirm provisioning result"
+expected_verb = "service-resource.confirm-provisioning-result"
+category = "direct"
+difficulty = "easy"
+workspace = "onboarding_request"
+
+[[test]]
+utterance = "record the resource owner result"
+expected_verb = "service-resource.confirm-provisioning-result"
+category = "natural"
+difficulty = "medium"
+workspace = "onboarding_request"
+
+[[test]]
+utterance = "confirm resource activation"
+expected_verb = "service-resource.confirm-provisioning-result"
+category = "natural"
+difficulty = "medium"
+workspace = "onboarding_request"
+
+[[test]]
+utterance = "get provisioning status for this slice"
+expected_verb = "service-resource.get-provisioning-status"
+category = "direct"
+difficulty = "easy"
+workspace = "onboarding_request"
+
+[[test]]
+utterance = "show resource provisioning status"
+expected_verb = "service-resource.get-provisioning-status"
+category = "natural"
+difficulty = "medium"
+workspace = "onboarding_request"
+
+[[test]]
+utterance = "check activation status for this slice"
+expected_verb = "service-resource.get-provisioning-status"
+category = "natural"
+difficulty = "medium"
+workspace = "onboarding_request"

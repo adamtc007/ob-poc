@@ -9,7 +9,7 @@ use entity_gateway::proto::ob::gateway::v1::{
     entity_gateway_client::EntityGatewayClient, SearchMode, SearchRequest,
 };
 use serde_json::{json, Value};
-use sqlx::PgPool;
+use sqlx::{PgPool, Row};
 use std::sync::Arc;
 use tokio::sync::Mutex;
 use tonic::transport::Channel;
@@ -2309,6 +2309,17 @@ impl ToolHandlers {
         let search = args["search"].as_str();
         let limit = args["limit"].as_i64().unwrap_or(10) as i32;
 
+        if let Some(results) = self
+            .operational_dsl_lookup(lookup_type, search, limit)
+            .await?
+        {
+            return Ok(json!({
+                "type": lookup_type,
+                "count": results.len(),
+                "results": results,
+            }));
+        }
+
         // Map lookup_type to EntityGateway nickname
         let nickname = match lookup_type {
             "cbu" => "CBU",
@@ -2330,7 +2341,7 @@ impl ToolHandlers {
             "market" => "MARKET",
             _ => {
                 return Err(anyhow!(
-                    "Unknown lookup_type: {}. Valid types: cbu, entity, person, legal_entity, fund, document, product, service, kyc_case, role, jurisdiction, currency, attribute, instrument_class, market",
+                    "Unknown lookup_type: {}. Valid types: cbu, entity, person, legal_entity, fund, document, product, service, application, application_instance, capability_binding, kyc_case, role, jurisdiction, currency, attribute, service_resource_def, resource_owner_principal, onboarding_data_request, onboarding_data_request_slice, provisioning_request, cbu_resource_instance, instrument_class, market",
                     lookup_type
                 ));
             }
@@ -2348,6 +2359,203 @@ impl ToolHandlers {
                 "score": score
             })).collect::<Vec<_>>()
         }))
+    }
+
+    async fn operational_dsl_lookup(
+        &self,
+        lookup_type: &str,
+        search: Option<&str>,
+        limit: i32,
+    ) -> Result<Option<Vec<Value>>> {
+        let pattern = search.map(|value| format!("%{value}%"));
+        let rows = match lookup_type {
+            "service_resource_def" => sqlx::query(
+                r#"
+                SELECT resource_id::text AS id,
+                       concat_ws(' | ', srdef_id, resource_code, name, lifecycle_status) AS display
+                FROM "ob-poc".service_resource_types
+                WHERE ($1::text IS NULL
+                   OR resource_id::text ILIKE $1
+                   OR srdef_id ILIKE $1
+                   OR resource_code ILIKE $1
+                   OR name ILIKE $1)
+                ORDER BY srdef_id NULLS LAST, resource_code
+                LIMIT $2
+                "#,
+            )
+            .bind(&pattern)
+            .bind(limit)
+            .fetch_all(&self.pool)
+            .await?,
+            "resource_owner_principal" => sqlx::query(
+                r#"
+                SELECT owner_principal_fqn AS id,
+                       concat_ws(' | ', owner_principal_fqn, owner_system, display_name, status) AS display
+                FROM "ob-poc".resource_owner_principals
+                WHERE ($1::text IS NULL
+                   OR owner_principal_fqn ILIKE $1
+                   OR owner_system ILIKE $1
+                   OR display_name ILIKE $1)
+                ORDER BY owner_system
+                LIMIT $2
+                "#,
+            )
+            .bind(&pattern)
+            .bind(limit)
+            .fetch_all(&self.pool)
+            .await?,
+            "onboarding_data_request" => sqlx::query(
+                r#"
+                SELECT data_request_id::text AS id,
+                       concat_ws(' | ', data_request_id::text, request_status, cbu_id::text, onboarding_request_id::text) AS display
+                FROM "ob-poc".onboarding_data_requests
+                WHERE ($1::text IS NULL
+                   OR data_request_id::text ILIKE $1
+                   OR onboarding_request_id::text ILIKE $1
+                   OR cbu_id::text ILIKE $1
+                   OR request_status ILIKE $1)
+                ORDER BY compiled_at DESC
+                LIMIT $2
+                "#,
+            )
+            .bind(&pattern)
+            .bind(limit)
+            .fetch_all(&self.pool)
+            .await?,
+            "onboarding_data_request_slice" => sqlx::query(
+                r#"
+                SELECT slice_id::text AS id,
+                       concat_ws(' | ', slice_id::text, srdef_id, slice_status, owner_system) AS display
+                FROM "ob-poc".onboarding_data_request_slices
+                WHERE ($1::text IS NULL
+                   OR slice_id::text ILIKE $1
+                   OR data_request_id::text ILIKE $1
+                   OR srdef_id ILIKE $1
+                   OR slice_status ILIKE $1
+                   OR owner_system ILIKE $1)
+                ORDER BY updated_at DESC
+                LIMIT $2
+                "#,
+            )
+            .bind(&pattern)
+            .bind(limit)
+            .fetch_all(&self.pool)
+            .await?,
+            "provisioning_request" => sqlx::query(
+                r#"
+                SELECT request_id::text AS id,
+                       concat_ws(' | ', request_id::text, srdef_id, status, owner_system, owner_principal_fqn, owner_ticket_id) AS display
+                FROM "ob-poc".provisioning_requests
+                WHERE ($1::text IS NULL
+                   OR request_id::text ILIKE $1
+                   OR srdef_id ILIKE $1
+                   OR status ILIKE $1
+                   OR owner_system ILIKE $1
+                   OR owner_principal_fqn ILIKE $1
+                   OR owner_ticket_id ILIKE $1)
+                ORDER BY requested_at DESC
+                LIMIT $2
+                "#,
+            )
+            .bind(&pattern)
+            .bind(limit)
+            .fetch_all(&self.pool)
+            .await?,
+            "cbu_resource_instance" => sqlx::query(
+                r#"
+                SELECT instance_id::text AS id,
+                       concat_ws(' | ', instance_id::text, srdef_id, status, instance_identifier, resource_url, instance_url) AS display
+                FROM "ob-poc".cbu_resource_instances
+                WHERE ($1::text IS NULL
+                   OR instance_id::text ILIKE $1
+                   OR cbu_id::text ILIKE $1
+                   OR srdef_id ILIKE $1
+                   OR status ILIKE $1
+                   OR instance_identifier ILIKE $1
+                   OR resource_url ILIKE $1
+                   OR instance_url ILIKE $1)
+                ORDER BY updated_at DESC
+                LIMIT $2
+                "#,
+            )
+            .bind(&pattern)
+            .bind(limit)
+            .fetch_all(&self.pool)
+            .await?,
+            "application" => sqlx::query(
+                r#"
+                SELECT id::text AS id,
+                       concat_ws(' | ', name, vendor, owner_team) AS display
+                FROM "ob-poc".applications
+                WHERE ($1::text IS NULL
+                   OR id::text ILIKE $1
+                   OR name ILIKE $1
+                   OR vendor ILIKE $1
+                   OR owner_team ILIKE $1)
+                ORDER BY name
+                LIMIT $2
+                "#,
+            )
+            .bind(&pattern)
+            .bind(limit)
+            .fetch_all(&self.pool)
+            .await?,
+            "application_instance" => sqlx::query(
+                r#"
+                SELECT ai.id::text AS id,
+                       concat_ws(' | ', a.name, ai.environment, ai.instance_label, ai.lifecycle_status) AS display
+                FROM "ob-poc".application_instances ai
+                JOIN "ob-poc".applications a ON a.id = ai.application_id
+                WHERE ($1::text IS NULL
+                   OR ai.id::text ILIKE $1
+                   OR a.name ILIKE $1
+                   OR ai.environment ILIKE $1
+                   OR ai.instance_label ILIKE $1
+                   OR ai.lifecycle_status ILIKE $1)
+                ORDER BY a.name, ai.environment, ai.instance_label
+                LIMIT $2
+                "#,
+            )
+            .bind(&pattern)
+            .bind(limit)
+            .fetch_all(&self.pool)
+            .await?,
+            "capability_binding" => sqlx::query(
+                r#"
+                SELECT cb.id::text AS id,
+                       concat_ws(' | ', a.name, ai.environment, cb.service_id::text, cb.binding_status) AS display
+                FROM "ob-poc".capability_bindings cb
+                JOIN "ob-poc".application_instances ai ON ai.id = cb.application_instance_id
+                JOIN "ob-poc".applications a ON a.id = ai.application_id
+                WHERE ($1::text IS NULL
+                   OR cb.id::text ILIKE $1
+                   OR cb.service_id::text ILIKE $1
+                   OR cb.binding_status ILIKE $1
+                   OR a.name ILIKE $1
+                   OR ai.environment ILIKE $1
+                   OR ai.instance_label ILIKE $1)
+                ORDER BY a.name, ai.environment, cb.service_id
+                LIMIT $2
+                "#,
+            )
+            .bind(&pattern)
+            .bind(limit)
+            .fetch_all(&self.pool)
+            .await?,
+            _ => return Ok(None),
+        };
+
+        Ok(Some(
+            rows.into_iter()
+                .map(|row| {
+                    json!({
+                        "id": row.get::<String, _>("id"),
+                        "display": row.get::<String, _>("display"),
+                        "score": 1.0,
+                    })
+                })
+                .collect(),
+        ))
     }
 
     /// Get completions for DSL - verbs, domains, products, roles

@@ -33,3 +33,6 @@ slots:
       onboarding_list_data_requests: onboarding.list-data-requests
       onboarding_get_data_request: onboarding.get-data-request
       onboarding_list_slices: onboarding.list-slices
+      onboarding_get_slice: onboarding.get-slice
+      onboarding_get_slice_attrs: onboarding.get-slice-attrs
+      resource_get_provisioning_status: service-resource.get-provisioning-status

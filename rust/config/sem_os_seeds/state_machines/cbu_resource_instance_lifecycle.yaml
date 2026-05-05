@@ -1,0 +1,98 @@
+state_machine: cbu_resource_instance_lifecycle
+description: Provisioned CBU service-resource instance lifecycle
+states:
+  - PENDING
+  - PROVISIONING
+  - AWAITING_OWNER
+  - ACTIVE
+  - FAILED
+  - CANCELLED
+  - SUSPENDED
+  - DECOMMISSIONED
+initial: PENDING
+transitions:
+  - from: PENDING
+    to: PROVISIONING
+    verbs: [service-resource.provision, provisioning.run]
+  - from: PENDING
+    to: AWAITING_OWNER
+    verbs: [onboarding.dispatch-ready-slices]
+  - from: PROVISIONING
+    to: AWAITING_OWNER
+    verbs: [onboarding.dispatch-ready-slices]
+  - from: AWAITING_OWNER
+    to: ACTIVE
+    verbs: [service-resource.confirm-provisioning-result]
+  - from: AWAITING_OWNER
+    to: FAILED
+    verbs: [service-resource.confirm-provisioning-result]
+  - from: PENDING
+    to: CANCELLED
+    verbs: [onboarding.cancel-slice, onboarding.cancel-data-request]
+  - from: PROVISIONING
+    to: CANCELLED
+    verbs: [onboarding.cancel-slice, onboarding.cancel-data-request]
+  - from: AWAITING_OWNER
+    to: CANCELLED
+    verbs: [onboarding.cancel-slice, onboarding.cancel-data-request]
+  - from: FAILED
+    to: CANCELLED
+    verbs: [onboarding.cancel-slice, onboarding.cancel-data-request]
+  - from: ACTIVE
+    to: SUSPENDED
+    verbs: [service-resource.suspend]
+  - from: SUSPENDED
+    to: ACTIVE
+    verbs: [service-resource.reactivate]
+  - from: ACTIVE
+    to: DECOMMISSIONED
+    verbs: [service-resource.decommission]
+  - from: SUSPENDED
+    to: DECOMMISSIONED
+    verbs: [service-resource.decommission]
+  - from: FAILED
+    to: DECOMMISSIONED
+    verbs: [service-resource.decommission]
+  - from: CANCELLED
+    to: DECOMMISSIONED
+    verbs: [service-resource.decommission]
+reducer:
+  overlay_sources:
+    resource_instance:
+      table: cbu_resource_instances
+      join: instance_id
+      provides: [status]
+  conditions:
+    is_pending:
+      expr: "resource_instance.status = 'PENDING'"
+    is_provisioning:
+      expr: "resource_instance.status = 'PROVISIONING'"
+    is_awaiting_owner:
+      expr: "resource_instance.status = 'AWAITING_OWNER'"
+    is_active:
+      expr: "resource_instance.status = 'ACTIVE'"
+    is_failed:
+      expr: "resource_instance.status = 'FAILED'"
+    is_cancelled:
+      expr: "resource_instance.status = 'CANCELLED'"
+    is_suspended:
+      expr: "resource_instance.status = 'SUSPENDED'"
+    is_decommissioned:
+      expr: "resource_instance.status = 'DECOMMISSIONED'"
+  rules:
+    - state: DECOMMISSIONED
+      requires: [is_decommissioned]
+    - state: SUSPENDED
+      requires: [is_suspended]
+    - state: CANCELLED
+      requires: [is_cancelled]
+    - state: FAILED
+      requires: [is_failed]
+    - state: ACTIVE
+      requires: [is_active]
+    - state: AWAITING_OWNER
+      requires: [is_awaiting_owner]
+    - state: PROVISIONING
+      requires: [is_provisioning]
+    - state: PENDING
+      requires: []

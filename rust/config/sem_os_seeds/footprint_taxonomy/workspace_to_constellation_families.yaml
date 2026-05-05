@@ -2,6 +2,8 @@ workspaces:
   ProductMaintenance:
     families:
       - product_service_taxonomy
+      - product_workspace
+      - lifecycle_resources
   Deal:
     families:
       - deal_commercial
@@ -23,6 +25,7 @@ workspaces:
       - trading_streetside
   OnBoarding:
     families:
+      - onboarding_workspace
       - cross_border_onboarding
       - fund_onboarding
       - manager_onboarding

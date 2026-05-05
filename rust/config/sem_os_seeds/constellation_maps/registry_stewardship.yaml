@@ -101,6 +101,20 @@ slots:
       check_gaps: { verb: service-resource.check-attribute-gaps, when: [empty, filled] }
       list: { verb: service-resource.list, when: [empty, filled] }
 
+  service_resource_def_governance:
+    type: entity
+    entity_kinds: [service_resource_def]
+    table: service_resource_types
+    pk: resource_id
+    join: { via: sem_reg_changeset_items, parent_fk: changeset_id, child_fk: resource_id }
+    cardinality: optional
+    state_machine: service_resource_def_governance_lifecycle
+    verbs:
+      publish: { verb: governance.publish, when: [draft, deprecated] }
+      review: { verb: governance.record-review, when: [active, deprecated] }
+      list: { verb: service-resource.list, when: [empty, filled] }
+      read: { verb: service-resource.read, when: filled }
+
   phrase_authoring:
     type: entity
     entity_kinds: [phrase]

@@ -666,6 +666,264 @@ entities:
       allowed: false
       canonical_verb: null
 
+  service_resource_def:
+    description: "SemOS-visible service resource definition"
+    category: resource
+
+    db:
+      schema: ob-poc
+      table: service_resource_types
+      pk: resource_id
+
+    search_keys:
+      - column: srdef_id
+        unique: true
+      - column: resource_code
+        unique: true
+
+    implicit_create:
+      allowed: false
+      canonical_verb: null
+
+  resource_owner_principal:
+    description: "Addressable owner principal for service-resource dispatch"
+    category: resource
+
+    db:
+      schema: ob-poc
+      table: resource_owner_principals
+      pk: owner_principal_fqn
+
+    search_keys:
+      - column: owner_system
+        unique: true
+      - column: display_name
+        unique: false
+
+    lifecycle:
+      status_column: status
+      states: [active, suspended, retired]
+      transitions:
+        - from: active
+          to: [suspended, retired]
+        - from: suspended
+          to: [active, retired]
+      initial_state: active
+
+    implicit_create:
+      allowed: false
+      canonical_verb: null
+
+  onboarding_data_request:
+    description: "Frozen per-onboarding service-resource data dictionary request"
+    category: resource
+
+    db:
+      schema: ob-poc
+      table: onboarding_data_requests
+      pk: data_request_id
+
+    search_keys:
+      - column: onboarding_request_id
+        unique: false
+      - column: cbu_id
+        unique: false
+
+    lifecycle:
+      status_column: request_status
+      states: [collecting, ready_for_dispatch, dispatching, awaiting_owner, completed, blocked, cancelled]
+      transitions:
+        - from: collecting
+          to: [ready_for_dispatch, blocked, cancelled]
+        - from: ready_for_dispatch
+          to: [dispatching, blocked, cancelled]
+        - from: dispatching
+          to: [awaiting_owner, blocked, cancelled]
+        - from: awaiting_owner
+          to: [completed, blocked, cancelled]
+        - from: blocked
+          to: [cancelled]
+      initial_state: collecting
+
+  onboarding_data_request_slice:
+    description: "Per-SRDEF and parameter dispatch slice of a data request"
+    category: resource
+
+    db:
+      schema: ob-poc
+      table: onboarding_data_request_slices
+      pk: slice_id
+
+    search_keys:
+      - column: data_request_id
+        unique: false
+      - column: srdef_id
+        unique: false
+
+    lifecycle:
+      status_column: slice_status
+      states: [collecting, ready, dispatched, awaiting_owner, activated, blocked, failed, cancelled]
+      transitions:
+        - from: collecting
+          to: [ready, failed, cancelled]
+        - from: ready
+          to: [dispatched, failed, cancelled]
+        - from: dispatched
+          to: [awaiting_owner, activated, failed, cancelled]
+        - from: awaiting_owner
+          to: [activated, failed, cancelled]
+        - from: failed
+          to: [cancelled]
+      initial_state: collecting
+
+  provisioning_request:
+    description: "Resource-owner provisioning request emitted for a ready slice"
+    category: resource
+
+    db:
+      schema: ob-poc
+      table: provisioning_requests
+      pk: request_id
+
+    search_keys:
+      - column: srdef_id
+        unique: false
+      - column: owner_ticket_id
+        unique: false
+
+    lifecycle:
+      status_column: status
+      states: [queued, sent, ack, completed, failed, cancelled]
+      transitions:
+        - from: queued
+          to: [sent, cancelled]
+        - from: sent
+          to: [ack, completed, failed, cancelled]
+        - from: ack
+          to: [completed, failed, cancelled]
+      initial_state: queued
+
+  onboarding_data_request_attr:
+    description: "Frozen attribute requirement/value row inside a data-request slice"
+    category: resource
+
+    db:
+      schema: ob-poc
+      table: onboarding_data_request_attrs
+      pk: attr_id
+
+    search_keys:
+      - column: slice_id
+        unique: false
+
+    lifecycle:
+      status_column: value_status
+      states: [missing, present, not_applicable]
+      transitions:
+        - from: missing
+          to: [present, not_applicable]
+      initial_state: missing
+
+  onboarding_data_request_discovery:
+    description: "Frozen per-request SRDEF discovery snapshot reference"
+    category: resource
+
+    db:
+      schema: ob-poc
+      table: onboarding_data_request_discoveries
+      pk: discovery_snapshot_id
+
+    search_keys:
+      - column: data_request_id
+        unique: false
+
+  application:
+    description: "Layer 4 application registry card"
+    category: resource
+
+    db:
+      schema: ob-poc
+      table: applications
+      pk: id
+
+    search_keys:
+      - column: name
+        unique: true
+      - column: owner_team
+        unique: false
+
+    implicit_create:
+      allowed: true
+      canonical_verb: application.register
+
+  application_instance:
+    description: "Layer 4 application deployment instance"
+    category: resource
+
+    db:
+      schema: ob-poc
+      table: application_instances
+      pk: id
+
+    search_keys:
+      - column: application_id
+        unique: false
+      - column: instance_label
+        unique: false
+
+    lifecycle:
+      status_column: lifecycle_status
+      states: [PROVISIONED, ACTIVE, MAINTENANCE_WINDOW, DEGRADED, OFFLINE, DECOMMISSIONED]
+      transitions:
+        - from: PROVISIONED
+          to: [ACTIVE]
+        - from: ACTIVE
+          to: [MAINTENANCE_WINDOW, OFFLINE, DECOMMISSIONED]
+        - from: MAINTENANCE_WINDOW
+          to: [ACTIVE, DECOMMISSIONED]
+        - from: DEGRADED
+          to: [ACTIVE, DECOMMISSIONED]
+        - from: OFFLINE
+          to: [ACTIVE, DECOMMISSIONED]
+      initial_state: PROVISIONED
+
+    implicit_create:
+      allowed: true
+      canonical_verb: application-instance.provision
+
+  capability_binding:
+    description: "Layer 4 binding between an application instance and a service capability"
+    category: resource
+
+    db:
+      schema: ob-poc
+      table: capability_bindings
+      pk: id
+
+    search_keys:
+      - column: application_instance_id
+        unique: false
+      - column: service_id
+        unique: false
+
+    lifecycle:
+      status_column: binding_status
+      states: [DRAFT, PILOT, LIVE, DEPRECATED, RETIRED]
+      transitions:
+        - from: DRAFT
+          to: [PILOT, RETIRED]
+        - from: PILOT
+          to: [DRAFT, LIVE, RETIRED]
+        - from: LIVE
+          to: [DEPRECATED, RETIRED]
+        - from: DEPRECATED
+          to: [RETIRED]
+      initial_state: DRAFT
+
+    implicit_create:
+      allowed: true
+      canonical_verb: capability-binding.draft
+
   # ===========================================================================
   # CBU Resource Instance
   # ===========================================================================
@@ -689,17 +947,23 @@ entities:
       states:
         - PENDING
         - PROVISIONING
-        - PROVISIONED
+        - AWAITING_OWNER
         - ACTIVE
+        - FAILED
+        - CANCELLED
         - SUSPENDED
         - DECOMMISSIONED
       transitions:
         - from: PENDING
-          to: [PROVISIONING]
+          to: [PROVISIONING, AWAITING_OWNER, CANCELLED]
         - from: PROVISIONING
-          to: [PROVISIONED]
-        - from: PROVISIONED
-          to: [ACTIVE]
+          to: [AWAITING_OWNER, CANCELLED]
+        - from: AWAITING_OWNER
+          to: [ACTIVE, FAILED, CANCELLED]
+        - from: FAILED
+          to: [CANCELLED, DECOMMISSIONED]
+        - from: CANCELLED
+          to: [DECOMMISSIONED]
         - from: ACTIVE
           to: [SUSPENDED, DECOMMISSIONED]
         - from: SUSPENDED

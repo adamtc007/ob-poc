@@ -37,6 +37,20 @@ allowed_verbs:
   - deal.request-onboarding
   - deal.request-onboarding-batch
   - cbu.read
+  # Post-handoff service-resource data dictionary lifecycle (Tranche 4 / v0.5)
+  # These operate on the deal_onboarding_request created by deal.request-onboarding
+  # and walk the compile → dispatch → confirm → status chain.
+  - onboarding.compile-data-request
+  - onboarding.dispatch-ready-slices
+  - onboarding.cancel-data-request
+  - onboarding.cancel-slice
+  - onboarding.get-data-request
+  - onboarding.list-data-requests
+  - onboarding.list-slices
+  - onboarding.get-slice
+  - onboarding.get-slice-attrs
+  - service-resource.confirm-provisioning-result
+  - service-resource.get-provisioning-status
 
 forbidden_verbs:
   - cbu.delete

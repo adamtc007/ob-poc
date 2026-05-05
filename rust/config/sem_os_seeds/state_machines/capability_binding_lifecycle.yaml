@@ -1,0 +1,57 @@
+state_machine: capability_binding_lifecycle
+description: Layer 4 application-instance to service capability binding lifecycle
+states: [DRAFT, PILOT, LIVE, DEPRECATED, RETIRED]
+initial: DRAFT
+transitions:
+  - from: DRAFT
+    to: PILOT
+    verbs: [capability-binding.start-pilot]
+  - from: PILOT
+    to: LIVE
+    verbs: [capability-binding.promote-live]
+  - from: PILOT
+    to: DRAFT
+    verbs: [capability-binding.abort-pilot]
+  - from: LIVE
+    to: DEPRECATED
+    verbs: [capability-binding.deprecate]
+  - from: DEPRECATED
+    to: RETIRED
+    verbs: [capability-binding.retire]
+  - from: LIVE
+    to: RETIRED
+    verbs: [application-instance.decommission]
+  - from: PILOT
+    to: RETIRED
+    verbs: [application-instance.decommission]
+  - from: DRAFT
+    to: RETIRED
+    verbs: [application-instance.decommission]
+reducer:
+  overlay_sources:
+    capability_binding:
+      table: capability_bindings
+      join: id
+      provides: [binding_status]
+  conditions:
+    is_draft:
+      expr: "capability_binding.binding_status = 'DRAFT'"
+    is_pilot:
+      expr: "capability_binding.binding_status = 'PILOT'"
+    is_live:
+      expr: "capability_binding.binding_status = 'LIVE'"
+    is_deprecated:
+      expr: "capability_binding.binding_status = 'DEPRECATED'"
+    is_retired:
+      expr: "capability_binding.binding_status = 'RETIRED'"
+  rules:
+    - state: RETIRED
+      requires: [is_retired]
+    - state: DEPRECATED
+      requires: [is_deprecated]
+    - state: LIVE
+      requires: [is_live]
+    - state: PILOT
+      requires: [is_pilot]
+    - state: DRAFT
+      requires: []

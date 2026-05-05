@@ -313,6 +313,135 @@ slots:
       terminal_states: [present, not_applicable]
     suspended_state_exempt: true
 
+  - id: onboarding_data_request_discovery
+    stateless: true
+    closure: closed_unbounded
+    eligibility:
+      entity_kinds: [onboarding_data_request_discovery]
+    parent_slot:
+      workspace: onboarding_request
+      slot: onboarding_data_request
+      join:
+        via: onboarding_data_request_discoveries
+        parent_fk: data_request_id
+        child_fk: discovery_snapshot_id
+    rationale: |
+      Frozen discovery explanation for why each SRDEF slice entered the
+      compiled data request. Immutable reference rows make the dictionary
+      replayable after SRDEF coverage changes.
+
+  - id: provisioning_request
+    stateless: false
+    closure: closed_unbounded
+    eligibility:
+      entity_kinds: [provisioning_request]
+    parent_slot:
+      workspace: onboarding_request
+      slot: onboarding_data_request_slice
+      join:
+        via: onboarding_data_request_slices
+        parent_fk: slice_id
+        child_fk: provisioning_request_id
+    state_machine:
+      id: provisioning_request_lifecycle
+      owner: onboarding
+      expected_lifetime: short_lived
+      source_entity: '"ob-poc".provisioning_requests'
+      state_column: status
+      scope: per_data_request_slice
+      description: |
+        Dispatch/request ledger row addressed to the resource owner for a
+        ready data-request slice.
+      states:
+        - id: queued
+          entry: true
+        - id: sent
+        - id: ack
+        - id: completed
+        - id: failed
+        - id: cancelled
+      transitions:
+        - from: queued
+          to: sent
+          via: onboarding.dispatch-ready-slices
+        - from: sent
+          to: ack
+          via: resource-owner-dispatch.ack
+        - from: [sent, ack]
+          to: completed
+          via: service-resource.confirm-provisioning-result
+        - from: [sent, ack]
+          to: failed
+          via: service-resource.confirm-provisioning-result
+        - from: [queued, sent, ack]
+          to: cancelled
+          via: [onboarding.cancel-slice, onboarding.cancel-data-request]
+      terminal_states: [completed, failed, cancelled]
+    suspended_state_exempt: true
+
+  - id: cbu_resource_instance
+    stateless: false
+    closure: closed_unbounded
+    eligibility:
+      entity_kinds: [cbu_resource_instance]
+    parent_slot:
+      workspace: onboarding_request
+      slot: onboarding_data_request_slice
+      join:
+        via: onboarding_data_request_slices
+        parent_fk: slice_id
+        child_fk: cbu_resource_instance_id
+    state_machine:
+      id: cbu_resource_instance_lifecycle
+      owner: onboarding
+      expected_lifetime: long_lived
+      source_entity: '"ob-poc".cbu_resource_instances'
+      state_column: status
+      scope: per_cbu_resource
+      description: |
+        Runtime service-resource instance created from an owner-confirmed
+        onboarding data-request slice.
+      states:
+        - id: PENDING
+          entry: true
+        - id: PROVISIONING
+        - id: AWAITING_OWNER
+        - id: ACTIVE
+        - id: FAILED
+        - id: CANCELLED
+        - id: SUSPENDED
+        - id: DECOMMISSIONED
+      transitions:
+        - from: PENDING
+          to: PROVISIONING
+          via: service-resource.provision
+        - from: PENDING
+          to: AWAITING_OWNER
+          via: onboarding.dispatch-ready-slices
+        - from: PROVISIONING
+          to: AWAITING_OWNER
+          via: onboarding.dispatch-ready-slices
+        - from: AWAITING_OWNER
+          to: ACTIVE
+          via: service-resource.confirm-provisioning-result
+        - from: AWAITING_OWNER
+          to: FAILED
+          via: service-resource.confirm-provisioning-result
+        - from: [PENDING, PROVISIONING, AWAITING_OWNER, FAILED]
+          to: CANCELLED
+          via: [onboarding.cancel-slice, onboarding.cancel-data-request]
+        - from: ACTIVE
+          to: SUSPENDED
+          via: service-resource.suspend
+        - from: SUSPENDED
+          to: ACTIVE
+          via: service-resource.reactivate
+        - from: [ACTIVE, SUSPENDED, FAILED, CANCELLED]
+          to: DECOMMISSIONED
+          via: service-resource.decommission
+      terminal_states: [DECOMMISSIONED]
+    suspended_state_exempt: true
+
   - id: resource_owner_principal
     stateless: false
     closure: closed_unbounded
@@ -428,6 +557,9 @@ product_module_gates:
     - onboarding_data_request
     - onboarding_data_request_slice
     - onboarding_data_request_attr
+    - onboarding_data_request_discovery
+    - provisioning_request
+    - cbu_resource_instance
     - resource_owner_principal
     - deal
     - cbu

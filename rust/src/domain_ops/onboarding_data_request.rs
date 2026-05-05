@@ -338,6 +338,94 @@ impl SemOsVerbOp for GetSlice {
     }
 }
 
+/// Read provisioning and resource-instance status for one data-request slice.
+pub struct GetProvisioningStatus;
+
+#[async_trait]
+impl SemOsVerbOp for GetProvisioningStatus {
+    fn fqn(&self) -> &str {
+        "service-resource.get-provisioning-status"
+    }
+
+    async fn execute(
+        &self,
+        args: &Value,
+        ctx: &mut VerbExecutionContext,
+        scope: &mut dyn TransactionScope,
+    ) -> Result<VerbExecutionOutcome> {
+        let slice_id = json_extract_uuid(args, ctx, "slice-id")?;
+        let row = sqlx::query(
+            r#"
+            SELECT
+                s.slice_id,
+                s.data_request_id,
+                s.srdef_id,
+                s.parameters,
+                s.owner_system,
+                s.owner_principal_fqn,
+                s.slice_status,
+                s.blocking_reason,
+                s.provisioning_request_id,
+                s.cbu_resource_instance_id,
+                pr.status AS provisioning_status,
+                pr.requested_at,
+                pr.owner_ticket_id,
+                pr.status_changed_at,
+                cri.status AS resource_instance_status,
+                cri.instance_identifier,
+                cri.resource_locator,
+                cri.resource_url,
+                pe.kind AS latest_event_kind,
+                pe.occurred_at AS latest_event_at
+            FROM "ob-poc".onboarding_data_request_slices s
+            LEFT JOIN "ob-poc".provisioning_requests pr
+              ON pr.request_id = s.provisioning_request_id
+            LEFT JOIN "ob-poc".cbu_resource_instances cri
+              ON cri.instance_id = s.cbu_resource_instance_id
+            LEFT JOIN LATERAL (
+                SELECT kind, occurred_at
+                FROM "ob-poc".provisioning_events
+                WHERE request_id = pr.request_id
+                ORDER BY occurred_at DESC NULLS LAST
+                LIMIT 1
+            ) pe ON TRUE
+            WHERE s.slice_id = $1
+            "#,
+        )
+        .bind(slice_id)
+        .fetch_optional(scope.executor())
+        .await?
+        .ok_or_else(|| anyhow!("slice not found: {slice_id}"))?;
+
+        Ok(VerbExecutionOutcome::Record(json!({
+            "slice_id": row.get::<Uuid, _>("slice_id"),
+            "data_request_id": row.get::<Uuid, _>("data_request_id"),
+            "srdef_id": row.get::<String, _>("srdef_id"),
+            "parameters": row.get::<Value, _>("parameters"),
+            "owner_system": row.get::<Option<String>, _>("owner_system"),
+            "owner_principal_fqn": row.get::<Option<String>, _>("owner_principal_fqn"),
+            "slice_status": row.get::<String, _>("slice_status"),
+            "blocking_reason": row.get::<Option<String>, _>("blocking_reason"),
+            "provisioning_request_id": row.get::<Option<Uuid>, _>("provisioning_request_id"),
+            "cbu_resource_instance_id": row.get::<Option<Uuid>, _>("cbu_resource_instance_id"),
+            "provisioning": {
+                "status": row.get::<Option<String>, _>("provisioning_status"),
+                "requested_at": row.get::<Option<chrono::DateTime<chrono::Utc>>, _>("requested_at"),
+                "owner_ticket_id": row.get::<Option<String>, _>("owner_ticket_id"),
+                "status_changed_at": row.get::<Option<chrono::DateTime<chrono::Utc>>, _>("status_changed_at"),
+                "latest_event_kind": row.get::<Option<String>, _>("latest_event_kind"),
+                "latest_event_at": row.get::<Option<chrono::DateTime<chrono::Utc>>, _>("latest_event_at"),
+            },
+            "resource_instance": {
+                "status": row.get::<Option<String>, _>("resource_instance_status"),
+                "instance_identifier": row.get::<Option<String>, _>("instance_identifier"),
+                "resource_locator": row.get::<Option<Value>, _>("resource_locator"),
+                "resource_url": row.get::<Option<String>, _>("resource_url"),
+            },
+        })))
+    }
+}
+
 /// List attributes for a slice.
 pub struct GetSliceAttrs;
 

@@ -446,6 +446,7 @@ pub fn extend_registry(registry: &mut sem_os_postgres::ops::SemOsVerbOpRegistry)
     registry.register(Arc::new(onboarding_data_request::ListDataRequests));
     registry.register(Arc::new(onboarding_data_request::ListSlices));
     registry.register(Arc::new(onboarding_data_request::GetSlice));
+    registry.register(Arc::new(onboarding_data_request::GetProvisioningStatus));
     registry.register(Arc::new(onboarding_data_request::GetSliceAttrs));
 
     // Phase B Pattern B slice #73: bpmn.* gRPC pass-through verbs

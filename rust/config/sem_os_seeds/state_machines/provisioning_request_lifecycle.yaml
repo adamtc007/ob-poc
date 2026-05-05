@@ -1,0 +1,70 @@
+state_machine: provisioning_request_lifecycle
+description: Resource-owner provisioning request dispatch lifecycle
+states:
+  - queued
+  - sent
+  - ack
+  - completed
+  - failed
+  - cancelled
+initial: queued
+transitions:
+  - from: queued
+    to: sent
+    verbs: [onboarding.dispatch-ready-slices, resource-owner-dispatch.deliver]
+  - from: sent
+    to: ack
+    verbs: [resource-owner-dispatch.ack]
+  - from: sent
+    to: completed
+    verbs: [service-resource.confirm-provisioning-result]
+  - from: ack
+    to: completed
+    verbs: [service-resource.confirm-provisioning-result]
+  - from: sent
+    to: failed
+    verbs: [service-resource.confirm-provisioning-result]
+  - from: ack
+    to: failed
+    verbs: [service-resource.confirm-provisioning-result]
+  - from: queued
+    to: cancelled
+    verbs: [onboarding.cancel-slice, onboarding.cancel-data-request]
+  - from: sent
+    to: cancelled
+    verbs: [onboarding.cancel-slice, onboarding.cancel-data-request]
+  - from: ack
+    to: cancelled
+    verbs: [onboarding.cancel-slice, onboarding.cancel-data-request]
+reducer:
+  overlay_sources:
+    provisioning_request:
+      table: provisioning_requests
+      join: request_id
+      provides: [status]
+  conditions:
+    is_queued:
+      expr: "provisioning_request.status = 'queued'"
+    is_sent:
+      expr: "provisioning_request.status = 'sent'"
+    is_ack:
+      expr: "provisioning_request.status = 'ack'"
+    is_completed:
+      expr: "provisioning_request.status = 'completed'"
+    is_failed:
+      expr: "provisioning_request.status = 'failed'"
+    is_cancelled:
+      expr: "provisioning_request.status = 'cancelled'"
+  rules:
+    - state: cancelled
+      requires: [is_cancelled]
+    - state: failed
+      requires: [is_failed]
+    - state: completed
+      requires: [is_completed]
+    - state: ack
+      requires: [is_ack]
+    - state: sent
+      requires: [is_sent]
+    - state: queued
+      requires: []
