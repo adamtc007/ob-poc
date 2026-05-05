@@ -264,6 +264,7 @@ domains:
             maps_to: relationship_id
             lookup:
               table: entity_relationships
+              entity_type: entity_relationship
               schema: ob-poc
               search_key: relationship_id
               primary_key: relationship_id
@@ -891,6 +892,7 @@ domains:
             description: The relationship being superseded
             lookup:
               table: entity_relationships
+              entity_type: entity_relationship
               schema: ob-poc
               search_key: relationship_id
               primary_key: relationship_id
@@ -1055,6 +1057,7 @@ domains:
             description: The relationship whose verification is being waived
             lookup:
               table: entity_relationships
+              entity_type: entity_relationship
               schema: ob-poc
               search_key: relationship_id
               primary_key: relationship_id

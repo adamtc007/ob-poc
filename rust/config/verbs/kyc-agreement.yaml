@@ -60,7 +60,7 @@ domains:
           maps_to: agreement_reference
         - name: kyc-standard
           type: string
-          required: true
+          required: false
           maps_to: kyc_standard
           default: "BNY_STANDARD"
         - name: auto-accept-threshold

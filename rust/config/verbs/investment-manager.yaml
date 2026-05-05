@@ -52,6 +52,7 @@ domains:
             maps_to: profile_id
             lookup:
               table: cbu_trading_profiles
+              entity_type: trading_profile
               schema: ob-poc
               search_key: profile_id
               primary_key: profile_id

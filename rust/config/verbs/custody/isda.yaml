@@ -134,6 +134,7 @@ domains:
             maps_to: isda_taxonomy_id
             lookup:
               table: isda_product_taxonomy
+              entity_type: isda_product_taxonomy
               schema: ob-poc
               code_column: taxonomy_code
               id_column: taxonomy_id

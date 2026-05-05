@@ -43,6 +43,7 @@ domains:
           required: true
           lookup:
             table: cases
+            entity_type: kyc_case
             schema: kyc
             search_key: case_id
             primary_key: case_id
@@ -115,6 +116,7 @@ domains:
           required: true
           lookup:
             table: cbus
+            entity_type: cbu
             schema: ob-poc
             search_key: name
             primary_key: cbu_id
@@ -332,6 +334,7 @@ domains:
           required: true
           lookup:
             table: cases
+            entity_type: kyc_case
             schema: kyc
             search_key: case_id
             primary_key: case_id
@@ -428,6 +431,7 @@ domains:
           required: true
           lookup:
             table: cases
+            entity_type: kyc_case
             schema: kyc
             search_key: case_id
             primary_key: case_id
@@ -578,6 +582,7 @@ domains:
           description: "KYC case to evaluate"
           lookup:
             table: cases
+            entity_type: kyc_case
             schema: kyc
             search_key: case_id
             primary_key: case_id

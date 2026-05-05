@@ -219,6 +219,7 @@ domains:
             maps_to: gateway_id
             lookup:
               table: trade_gateways
+              entity_type: trade_gateway
               schema: ob-poc
               search_key: gateway_code
               primary_key: gateway_id
@@ -475,6 +476,7 @@ domains:
             maps_to: gateway_id
             lookup:
               table: trade_gateways
+              entity_type: trade_gateway
               schema: ob-poc
               search_key: gateway_code
               primary_key: gateway_id
@@ -514,7 +516,7 @@ domains:
               primary_key: entity_id
           - name: priority
             type: integer
-            required: true
+            required: false
             maps_to: priority
             default: 50
           - name: is-active
@@ -681,6 +683,7 @@ domains:
             maps_to: primary_gateway_id
             lookup:
               table: trade_gateways
+              entity_type: trade_gateway
               schema: ob-poc
               search_key: gateway_code
               primary_key: gateway_id
@@ -690,6 +693,7 @@ domains:
             maps_to: fallback_gateway_id
             lookup:
               table: trade_gateways
+              entity_type: trade_gateway
               schema: ob-poc
               search_key: gateway_code
               primary_key: gateway_id

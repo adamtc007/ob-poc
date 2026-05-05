@@ -567,6 +567,7 @@ domains:
             description: "Scope validation to entities in this KYC case"
             lookup:
               table: cases
+              entity_type: kyc_case
               schema: kyc
               search_key: case_id
               primary_key: case_id

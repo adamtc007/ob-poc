@@ -123,6 +123,7 @@ domains:
           maps_to: security_type_id
           lookup:
             table: security_types
+            entity_type: security_type
             schema: ob-poc
             code_column: code
             id_column: security_type_id

@@ -151,6 +151,7 @@ domains:
             required: true
             lookup:
               table: sla_templates
+              entity_type: sla_template
               schema: ob-poc
               code_column: template_code
               id_column: template_id
@@ -161,6 +162,7 @@ domains:
             maps_to: profile_id
             lookup:
               table: cbu_trading_profiles
+              entity_type: trading_profile
               schema: ob-poc
               search_key: profile_id
               primary_key: profile_id
@@ -198,6 +200,7 @@ domains:
             maps_to: source_document_id
             lookup:
               table: document_catalog
+              entity_type: document
               schema: ob-poc
               search_key: document_name
               primary_key: doc_id
@@ -258,6 +261,7 @@ domains:
             maps_to: profile_id
             lookup:
               table: cbu_trading_profiles
+              entity_type: trading_profile
               schema: ob-poc
               search_key: profile_id
               primary_key: profile_id

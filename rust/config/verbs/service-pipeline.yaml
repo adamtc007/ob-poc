@@ -41,6 +41,7 @@ domains:
           description: "CBU to create intent for"
           lookup:
             table: cbus
+            entity_type: cbu
             schema: ob-poc
             search_key: name
             primary_key: cbu_id
@@ -50,6 +51,7 @@ domains:
           description: "Product being subscribed to"
           lookup:
             table: products
+            entity_type: product
             schema: ob-poc
             search_key: name
             primary_key: product_id
@@ -59,6 +61,7 @@ domains:
           description: "Service being configured"
           lookup:
             table: services
+            entity_type: service
             schema: ob-poc
             search_key: name
             primary_key: service_id
@@ -111,6 +114,7 @@ domains:
           required: true
           lookup:
             table: cbus
+            entity_type: cbu
             schema: ob-poc
             search_key: name
             primary_key: cbu_id
@@ -321,6 +325,7 @@ domains:
           required: true
           lookup:
             table: cbus
+            entity_type: cbu
             schema: ob-poc
             search_key: name
             primary_key: cbu_id
@@ -414,6 +419,7 @@ domains:
           required: true
           lookup:
             table: cbus
+            entity_type: cbu
             schema: ob-poc
             search_key: name
             primary_key: cbu_id
@@ -461,6 +467,7 @@ domains:
           required: true
           lookup:
             table: cbus
+            entity_type: cbu
             schema: ob-poc
             search_key: name
             primary_key: cbu_id
@@ -512,6 +519,7 @@ domains:
           required: true
           lookup:
             table: cbus
+            entity_type: cbu
             schema: ob-poc
             search_key: name
             primary_key: cbu_id
@@ -569,6 +577,7 @@ domains:
           required: true
           lookup:
             table: cbus
+            entity_type: cbu
             schema: ob-poc
             search_key: name
             primary_key: cbu_id
@@ -633,6 +642,7 @@ domains:
           required: true
           lookup:
             table: cbus
+            entity_type: cbu
             schema: ob-poc
             search_key: name
             primary_key: cbu_id
@@ -732,6 +742,7 @@ domains:
           required: true
           lookup:
             table: cbus
+            entity_type: cbu
             schema: ob-poc
             search_key: name
             primary_key: cbu_id
@@ -771,6 +782,7 @@ domains:
           required: true
           lookup:
             table: cbus
+            entity_type: cbu
             schema: ob-poc
             search_key: name
             primary_key: cbu_id
@@ -780,6 +792,7 @@ domains:
           description: "Specific service (or all if omitted)"
           lookup:
             table: services
+            entity_type: service
             schema: ob-poc
             search_key: name
             primary_key: service_id
@@ -824,6 +837,7 @@ domains:
           required: true
           lookup:
             table: cbus
+            entity_type: cbu
             schema: ob-poc
             search_key: name
             primary_key: cbu_id

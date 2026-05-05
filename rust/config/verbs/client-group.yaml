@@ -98,6 +98,7 @@ domains:
             maps_to: id
             lookup:
               table: client_group
+              entity_type: client_group
               schema: ob-poc
               search_key: canonical_name
               primary_key: id
@@ -138,6 +139,7 @@ domains:
             maps_to: id
             lookup:
               table: client_group
+              entity_type: client_group
               schema: ob-poc
               search_key: canonical_name
               primary_key: id
@@ -254,6 +256,7 @@ domains:
             description: "Client group ID"
             lookup:
               table: client_group
+              entity_type: client_group
               schema: ob-poc
               search_key: canonical_name
               primary_key: id
@@ -263,6 +266,7 @@ domains:
             description: "Entity to add to group"
             lookup:
               table: entities
+              entity_type: entity
               schema: ob-poc
               search_key: name
               primary_key: entity_id
@@ -379,6 +383,7 @@ domains:
             required: true
             lookup:
               table: client_group
+              entity_type: client_group
               schema: ob-poc
               search_key: canonical_name
               primary_key: id
@@ -387,6 +392,7 @@ domains:
             required: true
             lookup:
               table: entities
+              entity_type: entity
               schema: ob-poc
               search_key: name
               primary_key: entity_id
@@ -430,6 +436,7 @@ domains:
             required: true
             lookup:
               table: client_group
+              entity_type: client_group
               schema: ob-poc
               search_key: canonical_name
               primary_key: id
@@ -482,6 +489,7 @@ domains:
             required: true
             lookup:
               table: client_group
+              entity_type: client_group
               schema: ob-poc
               search_key: canonical_name
               primary_key: id
@@ -490,6 +498,7 @@ domains:
             required: true
             lookup:
               table: entities
+              entity_type: entity
               schema: ob-poc
               search_key: name
               primary_key: entity_id
@@ -574,6 +583,7 @@ domains:
             required: true
             lookup:
               table: client_group
+              entity_type: client_group
               schema: ob-poc
               search_key: canonical_name
               primary_key: id
@@ -583,6 +593,7 @@ domains:
             description: "Filter to specific entity"
             lookup:
               table: entities
+              entity_type: entity
               schema: ob-poc
               search_key: name
               primary_key: entity_id
@@ -641,6 +652,7 @@ domains:
             required: true
             lookup:
               table: client_group
+              entity_type: client_group
               schema: ob-poc
               search_key: canonical_name
               primary_key: id
@@ -700,6 +712,7 @@ domains:
             required: true
             lookup:
               table: client_group
+              entity_type: client_group
               schema: ob-poc
               search_key: canonical_name
               primary_key: id
@@ -758,6 +771,7 @@ domains:
             required: true
             lookup:
               table: client_group
+              entity_type: client_group
               schema: ob-poc
               search_key: canonical_name
               primary_key: id
@@ -766,6 +780,7 @@ domains:
             required: true
             lookup:
               table: entities
+              entity_type: entity
               schema: ob-poc
               search_key: name
               primary_key: entity_id
@@ -816,6 +831,7 @@ domains:
             required: true
             lookup:
               table: client_group
+              entity_type: client_group
               schema: ob-poc
               search_key: canonical_name
               primary_key: id
@@ -824,6 +840,7 @@ domains:
             required: true
             lookup:
               table: entities
+              entity_type: entity
               schema: ob-poc
               search_key: name
               primary_key: entity_id
@@ -871,6 +888,7 @@ domains:
             required: true
             lookup:
               table: client_group
+              entity_type: client_group
               schema: ob-poc
               search_key: canonical_name
               primary_key: id
@@ -882,6 +900,7 @@ domains:
             slot_type: entity_ref
             lookup:
               table: v_client_group_entity_search
+              entity_type: entity
               schema: ob-poc
               search_key: entity_name
               primary_key: entity_id
@@ -893,6 +912,7 @@ domains:
             description: "Role from roles table"
             lookup:
               table: roles
+              entity_type: role
               schema: ob-poc
               search_key: name
               primary_key: role_id
@@ -906,6 +926,7 @@ domains:
             preferred_roles: [FUND, SICAV, UCITS, AIF, SPV]
             lookup:
               table: v_client_group_entity_search
+              entity_type: entity
               schema: ob-poc
               search_key: entity_name
               primary_key: entity_id
@@ -991,6 +1012,7 @@ domains:
             required: true
             lookup:
               table: client_group
+              entity_type: client_group
               schema: ob-poc
               search_key: canonical_name
               primary_key: id
@@ -1000,6 +1022,7 @@ domains:
             description: "Filter to specific entity"
             lookup:
               table: v_client_group_entity_search
+              entity_type: entity
               schema: ob-poc
               search_key: entity_name
               primary_key: entity_id
@@ -1010,6 +1033,7 @@ domains:
             description: "Filter to specific role"
             lookup:
               table: roles
+              entity_type: role
               schema: ob-poc
               search_key: name
               primary_key: role_id
@@ -1048,6 +1072,7 @@ domains:
             required: true
             lookup:
               table: client_group
+              entity_type: client_group
               schema: ob-poc
               search_key: canonical_name
               primary_key: id
@@ -1099,6 +1124,7 @@ domains:
             required: true
             lookup:
               table: client_group
+              entity_type: client_group
               schema: ob-poc
               search_key: canonical_name
               primary_key: id
@@ -1108,6 +1134,7 @@ domains:
             description: "Parent/owner entity"
             lookup:
               table: v_client_group_entity_search
+              entity_type: entity
               schema: ob-poc
               search_key: entity_name
               primary_key: entity_id
@@ -1118,6 +1145,7 @@ domains:
             description: "Child/owned entity"
             lookup:
               table: v_client_group_entity_search
+              entity_type: entity
               schema: ob-poc
               search_key: entity_name
               primary_key: entity_id
@@ -1164,6 +1192,7 @@ domains:
             required: true
             lookup:
               table: client_group
+              entity_type: client_group
               schema: ob-poc
               search_key: canonical_name
               primary_key: id
@@ -1173,6 +1202,7 @@ domains:
             description: "Filter to relationships involving this entity"
             lookup:
               table: v_client_group_entity_search
+              entity_type: entity
               schema: ob-poc
               search_key: entity_name
               primary_key: entity_id
@@ -1361,6 +1391,7 @@ domains:
             required: true
             lookup:
               table: client_group
+              entity_type: client_group
               schema: ob-poc
               search_key: canonical_name
               primary_key: id
@@ -1403,6 +1434,7 @@ domains:
             required: true
             lookup:
               table: client_group
+              entity_type: client_group
               schema: ob-poc
               search_key: canonical_name
               primary_key: id
@@ -1450,6 +1482,7 @@ domains:
             required: true
             lookup:
               table: client_group
+              entity_type: client_group
               schema: ob-poc
               search_key: canonical_name
               primary_key: id
@@ -1497,6 +1530,7 @@ domains:
             required: true
             lookup:
               table: client_group
+              entity_type: client_group
               schema: ob-poc
               search_key: canonical_name
               primary_key: id

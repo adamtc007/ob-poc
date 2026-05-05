@@ -137,6 +137,7 @@ domains:
             maps_to: share_class_id
             lookup:
               table: share_classes
+              entity_type: share_class
               schema: kyc
               search_key: name
               primary_key: id
@@ -245,6 +246,7 @@ domains:
             required: true
             lookup:
               table: share_classes
+              entity_type: share_class
               schema: kyc
               search_key: name
               primary_key: id
@@ -290,6 +292,7 @@ domains:
             required: true
             lookup:
               table: share_classes
+              entity_type: share_class
               schema: kyc
               search_key: name
               primary_key: id
@@ -346,6 +349,7 @@ domains:
             required: true
             lookup:
               table: share_classes
+              entity_type: share_class
               schema: kyc
               search_key: name
               primary_key: id
@@ -398,6 +402,7 @@ domains:
             required: true
             lookup:
               table: share_classes
+              entity_type: share_class
               schema: kyc
               search_key: name
               primary_key: id
@@ -456,6 +461,7 @@ domains:
             required: true
             lookup:
               table: share_classes
+              entity_type: share_class
               schema: kyc
               search_key: name
               primary_key: id
@@ -505,6 +511,7 @@ domains:
             required: true
             lookup:
               table: share_classes
+              entity_type: share_class
               schema: kyc
               search_key: name
               primary_key: id
@@ -568,6 +575,7 @@ domains:
             description: Share class these options convert into
             lookup:
               table: share_classes
+              entity_type: share_class
               schema: kyc
               search_key: name
               primary_key: id
@@ -654,6 +662,7 @@ domains:
             required: true
             lookup:
               table: share_classes
+              entity_type: share_class
               schema: kyc
               search_key: name
               primary_key: id
@@ -725,6 +734,7 @@ domains:
             description: May be NULL until priced round
             lookup:
               table: share_classes
+              entity_type: share_class
               schema: kyc
               search_key: name
               primary_key: id
@@ -793,6 +803,7 @@ domains:
             required: false
             lookup:
               table: share_classes
+              entity_type: share_class
               schema: kyc
               search_key: name
               primary_key: id
@@ -854,6 +865,7 @@ domains:
             required: true
             lookup:
               table: dilution_instruments
+              entity_type: instrument
               schema: kyc
               search_key: instrument_id
               primary_key: instrument_id
@@ -906,6 +918,7 @@ domains:
             required: true
             lookup:
               table: dilution_instruments
+              entity_type: instrument
               schema: kyc
               search_key: instrument_id
               primary_key: instrument_id

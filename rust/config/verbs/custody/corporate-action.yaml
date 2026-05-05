@@ -179,6 +179,7 @@ domains:
           maps_to: event_type_id
           lookup:
             table: ca_event_types
+            entity_type: ca_event_type
             schema: ob-poc
             code_column: event_code
             id_column: event_type_id
@@ -373,6 +374,7 @@ domains:
           maps_to: event_type_id
           lookup:
             table: ca_event_types
+            entity_type: ca_event_type
             schema: ob-poc
             code_column: event_code
             id_column: event_type_id
@@ -522,6 +524,7 @@ domains:
           maps_to: event_type_id
           lookup:
             table: ca_event_types
+            entity_type: ca_event_type
             schema: ob-poc
             code_column: event_code
             id_column: event_type_id

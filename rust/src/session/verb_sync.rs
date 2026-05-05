@@ -173,16 +173,28 @@ impl VerbSyncService {
             }
         }
 
-        // Mark verbs not in registry as removed (don't delete, just log)
+        // Delete verbs not in registry (orphaned rows from prior schemas).
+        // Their diagnostics_json is stale and they'll never be invoked
+        // (registry is the source of truth), so leaving them around just
+        // pollutes the diagnostics tally.
         let registry_verbs: std::collections::HashSet<_> =
-            registry.all_verbs().map(|v| &v.full_name).collect();
-        let removed = existing_hashes
+            registry.all_verbs().map(|v| v.full_name.clone()).collect();
+        let orphans: Vec<&String> = existing_hashes
             .keys()
             .filter(|k| !registry_verbs.contains(*k))
-            .count() as i32;
+            .collect();
+        let removed = orphans.len() as i32;
 
         if removed > 0 {
-            warn!("{} verbs in DB not in YAML registry (orphaned)", removed);
+            warn!("Deleting {} orphaned verbs from DB (not in YAML registry)", removed);
+            let orphan_names: Vec<String> = orphans.into_iter().cloned().collect();
+            sqlx::query(
+                r#"DELETE FROM "ob-poc".dsl_verbs WHERE full_name = ANY($1)"#,
+            )
+            .bind(&orphan_names)
+            .execute(&self.pool)
+            .await
+            .map_err(VerbSyncError::from)?;
         }
 
         let duration_ms = start.elapsed().as_millis() as i64;
@@ -565,11 +577,21 @@ impl VerbSyncService {
         // Check behavior-specific requirements
         match &verb.behavior {
             RuntimeBehavior::Crud(crud) => {
-                // CRUD verbs should have table mapping
-                if crud.table.is_empty() {
+                // CRUD verbs need a table source. Standard ops use `table`,
+                // junction ops (role_link / role_unlink) use `junction`,
+                // entity_create-style ops use `base_table`, join-style list
+                // ops use `primary_table`. Accept any of these.
+                let has_table = !crud.table.is_empty()
+                    || crud.junction.as_deref().is_some_and(|s| !s.is_empty())
+                    || crud
+                        .primary_table
+                        .as_deref()
+                        .is_some_and(|s| !s.is_empty())
+                    || crud.base_table.as_deref().is_some_and(|s| !s.is_empty());
+                if !has_table {
                     diagnostics.add_error_with_path(
                         codes::CRUD_MISSING_TABLE,
-                        "CRUD behavior missing table name",
+                        "CRUD behavior missing table name (or junction/primary_table/base_table)",
                         Some("behavior.crud"),
                         None,
                     );
@@ -745,11 +767,17 @@ impl VerbSyncService {
         };
         hasher.update(behavior_str.as_bytes());
 
-        // Hash args
+        // Hash args (including lookup so YAML hygiene fixes invalidate hash)
         for arg in &verb.args {
             hasher.update(arg.name.as_bytes());
             hasher.update(format!("{:?}", arg.arg_type).as_bytes());
             hasher.update(if arg.required { b"1" } else { b"0" });
+            if let Some(ref lookup) = arg.lookup {
+                hasher.update(lookup.table.as_bytes());
+                if let Some(ref et) = lookup.entity_type {
+                    hasher.update(et.as_bytes());
+                }
+            }
         }
 
         // Hash produces/consumes

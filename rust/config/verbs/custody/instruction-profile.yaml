@@ -166,6 +166,7 @@ domains:
             maps_to: message_type_id
             lookup:
               table: instruction_message_types
+              entity_type: instruction_message_type
               schema: ob-poc
               search_key: message_type
               primary_key: message_type_id

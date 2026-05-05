@@ -61,7 +61,7 @@ domains:
             maps_to: registration_number
           - name: registration-type
             type: string
-            required: true
+            required: false
             maps_to: registration_type
             default: "PRIMARY"
           - name: activity-scope

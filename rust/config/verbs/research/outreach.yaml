@@ -424,6 +424,7 @@ domains:
             description: "KYC case to generate plan for"
             lookup:
               table: cases
+              entity_type: kyc_case
               schema: kyc
               search_key: case_id
               primary_key: case_id

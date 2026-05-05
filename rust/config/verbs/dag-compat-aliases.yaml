@@ -4,6 +4,11 @@
 # hygiene validation does not carry anonymous verb names. They are internal
 # compatibility declarations; canonical replacements should be used by new DAG
 # authoring.
+#
+# Behavior is `plugin` with handler `NoopAliasStub` — these aliases are never
+# actually invoked (they are `tier: diagnostics`, `internal: true`, `side_effects:
+# facts_only`), so the handler doesn't need to exist. CRUD was the wrong shape
+# (no table) and triggered CRUD_MISSING_TABLE diagnostics across all 48 aliases.
 
 domains:
   ubo-registry:
@@ -12,8 +17,8 @@ domains:
       promote: &deprecated_alias
         flavour: attribute_mutating
         description: "Deprecated DAG alias; use the canonical domain-specific verb."
-        behavior: crud
-        crud: { operation: select }
+        behavior: plugin
+        handler: NoopAliasStub
         metadata: &alias_meta
           tier: diagnostics
           source_of_truth: operational
