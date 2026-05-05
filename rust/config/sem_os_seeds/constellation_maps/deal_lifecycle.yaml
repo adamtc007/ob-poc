@@ -196,25 +196,6 @@ slots:
       dispute: { verb: billing.dispute-period, when: filled }
       period_summary: { verb: billing.period-summary, when: filled }
       revenue: { verb: billing.revenue-summary, when: filled }
-  pricing:
-    type: entity
-    entity_kinds: [entity]
-    join: { via: pricing_configs, parent_fk: deal_id, child_fk: config_id }
-    cardinality: optional
-    depends_on: [rate_card]
-    verbs:
-      set_valuation:
-        { verb: pricing-config.set-valuation-schedule, when: [empty, filled] }
-      set_nav: { verb: pricing-config.set-nav-threshold, when: [empty, filled] }
-      set_reporting: { verb: tax-config.set-reporting, when: [empty, filled] }
-      set_tax: { verb: tax-config.set-tax-status, when: [empty, filled] }
-      set_reclaim:
-        { verb: tax-config.set-reclaim-config, when: [empty, filled] }
-      find: { verb: pricing-config.find-for-instrument, when: filled }
-      list_jurisdictions: { verb: tax-config.list-jurisdictions, when: filled }
-      list_treaty_rates: { verb: tax-config.list-treaty-rates, when: filled }
-      list_tax_status: { verb: tax-config.list-tax-status, when: filled }
-      list_reclaims: { verb: tax-config.list-reclaim-configs, when: filled }
   contract_template:
     type: entity
     entity_kinds: [contract]
