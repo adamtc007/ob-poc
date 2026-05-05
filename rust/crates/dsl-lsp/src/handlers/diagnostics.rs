@@ -159,7 +159,7 @@ fn convert_diagnostic(diag: &SemanticDiagnostic, source: &str) -> Diagnostic {
         let suggestions: Vec<String> = diag
             .suggestions
             .iter()
-            .map(|s| format!("'{}' ({:.0}%)", s.replacement, s.confidence * 100.0))
+            .map(|s| format!("'{}' ({:.0}%)", s.replacement, (s.confidence * 100.0).min(100.0)))
             .collect();
         format!(
             "{}. Did you mean: {}?",

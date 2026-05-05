@@ -382,7 +382,7 @@ impl ProposalEngine {
                         rationale: format!(
                             "Verb '{}' matched with {:.0}% confidence: {}",
                             verb,
-                            confidence * 100.0,
+                            (confidence * 100.0).min(100.0),
                             description,
                         ),
                         missing_required_args: 0,

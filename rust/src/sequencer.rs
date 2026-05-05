@@ -4132,10 +4132,11 @@ impl ReplOrchestratorV2 {
                 message: format!(
                     "Proposed: {} (confidence: {:.0}%)\n\nConfirm or reject?",
                     session.last_proposal_set.as_ref().unwrap().proposals[0].sentence,
-                    session.last_proposal_set.as_ref().unwrap().proposals[0]
+                    (session.last_proposal_set.as_ref().unwrap().proposals[0]
                         .evidence
                         .confidence
-                        * 100.0
+                        * 100.0)
+                        .min(100.0)
                 ),
                 runbook_summary: None,
                 step_count: session.runbook.entries.len(),
@@ -4207,7 +4208,7 @@ impl ReplOrchestratorV2 {
                     message: format!(
                         "Selected: {} (confidence: {:.0}%)\n\nConfirm or reject?",
                         p.sentence,
-                        p.evidence.confidence * 100.0
+                        (p.evidence.confidence * 100.0).min(100.0)
                     ),
                     runbook_summary: None,
                     step_count: session.runbook.entries.len(),
@@ -4747,7 +4748,7 @@ impl ReplOrchestratorV2 {
                     message: format!(
                         "Proposed: {} (confidence: {:.0}%)\n\nConfirm or reject?",
                         sentence,
-                        confidence * 100.0
+                        (confidence * 100.0).min(100.0)
                     ),
                     runbook_summary: None,
                     step_count: session.runbook.entries.len(),
@@ -5062,7 +5063,7 @@ impl ReplOrchestratorV2 {
                     message: format!(
                         "Proposed: {} (confidence: {:.0}%)\n\nConfirm or reject?",
                         sentence,
-                        confidence * 100.0
+                        (confidence * 100.0).min(100.0)
                     ),
                     runbook_summary: None,
                     step_count: session.runbook.entries.len(),

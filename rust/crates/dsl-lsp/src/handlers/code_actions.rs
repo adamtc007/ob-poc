@@ -284,7 +284,7 @@ fn create_suggestion_action(
     let title = format!(
         "Replace with '{}' ({:.0}% match)",
         suggestion.replacement,
-        suggestion.confidence * 100.0
+        (suggestion.confidence * 100.0).min(100.0)
     );
 
     Some(CodeAction {
