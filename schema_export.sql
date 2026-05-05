@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict tp1TqSbl0xGqAHw8opdtIHjtg0b6817hbzLudajefYnfgTnwjAwoVcBrtljcMjc
+\restrict CWi1rgzg9LpA45v3hNLlHXgYn3zU4mo3qbwIWldmP7JPfTLWaAsLcDkGe1FGt7z
 
 -- Dumped from database version 18.1 (Homebrew)
 -- Dumped by pg_dump version 18.1 (Homebrew)
@@ -328,7 +328,8 @@ CREATE TYPE sem_reg.object_type AS ENUM (
     'observation_def',
     'derivation_spec',
     'phrase_mapping',
-    'dag_taxonomy'
+    'dag_taxonomy',
+    'service_resource_def'
 );
 
 
@@ -7134,6 +7135,41 @@ COMMENT ON VIEW "ob-poc".active_issues IS 'Issues needing attention, prioritized
 
 
 --
+-- Name: application_instances; Type: TABLE; Schema: ob-poc; Owner: -
+--
+
+CREATE TABLE "ob-poc".application_instances (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    application_id uuid NOT NULL,
+    environment character varying(50) NOT NULL,
+    instance_label character varying(255) NOT NULL,
+    lifecycle_status character varying(40) DEFAULT 'PROVISIONED'::character varying NOT NULL,
+    last_health_check_at timestamp with time zone,
+    health_check_status character varying(20),
+    decommissioned_at timestamp with time zone,
+    notes text,
+    created_at timestamp with time zone DEFAULT now(),
+    updated_at timestamp with time zone DEFAULT now(),
+    CONSTRAINT application_instances_lifecycle_status_check CHECK (((lifecycle_status)::text = ANY ((ARRAY['PROVISIONED'::character varying, 'ACTIVE'::character varying, 'MAINTENANCE_WINDOW'::character varying, 'DEGRADED'::character varying, 'OFFLINE'::character varying, 'DECOMMISSIONED'::character varying])::text[])))
+);
+
+
+--
+-- Name: applications; Type: TABLE; Schema: ob-poc; Owner: -
+--
+
+CREATE TABLE "ob-poc".applications (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    name character varying(255) NOT NULL,
+    vendor character varying(255),
+    owner_team character varying(255),
+    description text,
+    created_at timestamp with time zone DEFAULT now(),
+    updated_at timestamp with time zone DEFAULT now()
+);
+
+
+--
 -- Name: appointment_rights; Type: TABLE; Schema: ob-poc; Owner: -
 --
 
@@ -7844,6 +7880,26 @@ CREATE TABLE "ob-poc".calibration_utterances (
     admitted_at timestamp with time zone,
     deprecated_at timestamp with time zone,
     created_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+--
+-- Name: capability_bindings; Type: TABLE; Schema: ob-poc; Owner: -
+--
+
+CREATE TABLE "ob-poc".capability_bindings (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    application_instance_id uuid NOT NULL,
+    service_id uuid NOT NULL,
+    binding_status character varying(20) DEFAULT 'DRAFT'::character varying NOT NULL,
+    pilot_started_at timestamp with time zone,
+    promoted_live_at timestamp with time zone,
+    deprecated_at timestamp with time zone,
+    retired_at timestamp with time zone,
+    notes text,
+    created_at timestamp with time zone DEFAULT now(),
+    updated_at timestamp with time zone DEFAULT now(),
+    CONSTRAINT capability_bindings_binding_status_check CHECK (((binding_status)::text = ANY ((ARRAY['DRAFT'::character varying, 'PILOT'::character varying, 'LIVE'::character varying, 'DEPRECATED'::character varying, 'RETIRED'::character varying])::text[])))
 );
 
 
@@ -8875,7 +8931,8 @@ CREATE TABLE "ob-poc".cbu_resource_instances (
     last_request_id uuid,
     last_event_at timestamp with time zone,
     srdef_id text,
-    CONSTRAINT cbu_resource_instances_status_check CHECK (((status)::text = ANY (ARRAY[('PENDING'::character varying)::text, ('PROVISIONING'::character varying)::text, ('ACTIVE'::character varying)::text, ('SUSPENDED'::character varying)::text, ('DECOMMISSIONED'::character varying)::text])))
+    resource_locator jsonb,
+    CONSTRAINT cbu_resource_instances_status_check CHECK (((status)::text = ANY ((ARRAY['PENDING'::character varying, 'PROVISIONING'::character varying, 'AWAITING_OWNER'::character varying, 'ACTIVE'::character varying, 'FAILED'::character varying, 'CANCELLED'::character varying, 'SUSPENDED'::character varying, 'DECOMMISSIONED'::character varying])::text[])))
 );
 
 
@@ -8919,6 +8976,13 @@ COMMENT ON COLUMN "ob-poc".cbu_resource_instances.last_request_id IS 'Most recen
 --
 
 COMMENT ON COLUMN "ob-poc".cbu_resource_instances.srdef_id IS 'SRDEF that this instance fulfills';
+
+
+--
+-- Name: COLUMN cbu_resource_instances.resource_locator; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON COLUMN "ob-poc".cbu_resource_instances.resource_locator IS 'Structured owner-returned locator: {kind, value, identifier, owner_ticket_id}. resource_url remains a compatibility column.';
 
 
 --
@@ -10551,7 +10615,7 @@ CREATE TABLE "ob-poc".deal_onboarding_requests (
     contract_id uuid NOT NULL,
     cbu_id uuid NOT NULL,
     product_id uuid NOT NULL,
-    request_status character varying(50) DEFAULT 'REQUESTED'::character varying,
+    request_status character varying(50) DEFAULT 'PENDING'::character varying,
     requires_kyc boolean DEFAULT true,
     kyc_case_id uuid,
     kyc_cleared_at timestamp with time zone,
@@ -14705,6 +14769,142 @@ COMMENT ON TABLE "ob-poc".occurrences IS 'Individual occurrences of each failure
 
 
 --
+-- Name: onboarding_data_request_attrs; Type: TABLE; Schema: ob-poc; Owner: -
+--
+
+CREATE TABLE "ob-poc".onboarding_data_request_attrs (
+    slice_id uuid NOT NULL,
+    attr_id uuid NOT NULL,
+    attr_code text,
+    requirement_strength text DEFAULT 'required'::text NOT NULL,
+    condition_expression text,
+    condition_status text DEFAULT 'unconditional'::text NOT NULL,
+    source_policy jsonb DEFAULT '[]'::jsonb NOT NULL,
+    evidence_policy jsonb DEFAULT '{}'::jsonb NOT NULL,
+    merged_constraints jsonb DEFAULT '{}'::jsonb NOT NULL,
+    default_value jsonb,
+    value_status text DEFAULT 'missing'::text NOT NULL,
+    value_id uuid,
+    value_ref jsonb,
+    value_observed_at timestamp with time zone,
+    blocking_reason text,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    constraint_status text DEFAULT 'not_evaluated'::text NOT NULL,
+    evidence_status text DEFAULT 'not_evaluated'::text NOT NULL,
+    evaluation_detail jsonb DEFAULT '{}'::jsonb NOT NULL,
+    CONSTRAINT onboarding_data_request_attrs_condition_status_check CHECK ((condition_status = ANY (ARRAY['unconditional'::text, 'pending'::text, 'satisfied'::text, 'not_applicable'::text]))),
+    CONSTRAINT onboarding_data_request_attrs_constraint_status_check CHECK ((constraint_status = ANY (ARRAY['not_evaluated'::text, 'valid'::text, 'invalid'::text]))),
+    CONSTRAINT onboarding_data_request_attrs_evidence_status_check CHECK ((evidence_status = ANY (ARRAY['not_evaluated'::text, 'not_required'::text, 'required_missing'::text, 'provided'::text]))),
+    CONSTRAINT onboarding_data_request_attrs_requirement_strength_check CHECK ((requirement_strength = ANY (ARRAY['required'::text, 'optional'::text, 'conditional'::text]))),
+    CONSTRAINT onboarding_data_request_attrs_value_status_check CHECK ((value_status = ANY (ARRAY['missing'::text, 'present'::text, 'not_applicable'::text])))
+);
+
+
+--
+-- Name: TABLE onboarding_data_request_attrs; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON TABLE "ob-poc".onboarding_data_request_attrs IS 'Frozen attribute dictionary rows for an onboarding data request slice.';
+
+
+--
+-- Name: onboarding_data_request_discoveries; Type: TABLE; Schema: ob-poc; Owner: -
+--
+
+CREATE TABLE "ob-poc".onboarding_data_request_discoveries (
+    discovery_snapshot_id uuid DEFAULT uuidv7() CONSTRAINT onboarding_data_request_discover_discovery_snapshot_id_not_null NOT NULL,
+    data_request_id uuid NOT NULL,
+    source_discovery_id uuid,
+    srdef_id text NOT NULL,
+    resource_type_id uuid,
+    parameters jsonb DEFAULT '{}'::jsonb NOT NULL,
+    discovery_snapshot jsonb DEFAULT '{}'::jsonb NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+--
+-- Name: onboarding_data_request_slices; Type: TABLE; Schema: ob-poc; Owner: -
+--
+
+CREATE TABLE "ob-poc".onboarding_data_request_slices (
+    slice_id uuid DEFAULT uuidv7() NOT NULL,
+    data_request_id uuid NOT NULL,
+    discovery_snapshot_id uuid,
+    onboarding_request_id uuid NOT NULL,
+    cbu_id uuid NOT NULL,
+    srdef_id text NOT NULL,
+    resource_type_id uuid,
+    srdef_lineage text DEFAULT 'yaml'::text NOT NULL,
+    srdef_snapshot_id uuid,
+    parameters jsonb DEFAULT '{}'::jsonb NOT NULL,
+    owner_system text,
+    owner_principal_fqn text,
+    application_id uuid,
+    application_instance_id uuid,
+    cbu_resource_instance_id uuid,
+    provisioning_request_id uuid,
+    slice_status text DEFAULT 'collecting'::text NOT NULL,
+    blocking_reason text,
+    ready_at timestamp with time zone,
+    dispatched_at timestamp with time zone,
+    activated_at timestamp with time zone,
+    cancelled_at timestamp with time zone,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    l4_binding_required boolean DEFAULT false NOT NULL,
+    l4_binding_status text DEFAULT 'not_required'::text NOT NULL,
+    l4_blocking_reason text,
+    CONSTRAINT onboarding_data_request_slices_l4_binding_status_check CHECK ((l4_binding_status = ANY (ARRAY['not_required'::text, 'resolved'::text, 'missing_live_binding'::text]))),
+    CONSTRAINT onboarding_data_request_slices_slice_status_check CHECK ((slice_status = ANY (ARRAY['collecting'::text, 'ready'::text, 'dispatched'::text, 'awaiting_owner'::text, 'activated'::text, 'blocked'::text, 'failed'::text, 'cancelled'::text])))
+);
+
+
+--
+-- Name: TABLE onboarding_data_request_slices; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON TABLE "ob-poc".onboarding_data_request_slices IS 'Per-SRDEF/per-parameter slice of an onboarding data request.';
+
+
+--
+-- Name: COLUMN onboarding_data_request_slices.l4_binding_status; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON COLUMN "ob-poc".onboarding_data_request_slices.l4_binding_status IS 'L4 reconciliation status for request SRDEFs that bind to an application capability.';
+
+
+--
+-- Name: onboarding_data_requests; Type: TABLE; Schema: ob-poc; Owner: -
+--
+
+CREATE TABLE "ob-poc".onboarding_data_requests (
+    data_request_id uuid DEFAULT uuidv7() NOT NULL,
+    onboarding_request_id uuid NOT NULL,
+    deal_id uuid NOT NULL,
+    contract_id uuid NOT NULL,
+    cbu_id uuid NOT NULL,
+    product_id uuid NOT NULL,
+    request_status text DEFAULT 'collecting'::text NOT NULL,
+    compiled_at timestamp with time zone DEFAULT now() NOT NULL,
+    completed_at timestamp with time zone,
+    cancelled_at timestamp with time zone,
+    blocking_reason text,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT onboarding_data_requests_request_status_check CHECK ((request_status = ANY (ARRAY['collecting'::text, 'ready_for_dispatch'::text, 'dispatching'::text, 'awaiting_owner'::text, 'completed'::text, 'blocked'::text, 'cancelled'::text])))
+);
+
+
+--
+-- Name: TABLE onboarding_data_requests; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON TABLE "ob-poc".onboarding_data_requests IS 'Frozen per-onboarding service-resource data dictionary request.';
+
+
+--
 -- Name: onboarding_plans; Type: TABLE; Schema: ob-poc; Owner: -
 --
 
@@ -15369,7 +15569,7 @@ CREATE TABLE "ob-poc".provisioning_events (
     payload jsonb NOT NULL,
     content_hash text,
     CONSTRAINT provisioning_events_direction_check CHECK ((direction = ANY (ARRAY['OUT'::text, 'IN'::text]))),
-    CONSTRAINT provisioning_events_kind_check CHECK ((kind = ANY (ARRAY['REQUEST_SENT'::text, 'ACK'::text, 'RESULT'::text, 'ERROR'::text, 'STATUS'::text, 'RETRY'::text])))
+    CONSTRAINT provisioning_events_kind_check CHECK ((kind = ANY (ARRAY['REQUEST_PREPARED'::text, 'DISPATCHED'::text, 'STAND_DOWN'::text, 'ACK'::text, 'RESULT'::text, 'ERROR'::text, 'STATUS'::text, 'RETRY'::text, 'REQUEST_SENT'::text])))
 );
 
 
@@ -15460,6 +15660,11 @@ CREATE TABLE "ob-poc".provisioning_requests (
     owner_ticket_id text,
     parameters jsonb DEFAULT '{}'::jsonb,
     status_changed_at timestamp with time zone,
+    onboarding_request_id uuid,
+    onboarding_data_request_id uuid,
+    onboarding_data_request_slice_id uuid,
+    owner_principal_fqn text,
+    dispatch_idempotency_key text,
     CONSTRAINT provisioning_requests_requested_by_check CHECK ((requested_by = ANY (ARRAY['agent'::text, 'user'::text, 'system'::text]))),
     CONSTRAINT provisioning_requests_status_check CHECK ((status = ANY (ARRAY['queued'::text, 'sent'::text, 'ack'::text, 'completed'::text, 'failed'::text, 'cancelled'::text])))
 );
@@ -15469,7 +15674,7 @@ CREATE TABLE "ob-poc".provisioning_requests (
 -- Name: TABLE provisioning_requests; Type: COMMENT; Schema: ob-poc; Owner: -
 --
 
-COMMENT ON TABLE "ob-poc".provisioning_requests IS 'Append-only log of provisioning requests to owner systems.';
+COMMENT ON TABLE "ob-poc".provisioning_requests IS 'Provisioning request row with mutable workflow status plus append-only provisioning_events.';
 
 
 --
@@ -15925,6 +16130,9 @@ CREATE TABLE "ob-poc".resource_attribute_requirements (
     source_fallback text[],
     derivation_input_type text,
     derivation_input_ref jsonb,
+    requirement_status text DEFAULT 'synced'::text NOT NULL,
+    conflict_reason text,
+    CONSTRAINT resource_attribute_requirements_requirement_status_check CHECK ((requirement_status = ANY (ARRAY['synced'::text, 'missing_attribute_def'::text, 'conflict'::text]))),
     CONSTRAINT resource_attribute_requirements_requirement_type_check CHECK ((requirement_type = ANY (ARRAY['required'::text, 'optional'::text, 'conditional'::text]))),
     CONSTRAINT resource_attribute_requirements_source_kind_check CHECK (((source_kind IS NULL) OR (source_kind = ANY (ARRAY['derived'::text, 'cbu_profile'::text, 'cbu'::text, 'instrument_matrix'::text, 'legal_entity'::text, 'entity'::text, 'document'::text, 'product_option'::text, 'manual'::text, 'option_binding'::text]))))
 );
@@ -16051,6 +16259,41 @@ CREATE TABLE "ob-poc".resource_instance_dependencies (
     dependency_type character varying(20) DEFAULT 'required'::character varying,
     created_at timestamp with time zone DEFAULT now()
 );
+
+
+--
+-- Name: resource_owner_principals; Type: TABLE; Schema: ob-poc; Owner: -
+--
+
+CREATE TABLE "ob-poc".resource_owner_principals (
+    owner_principal_fqn text NOT NULL,
+    owner_system text NOT NULL,
+    display_name text NOT NULL,
+    dispatch_endpoint text,
+    status text DEFAULT 'active'::text NOT NULL,
+    metadata jsonb DEFAULT '{}'::jsonb NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    principal_kind text DEFAULT 'resource_owner'::text NOT NULL,
+    principal_capabilities jsonb DEFAULT '["resource_owner"]'::jsonb NOT NULL,
+    dispatch_enabled boolean DEFAULT true NOT NULL,
+    CONSTRAINT resource_owner_principals_principal_kind_check CHECK ((principal_kind = 'resource_owner'::text)),
+    CONSTRAINT resource_owner_principals_status_check CHECK ((status = ANY (ARRAY['active'::text, 'suspended'::text, 'retired'::text])))
+);
+
+
+--
+-- Name: TABLE resource_owner_principals; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON TABLE "ob-poc".resource_owner_principals IS 'Addressable service-resource owner principals used by onboarding data-request dispatch.';
+
+
+--
+-- Name: COLUMN resource_owner_principals.principal_capabilities; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON COLUMN "ob-poc".resource_owner_principals.principal_capabilities IS 'SemOS principal capability projection. Resource-owner principals carry resource_owner.';
 
 
 --
@@ -16636,6 +16879,22 @@ CREATE TABLE "ob-poc".service_resource_types (
     srdef_id text GENERATED ALWAYS AS (((((('SRDEF::'::text || (COALESCE(owner, 'UNKNOWN'::character varying))::text) || '::'::text) || (COALESCE(resource_type, 'Resource'::character varying))::text) || '::'::text) || (COALESCE(resource_code, ((resource_id)::text)::character varying))::text)) STORED,
     provisioning_strategy text DEFAULT 'create'::text,
     resource_purpose text,
+    lifecycle_status text DEFAULT 'unsynced'::text NOT NULL,
+    srdef_lineage text DEFAULT 'yaml'::text NOT NULL,
+    srdef_snapshot jsonb DEFAULT '{}'::jsonb NOT NULL,
+    srdef_snapshot_id uuid,
+    owner_principal_fqn text,
+    srdef_snapshot_hash text,
+    srdef_synced_at timestamp with time zone,
+    attribute_gap_count integer DEFAULT 0 NOT NULL,
+    attribute_conflict_count integer DEFAULT 0 NOT NULL,
+    binding_policy jsonb DEFAULT '{}'::jsonb NOT NULL,
+    l4_binding_required boolean DEFAULT false NOT NULL,
+    bound_application_id uuid,
+    bound_application_instance_id uuid,
+    governance_status text DEFAULT 'active'::text NOT NULL,
+    CONSTRAINT service_resource_types_governance_status_check CHECK ((governance_status = ANY (ARRAY['draft'::text, 'active'::text, 'deprecated'::text, 'retired'::text]))),
+    CONSTRAINT service_resource_types_lifecycle_status_check CHECK ((lifecycle_status = ANY (ARRAY['unsynced'::text, 'synced'::text, 'gaps_found'::text, 'complete'::text]))),
     CONSTRAINT service_resource_types_provisioning_strategy_check CHECK ((provisioning_strategy = ANY (ARRAY['create'::text, 'request'::text, 'discover'::text])))
 );
 
@@ -16701,6 +16960,27 @@ COMMENT ON COLUMN "ob-poc".service_resource_types.provisioning_strategy IS 'How 
 --
 
 COMMENT ON COLUMN "ob-poc".service_resource_types.resource_purpose IS 'Semantic purpose: custody_securities, swift_messaging, iam_access, etc.';
+
+
+--
+-- Name: COLUMN service_resource_types.lifecycle_status; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON COLUMN "ob-poc".service_resource_types.lifecycle_status IS 'Coverage/materialization lifecycle for SRDEF sync and attribute-gap readiness: unsynced, synced, gaps_found, complete.';
+
+
+--
+-- Name: COLUMN service_resource_types.srdef_snapshot_hash; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON COLUMN "ob-poc".service_resource_types.srdef_snapshot_hash IS 'Deterministic content hash of the governed SRDEF snapshot projected from YAML/SemOS source.';
+
+
+--
+-- Name: COLUMN service_resource_types.governance_status; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON COLUMN "ob-poc".service_resource_types.governance_status IS 'Catalogue governance lifecycle for the SRDEF object: draft, active, deprecated, retired.';
 
 
 --
@@ -22846,6 +23126,38 @@ ALTER TABLE ONLY "ob-poc".activation_runs
 
 
 --
+-- Name: application_instances application_instances_application_id_environment_instance_l_key; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".application_instances
+    ADD CONSTRAINT application_instances_application_id_environment_instance_l_key UNIQUE (application_id, environment, instance_label);
+
+
+--
+-- Name: application_instances application_instances_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".application_instances
+    ADD CONSTRAINT application_instances_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: applications applications_name_key; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".applications
+    ADD CONSTRAINT applications_name_key UNIQUE (name);
+
+
+--
+-- Name: applications applications_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".applications
+    ADD CONSTRAINT applications_pkey PRIMARY KEY (id);
+
+
+--
 -- Name: appointment_rights appointment_rights_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
 --
 
@@ -23059,6 +23371,22 @@ ALTER TABLE ONLY "ob-poc".calibration_scenarios
 
 ALTER TABLE ONLY "ob-poc".calibration_utterances
     ADD CONSTRAINT calibration_utterances_pkey PRIMARY KEY (utterance_id);
+
+
+--
+-- Name: capability_bindings capability_bindings_application_instance_id_service_id_key; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".capability_bindings
+    ADD CONSTRAINT capability_bindings_application_instance_id_service_id_key UNIQUE (application_instance_id, service_id);
+
+
+--
+-- Name: capability_bindings capability_bindings_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".capability_bindings
+    ADD CONSTRAINT capability_bindings_pkey PRIMARY KEY (id);
 
 
 --
@@ -25390,6 +25718,62 @@ ALTER TABLE ONLY "ob-poc".occurrences
 
 
 --
+-- Name: onboarding_data_request_attrs onboarding_data_request_attrs_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".onboarding_data_request_attrs
+    ADD CONSTRAINT onboarding_data_request_attrs_pkey PRIMARY KEY (slice_id, attr_id);
+
+
+--
+-- Name: onboarding_data_request_discoveries onboarding_data_request_disco_data_request_id_srdef_id_para_key; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".onboarding_data_request_discoveries
+    ADD CONSTRAINT onboarding_data_request_disco_data_request_id_srdef_id_para_key UNIQUE (data_request_id, srdef_id, parameters);
+
+
+--
+-- Name: onboarding_data_request_discoveries onboarding_data_request_discoveries_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".onboarding_data_request_discoveries
+    ADD CONSTRAINT onboarding_data_request_discoveries_pkey PRIMARY KEY (discovery_snapshot_id);
+
+
+--
+-- Name: onboarding_data_request_slices onboarding_data_request_slice_data_request_id_srdef_id_para_key; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".onboarding_data_request_slices
+    ADD CONSTRAINT onboarding_data_request_slice_data_request_id_srdef_id_para_key UNIQUE (data_request_id, srdef_id, parameters);
+
+
+--
+-- Name: onboarding_data_request_slices onboarding_data_request_slices_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".onboarding_data_request_slices
+    ADD CONSTRAINT onboarding_data_request_slices_pkey PRIMARY KEY (slice_id);
+
+
+--
+-- Name: onboarding_data_requests onboarding_data_requests_onboarding_request_id_key; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".onboarding_data_requests
+    ADD CONSTRAINT onboarding_data_requests_onboarding_request_id_key UNIQUE (onboarding_request_id);
+
+
+--
+-- Name: onboarding_data_requests onboarding_data_requests_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".onboarding_data_requests
+    ADD CONSTRAINT onboarding_data_requests_pkey PRIMARY KEY (data_request_id);
+
+
+--
 -- Name: onboarding_plans onboarding_plans_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
 --
 
@@ -25747,6 +26131,22 @@ ALTER TABLE ONLY "ob-poc".resource_instance_attributes
 
 ALTER TABLE ONLY "ob-poc".resource_instance_dependencies
     ADD CONSTRAINT resource_instance_dependencies_pkey PRIMARY KEY (instance_id, depends_on_instance_id);
+
+
+--
+-- Name: resource_owner_principals resource_owner_principals_owner_system_key; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".resource_owner_principals
+    ADD CONSTRAINT resource_owner_principals_owner_system_key UNIQUE (owner_system);
+
+
+--
+-- Name: resource_owner_principals resource_owner_principals_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".resource_owner_principals
+    ADD CONSTRAINT resource_owner_principals_pkey PRIMARY KEY (owner_principal_fqn);
 
 
 --
@@ -27364,6 +27764,13 @@ CREATE INDEX idx_analysis_type_date ON "ob-poc".intent_feedback_analysis USING b
 
 
 --
+-- Name: idx_application_instances_status; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_application_instances_status ON "ob-poc".application_instances USING btree (lifecycle_status);
+
+
+--
 -- Name: idx_appt_rights_holder; Type: INDEX; Schema: ob-poc; Owner: -
 --
 
@@ -27802,6 +28209,20 @@ CREATE INDEX idx_campaigns_deadline ON "ob-poc".access_review_campaigns USING bt
 --
 
 CREATE INDEX idx_campaigns_status ON "ob-poc".access_review_campaigns USING btree (status);
+
+
+--
+-- Name: idx_capability_bindings_service; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_capability_bindings_service ON "ob-poc".capability_bindings USING btree (service_id);
+
+
+--
+-- Name: idx_capability_bindings_status; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_capability_bindings_status ON "ob-poc".capability_bindings USING btree (binding_status);
 
 
 --
@@ -31109,6 +31530,48 @@ CREATE INDEX idx_occurrences_timestamp ON "ob-poc".occurrences USING btree (even
 
 
 --
+-- Name: idx_onboarding_data_attrs_status; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_onboarding_data_attrs_status ON "ob-poc".onboarding_data_request_attrs USING btree (slice_id, value_status);
+
+
+--
+-- Name: idx_onboarding_data_requests_cbu_status; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_onboarding_data_requests_cbu_status ON "ob-poc".onboarding_data_requests USING btree (cbu_id, request_status);
+
+
+--
+-- Name: idx_onboarding_data_slices_l4_status; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_onboarding_data_slices_l4_status ON "ob-poc".onboarding_data_request_slices USING btree (l4_binding_status) WHERE (l4_binding_status <> 'not_required'::text);
+
+
+--
+-- Name: idx_onboarding_data_slices_owner_principal; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_onboarding_data_slices_owner_principal ON "ob-poc".onboarding_data_request_slices USING btree (owner_principal_fqn) WHERE (owner_principal_fqn IS NOT NULL);
+
+
+--
+-- Name: idx_onboarding_data_slices_provisioning_request; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_onboarding_data_slices_provisioning_request ON "ob-poc".onboarding_data_request_slices USING btree (provisioning_request_id) WHERE (provisioning_request_id IS NOT NULL);
+
+
+--
+-- Name: idx_onboarding_data_slices_request_status; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_onboarding_data_slices_request_status ON "ob-poc".onboarding_data_request_slices USING btree (data_request_id, slice_status);
+
+
+--
 -- Name: idx_onboarding_plans_cbu; Type: INDEX; Schema: ob-poc; Owner: -
 --
 
@@ -31347,10 +31810,24 @@ CREATE INDEX idx_provisioning_requests_cbu ON "ob-poc".provisioning_requests USI
 
 
 --
+-- Name: idx_provisioning_requests_dispatch_idem; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE UNIQUE INDEX idx_provisioning_requests_dispatch_idem ON "ob-poc".provisioning_requests USING btree (dispatch_idempotency_key) WHERE (dispatch_idempotency_key IS NOT NULL);
+
+
+--
 -- Name: idx_provisioning_requests_instance; Type: INDEX; Schema: ob-poc; Owner: -
 --
 
 CREATE INDEX idx_provisioning_requests_instance ON "ob-poc".provisioning_requests USING btree (instance_id) WHERE (instance_id IS NOT NULL);
+
+
+--
+-- Name: idx_provisioning_requests_owner_principal; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_provisioning_requests_owner_principal ON "ob-poc".provisioning_requests USING btree (owner_principal_fqn) WHERE (owner_principal_fqn IS NOT NULL);
 
 
 --
@@ -31823,10 +32300,31 @@ CREATE INDEX idx_service_resource_types_dict_group ON "ob-poc".service_resource_
 
 
 --
+-- Name: idx_service_resource_types_governance_status; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_service_resource_types_governance_status ON "ob-poc".service_resource_types USING btree (governance_status);
+
+
+--
 -- Name: idx_service_resource_types_is_active; Type: INDEX; Schema: ob-poc; Owner: -
 --
 
 CREATE INDEX idx_service_resource_types_is_active ON "ob-poc".service_resource_types USING btree (is_active);
+
+
+--
+-- Name: idx_service_resource_types_l4_binding; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_service_resource_types_l4_binding ON "ob-poc".service_resource_types USING btree (l4_binding_required, bound_application_instance_id) WHERE l4_binding_required;
+
+
+--
+-- Name: idx_service_resource_types_lifecycle_status; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_service_resource_types_lifecycle_status ON "ob-poc".service_resource_types USING btree (lifecycle_status);
 
 
 --
@@ -31844,6 +32342,13 @@ CREATE INDEX idx_service_resource_types_owner ON "ob-poc".service_resource_types
 
 
 --
+-- Name: idx_service_resource_types_owner_principal; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_service_resource_types_owner_principal ON "ob-poc".service_resource_types USING btree (owner_principal_fqn) WHERE (owner_principal_fqn IS NOT NULL);
+
+
+--
 -- Name: idx_service_resource_types_resource_code; Type: INDEX; Schema: ob-poc; Owner: -
 --
 
@@ -31855,6 +32360,13 @@ CREATE INDEX idx_service_resource_types_resource_code ON "ob-poc".service_resour
 --
 
 CREATE INDEX idx_service_resource_types_srdef ON "ob-poc".service_resource_types USING btree (srdef_id);
+
+
+--
+-- Name: idx_service_resource_types_srdef_snapshot_hash; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_service_resource_types_srdef_snapshot_hash ON "ob-poc".service_resource_types USING btree (srdef_snapshot_hash) WHERE (srdef_snapshot_hash IS NOT NULL);
 
 
 --
@@ -33921,6 +34433,14 @@ ALTER TABLE ONLY "ob-poc".activation_runs
 
 
 --
+-- Name: application_instances application_instances_application_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".application_instances
+    ADD CONSTRAINT application_instances_application_id_fkey FOREIGN KEY (application_id) REFERENCES "ob-poc".applications(id);
+
+
+--
 -- Name: appointment_rights appointment_rights_holder_entity_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
 --
 
@@ -34134,6 +34654,14 @@ ALTER TABLE ONLY "ob-poc".calibration_runs
 
 ALTER TABLE ONLY "ob-poc".calibration_utterances
     ADD CONSTRAINT calibration_utterances_scenario_id_fkey FOREIGN KEY (scenario_id) REFERENCES "ob-poc".calibration_scenarios(scenario_id);
+
+
+--
+-- Name: capability_bindings capability_bindings_application_instance_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".capability_bindings
+    ADD CONSTRAINT capability_bindings_application_instance_id_fkey FOREIGN KEY (application_instance_id) REFERENCES "ob-poc".application_instances(id);
 
 
 --
@@ -37121,6 +37649,150 @@ ALTER TABLE ONLY "ob-poc".occurrences
 
 
 --
+-- Name: onboarding_data_request_attrs onboarding_data_request_attrs_attr_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".onboarding_data_request_attrs
+    ADD CONSTRAINT onboarding_data_request_attrs_attr_id_fkey FOREIGN KEY (attr_id) REFERENCES "ob-poc".attribute_registry(uuid);
+
+
+--
+-- Name: onboarding_data_request_attrs onboarding_data_request_attrs_slice_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".onboarding_data_request_attrs
+    ADD CONSTRAINT onboarding_data_request_attrs_slice_id_fkey FOREIGN KEY (slice_id) REFERENCES "ob-poc".onboarding_data_request_slices(slice_id) ON DELETE CASCADE;
+
+
+--
+-- Name: onboarding_data_request_discoveries onboarding_data_request_discoveries_data_request_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".onboarding_data_request_discoveries
+    ADD CONSTRAINT onboarding_data_request_discoveries_data_request_id_fkey FOREIGN KEY (data_request_id) REFERENCES "ob-poc".onboarding_data_requests(data_request_id) ON DELETE CASCADE;
+
+
+--
+-- Name: onboarding_data_request_discoveries onboarding_data_request_discoveries_resource_type_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".onboarding_data_request_discoveries
+    ADD CONSTRAINT onboarding_data_request_discoveries_resource_type_id_fkey FOREIGN KEY (resource_type_id) REFERENCES "ob-poc".service_resource_types(resource_id);
+
+
+--
+-- Name: onboarding_data_request_discoveries onboarding_data_request_discoveries_source_discovery_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".onboarding_data_request_discoveries
+    ADD CONSTRAINT onboarding_data_request_discoveries_source_discovery_id_fkey FOREIGN KEY (source_discovery_id) REFERENCES "ob-poc".srdef_discovery_reasons(discovery_id);
+
+
+--
+-- Name: onboarding_data_request_slices onboarding_data_request_slices_cbu_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".onboarding_data_request_slices
+    ADD CONSTRAINT onboarding_data_request_slices_cbu_id_fkey FOREIGN KEY (cbu_id) REFERENCES "ob-poc".cbus(cbu_id) ON DELETE CASCADE;
+
+
+--
+-- Name: onboarding_data_request_slices onboarding_data_request_slices_cbu_resource_instance_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".onboarding_data_request_slices
+    ADD CONSTRAINT onboarding_data_request_slices_cbu_resource_instance_id_fkey FOREIGN KEY (cbu_resource_instance_id) REFERENCES "ob-poc".cbu_resource_instances(instance_id);
+
+
+--
+-- Name: onboarding_data_request_slices onboarding_data_request_slices_data_request_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".onboarding_data_request_slices
+    ADD CONSTRAINT onboarding_data_request_slices_data_request_id_fkey FOREIGN KEY (data_request_id) REFERENCES "ob-poc".onboarding_data_requests(data_request_id) ON DELETE CASCADE;
+
+
+--
+-- Name: onboarding_data_request_slices onboarding_data_request_slices_discovery_snapshot_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".onboarding_data_request_slices
+    ADD CONSTRAINT onboarding_data_request_slices_discovery_snapshot_id_fkey FOREIGN KEY (discovery_snapshot_id) REFERENCES "ob-poc".onboarding_data_request_discoveries(discovery_snapshot_id) ON DELETE SET NULL;
+
+
+--
+-- Name: onboarding_data_request_slices onboarding_data_request_slices_onboarding_request_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".onboarding_data_request_slices
+    ADD CONSTRAINT onboarding_data_request_slices_onboarding_request_id_fkey FOREIGN KEY (onboarding_request_id) REFERENCES "ob-poc".deal_onboarding_requests(request_id) ON DELETE CASCADE;
+
+
+--
+-- Name: onboarding_data_request_slices onboarding_data_request_slices_owner_principal_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".onboarding_data_request_slices
+    ADD CONSTRAINT onboarding_data_request_slices_owner_principal_fkey FOREIGN KEY (owner_principal_fqn) REFERENCES "ob-poc".resource_owner_principals(owner_principal_fqn) ON DELETE SET NULL;
+
+
+--
+-- Name: onboarding_data_request_slices onboarding_data_request_slices_provisioning_request_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".onboarding_data_request_slices
+    ADD CONSTRAINT onboarding_data_request_slices_provisioning_request_id_fkey FOREIGN KEY (provisioning_request_id) REFERENCES "ob-poc".provisioning_requests(request_id);
+
+
+--
+-- Name: onboarding_data_request_slices onboarding_data_request_slices_resource_type_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".onboarding_data_request_slices
+    ADD CONSTRAINT onboarding_data_request_slices_resource_type_id_fkey FOREIGN KEY (resource_type_id) REFERENCES "ob-poc".service_resource_types(resource_id);
+
+
+--
+-- Name: onboarding_data_requests onboarding_data_requests_cbu_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".onboarding_data_requests
+    ADD CONSTRAINT onboarding_data_requests_cbu_id_fkey FOREIGN KEY (cbu_id) REFERENCES "ob-poc".cbus(cbu_id) ON DELETE CASCADE;
+
+
+--
+-- Name: onboarding_data_requests onboarding_data_requests_contract_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".onboarding_data_requests
+    ADD CONSTRAINT onboarding_data_requests_contract_id_fkey FOREIGN KEY (contract_id) REFERENCES "ob-poc".legal_contracts(contract_id);
+
+
+--
+-- Name: onboarding_data_requests onboarding_data_requests_deal_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".onboarding_data_requests
+    ADD CONSTRAINT onboarding_data_requests_deal_id_fkey FOREIGN KEY (deal_id) REFERENCES "ob-poc".deals(deal_id) ON DELETE CASCADE;
+
+
+--
+-- Name: onboarding_data_requests onboarding_data_requests_onboarding_request_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".onboarding_data_requests
+    ADD CONSTRAINT onboarding_data_requests_onboarding_request_id_fkey FOREIGN KEY (onboarding_request_id) REFERENCES "ob-poc".deal_onboarding_requests(request_id) ON DELETE CASCADE;
+
+
+--
+-- Name: onboarding_data_requests onboarding_data_requests_product_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".onboarding_data_requests
+    ADD CONSTRAINT onboarding_data_requests_product_id_fkey FOREIGN KEY (product_id) REFERENCES "ob-poc".products(product_id);
+
+
+--
 -- Name: onboarding_plans onboarding_plans_cbu_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
 --
 
@@ -37385,11 +38057,43 @@ ALTER TABLE ONLY "ob-poc".provisioning_requests
 
 
 --
+-- Name: provisioning_requests provisioning_requests_data_request_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".provisioning_requests
+    ADD CONSTRAINT provisioning_requests_data_request_fkey FOREIGN KEY (onboarding_data_request_id) REFERENCES "ob-poc".onboarding_data_requests(data_request_id) ON DELETE SET NULL;
+
+
+--
+-- Name: provisioning_requests provisioning_requests_data_request_slice_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".provisioning_requests
+    ADD CONSTRAINT provisioning_requests_data_request_slice_fkey FOREIGN KEY (onboarding_data_request_slice_id) REFERENCES "ob-poc".onboarding_data_request_slices(slice_id) ON DELETE SET NULL;
+
+
+--
 -- Name: provisioning_requests provisioning_requests_instance_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
 --
 
 ALTER TABLE ONLY "ob-poc".provisioning_requests
     ADD CONSTRAINT provisioning_requests_instance_id_fkey FOREIGN KEY (instance_id) REFERENCES "ob-poc".cbu_resource_instances(instance_id);
+
+
+--
+-- Name: provisioning_requests provisioning_requests_onboarding_request_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".provisioning_requests
+    ADD CONSTRAINT provisioning_requests_onboarding_request_id_fkey FOREIGN KEY (onboarding_request_id) REFERENCES "ob-poc".deal_onboarding_requests(request_id) ON DELETE SET NULL;
+
+
+--
+-- Name: provisioning_requests provisioning_requests_owner_principal_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".provisioning_requests
+    ADD CONSTRAINT provisioning_requests_owner_principal_fkey FOREIGN KEY (owner_principal_fqn) REFERENCES "ob-poc".resource_owner_principals(owner_principal_fqn) ON DELETE SET NULL;
 
 
 --
@@ -37758,6 +38462,14 @@ ALTER TABLE ONLY "ob-poc".service_resource_option_constraints
 
 ALTER TABLE ONLY "ob-poc".service_resource_option_constraints
     ADD CONSTRAINT service_resource_option_constraints_service_option_def_id_fkey FOREIGN KEY (service_option_def_id) REFERENCES "ob-poc".service_option_defs(service_option_def_id) ON DELETE CASCADE;
+
+
+--
+-- Name: service_resource_types service_resource_types_owner_principal_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".service_resource_types
+    ADD CONSTRAINT service_resource_types_owner_principal_fkey FOREIGN KEY (owner_principal_fqn) REFERENCES "ob-poc".resource_owner_principals(owner_principal_fqn) ON DELETE SET NULL;
 
 
 --
@@ -38612,5 +39324,5 @@ ALTER TABLE ONLY sem_reg_authoring.validation_reports
 -- PostgreSQL database dump complete
 --
 
-\unrestrict tp1TqSbl0xGqAHw8opdtIHjtg0b6817hbzLudajefYnfgTnwjAwoVcBrtljcMjc
+\unrestrict CWi1rgzg9LpA45v3hNLlHXgYn3zU4mo3qbwIWldmP7JPfTLWaAsLcDkGe1FGt7z
 
