@@ -29,3 +29,7 @@ slots:
       cpr_cross_sell: client-principal-relationship.cross-sell-check
       # Contract pack
       contract_pack_add: { verb: contract-pack.add-template, when: filled }
+      onboarding_compile_data_request: { verb: onboarding.compile-data-request, when: filled }
+      onboarding_list_data_requests: onboarding.list-data-requests
+      onboarding_get_data_request: onboarding.get-data-request
+      onboarding_list_slices: onboarding.list-slices

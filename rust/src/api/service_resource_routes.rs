@@ -16,7 +16,7 @@ use axum::{
 };
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value as JsonValue};
-use sqlx::PgPool;
+use sqlx::{PgPool, Row};
 use std::sync::Arc;
 use uuid::Uuid;
 
@@ -26,6 +26,7 @@ use crate::service_resources::{
     service::ServiceResourcePipelineService,
     srdef_loader::{load_srdefs_from_config, SrdefRegistry},
     types::*,
+    OnboardingDataRequestService,
 };
 
 // =============================================================================
@@ -88,6 +89,39 @@ pub fn service_resource_router(pool: PgPool) -> Router {
         .route(
             "/cbu/:cbu_id/provisioning-requests",
             get(list_provisioning_requests),
+        )
+        .route(
+            "/onboarding-requests/:onboarding_request_id/data-request",
+            post(compile_data_request),
+        )
+        .route("/data-requests/:data_request_id", get(get_data_request))
+        .route(
+            "/data-requests/:data_request_id/dispatch-ready",
+            post(dispatch_ready_slices),
+        )
+        .route(
+            "/data-requests/:data_request_id/cancel",
+            post(cancel_data_request),
+        )
+        .route(
+            "/data-requests/:data_request_id/slices",
+            get(list_data_request_slices),
+        )
+        .route(
+            "/data-request-slices/:slice_id",
+            get(get_data_request_slice),
+        )
+        .route(
+            "/data-request-slices/:slice_id/attrs",
+            get(get_data_request_slice_attrs),
+        )
+        .route(
+            "/data-request-slices/:slice_id/cancel",
+            post(cancel_data_request_slice),
+        )
+        .route(
+            "/provisioning-requests/:request_id/confirm",
+            post(confirm_provisioning_result),
         )
         // Readiness
         .route("/cbu/:cbu_id/readiness", get(get_readiness))
@@ -516,6 +550,261 @@ async fn list_provisioning_requests(
 
     match service.get_provisioning_requests(cbu_id).await {
         Ok(requests) => (StatusCode::OK, Json(json!({ "requests": requests }))),
+        Err(e) => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(json!({ "error": e.to_string() })),
+        ),
+    }
+}
+
+#[derive(Debug, Deserialize)]
+struct ConfirmProvisioningResultRequest {
+    payload: JsonValue,
+    content_hash: Option<String>,
+}
+
+async fn compile_data_request(
+    State(state): State<Arc<ServiceResourceState>>,
+    Path(onboarding_request_id): Path<Uuid>,
+) -> impl IntoResponse {
+    let service = OnboardingDataRequestService::new(state.pool.clone());
+    match service.compile_data_request(onboarding_request_id).await {
+        Ok(result) => (StatusCode::OK, Json(json!(result))),
+        Err(e) => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(json!({ "error": e.to_string() })),
+        ),
+    }
+}
+
+async fn dispatch_ready_slices(
+    State(state): State<Arc<ServiceResourceState>>,
+    Path(data_request_id): Path<Uuid>,
+) -> impl IntoResponse {
+    let service = OnboardingDataRequestService::new(state.pool.clone());
+    match service.dispatch_ready_slices(data_request_id).await {
+        Ok(result) => (StatusCode::OK, Json(json!(result))),
+        Err(e) => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(json!({ "error": e.to_string() })),
+        ),
+    }
+}
+
+async fn cancel_data_request(
+    State(state): State<Arc<ServiceResourceState>>,
+    Path(data_request_id): Path<Uuid>,
+) -> impl IntoResponse {
+    let service = OnboardingDataRequestService::new(state.pool.clone());
+    match service.cancel_data_request(data_request_id).await {
+        Ok(result) => (StatusCode::OK, Json(json!(result))),
+        Err(e) => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(json!({ "error": e.to_string() })),
+        ),
+    }
+}
+
+async fn cancel_data_request_slice(
+    State(state): State<Arc<ServiceResourceState>>,
+    Path(slice_id): Path<Uuid>,
+) -> impl IntoResponse {
+    let service = OnboardingDataRequestService::new(state.pool.clone());
+    match service.cancel_slice(slice_id).await {
+        Ok(result) => (StatusCode::OK, Json(json!(result))),
+        Err(e) => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(json!({ "error": e.to_string() })),
+        ),
+    }
+}
+
+async fn confirm_provisioning_result(
+    State(state): State<Arc<ServiceResourceState>>,
+    Path(request_id): Path<Uuid>,
+    Json(body): Json<ConfirmProvisioningResultRequest>,
+) -> impl IntoResponse {
+    let service = OnboardingDataRequestService::new(state.pool.clone());
+    match service
+        .confirm_provisioning_result(request_id, body.payload, body.content_hash)
+        .await
+    {
+        Ok(result) => (StatusCode::OK, Json(json!(result))),
+        Err(e) => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(json!({ "error": e.to_string() })),
+        ),
+    }
+}
+
+async fn get_data_request(
+    State(state): State<Arc<ServiceResourceState>>,
+    Path(data_request_id): Path<Uuid>,
+) -> impl IntoResponse {
+    match sqlx::query(
+        r#"
+        SELECT data_request_id, onboarding_request_id, deal_id, contract_id, cbu_id,
+               product_id, request_status, compiled_at, completed_at, cancelled_at,
+               blocking_reason
+        FROM "ob-poc".onboarding_data_requests
+        WHERE data_request_id = $1
+        "#,
+    )
+    .bind(data_request_id)
+    .fetch_optional(&state.pool)
+    .await
+    {
+        Ok(Some(row)) => (
+            StatusCode::OK,
+            Json(json!({
+                "data_request_id": row.get::<Uuid, _>("data_request_id"),
+                "onboarding_request_id": row.get::<Uuid, _>("onboarding_request_id"),
+                "deal_id": row.get::<Uuid, _>("deal_id"),
+                "contract_id": row.get::<Uuid, _>("contract_id"),
+                "cbu_id": row.get::<Uuid, _>("cbu_id"),
+                "product_id": row.get::<Uuid, _>("product_id"),
+                "request_status": row.get::<String, _>("request_status"),
+                "compiled_at": row.get::<chrono::DateTime<chrono::Utc>, _>("compiled_at"),
+                "completed_at": row.get::<Option<chrono::DateTime<chrono::Utc>>, _>("completed_at"),
+                "cancelled_at": row.get::<Option<chrono::DateTime<chrono::Utc>>, _>("cancelled_at"),
+                "blocking_reason": row.get::<Option<String>, _>("blocking_reason"),
+            })),
+        ),
+        Ok(None) => (
+            StatusCode::NOT_FOUND,
+            Json(json!({ "error": "data request not found" })),
+        ),
+        Err(e) => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(json!({ "error": e.to_string() })),
+        ),
+    }
+}
+
+async fn list_data_request_slices(
+    State(state): State<Arc<ServiceResourceState>>,
+    Path(data_request_id): Path<Uuid>,
+) -> impl IntoResponse {
+    match sqlx::query(
+        r#"
+        SELECT slice_id, data_request_id, srdef_id, parameters, owner_system,
+               owner_principal_fqn, slice_status, blocking_reason, provisioning_request_id
+        FROM "ob-poc".onboarding_data_request_slices
+        WHERE data_request_id = $1
+        ORDER BY srdef_id, parameters::text
+        "#,
+    )
+    .bind(data_request_id)
+    .fetch_all(&state.pool)
+    .await
+    {
+        Ok(rows) => (
+            StatusCode::OK,
+            Json(json!({
+                "slices": rows.into_iter().map(|row| json!({
+                    "slice_id": row.get::<Uuid, _>("slice_id"),
+                    "data_request_id": row.get::<Uuid, _>("data_request_id"),
+                    "srdef_id": row.get::<String, _>("srdef_id"),
+                    "parameters": row.get::<JsonValue, _>("parameters"),
+                    "owner_system": row.get::<Option<String>, _>("owner_system"),
+                    "owner_principal_fqn": row.get::<Option<String>, _>("owner_principal_fqn"),
+                    "slice_status": row.get::<String, _>("slice_status"),
+                    "blocking_reason": row.get::<Option<String>, _>("blocking_reason"),
+                    "provisioning_request_id": row.get::<Option<Uuid>, _>("provisioning_request_id"),
+                })).collect::<Vec<_>>()
+            })),
+        ),
+        Err(e) => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(json!({ "error": e.to_string() })),
+        ),
+    }
+}
+
+async fn get_data_request_slice(
+    State(state): State<Arc<ServiceResourceState>>,
+    Path(slice_id): Path<Uuid>,
+) -> impl IntoResponse {
+    match sqlx::query(
+        r#"
+        SELECT slice_id, data_request_id, onboarding_request_id, cbu_id, srdef_id,
+               resource_type_id, parameters, owner_system, owner_principal_fqn,
+               slice_status, blocking_reason, cbu_resource_instance_id,
+               provisioning_request_id
+        FROM "ob-poc".onboarding_data_request_slices
+        WHERE slice_id = $1
+        "#,
+    )
+    .bind(slice_id)
+    .fetch_optional(&state.pool)
+    .await
+    {
+        Ok(Some(row)) => (
+            StatusCode::OK,
+            Json(json!({
+                "slice_id": row.get::<Uuid, _>("slice_id"),
+                "data_request_id": row.get::<Uuid, _>("data_request_id"),
+                "onboarding_request_id": row.get::<Uuid, _>("onboarding_request_id"),
+                "cbu_id": row.get::<Uuid, _>("cbu_id"),
+                "srdef_id": row.get::<String, _>("srdef_id"),
+                "resource_type_id": row.get::<Option<Uuid>, _>("resource_type_id"),
+                "parameters": row.get::<JsonValue, _>("parameters"),
+                "owner_system": row.get::<Option<String>, _>("owner_system"),
+                "owner_principal_fqn": row.get::<Option<String>, _>("owner_principal_fqn"),
+                "slice_status": row.get::<String, _>("slice_status"),
+                "blocking_reason": row.get::<Option<String>, _>("blocking_reason"),
+                "cbu_resource_instance_id": row.get::<Option<Uuid>, _>("cbu_resource_instance_id"),
+                "provisioning_request_id": row.get::<Option<Uuid>, _>("provisioning_request_id"),
+            })),
+        ),
+        Ok(None) => (
+            StatusCode::NOT_FOUND,
+            Json(json!({ "error": "slice not found" })),
+        ),
+        Err(e) => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(json!({ "error": e.to_string() })),
+        ),
+    }
+}
+
+async fn get_data_request_slice_attrs(
+    State(state): State<Arc<ServiceResourceState>>,
+    Path(slice_id): Path<Uuid>,
+) -> impl IntoResponse {
+    match sqlx::query(
+        r#"
+        SELECT attr_id, attr_code, requirement_strength, condition_expression,
+               condition_status, source_policy, evidence_policy, merged_constraints,
+               value_status, value_ref, value_observed_at, blocking_reason
+        FROM "ob-poc".onboarding_data_request_attrs
+        WHERE slice_id = $1
+        ORDER BY attr_code
+        "#,
+    )
+    .bind(slice_id)
+    .fetch_all(&state.pool)
+    .await
+    {
+        Ok(rows) => (
+            StatusCode::OK,
+            Json(json!({
+                "attrs": rows.into_iter().map(|row| json!({
+                    "attr_id": row.get::<Uuid, _>("attr_id"),
+                    "attr_code": row.get::<Option<String>, _>("attr_code"),
+                    "requirement_strength": row.get::<String, _>("requirement_strength"),
+                    "condition_expression": row.get::<Option<String>, _>("condition_expression"),
+                    "condition_status": row.get::<String, _>("condition_status"),
+                    "source_policy": row.get::<JsonValue, _>("source_policy"),
+                    "evidence_policy": row.get::<JsonValue, _>("evidence_policy"),
+                    "merged_constraints": row.get::<JsonValue, _>("merged_constraints"),
+                    "value_status": row.get::<String, _>("value_status"),
+                    "value_ref": row.get::<Option<JsonValue>, _>("value_ref"),
+                    "value_observed_at": row.get::<Option<chrono::DateTime<chrono::Utc>>, _>("value_observed_at"),
+                    "blocking_reason": row.get::<Option<String>, _>("blocking_reason"),
+                })).collect::<Vec<_>>()
+            })),
+        ),
         Err(e) => (
             StatusCode::INTERNAL_SERVER_ERROR,
             Json(json!({ "error": e.to_string() })),

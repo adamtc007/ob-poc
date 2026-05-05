@@ -36,6 +36,19 @@ slots:
       list: { verb: service-resource.list, when: [empty, filled] }
       list_by_service: { verb: service-resource.list-by-service, when: [empty, filled] }
       list_attributes: { verb: service-resource.list-attributes, when: [empty, filled] }
+  resource_owner_principal:
+    type: entity
+    entity_kinds: [resource_owner_principal]
+    table: resource_owner_principals
+    pk: owner_principal_fqn
+    join: { via: service_resource_types, parent_fk: owner_principal_fqn, child_fk: owner_principal_fqn }
+    cardinality: optional
+    depends_on: [service_resource]
+    state_machine: resource_owner_principal_lifecycle
+    verbs:
+      read: { verb: service-resource.read-resource-owner, when: filled }
+      list: { verb: service-resource.list-resource-owners, when: [empty, filled] }
+      list_resources: { verb: service-resource.list, when: [empty, filled] }
   service_option:
     type: entity
     entity_kinds: [service_option]

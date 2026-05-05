@@ -28,6 +28,7 @@ candidate_entity_kinds:
   - product
   - service
   - resource_type
+  - resource_owner_principal
   - attribute
 grounding_threshold:
   required_input_keys: []

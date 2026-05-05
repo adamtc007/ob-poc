@@ -1,0 +1,32 @@
+state_machine: onboarding_data_request_attr_lifecycle
+description: Frozen attribute value status inside an onboarding data request slice
+states:
+  - missing
+  - present
+  - not_applicable
+initial: missing
+transitions:
+  - from: missing
+    to: present
+    verbs: [onboarding.compile-data-request, typed-attribute.record]
+  - from: missing
+    to: not_applicable
+    verbs: [onboarding.compile-data-request]
+reducer:
+  overlay_sources:
+    attr:
+      table: onboarding_data_request_attrs
+      join: attr_id
+      provides: [value_status]
+  conditions:
+    is_present:
+      expr: "attr.value_status = 'present'"
+    is_not_applicable:
+      expr: "attr.value_status = 'not_applicable'"
+  rules:
+    - state: not_applicable
+      requires: [is_not_applicable]
+    - state: present
+      requires: [is_present]
+    - state: missing
+      requires: []

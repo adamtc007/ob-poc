@@ -1646,6 +1646,117 @@ domains:
         writes: [ruleset]
 
   # ---------------------------------------------------------------------------
+  # ONBOARDING — Service-Resource Data Requests
+  # ---------------------------------------------------------------------------
+  onboarding:
+    description: "Operational onboarding data-request loop that freezes service-resource dictionaries, dispatches owner slices, and records returned locators"
+    tables:
+      onboarding_data_requests:
+        description: "Frozen per-deal-onboarding service-resource data dictionary request"
+        governance_tier: operational
+        classification: confidential
+        pii: false
+      onboarding_data_request_discoveries:
+        description: "Immutable SRDEF discovery snapshots captured when compiling an onboarding data request"
+        governance_tier: operational
+        classification: confidential
+        pii: false
+      onboarding_data_request_slices:
+        description: "Per-SRDEF/per-parameter owner-dispatch slice of an onboarding data request"
+        governance_tier: operational
+        classification: confidential
+        pii: false
+      onboarding_data_request_attrs:
+        description: "Frozen attribute requirement and value rows inside an onboarding data request slice"
+        governance_tier: operational
+        classification: confidential
+        pii: false
+      resource_owner_principals:
+        description: "Addressable service-resource owner principals used for dispatch and stand-down correlation"
+        governance_tier: governed
+        classification: internal
+        pii: false
+      public.outbox:
+        description: "Durable outbox rows for resource-owner dispatch and stand-down delivery"
+        governance_tier: operational
+        classification: internal
+        pii: false
+    verb_data_footprint:
+      onboarding.compile-data-request:
+        reads:
+          - deal_onboarding_requests
+          - srdef_discovery_reasons
+          - service_resource_types
+          - resource_attribute_requirements
+          - cbu_attr_values
+          - resource_owner_principals
+        writes:
+          - onboarding_data_requests
+          - onboarding_data_request_discoveries
+          - onboarding_data_request_slices
+          - onboarding_data_request_attrs
+          - resource_owner_principals
+      onboarding.dispatch-ready-slices:
+        reads:
+          - onboarding_data_requests
+          - onboarding_data_request_slices
+          - onboarding_data_request_attrs
+          - resource_owner_principals
+        writes:
+          - cbu_resource_instances
+          - provisioning_requests
+          - provisioning_events
+          - onboarding_data_request_slices
+          - public.outbox
+      onboarding.cancel-data-request:
+        reads:
+          - onboarding_data_request_slices
+          - provisioning_requests
+        writes:
+          - onboarding_data_requests
+          - onboarding_data_request_slices
+          - provisioning_requests
+          - provisioning_events
+          - cbu_resource_instances
+          - public.outbox
+      onboarding.cancel-slice:
+        reads:
+          - onboarding_data_request_slices
+          - provisioning_requests
+        writes:
+          - onboarding_data_requests
+          - onboarding_data_request_slices
+          - provisioning_requests
+          - provisioning_events
+          - cbu_resource_instances
+          - public.outbox
+      onboarding.get-data-request:
+        reads: [onboarding_data_requests]
+      onboarding.list-data-requests:
+        reads: [onboarding_data_requests]
+      onboarding.list-slices:
+        reads: [onboarding_data_request_slices]
+      onboarding.get-slice:
+        reads: [onboarding_data_request_slices]
+      onboarding.get-slice-attrs:
+        reads: [onboarding_data_request_attrs]
+      service-resource.confirm-provisioning-result:
+        reads:
+          - provisioning_requests
+          - provisioning_events
+          - onboarding_data_request_slices
+        writes:
+          - provisioning_requests
+          - provisioning_events
+          - cbu_resource_instances
+          - onboarding_data_request_slices
+          - onboarding_data_requests
+      service-resource.read-resource-owner:
+        reads: [resource_owner_principals]
+      service-resource.list-resource-owners:
+        reads: [resource_owner_principals]
+
+  # ---------------------------------------------------------------------------
   # PRODUCT & SERVICE — Catalog
   # ---------------------------------------------------------------------------
   product:
@@ -1711,6 +1822,21 @@ domains:
         governance_tier: governed
         classification: internal
         pii: false
+      resource_owner_principals:
+        description: "Addressable resource-owner principals for service-resource dispatch"
+        governance_tier: governed
+        classification: internal
+        pii: false
+      capability_bindings:
+        description: "Layer 4 application capability bindings used by SRDEF dispatch reconciliation"
+        governance_tier: operational
+        classification: internal
+        pii: false
+      application_instances:
+        description: "Layer 4 application instances used by capability binding status checks"
+        governance_tier: operational
+        classification: internal
+        pii: false
       resource_dependencies:
         description: "Inter-resource dependency graph for provisioning ordering"
         governance_tier: governed
@@ -1736,6 +1862,30 @@ domains:
         reads: [products]
       service.list:
         reads: [services]
+      service-resource.sync-definitions:
+        reads:
+          - service_resource_types
+          - resource_attribute_requirements
+          - sem_reg.snapshots
+          - attribute_registry
+        writes:
+          - service_resource_types
+          - resource_attribute_requirements
+          - resource_owner_principals
+          - sem_reg.snapshots
+      service-resource.check-attribute-gaps:
+        reads:
+          - service_resource_types
+          - resource_attribute_requirements
+          - sem_reg.snapshots
+          - attribute_registry
+      onboarding.compile-data-request:
+        reads:
+          - service_intents
+          - service_resource_types
+          - resource_attribute_requirements
+          - capability_bindings
+          - application_instances
 
   # ---------------------------------------------------------------------------
   # DOCS-BUNDLE — Document Bundle Application

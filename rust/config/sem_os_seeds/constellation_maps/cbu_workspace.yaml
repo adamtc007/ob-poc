@@ -112,6 +112,16 @@ slots:
       # ── Client group extras ─────────────────────────────────────────
       cg_add_ownership_source: { verb: client-group.add-ownership-source, when: filled }
       cg_list_tags: client-group.list-tags
+      onboarding_list_data_requests: onboarding.list-data-requests
+      onboarding_compile_data_request: { verb: onboarding.compile-data-request, when: filled }
+      onboarding_dispatch_ready_slices: { verb: onboarding.dispatch-ready-slices, when: filled }
+      onboarding_cancel_data_request: { verb: onboarding.cancel-data-request, when: filled }
+      onboarding_cancel_slice: { verb: onboarding.cancel-slice, when: filled }
+      onboarding_get_data_request: onboarding.get-data-request
+      onboarding_list_slices: onboarding.list-slices
+      onboarding_get_slice: onboarding.get-slice
+      onboarding_get_slice_attrs: onboarding.get-slice-attrs
+      resource_confirm_provisioning_result: service-resource.confirm-provisioning-result
   cbu_service_option_binding:
     type: entity
     entity_kinds: [cbu_service_option_binding]

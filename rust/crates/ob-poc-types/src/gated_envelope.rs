@@ -470,6 +470,10 @@ impl IdempotencyKey {
 ///   (Phase F.1 Pattern B fire-and-forget, 2026-04-22).
 /// - `BpmnCancel` — deferred gRPC cancel to bpmn-lite
 ///   (Phase F.1 Pattern B fire-and-forget, 2026-04-22).
+/// - `ResourceOwnerDispatch` — dispatch a service-resource provisioning
+///   request to its owning operational team/system.
+/// - `ResourceOwnerStandDown` — cancel a previously dispatched
+///   service-resource provisioning request.
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Hash)]
 #[serde(rename_all = "snake_case")]
 pub enum OutboxEffectKind {
@@ -480,6 +484,8 @@ pub enum OutboxEffectKind {
     MaintenanceSpawn,
     BpmnSignal,
     BpmnCancel,
+    ResourceOwnerDispatch,
+    ResourceOwnerStandDown,
 }
 
 /// A post-commit effect queued inside the stage-8 transaction and consumed

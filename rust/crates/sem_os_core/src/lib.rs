@@ -37,6 +37,7 @@ pub mod policy_rule;
 pub mod proof_obligation_def;
 pub mod relationship_type_def;
 pub mod requirement_profile_def;
+pub mod service_resource_def;
 pub mod state_graph_def;
 pub mod state_machine_def;
 pub mod taxonomy_def;

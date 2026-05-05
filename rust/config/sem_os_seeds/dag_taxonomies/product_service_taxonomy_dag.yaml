@@ -312,6 +312,47 @@ slots:
       (service_resource_def) live in SemOsMaintenance; per-CBU
       activation lives in CBU's service_consumption slot.
 
+  - id: resource_owner_principal
+    stateless: false
+    parent_slot:
+      workspace: product_maintenance
+      slot: service_resource
+      join:
+        via: service_resource_types
+        parent_fk: owner_principal_fqn
+        child_fk: owner_principal_fqn
+    state_machine:
+      id: resource_owner_principal_lifecycle
+      owner: stewards
+      expected_lifetime: long_lived
+      source_entity: '"ob-poc".resource_owner_principals'
+      state_column: status
+      scope: per_resource_owner
+      description: |
+        Addressable owner of service-resource activation. Product
+        maintenance reads this so SRDEF authors can see which owner
+        principal will receive onboarding dispatches.
+      states:
+        - id: active
+          entry: true
+          description: "Dispatchable."
+        - id: suspended
+          description: "Temporarily not dispatchable."
+        - id: retired
+          description: "No longer valid."
+      transitions:
+        - from: active
+          to: suspended
+          via: governance.record-review
+        - from: suspended
+          to: active
+          via: governance.record-review
+        - from: [active, suspended]
+          to: retired
+          via: governance.record-review
+      terminal_states: [retired]
+    suspended_state_exempt: true
+
   - id: attribute
     stateless: true
     rationale: |
@@ -343,6 +384,7 @@ product_module_gates:
     - service
     - service_version
     - service_resource
+    - resource_owner_principal
     - attribute
   conditionally_on: []
 

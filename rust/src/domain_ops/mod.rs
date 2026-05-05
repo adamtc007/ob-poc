@@ -156,6 +156,7 @@ pub mod helpers;
 // Registration flows through inventory; external ob-poc code does not
 // import these types directly.
 mod onboarding;
+mod onboarding_data_request;
 // Phase 5c — outreach_ops relocated to `dsl-runtime::domain_ops::outreach_ops`
 // Phase 5e — ownership_ops relocated to `dsl-runtime::domain_ops::ownership_ops`
 // Phase 5e — partnership_ops relocated to `dsl-runtime::domain_ops::partnership_ops`
@@ -436,6 +437,16 @@ pub fn extend_registry(registry: &mut sem_os_postgres::ops::SemOsVerbOpRegistry)
     // crate::database::derive_semantic_state + crate::ontology::SemanticStageRegistry
     // + crate::dsl_v2::executor::DslExecutor).
     registry.register(Arc::new(onboarding::OnboardingAutoComplete));
+    registry.register(Arc::new(onboarding_data_request::CompileDataRequest));
+    registry.register(Arc::new(onboarding_data_request::DispatchReadySlices));
+    registry.register(Arc::new(onboarding_data_request::ConfirmProvisioningResult));
+    registry.register(Arc::new(onboarding_data_request::CancelDataRequest));
+    registry.register(Arc::new(onboarding_data_request::CancelSlice));
+    registry.register(Arc::new(onboarding_data_request::GetDataRequest));
+    registry.register(Arc::new(onboarding_data_request::ListDataRequests));
+    registry.register(Arc::new(onboarding_data_request::ListSlices));
+    registry.register(Arc::new(onboarding_data_request::GetSlice));
+    registry.register(Arc::new(onboarding_data_request::GetSliceAttrs));
 
     // Phase B Pattern B slice #73: bpmn.* gRPC pass-through verbs
     // (bridges to crate::bpmn_integration::client).

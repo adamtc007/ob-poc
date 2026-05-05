@@ -12,6 +12,16 @@ slots:
     cardinality: root
     verbs:
       auto_complete: { verb: onboarding.auto-complete, when: filled }
+      compile_data_request: { verb: onboarding.compile-data-request, when: filled }
+      dispatch_ready_slices: { verb: onboarding.dispatch-ready-slices, when: filled }
+      cancel_data_request: { verb: onboarding.cancel-data-request, when: filled }
+      cancel_slice: { verb: onboarding.cancel-slice, when: filled }
+      get_data_request: onboarding.get-data-request
+      list_data_requests: onboarding.list-data-requests
+      list_slices: onboarding.list-slices
+      get_slice: onboarding.get-slice
+      get_slice_attrs: onboarding.get-slice-attrs
+      confirm_provisioning_result: service-resource.confirm-provisioning-result
       provisioning_run: { verb: provisioning.run, when: filled }
       provisioning_status: provisioning.status
       readiness_compute: { verb: readiness.compute, when: filled }
@@ -19,3 +29,62 @@ slots:
       pipeline_full: { verb: pipeline.full, when: filled }
       pack_select: { verb: pack.select, when: [empty, filled] }
       pack_answer: { verb: pack.answer, when: filled }
+  onboarding_data_request:
+    type: entity
+    entity_kinds: [onboarding_data_request]
+    table: onboarding_data_requests
+    pk: data_request_id
+    join: { via: onboarding_data_requests, parent_fk: cbu_id, child_fk: data_request_id }
+    cardinality: optional
+    depends_on: [workspace_root]
+    state_machine: onboarding_data_request_lifecycle
+    verbs:
+      get: onboarding.get-data-request
+      list: onboarding.list-data-requests
+      dispatch_ready_slices: { verb: onboarding.dispatch-ready-slices, when: ready_for_dispatch }
+      cancel: { verb: onboarding.cancel-data-request, when: [collecting, ready_for_dispatch, dispatching, awaiting_owner, blocked] }
+  onboarding_data_request_slice:
+    type: entity
+    entity_kinds: [onboarding_data_request_slice]
+    table: onboarding_data_request_slices
+    pk: slice_id
+    join: { via: onboarding_data_request_slices, parent_fk: data_request_id, child_fk: slice_id }
+    cardinality: optional
+    depends_on:
+      - slot: onboarding_data_request
+        min_state: collecting
+    state_machine: onboarding_data_request_slice_lifecycle
+    verbs:
+      list: onboarding.list-slices
+      get: onboarding.get-slice
+      attrs: onboarding.get-slice-attrs
+      cancel: { verb: onboarding.cancel-slice, when: [collecting, ready, dispatched, awaiting_owner, failed] }
+      confirm_provisioning_result: { verb: service-resource.confirm-provisioning-result, when: [dispatched, awaiting_owner] }
+  onboarding_data_request_attr:
+    type: entity
+    entity_kinds: [onboarding_data_request_attr]
+    table: onboarding_data_request_attrs
+    pk: attr_id
+    join: { via: onboarding_data_request_attrs, parent_fk: slice_id, child_fk: attr_id }
+    cardinality: optional
+    depends_on:
+      - slot: onboarding_data_request_slice
+        min_state: collecting
+    state_machine: onboarding_data_request_attr_lifecycle
+    verbs:
+      list: onboarding.get-slice-attrs
+  resource_owner_principal:
+    type: entity
+    entity_kinds: [resource_owner_principal]
+    table: resource_owner_principals
+    pk: owner_principal_fqn
+    join: { via: resource_owner_principals, parent_fk: owner_principal_fqn, child_fk: owner_principal_fqn }
+    cardinality: optional
+    depends_on:
+      - slot: onboarding_data_request_slice
+        min_state: ready
+    state_machine: resource_owner_principal_lifecycle
+    verbs:
+      read: { verb: service-resource.read-resource-owner, when: filled }
+      list: { verb: service-resource.list-resource-owners, when: [empty, filled] }
+      list_data_requests: onboarding.list-data-requests

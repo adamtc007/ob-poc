@@ -322,6 +322,7 @@ fn parse_object_type(s: &str) -> Option<ObjectType> {
         "evidence_strategy_def" => Some(ObjectType::EvidenceStrategyDef),
         "observation_def" => Some(ObjectType::ObservationDef),
         "derivation_spec" => Some(ObjectType::DerivationSpec),
+        "service_resource_def" => Some(ObjectType::ServiceResourceDef),
         _ => None,
     }
 }
@@ -1437,6 +1438,7 @@ async fn handle_describe_object(
             ObjectType::RequirementProfileDef,
             ObjectType::ProofObligationDef,
             ObjectType::EvidenceStrategyDef,
+            ObjectType::ServiceResourceDef,
         ];
         let mut found = Ok(None);
         for ot in &types {

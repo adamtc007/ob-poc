@@ -2449,6 +2449,7 @@ fn parse_object_type(s: &str) -> Option<ObjectType> {
         "evidence_strategy_def" => Some(ObjectType::EvidenceStrategyDef),
         "observation_def" => Some(ObjectType::ObservationDef),
         "derivation_spec" => Some(ObjectType::DerivationSpec),
+        "service_resource_def" => Some(ObjectType::ServiceResourceDef),
         _ => None,
     }
 }
@@ -2514,6 +2515,10 @@ mod tests {
         assert_eq!(
             parse_object_type("attribute_def"),
             Some(ObjectType::AttributeDef)
+        );
+        assert_eq!(
+            parse_object_type("service_resource_def"),
+            Some(ObjectType::ServiceResourceDef)
         );
         assert_eq!(parse_object_type("invalid"), None);
     }

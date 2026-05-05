@@ -148,6 +148,208 @@ slots:
     stateless: false
     state_machine: "(reconcile-existing — see deal_dag.yaml §2.2 deal_onboarding_request_lifecycle; Deal workspace owns the 5-state request lifecycle: PENDING → IN_PROGRESS → BLOCKED → COMPLETED / CANCELLED. This workspace creates rows and advances state but the authoritative state machine lives in Deal.)"
 
+  - id: onboarding_data_request
+    stateless: false
+    closure: closed_bounded
+    eligibility:
+      entity_kinds: [onboarding_data_request]
+    cardinality_max: 1
+    entry_state: collecting
+    parent_slot:
+      workspace: onboarding_request
+      slot: onboarding_request
+      join:
+        via: onboarding_data_requests
+        parent_fk: onboarding_request_id
+        child_fk: data_request_id
+    state_machine:
+      id: onboarding_data_request_lifecycle
+      owner: onboarding
+      expected_lifetime: short_lived
+      source_entity: '"ob-poc".onboarding_data_requests'
+      state_column: request_status
+      scope: per_deal_onboarding_request
+      description: |
+        Frozen per-onboarding service-resource data dictionary request.
+        Compiled from SRDEF discovery snapshots and CBU attribute values,
+        then dispatched to resource owners slice by slice.
+      states:
+        - id: collecting
+          entry: true
+          description: "Dictionary compiled but at least one required slice attribute is missing."
+        - id: ready_for_dispatch
+          description: "All slices have required values and can be dispatched."
+        - id: dispatching
+          description: "Dispatch has been requested and outbox delivery is in progress."
+        - id: awaiting_owner
+          description: "Resource owner has the request and has not returned a final locator."
+        - id: completed
+          description: "All slices activated successfully."
+        - id: blocked
+          description: "One or more slices failed or cannot progress."
+        - id: cancelled
+          description: "Request was cancelled before completion."
+      transitions:
+        - from: collecting
+          to: ready_for_dispatch
+          via: onboarding.compile-data-request
+        - from: ready_for_dispatch
+          to: dispatching
+          via: onboarding.dispatch-ready-slices
+        - from: dispatching
+          to: awaiting_owner
+          via: onboarding.dispatch-ready-slices
+        - from: awaiting_owner
+          to: completed
+          via: service-resource.confirm-provisioning-result
+        - from: [collecting, ready_for_dispatch, dispatching, awaiting_owner]
+          to: blocked
+          via: [service-resource.confirm-provisioning-result, readiness.compute]
+        - from: [collecting, ready_for_dispatch, dispatching, awaiting_owner, blocked]
+          to: cancelled
+          via: onboarding.cancel-data-request
+      terminal_states: [completed, cancelled]
+    suspended_state_exempt: true
+
+  - id: onboarding_data_request_slice
+    stateless: false
+    closure: closed_unbounded
+    eligibility:
+      entity_kinds: [onboarding_data_request_slice]
+    parent_slot:
+      workspace: onboarding_request
+      slot: onboarding_data_request
+      join:
+        via: onboarding_data_request_slices
+        parent_fk: data_request_id
+        child_fk: slice_id
+    state_machine:
+      id: onboarding_data_request_slice_lifecycle
+      owner: onboarding
+      expected_lifetime: short_lived
+      source_entity: '"ob-poc".onboarding_data_request_slices'
+      state_column: slice_status
+      scope: per_srdef_parameter_slice
+      description: |
+        Per-SRDEF/per-parameter slice of an onboarding data request. This
+        is the dispatch grain addressed to a resource owner principal.
+      states:
+        - id: collecting
+          entry: true
+          description: "Required slice attributes are still missing."
+        - id: ready
+          description: "Slice can be dispatched."
+        - id: dispatched
+          description: "Provisioning request and outbox row prepared."
+        - id: awaiting_owner
+          description: "Dispatch outbox was delivered; waiting for owner result."
+        - id: activated
+          description: "Owner returned a successful locator."
+        - id: blocked
+          description: "Slice cannot progress until data or owner issue is resolved."
+        - id: failed
+          description: "Owner returned a terminal failure."
+        - id: cancelled
+          description: "Slice was stood down."
+      transitions:
+        - from: collecting
+          to: ready
+          via: onboarding.compile-data-request
+        - from: ready
+          to: dispatched
+          via: onboarding.dispatch-ready-slices
+        - from: dispatched
+          to: awaiting_owner
+          via: onboarding.dispatch-ready-slices
+        - from: [dispatched, awaiting_owner]
+          to: activated
+          via: service-resource.confirm-provisioning-result
+        - from: [collecting, ready, dispatched, awaiting_owner]
+          to: failed
+          via: service-resource.confirm-provisioning-result
+        - from: [collecting, ready, dispatched, awaiting_owner, failed]
+          to: cancelled
+          via: [onboarding.cancel-slice, onboarding.cancel-data-request]
+      terminal_states: [activated, failed, cancelled]
+    suspended_state_exempt: true
+
+  - id: onboarding_data_request_attr
+    stateless: false
+    closure: closed_unbounded
+    eligibility:
+      entity_kinds: [onboarding_data_request_attr]
+    parent_slot:
+      workspace: onboarding_request
+      slot: onboarding_data_request_slice
+      join:
+        via: onboarding_data_request_attrs
+        parent_fk: slice_id
+        child_fk: attr_id
+    state_machine:
+      id: onboarding_data_request_attr_lifecycle
+      owner: onboarding
+      expected_lifetime: short_lived
+      source_entity: '"ob-poc".onboarding_data_request_attrs'
+      state_column: value_status
+      scope: per_slice_attribute
+      description: |
+        Frozen attribute requirement/value row inside a data-request slice.
+        Mutation stops once the slice leaves collecting/blocked.
+      states:
+        - id: missing
+          entry: true
+          description: "Required value absent from the frozen request."
+        - id: present
+          description: "Value was captured in the frozen request."
+        - id: not_applicable
+          description: "Conditional requirement did not apply."
+      transitions:
+        - from: missing
+          to: present
+          via: [onboarding.compile-data-request, typed-attribute.record]
+        - from: missing
+          to: not_applicable
+          via: onboarding.compile-data-request
+      terminal_states: [present, not_applicable]
+    suspended_state_exempt: true
+
+  - id: resource_owner_principal
+    stateless: false
+    closure: closed_unbounded
+    eligibility:
+      entity_kinds: [resource_owner_principal]
+    state_machine:
+      id: resource_owner_principal_lifecycle
+      owner: onboarding
+      expected_lifetime: long_lived
+      source_entity: '"ob-poc".resource_owner_principals'
+      state_column: status
+      scope: per_resource_owner
+      description: |
+        Addressable principal for systems or teams that own service-resource
+        activation. Slices dispatch to this principal rather than to a
+        free-text owner label.
+      states:
+        - id: active
+          entry: true
+          description: "May receive dispatch."
+        - id: suspended
+          description: "Temporarily unavailable for new dispatch."
+        - id: retired
+          description: "No longer valid."
+      transitions:
+        - from: active
+          to: suspended
+          via: governance.record-review
+        - from: suspended
+          to: active
+          via: governance.record-review
+        - from: [active, suspended]
+          to: retired
+          via: governance.record-review
+      terminal_states: [retired]
+    suspended_state_exempt: true
+
   - id: deal
     stateless: false
     state_machine: "(reference — see deal_dag.yaml §2.1 deal_commercial_lifecycle; read-only here — we pick an existing CONTRACTED deal)"
@@ -223,6 +425,10 @@ product_module_gates:
   always_on:
     - workspace_root
     - onboarding_request
+    - onboarding_data_request
+    - onboarding_data_request_slice
+    - onboarding_data_request_attr
+    - resource_owner_principal
     - deal
     - cbu
     - contract

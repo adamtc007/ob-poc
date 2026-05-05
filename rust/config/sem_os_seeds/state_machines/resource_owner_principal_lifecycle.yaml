@@ -1,0 +1,40 @@
+state_machine: resource_owner_principal_lifecycle
+description: Addressable resource-owner principal lifecycle
+states:
+  - active
+  - suspended
+  - retired
+initial: active
+transitions:
+  - from: active
+    to: suspended
+    verbs: [governance.record-review]
+  - from: suspended
+    to: active
+    verbs: [governance.record-review]
+  - from: active
+    to: retired
+    verbs: [governance.record-review]
+  - from: suspended
+    to: retired
+    verbs: [governance.record-review]
+reducer:
+  overlay_sources:
+    principal:
+      table: resource_owner_principals
+      join: owner_principal_fqn
+      provides: [status]
+  conditions:
+    is_active:
+      expr: "principal.status = 'active'"
+    is_suspended:
+      expr: "principal.status = 'suspended'"
+    is_retired:
+      expr: "principal.status = 'retired'"
+  rules:
+    - state: retired
+      requires: [is_retired]
+    - state: suspended
+      requires: [is_suspended]
+    - state: active
+      requires: []

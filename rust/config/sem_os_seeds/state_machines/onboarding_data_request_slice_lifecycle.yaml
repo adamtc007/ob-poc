@@ -1,0 +1,95 @@
+state_machine: onboarding_data_request_slice_lifecycle
+description: Per-resource-owner slice lifecycle for onboarding data requests
+states:
+  - collecting
+  - ready
+  - dispatched
+  - awaiting_owner
+  - activated
+  - blocked
+  - failed
+  - cancelled
+initial: collecting
+transitions:
+  - from: collecting
+    to: ready
+    verbs: [onboarding.compile-data-request]
+  - from: ready
+    to: dispatched
+    verbs: [onboarding.dispatch-ready-slices]
+  - from: dispatched
+    to: awaiting_owner
+    verbs: [onboarding.dispatch-ready-slices]
+  - from: dispatched
+    to: activated
+    verbs: [service-resource.confirm-provisioning-result]
+  - from: awaiting_owner
+    to: activated
+    verbs: [service-resource.confirm-provisioning-result]
+  - from: collecting
+    to: failed
+    verbs: [service-resource.confirm-provisioning-result]
+  - from: ready
+    to: failed
+    verbs: [service-resource.confirm-provisioning-result]
+  - from: dispatched
+    to: failed
+    verbs: [service-resource.confirm-provisioning-result]
+  - from: awaiting_owner
+    to: failed
+    verbs: [service-resource.confirm-provisioning-result]
+  - from: collecting
+    to: cancelled
+    verbs: [onboarding.cancel-slice, onboarding.cancel-data-request]
+  - from: ready
+    to: cancelled
+    verbs: [onboarding.cancel-slice, onboarding.cancel-data-request]
+  - from: dispatched
+    to: cancelled
+    verbs: [onboarding.cancel-slice, onboarding.cancel-data-request]
+  - from: awaiting_owner
+    to: cancelled
+    verbs: [onboarding.cancel-slice, onboarding.cancel-data-request]
+  - from: failed
+    to: cancelled
+    verbs: [onboarding.cancel-slice, onboarding.cancel-data-request]
+reducer:
+  overlay_sources:
+    slice:
+      table: onboarding_data_request_slices
+      join: slice_id
+      provides: [slice_status]
+  conditions:
+    is_collecting:
+      expr: "slice.slice_status = 'collecting'"
+    is_ready:
+      expr: "slice.slice_status = 'ready'"
+    is_dispatched:
+      expr: "slice.slice_status = 'dispatched'"
+    is_awaiting_owner:
+      expr: "slice.slice_status = 'awaiting_owner'"
+    is_activated:
+      expr: "slice.slice_status = 'activated'"
+    is_blocked:
+      expr: "slice.slice_status = 'blocked'"
+    is_failed:
+      expr: "slice.slice_status = 'failed'"
+    is_cancelled:
+      expr: "slice.slice_status = 'cancelled'"
+  rules:
+    - state: cancelled
+      requires: [is_cancelled]
+    - state: failed
+      requires: [is_failed]
+    - state: blocked
+      requires: [is_blocked]
+    - state: activated
+      requires: [is_activated]
+    - state: awaiting_owner
+      requires: [is_awaiting_owner]
+    - state: dispatched
+      requires: [is_dispatched]
+    - state: ready
+      requires: [is_ready]
+    - state: collecting
+      requires: []

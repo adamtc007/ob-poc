@@ -445,7 +445,7 @@ slots:
       id: service_resource_def_lifecycle
       owner: stewards
       expected_lifetime: long_lived
-      source_entity: '"sem_reg".service_resource_defs'
+      source_entity: '"ob-poc".service_resource_types'
       state_column: lifecycle_status
       scope: per_srdef
       description: |

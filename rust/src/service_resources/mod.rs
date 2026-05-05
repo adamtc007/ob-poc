@@ -43,6 +43,7 @@
 //! | `cbu_service_readiness` | Derived readiness status |
 
 pub mod discovery;
+pub mod onboarding_data_request;
 pub mod provisioning;
 pub mod service;
 pub mod srdef_loader;
@@ -103,6 +104,11 @@ pub use types::{
 };
 
 pub use service::ServiceResourcePipelineService;
+
+pub use onboarding_data_request::{
+    CancellationResult, CompileDataRequestResult, ConfirmProvisioningResult,
+    DispatchReadySlicesResult, OnboardingDataRequestService,
+};
 
 // Re-export loader types
 pub use srdef_loader::{

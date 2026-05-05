@@ -92,8 +92,8 @@ slots:
     type: entity
     entity_kinds: [resource_type]
     table: service_resource_types
-    pk: resource_type_id
-    join: { via: sem_reg_changeset_items, parent_fk: changeset_id, child_fk: resource_type_id }
+    pk: resource_id
+    join: { via: sem_reg_changeset_items, parent_fk: changeset_id, child_fk: resource_id }
     cardinality: optional
     state_machine: service_resource_def_lifecycle
     verbs:

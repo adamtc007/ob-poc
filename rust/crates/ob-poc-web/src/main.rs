@@ -940,7 +940,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let _outbox_drainer_handle = {
         use ob_poc::outbox::{
             BpmnCancelConsumer, BpmnSignalConsumer, MaintenanceSpawnConsumer, NarrateConsumer,
-            OutboxDrainerConfig, OutboxDrainerImpl,
+            OutboxDrainerConfig, OutboxDrainerImpl, ResourceOwnerDispatchConsumer,
+            ResourceOwnerStandDownConsumer,
         };
         let mut drainer = OutboxDrainerImpl::new(pool.clone(), OutboxDrainerConfig::default());
         drainer.register(Arc::new(MaintenanceSpawnConsumer::new()))?;
@@ -957,6 +958,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         // service. Failure is retryable with bounded attempts.
         drainer.register(Arc::new(BpmnSignalConsumer::new()))?;
         drainer.register(Arc::new(BpmnCancelConsumer::new()))?;
+        drainer.register(Arc::new(ResourceOwnerDispatchConsumer::new(pool.clone())))?;
+        drainer.register(Arc::new(ResourceOwnerStandDownConsumer::new(pool.clone())))?;
         tracing::info!("OutboxDrainer: spawning background task");
         drainer.spawn()
     };

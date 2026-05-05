@@ -60,3 +60,234 @@ domains:
             - emitting
           consequence:
             baseline: reviewable
+
+      compile-data-request:
+        flavour: instance_adding
+        description: "Compile a frozen service-resource data dictionary for a deal onboarding request"
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: cbu
+          noun: onboarding_data_request
+          tags: [onboarding, service-resource]
+          subject_kinds: [deal_onboarding_request]
+          phase_tags: [onboarding]
+          side_effects: state_write
+        invocation_phrases:
+          - "compile onboarding data request"
+          - "build service resource data dictionary"
+          - "prepare resource owner data request"
+          - "freeze onboarding resource requirements"
+        behavior: plugin
+        handler: CompileDataRequestOp
+        args:
+          - name: onboarding-request-id
+            type: uuid
+            required: true
+            lookup:
+              entity_type: deal_onboarding_request
+              table: deal_onboarding_requests
+              schema: ob-poc
+              search_key: request_id
+              primary_key: request_id
+        returns:
+          type: record
+          description: "Compiled data request summary"
+        three_axis:
+          state_effect: transition
+          external_effects: [emitting]
+          consequence:
+            baseline: reviewable
+
+      dispatch-ready-slices:
+        flavour: attribute_mutating
+        description: "Dispatch all ready service-resource data request slices to resource owners"
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: cbu
+          noun: onboarding_data_request
+          tags: [onboarding, service-resource]
+          phase_tags: [onboarding]
+          side_effects: outbox_write
+        invocation_phrases:
+          - "dispatch ready onboarding slices"
+          - "send ready resource owner requests"
+          - "dispatch resource owner data requests"
+        behavior: plugin
+        handler: DispatchReadySlicesOp
+        args:
+          - name: data-request-id
+            type: uuid
+            required: true
+        returns:
+          type: record
+        three_axis:
+          state_effect: transition
+          external_effects: [emitting]
+          consequence:
+            baseline: requires_confirmation
+
+      cancel-data-request:
+        flavour: discretionary
+        description: "Cancel all open slices for an onboarding data request"
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: cbu
+          noun: onboarding_data_request
+          tags: [onboarding, service-resource]
+          phase_tags: [onboarding]
+          side_effects: state_write
+        invocation_phrases:
+          - "cancel onboarding data request"
+          - "stand down all resource owner requests"
+        behavior: plugin
+        handler: CancelDataRequestOp
+        args:
+          - name: data-request-id
+            type: uuid
+            required: true
+        returns:
+          type: record
+        three_axis:
+          state_effect: transition
+          external_effects: [emitting]
+          consequence:
+            baseline: requires_confirmation
+
+      cancel-slice:
+        flavour: discretionary
+        description: "Cancel one open onboarding data request slice"
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: cbu
+          noun: onboarding_data_request_slice
+          tags: [onboarding, service-resource]
+          phase_tags: [onboarding]
+          side_effects: state_write
+        invocation_phrases:
+          - "cancel onboarding data request slice"
+          - "stand down this resource owner request"
+        behavior: plugin
+        handler: CancelSliceOp
+        args:
+          - name: slice-id
+            type: uuid
+            required: true
+        returns:
+          type: record
+        three_axis:
+          state_effect: transition
+          external_effects: [emitting]
+          consequence:
+            baseline: requires_confirmation
+
+      get-data-request:
+        flavour: attribute_mutating
+        description: "Read one onboarding data request"
+        metadata:
+          tier: diagnostics
+          source_of_truth: operational
+          scope: cbu
+          noun: onboarding_data_request
+          side_effects: facts_only
+        invocation_phrases:
+          - "get onboarding data request"
+          - "show data request"
+        behavior: plugin
+        handler: GetDataRequestOp
+        args:
+          - name: data-request-id
+            type: uuid
+            required: true
+        returns:
+          type: record
+
+      list-data-requests:
+        flavour: attribute_mutating
+        description: "List onboarding data requests"
+        metadata:
+          tier: diagnostics
+          source_of_truth: operational
+          scope: cbu
+          noun: onboarding_data_request
+          side_effects: facts_only
+        invocation_phrases:
+          - "list onboarding data requests"
+          - "show resource owner data requests"
+        behavior: plugin
+        handler: ListDataRequestsOp
+        args:
+          - name: cbu-id
+            type: uuid
+            required: false
+          - name: status
+            type: string
+            required: false
+        returns:
+          type: record_set
+
+      list-slices:
+        flavour: attribute_mutating
+        description: "List slices for an onboarding data request"
+        metadata:
+          tier: diagnostics
+          source_of_truth: operational
+          scope: cbu
+          noun: onboarding_data_request_slice
+          side_effects: facts_only
+        invocation_phrases:
+          - "list onboarding data request slices"
+          - "show resource owner slices"
+        behavior: plugin
+        handler: ListSlicesOp
+        args:
+          - name: data-request-id
+            type: uuid
+            required: true
+        returns:
+          type: record_set
+
+      get-slice:
+        flavour: attribute_mutating
+        description: "Read one onboarding data request slice"
+        metadata:
+          tier: diagnostics
+          source_of_truth: operational
+          scope: cbu
+          noun: onboarding_data_request_slice
+          side_effects: facts_only
+        invocation_phrases:
+          - "get onboarding data request slice"
+          - "show resource owner slice"
+        behavior: plugin
+        handler: GetSliceOp
+        args:
+          - name: slice-id
+            type: uuid
+            required: true
+        returns:
+          type: record
+
+      get-slice-attrs:
+        flavour: attribute_mutating
+        description: "List frozen attributes for an onboarding data request slice"
+        metadata:
+          tier: diagnostics
+          source_of_truth: operational
+          scope: cbu
+          noun: onboarding_data_request_attr
+          side_effects: facts_only
+        invocation_phrases:
+          - "get onboarding data request attributes"
+          - "show frozen slice attributes"
+        behavior: plugin
+        handler: GetSliceAttrsOp
+        args:
+          - name: slice-id
+            type: uuid
+            required: true
+        returns:
+          type: record_set

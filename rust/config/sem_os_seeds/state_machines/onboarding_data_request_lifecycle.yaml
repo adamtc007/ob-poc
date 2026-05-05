@@ -1,0 +1,87 @@
+state_machine: onboarding_data_request_lifecycle
+description: Onboarding-scoped service-resource data request lifecycle
+states:
+  - collecting
+  - ready_for_dispatch
+  - dispatching
+  - awaiting_owner
+  - completed
+  - blocked
+  - cancelled
+initial: collecting
+transitions:
+  - from: collecting
+    to: ready_for_dispatch
+    verbs: [onboarding.compile-data-request]
+  - from: ready_for_dispatch
+    to: dispatching
+    verbs: [onboarding.dispatch-ready-slices]
+  - from: dispatching
+    to: awaiting_owner
+    verbs: [onboarding.dispatch-ready-slices]
+  - from: awaiting_owner
+    to: completed
+    verbs: [service-resource.confirm-provisioning-result]
+  - from: collecting
+    to: blocked
+    verbs: [service-resource.confirm-provisioning-result, readiness.compute]
+  - from: ready_for_dispatch
+    to: blocked
+    verbs: [service-resource.confirm-provisioning-result, readiness.compute]
+  - from: dispatching
+    to: blocked
+    verbs: [service-resource.confirm-provisioning-result, readiness.compute]
+  - from: awaiting_owner
+    to: blocked
+    verbs: [service-resource.confirm-provisioning-result, readiness.compute]
+  - from: collecting
+    to: cancelled
+    verbs: [onboarding.cancel-data-request]
+  - from: ready_for_dispatch
+    to: cancelled
+    verbs: [onboarding.cancel-data-request]
+  - from: dispatching
+    to: cancelled
+    verbs: [onboarding.cancel-data-request]
+  - from: awaiting_owner
+    to: cancelled
+    verbs: [onboarding.cancel-data-request]
+  - from: blocked
+    to: cancelled
+    verbs: [onboarding.cancel-data-request]
+reducer:
+  overlay_sources:
+    request:
+      table: onboarding_data_requests
+      join: data_request_id
+      provides: [request_status]
+  conditions:
+    is_collecting:
+      expr: "request.request_status = 'collecting'"
+    is_ready_for_dispatch:
+      expr: "request.request_status = 'ready_for_dispatch'"
+    is_dispatching:
+      expr: "request.request_status = 'dispatching'"
+    is_awaiting_owner:
+      expr: "request.request_status = 'awaiting_owner'"
+    is_completed:
+      expr: "request.request_status = 'completed'"
+    is_blocked:
+      expr: "request.request_status = 'blocked'"
+    is_cancelled:
+      expr: "request.request_status = 'cancelled'"
+  rules:
+    - state: cancelled
+      requires: [is_cancelled]
+    - state: blocked
+      requires: [is_blocked]
+    - state: completed
+      requires: [is_completed]
+    - state: awaiting_owner
+      requires: [is_awaiting_owner]
+    - state: dispatching
+      requires: [is_dispatching]
+    - state: ready_for_dispatch
+      requires: [is_ready_for_dispatch]
+    - state: collecting
+      requires: []

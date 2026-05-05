@@ -28,6 +28,7 @@ slots:
       # ── Research workflow (decision tracking) ───────────────────────
       workflow_decision: { verb: research.workflow.record-decision, when: filled }
       workflow_confirm: { verb: research.workflow.confirm-decision, when: filled }
+      onboarding_get_slice_attrs: onboarding.get-slice-attrs
       workflow_reject: { verb: research.workflow.reject-decision, when: filled }
       workflow_action: { verb: research.workflow.record-action, when: filled }
       workflow_correction: { verb: research.workflow.record-correction, when: filled }
