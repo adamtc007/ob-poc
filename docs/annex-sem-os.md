@@ -418,9 +418,6 @@ pub struct SemOsContextEnvelope {
 pub enum PruneReason {
     AbacDenied { actor_role: String, required: String },
     EntityKindMismatch { verb_kinds: Vec<String>, subject_kind: String },
-    TierExcluded { tier: String, reason: String },
-    TaxonomyNoOverlap { verb_taxonomies: Vec<String> },
-    PreconditionFailed { precondition: String },
     AgentModeBlocked { mode: String },
     PolicyDenied { policy_fqn: String, reason: String },
 }
@@ -485,7 +482,6 @@ pub struct FilterSummary {
     pub after_group_scope: usize,
     pub after_semreg: usize,
     pub after_lifecycle: usize,
-    pub after_actor: usize,
     pub final_count: usize,
 }
 ```

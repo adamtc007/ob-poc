@@ -736,7 +736,7 @@ Returns the sub-session ID and list of unresolved references with initial matche
                     "parent_dsl_index": {
                         "type": "integer",
                         "default": 0,
-                        "description": "Index into parent's assembled_dsl that triggered resolution"
+                        "description": "Index into parent's run-sheet that triggered resolution"
                     }
                 },
                 "required": ["session_id", "unresolved_refs"]

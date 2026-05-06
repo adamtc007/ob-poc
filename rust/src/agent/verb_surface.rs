@@ -121,7 +121,6 @@ pub struct FilterSummary {
     pub after_group_scope: usize,
     pub after_semreg: usize,
     pub after_lifecycle: usize,
-    pub after_actor: usize,
     pub final_count: usize,
 }
 
@@ -304,17 +303,18 @@ pub struct VerbSurfaceContext<'a> {
     pub composite_state: Option<&'a GroupCompositeState>,
 }
 
-// ── 8-step compute pipeline ─────────────────────────────────────
+// ── 7-step compute pipeline ─────────────────────────────────────
 
 /// Compute the session verb surface by applying all governance layers.
 ///
-/// 6-step pipeline:
+/// 7-step pipeline:
 /// 1. Base set from RuntimeVerbRegistry
 /// 2. AgentMode filter (Research vs Governed)
 /// 3. Scope + workflow filter (group scope + workflow phase, merged)
 /// 4. SemReg CCIR (single enforcement point)
 /// 5. Lifecycle state filter
-/// 6. Rank + composite state bias + fingerprint
+/// 6. FailPolicy check (safe-harbor reduction when SemReg unavailable)
+/// 7. Rank + composite state bias + fingerprint
 pub fn compute_session_verb_surface(ctx: &VerbSurfaceContext<'_>) -> SessionVerbSurface {
     let registry = runtime_registry();
 
@@ -468,10 +468,7 @@ pub fn compute_session_verb_surface(ctx: &VerbSurfaceContext<'_>) -> SessionVerb
         .collect();
     let after_lifecycle = after_lc.len();
 
-    // Actor gating removed (was no-op passthrough).
-    let after_actor = after_lifecycle;
-
-    // ── Step 7: FailPolicy check ────────────────────────────────
+    // ── Step 6: FailPolicy check ────────────────────────────────
     let after_fp: Vec<(&str, &RuntimeVerb)> = if !semreg_available {
         match ctx.fail_policy {
             VerbSurfaceFailPolicy::FailClosed => {
@@ -504,7 +501,7 @@ pub fn compute_session_verb_surface(ctx: &VerbSurfaceContext<'_>) -> SessionVerb
         after_lc
     };
 
-    // ── Step 8: Rank, group, fingerprint ────────────────────────
+    // ── Step 7: Rank, group, fingerprint ────────────────────────
     let verbs: Vec<SurfaceVerb> = after_fp
         .iter()
         .map(|(_, rv)| {
@@ -587,7 +584,6 @@ pub fn compute_session_verb_surface(ctx: &VerbSurfaceContext<'_>) -> SessionVerb
             after_group_scope,
             after_semreg,
             after_lifecycle,
-            after_actor,
             final_count,
         },
     }
@@ -662,15 +658,6 @@ fn format_prune_reason(reason: &PruneReason) -> String {
             "Entity kind mismatch (verb: {:?}, subject: {subject_kind})",
             verb_kinds
         ),
-        PruneReason::TierExcluded { tier, reason } => {
-            format!("Tier excluded ({tier}: {reason})")
-        }
-        PruneReason::TaxonomyNoOverlap { verb_taxonomies } => {
-            format!("No taxonomy overlap ({:?})", verb_taxonomies)
-        }
-        PruneReason::PreconditionFailed { precondition } => {
-            format!("Precondition failed: {precondition}")
-        }
         PruneReason::AgentModeBlocked { mode } => format!("Blocked by {mode} mode"),
         PruneReason::PolicyDenied { policy_fqn, reason } => {
             format!("Policy denied ({policy_fqn}: {reason})")
@@ -1046,10 +1033,10 @@ mod tests {
         // Each stage should be <= the previous (progressive narrowing)
         assert!(s.after_agent_mode <= s.total_registry);
         assert!(s.after_workflow <= s.after_agent_mode);
+        assert!(s.after_group_scope == s.after_workflow);
         assert!(s.after_semreg <= s.after_workflow);
         assert!(s.after_lifecycle <= s.after_semreg);
-        assert!(s.after_actor <= s.after_lifecycle);
-        assert!(s.final_count <= s.after_actor);
+        assert!(s.final_count <= s.after_lifecycle);
     }
 
     #[test]

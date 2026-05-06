@@ -380,10 +380,6 @@ pub struct SessionStateResponse {
     #[serde(default)]
     pub pending_intents: Vec<serde_json::Value>,
 
-    /// Assembled DSL statements (empty vec if none, skipped in JSON if empty)
-    #[serde(default)]
-    pub assembled_dsl: Vec<String>,
-
     /// Combined DSL (None if no DSL assembled, skipped in JSON if None)
     #[serde(default)]
     pub combined_dsl: Option<String>,

@@ -1015,7 +1015,7 @@ SemReg resolve_context() → ContextEnvelope {
 }
 ```
 
-**PruneReason variants**: `AbacDenied`, `EntityKindMismatch`, `TierExcluded`, `TaxonomyNoOverlap`, `PreconditionFailed`, `AgentModeBlocked`, `PolicyDenied`
+**PruneReason variants**: `AbacDenied`, `EntityKindMismatch`, `AgentModeBlocked`, `PolicyDenied`
 
 Allowed verbs are threaded as **pre-constraints** into verb search (not just post-filter). TOCTOU recheck compares fingerprints before execution.
 

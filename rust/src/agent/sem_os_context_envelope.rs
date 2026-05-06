@@ -87,12 +87,6 @@ pub enum PruneReason {
         verb_kinds: Vec<String>,
         subject_kind: String,
     },
-    /// Tier excluded by view/evidence mode.
-    TierExcluded { tier: String, reason: String },
-    /// No taxonomy overlap between verb and subject.
-    TaxonomyNoOverlap { verb_taxonomies: Vec<String> },
-    /// Preconditions not met.
-    PreconditionFailed { precondition: String },
     /// AgentMode blocked the verb.
     AgentModeBlocked { mode: String },
     /// Policy rule denied the verb.

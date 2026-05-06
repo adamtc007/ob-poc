@@ -136,7 +136,6 @@ impl ToolHandlers {
                 "after_workflow": surface.filter_summary.after_workflow,
                 "after_semreg": surface.filter_summary.after_semreg,
                 "after_lifecycle": surface.filter_summary.after_lifecycle,
-                "after_actor": surface.filter_summary.after_actor,
                 "final_count": surface.filter_summary.final_count,
             },
         });

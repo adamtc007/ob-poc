@@ -1392,22 +1392,6 @@ impl AgentSession {
         id
     }
 
-    /// Set assembled DSL after validation
-    /// Deprecated: Use set_pending_dsl which adds to run_sheet
-    pub fn set_assembled_dsl(&mut self, dsl: Vec<String>) {
-        // Add each DSL string to run sheet as draft
-        for source in dsl {
-            self.run_sheet.add_draft(source, Vec::new());
-        }
-        self.transition(SessionEvent::DslReady);
-    }
-
-    /// Clear draft DSL entries
-    pub fn clear_assembled_dsl(&mut self) {
-        self.run_sheet.clear_drafts();
-        self.transition(SessionEvent::Cancelled);
-    }
-
     /// Record execution results and update context
     pub fn record_execution(&mut self, results: Vec<ExecutionResult>) {
         // Update context with created entities
@@ -3080,9 +3064,6 @@ pub struct SessionStateResponse {
     pub state: SessionState,
     /// Number of messages in the session
     pub message_count: usize,
-    /// Assembled DSL statements (empty vec if none)
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub assembled_dsl: Vec<String>,
     /// Combined DSL (None if no DSL assembled)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub combined_dsl: Option<String>,
@@ -3328,8 +3309,11 @@ mod tests {
         session.transition(SessionEvent::DslPendingValidation);
         assert_eq!(session.state, SessionState::PendingValidation);
 
-        // Set assembled DSL -> ReadyToExecute
-        session.set_assembled_dsl(vec!["(cbu.ensure :cbu-name \"Test\")".to_string()]);
+        // Add a draft to the run sheet -> ReadyToExecute
+        session
+            .run_sheet
+            .add_draft("(cbu.ensure :cbu-name \"Test\")".to_string(), Vec::new());
+        session.transition(SessionEvent::DslReady);
         assert_eq!(session.state, SessionState::ReadyToExecute);
         assert!(session.run_sheet.has_runnable()); // Entry is draft/runnable
 

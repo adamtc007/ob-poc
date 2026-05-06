@@ -756,11 +756,11 @@ The Semantic OS closed loop ensures that every utterance operates within the bou
 
 **Step 1 — SemOS Context Resolution:** The orchestrator calls `resolve_context()` with the current session state, producing a `SemOsContextEnvelope` containing:
 - `allowed_verbs`: HashSet of verb FQNs that pass ABAC, tier, precondition, and lifecycle checks
-- `pruned_verbs`: Vec of verbs rejected with structured `PruneReason` (7 variants: AbacDenied, EntityKindMismatch, TierExcluded, TaxonomyNoOverlap, PreconditionFailed, AgentModeBlocked, PolicyDenied)
+- `pruned_verbs`: Vec of verbs rejected with structured `PruneReason` (4 variants: AbacDenied, EntityKindMismatch, AgentModeBlocked, PolicyDenied)
 - `fingerprint`: SHA-256 of sorted allowed verb FQNs (format: `v1:<hex>`)
 - `evidence_gaps`, `governance_signals`: Governance intelligence for the agent
 
-**Step 2 — Verb Surface Computation (6-step pipeline):**
+**Step 2 — Verb Surface Computation (7-step pipeline):**
 1. Registry: Load all ~1,263 verbs from RuntimeVerbRegistry
 2. AgentMode: Filter by Research vs Governed mode
 3. Scope+Workflow: Apply group scope gate (no group = bootstrap domains only) + workflow phase filter (stage_focus → domain allowlists)

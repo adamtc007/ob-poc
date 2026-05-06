@@ -812,7 +812,7 @@ pub struct ExtractEntitiesResponse {
 
 #[derive(Debug, Deserialize)]
 pub struct ExecuteDslRequest {
-    /// DSL source to execute. If None/missing, uses session's assembled_dsl.
+    /// DSL source to execute. If None/missing, uses the session's run-sheet draft entries.
     #[serde(default)]
     pub dsl: Option<String>,
 }

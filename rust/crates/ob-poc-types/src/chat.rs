@@ -531,7 +531,6 @@ pub struct VerbSurfaceFilterSummary {
     pub after_workflow: usize,
     pub after_semreg: usize,
     pub after_lifecycle: usize,
-    pub after_actor: usize,
     pub final_count: usize,
 }
 
