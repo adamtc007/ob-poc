@@ -91,19 +91,44 @@ expect = [
 # =============================================================================
 # Gate 2: WorkspaceSelection — Workspace Choice
 # =============================================================================
+#
+# Selecting a workspace transitions to a CBU structure DAG picker (Gate 2.5)
+# before exposing journeys. The picker enumerates jurisdiction × vehicle
+# combinations (Luxembourg UCITS SICAV, Ireland AIF ICAV, etc.).
 
 [[tests]]
 id = "workspace-cbu-click"
-description = "Clicking CBU workspace button transitions to JourneySelection"
+description = "Clicking CBU workspace button transitions to structure-DAG picker"
 depends_on = "scope-gate-allianz-resolve"
 actions = [
     { type = "click_button", label = "CBU" },
     { type = "wait", ms = 5000 },
 ]
 expect = [
-    { type = "text_present", text = "CBU workspace selected" },
+    { type = "text_present", text = "Choose a specific CBU structure DAG" },
+    { type = "button_present", label = "Luxembourg UCITS SICAV" },
+    { type = "button_present", label = "Ireland UCITS ICAV" },
+    { type = "button_present", label = "UK Authorised OEIC" },
+]
+
+# =============================================================================
+# Gate 2.5: StructureDAGSelection — Jurisdiction x Vehicle Choice
+# =============================================================================
+
+[[tests]]
+id = "structure-dag-lux-sicav-click"
+description = "Selecting Luxembourg UCITS SICAV transitions to JourneySelection"
+depends_on = "workspace-cbu-click"
+actions = [
+    { type = "click_button", label = "Luxembourg UCITS SICAV" },
+    { type = "wait", ms = 5000 },
+]
+expect = [
+    { type = "text_present", text = "Luxembourg UCITS SICAV DAG selected" },
     { type = "text_present", text = "Which journey" },
     { type = "button_present", label = "Book Setup" },
+    { type = "button_present", label = "CBU Maintenance" },
+    { type = "button_present", label = "Instrument Matrix" },
 ]
 
 [[tests]]
@@ -139,7 +164,7 @@ expect = [
 [[tests]]
 id = "journey-book-setup-click"
 description = "Clicking Book Setup activates the pack and asks first question"
-depends_on = "workspace-cbu-click"
+depends_on = "structure-dag-lux-sicav-click"
 actions = [
     { type = "click_button", label = "Book Setup" },
     { type = "wait", ms = 5000 },
@@ -322,7 +347,9 @@ steps = [
     { action = "press_key", key = "Enter", pause_after = 4000 },
     { action = "screenshot", name = "01-workspace-options" },
     { action = "click_button", label = "CBU", pause_after = 4000 },
-    { action = "screenshot", name = "02-journey-options" },
+    { action = "screenshot", name = "02-structure-dag-options" },
+    { action = "click_button", label = "Luxembourg UCITS SICAV", pause_after = 4000 },
+    { action = "screenshot", name = "02b-journey-options" },
     { action = "click_button", label = "Book Setup", pause_after = 4000 },
     { action = "screenshot", name = "03-first-question" },
     { action = "type", text = "Allianz Luxembourg SICAV", pause_after = 1000 },
@@ -343,6 +370,7 @@ steps = [
     { action = "type", text = "Allianz", pause_after = 1000 },
     { action = "press_key", key = "Enter", pause_after = 4000 },
     { action = "click_button", label = "CBU", pause_after = 3000 },
+    { action = "click_button", label = "Luxembourg UCITS SICAV", pause_after = 3000 },
     { action = "click_button", label = "CBU Maintenance", pause_after = 3000 },
     { action = "type", text = "what's next", pause_after = 1000 },
     { action = "press_key", key = "Enter", pause_after = 5000 },

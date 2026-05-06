@@ -25,7 +25,7 @@ cd rust/
 
 # Agentic Scenario Harness
 cargo x harness list                               # List all suites + scenario counts
-cargo x harness run --all                           # Run all 48 scenarios (needs DATABASE_URL)
+cargo x harness run --all                           # Run all 44 scenarios (needs DATABASE_URL)
 cargo x harness run --suite scenarios/suites/governance_strict.yaml
 cargo x harness run --scenario direct_dsl_denied_viewer
 cargo x harness dump --scenario direct_dsl_denied_viewer
@@ -478,7 +478,7 @@ ob-poc/
 │   │   └── api/                # REST routes
 │   ├── tests/                  # External test harnesses (public API only)
 │   │   └── fixtures/macros/    # YAML macro fixtures for runbook harnesses
-│   └── scenarios/suites/       # 10 suites, 48 agentic test scenarios
+│   └── scenarios/suites/       # 9 suites, 44 agentic test scenarios
 ├── migrations/                 # 128 SQLx migrations
 ├── docs/                       # Current architecture truth + appendices
 ├── ai-thoughts/                # Historical design notes referenced by code/docs; not authoritative

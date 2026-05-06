@@ -59,7 +59,7 @@ function ClarificationCard({
           <button
             type="button"
             key={option.id}
-            onClick={() => onReply?.({ selected_option: option.id })}
+            onClick={() => onReply?.({ freeform_response: option.label })}
             className="block w-full rounded-lg border border-[var(--border-primary)] bg-[var(--bg-tertiary)] px-3 py-2 text-left text-sm transition-colors hover:border-[var(--accent-blue)] hover:bg-[var(--accent-blue)]/10"
           >
             <span className="font-medium text-[var(--text-primary)]">

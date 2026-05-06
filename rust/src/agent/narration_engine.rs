@@ -431,7 +431,7 @@ fn compute_blockers(post_slots: &[HydratedSlot]) -> Vec<NarrationBlocker> {
                         .map(|r| format!("{:?}", r))
                         .collect::<Vec<_>>()
                         .join("; "),
-                    unblock_hint: format!("fill {} first", humanize_slot_name(&slot.name)),
+                    unblock_hint: build_unblock_hint(&slot.name, &blocked.reasons),
                 });
             }
             collect(&slot.children, blockers);
@@ -443,6 +443,40 @@ fn compute_blockers(post_slots: &[HydratedSlot]) -> Vec<NarrationBlocker> {
     blockers.sort_by(|a, b| a.blocked_verb.cmp(&b.blocked_verb));
     blockers.dedup_by(|a, b| a.blocked_verb == b.blocked_verb);
     blockers
+}
+
+/// Produce a human-readable unblock hint by parsing the most-actionable
+/// `RuntimeBlockReason.message`. The reducer emits structured-but-flat strings
+/// like `"slot 'X' is in state 'filled' which does not satisfy action gating"`
+/// or `"dependency 'X' is in state 'empty' but requires 'intake'"`. A blanket
+/// "fill X first" misleads users when the slot is already filled but a gate
+/// downstream is unsatisfied.
+fn build_unblock_hint(
+    slot_name: &str,
+    reasons: &[crate::sem_os_runtime::constellation_runtime::RuntimeBlockReason],
+) -> String {
+    let humanized = humanize_slot_name(slot_name);
+    for reason in reasons {
+        if let Some((dep, current, required)) = parse_dependency_state(&reason.message) {
+            let dep_human = humanize_slot_name(&dep);
+            return format!("advance {} from '{}' to '{}'", dep_human, current, required);
+        }
+        if reason.message.contains("does not satisfy action gating") {
+            return format!("{} needs further state advancement", humanized);
+        }
+    }
+    format!("fill {} first", humanized)
+}
+
+/// Parse `"... '{name}' is in state '{current}' but requires '{required}'"`.
+fn parse_dependency_state(msg: &str) -> Option<(String, String, String)> {
+    let (_, after_first) = msg.split_once('\'')?;
+    let (name, rest) = after_first.split_once('\'')?;
+    let (_, after_state) = rest.split_once("state '")?;
+    let (current, rest) = after_state.split_once('\'')?;
+    let (_, after_requires) = rest.split_once("requires '")?;
+    let (required, _) = after_requires.split_once('\'')?;
+    Some((name.to_string(), current.to_string(), required.to_string()))
 }
 
 // ---------------------------------------------------------------------------
