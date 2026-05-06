@@ -17,6 +17,7 @@ mod catalogue;
 mod dag_test;
 mod deal_harness;
 mod entity;
+mod eval_tooling;
 mod fund_programme;
 mod gleif_crawl_dsl;
 mod gleif_import;
@@ -525,6 +526,30 @@ enum Command {
     Entity {
         #[command(subcommand)]
         action: EntityAction,
+    },
+
+    /// Eval-harness database lifecycle commands.
+    Db {
+        #[command(subcommand)]
+        action: eval_tooling::EvalDbAction,
+    },
+
+    /// Eval seed-bundle authoring and inspection commands.
+    Bundle {
+        #[command(subcommand)]
+        action: eval_tooling::EvalBundleAction,
+    },
+
+    /// Eval fixture lifecycle commands.
+    Fixture {
+        #[command(subcommand)]
+        action: eval_tooling::EvalFixtureAction,
+    },
+
+    /// Eval probe stub and recording commands.
+    Probe {
+        #[command(subcommand)]
+        action: eval_tooling::EvalProbeAction,
     },
 
     /// Deal Hierarchy Test Harness - Tests Deal → Products → Rate Cards DAG
@@ -1591,6 +1616,16 @@ fn main() -> Result<()> {
                 EntityAction::Stats { snapshot } => entity::stats(snapshot.as_deref()),
             }
         }
+        Command::Db { action } => {
+            let rt = tokio::runtime::Runtime::new()?;
+            rt.block_on(eval_tooling::run_db(action))
+        }
+        Command::Bundle { action } => eval_tooling::run_bundle(action),
+        Command::Fixture { action } => {
+            let rt = tokio::runtime::Runtime::new()?;
+            rt.block_on(eval_tooling::run_fixture(action))
+        }
+        Command::Probe { action } => eval_tooling::run_probe(action),
         Command::LoadFundProgramme {
             config,
             input,

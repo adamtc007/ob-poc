@@ -7,3 +7,6 @@ license.workspace = true
 description = "Fixture helpers and bundled test cases for the Sage Eval Harness."
 
 [dependencies]
+serde.workspace = true
+serde_yaml.workspace = true
+thiserror.workspace = true
