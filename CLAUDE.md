@@ -196,7 +196,14 @@ verb execution → rehydrate_tos() → tos.hydrated_state (HydratedSlot tree)
 
 **Two kinds of state on the session:** Resource state (the DAG, rehydrated after writes) and viewport state (view level, lens, focus — session-local, no rehydration). Navigation verbs mutate viewport state only.
 
-**All state changes flow through `orchestrator_v2.process()`.** No REST endpoint may directly mutate session, focus, navigation, or constellation state.
+**All resource-state and constellation-state changes flow through `orchestrator_v2.process()`.** No REST endpoint may directly mutate session resource state, navigation, or constellation state.
+
+**Documented metadata exemptions** (live alongside the constellation, not inside it — do not pass through `process()`):
+- `POST /api/session/:id/bindings` — symbol→entity aliases (`set_session_binding` in `agent_routes.rs`). Shell-style aliases scoped to a session; no constellation impact.
+- `POST /api/session/:id/focus` — `stage_focus` UI filter (`set_session_focus`). Viewport hint, not resource state.
+- `POST /api/session/:id/subsession` + `complete_subsession` — research scratch buffer that writes resolved bindings back into the parent. Sub-sessions are isolated from the parent's runbook by construction.
+
+These three are exempt because they're session metadata, not DAG state. Promote to a `process()`-mediated input variant only if a real consistency bug appears (e.g. a binding survives across a runbook checkpoint when it shouldn't).
 
 Observatory endpoints (`observatory_routes.rs`) MUST read from the session's `WorkspaceFrame.hydrated_state`, never call `try_hydrate_cbu()` independently or build `FocusState` from scratch. The `ShowLoop` is a transitional exception (renders SemReg object detail, not constellation slot state).
 
