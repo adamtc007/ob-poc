@@ -16,6 +16,8 @@ pub struct LlmInferenceTrace {
     pub trace_id: Uuid,
     pub provider: String,
     pub model: String,
+    pub model_id: String,
+    pub prompt_template_version: String,
     pub prompt_hash: String,
     pub response_hash: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -33,6 +35,9 @@ pub struct LlmInferenceTrace {
 pub struct LlmInferenceTraceInput<'a> {
     pub provider: &'a str,
     pub model: &'a str,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub model_id: Option<&'a str>,
+    pub prompt_template_version: &'a str,
     pub prompt: &'a str,
     pub response: &'a str,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -51,8 +56,12 @@ pub fn record_llm_inference_trace(input: LlmInferenceTraceInput<'_>) -> LlmInfer
     let trace_id = Uuid::new_v5(
         &Uuid::NAMESPACE_URL,
         format!(
-            "ob-poc:llm-trace:{}:{}:{}:{}",
-            input.provider, input.model, prompt_hash, response_hash
+            "ob-poc:llm-trace:{}:{}:{}:{}:{}",
+            input.provider,
+            input.model_id.unwrap_or(input.model),
+            input.prompt_template_version,
+            prompt_hash,
+            response_hash
         )
         .as_bytes(),
     );
@@ -61,6 +70,8 @@ pub fn record_llm_inference_trace(input: LlmInferenceTraceInput<'_>) -> LlmInfer
         trace_id,
         provider: input.provider.to_string(),
         model: input.model.to_string(),
+        model_id: input.model_id.unwrap_or(input.model).to_string(),
+        prompt_template_version: input.prompt_template_version.to_string(),
         prompt_hash,
         response_hash,
         context_hash: input.context_hash.map(str::to_string),
@@ -93,6 +104,8 @@ mod tests {
         LlmInferenceTraceInput {
             provider: "openai",
             model: "gpt-test",
+            model_id: Some("gpt-test"),
+            prompt_template_version: "test_prompt_v1",
             prompt: "system: classify\nuser: hello",
             response: "{\"intent\":\"read\"}",
             context_hash: Some("sha256:context"),

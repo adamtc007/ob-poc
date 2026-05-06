@@ -27,6 +27,12 @@ pub struct DomainPackManifest {
     #[serde(default)]
     pub declared_modes: Vec<DeclaredMode>,
     #[serde(default)]
+    pub workflow_phases: Vec<WorkflowPhase>,
+    #[serde(default)]
+    pub acp_personas: Vec<AcpPersonaDeclaration>,
+    #[serde(default)]
+    pub resource_uri_schemes: Vec<ResourceUriScheme>,
+    #[serde(default)]
     pub external_mcp_transports: Vec<ExternalMcpTransport>,
     #[serde(default)]
     pub typed_extension_points: Vec<TypedExtensionPoint>,
@@ -109,6 +115,29 @@ pub struct MentionNamespace {
 pub struct DeclaredMode {
     pub mode_id: String,
     pub label: String,
+    pub description: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct WorkflowPhase {
+    pub phase_id: String,
+    pub label: String,
+    pub description: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct AcpPersonaDeclaration {
+    pub persona_id: String,
+    pub label: String,
+    pub description: String,
+    #[serde(default)]
+    pub mutation_authority: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ResourceUriScheme {
+    pub scheme: String,
+    pub resource_kind: String,
     pub description: String,
 }
 
@@ -261,6 +290,21 @@ pub fn validate_domain_pack(manifest: &DomainPackManifest) -> DomainPackValidati
     let mut mode_ids = HashSet::new();
     for mode in &manifest.declared_modes {
         validate_declared_mode(mode, &mut mode_ids, &mut diagnostics);
+    }
+
+    let mut workflow_phases = HashSet::new();
+    for phase in &manifest.workflow_phases {
+        validate_workflow_phase(phase, &mut workflow_phases, &mut diagnostics);
+    }
+
+    let mut personas = HashSet::new();
+    for persona in &manifest.acp_personas {
+        validate_acp_persona(persona, &mut personas, &mut diagnostics);
+    }
+
+    let mut uri_schemes = HashSet::new();
+    for scheme in &manifest.resource_uri_schemes {
+        validate_resource_uri_scheme(scheme, &mut uri_schemes, &mut diagnostics);
     }
 
     let probe_ids: HashSet<&str> = manifest
@@ -493,6 +537,66 @@ fn validate_declared_mode(
     }
 }
 
+fn validate_workflow_phase(
+    phase: &WorkflowPhase,
+    seen: &mut HashSet<String>,
+    diagnostics: &mut Vec<DomainPackDiagnostic>,
+) {
+    require_non_empty(diagnostics, "workflow_phase.phase_id", &phase.phase_id);
+    require_non_empty(diagnostics, "workflow_phase.label", &phase.label);
+    require_non_empty(
+        diagnostics,
+        "workflow_phase.description",
+        &phase.description,
+    );
+    if !phase.phase_id.is_empty() && !seen.insert(phase.phase_id.clone()) {
+        diagnostics.push(diagnostic(
+            "domain_pack.duplicate_workflow_phase",
+            format!("duplicate workflow phase {}", phase.phase_id),
+        ));
+    }
+}
+
+fn validate_acp_persona(
+    persona: &AcpPersonaDeclaration,
+    seen: &mut HashSet<String>,
+    diagnostics: &mut Vec<DomainPackDiagnostic>,
+) {
+    require_non_empty(diagnostics, "acp_persona.persona_id", &persona.persona_id);
+    require_non_empty(diagnostics, "acp_persona.label", &persona.label);
+    require_non_empty(diagnostics, "acp_persona.description", &persona.description);
+    if !persona.persona_id.is_empty() && !seen.insert(persona.persona_id.clone()) {
+        diagnostics.push(diagnostic(
+            "domain_pack.duplicate_acp_persona",
+            format!("duplicate ACP persona {}", persona.persona_id),
+        ));
+    }
+}
+
+fn validate_resource_uri_scheme(
+    scheme: &ResourceUriScheme,
+    seen: &mut HashSet<String>,
+    diagnostics: &mut Vec<DomainPackDiagnostic>,
+) {
+    require_non_empty(diagnostics, "resource_uri_scheme.scheme", &scheme.scheme);
+    require_non_empty(
+        diagnostics,
+        "resource_uri_scheme.resource_kind",
+        &scheme.resource_kind,
+    );
+    require_non_empty(
+        diagnostics,
+        "resource_uri_scheme.description",
+        &scheme.description,
+    );
+    if !scheme.scheme.is_empty() && !seen.insert(scheme.scheme.clone()) {
+        diagnostics.push(diagnostic(
+            "domain_pack.duplicate_resource_uri_scheme",
+            format!("duplicate resource URI scheme {}", scheme.scheme),
+        ));
+    }
+}
+
 fn validate_external_mcp_transport(
     transport: &ExternalMcpTransport,
     probe_ids: &HashSet<&str>,
@@ -590,6 +694,31 @@ mod tests {
                 mode_id: "discovery".to_string(),
                 label: "Discovery".to_string(),
                 description: "Read-only substrate exploration".to_string(),
+            }],
+            workflow_phases: vec![WorkflowPhase {
+                phase_id: "discovery".to_string(),
+                label: "Discovery".to_string(),
+                description: "Read-only substrate exploration".to_string(),
+            }],
+            acp_personas: vec![
+                AcpPersonaDeclaration {
+                    persona_id: "sage:planning".to_string(),
+                    label: "Sage Planning".to_string(),
+                    description: "Discovery, projection, planning, and workbook drafting"
+                        .to_string(),
+                    mutation_authority: false,
+                },
+                AcpPersonaDeclaration {
+                    persona_id: "sage:execution".to_string(),
+                    label: "Sage Execution".to_string(),
+                    description: "Workbook validation, dry-run, and approved execution".to_string(),
+                    mutation_authority: true,
+                },
+            ],
+            resource_uri_schemes: vec![ResourceUriScheme {
+                scheme: "semos://entity/{id}".to_string(),
+                resource_kind: "entity".to_string(),
+                description: "SemOS entity reference".to_string(),
             }],
             external_mcp_transports: vec![],
             typed_extension_points: vec![TypedExtensionPoint {

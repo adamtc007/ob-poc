@@ -163,7 +163,17 @@ export type TraceOp =
       classification: string;
       redacted_count: number;
       acp_mode?: string;
+      acp_persona_mode?: string;
+      sage_workflow_phase?: string;
       mechanisms?: string[];
+      fallback_summary?: string[];
+      acp_mechanism_summary?: string[];
+      acp_fallback_summary?: string[];
+      projected_surface_summary?: string[];
+      capability_negotiation?: string[];
+      projection_count?: number;
+      projection_bytes?: number;
+      projection_latency_ms?: number;
     }
   | {
       op: "workbook_dry_run_validated";
@@ -187,6 +197,8 @@ export type TraceOp =
       trace_id: string;
       provider: string;
       model: string;
+      model_id?: string;
+      prompt_template_version?: string;
       prompt_hash: string;
       response_hash: string;
     }

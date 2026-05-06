@@ -1,6 +1,7 @@
 import { api } from "./client";
 
 export type AcpAdapterKind = "zed" | "test_harness";
+export type AcpPersonaMode = "sage:planning" | "sage:execution";
 export type AcpSessionState = "open" | "closed";
 export type AcpMutationCapability = "none";
 export type ContextClassification =
@@ -12,6 +13,7 @@ export type ContextClassification =
 export interface AcpSession {
   session_id: string;
   adapter: AcpAdapterKind;
+  persona: AcpPersonaMode;
   state: AcpSessionState;
   opened_at: string;
   mutation_capability: AcpMutationCapability;
@@ -19,6 +21,7 @@ export interface AcpSession {
 
 export interface AcpOpenSessionRequest {
   adapter?: AcpAdapterKind;
+  persona?: AcpPersonaMode;
 }
 
 export interface AcpOpenSessionResult {
@@ -98,6 +101,25 @@ export interface AcpDeclaredMode {
   description: string;
 }
 
+export interface AcpWorkflowPhase {
+  phase_id: string;
+  label: string;
+  description: string;
+}
+
+export interface AcpPersonaDeclaration {
+  persona_id: AcpPersonaMode;
+  label: string;
+  description: string;
+  mutation_authority: boolean;
+}
+
+export interface AcpResourceUriScheme {
+  scheme: string;
+  resource_kind: string;
+  description: string;
+}
+
 export interface AcpDeclaredModeCapability extends AcpDeclaredMode {
   discovery_visible: boolean;
   execution_authority: boolean;
@@ -156,6 +178,9 @@ export interface AcpPolicyCapabilities {
   projection_catalog: AcpProjectionCatalogEntry[];
   mention_namespaces: AcpMentionNamespace[];
   declared_modes: AcpDeclaredModeCapability[];
+  workflow_phases: AcpWorkflowPhase[];
+  acp_personas: AcpPersonaDeclaration[];
+  resource_uri_schemes: AcpResourceUriScheme[];
   external_mcp_transports: AcpExternalMcpTransport[];
   typed_extension_points: AcpTypedExtensionPoint[];
   context_policy: AcpContextPolicyView;
@@ -173,7 +198,16 @@ export interface AcpObpocCapabilities {
   projections: AcpProjectionCatalogEntry[];
   probes: AcpDiscoveryProbe[];
   mentionNamespaces: AcpMentionNamespace[];
-  modes: AcpDeclaredMode[];
+  modes: AcpPersonaDeclaration[];
+  workflowPhases: AcpWorkflowPhase[];
+  resourceUriSchemes: AcpResourceUriScheme[];
+  configOptions: {
+    personas: AcpPersonaDeclaration[];
+    defaultPersona: AcpPersonaMode;
+    workflowPhases: AcpWorkflowPhase[];
+    classificationTaxonomy: ContextClassification[];
+    declinedAuthoritySurfaces: string[];
+  };
   classification: AcpContextPolicyView;
   authoritySurfaces: AcpAuthoritySurfaceDecision[];
   externalMcpTransports: AcpExternalMcpTransport[];

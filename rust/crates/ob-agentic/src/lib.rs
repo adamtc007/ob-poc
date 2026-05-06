@@ -12,7 +12,7 @@
 //! ## Backend Selection
 //!
 //! Set `AGENT_BACKEND` environment variable:
-//! - `anthropic` (default): Anthropic Claude API
+//! - `anthropic` (default): Anthropic Claude API, `claude-sonnet-4-6`
 //! - `openai`: OpenAI API
 
 // LLM client abstraction

@@ -132,18 +132,53 @@ mention_namespaces:
     target_kind: semos.workspace
     description: Workspace stack and constellation frame references.
 declared_modes:
-  - mode_id: discovery
+  - mode_id: sage:planning
+    label: Sage Planning
+    description: Discovery, projection, planning, explanation, attestation prompting, and workbook drafting.
+  - mode_id: sage:execution
+    label: Sage Execution
+    description: Workbook validation, dry-run, HITL approval routing, and approved REPL DSL execution.
+workflow_phases:
+  - phase_id: discovery
     label: Discovery
     description: Read-only SemOS discovery and projection assembly.
-  - mode_id: planning
+  - phase_id: planning
     label: Planning
     description: Workbook and runbook plan construction without mutation.
-  - mode_id: explanation
+  - phase_id: explanation
     label: Explanation
     description: Semantic diff, policy, and lineage explanation.
-  - mode_id: attestation
+  - phase_id: attestation
     label: Attestation
     description: Approval-token and audit review before any restricted mutation path.
+acp_personas:
+  - persona_id: sage:planning
+    label: Sage Planning
+    description: Discovery, projection, planning, explanation, attestation prompting, and workbook drafting.
+    mutation_authority: false
+  - persona_id: sage:execution
+    label: Sage Execution
+    description: Workbook validation, dry-run, HITL approval routing, and approved REPL DSL execution.
+    mutation_authority: true
+resource_uri_schemes:
+  - scheme: semos://pack-manifest/{pack_id}
+    resource_kind: pack_manifest
+    description: Domain Pack manifest reference.
+  - scheme: semos://entity/{id}
+    resource_kind: entity
+    description: SemOS entity reference.
+  - scheme: semos://verb/{id}
+    resource_kind: verb
+    description: SemOS verb reference.
+  - scheme: semos://transition/{id}
+    resource_kind: transition
+    description: Domain transition reference.
+  - scheme: semos://workbook/{id}
+    resource_kind: workbook
+    description: Execution workbook reference.
+  - scheme: semos://semantic-diff/{id}
+    resource_kind: semantic_diff
+    description: Semantic diff artefact reference.
 external_mcp_transports: []
 typed_extension_points:
   - extension_id: semos.derivation_registry

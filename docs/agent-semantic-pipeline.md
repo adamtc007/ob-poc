@@ -151,9 +151,11 @@ Falls back to `DeterministicSage` on LLM failure. System prompt constrains LLM t
 
 ### LLM Usage
 
-**Model:** `claude-sonnet-4-20250514` (via `ANTHROPIC_MODEL` env var)
+**Model:** `claude-sonnet-4-6` (via `ANTHROPIC_MODEL` env var)
 **Endpoint:** `https://api.anthropic.com/v1/messages`
 **Headers:** `x-api-key`, `anthropic-version: 2023-06-01`
+**Temperature:** `0`
+**Sage prompt template version:** `sage_outcome_classifier_v2_sonnet_4_6`
 
 **LLM is used ONLY for:**
 1. Sage intent classification (observation plane, ~200ms)
@@ -358,6 +360,7 @@ pub struct OnboardingPlan {
 - `LlmClient` trait (pluggable backend)
 - `AnthropicClient` implementation with tool call support
 - Model configurable via `ANTHROPIC_MODEL` env var
+- Default model id locked for audit as `claude-sonnet-4-6`
 
 ---
 

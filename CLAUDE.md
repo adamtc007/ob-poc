@@ -263,7 +263,7 @@ Search Priority (9-tier):
 
 **PolicyGate:** Server-side single-pipeline enforcement. `SemOsContextEnvelope` replaces `SemRegVerbPolicy`: carries allowed verbs, pruned verbs with structured `PruneReason` (7 variants: AbacDenied, EntityKindMismatch, TierExcluded, TaxonomyNoOverlap, PreconditionFailed, AgentModeBlocked, PolicyDenied), `AllowedVerbSetFingerprint` (SHA-256), TOCTOU recheck. Pre-constrained verb search threads allowed verbs into `HybridVerbSearcher`.
 
-**ACP boundary (2026-05-06):** `ob_poc_acp` is the launchable Agent Client Protocol server over newline-delimited JSON-RPC stdio. ACP is the rich agent-editor projection surface for SemOS discovery, not the policy or mutation authority. `obpoc/policy`, `obpoc/projections/list`, and `obpoc/projection/get` expose Domain Pack policy, projection catalogue entries, typed hashed projection envelopes, discovery probe allow/refuse reasons, context classification/redaction rules, transition dry-run/mutation capability, and the mutation boundary (`workbook_approval_and_compiled_runbook_gate`). Visibility and authority are independent: Sage/editor may observe any classification-permitted projection the Domain Pack exposes; direct ACP mutation is refused. Enforcement remains behind ACP in SemOS Domain Pack validation, workbook integrity, approval tokens, and the compiled runbook execution gate.
+**ACP boundary (2026-05-06):** `ob_poc_acp` is the launchable Agent Client Protocol server over newline-delimited JSON-RPC stdio. ACP is the rich agent-editor projection surface for SemOS discovery, not the policy or mutation authority. ACP exposes two personas, `sage:planning` and `sage:execution`; discovery/planning/explanation/attestation are Sage workflow phases, not ACP modes. `obpoc/policy`, `obpoc/projections/list`, and `obpoc/projection/get` expose Domain Pack policy, projection catalogue entries, typed hashed projection envelopes, pack-declared `semos://...` resource URI schemes, discovery probe allow/refuse reasons, context classification/redaction rules, transition dry-run/mutation capability, and the mutation boundary (`workbook_approval_and_compiled_runbook_gate`). Projection is demand-driven: trace/audit events record `acp_mechanism_summary`, `acp_fallback_summary`, `projection_count`, `projection_bytes`, and `projection_latency_ms` to catch over-eager ACP projection during MVP-DryRun review. Visibility and authority are independent: Sage/editor may observe any classification-permitted projection the Domain Pack exposes; direct ACP mutation is refused. Enforcement remains behind ACP in SemOS Domain Pack validation, workbook integrity, approval tokens, and the compiled runbook execution gate.
 
 **SessionVerbSurface:** 6-step compute pipeline (was 8): Registry → AgentMode → Scope+Workflow (merged) → SemReg CCIR → Lifecycle → Rank+CompositeStateBias. FailClosed default = ~30 safe-harbor verbs. Dual fingerprints: `vs1:<hex>` (surface) vs `v1:<hex>` (SemReg).
 
@@ -494,6 +494,7 @@ ob-poc/
 DATABASE_URL="postgresql:///data_designer"
 AGENT_BACKEND=anthropic
 ANTHROPIC_API_KEY="sk-ant-..."
+ANTHROPIC_MODEL=claude-sonnet-4-6
 
 # Optional
 BPMN_LITE_GRPC_URL=http://localhost:50052   # Enable BPMN integration

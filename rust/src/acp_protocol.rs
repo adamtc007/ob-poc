@@ -9,9 +9,10 @@ use chrono::Utc;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use std::collections::{BTreeMap, BTreeSet};
+use std::time::Instant;
 use uuid::Uuid;
 
-use crate::acp::{self, AcpAdapterKind, AcpSession};
+use crate::acp::{self, AcpAdapterKind, AcpPersonaMode, AcpSession};
 use crate::runbook::KycUpdateStatusDryRunInput;
 
 pub const ACP_PROTOCOL_VERSION: &str = "0.4.3";
@@ -175,6 +176,15 @@ pub enum AcpContentBlock {
         #[serde(skip_serializing_if = "Option::is_none")]
         description: Option<String>,
     },
+    EmbeddedResource {
+        uri: String,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        name: Option<String>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        mime_type: Option<String>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        text: Option<String>,
+    },
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -189,6 +199,8 @@ pub struct AcpPromptRequest {
 #[serde(rename_all = "camelCase")]
 pub struct AcpSessionIdRequest {
     pub session_id: String,
+    #[serde(default)]
+    pub persona: Option<AcpPersonaMode>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -228,6 +240,24 @@ pub struct AcpProjectionGetRequest {
     pub adapter: AcpAdapterKind,
     #[serde(default)]
     pub subject: Option<sem_os_core::acp_projection::AcpProjectionSubject>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct AcpPermissionRequest {
+    #[serde(default)]
+    pub session_id: Option<String>,
+    #[serde(default, rename = "sessionId")]
+    pub session_id_camel: Option<String>,
+    #[serde(default)]
+    pub persona: Option<AcpPersonaMode>,
+    #[serde(default)]
+    pub workbook_id: Option<String>,
+    #[serde(default)]
+    pub workbook_hash: Option<String>,
+    #[serde(default)]
+    pub state_snapshot_id: Option<String>,
+    #[serde(default)]
+    pub evidence_refs: Vec<Value>,
 }
 
 fn default_adapter() -> AcpAdapterKind {
@@ -289,7 +319,8 @@ impl AcpJsonRpcAgent {
             "request_permission" | "obpoc/request_permission" => {
                 self.obpoc_request_permission(id, request.params)
             }
-            "write_text_file" | "create_text_file" | "terminal/new" => self.error(
+            "write_text_file" | "fs/write_text_file" | "create_text_file" | "terminal/new"
+            | "terminal/create" => self.error(
                 id,
                 INVALID_REQUEST,
                 format!(
@@ -354,7 +385,11 @@ impl AcpJsonRpcAgent {
 
     fn session_new(&mut self, id: Option<Value>) -> Vec<JsonRpcOutgoing> {
         let session_id = Uuid::new_v4();
-        let session = acp::open_acp_session(session_id, AcpAdapterKind::Zed);
+        let session = acp::open_acp_session_with_persona(
+            session_id,
+            AcpAdapterKind::Zed,
+            AcpPersonaMode::SagePlanning,
+        );
         self.sessions.insert(session_id, session);
         let now = Utc::now().to_rfc3339();
         self.response(
@@ -363,7 +398,7 @@ impl AcpJsonRpcAgent {
                 "sessionId": session_id.to_string(),
                 "session": self.session_record(session_id, "ob-poc ACP session", &now, &now),
                 "modeState": {
-                    "currentModeId": "discovery",
+                    "currentModeId": AcpPersonaMode::SagePlanning.as_str(),
                     "availableModes": obpoc_mode_state()
                 }
             }),
@@ -379,15 +414,30 @@ impl AcpJsonRpcAgent {
             Ok(session_id) => session_id,
             Err(error) => return self.error(id, INVALID_PARAMS, error.to_string(), None),
         };
-        self.sessions
-            .entry(session_id)
-            .or_insert_with(|| acp::open_acp_session(session_id, AcpAdapterKind::Zed));
+        self.sessions.entry(session_id).or_insert_with(|| {
+            acp::open_acp_session_with_persona(
+                session_id,
+                AcpAdapterKind::Zed,
+                request.persona.unwrap_or(AcpPersonaMode::SagePlanning),
+            )
+        });
         let now = Utc::now().to_rfc3339();
         self.response(
             id,
             json!({
                 "sessionId": session_id.to_string(),
                 "session": self.session_record(session_id, "ob-poc ACP session", &now, &now),
+                "modeState": {
+                    "currentModeId": request.persona.unwrap_or(AcpPersonaMode::SagePlanning).as_str(),
+                    "availableModes": obpoc_mode_state()
+                },
+                "restore": {
+                    "status": "loaded_without_persisted_runtime_state",
+                    "stalePolicy": "new_session_context_required",
+                    "configurationVersion": null,
+                    "stateSnapshotId": null,
+                    "pinnedResourceLinks": []
+                }
             }),
         )
     }
@@ -447,12 +497,14 @@ impl AcpJsonRpcAgent {
         let prompt_text = request
             .prompt
             .iter()
-            .filter_map(|block| match block {
-                AcpContentBlock::Text { text } => Some(text.as_str()),
-                AcpContentBlock::ResourceLink { .. } => None,
+            .map(|block| match block {
+                AcpContentBlock::Text { text } => text.as_str(),
+                AcpContentBlock::ResourceLink { uri, .. }
+                | AcpContentBlock::EmbeddedResource { uri, .. } => uri.as_str(),
             })
             .collect::<Vec<_>>()
             .join("\n");
+        let resolved_refs = resolve_prompt_resource_refs(&request.prompt);
         let text = if prompt_text.trim().is_empty() {
             "ACP session is open. Available ob-poc operations: context assembly, KYC update-status dry-run, restricted mutation refusal.".to_string()
         } else {
@@ -471,10 +523,13 @@ impl AcpJsonRpcAgent {
                         "sessionUpdate": "tool_call_update",
                         "toolCallId": format!("tool:projection-catalog:{session_id}"),
                         "status": "completed",
+                        "kind": "read",
+                        "persona": AcpPersonaMode::SagePlanning.as_str(),
+                        "workflowPhase": "discovery",
                         "title": "ACP projection catalogue",
                         "content": {
                             "type": "resource_link",
-                            "uri": "obpoc://acp/projections",
+                            "uri": "semos://pack-manifest/ob-poc.kyc",
                             "name": "SemOS projection surface",
                             "description": "Pack, policy, DAG, verbs, lineage, materiality, and workspace projections"
                         }
@@ -488,6 +543,17 @@ impl AcpJsonRpcAgent {
                     "sessionId": session_id.to_string(),
                     "update": {
                         "sessionUpdate": "plan",
+                        "persona": AcpPersonaMode::SagePlanning.as_str(),
+                        "workflowPhase": "planning",
+                        "goalProposalTrace": {
+                            "status": "projection_summary",
+                            "resolvedResourceRefs": resolved_refs,
+                            "acpMechanismSummary": ["resource_ref_resolution", "demand_driven"],
+                            "acpFallbackSummary": [],
+                            "projectionCount": 0,
+                            "projectionBytes": prompt_text.len(),
+                            "projectionLatencyMs": 0
+                        },
                         "entries": [
                             {"id": "discover", "status": "completed", "label": "Read SemOS projection surface"},
                             {"id": "plan", "status": "in_progress", "label": "Assemble workbook-safe plan"},
@@ -639,6 +705,7 @@ impl AcpJsonRpcAgent {
             .or_insert_with(|| acp::open_acp_session(session_id, request.adapter))
             .clone();
 
+        let started_at = Instant::now();
         match acp::build_acp_projection(
             &session,
             &manifest,
@@ -647,10 +714,30 @@ impl AcpJsonRpcAgent {
                 subject: request.subject,
             },
         ) {
-            Ok(envelope) => self.response(
-                id,
-                json!({"status": "acp_projection", "projection": envelope}),
-            ),
+            Ok(envelope) => {
+                let projection_latency_ms = started_at.elapsed().as_millis();
+                let projection_bytes = serde_json::to_vec(&envelope)
+                    .map(|bytes| bytes.len())
+                    .unwrap_or(0);
+                self.response(
+                    id,
+                    json!({
+                        "status": "acp_projection",
+                        "projection": envelope,
+                        "observability": {
+                            "acpMechanismSummary": [
+                                "projection_get",
+                                "classification_policy",
+                                "demand_driven"
+                            ],
+                            "acpFallbackSummary": [],
+                            "projectionCount": 1,
+                            "projectionBytes": projection_bytes,
+                            "projectionLatencyMs": projection_latency_ms
+                        }
+                    }),
+                )
+            }
             Err(error) => self.acp_error(id, error),
         }
     }
@@ -676,10 +763,12 @@ impl AcpJsonRpcAgent {
                             "sessionUpdate": "tool_call_update",
                             "toolCallId": format!("tool:dry-run:{}", output.workbook.id),
                             "status": "completed",
+                            "kind": "think",
+                            "persona": AcpPersonaMode::SageExecution.as_str(),
                             "title": "KYC update-status dry-run",
                             "content": {
                                 "type": "resource_link",
-                                "uri": format!("obpoc://workbook/{}", output.workbook.id),
+                                "uri": format!("semos://workbook/{}", output.workbook.id),
                                 "name": "Execution workbook",
                                 "description": "Workbook validated without mutation"
                             }
@@ -693,6 +782,9 @@ impl AcpJsonRpcAgent {
                         "sessionId": output.workbook.core.session_id.to_string(),
                         "update": {
                             "sessionUpdate": "semantic_diff",
+                            "persona": AcpPersonaMode::SageExecution.as_str(),
+                            "semanticDiffId": semantic_diff_uri(&output.workbook.id.to_string()),
+                            "fallbackSummary": ["resource_link"],
                             "diff": output.workbook.core.simulation.semantic_diff.clone(),
                             "transitionRef": output.workbook.core.simulation.transition_ref.clone()
                         }
@@ -712,22 +804,55 @@ impl AcpJsonRpcAgent {
         id: Option<Value>,
         params: Value,
     ) -> Vec<JsonRpcOutgoing> {
-        let session_id = match extract_session_id(&params) {
+        let request: AcpPermissionRequest = match serde_json::from_value(params) {
+            Ok(request) => request,
+            Err(error) => return self.error(id, INVALID_PARAMS, error.to_string(), None),
+        };
+        let raw_session_id = request.session_id.or(request.session_id_camel);
+        let session_id = match raw_session_id
+            .as_deref()
+            .ok_or_else(|| "session_id is required".to_string())
+            .and_then(|raw| Uuid::parse_str(raw).map_err(|error| error.to_string()))
+        {
             Ok(session_id) => session_id,
             Err(error) => return self.error(id, INVALID_PARAMS, error, None),
         };
-        self.sessions
-            .entry(session_id)
-            .or_insert_with(|| acp::open_acp_session(session_id, AcpAdapterKind::Zed));
+        if request.persona != Some(AcpPersonaMode::SageExecution) {
+            return self.error(
+                id,
+                INVALID_REQUEST,
+                "session/request_permission is only available to sage:execution",
+                Some(json!({
+                    "capability": "none",
+                    "requiredPersona": AcpPersonaMode::SageExecution.as_str(),
+                    "actualPersona": request.persona.map(AcpPersonaMode::as_str)
+                })),
+            );
+        }
+        self.sessions.entry(session_id).or_insert_with(|| {
+            acp::open_acp_session_with_persona(
+                session_id,
+                AcpAdapterKind::Zed,
+                AcpPersonaMode::SageExecution,
+            )
+        });
+        let permission_id = format!("permission:hitl:{}", Uuid::new_v4());
         self.response(
             id,
             json!({
                 "status": "permission_request_created",
-                "permission_request_id": format!("permission:hitl:{}", Uuid::new_v4()),
+                "permission_request_id": permission_id,
                 "session_id": session_id,
                 "authority_surface": "request_permission",
+                "persona": AcpPersonaMode::SageExecution.as_str(),
                 "scope": "hitl_approval_only",
                 "execution_authority": false,
+                "approval_binding": {
+                    "workbook_id": request.workbook_id,
+                    "workbook_hash": request.workbook_hash,
+                    "state_snapshot_id": request.state_snapshot_id,
+                    "evidence_refs": request.evidence_refs
+                },
                 "reason": "ACP may request attestation metadata, but mutation still requires workbook approval and the compiled runbook gate"
             }),
         )
@@ -778,11 +903,73 @@ impl AcpJsonRpcAgent {
 
 fn obpoc_mode_state() -> Value {
     json!([
-        {"id": "discovery", "name": "Discovery", "description": "Read-only SemOS discovery and projection assembly"},
-        {"id": "planning", "name": "Planning", "description": "Workbook and runbook plan construction without mutation"},
-        {"id": "explanation", "name": "Explanation", "description": "Semantic diff, policy, and lineage explanation"},
-        {"id": "attestation", "name": "Attestation", "description": "Approval-token and audit review before mutation gates"}
+        {"id": "sage:planning", "name": "Sage Planning", "description": "Discovery, projection, planning, explanation, attestation prompting, and workbook drafting"},
+        {"id": "sage:execution", "name": "Sage Execution", "description": "Workbook validation, dry-run, HITL approval routing, and approved REPL DSL execution"}
     ])
+}
+
+fn semantic_diff_uri(seed: &str) -> String {
+    format!("semos://semantic-diff/{seed}")
+}
+
+fn resolve_prompt_resource_refs(prompt: &[AcpContentBlock]) -> Vec<Value> {
+    prompt
+        .iter()
+        .filter_map(|block| match block {
+            AcpContentBlock::ResourceLink { uri, name, .. } => {
+                parse_semos_resource_uri(uri).map(|parsed| {
+                    json!({
+                        "uri": uri,
+                        "name": name,
+                        "resource_kind": parsed.resource_kind,
+                        "resource_id": parsed.resource_id,
+                    })
+                })
+            }
+            AcpContentBlock::EmbeddedResource {
+                uri,
+                name,
+                mime_type,
+                ..
+            } => parse_semos_resource_uri(uri).map(|parsed| {
+                json!({
+                    "uri": uri,
+                    "name": name,
+                    "mime_type": mime_type,
+                    "resource_kind": parsed.resource_kind,
+                    "resource_id": parsed.resource_id,
+                    "inbound_classification_required": true,
+                })
+            }),
+            AcpContentBlock::Text { .. } => None,
+        })
+        .collect()
+}
+
+struct ParsedSemosResource {
+    resource_kind: &'static str,
+    resource_id: String,
+}
+
+fn parse_semos_resource_uri(uri: &str) -> Option<ParsedSemosResource> {
+    let rest = uri.strip_prefix("semos://")?;
+    let (kind, id) = rest.split_once('/')?;
+    let resource_kind = match kind {
+        "pack-manifest" => "pack_manifest",
+        "entity" => "entity",
+        "verb" => "verb",
+        "transition" => "transition",
+        "workbook" => "workbook",
+        "semantic-diff" => "semantic_diff",
+        _ => return None,
+    };
+    if id.trim().is_empty() {
+        return None;
+    }
+    Some(ParsedSemosResource {
+        resource_kind,
+        resource_id: id.to_string(),
+    })
 }
 
 fn obpoc_capability_summary(manifest: &sem_os_core::domain_pack::DomainPackManifest) -> Value {
@@ -799,7 +986,16 @@ fn obpoc_capability_summary(manifest: &sem_os_core::domain_pack::DomainPackManif
         "projections": manifest.projection_catalog,
         "probes": manifest.discovery_probes,
         "mentionNamespaces": manifest.mention_namespaces,
-        "modes": manifest.declared_modes,
+        "modes": manifest.acp_personas,
+        "workflowPhases": manifest.workflow_phases,
+        "resourceUriSchemes": manifest.resource_uri_schemes,
+        "configOptions": {
+            "personas": manifest.acp_personas,
+            "defaultPersona": AcpPersonaMode::SagePlanning.as_str(),
+            "workflowPhases": manifest.workflow_phases,
+            "classificationTaxonomy": ["public", "internal", "confidential", "restricted"],
+            "declinedAuthoritySurfaces": ["fs/write_text_file", "terminal/create"]
+        },
         "classification": manifest.classification_policy,
         "authoritySurfaces": policy.authority_surfaces,
         "externalMcpTransports": manifest.external_mcp_transports,
@@ -879,7 +1075,18 @@ mod tests {
             .as_array()
             .unwrap()
             .iter()
-            .any(|surface| surface["surface"] == "terminal/new" && surface["permitted"] == false));
+            .any(
+                |surface| surface["surface"] == "terminal/create" && surface["permitted"] == false
+            ));
+        assert_eq!(
+            result["obpocCapabilities"]["configOptions"]["defaultPersona"],
+            "sage:planning"
+        );
+        assert!(result["obpocCapabilities"]["resourceUriSchemes"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|scheme| scheme["scheme"] == "semos://workbook/{id}"));
     }
 
     #[test]
@@ -956,6 +1163,18 @@ mod tests {
             }
             _ => panic!("expected response"),
         }
+        match &outgoing[1] {
+            JsonRpcOutgoing::Notification(notification) => {
+                let trace = &notification.params["update"]["goalProposalTrace"];
+                assert_eq!(trace["projectionCount"], 0);
+                assert!(trace["acpMechanismSummary"]
+                    .as_array()
+                    .unwrap()
+                    .iter()
+                    .any(|mechanism| mechanism == "demand_driven"));
+            }
+            _ => panic!("expected plan notification"),
+        }
     }
 
     #[test]
@@ -1026,9 +1245,8 @@ mod tests {
             .as_array()
             .unwrap()
             .iter()
-            .any(
-                |surface| surface["surface"] == "write_text_file" && surface["permitted"] == false
-            ));
+            .any(|surface| surface["surface"] == "fs/write_text_file"
+                && surface["permitted"] == false));
     }
 
     #[test]
@@ -1074,13 +1292,21 @@ mod tests {
             }),
         )));
 
-        let projection = &response.result.unwrap()["projection"];
+        let result = response.result.unwrap();
+        let projection = &result["projection"];
         assert_eq!(projection["projection_kind"], "transition_surface");
         assert_eq!(projection["pack_id"], "ob-poc.kyc");
         assert!(projection["projection_hash"]
             .as_str()
             .unwrap()
             .starts_with("sha256:"));
+        assert_eq!(result["observability"]["projectionCount"], 1);
+        assert!(result["observability"]["projectionBytes"].as_u64().unwrap() > 0);
+        assert!(result["observability"]["acpMechanismSummary"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|mechanism| mechanism == "demand_driven"));
         assert_eq!(
             projection["payload"]["transitions"][0]["transition_ref"],
             "kyc-case.intake-to-discovery"
@@ -1147,13 +1373,45 @@ mod tests {
         let response = only_response(agent.handle_request(request(
             1,
             "obpoc/request_permission",
-            json!({"session_id": SESSION_ID.to_string()}),
+            json!({
+                "session_id": SESSION_ID.to_string(),
+                "persona": "sage:execution",
+                "workbook_id": "ewb:v1:test",
+                "workbook_hash": "sha256:workbook",
+                "state_snapshot_id": "snapshot-1",
+                "evidence_refs": [{"kind": "case_id", "ref_id": CASE_ID.to_string()}]
+            }),
         )));
 
         let result = response.result.unwrap();
         assert_eq!(result["status"], "permission_request_created");
         assert_eq!(result["scope"], "hitl_approval_only");
         assert_eq!(result["execution_authority"], false);
+        assert_eq!(result["persona"], "sage:execution");
+        assert_eq!(
+            result["approval_binding"]["workbook_hash"],
+            "sha256:workbook"
+        );
+    }
+
+    #[test]
+    fn planning_persona_cannot_request_permission() {
+        let mut agent = AcpJsonRpcAgent::new();
+        let response = only_response(agent.handle_request(request(
+            1,
+            "obpoc/request_permission",
+            json!({
+                "session_id": SESSION_ID.to_string(),
+                "persona": "sage:planning"
+            }),
+        )));
+
+        let error = response.error.unwrap();
+        assert_eq!(error.code, INVALID_REQUEST);
+        assert_eq!(
+            error.data.unwrap()["requiredPersona"],
+            AcpPersonaMode::SageExecution.as_str()
+        );
     }
 
     #[test]

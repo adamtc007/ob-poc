@@ -160,11 +160,15 @@ pub fn validate_audit_chain(
                                 trace_id,
                                 provider,
                                 model,
+                                model_id,
+                                prompt_template_version,
                                 prompt_hash,
                                 response_hash,
                             } if trace_id == &trace.trace_id
                                 && provider == &trace.provider
                                 && model == &trace.model
+                                && model_id == &trace.model_id
+                                && prompt_template_version == &trace.prompt_template_version
                                 && prompt_hash == &trace.prompt_hash
                                 && response_hash == &trace.response_hash
                         )
@@ -335,8 +339,10 @@ mod tests {
 
     fn llm_trace() -> LlmInferenceTrace {
         record_llm_inference_trace(LlmInferenceTraceInput {
-            provider: "openai",
-            model: "gpt-test",
+            provider: "anthropic",
+            model: "claude-sonnet-4-6",
+            model_id: Some("claude-sonnet-4-6"),
+            prompt_template_version: "sage_outcome_classifier_v2_sonnet_4_6",
             prompt: "redacted prompt",
             response: "{\"intent\":\"kyc-case.update-status\"}",
             context_hash: Some("sha256:context"),
@@ -434,6 +440,8 @@ mod tests {
                     trace_id: trace.trace_id,
                     provider: trace.provider.clone(),
                     model: trace.model.clone(),
+                    model_id: trace.model_id.clone(),
+                    prompt_template_version: trace.prompt_template_version.clone(),
                     prompt_hash: trace.prompt_hash.clone(),
                     response_hash: trace.response_hash.clone(),
                 },

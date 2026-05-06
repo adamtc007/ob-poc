@@ -82,7 +82,7 @@ describe("acpApi", () => {
             reason: "projection payloads are policy-governed",
           },
           {
-            surface: "terminal/new",
+            surface: "terminal/create",
             permitted: false,
             reason: "terminal execution is outside ACP discovery",
           },
@@ -106,11 +106,39 @@ describe("acpApi", () => {
         ],
         declared_modes: [
           {
-            mode_id: "discovery",
-            label: "Discovery",
-            description: "Read-only SemOS discovery",
+            mode_id: "sage:planning",
+            label: "Sage Planning",
+            description: "Discovery and planning",
             discovery_visible: true,
             execution_authority: false,
+          },
+        ],
+        workflow_phases: [
+          {
+            phase_id: "discovery",
+            label: "Discovery",
+            description: "Read-only SemOS discovery",
+          },
+        ],
+        acp_personas: [
+          {
+            persona_id: "sage:planning",
+            label: "Sage Planning",
+            description: "Discovery and planning",
+            mutation_authority: false,
+          },
+          {
+            persona_id: "sage:execution",
+            label: "Sage Execution",
+            description: "Validation and execution",
+            mutation_authority: true,
+          },
+        ],
+        resource_uri_schemes: [
+          {
+            scheme: "semos://workbook/{id}",
+            resource_kind: "workbook",
+            description: "Execution workbook reference",
           },
         ],
         external_mcp_transports: [],
@@ -257,6 +285,7 @@ describe("acpApi", () => {
       session: {
         session_id: "session-123",
         adapter: "zed",
+        persona: "sage:planning",
         state: "open",
         opened_at: "2026-05-05T12:00:00Z",
         mutation_capability: "none",
@@ -288,6 +317,7 @@ describe("acpApi", () => {
       session: {
         session_id: "session-123",
         adapter: "zed",
+        persona: "sage:planning",
         state: "closed",
         opened_at: "2026-05-05T12:00:00Z",
         mutation_capability: "none",

@@ -486,6 +486,13 @@ describe("runbookPlanApi", () => {
           projection_hash: "sha256:projection",
           classification: "internal",
           redacted_count: 0,
+          mechanisms: ["projection_get"],
+          fallback_summary: [],
+          acp_mechanism_summary: ["projection_get", "demand_driven"],
+          acp_fallback_summary: [],
+          projection_count: 1,
+          projection_bytes: 128,
+          projection_latency_ms: 3,
         },
         stack_snapshot: [],
       },
@@ -535,8 +542,10 @@ describe("runbookPlanApi", () => {
         op: {
           op: "llm_inference_traced",
           trace_id: "trace-1",
-          provider: "openai",
-          model: "gpt-test",
+          provider: "anthropic",
+          model: "claude-sonnet-4-6",
+          model_id: "claude-sonnet-4-6",
+          prompt_template_version: "sage_outcome_classifier_v2_sonnet_4_6",
           prompt_hash: "sha256:prompt",
           response_hash: "sha256:response",
         },
@@ -563,6 +572,10 @@ describe("runbookPlanApi", () => {
     expect(result[2].op.op).toBe("acp_projection_served");
     if (result[2].op.op === "acp_projection_served") {
       expect(result[2].op.projection_hash).toBe("sha256:projection");
+      expect(result[2].op.acp_mechanism_summary).toContain("demand_driven");
+      expect(result[2].op.projection_count).toBe(1);
+      expect(result[2].op.projection_bytes).toBe(128);
+      expect(result[2].op.projection_latency_ms).toBe(3);
     }
     expect(fetchMock).toHaveBeenCalledWith(
       "http://localhost:3000/api/session/session-123/trace",

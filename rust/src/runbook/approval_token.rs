@@ -496,6 +496,9 @@ mod tests {
             projection_catalog: vec![],
             mention_namespaces: vec![],
             declared_modes: vec![],
+            workflow_phases: vec![],
+            acp_personas: vec![],
+            resource_uri_schemes: vec![],
             external_mcp_transports: vec![],
             typed_extension_points: vec![],
             classification_policy: ContextClassificationPolicy {

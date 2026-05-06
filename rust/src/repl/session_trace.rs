@@ -48,6 +48,7 @@ pub struct FrameRef {
 // ---------------------------------------------------------------------------
 
 /// The operation that occurred at this trace entry.
+#[allow(clippy::large_enum_variant)]
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(tag = "op", rename_all = "snake_case")]
 pub enum TraceOp {
@@ -71,6 +72,10 @@ pub enum TraceOp {
     AcpSessionOpened {
         adapter: String,
         mutation_capability: String,
+        #[serde(default)]
+        acp_persona_mode: String,
+        #[serde(default)]
+        capability_negotiation: Vec<String>,
     },
     AcpContextAssembled {
         pack_id: String,
@@ -86,7 +91,27 @@ pub enum TraceOp {
         #[serde(default)]
         acp_mode: String,
         #[serde(default)]
+        acp_persona_mode: String,
+        #[serde(default)]
+        sage_workflow_phase: String,
+        #[serde(default)]
         mechanisms: Vec<String>,
+        #[serde(default)]
+        fallback_summary: Vec<String>,
+        #[serde(default)]
+        acp_mechanism_summary: Vec<String>,
+        #[serde(default)]
+        acp_fallback_summary: Vec<String>,
+        #[serde(default)]
+        projected_surface_summary: Vec<String>,
+        #[serde(default)]
+        capability_negotiation: Vec<String>,
+        #[serde(default)]
+        projection_count: usize,
+        #[serde(default)]
+        projection_bytes: usize,
+        #[serde(default)]
+        projection_latency_ms: u128,
     },
     WorkbookDryRunValidated {
         workbook_id: String,
@@ -106,6 +131,10 @@ pub enum TraceOp {
         trace_id: Uuid,
         provider: String,
         model: String,
+        #[serde(default)]
+        model_id: String,
+        #[serde(default)]
+        prompt_template_version: String,
         prompt_hash: String,
         response_hash: String,
     },
@@ -271,6 +300,11 @@ mod tests {
             TraceOp::AcpSessionOpened {
                 adapter: "zed".into(),
                 mutation_capability: "none".into(),
+                acp_persona_mode: "sage:planning".into(),
+                capability_negotiation: vec![
+                    "declined:fs/write_text_file".into(),
+                    "declined:terminal/create".into(),
+                ],
             },
             TraceOp::AcpContextAssembled {
                 pack_id: "ob-poc.kyc".into(),
@@ -284,7 +318,20 @@ mod tests {
                 classification: "internal".into(),
                 redacted_count: 0,
                 acp_mode: "discovery".into(),
+                acp_persona_mode: "sage:planning".into(),
+                sage_workflow_phase: "discovery".into(),
                 mechanisms: vec!["projection_get".into()],
+                fallback_summary: vec![],
+                acp_mechanism_summary: vec!["projection_get".into()],
+                acp_fallback_summary: vec![],
+                projected_surface_summary: vec!["dag:internal:sha256:projection".into()],
+                capability_negotiation: vec![
+                    "declined:fs/write_text_file".into(),
+                    "declined:terminal/create".into(),
+                ],
+                projection_count: 1,
+                projection_bytes: 128,
+                projection_latency_ms: 3,
             },
             TraceOp::WorkbookDryRunValidated {
                 workbook_id: "ewb:v1:abc".into(),
@@ -302,8 +349,10 @@ mod tests {
             },
             TraceOp::LlmInferenceTraced {
                 trace_id: Uuid::nil(),
-                provider: "openai".into(),
-                model: "gpt-test".into(),
+                provider: "anthropic".into(),
+                model: "claude-sonnet-4-6".into(),
+                model_id: "claude-sonnet-4-6".into(),
+                prompt_template_version: "sage_outcome_classifier_v2_sonnet_4_6".into(),
                 prompt_hash: "sha256:prompt".into(),
                 response_hash: "sha256:response".into(),
             },

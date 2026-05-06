@@ -11,9 +11,10 @@ use sem_os_core::acp_projection::{
 };
 use sem_os_core::context_policy::{assemble_prompt_context, PromptContextAssembly};
 use sem_os_core::domain_pack::{
-    authorize_discovery_probe, ClassificationLimit, DiscoveryAuthorizationError, DiscoveryRequest,
-    DiscoveryResponse, DomainPackManifest, ExternalMcpTransport, MentionNamespace,
-    PackCompatibilityTier, ProjectionCatalogEntry, TypedExtensionPoint,
+    authorize_discovery_probe, AcpPersonaDeclaration, ClassificationLimit,
+    DiscoveryAuthorizationError, DiscoveryRequest, DiscoveryResponse, DomainPackManifest,
+    ExternalMcpTransport, MentionNamespace, PackCompatibilityTier, ProjectionCatalogEntry,
+    ResourceUriScheme, TypedExtensionPoint, WorkflowPhase,
 };
 use serde::{Deserialize, Serialize};
 use serde_json::json;
@@ -28,6 +29,7 @@ use crate::runbook::{
 pub struct AcpSession {
     pub session_id: Uuid,
     pub adapter: AcpAdapterKind,
+    pub persona: AcpPersonaMode,
     pub state: AcpSessionState,
     pub opened_at: DateTime<Utc>,
     pub mutation_capability: AcpMutationCapability,
@@ -38,6 +40,24 @@ pub struct AcpSession {
 pub enum AcpAdapterKind {
     Zed,
     TestHarness,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum AcpPersonaMode {
+    #[serde(rename = "sage:planning")]
+    SagePlanning,
+    #[serde(rename = "sage:execution")]
+    SageExecution,
+}
+
+impl AcpPersonaMode {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::SagePlanning => "sage:planning",
+            Self::SageExecution => "sage:execution",
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -72,6 +92,9 @@ pub struct AcpPolicyCapabilities {
     pub projection_catalog: Vec<ProjectionCatalogEntry>,
     pub mention_namespaces: Vec<MentionNamespace>,
     pub declared_modes: Vec<AcpDeclaredModeCapability>,
+    pub workflow_phases: Vec<WorkflowPhase>,
+    pub acp_personas: Vec<AcpPersonaDeclaration>,
+    pub resource_uri_schemes: Vec<ResourceUriScheme>,
     pub external_mcp_transports: Vec<ExternalMcpTransport>,
     pub typed_extension_points: Vec<TypedExtensionPoint>,
     pub context_policy: AcpContextPolicyView,
@@ -164,9 +187,18 @@ pub enum AcpAdapterError {
 }
 
 pub fn open_acp_session(session_id: Uuid, adapter: AcpAdapterKind) -> AcpSession {
+    open_acp_session_with_persona(session_id, adapter, AcpPersonaMode::SagePlanning)
+}
+
+pub fn open_acp_session_with_persona(
+    session_id: Uuid,
+    adapter: AcpAdapterKind,
+    persona: AcpPersonaMode,
+) -> AcpSession {
     AcpSession {
         session_id,
         adapter,
+        persona,
         state: AcpSessionState::Open,
         opened_at: Utc::now(),
         mutation_capability: AcpMutationCapability::None,
@@ -264,9 +296,12 @@ pub fn acp_policy_capabilities(
                 label: mode.label.clone(),
                 description: mode.description.clone(),
                 discovery_visible: true,
-                execution_authority: false,
+                execution_authority: mode.mode_id == AcpPersonaMode::SageExecution.as_str(),
             })
             .collect(),
+        workflow_phases: manifest.workflow_phases.clone(),
+        acp_personas: manifest.acp_personas.clone(),
+        resource_uri_schemes: manifest.resource_uri_schemes.clone(),
         external_mcp_transports: manifest.external_mcp_transports.clone(),
         typed_extension_points: manifest.typed_extension_points.clone(),
         context_policy: AcpContextPolicyView {
@@ -321,7 +356,7 @@ pub fn acp_authority_surfaces(manifest: &DomainPackManifest) -> Vec<AcpAuthority
             reason: "external MCP bindings must be declared by the pack and read-only".to_string(),
         },
         AcpAuthoritySurfaceDecision {
-            surface: "write_text_file".to_string(),
+            surface: "fs/write_text_file".to_string(),
             permitted: false,
             reason: "ACP visibility never grants editor file-write authority".to_string(),
         },
@@ -331,7 +366,7 @@ pub fn acp_authority_surfaces(manifest: &DomainPackManifest) -> Vec<AcpAuthority
             reason: "ACP visibility never grants editor file-create authority".to_string(),
         },
         AcpAuthoritySurfaceDecision {
-            surface: "terminal/new".to_string(),
+            surface: "terminal/create".to_string(),
             permitted: false,
             reason: "terminal execution is outside the ACP discovery surface".to_string(),
         },

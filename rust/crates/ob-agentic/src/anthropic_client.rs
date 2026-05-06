@@ -9,7 +9,7 @@ use serde::Deserialize;
 use super::llm_client::{LlmClient, ToolCallResult, ToolDefinition};
 
 /// Default Anthropic model
-const DEFAULT_MODEL: &str = "claude-sonnet-4-20250514";
+const DEFAULT_MODEL: &str = "claude-sonnet-4-6";
 
 /// Anthropic Claude API client
 #[derive(Clone)]
@@ -57,6 +57,7 @@ impl AnthropicClient {
             .json(&serde_json::json!({
                 "model": &self.model,
                 "max_tokens": 4096,
+                "temperature": 0,
                 "system": system_prompt,
                 "messages": [{"role": "user", "content": user_prompt}]
             }))
@@ -102,6 +103,7 @@ impl AnthropicClient {
             .json(&serde_json::json!({
                 "model": &self.model,
                 "max_tokens": 4096,
+                "temperature": 0,
                 "system": system_prompt,
                 "messages": [{"role": "user", "content": user_prompt}],
                 "tools": [{

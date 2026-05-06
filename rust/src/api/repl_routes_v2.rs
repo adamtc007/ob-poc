@@ -24,6 +24,7 @@ use sem_os_core::acp_projection::{
 use sem_os_core::domain_pack::DomainPackManifest;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
+use std::time::Instant;
 use uuid::Uuid;
 
 use crate::api::constellation_routes::{hydrate_workspace_state, resolve_context};
@@ -305,6 +306,8 @@ fn default_kyc_update_status_transition_ref() -> String {
 pub struct AcpOpenSessionRequest {
     #[serde(default = "default_acp_adapter")]
     pub adapter: crate::acp::AcpAdapterKind,
+    #[serde(default)]
+    pub persona: Option<crate::acp::AcpPersonaMode>,
 }
 
 /// Request to assemble redacted Sage context for an ACP session.
@@ -1093,9 +1096,20 @@ async fn get_acp_projection_route(
     State(state): State<ReplV2RouteState>,
     Path((session_id, kind)): Path<(Uuid, String)>,
 ) -> Result<Json<serde_json::Value>, (StatusCode, Json<ErrorResponseV2>)> {
+    let started_at = Instant::now();
     let value = get_acp_projection_value_for_state(&state, session_id, &kind)
         .await
         .map_err(acp_json_error)?;
+    let projection_latency_ms = started_at.elapsed().as_millis();
+    let projection_bytes = serde_json::to_vec(&value["projection"])
+        .map(|bytes| bytes.len())
+        .unwrap_or(0);
+    let acp_mechanism_summary = vec![
+        "projection_get".to_string(),
+        "classification_policy".to_string(),
+        "demand_driven".to_string(),
+    ];
+    let acp_fallback_summary = vec![];
     append_session_trace_if_present(
         &state,
         session_id,
@@ -1117,10 +1131,31 @@ async fn get_acp_projection_route(
                 .map(|redactions| redactions.len())
                 .unwrap_or(0),
             acp_mode: "discovery".to_string(),
-            mechanisms: vec![
-                "projection_get".to_string(),
-                "classification_policy".to_string(),
+            acp_persona_mode: "sage:planning".to_string(),
+            sage_workflow_phase: "discovery".to_string(),
+            mechanisms: acp_mechanism_summary.clone(),
+            fallback_summary: acp_fallback_summary.clone(),
+            acp_mechanism_summary,
+            acp_fallback_summary,
+            projected_surface_summary: vec![format!(
+                "{}:{}:{}",
+                value["projection"]["projection_kind"]
+                    .as_str()
+                    .unwrap_or("unknown"),
+                value["projection"]["classification"]
+                    .as_str()
+                    .unwrap_or("unknown"),
+                value["projection"]["projection_hash"]
+                    .as_str()
+                    .unwrap_or("unknown")
+            )],
+            capability_negotiation: vec![
+                "declined:fs/write_text_file".to_string(),
+                "declined:terminal/create".to_string(),
             ],
+            projection_count: 1,
+            projection_bytes,
+            projection_latency_ms,
         },
     )
     .await;
@@ -1199,16 +1234,13 @@ fn live_affinity_nodes(repl_session: &ReplSessionV2) -> Vec<serde_json::Value> {
         })
         .collect::<Vec<_>>();
 
-    nodes.extend(
-        repl_session
-            .bindings
-            .keys()
-            .map(|binding| serde_json::json!({
-                "id": format!("binding:{binding}"),
-                "kind": "binding",
-                "name": binding,
-            })),
-    );
+    nodes.extend(repl_session.bindings.keys().map(|binding| {
+        serde_json::json!({
+            "id": format!("binding:{binding}"),
+            "kind": "binding",
+            "name": binding,
+        })
+    }));
     nodes
 }
 
@@ -1226,12 +1258,7 @@ fn live_affinity_edges(repl_session: &ReplSessionV2) -> Vec<serde_json::Value> {
         })
         .collect::<Vec<_>>();
 
-    if let Some((index, frame)) = repl_session
-        .workspace_stack
-        .iter()
-        .enumerate()
-        .next_back()
-    {
+    if let Some((index, frame)) = repl_session.workspace_stack.iter().enumerate().next_back() {
         let frame_id = format!("workspace:{index}:{}", frame.constellation_map);
         edges.extend(repl_session.bindings.keys().map(|binding| {
             serde_json::json!({
@@ -1421,6 +1448,14 @@ async fn open_acp_session_route(
                 .as_str()
                 .unwrap_or("unknown")
                 .to_string(),
+            acp_persona_mode: value["session"]["persona"]
+                .as_str()
+                .unwrap_or("sage:planning")
+                .to_string(),
+            capability_negotiation: vec![
+                "declined:fs/write_text_file".to_string(),
+                "declined:terminal/create".to_string(),
+            ],
         },
     )
     .await;
@@ -1428,7 +1463,12 @@ async fn open_acp_session_route(
 }
 
 fn open_acp_session_value(session_id: Uuid, req: AcpOpenSessionRequest) -> serde_json::Value {
-    let session = crate::acp::open_acp_session(session_id, req.adapter);
+    let session = crate::acp::open_acp_session_with_persona(
+        session_id,
+        req.adapter,
+        req.persona
+            .unwrap_or(crate::acp::AcpPersonaMode::SagePlanning),
+    );
     serde_json::json!({
         "status": "acp_session_open",
         "session": session,
@@ -1444,7 +1484,12 @@ async fn close_acp_session_route(
 }
 
 fn close_acp_session_value(session_id: Uuid, req: AcpOpenSessionRequest) -> serde_json::Value {
-    let mut session = crate::acp::open_acp_session(session_id, req.adapter);
+    let mut session = crate::acp::open_acp_session_with_persona(
+        session_id,
+        req.adapter,
+        req.persona
+            .unwrap_or(crate::acp::AcpPersonaMode::SagePlanning),
+    );
     crate::acp::close_acp_session(&mut session);
     serde_json::json!({
         "status": "acp_session_closed",

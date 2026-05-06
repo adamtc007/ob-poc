@@ -20,6 +20,8 @@ use super::outcome::{
 use super::pre_classify::{pre_classify, SagePreClassification};
 use super::{IntentPolarity, SageEngine};
 
+pub const SAGE_LLM_PROMPT_TEMPLATE_VERSION: &str = "sage_outcome_classifier_v2_sonnet_4_6";
+
 const READ_DOMAINS: &[&str] = &[
     "cbu",
     "entity",
@@ -138,6 +140,7 @@ impl LlmSage {
 
 Given a user utterance and context, identify what the user wants to achieve.
 You are NOT selecting a function or verb. You are identifying the business outcome.
+Prompt template version: sage_outcome_classifier_v2_sonnet_4_6.
 
 RULES:
 1. Respond with only valid JSON tool arguments.

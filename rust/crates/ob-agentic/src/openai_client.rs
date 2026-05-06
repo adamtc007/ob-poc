@@ -55,11 +55,11 @@ impl OpenAiClient {
     ) -> Result<String> {
         let mut body = serde_json::json!({
             "model": &self.model,
+            "temperature": 0,
             "messages": [
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": user_prompt}
-            ],
-            "temperature": 0.1
+            ]
         });
 
         if json_mode {
@@ -116,11 +116,11 @@ impl OpenAiClient {
             .header("Content-Type", "application/json")
             .json(&serde_json::json!({
                 "model": &self.model,
+                "temperature": 0,
                 "messages": [
                     {"role": "system", "content": system_prompt},
                     {"role": "user", "content": user_prompt}
                 ],
-                "temperature": 0.1,
                 "functions": [{
                     "name": &tool.name,
                     "description": &tool.description,

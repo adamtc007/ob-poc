@@ -38,12 +38,21 @@ ACP exposes SemOS policy and projection decisions through `obpoc/policy`,
 and `GET /api/session/:id/acp/projections/:kind`:
 
 - Domain Pack id, version, and compatibility tier.
+- ACP personas `sage:planning` and `sage:execution`. Discovery, planning,
+  explanation, and attestation are Sage workflow phases recorded for audit,
+  not ACP modes.
+- Pack-declared `semos://...` URI schemes for pack manifests, entities, verbs,
+  transitions, workbooks, and semantic diff artefacts.
 - Domain Pack projection catalogue: pack manifest, probe catalogue, discovery
   surface, workspace state, DAG, graph scene, verb surface, transition surface,
   governance, evidence schema, AffinityGraph, lineage, derivation registry, and
   materiality.
 - Typed `AcpProjectionEnvelope` values with projection kind, classification,
   subject, snapshot refs, payload, redactions, projection hash, and timestamp.
+- Demand-driven projection observability: projection trace events record
+  `acp_mechanism_summary`, `acp_fallback_summary`, `projection_count`,
+  `projection_bytes`, and `projection_latency_ms` so MVP-DryRun trace review
+  can distinguish targeted projection from noisy over-projection.
 - Context classification policy, external LLM allowance, and required
   redactions.
 - Discovery probe allow/refuse decisions with reasons.
@@ -56,8 +65,12 @@ the editor may observe any projection that the Domain Pack exposes and the
 classification wrapper permits. Visibility does not create execution authority.
 Enforcement remains behind ACP. ACP can open sessions, advertise policy,
 assemble governed context, serve projection envelopes, and request workbook
-dry-runs. Direct mutation via ACP is refused; mutation must pass workbook
-approval and compile into a `CompiledRunbook` executed by `execute_runbook()`.
+dry-runs. ACP declines filesystem writes and client-side terminal creation at
+the capability boundary. Direct mutation via ACP is refused; mutation must pass
+workbook approval and compile into a `CompiledRunbook` executed by
+`execute_runbook()`. `session/request_permission` is accepted only for the
+`sage:execution` persona and returns a HITL request bound to workbook,
+evidence, and state-snapshot metadata.
 
 **Crates:**
 
