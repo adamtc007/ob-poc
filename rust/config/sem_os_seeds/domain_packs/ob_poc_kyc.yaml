@@ -1,0 +1,49 @@
+pack_id: ob-poc.kyc
+name: ob-poc KYC Domain Pack
+version: 0.1.0
+implementation_mode: native_compiled
+compatibility_tier: dry_run_only
+owned_constellations:
+  - kyc.onboarding
+allowed_transitions:
+  - transition_ref: kyc-case.intake-to-discovery
+    entity_type: kyc_case
+    state_machine: kyc_case_lifecycle
+    verb: kyc-case.update-status
+    from_state: INTAKE
+    to_state: DISCOVERY
+    dry_run_enabled: true
+    mutation_enabled: false
+    hitl_required: true
+    evidence_refs_required:
+      - case_id
+  - transition_ref: kyc-case.discovery-to-assessment
+    entity_type: kyc_case
+    state_machine: kyc_case_lifecycle
+    verb: kyc-case.update-status
+    from_state: DISCOVERY
+    to_state: ASSESSMENT
+    dry_run_enabled: true
+    mutation_enabled: false
+    hitl_required: true
+    evidence_refs_required:
+      - case_id
+discovery_probes:
+  - probe_id: kyc-case.read-state
+    operation: read_state
+    target: '"ob-poc".cases.status'
+    idempotent: true
+    modeled: true
+    first_class_state_mutation: false
+  - probe_id: kyc-case.read-evidence-summary
+    operation: read_evidence_summary
+    target: '"ob-poc".case_events'
+    idempotent: true
+    modeled: true
+    first_class_state_mutation: false
+classification_policy:
+  max_prompt_classification: internal
+  allow_external_llm: false
+  required_redactions:
+    - pii
+    - confidential_evidence

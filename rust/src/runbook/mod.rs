@@ -28,30 +28,46 @@
 //! existing orchestrator pipeline. Full macro/pack/constraint integration
 //! is wired in Phases 1-3.
 
+pub(crate) mod approval_token;
 pub(crate) mod canonical;
 pub(crate) mod compiler;
 pub(crate) mod constraint_gate;
+pub(crate) mod dsl_coder;
 pub(crate) mod envelope;
 pub(crate) mod errors;
 pub(crate) mod executor;
+pub(crate) mod kyc_dry_run;
+pub(crate) mod mutation_preflight;
 pub(crate) mod narration;
 pub(crate) mod plan_compiler;
 pub(crate) mod plan_executor;
 pub(crate) mod plan_types;
 pub(crate) mod response;
+pub(crate) mod restricted_mutation;
 pub(crate) mod sem_os_filter;
 pub(crate) mod step_executor_bridge;
 pub(crate) mod types;
 pub(crate) mod verb_classifier;
+pub(crate) mod workbook;
 pub(crate) mod write_set;
 
 // Re-export key types at module boundary
+pub use approval_token::{
+    compute_approval_token_id, create_approval_token_for_workbook,
+    validate_restricted_mutation_approval, ApprovalTokenId, ApprovalTokenValidationError,
+    MutationApprovalToken, MutationApprovalTokenCore, MutationApprovalTokenStatus,
+    ObservedMutationAnchors, RestrictedMutationApprovalCheck,
+};
 pub use canonical::{
     canonical_bytes_for_envelope, canonical_bytes_for_envelope_core, canonical_bytes_for_step,
     canonical_bytes_for_steps, content_addressed_id, full_sha256,
 };
 pub use compiler::compile_verb;
 pub use constraint_gate::check_pack_constraints;
+pub use dsl_coder::{
+    validate_workbook_for_dry_run, DslCoderDryRunResult, DslCoderExecutionMode,
+    DslCoderRefusalCode, DslCoderValidationError,
+};
 pub use envelope::{EnvelopeCore, ReplayEnvelope};
 pub use errors::{CompilationError, CompilationErrorKind};
 #[cfg(feature = "database")]
@@ -61,9 +77,21 @@ pub use executor::{
     ExecutionError, LockStats, RunbookEvent, RunbookExecutionResult, RunbookStore,
     RunbookStoreBackend, StepExecutionResult, StepExecutor, StepOutcome,
 };
+pub use kyc_dry_run::{
+    build_kyc_update_status_dry_run, KycUpdateStatusDryRunInput, KycUpdateStatusDryRunOutput,
+    KycUpdateStatusDryRunRefusal,
+};
+pub use mutation_preflight::{
+    prepare_restricted_mutation_preflight, MutationExecutor, MutationSemanticDiff,
+    RestrictedMutationPreflight, RestrictedMutationPreflightError,
+};
 pub use response::{
     ClarificationContext, ClarificationRequest, CompiledRunbookSummary, ConstraintViolationDetail,
     MissingField, OrchestratorResponse, Remediation, StepPreview,
+};
+pub use restricted_mutation::{
+    compile_restricted_mutation_preflight, RestrictedMutationRunbookCompilation,
+    RestrictedMutationRunbookCompilationError,
 };
 pub use sem_os_filter::{filter_verbs_against_allowed_set, SemOsDeniedVerb, SemOsFilterResult};
 pub use step_executor_bridge::{
@@ -75,6 +103,11 @@ pub use types::{
     ParkReason, StepCursor,
 };
 pub use verb_classifier::{classify_verb, VerbClassification};
+pub use workbook::{
+    compute_workbook_id, EvidenceRef, ExecutionWorkbook, ExecutionWorkbookCore,
+    ExecutionWorkbookId, ExecutionWorkbookValidationError, LlmTraceRef, StaleWorkbookPolicy,
+    WorkbookActor, WorkbookSubject,
+};
 pub use write_set::{derive_write_set, derive_write_set_heuristic};
 
 // Re-export compile_invocation (defined below)

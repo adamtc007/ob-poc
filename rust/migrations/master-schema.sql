@@ -9951,7 +9951,7 @@ CREATE TABLE "ob-poc".compiled_runbook_events (
 -- Name: TABLE compiled_runbook_events; Type: COMMENT; Schema: ob-poc; Owner: -
 --
 
-COMMENT ON TABLE "ob-poc".compiled_runbook_events IS 'Append-only event log for compiled runbook lifecycle. Status is derived from latest status_change event (INV-9).';
+COMMENT ON TABLE "ob-poc".compiled_runbook_events IS 'Append-only event log for compiled runbook lifecycle. Status is derived from latest status_change event (INV-9). ACP-visible mutation requests must still resolve to this runbook lifecycle; direct ACP mutation is not a database write path.';
 
 
 --
@@ -9973,7 +9973,7 @@ CREATE TABLE "ob-poc".compiled_runbooks (
 -- Name: TABLE compiled_runbooks; Type: COMMENT; Schema: ob-poc; Owner: -
 --
 
-COMMENT ON TABLE "ob-poc".compiled_runbooks IS 'Immutable compiled runbook artefacts. INSERT-only — UPDATE and DELETE prohibited by trigger (INV-9).';
+COMMENT ON TABLE "ob-poc".compiled_runbooks IS 'Immutable compiled runbook artefacts. INSERT-only — UPDATE and DELETE prohibited by trigger (INV-9). This table is the persisted execution boundary for ACP/workbook-approved restricted mutations.';
 
 
 --
@@ -37403,4 +37403,3 @@ ALTER TABLE ONLY sem_reg_authoring.validation_reports
 --
 
 \unrestrict rcCKICNa6fReLN6Yn3I0hVEwgQdVQZ9YLuv3kwMVDxJNFCHWSPrJge2BLbjCaRL
-

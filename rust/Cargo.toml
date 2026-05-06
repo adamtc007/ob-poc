@@ -189,6 +189,10 @@ name = "dsl_mcp"
 path = "src/bin/dsl_mcp.rs"
 required-features = ["mcp"]
 
+[[bin]]
+name = "ob_poc_acp"
+path = "src/bin/ob_poc_acp.rs"
+
 # Slice 4.1 (2026-04-22): `dsl_api` binary retired per user decision Q2(a).
 # `ob-poc-web` is now the sole authoritative HTTP server for all production
 # traffic. `Dockerfile.api` was deleted alongside this binary — downstream

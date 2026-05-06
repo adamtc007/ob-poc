@@ -68,6 +68,37 @@ pub enum TraceOp {
     RunbookApproved {
         runbook_id: String,
     },
+    AcpSessionOpened {
+        adapter: String,
+        mutation_capability: String,
+    },
+    AcpContextAssembled {
+        pack_id: String,
+        probe_id: String,
+        context_hash: String,
+        redacted_count: usize,
+    },
+    WorkbookDryRunValidated {
+        workbook_id: String,
+        transition_ref: String,
+    },
+    ApprovalTokenIssued {
+        approval_token_id: String,
+        workbook_id: String,
+        approved_by_actor_id: String,
+    },
+    RestrictedMutationPreflightPrepared {
+        workbook_id: String,
+        approval_token_id: String,
+        transition_ref: String,
+    },
+    LlmInferenceTraced {
+        trace_id: Uuid,
+        provider: String,
+        model: String,
+        prompt_hash: String,
+        response_hash: String,
+    },
     StateTransition {
         from: String,
         to: String,
@@ -226,6 +257,37 @@ mod tests {
             },
             TraceOp::RunbookApproved {
                 runbook_id: "abc123".into(),
+            },
+            TraceOp::AcpSessionOpened {
+                adapter: "zed".into(),
+                mutation_capability: "none".into(),
+            },
+            TraceOp::AcpContextAssembled {
+                pack_id: "ob-poc.kyc".into(),
+                probe_id: "kyc-case.read-state".into(),
+                context_hash: "sha256:abc".into(),
+                redacted_count: 1,
+            },
+            TraceOp::WorkbookDryRunValidated {
+                workbook_id: "ewb:v1:abc".into(),
+                transition_ref: "kyc-case.intake-to-discovery".into(),
+            },
+            TraceOp::ApprovalTokenIssued {
+                approval_token_id: "approval:v1:abc".into(),
+                workbook_id: "ewb:v1:abc".into(),
+                approved_by_actor_id: "approver@example.com".into(),
+            },
+            TraceOp::RestrictedMutationPreflightPrepared {
+                workbook_id: "ewb:v1:abc".into(),
+                approval_token_id: "approval:v1:abc".into(),
+                transition_ref: "kyc-case.intake-to-discovery".into(),
+            },
+            TraceOp::LlmInferenceTraced {
+                trace_id: Uuid::nil(),
+                provider: "openai".into(),
+                model: "gpt-test".into(),
+                prompt_hash: "sha256:prompt".into(),
+                response_hash: "sha256:response".into(),
             },
             TraceOp::StateTransition {
                 from: "draft".into(),

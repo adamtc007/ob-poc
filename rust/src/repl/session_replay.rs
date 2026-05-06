@@ -151,7 +151,14 @@ fn apply_trace_op(
             session.increment_tos_writes();
             Ok(())
         }
-        TraceOp::RunbookCompiled { .. } | TraceOp::RunbookApproved { .. } => {
+        TraceOp::RunbookCompiled { .. }
+        | TraceOp::RunbookApproved { .. }
+        | TraceOp::AcpSessionOpened { .. }
+        | TraceOp::AcpContextAssembled { .. }
+        | TraceOp::WorkbookDryRunValidated { .. }
+        | TraceOp::ApprovalTokenIssued { .. }
+        | TraceOp::RestrictedMutationPreflightPrepared { .. }
+        | TraceOp::LlmInferenceTraced { .. } => {
             // These are informational — no session mutation needed
             Ok(())
         }

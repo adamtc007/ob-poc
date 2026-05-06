@@ -24,6 +24,17 @@
 // sage::verb_resolve) now import from `dsl_runtime::entity_kind`.
 pub mod error;
 
+// ACP-facing transport-neutral adapter contracts.
+pub mod acp;
+pub mod acp_protocol;
+
+// LLM inference trace hashing and workbook binding.
+pub mod llm_trace;
+
+// Audit-chain reconstruction for ACP/workbook/dry-run traces.
+#[cfg(feature = "database")]
+pub mod audit_chain;
+
 // Data dictionary
 pub mod data_dictionary;
 

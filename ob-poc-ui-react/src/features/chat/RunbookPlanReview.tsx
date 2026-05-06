@@ -21,6 +21,7 @@ import {
 import { cn } from "../../lib/utils";
 import { runbookPlanApi } from "../../api/runbookPlan";
 import type {
+  KycUpdateStatusDryRunResult,
   RunbookPlan,
   RunbookPlanStep,
   PlanStepStatus,
@@ -36,6 +37,8 @@ interface RunbookPlanReviewProps {
   sessionId: string;
   /** If provided, use this plan directly instead of fetching. */
   initialPlan?: RunbookPlan;
+  /** If provided, render a validated workbook dry-run summary. */
+  initialDryRunResult?: KycUpdateStatusDryRunResult;
   /** Called when the plan is approved. */
   onApproved?: () => void;
   /** Called when the plan is cancelled. */
@@ -297,6 +300,54 @@ function AggregateSummary({
   );
 }
 
+function WorkbookDryRunCard({
+  result,
+}: {
+  result: KycUpdateStatusDryRunResult;
+}) {
+  const simulation = result.dry_run.semantic_diff;
+  const diff = simulation.semantic_diff;
+
+  return (
+    <div className="rounded-lg border border-cyan-200 bg-cyan-50 p-4 space-y-2">
+      <div className="flex items-center justify-between gap-3">
+        <div>
+          <div className="text-sm font-semibold text-cyan-950">
+            Workbook Dry Run
+          </div>
+          <div className="font-mono text-xs text-cyan-800">
+            {result.workbook.id}
+          </div>
+        </div>
+        <span className="rounded-full border border-cyan-300 bg-white px-2.5 py-0.5 text-xs font-medium text-cyan-800">
+          {result.status.replace(/_/g, " ")}
+        </span>
+      </div>
+
+      <div className="grid gap-2 text-xs text-cyan-900 sm:grid-cols-3">
+        <div>
+          <div className="font-medium text-cyan-700">Transition</div>
+          <div className="font-mono">{result.dry_run.transition_ref}</div>
+        </div>
+        <div>
+          <div className="font-medium text-cyan-700">State</div>
+          <div>
+            {simulation.from_state} <span aria-hidden="true">-&gt;</span>{" "}
+            {simulation.to_state}
+          </div>
+        </div>
+        <div>
+          <div className="font-medium text-cyan-700">Diff</div>
+          <div>
+            {diff.field}: {diff.before} <span aria-hidden="true">-&gt;</span>{" "}
+            {diff.after}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ---------------------------------------------------------------------------
 // Main component
 // ---------------------------------------------------------------------------
@@ -304,6 +355,7 @@ function AggregateSummary({
 export function RunbookPlanReview({
   sessionId,
   initialPlan,
+  initialDryRunResult,
   onApproved,
   onCancelled,
   onCompleted,
@@ -525,6 +577,10 @@ export function RunbookPlanReview({
       {/* Aggregate summary when complete */}
       {isCompleted && (
         <AggregateSummary plan={plan} stepResults={stepResults} />
+      )}
+
+      {initialDryRunResult && (
+        <WorkbookDryRunCard result={initialDryRunResult} />
       )}
 
       {/* Error */}

@@ -249,6 +249,82 @@ pub struct SessionFeedbackResponse {
     pub feedback: SessionFeedback,
 }
 
+/// Request for non-mutating KYC update-status workbook dry-run.
+#[derive(Debug, Clone, Deserialize)]
+pub struct KycUpdateStatusDryRunRequest {
+    pub case_id: Uuid,
+    #[serde(default = "default_kyc_update_status_transition_ref")]
+    pub transition_ref: String,
+    pub current_state: String,
+    pub requested_state: String,
+    pub configuration_version: String,
+    pub state_snapshot_id: String,
+    pub evidence_digest: String,
+    pub actor_id: String,
+    #[serde(default)]
+    pub actor_roles: Vec<String>,
+}
+
+/// Request to issue a restricted-mutation approval token for a workbook.
+#[derive(Debug, Clone, Deserialize)]
+pub struct KycApprovalTokenRequest {
+    pub workbook: crate::runbook::ExecutionWorkbook,
+    pub approved_by_actor_id: String,
+    pub approval_text: String,
+    pub expires_at: chrono::DateTime<chrono::Utc>,
+}
+
+/// Request to prepare a restricted mutation preflight. This does not execute mutation.
+#[derive(Debug, Clone, Deserialize)]
+pub struct KycRestrictedMutationPreflightRequest {
+    pub workbook: crate::runbook::ExecutionWorkbook,
+    pub approval_token: crate::runbook::MutationApprovalToken,
+    pub observed_configuration_version: String,
+    pub observed_state_snapshot_id: String,
+    pub observed_evidence_refs: Vec<crate::runbook::EvidenceRef>,
+    #[serde(default)]
+    pub consumed_token_ids: Vec<crate::runbook::ApprovalTokenId>,
+}
+
+/// Request to compile a prepared restricted mutation preflight into a runbook.
+#[derive(Debug, Clone, Deserialize)]
+pub struct KycRestrictedMutationCompileRunbookRequest {
+    pub preflight: crate::runbook::RestrictedMutationPreflight,
+}
+
+fn default_kyc_update_status_transition_ref() -> String {
+    "kyc-case.intake-to-discovery".to_string()
+}
+
+/// Request to open an ACP adapter session.
+#[derive(Debug, Clone, Deserialize)]
+pub struct AcpOpenSessionRequest {
+    #[serde(default = "default_acp_adapter")]
+    pub adapter: crate::acp::AcpAdapterKind,
+}
+
+/// Request to assemble redacted Sage context for an ACP session.
+#[derive(Debug, Clone, Deserialize)]
+pub struct AcpContextAssemblyRequest {
+    #[serde(default = "default_acp_adapter")]
+    pub adapter: crate::acp::AcpAdapterKind,
+    pub probe_id: String,
+    pub subject_kind: String,
+    pub subject_id: String,
+    #[serde(default)]
+    pub context: std::collections::BTreeMap<String, serde_json::Value>,
+    #[serde(default)]
+    pub observations: Vec<sem_os_core::domain_pack::DiscoveryObservation>,
+    #[serde(default)]
+    pub provenance: Vec<sem_os_core::domain_pack::DiscoveryProvenance>,
+    #[serde(default)]
+    pub first_class_state_mutated: bool,
+}
+
+fn default_acp_adapter() -> crate::acp::AcpAdapterKind {
+    crate::acp::AcpAdapterKind::Zed
+}
+
 impl From<ReplSessionV2> for SessionStateResponseV2 {
     fn from(session: ReplSessionV2) -> Self {
         Self {
@@ -886,10 +962,653 @@ pub fn session_scoped_router() -> Router<ReplV2RouteState> {
         )
         .route("/api/session/:id/runbook/cancel", post(cancel_runbook_plan))
         .route("/api/session/:id/runbook/status", get(get_runbook_status))
+        // Configuration-native workbook dry-run routes
+        .route(
+            "/api/session/:id/workbook/kyc/update-status/dry-run",
+            post(dry_run_kyc_update_status_workbook),
+        )
+        .route(
+            "/api/session/:id/workbook/kyc/approval-token",
+            post(issue_kyc_workbook_approval_token),
+        )
+        .route(
+            "/api/session/:id/workbook/kyc/restricted-mutation/preflight",
+            post(prepare_kyc_restricted_mutation_preflight),
+        )
+        .route(
+            "/api/session/:id/workbook/kyc/restricted-mutation/compile-runbook",
+            post(compile_kyc_restricted_mutation_runbook),
+        )
+        // ACP adapter lifecycle/context routes
+        .route(
+            "/api/session/:id/acp/capabilities",
+            get(get_acp_capabilities_route),
+        )
+        .route("/api/session/:id/acp/policy", get(get_acp_policy_route))
+        .route("/api/session/:id/acp/open", post(open_acp_session_route))
+        .route("/api/session/:id/acp/close", post(close_acp_session_route))
+        .route(
+            "/api/session/:id/acp/context",
+            post(assemble_acp_context_route),
+        )
         // Session trace routes (R9)
         .route("/api/session/:id/trace", get(get_session_trace))
         .route("/api/session/:id/trace/:seq", get(get_trace_entry))
         .route("/api/session/:id/trace/replay", post(replay_session_trace))
+}
+
+/// GET /api/session/:id/acp/capabilities
+async fn get_acp_capabilities_route(
+    Path(session_id): Path<Uuid>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<ErrorResponseV2>)> {
+    Ok(Json(acp_capabilities_value(session_id)))
+}
+
+fn acp_capabilities_value(session_id: Uuid) -> serde_json::Value {
+    let mut agent = crate::acp_protocol::AcpJsonRpcAgent::new();
+    let result = agent
+        .handle_request(crate::acp_protocol::JsonRpcRequest {
+            jsonrpc: "2.0".to_string(),
+            id: Some(serde_json::json!(1)),
+            method: "initialize".to_string(),
+            params: serde_json::json!({}),
+        })
+        .into_iter()
+        .find_map(|outgoing| match outgoing {
+            crate::acp_protocol::JsonRpcOutgoing::Response(response) => response.result,
+            crate::acp_protocol::JsonRpcOutgoing::Notification(_) => None,
+        })
+        .unwrap_or_else(|| serde_json::json!({}));
+
+    serde_json::json!({
+        "status": "acp_capabilities",
+        "session_id": session_id,
+        "capabilities": result,
+        "stdio": {
+            "command": "ob_poc_acp",
+            "transport": "jsonrpc_stdio",
+            "message_delimiter": "newline"
+        }
+    })
+}
+
+/// GET /api/session/:id/acp/policy
+async fn get_acp_policy_route(
+    Path(session_id): Path<Uuid>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<ErrorResponseV2>)> {
+    acp_policy_value(session_id)
+        .map(Json)
+        .map_err(acp_json_error)
+}
+
+fn acp_policy_value(session_id: Uuid) -> Result<serde_json::Value, crate::acp::AcpAdapterError> {
+    let manifest = load_ob_poc_kyc_domain_pack()?;
+    let session = crate::acp::open_acp_session(session_id, crate::acp::AcpAdapterKind::Zed);
+    let policy = crate::acp::acp_policy_capabilities(&session, &manifest)?;
+
+    Ok(serde_json::json!({
+        "status": "acp_policy",
+        "policy": policy,
+    }))
+}
+
+/// POST /api/session/:id/acp/open
+async fn open_acp_session_route(
+    State(state): State<ReplV2RouteState>,
+    Path(session_id): Path<Uuid>,
+    Json(req): Json<AcpOpenSessionRequest>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<ErrorResponseV2>)> {
+    let value = open_acp_session_value(session_id, req);
+    append_session_trace_if_present(
+        &state,
+        session_id,
+        crate::repl::session_trace::TraceOp::AcpSessionOpened {
+            adapter: value["session"]["adapter"]
+                .as_str()
+                .unwrap_or("unknown")
+                .to_string(),
+            mutation_capability: value["session"]["mutation_capability"]
+                .as_str()
+                .unwrap_or("unknown")
+                .to_string(),
+        },
+    )
+    .await;
+    Ok(Json(value))
+}
+
+fn open_acp_session_value(session_id: Uuid, req: AcpOpenSessionRequest) -> serde_json::Value {
+    let session = crate::acp::open_acp_session(session_id, req.adapter);
+    serde_json::json!({
+        "status": "acp_session_open",
+        "session": session,
+    })
+}
+
+/// POST /api/session/:id/acp/close
+async fn close_acp_session_route(
+    Path(session_id): Path<Uuid>,
+    Json(req): Json<AcpOpenSessionRequest>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<ErrorResponseV2>)> {
+    Ok(Json(close_acp_session_value(session_id, req)))
+}
+
+fn close_acp_session_value(session_id: Uuid, req: AcpOpenSessionRequest) -> serde_json::Value {
+    let mut session = crate::acp::open_acp_session(session_id, req.adapter);
+    crate::acp::close_acp_session(&mut session);
+    serde_json::json!({
+        "status": "acp_session_closed",
+        "session": session,
+    })
+}
+
+/// POST /api/session/:id/acp/context
+async fn assemble_acp_context_route(
+    State(state): State<ReplV2RouteState>,
+    Path(session_id): Path<Uuid>,
+    Json(req): Json<AcpContextAssemblyRequest>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<ErrorResponseV2>)> {
+    let value = assemble_acp_context_value(session_id, req).map_err(acp_json_error)?;
+    append_session_trace_if_present(
+        &state,
+        session_id,
+        crate::repl::session_trace::TraceOp::AcpContextAssembled {
+            pack_id: value["bundle"]["pack_id"]
+                .as_str()
+                .unwrap_or("unknown")
+                .to_string(),
+            probe_id: value["bundle"]["probe_id"]
+                .as_str()
+                .unwrap_or("unknown")
+                .to_string(),
+            context_hash: value["bundle"]["prompt_context"]["context_hash"]
+                .as_str()
+                .unwrap_or("unknown")
+                .to_string(),
+            redacted_count: value["bundle"]["prompt_context"]["redacted"]
+                .as_array()
+                .map(|redacted| redacted.len())
+                .unwrap_or(0),
+        },
+    )
+    .await;
+    Ok(Json(value))
+}
+
+fn assemble_acp_context_value(
+    session_id: Uuid,
+    req: AcpContextAssemblyRequest,
+) -> Result<serde_json::Value, crate::acp::AcpAdapterError> {
+    let manifest = load_ob_poc_kyc_domain_pack()?;
+    let session = crate::acp::open_acp_session(session_id, req.adapter);
+    let subject = sem_os_core::domain_pack::DiscoverySubject {
+        subject_kind: req.subject_kind,
+        subject_id: req.subject_id,
+    };
+    let probe_id = req.probe_id;
+    let discovery_request = sem_os_core::domain_pack::DiscoveryRequest {
+        pack_id: manifest.pack_id.clone(),
+        probe_id: probe_id.clone(),
+        subject: subject.clone(),
+        context: req.context,
+    };
+    let discovery_response = sem_os_core::domain_pack::DiscoveryResponse {
+        probe_id,
+        subject,
+        observations: req.observations,
+        provenance: req.provenance,
+        first_class_state_mutated: req.first_class_state_mutated,
+    };
+
+    let bundle = crate::acp::assemble_sage_context_for_acp(
+        &session,
+        &manifest,
+        discovery_request,
+        discovery_response,
+    )?;
+
+    Ok(serde_json::json!({
+        "status": "acp_context_assembled",
+        "bundle": bundle,
+    }))
+}
+
+/// POST /api/session/:id/workbook/kyc/update-status/dry-run
+async fn dry_run_kyc_update_status_workbook(
+    State(state): State<ReplV2RouteState>,
+    Path(session_id): Path<Uuid>,
+    Json(req): Json<KycUpdateStatusDryRunRequest>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<ErrorResponseV2>)> {
+    let value = dry_run_kyc_update_status_workbook_value(session_id, req)
+        .map_err(kyc_dry_run_json_error)?;
+    append_session_trace_if_present(
+        &state,
+        session_id,
+        crate::repl::session_trace::TraceOp::WorkbookDryRunValidated {
+            workbook_id: value["workbook"]["id"]
+                .as_str()
+                .unwrap_or("unknown")
+                .to_string(),
+            transition_ref: value["dry_run"]["transition_ref"]
+                .as_str()
+                .unwrap_or("unknown")
+                .to_string(),
+        },
+    )
+    .await;
+    Ok(Json(value))
+}
+
+fn dry_run_kyc_update_status_workbook_value(
+    session_id: Uuid,
+    req: KycUpdateStatusDryRunRequest,
+) -> Result<serde_json::Value, crate::runbook::KycUpdateStatusDryRunRefusal> {
+    let output = crate::runbook::build_kyc_update_status_dry_run(
+        crate::runbook::KycUpdateStatusDryRunInput {
+            session_id,
+            case_id: req.case_id,
+            actor_id: req.actor_id,
+            actor_roles: req.actor_roles,
+            transition_ref: req.transition_ref,
+            current_state: req.current_state,
+            requested_state: req.requested_state,
+            configuration_version: req.configuration_version,
+            state_snapshot_id: req.state_snapshot_id,
+            evidence_digest: req.evidence_digest,
+            llm_trace_ref: None,
+        },
+    )?;
+
+    Ok(serde_json::json!({
+        "status": "dry_run_validated",
+        "workbook": output.workbook,
+        "dry_run": output.dry_run
+    }))
+}
+
+/// POST /api/session/:id/workbook/kyc/approval-token
+async fn issue_kyc_workbook_approval_token(
+    State(state): State<ReplV2RouteState>,
+    Path(session_id): Path<Uuid>,
+    Json(req): Json<KycApprovalTokenRequest>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<ErrorResponseV2>)> {
+    let value = issue_kyc_workbook_approval_token_value(session_id, req)
+        .map_err(approval_token_json_error)?;
+    append_session_trace_if_present(
+        &state,
+        session_id,
+        crate::repl::session_trace::TraceOp::ApprovalTokenIssued {
+            approval_token_id: value["approval_token"]["id"]
+                .as_str()
+                .unwrap_or("unknown")
+                .to_string(),
+            workbook_id: value["approval_token"]["core"]["workbook_id"]
+                .as_str()
+                .unwrap_or("unknown")
+                .to_string(),
+            approved_by_actor_id: value["approval_token"]["core"]["approved_by_actor_id"]
+                .as_str()
+                .unwrap_or("unknown")
+                .to_string(),
+        },
+    )
+    .await;
+    Ok(Json(value))
+}
+
+fn issue_kyc_workbook_approval_token_value(
+    session_id: Uuid,
+    req: KycApprovalTokenRequest,
+) -> Result<serde_json::Value, crate::runbook::ApprovalTokenValidationError> {
+    if req.workbook.core.session_id != session_id {
+        return Err(
+            crate::runbook::ApprovalTokenValidationError::WorkbookBindingMismatch {
+                field: "session_id".to_string(),
+                expected: session_id.to_string(),
+                actual: req.workbook.core.session_id.to_string(),
+            },
+        );
+    }
+
+    let token = crate::runbook::create_approval_token_for_workbook(
+        &req.workbook,
+        req.approved_by_actor_id,
+        req.approval_text,
+        req.expires_at,
+        chrono::Utc::now(),
+    )?;
+
+    Ok(serde_json::json!({
+        "status": "approval_token_issued",
+        "approval_token": token,
+    }))
+}
+
+/// POST /api/session/:id/workbook/kyc/restricted-mutation/preflight
+async fn prepare_kyc_restricted_mutation_preflight(
+    State(state): State<ReplV2RouteState>,
+    Path(session_id): Path<Uuid>,
+    Json(req): Json<KycRestrictedMutationPreflightRequest>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<ErrorResponseV2>)> {
+    let value = prepare_kyc_restricted_mutation_preflight_value(session_id, req)
+        .map_err(preflight_json_error)?;
+    append_session_trace_if_present(
+        &state,
+        session_id,
+        crate::repl::session_trace::TraceOp::RestrictedMutationPreflightPrepared {
+            workbook_id: value["preflight"]["workbook_id"]
+                .as_str()
+                .unwrap_or("unknown")
+                .to_string(),
+            approval_token_id: value["preflight"]["approval"]["approval_token_id"]
+                .as_str()
+                .unwrap_or("unknown")
+                .to_string(),
+            transition_ref: value["preflight"]["transition_ref"]
+                .as_str()
+                .unwrap_or("unknown")
+                .to_string(),
+        },
+    )
+    .await;
+    Ok(Json(value))
+}
+
+fn prepare_kyc_restricted_mutation_preflight_value(
+    session_id: Uuid,
+    req: KycRestrictedMutationPreflightRequest,
+) -> Result<serde_json::Value, crate::runbook::RestrictedMutationPreflightError> {
+    if req.workbook.core.session_id != session_id {
+        return Err(
+            crate::runbook::RestrictedMutationPreflightError::ApprovalRefused {
+                error: crate::runbook::ApprovalTokenValidationError::WorkbookBindingMismatch {
+                    field: "session_id".to_string(),
+                    expected: session_id.to_string(),
+                    actual: req.workbook.core.session_id.to_string(),
+                },
+            },
+        );
+    }
+
+    let manifest = load_ob_poc_kyc_domain_pack().map_err(|error| {
+        crate::runbook::RestrictedMutationPreflightError::ApprovalRefused {
+            error: crate::runbook::ApprovalTokenValidationError::WorkbookBindingMismatch {
+                field: "pack".to_string(),
+                expected: "valid ob-poc KYC pack".to_string(),
+                actual: format!("{error:?}"),
+            },
+        }
+    })?;
+    prepare_kyc_restricted_mutation_preflight_value_with_manifest(session_id, req, &manifest)
+}
+
+fn prepare_kyc_restricted_mutation_preflight_value_with_manifest(
+    session_id: Uuid,
+    req: KycRestrictedMutationPreflightRequest,
+    manifest: &sem_os_core::domain_pack::DomainPackManifest,
+) -> Result<serde_json::Value, crate::runbook::RestrictedMutationPreflightError> {
+    if req.workbook.core.session_id != session_id {
+        return Err(
+            crate::runbook::RestrictedMutationPreflightError::ApprovalRefused {
+                error: crate::runbook::ApprovalTokenValidationError::WorkbookBindingMismatch {
+                    field: "session_id".to_string(),
+                    expected: session_id.to_string(),
+                    actual: req.workbook.core.session_id.to_string(),
+                },
+            },
+        );
+    }
+
+    let observed = crate::runbook::ObservedMutationAnchors {
+        configuration_version: req.observed_configuration_version,
+        state_snapshot_id: req.observed_state_snapshot_id,
+        evidence_refs: req.observed_evidence_refs,
+    };
+    let consumed_token_ids = req
+        .consumed_token_ids
+        .into_iter()
+        .collect::<std::collections::BTreeSet<_>>();
+    let preflight = crate::runbook::prepare_restricted_mutation_preflight(
+        &req.workbook,
+        Some(&req.approval_token),
+        manifest,
+        &observed,
+        &consumed_token_ids,
+        chrono::Utc::now(),
+    )?;
+
+    Ok(serde_json::json!({
+        "status": "restricted_mutation_preflight_prepared",
+        "preflight": preflight,
+    }))
+}
+
+/// POST /api/session/:id/workbook/kyc/restricted-mutation/compile-runbook
+async fn compile_kyc_restricted_mutation_runbook(
+    State(state): State<ReplV2RouteState>,
+    Path(session_id): Path<Uuid>,
+    Json(req): Json<KycRestrictedMutationCompileRunbookRequest>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<ErrorResponseV2>)> {
+    let runbook_version = {
+        let sessions = state.orchestrator.sessions_for_test();
+        let mut sessions_write = sessions.write().await;
+        let session = sessions_write.get_mut(&session_id).ok_or_else(|| {
+            (
+                StatusCode::NOT_FOUND,
+                Json(ErrorResponseV2 {
+                    error: "Session not found".to_string(),
+                    recoverable: false,
+                }),
+            )
+        })?;
+        session.allocate_runbook_version()
+    };
+
+    let compilation =
+        compile_kyc_restricted_mutation_runbook_value(session_id, runbook_version, req)
+            .map_err(compilation_json_error)?;
+
+    let compiled_runbook: crate::runbook::CompiledRunbook = serde_json::from_value(
+        compilation["compilation"]["compiled_runbook"].clone(),
+    )
+    .map_err(|error| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(ErrorResponseV2 {
+                error: format!("Compiled runbook serialization failed: {error}"),
+                recoverable: false,
+            }),
+        )
+    })?;
+
+    let store = state
+        .orchestrator
+        .runbook_store()
+        .unwrap_or_else(|| std::sync::Arc::new(crate::runbook::RunbookStore::new()));
+    use crate::runbook::RunbookStoreBackend;
+    store.insert(&compiled_runbook).await.map_err(|error| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(ErrorResponseV2 {
+                error: format!("{error}"),
+                recoverable: false,
+            }),
+        )
+    })?;
+
+    Ok(Json(compilation))
+}
+
+fn compile_kyc_restricted_mutation_runbook_value(
+    session_id: Uuid,
+    runbook_version: u64,
+    req: KycRestrictedMutationCompileRunbookRequest,
+) -> Result<serde_json::Value, crate::runbook::RestrictedMutationRunbookCompilationError> {
+    let compilation = crate::runbook::compile_restricted_mutation_preflight(
+        session_id,
+        runbook_version,
+        &req.preflight,
+    )?;
+
+    Ok(serde_json::json!({
+        "status": "restricted_mutation_runbook_compiled",
+        "compilation": compilation,
+    }))
+}
+
+fn kyc_dry_run_json_error(
+    refusal: crate::runbook::KycUpdateStatusDryRunRefusal,
+) -> (StatusCode, Json<ErrorResponseV2>) {
+    let status = match refusal {
+        crate::runbook::KycUpdateStatusDryRunRefusal::PackParseFailed { .. }
+        | crate::runbook::KycUpdateStatusDryRunRefusal::PackInvalid { .. }
+        | crate::runbook::KycUpdateStatusDryRunRefusal::WorkbookRefused { .. }
+        | crate::runbook::KycUpdateStatusDryRunRefusal::DslCoderRefused { .. } => {
+            StatusCode::BAD_REQUEST
+        }
+        crate::runbook::KycUpdateStatusDryRunRefusal::SimulationRefused { .. } => {
+            StatusCode::CONFLICT
+        }
+    };
+
+    (
+        status,
+        Json(ErrorResponseV2 {
+            error: format!("{refusal:?}"),
+            recoverable: true,
+        }),
+    )
+}
+
+fn approval_token_json_error(
+    error: crate::runbook::ApprovalTokenValidationError,
+) -> (StatusCode, Json<ErrorResponseV2>) {
+    let status = match error {
+        crate::runbook::ApprovalTokenValidationError::WorkbookIntegrity { .. }
+        | crate::runbook::ApprovalTokenValidationError::TokenHashMismatch { .. }
+        | crate::runbook::ApprovalTokenValidationError::WorkbookBindingMismatch { .. }
+        | crate::runbook::ApprovalTokenValidationError::RequiredFieldEmpty { .. }
+        | crate::runbook::ApprovalTokenValidationError::MissingEvidenceRefs => {
+            StatusCode::BAD_REQUEST
+        }
+        crate::runbook::ApprovalTokenValidationError::MissingApprovalToken
+        | crate::runbook::ApprovalTokenValidationError::TokenNotActive { .. }
+        | crate::runbook::ApprovalTokenValidationError::TokenExpired { .. }
+        | crate::runbook::ApprovalTokenValidationError::TokenReplay { .. }
+        | crate::runbook::ApprovalTokenValidationError::StateDrift { .. }
+        | crate::runbook::ApprovalTokenValidationError::EvidenceDrift { .. }
+        | crate::runbook::ApprovalTokenValidationError::TransitionMutationNotEnabled { .. } => {
+            StatusCode::CONFLICT
+        }
+    };
+
+    (
+        status,
+        Json(ErrorResponseV2 {
+            error: format!("{error:?}"),
+            recoverable: true,
+        }),
+    )
+}
+
+fn preflight_json_error(
+    error: crate::runbook::RestrictedMutationPreflightError,
+) -> (StatusCode, Json<ErrorResponseV2>) {
+    let status = match &error {
+        crate::runbook::RestrictedMutationPreflightError::ApprovalRefused { error } => {
+            approval_token_json_error(error.clone()).0
+        }
+        crate::runbook::RestrictedMutationPreflightError::PredictedDiffMismatch { .. } => {
+            StatusCode::CONFLICT
+        }
+    };
+
+    (
+        status,
+        Json(ErrorResponseV2 {
+            error: format!("{error:?}"),
+            recoverable: true,
+        }),
+    )
+}
+
+fn compilation_json_error(
+    error: crate::runbook::RestrictedMutationRunbookCompilationError,
+) -> (StatusCode, Json<ErrorResponseV2>) {
+    let status = match error {
+        crate::runbook::RestrictedMutationRunbookCompilationError::UnsupportedExecutor {
+            ..
+        }
+        | crate::runbook::RestrictedMutationRunbookCompilationError::UnsupportedVerb { .. }
+        | crate::runbook::RestrictedMutationRunbookCompilationError::ArgMismatch { .. } => {
+            StatusCode::BAD_REQUEST
+        }
+        crate::runbook::RestrictedMutationRunbookCompilationError::AlreadyExecuted { .. } => {
+            StatusCode::CONFLICT
+        }
+    };
+
+    (
+        status,
+        Json(ErrorResponseV2 {
+            error: format!("{error:?}"),
+            recoverable: true,
+        }),
+    )
+}
+
+fn load_ob_poc_kyc_domain_pack(
+) -> Result<sem_os_core::domain_pack::DomainPackManifest, crate::acp::AcpAdapterError> {
+    serde_yaml::from_str(include_str!(
+        "../../config/sem_os_seeds/domain_packs/ob_poc_kyc.yaml"
+    ))
+    .map_err(|err| crate::acp::AcpAdapterError::PackInvalid {
+        reason: err.to_string(),
+    })
+}
+
+fn acp_json_error(error: crate::acp::AcpAdapterError) -> (StatusCode, Json<ErrorResponseV2>) {
+    let status = match error {
+        crate::acp::AcpAdapterError::DiscoveryRefused { .. }
+        | crate::acp::AcpAdapterError::DiscoveryMutatedState
+        | crate::acp::AcpAdapterError::MutationNotSupported
+        | crate::acp::AcpAdapterError::DryRunRefused { .. } => StatusCode::CONFLICT,
+        crate::acp::AcpAdapterError::SessionClosed
+        | crate::acp::AcpAdapterError::PackInvalid { .. } => StatusCode::BAD_REQUEST,
+    };
+
+    (
+        status,
+        Json(ErrorResponseV2 {
+            error: format!("{error:?}"),
+            recoverable: true,
+        }),
+    )
+}
+
+async fn append_session_trace_if_present(
+    state: &ReplV2RouteState,
+    session_id: Uuid,
+    op: crate::repl::session_trace::TraceOp,
+) {
+    let sessions = state.orchestrator.sessions_for_test();
+    let mut sessions_write = sessions.write().await;
+    let Some(session) = sessions_write.get_mut(&session_id) else {
+        return;
+    };
+    session.append_trace(op);
+    drop(sessions_write);
+    if let Err(error) = state
+        .orchestrator
+        .persist_session_checkpoint(session_id)
+        .await
+    {
+        tracing::warn!(
+            session_id = %session_id,
+            error = %error,
+            "Failed to persist ACP/workbook trace checkpoint"
+        );
+    }
 }
 
 // ============================================================================
@@ -1624,6 +2343,50 @@ impl ReplV2RouteState {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use chrono::TimeZone;
+
+    fn test_session_id() -> Uuid {
+        Uuid::parse_str("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa").unwrap()
+    }
+
+    fn test_case_id() -> Uuid {
+        Uuid::parse_str("11111111-1111-1111-1111-111111111111").unwrap()
+    }
+
+    fn test_expires_at() -> chrono::DateTime<chrono::Utc> {
+        chrono::Utc.with_ymd_and_hms(2099, 5, 5, 13, 0, 0).unwrap()
+    }
+
+    fn dry_run_output() -> crate::runbook::KycUpdateStatusDryRunOutput {
+        crate::runbook::build_kyc_update_status_dry_run(
+            crate::runbook::KycUpdateStatusDryRunInput {
+                session_id: test_session_id(),
+                case_id: test_case_id(),
+                actor_id: "analyst@example.com".to_string(),
+                actor_roles: vec!["analyst".to_string()],
+                transition_ref: "kyc-case.discovery-to-assessment".to_string(),
+                current_state: "DISCOVERY".to_string(),
+                requested_state: "ASSESSMENT".to_string(),
+                configuration_version: "config-1".to_string(),
+                state_snapshot_id: "state-snapshot-1".to_string(),
+                evidence_digest: "sha256:case".to_string(),
+                llm_trace_ref: None,
+            },
+        )
+        .expect("dry-run output")
+    }
+
+    fn reference_mutation_manifest() -> sem_os_core::domain_pack::DomainPackManifest {
+        let mut manifest = load_ob_poc_kyc_domain_pack().expect("pack");
+        manifest.compatibility_tier =
+            sem_os_core::domain_pack::PackCompatibilityTier::ReferenceMutation;
+        for transition in &mut manifest.allowed_transitions {
+            if transition.transition_ref == "kyc-case.discovery-to-assessment" {
+                transition.mutation_enabled = true;
+            }
+        }
+        manifest
+    }
 
     #[test]
     fn test_input_request_v2_message_parsing() {
@@ -1787,5 +2550,405 @@ mod tests {
         assert_eq!(req.status, "completed");
         assert!(req.result.is_none());
         assert!(req.error.is_none());
+    }
+
+    #[test]
+    fn test_kyc_update_status_dry_run_request_defaults_transition_ref() {
+        let json = r#"{
+            "case_id": "11111111-1111-1111-1111-111111111111",
+            "current_state": "INTAKE",
+            "requested_state": "DISCOVERY",
+            "configuration_version": "config-1",
+            "state_snapshot_id": "state-snapshot-1",
+            "evidence_digest": "sha256:case",
+            "actor_id": "analyst@example.com"
+        }"#;
+
+        let req: KycUpdateStatusDryRunRequest = serde_json::from_str(json).unwrap();
+
+        assert_eq!(req.transition_ref, "kyc-case.intake-to-discovery");
+        assert!(req.actor_roles.is_empty());
+    }
+
+    #[test]
+    fn test_kyc_update_status_dry_run_value_success() {
+        let session_id = Uuid::parse_str("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa").unwrap();
+        let req = KycUpdateStatusDryRunRequest {
+            case_id: Uuid::parse_str("11111111-1111-1111-1111-111111111111").unwrap(),
+            transition_ref: "kyc-case.intake-to-discovery".to_string(),
+            current_state: "INTAKE".to_string(),
+            requested_state: "DISCOVERY".to_string(),
+            configuration_version: "config-1".to_string(),
+            state_snapshot_id: "state-snapshot-1".to_string(),
+            evidence_digest: "sha256:case".to_string(),
+            actor_id: "analyst@example.com".to_string(),
+            actor_roles: vec!["analyst".to_string()],
+        };
+
+        let value =
+            dry_run_kyc_update_status_workbook_value(session_id, req).expect("dry-run succeeds");
+
+        assert_eq!(value["status"], "dry_run_validated");
+        assert_eq!(
+            value["dry_run"]["transition_ref"],
+            "kyc-case.intake-to-discovery"
+        );
+        assert_eq!(value["dry_run"]["semantic_diff"]["to_state"], "DISCOVERY");
+        assert!(value["workbook"]["id"]
+            .as_str()
+            .unwrap()
+            .starts_with("ewb:v1:"));
+    }
+
+    #[test]
+    fn test_kyc_update_status_dry_run_value_refuses_illegal_transition() {
+        let session_id = Uuid::parse_str("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa").unwrap();
+        let req = KycUpdateStatusDryRunRequest {
+            case_id: Uuid::parse_str("11111111-1111-1111-1111-111111111111").unwrap(),
+            transition_ref: "kyc-case.intake-to-discovery".to_string(),
+            current_state: "REVIEW".to_string(),
+            requested_state: "DISCOVERY".to_string(),
+            configuration_version: "config-1".to_string(),
+            state_snapshot_id: "state-snapshot-1".to_string(),
+            evidence_digest: "sha256:case".to_string(),
+            actor_id: "analyst@example.com".to_string(),
+            actor_roles: vec![],
+        };
+
+        let err =
+            dry_run_kyc_update_status_workbook_value(session_id, req).expect_err("dry-run refused");
+
+        assert!(matches!(
+            err,
+            crate::runbook::KycUpdateStatusDryRunRefusal::SimulationRefused { .. }
+        ));
+        let (status, _) = kyc_dry_run_json_error(err);
+        assert_eq!(status, StatusCode::CONFLICT);
+    }
+
+    #[test]
+    fn test_kyc_approval_token_value_issues_workbook_bound_token() {
+        let output = dry_run_output();
+        let req = KycApprovalTokenRequest {
+            workbook: output.workbook.clone(),
+            approved_by_actor_id: "approver@example.com".to_string(),
+            approval_text: "Approved for restricted KYC update".to_string(),
+            expires_at: test_expires_at(),
+        };
+
+        let value =
+            issue_kyc_workbook_approval_token_value(test_session_id(), req).expect("token issued");
+
+        assert_eq!(value["status"], "approval_token_issued");
+        assert!(value["approval_token"]["id"]
+            .as_str()
+            .unwrap()
+            .starts_with("approval:v1:"));
+        assert_eq!(
+            value["approval_token"]["core"]["workbook_id"],
+            output.workbook.id.to_string()
+        );
+    }
+
+    #[test]
+    fn test_kyc_approval_token_value_refuses_session_mismatch() {
+        let output = dry_run_output();
+        let req = KycApprovalTokenRequest {
+            workbook: output.workbook,
+            approved_by_actor_id: "approver@example.com".to_string(),
+            approval_text: "Approved for restricted KYC update".to_string(),
+            expires_at: test_expires_at(),
+        };
+        let other_session_id = Uuid::parse_str("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb").unwrap();
+
+        let err = issue_kyc_workbook_approval_token_value(other_session_id, req)
+            .expect_err("session mismatch refused");
+
+        assert!(matches!(
+            err,
+            crate::runbook::ApprovalTokenValidationError::WorkbookBindingMismatch { .. }
+        ));
+        let (status, _) = approval_token_json_error(err);
+        assert_eq!(status, StatusCode::BAD_REQUEST);
+    }
+
+    #[test]
+    fn test_kyc_restricted_mutation_preflight_refuses_dry_run_only_seed() {
+        let output = dry_run_output();
+        let token = crate::runbook::create_approval_token_for_workbook(
+            &output.workbook,
+            "approver@example.com",
+            "Approved for restricted KYC update",
+            test_expires_at(),
+            chrono::Utc::now(),
+        )
+        .expect("approval token");
+        let req = KycRestrictedMutationPreflightRequest {
+            workbook: output.workbook.clone(),
+            approval_token: token,
+            observed_configuration_version: output.workbook.core.configuration_version.clone(),
+            observed_state_snapshot_id: output.workbook.core.state_snapshot_id.clone(),
+            observed_evidence_refs: output.workbook.core.evidence_refs.clone(),
+            consumed_token_ids: vec![],
+        };
+
+        let err = prepare_kyc_restricted_mutation_preflight_value(test_session_id(), req)
+            .expect_err("dry-run-only seed refused");
+
+        assert!(matches!(
+            err,
+            crate::runbook::RestrictedMutationPreflightError::ApprovalRefused {
+                error: crate::runbook::ApprovalTokenValidationError::TransitionMutationNotEnabled { .. }
+            }
+        ));
+        let (status, _) = preflight_json_error(err);
+        assert_eq!(status, StatusCode::CONFLICT);
+    }
+
+    #[test]
+    fn test_kyc_restricted_mutation_preflight_value_success_with_reference_manifest() {
+        let output = dry_run_output();
+        let token = crate::runbook::create_approval_token_for_workbook(
+            &output.workbook,
+            "approver@example.com",
+            "Approved for restricted KYC update",
+            test_expires_at(),
+            chrono::Utc::now(),
+        )
+        .expect("approval token");
+        let req = KycRestrictedMutationPreflightRequest {
+            workbook: output.workbook.clone(),
+            approval_token: token.clone(),
+            observed_configuration_version: output.workbook.core.configuration_version.clone(),
+            observed_state_snapshot_id: output.workbook.core.state_snapshot_id.clone(),
+            observed_evidence_refs: output.workbook.core.evidence_refs.clone(),
+            consumed_token_ids: vec![],
+        };
+
+        let value = prepare_kyc_restricted_mutation_preflight_value_with_manifest(
+            test_session_id(),
+            req,
+            &reference_mutation_manifest(),
+        )
+        .expect("preflight prepared");
+
+        assert_eq!(value["status"], "restricted_mutation_preflight_prepared");
+        assert_eq!(value["preflight"]["executor"], "existing_runbook_gate_only");
+        assert_eq!(
+            value["preflight"]["approval"]["approval_token_id"],
+            token.id.to_string()
+        );
+        assert!(value["preflight"]["actual_diff"].is_null());
+    }
+
+    #[test]
+    fn test_kyc_restricted_mutation_compile_runbook_value_success() {
+        let output = dry_run_output();
+        let token = crate::runbook::create_approval_token_for_workbook(
+            &output.workbook,
+            "approver@example.com",
+            "Approved for restricted KYC update",
+            test_expires_at(),
+            chrono::Utc::now(),
+        )
+        .expect("approval token");
+        let preflight_req = KycRestrictedMutationPreflightRequest {
+            workbook: output.workbook.clone(),
+            approval_token: token,
+            observed_configuration_version: output.workbook.core.configuration_version.clone(),
+            observed_state_snapshot_id: output.workbook.core.state_snapshot_id.clone(),
+            observed_evidence_refs: output.workbook.core.evidence_refs.clone(),
+            consumed_token_ids: vec![],
+        };
+        let preflight_value = prepare_kyc_restricted_mutation_preflight_value_with_manifest(
+            test_session_id(),
+            preflight_req,
+            &reference_mutation_manifest(),
+        )
+        .expect("preflight prepared");
+        let preflight: crate::runbook::RestrictedMutationPreflight =
+            serde_json::from_value(preflight_value["preflight"].clone()).expect("preflight json");
+
+        let value = compile_kyc_restricted_mutation_runbook_value(
+            test_session_id(),
+            3,
+            KycRestrictedMutationCompileRunbookRequest { preflight },
+        )
+        .expect("compiled runbook");
+
+        assert_eq!(value["status"], "restricted_mutation_runbook_compiled");
+        assert_eq!(value["compilation"]["compiled_runbook"]["version"], 3);
+        assert_eq!(
+            value["compilation"]["compiled_runbook"]["steps"][0]["verb"],
+            "kyc-case.update-status"
+        );
+        assert_eq!(
+            value["compilation"]["compiled_runbook"]["steps"][0]["args"]["status"],
+            "ASSESSMENT"
+        );
+        assert_eq!(
+            value["compilation"]["compiled_runbook"]["steps"][0]["write_set"][0],
+            output.workbook.core.subject.subject_id.to_string()
+        );
+    }
+
+    #[test]
+    fn test_acp_open_session_value_defaults_to_zed_without_mutation() {
+        let session_id = Uuid::parse_str("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa").unwrap();
+        let req: AcpOpenSessionRequest = serde_json::from_str("{}").unwrap();
+
+        let value = open_acp_session_value(session_id, req);
+
+        assert_eq!(value["status"], "acp_session_open");
+        assert_eq!(value["session"]["adapter"], "zed");
+        assert_eq!(value["session"]["mutation_capability"], "none");
+    }
+
+    #[test]
+    fn test_acp_capabilities_value_advertises_stdio_and_session_lifecycle() {
+        let session_id = Uuid::parse_str("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa").unwrap();
+
+        let value = acp_capabilities_value(session_id);
+
+        assert_eq!(value["status"], "acp_capabilities");
+        assert_eq!(value["stdio"]["command"], "ob_poc_acp");
+        assert_eq!(
+            value["capabilities"]["agentCapabilities"]["sessionCapabilities"]["close"],
+            true
+        );
+        assert_eq!(
+            value["capabilities"]["agentCapabilities"]["sessionCapabilities"]["list"],
+            true
+        );
+    }
+
+    #[test]
+    fn test_acp_policy_value_exposes_semos_policy_decisions() {
+        let session_id = Uuid::parse_str("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa").unwrap();
+
+        let value = acp_policy_value(session_id).expect("policy");
+
+        assert_eq!(value["status"], "acp_policy");
+        assert_eq!(value["policy"]["pack_id"], "ob-poc.kyc");
+        assert_eq!(
+            value["policy"]["adapter_policy"]["policy_authority"],
+            "SemOS Domain Pack + Workbook + Runbook Gate"
+        );
+        assert_eq!(
+            value["policy"]["adapter_policy"]["direct_mutation_supported"],
+            false
+        );
+        assert!(value["policy"]["transition_policy"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|transition| transition["dry_run_allowed"] == true
+                && transition["mutation_allowed"] == false));
+    }
+
+    #[test]
+    fn test_acp_close_session_value_marks_session_closed() {
+        let session_id = Uuid::parse_str("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa").unwrap();
+        let req: AcpOpenSessionRequest = serde_json::from_str("{}").unwrap();
+
+        let value = close_acp_session_value(session_id, req);
+
+        assert_eq!(value["status"], "acp_session_closed");
+        assert_eq!(value["session"]["state"], "closed");
+    }
+
+    #[test]
+    fn test_acp_context_value_redacts_required_context() {
+        let session_id = Uuid::parse_str("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa").unwrap();
+        let req: AcpContextAssemblyRequest = serde_json::from_value(serde_json::json!({
+            "adapter": "test_harness",
+            "probe_id": "kyc-case.read-evidence-summary",
+            "subject_kind": "kyc_case",
+            "subject_id": "11111111-1111-1111-1111-111111111111",
+            "observations": [
+                {
+                    "key": "case.status",
+                    "value": "INTAKE",
+                    "classification": "internal"
+                },
+                {
+                    "key": "case.confidential_evidence.summary",
+                    "value": "raw",
+                    "classification": "internal"
+                }
+            ]
+        }))
+        .unwrap();
+
+        let value = assemble_acp_context_value(session_id, req).expect("context assembled");
+
+        assert_eq!(value["status"], "acp_context_assembled");
+        assert_eq!(
+            value["bundle"]["prompt_context"]["included"][0]["key"],
+            "case.status"
+        );
+        assert_eq!(
+            value["bundle"]["prompt_context"]["redacted"][0]["key"],
+            "case.confidential_evidence.summary"
+        );
+    }
+
+    #[test]
+    fn test_acp_context_value_refuses_unknown_probe() {
+        let session_id = Uuid::parse_str("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa").unwrap();
+        let req: AcpContextAssemblyRequest = serde_json::from_value(serde_json::json!({
+            "probe_id": "kyc-case.write-state",
+            "subject_kind": "kyc_case",
+            "subject_id": "11111111-1111-1111-1111-111111111111"
+        }))
+        .unwrap();
+
+        let err = assemble_acp_context_value(session_id, req).expect_err("probe refused");
+
+        assert!(matches!(
+            err,
+            crate::acp::AcpAdapterError::DiscoveryRefused { .. }
+        ));
+        let (status, _) = acp_json_error(err);
+        assert_eq!(status, StatusCode::CONFLICT);
+    }
+
+    #[tokio::test]
+    async fn test_acp_trace_append_records_context_assembly() {
+        let orchestrator = std::sync::Arc::new(crate::sequencer::ReplOrchestratorV2::new(
+            crate::journey::router::PackRouter::new(vec![]),
+            std::sync::Arc::new(crate::sequencer::StubExecutor),
+        ));
+        let session_id = orchestrator.create_session().await;
+        let state = ReplV2RouteState {
+            orchestrator: orchestrator.clone(),
+        };
+
+        append_session_trace_if_present(
+            &state,
+            session_id,
+            crate::repl::session_trace::TraceOp::AcpContextAssembled {
+                pack_id: "ob-poc.kyc".to_string(),
+                probe_id: "kyc-case.read-state".to_string(),
+                context_hash: "sha256:test".to_string(),
+                redacted_count: 1,
+            },
+        )
+        .await;
+
+        let session = orchestrator.get_session(session_id).await.unwrap();
+        assert_eq!(session.trace.len(), 1);
+        assert!(matches!(
+            &session.trace[0].op,
+            crate::repl::session_trace::TraceOp::AcpContextAssembled {
+                pack_id,
+                probe_id,
+                context_hash,
+                redacted_count
+            } if pack_id == "ob-poc.kyc"
+                && probe_id == "kyc-case.read-state"
+                && context_hash == "sha256:test"
+                && *redacted_count == 1
+        ));
     }
 }

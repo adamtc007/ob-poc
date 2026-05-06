@@ -23,6 +23,30 @@ Two practical consequences follow.
   constellation or slot path, but they are still surfaced only through the
   currently grounded SEM-OS context.
 
+### ACP Policy Exposure
+
+ACP is a transport/client boundary over SemOS, not a separate policy engine.
+The launchable server is `ob_poc_acp` (`rust/src/bin/ob_poc_acp.rs`), speaking
+newline-delimited JSON-RPC over stdio. The protocol layer lives in
+`rust/src/acp_protocol.rs`; the transport-neutral SemOS adapter contracts live
+in `rust/src/acp.rs`.
+
+ACP exposes SemOS policy decisions through `obpoc/policy` and
+`GET /api/session/:id/acp/policy`:
+
+- Domain Pack id, version, and compatibility tier.
+- Context classification policy, external LLM allowance, and required
+  redactions.
+- Discovery probe allow/refuse decisions with reasons.
+- Transition-level dry-run/mutation decisions with reasons.
+- Mutation boundary: `workbook_approval_and_compiled_runbook_gate`.
+- Policy authority: `SemOS Domain Pack + Workbook + Runbook Gate`.
+
+Enforcement remains behind ACP. ACP can open sessions, advertise policy,
+assemble governed context, and request workbook dry-runs. Direct mutation via
+ACP is refused; mutation must pass workbook approval and compile into a
+`CompiledRunbook` executed by `execute_runbook()`.
+
 **Crates:**
 
 | Crate | Purpose |

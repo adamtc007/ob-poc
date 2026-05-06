@@ -276,8 +276,9 @@ impl VerbSurfaceComposition {
                 // journey explicitly authorises, even when SemOS has
                 // state-gated them out.
                 let mut seen: std::collections::HashSet<String> = std::collections::HashSet::new();
-                let mut union: Vec<String> = Vec::with_capacity(legal_verbs.len() + pack_verbs.len());
-                for v in legal_verbs.into_iter().chain(pack_verbs.into_iter()) {
+                let mut union: Vec<String> =
+                    Vec::with_capacity(legal_verbs.len() + pack_verbs.len());
+                for v in legal_verbs.into_iter().chain(pack_verbs) {
                     if seen.insert(v.clone()) {
                         union.push(v);
                     }
@@ -808,7 +809,9 @@ mod tests {
         assert!(out.allowed_verbs.contains(&"deal.read".into()));
         assert!(out.allowed_verbs.contains(&"cbu.create".into()));
         assert!(out.allowed_verbs.contains(&"agent.start".into()));
-        assert!(out.allowed_verbs.contains(&"onboarding.compile-data-request".into()));
+        assert!(out
+            .allowed_verbs
+            .contains(&"onboarding.compile-data-request".into()));
         assert_eq!(out.fingerprint, "v1:abc");
         assert_eq!(out.pruned_count, 9);
     }
