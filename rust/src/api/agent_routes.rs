@@ -336,14 +336,11 @@ async fn create_session(
     if req.workflow_focus.as_deref() == Some("semantic-os") {
         tracing::info!("Semantic OS session — building workflow selection packet");
 
-        // Store in memory
+        // Store in memory. The V2 REPL session owns conversation history via
+        // `create_session_with_id`; do not write the welcome to the V1
+        // UnifiedSession.
         {
             let mut sessions = state.sessions.write().await;
-            session.add_agent_message(
-                "Welcome to Semantic OS. What would you like to work on?".to_string(),
-                None,
-                None,
-            );
             let packet = build_semos_workflow_decision(session_id);
             session.pending_decision = Some(packet.clone());
             sessions.insert(session_id, session);
@@ -470,12 +467,14 @@ async fn create_session(
         None
     };
 
-    // Store the decision as pending on the session so replies are handled
+    // Store the decision as pending on the session so replies are handled.
+    // The V2 REPL session owns conversation history via `create_session_with_id`
+    // (which seeds the welcome prompt) — do not also write it onto the V1
+    // UnifiedSession.
     if let Some(ref packet) = decision {
         let mut sessions = state.sessions.write().await;
         if let Some(s) = sessions.get_mut(&session_id) {
             s.pending_decision = Some(packet.clone());
-            s.add_agent_message(welcome_message.clone(), None, None);
         }
     }
 
@@ -861,16 +860,31 @@ async fn get_session(
         }
     };
 
+    // Conversation history is owned by the V2 REPL session — the V1 UnifiedSession
+    // messages are no longer authoritative. Project V2 messages onto the wire type
+    // here; fall back to V1 only if the V2 orchestrator has not seen the session
+    // (e.g. external callers that bypassed POST /api/session).
+    let messages: Vec<crate::api::session::ChatMessage> =
+        if let Some(orchestrator) = state.repl_v2_orchestrator.as_ref() {
+            orchestrator
+                .get_session(session_id)
+                .await
+                .map(|s| s.messages.iter().map(v2_message_to_wire).collect())
+                .unwrap_or_default()
+        } else {
+            session.messages.iter().cloned().map(|m| m.into()).collect()
+        };
+
     Json(SessionStateResponse {
         session_id,
         entity_type: session.entity_type.clone(),
         entity_id: session.entity_id,
         state: session.state.clone().into(),
-        message_count: session.messages.len(),
+        message_count: messages.len(),
         assembled_dsl: vec![], // Legacy - now in run_sheet
         combined_dsl: session.run_sheet.combined_dsl(),
         context: session.context.clone(),
-        messages: session.messages.iter().cloned().map(|m| m.into()).collect(),
+        messages,
         can_execute: session.run_sheet.has_runnable(),
         version: Some(session.updated_at.to_rfc3339()),
         run_sheet: Some(session.run_sheet.to_api()),
@@ -890,6 +904,32 @@ async fn get_session(
             })
             .collect(),
     })
+}
+
+/// Project a V2 REPL session message onto the V1 wire `ChatMessage` shape used
+/// by `SessionStateResponse`.
+fn v2_message_to_wire(
+    msg: &crate::repl::session_v2::ChatMessage,
+) -> crate::api::session::ChatMessage {
+    use crate::api::session::MessageRole as WireRole;
+    use crate::repl::session_v2::MessageRole as V2Role;
+
+    crate::api::session::ChatMessage {
+        id: msg.id,
+        role: match msg.role {
+            V2Role::User => WireRole::User,
+            V2Role::Assistant => WireRole::Agent,
+            V2Role::System => WireRole::System,
+        },
+        content: msg.content.clone(),
+        timestamp: msg.timestamp,
+        intents: None,
+        dsl: None,
+        sage_explain: None,
+        coder_proposal: None,
+        discovery_bootstrap: None,
+        parked_entries: None,
+    }
 }
 
 /// DELETE /api/session/:id - Delete session (idempotent)
@@ -2755,44 +2795,67 @@ async fn clear_session_dsl(
     State(state): State<AgentState>,
     Path(session_id): Path<Uuid>,
 ) -> Result<Json<SessionStateResponse>, StatusCode> {
-    let mut sessions = state.sessions.write().await;
-    let session = sessions.get_mut(&session_id).ok_or(StatusCode::NOT_FOUND)?;
+    let (entity_type, entity_id, state_view, run_sheet, context, updated_at, bindings) = {
+        let mut sessions = state.sessions.write().await;
+        let session = sessions.get_mut(&session_id).ok_or(StatusCode::NOT_FOUND)?;
 
-    // Cancel any pending/draft entries in run_sheet
-    for entry in session.run_sheet.entries.iter_mut() {
-        if entry.status == crate::session::EntryStatus::Draft {
-            entry.status = crate::session::EntryStatus::Cancelled;
+        // Cancel any pending/draft entries in run_sheet
+        for entry in session.run_sheet.entries.iter_mut() {
+            if entry.status == crate::session::EntryStatus::Draft {
+                entry.status = crate::session::EntryStatus::Cancelled;
+            }
         }
-    }
+
+        (
+            session.entity_type.clone(),
+            session.entity_id,
+            session.state.clone().into(),
+            session.run_sheet.to_api(),
+            session.context.clone(),
+            session.updated_at,
+            session
+                .context
+                .bindings
+                .iter()
+                .map(|(k, v)| {
+                    (
+                        k.clone(),
+                        ob_poc_types::BoundEntityInfo {
+                            id: v.id.to_string(),
+                            name: v.display_name.clone(),
+                            entity_type: v.entity_type.clone(),
+                        },
+                    )
+                })
+                .collect(),
+        )
+    };
+
+    let messages: Vec<crate::api::session::ChatMessage> =
+        if let Some(orchestrator) = state.repl_v2_orchestrator.as_ref() {
+            orchestrator
+                .get_session(session_id)
+                .await
+                .map(|s| s.messages.iter().map(v2_message_to_wire).collect())
+                .unwrap_or_default()
+        } else {
+            Vec::new()
+        };
 
     Ok(Json(SessionStateResponse {
         session_id,
-        entity_type: session.entity_type.clone(),
-        entity_id: session.entity_id,
-        state: session.state.clone().into(),
-        message_count: session.messages.len(),
+        entity_type,
+        entity_id,
+        state: state_view,
+        message_count: messages.len(),
         assembled_dsl: vec![],
         combined_dsl: None,
-        context: session.context.clone(),
-        messages: session.messages.iter().cloned().map(|m| m.into()).collect(),
+        context,
+        messages,
         can_execute: false,
-        version: Some(session.updated_at.to_rfc3339()),
-        run_sheet: Some(session.run_sheet.to_api()),
-        bindings: session
-            .context
-            .bindings
-            .iter()
-            .map(|(k, v)| {
-                (
-                    k.clone(),
-                    ob_poc_types::BoundEntityInfo {
-                        id: v.id.to_string(),
-                        name: v.display_name.clone(),
-                        entity_type: v.entity_type.clone(),
-                    },
-                )
-            })
-            .collect(),
+        version: Some(updated_at.to_rfc3339()),
+        run_sheet: Some(run_sheet),
+        bindings,
     }))
 }
 

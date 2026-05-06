@@ -508,8 +508,12 @@ impl ReplOrchestratorV2 {
 
     /// Create a new session and return its ID.
     pub async fn create_session(&self) -> Uuid {
-        let session = ReplSessionV2::new();
+        let mut session = ReplSessionV2::new();
         let id = session.id;
+        session.push_message(
+            MessageRole::Assistant,
+            crate::api::session::WELCOME_MESSAGE.to_string(),
+        );
         self.sessions.write().await.insert(id, session);
         self.persistence_versions.write().await.insert(id, 0);
         id
@@ -519,6 +523,10 @@ impl ReplOrchestratorV2 {
     pub async fn create_session_with_id(&self, id: Uuid) {
         let mut session = ReplSessionV2::new();
         session.id = id;
+        session.push_message(
+            MessageRole::Assistant,
+            crate::api::session::WELCOME_MESSAGE.to_string(),
+        );
         self.sessions.write().await.insert(id, session);
         self.persistence_versions.write().await.insert(id, 0);
     }
