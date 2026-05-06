@@ -35,6 +35,11 @@ import type { SessionFeedback } from "../../../api/replV2";
 
 const DEFAULT_MAP_NAME = "struct.lux.ucits.sicav";
 const UNSELECTED_CBU_MAP_NAME = "cbu.structure.unselected";
+const UNIVERSE_ROOT_MAP_NAME = "universe.root";
+const PENDING_MAP_NAMES = new Set([
+  UNSELECTED_CBU_MAP_NAME,
+  UNIVERSE_ROOT_MAP_NAME,
+]);
 
 function stateBadgeClass(state: string, blocking: boolean): string {
   if (blocking) {
@@ -809,7 +814,8 @@ export function ConstellationPanel({
   }, [selectedSlotPath, sessionAllSlots, sessionHydrated]);
   const selectedCbuId = selectedCbu?.id ?? "";
   const sessionMapName = sessionFeedback?.tos.constellation_map;
-  const mapSelectionPending = sessionMapName === UNSELECTED_CBU_MAP_NAME;
+  const mapSelectionPending =
+    sessionMapName !== undefined && PENDING_MAP_NAMES.has(sessionMapName);
   const activeMapName =
     sessionMapName && !mapSelectionPending ? sessionMapName : DEFAULT_MAP_NAME;
 

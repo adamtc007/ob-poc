@@ -134,7 +134,7 @@ templates:
           jurisdiction: "LU"
           kind: "sicav"
 
-      - verb: cbu.assign-product
+      - verb: cbu.add-product
         repeat_for: fund_names
         args:
           product: "CUSTODY"
@@ -156,7 +156,7 @@ templates:
           jurisdiction: "UK"
           kind: "oeic"
 
-      - verb: cbu.assign-product
+      - verb: cbu.add-product
         repeat_for: fund_names
         args:
           product: "CUSTODY"
