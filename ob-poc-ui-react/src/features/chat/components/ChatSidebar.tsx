@@ -11,12 +11,28 @@ import {
   Loader2,
   PanelLeftOpen,
   PanelLeftClose,
+  AlertCircle,
+  X,
 } from "lucide-react";
 import { useState } from "react";
 import { chatApi } from "../../../api/chat";
+import { ApiError } from "../../../api/client";
 import { queryKeys, queryClient } from "../../../lib/query";
 import { cn, formatDate } from "../../../lib/utils";
 import type { ChatSessionSummary } from "../../../types/chat";
+
+function formatMutationError(err: unknown): string {
+  if (err instanceof ApiError) {
+    const detail =
+      typeof err.body === "object" && err.body && "error" in err.body
+        ? String((err.body as { error: unknown }).error)
+        : null;
+    const head = `${err.status} ${err.statusText || "Request failed"}`;
+    return detail ? `${head}: ${detail}` : head;
+  }
+  if (err instanceof Error) return err.message;
+  return "Request failed";
+}
 
 interface ChatSidebarProps {
   className?: string;
@@ -91,6 +107,17 @@ export function ChatSidebar({ className }: ChatSidebarProps) {
 
   const [expanded, setExpanded] = useState(false);
 
+  const mutationError =
+    createMutation.error ?? resumeMutation.error ?? deleteMutation.error;
+  const mutationErrorMessage = mutationError
+    ? formatMutationError(mutationError)
+    : null;
+  const dismissMutationError = () => {
+    createMutation.reset();
+    resumeMutation.reset();
+    deleteMutation.reset();
+  };
+
   if (!expanded) {
     return (
       <div
@@ -111,13 +138,23 @@ export function ChatSidebar({ className }: ChatSidebarProps) {
           type="button"
           onClick={() => createMutation.mutate()}
           disabled={createMutation.isPending}
-          className="rounded p-1.5 text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)] disabled:opacity-50"
-          title="New session"
+          className="relative rounded p-1.5 text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)] disabled:opacity-50"
+          title={
+            mutationErrorMessage
+              ? `New session — last attempt failed: ${mutationErrorMessage}`
+              : "New session"
+          }
         >
           {createMutation.isPending ? (
             <Loader2 size={14} className="animate-spin" />
           ) : (
             <Plus size={14} />
+          )}
+          {mutationErrorMessage && (
+            <span
+              aria-hidden
+              className="absolute right-0.5 top-0.5 h-1.5 w-1.5 rounded-full bg-[var(--accent-red)]"
+            />
           )}
         </button>
         <div className="flex-1 overflow-auto flex flex-col items-center gap-1 mt-1">
@@ -181,6 +218,26 @@ export function ChatSidebar({ className }: ChatSidebarProps) {
           </button>
         </div>
       </div>
+
+      {mutationErrorMessage && (
+        <div
+          role="alert"
+          aria-live="polite"
+          className="mx-2 mt-2 flex items-start gap-2 rounded-md border border-[var(--accent-red)]/30 bg-[var(--accent-red)]/10 px-2.5 py-1.5 text-xs text-[var(--accent-red)]"
+        >
+          <AlertCircle size={14} className="mt-0.5 flex-shrink-0" />
+          <span className="flex-1 break-words">{mutationErrorMessage}</span>
+          <button
+            type="button"
+            onClick={dismissMutationError}
+            className="rounded p-0.5 hover:bg-[var(--accent-red)]/20"
+            title="Dismiss"
+            aria-label="Dismiss error"
+          >
+            <X size={12} />
+          </button>
+        </div>
+      )}
 
       <div className="flex-1 overflow-auto p-1.5">
         {isLoading ? (
