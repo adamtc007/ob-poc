@@ -1,0 +1,12 @@
+[package]
+name = "ob-poc-eval-runner"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+description = "Replay runner for the Sage Eval Harness."
+
+[dependencies]
+ob-poc-eval-schema = { path = "../ob-poc-eval-schema" }
+serde.workspace = true
+thiserror.workspace = true

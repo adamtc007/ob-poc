@@ -1,0 +1,13 @@
+[package]
+name = "ob-poc-eval-schema"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+description = "Serde schemas for the Sage Eval Harness."
+
+[dependencies]
+chrono.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+serde_yaml.workspace = true

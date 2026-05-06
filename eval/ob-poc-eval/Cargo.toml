@@ -1,0 +1,10 @@
+[package]
+name = "ob-poc-eval"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+description = "CLI binary for the Sage Eval Harness."
+
+[dependencies]
+ob-poc-eval-schema = { path = "../ob-poc-eval-schema" }

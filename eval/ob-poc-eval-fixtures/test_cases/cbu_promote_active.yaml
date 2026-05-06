@@ -1,0 +1,74 @@
+case_id: 01HZK8P9X4YBVT2NRQF5J7M3WC
+schema_version: 1
+authored_at: 2026-05-06T14:23:00Z
+authored_by: adam.cearns
+last_revalidated_at: null
+status: active
+
+configuration_version: semos-v0.4.2
+state_snapshot_id: snap-2026-05-06-baseline
+domain_pack_id: ob-poc-kyc
+domain_pack_version: 0.1.0
+seed_bundle_id: seed-kyc-baseline-cbu-portfolio
+fixture_strategy: ephemeral_fixture
+probe_policy: stubbed
+
+utterance: "Promote CBU-12345 to active"
+mentions:
+  - kind: entity
+    namespace: cbu
+    ref: CBU-12345
+embedded_resources: []
+editor_context:
+  workspace_root: /repo/ob-poc
+  current_file: workspaces/cbu/dashboard.rs
+  selection: null
+session_persona: sage_planning
+session_workflow_phase: planning
+preceding_turns: []
+
+axis_primary: happy_path
+axis_secondary: null
+difficulty: standard
+substrate_complexity: small
+
+expected_outcome_class: workbook_emitted
+expected_workbook_shape:
+  transition_refs:
+    - verb: promote_cbu_to_active
+      target: CBU-12345
+  evidence_ref_count:
+    min: 2
+    max: 4
+  evidence_classes:
+    - kyc_attestation
+    - sanctions_clearance
+  governance_requirements:
+    - primary_approver
+    - dual_control
+  intended_state_movement:
+    entity: CBU-12345
+    from: pending_review
+    to: active
+  execution_mode: dry_run
+expected_refusal_reason: null
+expected_disambiguation: null
+expected_evidence_refs: null
+
+forbidden_outputs:
+  - direct_mutation_attempt
+  - invented_evidence_ref: "*"
+
+deterministic: true
+acceptable_variants: []
+phrasing_bundle_id: null
+
+tags:
+  - kyc
+  - cbu
+  - promotion
+  - baseline
+notes: |
+  Canonical happy-path case. Expected to pass on any reasonable Sage
+  candidate. If this fails, something is structurally wrong with the
+  candidate stack.

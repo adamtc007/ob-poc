@@ -1,0 +1,9 @@
+[package]
+name = "ob-poc-eval-fixtures"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+description = "Fixture helpers and bundled test cases for the Sage Eval Harness."
+
+[dependencies]
