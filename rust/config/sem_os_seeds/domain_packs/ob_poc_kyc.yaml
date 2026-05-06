@@ -41,6 +41,120 @@ discovery_probes:
     idempotent: true
     modeled: true
     first_class_state_mutation: false
+projection_catalog:
+  - kind: pack_manifest
+    source: domain_pack.manifest
+    default_classification: internal
+    acp_visible_by_default: true
+  - kind: probe_catalogue
+    source: domain_pack.discovery_probes
+    default_classification: internal
+    acp_visible_by_default: true
+  - kind: policy
+    source: semos.domain_pack_policy
+    default_classification: internal
+    acp_visible_by_default: true
+  - kind: transition_surface
+    source: domain_pack.allowed_transitions
+    default_classification: internal
+    allowed_subject_kinds:
+      - kyc_case
+    acp_visible_by_default: true
+  - kind: discovery_surface
+    source: semos.context_resolution.discovery_surface
+    default_classification: internal
+    max_depth: 3
+    acp_visible_by_default: true
+  - kind: verb_surface
+    source: semos.session_verb_surface
+    default_classification: internal
+    max_depth: 2
+    acp_visible_by_default: true
+  - kind: dag
+    source: semos.tos.hydrated_state
+    default_classification: internal
+    allowed_subject_kinds:
+      - kyc_case
+      - cbu
+    max_depth: 4
+    acp_visible_by_default: true
+  - kind: graph_scene
+    source: observatory.graph_scene_model
+    default_classification: internal
+    allowed_subject_kinds:
+      - kyc_case
+      - cbu
+    max_depth: 4
+    acp_visible_by_default: true
+  - kind: governance
+    source: semos.context_resolution.governance_signals
+    default_classification: internal
+    acp_visible_by_default: true
+  - kind: evidence_schema
+    source: semos.evidence_strategy
+    default_classification: confidential
+    allowed_subject_kinds:
+      - kyc_case
+    acp_visible_by_default: false
+  - kind: affinity_graph
+    source: semos.affinity_graph
+    default_classification: internal
+    max_depth: 3
+    acp_visible_by_default: true
+  - kind: lineage
+    source: semos.lineage_store
+    default_classification: confidential
+    max_depth: 3
+    acp_visible_by_default: false
+  - kind: derivation_registry
+    source: semos.derivation_registry
+    default_classification: internal
+    max_depth: 2
+    acp_visible_by_default: true
+  - kind: materiality
+    source: semos.materiality_policy
+    default_classification: internal
+    acp_visible_by_default: true
+mention_namespaces:
+  - namespace: entity
+    target_kind: semos.entity
+    description: Entity references resolvable by Sage and the editor.
+  - namespace: verb
+    target_kind: semos.verb
+    description: Verb and transition references exposed through the scoped verb surface.
+  - namespace: pack
+    target_kind: domain_pack
+    description: Domain Pack manifest and compatibility references.
+  - namespace: workbook
+    target_kind: execution_workbook
+    description: Workbook and evidence handoff references.
+  - namespace: workspace
+    target_kind: semos.workspace
+    description: Workspace stack and constellation frame references.
+declared_modes:
+  - mode_id: discovery
+    label: Discovery
+    description: Read-only SemOS discovery and projection assembly.
+  - mode_id: planning
+    label: Planning
+    description: Workbook and runbook plan construction without mutation.
+  - mode_id: explanation
+    label: Explanation
+    description: Semantic diff, policy, and lineage explanation.
+  - mode_id: attestation
+    label: Attestation
+    description: Approval-token and audit review before any restricted mutation path.
+external_mcp_transports: []
+typed_extension_points:
+  - extension_id: semos.derivation_registry
+    extension_kind: derivation_registry
+    implementation_ref: native::sem_os_core::derivation_registry
+  - extension_id: semos.lineage_projection
+    extension_kind: lineage_projection
+    implementation_ref: native::repl::session_trace
+  - extension_id: semos.materiality_policy
+    extension_kind: materiality_policy
+    implementation_ref: native::domain_pack.allowed_transitions
 classification_policy:
   max_prompt_classification: internal
   allow_external_llm: false

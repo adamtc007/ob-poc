@@ -18,6 +18,10 @@ use axum::{
     routing::{get, post},
     Json, Router,
 };
+use sem_os_core::acp_projection::{
+    AcpProjectionEnvelope, AcpProjectionEnvelopeInput, AcpProjectionKind,
+};
+use sem_os_core::domain_pack::DomainPackManifest;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use uuid::Uuid;
@@ -985,6 +989,14 @@ pub fn session_scoped_router() -> Router<ReplV2RouteState> {
             get(get_acp_capabilities_route),
         )
         .route("/api/session/:id/acp/policy", get(get_acp_policy_route))
+        .route(
+            "/api/session/:id/acp/projections",
+            get(list_acp_projections_route),
+        )
+        .route(
+            "/api/session/:id/acp/projections/:kind",
+            get(get_acp_projection_route),
+        )
         .route("/api/session/:id/acp/open", post(open_acp_session_route))
         .route("/api/session/:id/acp/close", post(close_acp_session_route))
         .route(
@@ -1050,6 +1062,344 @@ fn acp_policy_value(session_id: Uuid) -> Result<serde_json::Value, crate::acp::A
         "status": "acp_policy",
         "policy": policy,
     }))
+}
+
+/// GET /api/session/:id/acp/projections
+async fn list_acp_projections_route(
+    Path(session_id): Path<Uuid>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<ErrorResponseV2>)> {
+    list_acp_projections_value(session_id)
+        .map(Json)
+        .map_err(acp_json_error)
+}
+
+fn list_acp_projections_value(
+    session_id: Uuid,
+) -> Result<serde_json::Value, crate::acp::AcpAdapterError> {
+    let manifest = load_ob_poc_kyc_domain_pack()?;
+    let session = crate::acp::open_acp_session(session_id, crate::acp::AcpAdapterKind::Zed);
+    let projections = crate::acp::list_acp_projections(&session, &manifest)?;
+
+    Ok(serde_json::json!({
+        "status": "acp_projection_catalog",
+        "session_id": session_id,
+        "pack_id": manifest.pack_id,
+        "projections": projections,
+    }))
+}
+
+/// GET /api/session/:id/acp/projections/:kind
+async fn get_acp_projection_route(
+    State(state): State<ReplV2RouteState>,
+    Path((session_id, kind)): Path<(Uuid, String)>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<ErrorResponseV2>)> {
+    let value = get_acp_projection_value_for_state(&state, session_id, &kind)
+        .await
+        .map_err(acp_json_error)?;
+    append_session_trace_if_present(
+        &state,
+        session_id,
+        crate::repl::session_trace::TraceOp::AcpProjectionServed {
+            projection_kind: value["projection"]["projection_kind"]
+                .as_str()
+                .unwrap_or("unknown")
+                .to_string(),
+            projection_hash: value["projection"]["projection_hash"]
+                .as_str()
+                .unwrap_or("unknown")
+                .to_string(),
+            classification: value["projection"]["classification"]
+                .as_str()
+                .unwrap_or("unknown")
+                .to_string(),
+            redacted_count: value["projection"]["redactions"]
+                .as_array()
+                .map(|redactions| redactions.len())
+                .unwrap_or(0),
+            acp_mode: "discovery".to_string(),
+            mechanisms: vec![
+                "projection_get".to_string(),
+                "classification_policy".to_string(),
+            ],
+        },
+    )
+    .await;
+    Ok(Json(value))
+}
+
+async fn get_acp_projection_value_for_state(
+    state: &ReplV2RouteState,
+    session_id: Uuid,
+    kind: &str,
+) -> Result<serde_json::Value, crate::acp::AcpAdapterError> {
+    let manifest = load_ob_poc_kyc_domain_pack()?;
+    let session = crate::acp::open_acp_session(session_id, crate::acp::AcpAdapterKind::Zed);
+    let kind = kind.parse::<AcpProjectionKind>().map_err(|_| {
+        crate::acp::AcpAdapterError::ProjectionUnknown {
+            projection_kind: kind.to_string(),
+        }
+    })?;
+
+    if let Some(repl_session) = state.orchestrator.get_session(session_id).await {
+        if let Some(projection) =
+            build_live_acp_projection(&session, &manifest, &repl_session, kind)?
+        {
+            return Ok(serde_json::json!({
+                "status": "acp_projection",
+                "projection": projection,
+            }));
+        }
+    }
+
+    get_acp_projection_value(session_id, kind.as_str())
+}
+
+fn get_acp_projection_value(
+    session_id: Uuid,
+    kind: &str,
+) -> Result<serde_json::Value, crate::acp::AcpAdapterError> {
+    let manifest = load_ob_poc_kyc_domain_pack()?;
+    let session = crate::acp::open_acp_session(session_id, crate::acp::AcpAdapterKind::Zed);
+    let kind = kind
+        .parse::<sem_os_core::acp_projection::AcpProjectionKind>()
+        .map_err(|_| crate::acp::AcpAdapterError::ProjectionUnknown {
+            projection_kind: kind.to_string(),
+        })?;
+    let projection = crate::acp::build_acp_projection(
+        &session,
+        &manifest,
+        crate::acp::AcpProjectionRequest {
+            kind,
+            subject: None,
+        },
+    )?;
+
+    Ok(serde_json::json!({
+        "status": "acp_projection",
+        "projection": projection,
+    }))
+}
+
+fn live_affinity_nodes(repl_session: &ReplSessionV2) -> Vec<serde_json::Value> {
+    let mut nodes = repl_session
+        .workspace_stack
+        .iter()
+        .enumerate()
+        .map(|(index, frame)| {
+            serde_json::json!({
+                "id": format!("workspace:{index}:{}", frame.constellation_map),
+                "kind": "workspace_frame",
+                "workspace": frame.workspace,
+                "constellation_family": frame.constellation_family,
+                "constellation_map": frame.constellation_map,
+                "subject_kind": frame.subject_kind,
+                "subject_id": frame.subject_id,
+                "stale": frame.stale,
+            })
+        })
+        .collect::<Vec<_>>();
+
+    nodes.extend(
+        repl_session
+            .bindings
+            .keys()
+            .map(|binding| serde_json::json!({
+                "id": format!("binding:{binding}"),
+                "kind": "binding",
+                "name": binding,
+            })),
+    );
+    nodes
+}
+
+fn live_affinity_edges(repl_session: &ReplSessionV2) -> Vec<serde_json::Value> {
+    let mut edges = repl_session
+        .workspace_stack
+        .windows(2)
+        .enumerate()
+        .map(|(index, pair)| {
+            serde_json::json!({
+                "from": format!("workspace:{index}:{}", pair[0].constellation_map),
+                "to": format!("workspace:{}:{}", index + 1, pair[1].constellation_map),
+                "kind": "stack_adjacency",
+            })
+        })
+        .collect::<Vec<_>>();
+
+    if let Some((index, frame)) = repl_session
+        .workspace_stack
+        .iter()
+        .enumerate()
+        .next_back()
+    {
+        let frame_id = format!("workspace:{index}:{}", frame.constellation_map);
+        edges.extend(repl_session.bindings.keys().map(|binding| {
+            serde_json::json!({
+                "from": frame_id,
+                "to": format!("binding:{binding}"),
+                "kind": "current_frame_binding",
+            })
+        }));
+    }
+    edges
+}
+
+fn build_live_acp_projection(
+    session: &crate::acp::AcpSession,
+    manifest: &DomainPackManifest,
+    repl_session: &ReplSessionV2,
+    kind: AcpProjectionKind,
+) -> Result<Option<AcpProjectionEnvelope>, crate::acp::AcpAdapterError> {
+    let Some(catalog_entry) = manifest
+        .projection_catalog
+        .iter()
+        .find(|entry| entry.kind == kind)
+    else {
+        return Err(crate::acp::AcpAdapterError::ProjectionUnknown {
+            projection_kind: kind.as_str().to_string(),
+        });
+    };
+
+    let payload = match kind {
+        AcpProjectionKind::WorkspaceState => serde_json::json!({
+            "status": "live",
+            "active_workspace": repl_session.active_workspace,
+            "agent_mode": repl_session.agent_mode,
+            "conversation_mode": repl_session.conversation_mode,
+            "workspace_stack": repl_session.workspace_stack,
+            "session_stack": repl_session.session_stack,
+            "bindings": repl_session.bindings,
+            "runbook_plan_cursor": repl_session.runbook_plan_cursor,
+        }),
+        AcpProjectionKind::Dag => serde_json::json!({
+            "status": "live",
+            "frames": repl_session.workspace_stack.iter().map(|frame| serde_json::json!({
+                "workspace": frame.workspace.clone(),
+                "constellation_family": frame.constellation_family.clone(),
+                "constellation_map": frame.constellation_map.clone(),
+                "subject_kind": frame.subject_kind.clone(),
+                "subject_id": frame.subject_id,
+                "stale": frame.stale,
+                "hydrated_state": frame.hydrated_state.clone(),
+            })).collect::<Vec<_>>(),
+        }),
+        AcpProjectionKind::GraphScene => serde_json::json!({
+            "status": "live",
+            "source": "session_stack",
+            "session_stack": repl_session.session_stack,
+            "workspace_frame_count": repl_session.workspace_stack.len(),
+        }),
+        AcpProjectionKind::VerbSurface => serde_json::json!({
+            "status": "live",
+            "pending_verb": repl_session.pending_verb,
+            "scoped_surfaces": repl_session.workspace_stack.iter().filter_map(|frame| {
+                frame.hydrated_state.as_ref().map(|state| serde_json::json!({
+                    "workspace": frame.workspace.clone(),
+                    "constellation_map": frame.constellation_map.clone(),
+                    "verbs": state.scoped_verb_surface.clone(),
+                    "available_actions": state.available_actions.clone(),
+                    "narration_hot_verbs": frame.narration_hot_verbs.clone(),
+                }))
+            }).collect::<Vec<_>>(),
+        }),
+        AcpProjectionKind::DiscoverySurface => {
+            if let Some(envelope) = repl_session.pending_sem_os_envelope.as_ref() {
+                serde_json::json!({
+                    "status": "live",
+                    "resolution_stage": envelope.resolution_stage.clone(),
+                    "discovery_surface": envelope.discovery_surface.clone(),
+                    "grounded_action_surface": envelope.grounded_action_surface.clone(),
+                    "fingerprint": envelope.fingerprint_str(),
+                })
+            } else {
+                serde_json::json!({
+                    "status": "live_no_envelope",
+                    "reason": "session has no pending SemOS context envelope"
+                })
+            }
+        }
+        AcpProjectionKind::Governance => {
+            if let Some(envelope) = repl_session.pending_sem_os_envelope.as_ref() {
+                serde_json::json!({
+                    "status": "live",
+                    "fingerprint": envelope.fingerprint_str(),
+                    "evidence_gaps": envelope.evidence_gaps.clone(),
+                    "governance_signals": envelope.governance_signals.clone(),
+                    "snapshot_set_id": envelope.snapshot_set_id.clone(),
+                    "computed_at": envelope.computed_at,
+                })
+            } else {
+                serde_json::json!({
+                    "status": "live_no_envelope",
+                    "evidence_gaps": [],
+                    "governance_signals": []
+                })
+            }
+        }
+        AcpProjectionKind::Lineage => serde_json::json!({
+            "status": "live",
+            "trace_sequence": repl_session.trace_sequence,
+            "trace": repl_session.trace,
+            "session_stack": repl_session.session_stack,
+        }),
+        AcpProjectionKind::EvidenceSchema => serde_json::json!({
+            "status": "live",
+            "transition_evidence_requirements": manifest.allowed_transitions.iter().map(|transition| serde_json::json!({
+                "transition_ref": transition.transition_ref.clone(),
+                "entity_type": transition.entity_type.clone(),
+                "evidence_refs_required": transition.evidence_refs_required.clone(),
+                "classification": catalog_entry.default_classification,
+            })).collect::<Vec<_>>(),
+            "classification_policy": manifest.classification_policy,
+        }),
+        AcpProjectionKind::DerivationRegistry => serde_json::json!({
+            "status": "live",
+            "typed_extension_points": manifest.typed_extension_points.iter().filter(|extension| {
+                extension.extension_kind.contains("derivation")
+            }).collect::<Vec<_>>(),
+        }),
+        AcpProjectionKind::Materiality => serde_json::json!({
+            "status": "live",
+            "transition_materiality": manifest.allowed_transitions.iter().map(|transition| serde_json::json!({
+                "transition_ref": transition.transition_ref.clone(),
+                "verb": transition.verb.clone(),
+                "from_state": transition.from_state.clone(),
+                "to_state": transition.to_state.clone(),
+                "dry_run_enabled": transition.dry_run_enabled,
+                "mutation_enabled": transition.mutation_enabled,
+                "hitl_required": transition.hitl_required,
+                "evidence_refs_required": transition.evidence_refs_required.clone(),
+            })).collect::<Vec<_>>(),
+        }),
+        AcpProjectionKind::AffinityGraph => serde_json::json!({
+            "status": "live",
+            "source": "repl_session.workspace_stack",
+            "nodes": live_affinity_nodes(repl_session),
+            "edges": live_affinity_edges(repl_session),
+            "note": "Session-derived affinity projection; external SemOS AffinityGraph authority may enrich this shape when attached."
+        }),
+        AcpProjectionKind::PackManifest
+        | AcpProjectionKind::ProbeCatalogue
+        | AcpProjectionKind::TransitionSurface
+        | AcpProjectionKind::Policy => return Ok(None),
+    };
+
+    Ok(Some(AcpProjectionEnvelope::new(
+        AcpProjectionEnvelopeInput {
+            projection_kind: kind,
+            session_id: session.session_id,
+            pack_id: manifest.pack_id.clone(),
+            classification: catalog_entry.default_classification,
+            subject: None,
+            snapshot_refs: vec![
+                format!("domain_pack:{}@{}", manifest.pack_id, manifest.version),
+                format!("repl_session:{}", repl_session.id),
+                format!("trace_sequence:{}", repl_session.trace_sequence),
+            ],
+            payload,
+            redactions: vec![],
+        },
+    )))
 }
 
 /// POST /api/session/:id/acp/open
@@ -1572,6 +1922,8 @@ fn acp_json_error(error: crate::acp::AcpAdapterError) -> (StatusCode, Json<Error
         crate::acp::AcpAdapterError::DiscoveryRefused { .. }
         | crate::acp::AcpAdapterError::DiscoveryMutatedState
         | crate::acp::AcpAdapterError::MutationNotSupported
+        | crate::acp::AcpAdapterError::ProjectionUnknown { .. }
+        | crate::acp::AcpAdapterError::ProjectionSubjectRefused { .. }
         | crate::acp::AcpAdapterError::DryRunRefused { .. } => StatusCode::CONFLICT,
         crate::acp::AcpAdapterError::SessionClosed
         | crate::acp::AcpAdapterError::PackInvalid { .. } => StatusCode::BAD_REQUEST,
@@ -2844,6 +3196,43 @@ mod tests {
             .iter()
             .any(|transition| transition["dry_run_allowed"] == true
                 && transition["mutation_allowed"] == false));
+    }
+
+    #[test]
+    fn test_acp_projection_catalog_value_exposes_visibility_surface() {
+        let session_id = Uuid::parse_str("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa").unwrap();
+
+        let value = list_acp_projections_value(session_id).expect("projection catalog");
+
+        assert_eq!(value["status"], "acp_projection_catalog");
+        assert!(value["projections"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|entry| entry["kind"] == "dag"));
+        assert!(value["projections"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|entry| entry["kind"] == "verb_surface"));
+    }
+
+    #[test]
+    fn test_acp_projection_value_returns_hashed_envelope() {
+        let session_id = Uuid::parse_str("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa").unwrap();
+
+        let value = get_acp_projection_value(session_id, "probe_catalogue").expect("projection");
+
+        assert_eq!(value["status"], "acp_projection");
+        assert_eq!(value["projection"]["projection_kind"], "probe_catalogue");
+        assert!(value["projection"]["projection_hash"]
+            .as_str()
+            .unwrap()
+            .starts_with("sha256:"));
+        assert_eq!(
+            value["projection"]["payload"]["probes"][0]["probe_id"],
+            "kyc-case.read-state"
+        );
     }
 
     #[test]

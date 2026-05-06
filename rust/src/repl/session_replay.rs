@@ -155,6 +155,7 @@ fn apply_trace_op(
         | TraceOp::RunbookApproved { .. }
         | TraceOp::AcpSessionOpened { .. }
         | TraceOp::AcpContextAssembled { .. }
+        | TraceOp::AcpProjectionServed { .. }
         | TraceOp::WorkbookDryRunValidated { .. }
         | TraceOp::ApprovalTokenIssued { .. }
         | TraceOp::RestrictedMutationPreflightPrepared { .. }

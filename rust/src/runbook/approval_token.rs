@@ -493,6 +493,11 @@ mod tests {
                 evidence_refs_required: vec!["case_id".to_string()],
             }],
             discovery_probes: vec![],
+            projection_catalog: vec![],
+            mention_namespaces: vec![],
+            declared_modes: vec![],
+            external_mcp_transports: vec![],
+            typed_extension_points: vec![],
             classification_policy: ContextClassificationPolicy {
                 max_prompt_classification: ClassificationLimit::Internal,
                 allow_external_llm: false,

@@ -220,6 +220,16 @@ pub struct AcpContextExtensionRequest {
     pub first_class_state_mutated: bool,
 }
 
+#[derive(Debug, Clone, Deserialize)]
+pub struct AcpProjectionGetRequest {
+    pub session_id: String,
+    pub kind: sem_os_core::acp_projection::AcpProjectionKind,
+    #[serde(default = "default_adapter")]
+    pub adapter: AcpAdapterKind,
+    #[serde(default)]
+    pub subject: Option<sem_os_core::acp_projection::AcpProjectionSubject>,
+}
+
 fn default_adapter() -> AcpAdapterKind {
     AcpAdapterKind::Zed
 }
@@ -272,8 +282,26 @@ impl AcpJsonRpcAgent {
             "session/cancel" => self.session_cancel(request.params),
             "session/prompt" => self.session_prompt(id, request.params),
             "obpoc/policy" => self.obpoc_policy(id, request.params),
+            "obpoc/projections/list" => self.obpoc_projection_list(id, request.params),
+            "obpoc/projection/get" => self.obpoc_projection_get(id, request.params),
             "obpoc/context" => self.obpoc_context(id, request.params),
             "obpoc/kyc_update_status_dry_run" => self.obpoc_kyc_dry_run(id, request.params),
+            "request_permission" | "obpoc/request_permission" => {
+                self.obpoc_request_permission(id, request.params)
+            }
+            "write_text_file" | "create_text_file" | "terminal/new" => self.error(
+                id,
+                INVALID_REQUEST,
+                format!(
+                    "{} is outside the ACP discovery surface and is not permitted",
+                    request.method
+                ),
+                Some(json!({
+                    "capability": "none",
+                    "authority_surface": request.method,
+                    "reason": "ACP projects SemOS visibility only; execution remains behind workbook approval and the compiled runbook gate"
+                })),
+            ),
             "obpoc/mutation" => self.error(
                 id,
                 INVALID_REQUEST,
@@ -290,6 +318,8 @@ impl AcpJsonRpcAgent {
     }
 
     fn initialize_result(&self) -> Value {
+        let manifest =
+            load_ob_poc_kyc_domain_pack().expect("bundled ob-poc KYC Domain Pack parses");
         serde_json::to_value(AcpInitializeResponse {
             protocol_version: ACP_PROTOCOL_VERSION.to_string(),
             agent_capabilities: AcpAgentCapabilities {
@@ -315,6 +345,10 @@ impl AcpJsonRpcAgent {
                 version: env!("CARGO_PKG_VERSION").to_string(),
             },
         })
+        .map(|mut value| {
+            value["obpocCapabilities"] = obpoc_capability_summary(&manifest);
+            value
+        })
         .expect("ACP initialize result serializes")
     }
 
@@ -329,11 +363,8 @@ impl AcpJsonRpcAgent {
                 "sessionId": session_id.to_string(),
                 "session": self.session_record(session_id, "ob-poc ACP session", &now, &now),
                 "modeState": {
-                    "currentModeId": "sage",
-                    "availableModes": [
-                        {"id": "sage", "name": "Sage Discovery", "description": "Read-only discovery and context assembly"},
-                        {"id": "dsl-coder", "name": "DSL Coder Dry Run", "description": "Workbook dry-run validation without mutation"}
-                    ]
+                    "currentModeId": "discovery",
+                    "availableModes": obpoc_mode_state()
                 }
             }),
         )
@@ -437,6 +468,40 @@ impl AcpJsonRpcAgent {
                 params: json!({
                     "sessionId": session_id.to_string(),
                     "update": {
+                        "sessionUpdate": "tool_call_update",
+                        "toolCallId": format!("tool:projection-catalog:{session_id}"),
+                        "status": "completed",
+                        "title": "ACP projection catalogue",
+                        "content": {
+                            "type": "resource_link",
+                            "uri": "obpoc://acp/projections",
+                            "name": "SemOS projection surface",
+                            "description": "Pack, policy, DAG, verbs, lineage, materiality, and workspace projections"
+                        }
+                    }
+                }),
+            }),
+            JsonRpcOutgoing::Notification(JsonRpcNotification {
+                jsonrpc: "2.0".to_string(),
+                method: "session/update".to_string(),
+                params: json!({
+                    "sessionId": session_id.to_string(),
+                    "update": {
+                        "sessionUpdate": "plan",
+                        "entries": [
+                            {"id": "discover", "status": "completed", "label": "Read SemOS projection surface"},
+                            {"id": "plan", "status": "in_progress", "label": "Assemble workbook-safe plan"},
+                            {"id": "execute", "status": "blocked", "label": "Await DSL Coder and HITL gate"}
+                        ]
+                    }
+                }),
+            }),
+            JsonRpcOutgoing::Notification(JsonRpcNotification {
+                jsonrpc: "2.0".to_string(),
+                method: "session/update".to_string(),
+                params: json!({
+                    "sessionId": session_id.to_string(),
+                    "update": {
                         "sessionUpdate": "agent_message_chunk",
                         "content": {"type": "text", "text": text}
                     }
@@ -521,6 +586,75 @@ impl AcpJsonRpcAgent {
         }
     }
 
+    fn obpoc_projection_list(&mut self, id: Option<Value>, params: Value) -> Vec<JsonRpcOutgoing> {
+        let session_id = match extract_session_id(&params) {
+            Ok(session_id) => session_id,
+            Err(error) => return self.error(id, INVALID_PARAMS, error, None),
+        };
+        let adapter = params
+            .get("adapter")
+            .cloned()
+            .and_then(|value| serde_json::from_value::<AcpAdapterKind>(value).ok())
+            .unwrap_or(AcpAdapterKind::Zed);
+        let manifest = match load_ob_poc_kyc_domain_pack() {
+            Ok(manifest) => manifest,
+            Err(error) => return self.acp_error(id, error),
+        };
+        let session = self
+            .sessions
+            .entry(session_id)
+            .or_insert_with(|| acp::open_acp_session(session_id, adapter))
+            .clone();
+
+        match acp::list_acp_projections(&session, &manifest) {
+            Ok(projections) => self.response(
+                id,
+                json!({
+                    "status": "acp_projection_catalog",
+                    "session_id": session_id,
+                    "pack_id": manifest.pack_id,
+                    "projections": projections,
+                }),
+            ),
+            Err(error) => self.acp_error(id, error),
+        }
+    }
+
+    fn obpoc_projection_get(&mut self, id: Option<Value>, params: Value) -> Vec<JsonRpcOutgoing> {
+        let request: AcpProjectionGetRequest = match serde_json::from_value(params) {
+            Ok(request) => request,
+            Err(error) => return self.error(id, INVALID_PARAMS, error.to_string(), None),
+        };
+        let session_id = match Uuid::parse_str(&request.session_id) {
+            Ok(session_id) => session_id,
+            Err(error) => return self.error(id, INVALID_PARAMS, error.to_string(), None),
+        };
+        let manifest = match load_ob_poc_kyc_domain_pack() {
+            Ok(manifest) => manifest,
+            Err(error) => return self.acp_error(id, error),
+        };
+        let session = self
+            .sessions
+            .entry(session_id)
+            .or_insert_with(|| acp::open_acp_session(session_id, request.adapter))
+            .clone();
+
+        match acp::build_acp_projection(
+            &session,
+            &manifest,
+            acp::AcpProjectionRequest {
+                kind: request.kind,
+                subject: request.subject,
+            },
+        ) {
+            Ok(envelope) => self.response(
+                id,
+                json!({"status": "acp_projection", "projection": envelope}),
+            ),
+            Err(error) => self.acp_error(id, error),
+        }
+    }
+
     fn obpoc_kyc_dry_run(&mut self, id: Option<Value>, params: Value) -> Vec<JsonRpcOutgoing> {
         let input: KycUpdateStatusDryRunInput = match serde_json::from_value(params) {
             Ok(input) => input,
@@ -532,11 +666,71 @@ impl AcpJsonRpcAgent {
             .or_insert_with(|| acp::open_acp_session(input.session_id, AcpAdapterKind::Zed))
             .clone();
         match acp::acp_dry_run_kyc_update_status(&session, input) {
-            Ok(output) => {
-                self.response(id, json!({"status": "dry_run_validated", "output": output}))
-            }
+            Ok(output) => vec![
+                JsonRpcOutgoing::Notification(JsonRpcNotification {
+                    jsonrpc: "2.0".to_string(),
+                    method: "session/update".to_string(),
+                    params: json!({
+                        "sessionId": output.workbook.core.session_id.to_string(),
+                        "update": {
+                            "sessionUpdate": "tool_call_update",
+                            "toolCallId": format!("tool:dry-run:{}", output.workbook.id),
+                            "status": "completed",
+                            "title": "KYC update-status dry-run",
+                            "content": {
+                                "type": "resource_link",
+                                "uri": format!("obpoc://workbook/{}", output.workbook.id),
+                                "name": "Execution workbook",
+                                "description": "Workbook validated without mutation"
+                            }
+                        }
+                    }),
+                }),
+                JsonRpcOutgoing::Notification(JsonRpcNotification {
+                    jsonrpc: "2.0".to_string(),
+                    method: "session/update".to_string(),
+                    params: json!({
+                        "sessionId": output.workbook.core.session_id.to_string(),
+                        "update": {
+                            "sessionUpdate": "semantic_diff",
+                            "diff": output.workbook.core.simulation.semantic_diff.clone(),
+                            "transitionRef": output.workbook.core.simulation.transition_ref.clone()
+                        }
+                    }),
+                }),
+                JsonRpcOutgoing::Response(JsonRpcResponse::success(
+                    id,
+                    json!({"status": "dry_run_validated", "output": output}),
+                )),
+            ],
             Err(error) => self.acp_error(id, error),
         }
+    }
+
+    fn obpoc_request_permission(
+        &mut self,
+        id: Option<Value>,
+        params: Value,
+    ) -> Vec<JsonRpcOutgoing> {
+        let session_id = match extract_session_id(&params) {
+            Ok(session_id) => session_id,
+            Err(error) => return self.error(id, INVALID_PARAMS, error, None),
+        };
+        self.sessions
+            .entry(session_id)
+            .or_insert_with(|| acp::open_acp_session(session_id, AcpAdapterKind::Zed));
+        self.response(
+            id,
+            json!({
+                "status": "permission_request_created",
+                "permission_request_id": format!("permission:hitl:{}", Uuid::new_v4()),
+                "session_id": session_id,
+                "authority_surface": "request_permission",
+                "scope": "hitl_approval_only",
+                "execution_authority": false,
+                "reason": "ACP may request attestation metadata, but mutation still requires workbook approval and the compiled runbook gate"
+            }),
+        )
     }
 
     fn acp_error(&self, id: Option<Value>, error: acp::AcpAdapterError) -> Vec<JsonRpcOutgoing> {
@@ -580,6 +774,37 @@ impl AcpJsonRpcAgent {
             id, code, message, data,
         ))]
     }
+}
+
+fn obpoc_mode_state() -> Value {
+    json!([
+        {"id": "discovery", "name": "Discovery", "description": "Read-only SemOS discovery and projection assembly"},
+        {"id": "planning", "name": "Planning", "description": "Workbook and runbook plan construction without mutation"},
+        {"id": "explanation", "name": "Explanation", "description": "Semantic diff, policy, and lineage explanation"},
+        {"id": "attestation", "name": "Attestation", "description": "Approval-token and audit review before mutation gates"}
+    ])
+}
+
+fn obpoc_capability_summary(manifest: &sem_os_core::domain_pack::DomainPackManifest) -> Value {
+    let session = acp::open_acp_session(Uuid::nil(), AcpAdapterKind::Zed);
+    let policy = acp::acp_policy_capabilities(&session, manifest)
+        .expect("bundled ob-poc KYC Domain Pack validates");
+    json!({
+        "pack": {
+            "pack_id": manifest.pack_id,
+            "version": manifest.version,
+            "implementation_mode": manifest.implementation_mode,
+            "compatibility_tier": manifest.compatibility_tier
+        },
+        "projections": manifest.projection_catalog,
+        "probes": manifest.discovery_probes,
+        "mentionNamespaces": manifest.mention_namespaces,
+        "modes": manifest.declared_modes,
+        "classification": manifest.classification_policy,
+        "authoritySurfaces": policy.authority_surfaces,
+        "externalMcpTransports": manifest.external_mcp_transports,
+        "typedExtensionPoints": manifest.typed_extension_points
+    })
 }
 
 fn extract_session_id(params: &Value) -> Result<Uuid, String> {
@@ -631,7 +856,7 @@ mod tests {
         let mut agent = AcpJsonRpcAgent::new();
         let response = only_response(agent.handle_request(request(1, "initialize", json!({}))));
 
-        let result = response.result.unwrap();
+        let result = response.result.as_ref().unwrap();
         assert_eq!(result["protocolVersion"], ACP_PROTOCOL_VERSION);
         assert_eq!(
             result["agentCapabilities"]["sessionCapabilities"]["close"],
@@ -645,6 +870,16 @@ mod tests {
             result["agentCapabilities"]["promptCapabilities"]["embeddedContext"],
             true
         );
+        assert!(result["obpocCapabilities"]["projections"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|entry| entry["kind"] == "policy"));
+        assert!(result["obpocCapabilities"]["authoritySurfaces"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|surface| surface["surface"] == "terminal/new" && surface["permitted"] == false));
     }
 
     #[test]
@@ -703,19 +938,19 @@ mod tests {
             }),
         ));
 
-        assert_eq!(outgoing.len(), 2);
+        assert_eq!(outgoing.len(), 4);
         match &outgoing[0] {
             JsonRpcOutgoing::Notification(notification) => {
                 assert_eq!(notification.method, "session/update");
                 assert_eq!(notification.params["sessionId"], SESSION_ID.to_string());
                 assert_eq!(
                     notification.params["update"]["sessionUpdate"],
-                    "agent_message_chunk"
+                    "tool_call_update"
                 );
             }
             _ => panic!("expected session/update notification"),
         }
-        match &outgoing[1] {
+        match &outgoing[3] {
             JsonRpcOutgoing::Response(response) => {
                 assert_eq!(response.result.as_ref().unwrap()["stopReason"], "end_turn");
             }
@@ -748,7 +983,7 @@ mod tests {
             }),
         )));
 
-        let result = response.result.unwrap();
+        let result = response.result.as_ref().unwrap();
         assert_eq!(result["bundle"]["pack_id"], "ob-poc.kyc");
         assert_eq!(
             result["bundle"]["prompt_context"]["redacted"][0]["key"],
@@ -768,7 +1003,7 @@ mod tests {
             }),
         )));
 
-        let result = response.result.unwrap();
+        let result = response.result.as_ref().unwrap();
         assert_eq!(result["policy"]["pack_id"], "ob-poc.kyc");
         assert_eq!(
             result["policy"]["adapter_policy"]["policy_authority"],
@@ -782,12 +1017,80 @@ mod tests {
             result["policy"]["transition_policy"][0]["mutation_allowed"],
             false
         );
+        assert!(result["policy"]["projection_catalog"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|entry| entry["kind"] == "lineage"));
+        assert!(result["policy"]["authority_surfaces"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(
+                |surface| surface["surface"] == "write_text_file" && surface["permitted"] == false
+            ));
+    }
+
+    #[test]
+    fn extension_projection_list_exposes_declared_catalogue() {
+        let mut agent = AcpJsonRpcAgent::new();
+        let response = only_response(agent.handle_request(request(
+            1,
+            "obpoc/projections/list",
+            json!({
+                "session_id": SESSION_ID.to_string(),
+                "adapter": "zed"
+            }),
+        )));
+
+        let result = response.result.unwrap();
+        assert_eq!(result["status"], "acp_projection_catalog");
+        assert!(result["projections"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|entry| entry["kind"] == "dag"));
+        assert!(result["projections"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|entry| entry["kind"] == "verb_surface"));
+    }
+
+    #[test]
+    fn extension_projection_get_returns_hashed_envelope() {
+        let mut agent = AcpJsonRpcAgent::new();
+        let response = only_response(agent.handle_request(request(
+            1,
+            "obpoc/projection/get",
+            json!({
+                "session_id": SESSION_ID.to_string(),
+                "adapter": "zed",
+                "kind": "transition_surface",
+                "subject": {
+                    "subject_kind": "kyc_case",
+                    "subject_id": CASE_ID.to_string()
+                }
+            }),
+        )));
+
+        let projection = &response.result.unwrap()["projection"];
+        assert_eq!(projection["projection_kind"], "transition_surface");
+        assert_eq!(projection["pack_id"], "ob-poc.kyc");
+        assert!(projection["projection_hash"]
+            .as_str()
+            .unwrap()
+            .starts_with("sha256:"));
+        assert_eq!(
+            projection["payload"]["transitions"][0]["transition_ref"],
+            "kyc-case.intake-to-discovery"
+        );
     }
 
     #[test]
     fn extension_kyc_dry_run_uses_existing_workbook_gate() {
         let mut agent = AcpJsonRpcAgent::new();
-        let response = only_response(agent.handle_request(request(
+        let outgoing = agent.handle_request(request(
             1,
             "obpoc/kyc_update_status_dry_run",
             json!({
@@ -803,14 +1106,54 @@ mod tests {
                 "evidence_digest": "sha256:evidence",
                 "llm_trace_ref": null
             }),
-        )));
+        ));
 
-        let result = response.result.unwrap();
+        assert_eq!(outgoing.len(), 3);
+        assert!(matches!(
+            &outgoing[0],
+            JsonRpcOutgoing::Notification(notification)
+                if notification.params["update"]["sessionUpdate"] == "tool_call_update"
+        ));
+        assert!(matches!(
+            &outgoing[1],
+            JsonRpcOutgoing::Notification(notification)
+                if notification.params["update"]["sessionUpdate"] == "semantic_diff"
+        ));
+        let response = match &outgoing[2] {
+            JsonRpcOutgoing::Response(response) => response,
+            JsonRpcOutgoing::Notification(_) => panic!("expected response"),
+        };
+        let result = response.result.as_ref().unwrap();
         assert_eq!(result["status"], "dry_run_validated");
         assert_eq!(
             result["output"]["dry_run"]["transition_ref"],
             "kyc-case.intake-to-discovery"
         );
+    }
+
+    #[test]
+    fn execution_authority_methods_are_explicitly_refused() {
+        let mut agent = AcpJsonRpcAgent::new();
+        let response = only_response(agent.handle_request(request(1, "terminal/new", json!({}))));
+
+        let error = response.error.unwrap();
+        assert_eq!(error.code, INVALID_REQUEST);
+        assert_eq!(error.data.unwrap()["capability"], "none");
+    }
+
+    #[test]
+    fn permission_request_is_hitl_only() {
+        let mut agent = AcpJsonRpcAgent::new();
+        let response = only_response(agent.handle_request(request(
+            1,
+            "obpoc/request_permission",
+            json!({"session_id": SESSION_ID.to_string()}),
+        )));
+
+        let result = response.result.unwrap();
+        assert_eq!(result["status"], "permission_request_created");
+        assert_eq!(result["scope"], "hitl_approval_only");
+        assert_eq!(result["execution_authority"], false);
     }
 
     #[test]

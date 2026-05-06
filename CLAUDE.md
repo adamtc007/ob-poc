@@ -263,7 +263,7 @@ Search Priority (9-tier):
 
 **PolicyGate:** Server-side single-pipeline enforcement. `SemOsContextEnvelope` replaces `SemRegVerbPolicy`: carries allowed verbs, pruned verbs with structured `PruneReason` (7 variants: AbacDenied, EntityKindMismatch, TierExcluded, TaxonomyNoOverlap, PreconditionFailed, AgentModeBlocked, PolicyDenied), `AllowedVerbSetFingerprint` (SHA-256), TOCTOU recheck. Pre-constrained verb search threads allowed verbs into `HybridVerbSearcher`.
 
-**ACP boundary (2026-05-06):** `ob_poc_acp` is the launchable Agent Client Protocol server over newline-delimited JSON-RPC stdio. ACP is a client/transport boundary, not the policy authority: `obpoc/policy` exposes SemOS Domain Pack policy decisions, discovery probe allow/refuse reasons, context classification/redaction rules, transition dry-run/mutation capability, and the mutation boundary (`workbook_approval_and_compiled_runbook_gate`). Enforcement remains behind ACP in SemOS Domain Pack validation, workbook integrity, approval tokens, and the compiled runbook execution gate. Direct ACP mutation is refused.
+**ACP boundary (2026-05-06):** `ob_poc_acp` is the launchable Agent Client Protocol server over newline-delimited JSON-RPC stdio. ACP is the rich agent-editor projection surface for SemOS discovery, not the policy or mutation authority. `obpoc/policy`, `obpoc/projections/list`, and `obpoc/projection/get` expose Domain Pack policy, projection catalogue entries, typed hashed projection envelopes, discovery probe allow/refuse reasons, context classification/redaction rules, transition dry-run/mutation capability, and the mutation boundary (`workbook_approval_and_compiled_runbook_gate`). Visibility and authority are independent: Sage/editor may observe any classification-permitted projection the Domain Pack exposes; direct ACP mutation is refused. Enforcement remains behind ACP in SemOS Domain Pack validation, workbook integrity, approval tokens, and the compiled runbook execution gate.
 
 **SessionVerbSurface:** 6-step compute pipeline (was 8): Registry → AgentMode → Scope+Workflow (merged) → SemReg CCIR → Lifecycle → Rank+CompositeStateBias. FailClosed default = ~30 safe-harbor verbs. Dual fingerprints: `vs1:<hex>` (surface) vs `v1:<hex>` (SemReg).
 
@@ -320,6 +320,8 @@ The egui canvas renders `GraphSceneModel` from the Observatory API (polled every
 | `GET /api/session/:id/runbook/status` | Current plan status + cursor |
 | `GET /api/session/:id/acp/capabilities` | ACP protocol capabilities + stdio launch metadata |
 | `GET /api/session/:id/acp/policy` | ACP-visible SemOS policy/capability decisions |
+| `GET /api/session/:id/acp/projections` | ACP-visible SemOS projection catalogue |
+| `GET /api/session/:id/acp/projections/:kind` | Typed ACP projection envelope with hash/classification metadata |
 | `POST /api/session/:id/acp/open` | Open ACP adapter session (no direct mutation capability) |
 | `POST /api/session/:id/acp/close` | Close ACP adapter session |
 | `POST /api/session/:id/acp/context` | Assemble redacted Sage context via Domain Pack discovery policy |

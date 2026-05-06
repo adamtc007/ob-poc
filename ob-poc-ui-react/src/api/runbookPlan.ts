@@ -157,6 +157,15 @@ export type TraceOp =
       redacted_count: number;
     }
   | {
+      op: "acp_projection_served";
+      projection_kind: string;
+      projection_hash: string;
+      classification: string;
+      redacted_count: number;
+      acp_mode?: string;
+      mechanisms?: string[];
+    }
+  | {
       op: "workbook_dry_run_validated";
       workbook_id: string;
       transition_ref: string;

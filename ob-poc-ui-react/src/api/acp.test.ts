@@ -75,6 +75,52 @@ describe("acpApi", () => {
           mutation_boundary: "workbook_approval_and_compiled_runbook_gate",
           policy_authority: "SemOS Domain Pack + Workbook + Runbook Gate",
         },
+        authority_surfaces: [
+          {
+            surface: "obpoc/projection/get",
+            permitted: true,
+            reason: "projection payloads are policy-governed",
+          },
+          {
+            surface: "terminal/new",
+            permitted: false,
+            reason: "terminal execution is outside ACP discovery",
+          },
+        ],
+        projection_catalog: [
+          {
+            kind: "dag",
+            source: "semos.tos.hydrated_state",
+            default_classification: "internal",
+            allowed_subject_kinds: ["kyc_case"],
+            max_depth: 4,
+            acp_visible_by_default: true,
+          },
+        ],
+        mention_namespaces: [
+          {
+            namespace: "entity",
+            target_kind: "semos.entity",
+            description: "Entity references",
+          },
+        ],
+        declared_modes: [
+          {
+            mode_id: "discovery",
+            label: "Discovery",
+            description: "Read-only SemOS discovery",
+            discovery_visible: true,
+            execution_authority: false,
+          },
+        ],
+        external_mcp_transports: [],
+        typed_extension_points: [
+          {
+            extension_id: "semos.derivation_registry",
+            extension_kind: "derivation_registry",
+            implementation_ref: "native::sem_os_core::derivation_registry",
+          },
+        ],
         context_policy: {
           max_prompt_classification: "internal",
           allow_external_llm: false,
@@ -117,6 +163,87 @@ describe("acpApi", () => {
     expect(result).toEqual(response);
     expect(fetchMock).toHaveBeenCalledWith(
       "http://localhost:3000/api/session/session-123/acp/policy",
+      {
+        method: "GET",
+        headers: { "Content-Type": "application/json" },
+      },
+    );
+  });
+
+  it("fetches ACP projection catalogue", async () => {
+    const response = {
+      status: "acp_projection_catalog" as const,
+      session_id: "session-123",
+      pack_id: "ob-poc.kyc",
+      projections: [
+        {
+          kind: "dag" as const,
+          source: "semos.tos.hydrated_state",
+          default_classification: "internal" as const,
+          allowed_subject_kinds: ["kyc_case"],
+          max_depth: 4,
+          acp_visible_by_default: true,
+        },
+        {
+          kind: "lineage" as const,
+          source: "semos.lineage_store",
+          default_classification: "confidential" as const,
+          allowed_subject_kinds: [],
+          max_depth: 3,
+          acp_visible_by_default: false,
+        },
+      ],
+    };
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify(response), {
+        status: 200,
+        statusText: "OK",
+      }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    const result = await acpApi.projections("session-123");
+
+    expect(result).toEqual(response);
+    expect(fetchMock).toHaveBeenCalledWith(
+      "http://localhost:3000/api/session/session-123/acp/projections",
+      {
+        method: "GET",
+        headers: { "Content-Type": "application/json" },
+      },
+    );
+  });
+
+  it("fetches a typed ACP projection envelope", async () => {
+    const response = {
+      status: "acp_projection" as const,
+      projection: {
+        projection_kind: "probe_catalogue" as const,
+        session_id: "session-123",
+        pack_id: "ob-poc.kyc",
+        classification: "internal" as const,
+        snapshot_refs: ["domain_pack:ob-poc.kyc@0.1.0"],
+        payload: {
+          probes: [{ probe_id: "kyc-case.read-state" }],
+        },
+        redactions: [],
+        projection_hash: "sha256:abc",
+        generated_at: "2026-05-06T00:00:00Z",
+      },
+    };
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify(response), {
+        status: 200,
+        statusText: "OK",
+      }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    const result = await acpApi.projection("session-123", "probe_catalogue");
+
+    expect(result).toEqual(response);
+    expect(fetchMock).toHaveBeenCalledWith(
+      "http://localhost:3000/api/session/session-123/acp/projections/probe_catalogue",
       {
         method: "GET",
         headers: { "Content-Type": "application/json" },

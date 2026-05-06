@@ -6,12 +6,17 @@
 //! assemble redacted Sage context, and request DSL Coder dry-runs only.
 
 use chrono::{DateTime, Utc};
+use sem_os_core::acp_projection::{
+    AcpProjectionEnvelope, AcpProjectionEnvelopeInput, AcpProjectionKind, AcpProjectionSubject,
+};
 use sem_os_core::context_policy::{assemble_prompt_context, PromptContextAssembly};
 use sem_os_core::domain_pack::{
     authorize_discovery_probe, ClassificationLimit, DiscoveryAuthorizationError, DiscoveryRequest,
-    DiscoveryResponse, DomainPackManifest, PackCompatibilityTier,
+    DiscoveryResponse, DomainPackManifest, ExternalMcpTransport, MentionNamespace,
+    PackCompatibilityTier, ProjectionCatalogEntry, TypedExtensionPoint,
 };
 use serde::{Deserialize, Serialize};
+use serde_json::json;
 use uuid::Uuid;
 
 use crate::runbook::{
@@ -63,6 +68,12 @@ pub struct AcpPolicyCapabilities {
     pub pack_version: String,
     pub compatibility_tier: PackCompatibilityTier,
     pub adapter_policy: AcpAdapterPolicy,
+    pub authority_surfaces: Vec<AcpAuthoritySurfaceDecision>,
+    pub projection_catalog: Vec<ProjectionCatalogEntry>,
+    pub mention_namespaces: Vec<MentionNamespace>,
+    pub declared_modes: Vec<AcpDeclaredModeCapability>,
+    pub external_mcp_transports: Vec<ExternalMcpTransport>,
+    pub typed_extension_points: Vec<TypedExtensionPoint>,
     pub context_policy: AcpContextPolicyView,
     pub discovery_policy: Vec<AcpDiscoveryPolicyDecision>,
     pub transition_policy: Vec<AcpTransitionPolicyDecision>,
@@ -81,6 +92,22 @@ pub struct AcpContextPolicyView {
     pub max_prompt_classification: ClassificationLimit,
     pub allow_external_llm: bool,
     pub required_redactions: Vec<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct AcpDeclaredModeCapability {
+    pub mode_id: String,
+    pub label: String,
+    pub description: String,
+    pub discovery_visible: bool,
+    pub execution_authority: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct AcpAuthoritySurfaceDecision {
+    pub surface: String,
+    pub permitted: bool,
+    pub reason: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -106,6 +133,13 @@ pub struct AcpTransitionPolicyDecision {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct AcpProjectionRequest {
+    pub kind: AcpProjectionKind,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub subject: Option<AcpProjectionSubject>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "kind", rename_all = "snake_case")]
 pub enum AcpAdapterError {
     SessionClosed,
@@ -117,6 +151,13 @@ pub enum AcpAdapterError {
     },
     DiscoveryMutatedState,
     MutationNotSupported,
+    ProjectionUnknown {
+        projection_kind: String,
+    },
+    ProjectionSubjectRefused {
+        projection_kind: AcpProjectionKind,
+        subject_kind: String,
+    },
     DryRunRefused {
         refusal: KycUpdateStatusDryRunRefusal,
     },
@@ -212,6 +253,22 @@ pub fn acp_policy_capabilities(
             mutation_boundary: "workbook_approval_and_compiled_runbook_gate".to_string(),
             policy_authority: "SemOS Domain Pack + Workbook + Runbook Gate".to_string(),
         },
+        authority_surfaces: acp_authority_surfaces(manifest),
+        projection_catalog: manifest.projection_catalog.clone(),
+        mention_namespaces: manifest.mention_namespaces.clone(),
+        declared_modes: manifest
+            .declared_modes
+            .iter()
+            .map(|mode| AcpDeclaredModeCapability {
+                mode_id: mode.mode_id.clone(),
+                label: mode.label.clone(),
+                description: mode.description.clone(),
+                discovery_visible: true,
+                execution_authority: false,
+            })
+            .collect(),
+        external_mcp_transports: manifest.external_mcp_transports.clone(),
+        typed_extension_points: manifest.typed_extension_points.clone(),
         context_policy: AcpContextPolicyView {
             max_prompt_classification: manifest.classification_policy.max_prompt_classification,
             allow_external_llm: manifest.classification_policy.allow_external_llm,
@@ -220,6 +277,72 @@ pub fn acp_policy_capabilities(
         discovery_policy,
         transition_policy,
     })
+}
+
+pub fn acp_authority_surfaces(manifest: &DomainPackManifest) -> Vec<AcpAuthoritySurfaceDecision> {
+    vec![
+        AcpAuthoritySurfaceDecision {
+            surface: "session/prompt".to_string(),
+            permitted: true,
+            reason: "agent-editor conversation may request read-only discovery and planning"
+                .to_string(),
+        },
+        AcpAuthoritySurfaceDecision {
+            surface: "obpoc/projections/list".to_string(),
+            permitted: true,
+            reason: "projection catalogue is declared by the Domain Pack".to_string(),
+        },
+        AcpAuthoritySurfaceDecision {
+            surface: "obpoc/projection/get".to_string(),
+            permitted: true,
+            reason: "projection payloads are policy-governed and classification tagged".to_string(),
+        },
+        AcpAuthoritySurfaceDecision {
+            surface: "obpoc/context".to_string(),
+            permitted: true,
+            reason: "Sage context assembly is read-only and redacted by pack policy".to_string(),
+        },
+        AcpAuthoritySurfaceDecision {
+            surface: "obpoc/kyc_update_status_dry_run".to_string(),
+            permitted: true,
+            reason: "dry-run validates a workbook-shaped transition without mutation".to_string(),
+        },
+        AcpAuthoritySurfaceDecision {
+            surface: "request_permission".to_string(),
+            permitted: true,
+            reason: "permission requests are limited to HITL attestation metadata".to_string(),
+        },
+        AcpAuthoritySurfaceDecision {
+            surface: "mcp_tunnel".to_string(),
+            permitted: manifest
+                .external_mcp_transports
+                .iter()
+                .all(|transport| transport.read_only),
+            reason: "external MCP bindings must be declared by the pack and read-only".to_string(),
+        },
+        AcpAuthoritySurfaceDecision {
+            surface: "write_text_file".to_string(),
+            permitted: false,
+            reason: "ACP visibility never grants editor file-write authority".to_string(),
+        },
+        AcpAuthoritySurfaceDecision {
+            surface: "create_text_file".to_string(),
+            permitted: false,
+            reason: "ACP visibility never grants editor file-create authority".to_string(),
+        },
+        AcpAuthoritySurfaceDecision {
+            surface: "terminal/new".to_string(),
+            permitted: false,
+            reason: "terminal execution is outside the ACP discovery surface".to_string(),
+        },
+        AcpAuthoritySurfaceDecision {
+            surface: "obpoc/mutation".to_string(),
+            permitted: false,
+            reason:
+                "mutation is only available through workbook approval and the compiled runbook gate"
+                    .to_string(),
+        },
+    ]
 }
 
 pub fn assemble_sage_context_for_acp(
@@ -243,6 +366,95 @@ pub fn assemble_sage_context_for_acp(
         probe_id: request.probe_id,
         prompt_context: assemble_prompt_context(&manifest.classification_policy, &response),
     })
+}
+
+pub fn list_acp_projections(
+    session: &AcpSession,
+    manifest: &DomainPackManifest,
+) -> Result<Vec<ProjectionCatalogEntry>, AcpAdapterError> {
+    require_open(session)?;
+    require_valid_pack(manifest)?;
+    Ok(manifest.projection_catalog.clone())
+}
+
+pub fn build_acp_projection(
+    session: &AcpSession,
+    manifest: &DomainPackManifest,
+    request: AcpProjectionRequest,
+) -> Result<AcpProjectionEnvelope, AcpAdapterError> {
+    require_open(session)?;
+    require_valid_pack(manifest)?;
+
+    let catalog_entry = manifest
+        .projection_catalog
+        .iter()
+        .find(|entry| entry.kind == request.kind)
+        .ok_or_else(|| AcpAdapterError::ProjectionUnknown {
+            projection_kind: request.kind.as_str().to_string(),
+        })?;
+
+    if let Some(subject) = request.subject.as_ref() {
+        if !catalog_entry.allowed_subject_kinds.is_empty()
+            && !catalog_entry
+                .allowed_subject_kinds
+                .iter()
+                .any(|kind| kind == &subject.subject_kind)
+        {
+            return Err(AcpAdapterError::ProjectionSubjectRefused {
+                projection_kind: request.kind,
+                subject_kind: subject.subject_kind.clone(),
+            });
+        }
+    }
+
+    let policy = acp_policy_capabilities(session, manifest)?;
+    let payload = match request.kind {
+        AcpProjectionKind::PackManifest => serde_json::to_value(manifest)
+            .expect("Domain Pack manifest serializes as ACP projection"),
+        AcpProjectionKind::ProbeCatalogue => json!({
+            "probes": manifest.discovery_probes,
+            "policy": policy.discovery_policy,
+        }),
+        AcpProjectionKind::Policy => {
+            serde_json::to_value(policy).expect("ACP policy serializes as projection")
+        }
+        AcpProjectionKind::TransitionSurface => json!({
+            "transitions": manifest.allowed_transitions,
+            "policy": acp_policy_capabilities(session, manifest)?.transition_policy,
+        }),
+        AcpProjectionKind::DiscoverySurface
+        | AcpProjectionKind::WorkspaceState
+        | AcpProjectionKind::Dag
+        | AcpProjectionKind::GraphScene
+        | AcpProjectionKind::VerbSurface
+        | AcpProjectionKind::Governance
+        | AcpProjectionKind::EvidenceSchema
+        | AcpProjectionKind::AffinityGraph
+        | AcpProjectionKind::Lineage
+        | AcpProjectionKind::DerivationRegistry
+        | AcpProjectionKind::Materiality => json!({
+            "status": "declared_projection_source",
+            "source": catalog_entry.source,
+            "source_binding": "live_semos_session_projection",
+            "note": "Projection is declared in the Domain Pack and must be materialized by the host adapter from the named SemOS source.",
+            "max_depth": catalog_entry.max_depth,
+            "acp_visible_by_default": catalog_entry.acp_visible_by_default,
+        }),
+    };
+
+    Ok(AcpProjectionEnvelope::new(AcpProjectionEnvelopeInput {
+        projection_kind: request.kind,
+        session_id: session.session_id,
+        pack_id: manifest.pack_id.clone(),
+        classification: catalog_entry.default_classification,
+        subject: request.subject,
+        snapshot_refs: vec![format!(
+            "domain_pack:{}@{}",
+            manifest.pack_id, manifest.version
+        )],
+        payload,
+        redactions: vec![],
+    }))
 }
 
 pub fn acp_dry_run_kyc_update_status(
@@ -430,6 +642,66 @@ mod tests {
                 && transition.dry_run_allowed
                 && !transition.mutation_allowed
         }));
+    }
+
+    #[test]
+    fn acp_projection_catalog_exposes_declared_visibility_surface() {
+        let session = open_acp_session(SESSION_ID, AcpAdapterKind::Zed);
+        let projections = list_acp_projections(&session, &manifest()).expect("projection catalog");
+
+        assert!(projections
+            .iter()
+            .any(|entry| entry.kind == AcpProjectionKind::Dag));
+        assert!(projections
+            .iter()
+            .any(|entry| entry.kind == AcpProjectionKind::VerbSurface));
+        assert!(
+            projections
+                .iter()
+                .any(|entry| entry.kind == AcpProjectionKind::Lineage
+                    && !entry.acp_visible_by_default)
+        );
+    }
+
+    #[test]
+    fn acp_pack_manifest_projection_is_typed_and_hashed() {
+        let session = open_acp_session(SESSION_ID, AcpAdapterKind::Zed);
+        let envelope = build_acp_projection(
+            &session,
+            &manifest(),
+            AcpProjectionRequest {
+                kind: AcpProjectionKind::PackManifest,
+                subject: None,
+            },
+        )
+        .expect("projection");
+
+        assert_eq!(envelope.projection_kind, AcpProjectionKind::PackManifest);
+        assert_eq!(envelope.pack_id, "ob-poc.kyc");
+        assert!(envelope.projection_hash.starts_with("sha256:"));
+        assert_eq!(envelope.payload["pack_id"], "ob-poc.kyc");
+    }
+
+    #[test]
+    fn acp_projection_refuses_disallowed_subject_kind() {
+        let session = open_acp_session(SESSION_ID, AcpAdapterKind::Zed);
+        let err = build_acp_projection(
+            &session,
+            &manifest(),
+            AcpProjectionRequest {
+                kind: AcpProjectionKind::TransitionSurface,
+                subject: Some(AcpProjectionSubject {
+                    subject_kind: "deal".to_string(),
+                    subject_id: "deal-1".to_string(),
+                }),
+            },
+        )
+        .expect_err("subject refused");
+
+        assert!(matches!(
+            err,
+            AcpAdapterError::ProjectionSubjectRefused { .. }
+        ));
     }
 
     #[test]

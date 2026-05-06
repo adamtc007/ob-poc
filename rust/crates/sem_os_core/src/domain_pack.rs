@@ -3,6 +3,7 @@
 //! This is distinct from Journey Pack manifests. A Domain Pack declares the
 //! state-machine surface an adapter may discover, dry-run, and eventually mutate.
 
+use crate::acp_projection::AcpProjectionKind;
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, HashSet};
 
@@ -19,6 +20,16 @@ pub struct DomainPackManifest {
     pub allowed_transitions: Vec<DomainTransition>,
     #[serde(default)]
     pub discovery_probes: Vec<DiscoveryProbe>,
+    #[serde(default)]
+    pub projection_catalog: Vec<ProjectionCatalogEntry>,
+    #[serde(default)]
+    pub mention_namespaces: Vec<MentionNamespace>,
+    #[serde(default)]
+    pub declared_modes: Vec<DeclaredMode>,
+    #[serde(default)]
+    pub external_mcp_transports: Vec<ExternalMcpTransport>,
+    #[serde(default)]
+    pub typed_extension_points: Vec<TypedExtensionPoint>,
     pub classification_policy: ContextClassificationPolicy,
 }
 
@@ -72,6 +83,50 @@ pub struct DiscoveryProbe {
     pub modeled: bool,
     #[serde(default)]
     pub first_class_state_mutation: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ProjectionCatalogEntry {
+    pub kind: AcpProjectionKind,
+    pub source: String,
+    pub default_classification: ClassificationLimit,
+    #[serde(default)]
+    pub allowed_subject_kinds: Vec<String>,
+    #[serde(default)]
+    pub max_depth: Option<u32>,
+    #[serde(default)]
+    pub acp_visible_by_default: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct MentionNamespace {
+    pub namespace: String,
+    pub target_kind: String,
+    pub description: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct DeclaredMode {
+    pub mode_id: String,
+    pub label: String,
+    pub description: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ExternalMcpTransport {
+    pub server_id: String,
+    pub description: String,
+    pub read_only: bool,
+    pub classification: ClassificationLimit,
+    #[serde(default)]
+    pub allowed_probe_ids: Vec<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct TypedExtensionPoint {
+    pub extension_id: String,
+    pub extension_kind: String,
+    pub implementation_ref: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -191,6 +246,30 @@ pub fn validate_domain_pack(manifest: &DomainPackManifest) -> DomainPackValidati
     let mut probe_ids = HashSet::new();
     for probe in &manifest.discovery_probes {
         validate_probe(probe, &mut probe_ids, &mut diagnostics);
+    }
+
+    let mut projection_kinds = HashSet::new();
+    for projection in &manifest.projection_catalog {
+        validate_projection(projection, &mut projection_kinds, &mut diagnostics);
+    }
+
+    let mut mention_namespaces = HashSet::new();
+    for namespace in &manifest.mention_namespaces {
+        validate_mention_namespace(namespace, &mut mention_namespaces, &mut diagnostics);
+    }
+
+    let mut mode_ids = HashSet::new();
+    for mode in &manifest.declared_modes {
+        validate_declared_mode(mode, &mut mode_ids, &mut diagnostics);
+    }
+
+    let probe_ids: HashSet<&str> = manifest
+        .discovery_probes
+        .iter()
+        .map(|probe| probe.probe_id.as_str())
+        .collect();
+    for transport in &manifest.external_mcp_transports {
+        validate_external_mcp_transport(transport, &probe_ids, &mut diagnostics);
     }
 
     if matches!(
@@ -360,6 +439,86 @@ fn validate_probe(
     }
 }
 
+fn validate_projection(
+    projection: &ProjectionCatalogEntry,
+    seen: &mut HashSet<AcpProjectionKind>,
+    diagnostics: &mut Vec<DomainPackDiagnostic>,
+) {
+    require_non_empty(diagnostics, "projection.source", &projection.source);
+
+    if !seen.insert(projection.kind) {
+        diagnostics.push(diagnostic(
+            "domain_pack.duplicate_projection_kind",
+            format!("duplicate projection kind {}", projection.kind.as_str()),
+        ));
+    }
+
+    if matches!(projection.max_depth, Some(0)) {
+        diagnostics.push(diagnostic(
+            "domain_pack.invalid_projection_depth",
+            format!("{} has max_depth=0", projection.kind.as_str()),
+        ));
+    }
+}
+
+fn validate_mention_namespace(
+    namespace: &MentionNamespace,
+    seen: &mut HashSet<String>,
+    diagnostics: &mut Vec<DomainPackDiagnostic>,
+) {
+    require_non_empty(diagnostics, "mention.namespace", &namespace.namespace);
+    require_non_empty(diagnostics, "mention.target_kind", &namespace.target_kind);
+    require_non_empty(diagnostics, "mention.description", &namespace.description);
+    if !namespace.namespace.trim().is_empty() && !seen.insert(namespace.namespace.clone()) {
+        diagnostics.push(diagnostic(
+            "domain_pack.duplicate_mention_namespace",
+            format!("duplicate mention namespace {}", namespace.namespace),
+        ));
+    }
+}
+
+fn validate_declared_mode(
+    mode: &DeclaredMode,
+    seen: &mut HashSet<String>,
+    diagnostics: &mut Vec<DomainPackDiagnostic>,
+) {
+    require_non_empty(diagnostics, "mode.mode_id", &mode.mode_id);
+    require_non_empty(diagnostics, "mode.label", &mode.label);
+    require_non_empty(diagnostics, "mode.description", &mode.description);
+    if !mode.mode_id.trim().is_empty() && !seen.insert(mode.mode_id.clone()) {
+        diagnostics.push(diagnostic(
+            "domain_pack.duplicate_mode",
+            format!("duplicate mode {}", mode.mode_id),
+        ));
+    }
+}
+
+fn validate_external_mcp_transport(
+    transport: &ExternalMcpTransport,
+    probe_ids: &HashSet<&str>,
+    diagnostics: &mut Vec<DomainPackDiagnostic>,
+) {
+    require_non_empty(diagnostics, "mcp.server_id", &transport.server_id);
+    require_non_empty(diagnostics, "mcp.description", &transport.description);
+    if !transport.read_only {
+        diagnostics.push(diagnostic(
+            "domain_pack.mcp_transport_not_read_only",
+            format!("{} is not read-only", transport.server_id),
+        ));
+    }
+    for probe_id in &transport.allowed_probe_ids {
+        if !probe_ids.contains(probe_id.as_str()) {
+            diagnostics.push(diagnostic(
+                "domain_pack.mcp_transport_unknown_probe",
+                format!(
+                    "{} references unknown probe {}",
+                    transport.server_id, probe_id
+                ),
+            ));
+        }
+    }
+}
+
 fn require_non_empty(
     diagnostics: &mut Vec<DomainPackDiagnostic>,
     field: &'static str,
@@ -413,6 +572,31 @@ mod tests {
                 idempotent: true,
                 modeled: true,
                 first_class_state_mutation: false,
+            }],
+            projection_catalog: vec![ProjectionCatalogEntry {
+                kind: AcpProjectionKind::PackManifest,
+                source: "domain_pack.manifest".to_string(),
+                default_classification: ClassificationLimit::Internal,
+                allowed_subject_kinds: vec![],
+                max_depth: None,
+                acp_visible_by_default: true,
+            }],
+            mention_namespaces: vec![MentionNamespace {
+                namespace: "entity".to_string(),
+                target_kind: "semantic_entity".to_string(),
+                description: "SemOS entity reference".to_string(),
+            }],
+            declared_modes: vec![DeclaredMode {
+                mode_id: "discovery".to_string(),
+                label: "Discovery".to_string(),
+                description: "Read-only substrate exploration".to_string(),
+            }],
+            external_mcp_transports: vec![],
+            typed_extension_points: vec![TypedExtensionPoint {
+                extension_id: "derivation.registry".to_string(),
+                extension_kind: "derivation_registry".to_string(),
+                implementation_ref: "sem_os_core::derivation::DerivationFunctionRegistry"
+                    .to_string(),
             }],
             classification_policy: ContextClassificationPolicy {
                 max_prompt_classification: ClassificationLimit::Internal,
@@ -477,6 +661,22 @@ mod tests {
             .diagnostics
             .iter()
             .any(|d| d.code == "domain_pack.duplicate_transition_ref"));
+    }
+
+    #[test]
+    fn duplicate_projection_kinds_are_rejected() {
+        let mut manifest = valid_manifest();
+        manifest
+            .projection_catalog
+            .push(manifest.projection_catalog[0].clone());
+
+        let report = manifest.validate();
+
+        assert!(!report.valid);
+        assert!(report
+            .diagnostics
+            .iter()
+            .any(|d| d.code == "domain_pack.duplicate_projection_kind"));
     }
 
     #[test]

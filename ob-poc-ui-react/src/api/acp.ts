@@ -58,6 +58,7 @@ export interface AcpCapabilitiesResult {
       name: string;
       version: string;
     };
+    obpocCapabilities?: AcpObpocCapabilities;
   };
   stdio: {
     command: "ob_poc_acp";
@@ -79,12 +80,58 @@ export interface AcpContextPolicyView {
   required_redactions: string[];
 }
 
+export interface AcpAuthoritySurfaceDecision {
+  surface: string;
+  permitted: boolean;
+  reason: string;
+}
+
+export interface AcpMentionNamespace {
+  namespace: string;
+  target_kind: string;
+  description: string;
+}
+
+export interface AcpDeclaredMode {
+  mode_id: string;
+  label: string;
+  description: string;
+}
+
+export interface AcpDeclaredModeCapability extends AcpDeclaredMode {
+  discovery_visible: boolean;
+  execution_authority: boolean;
+}
+
+export interface AcpExternalMcpTransport {
+  server_id: string;
+  description: string;
+  read_only: boolean;
+  classification: ContextClassification;
+  allowed_probe_ids: string[];
+}
+
+export interface AcpTypedExtensionPoint {
+  extension_id: string;
+  extension_kind: string;
+  implementation_ref: string;
+}
+
 export interface AcpDiscoveryPolicyDecision {
   probe_id: string;
   operation: string;
   target: string;
   allowed: boolean;
   reason: string;
+}
+
+export interface AcpDiscoveryProbe {
+  probe_id: string;
+  operation: string;
+  target: string;
+  idempotent: boolean;
+  modeled: boolean;
+  first_class_state_mutation: boolean;
 }
 
 export interface AcpTransitionPolicyDecision {
@@ -105,14 +152,98 @@ export interface AcpPolicyCapabilities {
   pack_version: string;
   compatibility_tier: "dry_run_only" | "reference_mutation" | "reuse_proof";
   adapter_policy: AcpAdapterPolicy;
+  authority_surfaces: AcpAuthoritySurfaceDecision[];
+  projection_catalog: AcpProjectionCatalogEntry[];
+  mention_namespaces: AcpMentionNamespace[];
+  declared_modes: AcpDeclaredModeCapability[];
+  external_mcp_transports: AcpExternalMcpTransport[];
+  typed_extension_points: AcpTypedExtensionPoint[];
   context_policy: AcpContextPolicyView;
   discovery_policy: AcpDiscoveryPolicyDecision[];
   transition_policy: AcpTransitionPolicyDecision[];
 }
 
+export interface AcpObpocCapabilities {
+  pack: {
+    pack_id: string;
+    version: string;
+    implementation_mode: "native_compiled" | "external_adapter";
+    compatibility_tier: "dry_run_only" | "reference_mutation" | "reuse_proof";
+  };
+  projections: AcpProjectionCatalogEntry[];
+  probes: AcpDiscoveryProbe[];
+  mentionNamespaces: AcpMentionNamespace[];
+  modes: AcpDeclaredMode[];
+  classification: AcpContextPolicyView;
+  authoritySurfaces: AcpAuthoritySurfaceDecision[];
+  externalMcpTransports: AcpExternalMcpTransport[];
+  typedExtensionPoints: AcpTypedExtensionPoint[];
+}
+
 export interface AcpPolicyResult {
   status: "acp_policy";
   policy: AcpPolicyCapabilities;
+}
+
+export type AcpProjectionKind =
+  | "pack_manifest"
+  | "probe_catalogue"
+  | "discovery_surface"
+  | "workspace_state"
+  | "dag"
+  | "graph_scene"
+  | "verb_surface"
+  | "transition_surface"
+  | "governance"
+  | "evidence_schema"
+  | "affinity_graph"
+  | "lineage"
+  | "derivation_registry"
+  | "materiality"
+  | "policy";
+
+export interface AcpProjectionCatalogEntry {
+  kind: AcpProjectionKind;
+  source: string;
+  default_classification: ContextClassification;
+  allowed_subject_kinds: string[];
+  max_depth?: number | null;
+  acp_visible_by_default: boolean;
+}
+
+export interface AcpProjectionCatalogResult {
+  status: "acp_projection_catalog";
+  session_id: string;
+  pack_id: string;
+  projections: AcpProjectionCatalogEntry[];
+}
+
+export interface AcpProjectionSubject {
+  subject_kind: string;
+  subject_id: string;
+}
+
+export interface AcpProjectionRedaction {
+  path: string;
+  reason: string;
+}
+
+export interface AcpProjectionEnvelope {
+  projection_kind: AcpProjectionKind;
+  session_id: string;
+  pack_id: string;
+  classification: ContextClassification;
+  subject?: AcpProjectionSubject;
+  snapshot_refs: string[];
+  payload: unknown;
+  redactions: AcpProjectionRedaction[];
+  projection_hash: string;
+  generated_at: string;
+}
+
+export interface AcpProjectionResult {
+  status: "acp_projection";
+  projection: AcpProjectionEnvelope;
 }
 
 export interface AcpDiscoveryObservation {
@@ -180,6 +311,21 @@ export const acpApi = {
 
   async policy(sessionId: string): Promise<AcpPolicyResult> {
     return api.get<AcpPolicyResult>(`/session/${sessionId}/acp/policy`);
+  },
+
+  async projections(sessionId: string): Promise<AcpProjectionCatalogResult> {
+    return api.get<AcpProjectionCatalogResult>(
+      `/session/${sessionId}/acp/projections`,
+    );
+  },
+
+  async projection(
+    sessionId: string,
+    kind: AcpProjectionKind,
+  ): Promise<AcpProjectionResult> {
+    return api.get<AcpProjectionResult>(
+      `/session/${sessionId}/acp/projections/${kind}`,
+    );
   },
 
   async openSession(

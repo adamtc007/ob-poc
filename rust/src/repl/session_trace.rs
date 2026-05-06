@@ -78,6 +78,16 @@ pub enum TraceOp {
         context_hash: String,
         redacted_count: usize,
     },
+    AcpProjectionServed {
+        projection_kind: String,
+        projection_hash: String,
+        classification: String,
+        redacted_count: usize,
+        #[serde(default)]
+        acp_mode: String,
+        #[serde(default)]
+        mechanisms: Vec<String>,
+    },
     WorkbookDryRunValidated {
         workbook_id: String,
         transition_ref: String,
@@ -267,6 +277,14 @@ mod tests {
                 probe_id: "kyc-case.read-state".into(),
                 context_hash: "sha256:abc".into(),
                 redacted_count: 1,
+            },
+            TraceOp::AcpProjectionServed {
+                projection_kind: "dag".into(),
+                projection_hash: "sha256:projection".into(),
+                classification: "internal".into(),
+                redacted_count: 0,
+                acp_mode: "discovery".into(),
+                mechanisms: vec!["projection_get".into()],
             },
             TraceOp::WorkbookDryRunValidated {
                 workbook_id: "ewb:v1:abc".into(),

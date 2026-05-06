@@ -9951,7 +9951,7 @@ CREATE TABLE "ob-poc".compiled_runbook_events (
 -- Name: TABLE compiled_runbook_events; Type: COMMENT; Schema: ob-poc; Owner: -
 --
 
-COMMENT ON TABLE "ob-poc".compiled_runbook_events IS 'Append-only event log for compiled runbook lifecycle. Status is derived from latest status_change event (INV-9). ACP-visible mutation requests must still resolve to this runbook lifecycle; direct ACP mutation is not a database write path.';
+COMMENT ON TABLE "ob-poc".compiled_runbook_events IS 'Append-only event log for compiled runbook lifecycle. Status is derived from latest status_change event (INV-9). ACP-visible mutation requests must still resolve to this runbook lifecycle; direct ACP mutation is not a database write path. ACP projection visibility is audited separately through session trace/audit-chain projection events.';
 
 
 --

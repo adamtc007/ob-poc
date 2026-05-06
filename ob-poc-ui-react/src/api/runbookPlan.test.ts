@@ -479,6 +479,20 @@ describe("runbookPlanApi", () => {
         session_id: "session-123",
         sequence: 3,
         timestamp: "2026-05-05T12:00:02Z",
+        agent_mode: "sage",
+        op: {
+          op: "acp_projection_served",
+          projection_kind: "dag",
+          projection_hash: "sha256:projection",
+          classification: "internal",
+          redacted_count: 0,
+        },
+        stack_snapshot: [],
+      },
+      {
+        session_id: "session-123",
+        sequence: 4,
+        timestamp: "2026-05-05T12:00:02Z",
         agent_mode: "dsl_coder",
         op: {
           op: "workbook_dry_run_validated",
@@ -489,7 +503,7 @@ describe("runbookPlanApi", () => {
       },
       {
         session_id: "session-123",
-        sequence: 4,
+        sequence: 5,
         timestamp: "2026-05-05T12:00:03Z",
         agent_mode: "repl",
         op: {
@@ -502,7 +516,7 @@ describe("runbookPlanApi", () => {
       },
       {
         session_id: "session-123",
-        sequence: 5,
+        sequence: 6,
         timestamp: "2026-05-05T12:00:04Z",
         agent_mode: "repl",
         op: {
@@ -515,7 +529,7 @@ describe("runbookPlanApi", () => {
       },
       {
         session_id: "session-123",
-        sequence: 6,
+        sequence: 7,
         timestamp: "2026-05-05T12:00:05Z",
         agent_mode: "sage",
         op: {
@@ -545,6 +559,10 @@ describe("runbookPlanApi", () => {
     if (result[1].op.op === "acp_context_assembled") {
       expect(result[1].op.redacted_count).toBe(1);
       expect(result[1].op.context_hash).toBe("sha256:context");
+    }
+    expect(result[2].op.op).toBe("acp_projection_served");
+    if (result[2].op.op === "acp_projection_served") {
+      expect(result[2].op.projection_hash).toBe("sha256:projection");
     }
     expect(fetchMock).toHaveBeenCalledWith(
       "http://localhost:3000/api/session/session-123/trace",
