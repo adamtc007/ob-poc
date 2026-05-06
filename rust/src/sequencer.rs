@@ -897,6 +897,18 @@ impl ReplOrchestratorV2 {
             .map(|c| crate::agent::narration_engine::SlotSnapshot::capture(&c.slots))
             .unwrap_or_default();
 
+        // Contextual query intercept (ADR 043 Phase 2).
+        // "what's next", "what's missing", "where are we" bypass verb search
+        // and return narration directly from constellation state. No-op when
+        // no hydrated constellation is available — falls through to dispatch.
+        if let UserInputV2::Message { ref content } = input {
+            if crate::agent::narration_engine::is_contextual_query(content) {
+                if let Some(narration_resp) = self.handle_contextual_query(session, content) {
+                    return Ok(narration_resp);
+                }
+            }
+        }
+
         // Dispatch based on current state.
         let mut response = match session.state.clone() {
             ReplStateV2::ScopeGate { .. } => self.handle_scope_gate(session, input).await,
@@ -2092,12 +2104,6 @@ impl ReplOrchestratorV2 {
                     }
                 }
 
-                if crate::agent::narration_engine::is_contextual_query(&content) {
-                    if let Some(narration_resp) = self.handle_contextual_query(session, &content) {
-                        return narration_resp;
-                    }
-                }
-
                 if Self::is_pre_pack_read_only_query(&content) {
                     return self.propose_for_input(session, &content).await;
                 }
@@ -2201,15 +2207,6 @@ impl ReplOrchestratorV2 {
                 // Phase E: Check for power user fast commands before anything else.
                 if let Some(response) = self.try_fast_command(session, &content).await {
                     return response;
-                }
-
-                // Phase N: Contextual query intercept (ADR 043 Phase 2).
-                // "what's next", "what's missing", "where are we" bypass verb search
-                // and return narration directly from constellation state.
-                if crate::agent::narration_engine::is_contextual_query(&content) {
-                    if let Some(narration_resp) = self.handle_contextual_query(session, &content) {
-                        return narration_resp;
-                    }
                 }
 
                 // Check if there are still required questions to answer.
@@ -2523,12 +2520,6 @@ impl ReplOrchestratorV2 {
                 }
             },
             UserInputV2::Message { content } => {
-                // Contextual query intercept (ADR 043) — "what's next" etc.
-                if crate::agent::narration_engine::is_contextual_query(&content) {
-                    if let Some(narration_resp) = self.handle_contextual_query(session, &content) {
-                        return narration_resp;
-                    }
-                }
                 // Treat as new verb matching — same as InPack message handling.
                 return self.propose_for_input(session, &content).await;
             }
