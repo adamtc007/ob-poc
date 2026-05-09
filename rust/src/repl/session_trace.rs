@@ -69,6 +69,10 @@ pub struct TracePerformanceMetrics {
     #[serde(default)]
     pub language_pack_us: u64,
     #[serde(default)]
+    pub llm_draft_ms: u64,
+    #[serde(default)]
+    pub llm_draft_us: u64,
+    #[serde(default)]
     pub revision_loop_ms: u64,
     #[serde(default)]
     pub revision_loop_us: u64,
@@ -207,6 +211,18 @@ pub enum TraceOp {
         refusal_code: Option<String>,
         #[serde(default, skip_serializing_if = "Option::is_none")]
         pending_question_code: Option<String>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        draft_source: Option<String>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        llm_trace_id: Option<Uuid>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        llm_provider: Option<String>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        llm_model: Option<String>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        llm_prompt_hash: Option<String>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        llm_response_hash: Option<String>,
         #[serde(default, skip_serializing_if = "Option::is_none")]
         diagnostic_source_path: Option<String>,
         #[serde(default)]
@@ -465,6 +481,12 @@ mod tests {
                 semantic_diff_uri: Some("semos://semantic-diff/ewb:v1:abc".into()),
                 refusal_code: None,
                 pending_question_code: None,
+                draft_source: Some("deterministic".into()),
+                llm_trace_id: None,
+                llm_provider: None,
+                llm_model: None,
+                llm_prompt_hash: None,
+                llm_response_hash: None,
                 diagnostic_source_path: None,
                 revision_count: 1,
                 dry_run_valid: true,

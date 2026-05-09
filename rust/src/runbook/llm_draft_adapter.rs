@@ -5,6 +5,7 @@
 //! the deterministic revision/dry-run harness.
 
 use std::sync::Arc;
+use std::time::Instant;
 
 use anyhow::Context;
 use ob_agentic::llm_client::{LlmClient, ToolDefinition};
@@ -47,11 +48,18 @@ pub async fn run_kyc_update_status_llm_draft_loop(
     session_id: Uuid,
     actor_id: impl Into<String>,
     actor_roles: Vec<String>,
+    evidence_digest: Option<String>,
     client: Arc<dyn LlmClient>,
 ) -> LlmDraftLoopOutcome {
     let actor_id = actor_id.into();
     let system_prompt = system_prompt();
-    let user_prompt = match user_prompt(pack, session_id, &actor_id, &actor_roles) {
+    let user_prompt = match user_prompt(
+        pack,
+        session_id,
+        &actor_id,
+        &actor_roles,
+        evidence_digest.as_deref(),
+    ) {
         Ok(prompt) => prompt,
         Err(err) => {
             return LlmDraftLoopOutcome::AdapterRefused {
@@ -63,6 +71,7 @@ pub async fn run_kyc_update_status_llm_draft_loop(
         }
     };
 
+    let llm_started_at = Instant::now();
     let result = match client
         .chat_with_tool(system_prompt, &user_prompt, &workbook_draft_tool())
         .await
@@ -77,6 +86,7 @@ pub async fn run_kyc_update_status_llm_draft_loop(
             };
         }
     };
+    let llm_latency_ms = elapsed_ms(llm_started_at);
 
     if result.tool_name != "draft_kyc_update_status_workbook" {
         return LlmDraftLoopOutcome::AdapterRefused {
@@ -108,7 +118,7 @@ pub async fn run_kyc_update_status_llm_draft_loop(
         context_hash: None,
         input_tokens: None,
         output_tokens: None,
-        latency_ms: None,
+        latency_ms: Some(llm_latency_ms),
     });
 
     let mut draft: KycUpdateStatusWorkbookDraft = match serde_json::from_value(result.arguments) {
@@ -147,12 +157,17 @@ fn user_prompt(
     session_id: Uuid,
     actor_id: &str,
     actor_roles: &[String],
+    evidence_digest: Option<&str>,
 ) -> anyhow::Result<String> {
     let payload = serde_json::json!({
         "objective": pack.objective,
         "session_id": session_id,
         "actor_id": actor_id,
         "actor_roles": actor_roles,
+        "evidence": {
+            "digest": evidence_digest,
+            "instruction": "Use this exact digest when present. If absent, leave evidence_digest absent or null; do not invent one."
+        },
         "language_pack": pack,
         "draft_contract": {
             "verb": "kyc-case.update-status",
@@ -160,7 +175,8 @@ fn user_prompt(
             "case_id": pack.subject.id,
             "configuration_version": pack.configuration_version,
             "state_snapshot_id": pack.state_snapshot_id,
-            "evidence_digest_required": true
+            "evidence_digest_required": true,
+            "evidence_digest_may_be_absent_for_structured_refusal": true
         }
     });
     serde_json::to_string(&payload).context("serialize language pack prompt")
@@ -184,8 +200,7 @@ fn workbook_draft_tool() -> ToolDefinition {
                 "current_state",
                 "requested_state",
                 "configuration_version",
-                "state_snapshot_id",
-                "evidence_digest"
+                "state_snapshot_id"
             ],
             "properties": {
                 "session_id": { "type": "string", "format": "uuid" },
@@ -199,10 +214,19 @@ fn workbook_draft_tool() -> ToolDefinition {
                 "requested_state": { "type": "string" },
                 "configuration_version": { "type": "string" },
                 "state_snapshot_id": { "type": "string" },
-                "evidence_digest": { "type": "string" }
+                "evidence_digest": {
+                    "anyOf": [
+                        { "type": "string" },
+                        { "type": "null" }
+                    ]
+                }
             }
         }),
     }
+}
+
+fn elapsed_ms(started_at: Instant) -> u64 {
+    u64::try_from(started_at.elapsed().as_millis()).unwrap_or(u64::MAX)
 }
 
 #[cfg(test)]
@@ -302,6 +326,7 @@ mod tests {
             session_id,
             "sage",
             vec!["ops".to_string()],
+            Some("sha256:evidence".to_string()),
             client,
         )
         .await;
@@ -315,6 +340,7 @@ mod tests {
             panic!("expected harness completion");
         };
         assert_eq!(llm_trace.provider, "stub-provider");
+        assert!(llm_trace.latency_ms.is_some());
         assert!(draft.llm_trace_ref.is_some());
         assert!(matches!(
             outcome,
