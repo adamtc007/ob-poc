@@ -21,8 +21,11 @@ use serde_json::json;
 use uuid::Uuid;
 
 use crate::runbook::{
-    build_kyc_update_status_dry_run, KycUpdateStatusDryRunInput, KycUpdateStatusDryRunOutput,
-    KycUpdateStatusDryRunRefusal,
+    build_kyc_update_status_dry_run, build_kyc_update_status_language_pack,
+    run_kyc_update_status_revision_loop, transition_language_pack_readiness_report,
+    KycLanguagePackRequest, KycUpdateStatusDryRunInput, KycUpdateStatusDryRunOutput,
+    KycUpdateStatusDryRunRefusal, KycUpdateStatusWorkbookDraft, LanguagePackError,
+    SemOsLanguagePack, WorkbookRevisionOutcome,
 };
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -79,6 +82,19 @@ pub struct AcpSageContextBundle {
     pub pack_id: String,
     pub probe_id: String,
     pub prompt_context: PromptContextAssembly,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct AcpKycCaseStateSnapshot {
+    pub session_id: Uuid,
+    pub pack_id: String,
+    pub subject_kind: String,
+    pub subject_id: Uuid,
+    pub current_state: String,
+    pub configuration_version: String,
+    pub state_snapshot_id: String,
+    #[serde(default)]
+    pub snapshot_refs: Vec<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -160,6 +176,8 @@ pub struct AcpProjectionRequest {
     pub kind: AcpProjectionKind,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub subject: Option<AcpProjectionSubject>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub language_pack_request: Option<KycLanguagePackRequest>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -183,6 +201,12 @@ pub enum AcpAdapterError {
     },
     DryRunRefused {
         refusal: KycUpdateStatusDryRunRefusal,
+    },
+    LanguagePackRefused {
+        reason: String,
+    },
+    CaseStateDiscoveryRefused {
+        reason: String,
     },
 }
 
@@ -338,6 +362,23 @@ pub fn acp_authority_surfaces(manifest: &DomainPackManifest) -> Vec<AcpAuthority
             reason: "Sage context assembly is read-only and redacted by pack policy".to_string(),
         },
         AcpAuthoritySurfaceDecision {
+            surface: "obpoc/language_pack/get".to_string(),
+            permitted: true,
+            reason: "bounded private DSL language pack is read-only and task-shaped".to_string(),
+        },
+        AcpAuthoritySurfaceDecision {
+            surface: "obpoc/kyc_case_state/discover".to_string(),
+            permitted: true,
+            reason: "case state anchors are discovered through modeled read-only probes"
+                .to_string(),
+        },
+        AcpAuthoritySurfaceDecision {
+            surface: "obpoc/kyc_update_status_language_loop".to_string(),
+            permitted: true,
+            reason: "deterministic draft validation loop is dry-run only and non-mutating"
+                .to_string(),
+        },
+        AcpAuthoritySurfaceDecision {
             surface: "obpoc/kyc_update_status_dry_run".to_string(),
             permitted: true,
             reason: "dry-run validates a workbook-shaped transition without mutation".to_string(),
@@ -403,6 +444,84 @@ pub fn assemble_sage_context_for_acp(
     })
 }
 
+pub fn acp_discover_kyc_case_state(
+    session: &AcpSession,
+    manifest: &DomainPackManifest,
+    subject_id: Uuid,
+    response: DiscoveryResponse,
+) -> Result<AcpKycCaseStateSnapshot, AcpAdapterError> {
+    require_open(session)?;
+    require_valid_pack(manifest)?;
+
+    let request = DiscoveryRequest {
+        pack_id: manifest.pack_id.clone(),
+        probe_id: "kyc-case.read-state".to_string(),
+        subject: sem_os_core::domain_pack::DiscoverySubject {
+            subject_kind: "kyc_case".to_string(),
+            subject_id: subject_id.to_string(),
+        },
+        context: Default::default(),
+    };
+    authorize_discovery_probe(manifest, &request).map_err(map_discovery_error)?;
+
+    if response.first_class_state_mutated {
+        return Err(AcpAdapterError::DiscoveryMutatedState);
+    }
+    if response.probe_id != request.probe_id {
+        return Err(AcpAdapterError::CaseStateDiscoveryRefused {
+            reason: format!(
+                "expected probe {}, got {}",
+                request.probe_id, response.probe_id
+            ),
+        });
+    }
+    if response.subject.subject_kind != "kyc_case"
+        || response.subject.subject_id != subject_id.to_string()
+    {
+        return Err(AcpAdapterError::CaseStateDiscoveryRefused {
+            reason: "discovery response subject does not match requested KYC case".to_string(),
+        });
+    }
+
+    let current_state = observation_string(
+        &response,
+        &["case.status", "kyc_case.status", "current_state"],
+    )
+    .ok_or_else(|| AcpAdapterError::CaseStateDiscoveryRefused {
+        reason: "read-state response did not include case.status".to_string(),
+    })?;
+    let configuration_version = observation_string(
+        &response,
+        &["case.configuration_version", "configuration_version"],
+    )
+    .unwrap_or_else(|| format!("domain_pack:{}@{}", manifest.pack_id, manifest.version));
+    let snapshot_refs = response
+        .provenance
+        .iter()
+        .filter_map(|provenance| provenance.snapshot_ref.clone())
+        .collect::<Vec<_>>();
+    let state_snapshot_id =
+        observation_string(&response, &["case.state_snapshot_id", "state_snapshot_id"])
+            .or_else(|| snapshot_refs.first().cloned())
+            .unwrap_or_else(|| {
+                format!(
+                    "discovery:{}:{}:{}",
+                    response.probe_id, subject_id, configuration_version
+                )
+            });
+
+    Ok(AcpKycCaseStateSnapshot {
+        session_id: session.session_id,
+        pack_id: manifest.pack_id.clone(),
+        subject_kind: "kyc_case".to_string(),
+        subject_id,
+        current_state,
+        configuration_version,
+        state_snapshot_id,
+        snapshot_refs,
+    })
+}
+
 pub fn list_acp_projections(
     session: &AcpSession,
     manifest: &DomainPackManifest,
@@ -456,7 +575,20 @@ pub fn build_acp_projection(
         AcpProjectionKind::TransitionSurface => json!({
             "transitions": manifest.allowed_transitions,
             "policy": acp_policy_capabilities(session, manifest)?.transition_policy,
+            "language_pack_readiness": transition_language_pack_readiness_report(manifest),
         }),
+        AcpProjectionKind::LanguagePack => {
+            let language_pack_request = request.language_pack_request.clone().ok_or_else(|| {
+                AcpAdapterError::LanguagePackRefused {
+                    reason: "language_pack projection requires subject_id, current_state, configuration_version, and state_snapshot_id".to_string(),
+                }
+            })?;
+            serde_json::to_value(
+                build_kyc_update_status_language_pack(manifest, language_pack_request)
+                    .map_err(map_language_pack_error)?,
+            )
+            .expect("SemOS language pack serializes as ACP projection")
+        }
         AcpProjectionKind::DiscoverySurface
         | AcpProjectionKind::WorkspaceState
         | AcpProjectionKind::Dag
@@ -510,6 +642,35 @@ pub fn acp_dry_run_kyc_update_status(
         .map_err(|refusal| AcpAdapterError::DryRunRefused { refusal })
 }
 
+pub fn acp_kyc_update_status_language_pack(
+    session: &AcpSession,
+    manifest: &DomainPackManifest,
+    request: KycLanguagePackRequest,
+) -> Result<SemOsLanguagePack, AcpAdapterError> {
+    require_open(session)?;
+    require_valid_pack(manifest)?;
+    build_kyc_update_status_language_pack(manifest, request).map_err(map_language_pack_error)
+}
+
+pub fn acp_run_kyc_update_status_language_loop(
+    session: &AcpSession,
+    manifest: &DomainPackManifest,
+    request: KycLanguagePackRequest,
+    draft: KycUpdateStatusWorkbookDraft,
+) -> Result<(SemOsLanguagePack, WorkbookRevisionOutcome), AcpAdapterError> {
+    require_open(session)?;
+    require_valid_pack(manifest)?;
+    if draft.session_id != session.session_id {
+        return Err(AcpAdapterError::LanguagePackRefused {
+            reason: "draft session_id does not match ACP session".to_string(),
+        });
+    }
+    let pack = build_kyc_update_status_language_pack(manifest, request)
+        .map_err(map_language_pack_error)?;
+    let outcome = run_kyc_update_status_revision_loop(manifest, &pack, draft);
+    Ok((pack, outcome))
+}
+
 pub fn refuse_acp_mutation(session: &AcpSession) -> Result<(), AcpAdapterError> {
     require_open(session)?;
     Err(AcpAdapterError::MutationNotSupported)
@@ -553,11 +714,26 @@ fn map_discovery_error(error: DiscoveryAuthorizationError) -> AcpAdapterError {
     }
 }
 
+fn map_language_pack_error(error: LanguagePackError) -> AcpAdapterError {
+    AcpAdapterError::LanguagePackRefused {
+        reason: format!("{error:?}"),
+    }
+}
+
+fn observation_string(response: &DiscoveryResponse, keys: &[&str]) -> Option<String> {
+    response
+        .observations
+        .iter()
+        .find(|observation| keys.iter().any(|key| observation.key == *key))
+        .and_then(|observation| observation.value.as_str().map(str::to_string))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use sem_os_core::domain_pack::{
-        ClassificationLimit, DiscoveryObservation, DiscoverySubject, PackCompatibilityTier,
+        ClassificationLimit, DiscoveryObservation, DiscoveryProvenance, DiscoverySubject,
+        PackCompatibilityTier,
     };
     use uuid::uuid;
 
@@ -603,6 +779,33 @@ mod tests {
                 },
             ],
             provenance: vec![],
+            first_class_state_mutated: false,
+        }
+    }
+
+    fn state_discovery_response() -> DiscoveryResponse {
+        DiscoveryResponse {
+            probe_id: "kyc-case.read-state".to_string(),
+            subject: DiscoverySubject {
+                subject_kind: "kyc_case".to_string(),
+                subject_id: CASE_ID.to_string(),
+            },
+            observations: vec![
+                DiscoveryObservation {
+                    key: "case.status".to_string(),
+                    value: serde_json::json!("DISCOVERY"),
+                    classification: Some(ClassificationLimit::Internal),
+                },
+                DiscoveryObservation {
+                    key: "case.configuration_version".to_string(),
+                    value: serde_json::json!("config-live-1"),
+                    classification: Some(ClassificationLimit::Internal),
+                },
+            ],
+            provenance: vec![DiscoveryProvenance {
+                source: "sem_os.session_state".to_string(),
+                snapshot_ref: Some("snapshot-live-1".to_string()),
+            }],
             first_class_state_mutated: false,
         }
     }
@@ -658,6 +861,34 @@ mod tests {
     }
 
     #[test]
+    fn acp_discovers_kyc_case_state_from_read_only_probe() {
+        let session = open_acp_session(SESSION_ID, AcpAdapterKind::TestHarness);
+        let state =
+            acp_discover_kyc_case_state(&session, &manifest(), CASE_ID, state_discovery_response())
+                .expect("state discovered");
+
+        assert_eq!(state.subject_id, CASE_ID);
+        assert_eq!(state.current_state, "DISCOVERY");
+        assert_eq!(state.configuration_version, "config-live-1");
+        assert_eq!(state.state_snapshot_id, "snapshot-live-1");
+    }
+
+    #[test]
+    fn acp_case_state_discovery_refuses_missing_status() {
+        let session = open_acp_session(SESSION_ID, AcpAdapterKind::TestHarness);
+        let mut response = state_discovery_response();
+        response.observations.clear();
+
+        let err = acp_discover_kyc_case_state(&session, &manifest(), CASE_ID, response)
+            .expect_err("missing status refused");
+
+        assert!(matches!(
+            err,
+            AcpAdapterError::CaseStateDiscoveryRefused { .. }
+        ));
+    }
+
+    #[test]
     fn acp_policy_capabilities_exposes_semos_decisions() {
         let session = open_acp_session(SESSION_ID, AcpAdapterKind::Zed);
         let policy = acp_policy_capabilities(&session, &manifest()).expect("policy");
@@ -707,6 +938,7 @@ mod tests {
             AcpProjectionRequest {
                 kind: AcpProjectionKind::PackManifest,
                 subject: None,
+                language_pack_request: None,
             },
         )
         .expect("projection");
@@ -729,6 +961,7 @@ mod tests {
                     subject_kind: "deal".to_string(),
                     subject_id: "deal-1".to_string(),
                 }),
+                language_pack_request: None,
             },
         )
         .expect_err("subject refused");

@@ -77,6 +77,13 @@ pub fn build_kyc_update_status_dry_run(
         }
     })?;
 
+    build_kyc_update_status_dry_run_with_manifest(&manifest, input)
+}
+
+pub fn build_kyc_update_status_dry_run_with_manifest(
+    manifest: &DomainPackManifest,
+    input: KycUpdateStatusDryRunInput,
+) -> Result<KycUpdateStatusDryRunOutput, KycUpdateStatusDryRunRefusal> {
     let validation = manifest.validate();
     if !validation.valid {
         return Err(KycUpdateStatusDryRunRefusal::PackInvalid {
@@ -102,7 +109,7 @@ pub fn build_kyc_update_status_dry_run(
 
     let workbook = ExecutionWorkbook::new(ExecutionWorkbookCore {
         schema_version: 1,
-        pack_id: manifest.pack_id,
+        pack_id: manifest.pack_id.clone(),
         transition_ref: input.transition_ref,
         execution_mode: WorkbookExecutionMode::DryRun,
         session_id: input.session_id,

@@ -60,6 +60,13 @@ projection_catalog:
     allowed_subject_kinds:
       - kyc_case
     acp_visible_by_default: true
+  - kind: language_pack
+    source: semos.language_pack.kyc_update_status
+    default_classification: internal
+    allowed_subject_kinds:
+      - kyc_case
+    max_depth: 2
+    acp_visible_by_default: true
   - kind: discovery_surface
     source: semos.context_resolution.discovery_surface
     default_classification: internal

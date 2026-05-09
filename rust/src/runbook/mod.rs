@@ -37,6 +37,8 @@ pub(crate) mod envelope;
 pub(crate) mod errors;
 pub(crate) mod executor;
 pub(crate) mod kyc_dry_run;
+pub(crate) mod language_pack;
+pub(crate) mod llm_draft_adapter;
 pub(crate) mod mutation_preflight;
 pub(crate) mod narration;
 pub(crate) mod plan_compiler;
@@ -49,6 +51,8 @@ pub(crate) mod step_executor_bridge;
 pub(crate) mod types;
 pub(crate) mod verb_classifier;
 pub(crate) mod workbook;
+pub(crate) mod workbook_diagnostics;
+pub(crate) mod workbook_revision;
 pub(crate) mod write_set;
 
 // Re-export key types at module boundary
@@ -79,8 +83,19 @@ pub use executor::{
     RunbookStoreBackend, StepExecutionResult, StepExecutor, StepOutcome,
 };
 pub use kyc_dry_run::{
-    build_kyc_update_status_dry_run, KycUpdateStatusDryRunInput, KycUpdateStatusDryRunOutput,
-    KycUpdateStatusDryRunRefusal,
+    build_kyc_update_status_dry_run, build_kyc_update_status_dry_run_with_manifest,
+    KycUpdateStatusDryRunInput, KycUpdateStatusDryRunOutput, KycUpdateStatusDryRunRefusal,
+};
+pub use language_pack::{
+    build_kyc_update_status_language_pack, transition_language_pack_readiness,
+    transition_language_pack_readiness_report, BlockedVerb, CanonicalMicroPattern,
+    EvidencePolicySummary, KycLanguagePackRequest, LanguagePackArg, LanguagePackError,
+    LanguagePackSubject, LanguagePackTransition, LanguagePackVerb, SemOsLanguagePack,
+    TransitionEffect, TransitionLanguagePackReadiness, UuidBindingRequirement,
+};
+pub use llm_draft_adapter::{
+    run_kyc_update_status_llm_draft_loop, LlmDraftAdapterRefusal, LlmDraftLoopOutcome,
+    KYC_UPDATE_STATUS_LLM_DRAFT_PROMPT_TEMPLATE_VERSION,
 };
 pub use mutation_preflight::{
     prepare_restricted_mutation_preflight, MutationExecutor, MutationSemanticDiff,
@@ -109,6 +124,16 @@ pub use workbook::{
     compute_workbook_id, EvidenceRef, ExecutionWorkbook, ExecutionWorkbookCore,
     ExecutionWorkbookId, ExecutionWorkbookValidationError, LlmTraceRef, StaleWorkbookPolicy,
     WorkbookActor, WorkbookCheck, WorkbookCheckStatus, WorkbookExecutionMode, WorkbookSubject,
+};
+pub use workbook_diagnostics::{
+    diagnostic_from_state_simulation, diagnostic_from_workbook_validation,
+    diagnostics_from_dry_run_refusal, WorkbookDiagnostic,
+};
+pub use workbook_revision::{
+    run_kyc_update_status_revision_loop, validate_kyc_update_status_draft_without_revision,
+    KycUpdateStatusWorkbookDraft, LanguageAcquisitionMetrics, LanguageLoopTraceEvent,
+    StructuredWorkbookRefusal, WorkbookDraftAttempt, WorkbookRevisionOutcome,
+    MAX_WORKBOOK_REVISIONS,
 };
 pub use write_set::{derive_write_set, derive_write_set_heuristic};
 

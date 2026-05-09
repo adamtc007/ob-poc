@@ -13,7 +13,10 @@ use std::time::Instant;
 use uuid::Uuid;
 
 use crate::acp::{self, AcpAdapterKind, AcpPersonaMode, AcpSession};
-use crate::runbook::KycUpdateStatusDryRunInput;
+use crate::runbook::{
+    KycLanguagePackRequest, KycUpdateStatusDryRunInput, KycUpdateStatusWorkbookDraft,
+    WorkbookRevisionOutcome,
+};
 
 pub const ACP_PROTOCOL_VERSION: &str = "0.4.3";
 
@@ -240,6 +243,55 @@ pub struct AcpProjectionGetRequest {
     pub adapter: AcpAdapterKind,
     #[serde(default)]
     pub subject: Option<sem_os_core::acp_projection::AcpProjectionSubject>,
+    #[serde(default)]
+    pub current_state: Option<String>,
+    #[serde(default)]
+    pub configuration_version: Option<String>,
+    #[serde(default)]
+    pub state_snapshot_id: Option<String>,
+    #[serde(default)]
+    pub objective: Option<String>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct AcpKycCaseStateDiscoverRequest {
+    pub session_id: String,
+    #[serde(default = "default_adapter")]
+    pub adapter: AcpAdapterKind,
+    pub subject_id: Uuid,
+    #[serde(default)]
+    pub observations: Vec<sem_os_core::domain_pack::DiscoveryObservation>,
+    #[serde(default)]
+    pub provenance: Vec<sem_os_core::domain_pack::DiscoveryProvenance>,
+    #[serde(default)]
+    pub first_class_state_mutated: bool,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct AcpLanguagePackGetRequest {
+    pub session_id: String,
+    #[serde(default = "default_adapter")]
+    pub adapter: AcpAdapterKind,
+    pub subject_id: Uuid,
+    pub current_state: String,
+    pub configuration_version: String,
+    pub state_snapshot_id: String,
+    #[serde(default)]
+    pub objective: Option<String>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct AcpKycLanguageLoopRequest {
+    pub session_id: String,
+    #[serde(default = "default_adapter")]
+    pub adapter: AcpAdapterKind,
+    pub subject_id: Uuid,
+    pub current_state: String,
+    pub configuration_version: String,
+    pub state_snapshot_id: String,
+    #[serde(default)]
+    pub objective: Option<String>,
+    pub draft: KycUpdateStatusWorkbookDraft,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -314,6 +366,11 @@ impl AcpJsonRpcAgent {
             "obpoc/policy" => self.obpoc_policy(id, request.params),
             "obpoc/projections/list" => self.obpoc_projection_list(id, request.params),
             "obpoc/projection/get" => self.obpoc_projection_get(id, request.params),
+            "obpoc/kyc_case_state/discover" => self.obpoc_kyc_case_state_discover(id, request.params),
+            "obpoc/language_pack/get" => self.obpoc_language_pack_get(id, request.params),
+            "obpoc/kyc_update_status_language_loop" => {
+                self.obpoc_kyc_update_status_language_loop(id, request.params)
+            }
             "obpoc/context" => self.obpoc_context(id, request.params),
             "obpoc/kyc_update_status_dry_run" => self.obpoc_kyc_dry_run(id, request.params),
             "request_permission" | "obpoc/request_permission" => {
@@ -494,6 +551,12 @@ impl AcpJsonRpcAgent {
             return self.response(id, json!({"stopReason": "cancelled"}));
         }
 
+        if let Some(outgoing) =
+            self.try_session_prompt_kyc_update_status(id.clone(), session_id, &request.prompt)
+        {
+            return outgoing;
+        }
+
         let prompt_text = request
             .prompt
             .iter()
@@ -578,6 +641,37 @@ impl AcpJsonRpcAgent {
                 json!({"stopReason": "end_turn"}),
             )),
         ]
+    }
+
+    fn try_session_prompt_kyc_update_status(
+        &mut self,
+        id: Option<Value>,
+        session_id: Uuid,
+        prompt: &[AcpContentBlock],
+    ) -> Option<Vec<JsonRpcOutgoing>> {
+        let prompt_text = prompt_semantic_text(prompt);
+        if !looks_like_kyc_update_status_prompt(&prompt_text) {
+            return None;
+        }
+
+        let request = match kyc_language_loop_request_from_prompt(session_id, prompt) {
+            Ok(request) => request,
+            Err(error) => {
+                return Some(self.response(
+                    id,
+                    json!({
+                        "stopReason": "end_turn",
+                        "status": "pending_question",
+                        "pending_question": {
+                            "code": "kyc_update_status_prompt_incomplete",
+                            "missing": error
+                        }
+                    }),
+                ))
+            }
+        };
+
+        Some(self.obpoc_kyc_update_status_language_loop(id, request))
     }
 
     fn obpoc_context(&mut self, id: Option<Value>, params: Value) -> Vec<JsonRpcOutgoing> {
@@ -704,6 +798,64 @@ impl AcpJsonRpcAgent {
             .entry(session_id)
             .or_insert_with(|| acp::open_acp_session(session_id, request.adapter))
             .clone();
+        let language_pack_request = if request.kind
+            == sem_os_core::acp_projection::AcpProjectionKind::LanguagePack
+        {
+            let subject = match request.subject.as_ref() {
+                Some(subject) => subject,
+                None => {
+                    return self.error(
+                        id,
+                        INVALID_PARAMS,
+                        "language_pack projection requires subject".to_string(),
+                        None,
+                    )
+                }
+            };
+            let subject_id = match Uuid::parse_str(&subject.subject_id) {
+                Ok(subject_id) => subject_id,
+                Err(error) => return self.error(id, INVALID_PARAMS, error.to_string(), None),
+            };
+            Some(KycLanguagePackRequest {
+                subject_id,
+                current_state: match request.current_state {
+                    Some(current_state) => current_state,
+                    None => {
+                        return self.error(
+                            id,
+                            INVALID_PARAMS,
+                            "language_pack projection requires current_state".to_string(),
+                            None,
+                        )
+                    }
+                },
+                configuration_version: match request.configuration_version {
+                    Some(configuration_version) => configuration_version,
+                    None => {
+                        return self.error(
+                            id,
+                            INVALID_PARAMS,
+                            "language_pack projection requires configuration_version".to_string(),
+                            None,
+                        )
+                    }
+                },
+                state_snapshot_id: match request.state_snapshot_id {
+                    Some(state_snapshot_id) => state_snapshot_id,
+                    None => {
+                        return self.error(
+                            id,
+                            INVALID_PARAMS,
+                            "language_pack projection requires state_snapshot_id".to_string(),
+                            None,
+                        )
+                    }
+                },
+                objective: request.objective,
+            })
+        } else {
+            None
+        };
 
         let started_at = Instant::now();
         match acp::build_acp_projection(
@@ -712,6 +864,7 @@ impl AcpJsonRpcAgent {
             acp::AcpProjectionRequest {
                 kind: request.kind,
                 subject: request.subject,
+                language_pack_request,
             },
         ) {
             Ok(envelope) => {
@@ -741,6 +894,349 @@ impl AcpJsonRpcAgent {
             }
             Err(error) => self.acp_error(id, error),
         }
+    }
+
+    fn obpoc_kyc_case_state_discover(
+        &mut self,
+        id: Option<Value>,
+        params: Value,
+    ) -> Vec<JsonRpcOutgoing> {
+        let request: AcpKycCaseStateDiscoverRequest = match serde_json::from_value(params) {
+            Ok(request) => request,
+            Err(error) => return self.error(id, INVALID_PARAMS, error.to_string(), None),
+        };
+        let session_id = match Uuid::parse_str(&request.session_id) {
+            Ok(session_id) => session_id,
+            Err(error) => return self.error(id, INVALID_PARAMS, error.to_string(), None),
+        };
+        let manifest = match load_ob_poc_kyc_domain_pack() {
+            Ok(manifest) => manifest,
+            Err(error) => return self.acp_error(id, error),
+        };
+        let session = self
+            .sessions
+            .entry(session_id)
+            .or_insert_with(|| acp::open_acp_session(session_id, request.adapter))
+            .clone();
+        let response = sem_os_core::domain_pack::DiscoveryResponse {
+            probe_id: "kyc-case.read-state".to_string(),
+            subject: sem_os_core::domain_pack::DiscoverySubject {
+                subject_kind: "kyc_case".to_string(),
+                subject_id: request.subject_id.to_string(),
+            },
+            observations: request.observations,
+            provenance: request.provenance,
+            first_class_state_mutated: request.first_class_state_mutated,
+        };
+
+        let started_at = Instant::now();
+        match acp::acp_discover_kyc_case_state(&session, &manifest, request.subject_id, response) {
+            Ok(case_state) => {
+                let language_pack_request = json!({
+                    "subject_id": case_state.subject_id,
+                    "current_state": &case_state.current_state,
+                    "configuration_version": &case_state.configuration_version,
+                    "state_snapshot_id": &case_state.state_snapshot_id
+                });
+                self.response(
+                    id,
+                    json!({
+                        "status": "kyc_case_state_discovered",
+                        "case_state": case_state,
+                        "language_pack_request": language_pack_request,
+                        "observability": {
+                            "acpMechanismSummary": [
+                                "read_only_discovery_probe",
+                                "kyc_case_state_anchor",
+                                "language_pack_ready"
+                            ],
+                            "projectionLatencyMs": u64::try_from(started_at.elapsed().as_millis()).unwrap_or(u64::MAX)
+                        }
+                    }),
+                )
+            }
+            Err(error) => self.acp_error(id, error),
+        }
+    }
+
+    fn obpoc_language_pack_get(
+        &mut self,
+        id: Option<Value>,
+        params: Value,
+    ) -> Vec<JsonRpcOutgoing> {
+        let request: AcpLanguagePackGetRequest = match serde_json::from_value(params) {
+            Ok(request) => request,
+            Err(error) => return self.error(id, INVALID_PARAMS, error.to_string(), None),
+        };
+        let session_id = match Uuid::parse_str(&request.session_id) {
+            Ok(session_id) => session_id,
+            Err(error) => return self.error(id, INVALID_PARAMS, error.to_string(), None),
+        };
+        let manifest = match load_ob_poc_kyc_domain_pack() {
+            Ok(manifest) => manifest,
+            Err(error) => return self.acp_error(id, error),
+        };
+        let session = self
+            .sessions
+            .entry(session_id)
+            .or_insert_with(|| acp::open_acp_session(session_id, request.adapter))
+            .clone();
+
+        let started_at = Instant::now();
+        match acp::acp_kyc_update_status_language_pack(
+            &session,
+            &manifest,
+            KycLanguagePackRequest {
+                subject_id: request.subject_id,
+                current_state: request.current_state,
+                configuration_version: request.configuration_version,
+                state_snapshot_id: request.state_snapshot_id,
+                objective: request.objective,
+            },
+        ) {
+            Ok(language_pack) => {
+                let language_pack_bytes = serde_json::to_vec(&language_pack)
+                    .map(|bytes| bytes.len())
+                    .unwrap_or(0);
+                self.response(
+                    id,
+                    json!({
+                        "status": "sem_os_language_pack",
+                        "session_id": session_id,
+                        "language_pack": language_pack,
+                        "observability": {
+                            "acpMechanismSummary": [
+                                "language_pack_get",
+                                "bounded_private_dsl",
+                                "dry_run_only"
+                            ],
+                            "projectionCount": 1,
+                            "projectionBytes": language_pack_bytes,
+                            "projectionLatencyMs": u64::try_from(started_at.elapsed().as_millis()).unwrap_or(u64::MAX)
+                        }
+                    }),
+                )
+            }
+            Err(error) => self.acp_error(id, error),
+        }
+    }
+
+    fn obpoc_kyc_update_status_language_loop(
+        &mut self,
+        id: Option<Value>,
+        params: Value,
+    ) -> Vec<JsonRpcOutgoing> {
+        let request: AcpKycLanguageLoopRequest = match serde_json::from_value(params) {
+            Ok(request) => request,
+            Err(error) => return self.error(id, INVALID_PARAMS, error.to_string(), None),
+        };
+        let session_id = match Uuid::parse_str(&request.session_id) {
+            Ok(session_id) => session_id,
+            Err(error) => return self.error(id, INVALID_PARAMS, error.to_string(), None),
+        };
+        let manifest = match load_ob_poc_kyc_domain_pack() {
+            Ok(manifest) => manifest,
+            Err(error) => return self.acp_error(id, error),
+        };
+        let session = self
+            .sessions
+            .entry(session_id)
+            .or_insert_with(|| acp::open_acp_session(session_id, request.adapter))
+            .clone();
+
+        let started_at = Instant::now();
+        let outcome = match acp::acp_run_kyc_update_status_language_loop(
+            &session,
+            &manifest,
+            KycLanguagePackRequest {
+                subject_id: request.subject_id,
+                current_state: request.current_state,
+                configuration_version: request.configuration_version,
+                state_snapshot_id: request.state_snapshot_id,
+                objective: request.objective,
+            },
+            request.draft,
+        ) {
+            Ok(outcome) => outcome,
+            Err(error) => return self.acp_error(id, error),
+        };
+
+        let (language_pack, revision_outcome) = outcome;
+        let mut outgoing = vec![
+            JsonRpcOutgoing::Notification(JsonRpcNotification {
+                jsonrpc: "2.0".to_string(),
+                method: "session/update".to_string(),
+                params: json!({
+                    "sessionId": session_id.to_string(),
+                    "update": {
+                        "sessionUpdate": "tool_call_update",
+                        "toolCallId": format!("tool:language-pack:{session_id}"),
+                        "status": "completed",
+                        "kind": "read",
+                        "persona": AcpPersonaMode::SagePlanning.as_str(),
+                        "workflowPhase": "discovery",
+                        "title": "SemOS language pack",
+                        "content": {
+                            "type": "resource_link",
+                            "uri": format!("semos://pack-manifest/{}", language_pack.pack_id),
+                            "name": "KYC update-status language pack",
+                            "description": "Bounded private DSL context for kyc-case.update-status"
+                        }
+                    }
+                }),
+            }),
+            JsonRpcOutgoing::Notification(JsonRpcNotification {
+                jsonrpc: "2.0".to_string(),
+                method: "session/update".to_string(),
+                params: json!({
+                    "sessionId": session_id.to_string(),
+                    "update": {
+                        "sessionUpdate": "plan",
+                        "persona": AcpPersonaMode::SagePlanning.as_str(),
+                        "workflowPhase": "planning",
+                        "goalProposalTrace": language_loop_trace_summary(&revision_outcome),
+                        "entries": language_loop_plan_entries(&revision_outcome)
+                    }
+                }),
+            }),
+        ];
+
+        match revision_outcome {
+            WorkbookRevisionOutcome::DryRunValid {
+                output,
+                attempts,
+                metrics,
+                trace,
+            } => {
+                outgoing.push(JsonRpcOutgoing::Notification(JsonRpcNotification {
+                    jsonrpc: "2.0".to_string(),
+                    method: "session/update".to_string(),
+                    params: json!({
+                        "sessionId": session_id.to_string(),
+                        "update": {
+                            "sessionUpdate": "tool_call_update",
+                            "toolCallId": format!("tool:language-loop:{}", output.workbook.id),
+                            "status": "completed",
+                            "kind": "think",
+                            "persona": AcpPersonaMode::SageExecution.as_str(),
+                            "workflowPhase": "planning",
+                            "title": "Workbook validation loop",
+                            "content": {
+                                "type": "resource_link",
+                                "uri": format!("semos://workbook/{}", output.workbook.id),
+                                "name": "Validated execution workbook",
+                                "description": "Draft validated after bounded diagnostic revision"
+                            }
+                        }
+                    }),
+                }));
+                outgoing.push(JsonRpcOutgoing::Notification(JsonRpcNotification {
+                    jsonrpc: "2.0".to_string(),
+                    method: "session/update".to_string(),
+                    params: json!({
+                        "sessionId": session_id.to_string(),
+                        "update": {
+                            "sessionUpdate": "semantic_diff",
+                            "persona": AcpPersonaMode::SageExecution.as_str(),
+                            "semanticDiffId": output.dry_run.semantic_diff_uri.clone(),
+                            "fallbackSummary": ["resource_link"],
+                            "diff": output.dry_run.semantic_diff.semantic_diff.clone(),
+                            "transitionRef": output.dry_run.transition_ref.clone(),
+                            "validationTrace": output.dry_run.validation_trace.clone()
+                        }
+                    }),
+                }));
+                outgoing.push(JsonRpcOutgoing::Notification(JsonRpcNotification {
+                    jsonrpc: "2.0".to_string(),
+                    method: "session/update".to_string(),
+                    params: json!({
+                        "sessionId": session_id.to_string(),
+                        "update": {
+                            "sessionUpdate": "agent_message_chunk",
+                            "content": {
+                                "type": "text",
+                                "text": "KYC update-status workbook dry-run validated. No mutation was executed."
+                            }
+                        }
+                    }),
+                }));
+                outgoing.push(JsonRpcOutgoing::Response(JsonRpcResponse::success(
+                    id,
+                    json!({
+                        "status": "dry_run_validated",
+                        "language_pack": language_pack,
+                        "output": output,
+                        "attempts": attempts,
+                        "metrics": metrics,
+                        "trace": trace,
+                        "observability": {
+                            "projectionLatencyMs": u64::try_from(started_at.elapsed().as_millis()).unwrap_or(u64::MAX),
+                            "acpMechanismSummary": ["language_pack", "deterministic_revision_loop", "dry_run_only"]
+                        }
+                    }),
+                )));
+            }
+            WorkbookRevisionOutcome::Refused {
+                refusal,
+                attempts,
+                metrics,
+                trace,
+            } => {
+                outgoing.push(JsonRpcOutgoing::Notification(JsonRpcNotification {
+                    jsonrpc: "2.0".to_string(),
+                    method: "session/update".to_string(),
+                    params: json!({
+                        "sessionId": session_id.to_string(),
+                        "update": {
+                            "sessionUpdate": "tool_call_update",
+                            "toolCallId": format!("tool:language-loop-refusal:{session_id}"),
+                            "status": "failed",
+                            "kind": "think",
+                            "persona": AcpPersonaMode::SageExecution.as_str(),
+                            "workflowPhase": "planning",
+                            "title": "Workbook validation loop",
+                            "content": {
+                                "type": "embedded_resource",
+                                "uri": format!("semos://diagnostic/{}", refusal.refusal_code),
+                                "name": "Structured refusal",
+                                "text": serde_json::to_string(&refusal).unwrap_or_default()
+                            }
+                        }
+                    }),
+                }));
+                outgoing.push(JsonRpcOutgoing::Notification(JsonRpcNotification {
+                    jsonrpc: "2.0".to_string(),
+                    method: "session/update".to_string(),
+                    params: json!({
+                        "sessionId": session_id.to_string(),
+                        "update": {
+                            "sessionUpdate": "agent_message_chunk",
+                            "content": {
+                                "type": "text",
+                                "text": format!("KYC update-status workbook refused: {}", refusal.refusal_code)
+                            }
+                        }
+                    }),
+                }));
+                outgoing.push(JsonRpcOutgoing::Response(JsonRpcResponse::success(
+                    id,
+                    json!({
+                        "status": "structured_refusal",
+                        "language_pack": language_pack,
+                        "refusal": refusal,
+                        "attempts": attempts,
+                        "metrics": metrics,
+                        "trace": trace,
+                        "observability": {
+                            "projectionLatencyMs": u64::try_from(started_at.elapsed().as_millis()).unwrap_or(u64::MAX),
+                            "acpMechanismSummary": ["language_pack", "deterministic_revision_loop", "structured_refusal"]
+                        }
+                    }),
+                )));
+            }
+        }
+
+        outgoing
     }
 
     fn obpoc_kyc_dry_run(&mut self, id: Option<Value>, params: Value) -> Vec<JsonRpcOutgoing> {
@@ -944,6 +1440,237 @@ fn resolve_prompt_resource_refs(prompt: &[AcpContentBlock]) -> Vec<Value> {
         .collect()
 }
 
+fn prompt_semantic_text(prompt: &[AcpContentBlock]) -> String {
+    prompt
+        .iter()
+        .map(|block| match block {
+            AcpContentBlock::Text { text } => text.as_str(),
+            AcpContentBlock::ResourceLink { uri, .. } => uri.as_str(),
+            AcpContentBlock::EmbeddedResource { uri, text, .. } => {
+                text.as_deref().unwrap_or(uri.as_str())
+            }
+        })
+        .collect::<Vec<_>>()
+        .join("\n")
+}
+
+fn looks_like_kyc_update_status_prompt(prompt_text: &str) -> bool {
+    let lower = prompt_text.to_ascii_lowercase();
+    (lower.contains("kyc") || lower.contains("case"))
+        && (lower.contains("update-status")
+            || lower.contains("update status")
+            || lower.contains("advance")
+            || lower.contains("transition")
+            || lower.contains("move"))
+        && (lower.contains("discovery") || lower.contains("assessment"))
+}
+
+fn kyc_language_loop_request_from_prompt(
+    session_id: Uuid,
+    prompt: &[AcpContentBlock],
+) -> Result<Value, Vec<&'static str>> {
+    let prompt_text = prompt_semantic_text(prompt);
+    let case_state = extract_prompt_case_state(prompt, &prompt_text);
+    let subject_id = case_state
+        .as_ref()
+        .and_then(|state| state.subject_id)
+        .or_else(|| extract_first_uuid(&prompt_text));
+    let current_state = case_state
+        .as_ref()
+        .and_then(|state| state.current_state.clone())
+        .or_else(|| {
+            extract_state_after_marker(
+                &prompt_text,
+                &["current state", "current status", "from", "status"],
+            )
+        });
+    let requested_state = extract_state_after_marker(
+        &prompt_text,
+        &["to", "target", "requested", "advance to", "move to"],
+    )
+    .or_else(|| {
+        let lower = prompt_text.to_ascii_lowercase();
+        if lower.contains("assessment") {
+            Some("ASSESSMENT".to_string())
+        } else if lower.contains("discovery") {
+            Some("DISCOVERY".to_string())
+        } else {
+            None
+        }
+    });
+    let configuration_version = case_state
+        .as_ref()
+        .and_then(|state| state.configuration_version.clone())
+        .or_else(|| extract_token_with_prefix(&prompt_text, "config-"))
+        .unwrap_or_else(|| "config-1".to_string());
+    let state_snapshot_id = case_state
+        .as_ref()
+        .and_then(|state| state.state_snapshot_id.clone())
+        .or_else(|| extract_token_with_prefix(&prompt_text, "snapshot-"))
+        .unwrap_or_else(|| "snapshot-1".to_string());
+
+    let mut missing = Vec::new();
+    if subject_id.is_none() {
+        missing.push("case_uuid");
+    }
+    if current_state.is_none() {
+        missing.push("current_state");
+    }
+    if requested_state.is_none() {
+        missing.push("requested_state");
+    }
+    if !missing.is_empty() {
+        return Err(missing);
+    }
+
+    let subject_id = subject_id.expect("checked above");
+    let current_state = current_state.expect("checked above");
+    let requested_state = requested_state.expect("checked above");
+    let transition_ref = extract_transition_ref(&prompt_text)
+        .unwrap_or_else(|| transition_ref_for_states(&current_state, &requested_state));
+    let evidence_digest = extract_token_with_prefix(&prompt_text, "sha256:");
+
+    Ok(json!({
+        "session_id": session_id.to_string(),
+        "adapter": "zed",
+        "subject_id": subject_id,
+        "current_state": current_state,
+        "configuration_version": configuration_version,
+        "state_snapshot_id": state_snapshot_id,
+        "objective": prompt_text,
+        "draft": {
+            "session_id": session_id,
+            "actor_id": "sage:planning",
+            "actor_roles": ["agent"],
+            "verb": "kyc-case.update-status",
+            "transition_ref": transition_ref,
+            "subject_kind": "kyc_case",
+            "case_id": subject_id,
+            "current_state": current_state,
+            "requested_state": requested_state,
+            "configuration_version": configuration_version,
+            "state_snapshot_id": state_snapshot_id,
+            "evidence_digest": evidence_digest
+        }
+    }))
+}
+
+#[derive(Debug, Default)]
+struct PromptCaseState {
+    subject_id: Option<Uuid>,
+    current_state: Option<String>,
+    configuration_version: Option<String>,
+    state_snapshot_id: Option<String>,
+}
+
+fn extract_prompt_case_state(
+    prompt: &[AcpContentBlock],
+    prompt_text: &str,
+) -> Option<PromptCaseState> {
+    prompt
+        .iter()
+        .filter_map(|block| match block {
+            AcpContentBlock::EmbeddedResource {
+                text: Some(text), ..
+            } => Some(text.as_str()),
+            _ => None,
+        })
+        .filter_map(|text| serde_json::from_str::<Value>(text).ok())
+        .find_map(|value| prompt_case_state_from_value(&value))
+        .or_else(|| {
+            Some(PromptCaseState {
+                subject_id: extract_first_uuid(prompt_text),
+                current_state: extract_state_after_marker(
+                    prompt_text,
+                    &["current state", "current status", "from", "status"],
+                ),
+                configuration_version: extract_token_with_prefix(prompt_text, "config-"),
+                state_snapshot_id: extract_token_with_prefix(prompt_text, "snapshot-"),
+            })
+        })
+}
+
+fn prompt_case_state_from_value(value: &Value) -> Option<PromptCaseState> {
+    let source = value
+        .get("case_state")
+        .or_else(|| value.get("language_pack_request"))
+        .unwrap_or(value);
+    Some(PromptCaseState {
+        subject_id: source
+            .get("subject_id")
+            .or_else(|| source.get("case_id"))
+            .and_then(Value::as_str)
+            .and_then(|raw| Uuid::parse_str(raw).ok()),
+        current_state: source
+            .get("current_state")
+            .and_then(Value::as_str)
+            .map(str::to_string),
+        configuration_version: source
+            .get("configuration_version")
+            .and_then(Value::as_str)
+            .map(str::to_string),
+        state_snapshot_id: source
+            .get("state_snapshot_id")
+            .and_then(Value::as_str)
+            .map(str::to_string),
+    })
+}
+
+fn extract_first_uuid(text: &str) -> Option<Uuid> {
+    text.split(|ch: char| ch.is_whitespace() || matches!(ch, ',' | ';' | ')' | '(' | '"' | '\''))
+        .map(|token| token.trim_matches(|ch: char| matches!(ch, '.' | ':' | ',' | ';' | '[' | ']')))
+        .find_map(|token| Uuid::parse_str(token).ok())
+}
+
+fn extract_state_after_marker(text: &str, markers: &[&str]) -> Option<String> {
+    let lower = text.to_ascii_lowercase();
+    markers.iter().find_map(|marker| {
+        lower.find(marker).and_then(|start| {
+            let segment = lower
+                .get(start + marker.len()..)
+                .unwrap_or_default()
+                .chars()
+                .take(80)
+                .collect::<String>();
+            state_in_text(&segment)
+        })
+    })
+}
+
+fn state_in_text(text: &str) -> Option<String> {
+    [
+        ("INTAKE", "intake"),
+        ("DISCOVERY", "discovery"),
+        ("ASSESSMENT", "assessment"),
+    ]
+    .iter()
+    .filter_map(|(state, needle)| text.find(needle).map(|index| (index, *state)))
+    .min_by_key(|(index, _)| *index)
+    .map(|(_, state)| state.to_string())
+}
+
+fn extract_token_with_prefix(text: &str, prefix: &str) -> Option<String> {
+    text.split(|ch: char| ch.is_whitespace() || matches!(ch, '"' | '\'' | '(' | ')' | '[' | ']'))
+        .map(|token| token.trim_matches(|ch: char| matches!(ch, ',' | ';' | '.')))
+        .find(|token| token.starts_with(prefix))
+        .map(str::to_string)
+}
+
+fn extract_transition_ref(text: &str) -> Option<String> {
+    text.split(|ch: char| ch.is_whitespace() || matches!(ch, '"' | '\'' | '(' | ')' | '[' | ']'))
+        .map(|token| token.trim_matches(|ch: char| matches!(ch, ',' | ';' | '.')))
+        .find(|token| token.starts_with("kyc-case.") && token.contains("-to-"))
+        .map(str::to_string)
+}
+
+fn transition_ref_for_states(current_state: &str, requested_state: &str) -> String {
+    match (current_state, requested_state) {
+        ("INTAKE", "DISCOVERY") => "kyc-case.intake-to-discovery".to_string(),
+        ("DISCOVERY", "ASSESSMENT") => "kyc-case.discovery-to-assessment".to_string(),
+        _ => "kyc-case.unknown-transition".to_string(),
+    }
+}
+
 struct ParsedSemosResource {
     resource_kind: &'static str,
     resource_id: String,
@@ -1008,6 +1735,49 @@ fn extract_session_id(params: &Value) -> Result<Uuid, String> {
         .and_then(Value::as_str)
         .ok_or_else(|| "session_id is required".to_string())?;
     Uuid::parse_str(raw).map_err(|error| error.to_string())
+}
+
+fn language_loop_trace_summary(outcome: &WorkbookRevisionOutcome) -> Value {
+    match outcome {
+        WorkbookRevisionOutcome::DryRunValid { metrics, trace, .. } => json!({
+            "status": "dry_run_validated",
+            "acpMechanismSummary": ["language_pack", "deterministic_revision_loop", "dry_run_only"],
+            "acpFallbackSummary": [],
+            "revisionCount": metrics.revision_count,
+            "firstPassValid": metrics.first_pass_valid,
+            "dryRunValid": metrics.dry_run_valid,
+            "refusalCode": metrics.refusal_code,
+            "trace": trace
+        }),
+        WorkbookRevisionOutcome::Refused {
+            refusal,
+            metrics,
+            trace,
+            ..
+        } => json!({
+            "status": "structured_refusal",
+            "acpMechanismSummary": ["language_pack", "deterministic_revision_loop", "structured_refusal"],
+            "acpFallbackSummary": [],
+            "revisionCount": metrics.revision_count,
+            "firstPassValid": metrics.first_pass_valid,
+            "dryRunValid": metrics.dry_run_valid,
+            "refusalCode": refusal.refusal_code,
+            "trace": trace
+        }),
+    }
+}
+
+fn language_loop_plan_entries(outcome: &WorkbookRevisionOutcome) -> Value {
+    let (validation_status, dry_run_status) = match outcome {
+        WorkbookRevisionOutcome::DryRunValid { .. } => ("completed", "completed"),
+        WorkbookRevisionOutcome::Refused { .. } => ("failed", "blocked"),
+    };
+    json!([
+        {"id": "language-pack", "status": "completed", "label": "Retrieve bounded SemOS language pack"},
+        {"id": "draft", "status": "completed", "label": "Produce workbook draft"},
+        {"id": "validate", "status": validation_status, "label": "Validate draft with structured diagnostics"},
+        {"id": "dry-run", "status": dry_run_status, "label": "Run non-mutating workbook dry-run"}
+    ])
 }
 
 fn load_ob_poc_kyc_domain_pack(
@@ -1176,6 +1946,113 @@ mod tests {
     }
 
     #[test]
+    fn session_prompt_routes_kyc_update_status_to_language_loop() {
+        let mut agent = AcpJsonRpcAgent::new();
+        let case_state = json!({
+            "case_state": {
+                "subject_id": CASE_ID,
+                "current_state": "DISCOVERY",
+                "configuration_version": "config-1",
+                "state_snapshot_id": "snapshot-1"
+            }
+        });
+
+        let outgoing = agent.handle_request(request(
+            1,
+            "session/prompt",
+            json!({
+                "sessionId": SESSION_ID.to_string(),
+                "prompt": [
+                    {
+                        "type": "text",
+                        "text": "Advance the KYC case to assessment with evidence sha256:evidence"
+                    },
+                    {
+                        "type": "embedded_resource",
+                        "uri": format!("semos://entity/{}", CASE_ID),
+                        "name": "KYC case state",
+                        "mime_type": "application/json",
+                        "text": case_state.to_string()
+                    }
+                ]
+            }),
+        ));
+
+        assert_eq!(outgoing.len(), 6);
+        assert!(matches!(
+            &outgoing[0],
+            JsonRpcOutgoing::Notification(notification)
+                if notification.params["update"]["toolCallId"]
+                    .as_str()
+                    .unwrap()
+                    .starts_with("tool:language-pack:")
+        ));
+        assert!(matches!(
+            &outgoing[3],
+            JsonRpcOutgoing::Notification(notification)
+                if notification.params["update"]["sessionUpdate"] == "semantic_diff"
+        ));
+        let response = match &outgoing[5] {
+            JsonRpcOutgoing::Response(response) => response,
+            JsonRpcOutgoing::Notification(_) => panic!("expected response"),
+        };
+        let result = response.result.as_ref().unwrap();
+        assert_eq!(result["status"], "dry_run_validated");
+        assert_eq!(
+            result["output"]["dry_run"]["transition_ref"],
+            "kyc-case.discovery-to-assessment"
+        );
+    }
+
+    #[test]
+    fn session_prompt_kyc_missing_evidence_returns_structured_refusal() {
+        let mut agent = AcpJsonRpcAgent::new();
+        let case_state = json!({
+            "case_state": {
+                "subject_id": CASE_ID,
+                "current_state": "INTAKE",
+                "configuration_version": "config-1",
+                "state_snapshot_id": "snapshot-1"
+            }
+        });
+
+        let outgoing = agent.handle_request(request(
+            1,
+            "session/prompt",
+            json!({
+                "sessionId": SESSION_ID.to_string(),
+                "prompt": [
+                    {
+                        "type": "text",
+                        "text": "Move the KYC case to discovery"
+                    },
+                    {
+                        "type": "embedded_resource",
+                        "uri": format!("semos://entity/{}", CASE_ID),
+                        "name": "KYC case state",
+                        "mime_type": "application/json",
+                        "text": case_state.to_string()
+                    }
+                ]
+            }),
+        ));
+
+        assert_eq!(outgoing.len(), 5);
+        assert!(!outgoing.iter().any(|item| matches!(
+            item,
+            JsonRpcOutgoing::Notification(notification)
+                if notification.params["update"]["sessionUpdate"] == "semantic_diff"
+        )));
+        let response = match &outgoing[4] {
+            JsonRpcOutgoing::Response(response) => response,
+            JsonRpcOutgoing::Notification(_) => panic!("expected response"),
+        };
+        let result = response.result.as_ref().unwrap();
+        assert_eq!(result["status"], "structured_refusal");
+        assert_eq!(result["refusal"]["refusal_code"], "missing_evidence_digest");
+    }
+
+    #[test]
     fn extension_context_assembles_redacted_bundle() {
         let mut agent = AcpJsonRpcAgent::new();
         agent.handle_request(request(
@@ -1271,6 +2148,11 @@ mod tests {
             .unwrap()
             .iter()
             .any(|entry| entry["kind"] == "verb_surface"));
+        assert!(result["projections"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|entry| entry["kind"] == "language_pack"));
     }
 
     #[test]
@@ -1309,6 +2191,239 @@ mod tests {
             projection["payload"]["transitions"][0]["transition_ref"],
             "kyc-case.intake-to-discovery"
         );
+        assert_eq!(
+            projection["payload"]["language_pack_readiness"][0]["generator"],
+            "kyc_update_status_language_pack_v1"
+        );
+    }
+
+    #[test]
+    fn extension_projection_get_returns_language_pack_envelope() {
+        let mut agent = AcpJsonRpcAgent::new();
+        let response = only_response(agent.handle_request(request(
+            1,
+            "obpoc/projection/get",
+            json!({
+                "session_id": SESSION_ID.to_string(),
+                "adapter": "zed",
+                "kind": "language_pack",
+                "subject": {
+                    "subject_kind": "kyc_case",
+                    "subject_id": CASE_ID.to_string()
+                },
+                "current_state": "DISCOVERY",
+                "configuration_version": "config-1",
+                "state_snapshot_id": "snapshot-1",
+                "objective": "Move the KYC case to assessment"
+            }),
+        )));
+
+        let result = response.result.as_ref().unwrap();
+        let projection = &result["projection"];
+        assert_eq!(projection["projection_kind"], "language_pack");
+        assert_eq!(projection["payload"]["current_state"], "DISCOVERY");
+        assert_eq!(
+            projection["payload"]["candidate_transitions"][0]["transition_ref"],
+            "kyc-case.discovery-to-assessment"
+        );
+        assert!(projection["projection_hash"]
+            .as_str()
+            .unwrap()
+            .starts_with("sha256:"));
+    }
+
+    #[test]
+    fn extension_discovers_case_state_for_language_pack_anchors() {
+        let mut agent = AcpJsonRpcAgent::new();
+        let response = only_response(agent.handle_request(request(
+            1,
+            "obpoc/kyc_case_state/discover",
+            json!({
+                "session_id": SESSION_ID.to_string(),
+                "adapter": "zed",
+                "subject_id": CASE_ID,
+                "observations": [
+                    {
+                        "key": "case.status",
+                        "value": "DISCOVERY",
+                        "classification": "internal"
+                    },
+                    {
+                        "key": "case.configuration_version",
+                        "value": "config-live-1",
+                        "classification": "internal"
+                    }
+                ],
+                "provenance": [
+                    {
+                        "source": "sem_os.session_state",
+                        "snapshot_ref": "snapshot-live-1"
+                    }
+                ]
+            }),
+        )));
+
+        let result = response.result.as_ref().unwrap();
+        assert_eq!(result["status"], "kyc_case_state_discovered");
+        assert_eq!(result["case_state"]["current_state"], "DISCOVERY");
+        assert_eq!(
+            result["language_pack_request"]["state_snapshot_id"],
+            "snapshot-live-1"
+        );
+        assert!(result["observability"]["acpMechanismSummary"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|mechanism| mechanism == "read_only_discovery_probe"));
+    }
+
+    #[test]
+    fn extension_language_pack_get_returns_bounded_private_dsl_context() {
+        let mut agent = AcpJsonRpcAgent::new();
+        let response = only_response(agent.handle_request(request(
+            1,
+            "obpoc/language_pack/get",
+            json!({
+                "session_id": SESSION_ID.to_string(),
+                "adapter": "zed",
+                "subject_id": CASE_ID,
+                "current_state": "INTAKE",
+                "configuration_version": "config-1",
+                "state_snapshot_id": "snapshot-1"
+            }),
+        )));
+
+        let result = response.result.as_ref().unwrap();
+        assert_eq!(result["status"], "sem_os_language_pack");
+        assert_eq!(result["language_pack"]["pack_id"], "ob-poc.kyc");
+        assert_eq!(result["language_pack"]["subject"]["kind"], "kyc_case");
+        assert_eq!(
+            result["language_pack"]["valid_verbs"][0]["verb"],
+            "kyc-case.update-status"
+        );
+        assert_eq!(
+            result["language_pack"]["candidate_transitions"][0]["transition_ref"],
+            "kyc-case.intake-to-discovery"
+        );
+        assert!(
+            result["language_pack"]["canonical_patterns"]
+                .as_array()
+                .unwrap()
+                .len()
+                >= 3
+        );
+    }
+
+    #[test]
+    fn extension_language_loop_emits_visible_trace_before_dry_run() {
+        let mut agent = AcpJsonRpcAgent::new();
+        let outgoing = agent.handle_request(request(
+            1,
+            "obpoc/kyc_update_status_language_loop",
+            json!({
+                "session_id": SESSION_ID.to_string(),
+                "adapter": "zed",
+                "subject_id": CASE_ID,
+                "current_state": "INTAKE",
+                "configuration_version": "config-1",
+                "state_snapshot_id": "snapshot-1",
+                "draft": {
+                    "session_id": SESSION_ID,
+                    "actor_id": "analyst@example.com",
+                    "actor_roles": ["analyst"],
+                    "verb": "kyc-case.update-status",
+                    "transition_ref": "kyc-case.review-to-approved",
+                    "subject_kind": "kyc_case",
+                    "case_id": CASE_ID,
+                    "current_state": "INTAKE",
+                    "requested_state": "DISCOVERY",
+                    "configuration_version": "config-1",
+                    "state_snapshot_id": "snapshot-1",
+                    "evidence_digest": "sha256:evidence"
+                }
+            }),
+        ));
+
+        assert_eq!(outgoing.len(), 6);
+        assert!(matches!(
+            &outgoing[0],
+            JsonRpcOutgoing::Notification(notification)
+                if notification.params["update"]["sessionUpdate"] == "tool_call_update"
+                    && notification.params["update"]["toolCallId"]
+                        .as_str()
+                        .unwrap()
+                        .starts_with("tool:language-pack:")
+        ));
+        let plan_update = match &outgoing[1] {
+            JsonRpcOutgoing::Notification(notification) => &notification.params["update"],
+            JsonRpcOutgoing::Response(_) => panic!("expected plan notification"),
+        };
+        assert_eq!(plan_update["sessionUpdate"], "plan");
+        assert_eq!(
+            plan_update["goalProposalTrace"]["status"],
+            "dry_run_validated"
+        );
+        assert_eq!(plan_update["goalProposalTrace"]["revisionCount"], 1);
+        assert!(matches!(
+            &outgoing[3],
+            JsonRpcOutgoing::Notification(notification)
+                if notification.params["update"]["sessionUpdate"] == "semantic_diff"
+        ));
+        let response = match &outgoing[5] {
+            JsonRpcOutgoing::Response(response) => response,
+            JsonRpcOutgoing::Notification(_) => panic!("expected response"),
+        };
+        let result = response.result.as_ref().unwrap();
+        assert_eq!(result["status"], "dry_run_validated");
+        assert_eq!(result["metrics"]["revision_count"], 1);
+        assert_eq!(result["metrics"]["dry_run_valid"], true);
+    }
+
+    #[test]
+    fn extension_language_loop_returns_structured_refusal_without_semantic_diff() {
+        let mut agent = AcpJsonRpcAgent::new();
+        let outgoing = agent.handle_request(request(
+            1,
+            "obpoc/kyc_update_status_language_loop",
+            json!({
+                "session_id": SESSION_ID.to_string(),
+                "adapter": "zed",
+                "subject_id": CASE_ID,
+                "current_state": "INTAKE",
+                "configuration_version": "config-1",
+                "state_snapshot_id": "snapshot-1",
+                "draft": {
+                    "session_id": SESSION_ID,
+                    "actor_id": "analyst@example.com",
+                    "actor_roles": ["analyst"],
+                    "verb": "kyc-case.force-approve",
+                    "transition_ref": "kyc-case.intake-to-discovery",
+                    "subject_kind": "kyc_case",
+                    "case_id": CASE_ID,
+                    "current_state": "INTAKE",
+                    "requested_state": "DISCOVERY",
+                    "configuration_version": "config-1",
+                    "state_snapshot_id": "snapshot-1",
+                    "evidence_digest": "sha256:evidence"
+                }
+            }),
+        ));
+
+        assert_eq!(outgoing.len(), 5);
+        assert!(!outgoing.iter().any(|item| matches!(
+            item,
+            JsonRpcOutgoing::Notification(notification)
+                if notification.params["update"]["sessionUpdate"] == "semantic_diff"
+        )));
+        let response = match &outgoing[4] {
+            JsonRpcOutgoing::Response(response) => response,
+            JsonRpcOutgoing::Notification(_) => panic!("expected response"),
+        };
+        let result = response.result.as_ref().unwrap();
+        assert_eq!(result["status"], "structured_refusal");
+        assert_eq!(result["refusal"]["refusal_code"], "invented_verb");
+        assert_eq!(result["metrics"]["invented_verb_count"], 1);
+        assert_eq!(result["metrics"]["dry_run_valid"], false);
     }
 
     #[test]

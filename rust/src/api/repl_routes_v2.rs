@@ -1233,6 +1233,7 @@ fn get_acp_projection_value(
         crate::acp::AcpProjectionRequest {
             kind,
             subject: None,
+            language_pack_request: None,
         },
     )?;
 
@@ -1434,6 +1435,7 @@ fn build_live_acp_projection(
         }),
         AcpProjectionKind::PackManifest
         | AcpProjectionKind::ProbeCatalogue
+        | AcpProjectionKind::LanguagePack
         | AcpProjectionKind::TransitionSurface
         | AcpProjectionKind::Policy => return Ok(None),
     };
@@ -2052,6 +2054,8 @@ fn acp_json_error(error: crate::acp::AcpAdapterError) -> (StatusCode, Json<Error
         | crate::acp::AcpAdapterError::MutationNotSupported
         | crate::acp::AcpAdapterError::ProjectionUnknown { .. }
         | crate::acp::AcpAdapterError::ProjectionSubjectRefused { .. }
+        | crate::acp::AcpAdapterError::LanguagePackRefused { .. }
+        | crate::acp::AcpAdapterError::CaseStateDiscoveryRefused { .. }
         | crate::acp::AcpAdapterError::DryRunRefused { .. } => StatusCode::CONFLICT,
         crate::acp::AcpAdapterError::SessionClosed
         | crate::acp::AcpAdapterError::PackInvalid { .. } => StatusCode::BAD_REQUEST,
