@@ -39,6 +39,8 @@ pub enum LlmDraftLoopOutcome {
     HarnessCompleted {
         llm_trace: LlmInferenceTrace,
         draft: KycUpdateStatusWorkbookDraft,
+        #[serde(default)]
+        adapter_diagnostics: Vec<WorkbookDiagnostic>,
         outcome: WorkbookRevisionOutcome,
     },
     AdapterRefused {
@@ -125,7 +127,7 @@ pub async fn run_kyc_update_status_llm_draft_loop(
         }
     };
     let mut draft_arguments = result.arguments;
-    normalize_known_draft_bindings(
+    let mut adapter_diagnostics = normalize_known_draft_bindings(
         &mut draft_arguments,
         pack,
         session_id,
@@ -133,6 +135,7 @@ pub async fn run_kyc_update_status_llm_draft_loop(
         &actor_roles,
         evidence_digest.as_deref(),
     );
+    adapter_diagnostics.extend(repair_decode_fields(&mut draft_arguments, pack));
     let trace = record_llm_inference_trace(crate::llm_trace::LlmInferenceTraceInput {
         provider: client.provider_name(),
         model: client.model_name(),
@@ -177,6 +180,7 @@ pub async fn run_kyc_update_status_llm_draft_loop(
     LlmDraftLoopOutcome::HarnessCompleted {
         llm_trace: trace,
         draft,
+        adapter_diagnostics,
         outcome,
     }
 }
@@ -288,10 +292,11 @@ fn normalize_known_draft_bindings(
     actor_id: &str,
     actor_roles: &[String],
     evidence_digest: Option<&str>,
-) {
+) -> Vec<WorkbookDiagnostic> {
     let Some(object) = arguments.as_object_mut() else {
-        return;
+        return vec![];
     };
+    let current_state_was_missing = required_field_missing(object.get("current_state"));
     insert_if_missing(object, "session_id", serde_json::json!(session_id));
     insert_if_missing(object, "actor_id", serde_json::json!(actor_id));
     insert_if_missing(object, "actor_roles", serde_json::json!(actor_roles));
@@ -320,6 +325,113 @@ fn normalize_known_draft_bindings(
             serde_json::json!(evidence_digest),
         );
     }
+    if current_state_was_missing {
+        vec![WorkbookDiagnostic::repaired_required_workbook_field(
+            pack,
+            "current_state",
+            pack.current_state.clone(),
+            "repaired from read-only case-state anchor",
+            attempted_string(object, "verb"),
+            attempted_string(object, "transition_ref"),
+        )]
+    } else {
+        vec![]
+    }
+}
+
+fn repair_decode_fields(
+    arguments: &mut serde_json::Value,
+    pack: &SemOsLanguagePack,
+) -> Vec<WorkbookDiagnostic> {
+    let Some(object) = arguments.as_object_mut() else {
+        return vec![];
+    };
+
+    let mut diagnostics = Vec::new();
+    if required_field_missing(object.get("transition_ref")) {
+        if let Some(transition) = unambiguous_transition_for_decode_repair(object, pack) {
+            object.insert(
+                "transition_ref".to_string(),
+                serde_json::json!(transition.transition_ref.clone()),
+            );
+            diagnostics.push(WorkbookDiagnostic::repaired_required_workbook_field(
+                pack,
+                "transition_ref",
+                transition.transition_ref.clone(),
+                "repaired from unambiguous language-pack transition",
+                attempted_string(object, "verb"),
+                Some(transition.transition_ref.clone()),
+            ));
+        }
+    }
+
+    if required_field_missing(object.get("requested_state")) {
+        if let Some(transition) = object
+            .get("transition_ref")
+            .and_then(|value| value.as_str())
+            .and_then(|transition_ref| transition_by_ref(pack, transition_ref))
+        {
+            object.insert(
+                "requested_state".to_string(),
+                serde_json::json!(transition.to_state.clone()),
+            );
+            diagnostics.push(WorkbookDiagnostic::repaired_required_workbook_field(
+                pack,
+                "requested_state",
+                transition.to_state.clone(),
+                "repaired from declared transition effect",
+                attempted_string(object, "verb"),
+                Some(transition.transition_ref.clone()),
+            ));
+        }
+    }
+
+    diagnostics
+}
+
+fn unambiguous_transition_for_decode_repair<'a>(
+    object: &serde_json::Map<String, serde_json::Value>,
+    pack: &'a SemOsLanguagePack,
+) -> Option<&'a super::LanguagePackTransition> {
+    if let Some(requested_state) = object
+        .get("requested_state")
+        .and_then(|value| value.as_str())
+    {
+        let mut matches = pack
+            .candidate_transitions
+            .iter()
+            .filter(|transition| transition.to_state == requested_state);
+        let first = matches.next()?;
+        if matches.next().is_none() {
+            return Some(first);
+        }
+        return None;
+    }
+
+    if pack.candidate_transitions.len() == 1 {
+        return pack.candidate_transitions.first();
+    }
+
+    None
+}
+
+fn transition_by_ref<'a>(
+    pack: &'a SemOsLanguagePack,
+    transition_ref: &str,
+) -> Option<&'a super::LanguagePackTransition> {
+    pack.candidate_transitions
+        .iter()
+        .find(|transition| transition.transition_ref == transition_ref)
+}
+
+fn attempted_string(
+    object: &serde_json::Map<String, serde_json::Value>,
+    field: &str,
+) -> Option<String> {
+    object
+        .get(field)
+        .and_then(|value| value.as_str())
+        .map(str::to_string)
 }
 
 fn insert_if_missing(
@@ -525,6 +637,7 @@ mod tests {
         let LlmDraftLoopOutcome::HarnessCompleted {
             llm_trace,
             draft,
+            adapter_diagnostics,
             outcome,
         } = outcome
         else {
@@ -533,6 +646,7 @@ mod tests {
         assert_eq!(llm_trace.provider, "stub-provider");
         assert!(llm_trace.latency_ms.is_some());
         assert!(draft.llm_trace_ref.is_some());
+        assert!(adapter_diagnostics.is_empty());
         assert!(matches!(
             outcome,
             WorkbookRevisionOutcome::DryRunValid { .. }
@@ -540,7 +654,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn llm_draft_adapter_returns_structured_diagnostic_for_missing_transition_ref() {
+    async fn llm_draft_adapter_repairs_missing_transition_ref_from_requested_state() {
         let manifest: DomainPackManifest = serde_yaml::from_str(include_str!(
             "../../config/sem_os_seeds/domain_packs/ob_poc_kyc.yaml"
         ))
@@ -582,24 +696,154 @@ mod tests {
         )
         .await;
 
+        let LlmDraftLoopOutcome::HarnessCompleted {
+            draft,
+            adapter_diagnostics,
+            outcome,
+            ..
+        } = outcome
+        else {
+            panic!("expected harness completion");
+        };
+        assert_eq!(draft.transition_ref, "kyc-case.discovery-to-assessment");
+        assert_eq!(adapter_diagnostics.len(), 1);
+        assert_eq!(
+            adapter_diagnostics[0].error_code,
+            "repaired_required_workbook_field"
+        );
+        assert_eq!(adapter_diagnostics[0].source_path, "draft.transition_ref");
+        assert_eq!(
+            adapter_diagnostics[0].attempted_verb.as_deref(),
+            Some("kyc-case.update-status")
+        );
+        assert_eq!(
+            adapter_diagnostics[0].actual_state.as_deref(),
+            Some("missing")
+        );
+        assert_eq!(
+            adapter_diagnostics[0].expected_state.as_deref(),
+            Some("kyc-case.discovery-to-assessment")
+        );
+        assert!(matches!(
+            outcome,
+            WorkbookRevisionOutcome::DryRunValid { .. }
+        ));
+    }
+
+    #[tokio::test]
+    async fn llm_draft_adapter_repairs_missing_requested_state_from_transition_ref() {
+        let manifest: DomainPackManifest = serde_yaml::from_str(include_str!(
+            "../../config/sem_os_seeds/domain_packs/ob_poc_kyc.yaml"
+        ))
+        .unwrap();
+        let session_id = Uuid::parse_str(SESSION_ID).unwrap();
+        let case_id = Uuid::parse_str(CASE_ID).unwrap();
+        let pack = build_kyc_update_status_language_pack(
+            &manifest,
+            KycLanguagePackRequest {
+                subject_id: case_id,
+                current_state: "DISCOVERY".to_string(),
+                configuration_version: "config-1".to_string(),
+                state_snapshot_id: "snapshot-1".to_string(),
+                objective: Some("Move the KYC case from DISCOVERY to ASSESSMENT".to_string()),
+            },
+        )
+        .unwrap();
+        let client = Arc::new(StubLlmClient {
+            arguments: serde_json::json!({
+                "verb": "kyc-case.update-status",
+                "transition_ref": "kyc-case.discovery-to-assessment",
+                "subject_kind": "kyc_case",
+                "case_id": case_id,
+                "current_state": "DISCOVERY",
+                "configuration_version": "config-1",
+                "state_snapshot_id": "snapshot-1",
+                "evidence_digest": "sha256:evidence"
+            }),
+        });
+
+        let outcome = run_kyc_update_status_llm_draft_loop(
+            &manifest,
+            &pack,
+            session_id,
+            "sage",
+            vec!["ops".to_string()],
+            Some("sha256:evidence".to_string()),
+            client,
+        )
+        .await;
+
+        let LlmDraftLoopOutcome::HarnessCompleted {
+            draft,
+            adapter_diagnostics,
+            outcome,
+            ..
+        } = outcome
+        else {
+            panic!("expected harness completion");
+        };
+        assert_eq!(draft.requested_state, "ASSESSMENT");
+        assert_eq!(adapter_diagnostics[0].source_path, "draft.requested_state");
+        assert!(matches!(
+            outcome,
+            WorkbookRevisionOutcome::DryRunValid { .. }
+        ));
+    }
+
+    #[tokio::test]
+    async fn llm_draft_adapter_refuses_ambiguous_missing_transition_ref() {
+        let manifest: DomainPackManifest = serde_yaml::from_str(include_str!(
+            "../../config/sem_os_seeds/domain_packs/ob_poc_kyc.yaml"
+        ))
+        .unwrap();
+        let session_id = Uuid::parse_str(SESSION_ID).unwrap();
+        let case_id = Uuid::parse_str(CASE_ID).unwrap();
+        let mut pack = build_kyc_update_status_language_pack(
+            &manifest,
+            KycLanguagePackRequest {
+                subject_id: case_id,
+                current_state: "DISCOVERY".to_string(),
+                configuration_version: "config-1".to_string(),
+                state_snapshot_id: "snapshot-1".to_string(),
+                objective: Some("Move the KYC case forward".to_string()),
+            },
+        )
+        .unwrap();
+        let mut alternate = pack.candidate_transitions[0].clone();
+        alternate.transition_ref = "kyc-case.discovery-to-review".to_string();
+        alternate.to_state = "REVIEW".to_string();
+        pack.candidate_transitions.push(alternate);
+        let client = Arc::new(StubLlmClient {
+            arguments: serde_json::json!({
+                "verb": "kyc-case.update-status",
+                "subject_kind": "kyc_case",
+                "case_id": case_id,
+                "current_state": "DISCOVERY",
+                "configuration_version": "config-1",
+                "state_snapshot_id": "snapshot-1",
+                "evidence_digest": "sha256:evidence"
+            }),
+        });
+
+        let outcome = run_kyc_update_status_llm_draft_loop(
+            &manifest,
+            &pack,
+            session_id,
+            "sage",
+            vec!["ops".to_string()],
+            Some("sha256:evidence".to_string()),
+            client,
+        )
+        .await;
+
         let LlmDraftLoopOutcome::AdapterRefused { refusal } = outcome else {
             panic!("expected adapter refusal");
         };
         assert_eq!(refusal.refusal_code, "missing_required_workbook_field");
-        assert_eq!(refusal.diagnostics.len(), 1);
-        assert_eq!(refusal.diagnostics[0].source_path, "draft.transition_ref");
-        assert_eq!(
-            refusal.diagnostics[0].attempted_verb.as_deref(),
-            Some("kyc-case.update-status")
-        );
-        assert_eq!(
-            refusal.diagnostics[0].actual_state.as_deref(),
-            Some("missing")
-        );
-        assert!(refusal.diagnostics[0]
-            .suggested_transitions
-            .contains(&"kyc-case.discovery-to-assessment".to_string()));
-        assert!(refusal.llm_trace.is_some());
+        assert!(refusal
+            .diagnostics
+            .iter()
+            .any(|diagnostic| diagnostic.source_path == "draft.transition_ref"));
     }
 
     #[test]

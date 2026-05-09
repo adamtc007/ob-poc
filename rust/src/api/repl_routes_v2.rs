@@ -1909,12 +1909,14 @@ async fn acp_kyc_update_status_llm_draft_loop_value_with_client(
         crate::runbook::LlmDraftLoopOutcome::HarnessCompleted {
             llm_trace,
             draft,
+            adapter_diagnostics,
             outcome,
         } => Ok(acp_llm_harness_completed_value(
             language_pack,
             case_state,
             llm_trace,
             draft,
+            adapter_diagnostics,
             outcome,
             language_pack_us,
             adapter_us,
@@ -2008,6 +2010,7 @@ fn acp_llm_harness_completed_value(
     case_state: crate::acp::AcpKycCaseStateSnapshot,
     llm_trace: crate::llm_trace::LlmInferenceTrace,
     draft: crate::runbook::KycUpdateStatusWorkbookDraft,
+    adapter_diagnostics: Vec<crate::runbook::WorkbookDiagnostic>,
     outcome: crate::runbook::WorkbookRevisionOutcome,
     language_pack_us: u64,
     adapter_us: u64,
@@ -2024,40 +2027,45 @@ fn acp_llm_harness_completed_value(
             attempts,
             metrics,
             trace,
-        } => serde_json::json!({
-            "status": "dry_run_validated",
-            "draft_source": "llm_tool_call",
-            "case_state": case_state,
-            "language_pack": language_pack,
-            "llm_trace": llm_trace,
-            "llm_draft": draft,
-            "output": output,
-            "attempts": attempts,
-            "metrics": metrics,
-            "trace": trace,
-            "observability": {
-                "projectionLatencyMs": route_millis_from_micros(total_us),
-                "performance": route_llm_language_loop_performance(
-                    language_pack_us,
-                    llm_draft_us,
-                    adapter_us,
-                    metrics.dry_run_us,
-                    total_us,
-                ),
-                "conversationEfficiency": route_language_loop_conversation_efficiency(
-                    &metrics,
-                    "dry_run_validated",
-                    None,
-                ),
-                "acpMechanismSummary": [
-                    "read_only_case_state_anchor",
-                    "language_pack",
-                    "llm_tool_draft",
-                    "deterministic_revision_loop",
-                    "dry_run_only"
-                ]
-            }
-        }),
+        } => {
+            let metrics_value = adapter_metrics_value(&metrics, adapter_diagnostics.len());
+            let trace_events = adapter_trace_events(&trace, &adapter_diagnostics);
+            serde_json::json!({
+                "status": "dry_run_validated",
+                "draft_source": "llm_tool_call",
+                "case_state": case_state,
+                "language_pack": language_pack,
+                "llm_trace": llm_trace,
+                "llm_draft": draft,
+                "adapter_diagnostics": adapter_diagnostics,
+                "output": output,
+                "attempts": attempts,
+                "metrics": metrics_value,
+                "trace": trace_events,
+                "observability": {
+                    "projectionLatencyMs": route_millis_from_micros(total_us),
+                    "performance": route_llm_language_loop_performance(
+                        language_pack_us,
+                        llm_draft_us,
+                        adapter_us,
+                        metrics.dry_run_us,
+                        total_us,
+                    ),
+                    "conversationEfficiency": route_language_loop_conversation_efficiency(
+                        &metrics,
+                        "dry_run_validated",
+                        None,
+                    ),
+                    "acpMechanismSummary": [
+                        "read_only_case_state_anchor",
+                        "language_pack",
+                        "llm_tool_draft",
+                        "deterministic_revision_loop",
+                        "dry_run_only"
+                    ]
+                }
+            })
+        }
         crate::runbook::WorkbookRevisionOutcome::Refused {
             refusal,
             attempts,
@@ -2065,6 +2073,8 @@ fn acp_llm_harness_completed_value(
             trace,
         } => {
             let refusal_code = refusal.refusal_code.clone();
+            let metrics_value = adapter_metrics_value(&metrics, adapter_diagnostics.len());
+            let trace_events = adapter_trace_events(&trace, &adapter_diagnostics);
             serde_json::json!({
                 "status": "structured_refusal",
                 "draft_source": "llm_tool_call",
@@ -2072,10 +2082,11 @@ fn acp_llm_harness_completed_value(
                 "language_pack": language_pack,
                 "llm_trace": llm_trace,
                 "llm_draft": draft,
+                "adapter_diagnostics": adapter_diagnostics,
                 "refusal": refusal,
                 "attempts": attempts,
-                "metrics": metrics,
-                "trace": trace,
+                "metrics": metrics_value,
+                "trace": trace_events,
                 "observability": {
                     "projectionLatencyMs": route_millis_from_micros(total_us),
                     "performance": route_llm_language_loop_performance(
@@ -2101,6 +2112,54 @@ fn acp_llm_harness_completed_value(
             })
         }
     }
+}
+
+fn adapter_metrics_value(
+    metrics: &crate::runbook::LanguageAcquisitionMetrics,
+    decode_repair_count: usize,
+) -> serde_json::Value {
+    let mut value = serde_json::to_value(metrics).expect("language acquisition metrics serialize");
+    value["decode_repair_count"] = serde_json::json!(decode_repair_count);
+    value
+}
+
+fn adapter_trace_events(
+    trace: &[crate::runbook::LanguageLoopTraceEvent],
+    adapter_diagnostics: &[crate::runbook::WorkbookDiagnostic],
+) -> Vec<crate::runbook::LanguageLoopTraceEvent> {
+    let repair_events: Vec<_> = adapter_diagnostics
+        .iter()
+        .filter(|diagnostic| diagnostic.error_code == "repaired_required_workbook_field")
+        .map(|diagnostic| crate::runbook::LanguageLoopTraceEvent {
+            phase: "decode_repair".to_string(),
+            status: "completed".to_string(),
+            message: format!(
+                "{} repaired to {}",
+                diagnostic.source_path,
+                diagnostic
+                    .expected_state
+                    .as_deref()
+                    .unwrap_or("known value")
+            ),
+        })
+        .collect();
+    if repair_events.is_empty() {
+        return trace.to_vec();
+    }
+
+    let mut output = Vec::with_capacity(trace.len() + repair_events.len());
+    let mut inserted = false;
+    for event in trace.iter().cloned() {
+        output.push(event);
+        if !inserted {
+            output.extend(repair_events.clone());
+            inserted = true;
+        }
+    }
+    if !inserted {
+        output.extend(repair_events);
+    }
+    output
 }
 
 fn acp_llm_adapter_structured_refusal_value(
@@ -5074,7 +5133,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_acp_llm_draft_loop_missing_transition_ref_has_structured_diagnostic() {
+    async fn test_acp_llm_draft_loop_missing_transition_ref_is_repaired_and_traced() {
         let client = std::sync::Arc::new(StubToolLlmClient {
             arguments: serde_json::json!({
                 "verb": "kyc-case.update-status",
@@ -5100,23 +5159,29 @@ mod tests {
         .await
         .expect("LLM draft loop value");
 
-        assert_eq!(value["status"], "structured_refusal");
+        assert_eq!(value["status"], "dry_run_validated");
         assert_eq!(
-            value["refusal"]["refusal_code"],
-            "missing_required_workbook_field"
+            value["output"]["dry_run"]["transition_ref"],
+            "kyc-case.discovery-to-assessment"
         );
         assert_eq!(
-            value["refusal"]["diagnostics"][0]["source_path"],
+            value["adapter_diagnostics"][0]["error_code"],
+            "repaired_required_workbook_field"
+        );
+        assert_eq!(
+            value["adapter_diagnostics"][0]["source_path"],
             "draft.transition_ref"
         );
         assert_eq!(
-            value["refusal"]["diagnostics"][0]["attempted_verb"],
-            "kyc-case.update-status"
-        );
-        assert_eq!(
-            value["refusal"]["diagnostics"][0]["suggested_transitions"][0],
+            value["adapter_diagnostics"][0]["expected_state"],
             "kyc-case.discovery-to-assessment"
         );
+        assert_eq!(value["metrics"]["decode_repair_count"], 1);
+        assert!(value["trace"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|event| { event["phase"] == "decode_repair" && event["status"] == "completed" }));
         assert_eq!(value["llm_trace"]["provider"], "stub-llm-provider");
         assert_eq!(
             value["observability"]["conversationEfficiency"]["proseOnlyFailure"],
@@ -5143,7 +5208,7 @@ mod tests {
         .expect("live LLM draft loop value");
 
         println!(
-            "live_llm_smoke status={} transition={} refusal_code={} diagnostic_source={} diagnostic_reason={} revision_count={} provider={} model={} total_ms={} llm_draft_ms={} prose_only_failure={}",
+            "live_llm_smoke status={} transition={} refusal_code={} diagnostic_source={} diagnostic_reason={} revision_count={} decode_repair_count={} provider={} model={} total_ms={} llm_draft_ms={} prose_only_failure={}",
             value["status"].as_str().unwrap_or("unknown"),
             value["output"]["dry_run"]["transition_ref"]
                 .as_str()
@@ -5159,6 +5224,7 @@ mod tests {
                 .take(160)
                 .collect::<String>(),
             value["metrics"]["revision_count"].as_u64().unwrap_or(0),
+            value["metrics"]["decode_repair_count"].as_u64().unwrap_or(0),
             value["llm_trace"]["provider"].as_str().unwrap_or("unknown"),
             value["llm_trace"]["model"].as_str().unwrap_or("unknown"),
             value["observability"]["performance"]["total_ms"]

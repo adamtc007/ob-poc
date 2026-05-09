@@ -141,6 +141,28 @@ impl WorkbookDiagnostic {
         diag
     }
 
+    pub fn repaired_required_workbook_field(
+        pack: &SemOsLanguagePack,
+        field: impl Into<String>,
+        repaired_value: impl Into<String>,
+        reason: impl Into<String>,
+        attempted_verb: Option<String>,
+        attempted_transition: Option<String>,
+    ) -> Self {
+        let field = field.into();
+        let mut diag = Self::new(
+            "repaired_required_workbook_field",
+            format!("draft.{field}"),
+            pack,
+        );
+        diag.attempted_verb = attempted_verb;
+        diag.attempted_transition = attempted_transition;
+        diag.expected_state = Some(repaired_value.into());
+        diag.actual_state = Some("missing".to_string());
+        diag.blocked_transition_reason = Some(reason.into());
+        diag
+    }
+
     pub fn invalid_llm_draft_shape(pack: &SemOsLanguagePack, actual: impl Into<String>) -> Self {
         let mut diag = Self::new("invalid_llm_draft_shape", "draft", pack);
         diag.actual_state = Some(actual.into());
