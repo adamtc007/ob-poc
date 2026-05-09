@@ -138,6 +138,7 @@ function CoderProposalCard({ message }: { message: ChatMessageType }) {
 
 function AcpTraceCard({ trace }: { trace: AcpTraceSummary }) {
   const statusLabel = trace.outcome || trace.status;
+  const provider = trace.state_anchor_provider;
   const detailItems = [
     trace.outcome_layer ? `layer: ${trace.outcome_layer}` : null,
     trace.transition_ref ? `transition: ${trace.transition_ref}` : null,
@@ -149,6 +150,22 @@ function AcpTraceCard({ trace }: { trace: AcpTraceSummary }) {
       ? `revisions: ${trace.revision_count}`
       : null,
   ].filter((item): item is string => Boolean(item));
+  const providerItems = provider
+    ? [
+        provider.task ? `task: ${provider.task}` : null,
+        provider.status ? `provider: ${provider.status}` : null,
+        provider.state_anchor_source
+          ? `anchor: ${provider.state_anchor_source}`
+          : null,
+        provider.language_pack_generated !== undefined
+          ? `language pack: ${provider.language_pack_generated ? "yes" : "no"}`
+          : null,
+        provider.dry_run_valid !== undefined
+          ? `provider dry-run: ${provider.dry_run_valid ? "valid" : "not valid"}`
+          : null,
+        provider.no_mutation_authority ? "mutation: no authority" : null,
+      ].filter((item): item is string => Boolean(item))
+    : [];
 
   return (
     <div className="mt-2 rounded-lg border border-[var(--border-primary)] bg-[var(--bg-tertiary)] p-3 text-sm">
@@ -177,6 +194,42 @@ function AcpTraceCard({ trace }: { trace: AcpTraceSummary }) {
               {item}
             </span>
           ))}
+        </div>
+      )}
+
+      {provider && (
+        <div className="mt-3 border-t border-[var(--border-primary)] pt-3">
+          <div className="text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]">
+            State Anchor Provider
+          </div>
+          <div className="mt-2 flex flex-wrap gap-2">
+            {providerItems.map((item) => (
+              <span
+                key={item}
+                className="rounded bg-[var(--bg-secondary)] px-2 py-1 text-xs text-[var(--text-secondary)]"
+              >
+                {item}
+              </span>
+            ))}
+            {provider.provider_id && (
+              <span className="rounded bg-[var(--bg-secondary)] px-2 py-1 font-mono text-xs text-[var(--text-secondary)]">
+                {provider.provider_id}
+              </span>
+            )}
+          </div>
+          {provider.supported_tasks && provider.supported_tasks.length > 0 && (
+            <div className="mt-2 text-xs text-[var(--text-secondary)]">
+              supported: {provider.supported_tasks.join(", ")}
+            </div>
+          )}
+          {provider.needed && provider.needed.length > 0 && (
+            <div className="mt-1 text-xs text-[var(--text-secondary)]">
+              needed:{" "}
+              {provider.needed
+                .map((need) => need.replaceAll("_", " "))
+                .join(", ")}
+            </div>
+          )}
         </div>
       )}
 

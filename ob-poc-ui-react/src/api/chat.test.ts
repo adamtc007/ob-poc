@@ -61,6 +61,20 @@ describe("chatApi ACP prompt bridge", () => {
           },
         },
       ],
+      state_anchor_provider: {
+        provider_selected: true,
+        provider_id: "kyc.update_status.live_case_state",
+        task: "kyc-case.update-status",
+        status: "seeded",
+        state_anchor_source: "live_read_only_discovery_probe",
+        subject_id: "11111111-1111-1111-1111-111111111111",
+        supported_tasks: ["kyc-case.update-status", "deal.update-status"],
+        needed: [],
+        language_pack_generated: true,
+        dry_run_valid: false,
+        structured_outcome: true,
+        no_mutation_authority: true,
+      },
     };
     const fetchMock = vi.fn().mockResolvedValue(
       new Response(JSON.stringify(response), {
@@ -102,6 +116,18 @@ describe("chatApi ACP prompt bridge", () => {
       prose_only_failure: false,
       pending_user_turn_required: true,
       estimated_user_repair_turns_avoided: 1,
+      state_anchor_provider: {
+        provider_selected: true,
+        provider_id: "kyc.update_status.live_case_state",
+        task: "kyc-case.update-status",
+        status: "seeded",
+        state_anchor_source: "live_read_only_discovery_probe",
+        supported_tasks: ["kyc-case.update-status", "deal.update-status"],
+        language_pack_generated: true,
+        dry_run_valid: false,
+        structured_outcome: true,
+        no_mutation_authority: true,
+      },
     });
   });
 

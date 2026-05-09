@@ -26,6 +26,7 @@ import type {
   VerbProfile,
   VerbDisambiguationRequest,
   OnboardingStateView,
+  AcpStateAnchorProviderSummary,
   AcpTraceSummary,
 } from "../types/chat";
 import type { SessionFeedback } from "./replV2";
@@ -124,6 +125,7 @@ type AcpPromptGatewayResult = Record<string, unknown> & {
   traceProjection?: Record<string, unknown>;
   observability?: {
     conversationEfficiency?: Record<string, unknown>;
+    stateAnchorProvider?: Record<string, unknown>;
   };
   refusal?: {
     refusal_code?: string;
@@ -137,6 +139,21 @@ type AcpPromptGatewayResult = Record<string, unknown> & {
       semantic_diff_uri?: string;
     };
   };
+};
+
+type AcpStateAnchorProviderResult = Record<string, unknown> & {
+  provider_selected?: boolean;
+  provider_id?: string;
+  task?: string;
+  status?: string;
+  state_anchor_source?: string;
+  subject_id?: string;
+  supported_tasks?: string[];
+  needed?: string[];
+  language_pack_generated?: boolean;
+  dry_run_valid?: boolean;
+  structured_outcome?: boolean;
+  no_mutation_authority?: boolean;
 };
 
 function stringField(value: unknown): string | undefined {
@@ -157,6 +174,30 @@ function stringArrayField(value: unknown): string[] | undefined {
   return items.length ? items : undefined;
 }
 
+function acpStateAnchorProviderSummary(
+  value: unknown,
+): AcpStateAnchorProviderSummary | undefined {
+  if (!value || typeof value !== "object") return undefined;
+  const provider = value as AcpStateAnchorProviderResult;
+  const summary: AcpStateAnchorProviderSummary = {
+    provider_selected: booleanField(provider.provider_selected),
+    provider_id: stringField(provider.provider_id),
+    task: stringField(provider.task),
+    status: stringField(provider.status),
+    state_anchor_source: stringField(provider.state_anchor_source),
+    subject_id: stringField(provider.subject_id),
+    supported_tasks: stringArrayField(provider.supported_tasks),
+    needed: stringArrayField(provider.needed),
+    language_pack_generated: booleanField(provider.language_pack_generated),
+    dry_run_valid: booleanField(provider.dry_run_valid),
+    structured_outcome: booleanField(provider.structured_outcome),
+    no_mutation_authority: booleanField(provider.no_mutation_authority),
+  };
+  return Object.values(summary).some((field) => field !== undefined)
+    ? summary
+    : undefined;
+}
+
 function agentMessageText(outgoing: unknown[]): string | undefined {
   for (const item of outgoing) {
     if (!item || typeof item !== "object") continue;
@@ -175,9 +216,15 @@ function agentMessageText(outgoing: unknown[]): string | undefined {
   return undefined;
 }
 
-function acpTraceFromResult(result: AcpPromptGatewayResult): AcpTraceSummary {
+function acpTraceFromResult(
+  result: AcpPromptGatewayResult,
+  routeProvider?: Record<string, unknown>,
+): AcpTraceSummary {
   const traceProjection = result.traceProjection ?? {};
   const efficiency = result.observability?.conversationEfficiency ?? {};
+  const stateAnchorProvider =
+    acpStateAnchorProviderSummary(routeProvider) ??
+    acpStateAnchorProviderSummary(result.observability?.stateAnchorProvider);
   return {
     status: stringField(result.status) ?? "unknown",
     outcome:
@@ -207,6 +254,7 @@ function acpTraceFromResult(result: AcpPromptGatewayResult): AcpTraceSummary {
     estimated_user_repair_turns_avoided: numberField(
       efficiency.estimatedUserRepairTurnsAvoided,
     ),
+    state_anchor_provider: stateAnchorProvider,
   };
 }
 
@@ -214,7 +262,10 @@ function buildAcpPromptAssistantMessage(
   sessionId: string,
   envelope: AcpPromptResult<AcpPromptGatewayResult>,
 ): ChatMessage {
-  const trace = acpTraceFromResult(envelope.result);
+  const trace = acpTraceFromResult(
+    envelope.result,
+    envelope.state_anchor_provider,
+  );
   const content =
     agentMessageText(envelope.outgoing) ||
     trace.human_summary ||

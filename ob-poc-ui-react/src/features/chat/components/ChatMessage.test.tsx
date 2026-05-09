@@ -22,6 +22,18 @@ describe("ChatMessage ACP trace rendering", () => {
         dry_run_valid: false,
         prose_only_failure: false,
         revision_count: 0,
+        state_anchor_provider: {
+          provider_selected: true,
+          provider_id: "deal.update_status.live_deal_state",
+          task: "deal.update-status",
+          status: "seeded",
+          state_anchor_source: "live_read_only_discovery_probe",
+          supported_tasks: ["kyc-case.update-status", "deal.update-status"],
+          language_pack_generated: true,
+          dry_run_valid: false,
+          structured_outcome: true,
+          no_mutation_authority: true,
+        },
       },
     };
 
@@ -35,5 +47,10 @@ describe("ChatMessage ACP trace rendering", () => {
     expect(screen.getByText("missing_evidence_digest")).toBeInTheDocument();
     expect(screen.getByText("dry-run: not valid")).toBeInTheDocument();
     expect(screen.getByText("prose-only failure: no")).toBeInTheDocument();
+    expect(screen.getByText("State Anchor Provider")).toBeInTheDocument();
+    expect(screen.getByText("task: deal.update-status")).toBeInTheDocument();
+    expect(screen.getByText("provider: seeded")).toBeInTheDocument();
+    expect(screen.getByText("anchor: live_read_only_discovery_probe")).toBeInTheDocument();
+    expect(screen.getByText("mutation: no authority")).toBeInTheDocument();
   });
 });

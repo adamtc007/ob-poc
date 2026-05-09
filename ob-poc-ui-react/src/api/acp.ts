@@ -366,6 +366,7 @@ export interface AcpGatewayResult<T = unknown> {
   method: string;
   result: T;
   outgoing: unknown[];
+  state_anchor_provider?: Record<string, unknown>;
 }
 
 export type AcpPromptDraftSource =
@@ -386,6 +387,7 @@ export interface AcpPromptResult<T = unknown> {
   draft_source?: AcpPromptDraftSource;
   result: T;
   outgoing: unknown[];
+  state_anchor_provider?: Record<string, unknown>;
 }
 
 export const acpApi = {

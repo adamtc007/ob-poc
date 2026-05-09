@@ -50,6 +50,22 @@ export interface AcpTraceSummary {
   prose_only_failure?: boolean;
   pending_user_turn_required?: boolean;
   estimated_user_repair_turns_avoided?: number;
+  state_anchor_provider?: AcpStateAnchorProviderSummary;
+}
+
+export interface AcpStateAnchorProviderSummary {
+  provider_selected?: boolean;
+  provider_id?: string;
+  task?: string;
+  status?: string;
+  state_anchor_source?: string;
+  subject_id?: string;
+  supported_tasks?: string[];
+  needed?: string[];
+  language_pack_generated?: boolean;
+  dry_run_valid?: boolean;
+  structured_outcome?: boolean;
+  no_mutation_authority?: boolean;
 }
 
 export interface SageExplain {
