@@ -225,6 +225,14 @@ pub enum TraceOp {
         llm_response_hash: Option<String>,
         #[serde(default, skip_serializing_if = "Option::is_none")]
         diagnostic_source_path: Option<String>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        prompt_context_variant: Option<String>,
+        #[serde(default)]
+        decode_repair_count: u64,
+        #[serde(default)]
+        outcome_layer: String,
+        #[serde(default)]
+        diagnostic_codes: Vec<String>,
         #[serde(default)]
         revision_count: u8,
         #[serde(default)]
@@ -488,6 +496,10 @@ mod tests {
                 llm_prompt_hash: None,
                 llm_response_hash: None,
                 diagnostic_source_path: None,
+                prompt_context_variant: None,
+                decode_repair_count: 0,
+                outcome_layer: "dry_run_validated".into(),
+                diagnostic_codes: vec![],
                 revision_count: 1,
                 dry_run_valid: true,
                 first_pass_valid: false,

@@ -2033,6 +2033,7 @@ fn acp_llm_harness_completed_value(
             serde_json::json!({
                 "status": "dry_run_validated",
                 "draft_source": "llm_tool_call",
+                "prompt_context_variant": full_language_pack_prompt_context_variant(&language_pack),
                 "case_state": case_state,
                 "language_pack": language_pack,
                 "llm_trace": llm_trace,
@@ -2078,6 +2079,7 @@ fn acp_llm_harness_completed_value(
             serde_json::json!({
                 "status": "structured_refusal",
                 "draft_source": "llm_tool_call",
+                "prompt_context_variant": full_language_pack_prompt_context_variant(&language_pack),
                 "case_state": case_state,
                 "language_pack": language_pack,
                 "llm_trace": llm_trace,
@@ -2112,6 +2114,19 @@ fn acp_llm_harness_completed_value(
             })
         }
     }
+}
+
+fn full_language_pack_prompt_context_variant(
+    language_pack: &crate::runbook::SemOsLanguagePack,
+) -> serde_json::Value {
+    serde_json::json!({
+        "id": "full_language_pack",
+        "description": "Full SemOS language pack prompt context with transition landscape, effects, UUID bindings, and micro-patterns.",
+        "validation_pack_ref": format!(
+            "{}@{}",
+            language_pack.pack_id, language_pack.pack_version
+        ),
+    })
 }
 
 fn adapter_metrics_value(
@@ -2188,6 +2203,7 @@ fn acp_llm_adapter_structured_refusal_value(
     let mut value = serde_json::json!({
         "status": "structured_refusal",
         "draft_source": "llm_tool_call",
+        "prompt_context_variant": full_language_pack_prompt_context_variant(language_pack),
         "case_state": case_state,
         "language_pack": language_pack,
         "refusal": {
@@ -2424,6 +2440,12 @@ fn acp_language_loop_trace_op_from_value(
         .and_then(|diagnostic| diagnostic.get("source_path"))
         .and_then(|source_path| source_path.as_str())
         .map(str::to_string);
+    let prompt_context_variant = value_string(value, &["prompt_context_variant", "id"]);
+    let decode_repair_count = value
+        .get("metrics")
+        .and_then(|metrics| metrics.get("decode_repair_count"))
+        .and_then(|count| count.as_u64())
+        .unwrap_or(0);
     let revision_count = value
         .get("metrics")
         .and_then(|metrics| metrics.get("revision_count"))
@@ -2465,11 +2487,18 @@ fn acp_language_loop_trace_op_from_value(
     let trace = language_loop_trace_events(value, outcome);
     let performance = trace_performance_metrics(value);
     let conversation_efficiency = trace_conversation_efficiency(value, outcome);
+    let outcome_layer = language_loop_outcome_layer(value, outcome, revision_count);
+    let diagnostic_codes = language_loop_diagnostic_codes(value);
     let human_summary = language_loop_human_summary(
         outcome,
+        current_state.as_deref(),
+        requested_state.as_deref(),
+        decode_repair_count,
         revision_count,
         refusal_code.as_deref(),
         pending_question_code.as_deref(),
+        &outcome_layer,
+        &diagnostic_codes,
     );
 
     Some(crate::repl::session_trace::TraceOp::AcpLanguageLoopTraced {
@@ -2491,6 +2520,10 @@ fn acp_language_loop_trace_op_from_value(
         llm_prompt_hash,
         llm_response_hash,
         diagnostic_source_path,
+        prompt_context_variant,
+        decode_repair_count,
+        outcome_layer,
+        diagnostic_codes,
         revision_count,
         dry_run_valid,
         first_pass_valid,
@@ -2504,23 +2537,155 @@ fn acp_language_loop_trace_op_from_value(
 
 fn language_loop_human_summary(
     outcome: &str,
+    current_state: Option<&str>,
+    requested_state: Option<&str>,
+    decode_repair_count: u64,
     revision_count: u8,
     refusal_code: Option<&str>,
     pending_question_code: Option<&str>,
+    outcome_layer: &str,
+    diagnostic_codes: &[String],
 ) -> String {
     match outcome {
+        "dry_run_validated" if decode_repair_count > 0 => {
+            let field_word = if decode_repair_count == 1 {
+                "field"
+            } else {
+                "fields"
+            };
+            format!(
+                "I repaired {decode_repair_count} missing workbook {field_word} locally using the language pack, then drafted a valid dry-run workbook{}; no mutation was executed.",
+                transition_phrase(current_state, requested_state)
+            )
+        }
+        "dry_run_validated" if revision_count > 0 => {
+            let revision_word = if revision_count == 1 {
+                "revision"
+            } else {
+                "revisions"
+            };
+            format!(
+                "I revised the draft after {revision_count} local {revision_word} using structured diagnostics, then validated a dry-run workbook{}; no mutation was executed.",
+                transition_phrase(current_state, requested_state)
+            )
+        }
         "dry_run_validated" => format!(
-            "Validated a dry-run workbook after {revision_count} local revision(s); no mutation was executed."
+            "I found a valid transition{} and drafted a dry-run workbook; no mutation was executed.",
+            transition_phrase(current_state, requested_state)
         ),
+        "structured_refusal" if diagnostic_codes.iter().any(|code| code == "missing_evidence_digest") => {
+            "I stopped because required evidence digest is missing; no mutation was executed."
+                .to_string()
+        }
+        "structured_refusal" if outcome_layer == "decode_refusal" => {
+            "I stopped because the LLM draft omitted required workbook fields; no mutation was executed."
+                .to_string()
+        }
+        "structured_refusal"
+            if outcome_layer == "revision_refusal"
+                && diagnostic_codes.iter().any(|code| code == "unknown_transition")
+                && current_state.is_some() =>
+        {
+            format!(
+                "I stopped because no transition is valid from {}; no mutation was executed.",
+                current_state.unwrap_or("the current state")
+            )
+        }
         "structured_refusal" => format!(
-            "Stopped before mutation with structured refusal {}; the agent needs a valid DSL draft before proceeding.",
+            "I stopped with structured refusal {}; no mutation was executed.",
             refusal_code.unwrap_or("unknown_refusal")
         ),
         "pending_question" => format!(
-            "Need HITL clarification before drafting the workbook: {}.",
+            "I stopped before drafting because current case state/configuration anchor is missing; HITL clarification is needed ({}).",
             pending_question_code.unwrap_or("pending_question")
         ),
         _ => "ACP language loop produced a structured outcome.".to_string(),
+    }
+}
+
+fn transition_phrase(current_state: Option<&str>, requested_state: Option<&str>) -> String {
+    match (current_state, requested_state) {
+        (Some(current_state), Some(requested_state)) => {
+            format!(" from {current_state} to {requested_state}")
+        }
+        _ => String::new(),
+    }
+}
+
+fn language_loop_outcome_layer(
+    value: &serde_json::Value,
+    outcome: &str,
+    revision_count: u8,
+) -> String {
+    match outcome {
+        "pending_question" => "pre_llm_pending".to_string(),
+        "dry_run_validated" => "dry_run_validated".to_string(),
+        "structured_refusal" => {
+            if value.get("llm_trace").is_none() {
+                return "pre_llm_refusal".to_string();
+            }
+            let attempts_len = value
+                .get("attempts")
+                .and_then(|attempts| attempts.as_array())
+                .map(|attempts| attempts.len())
+                .unwrap_or(0);
+            if attempts_len == 0 {
+                "decode_refusal".to_string()
+            } else if revision_count > 0 {
+                "revision_refusal".to_string()
+            } else {
+                "validation_refusal".to_string()
+            }
+        }
+        _ => {
+            let prose_only_failure = value
+                .get("observability")
+                .and_then(|observability| observability.get("conversationEfficiency"))
+                .and_then(|efficiency| efficiency.get("proseOnlyFailure"))
+                .and_then(|failure| failure.as_bool())
+                .unwrap_or(false);
+            if prose_only_failure {
+                "prose_only_failure".to_string()
+            } else {
+                "unknown".to_string()
+            }
+        }
+    }
+}
+
+fn language_loop_diagnostic_codes(value: &serde_json::Value) -> Vec<String> {
+    let mut codes = Vec::new();
+    collect_language_loop_diagnostic_codes(value.get("adapter_diagnostics"), &mut codes);
+    collect_language_loop_diagnostic_codes(
+        value
+            .get("refusal")
+            .and_then(|refusal| refusal.get("diagnostics")),
+        &mut codes,
+    );
+    if let Some(attempts) = value
+        .get("attempts")
+        .and_then(|attempts| attempts.as_array())
+    {
+        for attempt in attempts {
+            collect_language_loop_diagnostic_codes(attempt.get("diagnostics"), &mut codes);
+        }
+    }
+    codes.sort();
+    codes.dedup();
+    codes
+}
+
+fn collect_language_loop_diagnostic_codes(
+    array: Option<&serde_json::Value>,
+    codes: &mut Vec<String>,
+) {
+    if let Some(array) = array.and_then(|value| value.as_array()) {
+        codes.extend(array.iter().filter_map(|diagnostic| {
+            diagnostic
+                .get("error_code")
+                .and_then(|code| code.as_str())
+                .map(str::to_string)
+        }));
     }
 }
 
@@ -6022,7 +6187,7 @@ mod tests {
         assert!(trace[0]["op"]["human_summary"]
             .as_str()
             .unwrap()
-            .contains("Need HITL clarification"));
+            .contains("I stopped before drafting"));
     }
 
     #[tokio::test]
@@ -6095,6 +6260,70 @@ mod tests {
             trace[0]["op"]["conversation_efficiency"]["prose_only_failure"],
             false
         );
+        assert_eq!(
+            trace[0]["op"]["prompt_context_variant"],
+            "full_language_pack"
+        );
+        assert_eq!(trace[0]["op"]["decode_repair_count"], 0);
+        assert_eq!(trace[0]["op"]["revision_count"], 1);
+        assert_eq!(trace[0]["op"]["outcome_layer"], "dry_run_validated");
+        assert!(trace[0]["op"]["diagnostic_codes"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|code| code == "unknown_transition"));
+        assert!(trace[0]["op"]["human_summary"]
+            .as_str()
+            .unwrap()
+            .contains("I revised the draft after 1 local revision"));
+    }
+
+    #[tokio::test]
+    async fn test_acp_llm_draft_loop_trace_projects_happy_path_without_repairs() {
+        let client = std::sync::Arc::new(StubToolLlmClient {
+            arguments: serde_json::json!({
+                "session_id": test_session_id(),
+                "actor_id": "sage",
+                "actor_roles": ["agent"],
+                "verb": "kyc-case.update-status",
+                "transition_ref": "kyc-case.discovery-to-assessment",
+                "subject_kind": "kyc_case",
+                "case_id": test_case_id(),
+                "current_state": "DISCOVERY",
+                "requested_state": "ASSESSMENT",
+                "configuration_version": "config-1",
+                "state_snapshot_id": "snapshot-1",
+                "evidence_digest": "sha256:evidence"
+            }),
+        });
+
+        let value = acp_kyc_update_status_llm_draft_loop_value_with_client(
+            test_session_id(),
+            llm_draft_request_with_discovery(
+                "DISCOVERY",
+                "Advance the KYC case to ASSESSMENT",
+                Some("sha256:evidence"),
+            ),
+            Ok(client),
+        )
+        .await
+        .expect("LLM draft loop value");
+
+        assert_eq!(value["status"], "dry_run_validated");
+        assert_eq!(value["metrics"]["first_pass_valid"], true);
+        let trace_op =
+            serde_json::to_value(acp_language_loop_trace_op_from_value(&value).expect("trace op"))
+                .expect("trace op json");
+
+        assert_eq!(trace_op["prompt_context_variant"], "full_language_pack");
+        assert_eq!(trace_op["decode_repair_count"], 0);
+        assert_eq!(trace_op["revision_count"], 0);
+        assert_eq!(trace_op["outcome_layer"], "dry_run_validated");
+        assert!(trace_op["diagnostic_codes"].as_array().unwrap().is_empty());
+        assert!(trace_op["human_summary"]
+            .as_str()
+            .unwrap()
+            .contains("I found a valid transition from DISCOVERY to ASSESSMENT"));
     }
 
     #[tokio::test]
@@ -6129,11 +6358,21 @@ mod tests {
             crate::repl::session_trace::TraceOp::AcpLanguageLoopTraced {
                 outcome,
                 pending_question_code,
+                prompt_context_variant,
+                decode_repair_count,
+                outcome_layer,
+                diagnostic_codes,
+                human_summary,
                 conversation_efficiency,
                 ..
             } if outcome == "pending_question"
                 && pending_question_code.as_deref()
                     == Some("kyc_update_status_state_anchor_incomplete")
+                && prompt_context_variant.is_none()
+                && decode_repair_count == 0
+                && outcome_layer == "pre_llm_pending"
+                && diagnostic_codes.is_empty()
+                && human_summary.contains("I stopped before drafting")
                 && conversation_efficiency.pending_user_turn_required
                 && !conversation_efficiency.prose_only_failure
         ));
@@ -6173,6 +6412,60 @@ mod tests {
             false
         );
         assert!(value["llm_draft"]["evidence_digest"].is_null());
+    }
+
+    #[tokio::test]
+    async fn test_acp_llm_draft_loop_trace_projects_revision_refusal() {
+        let client = std::sync::Arc::new(StubToolLlmClient {
+            arguments: serde_json::json!({
+                "session_id": test_session_id(),
+                "actor_id": "sage",
+                "actor_roles": ["agent"],
+                "verb": "kyc-case.update-status",
+                "transition_ref": "kyc-case.assessment-to-approved",
+                "subject_kind": "kyc_case",
+                "case_id": test_case_id(),
+                "current_state": "ASSESSMENT",
+                "requested_state": "APPROVED",
+                "configuration_version": "config-1",
+                "state_snapshot_id": "snapshot-1",
+                "evidence_digest": "sha256:evidence"
+            }),
+        });
+
+        let value = acp_kyc_update_status_llm_draft_loop_value_with_client(
+            test_session_id(),
+            llm_draft_request_with_discovery(
+                "ASSESSMENT",
+                "Set this KYC case status to APPROVED",
+                Some("sha256:evidence"),
+            ),
+            Ok(client),
+        )
+        .await
+        .expect("LLM draft loop value");
+
+        assert_eq!(value["status"], "structured_refusal");
+        assert_eq!(value["refusal"]["refusal_code"], "unknown_transition");
+        assert_eq!(value["metrics"]["revision_count"], 2);
+
+        let trace_op =
+            serde_json::to_value(acp_language_loop_trace_op_from_value(&value).expect("trace op"))
+                .expect("trace op json");
+
+        assert_eq!(trace_op["prompt_context_variant"], "full_language_pack");
+        assert_eq!(trace_op["decode_repair_count"], 0);
+        assert_eq!(trace_op["revision_count"], 2);
+        assert_eq!(trace_op["outcome_layer"], "revision_refusal");
+        assert!(trace_op["diagnostic_codes"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|code| code == "unknown_transition"));
+        assert!(trace_op["human_summary"]
+            .as_str()
+            .unwrap()
+            .contains("I stopped because no transition is valid from ASSESSMENT"));
     }
 
     #[tokio::test]
@@ -6230,6 +6523,23 @@ mod tests {
             value["observability"]["conversationEfficiency"]["proseOnlyFailure"],
             false
         );
+
+        let trace_op =
+            serde_json::to_value(acp_language_loop_trace_op_from_value(&value).expect("trace op"))
+                .expect("trace op json");
+        assert_eq!(trace_op["prompt_context_variant"], "full_language_pack");
+        assert_eq!(trace_op["decode_repair_count"], 1);
+        assert_eq!(trace_op["revision_count"], 0);
+        assert_eq!(trace_op["outcome_layer"], "dry_run_validated");
+        assert!(trace_op["diagnostic_codes"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|code| code == "repaired_required_workbook_field"));
+        assert!(trace_op["human_summary"]
+            .as_str()
+            .unwrap()
+            .contains("I repaired 1 missing workbook field locally"));
     }
 
     #[tokio::test]
