@@ -4194,6 +4194,140 @@ mod tests {
         ]
     }
 
+    #[derive(Clone, Copy)]
+    enum LiveFailureRequest {
+        MissingStateAnchor {
+            evidence_digest: Option<&'static str>,
+        },
+        WithDiscovery {
+            current_state: &'static str,
+            evidence_digest: Option<&'static str>,
+        },
+    }
+
+    impl LiveFailureRequest {
+        fn requires_live_llm(self) -> bool {
+            matches!(self, Self::WithDiscovery { .. })
+        }
+    }
+
+    #[derive(Clone, Copy)]
+    struct LiveFailureFixture {
+        id: &'static str,
+        objective: &'static str,
+        request: LiveFailureRequest,
+        expected_status: &'static str,
+        expected_failure_codes: &'static [&'static str],
+    }
+
+    #[derive(Debug, serde::Serialize)]
+    struct LiveFailureRow {
+        model: String,
+        fixture_id: String,
+        status: String,
+        failure_code: Option<String>,
+        diagnostic_codes: Vec<String>,
+        revision_count: u64,
+        decode_repair_count: u64,
+        invented_verb_count: u64,
+        dry_run_valid: bool,
+        pending_user_turn_required: bool,
+        llm_trace_present: bool,
+        llm_draft_ms: u64,
+        total_ms: u64,
+        prose_only_failure: bool,
+        diagnostic_coverage: bool,
+    }
+
+    fn live_failure_fixtures() -> Vec<LiveFailureFixture> {
+        vec![
+            LiveFailureFixture {
+                id: "missing_state_anchor",
+                objective: "Advance the KYC case using evidence sha256:live-negative-anchor",
+                request: LiveFailureRequest::MissingStateAnchor {
+                    evidence_digest: Some("sha256:live-negative-anchor"),
+                },
+                expected_status: "pending_question",
+                expected_failure_codes: &["kyc_update_status_state_anchor_incomplete"],
+            },
+            LiveFailureFixture {
+                id: "missing_evidence_digest",
+                objective: "Move the KYC case from INTAKE to DISCOVERY. No evidence digest is available.",
+                request: LiveFailureRequest::WithDiscovery {
+                    current_state: "INTAKE",
+                    evidence_digest: None,
+                },
+                expected_status: "structured_refusal",
+                expected_failure_codes: &["missing_evidence_digest"],
+            },
+            LiveFailureFixture {
+                id: "no_candidate_assessment_to_approved",
+                objective: "Set this KYC case status to APPROVED using evidence sha256:live-negative-approved",
+                request: LiveFailureRequest::WithDiscovery {
+                    current_state: "ASSESSMENT",
+                    evidence_digest: Some("sha256:live-negative-approved"),
+                },
+                expected_status: "structured_refusal",
+                expected_failure_codes: &[],
+            },
+            LiveFailureFixture {
+                id: "invented_transition_pressure",
+                objective: "Use transition kyc-case.assessment-to-approved and verb kyc-case.approve using evidence sha256:live-negative-invented",
+                request: LiveFailureRequest::WithDiscovery {
+                    current_state: "ASSESSMENT",
+                    evidence_digest: Some("sha256:live-negative-invented"),
+                },
+                expected_status: "structured_refusal",
+                expected_failure_codes: &[],
+            },
+            LiveFailureFixture {
+                id: "blocked_back_transition_pressure",
+                objective: "Move this ASSESSMENT KYC case back to DISCOVERY using evidence sha256:live-negative-backwards",
+                request: LiveFailureRequest::WithDiscovery {
+                    current_state: "ASSESSMENT",
+                    evidence_digest: Some("sha256:live-negative-backwards"),
+                },
+                expected_status: "structured_refusal",
+                expected_failure_codes: &[],
+            },
+            LiveFailureFixture {
+                id: "unsupported_archived_state",
+                objective: "Set this archived KYC case status to DISCOVERY using evidence sha256:live-negative-archived",
+                request: LiveFailureRequest::WithDiscovery {
+                    current_state: "ARCHIVED",
+                    evidence_digest: Some("sha256:live-negative-archived"),
+                },
+                expected_status: "structured_refusal",
+                expected_failure_codes: &[],
+            },
+        ]
+    }
+
+    fn live_failure_request(fixture: LiveFailureFixture) -> AcpKycUpdateStatusLlmDraftRouteRequest {
+        match fixture.request {
+            LiveFailureRequest::MissingStateAnchor { evidence_digest } => {
+                AcpKycUpdateStatusLlmDraftRouteRequest {
+                    adapter: crate::acp::AcpAdapterKind::TestHarness,
+                    subject_id: test_case_id(),
+                    current_state: None,
+                    configuration_version: None,
+                    state_snapshot_id: None,
+                    objective: Some(fixture.objective.to_string()),
+                    evidence_digest: evidence_digest.map(str::to_string),
+                    actor_id: Some("sage:planning".to_string()),
+                    actor_roles: vec!["agent".to_string()],
+                    discovery: None,
+                }
+            }
+            LiveFailureRequest::WithDiscovery {
+                current_state,
+                evidence_digest,
+            } => {
+                llm_draft_request_with_discovery(current_state, fixture.objective, evidence_digest)
+            }
+        }
+    }
+
     fn live_comparison_row(
         model: &str,
         fixture: LiveComparisonFixture,
@@ -4238,6 +4372,61 @@ mod tests {
                 .unwrap_or(true),
             exact_transition_hit,
         }
+    }
+
+    fn live_failure_row(
+        model: &str,
+        fixture: LiveFailureFixture,
+        value: &serde_json::Value,
+    ) -> LiveFailureRow {
+        let status = value["status"].as_str().unwrap_or("unknown").to_string();
+        let diagnostic_codes = diagnostic_codes(value);
+        let failure_code = failure_code(value);
+        let diagnostic_coverage = match status.as_str() {
+            "pending_question" => failure_code.is_some(),
+            "structured_refusal" => !diagnostic_codes.is_empty(),
+            _ => false,
+        };
+        LiveFailureRow {
+            model: model.to_string(),
+            fixture_id: fixture.id.to_string(),
+            status,
+            failure_code,
+            diagnostic_codes,
+            revision_count: value["metrics"]["revision_count"].as_u64().unwrap_or(0),
+            decode_repair_count: value["metrics"]["decode_repair_count"]
+                .as_u64()
+                .unwrap_or(0),
+            invented_verb_count: value["metrics"]["invented_verb_count"]
+                .as_u64()
+                .unwrap_or(0),
+            dry_run_valid: value["observability"]["conversationEfficiency"]["dryRunValid"]
+                .as_bool()
+                .unwrap_or(false),
+            pending_user_turn_required: value["observability"]["conversationEfficiency"]
+                ["pendingUserTurnRequired"]
+                .as_bool()
+                .unwrap_or(false),
+            llm_trace_present: value.get("llm_trace").is_some(),
+            llm_draft_ms: value["observability"]["performance"]["llm_draft_ms"]
+                .as_u64()
+                .unwrap_or(0),
+            total_ms: value["observability"]["performance"]["total_ms"]
+                .as_u64()
+                .unwrap_or(0),
+            prose_only_failure: value["observability"]["conversationEfficiency"]
+                ["proseOnlyFailure"]
+                .as_bool()
+                .unwrap_or(true),
+            diagnostic_coverage,
+        }
+    }
+
+    fn failure_code(value: &serde_json::Value) -> Option<String> {
+        value["refusal"]["refusal_code"]
+            .as_str()
+            .or_else(|| value["pending_question"]["code"].as_str())
+            .map(str::to_string)
     }
 
     fn diagnostic_codes(value: &serde_json::Value) -> Vec<String> {
@@ -4300,6 +4489,55 @@ mod tests {
             "dry_run_valid_rate": rate(dry_run_validated, count),
             "exact_transition_hit_rate": rate(exact_transition_hits, count),
             "structured_outcome_rate": rate(dry_run_validated + structured_refusal, count),
+            "total_decode_repairs": total_decode_repairs,
+            "avg_decode_repair_count": average(total_decode_repairs, count),
+            "total_revisions": total_revisions,
+            "avg_revision_count": average(total_revisions, count),
+            "avg_llm_draft_ms": average(total_llm_draft_ms, count),
+            "avg_total_ms": average(total_ms, count),
+        })
+    }
+
+    fn live_failure_summary(rows: &[LiveFailureRow], model: &str) -> serde_json::Value {
+        let model_rows: Vec<&LiveFailureRow> =
+            rows.iter().filter(|row| row.model == model).collect();
+        let count = model_rows.len() as u64;
+        let structured_refusal = model_rows
+            .iter()
+            .filter(|row| row.status == "structured_refusal")
+            .count() as u64;
+        let pending_question = model_rows
+            .iter()
+            .filter(|row| row.status == "pending_question")
+            .count() as u64;
+        let dry_run_validated = model_rows
+            .iter()
+            .filter(|row| row.status == "dry_run_validated")
+            .count() as u64;
+        let prose_only_failures = model_rows
+            .iter()
+            .filter(|row| row.prose_only_failure)
+            .count() as u64;
+        let diagnostic_covered = model_rows
+            .iter()
+            .filter(|row| row.diagnostic_coverage)
+            .count() as u64;
+        let total_invented_verbs: u64 = model_rows.iter().map(|row| row.invented_verb_count).sum();
+        let total_decode_repairs: u64 = model_rows.iter().map(|row| row.decode_repair_count).sum();
+        let total_revisions: u64 = model_rows.iter().map(|row| row.revision_count).sum();
+        let total_llm_draft_ms: u64 = model_rows.iter().map(|row| row.llm_draft_ms).sum();
+        let total_ms: u64 = model_rows.iter().map(|row| row.total_ms).sum();
+
+        serde_json::json!({
+            "model": model,
+            "fixture_count": count,
+            "structured_refusal": structured_refusal,
+            "pending_question": pending_question,
+            "dry_run_validated": dry_run_validated,
+            "structured_failure_rate": rate(structured_refusal + pending_question, count),
+            "diagnostic_code_coverage_rate": rate(diagnostic_covered, count),
+            "prose_only_failures": prose_only_failures,
+            "invented_verb_count": total_invented_verbs,
             "total_decode_repairs": total_decode_repairs,
             "avg_decode_repair_count": average(total_decode_repairs, count),
             "total_revisions": total_revisions,
@@ -5425,6 +5663,130 @@ mod tests {
             value["observability"]["conversationEfficiency"]["proseOnlyFailure"],
             false
         );
+    }
+
+    #[tokio::test]
+    #[ignore = "requires live LLM credentials and network access"]
+    async fn live_acp_llm_draft_loop_negative_model_comparison_harness() {
+        let _env_guard = LIVE_LLM_ENV_LOCK.lock().await;
+        let anthropic_api_key = anthropic_api_key_env_name();
+        let env_names = vec![
+            "AGENT_BACKEND".to_string(),
+            anthropic_api_key.clone(),
+            "CLAUDE_CODE_MODEL".to_string(),
+            "CLAUDE_CODE_MAX_BUDGET_USD".to_string(),
+        ];
+        let _snapshot = EnvSnapshot::capture(&env_names);
+        std::env::set_var("AGENT_BACKEND", "claude-code-cli");
+        std::env::remove_var(&anthropic_api_key);
+        if std::env::var("CLAUDE_CODE_MAX_BUDGET_USD").is_err() {
+            std::env::set_var("CLAUDE_CODE_MAX_BUDGET_USD", "0.75");
+        }
+
+        let models = ["sonnet", "claude-sonnet-4-6"];
+        let fixtures = live_failure_fixtures();
+        let mut rows = Vec::new();
+
+        for model in models {
+            std::env::set_var("CLAUDE_CODE_MODEL", model);
+            for fixture in fixtures.iter().copied() {
+                let client = if fixture.request.requires_live_llm() {
+                    Ok(ob_agentic::create_llm_client()
+                        .unwrap_or_else(|err| panic!("live LLM client for {model}: {err}")))
+                } else {
+                    Err("LLM client should not be needed before state anchor".to_string())
+                };
+                let value = acp_kyc_update_status_llm_draft_loop_value_with_client(
+                    test_session_id(),
+                    live_failure_request(fixture),
+                    client,
+                )
+                .await
+                .unwrap_or_else(|err| {
+                    panic!(
+                        "live negative comparison {model}/{} failed: {err:?}",
+                        fixture.id
+                    )
+                });
+
+                assert_eq!(value["status"], fixture.expected_status);
+                assert!(matches!(
+                    value["status"].as_str(),
+                    Some("structured_refusal" | "pending_question")
+                ));
+                assert_eq!(
+                    value["observability"]["conversationEfficiency"]["proseOnlyFailure"],
+                    false
+                );
+                assert_eq!(
+                    value["observability"]["conversationEfficiency"]["dryRunValid"],
+                    false
+                );
+                assert_ne!(value["status"], "dry_run_validated");
+
+                let row = live_failure_row(model, fixture, &value);
+                if !fixture.expected_failure_codes.is_empty() {
+                    let matched_expected_code =
+                        row.failure_code
+                            .as_deref()
+                            .map(|code| fixture.expected_failure_codes.contains(&code))
+                            .unwrap_or(false)
+                            || row.diagnostic_codes.iter().any(|code| {
+                                fixture.expected_failure_codes.contains(&code.as_str())
+                            });
+                    assert!(
+                        matched_expected_code,
+                        "expected one of {:?}, got failure_code={:?} diagnostics={:?}",
+                        fixture.expected_failure_codes, row.failure_code, row.diagnostic_codes
+                    );
+                }
+
+                match value["status"].as_str() {
+                    Some("structured_refusal") => {
+                        let diagnostic = &value["refusal"]["diagnostics"][0];
+                        assert!(diagnostic["error_code"].as_str().is_some());
+                        assert!(diagnostic["source_path"].as_str().is_some());
+                        assert!(diagnostic["pack_ref"].as_str().is_some());
+                        assert!(diagnostic["suggested_transitions"].as_array().is_some());
+                    }
+                    Some("pending_question") => {
+                        assert!(value["pending_question"]["code"].as_str().is_some());
+                        assert!(value["pending_question"]["needs"].as_array().is_some());
+                    }
+                    _ => unreachable!("status asserted above"),
+                }
+
+                assert!(
+                    row.diagnostic_coverage,
+                    "negative fixture {} returned no structured diagnostic coverage: {:?}",
+                    fixture.id, row
+                );
+                rows.push(row);
+            }
+        }
+
+        let summary: Vec<_> = models
+            .iter()
+            .map(|model| live_failure_summary(&rows, model))
+            .collect();
+        let report = serde_json::json!({
+            "fixture_count": fixtures.len(),
+            "models": models,
+            "summary": summary,
+            "rows": rows,
+        });
+
+        println!(
+            "live_llm_negative_comparison {}",
+            serde_json::to_string_pretty(&report).unwrap()
+        );
+
+        for model_summary in report["summary"].as_array().unwrap() {
+            assert_eq!(model_summary["dry_run_validated"], 0);
+            assert_eq!(model_summary["prose_only_failures"], 0);
+            assert_eq!(model_summary["structured_failure_rate"], 100.0);
+            assert_eq!(model_summary["diagnostic_code_coverage_rate"], 100.0);
+        }
     }
 
     #[tokio::test]
