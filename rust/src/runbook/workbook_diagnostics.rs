@@ -114,6 +114,64 @@ impl WorkbookDiagnostic {
         diag.actual_state = Some(actual.into());
         diag
     }
+
+    pub fn missing_required_workbook_field(
+        pack: &SemOsLanguagePack,
+        field: impl Into<String>,
+        attempted_verb: Option<String>,
+        attempted_transition: Option<String>,
+    ) -> Self {
+        let field = field.into();
+        let mut diag = Self::new(
+            "missing_required_workbook_field",
+            format!("draft.{field}"),
+            pack,
+        );
+        diag.attempted_verb = attempted_verb;
+        diag.attempted_transition = attempted_transition;
+        diag.actual_state = Some("missing".to_string());
+        diag.blocked_transition_reason =
+            Some("LLM tool arguments omitted a required workbook field".to_string());
+        if field == "transition_ref" && pack.candidate_transitions.len() == 1 {
+            diag.expected_state = pack
+                .candidate_transitions
+                .first()
+                .map(|transition| transition.transition_ref.clone());
+        }
+        diag
+    }
+
+    pub fn invalid_llm_draft_shape(pack: &SemOsLanguagePack, actual: impl Into<String>) -> Self {
+        let mut diag = Self::new("invalid_llm_draft_shape", "draft", pack);
+        diag.actual_state = Some(actual.into());
+        diag.blocked_transition_reason =
+            Some("LLM tool arguments were not a JSON object workbook draft".to_string());
+        diag
+    }
+
+    pub fn llm_draft_decode_failed(
+        pack: &SemOsLanguagePack,
+        reason: impl Into<String>,
+        attempted_verb: Option<String>,
+        attempted_transition: Option<String>,
+    ) -> Self {
+        let mut diag = Self::new("llm_draft_decode_failed", "draft", pack);
+        diag.attempted_verb = attempted_verb;
+        diag.attempted_transition = attempted_transition;
+        diag.blocked_transition_reason = Some(reason.into());
+        diag
+    }
+
+    pub fn llm_adapter_failure(
+        pack: &SemOsLanguagePack,
+        error_code: impl Into<String>,
+        source_path: impl Into<String>,
+        reason: impl Into<String>,
+    ) -> Self {
+        let mut diag = Self::new(error_code, source_path, pack);
+        diag.blocked_transition_reason = Some(reason.into());
+        diag
+    }
 }
 
 pub fn diagnostics_from_dry_run_refusal(

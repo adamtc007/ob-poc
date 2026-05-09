@@ -17,7 +17,7 @@ use crate::llm_trace::{record_llm_inference_trace, workbook_llm_trace_ref, LlmIn
 
 use super::{
     run_kyc_update_status_revision_loop, KycUpdateStatusWorkbookDraft, SemOsLanguagePack,
-    WorkbookRevisionOutcome,
+    WorkbookDiagnostic, WorkbookRevisionOutcome,
 };
 
 pub const KYC_UPDATE_STATUS_LLM_DRAFT_PROMPT_TEMPLATE_VERSION: &str =
@@ -27,6 +27,10 @@ pub const KYC_UPDATE_STATUS_LLM_DRAFT_PROMPT_TEMPLATE_VERSION: &str =
 pub struct LlmDraftAdapterRefusal {
     pub refusal_code: String,
     pub message: String,
+    #[serde(default)]
+    pub diagnostics: Vec<WorkbookDiagnostic>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub llm_trace: Option<LlmInferenceTrace>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -63,10 +67,13 @@ pub async fn run_kyc_update_status_llm_draft_loop(
         Ok(prompt) => prompt,
         Err(err) => {
             return LlmDraftLoopOutcome::AdapterRefused {
-                refusal: LlmDraftAdapterRefusal {
-                    refusal_code: "language_pack_serialization_failed".to_string(),
-                    message: err.to_string(),
-                },
+                refusal: adapter_refusal(
+                    pack,
+                    "language_pack_serialization_failed",
+                    "llm_draft_adapter.language_pack",
+                    err.to_string(),
+                    None,
+                ),
             };
         }
     };
@@ -79,10 +86,13 @@ pub async fn run_kyc_update_status_llm_draft_loop(
         Ok(result) => result,
         Err(err) => {
             return LlmDraftLoopOutcome::AdapterRefused {
-                refusal: LlmDraftAdapterRefusal {
-                    refusal_code: "llm_draft_failed".to_string(),
-                    message: err.to_string(),
-                },
+                refusal: adapter_refusal(
+                    pack,
+                    "llm_draft_failed",
+                    "llm_draft_adapter.client",
+                    err.to_string(),
+                    None,
+                ),
             };
         }
     };
@@ -90,10 +100,13 @@ pub async fn run_kyc_update_status_llm_draft_loop(
 
     if result.tool_name != "draft_kyc_update_status_workbook" {
         return LlmDraftLoopOutcome::AdapterRefused {
-            refusal: LlmDraftAdapterRefusal {
-                refusal_code: "unexpected_tool_call".to_string(),
-                message: result.tool_name,
-            },
+            refusal: adapter_refusal(
+                pack,
+                "unexpected_tool_call",
+                "llm_draft_adapter.tool_name",
+                result.tool_name,
+                None,
+            ),
         };
     }
 
@@ -101,10 +114,13 @@ pub async fn run_kyc_update_status_llm_draft_loop(
         Ok(json) => json,
         Err(err) => {
             return LlmDraftLoopOutcome::AdapterRefused {
-                refusal: LlmDraftAdapterRefusal {
-                    refusal_code: "llm_response_serialization_failed".to_string(),
-                    message: err.to_string(),
-                },
+                refusal: adapter_refusal(
+                    pack,
+                    "llm_response_serialization_failed",
+                    "llm_draft_adapter.response",
+                    err.to_string(),
+                    None,
+                ),
             };
         }
     };
@@ -130,13 +146,24 @@ pub async fn run_kyc_update_status_llm_draft_loop(
         latency_ms: Some(llm_latency_ms),
     });
 
-    let mut draft: KycUpdateStatusWorkbookDraft = match serde_json::from_value(draft_arguments) {
+    let mut draft: KycUpdateStatusWorkbookDraft = match decode_workbook_draft(draft_arguments, pack)
+    {
         Ok(draft) => draft,
-        Err(err) => {
+        Err(diagnostics) => {
+            let refusal_code = diagnostics
+                .first()
+                .map(|diagnostic| diagnostic.error_code.clone())
+                .unwrap_or_else(|| "llm_draft_decode_failed".to_string());
+            let message = diagnostics
+                .first()
+                .and_then(|diagnostic| diagnostic.blocked_transition_reason.clone())
+                .unwrap_or_else(|| "LLM draft did not satisfy workbook schema".to_string());
             return LlmDraftLoopOutcome::AdapterRefused {
                 refusal: LlmDraftAdapterRefusal {
-                    refusal_code: "llm_draft_decode_failed".to_string(),
-                    message: err.to_string(),
+                    refusal_code,
+                    message,
+                    diagnostics,
+                    llm_trace: Some(trace),
                 },
             };
         }
@@ -151,6 +178,106 @@ pub async fn run_kyc_update_status_llm_draft_loop(
         llm_trace: trace,
         draft,
         outcome,
+    }
+}
+
+fn adapter_refusal(
+    pack: &SemOsLanguagePack,
+    refusal_code: impl Into<String>,
+    source_path: impl Into<String>,
+    message: impl Into<String>,
+    llm_trace: Option<LlmInferenceTrace>,
+) -> LlmDraftAdapterRefusal {
+    let refusal_code = refusal_code.into();
+    let message = message.into();
+    LlmDraftAdapterRefusal {
+        refusal_code: refusal_code.clone(),
+        message: message.clone(),
+        diagnostics: vec![WorkbookDiagnostic::llm_adapter_failure(
+            pack,
+            refusal_code,
+            source_path,
+            message,
+        )],
+        llm_trace,
+    }
+}
+
+fn decode_workbook_draft(
+    arguments: serde_json::Value,
+    pack: &SemOsLanguagePack,
+) -> Result<KycUpdateStatusWorkbookDraft, Vec<WorkbookDiagnostic>> {
+    let Some(object) = arguments.as_object() else {
+        return Err(vec![WorkbookDiagnostic::invalid_llm_draft_shape(
+            pack,
+            json_type_name(&arguments),
+        )]);
+    };
+
+    let attempted_verb = object
+        .get("verb")
+        .and_then(|value| value.as_str())
+        .map(str::to_string);
+    let attempted_transition = object
+        .get("transition_ref")
+        .and_then(|value| value.as_str())
+        .map(str::to_string);
+    let missing_diagnostics: Vec<WorkbookDiagnostic> = [
+        "session_id",
+        "actor_id",
+        "actor_roles",
+        "verb",
+        "transition_ref",
+        "subject_kind",
+        "case_id",
+        "current_state",
+        "requested_state",
+        "configuration_version",
+        "state_snapshot_id",
+    ]
+    .into_iter()
+    .filter(|field| required_field_missing(object.get(*field)))
+    .map(|field| {
+        WorkbookDiagnostic::missing_required_workbook_field(
+            pack,
+            field,
+            attempted_verb.clone(),
+            attempted_transition.clone(),
+        )
+    })
+    .collect();
+
+    if !missing_diagnostics.is_empty() {
+        return Err(missing_diagnostics);
+    }
+
+    serde_json::from_value(arguments).map_err(|err| {
+        vec![WorkbookDiagnostic::llm_draft_decode_failed(
+            pack,
+            err.to_string(),
+            attempted_verb,
+            attempted_transition,
+        )]
+    })
+}
+
+fn required_field_missing(value: Option<&serde_json::Value>) -> bool {
+    match value {
+        None | Some(serde_json::Value::Null) => true,
+        Some(serde_json::Value::String(value)) => value.trim().is_empty(),
+        Some(serde_json::Value::Array(values)) => values.is_empty(),
+        Some(_) => false,
+    }
+}
+
+fn json_type_name(value: &serde_json::Value) -> &'static str {
+    match value {
+        serde_json::Value::Null => "null",
+        serde_json::Value::Bool(_) => "bool",
+        serde_json::Value::Number(_) => "number",
+        serde_json::Value::String(_) => "string",
+        serde_json::Value::Array(_) => "array",
+        serde_json::Value::Object(_) => "object",
     }
 }
 
@@ -410,6 +537,69 @@ mod tests {
             outcome,
             WorkbookRevisionOutcome::DryRunValid { .. }
         ));
+    }
+
+    #[tokio::test]
+    async fn llm_draft_adapter_returns_structured_diagnostic_for_missing_transition_ref() {
+        let manifest: DomainPackManifest = serde_yaml::from_str(include_str!(
+            "../../config/sem_os_seeds/domain_packs/ob_poc_kyc.yaml"
+        ))
+        .unwrap();
+        let session_id = Uuid::parse_str(SESSION_ID).unwrap();
+        let case_id = Uuid::parse_str(CASE_ID).unwrap();
+        let pack = build_kyc_update_status_language_pack(
+            &manifest,
+            KycLanguagePackRequest {
+                subject_id: case_id,
+                current_state: "DISCOVERY".to_string(),
+                configuration_version: "config-1".to_string(),
+                state_snapshot_id: "snapshot-1".to_string(),
+                objective: Some("Move the KYC case from DISCOVERY to ASSESSMENT".to_string()),
+            },
+        )
+        .unwrap();
+        let client = Arc::new(StubLlmClient {
+            arguments: serde_json::json!({
+                "verb": "kyc-case.update-status",
+                "subject_kind": "kyc_case",
+                "case_id": case_id,
+                "current_state": "DISCOVERY",
+                "requested_state": "ASSESSMENT",
+                "configuration_version": "config-1",
+                "state_snapshot_id": "snapshot-1",
+                "evidence_digest": "sha256:evidence"
+            }),
+        });
+
+        let outcome = run_kyc_update_status_llm_draft_loop(
+            &manifest,
+            &pack,
+            session_id,
+            "sage",
+            vec!["ops".to_string()],
+            Some("sha256:evidence".to_string()),
+            client,
+        )
+        .await;
+
+        let LlmDraftLoopOutcome::AdapterRefused { refusal } = outcome else {
+            panic!("expected adapter refusal");
+        };
+        assert_eq!(refusal.refusal_code, "missing_required_workbook_field");
+        assert_eq!(refusal.diagnostics.len(), 1);
+        assert_eq!(refusal.diagnostics[0].source_path, "draft.transition_ref");
+        assert_eq!(
+            refusal.diagnostics[0].attempted_verb.as_deref(),
+            Some("kyc-case.update-status")
+        );
+        assert_eq!(
+            refusal.diagnostics[0].actual_state.as_deref(),
+            Some("missing")
+        );
+        assert!(refusal.diagnostics[0]
+            .suggested_transitions
+            .contains(&"kyc-case.discovery-to-assessment".to_string()));
+        assert!(refusal.llm_trace.is_some());
     }
 
     #[test]

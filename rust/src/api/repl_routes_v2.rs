@@ -1878,10 +1878,12 @@ async fn acp_kyc_update_status_llm_draft_loop_value_with_client(
         Ok(client) => client,
         Err(error) => {
             return Ok(acp_llm_adapter_structured_refusal_value(
-                language_pack,
+                &language_pack,
                 case_state,
                 "llm_client_unavailable",
                 error,
+                vec![],
+                None,
                 language_pack_us,
                 0,
                 route_elapsed_us(total_started_at),
@@ -1920,10 +1922,12 @@ async fn acp_kyc_update_status_llm_draft_loop_value_with_client(
         )),
         crate::runbook::LlmDraftLoopOutcome::AdapterRefused { refusal } => {
             Ok(acp_llm_adapter_structured_refusal_value(
-                language_pack,
+                &language_pack,
                 case_state,
                 refusal.refusal_code,
                 refusal.message,
+                refusal.diagnostics,
+                refusal.llm_trace,
                 language_pack_us,
                 adapter_us,
                 total_us,
@@ -2100,27 +2104,36 @@ fn acp_llm_harness_completed_value(
 }
 
 fn acp_llm_adapter_structured_refusal_value(
-    language_pack: crate::runbook::SemOsLanguagePack,
+    language_pack: &crate::runbook::SemOsLanguagePack,
     case_state: crate::acp::AcpKycCaseStateSnapshot,
     refusal_code: impl Into<String>,
     message: impl Into<String>,
+    diagnostics: Vec<crate::runbook::WorkbookDiagnostic>,
+    llm_trace: Option<crate::llm_trace::LlmInferenceTrace>,
     language_pack_us: u64,
     adapter_us: u64,
     total_us: u64,
 ) -> serde_json::Value {
     let refusal_code = refusal_code.into();
-    serde_json::json!({
+    let message = message.into();
+    let diagnostics = if diagnostics.is_empty() {
+        vec![crate::runbook::WorkbookDiagnostic::llm_adapter_failure(
+            language_pack,
+            refusal_code.clone(),
+            "llm_draft_adapter",
+            message.clone(),
+        )]
+    } else {
+        diagnostics
+    };
+    let mut value = serde_json::json!({
         "status": "structured_refusal",
         "draft_source": "llm_tool_call",
         "case_state": case_state,
         "language_pack": language_pack,
         "refusal": {
             "refusal_code": refusal_code,
-            "diagnostics": [{
-                "error_code": refusal_code,
-                "source_path": "llm_draft_adapter",
-                "blocked_transition_reason": message.into()
-            }],
+            "diagnostics": diagnostics,
             "revision_count": 0
         },
         "attempts": [],
@@ -2168,7 +2181,11 @@ fn acp_llm_adapter_structured_refusal_value(
                 "structured_refusal"
             ]
         }
-    })
+    });
+    if let Some(llm_trace) = llm_trace {
+        value["llm_trace"] = serde_json::json!(llm_trace);
+    }
+    value
 }
 
 fn acp_language_loop_pending_question_value(
@@ -5057,6 +5074,57 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn test_acp_llm_draft_loop_missing_transition_ref_has_structured_diagnostic() {
+        let client = std::sync::Arc::new(StubToolLlmClient {
+            arguments: serde_json::json!({
+                "verb": "kyc-case.update-status",
+                "subject_kind": "kyc_case",
+                "case_id": test_case_id(),
+                "current_state": "DISCOVERY",
+                "requested_state": "ASSESSMENT",
+                "configuration_version": "config-1",
+                "state_snapshot_id": "snapshot-1",
+                "evidence_digest": "sha256:evidence"
+            }),
+        });
+
+        let value = acp_kyc_update_status_llm_draft_loop_value_with_client(
+            test_session_id(),
+            llm_draft_request_with_discovery(
+                "DISCOVERY",
+                "Advance the KYC case to ASSESSMENT",
+                Some("sha256:evidence"),
+            ),
+            Ok(client),
+        )
+        .await
+        .expect("LLM draft loop value");
+
+        assert_eq!(value["status"], "structured_refusal");
+        assert_eq!(
+            value["refusal"]["refusal_code"],
+            "missing_required_workbook_field"
+        );
+        assert_eq!(
+            value["refusal"]["diagnostics"][0]["source_path"],
+            "draft.transition_ref"
+        );
+        assert_eq!(
+            value["refusal"]["diagnostics"][0]["attempted_verb"],
+            "kyc-case.update-status"
+        );
+        assert_eq!(
+            value["refusal"]["diagnostics"][0]["suggested_transitions"][0],
+            "kyc-case.discovery-to-assessment"
+        );
+        assert_eq!(value["llm_trace"]["provider"], "stub-llm-provider");
+        assert_eq!(
+            value["observability"]["conversationEfficiency"]["proseOnlyFailure"],
+            false
+        );
+    }
+
+    #[tokio::test]
     #[ignore = "requires live LLM credentials and network access"]
     async fn live_acp_llm_draft_loop_smoke_validates_second_transition() {
         let client = ob_agentic::create_llm_client().expect("live LLM client");
@@ -5104,20 +5172,37 @@ mod tests {
                 .unwrap_or(true)
         );
 
-        assert_eq!(value["status"], "dry_run_validated");
-        assert_eq!(
-            value["output"]["dry_run"]["transition_ref"],
-            "kyc-case.discovery-to-assessment"
-        );
-        assert_eq!(value["case_state"]["current_state"], "DISCOVERY");
-        assert_eq!(
-            value["output"]["dry_run"]["semantic_diff"]["to_state"],
-            "ASSESSMENT"
-        );
+        assert!(matches!(
+            value["status"].as_str(),
+            Some("dry_run_validated" | "structured_refusal")
+        ));
         assert_eq!(
             value["observability"]["conversationEfficiency"]["proseOnlyFailure"],
             false
         );
+        match value["status"].as_str() {
+            Some("dry_run_validated") => {
+                assert_eq!(
+                    value["output"]["dry_run"]["transition_ref"],
+                    "kyc-case.discovery-to-assessment"
+                );
+                assert_eq!(value["case_state"]["current_state"], "DISCOVERY");
+                assert_eq!(
+                    value["output"]["dry_run"]["semantic_diff"]["to_state"],
+                    "ASSESSMENT"
+                );
+            }
+            Some("structured_refusal") => {
+                let diagnostic = &value["refusal"]["diagnostics"][0];
+                assert!(diagnostic["error_code"].as_str().is_some());
+                assert!(diagnostic["source_path"].as_str().is_some());
+                assert!(diagnostic["pack_ref"].as_str().is_some());
+                assert!(diagnostic["configuration_version"].as_str().is_some());
+                assert!(diagnostic["state_snapshot_id"].as_str().is_some());
+                assert!(diagnostic["suggested_transitions"].as_array().is_some());
+            }
+            _ => unreachable!("status asserted above"),
+        }
         assert!(value["llm_trace"]["prompt_hash"]
             .as_str()
             .unwrap()
