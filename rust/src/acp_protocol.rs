@@ -12,7 +12,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::time::Instant;
 use uuid::Uuid;
 
-use crate::acp::{self, AcpAdapterKind, AcpPersonaMode, AcpSession};
+use crate::acp::{self, AcpAdapterKind, AcpKycCaseStateSnapshot, AcpPersonaMode, AcpSession};
 use crate::runbook::{
     KycLanguagePackRequest, KycUpdateStatusDryRunInput, KycUpdateStatusDryRunOutput,
     KycUpdateStatusWorkbookDraft, LanguageAcquisitionMetrics, SemOsLanguagePack,
@@ -296,6 +296,8 @@ pub struct AcpKycLanguageLoopRequest {
     pub prompt_route_ms: Option<u64>,
     #[serde(default)]
     pub prompt_route_us: Option<u64>,
+    #[serde(default)]
+    pub state_discovery: Option<Value>,
     pub draft: KycUpdateStatusWorkbookDraft,
 }
 
@@ -325,6 +327,7 @@ fn default_adapter() -> AcpAdapterKind {
 pub struct AcpJsonRpcAgent {
     sessions: BTreeMap<Uuid, AcpSession>,
     cancelled_sessions: BTreeSet<Uuid>,
+    case_state_cache: BTreeMap<(Uuid, Uuid), AcpKycCaseStateSnapshot>,
 }
 
 impl AcpJsonRpcAgent {
@@ -704,7 +707,17 @@ impl AcpJsonRpcAgent {
             return None;
         }
 
-        let request = match kyc_language_loop_request_from_prompt(session_id, prompt) {
+        let subject_hint = prompt_subject_id(prompt);
+        let cached_case_state = subject_hint.and_then(|subject_id| {
+            self.case_state_cache
+                .get(&(session_id, subject_id))
+                .cloned()
+        });
+        let request = match kyc_language_loop_request_from_prompt(
+            session_id,
+            prompt,
+            cached_case_state.as_ref(),
+        ) {
             Ok(request) => request,
             Err(error) => {
                 let prompt_route_us = elapsed_us(prompt_route_started_at);
@@ -718,7 +731,14 @@ impl AcpJsonRpcAgent {
                         "pending_question": {
                             "code": "kyc_update_status_prompt_incomplete",
                             "missing": error,
-                            "needs": ["case_uuid", "current_state", "requested_state", "evidence_digest"]
+                            "needs": [
+                                "case_uuid",
+                                "current_state",
+                                "configuration_version",
+                                "state_snapshot_id",
+                                "requested_state",
+                                "evidence_digest"
+                            ]
                         },
                         "observability": {
                             "performance": {
@@ -1015,6 +1035,8 @@ impl AcpJsonRpcAgent {
         let started_at = Instant::now();
         match acp::acp_discover_kyc_case_state(&session, &manifest, request.subject_id, response) {
             Ok(case_state) => {
+                self.case_state_cache
+                    .insert((session_id, case_state.subject_id), case_state.clone());
                 let language_pack_request = json!({
                     "subject_id": case_state.subject_id,
                     "current_state": &case_state.current_state,
@@ -1145,6 +1167,7 @@ impl AcpJsonRpcAgent {
         let prompt_route_us = request
             .prompt_route_us
             .unwrap_or_else(|| request.prompt_route_ms.unwrap_or(0).saturating_mul(1_000));
+        let state_discovery = request.state_discovery.clone();
 
         let started_at = Instant::now();
         let outcome = match acp::acp_run_kyc_update_status_language_loop_timed(
@@ -1166,9 +1189,17 @@ impl AcpJsonRpcAgent {
         let language_pack = outcome.language_pack;
         let revision_outcome = outcome.revision_outcome;
         let timings = outcome.timings;
-        let trace_projection = language_loop_trace_projection(&language_pack, &revision_outcome);
+        let mut trace_projection =
+            language_loop_trace_projection(&language_pack, &revision_outcome);
+        attach_state_discovery(&mut trace_projection, state_discovery.as_ref());
         let acp_emit_started_at = Instant::now();
-        let mut outgoing = vec![
+        let mut outgoing = Vec::new();
+        if let Some(notification) =
+            state_discovery_tool_update(session_id, state_discovery.as_ref(), &trace_projection)
+        {
+            outgoing.push(notification);
+        }
+        outgoing.extend([
             JsonRpcOutgoing::Notification(JsonRpcNotification {
                 jsonrpc: "2.0".to_string(),
                 method: "session/update".to_string(),
@@ -1205,7 +1236,7 @@ impl AcpJsonRpcAgent {
                     }
                 }),
             }),
-        ];
+        ]);
 
         match revision_outcome {
             WorkbookRevisionOutcome::DryRunValid {
@@ -1217,8 +1248,11 @@ impl AcpJsonRpcAgent {
                 let human_summary = trace_projection["humanSummary"]
                     .as_str()
                     .unwrap_or("I validated a dry-run workbook; no mutation was executed.");
+                let discovery_summary =
+                    state_discovery_human_summary(trace_projection.get("stateDiscovery"));
                 let explanation = format!(
-                    "{} {}",
+                    "{}{} {}",
+                    discovery_summary,
                     human_summary,
                     explain_kyc_dry_run_success(output.as_ref(), &metrics)
                 );
@@ -1298,7 +1332,14 @@ impl AcpJsonRpcAgent {
                 let human_summary = trace_projection["humanSummary"]
                     .as_str()
                     .unwrap_or("I stopped with a structured refusal; no mutation was executed.");
-                let explanation = format!("{} {}", human_summary, explain_kyc_refusal(&refusal));
+                let discovery_summary =
+                    state_discovery_human_summary(trace_projection.get("stateDiscovery"));
+                let explanation = format!(
+                    "{}{} {}",
+                    discovery_summary,
+                    human_summary,
+                    explain_kyc_refusal(&refusal)
+                );
                 let acp_emit_us = elapsed_us(acp_emit_started_at);
                 outgoing.push(JsonRpcOutgoing::Notification(JsonRpcNotification {
                     jsonrpc: "2.0".to_string(),
@@ -1628,14 +1669,28 @@ fn looks_like_kyc_domain_prompt(prompt_text: &str) -> bool {
 fn kyc_language_loop_request_from_prompt(
     session_id: Uuid,
     prompt: &[AcpContentBlock],
+    cached_case_state: Option<&AcpKycCaseStateSnapshot>,
 ) -> Result<Value, Vec<&'static str>> {
     let prompt_text = prompt_semantic_text(prompt);
     let utterance_text = prompt_utterance_text(prompt);
-    let case_state = extract_prompt_case_state(prompt, &utterance_text);
+    let mut case_state = extract_prompt_case_state(prompt, &utterance_text);
     let subject_id = case_state
         .as_ref()
         .and_then(|state| state.subject_id)
-        .or_else(|| extract_first_uuid(&prompt_text));
+        .or_else(|| prompt_subject_id(prompt));
+    if let Some(cached) = cached_case_state {
+        if subject_id
+            .map(|subject_id| subject_id == cached.subject_id)
+            .unwrap_or(true)
+        {
+            merge_cached_case_state(&mut case_state, cached);
+        }
+    }
+
+    let subject_id = case_state
+        .as_ref()
+        .and_then(|state| state.subject_id)
+        .or(subject_id);
     let current_state = case_state
         .as_ref()
         .and_then(|state| state.current_state.clone())
@@ -1662,13 +1717,11 @@ fn kyc_language_loop_request_from_prompt(
     let configuration_version = case_state
         .as_ref()
         .and_then(|state| state.configuration_version.clone())
-        .or_else(|| extract_token_with_prefix(&prompt_text, "config-"))
-        .unwrap_or_else(|| "config-1".to_string());
+        .or_else(|| extract_token_with_prefix(&prompt_text, "config-"));
     let state_snapshot_id = case_state
         .as_ref()
         .and_then(|state| state.state_snapshot_id.clone())
-        .or_else(|| extract_token_with_prefix(&prompt_text, "snapshot-"))
-        .unwrap_or_else(|| "snapshot-1".to_string());
+        .or_else(|| extract_token_with_prefix(&prompt_text, "snapshot-"));
 
     let mut missing = Vec::new();
     if subject_id.is_none() {
@@ -1676,6 +1729,12 @@ fn kyc_language_loop_request_from_prompt(
     }
     if current_state.is_none() {
         missing.push("current_state");
+    }
+    if configuration_version.is_none() {
+        missing.push("configuration_version");
+    }
+    if state_snapshot_id.is_none() {
+        missing.push("state_snapshot_id");
     }
     if requested_state.is_none() {
         missing.push("requested_state");
@@ -1687,9 +1746,14 @@ fn kyc_language_loop_request_from_prompt(
     let subject_id = subject_id.expect("checked above");
     let current_state = current_state.expect("checked above");
     let requested_state = requested_state.expect("checked above");
+    let configuration_version = configuration_version.expect("checked above");
+    let state_snapshot_id = state_snapshot_id.expect("checked above");
     let transition_ref = extract_transition_ref(&utterance_text)
         .unwrap_or_else(|| transition_ref_for_states(&current_state, &requested_state));
     let evidence_digest = extract_token_with_prefix(&utterance_text, "sha256:");
+    let state_discovery = case_state
+        .as_ref()
+        .and_then(|state| state_discovery_trace_value(state, subject_id));
 
     Ok(json!({
         "session_id": session_id.to_string(),
@@ -1699,6 +1763,7 @@ fn kyc_language_loop_request_from_prompt(
         "configuration_version": configuration_version,
         "state_snapshot_id": state_snapshot_id,
         "objective": utterance_text,
+        "state_discovery": state_discovery,
         "draft": {
             "session_id": session_id,
             "actor_id": "sage:planning",
@@ -1722,6 +1787,57 @@ struct PromptCaseState {
     current_state: Option<String>,
     configuration_version: Option<String>,
     state_snapshot_id: Option<String>,
+    source: Option<&'static str>,
+    probe_id: Option<String>,
+    snapshot_refs: Vec<String>,
+}
+
+fn prompt_subject_id(prompt: &[AcpContentBlock]) -> Option<Uuid> {
+    prompt.iter().find_map(|block| match block {
+        AcpContentBlock::ResourceLink { uri, .. }
+        | AcpContentBlock::EmbeddedResource { uri, .. } => parse_semos_resource_uri(uri)
+            .filter(|parsed| parsed.resource_kind == "entity")
+            .and_then(|parsed| Uuid::parse_str(&parsed.resource_id).ok()),
+        AcpContentBlock::Text { text } => extract_first_uuid(text),
+    })
+}
+
+fn merge_cached_case_state(
+    case_state: &mut Option<PromptCaseState>,
+    cached: &AcpKycCaseStateSnapshot,
+) {
+    let state = case_state.get_or_insert_with(PromptCaseState::default);
+    state.subject_id.get_or_insert(cached.subject_id);
+    state
+        .current_state
+        .get_or_insert_with(|| cached.current_state.clone());
+    state
+        .configuration_version
+        .get_or_insert_with(|| cached.configuration_version.clone());
+    state
+        .state_snapshot_id
+        .get_or_insert_with(|| cached.state_snapshot_id.clone());
+    if state.snapshot_refs.is_empty() {
+        state.snapshot_refs = cached.snapshot_refs.clone();
+    }
+    if state.source.is_none() || state.source == Some("prompt_text_anchor") {
+        state.source = Some("cached_read_only_discovery_probe");
+        state.probe_id = Some("kyc-case.read-state".to_string());
+    }
+}
+
+fn state_discovery_trace_value(state: &PromptCaseState, subject_id: Uuid) -> Option<Value> {
+    let source = state.source?;
+    Some(json!({
+        "source": source,
+        "probeId": state.probe_id.as_deref().unwrap_or("kyc-case.read-state"),
+        "subjectId": subject_id,
+        "currentState": state.current_state.as_deref(),
+        "configurationVersion": state.configuration_version.as_deref(),
+        "stateSnapshotId": state.state_snapshot_id.as_deref(),
+        "snapshotRefs": state.snapshot_refs.clone(),
+        "firstClassStateMutated": false,
+    }))
 }
 
 fn extract_prompt_case_state(
@@ -1747,11 +1863,17 @@ fn extract_prompt_case_state(
                 ),
                 configuration_version: extract_token_with_prefix(prompt_text, "config-"),
                 state_snapshot_id: extract_token_with_prefix(prompt_text, "snapshot-"),
+                source: Some("prompt_text_anchor"),
+                probe_id: None,
+                snapshot_refs: vec![],
             })
         })
 }
 
 fn prompt_case_state_from_value(value: &Value) -> Option<PromptCaseState> {
+    if let Some(state) = prompt_case_state_from_discovery_value(value) {
+        return Some(state);
+    }
     let source = value
         .get("case_state")
         .or_else(|| value.get("language_pack_request"))
@@ -1774,7 +1896,83 @@ fn prompt_case_state_from_value(value: &Value) -> Option<PromptCaseState> {
             .get("state_snapshot_id")
             .and_then(Value::as_str)
             .map(str::to_string),
+        source: Some("embedded_case_state_anchor"),
+        probe_id: None,
+        snapshot_refs: vec![],
     })
+}
+
+fn prompt_case_state_from_discovery_value(value: &Value) -> Option<PromptCaseState> {
+    let source = value
+        .get("discovery_response")
+        .or_else(|| value.get("discoveryResponse"))
+        .unwrap_or(value);
+    let observations = source.get("observations")?.as_array()?;
+    if source
+        .get("first_class_state_mutated")
+        .or_else(|| source.get("firstClassStateMutated"))
+        .and_then(Value::as_bool)
+        .unwrap_or(false)
+    {
+        return Some(PromptCaseState {
+            source: Some("mutated_discovery_rejected"),
+            ..PromptCaseState::default()
+        });
+    }
+
+    let snapshot_refs = source
+        .get("provenance")
+        .and_then(Value::as_array)
+        .map(|items| {
+            items
+                .iter()
+                .filter_map(|item| item.get("snapshot_ref").and_then(Value::as_str))
+                .map(str::to_string)
+                .collect::<Vec<_>>()
+        })
+        .unwrap_or_default();
+    Some(PromptCaseState {
+        subject_id: source
+            .get("subject")
+            .and_then(|subject| subject.get("subject_id"))
+            .or_else(|| source.get("subject_id"))
+            .or_else(|| source.get("case_id"))
+            .and_then(Value::as_str)
+            .and_then(|raw| Uuid::parse_str(raw).ok()),
+        current_state: observation_value(observations, &["case.status", "kyc_case.status"]),
+        configuration_version: observation_value(
+            observations,
+            &["case.configuration_version", "configuration_version"],
+        ),
+        state_snapshot_id: observation_value(
+            observations,
+            &["case.state_snapshot_id", "state_snapshot_id"],
+        )
+        .or_else(|| snapshot_refs.first().cloned()),
+        source: Some("read_only_discovery_probe"),
+        probe_id: source
+            .get("probe_id")
+            .or_else(|| source.get("probeId"))
+            .and_then(Value::as_str)
+            .map(str::to_string)
+            .or_else(|| Some("kyc-case.read-state".to_string())),
+        snapshot_refs,
+    })
+}
+
+fn observation_value(observations: &[Value], keys: &[&str]) -> Option<String> {
+    observations
+        .iter()
+        .find(|observation| {
+            observation
+                .get("key")
+                .and_then(Value::as_str)
+                .map(|key| keys.iter().any(|candidate| key == *candidate))
+                .unwrap_or(false)
+        })
+        .and_then(|observation| observation.get("value"))
+        .and_then(Value::as_str)
+        .map(str::to_string)
 }
 
 fn extract_first_uuid(text: &str) -> Option<Uuid> {
@@ -2039,6 +2237,91 @@ fn language_loop_trace_projection(
     }
 }
 
+fn attach_state_discovery(trace_projection: &mut Value, state_discovery: Option<&Value>) {
+    let Some(state_discovery) = state_discovery else {
+        return;
+    };
+    if let Some(fields) = trace_projection.as_object_mut() {
+        fields.insert("stateDiscovery".to_string(), state_discovery.clone());
+    }
+}
+
+fn state_discovery_tool_update(
+    session_id: Uuid,
+    state_discovery: Option<&Value>,
+    trace_projection: &Value,
+) -> Option<JsonRpcOutgoing> {
+    let state_discovery = state_discovery?;
+    let source = state_discovery
+        .get("source")
+        .and_then(Value::as_str)
+        .unwrap_or_default();
+    if !matches!(
+        source,
+        "read_only_discovery_probe" | "cached_read_only_discovery_probe"
+    ) {
+        return None;
+    }
+    let subject_id = state_discovery
+        .get("subjectId")
+        .and_then(Value::as_str)
+        .unwrap_or("unknown");
+    Some(JsonRpcOutgoing::Notification(JsonRpcNotification {
+        jsonrpc: "2.0".to_string(),
+        method: "session/update".to_string(),
+        params: json!({
+            "sessionId": session_id.to_string(),
+            "update": {
+                "sessionUpdate": "tool_call_update",
+                "toolCallId": format!("tool:case-state-discovery:{subject_id}"),
+                "status": "completed",
+                "kind": "read",
+                "persona": AcpPersonaMode::SagePlanning.as_str(),
+                "workflowPhase": "discovery",
+                "title": "KYC case-state discovery",
+                "traceProjection": trace_projection,
+                "content": {
+                    "type": "resource_link",
+                    "uri": format!("semos://entity/{subject_id}"),
+                    "name": "Read-only KYC case-state anchor",
+                    "description": "Resolved current state, configuration version, and state snapshot before workbook drafting"
+                }
+            }
+        }),
+    }))
+}
+
+fn state_discovery_human_summary(state_discovery: Option<&Value>) -> String {
+    let Some(state_discovery) = state_discovery else {
+        return String::new();
+    };
+    let source = state_discovery
+        .get("source")
+        .and_then(Value::as_str)
+        .unwrap_or_default();
+    if !matches!(
+        source,
+        "read_only_discovery_probe" | "cached_read_only_discovery_probe"
+    ) {
+        return String::new();
+    }
+    let current_state = state_discovery
+        .get("currentState")
+        .and_then(Value::as_str)
+        .unwrap_or("unknown");
+    let configuration_version = state_discovery
+        .get("configurationVersion")
+        .and_then(Value::as_str)
+        .unwrap_or("unknown");
+    let state_snapshot_id = state_discovery
+        .get("stateSnapshotId")
+        .and_then(Value::as_str)
+        .unwrap_or("unknown");
+    format!(
+        "I read the KYC case state via read-only `kyc-case.read-state`: current state `{current_state}`, config `{configuration_version}`, snapshot `{state_snapshot_id}`. "
+    )
+}
+
 fn deterministic_language_loop_outcome_layer(
     attempts: &[WorkbookDraftAttempt],
     metrics: &LanguageAcquisitionMetrics,
@@ -2237,7 +2520,7 @@ fn pending_question_outgoing(
     code: &str,
     message: String,
 ) -> Vec<JsonRpcOutgoing> {
-    let trace_projection = pending_question_trace_projection(code, &message);
+    let trace_projection = pending_question_trace_projection(code, &message, &result);
     if let Value::Object(fields) = &mut result {
         fields.insert("traceProjection".to_string(), trace_projection.clone());
     }
@@ -2277,7 +2560,7 @@ fn pending_question_outgoing(
     ]
 }
 
-fn pending_question_trace_projection(code: &str, message: &str) -> Value {
+fn pending_question_trace_projection(code: &str, message: &str, result: &Value) -> Value {
     json!({
         "outcome": "pending_question",
         "promptContextVariant": "pre_language_pack_prompt_router",
@@ -2287,23 +2570,51 @@ fn pending_question_trace_projection(code: &str, message: &str) -> Value {
         "diagnosticCodes": [],
         "pendingQuestionCode": code,
         "humanSummary": message,
-        "neededFromUser": pending_question_needs(code),
+        "neededFromUser": pending_question_needs(result, code),
         "firstPassValid": false,
         "dryRunValid": false
     })
 }
 
-fn pending_question_needs(code: &str) -> Vec<String> {
-    match code {
-        "kyc_prompt_ambiguous" => vec!["explicit_verb_or_update_status_intent".to_string()],
-        "kyc_update_status_prompt_incomplete" => vec![
-            "case_uuid".to_string(),
-            "current_state".to_string(),
-            "requested_state".to_string(),
-            "evidence_digest".to_string(),
-        ],
-        _ => vec!["hitl_clarification".to_string()],
+fn pending_question_needs(result: &Value, code: &str) -> Vec<String> {
+    let mut needs = value_string_array(result, &["pending_question", "needs"]);
+    needs.extend(value_string_array(result, &["pending_question", "missing"]));
+    if needs.is_empty() {
+        needs = match code {
+            "kyc_prompt_ambiguous" => vec!["explicit_verb_or_update_status_intent".to_string()],
+            "kyc_update_status_prompt_incomplete" => vec![
+                "case_uuid".to_string(),
+                "current_state".to_string(),
+                "configuration_version".to_string(),
+                "state_snapshot_id".to_string(),
+                "requested_state".to_string(),
+                "evidence_digest".to_string(),
+            ],
+            _ => vec!["hitl_clarification".to_string()],
+        };
     }
+    needs.sort();
+    needs.dedup();
+    needs
+}
+
+fn value_string_array(value: &Value, path: &[&str]) -> Vec<String> {
+    let mut current = value;
+    for segment in path {
+        let Some(next) = current.get(*segment) else {
+            return Vec::new();
+        };
+        current = next;
+    }
+    current
+        .as_array()
+        .map(|items| {
+            items
+                .iter()
+                .filter_map(|item| item.as_str().map(str::to_string))
+                .collect()
+        })
+        .unwrap_or_default()
 }
 
 fn elapsed_ms(started_at: Instant) -> u64 {
@@ -2345,7 +2656,7 @@ fn explain_kyc_ambiguous_prompt(candidate_verbs: &[&str]) -> String {
 
 fn explain_kyc_incomplete_prompt(missing: &[&str]) -> String {
     format!(
-        "I found a KYC update-status intent, but I am stuck because the prompt is missing {}. I need the missing value(s); this workflow requires a case UUID, current state, requested state, and evidence digest before I can draft and validate the workbook. Example: Move case <uuid> from INTAKE to DISCOVERY with evidence sha256:... No workbook dry-run or mutation has run.",
+        "I found a KYC update-status intent, but I am stuck because the prompt is missing {}. I need the missing value(s); this workflow requires a case UUID, a read-only case-state anchor with current state/config/snapshot, requested state, and evidence digest before I can draft and validate the workbook. Example: Move case <uuid> to DISCOVERY with evidence sha256:... plus a kyc-case.read-state resource. No workbook dry-run or mutation has run.",
         inline_code_list(missing.iter().copied())
     )
 }
@@ -2748,6 +3059,203 @@ mod tests {
         assert!(message.contains("DISCOVERY"));
         assert!(message.contains("ASSESSMENT"));
         assert!(message.to_ascii_lowercase().contains("no mutation"));
+    }
+
+    #[test]
+    fn session_prompt_uses_read_only_discovery_resource_for_state_anchor() {
+        let mut agent = AcpJsonRpcAgent::new();
+        let discovery_response = json!({
+            "probe_id": "kyc-case.read-state",
+            "subject": {
+                "subject_kind": "kyc_case",
+                "subject_id": CASE_ID
+            },
+            "observations": [
+                {
+                    "key": "case.status",
+                    "value": "DISCOVERY",
+                    "classification": "internal"
+                },
+                {
+                    "key": "case.configuration_version",
+                    "value": "config-live-1",
+                    "classification": "internal"
+                },
+                {
+                    "key": "case.state_snapshot_id",
+                    "value": "snapshot-live-1",
+                    "classification": "internal"
+                }
+            ],
+            "provenance": [
+                {
+                    "source": "sem_os.session_state",
+                    "snapshot_ref": "snapshot-live-1"
+                }
+            ],
+            "first_class_state_mutated": false
+        });
+
+        let outgoing = agent.handle_request(request(
+            1,
+            "session/prompt",
+            json!({
+                "sessionId": SESSION_ID.to_string(),
+                "prompt": [
+                    {
+                        "type": "text",
+                        "text": "Advance the KYC case to assessment with evidence sha256:evidence"
+                    },
+                    {
+                        "type": "embedded_resource",
+                        "uri": format!("semos://entity/{}", CASE_ID),
+                        "name": "KYC read-state probe",
+                        "mime_type": "application/json",
+                        "text": discovery_response.to_string()
+                    }
+                ]
+            }),
+        ));
+
+        assert_eq!(outgoing.len(), 7);
+        let discovery_update = match &outgoing[0] {
+            JsonRpcOutgoing::Notification(notification) => &notification.params["update"],
+            JsonRpcOutgoing::Response(_) => panic!("expected discovery notification"),
+        };
+        assert_eq!(
+            discovery_update["toolCallId"],
+            format!("tool:case-state-discovery:{CASE_ID}")
+        );
+        assert_eq!(
+            discovery_update["traceProjection"]["stateDiscovery"]["source"],
+            "read_only_discovery_probe"
+        );
+        assert_eq!(
+            discovery_update["traceProjection"]["stateDiscovery"]["currentState"],
+            "DISCOVERY"
+        );
+
+        let response = match &outgoing[6] {
+            JsonRpcOutgoing::Response(response) => response,
+            JsonRpcOutgoing::Notification(_) => panic!("expected response"),
+        };
+        let result = response.result.as_ref().unwrap();
+        assert_eq!(result["status"], "dry_run_validated");
+        assert_eq!(
+            result["output"]["dry_run"]["transition_ref"],
+            "kyc-case.discovery-to-assessment"
+        );
+        assert_eq!(
+            result["language_pack"]["configuration_version"],
+            "config-live-1"
+        );
+        assert_eq!(
+            result["traceProjection"]["stateDiscovery"]["stateSnapshotId"],
+            "snapshot-live-1"
+        );
+        let message = agent_message_text(&outgoing);
+        assert!(message.contains("read-only `kyc-case.read-state`"));
+        assert!(message.contains("config-live-1"));
+        assert!(message.contains("snapshot-live-1"));
+    }
+
+    #[test]
+    fn session_prompt_uses_cached_read_only_discovery_state() {
+        let mut agent = AcpJsonRpcAgent::new();
+        let discovery = agent.handle_request(request(
+            1,
+            "obpoc/kyc_case_state/discover",
+            json!({
+                "session_id": SESSION_ID.to_string(),
+                "adapter": "zed",
+                "subject_id": CASE_ID,
+                "observations": [
+                    {"key": "case.status", "value": "DISCOVERY", "classification": "internal"},
+                    {"key": "case.configuration_version", "value": "config-live-1", "classification": "internal"},
+                    {"key": "case.state_snapshot_id", "value": "snapshot-live-1", "classification": "internal"}
+                ],
+                "provenance": [
+                    {"source": "sem_os.session_state", "snapshot_ref": "snapshot-live-1"}
+                ],
+                "first_class_state_mutated": false
+            }),
+        ));
+        let discovered = only_response(discovery).result.unwrap();
+        assert_eq!(discovered["status"], "kyc_case_state_discovered");
+
+        let outgoing = agent.handle_request(request(
+            2,
+            "session/prompt",
+            json!({
+                "sessionId": SESSION_ID.to_string(),
+                "prompt": [
+                    {
+                        "type": "text",
+                        "text": format!("Advance KYC case {CASE_ID} to ASSESSMENT with evidence sha256:evidence")
+                    }
+                ]
+            }),
+        ));
+
+        assert_eq!(outgoing.len(), 7);
+        let discovery_update = match &outgoing[0] {
+            JsonRpcOutgoing::Notification(notification) => &notification.params["update"],
+            JsonRpcOutgoing::Response(_) => panic!("expected discovery notification"),
+        };
+        assert_eq!(
+            discovery_update["traceProjection"]["stateDiscovery"]["source"],
+            "cached_read_only_discovery_probe"
+        );
+        let response = match &outgoing[6] {
+            JsonRpcOutgoing::Response(response) => response,
+            JsonRpcOutgoing::Notification(_) => panic!("expected response"),
+        };
+        let result = response.result.as_ref().unwrap();
+        assert_eq!(result["status"], "dry_run_validated");
+        assert_eq!(
+            result["traceProjection"]["stateDiscovery"]["configurationVersion"],
+            "config-live-1"
+        );
+    }
+
+    #[test]
+    fn session_prompt_with_case_uuid_but_no_state_discovery_is_pending() {
+        let mut agent = AcpJsonRpcAgent::new();
+        let outgoing = agent.handle_request(request(
+            1,
+            "session/prompt",
+            json!({
+                "sessionId": SESSION_ID.to_string(),
+                "prompt": [
+                    {
+                        "type": "text",
+                        "text": format!("Advance KYC case {CASE_ID} to ASSESSMENT with evidence sha256:evidence")
+                    }
+                ]
+            }),
+        ));
+
+        assert_eq!(outgoing.len(), 3);
+        let response = match &outgoing[2] {
+            JsonRpcOutgoing::Response(response) => response,
+            JsonRpcOutgoing::Notification(_) => panic!("expected response"),
+        };
+        let result = response.result.as_ref().unwrap();
+        assert_eq!(result["status"], "pending_question");
+        assert_eq!(
+            result["pending_question"]["code"],
+            "kyc_update_status_prompt_incomplete"
+        );
+        let missing = result["pending_question"]["missing"].as_array().unwrap();
+        assert!(missing.iter().any(|item| item == "current_state"));
+        assert!(missing.iter().any(|item| item == "configuration_version"));
+        assert!(missing.iter().any(|item| item == "state_snapshot_id"));
+        assert_eq!(result["traceProjection"]["outcomeLayer"], "pre_llm_pending");
+        assert!(result["traceProjection"]["neededFromUser"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|need| need == "state_snapshot_id"));
     }
 
     #[test]
