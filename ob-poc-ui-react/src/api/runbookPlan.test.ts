@@ -17,6 +17,7 @@ const workbookFixture = (): ExecutionWorkbook => ({
     schema_version: 1,
     pack_id: "ob-poc.kyc",
     transition_ref: "kyc-case.discovery-to-assessment",
+    execution_mode: "dry_run",
     session_id: "session-123",
     subject: {
       subject_kind: "kyc_case",
@@ -28,6 +29,7 @@ const workbookFixture = (): ExecutionWorkbook => ({
     },
     configuration_version: "config-1",
     state_snapshot_id: "snapshot-1",
+    objective: "Advance the KYC case from DISCOVERY to ASSESSMENT",
     evidence_refs: [
       {
         kind: "case_id",
@@ -103,6 +105,7 @@ describe("runbookPlanApi", () => {
           schema_version: 1,
           pack_id: "ob-poc-kyc",
           transition_ref: "kyc-case.discovery-to-assessment",
+          execution_mode: "dry_run",
           session_id: "session-123",
           subject: {
             subject_kind: "case",
@@ -114,6 +117,7 @@ describe("runbookPlanApi", () => {
           },
           configuration_version: "sem-os-v1",
           state_snapshot_id: "snapshot-1",
+          objective: "Advance the KYC case from discovery to assessment",
           evidence_refs: [
             {
               kind: "case-evidence",
@@ -155,6 +159,15 @@ describe("runbookPlanApi", () => {
       dry_run: {
         workbook_id: "workbook-1",
         transition_ref: "kyc-case.discovery-to-assessment",
+        semantic_diff_uri: "semos://semantic-diff/workbook-1",
+        validation_trace: [
+          {
+            step_number: 1,
+            step_id: "integrity",
+            status: "passed",
+            message: "Workbook validated",
+          },
+        ],
         semantic_diff: {
           transition_ref: "kyc-case.discovery-to-assessment",
           entity_id: "case-123",

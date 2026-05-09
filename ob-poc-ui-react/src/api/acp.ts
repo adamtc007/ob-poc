@@ -336,6 +336,58 @@ export interface AcpContextAssemblyResult {
   bundle: AcpSageContextBundle;
 }
 
+export type AcpContentBlock =
+  | {
+      type: "text";
+      text: string;
+    }
+  | {
+      type: "resource_link";
+      uri: string;
+      name?: string;
+      description?: string;
+    }
+  | {
+      type: "embedded_resource";
+      uri: string;
+      name?: string;
+      mime_type?: string;
+      text?: string;
+    };
+
+export interface AcpGatewayRequest {
+  method: string;
+  params?: Record<string, unknown>;
+}
+
+export interface AcpGatewayResult<T = unknown> {
+  status: "acp_gateway_processed";
+  session_id: string;
+  method: string;
+  result: T;
+  outgoing: unknown[];
+}
+
+export type AcpPromptDraftSource =
+  | "deterministic"
+  | "deterministic_draft"
+  | "llm"
+  | "llm_tool_call"
+  | "live_llm";
+
+export interface AcpPromptRequest {
+  prompt: AcpContentBlock[];
+  draft_source?: AcpPromptDraftSource;
+}
+
+export interface AcpPromptResult<T = unknown> {
+  status: "acp_prompt_processed";
+  session_id: string;
+  draft_source?: AcpPromptDraftSource;
+  result: T;
+  outgoing: unknown[];
+}
+
 export const acpApi = {
   async capabilities(sessionId: string): Promise<AcpCapabilitiesResult> {
     return api.get<AcpCapabilitiesResult>(
@@ -388,6 +440,26 @@ export const acpApi = {
   ): Promise<AcpContextAssemblyResult> {
     return api.post<AcpContextAssemblyResult>(
       `/session/${sessionId}/acp/context`,
+      request,
+    );
+  },
+
+  async gateway<T = unknown>(
+    sessionId: string,
+    request: AcpGatewayRequest,
+  ): Promise<AcpGatewayResult<T>> {
+    return api.post<AcpGatewayResult<T>>(
+      `/session/${sessionId}/acp/gateway`,
+      request,
+    );
+  },
+
+  async prompt<T = unknown>(
+    sessionId: string,
+    request: AcpPromptRequest,
+  ): Promise<AcpPromptResult<T>> {
+    return api.post<AcpPromptResult<T>>(
+      `/session/${sessionId}/acp/prompt`,
       request,
     );
   },

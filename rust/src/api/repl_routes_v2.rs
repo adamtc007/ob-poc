@@ -350,7 +350,7 @@ pub struct AcpPromptRouteRequest {
 }
 
 /// Generic ACP JSON-RPC gateway request for the REPL HTTP boundary.
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct AcpGatewayRouteRequest {
     pub method: String,
     #[serde(default)]
@@ -4211,6 +4211,67 @@ mod tests {
             .clone()
     }
 
+    async fn http_post_json(
+        app: &axum::Router,
+        uri: String,
+        body: serde_json::Value,
+    ) -> (StatusCode, serde_json::Value) {
+        use tower::ServiceExt as _;
+
+        let request = axum::http::Request::builder()
+            .method("POST")
+            .uri(uri)
+            .header("content-type", "application/json")
+            .body(axum::body::Body::from(body.to_string()))
+            .expect("HTTP request");
+        let response = app.clone().oneshot(request).await.expect("route response");
+        let status = response.status();
+        let body = response_json(response).await;
+        (status, body)
+    }
+
+    async fn http_get_json(app: &axum::Router, uri: String) -> (StatusCode, serde_json::Value) {
+        use tower::ServiceExt as _;
+
+        let request = axum::http::Request::builder()
+            .method("GET")
+            .uri(uri)
+            .body(axum::body::Body::empty())
+            .expect("HTTP request");
+        let response = app.clone().oneshot(request).await.expect("route response");
+        let status = response.status();
+        let body = response_json(response).await;
+        (status, body)
+    }
+
+    async fn response_json(response: axum::response::Response) -> serde_json::Value {
+        let bytes = axum::body::to_bytes(response.into_body(), 1_000_000)
+            .await
+            .expect("response body");
+        if bytes.is_empty() {
+            serde_json::Value::Null
+        } else {
+            serde_json::from_slice(&bytes).unwrap_or_else(|_| {
+                serde_json::json!({
+                    "raw": String::from_utf8_lossy(&bytes)
+                })
+            })
+        }
+    }
+
+    async fn http_post_acp_gateway(
+        app: &axum::Router,
+        session_id: Uuid,
+        request: AcpGatewayRouteRequest,
+    ) -> (StatusCode, serde_json::Value) {
+        http_post_json(
+            app,
+            format!("/api/session/{session_id}/acp/gateway"),
+            serde_json::json!(request),
+        )
+        .await
+    }
+
     #[derive(Clone, Copy)]
     struct LiveComparisonFixture {
         id: &'static str,
@@ -5967,6 +6028,211 @@ mod tests {
                 && context_hash == "sha256:test"
                 && *redacted_count == 1
         ));
+    }
+
+    #[tokio::test]
+    async fn test_acp_gateway_contract_old_direct_kyc_paths_are_unregistered() {
+        let (state, session_id) = test_route_state().await;
+        let app = session_scoped_router().with_state(state);
+
+        for path in [
+            format!("/api/session/{session_id}/acp/kyc/case-state/discover"),
+            format!("/api/session/{session_id}/acp/kyc/update-status/language-loop"),
+            format!("/api/session/{session_id}/acp/kyc/update-status/llm-draft-loop"),
+        ] {
+            let (status, _) = http_post_json(&app, path.clone(), serde_json::json!({})).await;
+            assert_eq!(
+                status,
+                StatusCode::NOT_FOUND,
+                "{path} must stay unregistered; use /acp/gateway or /acp/prompt"
+            );
+        }
+    }
+
+    #[tokio::test]
+    async fn test_acp_gateway_contract_handles_canonical_methods_and_trace_projection() {
+        let (state, session_id) = test_route_state().await;
+        let app = session_scoped_router().with_state(state);
+
+        let (discovery_status, discovery) = http_post_acp_gateway(
+            &app,
+            session_id,
+            case_state_discovery_request("DISCOVERY", "config-live-1", "snapshot-live-1"),
+        )
+        .await;
+        assert_eq!(discovery_status, StatusCode::OK);
+        assert_eq!(discovery["status"], "acp_gateway_processed");
+        assert_eq!(discovery["method"], "obpoc/kyc_case_state/discover");
+        assert_eq!(discovery["result"]["status"], "kyc_case_state_discovered");
+        assert_eq!(
+            discovery["result"]["language_pack_request"]["current_state"],
+            "DISCOVERY"
+        );
+
+        let (language_pack_status, language_pack) = http_post_acp_gateway(
+            &app,
+            session_id,
+            AcpGatewayRouteRequest {
+                method: "obpoc/language_pack/get".to_string(),
+                params: serde_json::json!({
+                    "adapter": crate::acp::AcpAdapterKind::TestHarness,
+                    "subject_id": test_case_id(),
+                    "current_state": "DISCOVERY",
+                    "configuration_version": "config-live-1",
+                    "state_snapshot_id": "snapshot-live-1",
+                    "objective": "Advance the KYC case to ASSESSMENT",
+                }),
+            },
+        )
+        .await;
+        assert_eq!(language_pack_status, StatusCode::OK);
+        assert_eq!(language_pack["status"], "acp_gateway_processed");
+        assert_eq!(language_pack["method"], "obpoc/language_pack/get");
+        assert_eq!(language_pack["result"]["status"], "sem_os_language_pack");
+        assert_eq!(
+            language_pack["result"]["language_pack"]["candidate_transitions"][0]["transition_ref"],
+            "kyc-case.discovery-to-assessment"
+        );
+        assert_eq!(
+            language_pack["result"]["observability"]["acpMechanismSummary"][0],
+            "language_pack_get"
+        );
+
+        let (dry_run_status, dry_run) = http_post_acp_gateway(
+            &app,
+            session_id,
+            AcpGatewayRouteRequest {
+                method: "session/prompt".to_string(),
+                params: serde_json::json!({
+                    "prompt": [
+                        {
+                            "type": "text",
+                            "text": format!(
+                                "Advance KYC case {} to ASSESSMENT with evidence sha256:evidence",
+                                test_case_id()
+                            )
+                        }
+                    ]
+                }),
+            },
+        )
+        .await;
+        assert_eq!(dry_run_status, StatusCode::OK);
+        assert_eq!(dry_run["status"], "acp_gateway_processed");
+        assert_eq!(dry_run["method"], "session/prompt");
+        assert_eq!(dry_run["result"]["status"], "dry_run_validated");
+        assert_eq!(
+            dry_run["result"]["traceProjection"]["stateDiscovery"]["source"],
+            "cached_read_only_discovery_probe"
+        );
+        let dry_outgoing = dry_run["outgoing"].as_array().expect("gateway outgoing");
+        assert!(dry_outgoing.iter().any(|item| {
+            item["params"]["update"]["toolCallId"]
+                .as_str()
+                .map(|id| id.starts_with("tool:language-pack:"))
+                .unwrap_or(false)
+        }));
+        assert!(dry_outgoing
+            .iter()
+            .any(|item| { item["params"]["update"]["sessionUpdate"] == "semantic_diff" }));
+
+        let (refusal_status, refusal) = http_post_acp_gateway(
+            &app,
+            session_id,
+            AcpGatewayRouteRequest {
+                method: "session/prompt".to_string(),
+                params: serde_json::json!({
+                    "prompt": [
+                        {
+                            "type": "text",
+                            "text": format!("Advance KYC case {} to ASSESSMENT", test_case_id())
+                        }
+                    ]
+                }),
+            },
+        )
+        .await;
+        assert_eq!(refusal_status, StatusCode::OK);
+        assert_eq!(refusal["status"], "acp_gateway_processed");
+        assert_eq!(refusal["result"]["status"], "structured_refusal");
+        assert_eq!(
+            refusal["result"]["refusal"]["refusal_code"],
+            "missing_evidence_digest"
+        );
+        assert!(refusal["outgoing"]
+            .as_array()
+            .expect("refusal outgoing")
+            .iter()
+            .any(
+                |item| item["params"]["update"]["traceProjection"]["outcomeLayer"]
+                    == "validation_refusal"
+            ));
+
+        let (trace_status, trace) =
+            http_get_json(&app, format!("/api/session/{session_id}/trace")).await;
+        assert_eq!(trace_status, StatusCode::OK);
+        let trace = trace.as_array().expect("session trace");
+        assert!(
+            trace
+                .iter()
+                .any(|entry| entry["op"]["outcome"] == "dry_run_validated"),
+            "gateway prompt dry-run must persist trace projection"
+        );
+        assert!(
+            trace
+                .iter()
+                .any(|entry| entry["op"]["outcome"] == "structured_refusal"
+                    && entry["op"]["refusal_code"] == "missing_evidence_digest"),
+            "gateway prompt refusal must persist structured trace projection"
+        );
+        assert!(trace.iter().all(|entry| {
+            entry["op"]["conversation_efficiency"]["prose_only_failure"] == false
+        }));
+
+        let (pending_state, pending_session_id) = test_route_state().await;
+        let pending_app = session_scoped_router().with_state(pending_state);
+        let (pending_status, pending) = http_post_acp_gateway(
+            &pending_app,
+            pending_session_id,
+            AcpGatewayRouteRequest {
+                method: "session/prompt".to_string(),
+                params: serde_json::json!({
+                    "prompt": [
+                        {
+                            "type": "text",
+                            "text": "Update status for the KYC case"
+                        }
+                    ]
+                }),
+            },
+        )
+        .await;
+        assert_eq!(pending_status, StatusCode::OK);
+        assert_eq!(pending["status"], "acp_gateway_processed");
+        assert_eq!(pending["result"]["status"], "pending_question");
+        assert_eq!(
+            pending["result"]["pending_question"]["code"],
+            "kyc_update_status_prompt_incomplete"
+        );
+        assert!(pending["outgoing"]
+            .as_array()
+            .expect("pending outgoing")
+            .iter()
+            .any(|item| item["params"]["update"]["sessionUpdate"] == "agent_message_chunk"));
+
+        let (pending_trace_status, pending_trace) = http_get_json(
+            &pending_app,
+            format!("/api/session/{pending_session_id}/trace"),
+        )
+        .await;
+        assert_eq!(pending_trace_status, StatusCode::OK);
+        assert!(pending_trace
+            .as_array()
+            .expect("pending trace")
+            .iter()
+            .any(|entry| entry["op"]["outcome"] == "pending_question"
+                && entry["op"]["pending_question_code"] == "kyc_update_status_prompt_incomplete"
+                && entry["op"]["conversation_efficiency"]["prose_only_failure"] == false));
     }
 
     #[tokio::test]

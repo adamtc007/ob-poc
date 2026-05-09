@@ -407,6 +407,107 @@ describe("acpApi", () => {
     );
   });
 
+  it("posts JSON-RPC ACP work through the generic gateway", async () => {
+    const response = {
+      status: "acp_gateway_processed" as const,
+      session_id: "session-123",
+      method: "obpoc/language_pack/get",
+      result: {
+        status: "sem_os_language_pack",
+      },
+      outgoing: [],
+    };
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify(response), {
+        status: 200,
+        statusText: "OK",
+      }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    const request = {
+      method: "obpoc/language_pack/get",
+      params: {
+        subject_id: "case-123",
+        current_state: "DISCOVERY",
+        configuration_version: "config-1",
+        state_snapshot_id: "snapshot-1",
+      },
+    };
+    const result = await acpApi.gateway("session-123", request);
+
+    expect(result).toEqual(response);
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/session/session-123/acp/gateway",
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(request),
+      },
+    );
+    expect(fetchMock.mock.calls[0][0]).not.toContain("/acp/kyc/");
+  });
+
+  it("posts user utterances through the canonical ACP prompt path", async () => {
+    const response = {
+      status: "acp_prompt_processed" as const,
+      session_id: "session-123",
+      result: {
+        status: "pending_question",
+        pending_question: {
+          code: "kyc_update_status_prompt_incomplete",
+        },
+      },
+      outgoing: [
+        {
+          method: "session/update",
+          params: {
+            update: {
+              sessionUpdate: "agent_message_chunk",
+              text: "I need the case UUID before I can draft the workbook.",
+            },
+          },
+        },
+      ],
+    };
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify(response), {
+        status: 200,
+        statusText: "OK",
+      }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    const request = {
+      prompt: [
+        {
+          type: "text" as const,
+          text: "Move the KYC case to DISCOVERY",
+        },
+      ],
+    };
+    const result = await acpApi.prompt("session-123", request);
+
+    expect(result).toEqual(response);
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/session/session-123/acp/prompt",
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(request),
+      },
+    );
+    expect(fetchMock.mock.calls[0][0]).not.toContain("/acp/kyc/");
+    expect(result.outgoing[0]).toMatchObject({
+      method: "session/update",
+      params: {
+        update: {
+          sessionUpdate: "agent_message_chunk",
+        },
+      },
+    });
+  });
+
   it("surfaces ACP context refusal details", async () => {
     vi.stubGlobal(
       "fetch",
