@@ -108,6 +108,15 @@ pub async fn run_kyc_update_status_llm_draft_loop(
             };
         }
     };
+    let mut draft_arguments = result.arguments;
+    normalize_known_draft_bindings(
+        &mut draft_arguments,
+        pack,
+        session_id,
+        &actor_id,
+        &actor_roles,
+        evidence_digest.as_deref(),
+    );
     let trace = record_llm_inference_trace(crate::llm_trace::LlmInferenceTraceInput {
         provider: client.provider_name(),
         model: client.model_name(),
@@ -121,7 +130,7 @@ pub async fn run_kyc_update_status_llm_draft_loop(
         latency_ms: Some(llm_latency_ms),
     });
 
-    let mut draft: KycUpdateStatusWorkbookDraft = match serde_json::from_value(result.arguments) {
+    let mut draft: KycUpdateStatusWorkbookDraft = match serde_json::from_value(draft_arguments) {
         Ok(draft) => draft,
         Err(err) => {
             return LlmDraftLoopOutcome::AdapterRefused {
@@ -142,6 +151,61 @@ pub async fn run_kyc_update_status_llm_draft_loop(
         llm_trace: trace,
         draft,
         outcome,
+    }
+}
+
+fn normalize_known_draft_bindings(
+    arguments: &mut serde_json::Value,
+    pack: &SemOsLanguagePack,
+    session_id: Uuid,
+    actor_id: &str,
+    actor_roles: &[String],
+    evidence_digest: Option<&str>,
+) {
+    let Some(object) = arguments.as_object_mut() else {
+        return;
+    };
+    insert_if_missing(object, "session_id", serde_json::json!(session_id));
+    insert_if_missing(object, "actor_id", serde_json::json!(actor_id));
+    insert_if_missing(object, "actor_roles", serde_json::json!(actor_roles));
+    insert_if_missing(object, "verb", serde_json::json!("kyc-case.update-status"));
+    insert_if_missing(object, "subject_kind", serde_json::json!(pack.subject.kind));
+    insert_if_missing(object, "case_id", serde_json::json!(pack.subject.id));
+    insert_if_missing(
+        object,
+        "current_state",
+        serde_json::json!(pack.current_state),
+    );
+    insert_if_missing(
+        object,
+        "configuration_version",
+        serde_json::json!(pack.configuration_version),
+    );
+    insert_if_missing(
+        object,
+        "state_snapshot_id",
+        serde_json::json!(pack.state_snapshot_id),
+    );
+    if let Some(evidence_digest) = evidence_digest {
+        insert_if_missing(
+            object,
+            "evidence_digest",
+            serde_json::json!(evidence_digest),
+        );
+    }
+}
+
+fn insert_if_missing(
+    object: &mut serde_json::Map<String, serde_json::Value>,
+    field: &str,
+    value: serde_json::Value,
+) {
+    let is_missing = object
+        .get(field)
+        .map(|value| value.is_null())
+        .unwrap_or(true);
+    if is_missing {
+        object.insert(field.to_string(), value);
     }
 }
 
@@ -346,5 +410,53 @@ mod tests {
             outcome,
             WorkbookRevisionOutcome::DryRunValid { .. }
         ));
+    }
+
+    #[test]
+    fn normalizes_known_bindings_without_overwriting_llm_choices() {
+        let manifest: DomainPackManifest = serde_yaml::from_str(include_str!(
+            "../../config/sem_os_seeds/domain_packs/ob_poc_kyc.yaml"
+        ))
+        .unwrap();
+        let session_id = Uuid::parse_str(SESSION_ID).unwrap();
+        let case_id = Uuid::parse_str(CASE_ID).unwrap();
+        let pack = build_kyc_update_status_language_pack(
+            &manifest,
+            KycLanguagePackRequest {
+                subject_id: case_id,
+                current_state: "DISCOVERY".to_string(),
+                configuration_version: "config-2".to_string(),
+                state_snapshot_id: "snapshot-2".to_string(),
+                objective: None,
+            },
+        )
+        .unwrap();
+        let mut arguments = serde_json::json!({
+            "transition_ref": "kyc-case.discovery-to-assessment",
+            "requested_state": "ASSESSMENT",
+            "current_state": "WRONG"
+        });
+
+        normalize_known_draft_bindings(
+            &mut arguments,
+            &pack,
+            session_id,
+            "sage",
+            &["ops".to_string()],
+            Some("sha256:evidence"),
+        );
+
+        assert_eq!(arguments["session_id"], SESSION_ID);
+        assert_eq!(arguments["actor_id"], "sage");
+        assert_eq!(arguments["verb"], "kyc-case.update-status");
+        assert_eq!(arguments["case_id"], CASE_ID);
+        assert_eq!(arguments["configuration_version"], "config-2");
+        assert_eq!(arguments["state_snapshot_id"], "snapshot-2");
+        assert_eq!(arguments["evidence_digest"], "sha256:evidence");
+        assert_eq!(arguments["current_state"], "WRONG");
+        assert_eq!(
+            arguments["transition_ref"],
+            "kyc-case.discovery-to-assessment"
+        );
     }
 }

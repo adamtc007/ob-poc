@@ -350,6 +350,10 @@ mod tests {
             ),
             normalize_path(
                 repo_root,
+                &repo_root.join("rust/crates/ob-agentic/src/claude_code_cli_client.rs"),
+            ),
+            normalize_path(
+                repo_root,
                 &repo_root.join("rust/crates/ob-agentic/src/openai_client.rs"),
             ),
         ]);
