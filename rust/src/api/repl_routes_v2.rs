@@ -4117,6 +4117,7 @@ mod tests {
         total_ms: u64,
         prose_only_failure: bool,
         exact_transition_hit: bool,
+        outcome_layer: String,
     }
 
     struct EnvSnapshot {
@@ -4237,6 +4238,7 @@ mod tests {
         total_ms: u64,
         prose_only_failure: bool,
         diagnostic_coverage: bool,
+        outcome_layer: String,
     }
 
     fn live_failure_fixtures() -> Vec<LiveFailureFixture> {
@@ -4371,6 +4373,7 @@ mod tests {
                 .as_bool()
                 .unwrap_or(true),
             exact_transition_hit,
+            outcome_layer: outcome_layer(value),
         }
     }
 
@@ -4419,6 +4422,40 @@ mod tests {
                 .as_bool()
                 .unwrap_or(true),
             diagnostic_coverage,
+            outcome_layer: outcome_layer(value),
+        }
+    }
+
+    fn outcome_layer(value: &serde_json::Value) -> String {
+        match value["status"].as_str() {
+            Some("pending_question") => "pre_llm_pending".to_string(),
+            Some("dry_run_validated") => "dry_run_validated".to_string(),
+            Some("structured_refusal") => {
+                if value.get("llm_trace").is_none() {
+                    return "pre_llm_refusal".to_string();
+                }
+                let attempts_len = value["attempts"]
+                    .as_array()
+                    .map(|attempts| attempts.len())
+                    .unwrap_or(0);
+                if attempts_len == 0 {
+                    "decode_refusal".to_string()
+                } else if value["metrics"]["revision_count"].as_u64().unwrap_or(0) > 0 {
+                    "revision_refusal".to_string()
+                } else {
+                    "validation_refusal".to_string()
+                }
+            }
+            _ => {
+                if value["observability"]["conversationEfficiency"]["proseOnlyFailure"]
+                    .as_bool()
+                    .unwrap_or(false)
+                {
+                    "prose_only_failure".to_string()
+                } else {
+                    "unknown".to_string()
+                }
+            }
         }
     }
 
@@ -4474,6 +4511,34 @@ mod tests {
             .iter()
             .filter(|row| row.prose_only_failure)
             .count() as u64;
+        let dry_run_layer = model_rows
+            .iter()
+            .filter(|row| row.outcome_layer == "dry_run_validated")
+            .count() as u64;
+        let structured_refusal_layer = model_rows
+            .iter()
+            .filter(|row| row.status == "structured_refusal")
+            .count() as u64;
+        let pre_llm_pending = model_rows
+            .iter()
+            .filter(|row| row.outcome_layer == "pre_llm_pending")
+            .count() as u64;
+        let pre_llm_refusal = model_rows
+            .iter()
+            .filter(|row| row.outcome_layer == "pre_llm_refusal")
+            .count() as u64;
+        let decode_refusal = model_rows
+            .iter()
+            .filter(|row| row.outcome_layer == "decode_refusal")
+            .count() as u64;
+        let validation_refusal = model_rows
+            .iter()
+            .filter(|row| row.outcome_layer == "validation_refusal")
+            .count() as u64;
+        let revision_refusal = model_rows
+            .iter()
+            .filter(|row| row.outcome_layer == "revision_refusal")
+            .count() as u64;
         let total_decode_repairs: u64 = model_rows.iter().map(|row| row.decode_repair_count).sum();
         let total_revisions: u64 = model_rows.iter().map(|row| row.revision_count).sum();
         let total_llm_draft_ms: u64 = model_rows.iter().map(|row| row.llm_draft_ms).sum();
@@ -4486,6 +4551,16 @@ mod tests {
             "structured_refusal": structured_refusal,
             "exact_transition_hits": exact_transition_hits,
             "prose_only_failures": prose_only_failures,
+            "outcome_layers": {
+                "pre_llm_pending": pre_llm_pending,
+                "pre_llm_refusal": pre_llm_refusal,
+                "decode_refusal": decode_refusal,
+                "validation_refusal": validation_refusal,
+                "revision_refusal": revision_refusal,
+                "dry_run_validated": dry_run_layer,
+                "structured_refusal": structured_refusal_layer,
+                "prose_only_failure": prose_only_failures,
+            },
             "dry_run_valid_rate": rate(dry_run_validated, count),
             "exact_transition_hit_rate": rate(exact_transition_hits, count),
             "structured_outcome_rate": rate(dry_run_validated + structured_refusal, count),
@@ -4522,6 +4597,26 @@ mod tests {
             .iter()
             .filter(|row| row.diagnostic_coverage)
             .count() as u64;
+        let pre_llm_pending = model_rows
+            .iter()
+            .filter(|row| row.outcome_layer == "pre_llm_pending")
+            .count() as u64;
+        let pre_llm_refusal = model_rows
+            .iter()
+            .filter(|row| row.outcome_layer == "pre_llm_refusal")
+            .count() as u64;
+        let decode_refusal = model_rows
+            .iter()
+            .filter(|row| row.outcome_layer == "decode_refusal")
+            .count() as u64;
+        let validation_refusal = model_rows
+            .iter()
+            .filter(|row| row.outcome_layer == "validation_refusal")
+            .count() as u64;
+        let revision_refusal = model_rows
+            .iter()
+            .filter(|row| row.outcome_layer == "revision_refusal")
+            .count() as u64;
         let total_invented_verbs: u64 = model_rows.iter().map(|row| row.invented_verb_count).sum();
         let total_decode_repairs: u64 = model_rows.iter().map(|row| row.decode_repair_count).sum();
         let total_revisions: u64 = model_rows.iter().map(|row| row.revision_count).sum();
@@ -4534,6 +4629,16 @@ mod tests {
             "structured_refusal": structured_refusal,
             "pending_question": pending_question,
             "dry_run_validated": dry_run_validated,
+            "outcome_layers": {
+                "pre_llm_pending": pre_llm_pending,
+                "pre_llm_refusal": pre_llm_refusal,
+                "decode_refusal": decode_refusal,
+                "validation_refusal": validation_refusal,
+                "revision_refusal": revision_refusal,
+                "dry_run_validated": dry_run_validated,
+                "structured_refusal": structured_refusal,
+                "prose_only_failure": prose_only_failures,
+            },
             "structured_failure_rate": rate(structured_refusal + pending_question, count),
             "diagnostic_code_coverage_rate": rate(diagnostic_covered, count),
             "prose_only_failures": prose_only_failures,
@@ -4545,6 +4650,54 @@ mod tests {
             "avg_llm_draft_ms": average(total_llm_draft_ms, count),
             "avg_total_ms": average(total_ms, count),
         })
+    }
+
+    fn live_report_metadata(report_name: &str) -> serde_json::Value {
+        serde_json::json!({
+            "report_schema_version": 1,
+            "report_name": report_name,
+            "generated_at": chrono::Utc::now().to_rfc3339(),
+            "commit": git_output(&["rev-parse", "HEAD"]).unwrap_or_else(|| "unknown".to_string()),
+            "commit_short": git_output(&["rev-parse", "--short", "HEAD"]).unwrap_or_else(|| "unknown".to_string()),
+            "branch": git_output(&["rev-parse", "--abbrev-ref", "HEAD"]).unwrap_or_else(|| "unknown".to_string()),
+            "git_dirty": git_output(&["status", "--porcelain"])
+                .map(|status| !status.trim().is_empty())
+                .unwrap_or(true),
+        })
+    }
+
+    fn write_live_report(report_name: &str, report: &serde_json::Value) -> std::path::PathBuf {
+        let report_dir = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("target")
+            .join("acp-live-reports");
+        std::fs::create_dir_all(&report_dir).expect("create ACP live report directory");
+        let commit_short = report["metadata"]["commit_short"]
+            .as_str()
+            .unwrap_or("unknown");
+        let dirty_suffix = if report["metadata"]["git_dirty"].as_bool().unwrap_or(true) {
+            "-dirty"
+        } else {
+            ""
+        };
+        let path = report_dir.join(format!("{report_name}-{commit_short}{dirty_suffix}.json"));
+        std::fs::write(
+            &path,
+            serde_json::to_string_pretty(report).expect("serialize ACP live report"),
+        )
+        .expect("write ACP live report");
+        path
+    }
+
+    fn git_output(args: &[&str]) -> Option<String> {
+        let output = std::process::Command::new("git")
+            .args(args)
+            .current_dir(env!("CARGO_MANIFEST_DIR"))
+            .output()
+            .ok()?;
+        if !output.status.success() {
+            return None;
+        }
+        Some(String::from_utf8_lossy(&output.stdout).trim().to_string())
     }
 
     fn rate(part: u64, whole: u64) -> f64 {
@@ -5770,14 +5923,17 @@ mod tests {
             .map(|model| live_failure_summary(&rows, model))
             .collect();
         let report = serde_json::json!({
+            "metadata": live_report_metadata("live_llm_negative_comparison"),
             "fixture_count": fixtures.len(),
             "models": models,
             "summary": summary,
             "rows": rows,
         });
+        let report_path = write_live_report("live-llm-negative-comparison", &report);
 
         println!(
-            "live_llm_negative_comparison {}",
+            "live_llm_negative_comparison report_path={} {}",
+            report_path.display(),
             serde_json::to_string_pretty(&report).unwrap()
         );
 
@@ -5869,14 +6025,17 @@ mod tests {
             .map(|model| live_comparison_summary(&rows, model))
             .collect();
         let report = serde_json::json!({
+            "metadata": live_report_metadata("live_llm_comparison"),
             "fixture_count": fixtures.len(),
             "models": models,
             "summary": summary,
             "rows": rows,
         });
+        let report_path = write_live_report("live-llm-comparison", &report);
 
         println!(
-            "live_llm_comparison {}",
+            "live_llm_comparison report_path={} {}",
+            report_path.display(),
             serde_json::to_string_pretty(&report).unwrap()
         );
 
