@@ -40,6 +40,8 @@ fn workflow_acp_prompt_language_loop_harness_reports_prompt_to_dry_run_rates() {
     let mut prose_only_failure = 0usize;
     let mut unexpected_fallback = 0usize;
     let mut timings = TimingStats::default();
+    let mut estimated_user_repair_turns_avoided = 0u64;
+    let mut pending_user_turn_required = 0usize;
 
     for fixture in fixtures {
         total += 1;
@@ -65,6 +67,14 @@ fn workflow_acp_prompt_language_loop_harness_reports_prompt_to_dry_run_rates() {
         let response = response_result(&outgoing)
             .unwrap_or_else(|| panic!("{}: expected JSON-RPC response", fixture.name));
         timings.record(response, &fixture.name);
+        let efficiency = conversation_efficiency(response, &fixture.name);
+        assert_eq!(efficiency["proseOnlyFailure"], false, "{}", fixture.name);
+        estimated_user_repair_turns_avoided += efficiency["estimatedUserRepairTurnsAvoided"]
+            .as_u64()
+            .unwrap_or(0);
+        if efficiency["pendingUserTurnRequired"] == true {
+            pending_user_turn_required += 1;
+        }
         let expected_prompt = expected_prompt_outcome(&fixture);
         match response["status"].as_str() {
             Some("dry_run_validated") => {
@@ -95,6 +105,11 @@ fn workflow_acp_prompt_language_loop_harness_reports_prompt_to_dry_run_rates() {
                     fixture.name
                 );
                 assert!(agent_message_lower.contains("evidence"), "{}", fixture.name);
+                assert_eq!(
+                    efficiency["pendingUserTurnRequired"], false,
+                    "{}",
+                    fixture.name
+                );
             }
             Some("structured_refusal") => {
                 assert_eq!(expected_prompt.outcome, "refused", "{}", fixture.name);
@@ -132,6 +147,16 @@ fn workflow_acp_prompt_language_loop_harness_reports_prompt_to_dry_run_rates() {
                 );
                 assert!(
                     agent_message_lower.contains("no mutation"),
+                    "{}",
+                    fixture.name
+                );
+                assert_eq!(
+                    efficiency["pendingUserTurnRequired"], true,
+                    "{}",
+                    fixture.name
+                );
+                assert_eq!(
+                    efficiency["pendingReason"], expected_refusal,
                     "{}",
                     fixture.name
                 );
@@ -199,6 +224,16 @@ fn workflow_acp_prompt_language_loop_harness_reports_prompt_to_dry_run_rates() {
         total,
         pct(unexpected_fallback, total)
     );
+    println!(
+        "  Local repair turns avoided: {}",
+        estimated_user_repair_turns_avoided
+    );
+    println!(
+        "  Pending HITL turns:       {}/{} ({:.1}%)",
+        pending_user_turn_required,
+        total,
+        pct(pending_user_turn_required, total)
+    );
     timings.print();
     println!("=======================================================================\n");
 
@@ -209,6 +244,11 @@ fn workflow_acp_prompt_language_loop_harness_reports_prompt_to_dry_run_rates() {
     assert_eq!(pending_question, 0);
     assert_eq!(prose_only_failure, 0);
     assert_eq!(unexpected_fallback, 0);
+    assert!(estimated_user_repair_turns_avoided > 0);
+    assert_eq!(
+        pending_user_turn_required,
+        structured_refusal + pending_question
+    );
 }
 
 #[derive(Debug, Clone)]
@@ -329,6 +369,16 @@ fn agent_message_text(outgoing: &[JsonRpcOutgoing]) -> String {
         })
         .collect::<Vec<_>>()
         .join("\n")
+}
+
+fn conversation_efficiency<'a>(response: &'a Value, fixture_name: &str) -> &'a Value {
+    let efficiency = &response["observability"]["conversationEfficiency"];
+    assert!(
+        efficiency.is_object(),
+        "{}: expected observability.conversationEfficiency payload",
+        fixture_name
+    );
+    efficiency
 }
 
 #[derive(Debug, Default)]

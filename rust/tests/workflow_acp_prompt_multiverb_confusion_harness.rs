@@ -29,6 +29,8 @@ fn workflow_acp_prompt_multiverb_confusion_reports_routing_precision() {
     let mut prose_only_failure = 0usize;
     let mut unexpected_fallback = 0usize;
     let mut timings = TimingStats::default();
+    let mut estimated_user_repair_turns_avoided = 0u64;
+    let mut pending_user_turn_required = 0usize;
 
     for scenario in &scenarios {
         total += 1;
@@ -59,6 +61,14 @@ fn workflow_acp_prompt_multiverb_confusion_reports_routing_precision() {
         let response = response_result(&outgoing)
             .unwrap_or_else(|| panic!("{}: expected JSON-RPC response", scenario.name));
         timings.record(response, scenario.name);
+        let efficiency = conversation_efficiency(response, scenario.name);
+        assert_eq!(efficiency["proseOnlyFailure"], false, "{}", scenario.name);
+        estimated_user_repair_turns_avoided += efficiency["estimatedUserRepairTurnsAvoided"]
+            .as_u64()
+            .unwrap_or(0);
+        if efficiency["pendingUserTurnRequired"] == true {
+            pending_user_turn_required += 1;
+        }
         match response["status"].as_str() {
             Some("dry_run_validated") => {
                 assert_eq!(
@@ -88,6 +98,11 @@ fn workflow_acp_prompt_multiverb_confusion_reports_routing_precision() {
                 );
                 assert!(
                     agent_message_lower.contains("no mutation"),
+                    "{}",
+                    scenario.name
+                );
+                assert_eq!(
+                    efficiency["pendingUserTurnRequired"], false,
                     "{}",
                     scenario.name
                 );
@@ -133,6 +148,11 @@ fn workflow_acp_prompt_multiverb_confusion_reports_routing_precision() {
                     "{}",
                     scenario.name
                 );
+                assert_eq!(
+                    efficiency["pendingUserTurnRequired"], true,
+                    "{}",
+                    scenario.name
+                );
             }
             Some("pending_question") => {
                 assert_eq!(
@@ -165,6 +185,16 @@ fn workflow_acp_prompt_multiverb_confusion_reports_routing_precision() {
                 assert!(
                     agent_message_lower.contains("no workbook dry-run")
                         || agent_message_lower.contains("no dry-run"),
+                    "{}",
+                    scenario.name
+                );
+                assert_eq!(
+                    efficiency["pendingUserTurnRequired"], true,
+                    "{}",
+                    scenario.name
+                );
+                assert!(
+                    efficiency["pendingReason"].as_str().is_some(),
                     "{}",
                     scenario.name
                 );
@@ -220,6 +250,16 @@ fn workflow_acp_prompt_multiverb_confusion_reports_routing_precision() {
         total,
         pct(unexpected_fallback, total)
     );
+    println!(
+        "  Local repair turns avoided: {}",
+        estimated_user_repair_turns_avoided
+    );
+    println!(
+        "  Pending HITL turns:       {}/{} ({:.1}%)",
+        pending_user_turn_required,
+        total,
+        pct(pending_user_turn_required, total)
+    );
     timings.print();
     println!("=======================================================================\n");
 
@@ -229,6 +269,10 @@ fn workflow_acp_prompt_multiverb_confusion_reports_routing_precision() {
     assert_eq!(pending_question, 5);
     assert_eq!(prose_only_failure, 0);
     assert_eq!(unexpected_fallback, 0);
+    assert_eq!(
+        pending_user_turn_required,
+        structured_refusal + pending_question
+    );
 }
 
 fn scenarios() -> Vec<Scenario> {
@@ -410,6 +454,16 @@ fn agent_message_text(outgoing: &[JsonRpcOutgoing]) -> String {
         })
         .collect::<Vec<_>>()
         .join("\n")
+}
+
+fn conversation_efficiency<'a>(response: &'a Value, scenario_name: &str) -> &'a Value {
+    let efficiency = &response["observability"]["conversationEfficiency"];
+    assert!(
+        efficiency.is_object(),
+        "{}: expected observability.conversationEfficiency payload",
+        scenario_name
+    );
+    efficiency
 }
 
 #[derive(Debug, Default)]

@@ -693,6 +693,7 @@ impl AcpJsonRpcAgent {
                                 "total_ms": millis_from_micros(prompt_route_us),
                                 "total_us": prompt_route_us
                             },
+                            "conversationEfficiency": pending_question_conversation_efficiency("kyc_prompt_ambiguous"),
                             "acpMechanismSummary": ["prompt_router", "structured_pending_question"]
                         }
                     }),
@@ -734,6 +735,7 @@ impl AcpJsonRpcAgent {
                                 "total_ms": millis_from_micros(prompt_route_us),
                                 "total_us": prompt_route_us
                             },
+                            "conversationEfficiency": pending_question_conversation_efficiency("kyc_update_status_prompt_incomplete"),
                             "acpMechanismSummary": ["prompt_router", "structured_pending_question"]
                         }
                     }),
@@ -1264,6 +1266,11 @@ impl AcpJsonRpcAgent {
                         "observability": {
                             "projectionLatencyMs": elapsed_ms(started_at),
                             "performance": language_loop_performance(&timings, prompt_route_us, acp_emit_us),
+                            "conversationEfficiency": language_loop_conversation_efficiency(
+                                &metrics,
+                                "dry_run_validated",
+                                None
+                            ),
                             "acpMechanismSummary": ["language_pack", "deterministic_revision_loop", "dry_run_only"]
                         }
                     }),
@@ -1312,6 +1319,11 @@ impl AcpJsonRpcAgent {
                         "observability": {
                             "projectionLatencyMs": elapsed_ms(started_at),
                             "performance": language_loop_performance(&timings, prompt_route_us, acp_emit_us),
+                            "conversationEfficiency": language_loop_conversation_efficiency(
+                                &metrics,
+                                "structured_refusal",
+                                Some(refusal.refusal_code.as_str())
+                            ),
                             "acpMechanismSummary": ["language_pack", "deterministic_revision_loop", "structured_refusal"]
                         }
                     }),
@@ -1937,6 +1949,45 @@ fn language_loop_performance(
     })
 }
 
+fn language_loop_conversation_efficiency(
+    metrics: &LanguageAcquisitionMetrics,
+    outcome: &str,
+    pending_reason: Option<&str>,
+) -> Value {
+    let pending_user_turn_required = !metrics.dry_run_valid;
+    let estimated_user_repair_turns_avoided = if metrics.dry_run_valid {
+        u64::from(metrics.revision_count)
+    } else {
+        0
+    };
+
+    json!({
+        "outcome": outcome,
+        "localRevisionCount": metrics.revision_count,
+        "estimatedUserRepairTurnsAvoided": estimated_user_repair_turns_avoided,
+        "pendingUserTurnRequired": pending_user_turn_required,
+        "pendingReason": pending_reason,
+        "firstPassValid": metrics.first_pass_valid,
+        "dryRunValid": metrics.dry_run_valid,
+        "structuredFailureMode": pending_reason,
+        "proseOnlyFailure": false
+    })
+}
+
+fn pending_question_conversation_efficiency(code: &str) -> Value {
+    json!({
+        "outcome": "pending_question",
+        "localRevisionCount": 0,
+        "estimatedUserRepairTurnsAvoided": 0,
+        "pendingUserTurnRequired": true,
+        "pendingReason": code,
+        "firstPassValid": false,
+        "dryRunValid": false,
+        "structuredFailureMode": code,
+        "proseOnlyFailure": false
+    })
+}
+
 fn pending_question_outgoing(
     id: Option<Value>,
     session_id: Uuid,
@@ -2387,6 +2438,14 @@ mod tests {
         assert!(result["observability"]["performance"]["dry_run_ms"]
             .as_u64()
             .is_some());
+        assert_eq!(
+            result["observability"]["conversationEfficiency"]["pendingUserTurnRequired"],
+            false
+        );
+        assert_eq!(
+            result["observability"]["conversationEfficiency"]["proseOnlyFailure"],
+            false
+        );
         let message = agent_message_text(&outgoing);
         assert!(message.contains("kyc-case.update-status"));
         assert!(message.contains("kyc-case.discovery-to-assessment"));
@@ -2447,6 +2506,18 @@ mod tests {
         assert!(result["observability"]["performance"]["dry_run_ms"]
             .as_u64()
             .is_some());
+        assert_eq!(
+            result["observability"]["conversationEfficiency"]["pendingUserTurnRequired"],
+            true
+        );
+        assert_eq!(
+            result["observability"]["conversationEfficiency"]["pendingReason"],
+            "missing_evidence_digest"
+        );
+        assert_eq!(
+            result["observability"]["conversationEfficiency"]["proseOnlyFailure"],
+            false
+        );
         let message = agent_message_text(&outgoing);
         assert!(message.contains("missing_evidence_digest"));
         assert!(message.contains("draft.evidence_digest"));
