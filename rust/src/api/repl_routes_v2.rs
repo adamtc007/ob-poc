@@ -4330,6 +4330,163 @@ mod tests {
         }
     }
 
+    #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+    enum LiveAblationVariant {
+        FullLanguagePack,
+        StrippedTransitionLandscape,
+    }
+
+    impl LiveAblationVariant {
+        fn id(self) -> &'static str {
+            match self {
+                Self::FullLanguagePack => "full_language_pack",
+                Self::StrippedTransitionLandscape => "stripped_transition_landscape",
+            }
+        }
+
+        fn description(self) -> &'static str {
+            match self {
+                Self::FullLanguagePack => {
+                    "Full SemOS language pack prompt context with transition landscape, effects, UUID bindings, and micro-patterns."
+                }
+                Self::StrippedTransitionLandscape => {
+                    "Control prompt context retaining schema, objective, current state, UUID binding, and evidence policy, but removing candidate transitions, blocked verbs, transition effects, and micro-patterns."
+                }
+            }
+        }
+
+        fn prompt_pack(
+            self,
+            full_pack: &crate::runbook::SemOsLanguagePack,
+        ) -> crate::runbook::SemOsLanguagePack {
+            let mut prompt_pack = full_pack.clone();
+            if self == Self::StrippedTransitionLandscape {
+                prompt_pack.candidate_transitions.clear();
+                prompt_pack.blocked_verbs.clear();
+                prompt_pack.transition_effects.clear();
+                prompt_pack.canonical_patterns.clear();
+            }
+            prompt_pack
+        }
+    }
+
+    #[derive(Clone, Copy)]
+    struct LiveAblationFixture {
+        id: &'static str,
+        current_state: &'static str,
+        objective: &'static str,
+        evidence_digest: &'static str,
+        expected_transition: &'static str,
+        expected_to_state: &'static str,
+    }
+
+    #[derive(Debug, serde::Serialize)]
+    struct LiveAblationRow {
+        model: String,
+        variant: String,
+        fixture_id: String,
+        current_state: String,
+        expected_transition: String,
+        expected_to_state: String,
+        status: String,
+        transition_ref: Option<String>,
+        to_state: Option<String>,
+        refusal_code: Option<String>,
+        diagnostic_codes: Vec<String>,
+        revision_count: u64,
+        decode_repair_count: u64,
+        llm_draft_ms: u64,
+        total_ms: u64,
+        prompt_candidate_transition_count: usize,
+        prompt_transition_effect_count: usize,
+        prompt_canonical_pattern_count: usize,
+        prose_only_failure: bool,
+        exact_transition_hit: bool,
+        outcome_layer: String,
+    }
+
+    fn live_ablation_fixtures() -> Vec<LiveAblationFixture> {
+        vec![
+            LiveAblationFixture {
+                id: "intake_status_target",
+                current_state: "INTAKE",
+                objective: "Set this KYC case status to DISCOVERY using evidence sha256:live-ablation-intake-target",
+                evidence_digest: "sha256:live-ablation-intake-target",
+                expected_transition: "kyc-case.intake-to-discovery",
+                expected_to_state: "DISCOVERY",
+            },
+            LiveAblationFixture {
+                id: "discovery_status_target",
+                current_state: "DISCOVERY",
+                objective: "Set this KYC case status to ASSESSMENT using evidence sha256:live-ablation-discovery-target",
+                evidence_digest: "sha256:live-ablation-discovery-target",
+                expected_transition: "kyc-case.discovery-to-assessment",
+                expected_to_state: "ASSESSMENT",
+            },
+            LiveAblationFixture {
+                id: "discovery_ready_for_assessment",
+                current_state: "DISCOVERY",
+                objective: "Mark the KYC case ready for ASSESSMENT using evidence sha256:live-ablation-discovery-ready",
+                evidence_digest: "sha256:live-ablation-discovery-ready",
+                expected_transition: "kyc-case.discovery-to-assessment",
+                expected_to_state: "ASSESSMENT",
+            },
+        ]
+    }
+
+    fn live_ablation_row(
+        model: &str,
+        variant: LiveAblationVariant,
+        fixture: LiveAblationFixture,
+        value: &serde_json::Value,
+        prompt_pack: &crate::runbook::SemOsLanguagePack,
+    ) -> LiveAblationRow {
+        let status = value["status"].as_str().unwrap_or("unknown").to_string();
+        let transition_ref = value["output"]["dry_run"]["transition_ref"]
+            .as_str()
+            .map(str::to_string);
+        let to_state = value["output"]["dry_run"]["semantic_diff"]["to_state"]
+            .as_str()
+            .map(str::to_string);
+        let exact_transition_hit = status == "dry_run_validated"
+            && transition_ref.as_deref() == Some(fixture.expected_transition)
+            && to_state.as_deref() == Some(fixture.expected_to_state);
+        LiveAblationRow {
+            model: model.to_string(),
+            variant: variant.id().to_string(),
+            fixture_id: fixture.id.to_string(),
+            current_state: fixture.current_state.to_string(),
+            expected_transition: fixture.expected_transition.to_string(),
+            expected_to_state: fixture.expected_to_state.to_string(),
+            status,
+            transition_ref,
+            to_state,
+            refusal_code: value["refusal"]["refusal_code"]
+                .as_str()
+                .map(str::to_string),
+            diagnostic_codes: diagnostic_codes(value),
+            revision_count: value["metrics"]["revision_count"].as_u64().unwrap_or(0),
+            decode_repair_count: value["metrics"]["decode_repair_count"]
+                .as_u64()
+                .unwrap_or(0),
+            llm_draft_ms: value["observability"]["performance"]["llm_draft_ms"]
+                .as_u64()
+                .unwrap_or(0),
+            total_ms: value["observability"]["performance"]["total_ms"]
+                .as_u64()
+                .unwrap_or(0),
+            prompt_candidate_transition_count: prompt_pack.candidate_transitions.len(),
+            prompt_transition_effect_count: prompt_pack.transition_effects.len(),
+            prompt_canonical_pattern_count: prompt_pack.canonical_patterns.len(),
+            prose_only_failure: value["observability"]["conversationEfficiency"]
+                ["proseOnlyFailure"]
+                .as_bool()
+                .unwrap_or(true),
+            exact_transition_hit,
+            outcome_layer: outcome_layer(value),
+        }
+    }
+
     fn live_comparison_row(
         model: &str,
         fixture: LiveComparisonFixture,
@@ -4652,6 +4809,110 @@ mod tests {
         })
     }
 
+    fn live_ablation_summary(
+        rows: &[LiveAblationRow],
+        model: &str,
+        variant: LiveAblationVariant,
+    ) -> serde_json::Value {
+        let model_rows: Vec<&LiveAblationRow> = rows
+            .iter()
+            .filter(|row| row.model == model && row.variant == variant.id())
+            .collect();
+        let count = model_rows.len() as u64;
+        let dry_run_validated = model_rows
+            .iter()
+            .filter(|row| row.status == "dry_run_validated")
+            .count() as u64;
+        let structured_refusal = model_rows
+            .iter()
+            .filter(|row| row.status == "structured_refusal")
+            .count() as u64;
+        let exact_transition_hits = model_rows
+            .iter()
+            .filter(|row| row.exact_transition_hit)
+            .count() as u64;
+        let prose_only_failures = model_rows
+            .iter()
+            .filter(|row| row.prose_only_failure)
+            .count() as u64;
+        let decode_refusal = model_rows
+            .iter()
+            .filter(|row| row.outcome_layer == "decode_refusal")
+            .count() as u64;
+        let validation_refusal = model_rows
+            .iter()
+            .filter(|row| row.outcome_layer == "validation_refusal")
+            .count() as u64;
+        let revision_refusal = model_rows
+            .iter()
+            .filter(|row| row.outcome_layer == "revision_refusal")
+            .count() as u64;
+        let total_decode_repairs: u64 = model_rows.iter().map(|row| row.decode_repair_count).sum();
+        let total_revisions: u64 = model_rows.iter().map(|row| row.revision_count).sum();
+        let total_llm_draft_ms: u64 = model_rows.iter().map(|row| row.llm_draft_ms).sum();
+        let total_ms: u64 = model_rows.iter().map(|row| row.total_ms).sum();
+
+        serde_json::json!({
+            "model": model,
+            "variant": variant.id(),
+            "variant_description": variant.description(),
+            "fixture_count": count,
+            "dry_run_validated": dry_run_validated,
+            "structured_refusal": structured_refusal,
+            "exact_transition_hits": exact_transition_hits,
+            "prose_only_failures": prose_only_failures,
+            "dry_run_valid_rate": rate(dry_run_validated, count),
+            "exact_transition_hit_rate": rate(exact_transition_hits, count),
+            "structured_outcome_rate": rate(dry_run_validated + structured_refusal, count),
+            "outcome_layers": {
+                "decode_refusal": decode_refusal,
+                "validation_refusal": validation_refusal,
+                "revision_refusal": revision_refusal,
+                "dry_run_validated": dry_run_validated,
+                "structured_refusal": structured_refusal,
+                "prose_only_failure": prose_only_failures,
+            },
+            "total_decode_repairs": total_decode_repairs,
+            "avg_decode_repair_count": average(total_decode_repairs, count),
+            "total_revisions": total_revisions,
+            "avg_revision_count": average(total_revisions, count),
+            "avg_llm_draft_ms": average(total_llm_draft_ms, count),
+            "avg_total_ms": average(total_ms, count),
+        })
+    }
+
+    fn live_ablation_deltas(rows: &[LiveAblationRow], model: &str) -> serde_json::Value {
+        let full = live_ablation_summary(rows, model, LiveAblationVariant::FullLanguagePack);
+        let stripped = live_ablation_summary(
+            rows,
+            model,
+            LiveAblationVariant::StrippedTransitionLandscape,
+        );
+        let full_exact = full["exact_transition_hit_rate"].as_f64().unwrap_or(0.0);
+        let stripped_exact = stripped["exact_transition_hit_rate"]
+            .as_f64()
+            .unwrap_or(0.0);
+        let full_dry_run = full["dry_run_valid_rate"].as_f64().unwrap_or(0.0);
+        let stripped_dry_run = stripped["dry_run_valid_rate"].as_f64().unwrap_or(0.0);
+        let full_repairs = full["avg_decode_repair_count"].as_f64().unwrap_or(0.0);
+        let stripped_repairs = stripped["avg_decode_repair_count"].as_f64().unwrap_or(0.0);
+        let full_revisions = full["avg_revision_count"].as_f64().unwrap_or(0.0);
+        let stripped_revisions = stripped["avg_revision_count"].as_f64().unwrap_or(0.0);
+        let full_latency = full["avg_total_ms"].as_f64().unwrap_or(0.0);
+        let stripped_latency = stripped["avg_total_ms"].as_f64().unwrap_or(0.0);
+
+        serde_json::json!({
+            "model": model,
+            "baseline_variant": LiveAblationVariant::FullLanguagePack.id(),
+            "control_variant": LiveAblationVariant::StrippedTransitionLandscape.id(),
+            "exact_transition_hit_rate_delta": round2(full_exact - stripped_exact),
+            "dry_run_valid_rate_delta": round2(full_dry_run - stripped_dry_run),
+            "avg_decode_repair_count_delta": round2(stripped_repairs - full_repairs),
+            "avg_revision_count_delta": round2(stripped_revisions - full_revisions),
+            "avg_total_ms_delta": round2(full_latency - stripped_latency),
+        })
+    }
+
     fn live_report_metadata(report_name: &str) -> serde_json::Value {
         serde_json::json!({
             "report_schema_version": 1,
@@ -4664,6 +4925,155 @@ mod tests {
                 .map(|status| !status.trim().is_empty())
                 .unwrap_or(true),
         })
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    async fn acp_kyc_update_status_llm_draft_loop_value_with_prompt_variant(
+        session_id: Uuid,
+        req: AcpKycUpdateStatusLlmDraftRouteRequest,
+        variant: LiveAblationVariant,
+        client: Result<std::sync::Arc<dyn ob_agentic::llm_client::LlmClient>, String>,
+    ) -> Result<(serde_json::Value, crate::runbook::SemOsLanguagePack), crate::acp::AcpAdapterError>
+    {
+        let manifest = load_ob_poc_kyc_domain_pack()?;
+        let session = crate::acp::open_acp_session(session_id, req.adapter);
+        let total_started_at = Instant::now();
+        let actor_id = req
+            .actor_id
+            .clone()
+            .unwrap_or_else(|| "sage:planning".to_string());
+        let actor_roles = if req.actor_roles.is_empty() {
+            vec!["agent".to_string()]
+        } else {
+            req.actor_roles.clone()
+        };
+        let anchor = resolve_kyc_case_state_anchor(&session, &manifest, &req)?;
+        let case_state = match anchor {
+            KycCaseStateAnchorResolution::Ready(case_state) => case_state,
+            KycCaseStateAnchorResolution::Pending(missing) => {
+                return Ok((
+                    acp_language_loop_pending_question_value(
+                        "kyc_update_status_state_anchor_incomplete",
+                        missing,
+                        route_elapsed_us(total_started_at),
+                    ),
+                    crate::runbook::SemOsLanguagePack {
+                        objective: "pending".to_string(),
+                        pack_id: manifest.pack_id.clone(),
+                        pack_version: manifest.version.clone(),
+                        configuration_version: String::new(),
+                        state_snapshot_id: String::new(),
+                        subject: crate::runbook::LanguagePackSubject {
+                            kind: "kyc_case".to_string(),
+                            id: req.subject_id,
+                        },
+                        current_state: String::new(),
+                        candidate_transitions: vec![],
+                        valid_verbs: vec![],
+                        blocked_verbs: vec![],
+                        argument_schema: vec![],
+                        transition_effects: vec![],
+                        evidence_policy: crate::runbook::EvidencePolicySummary {
+                            required_evidence_refs: vec![],
+                            dry_run_only: true,
+                            mutation_allowed: false,
+                            hitl_required: true,
+                        },
+                        uuid_bindings: vec![],
+                        canonical_patterns: vec![],
+                    },
+                ));
+            }
+        };
+
+        let language_pack_started_at = Instant::now();
+        let validation_pack = crate::acp::acp_kyc_update_status_language_pack(
+            &session,
+            &manifest,
+            crate::runbook::KycLanguagePackRequest {
+                subject_id: case_state.subject_id,
+                current_state: case_state.current_state.clone(),
+                configuration_version: case_state.configuration_version.clone(),
+                state_snapshot_id: case_state.state_snapshot_id.clone(),
+                objective: req.objective.clone(),
+            },
+        )?;
+        let prompt_pack = variant.prompt_pack(&validation_pack);
+        let language_pack_us = route_elapsed_us(language_pack_started_at);
+
+        let client = match client {
+            Ok(client) => client,
+            Err(error) => {
+                let value = acp_llm_adapter_structured_refusal_value(
+                    &prompt_pack,
+                    case_state,
+                    "llm_client_unavailable",
+                    error,
+                    vec![],
+                    None,
+                    language_pack_us,
+                    0,
+                    route_elapsed_us(total_started_at),
+                );
+                return Ok((value, prompt_pack));
+            }
+        };
+
+        let adapter_started_at = Instant::now();
+        let outcome = crate::runbook::run_kyc_update_status_llm_draft_loop_with_prompt_pack(
+            &manifest,
+            &prompt_pack,
+            &validation_pack,
+            session_id,
+            actor_id,
+            actor_roles,
+            req.evidence_digest.clone(),
+            client,
+        )
+        .await;
+        let adapter_us = route_elapsed_us(adapter_started_at);
+        let total_us = route_elapsed_us(total_started_at);
+
+        let mut value = match outcome {
+            crate::runbook::LlmDraftLoopOutcome::HarnessCompleted {
+                llm_trace,
+                draft,
+                adapter_diagnostics,
+                outcome,
+            } => acp_llm_harness_completed_value(
+                prompt_pack.clone(),
+                case_state,
+                llm_trace,
+                draft,
+                adapter_diagnostics,
+                outcome,
+                language_pack_us,
+                adapter_us,
+                total_us,
+            ),
+            crate::runbook::LlmDraftLoopOutcome::AdapterRefused { refusal } => {
+                acp_llm_adapter_structured_refusal_value(
+                    &prompt_pack,
+                    case_state,
+                    refusal.refusal_code,
+                    refusal.message,
+                    refusal.diagnostics,
+                    refusal.llm_trace,
+                    language_pack_us,
+                    adapter_us,
+                    total_us,
+                )
+            }
+        };
+        value["prompt_context_variant"] = serde_json::json!({
+            "id": variant.id(),
+            "description": variant.description(),
+            "validation_pack_ref": format!(
+                "{}@{}",
+                validation_pack.pack_id, validation_pack.pack_version
+            ),
+        });
+        Ok((value, prompt_pack))
     }
 
     fn write_live_report(report_name: &str, report: &serde_json::Value) -> std::path::PathBuf {
@@ -4712,8 +5122,12 @@ mod tests {
         if count == 0 {
             0.0
         } else {
-            ((total as f64 / count as f64) * 100.0).round() / 100.0
+            round2(total as f64 / count as f64)
         }
+    }
+
+    fn round2(value: f64) -> f64 {
+        (value * 100.0).round() / 100.0
     }
 
     fn reference_mutation_manifest() -> sem_os_core::domain_pack::DomainPackManifest {
@@ -5816,6 +6230,122 @@ mod tests {
             value["observability"]["conversationEfficiency"]["proseOnlyFailure"],
             false
         );
+    }
+
+    #[tokio::test]
+    #[ignore = "requires live LLM credentials and network access"]
+    async fn live_acp_llm_draft_loop_language_pack_ablation_harness() {
+        let _env_guard = LIVE_LLM_ENV_LOCK.lock().await;
+        let anthropic_api_key = anthropic_api_key_env_name();
+        let env_names = vec![
+            "AGENT_BACKEND".to_string(),
+            anthropic_api_key.clone(),
+            "CLAUDE_CODE_MODEL".to_string(),
+            "CLAUDE_CODE_MAX_BUDGET_USD".to_string(),
+        ];
+        let _snapshot = EnvSnapshot::capture(&env_names);
+        std::env::set_var("AGENT_BACKEND", "claude-code-cli");
+        std::env::remove_var(&anthropic_api_key);
+        if std::env::var("CLAUDE_CODE_MAX_BUDGET_USD").is_err() {
+            std::env::set_var("CLAUDE_CODE_MAX_BUDGET_USD", "0.75");
+        }
+
+        let models = ["sonnet", "claude-sonnet-4-6"];
+        let variants = [
+            LiveAblationVariant::FullLanguagePack,
+            LiveAblationVariant::StrippedTransitionLandscape,
+        ];
+        let fixtures = live_ablation_fixtures();
+        let mut rows = Vec::new();
+
+        for model in models {
+            std::env::set_var("CLAUDE_CODE_MODEL", model);
+            for variant in variants.iter().copied() {
+                for fixture in fixtures.iter().copied() {
+                    let client = ob_agentic::create_llm_client()
+                        .unwrap_or_else(|err| panic!("live LLM client for {model}: {err}"));
+                    let (value, prompt_pack) =
+                        acp_kyc_update_status_llm_draft_loop_value_with_prompt_variant(
+                            test_session_id(),
+                            llm_draft_request_with_discovery(
+                                fixture.current_state,
+                                fixture.objective,
+                                Some(fixture.evidence_digest),
+                            ),
+                            variant,
+                            Ok(client),
+                        )
+                        .await
+                        .unwrap_or_else(|err| {
+                            panic!(
+                                "live ablation {model}/{}/{} failed: {err:?}",
+                                variant.id(),
+                                fixture.id
+                            )
+                        });
+
+                    assert!(matches!(
+                        value["status"].as_str(),
+                        Some("dry_run_validated" | "structured_refusal")
+                    ));
+                    assert_eq!(
+                        value["observability"]["conversationEfficiency"]["proseOnlyFailure"],
+                        false
+                    );
+
+                    let row = live_ablation_row(model, variant, fixture, &value, &prompt_pack);
+                    if variant == LiveAblationVariant::FullLanguagePack {
+                        assert_eq!(value["status"], "dry_run_validated");
+                        assert!(
+                            row.exact_transition_hit,
+                            "full language pack missed expected transition: {:?}",
+                            row
+                        );
+                    }
+                    rows.push(row);
+                }
+            }
+        }
+
+        let summary: Vec<_> = models
+            .iter()
+            .flat_map(|model| {
+                variants
+                    .iter()
+                    .map(|variant| live_ablation_summary(&rows, model, *variant))
+            })
+            .collect();
+        let deltas: Vec<_> = models
+            .iter()
+            .map(|model| live_ablation_deltas(&rows, model))
+            .collect();
+        let report = serde_json::json!({
+            "metadata": live_report_metadata("live_llm_ablation_comparison"),
+            "fixture_count": fixtures.len(),
+            "models": models,
+            "variants": variants
+                .iter()
+                .map(|variant| serde_json::json!({
+                    "id": variant.id(),
+                    "description": variant.description(),
+                }))
+                .collect::<Vec<_>>(),
+            "summary": summary,
+            "deltas": deltas,
+            "rows": rows,
+        });
+        let report_path = write_live_report("live-llm-ablation-comparison", &report);
+
+        println!(
+            "live_llm_ablation_comparison report_path={} {}",
+            report_path.display(),
+            serde_json::to_string_pretty(&report).unwrap()
+        );
+
+        for model_summary in report["summary"].as_array().unwrap() {
+            assert_eq!(model_summary["prose_only_failures"], 0);
+            assert_eq!(model_summary["structured_outcome_rate"], 100.0);
+        }
     }
 
     #[tokio::test]

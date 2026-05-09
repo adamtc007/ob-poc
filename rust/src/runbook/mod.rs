@@ -94,7 +94,8 @@ pub use language_pack::{
     TransitionEffect, TransitionLanguagePackReadiness, UuidBindingRequirement,
 };
 pub use llm_draft_adapter::{
-    run_kyc_update_status_llm_draft_loop, LlmDraftAdapterRefusal, LlmDraftLoopOutcome,
+    run_kyc_update_status_llm_draft_loop, run_kyc_update_status_llm_draft_loop_with_prompt_pack,
+    LlmDraftAdapterRefusal, LlmDraftLoopOutcome,
     KYC_UPDATE_STATUS_LLM_DRAFT_PROMPT_TEMPLATE_VERSION,
 };
 pub use mutation_preflight::{

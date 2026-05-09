@@ -57,10 +57,34 @@ pub async fn run_kyc_update_status_llm_draft_loop(
     evidence_digest: Option<String>,
     client: Arc<dyn LlmClient>,
 ) -> LlmDraftLoopOutcome {
+    run_kyc_update_status_llm_draft_loop_with_prompt_pack(
+        manifest,
+        pack,
+        pack,
+        session_id,
+        actor_id,
+        actor_roles,
+        evidence_digest,
+        client,
+    )
+    .await
+}
+
+#[allow(clippy::too_many_arguments)]
+pub async fn run_kyc_update_status_llm_draft_loop_with_prompt_pack(
+    manifest: &DomainPackManifest,
+    prompt_pack: &SemOsLanguagePack,
+    validation_pack: &SemOsLanguagePack,
+    session_id: Uuid,
+    actor_id: impl Into<String>,
+    actor_roles: Vec<String>,
+    evidence_digest: Option<String>,
+    client: Arc<dyn LlmClient>,
+) -> LlmDraftLoopOutcome {
     let actor_id = actor_id.into();
     let system_prompt = system_prompt();
     let user_prompt = match user_prompt(
-        pack,
+        prompt_pack,
         session_id,
         &actor_id,
         &actor_roles,
@@ -70,7 +94,7 @@ pub async fn run_kyc_update_status_llm_draft_loop(
         Err(err) => {
             return LlmDraftLoopOutcome::AdapterRefused {
                 refusal: adapter_refusal(
-                    pack,
+                    validation_pack,
                     "language_pack_serialization_failed",
                     "llm_draft_adapter.language_pack",
                     err.to_string(),
@@ -89,7 +113,7 @@ pub async fn run_kyc_update_status_llm_draft_loop(
         Err(err) => {
             return LlmDraftLoopOutcome::AdapterRefused {
                 refusal: adapter_refusal(
-                    pack,
+                    validation_pack,
                     "llm_draft_failed",
                     "llm_draft_adapter.client",
                     err.to_string(),
@@ -103,7 +127,7 @@ pub async fn run_kyc_update_status_llm_draft_loop(
     if result.tool_name != "draft_kyc_update_status_workbook" {
         return LlmDraftLoopOutcome::AdapterRefused {
             refusal: adapter_refusal(
-                pack,
+                validation_pack,
                 "unexpected_tool_call",
                 "llm_draft_adapter.tool_name",
                 result.tool_name,
@@ -117,7 +141,7 @@ pub async fn run_kyc_update_status_llm_draft_loop(
         Err(err) => {
             return LlmDraftLoopOutcome::AdapterRefused {
                 refusal: adapter_refusal(
-                    pack,
+                    validation_pack,
                     "llm_response_serialization_failed",
                     "llm_draft_adapter.response",
                     err.to_string(),
@@ -129,13 +153,13 @@ pub async fn run_kyc_update_status_llm_draft_loop(
     let mut draft_arguments = result.arguments;
     let mut adapter_diagnostics = normalize_known_draft_bindings(
         &mut draft_arguments,
-        pack,
+        validation_pack,
         session_id,
         &actor_id,
         &actor_roles,
         evidence_digest.as_deref(),
     );
-    adapter_diagnostics.extend(repair_decode_fields(&mut draft_arguments, pack));
+    adapter_diagnostics.extend(repair_decode_fields(&mut draft_arguments, validation_pack));
     let trace = record_llm_inference_trace(crate::llm_trace::LlmInferenceTraceInput {
         provider: client.provider_name(),
         model: client.model_name(),
@@ -149,34 +173,34 @@ pub async fn run_kyc_update_status_llm_draft_loop(
         latency_ms: Some(llm_latency_ms),
     });
 
-    let mut draft: KycUpdateStatusWorkbookDraft = match decode_workbook_draft(draft_arguments, pack)
-    {
-        Ok(draft) => draft,
-        Err(diagnostics) => {
-            let refusal_code = diagnostics
-                .first()
-                .map(|diagnostic| diagnostic.error_code.clone())
-                .unwrap_or_else(|| "llm_draft_decode_failed".to_string());
-            let message = diagnostics
-                .first()
-                .and_then(|diagnostic| diagnostic.blocked_transition_reason.clone())
-                .unwrap_or_else(|| "LLM draft did not satisfy workbook schema".to_string());
-            return LlmDraftLoopOutcome::AdapterRefused {
-                refusal: LlmDraftAdapterRefusal {
-                    refusal_code,
-                    message,
-                    diagnostics,
-                    llm_trace: Some(trace),
-                },
-            };
-        }
-    };
+    let mut draft: KycUpdateStatusWorkbookDraft =
+        match decode_workbook_draft(draft_arguments, validation_pack) {
+            Ok(draft) => draft,
+            Err(diagnostics) => {
+                let refusal_code = diagnostics
+                    .first()
+                    .map(|diagnostic| diagnostic.error_code.clone())
+                    .unwrap_or_else(|| "llm_draft_decode_failed".to_string());
+                let message = diagnostics
+                    .first()
+                    .and_then(|diagnostic| diagnostic.blocked_transition_reason.clone())
+                    .unwrap_or_else(|| "LLM draft did not satisfy workbook schema".to_string());
+                return LlmDraftLoopOutcome::AdapterRefused {
+                    refusal: LlmDraftAdapterRefusal {
+                        refusal_code,
+                        message,
+                        diagnostics,
+                        llm_trace: Some(trace),
+                    },
+                };
+            }
+        };
     draft.session_id = session_id;
     draft.actor_id = actor_id;
     draft.actor_roles = actor_roles;
     draft.llm_trace_ref = Some(workbook_llm_trace_ref(&trace));
 
-    let outcome = run_kyc_update_status_revision_loop(manifest, pack, draft.clone());
+    let outcome = run_kyc_update_status_revision_loop(manifest, validation_pack, draft.clone());
     LlmDraftLoopOutcome::HarnessCompleted {
         llm_trace: trace,
         draft,
@@ -724,6 +748,71 @@ mod tests {
             adapter_diagnostics[0].expected_state.as_deref(),
             Some("kyc-case.discovery-to-assessment")
         );
+        assert!(matches!(
+            outcome,
+            WorkbookRevisionOutcome::DryRunValid { .. }
+        ));
+    }
+
+    #[tokio::test]
+    async fn llm_draft_adapter_can_prompt_with_reduced_pack_and_validate_with_full_pack() {
+        let manifest: DomainPackManifest = serde_yaml::from_str(include_str!(
+            "../../config/sem_os_seeds/domain_packs/ob_poc_kyc.yaml"
+        ))
+        .unwrap();
+        let session_id = Uuid::parse_str(SESSION_ID).unwrap();
+        let case_id = Uuid::parse_str(CASE_ID).unwrap();
+        let validation_pack = build_kyc_update_status_language_pack(
+            &manifest,
+            KycLanguagePackRequest {
+                subject_id: case_id,
+                current_state: "DISCOVERY".to_string(),
+                configuration_version: "config-1".to_string(),
+                state_snapshot_id: "snapshot-1".to_string(),
+                objective: Some("Set this KYC case status to ASSESSMENT".to_string()),
+            },
+        )
+        .unwrap();
+        let mut prompt_pack = validation_pack.clone();
+        prompt_pack.candidate_transitions.clear();
+        prompt_pack.transition_effects.clear();
+        prompt_pack.canonical_patterns.clear();
+        let client = Arc::new(StubLlmClient {
+            arguments: serde_json::json!({
+                "verb": "kyc-case.update-status",
+                "subject_kind": "kyc_case",
+                "case_id": case_id,
+                "current_state": "DISCOVERY",
+                "requested_state": "ASSESSMENT",
+                "configuration_version": "config-1",
+                "state_snapshot_id": "snapshot-1",
+                "evidence_digest": "sha256:evidence"
+            }),
+        });
+
+        let outcome = run_kyc_update_status_llm_draft_loop_with_prompt_pack(
+            &manifest,
+            &prompt_pack,
+            &validation_pack,
+            session_id,
+            "sage",
+            vec!["ops".to_string()],
+            Some("sha256:evidence".to_string()),
+            client,
+        )
+        .await;
+
+        let LlmDraftLoopOutcome::HarnessCompleted {
+            draft,
+            adapter_diagnostics,
+            outcome,
+            ..
+        } = outcome
+        else {
+            panic!("expected harness completion");
+        };
+        assert_eq!(draft.transition_ref, "kyc-case.discovery-to-assessment");
+        assert_eq!(adapter_diagnostics[0].source_path, "draft.transition_ref");
         assert!(matches!(
             outcome,
             WorkbookRevisionOutcome::DryRunValid { .. }
