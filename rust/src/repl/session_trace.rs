@@ -51,6 +51,62 @@ pub struct TraceValidationStep {
     pub message: String,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct TraceLanguageLoopEvent {
+    pub phase: String,
+    pub status: String,
+    pub message: String,
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq)]
+pub struct TracePerformanceMetrics {
+    #[serde(default)]
+    pub prompt_route_ms: u64,
+    #[serde(default)]
+    pub prompt_route_us: u64,
+    #[serde(default)]
+    pub language_pack_ms: u64,
+    #[serde(default)]
+    pub language_pack_us: u64,
+    #[serde(default)]
+    pub revision_loop_ms: u64,
+    #[serde(default)]
+    pub revision_loop_us: u64,
+    #[serde(default)]
+    pub dry_run_ms: u64,
+    #[serde(default)]
+    pub dry_run_us: u64,
+    #[serde(default)]
+    pub acp_emit_ms: u64,
+    #[serde(default)]
+    pub acp_emit_us: u64,
+    #[serde(default)]
+    pub total_ms: u64,
+    #[serde(default)]
+    pub total_us: u64,
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq)]
+pub struct TraceConversationEfficiency {
+    pub outcome: String,
+    #[serde(default)]
+    pub local_revision_count: u8,
+    #[serde(default)]
+    pub estimated_user_repair_turns_avoided: u64,
+    #[serde(default)]
+    pub pending_user_turn_required: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub pending_reason: Option<String>,
+    #[serde(default)]
+    pub first_pass_valid: bool,
+    #[serde(default)]
+    pub dry_run_valid: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub structured_failure_mode: Option<String>,
+    #[serde(default)]
+    pub prose_only_failure: bool,
+}
+
 // ---------------------------------------------------------------------------
 // TraceOp — discriminated operation tag
 // ---------------------------------------------------------------------------
@@ -128,6 +184,47 @@ pub enum TraceOp {
         semantic_diff_uri: String,
         #[serde(default)]
         validation_trace: Vec<TraceValidationStep>,
+    },
+    AcpLanguageLoopTraced {
+        outcome: String,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        pack_id: Option<String>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        subject_id: Option<Uuid>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        verb: Option<String>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        current_state: Option<String>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        requested_state: Option<String>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        transition_ref: Option<String>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        workbook_id: Option<String>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        semantic_diff_uri: Option<String>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        refusal_code: Option<String>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        pending_question_code: Option<String>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        diagnostic_source_path: Option<String>,
+        #[serde(default)]
+        revision_count: u8,
+        #[serde(default)]
+        dry_run_valid: bool,
+        #[serde(default)]
+        first_pass_valid: bool,
+        #[serde(default)]
+        human_summary: String,
+        #[serde(default)]
+        needed_from_user: Vec<String>,
+        #[serde(default)]
+        trace: Vec<TraceLanguageLoopEvent>,
+        #[serde(default)]
+        performance: TracePerformanceMetrics,
+        #[serde(default)]
+        conversation_efficiency: TraceConversationEfficiency,
     },
     ApprovalTokenIssued {
         approval_token_id: String,
@@ -355,6 +452,47 @@ mod tests {
                     status: "passed".into(),
                     message: "workbook integrity hash verified".into(),
                 }],
+            },
+            TraceOp::AcpLanguageLoopTraced {
+                outcome: "dry_run_validated".into(),
+                pack_id: Some("ob-poc.kyc".into()),
+                subject_id: Some(Uuid::nil()),
+                verb: Some("kyc-case.update-status".into()),
+                current_state: Some("INTAKE".into()),
+                requested_state: Some("DISCOVERY".into()),
+                transition_ref: Some("kyc-case.intake-to-discovery".into()),
+                workbook_id: Some("ewb:v1:abc".into()),
+                semantic_diff_uri: Some("semos://semantic-diff/ewb:v1:abc".into()),
+                refusal_code: None,
+                pending_question_code: None,
+                diagnostic_source_path: None,
+                revision_count: 1,
+                dry_run_valid: true,
+                first_pass_valid: false,
+                human_summary: "Validated a dry-run workbook after local revision.".into(),
+                needed_from_user: vec![],
+                trace: vec![TraceLanguageLoopEvent {
+                    phase: "dry_run".into(),
+                    status: "completed".into(),
+                    message: "semos://semantic-diff/ewb:v1:abc".into(),
+                }],
+                performance: TracePerformanceMetrics {
+                    language_pack_ms: 1,
+                    revision_loop_ms: 2,
+                    dry_run_ms: 1,
+                    total_ms: 4,
+                    ..TracePerformanceMetrics::default()
+                },
+                conversation_efficiency: TraceConversationEfficiency {
+                    outcome: "dry_run_validated".into(),
+                    local_revision_count: 1,
+                    estimated_user_repair_turns_avoided: 1,
+                    pending_user_turn_required: false,
+                    first_pass_valid: false,
+                    dry_run_valid: true,
+                    prose_only_failure: false,
+                    ..TraceConversationEfficiency::default()
+                },
             },
             TraceOp::ApprovalTokenIssued {
                 approval_token_id: "approval:v1:abc".into(),

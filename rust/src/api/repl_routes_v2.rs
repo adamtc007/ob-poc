@@ -336,6 +336,31 @@ pub struct AcpContextAssemblyRequest {
     pub first_class_state_mutated: bool,
 }
 
+/// Request to route an ACP prompt through the session-scoped HTTP API.
+#[derive(Debug, Clone, Deserialize)]
+pub struct AcpPromptRouteRequest {
+    #[serde(default)]
+    pub prompt: Vec<crate::acp_protocol::AcpContentBlock>,
+}
+
+/// Request to run the bounded KYC update-status language loop.
+#[derive(Debug, Clone, Deserialize)]
+pub struct AcpKycUpdateStatusLanguageLoopRouteRequest {
+    #[serde(default = "default_acp_adapter")]
+    pub adapter: crate::acp::AcpAdapterKind,
+    pub subject_id: Uuid,
+    pub current_state: String,
+    pub configuration_version: String,
+    pub state_snapshot_id: String,
+    #[serde(default)]
+    pub objective: Option<String>,
+    #[serde(default)]
+    pub prompt_route_ms: Option<u64>,
+    #[serde(default)]
+    pub prompt_route_us: Option<u64>,
+    pub draft: crate::runbook::KycUpdateStatusWorkbookDraft,
+}
+
 fn default_acp_adapter() -> crate::acp::AcpAdapterKind {
     crate::acp::AcpAdapterKind::Zed
 }
@@ -1018,6 +1043,11 @@ pub fn session_scoped_router() -> Router<ReplV2RouteState> {
             "/api/session/:id/acp/context",
             post(assemble_acp_context_route),
         )
+        .route("/api/session/:id/acp/prompt", post(acp_prompt_route))
+        .route(
+            "/api/session/:id/acp/kyc/update-status/language-loop",
+            post(acp_kyc_update_status_language_loop_route),
+        )
         // Session trace routes (R9)
         .route("/api/session/:id/trace", get(get_session_trace))
         .route("/api/session/:id/trace/:seq", get(get_trace_entry))
@@ -1595,6 +1625,506 @@ fn assemble_acp_context_value(
         "status": "acp_context_assembled",
         "bundle": bundle,
     }))
+}
+
+/// POST /api/session/:id/acp/prompt
+async fn acp_prompt_route(
+    State(state): State<ReplV2RouteState>,
+    Path(session_id): Path<Uuid>,
+    Json(req): Json<AcpPromptRouteRequest>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<ErrorResponseV2>)> {
+    let mut agent = crate::acp_protocol::AcpJsonRpcAgent::new();
+    let outgoing = agent.handle_request(crate::acp_protocol::JsonRpcRequest {
+        jsonrpc: "2.0".to_string(),
+        id: Some(serde_json::json!("prompt")),
+        method: "session/prompt".to_string(),
+        params: serde_json::json!({
+            "sessionId": session_id.to_string(),
+            "prompt": req.prompt,
+        }),
+    });
+    let result = outgoing.iter().find_map(|item| match item {
+        crate::acp_protocol::JsonRpcOutgoing::Response(response) => response.result.clone(),
+        crate::acp_protocol::JsonRpcOutgoing::Notification(_) => None,
+    });
+
+    if let Some(result) = &result {
+        if let Some(op) = acp_language_loop_trace_op_from_value(result) {
+            append_session_trace_if_present(&state, session_id, op).await;
+        }
+    }
+
+    Ok(Json(serde_json::json!({
+        "status": "acp_prompt_processed",
+        "session_id": session_id,
+        "result": result.unwrap_or_else(|| serde_json::json!({})),
+        "outgoing": outgoing,
+    })))
+}
+
+/// POST /api/session/:id/acp/kyc/update-status/language-loop
+async fn acp_kyc_update_status_language_loop_route(
+    State(state): State<ReplV2RouteState>,
+    Path(session_id): Path<Uuid>,
+    Json(req): Json<AcpKycUpdateStatusLanguageLoopRouteRequest>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<ErrorResponseV2>)> {
+    if req.draft.session_id != session_id {
+        return Err((
+            StatusCode::BAD_REQUEST,
+            Json(ErrorResponseV2 {
+                error: format!(
+                    "draft.session_id {} does not match route session {session_id}",
+                    req.draft.session_id
+                ),
+                recoverable: true,
+            }),
+        ));
+    }
+
+    let value =
+        acp_kyc_update_status_language_loop_value(session_id, req).map_err(acp_json_error)?;
+    if let Some(op) = acp_language_loop_trace_op_from_value(&value) {
+        append_session_trace_if_present(&state, session_id, op).await;
+    }
+    Ok(Json(value))
+}
+
+fn acp_kyc_update_status_language_loop_value(
+    session_id: Uuid,
+    req: AcpKycUpdateStatusLanguageLoopRouteRequest,
+) -> Result<serde_json::Value, crate::acp::AcpAdapterError> {
+    let manifest = load_ob_poc_kyc_domain_pack()?;
+    let session = crate::acp::open_acp_session(session_id, req.adapter);
+    let prompt_route_us = req
+        .prompt_route_us
+        .unwrap_or_else(|| req.prompt_route_ms.unwrap_or(0).saturating_mul(1_000));
+
+    let started_at = Instant::now();
+    let outcome = crate::acp::acp_run_kyc_update_status_language_loop_timed(
+        &session,
+        &manifest,
+        crate::runbook::KycLanguagePackRequest {
+            subject_id: req.subject_id,
+            current_state: req.current_state,
+            configuration_version: req.configuration_version,
+            state_snapshot_id: req.state_snapshot_id,
+            objective: req.objective,
+        },
+        req.draft,
+    )?;
+    let projection_latency_ms = route_elapsed_ms(started_at);
+    let language_pack = outcome.language_pack;
+    let timings = outcome.timings;
+    let performance = route_language_loop_performance(&timings, prompt_route_us, 0);
+
+    match outcome.revision_outcome {
+        crate::runbook::WorkbookRevisionOutcome::DryRunValid {
+            output,
+            attempts,
+            metrics,
+            trace,
+        } => Ok(serde_json::json!({
+            "status": "dry_run_validated",
+            "language_pack": language_pack,
+            "output": output,
+            "attempts": attempts,
+            "metrics": metrics,
+            "trace": trace,
+            "observability": {
+                "projectionLatencyMs": projection_latency_ms,
+                "performance": performance,
+                "conversationEfficiency": route_language_loop_conversation_efficiency(
+                    &metrics,
+                    "dry_run_validated",
+                    None,
+                ),
+                "acpMechanismSummary": ["language_pack", "deterministic_revision_loop", "dry_run_only"]
+            }
+        })),
+        crate::runbook::WorkbookRevisionOutcome::Refused {
+            refusal,
+            attempts,
+            metrics,
+            trace,
+        } => {
+            let refusal_code = refusal.refusal_code.clone();
+            Ok(serde_json::json!({
+                "status": "structured_refusal",
+                "language_pack": language_pack,
+                "refusal": refusal,
+                "attempts": attempts,
+                "metrics": metrics,
+                "trace": trace,
+                "observability": {
+                    "projectionLatencyMs": projection_latency_ms,
+                    "performance": performance,
+                    "conversationEfficiency": route_language_loop_conversation_efficiency(
+                        &metrics,
+                        "structured_refusal",
+                        Some(refusal_code.as_str()),
+                    ),
+                    "acpMechanismSummary": ["language_pack", "deterministic_revision_loop", "structured_refusal"]
+                }
+            }))
+        }
+    }
+}
+
+fn route_language_loop_performance(
+    timings: &crate::acp::AcpKycLanguageLoopTimings,
+    prompt_route_us: u64,
+    acp_emit_us: u64,
+) -> serde_json::Value {
+    let total_us = timings
+        .total_us
+        .saturating_add(prompt_route_us)
+        .saturating_add(acp_emit_us);
+    serde_json::json!({
+        "prompt_route_ms": route_millis_from_micros(prompt_route_us),
+        "prompt_route_us": prompt_route_us,
+        "language_pack_ms": timings.language_pack_ms,
+        "language_pack_us": timings.language_pack_us,
+        "revision_loop_ms": timings.revision_loop_ms,
+        "revision_loop_us": timings.revision_loop_us,
+        "dry_run_ms": timings.dry_run_ms,
+        "dry_run_us": timings.dry_run_us,
+        "acp_emit_ms": route_millis_from_micros(acp_emit_us),
+        "acp_emit_us": acp_emit_us,
+        "total_ms": route_millis_from_micros(total_us),
+        "total_us": total_us,
+    })
+}
+
+fn route_language_loop_conversation_efficiency(
+    metrics: &crate::runbook::LanguageAcquisitionMetrics,
+    outcome: &str,
+    pending_reason: Option<&str>,
+) -> serde_json::Value {
+    let pending_user_turn_required = !metrics.dry_run_valid;
+    let estimated_user_repair_turns_avoided = if metrics.dry_run_valid {
+        u64::from(metrics.revision_count)
+    } else {
+        0
+    };
+
+    serde_json::json!({
+        "outcome": outcome,
+        "localRevisionCount": metrics.revision_count,
+        "estimatedUserRepairTurnsAvoided": estimated_user_repair_turns_avoided,
+        "pendingUserTurnRequired": pending_user_turn_required,
+        "pendingReason": pending_reason,
+        "firstPassValid": metrics.first_pass_valid,
+        "dryRunValid": metrics.dry_run_valid,
+        "structuredFailureMode": pending_reason,
+        "proseOnlyFailure": false,
+    })
+}
+
+fn acp_language_loop_trace_op_from_value(
+    value: &serde_json::Value,
+) -> Option<crate::repl::session_trace::TraceOp> {
+    let outcome = value.get("status")?.as_str()?;
+    if !matches!(
+        outcome,
+        "dry_run_validated" | "structured_refusal" | "pending_question"
+    ) {
+        return None;
+    }
+
+    let pack_id = value_string(value, &["language_pack", "pack_id"]);
+    let subject_id = value_string(value, &["language_pack", "subject", "id"])
+        .or_else(|| last_attempt_string(value, &["draft", "case_id"]))
+        .and_then(|id| Uuid::parse_str(&id).ok());
+    let verb = value_string(value, &["output", "dry_run", "semantic_diff", "verb"])
+        .or_else(|| first_array_string(value, &["language_pack", "valid_verbs"], "verb"))
+        .or_else(|| last_attempt_string(value, &["draft", "verb"]));
+    let current_state = value_string(value, &["output", "dry_run", "semantic_diff", "from_state"])
+        .or_else(|| value_string(value, &["language_pack", "current_state"]))
+        .or_else(|| last_attempt_string(value, &["draft", "current_state"]));
+    let requested_state = value_string(value, &["output", "dry_run", "semantic_diff", "to_state"])
+        .or_else(|| last_attempt_string(value, &["draft", "requested_state"]));
+    let transition_ref = value_string(value, &["output", "dry_run", "transition_ref"])
+        .or_else(|| last_attempt_string(value, &["draft", "transition_ref"]))
+        .or_else(|| {
+            value
+                .get("refusal")
+                .and_then(|refusal| refusal.get("diagnostics"))
+                .and_then(|diagnostics| diagnostics.as_array())
+                .and_then(|diagnostics| diagnostics.first())
+                .and_then(|diagnostic| diagnostic.get("attempted_transition"))
+                .and_then(|transition| transition.as_str())
+                .map(str::to_string)
+        });
+    let workbook_id = value_string(value, &["output", "workbook", "id"])
+        .or_else(|| value_string(value, &["output", "dry_run", "workbook_id"]));
+    let semantic_diff_uri = value_string(value, &["output", "dry_run", "semantic_diff_uri"]);
+    let refusal_code = value_string(value, &["refusal", "refusal_code"]);
+    let pending_question_code = value_string(value, &["pending_question", "code"]);
+    let diagnostic_source_path = value
+        .get("refusal")
+        .and_then(|refusal| refusal.get("diagnostics"))
+        .and_then(|diagnostics| diagnostics.as_array())
+        .and_then(|diagnostics| diagnostics.first())
+        .and_then(|diagnostic| diagnostic.get("source_path"))
+        .and_then(|source_path| source_path.as_str())
+        .map(str::to_string);
+    let revision_count = value
+        .get("metrics")
+        .and_then(|metrics| metrics.get("revision_count"))
+        .and_then(|count| count.as_u64())
+        .or_else(|| {
+            value
+                .get("observability")
+                .and_then(|observability| observability.get("conversationEfficiency"))
+                .and_then(|efficiency| efficiency.get("localRevisionCount"))
+                .and_then(|count| count.as_u64())
+        })
+        .and_then(|count| u8::try_from(count).ok())
+        .unwrap_or(0);
+    let dry_run_valid = value
+        .get("metrics")
+        .and_then(|metrics| metrics.get("dry_run_valid"))
+        .and_then(|valid| valid.as_bool())
+        .or_else(|| {
+            value
+                .get("observability")
+                .and_then(|observability| observability.get("conversationEfficiency"))
+                .and_then(|efficiency| efficiency.get("dryRunValid"))
+                .and_then(|valid| valid.as_bool())
+        })
+        .unwrap_or(false);
+    let first_pass_valid = value
+        .get("metrics")
+        .and_then(|metrics| metrics.get("first_pass_valid"))
+        .and_then(|valid| valid.as_bool())
+        .or_else(|| {
+            value
+                .get("observability")
+                .and_then(|observability| observability.get("conversationEfficiency"))
+                .and_then(|efficiency| efficiency.get("firstPassValid"))
+                .and_then(|valid| valid.as_bool())
+        })
+        .unwrap_or(false);
+    let needed_from_user = needed_from_user(value);
+    let trace = language_loop_trace_events(value, outcome);
+    let performance = trace_performance_metrics(value);
+    let conversation_efficiency = trace_conversation_efficiency(value, outcome);
+    let human_summary = language_loop_human_summary(
+        outcome,
+        revision_count,
+        refusal_code.as_deref(),
+        pending_question_code.as_deref(),
+    );
+
+    Some(crate::repl::session_trace::TraceOp::AcpLanguageLoopTraced {
+        outcome: outcome.to_string(),
+        pack_id,
+        subject_id,
+        verb,
+        current_state,
+        requested_state,
+        transition_ref,
+        workbook_id,
+        semantic_diff_uri,
+        refusal_code,
+        pending_question_code,
+        diagnostic_source_path,
+        revision_count,
+        dry_run_valid,
+        first_pass_valid,
+        human_summary,
+        needed_from_user,
+        trace,
+        performance,
+        conversation_efficiency,
+    })
+}
+
+fn language_loop_human_summary(
+    outcome: &str,
+    revision_count: u8,
+    refusal_code: Option<&str>,
+    pending_question_code: Option<&str>,
+) -> String {
+    match outcome {
+        "dry_run_validated" => format!(
+            "Validated a dry-run workbook after {revision_count} local revision(s); no mutation was executed."
+        ),
+        "structured_refusal" => format!(
+            "Stopped before mutation with structured refusal {}; the agent needs a valid DSL draft before proceeding.",
+            refusal_code.unwrap_or("unknown_refusal")
+        ),
+        "pending_question" => format!(
+            "Need HITL clarification before drafting the workbook: {}.",
+            pending_question_code.unwrap_or("pending_question")
+        ),
+        _ => "ACP language loop produced a structured outcome.".to_string(),
+    }
+}
+
+fn language_loop_trace_events(
+    value: &serde_json::Value,
+    outcome: &str,
+) -> Vec<crate::repl::session_trace::TraceLanguageLoopEvent> {
+    let mut events = value
+        .get("trace")
+        .and_then(|trace| trace.as_array())
+        .map(|trace| {
+            trace
+                .iter()
+                .filter_map(|event| {
+                    Some(crate::repl::session_trace::TraceLanguageLoopEvent {
+                        phase: event.get("phase")?.as_str()?.to_string(),
+                        status: event.get("status")?.as_str()?.to_string(),
+                        message: event.get("message")?.as_str()?.to_string(),
+                    })
+                })
+                .collect::<Vec<_>>()
+        })
+        .unwrap_or_default();
+
+    if events.is_empty() && outcome == "pending_question" {
+        events.push(crate::repl::session_trace::TraceLanguageLoopEvent {
+            phase: "clarification".to_string(),
+            status: "blocked".to_string(),
+            message: value_string(value, &["pending_question", "code"])
+                .unwrap_or_else(|| "pending_question".to_string()),
+        });
+    }
+
+    events
+}
+
+fn trace_performance_metrics(
+    value: &serde_json::Value,
+) -> crate::repl::session_trace::TracePerformanceMetrics {
+    let performance = value
+        .get("observability")
+        .and_then(|observability| observability.get("performance"));
+    crate::repl::session_trace::TracePerformanceMetrics {
+        prompt_route_ms: nested_u64(performance, "prompt_route_ms"),
+        prompt_route_us: nested_u64(performance, "prompt_route_us"),
+        language_pack_ms: nested_u64(performance, "language_pack_ms"),
+        language_pack_us: nested_u64(performance, "language_pack_us"),
+        revision_loop_ms: nested_u64(performance, "revision_loop_ms"),
+        revision_loop_us: nested_u64(performance, "revision_loop_us"),
+        dry_run_ms: nested_u64(performance, "dry_run_ms"),
+        dry_run_us: nested_u64(performance, "dry_run_us"),
+        acp_emit_ms: nested_u64(performance, "acp_emit_ms"),
+        acp_emit_us: nested_u64(performance, "acp_emit_us"),
+        total_ms: nested_u64(performance, "total_ms"),
+        total_us: nested_u64(performance, "total_us"),
+    }
+}
+
+fn trace_conversation_efficiency(
+    value: &serde_json::Value,
+    outcome: &str,
+) -> crate::repl::session_trace::TraceConversationEfficiency {
+    let efficiency = value
+        .get("observability")
+        .and_then(|observability| observability.get("conversationEfficiency"));
+    crate::repl::session_trace::TraceConversationEfficiency {
+        outcome: nested_string(efficiency, "outcome").unwrap_or_else(|| outcome.to_string()),
+        local_revision_count: nested_u64(efficiency, "localRevisionCount")
+            .try_into()
+            .unwrap_or(u8::MAX),
+        estimated_user_repair_turns_avoided: nested_u64(
+            efficiency,
+            "estimatedUserRepairTurnsAvoided",
+        ),
+        pending_user_turn_required: nested_bool(efficiency, "pendingUserTurnRequired"),
+        pending_reason: nested_string(efficiency, "pendingReason"),
+        first_pass_valid: nested_bool(efficiency, "firstPassValid"),
+        dry_run_valid: nested_bool(efficiency, "dryRunValid"),
+        structured_failure_mode: nested_string(efficiency, "structuredFailureMode"),
+        prose_only_failure: nested_bool(efficiency, "proseOnlyFailure"),
+    }
+}
+
+fn needed_from_user(value: &serde_json::Value) -> Vec<String> {
+    let mut needed = value_string_array(value, &["pending_question", "needs"]);
+    needed.extend(value_string_array(value, &["pending_question", "missing"]));
+    needed.sort();
+    needed.dedup();
+    needed
+}
+
+fn value_string(value: &serde_json::Value, path: &[&str]) -> Option<String> {
+    let mut current = value;
+    for segment in path {
+        current = current.get(*segment)?;
+    }
+    current.as_str().map(str::to_string)
+}
+
+fn value_string_array(value: &serde_json::Value, path: &[&str]) -> Vec<String> {
+    let mut current = value;
+    for segment in path {
+        let Some(next) = current.get(*segment) else {
+            return Vec::new();
+        };
+        current = next;
+    }
+    current
+        .as_array()
+        .map(|items| {
+            items
+                .iter()
+                .filter_map(|item| item.as_str().map(str::to_string))
+                .collect()
+        })
+        .unwrap_or_default()
+}
+
+fn first_array_string(value: &serde_json::Value, path: &[&str], field: &str) -> Option<String> {
+    let mut current = value;
+    for segment in path {
+        current = current.get(*segment)?;
+    }
+    current
+        .as_array()?
+        .first()?
+        .get(field)?
+        .as_str()
+        .map(str::to_string)
+}
+
+fn last_attempt_string(value: &serde_json::Value, path: &[&str]) -> Option<String> {
+    let mut current = value.get("attempts")?.as_array()?.last()?;
+    for segment in path {
+        current = current.get(*segment)?;
+    }
+    current.as_str().map(str::to_string)
+}
+
+fn nested_u64(value: Option<&serde_json::Value>, key: &str) -> u64 {
+    value
+        .and_then(|value| value.get(key))
+        .and_then(|value| value.as_u64())
+        .unwrap_or(0)
+}
+
+fn nested_bool(value: Option<&serde_json::Value>, key: &str) -> bool {
+    value
+        .and_then(|value| value.get(key))
+        .and_then(|value| value.as_bool())
+        .unwrap_or(false)
+}
+
+fn nested_string(value: Option<&serde_json::Value>, key: &str) -> Option<String> {
+    value
+        .and_then(|value| value.get(key))
+        .and_then(|value| value.as_str())
+        .map(str::to_string)
+}
+
+fn route_elapsed_ms(started_at: Instant) -> u64 {
+    u64::try_from(started_at.elapsed().as_millis()).unwrap_or(u64::MAX)
+}
+
+fn route_millis_from_micros(micros: u64) -> u64 {
+    micros / 1_000
 }
 
 /// POST /api/session/:id/workbook/kyc/update-status/dry-run
@@ -2860,6 +3390,46 @@ mod tests {
         .expect("dry-run output")
     }
 
+    fn language_loop_draft(
+        session_id: Uuid,
+        verb: &str,
+        case_id: Option<Uuid>,
+    ) -> crate::runbook::KycUpdateStatusWorkbookDraft {
+        crate::runbook::KycUpdateStatusWorkbookDraft {
+            session_id,
+            actor_id: "analyst@example.com".to_string(),
+            actor_roles: vec!["analyst".to_string()],
+            verb: verb.to_string(),
+            transition_ref: "kyc-case.intake-to-discovery".to_string(),
+            subject_kind: "kyc_case".to_string(),
+            case_id,
+            current_state: "INTAKE".to_string(),
+            requested_state: "DISCOVERY".to_string(),
+            configuration_version: "config-1".to_string(),
+            state_snapshot_id: "state-snapshot-1".to_string(),
+            evidence_digest: Some("sha256:case".to_string()),
+            llm_trace_ref: None,
+        }
+    }
+
+    fn language_loop_request(
+        session_id: Uuid,
+        verb: &str,
+        case_id: Option<Uuid>,
+    ) -> AcpKycUpdateStatusLanguageLoopRouteRequest {
+        AcpKycUpdateStatusLanguageLoopRouteRequest {
+            adapter: crate::acp::AcpAdapterKind::TestHarness,
+            subject_id: test_case_id(),
+            current_state: "INTAKE".to_string(),
+            configuration_version: "config-1".to_string(),
+            state_snapshot_id: "state-snapshot-1".to_string(),
+            objective: Some("Move KYC case from intake to discovery".to_string()),
+            prompt_route_ms: None,
+            prompt_route_us: Some(125),
+            draft: language_loop_draft(session_id, verb, case_id),
+        }
+    }
+
     fn reference_mutation_manifest() -> sem_os_core::domain_pack::DomainPackManifest {
         let mut manifest = load_ob_poc_kyc_domain_pack().expect("pack");
         manifest.compatibility_tier =
@@ -3600,5 +4170,158 @@ mod tests {
                 && context_hash == "sha256:test"
                 && *redacted_count == 1
         ));
+    }
+
+    #[tokio::test]
+    async fn test_acp_language_loop_route_persists_dry_run_trace() {
+        let orchestrator = std::sync::Arc::new(crate::sequencer::ReplOrchestratorV2::new(
+            crate::journey::router::PackRouter::new(vec![]),
+            std::sync::Arc::new(crate::sequencer::StubExecutor),
+        ));
+        let session_id = orchestrator.create_session().await;
+        let state = ReplV2RouteState {
+            orchestrator: orchestrator.clone(),
+        };
+
+        let value = acp_kyc_update_status_language_loop_route(
+            State(state.clone()),
+            Path(session_id),
+            Json(language_loop_request(
+                session_id,
+                "kyc-case.update-status",
+                None,
+            )),
+        )
+        .await
+        .expect("language loop route")
+        .0;
+
+        assert_eq!(value["status"], "dry_run_validated");
+        assert_eq!(value["metrics"]["revision_count"], 1);
+
+        let trace = get_session_trace(State(state), Path(session_id))
+            .await
+            .expect("session trace")
+            .0;
+        assert_eq!(trace[0]["op"]["op"], "acp_language_loop_traced");
+        assert_eq!(trace[0]["op"]["outcome"], "dry_run_validated");
+        assert_eq!(
+            trace[0]["op"]["transition_ref"],
+            "kyc-case.intake-to-discovery"
+        );
+        assert!(trace[0]["op"]["semantic_diff_uri"]
+            .as_str()
+            .unwrap()
+            .starts_with("semos://semantic-diff/"));
+        assert_eq!(
+            trace[0]["op"]["conversation_efficiency"]["prose_only_failure"],
+            false
+        );
+        assert_eq!(
+            trace[0]["op"]["conversation_efficiency"]["estimated_user_repair_turns_avoided"],
+            1
+        );
+    }
+
+    #[tokio::test]
+    async fn test_acp_language_loop_route_persists_structured_refusal_trace() {
+        let orchestrator = std::sync::Arc::new(crate::sequencer::ReplOrchestratorV2::new(
+            crate::journey::router::PackRouter::new(vec![]),
+            std::sync::Arc::new(crate::sequencer::StubExecutor),
+        ));
+        let session_id = orchestrator.create_session().await;
+        let state = ReplV2RouteState {
+            orchestrator: orchestrator.clone(),
+        };
+
+        let value = acp_kyc_update_status_language_loop_route(
+            State(state.clone()),
+            Path(session_id),
+            Json(language_loop_request(
+                session_id,
+                "kyc-case.delete",
+                Some(test_case_id()),
+            )),
+        )
+        .await
+        .expect("language loop route")
+        .0;
+
+        assert_eq!(value["status"], "structured_refusal");
+        assert_eq!(value["refusal"]["refusal_code"], "invented_verb");
+
+        let session = orchestrator.get_session(session_id).await.unwrap();
+        assert_eq!(session.trace.len(), 1);
+        assert!(matches!(
+            &session.trace[0].op,
+            crate::repl::session_trace::TraceOp::AcpLanguageLoopTraced {
+                outcome,
+                refusal_code,
+                diagnostic_source_path,
+                dry_run_valid,
+                conversation_efficiency,
+                ..
+            } if outcome == "structured_refusal"
+                && refusal_code.as_deref() == Some("invented_verb")
+                && diagnostic_source_path.as_deref() == Some("draft.verb")
+                && !dry_run_valid
+                && conversation_efficiency.pending_user_turn_required
+                && !conversation_efficiency.prose_only_failure
+        ));
+    }
+
+    #[tokio::test]
+    async fn test_acp_prompt_route_persists_pending_question_trace() {
+        let orchestrator = std::sync::Arc::new(crate::sequencer::ReplOrchestratorV2::new(
+            crate::journey::router::PackRouter::new(vec![]),
+            std::sync::Arc::new(crate::sequencer::StubExecutor),
+        ));
+        let session_id = orchestrator.create_session().await;
+        let state = ReplV2RouteState {
+            orchestrator: orchestrator.clone(),
+        };
+
+        let value = acp_prompt_route(
+            State(state.clone()),
+            Path(session_id),
+            Json(AcpPromptRouteRequest {
+                prompt: vec![crate::acp_protocol::AcpContentBlock::Text {
+                    text: "update status for KYC case".to_string(),
+                }],
+            }),
+        )
+        .await
+        .expect("prompt route")
+        .0;
+
+        assert_eq!(value["result"]["status"], "pending_question");
+        assert_eq!(
+            value["result"]["pending_question"]["code"],
+            "kyc_update_status_prompt_incomplete"
+        );
+
+        let trace = get_session_trace(State(state), Path(session_id))
+            .await
+            .expect("session trace")
+            .0;
+        assert_eq!(trace[0]["op"]["op"], "acp_language_loop_traced");
+        assert_eq!(trace[0]["op"]["outcome"], "pending_question");
+        assert_eq!(
+            trace[0]["op"]["pending_question_code"],
+            "kyc_update_status_prompt_incomplete"
+        );
+        assert!(trace[0]["op"]["needed_from_user"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|need| need == "case_uuid"));
+        assert_eq!(
+            trace[0]["op"]["conversation_efficiency"]["prose_only_failure"],
+            false
+        );
+        assert!(trace[0]["op"]["human_summary"]
+            .as_str()
+            .unwrap()
+            .contains("Need HITL clarification"));
     }
 }
