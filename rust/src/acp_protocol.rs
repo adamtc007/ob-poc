@@ -281,7 +281,7 @@ pub struct AcpLanguagePackGetRequest {
     pub objective: Option<String>,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AcpKycLanguageLoopRequest {
     pub session_id: String,
     #[serde(default = "default_adapter")]
@@ -333,6 +333,22 @@ pub struct AcpJsonRpcAgent {
 impl AcpJsonRpcAgent {
     pub fn new() -> Self {
         Self::default()
+    }
+
+    pub fn kyc_update_status_language_loop_request_from_prompt(
+        &self,
+        session_id: Uuid,
+        prompt: &[AcpContentBlock],
+    ) -> Result<AcpKycLanguageLoopRequest, Vec<&'static str>> {
+        let subject_hint = prompt_subject_id(prompt);
+        let cached_case_state = subject_hint.and_then(|subject_id| {
+            self.case_state_cache
+                .get(&(session_id, subject_id))
+                .cloned()
+        });
+        let request =
+            kyc_language_loop_request_from_prompt(session_id, prompt, cached_case_state.as_ref())?;
+        Ok(serde_json::from_value(request).expect("prompt request shape is typed"))
     }
 
     pub fn handle_line(&mut self, line: &str) -> Vec<JsonRpcOutgoing> {
@@ -707,17 +723,9 @@ impl AcpJsonRpcAgent {
             return None;
         }
 
-        let subject_hint = prompt_subject_id(prompt);
-        let cached_case_state = subject_hint.and_then(|subject_id| {
-            self.case_state_cache
-                .get(&(session_id, subject_id))
-                .cloned()
-        });
-        let request = match kyc_language_loop_request_from_prompt(
-            session_id,
-            prompt,
-            cached_case_state.as_ref(),
-        ) {
+        let request = match self
+            .kyc_update_status_language_loop_request_from_prompt(session_id, prompt)
+        {
             Ok(request) => request,
             Err(error) => {
                 let prompt_route_us = elapsed_us(prompt_route_started_at);
@@ -767,13 +775,9 @@ impl AcpJsonRpcAgent {
 
         let prompt_route_us = elapsed_us(prompt_route_started_at);
         let mut request = request;
-        if let Value::Object(fields) = &mut request {
-            fields.insert(
-                "prompt_route_ms".to_string(),
-                json!(millis_from_micros(prompt_route_us)),
-            );
-            fields.insert("prompt_route_us".to_string(), json!(prompt_route_us));
-        }
+        request.prompt_route_ms = Some(millis_from_micros(prompt_route_us));
+        request.prompt_route_us = Some(prompt_route_us);
+        let request = serde_json::to_value(request).expect("typed prompt request serializes");
         Some(self.obpoc_kyc_update_status_language_loop(id, request))
     }
 

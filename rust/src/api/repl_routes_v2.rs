@@ -23,7 +23,7 @@ use sem_os_core::acp_projection::{
 };
 use sem_os_core::domain_pack::DomainPackManifest;
 use serde::{Deserialize, Serialize};
-use std::sync::Arc;
+use std::sync::{Arc, LazyLock};
 use std::time::Instant;
 use uuid::Uuid;
 
@@ -45,6 +45,10 @@ use crate::sequencer::ReplOrchestratorV2;
 pub struct ReplV2RouteState {
     pub orchestrator: Arc<ReplOrchestratorV2>,
 }
+
+static REPL_ACP_AGENTS: LazyLock<
+    tokio::sync::Mutex<std::collections::BTreeMap<Uuid, crate::acp_protocol::AcpJsonRpcAgent>>,
+> = LazyLock::new(|| tokio::sync::Mutex::new(std::collections::BTreeMap::new()));
 
 // ============================================================================
 // Request / Response Types
@@ -341,6 +345,8 @@ pub struct AcpContextAssemblyRequest {
 pub struct AcpPromptRouteRequest {
     #[serde(default)]
     pub prompt: Vec<crate::acp_protocol::AcpContentBlock>,
+    #[serde(default)]
+    pub draft_source: Option<String>,
 }
 
 /// Request to run the bounded KYC update-status language loop.
@@ -364,6 +370,20 @@ pub struct AcpKycUpdateStatusLanguageLoopRouteRequest {
 /// Read-only KYC case-state discovery material supplied by the ACP host.
 #[derive(Debug, Clone, Deserialize)]
 pub struct AcpKycCaseStateDiscoveryRouteRequest {
+    #[serde(default)]
+    pub observations: Vec<sem_os_core::domain_pack::DiscoveryObservation>,
+    #[serde(default)]
+    pub provenance: Vec<sem_os_core::domain_pack::DiscoveryProvenance>,
+    #[serde(default)]
+    pub first_class_state_mutated: bool,
+}
+
+/// Request to discover and cache a KYC case-state anchor for ACP prompt routing.
+#[derive(Debug, Clone, Deserialize)]
+pub struct AcpKycCaseStateDiscoverRouteRequest {
+    #[serde(default = "default_acp_adapter")]
+    pub adapter: crate::acp::AcpAdapterKind,
+    pub subject_id: Uuid,
     #[serde(default)]
     pub observations: Vec<sem_os_core::domain_pack::DiscoveryObservation>,
     #[serde(default)]
@@ -1078,6 +1098,10 @@ pub fn session_scoped_router() -> Router<ReplV2RouteState> {
             "/api/session/:id/acp/context",
             post(assemble_acp_context_route),
         )
+        .route(
+            "/api/session/:id/acp/kyc/case-state/discover",
+            post(discover_acp_kyc_case_state_route),
+        )
         .route("/api/session/:id/acp/prompt", post(acp_prompt_route))
         .route(
             "/api/session/:id/acp/kyc/update-status/language-loop",
@@ -1578,6 +1602,7 @@ async fn close_acp_session_route(
     Path(session_id): Path<Uuid>,
     Json(req): Json<AcpOpenSessionRequest>,
 ) -> Result<Json<serde_json::Value>, (StatusCode, Json<ErrorResponseV2>)> {
+    REPL_ACP_AGENTS.lock().await.remove(&session_id);
     Ok(Json(close_acp_session_value(session_id, req)))
 }
 
@@ -1666,26 +1691,112 @@ fn assemble_acp_context_value(
     }))
 }
 
+async fn handle_repl_acp_request(
+    session_id: Uuid,
+    request: crate::acp_protocol::JsonRpcRequest,
+) -> Vec<crate::acp_protocol::JsonRpcOutgoing> {
+    let mut agents = REPL_ACP_AGENTS.lock().await;
+    let agent = agents
+        .entry(session_id)
+        .or_insert_with(crate::acp_protocol::AcpJsonRpcAgent::new);
+    agent.handle_request(request)
+}
+
+fn json_rpc_outgoing_result(
+    outgoing: &[crate::acp_protocol::JsonRpcOutgoing],
+) -> Option<serde_json::Value> {
+    outgoing.iter().find_map(|item| match item {
+        crate::acp_protocol::JsonRpcOutgoing::Response(response) => response.result.clone(),
+        crate::acp_protocol::JsonRpcOutgoing::Notification(_) => None,
+    })
+}
+
+async fn resolve_acp_prompt_language_loop_request(
+    session_id: Uuid,
+    prompt: &[crate::acp_protocol::AcpContentBlock],
+) -> Result<crate::acp_protocol::AcpKycLanguageLoopRequest, Vec<&'static str>> {
+    let mut agents = REPL_ACP_AGENTS.lock().await;
+    let agent = agents
+        .entry(session_id)
+        .or_insert_with(crate::acp_protocol::AcpJsonRpcAgent::new);
+    agent.kyc_update_status_language_loop_request_from_prompt(session_id, prompt)
+}
+
+/// POST /api/session/:id/acp/kyc/case-state/discover
+async fn discover_acp_kyc_case_state_route(
+    Path(session_id): Path<Uuid>,
+    Json(req): Json<AcpKycCaseStateDiscoverRouteRequest>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<ErrorResponseV2>)> {
+    let outgoing = handle_repl_acp_request(
+        session_id,
+        crate::acp_protocol::JsonRpcRequest {
+            jsonrpc: "2.0".to_string(),
+            id: Some(serde_json::json!("kyc-case-state-discover")),
+            method: "obpoc/kyc_case_state/discover".to_string(),
+            params: serde_json::json!({
+                "session_id": session_id.to_string(),
+                "adapter": req.adapter,
+                "subject_id": req.subject_id,
+                "observations": req.observations,
+                "provenance": req.provenance,
+                "first_class_state_mutated": req.first_class_state_mutated,
+            }),
+        },
+    )
+    .await;
+    let result = json_rpc_outgoing_result(&outgoing).unwrap_or_else(|| serde_json::json!({}));
+
+    Ok(Json(serde_json::json!({
+        "status": "acp_kyc_case_state_discovery_processed",
+        "session_id": session_id,
+        "result": result,
+        "outgoing": outgoing,
+    })))
+}
+
+fn acp_prompt_requests_llm_draft(
+    req: &AcpPromptRouteRequest,
+) -> Result<bool, (StatusCode, Json<ErrorResponseV2>)> {
+    match req.draft_source.as_deref().unwrap_or("deterministic") {
+        "deterministic" | "deterministic_draft" => Ok(false),
+        "llm" | "llm_tool_call" | "live_llm" => Ok(true),
+        draft_source => Err((
+            StatusCode::BAD_REQUEST,
+            Json(ErrorResponseV2 {
+                error: format!(
+                    "unsupported ACP prompt draft_source `{draft_source}`; expected deterministic or llm_tool_call"
+                ),
+                recoverable: true,
+            }),
+        )),
+    }
+}
+
 /// POST /api/session/:id/acp/prompt
 async fn acp_prompt_route(
     State(state): State<ReplV2RouteState>,
     Path(session_id): Path<Uuid>,
     Json(req): Json<AcpPromptRouteRequest>,
 ) -> Result<Json<serde_json::Value>, (StatusCode, Json<ErrorResponseV2>)> {
-    let mut agent = crate::acp_protocol::AcpJsonRpcAgent::new();
-    let outgoing = agent.handle_request(crate::acp_protocol::JsonRpcRequest {
-        jsonrpc: "2.0".to_string(),
-        id: Some(serde_json::json!("prompt")),
-        method: "session/prompt".to_string(),
-        params: serde_json::json!({
-            "sessionId": session_id.to_string(),
-            "prompt": req.prompt,
-        }),
-    });
-    let result = outgoing.iter().find_map(|item| match item {
-        crate::acp_protocol::JsonRpcOutgoing::Response(response) => response.result.clone(),
-        crate::acp_protocol::JsonRpcOutgoing::Notification(_) => None,
-    });
+    if acp_prompt_requests_llm_draft(&req)? {
+        let client = ob_agentic::create_llm_client().map_err(|error| error.to_string());
+        return acp_prompt_route_with_llm_client(state, session_id, req, client).await;
+    }
+
+    let outgoing = handle_repl_acp_request(
+        session_id,
+        crate::acp_protocol::JsonRpcRequest {
+            jsonrpc: "2.0".to_string(),
+            id: Some(serde_json::json!("prompt")),
+            method: "session/prompt".to_string(),
+            params: serde_json::json!({
+                "sessionId": session_id.to_string(),
+                "prompt": req.prompt,
+            }),
+        },
+    )
+    .await;
+    let result = json_rpc_outgoing_result(&outgoing);
 
     if let Some(result) = &result {
         if let Some(op) = acp_language_loop_trace_op_from_value(result) {
@@ -1698,6 +1809,66 @@ async fn acp_prompt_route(
         "session_id": session_id,
         "result": result.unwrap_or_else(|| serde_json::json!({})),
         "outgoing": outgoing,
+    })))
+}
+
+async fn acp_prompt_route_with_llm_client(
+    state: ReplV2RouteState,
+    session_id: Uuid,
+    req: AcpPromptRouteRequest,
+    client: Result<std::sync::Arc<dyn ob_agentic::llm_client::LlmClient>, String>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<ErrorResponseV2>)> {
+    let total_started_at = Instant::now();
+    let request = match resolve_acp_prompt_language_loop_request(session_id, &req.prompt).await {
+        Ok(request) => request,
+        Err(missing) => {
+            let result = acp_language_loop_pending_question_value(
+                "kyc_update_status_prompt_incomplete",
+                missing.into_iter().map(str::to_string).collect(),
+                route_elapsed_us(total_started_at),
+            );
+            if let Some(op) = acp_language_loop_trace_op_from_value(&result) {
+                append_session_trace_if_present(&state, session_id, op).await;
+            }
+            return Ok(Json(serde_json::json!({
+                "status": "acp_prompt_processed",
+                "session_id": session_id,
+                "draft_source": "llm_tool_call",
+                "result": result,
+                "outgoing": []
+            })));
+        }
+    };
+
+    let value = acp_kyc_update_status_llm_draft_loop_value_with_client(
+        session_id,
+        AcpKycUpdateStatusLlmDraftRouteRequest {
+            adapter: request.adapter,
+            subject_id: request.subject_id,
+            current_state: Some(request.current_state),
+            configuration_version: Some(request.configuration_version),
+            state_snapshot_id: Some(request.state_snapshot_id),
+            objective: request.objective,
+            evidence_digest: request.draft.evidence_digest,
+            actor_id: Some(request.draft.actor_id),
+            actor_roles: request.draft.actor_roles,
+            discovery: None,
+        },
+        client,
+    )
+    .await
+    .map_err(acp_json_error)?;
+
+    if let Some(op) = acp_language_loop_trace_op_from_value(&value) {
+        append_session_trace_if_present(&state, session_id, op).await;
+    }
+
+    Ok(Json(serde_json::json!({
+        "status": "acp_prompt_processed",
+        "session_id": session_id,
+        "draft_source": "llm_tool_call",
+        "result": value,
+        "outgoing": []
     })))
 }
 
@@ -2268,13 +2439,22 @@ fn acp_language_loop_pending_question_value(
     missing: Vec<String>,
     total_us: u64,
 ) -> serde_json::Value {
+    let needs = if missing.is_empty() {
+        vec![
+            "current_state".to_string(),
+            "configuration_version".to_string(),
+            "state_snapshot_id".to_string(),
+        ]
+    } else {
+        missing.clone()
+    };
     serde_json::json!({
         "stopReason": "end_turn",
         "status": "pending_question",
         "pending_question": {
             "code": code,
             "missing": missing,
-            "needs": ["current_state", "configuration_version", "state_snapshot_id"]
+            "needs": needs
         },
         "observability": {
             "performance": {
@@ -4253,6 +4433,39 @@ mod tests {
         }
     }
 
+    fn case_state_discovery_request(
+        current_state: &str,
+        configuration_version: &str,
+        state_snapshot_id: &str,
+    ) -> AcpKycCaseStateDiscoverRouteRequest {
+        AcpKycCaseStateDiscoverRouteRequest {
+            adapter: crate::acp::AcpAdapterKind::TestHarness,
+            subject_id: test_case_id(),
+            observations: vec![
+                sem_os_core::domain_pack::DiscoveryObservation {
+                    key: "case.status".to_string(),
+                    value: serde_json::json!(current_state),
+                    classification: Some(sem_os_core::domain_pack::ClassificationLimit::Internal),
+                },
+                sem_os_core::domain_pack::DiscoveryObservation {
+                    key: "case.configuration_version".to_string(),
+                    value: serde_json::json!(configuration_version),
+                    classification: Some(sem_os_core::domain_pack::ClassificationLimit::Internal),
+                },
+                sem_os_core::domain_pack::DiscoveryObservation {
+                    key: "case.state_snapshot_id".to_string(),
+                    value: serde_json::json!(state_snapshot_id),
+                    classification: Some(sem_os_core::domain_pack::ClassificationLimit::Internal),
+                },
+            ],
+            provenance: vec![sem_os_core::domain_pack::DiscoveryProvenance {
+                source: "sem_os.session_state".to_string(),
+                snapshot_ref: Some(state_snapshot_id.to_string()),
+            }],
+            first_class_state_mutated: false,
+        }
+    }
+
     #[derive(Clone, Copy)]
     struct LiveComparisonFixture {
         id: &'static str,
@@ -6156,6 +6369,7 @@ mod tests {
                 prompt: vec![crate::acp_protocol::AcpContentBlock::Text {
                     text: "update status for KYC case".to_string(),
                 }],
+                draft_source: None,
             }),
         )
         .await
@@ -6191,6 +6405,151 @@ mod tests {
             .as_str()
             .unwrap()
             .contains("I stopped before drafting"));
+    }
+
+    #[tokio::test]
+    async fn test_acp_prompt_route_reuses_repl_cached_case_state_discovery() {
+        let orchestrator = std::sync::Arc::new(crate::sequencer::ReplOrchestratorV2::new(
+            crate::journey::router::PackRouter::new(vec![]),
+            std::sync::Arc::new(crate::sequencer::StubExecutor),
+        ));
+        let session_id = orchestrator.create_session().await;
+        let state = ReplV2RouteState {
+            orchestrator: orchestrator.clone(),
+        };
+
+        let discovered = discover_acp_kyc_case_state_route(
+            Path(session_id),
+            Json(case_state_discovery_request(
+                "DISCOVERY",
+                "config-live-1",
+                "snapshot-live-1",
+            )),
+        )
+        .await
+        .expect("case-state discovery")
+        .0;
+        assert_eq!(discovered["result"]["status"], "kyc_case_state_discovered");
+
+        let value = acp_prompt_route(
+            State(state.clone()),
+            Path(session_id),
+            Json(AcpPromptRouteRequest {
+                prompt: vec![crate::acp_protocol::AcpContentBlock::Text {
+                    text: format!(
+                        "Advance KYC case {} to ASSESSMENT with evidence sha256:evidence",
+                        test_case_id()
+                    ),
+                }],
+                draft_source: None,
+            }),
+        )
+        .await
+        .expect("prompt route")
+        .0;
+
+        assert_eq!(value["result"]["status"], "dry_run_validated");
+        assert_eq!(
+            value["result"]["output"]["dry_run"]["transition_ref"],
+            "kyc-case.discovery-to-assessment"
+        );
+        assert_eq!(
+            value["result"]["traceProjection"]["stateDiscovery"]["source"],
+            "cached_read_only_discovery_probe"
+        );
+        assert_eq!(
+            value["result"]["language_pack"]["configuration_version"],
+            "config-live-1"
+        );
+        assert!(value["outgoing"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|item| item["params"]["update"]["toolCallId"]
+                .as_str()
+                .map(|id| id.starts_with("tool:case-state-discovery:"))
+                .unwrap_or(false)));
+    }
+
+    #[tokio::test]
+    async fn test_acp_prompt_route_llm_mode_uses_repl_cached_state_behind_harness() {
+        let orchestrator = std::sync::Arc::new(crate::sequencer::ReplOrchestratorV2::new(
+            crate::journey::router::PackRouter::new(vec![]),
+            std::sync::Arc::new(crate::sequencer::StubExecutor),
+        ));
+        let session_id = orchestrator.create_session().await;
+        let state = ReplV2RouteState {
+            orchestrator: orchestrator.clone(),
+        };
+
+        let _ = discover_acp_kyc_case_state_route(
+            Path(session_id),
+            Json(case_state_discovery_request(
+                "DISCOVERY",
+                "config-live-1",
+                "snapshot-live-1",
+            )),
+        )
+        .await
+        .expect("case-state discovery");
+
+        let client = std::sync::Arc::new(StubToolLlmClient {
+            arguments: serde_json::json!({
+                "session_id": session_id,
+                "actor_id": "sage:planning",
+                "actor_roles": ["agent"],
+                "verb": "kyc-case.update-status",
+                "transition_ref": "kyc-case.discovery-to-assessment",
+                "subject_kind": "kyc_case",
+                "case_id": test_case_id(),
+                "current_state": "DISCOVERY",
+                "requested_state": "ASSESSMENT",
+                "configuration_version": "config-live-1",
+                "state_snapshot_id": "snapshot-live-1",
+                "evidence_digest": "sha256:evidence"
+            }),
+        });
+
+        let value = acp_prompt_route_with_llm_client(
+            state.clone(),
+            session_id,
+            AcpPromptRouteRequest {
+                prompt: vec![crate::acp_protocol::AcpContentBlock::Text {
+                    text: format!(
+                        "Advance KYC case {} to ASSESSMENT with evidence sha256:evidence",
+                        test_case_id()
+                    ),
+                }],
+                draft_source: Some("llm_tool_call".to_string()),
+            },
+            Ok(client),
+        )
+        .await
+        .expect("prompt llm route")
+        .0;
+
+        assert_eq!(value["status"], "acp_prompt_processed");
+        assert_eq!(value["draft_source"], "llm_tool_call");
+        assert_eq!(value["result"]["status"], "dry_run_validated");
+        assert_eq!(value["result"]["draft_source"], "llm_tool_call");
+        assert_eq!(
+            value["result"]["output"]["dry_run"]["transition_ref"],
+            "kyc-case.discovery-to-assessment"
+        );
+        assert_eq!(
+            value["result"]["llm_trace"]["provider"],
+            "stub-llm-provider"
+        );
+
+        let trace = get_session_trace(State(state), Path(session_id))
+            .await
+            .expect("session trace")
+            .0;
+        assert!(trace.as_array().unwrap().iter().any(|entry| {
+            entry["op"]["op"] == "acp_language_loop_traced"
+                && entry["op"]["draft_source"] == "llm_tool_call"
+                && entry["op"]["llm_provider"] == "stub-llm-provider"
+        }));
     }
 
     #[tokio::test]
