@@ -6,7 +6,7 @@
  */
 
 import { api } from "./client";
-import { acpApi, type AcpPromptResult } from "./acp";
+import { acpApi, type AcpContentBlock, type AcpPromptResult } from "./acp";
 import {
   CHAT_SESSIONS_STORAGE_KEY,
   isSessionMissingError,
@@ -31,6 +31,19 @@ import type {
 import type { SessionFeedback } from "./replV2";
 
 const ACP_PROMPT_COMMAND = /^\/acp(?:\s+|$)/i;
+
+export interface AcpKycCaseStateAnchor {
+  subjectId: string;
+  currentState: string;
+  configurationVersion: string;
+  stateSnapshotId: string;
+  source?: string;
+  snapshotRefs?: string[];
+}
+
+interface AcpPromptContext {
+  acp_state_anchor?: AcpKycCaseStateAnchor;
+}
 
 export function isAcpPromptCommand(message: string): boolean {
   return ACP_PROMPT_COMMAND.test(message.trim());
@@ -213,6 +226,58 @@ function buildAcpPromptAssistantMessage(
     content,
     timestamp: new Date().toISOString(),
     acp_trace: trace,
+  };
+}
+
+function acpPromptContext(request: SendMessageRequest): AcpPromptContext {
+  return (request.context ?? {}) as AcpPromptContext;
+}
+
+function acpStateAnchorContentBlock(anchor: AcpKycCaseStateAnchor) {
+  const provenance =
+    anchor.snapshotRefs && anchor.snapshotRefs.length > 0
+      ? anchor.snapshotRefs.map((snapshotRef) => ({
+          source: anchor.source ?? "ui.session_context",
+          snapshot_ref: snapshotRef,
+        }))
+      : [
+          {
+            source: anchor.source ?? "ui.session_context",
+            snapshot_ref: anchor.stateSnapshotId,
+          },
+        ];
+
+  return {
+    type: "embedded_resource" as const,
+    uri: `semos://entity/${anchor.subjectId}`,
+    name: "KYC read-state probe",
+    mime_type: "application/json",
+    text: JSON.stringify({
+      probe_id: "kyc-case.read-state",
+      subject: {
+        subject_kind: "kyc_case",
+        subject_id: anchor.subjectId,
+      },
+      observations: [
+        {
+          key: "case.status",
+          value: anchor.currentState,
+          classification: "internal",
+        },
+        {
+          key: "case.configuration_version",
+          value: anchor.configurationVersion,
+          classification: "internal",
+        },
+        {
+          key: "case.state_snapshot_id",
+          value: anchor.stateSnapshotId,
+          classification: "internal",
+        },
+      ],
+      provenance,
+      first_class_state_mutated: false,
+    }),
   };
 }
 
@@ -537,13 +602,19 @@ export const chatApi = {
       throw new Error("ACP prompt requires a non-empty utterance");
     }
 
+    const prompt: AcpContentBlock[] = [
+      {
+        type: "text",
+        text: promptText,
+      },
+    ];
+    const anchor = acpPromptContext(request).acp_state_anchor;
+    if (anchor) {
+      prompt.push(acpStateAnchorContentBlock(anchor));
+    }
+
     const envelope = await acpApi.prompt<AcpPromptGatewayResult>(sessionId, {
-      prompt: [
-        {
-          type: "text",
-          text: promptText,
-        },
-      ],
+      prompt,
     });
 
     return {

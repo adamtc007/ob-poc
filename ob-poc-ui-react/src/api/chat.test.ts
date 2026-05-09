@@ -104,4 +104,113 @@ describe("chatApi ACP prompt bridge", () => {
       estimated_user_repair_turns_avoided: 1,
     });
   });
+
+  it("includes read-only KYC case state context when available", async () => {
+    const response = {
+      status: "acp_prompt_processed",
+      session_id: "session-123",
+      result: {
+        status: "dry_run_validated",
+        output: {
+          dry_run: {
+            transition_ref: "kyc-case.discovery-to-assessment",
+            semantic_diff_uri: "semos://semantic-diff/workbook-1",
+          },
+        },
+        traceProjection: {
+          outcome: "dry_run_validated",
+          outcomeLayer: "dry_run_validated",
+          humanSummary: "I validated a dry-run workbook; no mutation ran.",
+          transitionRef: "kyc-case.discovery-to-assessment",
+          semanticDiffUri: "semos://semantic-diff/workbook-1",
+          neededFromUser: [],
+          diagnosticCodes: [],
+          dryRunValid: true,
+          firstPassValid: true,
+          revisionCount: 0,
+        },
+        observability: {
+          conversationEfficiency: {
+            proseOnlyFailure: false,
+            pendingUserTurnRequired: false,
+            estimatedUserRepairTurnsAvoided: 0,
+          },
+        },
+      },
+      outgoing: [],
+    };
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify(response), {
+        status: 200,
+        statusText: "OK",
+      }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    const result = await chatApi.sendAcpPrompt("session-123", {
+      message: "/acp Advance the KYC case to ASSESSMENT with evidence sha256:evidence",
+      context: {
+        acp_state_anchor: {
+          subjectId: "11111111-1111-1111-1111-111111111111",
+          currentState: "DISCOVERY",
+          configurationVersion: "constellation-v1",
+          stateSnapshotId: "ui-constellation:case:11111111",
+          source: "ui.constellation.read_only",
+          snapshotRefs: ["ui-constellation:case:11111111"],
+        },
+      },
+    });
+
+    const body = JSON.parse(fetchMock.mock.calls[0][1]?.body as string);
+    expect(body.prompt).toHaveLength(2);
+    expect(body.prompt[0]).toEqual({
+      type: "text",
+      text: "Advance the KYC case to ASSESSMENT with evidence sha256:evidence",
+    });
+    expect(body.prompt[1]).toMatchObject({
+      type: "embedded_resource",
+      uri: "semos://entity/11111111-1111-1111-1111-111111111111",
+      name: "KYC read-state probe",
+      mime_type: "application/json",
+    });
+    const embedded = JSON.parse(body.prompt[1].text);
+    expect(embedded).toMatchObject({
+      probe_id: "kyc-case.read-state",
+      subject: {
+        subject_kind: "kyc_case",
+        subject_id: "11111111-1111-1111-1111-111111111111",
+      },
+      first_class_state_mutated: false,
+    });
+    expect(embedded.observations).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          key: "case.status",
+          value: "DISCOVERY",
+          classification: "internal",
+        }),
+        expect.objectContaining({
+          key: "case.configuration_version",
+          value: "constellation-v1",
+        }),
+        expect.objectContaining({
+          key: "case.state_snapshot_id",
+          value: "ui-constellation:case:11111111",
+        }),
+      ]),
+    );
+    expect(fetchMock.mock.calls[0][0]).toBe(
+      "/api/session/session-123/acp/prompt",
+    );
+    expect(fetchMock.mock.calls[0][0]).not.toContain("/acp/kyc/");
+    expect(result.message.acp_trace).toMatchObject({
+      status: "dry_run_validated",
+      outcome: "dry_run_validated",
+      transition_ref: "kyc-case.discovery-to-assessment",
+      semantic_diff_uri: "semos://semantic-diff/workbook-1",
+      dry_run_valid: true,
+      prose_only_failure: false,
+      pending_user_turn_required: false,
+    });
+  });
 });
