@@ -2621,15 +2621,14 @@ fn language_loop_outcome_layer(
         "pending_question" => "pre_llm_pending".to_string(),
         "dry_run_validated" => "dry_run_validated".to_string(),
         "structured_refusal" => {
-            if value.get("llm_trace").is_none() {
-                return "pre_llm_refusal".to_string();
-            }
             let attempts_len = value
                 .get("attempts")
                 .and_then(|attempts| attempts.as_array())
                 .map(|attempts| attempts.len())
                 .unwrap_or(0);
-            if attempts_len == 0 {
+            if attempts_len == 0 && value.get("llm_trace").is_none() {
+                "pre_llm_refusal".to_string()
+            } else if attempts_len == 0 {
                 "decode_refusal".to_string()
             } else if revision_count > 0 {
                 "revision_refusal".to_string()
@@ -6123,12 +6122,16 @@ mod tests {
                 outcome,
                 refusal_code,
                 diagnostic_source_path,
+                outcome_layer,
+                diagnostic_codes,
                 dry_run_valid,
                 conversation_efficiency,
                 ..
             } if outcome == "structured_refusal"
                 && refusal_code.as_deref() == Some("invented_verb")
                 && diagnostic_source_path.as_deref() == Some("draft.verb")
+                && outcome_layer == "validation_refusal"
+                && diagnostic_codes.iter().any(|code| code == "invented_verb")
                 && !dry_run_valid
                 && conversation_efficiency.pending_user_turn_required
                 && !conversation_efficiency.prose_only_failure

@@ -39,6 +39,9 @@ fn workflow_acp_prompt_language_loop_harness_reports_prompt_to_dry_run_rates() {
     let mut pending_question = 0usize;
     let mut prose_only_failure = 0usize;
     let mut unexpected_fallback = 0usize;
+    let mut trace_projection_count = 0usize;
+    let mut hitl_summary_count = 0usize;
+    let mut structured_diagnostic_count = 0usize;
     let mut timings = TimingStats::default();
     let mut estimated_user_repair_turns_avoided = 0u64;
     let mut pending_user_turn_required = 0usize;
@@ -69,6 +72,21 @@ fn workflow_acp_prompt_language_loop_harness_reports_prompt_to_dry_run_rates() {
         timings.record(response, &fixture.name);
         let efficiency = conversation_efficiency(response, &fixture.name);
         assert_eq!(efficiency["proseOnlyFailure"], false, "{}", fixture.name);
+        let trace_projection = trace_projection(response, &fixture.name);
+        trace_projection_count += 1;
+        assert_eq!(
+            trace_projection["promptContextVariant"], "deterministic_language_loop",
+            "{}",
+            fixture.name
+        );
+        assert_eq!(trace_projection["decodeRepairCount"], 0, "{}", fixture.name);
+        if trace_projection["humanSummary"]
+            .as_str()
+            .map(|summary| !summary.trim().is_empty())
+            .unwrap_or(false)
+        {
+            hitl_summary_count += 1;
+        }
         estimated_user_repair_turns_avoided += efficiency["estimatedUserRepairTurnsAvoided"]
             .as_u64()
             .unwrap_or(0);
@@ -99,6 +117,15 @@ fn workflow_acp_prompt_language_loop_harness_reports_prompt_to_dry_run_rates() {
                     transition
                 );
                 assert!(agent_message_lower.contains("dry-run"), "{}", fixture.name);
+                assert_eq!(
+                    trace_projection["outcomeLayer"], "dry_run_validated",
+                    "{}",
+                    fixture.name
+                );
+                assert!(trace_projection["humanSummary"]
+                    .as_str()
+                    .unwrap()
+                    .contains("dry-run workbook"));
                 assert!(
                     agent_message_lower.contains("no mutation"),
                     "{}",
@@ -114,6 +141,10 @@ fn workflow_acp_prompt_language_loop_harness_reports_prompt_to_dry_run_rates() {
             Some("structured_refusal") => {
                 assert_eq!(expected_prompt.outcome, "refused", "{}", fixture.name);
                 structured_refusal += 1;
+                structured_diagnostic_count += trace_projection["diagnosticCodes"]
+                    .as_array()
+                    .map(|codes| usize::from(!codes.is_empty()))
+                    .unwrap_or(0);
                 assert!(
                     !outgoing.iter().any(is_semantic_diff),
                     "{} produced semantic diff after refusal",
@@ -128,6 +159,19 @@ fn workflow_acp_prompt_language_loop_harness_reports_prompt_to_dry_run_rates() {
                     "{}",
                     fixture.name
                 );
+                assert_eq!(
+                    trace_projection["outcomeLayer"], "validation_refusal",
+                    "{}",
+                    fixture.name
+                );
+                assert!(trace_projection["humanSummary"]
+                    .as_str()
+                    .unwrap()
+                    .contains("I stopped"));
+                assert!(trace_projection["neededFromUser"]
+                    .as_array()
+                    .map(|needs| !needs.is_empty())
+                    .unwrap_or(false));
                 assert!(
                     agent_message_lower.contains(expected_refusal),
                     "{} explanation omitted refusal code {}",
@@ -225,6 +269,18 @@ fn workflow_acp_prompt_language_loop_harness_reports_prompt_to_dry_run_rates() {
         pct(unexpected_fallback, total)
     );
     println!(
+        "  ACP trace projections:    {}/{} ({:.1}%)",
+        trace_projection_count,
+        total,
+        pct(trace_projection_count, total)
+    );
+    println!(
+        "  HITL summaries:           {}/{} ({:.1}%)",
+        hitl_summary_count,
+        total,
+        pct(hitl_summary_count, total)
+    );
+    println!(
         "  Local repair turns avoided: {}",
         estimated_user_repair_turns_avoided
     );
@@ -244,6 +300,9 @@ fn workflow_acp_prompt_language_loop_harness_reports_prompt_to_dry_run_rates() {
     assert_eq!(pending_question, 0);
     assert_eq!(prose_only_failure, 0);
     assert_eq!(unexpected_fallback, 0);
+    assert_eq!(trace_projection_count, total);
+    assert_eq!(hitl_summary_count, total);
+    assert_eq!(structured_diagnostic_count, structured_refusal);
     assert!(estimated_user_repair_turns_avoided > 0);
     assert_eq!(
         pending_user_turn_required,
@@ -379,6 +438,16 @@ fn conversation_efficiency<'a>(response: &'a Value, fixture_name: &str) -> &'a V
         fixture_name
     );
     efficiency
+}
+
+fn trace_projection<'a>(response: &'a Value, fixture_name: &str) -> &'a Value {
+    let projection = &response["traceProjection"];
+    assert!(
+        projection.is_object(),
+        "{}: expected ACP traceProjection payload",
+        fixture_name
+    );
+    projection
 }
 
 #[derive(Debug, Default)]

@@ -15,8 +15,8 @@ use uuid::Uuid;
 use crate::acp::{self, AcpAdapterKind, AcpPersonaMode, AcpSession};
 use crate::runbook::{
     KycLanguagePackRequest, KycUpdateStatusDryRunInput, KycUpdateStatusDryRunOutput,
-    KycUpdateStatusWorkbookDraft, LanguageAcquisitionMetrics, StructuredWorkbookRefusal,
-    WorkbookDiagnostic, WorkbookRevisionOutcome,
+    KycUpdateStatusWorkbookDraft, LanguageAcquisitionMetrics, SemOsLanguagePack,
+    StructuredWorkbookRefusal, WorkbookDiagnostic, WorkbookDraftAttempt, WorkbookRevisionOutcome,
 };
 
 pub const ACP_PROTOCOL_VERSION: &str = "0.4.3";
@@ -1166,6 +1166,7 @@ impl AcpJsonRpcAgent {
         let language_pack = outcome.language_pack;
         let revision_outcome = outcome.revision_outcome;
         let timings = outcome.timings;
+        let trace_projection = language_loop_trace_projection(&language_pack, &revision_outcome);
         let acp_emit_started_at = Instant::now();
         let mut outgoing = vec![
             JsonRpcOutgoing::Notification(JsonRpcNotification {
@@ -1199,7 +1200,7 @@ impl AcpJsonRpcAgent {
                         "sessionUpdate": "plan",
                         "persona": AcpPersonaMode::SagePlanning.as_str(),
                         "workflowPhase": "planning",
-                        "goalProposalTrace": language_loop_trace_summary(&revision_outcome),
+                        "goalProposalTrace": language_loop_trace_summary(&revision_outcome, &trace_projection),
                         "entries": language_loop_plan_entries(&revision_outcome)
                     }
                 }),
@@ -1213,7 +1214,14 @@ impl AcpJsonRpcAgent {
                 metrics,
                 trace,
             } => {
-                let explanation = explain_kyc_dry_run_success(output.as_ref(), &metrics);
+                let human_summary = trace_projection["humanSummary"]
+                    .as_str()
+                    .unwrap_or("I validated a dry-run workbook; no mutation was executed.");
+                let explanation = format!(
+                    "{} {}",
+                    human_summary,
+                    explain_kyc_dry_run_success(output.as_ref(), &metrics)
+                );
                 let acp_emit_us = elapsed_us(acp_emit_started_at);
                 outgoing.push(JsonRpcOutgoing::Notification(JsonRpcNotification {
                     jsonrpc: "2.0".to_string(),
@@ -1228,6 +1236,7 @@ impl AcpJsonRpcAgent {
                             "persona": AcpPersonaMode::SageExecution.as_str(),
                             "workflowPhase": "planning",
                             "title": "Workbook validation loop",
+                            "traceProjection": trace_projection.clone(),
                             "content": {
                                 "type": "resource_link",
                                 "uri": format!("semos://workbook/{}", output.workbook.id),
@@ -1263,6 +1272,10 @@ impl AcpJsonRpcAgent {
                         "attempts": attempts,
                         "metrics": metrics,
                         "trace": trace,
+                        "prompt_context_variant": {
+                            "id": trace_projection["promptContextVariant"].clone()
+                        },
+                        "traceProjection": trace_projection,
                         "observability": {
                             "projectionLatencyMs": elapsed_ms(started_at),
                             "performance": language_loop_performance(&timings, prompt_route_us, acp_emit_us),
@@ -1282,7 +1295,10 @@ impl AcpJsonRpcAgent {
                 metrics,
                 trace,
             } => {
-                let explanation = explain_kyc_refusal(&refusal);
+                let human_summary = trace_projection["humanSummary"]
+                    .as_str()
+                    .unwrap_or("I stopped with a structured refusal; no mutation was executed.");
+                let explanation = format!("{} {}", human_summary, explain_kyc_refusal(&refusal));
                 let acp_emit_us = elapsed_us(acp_emit_started_at);
                 outgoing.push(JsonRpcOutgoing::Notification(JsonRpcNotification {
                     jsonrpc: "2.0".to_string(),
@@ -1297,6 +1313,7 @@ impl AcpJsonRpcAgent {
                             "persona": AcpPersonaMode::SageExecution.as_str(),
                             "workflowPhase": "planning",
                             "title": "Workbook validation loop",
+                            "traceProjection": trace_projection.clone(),
                             "content": {
                                 "type": "embedded_resource",
                                 "uri": format!("semos://diagnostic/{}", refusal.refusal_code),
@@ -1316,6 +1333,10 @@ impl AcpJsonRpcAgent {
                         "attempts": attempts,
                         "metrics": metrics,
                         "trace": trace,
+                        "prompt_context_variant": {
+                            "id": trace_projection["promptContextVariant"].clone()
+                        },
+                        "traceProjection": trace_projection,
                         "observability": {
                             "projectionLatencyMs": elapsed_ms(started_at),
                             "performance": language_loop_performance(&timings, prompt_route_us, acp_emit_us),
@@ -1877,13 +1898,21 @@ fn extract_session_id(params: &Value) -> Result<Uuid, String> {
     Uuid::parse_str(raw).map_err(|error| error.to_string())
 }
 
-fn language_loop_trace_summary(outcome: &WorkbookRevisionOutcome) -> Value {
+fn language_loop_trace_summary(
+    outcome: &WorkbookRevisionOutcome,
+    trace_projection: &Value,
+) -> Value {
     match outcome {
         WorkbookRevisionOutcome::DryRunValid { metrics, trace, .. } => json!({
             "status": "dry_run_validated",
             "acpMechanismSummary": ["language_pack", "deterministic_revision_loop", "dry_run_only"],
             "acpFallbackSummary": [],
+            "promptContextVariant": trace_projection["promptContextVariant"].clone(),
+            "outcomeLayer": trace_projection["outcomeLayer"].clone(),
+            "diagnosticCodes": trace_projection["diagnosticCodes"].clone(),
+            "humanSummary": trace_projection["humanSummary"].clone(),
             "revisionCount": metrics.revision_count,
+            "decodeRepairCount": 0,
             "firstPassValid": metrics.first_pass_valid,
             "dryRunValid": metrics.dry_run_valid,
             "dryRunMs": metrics.dry_run_ms,
@@ -1900,7 +1929,12 @@ fn language_loop_trace_summary(outcome: &WorkbookRevisionOutcome) -> Value {
             "status": "structured_refusal",
             "acpMechanismSummary": ["language_pack", "deterministic_revision_loop", "structured_refusal"],
             "acpFallbackSummary": [],
+            "promptContextVariant": trace_projection["promptContextVariant"].clone(),
+            "outcomeLayer": trace_projection["outcomeLayer"].clone(),
+            "diagnosticCodes": trace_projection["diagnosticCodes"].clone(),
+            "humanSummary": trace_projection["humanSummary"].clone(),
             "revisionCount": metrics.revision_count,
+            "decodeRepairCount": 0,
             "firstPassValid": metrics.first_pass_valid,
             "dryRunValid": metrics.dry_run_valid,
             "dryRunMs": metrics.dry_run_ms,
@@ -1908,6 +1942,214 @@ fn language_loop_trace_summary(outcome: &WorkbookRevisionOutcome) -> Value {
             "refusalCode": refusal.refusal_code,
             "trace": trace
         }),
+    }
+}
+
+fn language_loop_trace_projection(
+    language_pack: &SemOsLanguagePack,
+    outcome: &WorkbookRevisionOutcome,
+) -> Value {
+    match outcome {
+        WorkbookRevisionOutcome::DryRunValid {
+            output,
+            attempts,
+            metrics,
+            ..
+        } => {
+            let semantic = &output.dry_run.semantic_diff;
+            let diagnostic_codes = diagnostic_codes_from_attempts(attempts);
+            let human_summary = language_loop_human_summary_for_dry_run(
+                Some(semantic.from_state.as_str()),
+                Some(semantic.to_state.as_str()),
+                metrics.revision_count,
+            );
+            json!({
+                "outcome": "dry_run_validated",
+                "packId": language_pack.pack_id,
+                "packRef": format!("{}@{}", language_pack.pack_id, language_pack.pack_version),
+                "subjectId": language_pack.subject.id,
+                "verb": "kyc-case.update-status",
+                "currentState": semantic.from_state,
+                "requestedState": semantic.to_state,
+                "transitionRef": output.dry_run.transition_ref,
+                "workbookId": output.workbook.id,
+                "semanticDiffUri": output.dry_run.semantic_diff_uri,
+                "promptContextVariant": "deterministic_language_loop",
+                "decodeRepairCount": 0,
+                "revisionCount": metrics.revision_count,
+                "outcomeLayer": "dry_run_validated",
+                "diagnosticCodes": diagnostic_codes,
+                "firstPassValid": metrics.first_pass_valid,
+                "dryRunValid": metrics.dry_run_valid,
+                "humanSummary": human_summary,
+                "neededFromUser": []
+            })
+        }
+        WorkbookRevisionOutcome::Refused {
+            refusal,
+            attempts,
+            metrics,
+            ..
+        } => {
+            let diagnostic_codes = diagnostic_codes_from_refusal(attempts, refusal);
+            let outcome_layer = deterministic_language_loop_outcome_layer(attempts, metrics);
+            let last_draft = attempts.last().map(|attempt| &attempt.draft);
+            let current_state = last_draft
+                .map(|draft| draft.current_state.as_str())
+                .unwrap_or(language_pack.current_state.as_str());
+            let requested_state = last_draft.map(|draft| draft.requested_state.as_str());
+            let transition_ref = last_draft.map(|draft| draft.transition_ref.as_str());
+            let human_summary = language_loop_human_summary_for_refusal(
+                current_state,
+                &outcome_layer,
+                &diagnostic_codes,
+                refusal.refusal_code.as_str(),
+            );
+            let needed_from_user = refusal
+                .diagnostics
+                .first()
+                .map(needed_from_diagnostic)
+                .unwrap_or_else(|| vec!["corrected_workbook_draft".to_string()]);
+
+            json!({
+                "outcome": "structured_refusal",
+                "packId": language_pack.pack_id,
+                "packRef": format!("{}@{}", language_pack.pack_id, language_pack.pack_version),
+                "subjectId": language_pack.subject.id,
+                "verb": "kyc-case.update-status",
+                "currentState": current_state,
+                "requestedState": requested_state,
+                "transitionRef": transition_ref,
+                "refusalCode": refusal.refusal_code,
+                "diagnosticSourcePath": refusal
+                    .diagnostics
+                    .first()
+                    .map(|diagnostic| diagnostic.source_path.as_str()),
+                "promptContextVariant": "deterministic_language_loop",
+                "decodeRepairCount": 0,
+                "revisionCount": metrics.revision_count,
+                "outcomeLayer": outcome_layer,
+                "diagnosticCodes": diagnostic_codes,
+                "firstPassValid": metrics.first_pass_valid,
+                "dryRunValid": metrics.dry_run_valid,
+                "humanSummary": human_summary,
+                "neededFromUser": needed_from_user
+            })
+        }
+    }
+}
+
+fn deterministic_language_loop_outcome_layer(
+    attempts: &[WorkbookDraftAttempt],
+    metrics: &LanguageAcquisitionMetrics,
+) -> &'static str {
+    if attempts.is_empty() {
+        "pre_llm_refusal"
+    } else if metrics.revision_count > 0 {
+        "revision_refusal"
+    } else {
+        "validation_refusal"
+    }
+}
+
+fn diagnostic_codes_from_refusal(
+    attempts: &[WorkbookDraftAttempt],
+    refusal: &StructuredWorkbookRefusal,
+) -> Vec<String> {
+    let mut codes = diagnostic_codes_from_attempts(attempts);
+    codes.extend(
+        refusal
+            .diagnostics
+            .iter()
+            .map(|diagnostic| diagnostic.error_code.clone()),
+    );
+    codes.sort();
+    codes.dedup();
+    codes
+}
+
+fn diagnostic_codes_from_attempts(attempts: &[WorkbookDraftAttempt]) -> Vec<String> {
+    let mut codes = attempts
+        .iter()
+        .flat_map(|attempt| attempt.diagnostics.iter())
+        .map(|diagnostic| diagnostic.error_code.clone())
+        .collect::<Vec<_>>();
+    codes.sort();
+    codes.dedup();
+    codes
+}
+
+fn language_loop_human_summary_for_dry_run(
+    current_state: Option<&str>,
+    requested_state: Option<&str>,
+    revision_count: u8,
+) -> String {
+    if revision_count > 0 {
+        let revision_word = if revision_count == 1 {
+            "revision"
+        } else {
+            "revisions"
+        };
+        format!(
+            "I revised the draft after {revision_count} local {revision_word} using structured diagnostics, then validated a dry-run workbook{}; no mutation was executed.",
+            transition_phrase(current_state, requested_state)
+        )
+    } else {
+        format!(
+            "I found a valid transition{} and drafted a dry-run workbook; no mutation was executed.",
+            transition_phrase(current_state, requested_state)
+        )
+    }
+}
+
+fn language_loop_human_summary_for_refusal(
+    current_state: &str,
+    outcome_layer: &str,
+    diagnostic_codes: &[String],
+    refusal_code: &str,
+) -> String {
+    if diagnostic_codes
+        .iter()
+        .any(|code| code == "missing_evidence_digest")
+    {
+        "I stopped because required evidence digest is missing; no mutation was executed."
+            .to_string()
+    } else if outcome_layer == "revision_refusal"
+        && diagnostic_codes
+            .iter()
+            .any(|code| code == "unknown_transition")
+    {
+        format!(
+            "I stopped because no transition is valid from {current_state}; no mutation was executed."
+        )
+    } else {
+        format!("I stopped with structured refusal {refusal_code}; no mutation was executed.")
+    }
+}
+
+fn transition_phrase(current_state: Option<&str>, requested_state: Option<&str>) -> String {
+    match (current_state, requested_state) {
+        (Some(current_state), Some(requested_state)) => {
+            format!(" from {current_state} to {requested_state}")
+        }
+        _ => String::new(),
+    }
+}
+
+fn needed_from_diagnostic(diagnostic: &WorkbookDiagnostic) -> Vec<String> {
+    match diagnostic.error_code.as_str() {
+        "missing_evidence_digest" => vec!["evidence_digest".to_string()],
+        "missing_uuid_binding" => diagnostic
+            .missing_uuid_binding
+            .clone()
+            .map(|binding| vec![binding])
+            .unwrap_or_else(|| vec!["case_uuid".to_string()]),
+        "invented_verb" => vec!["valid_verb".to_string()],
+        "unknown_transition" => vec!["valid_transition".to_string()],
+        "current_state_mismatch" => vec!["current_state".to_string()],
+        "requested_state_mismatch" => vec!["requested_state".to_string()],
+        "stale_replan_required" => vec!["fresh_state_anchor".to_string()],
+        _ => vec!["corrected_workbook_draft".to_string()],
     }
 }
 
@@ -1991,10 +2233,15 @@ fn pending_question_conversation_efficiency(code: &str) -> Value {
 fn pending_question_outgoing(
     id: Option<Value>,
     session_id: Uuid,
-    result: Value,
+    mut result: Value,
     code: &str,
     message: String,
 ) -> Vec<JsonRpcOutgoing> {
+    let trace_projection = pending_question_trace_projection(code, &message);
+    if let Value::Object(fields) = &mut result {
+        fields.insert("traceProjection".to_string(), trace_projection.clone());
+    }
+
     vec![
         JsonRpcOutgoing::Notification(JsonRpcNotification {
             jsonrpc: "2.0".to_string(),
@@ -2008,6 +2255,12 @@ fn pending_question_outgoing(
                     "goalProposalTrace": {
                         "status": "pending_question",
                         "pendingQuestionCode": code,
+                        "promptContextVariant": trace_projection["promptContextVariant"].clone(),
+                        "outcomeLayer": trace_projection["outcomeLayer"].clone(),
+                        "diagnosticCodes": trace_projection["diagnosticCodes"].clone(),
+                        "humanSummary": trace_projection["humanSummary"].clone(),
+                        "decodeRepairCount": 0,
+                        "revisionCount": 0,
                         "acpMechanismSummary": ["prompt_router", "structured_pending_question"],
                         "acpFallbackSummary": []
                     },
@@ -2022,6 +2275,35 @@ fn pending_question_outgoing(
         agent_message_update(session_id, message),
         JsonRpcOutgoing::Response(JsonRpcResponse::success(id, result)),
     ]
+}
+
+fn pending_question_trace_projection(code: &str, message: &str) -> Value {
+    json!({
+        "outcome": "pending_question",
+        "promptContextVariant": "pre_language_pack_prompt_router",
+        "decodeRepairCount": 0,
+        "revisionCount": 0,
+        "outcomeLayer": "pre_llm_pending",
+        "diagnosticCodes": [],
+        "pendingQuestionCode": code,
+        "humanSummary": message,
+        "neededFromUser": pending_question_needs(code),
+        "firstPassValid": false,
+        "dryRunValid": false
+    })
+}
+
+fn pending_question_needs(code: &str) -> Vec<String> {
+    match code {
+        "kyc_prompt_ambiguous" => vec!["explicit_verb_or_update_status_intent".to_string()],
+        "kyc_update_status_prompt_incomplete" => vec![
+            "case_uuid".to_string(),
+            "current_state".to_string(),
+            "requested_state".to_string(),
+            "evidence_digest".to_string(),
+        ],
+        _ => vec!["hitl_clarification".to_string()],
+    }
 }
 
 fn elapsed_ms(started_at: Instant) -> u64 {
@@ -2446,7 +2728,21 @@ mod tests {
             result["observability"]["conversationEfficiency"]["proseOnlyFailure"],
             false
         );
+        assert_eq!(
+            result["traceProjection"]["promptContextVariant"],
+            "deterministic_language_loop"
+        );
+        assert_eq!(
+            result["traceProjection"]["outcomeLayer"],
+            "dry_run_validated"
+        );
+        assert_eq!(result["traceProjection"]["decodeRepairCount"], 0);
+        assert!(result["traceProjection"]["humanSummary"]
+            .as_str()
+            .unwrap()
+            .contains("I found a valid transition from DISCOVERY to ASSESSMENT"));
         let message = agent_message_text(&outgoing);
+        assert!(message.contains("I found a valid transition from DISCOVERY to ASSESSMENT"));
         assert!(message.contains("kyc-case.update-status"));
         assert!(message.contains("kyc-case.discovery-to-assessment"));
         assert!(message.contains("DISCOVERY"));
@@ -2518,11 +2814,84 @@ mod tests {
             result["observability"]["conversationEfficiency"]["proseOnlyFailure"],
             false
         );
+        assert_eq!(
+            result["traceProjection"]["promptContextVariant"],
+            "deterministic_language_loop"
+        );
+        assert_eq!(
+            result["traceProjection"]["outcomeLayer"],
+            "validation_refusal"
+        );
+        assert!(result["traceProjection"]["diagnosticCodes"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|code| code == "missing_evidence_digest"));
+        assert!(result["traceProjection"]["humanSummary"]
+            .as_str()
+            .unwrap()
+            .contains("required evidence digest is missing"));
         let message = agent_message_text(&outgoing);
+        assert!(message.contains("required evidence digest is missing"));
         assert!(message.contains("missing_evidence_digest"));
         assert!(message.contains("draft.evidence_digest"));
         assert!(message.contains("Correct") || message.contains("provide"));
         assert!(message.to_ascii_lowercase().contains("no mutation"));
+    }
+
+    #[test]
+    fn session_prompt_kyc_incomplete_returns_pending_trace_projection() {
+        let mut agent = AcpJsonRpcAgent::new();
+        let outgoing = agent.handle_request(request(
+            1,
+            "session/prompt",
+            json!({
+                "sessionId": SESSION_ID.to_string(),
+                "prompt": [
+                    {
+                        "type": "text",
+                        "text": "update status for KYC case"
+                    }
+                ]
+            }),
+        ));
+
+        assert_eq!(outgoing.len(), 3);
+        let plan_update = match &outgoing[0] {
+            JsonRpcOutgoing::Notification(notification) => &notification.params["update"],
+            JsonRpcOutgoing::Response(_) => panic!("expected plan notification"),
+        };
+        assert_eq!(
+            plan_update["goalProposalTrace"]["status"],
+            "pending_question"
+        );
+        assert_eq!(
+            plan_update["goalProposalTrace"]["outcomeLayer"],
+            "pre_llm_pending"
+        );
+        assert_eq!(
+            plan_update["goalProposalTrace"]["promptContextVariant"],
+            "pre_language_pack_prompt_router"
+        );
+        assert!(plan_update["goalProposalTrace"]["humanSummary"]
+            .as_str()
+            .unwrap()
+            .contains("missing"));
+
+        let response = match &outgoing[2] {
+            JsonRpcOutgoing::Response(response) => response,
+            JsonRpcOutgoing::Notification(_) => panic!("expected response"),
+        };
+        let result = response.result.as_ref().unwrap();
+        assert_eq!(result["status"], "pending_question");
+        assert_eq!(result["traceProjection"]["outcomeLayer"], "pre_llm_pending");
+        assert!(result["traceProjection"]["neededFromUser"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|need| need == "case_uuid"));
+        let message = agent_message_text(&outgoing);
+        assert!(message.contains("I found a KYC update-status intent"));
     }
 
     #[test]
@@ -2837,6 +3206,33 @@ mod tests {
             "dry_run_validated"
         );
         assert_eq!(plan_update["goalProposalTrace"]["revisionCount"], 1);
+        assert_eq!(
+            plan_update["goalProposalTrace"]["promptContextVariant"],
+            "deterministic_language_loop"
+        );
+        assert_eq!(
+            plan_update["goalProposalTrace"]["outcomeLayer"],
+            "dry_run_validated"
+        );
+        assert_eq!(plan_update["goalProposalTrace"]["decodeRepairCount"], 0);
+        assert!(plan_update["goalProposalTrace"]["diagnosticCodes"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|code| code == "unknown_transition"));
+        assert!(plan_update["goalProposalTrace"]["humanSummary"]
+            .as_str()
+            .unwrap()
+            .contains("I revised the draft after 1 local revision"));
+        let validation_update = match &outgoing[2] {
+            JsonRpcOutgoing::Notification(notification) => &notification.params["update"],
+            JsonRpcOutgoing::Response(_) => panic!("expected validation notification"),
+        };
+        assert_eq!(
+            validation_update["traceProjection"]["promptContextVariant"],
+            "deterministic_language_loop"
+        );
+        assert_eq!(validation_update["traceProjection"]["revisionCount"], 1);
         assert!(matches!(
             &outgoing[3],
             JsonRpcOutgoing::Notification(notification)
@@ -2850,6 +3246,16 @@ mod tests {
         assert_eq!(result["status"], "dry_run_validated");
         assert_eq!(result["metrics"]["revision_count"], 1);
         assert_eq!(result["metrics"]["dry_run_valid"], true);
+        assert_eq!(
+            result["traceProjection"]["promptContextVariant"],
+            "deterministic_language_loop"
+        );
+        assert_eq!(
+            result["traceProjection"]["outcomeLayer"],
+            "dry_run_validated"
+        );
+        let message = agent_message_text(&outgoing);
+        assert!(message.contains("I revised the draft after 1 local revision"));
     }
 
     #[test]
@@ -2897,6 +3303,33 @@ mod tests {
         assert_eq!(result["refusal"]["refusal_code"], "invented_verb");
         assert_eq!(result["metrics"]["invented_verb_count"], 1);
         assert_eq!(result["metrics"]["dry_run_valid"], false);
+        assert_eq!(
+            result["traceProjection"]["promptContextVariant"],
+            "deterministic_language_loop"
+        );
+        assert_eq!(
+            result["traceProjection"]["outcomeLayer"],
+            "validation_refusal"
+        );
+        assert!(result["traceProjection"]["diagnosticCodes"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|code| code == "invented_verb"));
+        assert!(result["traceProjection"]["humanSummary"]
+            .as_str()
+            .unwrap()
+            .contains("structured refusal invented_verb"));
+        let plan_update = match &outgoing[1] {
+            JsonRpcOutgoing::Notification(notification) => &notification.params["update"],
+            JsonRpcOutgoing::Response(_) => panic!("expected plan notification"),
+        };
+        assert_eq!(
+            plan_update["goalProposalTrace"]["outcomeLayer"],
+            "validation_refusal"
+        );
+        let message = agent_message_text(&outgoing);
+        assert!(message.contains("I stopped with structured refusal invented_verb"));
     }
 
     #[test]
