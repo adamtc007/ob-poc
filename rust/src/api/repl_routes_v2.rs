@@ -349,71 +349,25 @@ pub struct AcpPromptRouteRequest {
     pub draft_source: Option<String>,
 }
 
-/// Request to run the bounded KYC update-status language loop.
+/// Generic ACP JSON-RPC gateway request for the REPL HTTP boundary.
 #[derive(Debug, Clone, Deserialize)]
-pub struct AcpKycUpdateStatusLanguageLoopRouteRequest {
-    #[serde(default = "default_acp_adapter")]
-    pub adapter: crate::acp::AcpAdapterKind,
-    pub subject_id: Uuid,
-    pub current_state: String,
-    pub configuration_version: String,
-    pub state_snapshot_id: String,
+pub struct AcpGatewayRouteRequest {
+    pub method: String,
     #[serde(default)]
-    pub objective: Option<String>,
-    #[serde(default)]
-    pub prompt_route_ms: Option<u64>,
-    #[serde(default)]
-    pub prompt_route_us: Option<u64>,
-    pub draft: crate::runbook::KycUpdateStatusWorkbookDraft,
+    pub params: serde_json::Value,
 }
 
-/// Read-only KYC case-state discovery material supplied by the ACP host.
-#[derive(Debug, Clone, Deserialize)]
-pub struct AcpKycCaseStateDiscoveryRouteRequest {
-    #[serde(default)]
-    pub observations: Vec<sem_os_core::domain_pack::DiscoveryObservation>,
-    #[serde(default)]
-    pub provenance: Vec<sem_os_core::domain_pack::DiscoveryProvenance>,
-    #[serde(default)]
-    pub first_class_state_mutated: bool,
-}
-
-/// Request to discover and cache a KYC case-state anchor for ACP prompt routing.
-#[derive(Debug, Clone, Deserialize)]
-pub struct AcpKycCaseStateDiscoverRouteRequest {
-    #[serde(default = "default_acp_adapter")]
-    pub adapter: crate::acp::AcpAdapterKind,
-    pub subject_id: Uuid,
-    #[serde(default)]
-    pub observations: Vec<sem_os_core::domain_pack::DiscoveryObservation>,
-    #[serde(default)]
-    pub provenance: Vec<sem_os_core::domain_pack::DiscoveryProvenance>,
-    #[serde(default)]
-    pub first_class_state_mutated: bool,
-}
-
-/// Request to let an LLM draft a KYC update-status workbook behind validation.
-#[derive(Debug, Clone, Deserialize)]
-pub struct AcpKycUpdateStatusLlmDraftRouteRequest {
-    #[serde(default = "default_acp_adapter")]
-    pub adapter: crate::acp::AcpAdapterKind,
-    pub subject_id: Uuid,
-    #[serde(default)]
-    pub current_state: Option<String>,
-    #[serde(default)]
-    pub configuration_version: Option<String>,
-    #[serde(default)]
-    pub state_snapshot_id: Option<String>,
-    #[serde(default)]
-    pub objective: Option<String>,
-    #[serde(default)]
-    pub evidence_digest: Option<String>,
-    #[serde(default)]
-    pub actor_id: Option<String>,
-    #[serde(default)]
-    pub actor_roles: Vec<String>,
-    #[serde(default)]
-    pub discovery: Option<AcpKycCaseStateDiscoveryRouteRequest>,
+#[derive(Debug, Clone)]
+struct KycUpdateStatusLlmDraftInput {
+    adapter: crate::acp::AcpAdapterKind,
+    subject_id: Uuid,
+    current_state: String,
+    configuration_version: String,
+    state_snapshot_id: String,
+    objective: Option<String>,
+    evidence_digest: Option<String>,
+    actor_id: Option<String>,
+    actor_roles: Vec<String>,
 }
 
 fn default_acp_adapter() -> crate::acp::AcpAdapterKind {
@@ -1098,19 +1052,8 @@ pub fn session_scoped_router() -> Router<ReplV2RouteState> {
             "/api/session/:id/acp/context",
             post(assemble_acp_context_route),
         )
-        .route(
-            "/api/session/:id/acp/kyc/case-state/discover",
-            post(discover_acp_kyc_case_state_route),
-        )
+        .route("/api/session/:id/acp/gateway", post(acp_gateway_route))
         .route("/api/session/:id/acp/prompt", post(acp_prompt_route))
-        .route(
-            "/api/session/:id/acp/kyc/update-status/language-loop",
-            post(acp_kyc_update_status_language_loop_route),
-        )
-        .route(
-            "/api/session/:id/acp/kyc/update-status/llm-draft-loop",
-            post(acp_kyc_update_status_llm_draft_loop_route),
-        )
         // Session trace routes (R9)
         .route("/api/session/:id/trace", get(get_session_trace))
         .route("/api/session/:id/trace/:seq", get(get_trace_entry))
@@ -1722,36 +1665,71 @@ async fn resolve_acp_prompt_language_loop_request(
     agent.kyc_update_status_language_loop_request_from_prompt(session_id, prompt)
 }
 
-/// POST /api/session/:id/acp/kyc/case-state/discover
-async fn discover_acp_kyc_case_state_route(
+/// POST /api/session/:id/acp/gateway
+async fn acp_gateway_route(
+    State(state): State<ReplV2RouteState>,
     Path(session_id): Path<Uuid>,
-    Json(req): Json<AcpKycCaseStateDiscoverRouteRequest>,
+    Json(req): Json<AcpGatewayRouteRequest>,
 ) -> Result<Json<serde_json::Value>, (StatusCode, Json<ErrorResponseV2>)> {
+    let params = acp_gateway_params(session_id, &req.method, req.params);
     let outgoing = handle_repl_acp_request(
         session_id,
         crate::acp_protocol::JsonRpcRequest {
             jsonrpc: "2.0".to_string(),
-            id: Some(serde_json::json!("kyc-case-state-discover")),
-            method: "obpoc/kyc_case_state/discover".to_string(),
-            params: serde_json::json!({
-                "session_id": session_id.to_string(),
-                "adapter": req.adapter,
-                "subject_id": req.subject_id,
-                "observations": req.observations,
-                "provenance": req.provenance,
-                "first_class_state_mutated": req.first_class_state_mutated,
-            }),
+            id: Some(serde_json::json!("repl-acp-gateway")),
+            method: req.method.clone(),
+            params,
         },
     )
     .await;
     let result = json_rpc_outgoing_result(&outgoing).unwrap_or_else(|| serde_json::json!({}));
+    if let Some(op) = acp_language_loop_trace_op_from_value(&result) {
+        append_session_trace_if_present(&state, session_id, op).await;
+    }
 
     Ok(Json(serde_json::json!({
-        "status": "acp_kyc_case_state_discovery_processed",
+        "status": "acp_gateway_processed",
         "session_id": session_id,
+        "method": req.method,
         "result": result,
         "outgoing": outgoing,
     })))
+}
+
+fn acp_gateway_params(
+    session_id: Uuid,
+    method: &str,
+    params: serde_json::Value,
+) -> serde_json::Value {
+    let mut params = match params {
+        serde_json::Value::Object(fields) => fields,
+        _ => serde_json::Map::new(),
+    };
+    let session_id_string = session_id.to_string();
+    match method {
+        "session/prompt" => {
+            params
+                .entry("sessionId")
+                .or_insert_with(|| serde_json::json!(session_id_string));
+        }
+        "session/load" | "session/close" | "session/cancel" => {
+            params
+                .entry("sessionId")
+                .or_insert_with(|| serde_json::json!(session_id_string.clone()));
+            params
+                .entry("session_id")
+                .or_insert_with(|| serde_json::json!(session_id_string));
+        }
+        _ => {
+            params
+                .entry("session_id")
+                .or_insert_with(|| serde_json::json!(session_id_string.clone()));
+            params
+                .entry("sessionId")
+                .or_insert_with(|| serde_json::json!(session_id_string));
+        }
+    }
+    serde_json::Value::Object(params)
 }
 
 fn acp_prompt_requests_llm_draft(
@@ -1840,19 +1818,18 @@ async fn acp_prompt_route_with_llm_client(
         }
     };
 
-    let value = acp_kyc_update_status_llm_draft_loop_value_with_client(
+    let value = run_acp_prompt_llm_draft_value_with_client(
         session_id,
-        AcpKycUpdateStatusLlmDraftRouteRequest {
+        KycUpdateStatusLlmDraftInput {
             adapter: request.adapter,
             subject_id: request.subject_id,
-            current_state: Some(request.current_state),
-            configuration_version: Some(request.configuration_version),
-            state_snapshot_id: Some(request.state_snapshot_id),
+            current_state: request.current_state,
+            configuration_version: request.configuration_version,
+            state_snapshot_id: request.state_snapshot_id,
             objective: request.objective,
             evidence_digest: request.draft.evidence_digest,
             actor_id: Some(request.draft.actor_id),
             actor_roles: request.draft.actor_roles,
-            discovery: None,
         },
         client,
     )
@@ -1872,138 +1849,9 @@ async fn acp_prompt_route_with_llm_client(
     })))
 }
 
-/// POST /api/session/:id/acp/kyc/update-status/language-loop
-async fn acp_kyc_update_status_language_loop_route(
-    State(state): State<ReplV2RouteState>,
-    Path(session_id): Path<Uuid>,
-    Json(req): Json<AcpKycUpdateStatusLanguageLoopRouteRequest>,
-) -> Result<Json<serde_json::Value>, (StatusCode, Json<ErrorResponseV2>)> {
-    if req.draft.session_id != session_id {
-        return Err((
-            StatusCode::BAD_REQUEST,
-            Json(ErrorResponseV2 {
-                error: format!(
-                    "draft.session_id {} does not match route session {session_id}",
-                    req.draft.session_id
-                ),
-                recoverable: true,
-            }),
-        ));
-    }
-
-    let value =
-        acp_kyc_update_status_language_loop_value(session_id, req).map_err(acp_json_error)?;
-    if let Some(op) = acp_language_loop_trace_op_from_value(&value) {
-        append_session_trace_if_present(&state, session_id, op).await;
-    }
-    Ok(Json(value))
-}
-
-/// POST /api/session/:id/acp/kyc/update-status/llm-draft-loop
-async fn acp_kyc_update_status_llm_draft_loop_route(
-    State(state): State<ReplV2RouteState>,
-    Path(session_id): Path<Uuid>,
-    Json(req): Json<AcpKycUpdateStatusLlmDraftRouteRequest>,
-) -> Result<Json<serde_json::Value>, (StatusCode, Json<ErrorResponseV2>)> {
-    let client = ob_agentic::create_llm_client().map_err(|error| error.to_string());
-    let value = acp_kyc_update_status_llm_draft_loop_value_with_client(session_id, req, client)
-        .await
-        .map_err(acp_json_error)?;
-    if let Some(op) = acp_language_loop_trace_op_from_value(&value) {
-        append_session_trace_if_present(&state, session_id, op).await;
-    }
-    Ok(Json(value))
-}
-
-fn acp_kyc_update_status_language_loop_value(
+async fn run_acp_prompt_llm_draft_value_with_client(
     session_id: Uuid,
-    req: AcpKycUpdateStatusLanguageLoopRouteRequest,
-) -> Result<serde_json::Value, crate::acp::AcpAdapterError> {
-    let manifest = load_ob_poc_kyc_domain_pack()?;
-    let session = crate::acp::open_acp_session(session_id, req.adapter);
-    let prompt_route_us = req
-        .prompt_route_us
-        .unwrap_or_else(|| req.prompt_route_ms.unwrap_or(0).saturating_mul(1_000));
-
-    let started_at = Instant::now();
-    let outcome = crate::acp::acp_run_kyc_update_status_language_loop_timed(
-        &session,
-        &manifest,
-        crate::runbook::KycLanguagePackRequest {
-            subject_id: req.subject_id,
-            current_state: req.current_state,
-            configuration_version: req.configuration_version,
-            state_snapshot_id: req.state_snapshot_id,
-            objective: req.objective,
-        },
-        req.draft,
-    )?;
-    let projection_latency_ms = route_elapsed_ms(started_at);
-    let language_pack = outcome.language_pack;
-    let timings = outcome.timings;
-    let performance = route_language_loop_performance(&timings, prompt_route_us, 0);
-
-    match outcome.revision_outcome {
-        crate::runbook::WorkbookRevisionOutcome::DryRunValid {
-            output,
-            attempts,
-            metrics,
-            trace,
-        } => Ok(serde_json::json!({
-            "status": "dry_run_validated",
-            "language_pack": language_pack,
-            "output": output,
-            "attempts": attempts,
-            "metrics": metrics,
-            "trace": trace,
-            "observability": {
-                "projectionLatencyMs": projection_latency_ms,
-                "performance": performance,
-                "conversationEfficiency": route_language_loop_conversation_efficiency(
-                    &metrics,
-                    "dry_run_validated",
-                    None,
-                ),
-                "acpMechanismSummary": ["language_pack", "deterministic_revision_loop", "dry_run_only"]
-            }
-        })),
-        crate::runbook::WorkbookRevisionOutcome::Refused {
-            refusal,
-            attempts,
-            metrics,
-            trace,
-        } => {
-            let refusal_code = refusal.refusal_code.clone();
-            Ok(serde_json::json!({
-                "status": "structured_refusal",
-                "language_pack": language_pack,
-                "refusal": refusal,
-                "attempts": attempts,
-                "metrics": metrics,
-                "trace": trace,
-                "observability": {
-                    "projectionLatencyMs": projection_latency_ms,
-                    "performance": performance,
-                    "conversationEfficiency": route_language_loop_conversation_efficiency(
-                        &metrics,
-                        "structured_refusal",
-                        Some(refusal_code.as_str()),
-                    ),
-                    "acpMechanismSummary": ["language_pack", "deterministic_revision_loop", "structured_refusal"]
-                }
-            }))
-        }
-    }
-}
-
-enum KycCaseStateAnchorResolution {
-    Ready(crate::acp::AcpKycCaseStateSnapshot),
-    Pending(Vec<String>),
-}
-
-async fn acp_kyc_update_status_llm_draft_loop_value_with_client(
-    session_id: Uuid,
-    req: AcpKycUpdateStatusLlmDraftRouteRequest,
+    req: KycUpdateStatusLlmDraftInput,
     client: Result<std::sync::Arc<dyn ob_agentic::llm_client::LlmClient>, String>,
 ) -> Result<serde_json::Value, crate::acp::AcpAdapterError> {
     let manifest = load_ob_poc_kyc_domain_pack()?;
@@ -2019,16 +1867,15 @@ async fn acp_kyc_update_status_llm_draft_loop_value_with_client(
         req.actor_roles.clone()
     };
 
-    let anchor = resolve_kyc_case_state_anchor(&session, &manifest, &req)?;
-    let case_state = match anchor {
-        KycCaseStateAnchorResolution::Ready(case_state) => case_state,
-        KycCaseStateAnchorResolution::Pending(missing) => {
-            return Ok(acp_language_loop_pending_question_value(
-                "kyc_update_status_state_anchor_incomplete",
-                missing,
-                route_elapsed_us(total_started_at),
-            ));
-        }
+    let case_state = crate::acp::AcpKycCaseStateSnapshot {
+        session_id,
+        pack_id: manifest.pack_id.clone(),
+        subject_kind: "kyc_case".to_string(),
+        subject_id: req.subject_id,
+        current_state: req.current_state.clone(),
+        configuration_version: req.configuration_version.clone(),
+        state_snapshot_id: req.state_snapshot_id.clone(),
+        snapshot_refs: vec![],
     };
 
     let language_pack_started_at = Instant::now();
@@ -2107,72 +1954,6 @@ async fn acp_kyc_update_status_llm_draft_loop_value_with_client(
             ))
         }
     }
-}
-
-fn resolve_kyc_case_state_anchor(
-    session: &crate::acp::AcpSession,
-    manifest: &DomainPackManifest,
-    req: &AcpKycUpdateStatusLlmDraftRouteRequest,
-) -> Result<KycCaseStateAnchorResolution, crate::acp::AcpAdapterError> {
-    if let Some(discovery) = &req.discovery {
-        let response = sem_os_core::domain_pack::DiscoveryResponse {
-            probe_id: "kyc-case.read-state".to_string(),
-            subject: sem_os_core::domain_pack::DiscoverySubject {
-                subject_kind: "kyc_case".to_string(),
-                subject_id: req.subject_id.to_string(),
-            },
-            observations: discovery.observations.clone(),
-            provenance: discovery.provenance.clone(),
-            first_class_state_mutated: discovery.first_class_state_mutated,
-        };
-        return crate::acp::acp_discover_kyc_case_state(
-            session,
-            manifest,
-            req.subject_id,
-            response,
-        )
-        .map(KycCaseStateAnchorResolution::Ready);
-    }
-
-    let mut missing = Vec::new();
-    if req.current_state.as_deref().unwrap_or("").trim().is_empty() {
-        missing.push("current_state".to_string());
-    }
-    if req
-        .configuration_version
-        .as_deref()
-        .unwrap_or("")
-        .trim()
-        .is_empty()
-    {
-        missing.push("configuration_version".to_string());
-    }
-    if req
-        .state_snapshot_id
-        .as_deref()
-        .unwrap_or("")
-        .trim()
-        .is_empty()
-    {
-        missing.push("state_snapshot_id".to_string());
-    }
-
-    if !missing.is_empty() {
-        return Ok(KycCaseStateAnchorResolution::Pending(missing));
-    }
-
-    Ok(KycCaseStateAnchorResolution::Ready(
-        crate::acp::AcpKycCaseStateSnapshot {
-            session_id: session.session_id,
-            pack_id: manifest.pack_id.clone(),
-            subject_kind: "kyc_case".to_string(),
-            subject_id: req.subject_id,
-            current_state: req.current_state.clone().expect("checked above"),
-            configuration_version: req.configuration_version.clone().expect("checked above"),
-            state_snapshot_id: req.state_snapshot_id.clone().expect("checked above"),
-            snapshot_refs: vec![],
-        },
-    ))
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -2486,31 +2267,6 @@ fn acp_language_loop_pending_question_value(
             },
             "acpMechanismSummary": ["read_only_case_state_anchor", "structured_pending_question"]
         }
-    })
-}
-
-fn route_language_loop_performance(
-    timings: &crate::acp::AcpKycLanguageLoopTimings,
-    prompt_route_us: u64,
-    acp_emit_us: u64,
-) -> serde_json::Value {
-    let total_us = timings
-        .total_us
-        .saturating_add(prompt_route_us)
-        .saturating_add(acp_emit_us);
-    serde_json::json!({
-        "prompt_route_ms": route_millis_from_micros(prompt_route_us),
-        "prompt_route_us": prompt_route_us,
-        "language_pack_ms": timings.language_pack_ms,
-        "language_pack_us": timings.language_pack_us,
-        "revision_loop_ms": timings.revision_loop_ms,
-        "revision_loop_us": timings.revision_loop_us,
-        "dry_run_ms": timings.dry_run_ms,
-        "dry_run_us": timings.dry_run_us,
-        "acp_emit_ms": route_millis_from_micros(acp_emit_us),
-        "acp_emit_us": acp_emit_us,
-        "total_ms": route_millis_from_micros(total_us),
-        "total_us": total_us,
     })
 }
 
@@ -3025,10 +2781,6 @@ fn nested_string(value: Option<&serde_json::Value>, key: &str) -> Option<String>
         .and_then(|value| value.get(key))
         .and_then(|value| value.as_str())
         .map(str::to_string)
-}
-
-fn route_elapsed_ms(started_at: Instant) -> u64 {
-    u64::try_from(started_at.elapsed().as_millis()).unwrap_or(u64::MAX)
 }
 
 fn route_elapsed_us(started_at: Instant) -> u64 {
@@ -4306,46 +4058,6 @@ mod tests {
         .expect("dry-run output")
     }
 
-    fn language_loop_draft(
-        session_id: Uuid,
-        verb: &str,
-        case_id: Option<Uuid>,
-    ) -> crate::runbook::KycUpdateStatusWorkbookDraft {
-        crate::runbook::KycUpdateStatusWorkbookDraft {
-            session_id,
-            actor_id: "analyst@example.com".to_string(),
-            actor_roles: vec!["analyst".to_string()],
-            verb: verb.to_string(),
-            transition_ref: "kyc-case.intake-to-discovery".to_string(),
-            subject_kind: "kyc_case".to_string(),
-            case_id,
-            current_state: "INTAKE".to_string(),
-            requested_state: "DISCOVERY".to_string(),
-            configuration_version: "config-1".to_string(),
-            state_snapshot_id: "state-snapshot-1".to_string(),
-            evidence_digest: Some("sha256:case".to_string()),
-            llm_trace_ref: None,
-        }
-    }
-
-    fn language_loop_request(
-        session_id: Uuid,
-        verb: &str,
-        case_id: Option<Uuid>,
-    ) -> AcpKycUpdateStatusLanguageLoopRouteRequest {
-        AcpKycUpdateStatusLanguageLoopRouteRequest {
-            adapter: crate::acp::AcpAdapterKind::TestHarness,
-            subject_id: test_case_id(),
-            current_state: "INTAKE".to_string(),
-            configuration_version: "config-1".to_string(),
-            state_snapshot_id: "state-snapshot-1".to_string(),
-            objective: Some("Move KYC case from intake to discovery".to_string()),
-            prompt_route_ms: None,
-            prompt_route_us: Some(125),
-            draft: language_loop_draft(session_id, verb, case_id),
-        }
-    }
-
     struct StubToolLlmClient {
         arguments: serde_json::Value,
     }
@@ -4388,48 +4100,34 @@ mod tests {
         }
     }
 
-    fn llm_draft_request_with_discovery(
+    fn discovery_resource(
         current_state: &str,
-        objective: &str,
-        evidence_digest: Option<&str>,
-    ) -> AcpKycUpdateStatusLlmDraftRouteRequest {
-        AcpKycUpdateStatusLlmDraftRouteRequest {
-            adapter: crate::acp::AcpAdapterKind::TestHarness,
-            subject_id: test_case_id(),
-            current_state: None,
-            configuration_version: None,
-            state_snapshot_id: None,
-            objective: Some(objective.to_string()),
-            evidence_digest: evidence_digest.map(str::to_string),
-            actor_id: Some("sage:planning".to_string()),
-            actor_roles: vec!["agent".to_string()],
-            discovery: Some(AcpKycCaseStateDiscoveryRouteRequest {
-                observations: vec![
-                    sem_os_core::domain_pack::DiscoveryObservation {
-                        key: "case.status".to_string(),
-                        value: serde_json::json!(current_state),
-                        classification: Some(
-                            sem_os_core::domain_pack::ClassificationLimit::Internal,
-                        ),
+        configuration_version: &str,
+        state_snapshot_id: &str,
+    ) -> crate::acp_protocol::AcpContentBlock {
+        crate::acp_protocol::AcpContentBlock::EmbeddedResource {
+            uri: format!("semos://entity/{}", test_case_id()),
+            name: Some("KYC read-state probe".to_string()),
+            mime_type: Some("application/json".to_string()),
+            text: Some(
+                serde_json::json!({
+                    "probe_id": "kyc-case.read-state",
+                    "subject": {
+                        "subject_kind": "kyc_case",
+                        "subject_id": test_case_id(),
                     },
-                    sem_os_core::domain_pack::DiscoveryObservation {
-                        key: "case.configuration_version".to_string(),
-                        value: serde_json::json!("config-1"),
-                        classification: Some(
-                            sem_os_core::domain_pack::ClassificationLimit::Internal,
-                        ),
-                    },
-                    sem_os_core::domain_pack::DiscoveryObservation {
-                        key: "case.state_snapshot_id".to_string(),
-                        value: serde_json::json!("snapshot-1"),
-                        classification: Some(
-                            sem_os_core::domain_pack::ClassificationLimit::Internal,
-                        ),
-                    },
-                ],
-                provenance: vec![],
-                first_class_state_mutated: false,
-            }),
+                    "observations": [
+                        {"key": "case.status", "value": current_state, "classification": "internal"},
+                        {"key": "case.configuration_version", "value": configuration_version, "classification": "internal"},
+                        {"key": "case.state_snapshot_id", "value": state_snapshot_id, "classification": "internal"}
+                    ],
+                    "provenance": [
+                        {"source": "sem_os.session_state", "snapshot_ref": state_snapshot_id}
+                    ],
+                    "first_class_state_mutated": false
+                })
+                .to_string(),
+            ),
         }
     }
 
@@ -4437,33 +4135,80 @@ mod tests {
         current_state: &str,
         configuration_version: &str,
         state_snapshot_id: &str,
-    ) -> AcpKycCaseStateDiscoverRouteRequest {
-        AcpKycCaseStateDiscoverRouteRequest {
-            adapter: crate::acp::AcpAdapterKind::TestHarness,
-            subject_id: test_case_id(),
-            observations: vec![
-                sem_os_core::domain_pack::DiscoveryObservation {
-                    key: "case.status".to_string(),
-                    value: serde_json::json!(current_state),
-                    classification: Some(sem_os_core::domain_pack::ClassificationLimit::Internal),
-                },
-                sem_os_core::domain_pack::DiscoveryObservation {
-                    key: "case.configuration_version".to_string(),
-                    value: serde_json::json!(configuration_version),
-                    classification: Some(sem_os_core::domain_pack::ClassificationLimit::Internal),
-                },
-                sem_os_core::domain_pack::DiscoveryObservation {
-                    key: "case.state_snapshot_id".to_string(),
-                    value: serde_json::json!(state_snapshot_id),
-                    classification: Some(sem_os_core::domain_pack::ClassificationLimit::Internal),
-                },
-            ],
-            provenance: vec![sem_os_core::domain_pack::DiscoveryProvenance {
-                source: "sem_os.session_state".to_string(),
-                snapshot_ref: Some(state_snapshot_id.to_string()),
-            }],
-            first_class_state_mutated: false,
+    ) -> AcpGatewayRouteRequest {
+        AcpGatewayRouteRequest {
+            method: "obpoc/kyc_case_state/discover".to_string(),
+            params: serde_json::json!({
+                "adapter": crate::acp::AcpAdapterKind::TestHarness,
+                "subject_id": test_case_id(),
+                "observations": [
+                    {"key": "case.status", "value": current_state, "classification": "internal"},
+                    {"key": "case.configuration_version", "value": configuration_version, "classification": "internal"},
+                    {"key": "case.state_snapshot_id", "value": state_snapshot_id, "classification": "internal"}
+                ],
+                "provenance": [
+                    {"source": "sem_os.session_state", "snapshot_ref": state_snapshot_id}
+                ],
+                "first_class_state_mutated": false
+            }),
         }
+    }
+
+    fn llm_prompt_request_with_discovery(
+        current_state: &str,
+        objective: &str,
+        evidence_digest: Option<&str>,
+    ) -> AcpPromptRouteRequest {
+        let text = match evidence_digest {
+            Some(evidence_digest) if !objective.contains(evidence_digest) => {
+                format!("{objective} with evidence {evidence_digest}")
+            }
+            _ => objective.to_string(),
+        };
+        AcpPromptRouteRequest {
+            prompt: vec![
+                crate::acp_protocol::AcpContentBlock::Text { text },
+                discovery_resource(current_state, "config-1", "snapshot-1"),
+            ],
+            draft_source: Some("llm_tool_call".to_string()),
+        }
+    }
+
+    fn llm_prompt_request_without_state_anchor(
+        objective: &str,
+        evidence_digest: Option<&str>,
+    ) -> AcpPromptRouteRequest {
+        let mut text = format!("{} for KYC case {}", objective, test_case_id());
+        if let Some(evidence_digest) = evidence_digest {
+            text.push_str(" with evidence ");
+            text.push_str(evidence_digest);
+        }
+        AcpPromptRouteRequest {
+            prompt: vec![crate::acp_protocol::AcpContentBlock::Text { text }],
+            draft_source: Some("llm_tool_call".to_string()),
+        }
+    }
+
+    async fn test_route_state() -> (ReplV2RouteState, Uuid) {
+        let orchestrator = std::sync::Arc::new(crate::sequencer::ReplOrchestratorV2::new(
+            crate::journey::router::PackRouter::new(vec![]),
+            std::sync::Arc::new(crate::sequencer::StubExecutor),
+        ));
+        let session_id = orchestrator.create_session().await;
+        (ReplV2RouteState { orchestrator }, session_id)
+    }
+
+    async fn llm_prompt_result_with_client(
+        state: ReplV2RouteState,
+        session_id: Uuid,
+        req: AcpPromptRouteRequest,
+        client: Result<std::sync::Arc<dyn LlmClient>, String>,
+    ) -> serde_json::Value {
+        acp_prompt_route_with_llm_client(state, session_id, req, client)
+            .await
+            .expect("ACP prompt LLM gateway")
+            .0["result"]
+            .clone()
     }
 
     #[derive(Clone, Copy)]
@@ -4627,7 +4372,7 @@ mod tests {
                     evidence_digest: Some("sha256:live-negative-anchor"),
                 },
                 expected_status: "pending_question",
-                expected_failure_codes: &["kyc_update_status_state_anchor_incomplete"],
+                expected_failure_codes: &["kyc_update_status_prompt_incomplete"],
             },
             LiveFailureFixture {
                 id: "missing_evidence_digest",
@@ -4682,27 +4427,16 @@ mod tests {
         ]
     }
 
-    fn live_failure_request(fixture: LiveFailureFixture) -> AcpKycUpdateStatusLlmDraftRouteRequest {
+    fn live_failure_request(fixture: LiveFailureFixture) -> AcpPromptRouteRequest {
         match fixture.request {
             LiveFailureRequest::MissingStateAnchor { evidence_digest } => {
-                AcpKycUpdateStatusLlmDraftRouteRequest {
-                    adapter: crate::acp::AcpAdapterKind::TestHarness,
-                    subject_id: test_case_id(),
-                    current_state: None,
-                    configuration_version: None,
-                    state_snapshot_id: None,
-                    objective: Some(fixture.objective.to_string()),
-                    evidence_digest: evidence_digest.map(str::to_string),
-                    actor_id: Some("sage:planning".to_string()),
-                    actor_roles: vec!["agent".to_string()],
-                    discovery: None,
-                }
+                llm_prompt_request_without_state_anchor(fixture.objective, evidence_digest)
             }
             LiveFailureRequest::WithDiscovery {
                 current_state,
                 evidence_digest,
             } => {
-                llm_draft_request_with_discovery(current_state, fixture.objective, evidence_digest)
+                llm_prompt_request_with_discovery(current_state, fixture.objective, evidence_digest)
             }
         }
     }
@@ -5305,62 +5039,48 @@ mod tests {
     }
 
     #[allow(clippy::too_many_arguments)]
-    async fn acp_kyc_update_status_llm_draft_loop_value_with_prompt_variant(
+    async fn acp_prompt_llm_draft_loop_value_with_prompt_variant(
+        _state: ReplV2RouteState,
         session_id: Uuid,
-        req: AcpKycUpdateStatusLlmDraftRouteRequest,
+        req: AcpPromptRouteRequest,
         variant: LiveAblationVariant,
         client: Result<std::sync::Arc<dyn ob_agentic::llm_client::LlmClient>, String>,
     ) -> Result<(serde_json::Value, crate::runbook::SemOsLanguagePack), crate::acp::AcpAdapterError>
     {
         let manifest = load_ob_poc_kyc_domain_pack()?;
-        let session = crate::acp::open_acp_session(session_id, req.adapter);
+        let prompt_request = crate::acp_protocol::AcpJsonRpcAgent::new()
+            .kyc_update_status_language_loop_request_from_prompt(session_id, &req.prompt)
+            .map_err(|missing| crate::acp::AcpAdapterError::LanguagePackRefused {
+                reason: format!("prompt missing {}", missing.join(", ")),
+            })?;
+        let session = crate::acp::open_acp_session(session_id, prompt_request.adapter);
         let total_started_at = Instant::now();
-        let actor_id = req
-            .actor_id
-            .clone()
-            .unwrap_or_else(|| "sage:planning".to_string());
-        let actor_roles = if req.actor_roles.is_empty() {
+        let actor_id = prompt_request.draft.actor_id.clone();
+        let actor_roles = if prompt_request.draft.actor_roles.is_empty() {
             vec!["agent".to_string()]
         } else {
-            req.actor_roles.clone()
+            prompt_request.draft.actor_roles.clone()
         };
-        let anchor = resolve_kyc_case_state_anchor(&session, &manifest, &req)?;
-        let case_state = match anchor {
-            KycCaseStateAnchorResolution::Ready(case_state) => case_state,
-            KycCaseStateAnchorResolution::Pending(missing) => {
-                return Ok((
-                    acp_language_loop_pending_question_value(
-                        "kyc_update_status_state_anchor_incomplete",
-                        missing,
-                        route_elapsed_us(total_started_at),
-                    ),
-                    crate::runbook::SemOsLanguagePack {
-                        objective: "pending".to_string(),
-                        pack_id: manifest.pack_id.clone(),
-                        pack_version: manifest.version.clone(),
-                        configuration_version: String::new(),
-                        state_snapshot_id: String::new(),
-                        subject: crate::runbook::LanguagePackSubject {
-                            kind: "kyc_case".to_string(),
-                            id: req.subject_id,
-                        },
-                        current_state: String::new(),
-                        candidate_transitions: vec![],
-                        valid_verbs: vec![],
-                        blocked_verbs: vec![],
-                        argument_schema: vec![],
-                        transition_effects: vec![],
-                        evidence_policy: crate::runbook::EvidencePolicySummary {
-                            required_evidence_refs: vec![],
-                            dry_run_only: true,
-                            mutation_allowed: false,
-                            hitl_required: true,
-                        },
-                        uuid_bindings: vec![],
-                        canonical_patterns: vec![],
-                    },
-                ));
-            }
+        let case_state = crate::acp::AcpKycCaseStateSnapshot {
+            session_id,
+            pack_id: manifest.pack_id.clone(),
+            subject_kind: "kyc_case".to_string(),
+            subject_id: prompt_request.subject_id,
+            current_state: prompt_request.current_state.clone(),
+            configuration_version: prompt_request.configuration_version.clone(),
+            state_snapshot_id: prompt_request.state_snapshot_id.clone(),
+            snapshot_refs: prompt_request
+                .state_discovery
+                .as_ref()
+                .and_then(|discovery| discovery.get("snapshotRefs"))
+                .and_then(serde_json::Value::as_array)
+                .map(|refs| {
+                    refs.iter()
+                        .filter_map(serde_json::Value::as_str)
+                        .map(str::to_string)
+                        .collect()
+                })
+                .unwrap_or_default(),
         };
 
         let language_pack_started_at = Instant::now();
@@ -5372,7 +5092,7 @@ mod tests {
                 current_state: case_state.current_state.clone(),
                 configuration_version: case_state.configuration_version.clone(),
                 state_snapshot_id: case_state.state_snapshot_id.clone(),
-                objective: req.objective.clone(),
+                objective: prompt_request.objective.clone(),
             },
         )?;
         let prompt_pack = variant.prompt_pack(&validation_pack);
@@ -5404,7 +5124,7 @@ mod tests {
             session_id,
             actor_id,
             actor_roles,
-            req.evidence_digest.clone(),
+            prompt_request.draft.evidence_digest.clone(),
             client,
         )
         .await;
@@ -6250,31 +5970,35 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_acp_language_loop_route_persists_dry_run_trace() {
-        let orchestrator = std::sync::Arc::new(crate::sequencer::ReplOrchestratorV2::new(
-            crate::journey::router::PackRouter::new(vec![]),
-            std::sync::Arc::new(crate::sequencer::StubExecutor),
-        ));
-        let session_id = orchestrator.create_session().await;
-        let state = ReplV2RouteState {
-            orchestrator: orchestrator.clone(),
-        };
+    async fn test_acp_gateway_prompt_persists_dry_run_trace() {
+        let (state, session_id) = test_route_state().await;
 
-        let value = acp_kyc_update_status_language_loop_route(
+        let gateway = acp_gateway_route(
             State(state.clone()),
             Path(session_id),
-            Json(language_loop_request(
-                session_id,
-                "kyc-case.update-status",
-                None,
-            )),
+            Json(AcpGatewayRouteRequest {
+                method: "session/prompt".to_string(),
+                params: serde_json::json!({
+                    "prompt": [
+                        {
+                            "type": "text",
+                            "text": format!(
+                                "Move KYC case {} to DISCOVERY with evidence sha256:case",
+                                test_case_id()
+                            )
+                        },
+                        discovery_resource("INTAKE", "config-1", "state-snapshot-1")
+                    ]
+                }),
+            }),
         )
         .await
-        .expect("language loop route")
+        .expect("ACP gateway")
         .0;
+        let value = &gateway["result"];
 
         assert_eq!(value["status"], "dry_run_validated");
-        assert_eq!(value["metrics"]["revision_count"], 1);
+        assert_eq!(value["metrics"]["revision_count"], 0);
 
         let trace = get_session_trace(State(state), Path(session_id))
             .await
@@ -6296,38 +6020,39 @@ mod tests {
         );
         assert_eq!(
             trace[0]["op"]["conversation_efficiency"]["estimated_user_repair_turns_avoided"],
-            1
+            0
         );
     }
 
     #[tokio::test]
-    async fn test_acp_language_loop_route_persists_structured_refusal_trace() {
-        let orchestrator = std::sync::Arc::new(crate::sequencer::ReplOrchestratorV2::new(
-            crate::journey::router::PackRouter::new(vec![]),
-            std::sync::Arc::new(crate::sequencer::StubExecutor),
-        ));
-        let session_id = orchestrator.create_session().await;
-        let state = ReplV2RouteState {
-            orchestrator: orchestrator.clone(),
-        };
+    async fn test_acp_gateway_prompt_persists_structured_refusal_trace() {
+        let (state, session_id) = test_route_state().await;
 
-        let value = acp_kyc_update_status_language_loop_route(
+        let gateway = acp_gateway_route(
             State(state.clone()),
             Path(session_id),
-            Json(language_loop_request(
-                session_id,
-                "kyc-case.delete",
-                Some(test_case_id()),
-            )),
+            Json(AcpGatewayRouteRequest {
+                method: "session/prompt".to_string(),
+                params: serde_json::json!({
+                    "prompt": [
+                        {
+                            "type": "text",
+                            "text": format!("Move KYC case {} to DISCOVERY", test_case_id())
+                        },
+                        discovery_resource("INTAKE", "config-1", "snapshot-1")
+                    ]
+                }),
+            }),
         )
         .await
-        .expect("language loop route")
+        .expect("ACP gateway")
         .0;
+        let value = &gateway["result"];
 
         assert_eq!(value["status"], "structured_refusal");
-        assert_eq!(value["refusal"]["refusal_code"], "invented_verb");
+        assert_eq!(value["refusal"]["refusal_code"], "missing_evidence_digest");
 
-        let session = orchestrator.get_session(session_id).await.unwrap();
+        let session = state.orchestrator.get_session(session_id).await.unwrap();
         assert_eq!(session.trace.len(), 1);
         assert!(matches!(
             &session.trace[0].op,
@@ -6341,10 +6066,10 @@ mod tests {
                 conversation_efficiency,
                 ..
             } if outcome == "structured_refusal"
-                && refusal_code.as_deref() == Some("invented_verb")
-                && diagnostic_source_path.as_deref() == Some("draft.verb")
+                && refusal_code.as_deref() == Some("missing_evidence_digest")
+                && diagnostic_source_path.as_deref() == Some("draft.evidence_digest")
                 && outcome_layer == "validation_refusal"
-                && diagnostic_codes.iter().any(|code| code == "invented_verb")
+                && diagnostic_codes.iter().any(|code| code == "missing_evidence_digest")
                 && !dry_run_valid
                 && conversation_efficiency.pending_user_turn_required
                 && !conversation_efficiency.prose_only_failure
@@ -6418,7 +6143,8 @@ mod tests {
             orchestrator: orchestrator.clone(),
         };
 
-        let discovered = discover_acp_kyc_case_state_route(
+        let discovered = acp_gateway_route(
+            State(state.clone()),
             Path(session_id),
             Json(case_state_discovery_request(
                 "DISCOVERY",
@@ -6427,7 +6153,7 @@ mod tests {
             )),
         )
         .await
-        .expect("case-state discovery")
+        .expect("ACP gateway discovery")
         .0;
         assert_eq!(discovered["result"]["status"], "kyc_case_state_discovered");
 
@@ -6482,7 +6208,8 @@ mod tests {
             orchestrator: orchestrator.clone(),
         };
 
-        let _ = discover_acp_kyc_case_state_route(
+        let _ = acp_gateway_route(
+            State(state.clone()),
             Path(session_id),
             Json(case_state_discovery_request(
                 "DISCOVERY",
@@ -6491,7 +6218,7 @@ mod tests {
             )),
         )
         .await
-        .expect("case-state discovery");
+        .expect("ACP gateway discovery");
 
         let client = std::sync::Arc::new(StubToolLlmClient {
             arguments: serde_json::json!({
@@ -6554,14 +6281,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_acp_llm_draft_loop_uses_discovered_state_for_second_transition_trace() {
-        let orchestrator = std::sync::Arc::new(crate::sequencer::ReplOrchestratorV2::new(
-            crate::journey::router::PackRouter::new(vec![]),
-            std::sync::Arc::new(crate::sequencer::StubExecutor),
-        ));
-        let session_id = orchestrator.create_session().await;
-        let state = ReplV2RouteState {
-            orchestrator: orchestrator.clone(),
-        };
+        let (state, session_id) = test_route_state().await;
         let client = std::sync::Arc::new(StubToolLlmClient {
             arguments: serde_json::json!({
                 "session_id": session_id,
@@ -6579,17 +6299,17 @@ mod tests {
             }),
         });
 
-        let value = acp_kyc_update_status_llm_draft_loop_value_with_client(
+        let value = llm_prompt_result_with_client(
+            state.clone(),
             session_id,
-            llm_draft_request_with_discovery(
+            llm_prompt_request_with_discovery(
                 "DISCOVERY",
                 "Advance the KYC case to ASSESSMENT",
                 Some("sha256:evidence"),
             ),
             Ok(client),
         )
-        .await
-        .expect("LLM draft loop value");
+        .await;
 
         assert_eq!(value["status"], "dry_run_validated");
         assert_eq!(value["draft_source"], "llm_tool_call");
@@ -6601,12 +6321,6 @@ mod tests {
         assert_eq!(value["llm_trace"]["provider"], "stub-llm-provider");
         assert_eq!(value["metrics"]["revision_count"], 1);
 
-        append_session_trace_if_present(
-            &state,
-            session_id,
-            acp_language_loop_trace_op_from_value(&value).expect("trace op"),
-        )
-        .await;
         let trace = get_session_trace(State(state), Path(session_id))
             .await
             .expect("session trace")
@@ -6642,9 +6356,10 @@ mod tests {
 
     #[tokio::test]
     async fn test_acp_llm_draft_loop_trace_projects_happy_path_without_repairs() {
+        let (state, session_id) = test_route_state().await;
         let client = std::sync::Arc::new(StubToolLlmClient {
             arguments: serde_json::json!({
-                "session_id": test_session_id(),
+                "session_id": session_id,
                 "actor_id": "sage",
                 "actor_roles": ["agent"],
                 "verb": "kyc-case.update-status",
@@ -6659,17 +6374,17 @@ mod tests {
             }),
         });
 
-        let value = acp_kyc_update_status_llm_draft_loop_value_with_client(
-            test_session_id(),
-            llm_draft_request_with_discovery(
+        let value = llm_prompt_result_with_client(
+            state,
+            session_id,
+            llm_prompt_request_with_discovery(
                 "DISCOVERY",
                 "Advance the KYC case to ASSESSMENT",
                 Some("sha256:evidence"),
             ),
             Ok(client),
         )
-        .await
-        .expect("LLM draft loop value");
+        .await;
 
         assert_eq!(value["status"], "dry_run_validated");
         assert_eq!(value["metrics"]["first_pass_valid"], true);
@@ -6690,29 +6405,19 @@ mod tests {
 
     #[tokio::test]
     async fn test_acp_llm_draft_loop_missing_state_anchor_is_pending_question() {
-        let value = acp_kyc_update_status_llm_draft_loop_value_with_client(
-            test_session_id(),
-            AcpKycUpdateStatusLlmDraftRouteRequest {
-                adapter: crate::acp::AcpAdapterKind::TestHarness,
-                subject_id: test_case_id(),
-                current_state: None,
-                configuration_version: None,
-                state_snapshot_id: None,
-                objective: Some("Advance the case".to_string()),
-                evidence_digest: Some("sha256:evidence".to_string()),
-                actor_id: None,
-                actor_roles: vec![],
-                discovery: None,
-            },
+        let (state, session_id) = test_route_state().await;
+        let value = llm_prompt_result_with_client(
+            state,
+            session_id,
+            llm_prompt_request_without_state_anchor("Advance the case", Some("sha256:evidence")),
             Err("LLM client should not be needed before state anchor".to_string()),
         )
-        .await
-        .expect("pending question value");
+        .await;
 
         assert_eq!(value["status"], "pending_question");
         assert_eq!(
             value["pending_question"]["code"],
-            "kyc_update_status_state_anchor_incomplete"
+            "kyc_update_status_prompt_incomplete"
         );
         let trace_op = acp_language_loop_trace_op_from_value(&value).expect("trace op");
         assert!(matches!(
@@ -6729,7 +6434,7 @@ mod tests {
                 ..
             } if outcome == "pending_question"
                 && pending_question_code.as_deref()
-                    == Some("kyc_update_status_state_anchor_incomplete")
+                    == Some("kyc_update_status_prompt_incomplete")
                 && prompt_context_variant.is_none()
                 && decode_repair_count == 0
                 && outcome_layer == "pre_llm_pending"
@@ -6742,9 +6447,10 @@ mod tests {
 
     #[tokio::test]
     async fn test_acp_llm_draft_loop_missing_evidence_is_structured_refusal() {
+        let (state, session_id) = test_route_state().await;
         let client = std::sync::Arc::new(StubToolLlmClient {
             arguments: serde_json::json!({
-                "session_id": test_session_id(),
+                "session_id": session_id,
                 "actor_id": "sage",
                 "actor_roles": ["agent"],
                 "verb": "kyc-case.update-status",
@@ -6759,13 +6465,13 @@ mod tests {
             }),
         });
 
-        let value = acp_kyc_update_status_llm_draft_loop_value_with_client(
-            test_session_id(),
-            llm_draft_request_with_discovery("INTAKE", "Move the KYC case to DISCOVERY", None),
+        let value = llm_prompt_result_with_client(
+            state,
+            session_id,
+            llm_prompt_request_with_discovery("INTAKE", "Move the KYC case to DISCOVERY", None),
             Ok(client),
         )
-        .await
-        .expect("LLM draft loop value");
+        .await;
 
         assert_eq!(value["status"], "structured_refusal");
         assert_eq!(value["refusal"]["refusal_code"], "missing_evidence_digest");
@@ -6778,34 +6484,35 @@ mod tests {
 
     #[tokio::test]
     async fn test_acp_llm_draft_loop_trace_projects_revision_refusal() {
+        let (state, session_id) = test_route_state().await;
         let client = std::sync::Arc::new(StubToolLlmClient {
             arguments: serde_json::json!({
-                "session_id": test_session_id(),
+                "session_id": session_id,
                 "actor_id": "sage",
                 "actor_roles": ["agent"],
                 "verb": "kyc-case.update-status",
-                "transition_ref": "kyc-case.assessment-to-approved",
+                "transition_ref": "kyc-case.assessment-to-discovery",
                 "subject_kind": "kyc_case",
                 "case_id": test_case_id(),
                 "current_state": "ASSESSMENT",
-                "requested_state": "APPROVED",
+                "requested_state": "DISCOVERY",
                 "configuration_version": "config-1",
                 "state_snapshot_id": "snapshot-1",
                 "evidence_digest": "sha256:evidence"
             }),
         });
 
-        let value = acp_kyc_update_status_llm_draft_loop_value_with_client(
-            test_session_id(),
-            llm_draft_request_with_discovery(
+        let value = llm_prompt_result_with_client(
+            state,
+            session_id,
+            llm_prompt_request_with_discovery(
                 "ASSESSMENT",
-                "Set this KYC case status to APPROVED",
+                "Move this ASSESSMENT KYC case back to DISCOVERY",
                 Some("sha256:evidence"),
             ),
             Ok(client),
         )
-        .await
-        .expect("LLM draft loop value");
+        .await;
 
         assert_eq!(value["status"], "structured_refusal");
         assert_eq!(value["refusal"]["refusal_code"], "unknown_transition");
@@ -6832,6 +6539,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_acp_llm_draft_loop_missing_transition_ref_is_repaired_and_traced() {
+        let (state, session_id) = test_route_state().await;
         let client = std::sync::Arc::new(StubToolLlmClient {
             arguments: serde_json::json!({
                 "verb": "kyc-case.update-status",
@@ -6845,17 +6553,17 @@ mod tests {
             }),
         });
 
-        let value = acp_kyc_update_status_llm_draft_loop_value_with_client(
-            test_session_id(),
-            llm_draft_request_with_discovery(
+        let value = llm_prompt_result_with_client(
+            state,
+            session_id,
+            llm_prompt_request_with_discovery(
                 "DISCOVERY",
                 "Advance the KYC case to ASSESSMENT",
                 Some("sha256:evidence"),
             ),
             Ok(client),
         )
-        .await
-        .expect("LLM draft loop value");
+        .await;
 
         assert_eq!(value["status"], "dry_run_validated");
         assert_eq!(
@@ -6936,25 +6644,26 @@ mod tests {
                 for fixture in fixtures.iter().copied() {
                     let client = ob_agentic::create_llm_client()
                         .unwrap_or_else(|err| panic!("live LLM client for {model}: {err}"));
-                    let (value, prompt_pack) =
-                        acp_kyc_update_status_llm_draft_loop_value_with_prompt_variant(
-                            test_session_id(),
-                            llm_draft_request_with_discovery(
-                                fixture.current_state,
-                                fixture.objective,
-                                Some(fixture.evidence_digest),
-                            ),
-                            variant,
-                            Ok(client),
+                    let (state, session_id) = test_route_state().await;
+                    let (value, prompt_pack) = acp_prompt_llm_draft_loop_value_with_prompt_variant(
+                        state,
+                        session_id,
+                        llm_prompt_request_with_discovery(
+                            fixture.current_state,
+                            fixture.objective,
+                            Some(fixture.evidence_digest),
+                        ),
+                        variant,
+                        Ok(client),
+                    )
+                    .await
+                    .unwrap_or_else(|err| {
+                        panic!(
+                            "live ablation {model}/{}/{} failed: {err:?}",
+                            variant.id(),
+                            fixture.id
                         )
-                        .await
-                        .unwrap_or_else(|err| {
-                            panic!(
-                                "live ablation {model}/{}/{} failed: {err:?}",
-                                variant.id(),
-                                fixture.id
-                            )
-                        });
+                    });
 
                     assert!(matches!(
                         value["status"].as_str(),
@@ -7051,18 +6760,14 @@ mod tests {
                 } else {
                     Err("LLM client should not be needed before state anchor".to_string())
                 };
-                let value = acp_kyc_update_status_llm_draft_loop_value_with_client(
-                    test_session_id(),
+                let (state, session_id) = test_route_state().await;
+                let value = llm_prompt_result_with_client(
+                    state,
+                    session_id,
                     live_failure_request(fixture),
                     client,
                 )
-                .await
-                .unwrap_or_else(|err| {
-                    panic!(
-                        "live negative comparison {model}/{} failed: {err:?}",
-                        fixture.id
-                    )
-                });
+                .await;
 
                 assert_eq!(value["status"], fixture.expected_status);
                 assert!(matches!(
@@ -7174,19 +6879,18 @@ mod tests {
             for fixture in fixtures.iter().copied() {
                 let client = ob_agentic::create_llm_client()
                     .unwrap_or_else(|err| panic!("live LLM client for {model}: {err}"));
-                let value = acp_kyc_update_status_llm_draft_loop_value_with_client(
-                    test_session_id(),
-                    llm_draft_request_with_discovery(
+                let (state, session_id) = test_route_state().await;
+                let value = llm_prompt_result_with_client(
+                    state,
+                    session_id,
+                    llm_prompt_request_with_discovery(
                         fixture.current_state,
                         fixture.objective,
                         Some(fixture.evidence_digest),
                     ),
                     Ok(client),
                 )
-                .await
-                .unwrap_or_else(|err| {
-                    panic!("live comparison {model}/{} failed: {err:?}", fixture.id)
-                });
+                .await;
 
                 assert!(matches!(
                     value["status"].as_str(),
@@ -7252,19 +6956,19 @@ mod tests {
     async fn live_acp_llm_draft_loop_smoke_validates_second_transition() {
         let _env_guard = LIVE_LLM_ENV_LOCK.lock().await;
         let client = ob_agentic::create_llm_client().expect("live LLM client");
-        let session_id = test_session_id();
+        let (state, session_id) = test_route_state().await;
 
-        let value = acp_kyc_update_status_llm_draft_loop_value_with_client(
+        let value = llm_prompt_result_with_client(
+            state,
             session_id,
-            llm_draft_request_with_discovery(
+            llm_prompt_request_with_discovery(
                 "DISCOVERY",
                 "Advance the KYC case from DISCOVERY to ASSESSMENT using evidence sha256:live-smoke",
                 Some("sha256:live-smoke"),
             ),
             Ok(client),
         )
-        .await
-        .expect("live LLM draft loop value");
+        .await;
 
         println!(
             "live_llm_smoke status={} transition={} refusal_code={} diagnostic_source={} diagnostic_reason={} revision_count={} decode_repair_count={} provider={} model={} total_ms={} llm_draft_ms={} prose_only_failure={}",

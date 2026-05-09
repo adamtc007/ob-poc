@@ -46,7 +46,7 @@ fn workflow_acp_prompt_multiverb_confusion_reports_routing_precision() {
         }
         assert_eq!(
             routed, scenario.expect_language_loop,
-            "{} language-loop routing",
+            "{} ACP prompt gateway routing",
             scenario.name
         );
 

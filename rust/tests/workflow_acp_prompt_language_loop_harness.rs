@@ -1,4 +1,4 @@
-//! ACP `session/prompt` harness for KYC update-status language-loop routing.
+//! ACP `session/prompt` harness for KYC update-status gateway routing.
 
 use std::fs;
 use std::path::Path;
