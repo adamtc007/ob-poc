@@ -1645,10 +1645,235 @@ async fn handle_repl_acp_request(
     agent.handle_request(request)
 }
 
+async fn seed_acp_prompt_case_state_from_live_context(
+    state: &ReplV2RouteState,
+    session_id: Uuid,
+    prompt: &[crate::acp_protocol::AcpContentBlock],
+) -> Vec<crate::acp_protocol::JsonRpcOutgoing> {
+    if !acp_prompt_looks_like_kyc_update_status(prompt)
+        || acp_prompt_has_read_only_case_state_anchor(prompt)
+    {
+        return Vec::new();
+    }
+
+    let case_id = match acp_prompt_case_id_from_prompt(prompt) {
+        Some(case_id) => Some(case_id),
+        None => acp_prompt_session_case_id(state, session_id).await,
+    };
+    let Some(case_id) = case_id else {
+        return Vec::new();
+    };
+    let Some(case_state) = acp_prompt_live_case_state(state, session_id, case_id).await else {
+        return Vec::new();
+    };
+
+    handle_repl_acp_request(
+        session_id,
+        acp_prompt_live_case_state_discovery_request(session_id, case_state),
+    )
+    .await
+}
+
+async fn acp_prompt_session_case_id(state: &ReplV2RouteState, session_id: Uuid) -> Option<Uuid> {
+    let session = state.orchestrator.get_session(session_id).await?;
+    session.workspace_stack.iter().rev().find_map(|frame| {
+        frame.current_case_id.or_else(|| {
+            if frame.subject_kind == Some(crate::repl::types_v2::SubjectKind::Case) {
+                frame.subject_id
+            } else {
+                None
+            }
+        })
+    })
+}
+
+#[derive(Debug, Clone)]
+struct AcpPromptLiveCaseState {
+    subject_id: Uuid,
+    current_state: String,
+    configuration_version: String,
+    state_snapshot_id: String,
+}
+
+#[cfg(feature = "database")]
+async fn acp_prompt_live_case_state(
+    state: &ReplV2RouteState,
+    session_id: Uuid,
+    case_id: Uuid,
+) -> Option<AcpPromptLiveCaseState> {
+    let pool = state.orchestrator.pool()?;
+    let row = match sqlx::query_as::<_, (Option<String>,)>(
+        r#"SELECT status FROM "ob-poc".cases WHERE case_id = $1"#,
+    )
+    .bind(case_id)
+    .fetch_optional(pool)
+    .await
+    {
+        Ok(row) => row,
+        Err(error) => {
+            tracing::warn!(
+                session_id = %session_id,
+                case_id = %case_id,
+                error = %error,
+                "Failed to read live KYC case state for ACP prompt"
+            );
+            return None;
+        }
+    };
+    let (status,) = row?;
+    let current_state = status
+        .filter(|status| !status.trim().is_empty())
+        .unwrap_or_else(|| "INTAKE".to_string())
+        .trim()
+        .to_ascii_uppercase();
+    let configuration_version = load_ob_poc_kyc_domain_pack()
+        .map(|manifest| format!("domain_pack:{}@{}", manifest.pack_id, manifest.version))
+        .unwrap_or_else(|_| "domain_pack:ob-poc.kyc".to_string());
+    let state_snapshot_id = format!(
+        "postgres:ob-poc.cases:{case_id}:status:{}",
+        current_state.to_ascii_lowercase()
+    );
+
+    Some(AcpPromptLiveCaseState {
+        subject_id: case_id,
+        current_state,
+        configuration_version,
+        state_snapshot_id,
+    })
+}
+
+#[cfg(not(feature = "database"))]
+async fn acp_prompt_live_case_state(
+    _state: &ReplV2RouteState,
+    _session_id: Uuid,
+    _case_id: Uuid,
+) -> Option<AcpPromptLiveCaseState> {
+    None
+}
+
+fn acp_prompt_live_case_state_discovery_request(
+    session_id: Uuid,
+    case_state: AcpPromptLiveCaseState,
+) -> crate::acp_protocol::JsonRpcRequest {
+    crate::acp_protocol::JsonRpcRequest {
+        jsonrpc: "2.0".to_string(),
+        id: Some(serde_json::json!("live-case-state-discovery")),
+        method: "obpoc/kyc_case_state/discover".to_string(),
+        params: serde_json::json!({
+            "session_id": session_id,
+            "sessionId": session_id,
+            "adapter": crate::acp::AcpAdapterKind::Zed,
+            "subject_id": case_state.subject_id,
+            "observations": [
+                {"key": "case.status", "value": case_state.current_state, "classification": "internal"},
+                {"key": "case.configuration_version", "value": case_state.configuration_version, "classification": "internal"},
+                {"key": "case.state_snapshot_id", "value": case_state.state_snapshot_id, "classification": "internal"}
+            ],
+            "provenance": [
+                {"source": "postgres.ob-poc.cases", "snapshot_ref": case_state.state_snapshot_id}
+            ],
+            "first_class_state_mutated": false
+        }),
+    }
+}
+
+fn acp_prompt_blocks_from_params(
+    params: &serde_json::Value,
+) -> Option<Vec<crate::acp_protocol::AcpContentBlock>> {
+    serde_json::from_value::<crate::acp_protocol::AcpPromptRequest>(params.clone())
+        .ok()
+        .map(|request| request.prompt)
+}
+
+fn acp_prompt_looks_like_kyc_update_status(
+    prompt: &[crate::acp_protocol::AcpContentBlock],
+) -> bool {
+    let lower = acp_prompt_text(prompt).to_ascii_lowercase();
+    (lower.contains("kyc") || lower.contains("case"))
+        && (lower.contains("update-status")
+            || lower.contains("update status")
+            || lower.contains("advance")
+            || lower.contains("transition")
+            || lower.contains("move")
+            || lower.contains("change status")
+            || lower.contains("set status"))
+}
+
+fn acp_prompt_has_read_only_case_state_anchor(
+    prompt: &[crate::acp_protocol::AcpContentBlock],
+) -> bool {
+    prompt.iter().any(|block| match block {
+        crate::acp_protocol::AcpContentBlock::EmbeddedResource { text, .. } => text
+            .as_deref()
+            .and_then(|text| serde_json::from_str::<serde_json::Value>(text).ok())
+            .map(|value| {
+                value
+                    .get("probe_id")
+                    .or_else(|| value.get("probeId"))
+                    .and_then(|probe_id| probe_id.as_str())
+                    == Some("kyc-case.read-state")
+            })
+            .unwrap_or(false),
+        crate::acp_protocol::AcpContentBlock::Text { .. }
+        | crate::acp_protocol::AcpContentBlock::ResourceLink { .. } => false,
+    })
+}
+
+fn acp_prompt_case_id_from_prompt(prompt: &[crate::acp_protocol::AcpContentBlock]) -> Option<Uuid> {
+    prompt.iter().find_map(|block| match block {
+        crate::acp_protocol::AcpContentBlock::Text { text } => acp_extract_first_uuid(text),
+        crate::acp_protocol::AcpContentBlock::ResourceLink { uri, .. } => {
+            acp_entity_uuid_from_uri(uri).or_else(|| acp_extract_first_uuid(uri))
+        }
+        crate::acp_protocol::AcpContentBlock::EmbeddedResource { uri, text, .. } => text
+            .as_deref()
+            .and_then(acp_case_id_from_embedded_resource_text)
+            .or_else(|| acp_entity_uuid_from_uri(uri))
+            .or_else(|| acp_extract_first_uuid(uri)),
+    })
+}
+
+fn acp_case_id_from_embedded_resource_text(text: &str) -> Option<Uuid> {
+    let value = serde_json::from_str::<serde_json::Value>(text).ok()?;
+    value
+        .pointer("/subject/subject_id")
+        .or_else(|| value.pointer("/subject/subjectId"))
+        .or_else(|| value.pointer("/case_state/subject_id"))
+        .or_else(|| value.pointer("/caseState/subjectId"))
+        .and_then(|value| value.as_str())
+        .and_then(|value| Uuid::parse_str(value).ok())
+}
+
+fn acp_entity_uuid_from_uri(uri: &str) -> Option<Uuid> {
+    let rest = uri.strip_prefix("semos://entity/")?;
+    let id = rest
+        .split(|ch| matches!(ch, '/' | '?' | '#'))
+        .next()
+        .unwrap_or(rest);
+    Uuid::parse_str(id).ok()
+}
+
+fn acp_extract_first_uuid(text: &str) -> Option<Uuid> {
+    text.split(|ch: char| !(ch.is_ascii_hexdigit() || ch == '-'))
+        .find_map(|token| Uuid::parse_str(token).ok())
+}
+
+fn acp_prompt_text(prompt: &[crate::acp_protocol::AcpContentBlock]) -> String {
+    prompt
+        .iter()
+        .filter_map(|block| match block {
+            crate::acp_protocol::AcpContentBlock::Text { text } => Some(text.as_str()),
+            crate::acp_protocol::AcpContentBlock::ResourceLink { .. }
+            | crate::acp_protocol::AcpContentBlock::EmbeddedResource { .. } => None,
+        })
+        .collect::<Vec<_>>()
+        .join("\n")
+}
+
 fn json_rpc_outgoing_result(
     outgoing: &[crate::acp_protocol::JsonRpcOutgoing],
 ) -> Option<serde_json::Value> {
-    outgoing.iter().find_map(|item| match item {
+    outgoing.iter().rev().find_map(|item| match item {
         crate::acp_protocol::JsonRpcOutgoing::Response(response) => response.result.clone(),
         crate::acp_protocol::JsonRpcOutgoing::Notification(_) => None,
     })
@@ -1672,7 +1897,16 @@ async fn acp_gateway_route(
     Json(req): Json<AcpGatewayRouteRequest>,
 ) -> Result<Json<serde_json::Value>, (StatusCode, Json<ErrorResponseV2>)> {
     let params = acp_gateway_params(session_id, &req.method, req.params);
-    let outgoing = handle_repl_acp_request(
+    let mut outgoing = if req.method == "session/prompt" {
+        if let Some(prompt) = acp_prompt_blocks_from_params(&params) {
+            seed_acp_prompt_case_state_from_live_context(&state, session_id, &prompt).await
+        } else {
+            Vec::new()
+        }
+    } else {
+        Vec::new()
+    };
+    let prompt_outgoing = handle_repl_acp_request(
         session_id,
         crate::acp_protocol::JsonRpcRequest {
             jsonrpc: "2.0".to_string(),
@@ -1682,6 +1916,7 @@ async fn acp_gateway_route(
         },
     )
     .await;
+    outgoing.extend(prompt_outgoing);
     let result = json_rpc_outgoing_result(&outgoing).unwrap_or_else(|| serde_json::json!({}));
     if let Some(op) = acp_language_loop_trace_op_from_value(&result) {
         append_session_trace_if_present(&state, session_id, op).await;
@@ -1761,7 +1996,9 @@ async fn acp_prompt_route(
         return acp_prompt_route_with_llm_client(state, session_id, req, client).await;
     }
 
-    let outgoing = handle_repl_acp_request(
+    let mut outgoing =
+        seed_acp_prompt_case_state_from_live_context(&state, session_id, &req.prompt).await;
+    let prompt_outgoing = handle_repl_acp_request(
         session_id,
         crate::acp_protocol::JsonRpcRequest {
             jsonrpc: "2.0".to_string(),
@@ -1774,6 +2011,7 @@ async fn acp_prompt_route(
         },
     )
     .await;
+    outgoing.extend(prompt_outgoing);
     let result = json_rpc_outgoing_result(&outgoing);
 
     if let Some(result) = &result {
@@ -1797,6 +2035,8 @@ async fn acp_prompt_route_with_llm_client(
     client: Result<std::sync::Arc<dyn ob_agentic::llm_client::LlmClient>, String>,
 ) -> Result<Json<serde_json::Value>, (StatusCode, Json<ErrorResponseV2>)> {
     let total_started_at = Instant::now();
+    let discovery_outgoing =
+        seed_acp_prompt_case_state_from_live_context(&state, session_id, &req.prompt).await;
     let request = match resolve_acp_prompt_language_loop_request(session_id, &req.prompt).await {
         Ok(request) => request,
         Err(missing) => {
@@ -1813,7 +2053,7 @@ async fn acp_prompt_route_with_llm_client(
                 "session_id": session_id,
                 "draft_source": "llm_tool_call",
                 "result": result,
-                "outgoing": []
+                "outgoing": discovery_outgoing
             })));
         }
     };
@@ -1845,7 +2085,7 @@ async fn acp_prompt_route_with_llm_client(
         "session_id": session_id,
         "draft_source": "llm_tool_call",
         "result": value,
-        "outgoing": []
+        "outgoing": discovery_outgoing
     })))
 }
 
@@ -3849,12 +4089,20 @@ async fn get_session_trace(
     Path(session_id): Path<Uuid>,
 ) -> Result<Json<serde_json::Value>, (StatusCode, Json<ErrorResponseV2>)> {
     if let Ok(pool) = state.orchestrator_pool() {
-        let trace =
-            crate::repl::trace_repository::SessionTraceRepository::load_trace(pool, session_id)
-                .await
-                .map_err(anyhow_json_error)?;
-        if !trace.is_empty() {
-            return Ok(Json(serde_json::to_value(trace).unwrap_or_default()));
+        match crate::repl::trace_repository::SessionTraceRepository::load_trace(pool, session_id)
+            .await
+        {
+            Ok(trace) if !trace.is_empty() => {
+                return Ok(Json(serde_json::to_value(trace).unwrap_or_default()));
+            }
+            Ok(_) => {}
+            Err(error) => {
+                tracing::warn!(
+                    session_id = %session_id,
+                    error = %error,
+                    "Failed to load persisted session trace; falling back to in-memory trace"
+                );
+            }
         }
     }
 
@@ -3883,12 +4131,21 @@ async fn get_trace_entry(
     Path((session_id, seq)): Path<(Uuid, u64)>,
 ) -> Result<Json<serde_json::Value>, (StatusCode, Json<ErrorResponseV2>)> {
     if let Ok(pool) = state.orchestrator_pool() {
-        if let Some(entry) =
-            crate::repl::trace_repository::SessionTraceRepository::load_entry(pool, session_id, seq)
-                .await
-                .map_err(anyhow_json_error)?
+        match crate::repl::trace_repository::SessionTraceRepository::load_entry(
+            pool, session_id, seq,
+        )
+        .await
         {
-            return Ok(Json(serde_json::to_value(entry).unwrap_or_default()));
+            Ok(Some(entry)) => return Ok(Json(serde_json::to_value(entry).unwrap_or_default())),
+            Ok(None) => {}
+            Err(error) => {
+                tracing::warn!(
+                    session_id = %session_id,
+                    seq,
+                    error = %error,
+                    "Failed to load persisted session trace entry; falling back to in-memory trace"
+                );
+            }
         }
     }
 
@@ -3927,9 +4184,19 @@ async fn replay_session_trace(
     Json(body): Json<serde_json::Value>,
 ) -> Result<Json<serde_json::Value>, (StatusCode, Json<ErrorResponseV2>)> {
     let persisted_trace = if let Ok(pool) = state.orchestrator_pool() {
-        crate::repl::trace_repository::SessionTraceRepository::load_trace(pool, session_id)
+        match crate::repl::trace_repository::SessionTraceRepository::load_trace(pool, session_id)
             .await
-            .map_err(anyhow_json_error)?
+        {
+            Ok(trace) => trace,
+            Err(error) => {
+                tracing::warn!(
+                    session_id = %session_id,
+                    error = %error,
+                    "Failed to load persisted session trace for replay; falling back to in-memory trace"
+                );
+                Vec::new()
+            }
+        }
     } else {
         Vec::new()
     };
@@ -4242,6 +4509,94 @@ mod tests {
         let status = response.status();
         let body = response_json(response).await;
         (status, body)
+    }
+
+    #[test]
+    fn test_acp_prompt_live_case_state_discovery_request_is_read_only_gateway_probe() {
+        let request = acp_prompt_live_case_state_discovery_request(
+            test_session_id(),
+            AcpPromptLiveCaseState {
+                subject_id: test_case_id(),
+                current_state: "DISCOVERY".to_string(),
+                configuration_version: "domain_pack:ob-poc.kyc@0.1.0".to_string(),
+                state_snapshot_id:
+                    "postgres:ob-poc.cases:11111111-1111-1111-1111-111111111111:status:discovery"
+                        .to_string(),
+            },
+        );
+
+        assert_eq!(request.method, "obpoc/kyc_case_state/discover");
+        assert_eq!(request.params["first_class_state_mutated"], false);
+        assert_eq!(request.params["subject_id"], test_case_id().to_string());
+        assert_eq!(request.params["observations"][0]["key"], "case.status");
+        assert_eq!(
+            request.params["provenance"][0]["source"],
+            "postgres.ob-poc.cases"
+        );
+    }
+
+    #[test]
+    fn test_acp_prompt_case_id_extraction_and_anchor_detection() {
+        let prompt = vec![
+            crate::acp_protocol::AcpContentBlock::Text {
+                text: format!(
+                    "Advance KYC case {} to ASSESSMENT with evidence sha256:evidence",
+                    test_case_id()
+                ),
+            },
+            discovery_resource("DISCOVERY", "config-1", "snapshot-1"),
+        ];
+
+        assert!(acp_prompt_looks_like_kyc_update_status(&prompt));
+        assert!(acp_prompt_has_read_only_case_state_anchor(&prompt));
+        assert_eq!(
+            acp_prompt_case_id_from_prompt(&prompt),
+            Some(test_case_id())
+        );
+    }
+
+    #[test]
+    fn test_json_rpc_result_prefers_prompt_response_after_seeded_discovery() {
+        let outgoing = vec![
+            crate::acp_protocol::JsonRpcOutgoing::Response(crate::acp_protocol::JsonRpcResponse {
+                jsonrpc: "2.0".to_string(),
+                id: Some(serde_json::json!("live-case-state-discovery")),
+                result: Some(serde_json::json!({"status": "kyc_case_state_discovered"})),
+                error: None,
+            }),
+            crate::acp_protocol::JsonRpcOutgoing::Response(crate::acp_protocol::JsonRpcResponse {
+                jsonrpc: "2.0".to_string(),
+                id: Some(serde_json::json!("prompt")),
+                result: Some(serde_json::json!({"status": "dry_run_validated"})),
+                error: None,
+            }),
+        ];
+
+        let result = json_rpc_outgoing_result(&outgoing).expect("last response result");
+
+        assert_eq!(result["status"], "dry_run_validated");
+    }
+
+    #[tokio::test]
+    async fn test_acp_prompt_session_case_id_uses_case_workspace_context() {
+        let (state, session_id) = test_route_state().await;
+        let sessions = state.orchestrator.sessions_for_test();
+        let mut sessions_write = sessions.write().await;
+        let session = sessions_write.get_mut(&session_id).expect("session");
+        let mut frame = WorkspaceFrame::new(
+            WorkspaceKind::Kyc,
+            crate::repl::types_v2::SessionScope::infrastructure(),
+        );
+        frame.subject_kind = Some(crate::repl::types_v2::SubjectKind::Case);
+        frame.subject_id = Some(test_case_id());
+        session.push_workspace_frame(frame).expect("push frame");
+        drop(sessions_write);
+
+        let case_id = acp_prompt_session_case_id(&state, session_id)
+            .await
+            .expect("case id from session");
+
+        assert_eq!(case_id, test_case_id());
     }
 
     async fn response_json(response: axum::response::Response) -> serde_json::Value {
