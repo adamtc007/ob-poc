@@ -43,6 +43,7 @@ use crate::dsl_v2::{expand_templates_simple, BatchPolicy};
 use crate::ontology::SemanticStageRegistry;
 use ob_poc_types::chat::{ChatResponse, SessionStateEnum};
 use ob_poc_types::{SessionInputRequest, SessionInputResponse};
+use std::time::Instant;
 
 use axum::{
     extract::{Path, Query, State},
@@ -208,11 +209,67 @@ async fn session_input(
 /// Returns `Some(ReplResponseV2)` if the REPL session exists and is in a gate state
 /// (ScopeGate, WorkspaceSelection, JourneySelection) or any later REPL state.
 /// Returns `None` if no REPL session exists for this ID (legacy agent session).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum AcpSessionInputDraftMode {
+    Deterministic,
+    LiveLlm,
+}
+
+impl AcpSessionInputDraftMode {
+    fn from_str(value: &str) -> Option<Self> {
+        match value.trim().to_ascii_lowercase().as_str() {
+            "" | "deterministic" | "deterministic_draft" => Some(Self::Deterministic),
+            "llm" | "llm_tool_call" | "live_llm" => Some(Self::LiveLlm),
+            _ => None,
+        }
+    }
+
+    fn as_str(self) -> &'static str {
+        match self {
+            Self::Deterministic => "deterministic",
+            Self::LiveLlm => "llm_tool_call",
+        }
+    }
+
+    fn can_run_for_task(self, task: &str) -> bool {
+        match self {
+            Self::Deterministic => true,
+            // The live draft adapter is currently implemented for the KYC
+            // language loop only. Other providers stay on deterministic ACP.
+            Self::LiveLlm => task == "kyc-case.update-status",
+        }
+    }
+}
+
+fn acp_session_input_draft_mode() -> AcpSessionInputDraftMode {
+    std::env::var("OB_ACP_SESSION_INPUT_DRAFT_SOURCE")
+        .ok()
+        .or_else(|| std::env::var("OB_ACP_SESSION_INPUT_DRAFT_MODE").ok())
+        .and_then(|value| AcpSessionInputDraftMode::from_str(&value))
+        .unwrap_or(AcpSessionInputDraftMode::Deterministic)
+}
+
 async fn try_route_supported_acp_prompt(
     orchestrator: &std::sync::Arc<crate::sequencer::ReplOrchestratorV2>,
     session_id: Uuid,
     message: &str,
 ) -> Option<ChatResponse> {
+    try_route_supported_acp_prompt_with_draft_mode(
+        orchestrator,
+        session_id,
+        message,
+        acp_session_input_draft_mode(),
+    )
+    .await
+}
+
+async fn try_route_supported_acp_prompt_with_draft_mode(
+    orchestrator: &std::sync::Arc<crate::sequencer::ReplOrchestratorV2>,
+    session_id: Uuid,
+    message: &str,
+    requested_draft_mode: AcpSessionInputDraftMode,
+) -> Option<ChatResponse> {
+    let route_started_at = Instant::now();
     let prompt_text = message.trim();
     if prompt_text.is_empty() {
         return None;
@@ -228,14 +285,66 @@ async fn try_route_supported_acp_prompt(
     let route_state = crate::api::repl_routes_v2::ReplV2RouteState {
         orchestrator: orchestrator.clone(),
     };
-    let envelope = crate::api::repl_routes_v2::process_acp_prompt_deterministic_envelope(
-        &route_state,
-        session_id,
-        prompt,
-        serde_json::json!("session-input-acp"),
-        "acp_session_input_processed",
-    )
-    .await;
+    let mut effective_draft_mode = if requested_draft_mode.can_run_for_task(task) {
+        requested_draft_mode
+    } else {
+        AcpSessionInputDraftMode::Deterministic
+    };
+    let mut envelope = match effective_draft_mode {
+        AcpSessionInputDraftMode::Deterministic => {
+            crate::api::repl_routes_v2::process_acp_prompt_deterministic_envelope(
+                &route_state,
+                session_id,
+                prompt,
+                serde_json::json!("session-input-acp"),
+                "acp_session_input_processed",
+            )
+            .await
+        }
+        AcpSessionInputDraftMode::LiveLlm => {
+            let client = ob_agentic::create_llm_client().map_err(|error| error.to_string());
+            match crate::api::repl_routes_v2::process_acp_prompt_llm_envelope(
+                &route_state,
+                session_id,
+                prompt,
+                serde_json::json!("session-input-acp"),
+                "acp_session_input_processed",
+                client,
+            )
+            .await
+            {
+                Ok(envelope) => envelope,
+                Err((status, error)) => {
+                    tracing::warn!(
+                        session_id = %session_id,
+                        task,
+                        requested_draft_source = requested_draft_mode.as_str(),
+                        status = %status,
+                        error = %error.0.error,
+                        "ACP session input LLM draft failed before structured result; falling back to deterministic ACP"
+                    );
+                    effective_draft_mode = AcpSessionInputDraftMode::Deterministic;
+                    crate::api::repl_routes_v2::process_acp_prompt_deterministic_envelope(
+                        &route_state,
+                        session_id,
+                        vec![crate::acp_protocol::AcpContentBlock::Text {
+                            text: prompt_text.to_string(),
+                        }],
+                        serde_json::json!("session-input-acp"),
+                        "acp_session_input_processed",
+                    )
+                    .await
+                }
+            }
+        }
+    };
+    annotate_acp_session_input_envelope(
+        &mut envelope,
+        task,
+        requested_draft_mode,
+        effective_draft_mode,
+        route_started_at,
+    );
     let result = envelope.get("result")?;
     let result_status = result.get("status").and_then(serde_json::Value::as_str)?;
     if !matches!(
@@ -250,6 +359,15 @@ async fn try_route_supported_acp_prompt(
         );
         return None;
     }
+
+    emit_acp_session_input_observability(
+        session_id,
+        task,
+        requested_draft_mode,
+        effective_draft_mode,
+        &envelope,
+        result_status,
+    );
 
     let assistant_message = acp_agent_message_text(&envelope)
         .or_else(|| value_string(result, &["traceProjection", "humanSummary"]))
@@ -306,6 +424,87 @@ async fn try_route_supported_acp_prompt(
     })
 }
 
+fn annotate_acp_session_input_envelope(
+    envelope: &mut serde_json::Value,
+    task: &str,
+    requested_draft_mode: AcpSessionInputDraftMode,
+    effective_draft_mode: AcpSessionInputDraftMode,
+    route_started_at: Instant,
+) {
+    let route_latency_us = route_started_at
+        .elapsed()
+        .as_micros()
+        .min(u128::from(u64::MAX)) as u64;
+    let route_latency_ms = route_latency_us.div_ceil(1_000);
+    let effective_draft_source = envelope
+        .get("result")
+        .and_then(|result| value_string(result, &["draft_source"]))
+        .unwrap_or_else(|| effective_draft_mode.as_str().to_string());
+    let session_input = serde_json::json!({
+        "route": "session_input",
+        "provider_task": task,
+        "requested_draft_source": requested_draft_mode.as_str(),
+        "effective_draft_source": effective_draft_source,
+        "route_latency_ms": route_latency_ms,
+        "route_latency_us": route_latency_us,
+        "selected": true,
+        "dry_run_only": true,
+        "no_mutation_authority": true
+    });
+
+    if let Some(object) = envelope.as_object_mut() {
+        object.insert("session_input".to_string(), session_input.clone());
+    }
+    if let Some(result_object) = envelope
+        .get_mut("result")
+        .and_then(serde_json::Value::as_object_mut)
+    {
+        result_object.insert("session_input".to_string(), session_input);
+    }
+}
+
+fn emit_acp_session_input_observability(
+    session_id: Uuid,
+    task: &str,
+    requested_draft_mode: AcpSessionInputDraftMode,
+    effective_draft_mode: AcpSessionInputDraftMode,
+    envelope: &serde_json::Value,
+    result_status: &str,
+) {
+    let result = envelope.get("result").unwrap_or(&serde_json::Value::Null);
+    let metrics = result.get("metrics").unwrap_or(&serde_json::Value::Null);
+    let efficiency = result
+        .pointer("/observability/conversationEfficiency")
+        .unwrap_or(&serde_json::Value::Null);
+    let session_input = envelope
+        .get("session_input")
+        .unwrap_or(&serde_json::Value::Null);
+
+    tracing::info!(
+        session_id = %session_id,
+        provider_task = task,
+        requested_draft_source = requested_draft_mode.as_str(),
+        effective_draft_source = value_string(session_input, &["effective_draft_source"]).as_deref().unwrap_or(effective_draft_mode.as_str()),
+        result_status,
+        invented_verb_count = value_u64(metrics, &["invented_verb_count"]).unwrap_or(0),
+        uuid_binding_complete = value_bool(metrics, &["uuid_binding_complete"]).unwrap_or(false),
+        state_valid_transition_selected = value_bool(metrics, &["state_valid_transition_selected"]).unwrap_or(false),
+        first_pass_valid = value_bool(efficiency, &["firstPassValid"])
+            .or_else(|| value_bool(metrics, &["first_pass_valid"]))
+            .unwrap_or(false),
+        revision_count = value_u64(efficiency, &["localRevisionCount"])
+            .or_else(|| value_u64(metrics, &["revision_count"]))
+            .unwrap_or(0),
+        dry_run_valid = value_bool(efficiency, &["dryRunValid"])
+            .or_else(|| value_bool(metrics, &["dry_run_valid"]))
+            .unwrap_or(false),
+        pending_user_turn_required = value_bool(efficiency, &["pendingUserTurnRequired"]).unwrap_or(false),
+        prose_only_failure = value_bool(efficiency, &["proseOnlyFailure"]).unwrap_or(false),
+        route_latency_us = value_u64(session_input, &["route_latency_us"]).unwrap_or(0),
+        "ACP session input route completed"
+    );
+}
+
 fn acp_agent_message_text(envelope: &serde_json::Value) -> Option<String> {
     envelope
         .get("outgoing")
@@ -335,11 +534,27 @@ fn acp_chat_trace_summary(envelope: &serde_json::Value) -> Option<serde_json::Va
         .pointer("/observability/conversationEfficiency")
         .cloned()
         .unwrap_or_else(|| serde_json::json!({}));
+    let performance = result
+        .pointer("/observability/performance")
+        .cloned()
+        .unwrap_or_else(|| serde_json::json!({}));
+    let session_input = envelope
+        .get("session_input")
+        .cloned()
+        .or_else(|| result.get("session_input").cloned())
+        .unwrap_or_else(|| serde_json::json!({}));
 
     Some(serde_json::json!({
         "status": value_string(result, &["status"]).unwrap_or_else(|| "unknown".to_string()),
         "outcome": value_string(&trace_projection, &["outcome"])
             .or_else(|| value_string(result, &["status"])),
+        "route": value_string(&session_input, &["route"]),
+        "provider_task": value_string(&session_input, &["provider_task"]),
+        "requested_draft_source": value_string(&session_input, &["requested_draft_source"]),
+        "draft_source": value_string(&session_input, &["effective_draft_source"])
+            .or_else(|| value_string(result, &["draft_source"])),
+        "route_latency_ms": value_u64(&session_input, &["route_latency_ms"]),
+        "route_latency_us": value_u64(&session_input, &["route_latency_us"]),
         "outcome_layer": value_string(&trace_projection, &["outcomeLayer"]),
         "human_summary": value_string(&trace_projection, &["humanSummary"]),
         "prompt_context_variant": value_string(&trace_projection, &["promptContextVariant"]),
@@ -359,6 +574,7 @@ fn acp_chat_trace_summary(envelope: &serde_json::Value) -> Option<serde_json::Va
         "prose_only_failure": value_bool(&efficiency, &["proseOnlyFailure"]),
         "pending_user_turn_required": value_bool(&efficiency, &["pendingUserTurnRequired"]),
         "estimated_user_repair_turns_avoided": value_u64(&efficiency, &["estimatedUserRepairTurnsAvoided"]),
+        "performance": performance,
         "state_anchor_provider": envelope.get("state_anchor_provider").cloned(),
     }))
 }
@@ -3176,6 +3392,9 @@ mod tests {
         let chat_api_path = manifest_dir.join("../ob-poc-ui-react/src/api/chat.ts");
         let source = std::fs::read_to_string(&chat_api_path)
             .unwrap_or_else(|e| panic!("Failed to read {}: {}", chat_api_path.display(), e));
+        let chat_page_path = manifest_dir.join("../ob-poc-ui-react/src/features/chat/ChatPage.tsx");
+        let chat_page_source = std::fs::read_to_string(&chat_page_path)
+            .unwrap_or_else(|e| panic!("Failed to read {}: {}", chat_page_path.display(), e));
 
         assert!(
             source.contains("`/session/${sessionId}/input`"),
@@ -3185,6 +3404,27 @@ mod tests {
             !source.contains("/execute"),
             "chat UI must not call /execute directly"
         );
+        assert!(
+            !chat_page_source.contains("sendAcpPrompt"),
+            "user-facing chat page must not divert /acp commands around /input"
+        );
+        assert!(
+            !chat_page_source.contains("isAcpPromptCommand"),
+            "user-facing chat page must let the backend choose ACP routing"
+        );
+    }
+
+    #[test]
+    fn test_acp_session_input_draft_mode_parsing() {
+        assert_eq!(
+            AcpSessionInputDraftMode::from_str("deterministic"),
+            Some(AcpSessionInputDraftMode::Deterministic)
+        );
+        assert_eq!(
+            AcpSessionInputDraftMode::from_str("live_llm"),
+            Some(AcpSessionInputDraftMode::LiveLlm)
+        );
+        assert_eq!(AcpSessionInputDraftMode::from_str("random"), None);
     }
 
     #[test]
@@ -3223,6 +3463,10 @@ mod tests {
         assert!(chat.message.contains("validated a dry-run workbook"));
         let trace = chat.acp_trace.expect("normal chat should carry ACP trace");
         assert_eq!(trace["status"], "dry_run_validated");
+        assert_eq!(trace["route"], "session_input");
+        assert_eq!(trace["provider_task"], "deal.update-status");
+        assert_eq!(trace["requested_draft_source"], "deterministic");
+        assert_eq!(trace["draft_source"], "deterministic_provider");
         assert_eq!(trace["transition_ref"], "deal.prospect-to-qualifying");
         assert_eq!(trace["state_anchor_provider"]["task"], "deal.update-status");
         assert_eq!(
@@ -3241,6 +3485,31 @@ mod tests {
             .messages
             .iter()
             .any(|message| message.content.contains("validated a dry-run workbook")));
+    }
+
+    #[tokio::test]
+    async fn test_live_llm_session_input_mode_is_task_bounded_for_deal_provider() {
+        let orchestrator = Arc::new(ReplOrchestratorV2::new(
+            PackRouter::new(vec![]),
+            Arc::new(StubExecutor),
+        ));
+        let session_id = orchestrator.create_session().await;
+
+        let chat = try_route_supported_acp_prompt_with_draft_mode(
+            &orchestrator,
+            session_id,
+            "Advance deal 11111111-1111-1111-1111-111111111111 from PROSPECT to QUALIFYING with evidence sha256:evidence",
+            AcpSessionInputDraftMode::LiveLlm,
+        )
+        .await
+        .expect("supported deal prompt should still route through ACP");
+
+        let trace = chat.acp_trace.expect("normal chat should carry ACP trace");
+        assert_eq!(trace["status"], "dry_run_validated");
+        assert_eq!(trace["provider_task"], "deal.update-status");
+        assert_eq!(trace["requested_draft_source"], "llm_tool_call");
+        assert_eq!(trace["draft_source"], "deterministic_provider");
+        assert_eq!(trace["transition_ref"], "deal.prospect-to-qualifying");
     }
 
     #[tokio::test]

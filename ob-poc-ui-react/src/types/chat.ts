@@ -35,6 +35,12 @@ export interface ChatMessage {
 export interface AcpTraceSummary {
   status: string;
   outcome?: string;
+  route?: string;
+  provider_task?: string;
+  requested_draft_source?: string;
+  draft_source?: string;
+  route_latency_ms?: number;
+  route_latency_us?: number;
   outcome_layer?: string;
   human_summary?: string;
   prompt_context_variant?: string;
@@ -50,7 +56,25 @@ export interface AcpTraceSummary {
   prose_only_failure?: boolean;
   pending_user_turn_required?: boolean;
   estimated_user_repair_turns_avoided?: number;
+  performance?: AcpTracePerformanceSummary;
   state_anchor_provider?: AcpStateAnchorProviderSummary;
+}
+
+export interface AcpTracePerformanceSummary {
+  prompt_route_ms?: number;
+  prompt_route_us?: number;
+  language_pack_ms?: number;
+  language_pack_us?: number;
+  llm_draft_ms?: number;
+  llm_draft_us?: number;
+  revision_loop_ms?: number;
+  revision_loop_us?: number;
+  dry_run_ms?: number;
+  dry_run_us?: number;
+  acp_emit_ms?: number;
+  acp_emit_us?: number;
+  total_ms?: number;
+  total_us?: number;
 }
 
 export interface AcpStateAnchorProviderSummary {

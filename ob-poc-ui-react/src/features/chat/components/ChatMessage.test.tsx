@@ -14,6 +14,9 @@ describe("ChatMessage ACP trace rendering", () => {
       acp_trace: {
         status: "structured_refusal",
         outcome: "structured_refusal",
+        route: "session_input",
+        requested_draft_source: "llm_tool_call",
+        draft_source: "llm_tool_call",
         outcome_layer: "validation_refusal",
         human_summary: "I stopped because evidence is missing.",
         refusal_code: "missing_evidence_digest",
@@ -22,6 +25,10 @@ describe("ChatMessage ACP trace rendering", () => {
         dry_run_valid: false,
         prose_only_failure: false,
         revision_count: 0,
+        performance: {
+          total_ms: 42,
+          llm_draft_ms: 31,
+        },
         state_anchor_provider: {
           provider_selected: true,
           provider_id: "deal.update_status.live_deal_state",
@@ -41,6 +48,10 @@ describe("ChatMessage ACP trace rendering", () => {
 
     expect(screen.getByText("ACP Trace")).toBeInTheDocument();
     expect(screen.getByText("structured_refusal")).toBeInTheDocument();
+    expect(screen.getByText("route: session_input")).toBeInTheDocument();
+    expect(screen.getByText("draft: llm_tool_call")).toBeInTheDocument();
+    expect(screen.getByText("total: 42ms")).toBeInTheDocument();
+    expect(screen.getByText("llm: 31ms")).toBeInTheDocument();
     expect(screen.getByText("layer: validation_refusal")).toBeInTheDocument();
     expect(screen.getByText("refusal: missing_evidence_digest")).toBeInTheDocument();
     expect(screen.getByText("evidence digest")).toBeInTheDocument();

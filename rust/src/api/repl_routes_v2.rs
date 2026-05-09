@@ -1883,14 +1883,31 @@ async fn acp_prompt_route_with_llm_client(
     req: AcpPromptRouteRequest,
     client: Result<std::sync::Arc<dyn ob_agentic::llm_client::LlmClient>, String>,
 ) -> Result<Json<serde_json::Value>, (StatusCode, Json<ErrorResponseV2>)> {
+    Ok(Json(
+        process_acp_prompt_llm_envelope(
+            &state,
+            session_id,
+            req.prompt,
+            serde_json::json!("prompt"),
+            "acp_prompt_processed",
+            client,
+        )
+        .await?,
+    ))
+}
+
+pub(crate) async fn process_acp_prompt_llm_envelope(
+    state: &ReplV2RouteState,
+    session_id: Uuid,
+    prompt: Vec<crate::acp_protocol::AcpContentBlock>,
+    response_id: serde_json::Value,
+    envelope_status: &'static str,
+    client: Result<std::sync::Arc<dyn ob_agentic::llm_client::LlmClient>, String>,
+) -> Result<serde_json::Value, (StatusCode, Json<ErrorResponseV2>)> {
     let total_started_at = Instant::now();
-    let provider_outcome = acp_prompt_state_anchor_provider_outcome(
-        &state,
-        session_id,
-        &req.prompt,
-        serde_json::json!("prompt"),
-    )
-    .await;
+    let provider_outcome =
+        acp_prompt_state_anchor_provider_outcome(state, session_id, &prompt, response_id.clone())
+            .await;
     let (discovery_outgoing, provider_report) = match provider_outcome {
         AcpPromptStateAnchorProviderOutcome::Continue { outgoing, report } => (outgoing, report),
         AcpPromptStateAnchorProviderOutcome::Complete { outgoing, report } => {
@@ -1898,21 +1915,21 @@ async fn acp_prompt_route_with_llm_client(
             let state_anchor_provider = report.metrics(result.as_ref());
             if let Some(result) = &result {
                 if let Some(op) = acp_language_loop_trace_op_from_value(result) {
-                    append_session_trace_if_present(&state, session_id, op).await;
+                    append_session_trace_if_present(state, session_id, op).await;
                 }
             }
 
-            return Ok(Json(serde_json::json!({
-                "status": "acp_prompt_processed",
+            return Ok(serde_json::json!({
+                "status": envelope_status,
                 "session_id": session_id,
                 "draft_source": "llm_tool_call",
                 "result": result.clone().unwrap_or_else(|| serde_json::json!({})),
                 "outgoing": outgoing,
                 "state_anchor_provider": state_anchor_provider,
-            })));
+            }));
         }
     };
-    let request = match resolve_acp_prompt_language_loop_request(session_id, &req.prompt).await {
+    let request = match resolve_acp_prompt_language_loop_request(session_id, &prompt).await {
         Ok(request) => request,
         Err(missing) => {
             let result = acp_language_loop_pending_question_value(
@@ -1921,17 +1938,17 @@ async fn acp_prompt_route_with_llm_client(
                 route_elapsed_us(total_started_at),
             );
             if let Some(op) = acp_language_loop_trace_op_from_value(&result) {
-                append_session_trace_if_present(&state, session_id, op).await;
+                append_session_trace_if_present(state, session_id, op).await;
             }
             let state_anchor_provider = provider_report.metrics(Some(&result));
-            return Ok(Json(serde_json::json!({
-                "status": "acp_prompt_processed",
+            return Ok(serde_json::json!({
+                "status": envelope_status,
                 "session_id": session_id,
                 "draft_source": "llm_tool_call",
                 "result": result,
                 "outgoing": discovery_outgoing,
                 "state_anchor_provider": state_anchor_provider,
-            })));
+            }));
         }
     };
 
@@ -1954,18 +1971,18 @@ async fn acp_prompt_route_with_llm_client(
     .map_err(acp_json_error)?;
 
     if let Some(op) = acp_language_loop_trace_op_from_value(&value) {
-        append_session_trace_if_present(&state, session_id, op).await;
+        append_session_trace_if_present(state, session_id, op).await;
     }
 
     let state_anchor_provider = provider_report.metrics(Some(&value));
-    Ok(Json(serde_json::json!({
-        "status": "acp_prompt_processed",
+    Ok(serde_json::json!({
+        "status": envelope_status,
         "session_id": session_id,
         "draft_source": "llm_tool_call",
         "result": value,
         "outgoing": discovery_outgoing,
         "state_anchor_provider": state_anchor_provider,
-    })))
+    }))
 }
 
 async fn run_acp_prompt_llm_draft_value_with_client(

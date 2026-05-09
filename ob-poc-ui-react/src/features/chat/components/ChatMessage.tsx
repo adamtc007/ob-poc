@@ -140,6 +140,12 @@ function AcpTraceCard({ trace }: { trace: AcpTraceSummary }) {
   const statusLabel = trace.outcome || trace.status;
   const provider = trace.state_anchor_provider;
   const detailItems = [
+    trace.route ? `route: ${trace.route}` : null,
+    trace.draft_source ? `draft: ${trace.draft_source}` : null,
+    trace.requested_draft_source &&
+    trace.requested_draft_source !== trace.draft_source
+      ? `requested: ${trace.requested_draft_source}`
+      : null,
     trace.outcome_layer ? `layer: ${trace.outcome_layer}` : null,
     trace.transition_ref ? `transition: ${trace.transition_ref}` : null,
     trace.refusal_code ? `refusal: ${trace.refusal_code}` : null,
@@ -148,6 +154,15 @@ function AcpTraceCard({ trace }: { trace: AcpTraceSummary }) {
       : null,
     trace.revision_count !== undefined
       ? `revisions: ${trace.revision_count}`
+      : null,
+    trace.performance?.total_ms !== undefined
+      ? `total: ${trace.performance.total_ms}ms`
+      : trace.route_latency_ms !== undefined
+        ? `route: ${trace.route_latency_ms}ms`
+        : null,
+    trace.performance?.llm_draft_ms !== undefined &&
+    trace.performance.llm_draft_ms > 0
+      ? `llm: ${trace.performance.llm_draft_ms}ms`
       : null,
   ].filter((item): item is string => Boolean(item));
   const providerItems = provider

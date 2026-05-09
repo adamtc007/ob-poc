@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import {
   AlertTriangle,
@@ -28,7 +28,6 @@ import {
   type HydratedConstellation,
   type HydratedSlot,
 } from "../../../api/constellation";
-import type { AcpKycCaseStateAnchor } from "../../../api/chat";
 import type { CbuSummary } from "../../../api/scope";
 import { queryKeys } from "../../../lib/query";
 import { cn } from "../../../lib/utils";
@@ -41,40 +40,6 @@ const PENDING_MAP_NAMES = new Set([
   UNSELECTED_CBU_MAP_NAME,
   UNIVERSE_ROOT_MAP_NAME,
 ]);
-const KYC_CASE_STATES = new Set(["INTAKE", "DISCOVERY", "ASSESSMENT"]);
-
-function normalizeKycCaseState(status?: string | null): string | null {
-  const normalized = status?.trim().replaceAll("-", "_").toUpperCase();
-  if (!normalized) return null;
-  return KYC_CASE_STATES.has(normalized) ? normalized : null;
-}
-
-function buildAcpKycCaseStateAnchor(
-  selectedCase: ConstellationCaseSummary | null,
-  hydrated: HydratedConstellation | undefined,
-): AcpKycCaseStateAnchor | null {
-  const currentState = normalizeKycCaseState(selectedCase?.status);
-  if (!selectedCase?.case_id || !currentState || !hydrated) {
-    return null;
-  }
-
-  const configurationVersion = hydrated.map_revision || "ui-constellation";
-  const stateSnapshotId = [
-    "ui-constellation",
-    hydrated.constellation || "unknown",
-    configurationVersion,
-    selectedCase.case_id,
-  ].join(":");
-
-  return {
-    subjectId: selectedCase.case_id,
-    currentState,
-    configurationVersion,
-    stateSnapshotId,
-    source: "ui.constellation.read_only",
-    snapshotRefs: [stateSnapshotId],
-  };
-}
 
 function stateBadgeClass(state: string, blocking: boolean): string {
   if (blocking) {
@@ -820,13 +785,11 @@ export function ConstellationPanel({
   sessionFeedback,
   className,
   onPromptAgent,
-  onAcpStateAnchorChange,
 }: {
   selectedCbu: CbuSummary | null;
   sessionFeedback?: SessionFeedback;
   className?: string;
   onPromptAgent?: (prompt: string) => void;
-  onAcpStateAnchorChange?: (anchor: AcpKycCaseStateAnchor | null) => void;
 }) {
   const [caseIdSelection, setCaseIdSelection] = useState<
     string | null | undefined
@@ -926,14 +889,6 @@ export function ConstellationPanel({
       ) ?? null,
     [effectiveCaseId, casesQuery.data],
   );
-
-  useEffect(() => {
-    if (!onAcpStateAnchorChange) return;
-    onAcpStateAnchorChange(
-      buildAcpKycCaseStateAnchor(selectedCase, constellationQuery.data),
-    );
-    return () => onAcpStateAnchorChange(null);
-  }, [constellationQuery.data, onAcpStateAnchorChange, selectedCase]);
 
   const refreshAll = async () => {
     await Promise.all([constellationQuery.refetch(), summaryQuery.refetch()]);

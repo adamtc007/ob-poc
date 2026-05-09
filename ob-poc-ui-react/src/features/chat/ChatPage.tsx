@@ -6,11 +6,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useEffect, useRef, useCallback, useMemo, useState } from "react";
 import { Loader2, BookOpen } from "lucide-react";
-import {
-  chatApi,
-  isAcpPromptCommand,
-  type AcpKycCaseStateAnchor,
-} from "../../api/chat";
+import { chatApi } from "../../api/chat";
 import { scopeApi, type CbuSummary } from "../../api/scope";
 import { observatoryApi } from "../../api/observatory";
 import { FlightDeck } from "./components/FlightDeck";
@@ -41,8 +37,6 @@ export function ChatPage() {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const [selectedCbu, setSelectedCbu] = useState<CbuSummary | null>(null);
   const [showRunbookPlan, setShowRunbookPlan] = useState(false);
-  const [acpStateAnchor, setAcpStateAnchor] =
-    useState<AcpKycCaseStateAnchor | null>(null);
   const {
     setCurrentSession,
     currentSession,
@@ -307,42 +301,6 @@ export function ChatPage() {
     },
   });
 
-  const acpPromptMutation = useMutation({
-    mutationFn: (message: string) => {
-      if (!sessionId) throw new Error("No session selected");
-      return chatApi.sendAcpPrompt(sessionId, {
-        message,
-        context: acpStateAnchor
-          ? {
-              acp_state_anchor: acpStateAnchor,
-            }
-          : undefined,
-      });
-    },
-    onMutate: (message) => {
-      addMessage({
-        id: `temp-acp-${Date.now()}`,
-        role: "user",
-        content: message,
-        timestamp: new Date().toISOString(),
-      });
-      setStreaming(true);
-    },
-    onSuccess: (response) => {
-      addMessage(response.message);
-      if (sessionId) {
-        queryClient.invalidateQueries({
-          queryKey: queryKeys.observatory.all(sessionId),
-        });
-      }
-      setStreaming(false);
-    },
-    onError: (err) => {
-      console.error("[ChatPage] sendAcpPrompt failed:", err);
-      setStreaming(false);
-    },
-  });
-
   // Decision reply mutation
   const replyMutation = useMutation({
     mutationFn: (reply: DecisionReply) => {
@@ -435,13 +393,9 @@ export function ChatPage() {
         });
         return;
       }
-      if (isAcpPromptCommand(message)) {
-        acpPromptMutation.mutate(message);
-        return;
-      }
       sendMutation.mutate(message);
     },
-    [acpPromptMutation, sendMutation, navigate],
+    [sendMutation, navigate],
   );
 
   const latestSessionFeedback = useMemo<SessionFeedback | undefined>(() => {
@@ -560,7 +514,6 @@ export function ChatPage() {
             disabled={
               !sessionId ||
               sendMutation.isPending ||
-              acpPromptMutation.isPending ||
               discoverySelectionMutation.isPending
             }
             placeholder={
@@ -588,7 +541,6 @@ export function ChatPage() {
               sessionFeedback={latestSessionFeedback}
               className="min-h-0"
               onPromptAgent={handleSend}
-              onAcpStateAnchorChange={setAcpStateAnchor}
             />
 
             {latestNarration && (
