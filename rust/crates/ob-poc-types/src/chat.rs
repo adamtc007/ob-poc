@@ -378,6 +378,10 @@ pub struct ChatResponse {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub narration: Option<crate::narration::NarrationPayload>,
 
+    /// Structured ACP prompt / language-loop trace shown to the HIL.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub acp_trace: Option<serde_json::Value>,
+
     /// Phase A.2 (F5 follow-on, 2026-04-22): turn-level correlation id.
     /// Set on every response that reaches a consumer; threaded into the
     /// shadow `GatedVerbEnvelope` and every `tracing::debug!` event so an

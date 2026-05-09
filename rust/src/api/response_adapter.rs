@@ -45,6 +45,7 @@ pub fn repl_to_chat_response(resp: ReplResponseV2, session_id: Uuid) -> ChatResp
         runbook_plan: None,
         session_feedback,
         narration: resp.narration.clone(),
+        acp_trace: None,
         // Phase A.2 (F5 follow-on): forward the turn-level correlation id.
         trace_id: resp.trace_id,
     };

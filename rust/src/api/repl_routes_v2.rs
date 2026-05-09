@@ -1792,6 +1792,68 @@ fn acp_prompt_requests_llm_draft(
     }
 }
 
+pub(crate) async fn process_acp_prompt_deterministic_envelope(
+    state: &ReplV2RouteState,
+    session_id: Uuid,
+    prompt: Vec<crate::acp_protocol::AcpContentBlock>,
+    response_id: serde_json::Value,
+    envelope_status: &'static str,
+) -> serde_json::Value {
+    let provider_outcome =
+        acp_prompt_state_anchor_provider_outcome(state, session_id, &prompt, response_id.clone())
+            .await;
+    let (mut outgoing, provider_report) = match provider_outcome {
+        AcpPromptStateAnchorProviderOutcome::Continue { outgoing, report } => (outgoing, report),
+        AcpPromptStateAnchorProviderOutcome::Complete { outgoing, report } => {
+            let result = json_rpc_outgoing_result(&outgoing);
+            let state_anchor_provider = report.metrics(result.as_ref());
+            if let Some(result) = &result {
+                if let Some(op) = acp_language_loop_trace_op_from_value(result) {
+                    append_session_trace_if_present(state, session_id, op).await;
+                }
+            }
+
+            return serde_json::json!({
+                "status": envelope_status,
+                "session_id": session_id,
+                "result": result.clone().unwrap_or_else(|| serde_json::json!({})),
+                "outgoing": outgoing,
+                "state_anchor_provider": state_anchor_provider,
+            });
+        }
+    };
+    let prompt_outgoing = handle_repl_acp_request(
+        session_id,
+        crate::acp_protocol::JsonRpcRequest {
+            jsonrpc: "2.0".to_string(),
+            id: Some(response_id),
+            method: "session/prompt".to_string(),
+            params: serde_json::json!({
+                "sessionId": session_id.to_string(),
+                "prompt": prompt,
+            }),
+        },
+    )
+    .await;
+    outgoing.extend(prompt_outgoing);
+    let result = json_rpc_outgoing_result(&outgoing);
+
+    if let Some(result) = &result {
+        if let Some(op) = acp_language_loop_trace_op_from_value(result) {
+            append_session_trace_if_present(state, session_id, op).await;
+        }
+    }
+
+    let state_anchor_provider = provider_report.metrics(result.as_ref());
+    serde_json::json!({
+        "status": envelope_status,
+        "session_id": session_id,
+        "result": result.clone().unwrap_or_else(|| serde_json::json!({})),
+        "outgoing": outgoing,
+        "state_anchor_provider": state_anchor_provider,
+    })
+}
+
 /// POST /api/session/:id/acp/prompt
 async fn acp_prompt_route(
     State(state): State<ReplV2RouteState>,
@@ -1803,63 +1865,16 @@ async fn acp_prompt_route(
         return acp_prompt_route_with_llm_client(state, session_id, req, client).await;
     }
 
-    let provider_outcome = acp_prompt_state_anchor_provider_outcome(
-        &state,
-        session_id,
-        &req.prompt,
-        serde_json::json!("prompt"),
-    )
-    .await;
-    let (mut outgoing, provider_report) = match provider_outcome {
-        AcpPromptStateAnchorProviderOutcome::Continue { outgoing, report } => (outgoing, report),
-        AcpPromptStateAnchorProviderOutcome::Complete { outgoing, report } => {
-            let result = json_rpc_outgoing_result(&outgoing);
-            let state_anchor_provider = report.metrics(result.as_ref());
-            if let Some(result) = &result {
-                if let Some(op) = acp_language_loop_trace_op_from_value(result) {
-                    append_session_trace_if_present(&state, session_id, op).await;
-                }
-            }
-
-            return Ok(Json(serde_json::json!({
-                "status": "acp_prompt_processed",
-                "session_id": session_id,
-                "result": result.clone().unwrap_or_else(|| serde_json::json!({})),
-                "outgoing": outgoing,
-                "state_anchor_provider": state_anchor_provider,
-            })));
-        }
-    };
-    let prompt_outgoing = handle_repl_acp_request(
-        session_id,
-        crate::acp_protocol::JsonRpcRequest {
-            jsonrpc: "2.0".to_string(),
-            id: Some(serde_json::json!("prompt")),
-            method: "session/prompt".to_string(),
-            params: serde_json::json!({
-                "sessionId": session_id.to_string(),
-                "prompt": req.prompt,
-            }),
-        },
-    )
-    .await;
-    outgoing.extend(prompt_outgoing);
-    let result = json_rpc_outgoing_result(&outgoing);
-
-    if let Some(result) = &result {
-        if let Some(op) = acp_language_loop_trace_op_from_value(result) {
-            append_session_trace_if_present(&state, session_id, op).await;
-        }
-    }
-
-    let state_anchor_provider = provider_report.metrics(result.as_ref());
-    Ok(Json(serde_json::json!({
-        "status": "acp_prompt_processed",
-        "session_id": session_id,
-        "result": result.clone().unwrap_or_else(|| serde_json::json!({})),
-        "outgoing": outgoing,
-        "state_anchor_provider": state_anchor_provider,
-    })))
+    Ok(Json(
+        process_acp_prompt_deterministic_envelope(
+            &state,
+            session_id,
+            req.prompt,
+            serde_json::json!("prompt"),
+            "acp_prompt_processed",
+        )
+        .await,
+    ))
 }
 
 async fn acp_prompt_route_with_llm_client(

@@ -246,6 +246,15 @@ pub(crate) async fn acp_prompt_state_anchor_provider_outcome(
     }
 }
 
+pub(crate) fn acp_prompt_supported_provider_task(
+    prompt: &[crate::acp_protocol::AcpContentBlock],
+) -> Option<&'static str> {
+    match acp_prompt_state_anchor_provider_selection(prompt) {
+        Some(AcpPromptStateAnchorProviderSelection::Provider(provider)) => Some(provider.task()),
+        Some(AcpPromptStateAnchorProviderSelection::UnsupportedStatefulDag) | None => None,
+    }
+}
+
 async fn acp_prompt_kyc_update_status_state_anchor_provider_outcome(
     state: &ReplV2RouteState,
     session_id: Uuid,

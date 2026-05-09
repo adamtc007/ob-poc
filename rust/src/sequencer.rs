@@ -612,6 +612,28 @@ impl ReplOrchestratorV2 {
         Ok(())
     }
 
+    /// Record an externally-handled chat exchange against the REPL session.
+    ///
+    /// Used by ACP prompt handling when `/api/session/:id/input` routes a
+    /// supported state-transition utterance through ACP rather than the normal
+    /// REPL interpreter.
+    pub async fn record_external_chat_exchange(
+        &self,
+        session_id: Uuid,
+        user_message: String,
+        assistant_message: String,
+    ) -> anyhow::Result<()> {
+        {
+            let mut sessions = self.sessions.write().await;
+            let session = sessions
+                .get_mut(&session_id)
+                .ok_or(OrchestratorError::SessionNotFound(session_id))?;
+            session.push_message(MessageRole::User, user_message);
+            session.push_message(MessageRole::Assistant, assistant_message);
+        }
+        self.persist_session_checkpoint(session_id).await
+    }
+
     /// Push a new workspace frame onto the session stack.
     ///
     /// # Examples

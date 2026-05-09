@@ -921,6 +921,7 @@ interface ChatInputEnvelope {
     discovery_bootstrap?: DiscoveryBootstrap;
     session_feedback?: SessionFeedback;
     narration?: import("../types/chat").NarrationPayload;
+    acp_trace?: AcpTraceSummary;
     available_verbs?: VerbProfile[];
     surface_fingerprint?: string;
     decision?: {
@@ -972,6 +973,7 @@ function buildAssistantMessage(
     onboarding_state: response.onboarding_state,
     session_feedback: response.session_feedback,
     narration: response.narration,
+    acp_trace: response.acp_trace,
   };
 
   if (response.verb_disambiguation) {

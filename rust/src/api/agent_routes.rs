@@ -41,6 +41,7 @@ use crate::dsl_v2::syntax::parse_program;
 use crate::dsl_v2::tooling::SemanticValidator;
 use crate::dsl_v2::{expand_templates_simple, BatchPolicy};
 use crate::ontology::SemanticStageRegistry;
+use ob_poc_types::chat::{ChatResponse, SessionStateEnum};
 use ob_poc_types::{SessionInputRequest, SessionInputResponse};
 
 use axum::{
@@ -146,6 +147,16 @@ async fn session_input(
 ) -> Result<Json<SessionInputResponse>, StatusCode> {
     // Try routing through REPL V2 orchestrator first (unified pipeline).
     if let Some(ref orchestrator) = state.repl_v2_orchestrator {
+        if let SessionInputRequest::Utterance { message } = &req {
+            if let Some(chat_response) =
+                try_route_supported_acp_prompt(orchestrator, session_id, message).await
+            {
+                return Ok(Json(SessionInputResponse::Chat {
+                    response: Box::new(chat_response),
+                }));
+            }
+        }
+
         if let Some(repl_response) = try_route_through_repl(&req, orchestrator, session_id).await {
             // Extract onboarding state from REPL response BEFORE moving it into
             // the chat response adapter (which takes ownership). Reads from the
@@ -197,6 +208,189 @@ async fn session_input(
 /// Returns `Some(ReplResponseV2)` if the REPL session exists and is in a gate state
 /// (ScopeGate, WorkspaceSelection, JourneySelection) or any later REPL state.
 /// Returns `None` if no REPL session exists for this ID (legacy agent session).
+async fn try_route_supported_acp_prompt(
+    orchestrator: &std::sync::Arc<crate::sequencer::ReplOrchestratorV2>,
+    session_id: Uuid,
+    message: &str,
+) -> Option<ChatResponse> {
+    let prompt_text = message.trim();
+    if prompt_text.is_empty() {
+        return None;
+    }
+    let prompt = vec![crate::acp_protocol::AcpContentBlock::Text {
+        text: prompt_text.to_string(),
+    }];
+    let task = crate::api::acp_state_anchor::acp_prompt_supported_provider_task(&prompt)?;
+    if orchestrator.get_session(session_id).await.is_none() {
+        return None;
+    }
+
+    let route_state = crate::api::repl_routes_v2::ReplV2RouteState {
+        orchestrator: orchestrator.clone(),
+    };
+    let envelope = crate::api::repl_routes_v2::process_acp_prompt_deterministic_envelope(
+        &route_state,
+        session_id,
+        prompt,
+        serde_json::json!("session-input-acp"),
+        "acp_session_input_processed",
+    )
+    .await;
+    let result = envelope.get("result")?;
+    let result_status = result.get("status").and_then(serde_json::Value::as_str)?;
+    if !matches!(
+        result_status,
+        "dry_run_validated" | "structured_refusal" | "pending_question"
+    ) {
+        tracing::warn!(
+            session_id = %session_id,
+            task,
+            result_status,
+            "ACP prompt returned non-structured result; falling back to REPL"
+        );
+        return None;
+    }
+
+    let assistant_message = acp_agent_message_text(&envelope)
+        .or_else(|| value_string(result, &["traceProjection", "humanSummary"]))
+        .unwrap_or_else(|| {
+            "ACP handled this state-transition request with a structured dry-run-only outcome."
+                .to_string()
+        });
+    let acp_trace = acp_chat_trace_summary(&envelope);
+    if let Err(error) = orchestrator
+        .record_external_chat_exchange(
+            session_id,
+            prompt_text.to_string(),
+            assistant_message.clone(),
+        )
+        .await
+    {
+        tracing::warn!(
+            session_id = %session_id,
+            task,
+            error = %error,
+            "Failed to record ACP chat exchange in REPL session history"
+        );
+    }
+    let session_feedback = orchestrator
+        .session_feedback(session_id)
+        .await
+        .ok()
+        .and_then(|feedback| serde_json::to_value(feedback).ok());
+
+    Some(ChatResponse {
+        message: assistant_message,
+        dsl: None,
+        session_state: SessionStateEnum::Scoped,
+        commands: None,
+        disambiguation_request: None,
+        verb_disambiguation: None,
+        intent_tier: None,
+        unresolved_refs: None,
+        current_ref_index: None,
+        dsl_hash: None,
+        decision: None,
+        available_verbs: None,
+        surface_fingerprint: None,
+        sage_explain: None,
+        coder_proposal: None,
+        discovery_bootstrap: None,
+        parked_entries: None,
+        onboarding_state: None,
+        runbook_plan: None,
+        session_feedback,
+        narration: None,
+        acp_trace,
+        trace_id: None,
+    })
+}
+
+fn acp_agent_message_text(envelope: &serde_json::Value) -> Option<String> {
+    envelope
+        .get("outgoing")
+        .and_then(serde_json::Value::as_array)
+        .and_then(|outgoing| {
+            outgoing.iter().find_map(|item| {
+                let update = item.pointer("/params/update")?;
+                if update
+                    .get("sessionUpdate")
+                    .and_then(serde_json::Value::as_str)
+                    != Some("agent_message_chunk")
+                {
+                    return None;
+                }
+                value_string(update, &["content", "text"])
+            })
+        })
+}
+
+fn acp_chat_trace_summary(envelope: &serde_json::Value) -> Option<serde_json::Value> {
+    let result = envelope.get("result")?;
+    let trace_projection = result
+        .get("traceProjection")
+        .cloned()
+        .unwrap_or_else(|| serde_json::json!({}));
+    let efficiency = result
+        .pointer("/observability/conversationEfficiency")
+        .cloned()
+        .unwrap_or_else(|| serde_json::json!({}));
+
+    Some(serde_json::json!({
+        "status": value_string(result, &["status"]).unwrap_or_else(|| "unknown".to_string()),
+        "outcome": value_string(&trace_projection, &["outcome"])
+            .or_else(|| value_string(result, &["status"])),
+        "outcome_layer": value_string(&trace_projection, &["outcomeLayer"]),
+        "human_summary": value_string(&trace_projection, &["humanSummary"]),
+        "prompt_context_variant": value_string(&trace_projection, &["promptContextVariant"]),
+        "transition_ref": value_string(&trace_projection, &["transitionRef"])
+            .or_else(|| value_string(result, &["output", "dry_run", "transition_ref"])),
+        "semantic_diff_uri": value_string(&trace_projection, &["semanticDiffUri"])
+            .or_else(|| value_string(result, &["output", "dry_run", "semantic_diff_uri"])),
+        "refusal_code": value_string(&trace_projection, &["refusalCode"])
+            .or_else(|| value_string(result, &["refusal", "refusal_code"])),
+        "pending_question_code": value_string(&trace_projection, &["pendingQuestionCode"])
+            .or_else(|| value_string(result, &["pending_question", "code"])),
+        "needed_from_user": value_string_array(&trace_projection, &["neededFromUser"]),
+        "diagnostic_codes": value_string_array(&trace_projection, &["diagnosticCodes"]),
+        "dry_run_valid": value_bool(&trace_projection, &["dryRunValid"]),
+        "first_pass_valid": value_bool(&trace_projection, &["firstPassValid"]),
+        "revision_count": value_u64(&trace_projection, &["revisionCount"]),
+        "prose_only_failure": value_bool(&efficiency, &["proseOnlyFailure"]),
+        "pending_user_turn_required": value_bool(&efficiency, &["pendingUserTurnRequired"]),
+        "estimated_user_repair_turns_avoided": value_u64(&efficiency, &["estimatedUserRepairTurnsAvoided"]),
+        "state_anchor_provider": envelope.get("state_anchor_provider").cloned(),
+    }))
+}
+
+fn value_at_path<'a>(value: &'a serde_json::Value, path: &[&str]) -> Option<&'a serde_json::Value> {
+    path.iter()
+        .try_fold(value, |current, key| current.get(*key))
+}
+
+fn value_string(value: &serde_json::Value, path: &[&str]) -> Option<String> {
+    value_at_path(value, path)
+        .and_then(serde_json::Value::as_str)
+        .map(str::to_string)
+}
+
+fn value_bool(value: &serde_json::Value, path: &[&str]) -> Option<bool> {
+    value_at_path(value, path).and_then(serde_json::Value::as_bool)
+}
+
+fn value_u64(value: &serde_json::Value, path: &[&str]) -> Option<u64> {
+    value_at_path(value, path).and_then(serde_json::Value::as_u64)
+}
+
+fn value_string_array(value: &serde_json::Value, path: &[&str]) -> Option<Vec<String>> {
+    let items = value_at_path(value, path)?
+        .as_array()?
+        .iter()
+        .filter_map(|item| item.as_str().map(str::to_string))
+        .collect::<Vec<_>>();
+    (!items.is_empty()).then_some(items)
+}
+
 async fn try_route_through_repl(
     req: &SessionInputRequest,
     orchestrator: &std::sync::Arc<crate::sequencer::ReplOrchestratorV2>,
@@ -2949,6 +3143,9 @@ async fn get_enriched_dsl(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::journey::router::PackRouter;
+    use crate::sequencer::{ReplOrchestratorV2, StubExecutor};
+    use std::sync::Arc;
 
     #[test]
     fn test_validate_dsl() {
@@ -3004,6 +3201,66 @@ mod tests {
         assert!(
             !source.contains("SEMTAXONOMY_ENABLED"),
             "routes should not branch on SEMTAXONOMY_ENABLED"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_supported_acp_prompt_routes_before_repl_on_normal_input() {
+        let orchestrator = Arc::new(ReplOrchestratorV2::new(
+            PackRouter::new(vec![]),
+            Arc::new(StubExecutor),
+        ));
+        let session_id = orchestrator.create_session().await;
+
+        let chat = try_route_supported_acp_prompt(
+            &orchestrator,
+            session_id,
+            "Advance deal 11111111-1111-1111-1111-111111111111 from PROSPECT to QUALIFYING with evidence sha256:evidence",
+        )
+        .await
+        .expect("supported ACP prompt should route through ACP");
+
+        assert!(chat.message.contains("validated a dry-run workbook"));
+        let trace = chat.acp_trace.expect("normal chat should carry ACP trace");
+        assert_eq!(trace["status"], "dry_run_validated");
+        assert_eq!(trace["transition_ref"], "deal.prospect-to-qualifying");
+        assert_eq!(trace["state_anchor_provider"]["task"], "deal.update-status");
+        assert_eq!(
+            trace["state_anchor_provider"]["no_mutation_authority"],
+            true
+        );
+
+        let session = orchestrator
+            .get_session(session_id)
+            .await
+            .expect("session should still exist");
+        assert!(session.messages.iter().any(|message| message
+            .content
+            .contains("Advance deal 11111111-1111-1111-1111-111111111111")));
+        assert!(session
+            .messages
+            .iter()
+            .any(|message| message.content.contains("validated a dry-run workbook")));
+    }
+
+    #[tokio::test]
+    async fn test_unsupported_stateful_dag_stays_on_repl_input_path() {
+        let orchestrator = Arc::new(ReplOrchestratorV2::new(
+            PackRouter::new(vec![]),
+            Arc::new(StubExecutor),
+        ));
+        let session_id = orchestrator.create_session().await;
+
+        let chat = try_route_supported_acp_prompt(
+            &orchestrator,
+            session_id,
+            "Advance loan 11111111-1111-1111-1111-111111111111 from INTAKE to REVIEW with evidence sha256:evidence",
+        )
+        .await;
+
+        assert!(
+            chat.is_none(),
+            "unsupported stateful DAGs should not bypass normal REPL input"
         );
     }
 }
