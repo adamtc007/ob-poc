@@ -49,6 +49,8 @@ fn workflow_language_loop_harness_reports_draft_revision_dry_run_rates() {
     let mut dry_run_valid = 0usize;
     let mut refused = 0usize;
     let mut invented_verb_count = 0u32;
+    let mut measured_dry_run_us = 0u64;
+    let mut max_dry_run_us = 0u64;
 
     for fixture in fixtures {
         total += 1;
@@ -109,6 +111,8 @@ fn workflow_language_loop_harness_reports_draft_revision_dry_run_rates() {
                 }
                 assert!(trace.iter().any(|event| event.phase == "language_pack"));
                 assert!(trace.iter().any(|event| event.phase == "dry_run"));
+                measured_dry_run_us += metrics.dry_run_us;
+                max_dry_run_us = max_dry_run_us.max(metrics.dry_run_us);
                 invented_verb_count += metrics.invented_verb_count;
             }
             WorkbookRevisionOutcome::Refused {
@@ -136,6 +140,8 @@ fn workflow_language_loop_harness_reports_draft_revision_dry_run_rates() {
                 );
                 assert!(trace.iter().any(|event| event.phase == "language_pack"));
                 assert!(trace.iter().any(|event| event.phase == "refusal"));
+                measured_dry_run_us += metrics.dry_run_us;
+                max_dry_run_us = max_dry_run_us.max(metrics.dry_run_us);
                 invented_verb_count += metrics.invented_verb_count;
             }
         }
@@ -193,6 +199,14 @@ fn workflow_language_loop_harness_reports_draft_revision_dry_run_rates() {
         pct(contained_invalid, total)
     );
     println!("  Invented verb count:      {}", invented_verb_count);
+    println!(
+        "  Avg measured dry_run_ms:  {:.2}",
+        avg_ms(measured_dry_run_us, total)
+    );
+    println!(
+        "  Max measured dry_run_ms:  {:.2}",
+        max_dry_run_us as f64 / 1_000.0
+    );
     println!("=======================================================================\n");
 
     assert_eq!(baseline_valid, 2);
@@ -234,5 +248,13 @@ fn pct(part: usize, total: usize) -> f64 {
         0.0
     } else {
         part as f64 * 100.0 / total as f64
+    }
+}
+
+fn avg_ms(total_us: u64, count: usize) -> f64 {
+    if count == 0 {
+        0.0
+    } else {
+        total_us as f64 / count as f64 / 1_000.0
     }
 }

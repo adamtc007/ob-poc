@@ -6,6 +6,7 @@
 
 use sem_os_core::domain_pack::DomainPackManifest;
 use serde::{Deserialize, Serialize};
+use std::time::Instant;
 use uuid::Uuid;
 
 use super::{
@@ -53,6 +54,10 @@ pub struct LanguageAcquisitionMetrics {
     pub first_pass_valid: bool,
     pub revision_count: u8,
     pub dry_run_valid: bool,
+    #[serde(default)]
+    pub dry_run_ms: u64,
+    #[serde(default)]
+    pub dry_run_us: u64,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub refusal_code: Option<String>,
 }
@@ -103,6 +108,7 @@ pub fn run_kyc_update_status_revision_loop(
     let mut revision_count = 0;
     let mut invented_verb_count = 0;
     let mut first_pass_valid = false;
+    let mut dry_run_us = 0;
 
     loop {
         trace.push(trace_event(
@@ -136,6 +142,7 @@ pub fn run_kyc_update_status_revision_loop(
                     revision_count,
                     invented_verb_count,
                     first_pass_valid,
+                    dry_run_us,
                     diagnostics,
                 );
             }
@@ -150,7 +157,10 @@ pub fn run_kyc_update_status_revision_loop(
         }
 
         let input = draft_to_input(&current);
-        match build_kyc_update_status_dry_run_with_manifest(manifest, input) {
+        let dry_run_started_at = Instant::now();
+        let dry_run_result = build_kyc_update_status_dry_run_with_manifest(manifest, input);
+        dry_run_us = dry_run_us.saturating_add(elapsed_us(dry_run_started_at));
+        match dry_run_result {
             Ok(output) => {
                 let attempt = WorkbookDraftAttempt {
                     attempt_number: revision_count + 1,
@@ -176,6 +186,7 @@ pub fn run_kyc_update_status_revision_loop(
                     invented_verb_count,
                     first_pass_valid,
                     true,
+                    dry_run_us,
                     None,
                 );
                 return WorkbookRevisionOutcome::DryRunValid {
@@ -205,6 +216,7 @@ pub fn run_kyc_update_status_revision_loop(
                         revision_count,
                         invented_verb_count,
                         first_pass_valid,
+                        dry_run_us,
                         diagnostics,
                     );
                 }
@@ -372,6 +384,7 @@ fn refused(
     revision_count: u8,
     invented_verb_count: u32,
     first_pass_valid: bool,
+    dry_run_us: u64,
     diagnostics: Vec<WorkbookDiagnostic>,
 ) -> WorkbookRevisionOutcome {
     let refusal_code = diagnostics
@@ -386,6 +399,7 @@ fn refused(
         invented_verb_count,
         first_pass_valid,
         false,
+        dry_run_us,
         Some(refusal_code.clone()),
     );
     WorkbookRevisionOutcome::Refused {
@@ -407,6 +421,7 @@ fn metrics(
     invented_verb_count: u32,
     first_pass_valid: bool,
     dry_run_valid: bool,
+    dry_run_us: u64,
     refusal_code: Option<String>,
 ) -> LanguageAcquisitionMetrics {
     let last_draft = attempts.last().map(|attempt| &attempt.draft);
@@ -420,8 +435,18 @@ fn metrics(
         first_pass_valid,
         revision_count,
         dry_run_valid,
+        dry_run_ms: millis_from_micros(dry_run_us),
+        dry_run_us,
         refusal_code,
     }
+}
+
+fn elapsed_us(started_at: Instant) -> u64 {
+    u64::try_from(started_at.elapsed().as_micros()).unwrap_or(u64::MAX)
+}
+
+fn millis_from_micros(micros: u64) -> u64 {
+    micros / 1_000
 }
 
 fn trace_event(

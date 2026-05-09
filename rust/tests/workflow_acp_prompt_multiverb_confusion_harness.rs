@@ -28,6 +28,7 @@ fn workflow_acp_prompt_multiverb_confusion_reports_routing_precision() {
     let mut pending_question = 0usize;
     let mut prose_only_failure = 0usize;
     let mut unexpected_fallback = 0usize;
+    let mut timings = TimingStats::default();
 
     for scenario in &scenarios {
         total += 1;
@@ -47,8 +48,17 @@ fn workflow_acp_prompt_multiverb_confusion_reports_routing_precision() {
             scenario.name
         );
 
+        let agent_message = agent_message_text(&outgoing);
+        assert!(
+            !agent_message.trim().is_empty(),
+            "{}: expected ACP HITL explanation message",
+            scenario.name
+        );
+        let agent_message_lower = agent_message.to_ascii_lowercase();
+
         let response = response_result(&outgoing)
             .unwrap_or_else(|| panic!("{}: expected JSON-RPC response", scenario.name));
+        timings.record(response, scenario.name);
         match response["status"].as_str() {
             Some("dry_run_validated") => {
                 assert_eq!(
@@ -64,7 +74,23 @@ fn workflow_acp_prompt_multiverb_confusion_reports_routing_precision() {
                         "{}",
                         scenario.name
                     );
+                    assert!(
+                        agent_message_lower.contains(expected_transition),
+                        "{} explanation omitted transition {}",
+                        scenario.name,
+                        expected_transition
+                    );
                 }
+                assert!(
+                    agent_message_lower.contains("kyc-case.update-status"),
+                    "{}",
+                    scenario.name
+                );
+                assert!(
+                    agent_message_lower.contains("no mutation"),
+                    "{}",
+                    scenario.name
+                );
             }
             Some("structured_refusal") => {
                 assert_eq!(
@@ -84,7 +110,29 @@ fn workflow_acp_prompt_multiverb_confusion_reports_routing_precision() {
                         "{}",
                         scenario.name
                     );
+                    assert!(
+                        agent_message_lower.contains(expected_refusal),
+                        "{} explanation omitted refusal code {}",
+                        scenario.name,
+                        expected_refusal
+                    );
                 }
+                assert!(
+                    agent_message_lower.contains("validator"),
+                    "{}",
+                    scenario.name
+                );
+                assert!(
+                    agent_message_lower.contains("correct")
+                        || agent_message_lower.contains("provide"),
+                    "{}",
+                    scenario.name
+                );
+                assert!(
+                    agent_message_lower.contains("no mutation"),
+                    "{}",
+                    scenario.name
+                );
             }
             Some("pending_question") => {
                 assert_eq!(
@@ -96,6 +144,28 @@ fn workflow_acp_prompt_multiverb_confusion_reports_routing_precision() {
                 assert!(
                     !outgoing.iter().any(is_semantic_diff),
                     "{} produced semantic diff after pending question",
+                    scenario.name
+                );
+                assert!(
+                    outgoing.iter().any(is_pending_question_plan),
+                    "{} missing pending-question ACP plan trace",
+                    scenario.name
+                );
+                assert!(
+                    agent_message_lower.contains("stuck")
+                        || agent_message_lower.contains("cannot safely choose"),
+                    "{}",
+                    scenario.name
+                );
+                assert!(
+                    agent_message_lower.contains("please") || agent_message_lower.contains("need"),
+                    "{}",
+                    scenario.name
+                );
+                assert!(
+                    agent_message_lower.contains("no workbook dry-run")
+                        || agent_message_lower.contains("no dry-run"),
+                    "{}",
                     scenario.name
                 );
             }
@@ -150,6 +220,7 @@ fn workflow_acp_prompt_multiverb_confusion_reports_routing_precision() {
         total,
         pct(unexpected_fallback, total)
     );
+    timings.print();
     println!("=======================================================================\n");
 
     assert_eq!(language_loop_routed, 5);
@@ -313,6 +384,112 @@ fn is_semantic_diff(item: &JsonRpcOutgoing) -> bool {
         JsonRpcOutgoing::Notification(notification)
             if notification.params["update"]["sessionUpdate"] == "semantic_diff"
     )
+}
+
+fn is_pending_question_plan(item: &JsonRpcOutgoing) -> bool {
+    matches!(
+        item,
+        JsonRpcOutgoing::Notification(notification)
+            if notification.params["update"]["sessionUpdate"] == "plan"
+                && notification.params["update"]["goalProposalTrace"]["status"] == "pending_question"
+    )
+}
+
+fn agent_message_text(outgoing: &[JsonRpcOutgoing]) -> String {
+    outgoing
+        .iter()
+        .filter_map(|item| match item {
+            JsonRpcOutgoing::Notification(notification)
+                if notification.params["update"]["sessionUpdate"] == "agent_message_chunk" =>
+            {
+                notification.params["update"]["content"]["text"]
+                    .as_str()
+                    .map(str::to_string)
+            }
+            _ => None,
+        })
+        .collect::<Vec<_>>()
+        .join("\n")
+}
+
+#[derive(Debug, Default)]
+struct TimingStats {
+    count: usize,
+    prompt_route_us: u64,
+    language_pack_us: u64,
+    revision_loop_us: u64,
+    dry_run_us: u64,
+    acp_emit_us: u64,
+    total_us: u64,
+    max_total_us: u64,
+}
+
+impl TimingStats {
+    fn record(&mut self, response: &Value, scenario_name: &str) {
+        let performance = &response["observability"]["performance"];
+        assert!(
+            performance.is_object(),
+            "{}: expected observability.performance timing payload",
+            scenario_name
+        );
+        let total_us = metric_us(performance, "total");
+        self.count += 1;
+        self.prompt_route_us += metric_us(performance, "prompt_route");
+        self.language_pack_us += metric_us(performance, "language_pack");
+        self.revision_loop_us += metric_us(performance, "revision_loop");
+        self.dry_run_us += metric_us(performance, "dry_run");
+        self.acp_emit_us += metric_us(performance, "acp_emit");
+        self.total_us += total_us;
+        self.max_total_us = self.max_total_us.max(total_us);
+    }
+
+    fn print(&self) {
+        println!(
+            "  Avg prompt_route_ms:      {:.2}",
+            avg_ms(self.prompt_route_us, self.count)
+        );
+        println!(
+            "  Avg language_pack_ms:     {:.2}",
+            avg_ms(self.language_pack_us, self.count)
+        );
+        println!(
+            "  Avg revision_loop_ms:     {:.2}",
+            avg_ms(self.revision_loop_us, self.count)
+        );
+        println!(
+            "  Avg dry_run_ms:           {:.2}",
+            avg_ms(self.dry_run_us, self.count)
+        );
+        println!(
+            "  Avg acp_emit_ms:          {:.2}",
+            avg_ms(self.acp_emit_us, self.count)
+        );
+        println!(
+            "  Avg total_ms:             {:.2}",
+            avg_ms(self.total_us, self.count)
+        );
+        println!(
+            "  Max total_ms:             {:.2}",
+            self.max_total_us as f64 / 1_000.0
+        );
+    }
+}
+
+fn metric_us(value: &Value, prefix: &str) -> u64 {
+    let us_field = format!("{prefix}_us");
+    let ms_field = format!("{prefix}_ms");
+    value[&us_field]
+        .as_u64()
+        .or_else(|| value[&ms_field].as_u64().map(|ms| ms.saturating_mul(1_000)))
+        .unwrap_or(0)
+}
+
+fn avg_ms(total_us: u64, count: usize) -> f64 {
+    if count == 0 {
+        0.0
+    } else {
+        total_us as f64 / count as f64 / 1_000.0
+    }
 }
 
 fn pct(part: usize, total: usize) -> f64 {

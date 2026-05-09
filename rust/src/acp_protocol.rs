@@ -14,8 +14,9 @@ use uuid::Uuid;
 
 use crate::acp::{self, AcpAdapterKind, AcpPersonaMode, AcpSession};
 use crate::runbook::{
-    KycLanguagePackRequest, KycUpdateStatusDryRunInput, KycUpdateStatusWorkbookDraft,
-    WorkbookRevisionOutcome,
+    KycLanguagePackRequest, KycUpdateStatusDryRunInput, KycUpdateStatusDryRunOutput,
+    KycUpdateStatusWorkbookDraft, LanguageAcquisitionMetrics, StructuredWorkbookRefusal,
+    WorkbookDiagnostic, WorkbookRevisionOutcome,
 };
 
 pub const ACP_PROTOCOL_VERSION: &str = "0.4.3";
@@ -291,6 +292,10 @@ pub struct AcpKycLanguageLoopRequest {
     pub state_snapshot_id: String,
     #[serde(default)]
     pub objective: Option<String>,
+    #[serde(default)]
+    pub prompt_route_ms: Option<u64>,
+    #[serde(default)]
+    pub prompt_route_us: Option<u64>,
     pub draft: KycUpdateStatusWorkbookDraft,
 }
 
@@ -649,25 +654,50 @@ impl AcpJsonRpcAgent {
         session_id: Uuid,
         prompt: &[AcpContentBlock],
     ) -> Option<Vec<JsonRpcOutgoing>> {
+        let prompt_route_started_at = Instant::now();
         let utterance_text = prompt_utterance_text(prompt);
         if !looks_like_kyc_update_status_prompt(&utterance_text) {
             if looks_like_kyc_domain_prompt(&utterance_text) {
-                return Some(self.response(
+                let prompt_route_us = elapsed_us(prompt_route_started_at);
+                let candidate_verbs = vec![
+                    "kyc-case.read",
+                    "kyc-case.create",
+                    "kyc-case.update-status",
+                    "screening.update-status",
+                    "document.collect",
+                ];
+                let message = explain_kyc_ambiguous_prompt(&candidate_verbs);
+                return Some(pending_question_outgoing(
                     id,
+                    session_id,
                     json!({
                         "stopReason": "end_turn",
                         "status": "pending_question",
                         "pending_question": {
                             "code": "kyc_prompt_ambiguous",
-                            "candidate_verbs": [
-                                "kyc-case.read",
-                                "kyc-case.create",
-                                "kyc-case.update-status",
-                                "screening.update-status",
-                                "document.collect"
-                            ]
+                            "candidate_verbs": candidate_verbs,
+                            "needs": ["explicit_verb_or_update_status_intent"]
+                        },
+                        "observability": {
+                            "performance": {
+                                "prompt_route_ms": millis_from_micros(prompt_route_us),
+                                "prompt_route_us": prompt_route_us,
+                                "language_pack_ms": 0,
+                                "language_pack_us": 0,
+                                "revision_loop_ms": 0,
+                                "revision_loop_us": 0,
+                                "dry_run_ms": 0,
+                                "dry_run_us": 0,
+                                "acp_emit_ms": 0,
+                                "acp_emit_us": 0,
+                                "total_ms": millis_from_micros(prompt_route_us),
+                                "total_us": prompt_route_us
+                            },
+                            "acpMechanismSummary": ["prompt_router", "structured_pending_question"]
                         }
                     }),
+                    "kyc_prompt_ambiguous",
+                    message,
                 ));
             }
             return None;
@@ -676,20 +706,52 @@ impl AcpJsonRpcAgent {
         let request = match kyc_language_loop_request_from_prompt(session_id, prompt) {
             Ok(request) => request,
             Err(error) => {
-                return Some(self.response(
+                let prompt_route_us = elapsed_us(prompt_route_started_at);
+                let message = explain_kyc_incomplete_prompt(&error);
+                return Some(pending_question_outgoing(
                     id,
+                    session_id,
                     json!({
                         "stopReason": "end_turn",
                         "status": "pending_question",
                         "pending_question": {
                             "code": "kyc_update_status_prompt_incomplete",
-                            "missing": error
+                            "missing": error,
+                            "needs": ["case_uuid", "current_state", "requested_state", "evidence_digest"]
+                        },
+                        "observability": {
+                            "performance": {
+                                "prompt_route_ms": millis_from_micros(prompt_route_us),
+                                "prompt_route_us": prompt_route_us,
+                                "language_pack_ms": 0,
+                                "language_pack_us": 0,
+                                "revision_loop_ms": 0,
+                                "revision_loop_us": 0,
+                                "dry_run_ms": 0,
+                                "dry_run_us": 0,
+                                "acp_emit_ms": 0,
+                                "acp_emit_us": 0,
+                                "total_ms": millis_from_micros(prompt_route_us),
+                                "total_us": prompt_route_us
+                            },
+                            "acpMechanismSummary": ["prompt_router", "structured_pending_question"]
                         }
                     }),
-                ))
+                    "kyc_update_status_prompt_incomplete",
+                    message,
+                ));
             }
         };
 
+        let prompt_route_us = elapsed_us(prompt_route_started_at);
+        let mut request = request;
+        if let Value::Object(fields) = &mut request {
+            fields.insert(
+                "prompt_route_ms".to_string(),
+                json!(millis_from_micros(prompt_route_us)),
+            );
+            fields.insert("prompt_route_us".to_string(), json!(prompt_route_us));
+        }
         Some(self.obpoc_kyc_update_status_language_loop(id, request))
     }
 
@@ -969,7 +1031,7 @@ impl AcpJsonRpcAgent {
                                 "kyc_case_state_anchor",
                                 "language_pack_ready"
                             ],
-                            "projectionLatencyMs": u64::try_from(started_at.elapsed().as_millis()).unwrap_or(u64::MAX)
+                            "projectionLatencyMs": elapsed_ms(started_at)
                         }
                     }),
                 )
@@ -1014,6 +1076,8 @@ impl AcpJsonRpcAgent {
             },
         ) {
             Ok(language_pack) => {
+                let language_pack_us = elapsed_us(started_at);
+                let language_pack_ms = millis_from_micros(language_pack_us);
                 let language_pack_bytes = serde_json::to_vec(&language_pack)
                     .map(|bytes| bytes.len())
                     .unwrap_or(0);
@@ -1031,7 +1095,21 @@ impl AcpJsonRpcAgent {
                             ],
                             "projectionCount": 1,
                             "projectionBytes": language_pack_bytes,
-                            "projectionLatencyMs": u64::try_from(started_at.elapsed().as_millis()).unwrap_or(u64::MAX)
+                            "projectionLatencyMs": language_pack_ms,
+                            "performance": {
+                                "prompt_route_ms": 0,
+                                "prompt_route_us": 0,
+                                "language_pack_ms": language_pack_ms,
+                                "language_pack_us": language_pack_us,
+                                "revision_loop_ms": 0,
+                                "revision_loop_us": 0,
+                                "dry_run_ms": 0,
+                                "dry_run_us": 0,
+                                "acp_emit_ms": 0,
+                                "acp_emit_us": 0,
+                                "total_ms": language_pack_ms,
+                                "total_us": language_pack_us
+                            }
                         }
                     }),
                 )
@@ -1062,9 +1140,12 @@ impl AcpJsonRpcAgent {
             .entry(session_id)
             .or_insert_with(|| acp::open_acp_session(session_id, request.adapter))
             .clone();
+        let prompt_route_us = request
+            .prompt_route_us
+            .unwrap_or_else(|| request.prompt_route_ms.unwrap_or(0).saturating_mul(1_000));
 
         let started_at = Instant::now();
-        let outcome = match acp::acp_run_kyc_update_status_language_loop(
+        let outcome = match acp::acp_run_kyc_update_status_language_loop_timed(
             &session,
             &manifest,
             KycLanguagePackRequest {
@@ -1080,7 +1161,10 @@ impl AcpJsonRpcAgent {
             Err(error) => return self.acp_error(id, error),
         };
 
-        let (language_pack, revision_outcome) = outcome;
+        let language_pack = outcome.language_pack;
+        let revision_outcome = outcome.revision_outcome;
+        let timings = outcome.timings;
+        let acp_emit_started_at = Instant::now();
         let mut outgoing = vec![
             JsonRpcOutgoing::Notification(JsonRpcNotification {
                 jsonrpc: "2.0".to_string(),
@@ -1127,6 +1211,8 @@ impl AcpJsonRpcAgent {
                 metrics,
                 trace,
             } => {
+                let explanation = explain_kyc_dry_run_success(output.as_ref(), &metrics);
+                let acp_emit_us = elapsed_us(acp_emit_started_at);
                 outgoing.push(JsonRpcOutgoing::Notification(JsonRpcNotification {
                     jsonrpc: "2.0".to_string(),
                     method: "session/update".to_string(),
@@ -1165,20 +1251,7 @@ impl AcpJsonRpcAgent {
                         }
                     }),
                 }));
-                outgoing.push(JsonRpcOutgoing::Notification(JsonRpcNotification {
-                    jsonrpc: "2.0".to_string(),
-                    method: "session/update".to_string(),
-                    params: json!({
-                        "sessionId": session_id.to_string(),
-                        "update": {
-                            "sessionUpdate": "agent_message_chunk",
-                            "content": {
-                                "type": "text",
-                                "text": "KYC update-status workbook dry-run validated. No mutation was executed."
-                            }
-                        }
-                    }),
-                }));
+                outgoing.push(agent_message_update(session_id, explanation));
                 outgoing.push(JsonRpcOutgoing::Response(JsonRpcResponse::success(
                     id,
                     json!({
@@ -1189,7 +1262,8 @@ impl AcpJsonRpcAgent {
                         "metrics": metrics,
                         "trace": trace,
                         "observability": {
-                            "projectionLatencyMs": u64::try_from(started_at.elapsed().as_millis()).unwrap_or(u64::MAX),
+                            "projectionLatencyMs": elapsed_ms(started_at),
+                            "performance": language_loop_performance(&timings, prompt_route_us, acp_emit_us),
                             "acpMechanismSummary": ["language_pack", "deterministic_revision_loop", "dry_run_only"]
                         }
                     }),
@@ -1201,6 +1275,8 @@ impl AcpJsonRpcAgent {
                 metrics,
                 trace,
             } => {
+                let explanation = explain_kyc_refusal(&refusal);
+                let acp_emit_us = elapsed_us(acp_emit_started_at);
                 outgoing.push(JsonRpcOutgoing::Notification(JsonRpcNotification {
                     jsonrpc: "2.0".to_string(),
                     method: "session/update".to_string(),
@@ -1223,20 +1299,7 @@ impl AcpJsonRpcAgent {
                         }
                     }),
                 }));
-                outgoing.push(JsonRpcOutgoing::Notification(JsonRpcNotification {
-                    jsonrpc: "2.0".to_string(),
-                    method: "session/update".to_string(),
-                    params: json!({
-                        "sessionId": session_id.to_string(),
-                        "update": {
-                            "sessionUpdate": "agent_message_chunk",
-                            "content": {
-                                "type": "text",
-                                "text": format!("KYC update-status workbook refused: {}", refusal.refusal_code)
-                            }
-                        }
-                    }),
-                }));
+                outgoing.push(agent_message_update(session_id, explanation));
                 outgoing.push(JsonRpcOutgoing::Response(JsonRpcResponse::success(
                     id,
                     json!({
@@ -1247,7 +1310,8 @@ impl AcpJsonRpcAgent {
                         "metrics": metrics,
                         "trace": trace,
                         "observability": {
-                            "projectionLatencyMs": u64::try_from(started_at.elapsed().as_millis()).unwrap_or(u64::MAX),
+                            "projectionLatencyMs": elapsed_ms(started_at),
+                            "performance": language_loop_performance(&timings, prompt_route_us, acp_emit_us),
                             "acpMechanismSummary": ["language_pack", "deterministic_revision_loop", "structured_refusal"]
                         }
                     }),
@@ -1268,50 +1332,74 @@ impl AcpJsonRpcAgent {
             .entry(input.session_id)
             .or_insert_with(|| acp::open_acp_session(input.session_id, AcpAdapterKind::Zed))
             .clone();
+        let dry_run_started_at = Instant::now();
         match acp::acp_dry_run_kyc_update_status(&session, input) {
-            Ok(output) => vec![
-                JsonRpcOutgoing::Notification(JsonRpcNotification {
-                    jsonrpc: "2.0".to_string(),
-                    method: "session/update".to_string(),
-                    params: json!({
-                        "sessionId": output.workbook.core.session_id.to_string(),
-                        "update": {
-                            "sessionUpdate": "tool_call_update",
-                            "toolCallId": format!("tool:dry-run:{}", output.workbook.id),
-                            "status": "completed",
-                            "kind": "think",
-                            "persona": AcpPersonaMode::SageExecution.as_str(),
-                            "title": "KYC update-status dry-run",
-                            "content": {
-                                "type": "resource_link",
-                                "uri": format!("semos://workbook/{}", output.workbook.id),
-                                "name": "Execution workbook",
-                                "description": "Workbook validated without mutation"
+            Ok(output) => {
+                let dry_run_us = elapsed_us(dry_run_started_at);
+                let dry_run_ms = millis_from_micros(dry_run_us);
+                vec![
+                    JsonRpcOutgoing::Notification(JsonRpcNotification {
+                        jsonrpc: "2.0".to_string(),
+                        method: "session/update".to_string(),
+                        params: json!({
+                            "sessionId": output.workbook.core.session_id.to_string(),
+                            "update": {
+                                "sessionUpdate": "tool_call_update",
+                                "toolCallId": format!("tool:dry-run:{}", output.workbook.id),
+                                "status": "completed",
+                                "kind": "think",
+                                "persona": AcpPersonaMode::SageExecution.as_str(),
+                                "title": "KYC update-status dry-run",
+                                "content": {
+                                    "type": "resource_link",
+                                    "uri": format!("semos://workbook/{}", output.workbook.id),
+                                    "name": "Execution workbook",
+                                    "description": "Workbook validated without mutation"
+                                }
                             }
-                        }
+                        }),
                     }),
-                }),
-                JsonRpcOutgoing::Notification(JsonRpcNotification {
-                    jsonrpc: "2.0".to_string(),
-                    method: "session/update".to_string(),
-                    params: json!({
-                        "sessionId": output.workbook.core.session_id.to_string(),
-                        "update": {
-                            "sessionUpdate": "semantic_diff",
-                            "persona": AcpPersonaMode::SageExecution.as_str(),
-                            "semanticDiffId": output.dry_run.semantic_diff_uri.clone(),
-                            "fallbackSummary": ["resource_link"],
-                            "diff": output.dry_run.semantic_diff.semantic_diff.clone(),
-                            "transitionRef": output.dry_run.transition_ref.clone(),
-                            "validationTrace": output.dry_run.validation_trace.clone()
-                        }
+                    JsonRpcOutgoing::Notification(JsonRpcNotification {
+                        jsonrpc: "2.0".to_string(),
+                        method: "session/update".to_string(),
+                        params: json!({
+                            "sessionId": output.workbook.core.session_id.to_string(),
+                            "update": {
+                                "sessionUpdate": "semantic_diff",
+                                "persona": AcpPersonaMode::SageExecution.as_str(),
+                                "semanticDiffId": output.dry_run.semantic_diff_uri.clone(),
+                                "fallbackSummary": ["resource_link"],
+                                "diff": output.dry_run.semantic_diff.semantic_diff.clone(),
+                                "transitionRef": output.dry_run.transition_ref.clone(),
+                                "validationTrace": output.dry_run.validation_trace.clone()
+                            }
+                        }),
                     }),
-                }),
-                JsonRpcOutgoing::Response(JsonRpcResponse::success(
-                    id,
-                    json!({"status": "dry_run_validated", "output": output}),
-                )),
-            ],
+                    JsonRpcOutgoing::Response(JsonRpcResponse::success(
+                        id,
+                        json!({
+                            "status": "dry_run_validated",
+                            "output": output,
+                            "observability": {
+                                "performance": {
+                                    "prompt_route_ms": 0,
+                                    "prompt_route_us": 0,
+                                    "language_pack_ms": 0,
+                                    "language_pack_us": 0,
+                                    "revision_loop_ms": 0,
+                                    "revision_loop_us": 0,
+                                    "dry_run_ms": dry_run_ms,
+                                    "dry_run_us": dry_run_us,
+                                    "acp_emit_ms": 0,
+                                    "acp_emit_us": 0,
+                                    "total_ms": dry_run_ms,
+                                    "total_us": dry_run_us
+                                }
+                            }
+                        }),
+                    )),
+                ]
+            }
             Err(error) => self.acp_error(id, error),
         }
     }
@@ -1786,6 +1874,8 @@ fn language_loop_trace_summary(outcome: &WorkbookRevisionOutcome) -> Value {
             "revisionCount": metrics.revision_count,
             "firstPassValid": metrics.first_pass_valid,
             "dryRunValid": metrics.dry_run_valid,
+            "dryRunMs": metrics.dry_run_ms,
+            "dryRunUs": metrics.dry_run_us,
             "refusalCode": metrics.refusal_code,
             "trace": trace
         }),
@@ -1801,6 +1891,8 @@ fn language_loop_trace_summary(outcome: &WorkbookRevisionOutcome) -> Value {
             "revisionCount": metrics.revision_count,
             "firstPassValid": metrics.first_pass_valid,
             "dryRunValid": metrics.dry_run_valid,
+            "dryRunMs": metrics.dry_run_ms,
+            "dryRunUs": metrics.dry_run_us,
             "refusalCode": refusal.refusal_code,
             "trace": trace
         }),
@@ -1818,6 +1910,230 @@ fn language_loop_plan_entries(outcome: &WorkbookRevisionOutcome) -> Value {
         {"id": "validate", "status": validation_status, "label": "Validate draft with structured diagnostics"},
         {"id": "dry-run", "status": dry_run_status, "label": "Run non-mutating workbook dry-run"}
     ])
+}
+
+fn language_loop_performance(
+    timings: &acp::AcpKycLanguageLoopTimings,
+    prompt_route_us: u64,
+    acp_emit_us: u64,
+) -> Value {
+    let total_us = timings
+        .total_us
+        .saturating_add(prompt_route_us)
+        .saturating_add(acp_emit_us);
+    json!({
+        "prompt_route_ms": millis_from_micros(prompt_route_us),
+        "prompt_route_us": prompt_route_us,
+        "language_pack_ms": timings.language_pack_ms,
+        "language_pack_us": timings.language_pack_us,
+        "revision_loop_ms": timings.revision_loop_ms,
+        "revision_loop_us": timings.revision_loop_us,
+        "dry_run_ms": timings.dry_run_ms,
+        "dry_run_us": timings.dry_run_us,
+        "acp_emit_ms": millis_from_micros(acp_emit_us),
+        "acp_emit_us": acp_emit_us,
+        "total_ms": millis_from_micros(total_us),
+        "total_us": total_us
+    })
+}
+
+fn pending_question_outgoing(
+    id: Option<Value>,
+    session_id: Uuid,
+    result: Value,
+    code: &str,
+    message: String,
+) -> Vec<JsonRpcOutgoing> {
+    vec![
+        JsonRpcOutgoing::Notification(JsonRpcNotification {
+            jsonrpc: "2.0".to_string(),
+            method: "session/update".to_string(),
+            params: json!({
+                "sessionId": session_id.to_string(),
+                "update": {
+                    "sessionUpdate": "plan",
+                    "persona": AcpPersonaMode::SagePlanning.as_str(),
+                    "workflowPhase": "clarification",
+                    "goalProposalTrace": {
+                        "status": "pending_question",
+                        "pendingQuestionCode": code,
+                        "acpMechanismSummary": ["prompt_router", "structured_pending_question"],
+                        "acpFallbackSummary": []
+                    },
+                    "entries": [
+                        {"id": "understand", "status": "completed", "label": "Identify KYC prompt"},
+                        {"id": "clarify", "status": "blocked", "label": "Need HITL clarification before workbook draft"},
+                        {"id": "dry-run", "status": "blocked", "label": "No dry-run started"}
+                    ]
+                }
+            }),
+        }),
+        agent_message_update(session_id, message),
+        JsonRpcOutgoing::Response(JsonRpcResponse::success(id, result)),
+    ]
+}
+
+fn elapsed_ms(started_at: Instant) -> u64 {
+    u64::try_from(started_at.elapsed().as_millis()).unwrap_or(u64::MAX)
+}
+
+fn elapsed_us(started_at: Instant) -> u64 {
+    u64::try_from(started_at.elapsed().as_micros()).unwrap_or(u64::MAX)
+}
+
+fn millis_from_micros(micros: u64) -> u64 {
+    micros / 1_000
+}
+
+fn agent_message_update(session_id: Uuid, text: impl Into<String>) -> JsonRpcOutgoing {
+    let text = text.into();
+    JsonRpcOutgoing::Notification(JsonRpcNotification {
+        jsonrpc: "2.0".to_string(),
+        method: "session/update".to_string(),
+        params: json!({
+            "sessionId": session_id.to_string(),
+            "update": {
+                "sessionUpdate": "agent_message_chunk",
+                "content": {
+                    "type": "text",
+                    "text": text
+                }
+            }
+        }),
+    })
+}
+
+fn explain_kyc_ambiguous_prompt(candidate_verbs: &[&str]) -> String {
+    format!(
+        "I can see this is KYC-related, but I cannot safely choose the private DSL verb yet. Candidate verbs are {}. Please choose the verb, or say: Move case <uuid> from INTAKE to DISCOVERY with evidence sha256:... No workbook dry-run or mutation has run.",
+        inline_code_list(candidate_verbs.iter().copied())
+    )
+}
+
+fn explain_kyc_incomplete_prompt(missing: &[&str]) -> String {
+    format!(
+        "I found a KYC update-status intent, but I am stuck because the prompt is missing {}. I need the missing value(s); this workflow requires a case UUID, current state, requested state, and evidence digest before I can draft and validate the workbook. Example: Move case <uuid> from INTAKE to DISCOVERY with evidence sha256:... No workbook dry-run or mutation has run.",
+        inline_code_list(missing.iter().copied())
+    )
+}
+
+fn explain_kyc_dry_run_success(
+    output: &KycUpdateStatusDryRunOutput,
+    metrics: &LanguageAcquisitionMetrics,
+) -> String {
+    let semantic = &output.dry_run.semantic_diff;
+    let revision = if metrics.revision_count == 0 {
+        "The workbook draft validated on the first pass.".to_string()
+    } else {
+        format!(
+            "The workbook draft needed {} structured revision(s) before validation.",
+            metrics.revision_count
+        )
+    };
+    let evidence_count = output.workbook.core.evidence_refs.len();
+    let evidence_suffix = if evidence_count == 1 { "" } else { "s" };
+
+    format!(
+        "I understood this as `kyc-case.update-status`. I selected transition `{}` for case `{}`: `{}` -> `{}` using pack `{}` and snapshot `{}`. {} Evidence binding is present ({} reference{}). This is dry-run only; no mutation was executed and the normal runbook gate remains the only mutation path.",
+        output.dry_run.transition_ref,
+        output.workbook.core.subject.subject_id,
+        semantic.from_state,
+        semantic.to_state,
+        output.workbook.core.pack_id,
+        output.workbook.core.state_snapshot_id,
+        revision,
+        evidence_count,
+        evidence_suffix
+    )
+}
+
+fn explain_kyc_refusal(refusal: &StructuredWorkbookRefusal) -> String {
+    let mut parts = vec![format!(
+        "I could not validate the KYC update-status workbook: `{}`.",
+        refusal.refusal_code
+    )];
+
+    if let Some(diagnostic) = refusal.diagnostics.first() {
+        parts.extend(explain_workbook_diagnostic(diagnostic));
+    }
+
+    parts.push(
+        "Correct the blocked field or provide the missing input, then I can retry the dry-run. No mutation was executed.".to_string(),
+    );
+    parts.join(" ")
+}
+
+fn explain_workbook_diagnostic(diagnostic: &WorkbookDiagnostic) -> Vec<String> {
+    let mut parts = vec![format!(
+        "The validator stopped at `{}` with `{}`.",
+        diagnostic.source_path, diagnostic.error_code
+    )];
+
+    if let Some(verb) = diagnostic.attempted_verb.as_deref() {
+        parts.push(format!("Attempted verb: `{verb}`."));
+    }
+    if let Some(transition) = diagnostic.attempted_transition.as_deref() {
+        parts.push(format!("Attempted transition: `{transition}`."));
+    }
+    if let Some(binding) = diagnostic.missing_uuid_binding.as_deref() {
+        parts.push(format!("Missing UUID binding: `{binding}`."));
+    }
+    if diagnostic.expected_state.is_some() || diagnostic.actual_state.is_some() {
+        parts.push(format!(
+            "Expected `{}`, got `{}`.",
+            diagnostic.expected_state.as_deref().unwrap_or("unknown"),
+            diagnostic.actual_state.as_deref().unwrap_or("unknown")
+        ));
+    }
+    if let Some(reason) = diagnostic.blocked_transition_reason.as_deref() {
+        parts.push(format!("Reason: {reason}."));
+    }
+    if !diagnostic.suggested_verbs.is_empty() {
+        parts.push(format!(
+            "Valid verb(s): {}.",
+            inline_code_list(
+                diagnostic
+                    .suggested_verbs
+                    .iter()
+                    .take(3)
+                    .map(String::as_str)
+            )
+        ));
+    }
+    if !diagnostic.suggested_transitions.is_empty() {
+        parts.push(format!(
+            "Valid transition candidate(s): {}.",
+            inline_code_list(
+                diagnostic
+                    .suggested_transitions
+                    .iter()
+                    .take(3)
+                    .map(String::as_str)
+            )
+        ));
+    }
+    parts.push(format!(
+        "Pack anchor: `{}` / config `{}` / snapshot `{}`.",
+        diagnostic.pack_ref, diagnostic.configuration_version, diagnostic.state_snapshot_id
+    ));
+
+    parts
+}
+
+fn inline_code_list<I, S>(values: I) -> String
+where
+    I: IntoIterator<Item = S>,
+    S: AsRef<str>,
+{
+    let quoted = values
+        .into_iter()
+        .map(|value| format!("`{}`", value.as_ref()))
+        .collect::<Vec<_>>();
+    if quoted.is_empty() {
+        "`unknown`".to_string()
+    } else {
+        quoted.join(", ")
+    }
 }
 
 fn load_ob_poc_kyc_domain_pack(
@@ -1853,6 +2169,23 @@ mod tests {
             JsonRpcOutgoing::Response(response) => response,
             JsonRpcOutgoing::Notification(_) => panic!("expected response"),
         }
+    }
+
+    fn agent_message_text(outgoing: &[JsonRpcOutgoing]) -> String {
+        outgoing
+            .iter()
+            .filter_map(|item| match item {
+                JsonRpcOutgoing::Notification(notification)
+                    if notification.params["update"]["sessionUpdate"] == "agent_message_chunk" =>
+                {
+                    notification.params["update"]["content"]["text"]
+                        .as_str()
+                        .map(str::to_string)
+                }
+                _ => None,
+            })
+            .collect::<Vec<_>>()
+            .join("\n")
     }
 
     #[test]
@@ -2042,6 +2375,24 @@ mod tests {
             result["output"]["dry_run"]["transition_ref"],
             "kyc-case.discovery-to-assessment"
         );
+        assert!(result["observability"]["performance"]["prompt_route_ms"]
+            .as_u64()
+            .is_some());
+        assert!(result["observability"]["performance"]["language_pack_ms"]
+            .as_u64()
+            .is_some());
+        assert!(result["observability"]["performance"]["revision_loop_ms"]
+            .as_u64()
+            .is_some());
+        assert!(result["observability"]["performance"]["dry_run_ms"]
+            .as_u64()
+            .is_some());
+        let message = agent_message_text(&outgoing);
+        assert!(message.contains("kyc-case.update-status"));
+        assert!(message.contains("kyc-case.discovery-to-assessment"));
+        assert!(message.contains("DISCOVERY"));
+        assert!(message.contains("ASSESSMENT"));
+        assert!(message.to_ascii_lowercase().contains("no mutation"));
     }
 
     #[test]
@@ -2090,6 +2441,17 @@ mod tests {
         let result = response.result.as_ref().unwrap();
         assert_eq!(result["status"], "structured_refusal");
         assert_eq!(result["refusal"]["refusal_code"], "missing_evidence_digest");
+        assert!(result["observability"]["performance"]["prompt_route_ms"]
+            .as_u64()
+            .is_some());
+        assert!(result["observability"]["performance"]["dry_run_ms"]
+            .as_u64()
+            .is_some());
+        let message = agent_message_text(&outgoing);
+        assert!(message.contains("missing_evidence_digest"));
+        assert!(message.contains("draft.evidence_digest"));
+        assert!(message.contains("Correct") || message.contains("provide"));
+        assert!(message.to_ascii_lowercase().contains("no mutation"));
     }
 
     #[test]

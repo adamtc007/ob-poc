@@ -18,6 +18,7 @@ use sem_os_core::domain_pack::{
 };
 use serde::{Deserialize, Serialize};
 use serde_json::json;
+use std::time::Instant;
 use uuid::Uuid;
 
 use crate::runbook::{
@@ -27,6 +28,25 @@ use crate::runbook::{
     KycUpdateStatusDryRunRefusal, KycUpdateStatusWorkbookDraft, LanguagePackError,
     SemOsLanguagePack, WorkbookRevisionOutcome,
 };
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct AcpKycLanguageLoopTimedOutcome {
+    pub language_pack: SemOsLanguagePack,
+    pub revision_outcome: WorkbookRevisionOutcome,
+    pub timings: AcpKycLanguageLoopTimings,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct AcpKycLanguageLoopTimings {
+    pub language_pack_ms: u64,
+    pub language_pack_us: u64,
+    pub revision_loop_ms: u64,
+    pub revision_loop_us: u64,
+    pub dry_run_ms: u64,
+    pub dry_run_us: u64,
+    pub total_ms: u64,
+    pub total_us: u64,
+}
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct AcpSession {
@@ -658,6 +678,17 @@ pub fn acp_run_kyc_update_status_language_loop(
     request: KycLanguagePackRequest,
     draft: KycUpdateStatusWorkbookDraft,
 ) -> Result<(SemOsLanguagePack, WorkbookRevisionOutcome), AcpAdapterError> {
+    let outcome = acp_run_kyc_update_status_language_loop_timed(session, manifest, request, draft)?;
+    Ok((outcome.language_pack, outcome.revision_outcome))
+}
+
+pub fn acp_run_kyc_update_status_language_loop_timed(
+    session: &AcpSession,
+    manifest: &DomainPackManifest,
+    request: KycLanguagePackRequest,
+    draft: KycUpdateStatusWorkbookDraft,
+) -> Result<AcpKycLanguageLoopTimedOutcome, AcpAdapterError> {
+    let total_started_at = Instant::now();
     require_open(session)?;
     require_valid_pack(manifest)?;
     if draft.session_id != session.session_id {
@@ -665,10 +696,31 @@ pub fn acp_run_kyc_update_status_language_loop(
             reason: "draft session_id does not match ACP session".to_string(),
         });
     }
-    let pack = build_kyc_update_status_language_pack(manifest, request)
+    let language_pack_started_at = Instant::now();
+    let language_pack = build_kyc_update_status_language_pack(manifest, request)
         .map_err(map_language_pack_error)?;
-    let outcome = run_kyc_update_status_revision_loop(manifest, &pack, draft);
-    Ok((pack, outcome))
+    let language_pack_us = elapsed_us(language_pack_started_at);
+
+    let revision_loop_started_at = Instant::now();
+    let revision_outcome = run_kyc_update_status_revision_loop(manifest, &language_pack, draft);
+    let revision_loop_us = elapsed_us(revision_loop_started_at);
+    let dry_run_us = revision_outcome_dry_run_us(&revision_outcome);
+    let total_us = elapsed_us(total_started_at);
+
+    Ok(AcpKycLanguageLoopTimedOutcome {
+        language_pack,
+        revision_outcome,
+        timings: AcpKycLanguageLoopTimings {
+            language_pack_ms: millis_from_micros(language_pack_us),
+            language_pack_us,
+            revision_loop_ms: millis_from_micros(revision_loop_us),
+            revision_loop_us,
+            dry_run_ms: millis_from_micros(dry_run_us),
+            dry_run_us,
+            total_ms: millis_from_micros(total_us),
+            total_us,
+        },
+    })
 }
 
 pub fn refuse_acp_mutation(session: &AcpSession) -> Result<(), AcpAdapterError> {
@@ -718,6 +770,21 @@ fn map_language_pack_error(error: LanguagePackError) -> AcpAdapterError {
     AcpAdapterError::LanguagePackRefused {
         reason: format!("{error:?}"),
     }
+}
+
+fn revision_outcome_dry_run_us(outcome: &WorkbookRevisionOutcome) -> u64 {
+    match outcome {
+        WorkbookRevisionOutcome::DryRunValid { metrics, .. }
+        | WorkbookRevisionOutcome::Refused { metrics, .. } => metrics.dry_run_us,
+    }
+}
+
+fn elapsed_us(started_at: Instant) -> u64 {
+    u64::try_from(started_at.elapsed().as_micros()).unwrap_or(u64::MAX)
+}
+
+fn millis_from_micros(micros: u64) -> u64 {
+    micros / 1_000
 }
 
 fn observation_string(response: &DiscoveryResponse, keys: &[&str]) -> Option<String> {
