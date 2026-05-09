@@ -1825,8 +1825,21 @@ fn merge_cached_case_state(
         state.snapshot_refs = cached.snapshot_refs.clone();
     }
     if state.source.is_none() || state.source == Some("prompt_text_anchor") {
-        state.source = Some("cached_read_only_discovery_probe");
+        state.source = Some(cached_case_state_trace_source(cached));
         state.probe_id = Some("kyc-case.read-state".to_string());
+    }
+}
+
+fn cached_case_state_trace_source(cached: &AcpKycCaseStateSnapshot) -> &'static str {
+    if cached.state_snapshot_id.starts_with("postgres:")
+        || cached
+            .snapshot_refs
+            .iter()
+            .any(|snapshot_ref| snapshot_ref.starts_with("postgres:"))
+    {
+        "live_read_only_discovery_probe"
+    } else {
+        "cached_read_only_discovery_probe"
     }
 }
 
@@ -2262,7 +2275,9 @@ fn state_discovery_tool_update(
         .unwrap_or_default();
     if !matches!(
         source,
-        "read_only_discovery_probe" | "cached_read_only_discovery_probe"
+        "read_only_discovery_probe"
+            | "cached_read_only_discovery_probe"
+            | "live_read_only_discovery_probe"
     ) {
         return None;
     }
@@ -2305,7 +2320,9 @@ fn state_discovery_human_summary(state_discovery: Option<&Value>) -> String {
         .unwrap_or_default();
     if !matches!(
         source,
-        "read_only_discovery_probe" | "cached_read_only_discovery_probe"
+        "read_only_discovery_probe"
+            | "cached_read_only_discovery_probe"
+            | "live_read_only_discovery_probe"
     ) {
         return String::new();
     }
@@ -3220,6 +3237,58 @@ mod tests {
             result["traceProjection"]["stateDiscovery"]["configurationVersion"],
             "config-live-1"
         );
+    }
+
+    #[test]
+    fn session_prompt_marks_postgres_cached_state_as_live_read_only_discovery() {
+        let mut agent = AcpJsonRpcAgent::new();
+        let snapshot_ref = format!("postgres:ob-poc.cases:{CASE_ID}:status:discovery");
+        let discovery = agent.handle_request(request(
+            1,
+            "obpoc/kyc_case_state/discover",
+            json!({
+                "session_id": SESSION_ID.to_string(),
+                "adapter": "zed",
+                "subject_id": CASE_ID,
+                "observations": [
+                    {"key": "case.status", "value": "DISCOVERY", "classification": "internal"},
+                    {"key": "case.configuration_version", "value": "domain_pack:ob-poc.kyc@0.1.0", "classification": "internal"},
+                    {"key": "case.state_snapshot_id", "value": snapshot_ref, "classification": "internal"}
+                ],
+                "provenance": [
+                    {"source": "postgres.ob-poc.cases", "snapshot_ref": snapshot_ref}
+                ],
+                "first_class_state_mutated": false
+            }),
+        ));
+        assert_eq!(
+            only_response(discovery).result.unwrap()["status"],
+            "kyc_case_state_discovered"
+        );
+
+        let outgoing = agent.handle_request(request(
+            2,
+            "session/prompt",
+            json!({
+                "sessionId": SESSION_ID.to_string(),
+                "prompt": [
+                    {
+                        "type": "text",
+                        "text": format!("Advance KYC case {CASE_ID} to ASSESSMENT with evidence sha256:evidence")
+                    }
+                ]
+            }),
+        ));
+
+        let discovery_update = match &outgoing[0] {
+            JsonRpcOutgoing::Notification(notification) => &notification.params["update"],
+            JsonRpcOutgoing::Response(_) => panic!("expected discovery notification"),
+        };
+        assert_eq!(
+            discovery_update["traceProjection"]["stateDiscovery"]["source"],
+            "live_read_only_discovery_probe"
+        );
+        assert!(agent_message_text(&outgoing).contains("read-only `kyc-case.read-state`"));
     }
 
     #[test]

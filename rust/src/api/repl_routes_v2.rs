@@ -1645,15 +1645,189 @@ async fn handle_repl_acp_request(
     agent.handle_request(request)
 }
 
-async fn seed_acp_prompt_case_state_from_live_context(
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum AcpPromptStateAnchorProvider {
+    KycUpdateStatus,
+}
+
+impl AcpPromptStateAnchorProvider {
+    fn id(self) -> &'static str {
+        match self {
+            Self::KycUpdateStatus => "kyc.update_status.live_case_state",
+        }
+    }
+
+    fn task(self) -> &'static str {
+        match self {
+            Self::KycUpdateStatus => "kyc-case.update-status",
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct AcpPromptStateAnchorProviderReport {
+    provider_id: Option<&'static str>,
+    task: Option<&'static str>,
+    status: &'static str,
+    state_anchor_source: Option<&'static str>,
+    subject_id: Option<Uuid>,
+    supported_tasks: Vec<&'static str>,
+    needed: Vec<&'static str>,
+}
+
+impl AcpPromptStateAnchorProviderReport {
+    fn not_applicable() -> Self {
+        Self {
+            provider_id: None,
+            task: None,
+            status: "not_applicable",
+            state_anchor_source: None,
+            subject_id: None,
+            supported_tasks: vec!["kyc-case.update-status"],
+            needed: Vec::new(),
+        }
+    }
+
+    fn for_provider(provider: AcpPromptStateAnchorProvider, status: &'static str) -> Self {
+        Self {
+            provider_id: Some(provider.id()),
+            task: Some(provider.task()),
+            status,
+            state_anchor_source: None,
+            subject_id: None,
+            supported_tasks: vec!["kyc-case.update-status"],
+            needed: Vec::new(),
+        }
+    }
+
+    fn unsupported(needed: Vec<&'static str>) -> Self {
+        Self {
+            provider_id: None,
+            task: None,
+            status: "provider_unavailable",
+            state_anchor_source: None,
+            subject_id: None,
+            supported_tasks: vec!["kyc-case.update-status"],
+            needed,
+        }
+    }
+
+    fn metrics(&self, result: Option<&serde_json::Value>) -> serde_json::Value {
+        let language_pack_generated = result
+            .and_then(|value| value.get("language_pack"))
+            .is_some();
+        let dry_run_valid = result
+            .and_then(|value| {
+                value
+                    .get("metrics")
+                    .and_then(|metrics| metrics.get("dry_run_valid"))
+                    .and_then(|valid| valid.as_bool())
+                    .or_else(|| {
+                        value
+                            .get("status")
+                            .and_then(|status| status.as_str())
+                            .map(|status| status == "dry_run_validated")
+                    })
+            })
+            .unwrap_or(false);
+        let structured_outcome = result
+            .and_then(|value| value.get("status"))
+            .and_then(|status| status.as_str())
+            .map(|status| {
+                matches!(
+                    status,
+                    "dry_run_validated" | "structured_refusal" | "pending_question"
+                )
+            })
+            .unwrap_or(false);
+
+        serde_json::json!({
+            "provider_selected": self.provider_id.is_some(),
+            "provider_id": self.provider_id,
+            "task": self.task,
+            "status": self.status,
+            "state_anchor_source": self.state_anchor_source,
+            "subject_id": self.subject_id,
+            "supported_tasks": self.supported_tasks,
+            "needed": self.needed,
+            "language_pack_generated": language_pack_generated,
+            "dry_run_valid": dry_run_valid,
+            "structured_outcome": structured_outcome,
+            "no_mutation_authority": true
+        })
+    }
+}
+
+enum AcpPromptStateAnchorProviderOutcome {
+    Continue {
+        outgoing: Vec<crate::acp_protocol::JsonRpcOutgoing>,
+        report: AcpPromptStateAnchorProviderReport,
+    },
+    Complete {
+        outgoing: Vec<crate::acp_protocol::JsonRpcOutgoing>,
+        report: AcpPromptStateAnchorProviderReport,
+    },
+}
+
+impl AcpPromptStateAnchorProviderOutcome {
+    fn continue_without_provider() -> Self {
+        Self::Continue {
+            outgoing: Vec::new(),
+            report: AcpPromptStateAnchorProviderReport::not_applicable(),
+        }
+    }
+}
+
+async fn acp_prompt_state_anchor_provider_outcome(
     state: &ReplV2RouteState,
     session_id: Uuid,
     prompt: &[crate::acp_protocol::AcpContentBlock],
-) -> Vec<crate::acp_protocol::JsonRpcOutgoing> {
-    if !acp_prompt_looks_like_kyc_update_status(prompt)
-        || acp_prompt_has_read_only_case_state_anchor(prompt)
-    {
-        return Vec::new();
+    response_id: serde_json::Value,
+) -> AcpPromptStateAnchorProviderOutcome {
+    let Some(selection) = acp_prompt_state_anchor_provider_selection(prompt) else {
+        return AcpPromptStateAnchorProviderOutcome::continue_without_provider();
+    };
+
+    match selection {
+        AcpPromptStateAnchorProviderSelection::Provider(
+            AcpPromptStateAnchorProvider::KycUpdateStatus,
+        ) => {
+            acp_prompt_kyc_update_status_state_anchor_provider_outcome(state, session_id, prompt)
+                .await
+        }
+        AcpPromptStateAnchorProviderSelection::UnsupportedStatefulDag => {
+            let report = AcpPromptStateAnchorProviderReport::unsupported(vec![
+                "supported_sem_os_state_anchor_provider",
+                "task_specific_language_pack",
+            ]);
+            let outgoing = acp_prompt_unsupported_state_anchor_provider_outgoing(
+                session_id,
+                response_id,
+                &report,
+            );
+            AcpPromptStateAnchorProviderOutcome::Complete { outgoing, report }
+        }
+    }
+}
+
+async fn acp_prompt_kyc_update_status_state_anchor_provider_outcome(
+    state: &ReplV2RouteState,
+    session_id: Uuid,
+    prompt: &[crate::acp_protocol::AcpContentBlock],
+) -> AcpPromptStateAnchorProviderOutcome {
+    let mut report = AcpPromptStateAnchorProviderReport::for_provider(
+        AcpPromptStateAnchorProvider::KycUpdateStatus,
+        "selected",
+    );
+
+    if acp_prompt_has_read_only_case_state_anchor(prompt) {
+        report.status = "prompt_anchor_present";
+        report.state_anchor_source = Some("prompt_read_only_discovery_probe");
+        report.subject_id = acp_prompt_case_id_from_prompt(prompt);
+        return AcpPromptStateAnchorProviderOutcome::Continue {
+            outgoing: Vec::new(),
+            report,
+        };
     }
 
     let case_id = match acp_prompt_case_id_from_prompt(prompt) {
@@ -1661,17 +1835,168 @@ async fn seed_acp_prompt_case_state_from_live_context(
         None => acp_prompt_session_case_id(state, session_id).await,
     };
     let Some(case_id) = case_id else {
-        return Vec::new();
+        report.status = "missing_subject";
+        report.needed = vec!["case_uuid"];
+        return AcpPromptStateAnchorProviderOutcome::Continue {
+            outgoing: Vec::new(),
+            report,
+        };
     };
-    let Some(case_state) = acp_prompt_live_case_state(state, session_id, case_id).await else {
-        return Vec::new();
-    };
+    report.subject_id = Some(case_id);
 
-    handle_repl_acp_request(
+    let Some(case_state) = acp_prompt_live_case_state(state, session_id, case_id).await else {
+        report.status = "state_anchor_unavailable";
+        report.needed = vec!["live_case_state"];
+        return AcpPromptStateAnchorProviderOutcome::Continue {
+            outgoing: Vec::new(),
+            report,
+        };
+    };
+    report.status = "seeded";
+    report.state_anchor_source = Some("live_read_only_discovery_probe");
+
+    let outgoing = handle_repl_acp_request(
         session_id,
         acp_prompt_live_case_state_discovery_request(session_id, case_state),
     )
-    .await
+    .await;
+
+    AcpPromptStateAnchorProviderOutcome::Continue { outgoing, report }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum AcpPromptStateAnchorProviderSelection {
+    Provider(AcpPromptStateAnchorProvider),
+    UnsupportedStatefulDag,
+}
+
+fn acp_prompt_state_anchor_provider_selection(
+    prompt: &[crate::acp_protocol::AcpContentBlock],
+) -> Option<AcpPromptStateAnchorProviderSelection> {
+    if acp_prompt_looks_like_kyc_update_status(prompt) {
+        return Some(AcpPromptStateAnchorProviderSelection::Provider(
+            AcpPromptStateAnchorProvider::KycUpdateStatus,
+        ));
+    }
+    if acp_prompt_looks_like_stateful_transition_request(prompt) {
+        return Some(AcpPromptStateAnchorProviderSelection::UnsupportedStatefulDag);
+    }
+    None
+}
+
+fn acp_prompt_unsupported_state_anchor_provider_outgoing(
+    session_id: Uuid,
+    response_id: serde_json::Value,
+    report: &AcpPromptStateAnchorProviderReport,
+) -> Vec<crate::acp_protocol::JsonRpcOutgoing> {
+    let message = "I can see a state-transition style request, but this SemOS state-anchor provider is not wired yet. I need a supported task-specific provider and language pack before drafting a workbook. Supported now: `kyc-case.update-status`. No dry-run or mutation has run.";
+    let mut result = serde_json::json!({
+        "stopReason": "end_turn",
+        "status": "pending_question",
+        "pending_question": {
+            "code": "sem_os_state_anchor_provider_unavailable",
+            "needs": report.needed,
+            "supported_tasks": report.supported_tasks
+        },
+        "metrics": {
+            "language_pack_generated": false,
+            "invented_verb_count": 0,
+            "uuid_binding_complete": false,
+            "state_valid_transition_selected": false,
+            "first_pass_valid": false,
+            "revision_count": 0,
+            "dry_run_valid": false,
+            "refusal_code": "sem_os_state_anchor_provider_unavailable"
+        },
+        "observability": {
+            "performance": {
+                "prompt_route_ms": 0,
+                "prompt_route_us": 0,
+                "language_pack_ms": 0,
+                "language_pack_us": 0,
+                "revision_loop_ms": 0,
+                "revision_loop_us": 0,
+                "dry_run_ms": 0,
+                "dry_run_us": 0,
+                "acp_emit_ms": 0,
+                "acp_emit_us": 0,
+                "total_ms": 0,
+                "total_us": 0
+            },
+            "conversationEfficiency": {
+                "outcome": "pending_question",
+                "localRevisionCount": 0,
+                "estimatedUserRepairTurnsAvoided": 0,
+                "pendingUserTurnRequired": true,
+                "pendingReason": "sem_os_state_anchor_provider_unavailable",
+                "firstPassValid": false,
+                "dryRunValid": false,
+                "structuredFailureMode": "sem_os_state_anchor_provider_unavailable",
+                "proseOnlyFailure": false
+            },
+            "acpMechanismSummary": [
+                "state_anchor_provider_router",
+                "structured_pending_question",
+                "dry_run_only"
+            ]
+        },
+        "trace": [
+            {
+                "phase": "state_anchor_provider",
+                "status": "blocked",
+                "message": "No supported SemOS state-anchor provider is wired for this task"
+            }
+        ]
+    });
+    let state_anchor_provider = report.metrics(Some(&result));
+    if let Some(observability) = result
+        .get_mut("observability")
+        .and_then(|value| value.as_object_mut())
+    {
+        observability.insert("stateAnchorProvider".to_string(), state_anchor_provider);
+    }
+
+    vec![
+        crate::acp_protocol::JsonRpcOutgoing::Notification(
+            crate::acp_protocol::JsonRpcNotification {
+                jsonrpc: "2.0".to_string(),
+                method: "session/update".to_string(),
+                params: serde_json::json!({
+                    "sessionId": session_id.to_string(),
+                    "update": {
+                        "sessionUpdate": "plan",
+                        "persona": crate::acp::AcpPersonaMode::SagePlanning.as_str(),
+                        "workflowPhase": "discovery",
+                        "goalProposalTrace": result,
+                        "entries": [
+                            {"id": "state-anchor-provider", "status": "blocked", "label": "Select SemOS state-anchor provider"},
+                            {"id": "language-pack", "status": "blocked", "label": "Retrieve task language pack"},
+                            {"id": "dry-run", "status": "blocked", "label": "Await supported provider"}
+                        ]
+                    }
+                }),
+            },
+        ),
+        crate::acp_protocol::JsonRpcOutgoing::Notification(
+            crate::acp_protocol::JsonRpcNotification {
+                jsonrpc: "2.0".to_string(),
+                method: "session/update".to_string(),
+                params: serde_json::json!({
+                    "sessionId": session_id.to_string(),
+                    "update": {
+                        "sessionUpdate": "agent_message_chunk",
+                        "content": {"type": "text", "text": message}
+                    }
+                }),
+            },
+        ),
+        crate::acp_protocol::JsonRpcOutgoing::Response(crate::acp_protocol::JsonRpcResponse {
+            jsonrpc: "2.0".to_string(),
+            id: Some(response_id),
+            result: Some(result),
+            error: None,
+        }),
+    ]
 }
 
 async fn acp_prompt_session_case_id(state: &ReplV2RouteState, session_id: Uuid) -> Option<Uuid> {
@@ -1789,14 +2114,30 @@ fn acp_prompt_looks_like_kyc_update_status(
     prompt: &[crate::acp_protocol::AcpContentBlock],
 ) -> bool {
     let lower = acp_prompt_text(prompt).to_ascii_lowercase();
-    (lower.contains("kyc") || lower.contains("case"))
-        && (lower.contains("update-status")
-            || lower.contains("update status")
-            || lower.contains("advance")
-            || lower.contains("transition")
-            || lower.contains("move")
-            || lower.contains("change status")
-            || lower.contains("set status"))
+    (lower.contains("kyc") || lower.contains("kyc-case.update-status"))
+        && acp_prompt_has_state_transition_intent(&lower)
+}
+
+fn acp_prompt_looks_like_stateful_transition_request(
+    prompt: &[crate::acp_protocol::AcpContentBlock],
+) -> bool {
+    let lower = acp_prompt_text(prompt).to_ascii_lowercase();
+    let has_state_subject = lower.contains("case")
+        || lower.contains("workflow")
+        || lower.contains("dag")
+        || lower.contains("state")
+        || lower.contains("status");
+    has_state_subject && acp_prompt_has_state_transition_intent(&lower)
+}
+
+fn acp_prompt_has_state_transition_intent(lower: &str) -> bool {
+    lower.contains("update-status")
+        || lower.contains("update status")
+        || lower.contains("advance")
+        || lower.contains("transition")
+        || lower.contains("move")
+        || lower.contains("change status")
+        || lower.contains("set status")
 }
 
 fn acp_prompt_has_read_only_case_state_anchor(
@@ -1897,14 +2238,40 @@ async fn acp_gateway_route(
     Json(req): Json<AcpGatewayRouteRequest>,
 ) -> Result<Json<serde_json::Value>, (StatusCode, Json<ErrorResponseV2>)> {
     let params = acp_gateway_params(session_id, &req.method, req.params);
-    let mut outgoing = if req.method == "session/prompt" {
+    let provider_outcome = if req.method == "session/prompt" {
         if let Some(prompt) = acp_prompt_blocks_from_params(&params) {
-            seed_acp_prompt_case_state_from_live_context(&state, session_id, &prompt).await
+            acp_prompt_state_anchor_provider_outcome(
+                &state,
+                session_id,
+                &prompt,
+                serde_json::json!("repl-acp-gateway"),
+            )
+            .await
         } else {
-            Vec::new()
+            AcpPromptStateAnchorProviderOutcome::continue_without_provider()
         }
     } else {
-        Vec::new()
+        AcpPromptStateAnchorProviderOutcome::continue_without_provider()
+    };
+    let (mut outgoing, provider_report) = match provider_outcome {
+        AcpPromptStateAnchorProviderOutcome::Continue { outgoing, report } => (outgoing, report),
+        AcpPromptStateAnchorProviderOutcome::Complete { outgoing, report } => {
+            let result =
+                json_rpc_outgoing_result(&outgoing).unwrap_or_else(|| serde_json::json!({}));
+            let state_anchor_provider = report.metrics(Some(&result));
+            if let Some(op) = acp_language_loop_trace_op_from_value(&result) {
+                append_session_trace_if_present(&state, session_id, op).await;
+            }
+
+            return Ok(Json(serde_json::json!({
+                "status": "acp_gateway_processed",
+                "session_id": session_id,
+                "method": req.method,
+                "result": result,
+                "outgoing": outgoing,
+                "state_anchor_provider": state_anchor_provider,
+            })));
+        }
     };
     let prompt_outgoing = handle_repl_acp_request(
         session_id,
@@ -1918,6 +2285,7 @@ async fn acp_gateway_route(
     .await;
     outgoing.extend(prompt_outgoing);
     let result = json_rpc_outgoing_result(&outgoing).unwrap_or_else(|| serde_json::json!({}));
+    let state_anchor_provider = provider_report.metrics(Some(&result));
     if let Some(op) = acp_language_loop_trace_op_from_value(&result) {
         append_session_trace_if_present(&state, session_id, op).await;
     }
@@ -1928,6 +2296,7 @@ async fn acp_gateway_route(
         "method": req.method,
         "result": result,
         "outgoing": outgoing,
+        "state_anchor_provider": state_anchor_provider,
     })))
 }
 
@@ -1996,8 +2365,33 @@ async fn acp_prompt_route(
         return acp_prompt_route_with_llm_client(state, session_id, req, client).await;
     }
 
-    let mut outgoing =
-        seed_acp_prompt_case_state_from_live_context(&state, session_id, &req.prompt).await;
+    let provider_outcome = acp_prompt_state_anchor_provider_outcome(
+        &state,
+        session_id,
+        &req.prompt,
+        serde_json::json!("prompt"),
+    )
+    .await;
+    let (mut outgoing, provider_report) = match provider_outcome {
+        AcpPromptStateAnchorProviderOutcome::Continue { outgoing, report } => (outgoing, report),
+        AcpPromptStateAnchorProviderOutcome::Complete { outgoing, report } => {
+            let result = json_rpc_outgoing_result(&outgoing);
+            let state_anchor_provider = report.metrics(result.as_ref());
+            if let Some(result) = &result {
+                if let Some(op) = acp_language_loop_trace_op_from_value(result) {
+                    append_session_trace_if_present(&state, session_id, op).await;
+                }
+            }
+
+            return Ok(Json(serde_json::json!({
+                "status": "acp_prompt_processed",
+                "session_id": session_id,
+                "result": result.clone().unwrap_or_else(|| serde_json::json!({})),
+                "outgoing": outgoing,
+                "state_anchor_provider": state_anchor_provider,
+            })));
+        }
+    };
     let prompt_outgoing = handle_repl_acp_request(
         session_id,
         crate::acp_protocol::JsonRpcRequest {
@@ -2020,11 +2414,13 @@ async fn acp_prompt_route(
         }
     }
 
+    let state_anchor_provider = provider_report.metrics(result.as_ref());
     Ok(Json(serde_json::json!({
         "status": "acp_prompt_processed",
         "session_id": session_id,
-        "result": result.unwrap_or_else(|| serde_json::json!({})),
+        "result": result.clone().unwrap_or_else(|| serde_json::json!({})),
         "outgoing": outgoing,
+        "state_anchor_provider": state_anchor_provider,
     })))
 }
 
@@ -2035,8 +2431,34 @@ async fn acp_prompt_route_with_llm_client(
     client: Result<std::sync::Arc<dyn ob_agentic::llm_client::LlmClient>, String>,
 ) -> Result<Json<serde_json::Value>, (StatusCode, Json<ErrorResponseV2>)> {
     let total_started_at = Instant::now();
-    let discovery_outgoing =
-        seed_acp_prompt_case_state_from_live_context(&state, session_id, &req.prompt).await;
+    let provider_outcome = acp_prompt_state_anchor_provider_outcome(
+        &state,
+        session_id,
+        &req.prompt,
+        serde_json::json!("prompt"),
+    )
+    .await;
+    let (discovery_outgoing, provider_report) = match provider_outcome {
+        AcpPromptStateAnchorProviderOutcome::Continue { outgoing, report } => (outgoing, report),
+        AcpPromptStateAnchorProviderOutcome::Complete { outgoing, report } => {
+            let result = json_rpc_outgoing_result(&outgoing);
+            let state_anchor_provider = report.metrics(result.as_ref());
+            if let Some(result) = &result {
+                if let Some(op) = acp_language_loop_trace_op_from_value(result) {
+                    append_session_trace_if_present(&state, session_id, op).await;
+                }
+            }
+
+            return Ok(Json(serde_json::json!({
+                "status": "acp_prompt_processed",
+                "session_id": session_id,
+                "draft_source": "llm_tool_call",
+                "result": result.clone().unwrap_or_else(|| serde_json::json!({})),
+                "outgoing": outgoing,
+                "state_anchor_provider": state_anchor_provider,
+            })));
+        }
+    };
     let request = match resolve_acp_prompt_language_loop_request(session_id, &req.prompt).await {
         Ok(request) => request,
         Err(missing) => {
@@ -2048,12 +2470,14 @@ async fn acp_prompt_route_with_llm_client(
             if let Some(op) = acp_language_loop_trace_op_from_value(&result) {
                 append_session_trace_if_present(&state, session_id, op).await;
             }
+            let state_anchor_provider = provider_report.metrics(Some(&result));
             return Ok(Json(serde_json::json!({
                 "status": "acp_prompt_processed",
                 "session_id": session_id,
                 "draft_source": "llm_tool_call",
                 "result": result,
-                "outgoing": discovery_outgoing
+                "outgoing": discovery_outgoing,
+                "state_anchor_provider": state_anchor_provider,
             })));
         }
     };
@@ -2080,12 +2504,14 @@ async fn acp_prompt_route_with_llm_client(
         append_session_trace_if_present(&state, session_id, op).await;
     }
 
+    let state_anchor_provider = provider_report.metrics(Some(&value));
     Ok(Json(serde_json::json!({
         "status": "acp_prompt_processed",
         "session_id": session_id,
         "draft_source": "llm_tool_call",
         "result": value,
-        "outgoing": discovery_outgoing
+        "outgoing": discovery_outgoing,
+        "state_anchor_provider": state_anchor_provider,
     })))
 }
 
@@ -4556,6 +4982,33 @@ mod tests {
     }
 
     #[test]
+    fn test_acp_prompt_state_anchor_provider_selection_is_task_bounded() {
+        let kyc_prompt = vec![crate::acp_protocol::AcpContentBlock::Text {
+            text: format!(
+                "Advance KYC case {} to DISCOVERY with evidence sha256:evidence",
+                test_case_id()
+            ),
+        }];
+        let loan_prompt = vec![crate::acp_protocol::AcpContentBlock::Text {
+            text: format!(
+                "Advance loan case {} to APPROVED with evidence sha256:evidence",
+                test_case_id()
+            ),
+        }];
+
+        assert_eq!(
+            acp_prompt_state_anchor_provider_selection(&kyc_prompt),
+            Some(AcpPromptStateAnchorProviderSelection::Provider(
+                AcpPromptStateAnchorProvider::KycUpdateStatus
+            ))
+        );
+        assert_eq!(
+            acp_prompt_state_anchor_provider_selection(&loan_prompt),
+            Some(AcpPromptStateAnchorProviderSelection::UnsupportedStatefulDag)
+        );
+    }
+
+    #[test]
     fn test_json_rpc_result_prefers_prompt_response_after_seeded_discovery() {
         let outgoing = vec![
             crate::acp_protocol::JsonRpcOutgoing::Response(crate::acp_protocol::JsonRpcResponse {
@@ -6476,6 +6929,20 @@ mod tests {
         assert_eq!(dry_run["status"], "acp_gateway_processed");
         assert_eq!(dry_run["method"], "session/prompt");
         assert_eq!(dry_run["result"]["status"], "dry_run_validated");
+        assert_eq!(dry_run["state_anchor_provider"]["provider_selected"], true);
+        assert_eq!(
+            dry_run["state_anchor_provider"]["task"],
+            "kyc-case.update-status"
+        );
+        assert_eq!(
+            dry_run["state_anchor_provider"]["language_pack_generated"],
+            true
+        );
+        assert_eq!(dry_run["state_anchor_provider"]["dry_run_valid"], true);
+        assert_eq!(
+            dry_run["state_anchor_provider"]["no_mutation_authority"],
+            true
+        );
         assert_eq!(
             dry_run["result"]["traceProjection"]["stateDiscovery"]["source"],
             "cached_read_only_discovery_probe"
@@ -6588,6 +7055,73 @@ mod tests {
             .any(|entry| entry["op"]["outcome"] == "pending_question"
                 && entry["op"]["pending_question_code"] == "kyc_update_status_prompt_incomplete"
                 && entry["op"]["conversation_efficiency"]["prose_only_failure"] == false));
+    }
+
+    #[tokio::test]
+    async fn test_acp_gateway_prompt_returns_structured_pending_for_unsupported_state_anchor_provider(
+    ) {
+        let (state, session_id) = test_route_state().await;
+
+        let gateway = acp_gateway_route(
+            State(state.clone()),
+            Path(session_id),
+            Json(AcpGatewayRouteRequest {
+                method: "session/prompt".to_string(),
+                params: serde_json::json!({
+                    "prompt": [
+                        {
+                            "type": "text",
+                            "text": format!(
+                                "Advance loan case {} to APPROVED with evidence sha256:evidence",
+                                test_case_id()
+                            )
+                        }
+                    ]
+                }),
+            }),
+        )
+        .await
+        .expect("ACP gateway")
+        .0;
+
+        assert_eq!(gateway["status"], "acp_gateway_processed");
+        assert_eq!(gateway["result"]["status"], "pending_question");
+        assert_eq!(
+            gateway["result"]["pending_question"]["code"],
+            "sem_os_state_anchor_provider_unavailable"
+        );
+        assert_eq!(
+            gateway["state_anchor_provider"]["status"],
+            "provider_unavailable"
+        );
+        assert_eq!(gateway["state_anchor_provider"]["provider_selected"], false);
+        assert_eq!(
+            gateway["state_anchor_provider"]["language_pack_generated"],
+            false
+        );
+        assert_eq!(gateway["state_anchor_provider"]["structured_outcome"], true);
+        assert_eq!(
+            gateway["state_anchor_provider"]["no_mutation_authority"],
+            true
+        );
+        assert!(gateway["outgoing"]
+            .as_array()
+            .expect("outgoing")
+            .iter()
+            .any(|item| item["params"]["update"]["sessionUpdate"] == "agent_message_chunk"));
+
+        let trace = get_session_trace(State(state), Path(session_id))
+            .await
+            .expect("session trace")
+            .0;
+        assert_eq!(
+            trace[0]["op"]["pending_question_code"],
+            "sem_os_state_anchor_provider_unavailable"
+        );
+        assert_eq!(
+            trace[0]["op"]["conversation_efficiency"]["prose_only_failure"],
+            false
+        );
     }
 
     #[tokio::test]
