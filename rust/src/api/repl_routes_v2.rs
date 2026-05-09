@@ -3929,6 +3929,8 @@ mod tests {
     use chrono::TimeZone;
     use ob_agentic::llm_client::{LlmClient, ToolCallResult, ToolDefinition};
 
+    static LIVE_LLM_ENV_LOCK: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
+
     fn test_session_id() -> Uuid {
         Uuid::parse_str("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa").unwrap()
     }
@@ -4084,6 +4086,242 @@ mod tests {
                 provenance: vec![],
                 first_class_state_mutated: false,
             }),
+        }
+    }
+
+    #[derive(Clone, Copy)]
+    struct LiveComparisonFixture {
+        id: &'static str,
+        current_state: &'static str,
+        objective: &'static str,
+        evidence_digest: &'static str,
+        expected_transition: &'static str,
+        expected_to_state: &'static str,
+    }
+
+    #[derive(Debug, serde::Serialize)]
+    struct LiveComparisonRow {
+        model: String,
+        fixture_id: String,
+        current_state: String,
+        expected_transition: String,
+        expected_to_state: String,
+        status: String,
+        transition_ref: Option<String>,
+        to_state: Option<String>,
+        refusal_code: Option<String>,
+        diagnostic_codes: Vec<String>,
+        revision_count: u64,
+        decode_repair_count: u64,
+        llm_draft_ms: u64,
+        total_ms: u64,
+        prose_only_failure: bool,
+        exact_transition_hit: bool,
+    }
+
+    struct EnvSnapshot {
+        values: Vec<(String, Option<String>)>,
+    }
+
+    impl EnvSnapshot {
+        fn capture(names: &[String]) -> Self {
+            Self {
+                values: names
+                    .iter()
+                    .map(|name| (name.clone(), std::env::var(name).ok()))
+                    .collect(),
+            }
+        }
+    }
+
+    impl Drop for EnvSnapshot {
+        fn drop(&mut self) {
+            for (name, value) in &self.values {
+                match value {
+                    Some(value) => std::env::set_var(name, value),
+                    None => std::env::remove_var(name),
+                }
+            }
+        }
+    }
+
+    fn anthropic_api_key_env_name() -> String {
+        ["ANTHROPIC", "_API_KEY"].concat()
+    }
+
+    fn live_comparison_fixtures() -> Vec<LiveComparisonFixture> {
+        vec![
+            LiveComparisonFixture {
+                id: "intake_explicit",
+                current_state: "INTAKE",
+                objective: "Move the KYC case from INTAKE to DISCOVERY using evidence sha256:live-intake-explicit",
+                evidence_digest: "sha256:live-intake-explicit",
+                expected_transition: "kyc-case.intake-to-discovery",
+                expected_to_state: "DISCOVERY",
+            },
+            LiveComparisonFixture {
+                id: "intake_status_target",
+                current_state: "INTAKE",
+                objective: "Set this KYC case status to DISCOVERY using evidence sha256:live-intake-status-target",
+                evidence_digest: "sha256:live-intake-status-target",
+                expected_transition: "kyc-case.intake-to-discovery",
+                expected_to_state: "DISCOVERY",
+            },
+            LiveComparisonFixture {
+                id: "discovery_explicit",
+                current_state: "DISCOVERY",
+                objective: "Advance the KYC case from DISCOVERY to ASSESSMENT using evidence sha256:live-discovery-explicit",
+                evidence_digest: "sha256:live-discovery-explicit",
+                expected_transition: "kyc-case.discovery-to-assessment",
+                expected_to_state: "ASSESSMENT",
+            },
+            LiveComparisonFixture {
+                id: "discovery_status_target",
+                current_state: "DISCOVERY",
+                objective: "Set this KYC case status to ASSESSMENT using evidence sha256:live-discovery-status-target",
+                evidence_digest: "sha256:live-discovery-status-target",
+                expected_transition: "kyc-case.discovery-to-assessment",
+                expected_to_state: "ASSESSMENT",
+            },
+            LiveComparisonFixture {
+                id: "discovery_ready_for_assessment",
+                current_state: "DISCOVERY",
+                objective: "Mark the KYC case ready for ASSESSMENT using evidence sha256:live-discovery-ready",
+                evidence_digest: "sha256:live-discovery-ready",
+                expected_transition: "kyc-case.discovery-to-assessment",
+                expected_to_state: "ASSESSMENT",
+            },
+        ]
+    }
+
+    fn live_comparison_row(
+        model: &str,
+        fixture: LiveComparisonFixture,
+        value: &serde_json::Value,
+    ) -> LiveComparisonRow {
+        let status = value["status"].as_str().unwrap_or("unknown").to_string();
+        let transition_ref = value["output"]["dry_run"]["transition_ref"]
+            .as_str()
+            .map(str::to_string);
+        let to_state = value["output"]["dry_run"]["semantic_diff"]["to_state"]
+            .as_str()
+            .map(str::to_string);
+        let exact_transition_hit = status == "dry_run_validated"
+            && transition_ref.as_deref() == Some(fixture.expected_transition)
+            && to_state.as_deref() == Some(fixture.expected_to_state);
+        LiveComparisonRow {
+            model: model.to_string(),
+            fixture_id: fixture.id.to_string(),
+            current_state: fixture.current_state.to_string(),
+            expected_transition: fixture.expected_transition.to_string(),
+            expected_to_state: fixture.expected_to_state.to_string(),
+            status,
+            transition_ref,
+            to_state,
+            refusal_code: value["refusal"]["refusal_code"]
+                .as_str()
+                .map(str::to_string),
+            diagnostic_codes: diagnostic_codes(value),
+            revision_count: value["metrics"]["revision_count"].as_u64().unwrap_or(0),
+            decode_repair_count: value["metrics"]["decode_repair_count"]
+                .as_u64()
+                .unwrap_or(0),
+            llm_draft_ms: value["observability"]["performance"]["llm_draft_ms"]
+                .as_u64()
+                .unwrap_or(0),
+            total_ms: value["observability"]["performance"]["total_ms"]
+                .as_u64()
+                .unwrap_or(0),
+            prose_only_failure: value["observability"]["conversationEfficiency"]
+                ["proseOnlyFailure"]
+                .as_bool()
+                .unwrap_or(true),
+            exact_transition_hit,
+        }
+    }
+
+    fn diagnostic_codes(value: &serde_json::Value) -> Vec<String> {
+        let mut codes = Vec::new();
+        collect_diagnostic_codes(value.get("adapter_diagnostics"), &mut codes);
+        collect_diagnostic_codes(
+            value
+                .get("refusal")
+                .and_then(|refusal| refusal.get("diagnostics")),
+            &mut codes,
+        );
+        codes.sort();
+        codes.dedup();
+        codes
+    }
+
+    fn collect_diagnostic_codes(array: Option<&serde_json::Value>, codes: &mut Vec<String>) {
+        if let Some(array) = array.and_then(|value| value.as_array()) {
+            codes.extend(array.iter().filter_map(|diagnostic| {
+                diagnostic
+                    .get("error_code")
+                    .and_then(|code| code.as_str())
+                    .map(str::to_string)
+            }));
+        }
+    }
+
+    fn live_comparison_summary(rows: &[LiveComparisonRow], model: &str) -> serde_json::Value {
+        let model_rows: Vec<&LiveComparisonRow> =
+            rows.iter().filter(|row| row.model == model).collect();
+        let count = model_rows.len() as u64;
+        let dry_run_validated = model_rows
+            .iter()
+            .filter(|row| row.status == "dry_run_validated")
+            .count() as u64;
+        let structured_refusal = model_rows
+            .iter()
+            .filter(|row| row.status == "structured_refusal")
+            .count() as u64;
+        let exact_transition_hits = model_rows
+            .iter()
+            .filter(|row| row.exact_transition_hit)
+            .count() as u64;
+        let prose_only_failures = model_rows
+            .iter()
+            .filter(|row| row.prose_only_failure)
+            .count() as u64;
+        let total_decode_repairs: u64 = model_rows.iter().map(|row| row.decode_repair_count).sum();
+        let total_revisions: u64 = model_rows.iter().map(|row| row.revision_count).sum();
+        let total_llm_draft_ms: u64 = model_rows.iter().map(|row| row.llm_draft_ms).sum();
+        let total_ms: u64 = model_rows.iter().map(|row| row.total_ms).sum();
+
+        serde_json::json!({
+            "model": model,
+            "fixture_count": count,
+            "dry_run_validated": dry_run_validated,
+            "structured_refusal": structured_refusal,
+            "exact_transition_hits": exact_transition_hits,
+            "prose_only_failures": prose_only_failures,
+            "dry_run_valid_rate": rate(dry_run_validated, count),
+            "exact_transition_hit_rate": rate(exact_transition_hits, count),
+            "structured_outcome_rate": rate(dry_run_validated + structured_refusal, count),
+            "total_decode_repairs": total_decode_repairs,
+            "avg_decode_repair_count": average(total_decode_repairs, count),
+            "total_revisions": total_revisions,
+            "avg_revision_count": average(total_revisions, count),
+            "avg_llm_draft_ms": average(total_llm_draft_ms, count),
+            "avg_total_ms": average(total_ms, count),
+        })
+    }
+
+    fn rate(part: u64, whole: u64) -> f64 {
+        if whole == 0 {
+            0.0
+        } else {
+            ((part as f64 / whole as f64) * 10_000.0).round() / 100.0
+        }
+    }
+
+    fn average(total: u64, count: u64) -> f64 {
+        if count == 0 {
+            0.0
+        } else {
+            ((total as f64 / count as f64) * 100.0).round() / 100.0
         }
     }
 
@@ -5191,7 +5429,105 @@ mod tests {
 
     #[tokio::test]
     #[ignore = "requires live LLM credentials and network access"]
+    async fn live_acp_llm_draft_loop_model_comparison_harness() {
+        let _env_guard = LIVE_LLM_ENV_LOCK.lock().await;
+        let anthropic_api_key = anthropic_api_key_env_name();
+        let env_names = vec![
+            "AGENT_BACKEND".to_string(),
+            anthropic_api_key.clone(),
+            "CLAUDE_CODE_MODEL".to_string(),
+            "CLAUDE_CODE_MAX_BUDGET_USD".to_string(),
+        ];
+        let _snapshot = EnvSnapshot::capture(&env_names);
+        std::env::set_var("AGENT_BACKEND", "claude-code-cli");
+        std::env::remove_var(&anthropic_api_key);
+        if std::env::var("CLAUDE_CODE_MAX_BUDGET_USD").is_err() {
+            std::env::set_var("CLAUDE_CODE_MAX_BUDGET_USD", "0.75");
+        }
+
+        let models = ["sonnet", "claude-sonnet-4-6"];
+        let fixtures = live_comparison_fixtures();
+        let mut rows = Vec::new();
+
+        for model in models {
+            std::env::set_var("CLAUDE_CODE_MODEL", model);
+            for fixture in fixtures.iter().copied() {
+                let client = ob_agentic::create_llm_client()
+                    .unwrap_or_else(|err| panic!("live LLM client for {model}: {err}"));
+                let value = acp_kyc_update_status_llm_draft_loop_value_with_client(
+                    test_session_id(),
+                    llm_draft_request_with_discovery(
+                        fixture.current_state,
+                        fixture.objective,
+                        Some(fixture.evidence_digest),
+                    ),
+                    Ok(client),
+                )
+                .await
+                .unwrap_or_else(|err| {
+                    panic!("live comparison {model}/{} failed: {err:?}", fixture.id)
+                });
+
+                assert!(matches!(
+                    value["status"].as_str(),
+                    Some("dry_run_validated" | "structured_refusal")
+                ));
+                assert_eq!(
+                    value["observability"]["conversationEfficiency"]["proseOnlyFailure"],
+                    false
+                );
+
+                match value["status"].as_str() {
+                    Some("dry_run_validated") => {
+                        assert_eq!(
+                            value["output"]["dry_run"]["transition_ref"],
+                            fixture.expected_transition
+                        );
+                        assert_eq!(
+                            value["output"]["dry_run"]["semantic_diff"]["to_state"],
+                            fixture.expected_to_state
+                        );
+                    }
+                    Some("structured_refusal") => {
+                        let diagnostic = &value["refusal"]["diagnostics"][0];
+                        assert!(diagnostic["error_code"].as_str().is_some());
+                        assert!(diagnostic["source_path"].as_str().is_some());
+                        assert!(diagnostic["pack_ref"].as_str().is_some());
+                        assert!(diagnostic["suggested_transitions"].as_array().is_some());
+                    }
+                    _ => unreachable!("status asserted above"),
+                }
+
+                rows.push(live_comparison_row(model, fixture, &value));
+            }
+        }
+
+        let summary: Vec<_> = models
+            .iter()
+            .map(|model| live_comparison_summary(&rows, model))
+            .collect();
+        let report = serde_json::json!({
+            "fixture_count": fixtures.len(),
+            "models": models,
+            "summary": summary,
+            "rows": rows,
+        });
+
+        println!(
+            "live_llm_comparison {}",
+            serde_json::to_string_pretty(&report).unwrap()
+        );
+
+        for model_summary in report["summary"].as_array().unwrap() {
+            assert_eq!(model_summary["prose_only_failures"], 0);
+            assert_eq!(model_summary["structured_outcome_rate"], 100.0);
+        }
+    }
+
+    #[tokio::test]
+    #[ignore = "requires live LLM credentials and network access"]
     async fn live_acp_llm_draft_loop_smoke_validates_second_transition() {
+        let _env_guard = LIVE_LLM_ENV_LOCK.lock().await;
         let client = ob_agentic::create_llm_client().expect("live LLM client");
         let session_id = test_session_id();
 
