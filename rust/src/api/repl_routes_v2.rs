@@ -5055,4 +5055,76 @@ mod tests {
         );
         assert!(value["llm_draft"]["evidence_digest"].is_null());
     }
+
+    #[tokio::test]
+    #[ignore = "requires live LLM credentials and network access"]
+    async fn live_acp_llm_draft_loop_smoke_validates_second_transition() {
+        let client = ob_agentic::create_llm_client().expect("live LLM client");
+        let session_id = test_session_id();
+
+        let value = acp_kyc_update_status_llm_draft_loop_value_with_client(
+            session_id,
+            llm_draft_request_with_discovery(
+                "DISCOVERY",
+                "Advance the KYC case from DISCOVERY to ASSESSMENT using evidence sha256:live-smoke",
+                Some("sha256:live-smoke"),
+            ),
+            Ok(client),
+        )
+        .await
+        .expect("live LLM draft loop value");
+
+        println!(
+            "live_llm_smoke status={} transition={} refusal_code={} diagnostic_source={} diagnostic_reason={} revision_count={} provider={} model={} total_ms={} llm_draft_ms={} prose_only_failure={}",
+            value["status"].as_str().unwrap_or("unknown"),
+            value["output"]["dry_run"]["transition_ref"]
+                .as_str()
+                .unwrap_or("none"),
+            value["refusal"]["refusal_code"].as_str().unwrap_or("none"),
+            value["refusal"]["diagnostics"][0]["source_path"]
+                .as_str()
+                .unwrap_or("none"),
+            value["refusal"]["diagnostics"][0]["blocked_transition_reason"]
+                .as_str()
+                .unwrap_or("none")
+                .chars()
+                .take(160)
+                .collect::<String>(),
+            value["metrics"]["revision_count"].as_u64().unwrap_or(0),
+            value["llm_trace"]["provider"].as_str().unwrap_or("unknown"),
+            value["llm_trace"]["model"].as_str().unwrap_or("unknown"),
+            value["observability"]["performance"]["total_ms"]
+                .as_u64()
+                .unwrap_or(0),
+            value["observability"]["performance"]["llm_draft_ms"]
+                .as_u64()
+                .unwrap_or(0),
+            value["observability"]["conversationEfficiency"]["proseOnlyFailure"]
+                .as_bool()
+                .unwrap_or(true)
+        );
+
+        assert_eq!(value["status"], "dry_run_validated");
+        assert_eq!(
+            value["output"]["dry_run"]["transition_ref"],
+            "kyc-case.discovery-to-assessment"
+        );
+        assert_eq!(value["case_state"]["current_state"], "DISCOVERY");
+        assert_eq!(
+            value["output"]["dry_run"]["semantic_diff"]["to_state"],
+            "ASSESSMENT"
+        );
+        assert_eq!(
+            value["observability"]["conversationEfficiency"]["proseOnlyFailure"],
+            false
+        );
+        assert!(value["llm_trace"]["prompt_hash"]
+            .as_str()
+            .unwrap()
+            .starts_with("sha256:"));
+        assert!(value["llm_trace"]["response_hash"]
+            .as_str()
+            .unwrap()
+            .starts_with("sha256:"));
+    }
 }
