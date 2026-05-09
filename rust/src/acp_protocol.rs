@@ -649,8 +649,27 @@ impl AcpJsonRpcAgent {
         session_id: Uuid,
         prompt: &[AcpContentBlock],
     ) -> Option<Vec<JsonRpcOutgoing>> {
-        let prompt_text = prompt_semantic_text(prompt);
-        if !looks_like_kyc_update_status_prompt(&prompt_text) {
+        let utterance_text = prompt_utterance_text(prompt);
+        if !looks_like_kyc_update_status_prompt(&utterance_text) {
+            if looks_like_kyc_domain_prompt(&utterance_text) {
+                return Some(self.response(
+                    id,
+                    json!({
+                        "stopReason": "end_turn",
+                        "status": "pending_question",
+                        "pending_question": {
+                            "code": "kyc_prompt_ambiguous",
+                            "candidate_verbs": [
+                                "kyc-case.read",
+                                "kyc-case.create",
+                                "kyc-case.update-status",
+                                "screening.update-status",
+                                "document.collect"
+                            ]
+                        }
+                    }),
+                ));
+            }
             return None;
         }
 
@@ -1454,6 +1473,17 @@ fn prompt_semantic_text(prompt: &[AcpContentBlock]) -> String {
         .join("\n")
 }
 
+fn prompt_utterance_text(prompt: &[AcpContentBlock]) -> String {
+    prompt
+        .iter()
+        .filter_map(|block| match block {
+            AcpContentBlock::Text { text } => Some(text.as_str()),
+            AcpContentBlock::ResourceLink { .. } | AcpContentBlock::EmbeddedResource { .. } => None,
+        })
+        .collect::<Vec<_>>()
+        .join("\n")
+}
+
 fn looks_like_kyc_update_status_prompt(prompt_text: &str) -> bool {
     let lower = prompt_text.to_ascii_lowercase();
     (lower.contains("kyc") || lower.contains("case"))
@@ -1461,8 +1491,17 @@ fn looks_like_kyc_update_status_prompt(prompt_text: &str) -> bool {
             || lower.contains("update status")
             || lower.contains("advance")
             || lower.contains("transition")
-            || lower.contains("move"))
-        && (lower.contains("discovery") || lower.contains("assessment"))
+            || lower.contains("move")
+            || lower.contains("change status")
+            || lower.contains("set status"))
+}
+
+fn looks_like_kyc_domain_prompt(prompt_text: &str) -> bool {
+    let lower = prompt_text.to_ascii_lowercase();
+    (lower.contains("kyc") && lower.contains("case"))
+        || lower.contains("kyc-case.")
+        || lower.contains("screening")
+        || lower.contains("due diligence")
 }
 
 fn kyc_language_loop_request_from_prompt(
@@ -1470,7 +1509,8 @@ fn kyc_language_loop_request_from_prompt(
     prompt: &[AcpContentBlock],
 ) -> Result<Value, Vec<&'static str>> {
     let prompt_text = prompt_semantic_text(prompt);
-    let case_state = extract_prompt_case_state(prompt, &prompt_text);
+    let utterance_text = prompt_utterance_text(prompt);
+    let case_state = extract_prompt_case_state(prompt, &utterance_text);
     let subject_id = case_state
         .as_ref()
         .and_then(|state| state.subject_id)
@@ -1485,11 +1525,11 @@ fn kyc_language_loop_request_from_prompt(
             )
         });
     let requested_state = extract_state_after_marker(
-        &prompt_text,
+        &utterance_text,
         &["to", "target", "requested", "advance to", "move to"],
     )
     .or_else(|| {
-        let lower = prompt_text.to_ascii_lowercase();
+        let lower = utterance_text.to_ascii_lowercase();
         if lower.contains("assessment") {
             Some("ASSESSMENT".to_string())
         } else if lower.contains("discovery") {
@@ -1526,9 +1566,9 @@ fn kyc_language_loop_request_from_prompt(
     let subject_id = subject_id.expect("checked above");
     let current_state = current_state.expect("checked above");
     let requested_state = requested_state.expect("checked above");
-    let transition_ref = extract_transition_ref(&prompt_text)
+    let transition_ref = extract_transition_ref(&utterance_text)
         .unwrap_or_else(|| transition_ref_for_states(&current_state, &requested_state));
-    let evidence_digest = extract_token_with_prefix(&prompt_text, "sha256:");
+    let evidence_digest = extract_token_with_prefix(&utterance_text, "sha256:");
 
     Ok(json!({
         "session_id": session_id.to_string(),
@@ -1537,7 +1577,7 @@ fn kyc_language_loop_request_from_prompt(
         "current_state": current_state,
         "configuration_version": configuration_version,
         "state_snapshot_id": state_snapshot_id,
-        "objective": prompt_text,
+        "objective": utterance_text,
         "draft": {
             "session_id": session_id,
             "actor_id": "sage:planning",
