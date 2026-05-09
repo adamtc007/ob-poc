@@ -69,6 +69,7 @@ function dryRunResult(): KycUpdateStatusDryRunResult {
         schema_version: 1,
         pack_id: "ob-poc-kyc",
         transition_ref: "kyc-case.discovery-to-assessment",
+        execution_mode: "dry_run",
         session_id: "session-123",
         subject: {
           subject_kind: "case",
@@ -80,7 +81,13 @@ function dryRunResult(): KycUpdateStatusDryRunResult {
         },
         configuration_version: "sem-os-v1",
         state_snapshot_id: "snapshot-1",
+        objective: "Move KYC case from discovery to assessment",
+        editor_context_refs: ["semos://entity/case-123"],
         evidence_refs: [],
+        expected_preconditions: ["status == DISCOVERY"],
+        expected_postconditions: ["status == ASSESSMENT"],
+        invariant_checks: [],
+        governance_checks: [],
         simulation: {
           transition_ref: "kyc-case.discovery-to-assessment",
           entity_id: "case-123",
@@ -113,6 +120,15 @@ function dryRunResult(): KycUpdateStatusDryRunResult {
     dry_run: {
       workbook_id: "ewb:v1:abc123",
       transition_ref: "kyc-case.discovery-to-assessment",
+      semantic_diff_uri: "semos://semantic-diff/ewb:v1:abc123",
+      validation_trace: [
+        {
+          step_number: 3,
+          step_id: "integrity",
+          status: "passed",
+          message: "workbook integrity hash verified",
+        },
+      ],
       semantic_diff: {
         transition_ref: "kyc-case.discovery-to-assessment",
         entity_id: "case-123",
@@ -197,5 +213,9 @@ describe("RunbookPlanReview", () => {
     ).toBeInTheDocument();
     expect(screen.getAllByText(/DISCOVERY/)).toHaveLength(2);
     expect(screen.getAllByText(/ASSESSMENT/)).toHaveLength(2);
+    expect(
+      screen.getByText("semos://semantic-diff/ewb:v1:abc123"),
+    ).toBeInTheDocument();
+    expect(screen.getByText("1 checks, 1 passed")).toBeInTheDocument();
   });
 });

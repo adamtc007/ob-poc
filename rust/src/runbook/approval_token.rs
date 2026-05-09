@@ -393,7 +393,7 @@ mod tests {
     use super::*;
     use crate::runbook::{
         EvidenceRef, ExecutionWorkbook, ExecutionWorkbookCore, StaleWorkbookPolicy, WorkbookActor,
-        WorkbookSubject,
+        WorkbookExecutionMode, WorkbookSubject,
     };
     use chrono::TimeZone;
     use sem_os_core::domain_pack::{
@@ -447,6 +447,7 @@ mod tests {
             schema_version: 1,
             pack_id: "ob-poc.kyc".to_string(),
             transition_ref: "kyc-case.discovery-to-assessment".to_string(),
+            execution_mode: WorkbookExecutionMode::DryRun,
             session_id: SESSION_ID,
             subject: WorkbookSubject {
                 subject_kind: "kyc_case".to_string(),
@@ -458,12 +459,22 @@ mod tests {
             },
             configuration_version: "config-1".to_string(),
             state_snapshot_id: "snapshot-1".to_string(),
+            objective: "Move KYC case from discovery to assessment".to_string(),
+            user_prompt_ref: None,
+            editor_context_refs: vec![],
             evidence_refs: vec![EvidenceRef {
                 kind: "case_id".to_string(),
                 ref_id: CASE_ID.to_string(),
                 digest: "sha256:evidence".to_string(),
+                source_system: None,
+                field_path: None,
+                classification: None,
             }],
             llm_trace_ref: None,
+            expected_preconditions: vec![],
+            expected_postconditions: vec![],
+            invariant_checks: vec![],
+            governance_checks: vec![],
             simulation: simulation(),
             stale_policy: StaleWorkbookPolicy::Revalidate,
             previous_workbook_id: None,

@@ -297,6 +297,14 @@ pub struct KycRestrictedMutationCompileRunbookRequest {
     pub preflight: crate::runbook::RestrictedMutationPreflight,
 }
 
+/// Request to record actual semantic diff after the compiled runbook gate executes.
+#[derive(Debug, Clone, Deserialize)]
+pub struct KycRestrictedMutationReceiptRequest {
+    pub preflight: crate::runbook::RestrictedMutationPreflight,
+    pub compilation: crate::runbook::RestrictedMutationRunbookCompilation,
+    pub actual_diff: crate::runbook::MutationSemanticDiff,
+}
+
 fn default_kyc_update_status_transition_ref() -> String {
     "kyc-case.intake-to-discovery".to_string()
 }
@@ -986,6 +994,10 @@ pub fn session_scoped_router() -> Router<ReplV2RouteState> {
             "/api/session/:id/workbook/kyc/restricted-mutation/compile-runbook",
             post(compile_kyc_restricted_mutation_runbook),
         )
+        .route(
+            "/api/session/:id/workbook/kyc/restricted-mutation/receipt",
+            post(record_kyc_restricted_mutation_receipt),
+        )
         // ACP adapter lifecycle/context routes
         .route(
             "/api/session/:id/acp/capabilities",
@@ -1115,7 +1127,7 @@ async fn get_acp_projection_route(
     let value = get_acp_projection_value_for_state(&state, session_id, &kind)
         .await
         .map_err(acp_json_error)?;
-    let projection_latency_ms = started_at.elapsed().as_millis();
+    let projection_latency_ms = u64::try_from(started_at.elapsed().as_millis()).unwrap_or(u64::MAX);
     let projection_bytes = serde_json::to_vec(&value["projection"])
         .map(|bytes| bytes.len())
         .unwrap_or(0);
@@ -1603,6 +1615,12 @@ async fn dry_run_kyc_update_status_workbook(
                 .as_str()
                 .unwrap_or("unknown")
                 .to_string(),
+            semantic_diff_uri: value["dry_run"]["semantic_diff_uri"]
+                .as_str()
+                .unwrap_or("unknown")
+                .to_string(),
+            validation_trace: serde_json::from_value(value["dry_run"]["validation_trace"].clone())
+                .unwrap_or_default(),
         },
     )
     .await;
@@ -1866,6 +1884,52 @@ fn compile_kyc_restricted_mutation_runbook_value(
     }))
 }
 
+/// POST /api/session/:id/workbook/kyc/restricted-mutation/receipt
+async fn record_kyc_restricted_mutation_receipt(
+    Path(session_id): Path<Uuid>,
+    Json(req): Json<KycRestrictedMutationReceiptRequest>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<ErrorResponseV2>)> {
+    let value = record_kyc_restricted_mutation_receipt_value(session_id, req)
+        .map_err(compilation_json_error)?;
+    Ok(Json(value))
+}
+
+fn record_kyc_restricted_mutation_receipt_value(
+    session_id: Uuid,
+    req: KycRestrictedMutationReceiptRequest,
+) -> Result<serde_json::Value, crate::runbook::RestrictedMutationRunbookCompilationError> {
+    if req.preflight.approval.workbook_id != req.compilation.workbook_id {
+        return Err(
+            crate::runbook::RestrictedMutationRunbookCompilationError::ReceiptBindingMismatch {
+                field: "session_workbook_id".to_string(),
+                expected: req.compilation.workbook_id.to_string(),
+                actual: req.preflight.approval.workbook_id.to_string(),
+            },
+        );
+    }
+    if req.compilation.compiled_runbook.session_id != session_id {
+        return Err(
+            crate::runbook::RestrictedMutationRunbookCompilationError::ReceiptBindingMismatch {
+                field: "session_id".to_string(),
+                expected: session_id.to_string(),
+                actual: req.compilation.compiled_runbook.session_id.to_string(),
+            },
+        );
+    }
+
+    let receipt = crate::runbook::record_restricted_mutation_execution_receipt(
+        &req.compilation,
+        &req.preflight,
+        req.actual_diff,
+        chrono::Utc::now(),
+    )?;
+
+    Ok(serde_json::json!({
+        "status": "restricted_mutation_execution_recorded",
+        "receipt": receipt,
+    }))
+}
+
 fn kyc_dry_run_json_error(
     refusal: crate::runbook::KycUpdateStatusDryRunRefusal,
 ) -> (StatusCode, Json<ErrorResponseV2>) {
@@ -1950,12 +2014,16 @@ fn compilation_json_error(
             ..
         }
         | crate::runbook::RestrictedMutationRunbookCompilationError::UnsupportedVerb { .. }
-        | crate::runbook::RestrictedMutationRunbookCompilationError::ArgMismatch { .. } => {
-            StatusCode::BAD_REQUEST
-        }
+        | crate::runbook::RestrictedMutationRunbookCompilationError::ArgMismatch { .. }
+        | crate::runbook::RestrictedMutationRunbookCompilationError::ReceiptBindingMismatch {
+            ..
+        } => StatusCode::BAD_REQUEST,
         crate::runbook::RestrictedMutationRunbookCompilationError::AlreadyExecuted { .. } => {
             StatusCode::CONFLICT
         }
+        crate::runbook::RestrictedMutationRunbookCompilationError::ActualDiffMismatch {
+            ..
+        } => StatusCode::CONFLICT,
     };
 
     (
@@ -3006,6 +3074,15 @@ mod tests {
             "kyc-case.intake-to-discovery"
         );
         assert_eq!(value["dry_run"]["semantic_diff"]["to_state"], "DISCOVERY");
+        assert!(value["dry_run"]["semantic_diff_uri"]
+            .as_str()
+            .unwrap()
+            .starts_with("semos://semantic-diff/ewb:v1:"));
+        assert!(value["dry_run"]["validation_trace"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|step| step["step_id"] == "integrity"));
         assert!(value["workbook"]["id"]
             .as_str()
             .unwrap()
@@ -3202,6 +3279,124 @@ mod tests {
             value["compilation"]["compiled_runbook"]["steps"][0]["write_set"][0],
             output.workbook.core.subject.subject_id.to_string()
         );
+    }
+
+    #[test]
+    fn test_kyc_restricted_mutation_receipt_value_records_actual_diff() {
+        let output = dry_run_output();
+        let token = crate::runbook::create_approval_token_for_workbook(
+            &output.workbook,
+            "approver@example.com",
+            "Approved for restricted KYC update",
+            test_expires_at(),
+            chrono::Utc::now(),
+        )
+        .expect("approval token");
+        let preflight_req = KycRestrictedMutationPreflightRequest {
+            workbook: output.workbook.clone(),
+            approval_token: token,
+            observed_configuration_version: output.workbook.core.configuration_version.clone(),
+            observed_state_snapshot_id: output.workbook.core.state_snapshot_id.clone(),
+            observed_evidence_refs: output.workbook.core.evidence_refs.clone(),
+            consumed_token_ids: vec![],
+        };
+        let preflight_value = prepare_kyc_restricted_mutation_preflight_value_with_manifest(
+            test_session_id(),
+            preflight_req,
+            &reference_mutation_manifest(),
+        )
+        .expect("preflight prepared");
+        let preflight: crate::runbook::RestrictedMutationPreflight =
+            serde_json::from_value(preflight_value["preflight"].clone()).expect("preflight json");
+        let compilation_value = compile_kyc_restricted_mutation_runbook_value(
+            test_session_id(),
+            3,
+            KycRestrictedMutationCompileRunbookRequest {
+                preflight: preflight.clone(),
+            },
+        )
+        .expect("compiled runbook");
+        let compilation: crate::runbook::RestrictedMutationRunbookCompilation =
+            serde_json::from_value(compilation_value["compilation"].clone())
+                .expect("compilation json");
+
+        let value = record_kyc_restricted_mutation_receipt_value(
+            test_session_id(),
+            KycRestrictedMutationReceiptRequest {
+                preflight: preflight.clone(),
+                compilation,
+                actual_diff: preflight.intended_diff.clone(),
+            },
+        )
+        .expect("receipt recorded");
+
+        assert_eq!(value["status"], "restricted_mutation_execution_recorded");
+        assert_eq!(
+            value["receipt"]["intended_diff"],
+            value["receipt"]["actual_diff"]
+        );
+        assert_eq!(
+            value["receipt"]["predicted_diff"]["semantic_diff"]["after"],
+            "ASSESSMENT"
+        );
+    }
+
+    #[test]
+    fn test_kyc_restricted_mutation_receipt_refuses_actual_diff_drift() {
+        let output = dry_run_output();
+        let token = crate::runbook::create_approval_token_for_workbook(
+            &output.workbook,
+            "approver@example.com",
+            "Approved for restricted KYC update",
+            test_expires_at(),
+            chrono::Utc::now(),
+        )
+        .expect("approval token");
+        let preflight_value = prepare_kyc_restricted_mutation_preflight_value_with_manifest(
+            test_session_id(),
+            KycRestrictedMutationPreflightRequest {
+                workbook: output.workbook.clone(),
+                approval_token: token,
+                observed_configuration_version: output.workbook.core.configuration_version.clone(),
+                observed_state_snapshot_id: output.workbook.core.state_snapshot_id.clone(),
+                observed_evidence_refs: output.workbook.core.evidence_refs.clone(),
+                consumed_token_ids: vec![],
+            },
+            &reference_mutation_manifest(),
+        )
+        .expect("preflight prepared");
+        let preflight: crate::runbook::RestrictedMutationPreflight =
+            serde_json::from_value(preflight_value["preflight"].clone()).expect("preflight json");
+        let compilation: crate::runbook::RestrictedMutationRunbookCompilation =
+            serde_json::from_value(
+                compile_kyc_restricted_mutation_runbook_value(
+                    test_session_id(),
+                    3,
+                    KycRestrictedMutationCompileRunbookRequest {
+                        preflight: preflight.clone(),
+                    },
+                )
+                .expect("compiled runbook")["compilation"]
+                    .clone(),
+            )
+            .expect("compilation json");
+        let mut actual_diff = preflight.intended_diff.clone();
+        actual_diff.after = "APPROVED".to_string();
+
+        let err = record_kyc_restricted_mutation_receipt_value(
+            test_session_id(),
+            KycRestrictedMutationReceiptRequest {
+                preflight,
+                compilation,
+                actual_diff,
+            },
+        )
+        .expect_err("actual diff drift refused");
+
+        assert!(matches!(
+            err,
+            crate::runbook::RestrictedMutationRunbookCompilationError::ActualDiffMismatch { .. }
+        ));
     }
 
     #[test]

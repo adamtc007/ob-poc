@@ -10,10 +10,10 @@ use std::collections::BTreeMap;
 use uuid::Uuid;
 
 use crate::llm_trace::LlmInferenceTrace;
-use crate::repl::session_trace::{TraceEntry, TraceOp};
+use crate::repl::session_trace::{TraceEntry, TraceOp, TraceValidationStep};
 use crate::runbook::{
-    ApprovalTokenId, DslCoderDryRunResult, ExecutionWorkbook, ExecutionWorkbookId,
-    ExecutionWorkbookValidationError, RestrictedMutationPreflight,
+    ApprovalTokenId, DslCoderDryRunResult, DslCoderValidationStepStatus, ExecutionWorkbook,
+    ExecutionWorkbookId, ExecutionWorkbookValidationError, RestrictedMutationPreflight,
 };
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -56,6 +56,13 @@ pub enum AuditChainValidationError {
         actual: String,
     },
     DryRunSimulationMismatch,
+    DryRunSemanticDiffUriMismatch {
+        expected: String,
+        actual: String,
+    },
+    DryRunValidationTraceMismatch {
+        workbook_id: String,
+    },
     MissingWorkbookDryRunTrace {
         workbook_id: String,
     },
@@ -119,6 +126,7 @@ pub fn validate_audit_chain(
         return Err(AuditChainValidationError::DryRunSimulationMismatch);
     }
 
+    let expected_validation_trace = trace_validation_steps(dry_run);
     let mut trace_sequences = BTreeMap::new();
     let dry_run_sequence = trace_entries
         .iter()
@@ -129,8 +137,12 @@ pub fn validate_audit_chain(
                     TraceOp::WorkbookDryRunValidated {
                         workbook_id,
                         transition_ref,
+                        semantic_diff_uri,
+                        validation_trace,
                     } if workbook_id == &workbook.id.to_string()
                         && transition_ref == &workbook.core.transition_ref
+                        && semantic_diff_uri == &dry_run.semantic_diff_uri
+                        && validation_trace == &expected_validation_trace
                 )
         })
         .map(|entry| entry.sequence)
@@ -224,6 +236,24 @@ pub fn validate_audit_chain(
     })
 }
 
+fn trace_validation_steps(dry_run: &DslCoderDryRunResult) -> Vec<TraceValidationStep> {
+    dry_run
+        .validation_trace
+        .iter()
+        .map(|step| TraceValidationStep {
+            step_number: step.step_number,
+            step_id: step.step_id.clone(),
+            status: match step.status {
+                DslCoderValidationStepStatus::Passed => "passed",
+                DslCoderValidationStepStatus::Failed => "failed",
+                DslCoderValidationStepStatus::Skipped => "skipped",
+            }
+            .to_string(),
+            message: step.message.clone(),
+        })
+        .collect()
+}
+
 pub fn validate_restricted_mutation_audit_chain(
     session_id: Uuid,
     trace_entries: &[TraceEntry],
@@ -297,10 +327,11 @@ mod tests {
     use crate::repl::session_trace::TraceEntry;
     use crate::repl::types_v2::AgentMode;
     use crate::runbook::{
-        ApprovalTokenId, DslCoderDryRunResult, EvidenceRef, ExecutionWorkbook,
-        ExecutionWorkbookCore, MutationExecutor, MutationSemanticDiff,
-        RestrictedMutationApprovalCheck, RestrictedMutationPreflight, StaleWorkbookPolicy,
-        WorkbookActor, WorkbookSubject,
+        ApprovalTokenId, DslCoderDryRunResult, DslCoderValidationStep,
+        DslCoderValidationStepStatus, EvidenceRef, ExecutionWorkbook, ExecutionWorkbookCore,
+        MutationExecutor, MutationSemanticDiff, RestrictedMutationApprovalCheck,
+        RestrictedMutationPreflight, StaleWorkbookPolicy, WorkbookActor, WorkbookExecutionMode,
+        WorkbookSubject,
     };
     use chrono::Utc;
     use sem_os_core::state_simulation::{
@@ -358,6 +389,7 @@ mod tests {
             schema_version: 1,
             pack_id: "ob-poc.kyc".to_string(),
             transition_ref: "kyc-case.discovery-to-assessment".to_string(),
+            execution_mode: WorkbookExecutionMode::DryRun,
             session_id: SESSION_ID,
             subject: WorkbookSubject {
                 subject_kind: "kyc_case".to_string(),
@@ -369,12 +401,22 @@ mod tests {
             },
             configuration_version: "config-1".to_string(),
             state_snapshot_id: "snapshot-1".to_string(),
+            objective: "Move KYC case from discovery to assessment".to_string(),
+            user_prompt_ref: None,
+            editor_context_refs: vec![],
             evidence_refs: vec![EvidenceRef {
                 kind: "case_id".to_string(),
                 ref_id: CASE_ID.to_string(),
                 digest: "sha256:evidence".to_string(),
+                source_system: None,
+                field_path: None,
+                classification: None,
             }],
             llm_trace_ref: with_llm_trace.then(|| workbook_llm_trace_ref(&trace)),
+            expected_preconditions: vec![],
+            expected_postconditions: vec![],
+            invariant_checks: vec![],
+            governance_checks: vec![],
             simulation: simulation(),
             stale_policy: StaleWorkbookPolicy::Reject,
             previous_workbook_id: None,
@@ -388,6 +430,13 @@ mod tests {
             workbook_id: workbook.id.to_string(),
             transition_ref: workbook.core.transition_ref.clone(),
             semantic_diff: workbook.core.simulation.clone(),
+            semantic_diff_uri: format!("semos://semantic-diff/{}", workbook.id),
+            validation_trace: vec![DslCoderValidationStep {
+                step_number: 3,
+                step_id: "integrity".to_string(),
+                status: DslCoderValidationStepStatus::Passed,
+                message: "workbook integrity hash verified".to_string(),
+            }],
         }
     }
 
@@ -454,6 +503,8 @@ mod tests {
                 TraceOp::WorkbookDryRunValidated {
                     workbook_id: workbook.id.to_string(),
                     transition_ref: workbook.core.transition_ref.clone(),
+                    semantic_diff_uri: format!("semos://semantic-diff/{}", workbook.id),
+                    validation_trace: trace_validation_steps(&dry_run(workbook)),
                 },
                 vec![],
             ),
@@ -531,6 +582,8 @@ mod tests {
             TraceOp::WorkbookDryRunValidated {
                 workbook_id: workbook.id.to_string(),
                 transition_ref: workbook.core.transition_ref.clone(),
+                semantic_diff_uri: dry_run.semantic_diff_uri.clone(),
+                validation_trace: trace_validation_steps(&dry_run),
             },
             vec![],
         )];

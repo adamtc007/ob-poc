@@ -715,7 +715,8 @@ impl AcpJsonRpcAgent {
             },
         ) {
             Ok(envelope) => {
-                let projection_latency_ms = started_at.elapsed().as_millis();
+                let projection_latency_ms =
+                    u64::try_from(started_at.elapsed().as_millis()).unwrap_or(u64::MAX);
                 let projection_bytes = serde_json::to_vec(&envelope)
                     .map(|bytes| bytes.len())
                     .unwrap_or(0);
@@ -783,10 +784,11 @@ impl AcpJsonRpcAgent {
                         "update": {
                             "sessionUpdate": "semantic_diff",
                             "persona": AcpPersonaMode::SageExecution.as_str(),
-                            "semanticDiffId": semantic_diff_uri(&output.workbook.id.to_string()),
+                            "semanticDiffId": output.dry_run.semantic_diff_uri.clone(),
                             "fallbackSummary": ["resource_link"],
-                            "diff": output.workbook.core.simulation.semantic_diff.clone(),
-                            "transitionRef": output.workbook.core.simulation.transition_ref.clone()
+                            "diff": output.dry_run.semantic_diff.semantic_diff.clone(),
+                            "transitionRef": output.dry_run.transition_ref.clone(),
+                            "validationTrace": output.dry_run.validation_trace.clone()
                         }
                     }),
                 }),
@@ -906,10 +908,6 @@ fn obpoc_mode_state() -> Value {
         {"id": "sage:planning", "name": "Sage Planning", "description": "Discovery, projection, planning, explanation, attestation prompting, and workbook drafting"},
         {"id": "sage:execution", "name": "Sage Execution", "description": "Workbook validation, dry-run, HITL approval routing, and approved REPL DSL execution"}
     ])
-}
-
-fn semantic_diff_uri(seed: &str) -> String {
-    format!("semos://semantic-diff/{seed}")
 }
 
 fn resolve_prompt_resource_refs(prompt: &[AcpContentBlock]) -> Vec<Value> {
@@ -1345,6 +1343,19 @@ mod tests {
             JsonRpcOutgoing::Notification(notification)
                 if notification.params["update"]["sessionUpdate"] == "semantic_diff"
         ));
+        let semantic_update = match &outgoing[1] {
+            JsonRpcOutgoing::Notification(notification) => &notification.params["update"],
+            JsonRpcOutgoing::Response(_) => panic!("expected semantic diff notification"),
+        };
+        assert!(semantic_update["semanticDiffId"]
+            .as_str()
+            .unwrap()
+            .starts_with("semos://semantic-diff/ewb:v1:"));
+        assert!(semantic_update["validationTrace"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|step| step["step_id"] == "integrity"));
         let response = match &outgoing[2] {
             JsonRpcOutgoing::Response(response) => response,
             JsonRpcOutgoing::Notification(_) => panic!("expected response"),
@@ -1355,6 +1366,129 @@ mod tests {
             result["output"]["dry_run"]["transition_ref"],
             "kyc-case.intake-to-discovery"
         );
+        assert!(result["output"]["dry_run"]["semantic_diff_uri"]
+            .as_str()
+            .unwrap()
+            .starts_with("semos://semantic-diff/ewb:v1:"));
+    }
+
+    #[test]
+    fn mvp_dry_run_vertical_slice_preserves_acp_policy_and_refuses_mutation() {
+        let mut agent = AcpJsonRpcAgent::new();
+
+        let initialized = only_response(agent.handle_request(request(1, "initialize", json!({}))));
+        assert_eq!(
+            initialized.result.as_ref().unwrap()["obpocCapabilities"]["pack"]["pack_id"],
+            "ob-poc.kyc"
+        );
+
+        let loaded = only_response(agent.handle_request(request(
+            2,
+            "session/load",
+            json!({
+                "sessionId": SESSION_ID.to_string(),
+                "persona": "sage:execution"
+            }),
+        )));
+        assert_eq!(
+            loaded.result.as_ref().unwrap()["modeState"]["currentModeId"],
+            "sage:execution"
+        );
+
+        let context = only_response(agent.handle_request(request(
+            3,
+            "obpoc/context",
+            json!({
+                "session_id": SESSION_ID.to_string(),
+                "adapter": "test_harness",
+                "probe_id": "kyc-case.read-evidence-summary",
+                "subject_kind": "kyc_case",
+                "subject_id": CASE_ID.to_string(),
+                "observations": [
+                    {"key": "case.status", "value": "INTAKE", "classification": "internal"},
+                    {"key": "case.confidential_evidence.summary", "value": "raw", "classification": "internal"}
+                ]
+            }),
+        )));
+        assert_eq!(
+            context.result.as_ref().unwrap()["bundle"]["prompt_context"]["included"][0]["key"],
+            "case.status"
+        );
+        assert_eq!(
+            context.result.as_ref().unwrap()["bundle"]["prompt_context"]["redacted"][0]["key"],
+            "case.confidential_evidence.summary"
+        );
+
+        let projection = only_response(agent.handle_request(request(
+            4,
+            "obpoc/projection/get",
+            json!({
+                "session_id": SESSION_ID.to_string(),
+                "kind": "transition_surface",
+                "subject": {
+                    "subject_kind": "kyc_case",
+                    "subject_id": CASE_ID.to_string()
+                }
+            }),
+        )));
+        assert!(
+            projection.result.as_ref().unwrap()["projection"]["projection_hash"]
+                .as_str()
+                .unwrap()
+                .starts_with("sha256:")
+        );
+
+        let dry_run = agent.handle_request(request(
+            5,
+            "obpoc/kyc_update_status_dry_run",
+            json!({
+                "session_id": SESSION_ID,
+                "case_id": CASE_ID,
+                "actor_id": "analyst@example.com",
+                "actor_roles": ["analyst"],
+                "transition_ref": "kyc-case.intake-to-discovery",
+                "current_state": "INTAKE",
+                "requested_state": "DISCOVERY",
+                "configuration_version": "config-1",
+                "state_snapshot_id": "snapshot-1",
+                "evidence_digest": "sha256:evidence",
+                "llm_trace_ref": null
+            }),
+        ));
+        assert_eq!(dry_run.len(), 3);
+        let semantic_update = match &dry_run[1] {
+            JsonRpcOutgoing::Notification(notification) => &notification.params["update"],
+            JsonRpcOutgoing::Response(_) => panic!("expected semantic diff notification"),
+        };
+        assert!(semantic_update["semanticDiffId"]
+            .as_str()
+            .unwrap()
+            .starts_with("semos://semantic-diff/ewb:v1:"));
+        let validation_trace = semantic_update["validationTrace"].as_array().unwrap();
+        assert!(validation_trace.len() >= 4);
+        assert!(validation_trace
+            .iter()
+            .any(|step| step["step_id"] == "integrity"));
+        assert!(validation_trace
+            .iter()
+            .any(|step| step["step_id"] == "dry-run"));
+        let dry_run_response = match &dry_run[2] {
+            JsonRpcOutgoing::Response(response) => response,
+            JsonRpcOutgoing::Notification(_) => panic!("expected dry-run response"),
+        };
+        assert_eq!(
+            dry_run_response.result.as_ref().unwrap()["output"]["workbook"]["core"]
+                ["execution_mode"],
+            "dry_run"
+        );
+
+        let mutation = only_response(agent.handle_request(request(
+            6,
+            "obpoc/mutation",
+            json!({"session_id": SESSION_ID.to_string()}),
+        )));
+        assert_eq!(mutation.error.as_ref().unwrap().code, INVALID_REQUEST);
+        assert_eq!(mutation.error.unwrap().data.unwrap()["capability"], "none");
     }
 
     #[test]

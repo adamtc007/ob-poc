@@ -43,6 +43,14 @@ pub struct FrameRef {
     pub stale: bool,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct TraceValidationStep {
+    pub step_number: u8,
+    pub step_id: String,
+    pub status: String,
+    pub message: String,
+}
+
 // ---------------------------------------------------------------------------
 // TraceOp — discriminated operation tag
 // ---------------------------------------------------------------------------
@@ -111,11 +119,15 @@ pub enum TraceOp {
         #[serde(default)]
         projection_bytes: usize,
         #[serde(default)]
-        projection_latency_ms: u128,
+        projection_latency_ms: u64,
     },
     WorkbookDryRunValidated {
         workbook_id: String,
         transition_ref: String,
+        #[serde(default)]
+        semantic_diff_uri: String,
+        #[serde(default)]
+        validation_trace: Vec<TraceValidationStep>,
     },
     ApprovalTokenIssued {
         approval_token_id: String,
@@ -336,6 +348,13 @@ mod tests {
             TraceOp::WorkbookDryRunValidated {
                 workbook_id: "ewb:v1:abc".into(),
                 transition_ref: "kyc-case.intake-to-discovery".into(),
+                semantic_diff_uri: "semos://semantic-diff/ewb:v1:abc".into(),
+                validation_trace: vec![TraceValidationStep {
+                    step_number: 1,
+                    step_id: "integrity".into(),
+                    status: "passed".into(),
+                    message: "workbook integrity hash verified".into(),
+                }],
             },
             TraceOp::ApprovalTokenIssued {
                 approval_token_id: "approval:v1:abc".into(),

@@ -19,7 +19,7 @@ use super::dsl_coder::{
 };
 use super::workbook::{
     EvidenceRef, ExecutionWorkbook, ExecutionWorkbookCore, LlmTraceRef, StaleWorkbookPolicy,
-    WorkbookActor, WorkbookSubject,
+    WorkbookActor, WorkbookExecutionMode, WorkbookSubject,
 };
 
 const OB_POC_KYC_PACK: &str =
@@ -104,6 +104,7 @@ pub fn build_kyc_update_status_dry_run(
         schema_version: 1,
         pack_id: manifest.pack_id,
         transition_ref: input.transition_ref,
+        execution_mode: WorkbookExecutionMode::DryRun,
         session_id: input.session_id,
         subject: WorkbookSubject {
             subject_kind: "kyc_case".to_string(),
@@ -115,12 +116,25 @@ pub fn build_kyc_update_status_dry_run(
         },
         configuration_version: input.configuration_version,
         state_snapshot_id: input.state_snapshot_id,
+        objective: format!(
+            "Move KYC case from {} to {}",
+            input.current_state, input.requested_state
+        ),
+        user_prompt_ref: None,
+        editor_context_refs: vec![],
         evidence_refs: vec![EvidenceRef {
             kind: "case_id".to_string(),
             ref_id: input.case_id.to_string(),
             digest: input.evidence_digest,
+            source_system: Some("ob-poc".to_string()),
+            field_path: Some("kyc_case.id".to_string()),
+            classification: None,
         }],
         llm_trace_ref: input.llm_trace_ref,
+        expected_preconditions: vec![format!("status == {}", input.current_state)],
+        expected_postconditions: vec![format!("status == {}", input.requested_state)],
+        invariant_checks: vec![],
+        governance_checks: vec![],
         simulation,
         stale_policy: StaleWorkbookPolicy::Revalidate,
         previous_workbook_id: None,

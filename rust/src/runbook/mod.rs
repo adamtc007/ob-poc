@@ -66,7 +66,8 @@ pub use compiler::compile_verb;
 pub use constraint_gate::check_pack_constraints;
 pub use dsl_coder::{
     validate_workbook_for_dry_run, DslCoderDryRunResult, DslCoderExecutionMode,
-    DslCoderRefusalCode, DslCoderValidationError,
+    DslCoderRefusalCode, DslCoderValidationError, DslCoderValidationStep,
+    DslCoderValidationStepStatus,
 };
 pub use envelope::{EnvelopeCore, ReplayEnvelope};
 pub use errors::{CompilationError, CompilationErrorKind};
@@ -90,7 +91,8 @@ pub use response::{
     MissingField, OrchestratorResponse, Remediation, StepPreview,
 };
 pub use restricted_mutation::{
-    compile_restricted_mutation_preflight, RestrictedMutationRunbookCompilation,
+    compile_restricted_mutation_preflight, record_restricted_mutation_execution_receipt,
+    RestrictedMutationExecutionReceipt, RestrictedMutationRunbookCompilation,
     RestrictedMutationRunbookCompilationError,
 };
 pub use sem_os_filter::{filter_verbs_against_allowed_set, SemOsDeniedVerb, SemOsFilterResult};
@@ -106,7 +108,7 @@ pub use verb_classifier::{classify_verb, VerbClassification};
 pub use workbook::{
     compute_workbook_id, EvidenceRef, ExecutionWorkbook, ExecutionWorkbookCore,
     ExecutionWorkbookId, ExecutionWorkbookValidationError, LlmTraceRef, StaleWorkbookPolicy,
-    WorkbookActor, WorkbookSubject,
+    WorkbookActor, WorkbookCheck, WorkbookCheckStatus, WorkbookExecutionMode, WorkbookSubject,
 };
 pub use write_set::{derive_write_set, derive_write_set_heuristic};
 

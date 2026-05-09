@@ -2,7 +2,7 @@
 //!
 //! A workbook is the immutable handoff between Sage/discovery and the DSL Coder
 //! gate. It binds a declared Domain Pack transition to configuration/state
-//! anchors, evidence references, and a SemOS simulation result.
+//! anchors, evidence references, execution mode, and a SemOS simulation result.
 
 use chrono::{DateTime, Utc};
 use sem_os_core::state_simulation::StateSimulationResult;
@@ -58,14 +58,28 @@ pub struct ExecutionWorkbookCore {
     pub schema_version: u16,
     pub pack_id: String,
     pub transition_ref: String,
+    pub execution_mode: WorkbookExecutionMode,
     pub session_id: Uuid,
     pub subject: WorkbookSubject,
     pub actor: WorkbookActor,
     pub configuration_version: String,
     pub state_snapshot_id: String,
+    pub objective: String,
+    #[serde(default)]
+    pub user_prompt_ref: Option<String>,
+    #[serde(default)]
+    pub editor_context_refs: Vec<String>,
     pub evidence_refs: Vec<EvidenceRef>,
     #[serde(default)]
     pub llm_trace_ref: Option<LlmTraceRef>,
+    #[serde(default)]
+    pub expected_preconditions: Vec<String>,
+    #[serde(default)]
+    pub expected_postconditions: Vec<String>,
+    #[serde(default)]
+    pub invariant_checks: Vec<WorkbookCheck>,
+    #[serde(default)]
+    pub governance_checks: Vec<WorkbookCheck>,
     pub simulation: StateSimulationResult,
     pub stale_policy: StaleWorkbookPolicy,
     #[serde(default)]
@@ -80,6 +94,7 @@ impl ExecutionWorkbookCore {
         require_non_empty("transition_ref", &self.transition_ref)?;
         require_non_empty("configuration_version", &self.configuration_version)?;
         require_non_empty("state_snapshot_id", &self.state_snapshot_id)?;
+        require_non_empty("objective", &self.objective)?;
         require_non_empty("subject_kind", &self.subject.subject_kind)?;
         require_non_empty("actor_id", &self.actor.actor_id)?;
 
@@ -121,6 +136,14 @@ pub enum ExecutionWorkbookStatus {
     Rejected,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum WorkbookExecutionMode {
+    DryRun,
+    ExecuteAfterApproval,
+    Execute,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct WorkbookSubject {
     pub subject_kind: String,
@@ -139,6 +162,12 @@ pub struct EvidenceRef {
     pub kind: String,
     pub ref_id: String,
     pub digest: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub source_system: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub field_path: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub classification: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -154,6 +183,21 @@ pub enum StaleWorkbookPolicy {
     Reject,
     Revalidate,
     RebindIfEquivalent,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct WorkbookCheck {
+    pub check_id: String,
+    pub status: WorkbookCheckStatus,
+    pub message: String,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum WorkbookCheckStatus {
+    Passed,
+    Failed,
+    NotEvaluated,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -178,10 +222,13 @@ pub enum ExecutionWorkbookValidationError {
 }
 
 pub fn compute_workbook_id(core: &ExecutionWorkbookCore) -> ExecutionWorkbookId {
-    let bytes = bincode::serialize(core)
-        .expect("bincode serialization of ExecutionWorkbookCore is infallible");
+    let bytes = canonical_workbook_bytes(core);
     let digest = Sha256::digest(bytes);
     ExecutionWorkbookId(format!("ewb:v1:{}", hex::encode(digest)))
+}
+
+pub fn canonical_workbook_bytes(core: &ExecutionWorkbookCore) -> Vec<u8> {
+    serde_json::to_vec(core).expect("ExecutionWorkbookCore serializes to canonical JSON bytes")
 }
 
 fn require_non_empty(
@@ -239,6 +286,7 @@ mod tests {
             schema_version: 1,
             pack_id: "ob-poc.kyc".to_string(),
             transition_ref: "kyc-case.intake-to-discovery".to_string(),
+            execution_mode: WorkbookExecutionMode::DryRun,
             session_id: SESSION_ID,
             subject: WorkbookSubject {
                 subject_kind: "kyc_case".to_string(),
@@ -250,16 +298,34 @@ mod tests {
             },
             configuration_version: "config-1".to_string(),
             state_snapshot_id: "state-snapshot-1".to_string(),
+            objective: "Move KYC case from intake to discovery".to_string(),
+            user_prompt_ref: Some("prompt:sha256:test".to_string()),
+            editor_context_refs: vec!["semos://entity/test".to_string()],
             evidence_refs: vec![EvidenceRef {
                 kind: "case_id".to_string(),
                 ref_id: CASE_ID.to_string(),
                 digest: "sha256:case".to_string(),
+                source_system: Some("ob-poc".to_string()),
+                field_path: Some("cases.id".to_string()),
+                classification: Some("internal".to_string()),
             }],
             llm_trace_ref: Some(LlmTraceRef {
                 trace_id: TRACE_ID,
                 prompt_hash: "sha256:prompt".to_string(),
                 response_hash: "sha256:response".to_string(),
             }),
+            expected_preconditions: vec!["status == INTAKE".to_string()],
+            expected_postconditions: vec!["status == DISCOVERY".to_string()],
+            invariant_checks: vec![WorkbookCheck {
+                check_id: "kyc.transition.frontier".to_string(),
+                status: WorkbookCheckStatus::Passed,
+                message: "transition is declared in Domain Pack".to_string(),
+            }],
+            governance_checks: vec![WorkbookCheck {
+                check_id: "kyc.evidence.case_id".to_string(),
+                status: WorkbookCheckStatus::Passed,
+                message: "case evidence reference present".to_string(),
+            }],
             simulation: simulation("kyc-case.intake-to-discovery", CASE_ID),
             stale_policy: StaleWorkbookPolicy::Revalidate,
             previous_workbook_id: None,
@@ -299,6 +365,17 @@ mod tests {
         assert!(next.core.previous_workbook_id.is_some());
         assert_eq!(next.core.stale_policy, StaleWorkbookPolicy::Reject);
         assert_ne!(next.id, compute_workbook_id(&core()));
+    }
+
+    #[test]
+    fn workbook_hash_uses_canonical_json_payload() {
+        let core = core();
+        let bytes = canonical_workbook_bytes(&core);
+
+        assert!(std::str::from_utf8(&bytes)
+            .unwrap()
+            .contains("\"execution_mode\":\"dry_run\""));
+        assert_eq!(compute_workbook_id(&core), compute_workbook_id(&core));
     }
 
     #[test]

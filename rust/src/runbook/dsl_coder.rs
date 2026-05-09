@@ -9,6 +9,7 @@ use serde::{Deserialize, Serialize};
 
 use super::workbook::{
     ExecutionWorkbook, ExecutionWorkbookStatus, ExecutionWorkbookValidationError,
+    WorkbookExecutionMode,
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -23,6 +24,8 @@ pub struct DslCoderDryRunResult {
     pub workbook_id: String,
     pub transition_ref: String,
     pub semantic_diff: StateSimulationResult,
+    pub semantic_diff_uri: String,
+    pub validation_trace: Vec<DslCoderValidationStep>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -36,10 +39,27 @@ pub struct DslCoderValidationError {
 pub enum DslCoderRefusalCode {
     WorkbookIntegrityFailed,
     MutationNotEnabled,
+    ExecutionModeMismatch,
     WorkbookSuperseded,
     WorkbookAlreadyExecuted,
     WorkbookRejected,
     TransitionBindingMismatch,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct DslCoderValidationStep {
+    pub step_number: u8,
+    pub step_id: String,
+    pub status: DslCoderValidationStepStatus,
+    pub message: String,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum DslCoderValidationStepStatus {
+    Passed,
+    Failed,
+    Skipped,
 }
 
 pub fn validate_workbook_for_dry_run(
@@ -50,6 +70,13 @@ pub fn validate_workbook_for_dry_run(
         return Err(refusal(
             DslCoderRefusalCode::MutationNotEnabled,
             "mutation execution is disabled for the MVP dry-run boundary",
+        ));
+    }
+
+    if workbook.core.execution_mode != WorkbookExecutionMode::DryRun {
+        return Err(refusal(
+            DslCoderRefusalCode::ExecutionModeMismatch,
+            "dry-run validator only accepts workbooks with execution_mode=dry_run",
         ));
     }
 
@@ -81,7 +108,46 @@ pub fn validate_workbook_for_dry_run(
         workbook_id: workbook.id.to_string(),
         transition_ref: workbook.core.transition_ref.clone(),
         semantic_diff: workbook.core.simulation.clone(),
+        semantic_diff_uri: format!("semos://semantic-diff/{}", workbook.id),
+        validation_trace: validation_trace(),
     })
+}
+
+fn validation_trace() -> Vec<DslCoderValidationStep> {
+    vec![
+        step(1, "schema", "workbook schema received"),
+        step(2, "execution-mode", "workbook execution_mode is dry_run"),
+        step(3, "integrity", "workbook integrity hash verified"),
+        step(4, "status", "workbook status permits validation"),
+        step(5, "configuration-version", "configuration version is bound"),
+        step(6, "state-snapshot", "state snapshot is bound"),
+        step(
+            7,
+            "explicit-bindings",
+            "subject and transition bindings are explicit",
+        ),
+        step(
+            8,
+            "frontier",
+            "transition was simulated from declared Domain Pack frontier",
+        ),
+        step(9, "evidence", "required evidence references are present"),
+        step(
+            10,
+            "semantic-diff",
+            "semantic diff is attached to workbook simulation",
+        ),
+        step(11, "dry-run", "dry-run result is non-mutating"),
+    ]
+}
+
+fn step(step_number: u8, step_id: &str, message: &str) -> DslCoderValidationStep {
+    DslCoderValidationStep {
+        step_number,
+        step_id: step_id.to_string(),
+        status: DslCoderValidationStepStatus::Passed,
+        message: message.to_string(),
+    }
 }
 
 fn map_workbook_error(err: ExecutionWorkbookValidationError) -> DslCoderValidationError {
@@ -112,7 +178,7 @@ mod tests {
     use super::*;
     use crate::runbook::workbook::{
         EvidenceRef, ExecutionWorkbook, ExecutionWorkbookCore, ExecutionWorkbookId, LlmTraceRef,
-        StaleWorkbookPolicy, WorkbookActor, WorkbookSubject,
+        StaleWorkbookPolicy, WorkbookActor, WorkbookExecutionMode, WorkbookSubject,
     };
     use sem_os_core::state_simulation::{
         SemanticStateDiff, SimulatedStateAdvance, StateSimulationResult,
@@ -155,6 +221,7 @@ mod tests {
             schema_version: 1,
             pack_id: "ob-poc.kyc".to_string(),
             transition_ref: "kyc-case.intake-to-discovery".to_string(),
+            execution_mode: WorkbookExecutionMode::DryRun,
             session_id: SESSION_ID,
             subject: WorkbookSubject {
                 subject_kind: "kyc_case".to_string(),
@@ -166,16 +233,26 @@ mod tests {
             },
             configuration_version: "config-1".to_string(),
             state_snapshot_id: "state-snapshot-1".to_string(),
+            objective: "Move KYC case from intake to discovery".to_string(),
+            user_prompt_ref: None,
+            editor_context_refs: vec![],
             evidence_refs: vec![EvidenceRef {
                 kind: "case_id".to_string(),
                 ref_id: CASE_ID.to_string(),
                 digest: "sha256:case".to_string(),
+                source_system: None,
+                field_path: None,
+                classification: None,
             }],
             llm_trace_ref: Some(LlmTraceRef {
                 trace_id: TRACE_ID,
                 prompt_hash: "sha256:prompt".to_string(),
                 response_hash: "sha256:response".to_string(),
             }),
+            expected_preconditions: vec![],
+            expected_postconditions: vec![],
+            invariant_checks: vec![],
+            governance_checks: vec![],
             simulation: simulation(),
             stale_policy: StaleWorkbookPolicy::Revalidate,
             previous_workbook_id: None,
@@ -194,6 +271,13 @@ mod tests {
         assert_eq!(result.workbook_id, workbook.id.to_string());
         assert_eq!(result.transition_ref, "kyc-case.intake-to-discovery");
         assert_eq!(result.semantic_diff.to_state, "DISCOVERY");
+        assert!(result
+            .semantic_diff_uri
+            .starts_with("semos://semantic-diff/"));
+        assert!(result
+            .validation_trace
+            .iter()
+            .any(|step| step.step_id == "integrity"));
     }
 
     #[test]
@@ -202,6 +286,18 @@ mod tests {
             .expect_err("mutation refused");
 
         assert_eq!(err.code, DslCoderRefusalCode::MutationNotEnabled);
+    }
+
+    #[test]
+    fn refuses_non_dry_run_workbook_mode() {
+        let mut workbook = workbook();
+        workbook.core.execution_mode = WorkbookExecutionMode::ExecuteAfterApproval;
+        workbook.id = crate::runbook::compute_workbook_id(&workbook.core);
+
+        let err = validate_workbook_for_dry_run(&workbook, DslCoderExecutionMode::DryRun)
+            .expect_err("non-dry-run workbook refused");
+
+        assert_eq!(err.code, DslCoderRefusalCode::ExecutionModeMismatch);
     }
 
     #[test]
