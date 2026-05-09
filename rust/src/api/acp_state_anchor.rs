@@ -1,8 +1,8 @@
 //! ACP state-anchor provider routing.
 //!
-//! This module keeps the `/acp/prompt` and `/acp/gateway` routes on one ACP
-//! path while allowing task-specific, read-only state anchors to seed bounded
-//! language-pack / dry-run loops.
+//! This module keeps session input and the ACP JSON-RPC gateway on one ACP
+//! processing path while allowing task-specific, read-only state anchors to seed
+//! bounded language-pack / dry-run loops.
 
 use sem_os_core::state_simulation::{
     SemanticStateDiff, SimulatedStateAdvance, StateSimulationResult,

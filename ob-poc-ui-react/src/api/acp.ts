@@ -369,27 +369,6 @@ export interface AcpGatewayResult<T = unknown> {
   state_anchor_provider?: Record<string, unknown>;
 }
 
-export type AcpPromptDraftSource =
-  | "deterministic"
-  | "deterministic_draft"
-  | "llm"
-  | "llm_tool_call"
-  | "live_llm";
-
-export interface AcpPromptRequest {
-  prompt: AcpContentBlock[];
-  draft_source?: AcpPromptDraftSource;
-}
-
-export interface AcpPromptResult<T = unknown> {
-  status: "acp_prompt_processed";
-  session_id: string;
-  draft_source?: AcpPromptDraftSource;
-  result: T;
-  outgoing: unknown[];
-  state_anchor_provider?: Record<string, unknown>;
-}
-
 export const acpApi = {
   async capabilities(sessionId: string): Promise<AcpCapabilitiesResult> {
     return api.get<AcpCapabilitiesResult>(
@@ -456,15 +435,6 @@ export const acpApi = {
     );
   },
 
-  async prompt<T = unknown>(
-    sessionId: string,
-    request: AcpPromptRequest,
-  ): Promise<AcpPromptResult<T>> {
-    return api.post<AcpPromptResult<T>>(
-      `/session/${sessionId}/acp/prompt`,
-      request,
-    );
-  },
 };
 
 export default acpApi;

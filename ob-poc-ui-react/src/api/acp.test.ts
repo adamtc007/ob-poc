@@ -448,10 +448,11 @@ describe("acpApi", () => {
     expect(fetchMock.mock.calls[0][0]).not.toContain("/acp/kyc/");
   });
 
-  it("posts user utterances through the canonical ACP prompt path", async () => {
+  it("posts ACP session prompts through the generic gateway", async () => {
     const response = {
-      status: "acp_prompt_processed" as const,
+      status: "acp_gateway_processed" as const,
       session_id: "session-123",
+      method: "session/prompt",
       result: {
         status: "pending_question",
         pending_question: {
@@ -479,18 +480,21 @@ describe("acpApi", () => {
     vi.stubGlobal("fetch", fetchMock);
 
     const request = {
-      prompt: [
-        {
-          type: "text" as const,
-          text: "Move the KYC case to DISCOVERY",
-        },
-      ],
+      method: "session/prompt",
+      params: {
+        prompt: [
+          {
+            type: "text" as const,
+            text: "Move the KYC case to DISCOVERY",
+          },
+        ],
+      },
     };
-    const result = await acpApi.prompt("session-123", request);
+    const result = await acpApi.gateway("session-123", request);
 
     expect(result).toEqual(response);
     expect(fetchMock).toHaveBeenCalledWith(
-      "/api/session/session-123/acp/prompt",
+      "/api/session/session-123/acp/gateway",
       {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -498,6 +502,7 @@ describe("acpApi", () => {
       },
     );
     expect(fetchMock.mock.calls[0][0]).not.toContain("/acp/kyc/");
+    expect(fetchMock.mock.calls[0][0]).not.toContain("/acp/prompt");
     expect(result.outgoing[0]).toMatchObject({
       method: "session/update",
       params: {

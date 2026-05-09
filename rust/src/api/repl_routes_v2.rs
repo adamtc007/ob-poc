@@ -344,15 +344,6 @@ pub struct AcpContextAssemblyRequest {
     pub first_class_state_mutated: bool,
 }
 
-/// Request to route an ACP prompt through the session-scoped HTTP API.
-#[derive(Debug, Clone, Deserialize)]
-pub struct AcpPromptRouteRequest {
-    #[serde(default)]
-    pub prompt: Vec<crate::acp_protocol::AcpContentBlock>,
-    #[serde(default)]
-    pub draft_source: Option<String>,
-}
-
 /// Generic ACP JSON-RPC gateway request for the REPL HTTP boundary.
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct AcpGatewayRouteRequest {
@@ -1057,7 +1048,6 @@ pub fn session_scoped_router() -> Router<ReplV2RouteState> {
             post(assemble_acp_context_route),
         )
         .route("/api/session/:id/acp/gateway", post(acp_gateway_route))
-        .route("/api/session/:id/acp/prompt", post(acp_prompt_route))
         // Session trace routes (R9)
         .route("/api/session/:id/trace", get(get_session_trace))
         .route("/api/session/:id/trace/:seq", get(get_trace_entry))
@@ -1675,43 +1665,48 @@ async fn acp_gateway_route(
     Path(session_id): Path<Uuid>,
     Json(req): Json<AcpGatewayRouteRequest>,
 ) -> Result<Json<serde_json::Value>, (StatusCode, Json<ErrorResponseV2>)> {
+    acp_gateway_route_with_llm_client(state, session_id, req, None).await
+}
+
+async fn acp_gateway_route_with_llm_client(
+    state: ReplV2RouteState,
+    session_id: Uuid,
+    req: AcpGatewayRouteRequest,
+    llm_client: Option<Result<std::sync::Arc<dyn ob_agentic::llm_client::LlmClient>, String>>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<ErrorResponseV2>)> {
     let params = acp_gateway_params(session_id, &req.method, req.params);
-    let provider_outcome = if req.method == "session/prompt" {
-        if let Some(prompt) = acp_prompt_blocks_from_params(&params) {
-            acp_prompt_state_anchor_provider_outcome(
+    if req.method == "session/prompt" {
+        let prompt = acp_prompt_blocks_from_params(&params).unwrap_or_default();
+        let mut envelope = if acp_prompt_params_request_llm_draft(&params)? {
+            let client = llm_client.unwrap_or_else(|| {
+                ob_agentic::create_llm_client().map_err(|error| error.to_string())
+            });
+            process_acp_prompt_llm_envelope(
                 &state,
                 session_id,
-                &prompt,
+                prompt,
                 serde_json::json!("repl-acp-gateway"),
+                "acp_gateway_processed",
+                client,
+            )
+            .await?
+        } else {
+            process_acp_prompt_deterministic_envelope(
+                &state,
+                session_id,
+                prompt,
+                serde_json::json!("repl-acp-gateway"),
+                "acp_gateway_processed",
             )
             .await
-        } else {
-            AcpPromptStateAnchorProviderOutcome::continue_without_provider()
+        };
+        if let Some(object) = envelope.as_object_mut() {
+            object.insert("method".to_string(), serde_json::json!(req.method));
         }
-    } else {
-        AcpPromptStateAnchorProviderOutcome::continue_without_provider()
-    };
-    let (mut outgoing, provider_report) = match provider_outcome {
-        AcpPromptStateAnchorProviderOutcome::Continue { outgoing, report } => (outgoing, report),
-        AcpPromptStateAnchorProviderOutcome::Complete { outgoing, report } => {
-            let result =
-                json_rpc_outgoing_result(&outgoing).unwrap_or_else(|| serde_json::json!({}));
-            let state_anchor_provider = report.metrics(Some(&result));
-            if let Some(op) = acp_language_loop_trace_op_from_value(&result) {
-                append_session_trace_if_present(&state, session_id, op).await;
-            }
+        return Ok(Json(envelope));
+    }
 
-            return Ok(Json(serde_json::json!({
-                "status": "acp_gateway_processed",
-                "session_id": session_id,
-                "method": req.method,
-                "result": result,
-                "outgoing": outgoing,
-                "state_anchor_provider": state_anchor_provider,
-            })));
-        }
-    };
-    let prompt_outgoing = handle_repl_acp_request(
+    let outgoing = handle_repl_acp_request(
         session_id,
         crate::acp_protocol::JsonRpcRequest {
             jsonrpc: "2.0".to_string(),
@@ -1721,9 +1716,7 @@ async fn acp_gateway_route(
         },
     )
     .await;
-    outgoing.extend(prompt_outgoing);
     let result = json_rpc_outgoing_result(&outgoing).unwrap_or_else(|| serde_json::json!({}));
-    let state_anchor_provider = provider_report.metrics(Some(&result));
     if let Some(op) = acp_language_loop_trace_op_from_value(&result) {
         append_session_trace_if_present(&state, session_id, op).await;
     }
@@ -1734,7 +1727,6 @@ async fn acp_gateway_route(
         "method": req.method,
         "result": result,
         "outgoing": outgoing,
-        "state_anchor_provider": state_anchor_provider,
     })))
 }
 
@@ -1774,10 +1766,15 @@ fn acp_gateway_params(
     serde_json::Value::Object(params)
 }
 
-fn acp_prompt_requests_llm_draft(
-    req: &AcpPromptRouteRequest,
+fn acp_prompt_params_request_llm_draft(
+    params: &serde_json::Value,
 ) -> Result<bool, (StatusCode, Json<ErrorResponseV2>)> {
-    match req.draft_source.as_deref().unwrap_or("deterministic") {
+    let draft_source = params
+        .get("draft_source")
+        .or_else(|| params.get("draftSource"))
+        .and_then(serde_json::Value::as_str)
+        .unwrap_or("deterministic");
+    match draft_source {
         "deterministic" | "deterministic_draft" => Ok(false),
         "llm" | "llm_tool_call" | "live_llm" => Ok(true),
         draft_source => Err((
@@ -1852,48 +1849,6 @@ pub(crate) async fn process_acp_prompt_deterministic_envelope(
         "outgoing": outgoing,
         "state_anchor_provider": state_anchor_provider,
     })
-}
-
-/// POST /api/session/:id/acp/prompt
-async fn acp_prompt_route(
-    State(state): State<ReplV2RouteState>,
-    Path(session_id): Path<Uuid>,
-    Json(req): Json<AcpPromptRouteRequest>,
-) -> Result<Json<serde_json::Value>, (StatusCode, Json<ErrorResponseV2>)> {
-    if acp_prompt_requests_llm_draft(&req)? {
-        let client = ob_agentic::create_llm_client().map_err(|error| error.to_string());
-        return acp_prompt_route_with_llm_client(state, session_id, req, client).await;
-    }
-
-    Ok(Json(
-        process_acp_prompt_deterministic_envelope(
-            &state,
-            session_id,
-            req.prompt,
-            serde_json::json!("prompt"),
-            "acp_prompt_processed",
-        )
-        .await,
-    ))
-}
-
-async fn acp_prompt_route_with_llm_client(
-    state: ReplV2RouteState,
-    session_id: Uuid,
-    req: AcpPromptRouteRequest,
-    client: Result<std::sync::Arc<dyn ob_agentic::llm_client::LlmClient>, String>,
-) -> Result<Json<serde_json::Value>, (StatusCode, Json<ErrorResponseV2>)> {
-    Ok(Json(
-        process_acp_prompt_llm_envelope(
-            &state,
-            session_id,
-            req.prompt,
-            serde_json::json!("prompt"),
-            "acp_prompt_processed",
-            client,
-        )
-        .await?,
-    ))
 }
 
 pub(crate) async fn process_acp_prompt_llm_envelope(
@@ -4191,6 +4146,15 @@ mod tests {
 
     static LIVE_LLM_ENV_LOCK: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
 
+    /// Internal request shape used by ACP prompt processing tests and live harnesses.
+    ///
+    /// HTTP prompt ingress is intentionally closed. Application chat enters through
+    /// `/session/:id/input`; ACP clients enter through `/session/:id/acp/gateway`.
+    #[derive(Debug, Clone)]
+    struct AcpPromptEnvelopeRequest {
+        pub prompt: Vec<crate::acp_protocol::AcpContentBlock>,
+    }
+
     fn test_session_id() -> Uuid {
         Uuid::parse_str("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa").unwrap()
     }
@@ -4322,34 +4286,32 @@ mod tests {
         current_state: &str,
         objective: &str,
         evidence_digest: Option<&str>,
-    ) -> AcpPromptRouteRequest {
+    ) -> AcpPromptEnvelopeRequest {
         let text = match evidence_digest {
             Some(evidence_digest) if !objective.contains(evidence_digest) => {
                 format!("{objective} with evidence {evidence_digest}")
             }
             _ => objective.to_string(),
         };
-        AcpPromptRouteRequest {
+        AcpPromptEnvelopeRequest {
             prompt: vec![
                 crate::acp_protocol::AcpContentBlock::Text { text },
                 discovery_resource(current_state, "config-1", "snapshot-1"),
             ],
-            draft_source: Some("llm_tool_call".to_string()),
         }
     }
 
     fn llm_prompt_request_without_state_anchor(
         objective: &str,
         evidence_digest: Option<&str>,
-    ) -> AcpPromptRouteRequest {
+    ) -> AcpPromptEnvelopeRequest {
         let mut text = format!("{} for KYC case {}", objective, test_case_id());
         if let Some(evidence_digest) = evidence_digest {
             text.push_str(" with evidence ");
             text.push_str(evidence_digest);
         }
-        AcpPromptRouteRequest {
+        AcpPromptEnvelopeRequest {
             prompt: vec![crate::acp_protocol::AcpContentBlock::Text { text }],
-            draft_source: Some("llm_tool_call".to_string()),
         }
     }
 
@@ -4365,13 +4327,19 @@ mod tests {
     async fn llm_prompt_result_with_client(
         state: ReplV2RouteState,
         session_id: Uuid,
-        req: AcpPromptRouteRequest,
+        req: AcpPromptEnvelopeRequest,
         client: Result<std::sync::Arc<dyn LlmClient>, String>,
     ) -> serde_json::Value {
-        acp_prompt_route_with_llm_client(state, session_id, req, client)
-            .await
-            .expect("ACP prompt LLM gateway")
-            .0["result"]
+        process_acp_prompt_llm_envelope(
+            &state,
+            session_id,
+            req.prompt,
+            serde_json::json!("test-acp-prompt"),
+            "acp_gateway_processed",
+            client,
+        )
+        .await
+        .expect("ACP prompt LLM gateway")["result"]
             .clone()
     }
 
@@ -4696,7 +4664,7 @@ mod tests {
         ]
     }
 
-    fn live_failure_request(fixture: LiveFailureFixture) -> AcpPromptRouteRequest {
+    fn live_failure_request(fixture: LiveFailureFixture) -> AcpPromptEnvelopeRequest {
         match fixture.request {
             LiveFailureRequest::MissingStateAnchor { evidence_digest } => {
                 llm_prompt_request_without_state_anchor(fixture.objective, evidence_digest)
@@ -5311,7 +5279,7 @@ mod tests {
     async fn acp_prompt_llm_draft_loop_value_with_prompt_variant(
         _state: ReplV2RouteState,
         session_id: Uuid,
-        req: AcpPromptRouteRequest,
+        req: AcpPromptEnvelopeRequest,
         variant: LiveAblationVariant,
         client: Result<std::sync::Arc<dyn ob_agentic::llm_client::LlmClient>, String>,
     ) -> Result<(serde_json::Value, crate::runbook::SemOsLanguagePack), crate::acp::AcpAdapterError>
@@ -6239,11 +6207,12 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_acp_gateway_contract_old_direct_kyc_paths_are_unregistered() {
+    async fn test_acp_gateway_contract_parallel_prompt_paths_are_unregistered() {
         let (state, session_id) = test_route_state().await;
         let app = session_scoped_router().with_state(state);
 
         for path in [
+            format!("/api/session/{session_id}/acp/prompt"),
             format!("/api/session/{session_id}/acp/kyc/case-state/discover"),
             format!("/api/session/{session_id}/acp/kyc/update-status/language-loop"),
             format!("/api/session/{session_id}/acp/kyc/update-status/llm-draft-loop"),
@@ -6252,7 +6221,7 @@ mod tests {
             assert_eq!(
                 status,
                 StatusCode::NOT_FOUND,
-                "{path} must stay unregistered; use /acp/gateway or /acp/prompt"
+                "{path} must stay unregistered; use /input for app chat or /acp/gateway for ACP JSON-RPC"
             );
         }
     }
@@ -6632,7 +6601,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_acp_prompt_route_persists_pending_question_trace() {
+    async fn test_acp_gateway_session_prompt_persists_pending_question_trace() {
         let orchestrator = std::sync::Arc::new(crate::sequencer::ReplOrchestratorV2::new(
             crate::journey::router::PackRouter::new(vec![]),
             std::sync::Arc::new(crate::sequencer::StubExecutor),
@@ -6642,20 +6611,27 @@ mod tests {
             orchestrator: orchestrator.clone(),
         };
 
-        let value = acp_prompt_route(
+        let value = acp_gateway_route(
             State(state.clone()),
             Path(session_id),
-            Json(AcpPromptRouteRequest {
-                prompt: vec![crate::acp_protocol::AcpContentBlock::Text {
-                    text: "update status for KYC case".to_string(),
-                }],
-                draft_source: None,
+            Json(AcpGatewayRouteRequest {
+                method: "session/prompt".to_string(),
+                params: serde_json::json!({
+                    "prompt": [
+                        {
+                            "type": "text",
+                            "text": "update status for KYC case"
+                        }
+                    ]
+                }),
             }),
         )
         .await
-        .expect("prompt route")
+        .expect("ACP gateway prompt")
         .0;
 
+        assert_eq!(value["status"], "acp_gateway_processed");
+        assert_eq!(value["method"], "session/prompt");
         assert_eq!(value["result"]["status"], "pending_question");
         assert_eq!(
             value["result"]["pending_question"]["code"],
@@ -6688,27 +6664,33 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_acp_prompt_route_uses_deal_state_anchor_provider_on_same_path() {
+    async fn test_acp_gateway_session_prompt_uses_deal_state_anchor_provider() {
         let (state, session_id) = test_route_state().await;
 
-        let value = acp_prompt_route(
+        let value = acp_gateway_route(
             State(state.clone()),
             Path(session_id),
-            Json(AcpPromptRouteRequest {
-                prompt: vec![crate::acp_protocol::AcpContentBlock::Text {
-                    text: format!(
-                        "Advance deal {} from PROSPECT to QUALIFYING with evidence sha256:evidence",
-                        test_case_id()
-                    ),
-                }],
-                draft_source: None,
+            Json(AcpGatewayRouteRequest {
+                method: "session/prompt".to_string(),
+                params: serde_json::json!({
+                    "prompt": [
+                        {
+                            "type": "text",
+                            "text": format!(
+                                "Advance deal {} from PROSPECT to QUALIFYING with evidence sha256:evidence",
+                                test_case_id()
+                            )
+                        }
+                    ]
+                }),
             }),
         )
         .await
-        .expect("deal prompt route")
+        .expect("ACP gateway deal prompt")
         .0;
 
-        assert_eq!(value["status"], "acp_prompt_processed");
+        assert_eq!(value["status"], "acp_gateway_processed");
+        assert_eq!(value["method"], "session/prompt");
         assert_eq!(value["result"]["status"], "dry_run_validated");
         assert_eq!(value["state_anchor_provider"]["task"], "deal.update-status");
         assert_eq!(
@@ -6738,7 +6720,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_acp_prompt_route_reuses_repl_cached_case_state_discovery() {
+    async fn test_acp_gateway_session_prompt_reuses_repl_cached_case_state_discovery() {
         let orchestrator = std::sync::Arc::new(crate::sequencer::ReplOrchestratorV2::new(
             crate::journey::router::PackRouter::new(vec![]),
             std::sync::Arc::new(crate::sequencer::StubExecutor),
@@ -6762,23 +6744,30 @@ mod tests {
         .0;
         assert_eq!(discovered["result"]["status"], "kyc_case_state_discovered");
 
-        let value = acp_prompt_route(
+        let value = acp_gateway_route(
             State(state.clone()),
             Path(session_id),
-            Json(AcpPromptRouteRequest {
-                prompt: vec![crate::acp_protocol::AcpContentBlock::Text {
-                    text: format!(
-                        "Advance KYC case {} to ASSESSMENT with evidence sha256:evidence",
-                        test_case_id()
-                    ),
-                }],
-                draft_source: None,
+            Json(AcpGatewayRouteRequest {
+                method: "session/prompt".to_string(),
+                params: serde_json::json!({
+                    "prompt": [
+                        {
+                            "type": "text",
+                            "text": format!(
+                                "Advance KYC case {} to ASSESSMENT with evidence sha256:evidence",
+                                test_case_id()
+                            )
+                        }
+                    ]
+                }),
             }),
         )
         .await
-        .expect("prompt route")
+        .expect("ACP gateway prompt")
         .0;
 
+        assert_eq!(value["status"], "acp_gateway_processed");
+        assert_eq!(value["method"], "session/prompt");
         assert_eq!(value["result"]["status"], "dry_run_validated");
         assert_eq!(
             value["result"]["output"]["dry_run"]["transition_ref"],
@@ -6803,7 +6792,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_acp_prompt_route_llm_mode_uses_repl_cached_state_behind_harness() {
+    async fn test_acp_gateway_session_prompt_llm_mode_uses_repl_cached_state_behind_harness() {
         let orchestrator = std::sync::Arc::new(crate::sequencer::ReplOrchestratorV2::new(
             crate::journey::router::PackRouter::new(vec![]),
             std::sync::Arc::new(crate::sequencer::StubExecutor),
@@ -6842,25 +6831,32 @@ mod tests {
             }),
         });
 
-        let value = acp_prompt_route_with_llm_client(
+        let value = acp_gateway_route_with_llm_client(
             state.clone(),
             session_id,
-            AcpPromptRouteRequest {
-                prompt: vec![crate::acp_protocol::AcpContentBlock::Text {
-                    text: format!(
-                        "Advance KYC case {} to ASSESSMENT with evidence sha256:evidence",
-                        test_case_id()
-                    ),
-                }],
-                draft_source: Some("llm_tool_call".to_string()),
+            AcpGatewayRouteRequest {
+                method: "session/prompt".to_string(),
+                params: serde_json::json!({
+                    "draft_source": "llm_tool_call",
+                    "prompt": [
+                        {
+                            "type": "text",
+                            "text": format!(
+                                "Advance KYC case {} to ASSESSMENT with evidence sha256:evidence",
+                                test_case_id()
+                            )
+                        }
+                    ]
+                }),
             },
-            Ok(client),
+            Some(Ok(client)),
         )
         .await
-        .expect("prompt llm route")
+        .expect("ACP gateway LLM prompt")
         .0;
 
-        assert_eq!(value["status"], "acp_prompt_processed");
+        assert_eq!(value["status"], "acp_gateway_processed");
+        assert_eq!(value["method"], "session/prompt");
         assert_eq!(value["draft_source"], "llm_tool_call");
         assert_eq!(value["result"]["status"], "dry_run_validated");
         assert_eq!(value["result"]["draft_source"], "llm_tool_call");
