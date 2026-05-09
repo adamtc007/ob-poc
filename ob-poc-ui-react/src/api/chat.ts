@@ -6,6 +6,7 @@
  */
 
 import { api } from "./client";
+import { acpApi, type AcpPromptResult } from "./acp";
 import {
   CHAT_SESSIONS_STORAGE_KEY,
   isSessionMissingError,
@@ -25,8 +26,19 @@ import type {
   VerbProfile,
   VerbDisambiguationRequest,
   OnboardingStateView,
+  AcpTraceSummary,
 } from "../types/chat";
 import type { SessionFeedback } from "./replV2";
+
+const ACP_PROMPT_COMMAND = /^\/acp(?:\s+|$)/i;
+
+export function isAcpPromptCommand(message: string): boolean {
+  return ACP_PROMPT_COMMAND.test(message.trim());
+}
+
+export function acpPromptTextFromCommand(message: string): string {
+  return message.trim().replace(ACP_PROMPT_COMMAND, "").trim();
+}
 
 /**
  * Backend session response structure
@@ -91,6 +103,116 @@ function mapBackendSession(backend: BackendSession): ChatSession {
       discovery_bootstrap: msg.discovery_bootstrap,
       session_feedback: msg.session_feedback,
     })),
+  };
+}
+
+type AcpPromptGatewayResult = Record<string, unknown> & {
+  status?: string;
+  traceProjection?: Record<string, unknown>;
+  observability?: {
+    conversationEfficiency?: Record<string, unknown>;
+  };
+  refusal?: {
+    refusal_code?: string;
+  };
+  pending_question?: {
+    code?: string;
+  };
+  output?: {
+    dry_run?: {
+      transition_ref?: string;
+      semantic_diff_uri?: string;
+    };
+  };
+};
+
+function stringField(value: unknown): string | undefined {
+  return typeof value === "string" && value.trim() ? value : undefined;
+}
+
+function numberField(value: unknown): number | undefined {
+  return typeof value === "number" ? value : undefined;
+}
+
+function booleanField(value: unknown): boolean | undefined {
+  return typeof value === "boolean" ? value : undefined;
+}
+
+function stringArrayField(value: unknown): string[] | undefined {
+  if (!Array.isArray(value)) return undefined;
+  const items = value.filter((item): item is string => typeof item === "string");
+  return items.length ? items : undefined;
+}
+
+function agentMessageText(outgoing: unknown[]): string | undefined {
+  for (const item of outgoing) {
+    if (!item || typeof item !== "object") continue;
+    const params = (item as { params?: unknown }).params;
+    if (!params || typeof params !== "object") continue;
+    const update = (params as { update?: unknown }).update;
+    if (!update || typeof update !== "object") continue;
+    const updateRecord = update as {
+      sessionUpdate?: unknown;
+      content?: { text?: unknown };
+    };
+    if (updateRecord.sessionUpdate !== "agent_message_chunk") continue;
+    const text = stringField(updateRecord.content?.text);
+    if (text) return text;
+  }
+  return undefined;
+}
+
+function acpTraceFromResult(result: AcpPromptGatewayResult): AcpTraceSummary {
+  const traceProjection = result.traceProjection ?? {};
+  const efficiency = result.observability?.conversationEfficiency ?? {};
+  return {
+    status: stringField(result.status) ?? "unknown",
+    outcome:
+      stringField(traceProjection.outcome) ?? stringField(result.status),
+    outcome_layer: stringField(traceProjection.outcomeLayer),
+    human_summary: stringField(traceProjection.humanSummary),
+    prompt_context_variant: stringField(traceProjection.promptContextVariant),
+    transition_ref:
+      stringField(traceProjection.transitionRef) ??
+      stringField(result.output?.dry_run?.transition_ref),
+    semantic_diff_uri:
+      stringField(traceProjection.semanticDiffUri) ??
+      stringField(result.output?.dry_run?.semantic_diff_uri),
+    refusal_code:
+      stringField(traceProjection.refusalCode) ??
+      stringField(result.refusal?.refusal_code),
+    pending_question_code:
+      stringField(traceProjection.pendingQuestionCode) ??
+      stringField(result.pending_question?.code),
+    needed_from_user: stringArrayField(traceProjection.neededFromUser),
+    diagnostic_codes: stringArrayField(traceProjection.diagnosticCodes),
+    dry_run_valid: booleanField(traceProjection.dryRunValid),
+    first_pass_valid: booleanField(traceProjection.firstPassValid),
+    revision_count: numberField(traceProjection.revisionCount),
+    prose_only_failure: booleanField(efficiency.proseOnlyFailure),
+    pending_user_turn_required: booleanField(efficiency.pendingUserTurnRequired),
+    estimated_user_repair_turns_avoided: numberField(
+      efficiency.estimatedUserRepairTurnsAvoided,
+    ),
+  };
+}
+
+function buildAcpPromptAssistantMessage(
+  sessionId: string,
+  envelope: AcpPromptResult<AcpPromptGatewayResult>,
+): ChatMessage {
+  const trace = acpTraceFromResult(envelope.result);
+  const content =
+    agentMessageText(envelope.outgoing) ||
+    trace.human_summary ||
+    "ACP prompt completed with a structured result.";
+
+  return {
+    id: `${sessionId}-acp-${Date.now()}`,
+    role: "assistant",
+    content,
+    timestamp: new Date().toISOString(),
+    acp_trace: trace,
   };
 }
 
@@ -394,6 +516,45 @@ export const chatApi = {
       },
       available_verbs: response.available_verbs,
       surface_fingerprint: response.surface_fingerprint,
+    };
+  },
+
+  /**
+   * Send a user utterance through the ACP prompt gateway.
+   *
+   * This is intentionally opt-in from the chat UI. Normal chat continues to
+   * use `/session/:id/input`; ACP prompt mode exercises the SemOS language
+   * pack / validation / dry-run loop and returns a structured trace for HIL.
+   */
+  async sendAcpPrompt(
+    sessionId: string,
+    request: SendMessageRequest,
+  ): Promise<SendMessageResponse> {
+    const promptText = isAcpPromptCommand(request.message)
+      ? acpPromptTextFromCommand(request.message)
+      : request.message.trim();
+    if (!promptText) {
+      throw new Error("ACP prompt requires a non-empty utterance");
+    }
+
+    const envelope = await acpApi.prompt<AcpPromptGatewayResult>(sessionId, {
+      prompt: [
+        {
+          type: "text",
+          text: promptText,
+        },
+      ],
+    });
+
+    return {
+      message: buildAcpPromptAssistantMessage(sessionId, envelope),
+      session: {
+        id: sessionId,
+        title: "",
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+        messages: [],
+      },
     };
   },
 

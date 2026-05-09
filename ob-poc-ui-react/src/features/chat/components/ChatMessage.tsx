@@ -7,6 +7,7 @@ import { User, Bot, AlertCircle, CheckCircle, Loader2 } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import type {
+  AcpTraceSummary,
   ChatMessage as ChatMessageType,
   DiscoverySelection,
   ToolCall,
@@ -131,6 +132,102 @@ function CoderProposalCard({ message }: { message: ChatMessageType }) {
           <code>{message.coder_proposal.dsl}</code>
         </pre>
       )}
+    </div>
+  );
+}
+
+function AcpTraceCard({ trace }: { trace: AcpTraceSummary }) {
+  const statusLabel = trace.outcome || trace.status;
+  const detailItems = [
+    trace.outcome_layer ? `layer: ${trace.outcome_layer}` : null,
+    trace.transition_ref ? `transition: ${trace.transition_ref}` : null,
+    trace.refusal_code ? `refusal: ${trace.refusal_code}` : null,
+    trace.pending_question_code
+      ? `pending: ${trace.pending_question_code}`
+      : null,
+    trace.revision_count !== undefined
+      ? `revisions: ${trace.revision_count}`
+      : null,
+  ].filter((item): item is string => Boolean(item));
+
+  return (
+    <div className="mt-2 rounded-lg border border-[var(--border-primary)] bg-[var(--bg-tertiary)] p-3 text-sm">
+      <div className="flex items-center justify-between gap-2">
+        <div className="text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]">
+          ACP Trace
+        </div>
+        <span className="rounded bg-[var(--bg-secondary)] px-2 py-1 text-xs font-mono text-[var(--text-secondary)]">
+          {statusLabel}
+        </span>
+      </div>
+
+      {trace.human_summary && (
+        <div className="mt-2 text-xs text-[var(--text-secondary)]">
+          {trace.human_summary}
+        </div>
+      )}
+
+      {detailItems.length > 0 && (
+        <div className="mt-2 flex flex-wrap gap-2">
+          {detailItems.map((item) => (
+            <span
+              key={item}
+              className="rounded bg-[var(--bg-secondary)] px-2 py-1 text-xs text-[var(--text-secondary)]"
+            >
+              {item}
+            </span>
+          ))}
+        </div>
+      )}
+
+      {trace.needed_from_user && trace.needed_from_user.length > 0 && (
+        <div className="mt-3">
+          <div className="text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]">
+            Needed From User
+          </div>
+          <ul className="mt-1 list-disc pl-5 text-xs text-[var(--text-secondary)]">
+            {trace.needed_from_user.map((need) => (
+              <li key={need}>{need.replaceAll("_", " ")}</li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {trace.diagnostic_codes && trace.diagnostic_codes.length > 0 && (
+        <div className="mt-3">
+          <div className="text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]">
+            Diagnostics
+          </div>
+          <div className="mt-1 flex flex-wrap gap-2">
+            {trace.diagnostic_codes.map((code) => (
+              <span
+                key={code}
+                className="rounded bg-[var(--bg-secondary)] px-2 py-1 font-mono text-xs text-[var(--text-secondary)]"
+              >
+                {code}
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
+
+      <div className="mt-3 flex flex-wrap gap-2 text-xs text-[var(--text-secondary)]">
+        {trace.dry_run_valid !== undefined && (
+          <span className="rounded bg-[var(--bg-secondary)] px-2 py-1">
+            dry-run: {trace.dry_run_valid ? "valid" : "not valid"}
+          </span>
+        )}
+        {trace.prose_only_failure !== undefined && (
+          <span className="rounded bg-[var(--bg-secondary)] px-2 py-1">
+            prose-only failure: {trace.prose_only_failure ? "yes" : "no"}
+          </span>
+        )}
+        {trace.semantic_diff_uri && (
+          <span className="rounded bg-[var(--bg-secondary)] px-2 py-1 font-mono">
+            {trace.semantic_diff_uri}
+          </span>
+        )}
+      </div>
     </div>
   );
 }
@@ -430,6 +527,7 @@ export function ChatMessage({
             />
             <ParkedEntriesCard message={message} />
             <CoderProposalCard message={message} />
+            {message.acp_trace && <AcpTraceCard trace={message.acp_trace} />}
             <OnboardingStateCard
               message={message}
               onVerbClick={onSendMessage}

@@ -28,6 +28,28 @@ export interface ChatMessage {
   runbook_plan?: import("../api/runbookPlan").RunbookPlan;
   /** Proactive narration — progress, gaps, suggested next steps (ADR 043). */
   narration?: NarrationPayload;
+  /** Structured ACP prompt / language-loop trace shown to the HIL. */
+  acp_trace?: AcpTraceSummary;
+}
+
+export interface AcpTraceSummary {
+  status: string;
+  outcome?: string;
+  outcome_layer?: string;
+  human_summary?: string;
+  prompt_context_variant?: string;
+  transition_ref?: string;
+  semantic_diff_uri?: string;
+  refusal_code?: string;
+  pending_question_code?: string;
+  needed_from_user?: string[];
+  diagnostic_codes?: string[];
+  dry_run_valid?: boolean;
+  first_pass_valid?: boolean;
+  revision_count?: number;
+  prose_only_failure?: boolean;
+  pending_user_turn_required?: boolean;
+  estimated_user_repair_turns_avoided?: number;
 }
 
 export interface SageExplain {

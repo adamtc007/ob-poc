@@ -6,7 +6,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useEffect, useRef, useCallback, useMemo, useState } from "react";
 import { Loader2, BookOpen } from "lucide-react";
-import { chatApi } from "../../api/chat";
+import { chatApi, isAcpPromptCommand } from "../../api/chat";
 import { scopeApi, type CbuSummary } from "../../api/scope";
 import { observatoryApi } from "../../api/observatory";
 import { FlightDeck } from "./components/FlightDeck";
@@ -301,6 +301,35 @@ export function ChatPage() {
     },
   });
 
+  const acpPromptMutation = useMutation({
+    mutationFn: (message: string) => {
+      if (!sessionId) throw new Error("No session selected");
+      return chatApi.sendAcpPrompt(sessionId, { message });
+    },
+    onMutate: (message) => {
+      addMessage({
+        id: `temp-acp-${Date.now()}`,
+        role: "user",
+        content: message,
+        timestamp: new Date().toISOString(),
+      });
+      setStreaming(true);
+    },
+    onSuccess: (response) => {
+      addMessage(response.message);
+      if (sessionId) {
+        queryClient.invalidateQueries({
+          queryKey: queryKeys.observatory.all(sessionId),
+        });
+      }
+      setStreaming(false);
+    },
+    onError: (err) => {
+      console.error("[ChatPage] sendAcpPrompt failed:", err);
+      setStreaming(false);
+    },
+  });
+
   // Decision reply mutation
   const replyMutation = useMutation({
     mutationFn: (reply: DecisionReply) => {
@@ -393,9 +422,13 @@ export function ChatPage() {
         });
         return;
       }
+      if (isAcpPromptCommand(message)) {
+        acpPromptMutation.mutate(message);
+        return;
+      }
       sendMutation.mutate(message);
     },
-    [sendMutation, navigate],
+    [acpPromptMutation, sendMutation, navigate],
   );
 
   const latestSessionFeedback = useMemo<SessionFeedback | undefined>(() => {
@@ -514,6 +547,7 @@ export function ChatPage() {
             disabled={
               !sessionId ||
               sendMutation.isPending ||
+              acpPromptMutation.isPending ||
               discoverySelectionMutation.isPending
             }
             placeholder={
