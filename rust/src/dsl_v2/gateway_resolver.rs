@@ -631,15 +631,16 @@ fn ref_type_to_nickname(ref_type: RefType) -> &'static str {
         RefType::Service => "SERVICE",
         RefType::Currency => "CURRENCY",
         RefType::ClientType => "CLIENT_TYPE",
-        // ClientGroup uses separate resolver (PgClientGroupResolver), not Gateway
-        // This is a placeholder - Gateway won't have CLIENT_GROUP index
         RefType::ClientGroup => "CLIENT_GROUP",
     }
 }
 
 /// Check if this ref type uses UUID-based lookup
 fn is_uuid_lookup(ref_type: RefType) -> bool {
-    matches!(ref_type, RefType::Cbu | RefType::Entity | RefType::Document)
+    matches!(
+        ref_type,
+        RefType::Cbu | RefType::Entity | RefType::Document | RefType::ClientGroup
+    )
 }
 
 #[cfg(test)]

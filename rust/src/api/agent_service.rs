@@ -102,7 +102,6 @@
 //! Both `agentic_server` and `ob-poc-web` should use this service.
 
 use crate::agent::learning::embedder::CandleEmbedder;
-use crate::api::client_group_adapter::ClientGroupEmbedderAdapter;
 
 use crate::api::session::DisambiguationRequest;
 use crate::dsl_v2::ast::AstNode;
@@ -2127,14 +2126,9 @@ impl AgentService {
     /// Returns the entity if exactly one match is found,
     /// or a list of suggestions if multiple/no matches.
     ///
-    /// For client_group type, uses PgClientGroupResolver with semantic search.
     async fn resolve_entity(&self, entity_type: &str, name: &str) -> Result<ResolveResult, String> {
-        // Special handling for client_group - uses PgClientGroupResolver
-        if entity_type == "client_group" || entity_type == "client" {
-            return self.resolve_client_group(name).await;
-        }
-
         let ref_type = match entity_type {
+            "client_group" | "client" => RefType::ClientGroup,
             "cbu" => RefType::Cbu,
             "entity" | "person" | "company" => RefType::Entity,
             "product" => RefType::Product,
@@ -2152,51 +2146,5 @@ impl AgentService {
             .resolve(ref_type, name)
             .await
             .map_err(|e| format!("Resolution failed: {}", e))
-    }
-
-    /// Resolve a client group by name using PgClientGroupResolver
-    async fn resolve_client_group(&self, name: &str) -> Result<ResolveResult, String> {
-        use crate::dsl_v2::ref_resolver::SuggestedMatch;
-        use ob_semantic_matcher::client_group_resolver::{
-            ClientGroupAliasResolver, ClientGroupResolveError, ResolutionConfig,
-        };
-
-        let adapter = ClientGroupEmbedderAdapter(self.embedder.clone());
-        let resolver = ob_semantic_matcher::client_group_resolver::PgClientGroupResolver::new(
-            self.pool.clone(),
-            Arc::new(adapter),
-            "BAAI/bge-small-en-v1.5".to_string(),
-        );
-
-        let config = ResolutionConfig::default();
-
-        match resolver.resolve_alias(name, &config).await {
-            Ok(m) => {
-                // Single confident match
-                Ok(ResolveResult::Found {
-                    id: m.group_id,
-                    display: m.canonical_name,
-                })
-            }
-            Err(ClientGroupResolveError::Ambiguous { candidates, .. }) => {
-                // Multiple candidates - return suggestions
-                let suggestions = candidates
-                    .into_iter()
-                    .map(|c| SuggestedMatch {
-                        value: c.group_id.to_string(),
-                        display: c.canonical_name,
-                        score: c.similarity_score,
-                    })
-                    .collect();
-                Ok(ResolveResult::NotFound { suggestions })
-            }
-            Err(ClientGroupResolveError::NoMatch(_)) => {
-                // No match - return empty suggestions
-                Ok(ResolveResult::NotFound {
-                    suggestions: vec![],
-                })
-            }
-            Err(e) => Err(format!("Client group resolution failed: {}", e)),
-        }
     }
 }

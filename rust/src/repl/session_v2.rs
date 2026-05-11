@@ -347,6 +347,98 @@ impl ReplSessionV2 {
         self.set_workspace(workspace);
     }
 
+    /// Apply an entity lookup result to the persisted REPL/DAG session state.
+    ///
+    /// Returns `true` when the top-of-stack DAG subject changed and should be
+    /// rehydrated.
+    ///
+    /// # Examples
+    /// ```rust,ignore
+    /// let changed = session.apply_lookup_result(&lookup_result);
+    /// if changed {
+    ///     // Rehydrate the top-of-stack workspace before returning feedback.
+    /// }
+    /// ```
+    pub(crate) fn apply_lookup_result(&mut self, result: &LookupResult) -> bool {
+        self.last_entity_resolution = Some(result.into());
+        self.clear_last_entity_bindings();
+
+        let Some(entity) = result.dominant_entity.as_ref() else {
+            self.last_active_at = Utc::now();
+            self.sync_session_stack_state();
+            return false;
+        };
+        if entity.entity_id.is_nil() {
+            self.last_active_at = Utc::now();
+            self.sync_session_stack_state();
+            return false;
+        }
+
+        self.bindings.insert(
+            "last_entity_id".to_string(),
+            serde_json::json!(entity.entity_id.to_string()),
+        );
+        self.bindings.insert(
+            "last_entity_kind".to_string(),
+            serde_json::json!(entity.entity_kind.as_str()),
+        );
+        self.bindings.insert(
+            "last_entity_name".to_string(),
+            serde_json::json!(entity.canonical_name.as_str()),
+        );
+        let normalized_kind = binding_key_fragment(&entity.entity_kind);
+        if !normalized_kind.is_empty() {
+            self.bindings.insert(
+                format!("last_{normalized_kind}_id"),
+                serde_json::json!(entity.entity_id.to_string()),
+            );
+        }
+
+        let subject_kind = subject_kind_for_entity_kind(&entity.entity_kind);
+        if matches!(subject_kind, Some(SubjectKind::Cbu)) {
+            self.cbu_ids.retain(|id| *id != entity.entity_id);
+            self.cbu_ids.push(entity.entity_id);
+        }
+
+        let mut subject_changed = false;
+        if let Some(kind) = subject_kind {
+            if let Some(tos) = self.workspace_stack.last_mut() {
+                let supported = tos.workspace.registry_entry().subject_kinds.contains(&kind);
+                if supported
+                    && (tos.subject_kind.as_ref() != Some(&kind)
+                        || tos.subject_id != Some(entity.entity_id))
+                {
+                    tos.subject_kind = Some(kind);
+                    tos.subject_id = Some(entity.entity_id);
+                    tos.hydrated_state = None;
+                    tos.stale = true;
+                    subject_changed = true;
+                }
+            }
+        }
+
+        self.last_active_at = Utc::now();
+        self.sync_session_stack_state();
+        subject_changed
+    }
+
+    fn clear_last_entity_bindings(&mut self) {
+        let previous_kind_key = self
+            .bindings
+            .get("last_entity_kind")
+            .and_then(|value| value.as_str())
+            .map(binding_key_fragment);
+
+        self.bindings.remove("last_entity_id");
+        self.bindings.remove("last_entity_kind");
+        self.bindings.remove("last_entity_name");
+        if let Some(kind_key) = previous_kind_key {
+            if !kind_key.is_empty() {
+                self.bindings.remove(&format!("last_{kind_key}_id"));
+            }
+        }
+    }
+
     /// Return the current session scope if the client group is known.
     ///
     /// # Examples
@@ -1066,6 +1158,43 @@ fn subject_kind_to_shared(
     }
 }
 
+fn subject_kind_for_entity_kind(entity_kind: &str) -> Option<SubjectKind> {
+    match binding_key_fragment(entity_kind).as_str() {
+        "client_group" | "clientgroup" => Some(SubjectKind::ClientGroup),
+        "cbu" | "fund" | "client_business_unit" | "client_business_unit_entity" => {
+            Some(SubjectKind::Cbu)
+        }
+        "deal" => Some(SubjectKind::Deal),
+        "case" | "kyc_case" => Some(SubjectKind::Case),
+        "handoff" => Some(SubjectKind::Handoff),
+        "matrix" | "instrument_matrix" => Some(SubjectKind::Matrix),
+        "product" => Some(SubjectKind::Product),
+        "service" => Some(SubjectKind::Service),
+        "resource" => Some(SubjectKind::Resource),
+        "attribute" => Some(SubjectKind::Attribute),
+        "" | "company" | "entity" | "document" | "legal_entity" | "jurisdiction" => None,
+        _ => None,
+    }
+}
+
+fn binding_key_fragment(value: &str) -> String {
+    value
+        .trim()
+        .chars()
+        .map(|ch| {
+            if ch.is_ascii_alphanumeric() {
+                ch.to_ascii_lowercase()
+            } else {
+                '_'
+            }
+        })
+        .collect::<String>()
+        .split('_')
+        .filter(|part| !part.is_empty())
+        .collect::<Vec<_>>()
+        .join("_")
+}
+
 /// A single message in the session conversation history.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ChatMessage {
@@ -1103,6 +1232,63 @@ required_context:
 "#;
         let (manifest, _) = crate::journey::pack::load_pack_from_bytes(yaml.as_bytes()).unwrap();
         Arc::new(manifest)
+    }
+
+    fn lookup_with_dominant(
+        entity_id: Uuid,
+        entity_kind: &str,
+        canonical_name: &str,
+    ) -> crate::lookup::LookupResult {
+        crate::lookup::LookupResult {
+            entity_snapshot: crate::lookup::EntitySnapshotMetadata {
+                hash: "snapshot-hash".to_string(),
+                version: 1,
+                entity_count: 7,
+            },
+            verbs: Vec::new(),
+            entities: vec![crate::entity_linking::EntityResolution {
+                mention_span: (0, 7),
+                mention_text: canonical_name.to_string(),
+                candidates: vec![crate::entity_linking::EntityCandidate {
+                    entity_id,
+                    entity_kind: entity_kind.to_string(),
+                    canonical_name: canonical_name.to_string(),
+                    score: 0.92,
+                    evidence: Vec::new(),
+                }],
+                selected: Some(entity_id),
+                confidence: 0.92,
+                evidence: Vec::new(),
+            }],
+            dominant_entity: Some(crate::lookup::service::DominantEntity {
+                entity_id,
+                canonical_name: canonical_name.to_string(),
+                entity_kind: entity_kind.to_string(),
+                confidence: 0.92,
+                mention_span: (0, 7),
+            }),
+            expected_kinds: vec![entity_kind.to_string()],
+            concepts: Vec::new(),
+            verb_matched: false,
+            entities_resolved: true,
+        }
+    }
+
+    fn lookup_without_dominant() -> crate::lookup::LookupResult {
+        crate::lookup::LookupResult {
+            entity_snapshot: crate::lookup::EntitySnapshotMetadata {
+                hash: "snapshot-hash".to_string(),
+                version: 1,
+                entity_count: 7,
+            },
+            verbs: Vec::new(),
+            entities: Vec::new(),
+            dominant_entity: None,
+            expected_kinds: Vec::new(),
+            concepts: Vec::new(),
+            verb_matched: false,
+            entities_resolved: false,
+        }
     }
 
     #[test]
@@ -1223,6 +1409,112 @@ required_context:
         );
         assert_eq!(entity_resolution.mentions.len(), 1);
         assert_eq!(entity_resolution.mentions[0].selected_id, Some(entity_id));
+    }
+
+    #[test]
+    fn test_apply_lookup_result_updates_repl_and_dag_subject() {
+        let entity_id = Uuid::new_v4();
+        let lookup = lookup_with_dominant(entity_id, "cbu", "Allianz Fund");
+
+        let mut session = ReplSessionV2::new();
+        session.set_client_scope(Uuid::new_v4());
+        session.set_workspace_root(WorkspaceKind::Cbu);
+
+        assert!(session.apply_lookup_result(&lookup));
+        assert_eq!(session.cbu_ids, vec![entity_id]);
+        assert_eq!(
+            session
+                .bindings
+                .get("last_entity_id")
+                .and_then(|value| value.as_str())
+                .map(ToOwned::to_owned),
+            Some(entity_id.to_string())
+        );
+        assert_eq!(
+            session
+                .tos_frame()
+                .and_then(|frame| frame.subject_kind.clone()),
+            Some(SubjectKind::Cbu)
+        );
+        assert_eq!(
+            session.tos_frame().and_then(|frame| frame.subject_id),
+            Some(entity_id)
+        );
+        assert_eq!(
+            session.session_stack.workspace_stack[0].subject_id,
+            Some(entity_id)
+        );
+    }
+
+    #[test]
+    fn test_apply_lookup_result_clears_last_entity_when_no_entity_selected() {
+        let entity_id = Uuid::new_v4();
+        let lookup = lookup_with_dominant(entity_id, "cbu", "Allianz Fund");
+
+        let mut session = ReplSessionV2::new();
+        session.set_client_scope(Uuid::new_v4());
+        session.set_workspace_root(WorkspaceKind::Cbu);
+        assert!(session.apply_lookup_result(&lookup));
+
+        assert!(!session.apply_lookup_result(&lookup_without_dominant()));
+        assert!(!session.bindings.contains_key("last_entity_id"));
+        assert!(!session.bindings.contains_key("last_entity_kind"));
+        assert!(!session.bindings.contains_key("last_entity_name"));
+        assert!(!session.bindings.contains_key("last_cbu_id"));
+        assert_eq!(
+            session.tos_frame().and_then(|frame| frame.subject_id),
+            Some(entity_id)
+        );
+        assert!(session
+            .last_entity_resolution
+            .as_ref()
+            .is_some_and(|resolution| resolution.dominant_entity.is_none()));
+    }
+
+    #[test]
+    fn test_apply_lookup_result_ignores_nil_entity_id() {
+        let lookup = lookup_with_dominant(Uuid::nil(), "cbu", "Empty Fund");
+
+        let mut session = ReplSessionV2::new();
+        session.set_client_scope(Uuid::new_v4());
+        session.set_workspace_root(WorkspaceKind::Cbu);
+
+        assert!(!session.apply_lookup_result(&lookup));
+        assert!(session.cbu_ids.is_empty());
+        assert!(!session.bindings.contains_key("last_entity_id"));
+        assert!(session
+            .tos_frame()
+            .is_some_and(|frame| frame.subject_id.is_none()));
+    }
+
+    #[test]
+    fn test_apply_lookup_result_reselection_updates_cbu_recency_without_duplicates() {
+        let first_id = Uuid::new_v4();
+        let second_id = Uuid::new_v4();
+        let first_lookup = lookup_with_dominant(first_id, "cbu", "First Fund");
+        let second_lookup = lookup_with_dominant(second_id, "cbu", "Second Fund");
+
+        let mut session = ReplSessionV2::new();
+        session.set_client_scope(Uuid::new_v4());
+        session.set_workspace_root(WorkspaceKind::Cbu);
+
+        assert!(session.apply_lookup_result(&first_lookup));
+        assert!(session.apply_lookup_result(&second_lookup));
+        assert!(session.apply_lookup_result(&first_lookup));
+
+        assert_eq!(session.cbu_ids, vec![second_id, first_id]);
+        assert_eq!(
+            session.tos_frame().and_then(|frame| frame.subject_id),
+            Some(first_id)
+        );
+        assert_eq!(
+            session
+                .bindings
+                .get("last_cbu_id")
+                .and_then(|value| value.as_str())
+                .map(ToOwned::to_owned),
+            Some(first_id.to_string())
+        );
     }
 
     #[test]

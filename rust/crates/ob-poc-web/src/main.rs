@@ -1220,9 +1220,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         // Create RunbookStore — shared store for compiled runbook artifacts.
         // INV-3: all execution must go through execute_runbook(CompiledRunbookId).
         let runbook_store = Arc::new(ob_poc::runbook::RunbookStore::new());
+        let session_repository = Arc::new(
+            ob_poc::repl::session_repository::SessionRepositoryV2::new(pool.clone()),
+        );
 
         let mut orchestrator = ReplOrchestratorV2::new(pack_router, legacy_executor)
             .with_pool(pool.clone())
+            .with_session_repository(session_repository)
             .with_runbook_store(runbook_store)
             .with_orchestrated_verbs(orchestrated_verbs);
 

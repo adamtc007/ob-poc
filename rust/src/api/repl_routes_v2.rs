@@ -762,6 +762,13 @@ async fn push_session_context(
         .await
         .map_err(as_json_error)?;
 
+    #[cfg(feature = "database")]
+    let turn_lock = state
+        .orchestrator
+        .acquire_session_turn_record_lock(request.context.session_id)
+        .await
+        .map_err(anyhow_json_error)?;
+
     let existing = state
         .orchestrator
         .get_session(request.context.session_id)
@@ -821,9 +828,13 @@ async fn push_session_context(
         .map_err(anyhow_json_error)?;
     state
         .orchestrator
-        .persist_session_checkpoint(request.context.session_id)
+        .persist_session_checkpoint_with_record_lock(request.context.session_id)
         .await
         .map_err(anyhow_json_error)?;
+    #[cfg(feature = "database")]
+    if let Some(lock) = turn_lock {
+        lock.release().await.map_err(anyhow_json_error)?;
+    }
 
     Ok(Json(SessionFeedbackResponse { resolved, feedback }))
 }
@@ -832,6 +843,13 @@ async fn commit_session_context(
     State(state): State<ReplV2RouteState>,
     Json(request): Json<SessionStackRequest>,
 ) -> Result<Json<SessionFeedback>, (StatusCode, Json<ErrorResponseV2>)> {
+    #[cfg(feature = "database")]
+    let turn_lock = state
+        .orchestrator
+        .acquire_session_turn_record_lock(request.session_id)
+        .await
+        .map_err(anyhow_json_error)?;
+
     // R1.3: AgentMode gate
     if let Some(session) = state.orchestrator.get_session(request.session_id).await {
         if !session.agent_mode.can_stack_op() {
@@ -856,9 +874,13 @@ async fn commit_session_context(
         .map_err(anyhow_json_error)?;
     state
         .orchestrator
-        .persist_session_checkpoint(request.session_id)
+        .persist_session_checkpoint_with_record_lock(request.session_id)
         .await
         .map_err(anyhow_json_error)?;
+    #[cfg(feature = "database")]
+    if let Some(lock) = turn_lock {
+        lock.release().await.map_err(anyhow_json_error)?;
+    }
     Ok(Json(feedback))
 }
 
@@ -866,6 +888,13 @@ async fn pop_session_context(
     State(state): State<ReplV2RouteState>,
     Json(request): Json<SessionStackRequest>,
 ) -> Result<Json<SessionFeedback>, (StatusCode, Json<ErrorResponseV2>)> {
+    #[cfg(feature = "database")]
+    let turn_lock = state
+        .orchestrator
+        .acquire_session_turn_record_lock(request.session_id)
+        .await
+        .map_err(anyhow_json_error)?;
+
     // R1.3: AgentMode gate
     if let Some(session) = state.orchestrator.get_session(request.session_id).await {
         if !session.agent_mode.can_stack_op() {
@@ -890,9 +919,13 @@ async fn pop_session_context(
         .map_err(anyhow_json_error)?;
     state
         .orchestrator
-        .persist_session_checkpoint(request.session_id)
+        .persist_session_checkpoint_with_record_lock(request.session_id)
         .await
         .map_err(anyhow_json_error)?;
+    #[cfg(feature = "database")]
+    if let Some(lock) = turn_lock {
+        lock.release().await.map_err(anyhow_json_error)?;
+    }
     Ok(Json(feedback))
 }
 
@@ -1354,6 +1387,7 @@ fn build_live_acp_projection(
             "workspace_stack": repl_session.workspace_stack,
             "session_stack": repl_session.session_stack,
             "bindings": repl_session.bindings,
+            "entity_resolution": repl_session.last_entity_resolution,
             "runbook_plan_cursor": repl_session.runbook_plan_cursor,
         }),
         AcpProjectionKind::Dag => serde_json::json!({
@@ -1426,6 +1460,7 @@ fn build_live_acp_projection(
             "trace_sequence": repl_session.trace_sequence,
             "trace": repl_session.trace,
             "session_stack": repl_session.session_stack,
+            "entity_resolution": repl_session.last_entity_resolution,
         }),
         AcpProjectionKind::EvidenceSchema => serde_json::json!({
             "status": "live",
@@ -3620,6 +3655,23 @@ async fn append_session_trace_if_present(
     session_id: Uuid,
     op: crate::repl::session_trace::TraceOp,
 ) {
+    #[cfg(feature = "database")]
+    let turn_lock = match state
+        .orchestrator
+        .acquire_session_turn_record_lock(session_id)
+        .await
+    {
+        Ok(lock) => lock,
+        Err(error) => {
+            tracing::warn!(
+                session_id = %session_id,
+                error = %error,
+                "Failed to acquire session record lock for ACP/workbook trace"
+            );
+            return;
+        }
+    };
+
     let sessions = state.orchestrator.sessions_for_test();
     let mut sessions_write = sessions.write().await;
     let Some(session) = sessions_write.get_mut(&session_id) else {
@@ -3629,7 +3681,7 @@ async fn append_session_trace_if_present(
     drop(sessions_write);
     if let Err(error) = state
         .orchestrator
-        .persist_session_checkpoint(session_id)
+        .persist_session_checkpoint_with_record_lock(session_id)
         .await
     {
         tracing::warn!(
@@ -3637,6 +3689,16 @@ async fn append_session_trace_if_present(
             error = %error,
             "Failed to persist ACP/workbook trace checkpoint"
         );
+    }
+    #[cfg(feature = "database")]
+    if let Some(lock) = turn_lock {
+        if let Err(error) = lock.release().await {
+            tracing::warn!(
+                session_id = %session_id,
+                error = %error,
+                "Failed to release session record lock for ACP/workbook trace"
+            );
+        }
     }
 }
 
@@ -3649,6 +3711,13 @@ async fn compile_runbook_plan(
     State(state): State<ReplV2RouteState>,
     Path(session_id): Path<Uuid>,
 ) -> Result<Json<serde_json::Value>, (StatusCode, Json<ErrorResponseV2>)> {
+    #[cfg(feature = "database")]
+    let turn_lock = state
+        .orchestrator
+        .acquire_session_turn_record_lock(session_id)
+        .await
+        .map_err(anyhow_json_error)?;
+
     let sessions = state.orchestrator.sessions_for_test();
     let mut sessions_write = sessions.write().await;
     let session = sessions_write.get_mut(&session_id).ok_or_else(|| {
@@ -3747,9 +3816,13 @@ async fn compile_runbook_plan(
     drop(sessions_write);
     state
         .orchestrator
-        .persist_session_checkpoint(session_id)
+        .persist_session_checkpoint_with_record_lock(session_id)
         .await
         .map_err(anyhow_json_error)?;
+    #[cfg(feature = "database")]
+    if let Some(lock) = turn_lock {
+        lock.release().await.map_err(anyhow_json_error)?;
+    }
 
     Ok(Json(serde_json::json!({
         "status": "compiled",
@@ -3794,6 +3867,13 @@ async fn approve_runbook_plan(
     State(state): State<ReplV2RouteState>,
     Path(session_id): Path<Uuid>,
 ) -> Result<Json<serde_json::Value>, (StatusCode, Json<ErrorResponseV2>)> {
+    #[cfg(feature = "database")]
+    let turn_lock = state
+        .orchestrator
+        .acquire_session_turn_record_lock(session_id)
+        .await
+        .map_err(anyhow_json_error)?;
+
     let sessions = state.orchestrator.sessions_for_test();
     let mut sessions_write = sessions.write().await;
     let session = sessions_write.get_mut(&session_id).ok_or_else(|| {
@@ -3849,9 +3929,13 @@ async fn approve_runbook_plan(
     drop(sessions_write);
     state
         .orchestrator
-        .persist_session_checkpoint(session_id)
+        .persist_session_checkpoint_with_record_lock(session_id)
         .await
         .map_err(anyhow_json_error)?;
+    #[cfg(feature = "database")]
+    if let Some(lock) = turn_lock {
+        lock.release().await.map_err(anyhow_json_error)?;
+    }
     Ok(Json(
         serde_json::json!({ "status": "approved", "plan_id": plan_id }),
     ))
@@ -3862,6 +3946,13 @@ async fn execute_runbook_plan(
     State(state): State<ReplV2RouteState>,
     Path(session_id): Path<Uuid>,
 ) -> Result<Json<serde_json::Value>, (StatusCode, Json<ErrorResponseV2>)> {
+    #[cfg(feature = "database")]
+    let turn_lock = state
+        .orchestrator
+        .acquire_session_turn_record_lock(session_id)
+        .await
+        .map_err(anyhow_json_error)?;
+
     ensure_runbook_step_workspace_ready(&state, session_id).await?;
 
     // Phase 1: Read session data under a brief read lock, then release before async work.
@@ -4112,9 +4203,13 @@ async fn execute_runbook_plan(
         drop(sessions_write);
         state
             .orchestrator
-            .persist_session_checkpoint(session_id)
+            .persist_session_checkpoint_with_record_lock(session_id)
             .await
             .map_err(anyhow_json_error)?;
+        #[cfg(feature = "database")]
+        if let Some(lock) = turn_lock {
+            lock.release().await.map_err(anyhow_json_error)?;
+        }
         Ok(response)
     }
 }
@@ -4124,6 +4219,13 @@ async fn cancel_runbook_plan(
     State(state): State<ReplV2RouteState>,
     Path(session_id): Path<Uuid>,
 ) -> Result<Json<serde_json::Value>, (StatusCode, Json<ErrorResponseV2>)> {
+    #[cfg(feature = "database")]
+    let turn_lock = state
+        .orchestrator
+        .acquire_session_turn_record_lock(session_id)
+        .await
+        .map_err(anyhow_json_error)?;
+
     let sessions = state.orchestrator.sessions_for_test();
     let mut sessions_write = sessions.write().await;
     let session = sessions_write.get_mut(&session_id).ok_or_else(|| {
@@ -4151,9 +4253,13 @@ async fn cancel_runbook_plan(
     drop(sessions_write);
     state
         .orchestrator
-        .persist_session_checkpoint(session_id)
+        .persist_session_checkpoint_with_record_lock(session_id)
         .await
         .map_err(anyhow_json_error)?;
+    #[cfg(feature = "database")]
+    if let Some(lock) = turn_lock {
+        lock.release().await.map_err(anyhow_json_error)?;
+    }
     Ok(Json(serde_json::json!({
         "status": "cancelled",
         "steps_cancelled": cancelled.len()

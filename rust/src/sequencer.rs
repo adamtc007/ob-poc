@@ -591,47 +591,118 @@ impl ReplOrchestratorV2 {
 
     /// Persist the current snapshot of a session, if persistence is configured.
     pub async fn persist_session_checkpoint(&self, session_id: Uuid) -> anyhow::Result<()> {
-        let Some(session) = self.get_session(session_id).await else {
-            anyhow::bail!("session {session_id} not found for persistence");
-        };
+        self.persist_session_checkpoint_inner(session_id, false)
+            .await
+    }
+
+    async fn persist_session_checkpoint_inner(
+        &self,
+        session_id: Uuid,
+        record_lock_held: bool,
+    ) -> anyhow::Result<()> {
         #[cfg(feature = "database")]
         if let Some(ref repo) = self.session_repository {
-            let version = self
-                .persistence_versions
-                .read()
-                .await
-                .get(&session_id)
-                .copied()
-                .unwrap_or(0);
-            let new_version = repo.save_session(&session, version).await?;
-            self.persistence_versions
-                .write()
-                .await
-                .insert(session_id, new_version);
+            let Some(session) = self.get_session(session_id).await else {
+                anyhow::bail!("session {session_id} not found for persistence");
+            };
+            self.save_session_snapshot(repo, &session, record_lock_held)
+                .await?;
+        }
+        #[cfg(not(feature = "database"))]
+        {
+            if self.get_session(session_id).await.is_none() {
+                anyhow::bail!("session {session_id} not found for persistence");
+            }
         }
         Ok(())
     }
 
-    /// Record an externally-handled chat exchange against the REPL session.
+    pub(crate) async fn persist_session_checkpoint_with_record_lock(
+        &self,
+        session_id: Uuid,
+    ) -> anyhow::Result<()> {
+        self.persist_session_checkpoint_inner(session_id, true)
+            .await
+    }
+
+    #[cfg(feature = "database")]
+    async fn save_session_snapshot(
+        &self,
+        repo: &crate::repl::session_repository::SessionRepositoryV2,
+        session: &ReplSessionV2,
+        record_lock_held: bool,
+    ) -> anyhow::Result<i64> {
+        let mut versions = self.persistence_versions.write().await;
+        let version = versions.get(&session.id).copied().unwrap_or(0);
+        let new_version = if record_lock_held {
+            repo.save_session_with_record_lock(session, version).await?
+        } else {
+            repo.save_session(session, version).await?
+        };
+        versions.insert(session.id, new_version);
+        Ok(new_version)
+    }
+
+    #[cfg(feature = "database")]
+    pub(crate) async fn acquire_session_turn_record_lock(
+        &self,
+        session_id: Uuid,
+    ) -> anyhow::Result<Option<crate::repl::session_repository::SessionRecordLock>> {
+        let Some(repo) = self.session_repository.as_ref() else {
+            return Ok(None);
+        };
+        let record_lock = repo.acquire_session_record_lock(session_id).await?;
+        if let Some((mut session, version)) = repo.load_session(session_id).await? {
+            session.rehydrate(&self.pack_router);
+            self.restore_session_with_version(session, version).await;
+        }
+        Ok(Some(record_lock))
+    }
+
+    /// Record a Sage/ACP-owned chat exchange against the shared REPL session record.
     ///
-    /// Used by ACP prompt handling when `/api/session/:id/input` routes a
-    /// supported state-transition utterance through ACP rather than the normal
-    /// REPL interpreter.
+    /// This keeps Sage-side utterances on the same durable session surface that
+    /// REPL uses as its DSL assembly workbook.
+    ///
+    /// # Examples
+    /// ```rust,ignore
+    /// orchestrator
+    ///     .record_external_chat_exchange(session_id, user_text, assistant_text)
+    ///     .await?;
+    /// ```
     pub async fn record_external_chat_exchange(
         &self,
         session_id: Uuid,
         user_message: String,
         assistant_message: String,
     ) -> anyhow::Result<()> {
+        #[cfg(feature = "database")]
+        let turn_lock = self.acquire_session_turn_record_lock(session_id).await?;
+
+        let lookup_result = if let Some(lookup_service) = &self.lookup_service {
+            Some(lookup_service.analyze(&user_message, 5).await)
+        } else {
+            None
+        };
+
         {
             let mut sessions = self.sessions.write().await;
             let session = sessions
                 .get_mut(&session_id)
                 .ok_or(OrchestratorError::SessionNotFound(session_id))?;
+            if let Some(result) = lookup_result.as_ref() {
+                session.apply_lookup_result(result);
+            }
             session.push_message(MessageRole::User, user_message);
             session.push_message(MessageRole::Assistant, assistant_message);
         }
-        self.persist_session_checkpoint(session_id).await
+        self.persist_session_checkpoint_with_record_lock(session_id)
+            .await?;
+        #[cfg(feature = "database")]
+        if let Some(lock) = turn_lock {
+            lock.release().await?;
+        }
+        Ok(())
     }
 
     /// Push a new workspace frame onto the session stack.
@@ -810,7 +881,11 @@ impl ReplOrchestratorV2 {
             other => anyhow::bail!("Invalid signal status: {}", other),
         };
 
+        #[cfg(feature = "database")]
+        let turn_lock = self.acquire_session_turn_record_lock(session_id).await?;
+
         // 3. Resume the parked entry in the runbook.
+        let mut failed_response = None;
         {
             let mut sessions = self.sessions.write().await;
             let session = sessions
@@ -841,7 +916,9 @@ impl ReplOrchestratorV2 {
                 let response = ReplResponseV2 {
                     state: ReplStateV2::RunbookEditing,
                     kind: ReplResponseKindV2::Error {
-                        error: error.unwrap_or_else(|| "External task failed".into()),
+                        error: error
+                            .clone()
+                            .unwrap_or_else(|| "External task failed".into()),
                         recoverable: true,
                     },
                     message: "External task failed. Edit the runbook or retry.".into(),
@@ -851,8 +928,20 @@ impl ReplOrchestratorV2 {
                     narration: None,
                     trace_id: None,
                 };
-                return Ok(Some(response));
+                failed_response = Some(response);
             }
+        }
+
+        self.persist_session_checkpoint_with_record_lock(session_id)
+            .await?;
+
+        #[cfg(feature = "database")]
+        if let Some(lock) = turn_lock {
+            lock.release().await?;
+        }
+
+        if let Some(response) = failed_response {
+            return Ok(Some(response));
         }
 
         // 4. For "completed" signals, continue execution via the state machine.
@@ -874,6 +963,12 @@ impl ReplOrchestratorV2 {
         session_id: Uuid,
         input: UserInputV2,
     ) -> Result<ReplResponseV2, OrchestratorError> {
+        #[cfg(feature = "database")]
+        let turn_lock = self
+            .acquire_session_turn_record_lock(session_id)
+            .await
+            .map_err(|error| OrchestratorError::PersistenceFailed(error.to_string()))?;
+
         let mut sessions = self.sessions.write().await;
         let session = sessions
             .get_mut(&session_id)
@@ -1183,8 +1278,22 @@ impl ReplOrchestratorV2 {
         drop(sessions);
 
         // Persist session state + trace entries to database (audit trail).
-        if let Err(e) = self.persist_session_checkpoint(session_id).await {
+        if let Err(e) = self
+            .persist_session_checkpoint_with_record_lock(session_id)
+            .await
+        {
             tracing::warn!(session_id = %session_id, error = %e, "Session checkpoint after process() failed");
+        }
+
+        #[cfg(feature = "database")]
+        if let Some(lock) = turn_lock {
+            if let Err(error) = lock.release().await {
+                tracing::warn!(
+                    session_id = %session_id,
+                    error = %error,
+                    "Session turn record lock release failed"
+                );
+            }
         }
 
         Ok(response)
@@ -4310,8 +4419,23 @@ impl ReplOrchestratorV2 {
                 "Stage 2b — entities resolved"
             );
 
-            session.last_entity_resolution = Some((&result).into());
+            let subject_changed = session.apply_lookup_result(&result);
             session.pending_lookup_result = Some(result);
+            #[cfg(feature = "database")]
+            if subject_changed {
+                if let Some(pool) = self.pool() {
+                    match self.rehydrate_tos(pool, session).await {
+                        Ok(hydrated) => session.hydrate_tos(hydrated),
+                        Err(error) => {
+                            tracing::warn!(
+                                session_id = %session.id,
+                                error = %error,
+                                "DAG rehydration failed after entity resolution"
+                            );
+                        }
+                    }
+                }
+            }
         }
 
         // Phase 4 CCIR: Resolve SemOsContextEnvelope and pre-constrain verb search.
@@ -6783,20 +6907,8 @@ impl ReplOrchestratorV2 {
         #[cfg(feature = "database")]
         {
             if let Some(ref repo) = self.session_repository {
-                let version = self
-                    .persistence_versions
-                    .read()
-                    .await
-                    .get(&session.id)
-                    .copied()
-                    .unwrap_or(0);
-                match repo.save_session(session, version).await {
-                    Ok(new_version) => {
-                        self.persistence_versions
-                            .write()
-                            .await
-                            .insert(session.id, new_version);
-                    }
+                match self.save_session_snapshot(repo, session, false).await {
+                    Ok(_) => {}
                     Err(e) => {
                         tracing::warn!(
                             session_id = %session.id,
@@ -6821,21 +6933,12 @@ impl ReplOrchestratorV2 {
         #[cfg(feature = "database")]
         {
             if let Some(ref repo) = self.session_repository {
-                let version = self
-                    .persistence_versions
-                    .read()
-                    .await
-                    .get(&session.id)
-                    .copied()
-                    .unwrap_or(0);
-                let new_version = repo
-                    .save_session(session, version)
-                    .await
-                    .map_err(|e| OrchestratorError::PersistenceFailed(e.to_string()))?;
-                self.persistence_versions
-                    .write()
-                    .await
-                    .insert(session.id, new_version);
+                match self.save_session_snapshot(repo, session, false).await {
+                    Ok(_) => {}
+                    Err(error) => {
+                        return Err(OrchestratorError::PersistenceFailed(error.to_string()));
+                    }
+                }
                 // Also persist any active invocation records.
                 for entry in &session.runbook.entries {
                     if let Some(ref inv) = entry.invocation {
@@ -7762,6 +7865,112 @@ mod tests {
     use super::*;
     use crate::journey::pack::load_pack_from_bytes;
 
+    struct SingleEntityLinker {
+        entity_id: Uuid,
+    }
+
+    struct NamedEntityLinker {
+        entities: std::collections::HashMap<String, Uuid>,
+    }
+
+    impl crate::entity_linking::EntityLinkingService for SingleEntityLinker {
+        fn snapshot_hash(&self) -> &str {
+            "test-snapshot"
+        }
+
+        fn snapshot_version(&self) -> u32 {
+            1
+        }
+
+        fn entity_count(&self) -> usize {
+            1
+        }
+
+        fn resolve_mentions(
+            &self,
+            utterance: &str,
+            _expected_kinds: Option<&[String]>,
+            _context_concepts: Option<&[String]>,
+            _limit: usize,
+        ) -> Vec<crate::entity_linking::EntityResolution> {
+            vec![crate::entity_linking::EntityResolution {
+                mention_span: (0, utterance.len()),
+                mention_text: utterance.to_string(),
+                candidates: vec![crate::entity_linking::EntityCandidate {
+                    entity_id: self.entity_id,
+                    entity_kind: "cbu".to_string(),
+                    canonical_name: "Allianz Fund".to_string(),
+                    score: 0.95,
+                    evidence: Vec::new(),
+                }],
+                selected: Some(self.entity_id),
+                confidence: 0.95,
+                evidence: Vec::new(),
+            }]
+        }
+
+        fn extract_mention_spans(&self, utterance: &str) -> Vec<(usize, usize)> {
+            vec![(0, utterance.len())]
+        }
+    }
+
+    impl crate::entity_linking::EntityLinkingService for NamedEntityLinker {
+        fn snapshot_hash(&self) -> &str {
+            "test-snapshot"
+        }
+
+        fn snapshot_version(&self) -> u32 {
+            1
+        }
+
+        fn entity_count(&self) -> usize {
+            self.entities.len()
+        }
+
+        fn resolve_mentions(
+            &self,
+            utterance: &str,
+            _expected_kinds: Option<&[String]>,
+            _context_concepts: Option<&[String]>,
+            _limit: usize,
+        ) -> Vec<crate::entity_linking::EntityResolution> {
+            let Some((name, entity_id)) = self
+                .entities
+                .iter()
+                .find(|(name, _)| utterance.contains(name.as_str()))
+            else {
+                return Vec::new();
+            };
+
+            vec![crate::entity_linking::EntityResolution {
+                mention_span: (0, utterance.len()),
+                mention_text: utterance.to_string(),
+                candidates: vec![crate::entity_linking::EntityCandidate {
+                    entity_id: *entity_id,
+                    entity_kind: "cbu".to_string(),
+                    canonical_name: name.clone(),
+                    score: 0.95,
+                    evidence: Vec::new(),
+                }],
+                selected: Some(*entity_id),
+                confidence: 0.95,
+                evidence: Vec::new(),
+            }]
+        }
+
+        fn extract_mention_spans(&self, utterance: &str) -> Vec<(usize, usize)> {
+            if self
+                .entities
+                .keys()
+                .any(|name| utterance.contains(name.as_str()))
+            {
+                vec![(0, utterance.len())]
+            } else {
+                Vec::new()
+            }
+        }
+    }
+
     fn onboarding_yaml() -> &'static str {
         r#"
 id: onboarding-request
@@ -7817,6 +8026,288 @@ definition_of_done:
         let id = orch.create_session().await;
         let session = orch.get_session(id).await.unwrap();
         assert!(matches!(session.state, ReplStateV2::ScopeGate { .. }));
+    }
+
+    #[tokio::test]
+    async fn test_external_chat_exchange_updates_shared_entity_session_record() {
+        let entity_id = Uuid::new_v4();
+        let lookup_service = LookupService::new(Arc::new(SingleEntityLinker { entity_id }));
+        let orch = make_orchestrator().with_lookup_service(lookup_service);
+        let session_id = orch.create_session().await;
+        {
+            let mut sessions = orch.sessions.write().await;
+            let session = sessions.get_mut(&session_id).unwrap();
+            session.set_client_scope(Uuid::new_v4());
+            session.set_workspace_root(crate::repl::types_v2::WorkspaceKind::Cbu);
+        }
+
+        orch.record_external_chat_exchange(
+            session_id,
+            "Allianz Fund".to_string(),
+            "Structured ACP response".to_string(),
+        )
+        .await
+        .unwrap();
+
+        let session = orch.get_session(session_id).await.unwrap();
+        assert_eq!(
+            session
+                .last_entity_resolution
+                .as_ref()
+                .and_then(|resolution| resolution.dominant_entity.as_ref())
+                .map(|entity| entity.entity_id),
+            Some(entity_id)
+        );
+        assert_eq!(session.cbu_ids, vec![entity_id]);
+        assert_eq!(
+            session.tos_frame().and_then(|frame| frame.subject_id),
+            Some(entity_id)
+        );
+        assert_eq!(
+            session
+                .bindings
+                .get("last_entity_id")
+                .and_then(|value| value.as_str())
+                .map(ToOwned::to_owned),
+            Some(entity_id.to_string())
+        );
+    }
+
+    #[cfg(feature = "database")]
+    #[sqlx::test(migrations = "./test-migrations/session_repository")]
+    async fn test_checkpoint_rejects_stale_version_without_overwriting_workbook_state(
+        pool: sqlx::PgPool,
+    ) {
+        let repo = Arc::new(crate::repl::session_repository::SessionRepositoryV2::new(
+            pool,
+        ));
+        let orch = make_orchestrator().with_session_repository(Arc::clone(&repo));
+        let session_id = orch.create_session().await;
+
+        {
+            let mut sessions = orch.sessions.write().await;
+            let session = sessions.get_mut(&session_id).unwrap();
+            session.push_message(MessageRole::User, "Sage design pass".to_string());
+        }
+        orch.persist_session_checkpoint(session_id).await.unwrap();
+
+        let proposed_source = "(cbu.update :name \"Compiler Workbook\")";
+        {
+            let mut sessions = orch.sessions.write().await;
+            let session = sessions.get_mut(&session_id).unwrap();
+            session.push_message(MessageRole::User, proposed_source.to_string());
+            session.bindings.insert(
+                "proposed_repl_source".to_string(),
+                serde_json::json!(proposed_source),
+            );
+        }
+
+        orch.persistence_versions
+            .write()
+            .await
+            .insert(session_id, 0);
+        let stale_result = orch.persist_session_checkpoint(session_id).await;
+        assert!(stale_result.is_err());
+
+        let (loaded, version) = repo.load_session(session_id).await.unwrap().unwrap();
+        assert_eq!(version, 1);
+        assert!(!loaded
+            .messages
+            .iter()
+            .any(|message| message.content == proposed_source));
+        assert!(!loaded.bindings.contains_key("proposed_repl_source"));
+    }
+
+    #[cfg(feature = "database")]
+    #[sqlx::test(migrations = "./test-migrations/session_repository")]
+    async fn test_cross_orchestrator_stale_session_cannot_overwrite_newer_workbook_state(
+        pool: sqlx::PgPool,
+    ) {
+        let repo = Arc::new(crate::repl::session_repository::SessionRepositoryV2::new(
+            pool,
+        ));
+        let orch_a = make_orchestrator().with_session_repository(Arc::clone(&repo));
+        let orch_b = make_orchestrator().with_session_repository(Arc::clone(&repo));
+        let session_id = orch_a.create_session().await;
+        orch_a.persist_session_checkpoint(session_id).await.unwrap();
+
+        let (stale_session, stale_version) = repo.load_session(session_id).await.unwrap().unwrap();
+        orch_b
+            .restore_session_with_version(stale_session, stale_version)
+            .await;
+
+        let source_a = "(cbu.update :name \"Committed\")";
+        {
+            let mut sessions = orch_a.sessions.write().await;
+            let session = sessions.get_mut(&session_id).unwrap();
+            session.push_message(MessageRole::User, source_a.to_string());
+            session.bindings.insert(
+                "proposed_repl_source".to_string(),
+                serde_json::json!(source_a),
+            );
+        }
+        orch_a.persist_session_checkpoint(session_id).await.unwrap();
+
+        let source_b = "(cbu.update :name \"Stale\")";
+        {
+            let mut sessions = orch_b.sessions.write().await;
+            let session = sessions.get_mut(&session_id).unwrap();
+            session.push_message(MessageRole::User, source_b.to_string());
+            session.bindings.insert(
+                "proposed_repl_source".to_string(),
+                serde_json::json!(source_b),
+            );
+        }
+        let stale_result = orch_b.persist_session_checkpoint(session_id).await;
+        assert!(stale_result.is_err());
+
+        let (loaded, version) = repo.load_session(session_id).await.unwrap().unwrap();
+        assert_eq!(version, stale_version + 1);
+        assert!(loaded
+            .messages
+            .iter()
+            .any(|message| message.content == source_a));
+        assert!(!loaded
+            .messages
+            .iter()
+            .any(|message| message.content == source_b));
+        assert_eq!(
+            loaded
+                .bindings
+                .get("proposed_repl_source")
+                .and_then(|value| value.as_str()),
+            Some(source_a)
+        );
+    }
+
+    #[cfg(feature = "database")]
+    #[sqlx::test(migrations = "./test-migrations/session_repository")]
+    async fn test_turn_record_lock_blocks_same_session_writer_until_release(pool: sqlx::PgPool) {
+        let repo = Arc::new(crate::repl::session_repository::SessionRepositoryV2::new(
+            pool,
+        ));
+        let orch = Arc::new(make_orchestrator().with_session_repository(Arc::clone(&repo)));
+        let session_id = orch.create_session().await;
+        orch.persist_session_checkpoint(session_id).await.unwrap();
+
+        let lock = repo.acquire_session_record_lock(session_id).await.unwrap();
+        let writer = Arc::clone(&orch);
+        let handle = tokio::spawn(async move {
+            writer
+                .record_external_chat_exchange(
+                    session_id,
+                    "blocked writer".to_string(),
+                    "released writer".to_string(),
+                )
+                .await
+        });
+
+        tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+        assert!(
+            !handle.is_finished(),
+            "same-session writer must block behind the durable turn lock"
+        );
+
+        lock.release().await.unwrap();
+        handle.await.unwrap().unwrap();
+
+        let (loaded, _) = repo.load_session(session_id).await.unwrap().unwrap();
+        assert!(loaded
+            .messages
+            .iter()
+            .any(|message| message.content == "blocked writer"));
+        assert!(loaded
+            .messages
+            .iter()
+            .any(|message| message.content == "released writer"));
+    }
+
+    #[cfg(feature = "database")]
+    #[sqlx::test(migrations = "./test-migrations/session_repository_without_traces")]
+    async fn test_session_checkpoint_survives_missing_trace_table(pool: sqlx::PgPool) {
+        let repo = Arc::new(crate::repl::session_repository::SessionRepositoryV2::new(
+            pool,
+        ));
+        let orch = make_orchestrator().with_session_repository(Arc::clone(&repo));
+        let session_id = orch.create_session().await;
+
+        {
+            let mut sessions = orch.sessions.write().await;
+            let session = sessions.get_mut(&session_id).unwrap();
+            session.push_message(MessageRole::User, "persist without trace table".to_string());
+        }
+
+        orch.persist_session_checkpoint(session_id).await.unwrap();
+
+        let (loaded, version) = repo.load_session(session_id).await.unwrap().unwrap();
+        assert_eq!(version, 1);
+        assert!(loaded
+            .messages
+            .iter()
+            .any(|message| message.content == "persist without trace table"));
+    }
+
+    #[cfg(feature = "database")]
+    #[sqlx::test(migrations = "./test-migrations/session_repository")]
+    async fn test_concurrent_sage_checkpoints_preserve_shared_session_record(pool: sqlx::PgPool) {
+        let entities: std::collections::HashMap<String, Uuid> = (0..6)
+            .map(|idx| (format!("Fund {idx}"), Uuid::new_v4()))
+            .collect();
+        let entity_ids: Vec<Uuid> = entities.values().copied().collect();
+        let lookup_service = LookupService::new(Arc::new(NamedEntityLinker { entities }));
+        let repo = Arc::new(crate::repl::session_repository::SessionRepositoryV2::new(
+            pool,
+        ));
+        let orch = Arc::new(
+            make_orchestrator()
+                .with_lookup_service(lookup_service)
+                .with_session_repository(Arc::clone(&repo)),
+        );
+        let session_id = orch.create_session().await;
+        {
+            let mut sessions = orch.sessions.write().await;
+            let session = sessions.get_mut(&session_id).unwrap();
+            session.set_client_scope(Uuid::new_v4());
+            session.set_workspace_root(crate::repl::types_v2::WorkspaceKind::Cbu);
+        }
+
+        let mut handles = Vec::new();
+        for idx in 0..6 {
+            let orch = Arc::clone(&orch);
+            handles.push(tokio::spawn(async move {
+                orch.record_external_chat_exchange(
+                    session_id,
+                    format!("Open workspace for Fund {idx}"),
+                    format!("Structured response {idx}"),
+                )
+                .await
+            }));
+        }
+        for handle in handles {
+            handle.await.unwrap().unwrap();
+        }
+
+        let (loaded, version) = repo.load_session(session_id).await.unwrap().unwrap();
+        assert!(version >= 6);
+        for idx in 0..6 {
+            assert!(loaded
+                .messages
+                .iter()
+                .any(|message| message.content == format!("Open workspace for Fund {idx}")));
+            assert!(loaded
+                .messages
+                .iter()
+                .any(|message| message.content == format!("Structured response {idx}")));
+        }
+        for entity_id in &entity_ids {
+            assert!(loaded.cbu_ids.contains(entity_id));
+        }
+        assert!(loaded
+            .bindings
+            .get("last_entity_id")
+            .and_then(|value| value.as_str())
+            .and_then(|value| Uuid::parse_str(value).ok())
+            .is_some_and(|entity_id| entity_ids.contains(&entity_id)));
     }
 
     #[tokio::test]

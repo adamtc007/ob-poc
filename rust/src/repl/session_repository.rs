@@ -1,12 +1,12 @@
 //! Session Repository V2 — Database persistence for REPL v2 sessions.
 //!
-//! Sessions are persisted on parking/resumption events (checkpoint-based).
-//! Normal in-memory mutations (adding entries, editing) are NOT persisted —
-//! only critical state changes (park, resume, complete) trigger writes.
+//! Sessions are persisted through orchestrator checkpoints. A normal REPL/Sage
+//! turn checkpoints after `process()`, and critical gates (park, resume,
+//! approve, reject, complete) require a successful checkpoint.
 
 use anyhow::{Context, Result};
-use sqlx::PgPool;
 use sqlx::Row;
+use sqlx::{PgPool, Postgres, Transaction};
 use uuid::Uuid;
 
 use super::runbook::InvocationRecord;
@@ -17,9 +17,59 @@ pub struct SessionRepositoryV2 {
     pool: PgPool,
 }
 
+/// Transaction-scoped lock for one durable REPL session record.
+pub struct SessionRecordLock {
+    tx: Option<Transaction<'static, Postgres>>,
+}
+
+impl SessionRecordLock {
+    /// Release the session record lock.
+    ///
+    /// # Examples
+    /// ```rust,ignore
+    /// let lock = repo.acquire_session_record_lock(session_id).await?;
+    /// lock.release().await?;
+    /// ```
+    pub async fn release(mut self) -> Result<()> {
+        if let Some(tx) = self.tx.take() {
+            tx.commit()
+                .await
+                .context("Failed to release session record lock")?;
+        }
+        Ok(())
+    }
+}
+
 impl SessionRepositoryV2 {
     pub fn new(pool: PgPool) -> Self {
         Self { pool }
+    }
+
+    /// Acquire the durable record lock for a REPL session.
+    ///
+    /// # Examples
+    /// ```rust,ignore
+    /// let lock = repo.acquire_session_record_lock(session_id).await?;
+    /// // Mutate and checkpoint the session while the lock is held.
+    /// lock.release().await?;
+    /// ```
+    pub async fn acquire_session_record_lock(&self, session_id: Uuid) -> Result<SessionRecordLock> {
+        let lock_key = crate::database::locks::lock_key("repl_session_v2", &session_id.to_string());
+        loop {
+            let mut tx = self
+                .pool
+                .begin()
+                .await
+                .context("Failed to begin session lock transaction")?;
+            if crate::database::locks::try_advisory_xact_lock(&mut tx, lock_key)
+                .await
+                .context("Failed to acquire session record lock")?
+            {
+                return Ok(SessionRecordLock { tx: Some(tx) });
+            }
+            drop(tx);
+            tokio::time::sleep(std::time::Duration::from_millis(25)).await;
+        }
     }
 
     /// Save or update a session with optimistic concurrency.
@@ -29,6 +79,33 @@ impl SessionRepositoryV2 {
     /// Returns the new version on success.
     #[allow(deprecated)] // Reads deprecated fields for DB persistence (migration compat)
     pub async fn save_session(&self, session: &ReplSessionV2, version: i64) -> Result<i64> {
+        self.save_session_inner(session, version, true).await
+    }
+
+    /// Save a session while the caller already holds the session record lock.
+    ///
+    /// # Examples
+    /// ```rust,ignore
+    /// let lock = repo.acquire_session_record_lock(session.id).await?;
+    /// let version = repo.save_session_with_record_lock(&session, version).await?;
+    /// lock.release().await?;
+    /// ```
+    #[allow(deprecated)] // Reads deprecated fields for DB persistence (migration compat)
+    pub async fn save_session_with_record_lock(
+        &self,
+        session: &ReplSessionV2,
+        version: i64,
+    ) -> Result<i64> {
+        self.save_session_inner(session, version, false).await
+    }
+
+    #[allow(deprecated)] // Reads deprecated fields for DB persistence (migration compat)
+    async fn save_session_inner(
+        &self,
+        session: &ReplSessionV2,
+        version: i64,
+        acquire_lock: bool,
+    ) -> Result<i64> {
         let state =
             serde_json::to_value(&session.state).context("Failed to serialize session state")?;
         let client_context = session
@@ -66,6 +143,18 @@ impl SessionRepositoryV2 {
         });
 
         let new_version = version + 1;
+        let mut tx = self
+            .pool
+            .begin()
+            .await
+            .context("Failed to begin session save transaction")?;
+        if acquire_lock {
+            let lock_key =
+                crate::database::locks::lock_key("repl_session_v2", &session.id.to_string());
+            crate::database::locks::advisory_xact_lock(&mut tx, lock_key)
+                .await
+                .context("Failed to acquire session record lock")?;
+        }
 
         let rows = sqlx::query(
             r#"
@@ -96,7 +185,7 @@ impl SessionRepositoryV2 {
         .bind(session.last_active_at)
         .bind(new_version)
         .bind(version)
-        .execute(&self.pool)
+        .execute(&mut *tx)
         .await
         .context("Failed to save session")?
         .rows_affected();
@@ -108,14 +197,6 @@ impl SessionRepositoryV2 {
                 version
             );
         }
-
-        #[cfg(feature = "database")]
-        crate::repl::trace_repository::SessionTraceRepository::append_batch(
-            &self.pool,
-            &session.trace,
-        )
-        .await
-        .context("Failed to persist session trace")?;
 
         if let Some(plan) = &session.runbook_plan {
             let status = runbook_plan_status_name(&plan.status);
@@ -149,9 +230,27 @@ impl SessionRepositoryV2 {
             .bind(bindings)
             .bind(approval)
             .bind(plan.compiled_at)
-            .execute(&self.pool)
+            .execute(&mut *tx)
             .await
             .context("Failed to persist runbook plan")?;
+        }
+
+        tx.commit()
+            .await
+            .context("Failed to commit session save transaction")?;
+
+        #[cfg(feature = "database")]
+        if let Err(error) = crate::repl::trace_repository::SessionTraceRepository::append_batch(
+            &self.pool,
+            &session.trace,
+        )
+        .await
+        {
+            tracing::warn!(
+                session_id = %session.id,
+                error = %error,
+                "Failed to persist session trace batch after session checkpoint"
+            );
         }
 
         Ok(new_version)
@@ -356,14 +455,24 @@ impl SessionRepositoryV2 {
 
                 #[cfg(feature = "database")]
                 {
-                    session.trace =
-                        crate::repl::trace_repository::SessionTraceRepository::load_trace(
-                            &self.pool, session.id,
-                        )
-                        .await
-                        .context("Failed to load session trace")?;
-                    if let Some(last) = session.trace.last() {
-                        session.trace_sequence = session.trace_sequence.max(last.sequence);
+                    match crate::repl::trace_repository::SessionTraceRepository::load_trace(
+                        &self.pool, session.id,
+                    )
+                    .await
+                    {
+                        Ok(trace) => {
+                            session.trace = trace;
+                            if let Some(last) = session.trace.last() {
+                                session.trace_sequence = session.trace_sequence.max(last.sequence);
+                            }
+                        }
+                        Err(error) => {
+                            tracing::warn!(
+                                session_id = %session.id,
+                                error = %error,
+                                "Failed to load session trace batch with session checkpoint"
+                            );
+                        }
                     }
                 }
 
@@ -560,5 +669,83 @@ mod tests {
             Some(ob_poc_types::session_stack::SessionWorkspaceKind::Cbu)
         );
         assert_eq!(loaded.session_stack.trace_sequence, 12);
+    }
+
+    #[sqlx::test(migrations = "./test-migrations/session_repository")]
+    async fn test_save_load_preserves_entity_resolution_session_state(pool: PgPool) {
+        let repo = SessionRepositoryV2::new(pool);
+        let entity_id = Uuid::new_v4();
+        let lookup = crate::lookup::LookupResult {
+            entity_snapshot: crate::lookup::EntitySnapshotMetadata {
+                hash: "snapshot-hash".to_string(),
+                version: 1,
+                entity_count: 7,
+            },
+            verbs: Vec::new(),
+            entities: vec![crate::entity_linking::EntityResolution {
+                mention_span: (0, 7),
+                mention_text: "Allianz".to_string(),
+                candidates: vec![crate::entity_linking::EntityCandidate {
+                    entity_id,
+                    entity_kind: "cbu".to_string(),
+                    canonical_name: "Allianz Fund".to_string(),
+                    score: 0.92,
+                    evidence: Vec::new(),
+                }],
+                selected: Some(entity_id),
+                confidence: 0.92,
+                evidence: Vec::new(),
+            }],
+            dominant_entity: Some(crate::lookup::service::DominantEntity {
+                entity_id,
+                canonical_name: "Allianz Fund".to_string(),
+                entity_kind: "cbu".to_string(),
+                confidence: 0.92,
+                mention_span: (0, 7),
+            }),
+            expected_kinds: vec!["cbu".to_string()],
+            concepts: Vec::new(),
+            verb_matched: false,
+            entities_resolved: true,
+        };
+
+        let mut session = ReplSessionV2::new();
+        session.set_client_scope(Uuid::new_v4());
+        session.set_workspace_root(crate::repl::types_v2::WorkspaceKind::Cbu);
+        assert!(session.apply_lookup_result(&lookup));
+
+        let version = repo.save_session(&session, 0).await.unwrap();
+        assert_eq!(version, 1);
+
+        let (loaded, loaded_version) = repo.load_session(session.id).await.unwrap().unwrap();
+        assert_eq!(loaded_version, 1);
+        assert_eq!(loaded.cbu_ids, vec![entity_id]);
+        assert_eq!(
+            loaded
+                .last_entity_resolution
+                .as_ref()
+                .and_then(|resolution| resolution.dominant_entity.as_ref())
+                .map(|entity| entity.entity_id),
+            Some(entity_id)
+        );
+        assert_eq!(
+            loaded
+                .bindings
+                .get("last_entity_id")
+                .and_then(|value| value.as_str())
+                .map(ToOwned::to_owned),
+            Some(entity_id.to_string())
+        );
+        assert_eq!(
+            loaded
+                .workspace_stack
+                .last()
+                .and_then(|frame| frame.subject_id),
+            Some(entity_id)
+        );
+        assert_eq!(
+            loaded.session_stack.workspace_stack[0].subject_id,
+            Some(entity_id)
+        );
     }
 }
