@@ -377,7 +377,7 @@ async fn test_template_provenance() {
     // repeat_for entries should each have provenance.
     let product_entries: Vec<_> = entries
         .iter()
-        .filter(|e| e.verb == "cbu.assign-product")
+        .filter(|e| e.verb == "cbu.add-product")
         .collect();
     assert_eq!(
         product_entries.len(),

@@ -157,12 +157,9 @@ pub fn record_o3_source_attribution_metric(
         .collect::<Vec<_>>();
     let attributed_source_count = unique_source_hashes.len();
     let missing_source_count = required_source_count.saturating_sub(attributed_source_count);
-    let coverage_basis_points = if required_source_count == 0 {
-        10_000
-    } else {
-        ((attributed_source_count.min(required_source_count) * 10_000) / required_source_count)
-            as u16
-    };
+    let coverage_basis_points = (attributed_source_count.min(required_source_count) * 10_000)
+        .checked_div(required_source_count)
+        .unwrap_or(10_000) as u16;
     let metric_id = Uuid::new_v5(
         &Uuid::NAMESPACE_URL,
         format!(

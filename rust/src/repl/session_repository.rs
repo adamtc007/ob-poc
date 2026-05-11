@@ -62,6 +62,7 @@ impl SessionRepositoryV2 {
             "bindings": session.bindings,
             "cbu_ids": session.cbu_ids,
             "name": session.name,
+            "last_entity_resolution": session.last_entity_resolution,
         });
 
         let new_version = version + 1;
@@ -222,6 +223,13 @@ impl SessionRepositoryV2 {
                     pending_trace_id: None,
                     pending_sem_os_envelope: None,
                     pending_lookup_result: None,
+                    last_entity_resolution: serde_json::from_value(
+                        extended_state
+                            .get("last_entity_resolution")
+                            .cloned()
+                            .unwrap_or(serde_json::Value::Null),
+                    )
+                    .context("Failed to deserialize last_entity_resolution")?,
                     pending_execution_rechecks: Vec::new(),
                     active_workspace: serde_json::from_value(
                         extended_state

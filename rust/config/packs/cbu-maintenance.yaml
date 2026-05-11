@@ -17,6 +17,9 @@ invocation_phrases:
   - "add entity to CBU"
   - "assign role"
   - "attach product"
+  - "attach product to CBU"
+  - "product onboarding for CBU"
+  - "CBU product onboarding"
   - "configure CBU"
   - "CBU setup"
 

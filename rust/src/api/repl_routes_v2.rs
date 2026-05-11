@@ -1833,7 +1833,12 @@ pub(crate) async fn process_acp_prompt_deterministic_envelope(
     )
     .await;
     outgoing.extend(prompt_outgoing);
-    let result = json_rpc_outgoing_result(&outgoing);
+    let mut result = json_rpc_outgoing_result(&outgoing);
+    if let Some(result) = result.as_mut() {
+        if let Some(session) = state.orchestrator.get_session(session_id).await {
+            attach_session_runtime_trace_to_result(result, &session);
+        }
+    }
 
     if let Some(result) = &result {
         if let Some(op) = acp_language_loop_trace_op_from_value(result) {
@@ -1849,6 +1854,65 @@ pub(crate) async fn process_acp_prompt_deterministic_envelope(
         "outgoing": outgoing,
         "state_anchor_provider": state_anchor_provider,
     })
+}
+
+fn attach_session_runtime_trace_to_result(result: &mut serde_json::Value, session: &ReplSessionV2) {
+    let Some(pack_id) = value_string(result, &["dag_semantic", "pack", "pack_id"]) else {
+        return;
+    };
+    let Some(static_envelope_hash) = value_string(
+        result,
+        &["traceProjection", "envelopeTrace", "envelope_hash"],
+    )
+    .or_else(|| value_string(result, &["dag_semantic", "envelope_trace", "envelope_hash"])) else {
+        return;
+    };
+    let selected_ref = value_string(result, &["dag_semantic", "selected_verb"])
+        .or_else(|| value_string(result, &["traceProjection", "selectedVerb"]))
+        .or_else(|| {
+            value_string(
+                result,
+                &["dag_semantic", "selected_template", "template_id"],
+            )
+        })
+        .unwrap_or_else(|| "unknown".to_string());
+    let missing_required_args =
+        value_string_array(result, &["dag_semantic", "missing_required_args"]);
+    let source = crate::acp_runtime_context_sources::build_session_runtime_context_source(
+        crate::acp_runtime_context_sources::AcpRuntimeContextBuildInput {
+            pack_id,
+            selected_ref,
+            static_envelope_hash,
+            session: Some(session),
+            missing_required_args,
+        },
+    );
+    let projection = crate::acp_runtime_context::build_acp_runtime_context_projection(source);
+    let trace = serde_json::json!({
+        "schema_version": projection.schema_version,
+        "pack_id": projection.pack_id,
+        "snapshot_id": projection.snapshot_id,
+        "runtime_hash": projection.runtime_hash,
+        "redaction_policy": projection.redaction_policy,
+        "freshness_policy": projection.freshness_policy,
+        "static_envelope_hash": projection.static_envelope_hash,
+        "projection_hash": projection.projection_hash,
+        "verified": projection.verified,
+        "redacted_count": projection.redacted_count,
+        "blocked_field_codes": projection.blocked_field_codes,
+    });
+    if let Some(trace_projection) = result
+        .get_mut("traceProjection")
+        .and_then(serde_json::Value::as_object_mut)
+    {
+        trace_projection.insert("runtimeTrace".to_string(), trace.clone());
+    }
+    if let Some(dag_semantic) = result
+        .get_mut("dag_semantic")
+        .and_then(serde_json::Value::as_object_mut)
+    {
+        dag_semantic.insert("runtime_trace".to_string(), trace);
+    }
 }
 
 pub(crate) async fn process_acp_prompt_llm_envelope(
@@ -2220,6 +2284,7 @@ fn adapter_trace_events(
     output
 }
 
+#[allow(clippy::too_many_arguments)]
 fn acp_llm_adapter_structured_refusal_value(
     language_pack: &crate::runbook::SemOsLanguagePack,
     case_state: crate::acp::AcpKycCaseStateSnapshot,
@@ -2418,18 +2483,139 @@ fn acp_language_loop_trace_op_from_value(
     let outcome = value.get("status")?.as_str()?;
     if !matches!(
         outcome,
-        "dry_run_validated" | "structured_refusal" | "pending_question"
+        "dry_run_validated" | "structured_refusal" | "pending_question" | "dag_semantic_proposal"
     ) {
         return None;
     }
 
-    let pack_id = value_string(value, &["language_pack", "pack_id"]);
+    let registry_schema_version = value_string(
+        value,
+        &["traceProjection", "registryTrace", "schema_version"],
+    )
+    .or_else(|| value_string(value, &["dag_semantic", "registry_trace", "schema_version"]));
+    let registry_projection_hash = value_string(
+        value,
+        &["traceProjection", "registryTrace", "source_projection_hash"],
+    )
+    .or_else(|| {
+        value_string(
+            value,
+            &["dag_semantic", "registry_trace", "source_projection_hash"],
+        )
+    });
+    let registry_verified = value_bool(value, &["traceProjection", "registryTrace", "verified"])
+        .or_else(|| value_bool(value, &["dag_semantic", "registry_trace", "verified"]));
+    let envelope_schema_version = value_string(
+        value,
+        &["traceProjection", "envelopeTrace", "schema_version"],
+    )
+    .or_else(|| value_string(value, &["dag_semantic", "envelope_trace", "schema_version"]));
+    let envelope_hash = value_string(
+        value,
+        &["traceProjection", "envelopeTrace", "envelope_hash"],
+    )
+    .or_else(|| value_string(value, &["dag_semantic", "envelope_trace", "envelope_hash"]));
+    let envelope_pack_id = value_string(value, &["traceProjection", "envelopeTrace", "pack_id"])
+        .or_else(|| value_string(value, &["dag_semantic", "envelope_trace", "pack_id"]));
+    let envelope_projection_hash = value_string(
+        value,
+        &["traceProjection", "envelopeTrace", "source_projection_hash"],
+    )
+    .or_else(|| {
+        value_string(
+            value,
+            &["dag_semantic", "envelope_trace", "source_projection_hash"],
+        )
+    });
+    let envelope_verified = value_bool(value, &["traceProjection", "envelopeTrace", "verified"])
+        .or_else(|| value_bool(value, &["dag_semantic", "envelope_trace", "verified"]));
+    let runtime_schema_version = value_string(
+        value,
+        &["traceProjection", "runtimeTrace", "schema_version"],
+    )
+    .or_else(|| value_string(value, &["dag_semantic", "runtime_trace", "schema_version"]));
+    let runtime_pack_id = value_string(value, &["traceProjection", "runtimeTrace", "pack_id"])
+        .or_else(|| value_string(value, &["dag_semantic", "runtime_trace", "pack_id"]));
+    let runtime_snapshot_id =
+        value_string(value, &["traceProjection", "runtimeTrace", "snapshot_id"])
+            .or_else(|| value_string(value, &["dag_semantic", "runtime_trace", "snapshot_id"]));
+    let runtime_hash = value_string(value, &["traceProjection", "runtimeTrace", "runtime_hash"])
+        .or_else(|| value_string(value, &["dag_semantic", "runtime_trace", "runtime_hash"]));
+    let runtime_redaction_policy = value_string(
+        value,
+        &["traceProjection", "runtimeTrace", "redaction_policy"],
+    )
+    .or_else(|| {
+        value_string(
+            value,
+            &["dag_semantic", "runtime_trace", "redaction_policy"],
+        )
+    });
+    let runtime_freshness_policy = value_string(
+        value,
+        &["traceProjection", "runtimeTrace", "freshness_policy"],
+    )
+    .or_else(|| {
+        value_string(
+            value,
+            &["dag_semantic", "runtime_trace", "freshness_policy"],
+        )
+    });
+    let runtime_static_envelope_hash = value_string(
+        value,
+        &["traceProjection", "runtimeTrace", "static_envelope_hash"],
+    )
+    .or_else(|| {
+        value_string(
+            value,
+            &["dag_semantic", "runtime_trace", "static_envelope_hash"],
+        )
+    });
+    let runtime_projection_hash = value_string(
+        value,
+        &["traceProjection", "runtimeTrace", "projection_hash"],
+    )
+    .or_else(|| value_string(value, &["dag_semantic", "runtime_trace", "projection_hash"]));
+    let runtime_verified = value_bool(value, &["traceProjection", "runtimeTrace", "verified"])
+        .or_else(|| value_bool(value, &["dag_semantic", "runtime_trace", "verified"]));
+    let runtime_redacted_count = value_u64(
+        value,
+        &["traceProjection", "runtimeTrace", "redacted_count"],
+    )
+    .or_else(|| value_u64(value, &["dag_semantic", "runtime_trace", "redacted_count"]))
+    .and_then(|count| usize::try_from(count).ok());
+    let mut runtime_blocked_field_codes = value_string_array(
+        value,
+        &["traceProjection", "runtimeTrace", "blocked_field_codes"],
+    );
+    if runtime_blocked_field_codes.is_empty() {
+        runtime_blocked_field_codes = value_string_array(
+            value,
+            &["dag_semantic", "runtime_trace", "blocked_field_codes"],
+        );
+    }
+    let projection_hash = envelope_projection_hash
+        .clone()
+        .or_else(|| registry_projection_hash.clone())
+        .or_else(|| value_string(value, &["traceProjection", "projectionHash"]));
+    let selected_template_id = value_string(
+        value,
+        &["traceProjection", "selectedTemplate", "template_id"],
+    )
+    .or_else(|| value_string(value, &["dag_semantic", "selected_template", "template_id"]));
+    let selected_macro_id = dag_semantic_selected_macro_id(value);
+
+    let pack_id = value_string(value, &["language_pack", "pack_id"])
+        .or_else(|| value_string(value, &["dag_semantic", "pack", "pack_id"]))
+        .or_else(|| envelope_pack_id.clone());
     let subject_id = value_string(value, &["language_pack", "subject", "id"])
         .or_else(|| last_attempt_string(value, &["draft", "case_id"]))
         .and_then(|id| Uuid::parse_str(&id).ok());
     let verb = value_string(value, &["output", "dry_run", "semantic_diff", "verb"])
         .or_else(|| first_array_string(value, &["language_pack", "valid_verbs"], "verb"))
-        .or_else(|| last_attempt_string(value, &["draft", "verb"]));
+        .or_else(|| last_attempt_string(value, &["draft", "verb"]))
+        .or_else(|| value_string(value, &["dag_semantic", "selected_verb"]))
+        .or_else(|| value_string(value, &["traceProjection", "selectedVerb"]));
     let current_state = value_string(value, &["output", "dry_run", "semantic_diff", "from_state"])
         .or_else(|| value_string(value, &["language_pack", "current_state"]))
         .or_else(|| last_attempt_string(value, &["draft", "current_state"]));
@@ -2516,17 +2702,20 @@ fn acp_language_loop_trace_op_from_value(
     let conversation_efficiency = trace_conversation_efficiency(value, outcome);
     let outcome_layer = language_loop_outcome_layer(value, outcome, revision_count);
     let diagnostic_codes = language_loop_diagnostic_codes(value);
-    let human_summary = language_loop_human_summary(
-        outcome,
-        current_state.as_deref(),
-        requested_state.as_deref(),
-        decode_repair_count,
-        revision_count,
-        refusal_code.as_deref(),
-        pending_question_code.as_deref(),
-        &outcome_layer,
-        &diagnostic_codes,
-    );
+    let human_summary =
+        value_string(value, &["traceProjection", "humanSummary"]).unwrap_or_else(|| {
+            language_loop_human_summary(
+                outcome,
+                current_state.as_deref(),
+                requested_state.as_deref(),
+                decode_repair_count,
+                revision_count,
+                refusal_code.as_deref(),
+                pending_question_code.as_deref(),
+                &outcome_layer,
+                &diagnostic_codes,
+            )
+        });
 
     Some(crate::repl::session_trace::TraceOp::AcpLanguageLoopTraced {
         outcome: outcome.to_string(),
@@ -2548,6 +2737,28 @@ fn acp_language_loop_trace_op_from_value(
         llm_response_hash,
         diagnostic_source_path,
         prompt_context_variant,
+        registry_schema_version,
+        registry_projection_hash,
+        registry_verified,
+        envelope_schema_version,
+        envelope_hash,
+        envelope_pack_id,
+        envelope_projection_hash,
+        envelope_verified,
+        runtime_schema_version,
+        runtime_pack_id,
+        runtime_snapshot_id,
+        runtime_hash,
+        runtime_redaction_policy,
+        runtime_freshness_policy,
+        runtime_static_envelope_hash,
+        runtime_projection_hash,
+        runtime_verified,
+        runtime_redacted_count,
+        runtime_blocked_field_codes,
+        projection_hash,
+        selected_template_id,
+        selected_macro_id,
         decode_repair_count,
         outcome_layer,
         diagnostic_codes,
@@ -2562,6 +2773,7 @@ fn acp_language_loop_trace_op_from_value(
     })
 }
 
+#[allow(clippy::too_many_arguments)]
 fn language_loop_human_summary(
     outcome: &str,
     current_state: Option<&str>,
@@ -2645,8 +2857,15 @@ fn language_loop_outcome_layer(
     revision_count: u8,
 ) -> String {
     match outcome {
+        "pending_question" if value.get("dag_semantic").is_some() => {
+            "dag_semantic_router".to_string()
+        }
         "pending_question" => "pre_llm_pending".to_string(),
+        "dag_semantic_proposal" => "dag_semantic_router".to_string(),
         "dry_run_validated" => "dry_run_validated".to_string(),
+        "structured_refusal" if value.get("dag_semantic").is_some() => {
+            "dag_semantic_router".to_string()
+        }
         "structured_refusal" => {
             let attempts_len = value
                 .get("attempts")
@@ -2681,6 +2900,10 @@ fn language_loop_outcome_layer(
 
 fn language_loop_diagnostic_codes(value: &serde_json::Value) -> Vec<String> {
     let mut codes = Vec::new();
+    codes.extend(value_string_array(
+        value,
+        &["traceProjection", "diagnosticCodes"],
+    ));
     collect_language_loop_diagnostic_codes(value.get("adapter_diagnostics"), &mut codes);
     collect_language_loop_diagnostic_codes(
         value
@@ -2800,9 +3023,28 @@ fn trace_conversation_efficiency(
 fn needed_from_user(value: &serde_json::Value) -> Vec<String> {
     let mut needed = value_string_array(value, &["pending_question", "needs"]);
     needed.extend(value_string_array(value, &["pending_question", "missing"]));
+    needed.extend(value_string_array(
+        value,
+        &["traceProjection", "neededFromUser"],
+    ));
     needed.sort();
     needed.dedup();
     needed
+}
+
+fn dag_semantic_selected_macro_id(value: &serde_json::Value) -> Option<String> {
+    let selected_verb = value_string(value, &["dag_semantic", "selected_verb"])
+        .or_else(|| value_string(value, &["traceProjection", "selectedVerb"]))?;
+    let candidates = value
+        .get("dag_semantic")
+        .and_then(|semantic| semantic.get("top_candidates"))
+        .and_then(serde_json::Value::as_array)?;
+    candidates.iter().find_map(|candidate| {
+        let candidate_verb = candidate.get("verb")?.as_str()?;
+        let side_effects = candidate.get("side_effects")?.as_str()?;
+        (candidate_verb == selected_verb && side_effects == "macro_projection_only")
+            .then(|| selected_verb.clone())
+    })
 }
 
 fn value_string(value: &serde_json::Value, path: &[&str]) -> Option<String> {
@@ -2811,6 +3053,22 @@ fn value_string(value: &serde_json::Value, path: &[&str]) -> Option<String> {
         current = current.get(*segment)?;
     }
     current.as_str().map(str::to_string)
+}
+
+fn value_bool(value: &serde_json::Value, path: &[&str]) -> Option<bool> {
+    let mut current = value;
+    for segment in path {
+        current = current.get(*segment)?;
+    }
+    current.as_bool()
+}
+
+fn value_u64(value: &serde_json::Value, path: &[&str]) -> Option<u64> {
+    let mut current = value;
+    for segment in path {
+        current = current.get(*segment)?;
+    }
+    current.as_u64()
 }
 
 fn value_string_array(value: &serde_json::Value, path: &[&str]) -> Vec<String> {
@@ -3154,6 +3412,7 @@ async fn compile_kyc_restricted_mutation_runbook(
     Ok(Json(compilation))
 }
 
+#[allow(clippy::result_large_err)]
 fn compile_kyc_restricted_mutation_runbook_value(
     session_id: Uuid,
     runbook_version: u64,
@@ -3181,6 +3440,7 @@ async fn record_kyc_restricted_mutation_receipt(
     Ok(Json(value))
 }
 
+#[allow(clippy::result_large_err)]
 fn record_kyc_restricted_mutation_receipt_value(
     session_id: Uuid,
     req: KycRestrictedMutationReceiptRequest,
@@ -6254,9 +6514,13 @@ mod tests {
                 params: serde_json::json!({
                     "adapter": crate::acp::AcpAdapterKind::TestHarness,
                     "subject_id": test_case_id(),
+                    "subject_kind": "kyc_case",
+                    "verb": "kyc-case.update-status",
                     "current_state": "DISCOVERY",
                     "configuration_version": "config-live-1",
                     "state_snapshot_id": "snapshot-live-1",
+                    "subject_uuid_field": "case_id",
+                    "state_field": "case.status",
                     "objective": "Advance the KYC case to ASSESSMENT",
                 }),
             },
@@ -6269,6 +6533,10 @@ mod tests {
         assert_eq!(
             language_pack["result"]["language_pack"]["candidate_transitions"][0]["transition_ref"],
             "kyc-case.discovery-to-assessment"
+        );
+        assert_eq!(
+            language_pack["result"]["language_pack"]["transition_effects"][0]["field"],
+            "case.status"
         );
         assert_eq!(
             language_pack["result"]["observability"]["acpMechanismSummary"][0],
@@ -6601,6 +6869,62 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn test_acp_gateway_prompt_persists_dag_semantic_envelope_trace() {
+        let (state, session_id) = test_route_state().await;
+
+        let gateway = acp_gateway_route(
+            State(state.clone()),
+            Path(session_id),
+            Json(AcpGatewayRouteRequest {
+                method: "session/prompt".to_string(),
+                params: serde_json::json!({
+                    "prompt": [
+                        {
+                            "type": "text",
+                            "text": "assign role to cbu"
+                        }
+                    ]
+                }),
+            }),
+        )
+        .await
+        .expect("ACP gateway")
+        .0;
+        let value = &gateway["result"];
+
+        assert_eq!(value["status"], "pending_question");
+        assert_eq!(value["dag_semantic"]["selected_verb"], "cbu.assign-role");
+        assert_eq!(value["traceProjection"]["registryTrace"]["verified"], true);
+        assert_eq!(value["traceProjection"]["envelopeTrace"]["verified"], true);
+
+        let trace = get_session_trace(State(state), Path(session_id))
+            .await
+            .expect("session trace")
+            .0;
+        assert_eq!(trace[0]["op"]["op"], "acp_language_loop_traced");
+        assert_eq!(trace[0]["op"]["outcome"], "pending_question");
+        assert_eq!(trace[0]["op"]["pack_id"], "cbu-maintenance");
+        assert_eq!(trace[0]["op"]["verb"], "cbu.assign-role");
+        assert_eq!(trace[0]["op"]["registry_verified"], true);
+        assert_eq!(trace[0]["op"]["envelope_verified"], true);
+        assert_eq!(trace[0]["op"]["envelope_pack_id"], "cbu-maintenance");
+        assert!(trace[0]["op"]["envelope_hash"]
+            .as_str()
+            .expect("envelope hash")
+            .starts_with("sha256:"));
+        assert_eq!(
+            trace[0]["op"]["projection_hash"],
+            trace[0]["op"]["envelope_projection_hash"]
+        );
+        assert_eq!(trace[0]["op"]["outcome_layer"], "dag_semantic_router");
+        assert!(trace[0]["op"]["needed_from_user"]
+            .as_array()
+            .expect("needed from user")
+            .iter()
+            .any(|item| item == "cbu-id"));
+    }
+
+    #[tokio::test]
     async fn test_acp_gateway_session_prompt_persists_pending_question_trace() {
         let orchestrator = std::sync::Arc::new(crate::sequencer::ReplOrchestratorV2::new(
             crate::journey::router::PackRouter::new(vec![]),
@@ -6660,7 +6984,7 @@ mod tests {
         assert!(trace[0]["op"]["human_summary"]
             .as_str()
             .unwrap()
-            .contains("I stopped before drafting"));
+            .contains("I found a KYC update-status intent"));
     }
 
     #[tokio::test]
@@ -6694,6 +7018,10 @@ mod tests {
         assert_eq!(value["result"]["status"], "dry_run_validated");
         assert_eq!(value["state_anchor_provider"]["task"], "deal.update-status");
         assert_eq!(
+            value["state_anchor_provider"]["language_pack_boundary"],
+            "update_status_language_pack_v1"
+        );
+        assert_eq!(
             value["state_anchor_provider"]["state_anchor_source"],
             "prompt_read_only_state_anchor"
         );
@@ -6717,6 +7045,10 @@ mod tests {
             "deal.prospect-to-qualifying"
         );
         assert_eq!(trace[0]["op"]["dry_run_valid"], true);
+        assert!(trace[0]["op"]["human_summary"]
+            .as_str()
+            .unwrap()
+            .contains("deal.update-status"));
     }
 
     #[tokio::test]

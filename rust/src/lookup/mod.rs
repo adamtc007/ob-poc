@@ -31,4 +31,4 @@
 
 pub mod service;
 
-pub use service::{LookupResult, LookupService};
+pub use service::{EntitySnapshotMetadata, LookupResult, LookupService};

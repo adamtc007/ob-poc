@@ -4310,6 +4310,7 @@ impl ReplOrchestratorV2 {
                 "Stage 2b — entities resolved"
             );
 
+            session.last_entity_resolution = Some((&result).into());
             session.pending_lookup_result = Some(result);
         }
 
@@ -8878,6 +8879,11 @@ definition_of_done:
     fn test_repl_phase2_halt_reason_uses_ambiguous_lookup() {
         let mut session = ReplSessionV2::new();
         session.pending_lookup_result = Some(crate::lookup::LookupResult {
+            entity_snapshot: crate::lookup::service::EntitySnapshotMetadata {
+                hash: "test".to_string(),
+                version: 1,
+                entity_count: 2,
+            },
             verbs: vec![],
             entities: vec![crate::entity_linking::EntityResolution {
                 mention_span: (0, 7),
@@ -8981,6 +8987,11 @@ definition_of_done:
         let orch = ReplOrchestratorV2::new(PackRouter::new(vec![]), Arc::new(StubExecutor));
         let mut session = ReplSessionV2::new();
         session.pending_lookup_result = Some(crate::lookup::LookupResult {
+            entity_snapshot: crate::lookup::service::EntitySnapshotMetadata {
+                hash: "test".to_string(),
+                version: 1,
+                entity_count: 2,
+            },
             verbs: vec![],
             entities: vec![crate::entity_linking::EntityResolution {
                 mention_span: (0, 7),

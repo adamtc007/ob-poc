@@ -681,6 +681,108 @@ pub struct SessionFeedback {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub pending_verb: Option<VerbRef>,
     pub conversation_mode: ConversationMode,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub entity_resolution: Option<SessionEntityResolutionFeedback>,
+}
+
+/// Entity-resolution evidence visible on Sage session feedback.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct SessionEntityResolutionFeedback {
+    pub snapshot_hash: String,
+    pub snapshot_version: u32,
+    pub entity_count: usize,
+    #[serde(default)]
+    pub expected_kinds: Vec<String>,
+    pub entities_resolved: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub dominant_entity: Option<SessionEntityCandidateFeedback>,
+    #[serde(default)]
+    pub mentions: Vec<SessionEntityMentionFeedback>,
+}
+
+/// One mention resolved by the Sage entity-linking service.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct SessionEntityMentionFeedback {
+    pub span: (usize, usize),
+    pub text: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub selected_id: Option<Uuid>,
+    pub confidence: f32,
+    #[serde(default)]
+    pub candidates: Vec<SessionEntityCandidateFeedback>,
+}
+
+/// One candidate considered during entity resolution.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct SessionEntityCandidateFeedback {
+    pub entity_id: Uuid,
+    pub entity_kind: String,
+    pub canonical_name: String,
+    pub score: f32,
+    #[serde(default)]
+    pub evidence: Vec<String>,
+}
+
+impl From<&crate::lookup::LookupResult> for SessionEntityResolutionFeedback {
+    fn from(result: &crate::lookup::LookupResult) -> Self {
+        let mentions = result
+            .entities
+            .iter()
+            .map(|resolution| {
+                let candidates = resolution
+                    .candidates
+                    .iter()
+                    .take(3)
+                    .map(SessionEntityCandidateFeedback::from)
+                    .collect();
+                SessionEntityMentionFeedback {
+                    span: resolution.mention_span,
+                    text: resolution.mention_text.clone(),
+                    selected_id: resolution.selected,
+                    confidence: resolution.confidence,
+                    candidates,
+                }
+            })
+            .collect();
+
+        let dominant_entity =
+            result
+                .dominant_entity
+                .as_ref()
+                .map(|dominant| SessionEntityCandidateFeedback {
+                    entity_id: dominant.entity_id,
+                    entity_kind: dominant.entity_kind.clone(),
+                    canonical_name: dominant.canonical_name.clone(),
+                    score: dominant.confidence,
+                    evidence: Vec::new(),
+                });
+
+        Self {
+            snapshot_hash: result.entity_snapshot.hash.clone(),
+            snapshot_version: result.entity_snapshot.version,
+            entity_count: result.entity_snapshot.entity_count,
+            expected_kinds: result.expected_kinds.clone(),
+            entities_resolved: result.entities_resolved,
+            dominant_entity,
+            mentions,
+        }
+    }
+}
+
+impl From<&crate::entity_linking::EntityCandidate> for SessionEntityCandidateFeedback {
+    fn from(candidate: &crate::entity_linking::EntityCandidate) -> Self {
+        Self {
+            entity_id: candidate.entity_id,
+            entity_kind: candidate.entity_kind.clone(),
+            canonical_name: candidate.canonical_name.clone(),
+            score: candidate.score,
+            evidence: candidate
+                .evidence
+                .iter()
+                .map(|evidence| format!("{evidence:?}"))
+                .collect(),
+        }
+    }
 }
 
 /// Semantic IR frame used before deterministic or probabilistic resolution.

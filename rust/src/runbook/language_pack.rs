@@ -1,7 +1,8 @@
-//! Task-shaped SemOS language pack for KYC update-status workbook drafting.
+//! Task-shaped SemOS language packs for update-status workbook drafting.
 //!
-//! This is intentionally narrow. It teaches Sage/Coder one private DSL slice:
-//! `kyc-case.update-status` against the active KYC case state.
+//! This stays deliberately bounded: it teaches Sage/Coder one active
+//! dry-run-only transition surface from a Domain Pack, rather than dumping the
+//! whole SemOS substrate into prompt context.
 
 use sem_os_core::domain_pack::{DomainPackManifest, DomainTransition};
 use serde::{Deserialize, Serialize};
@@ -15,6 +16,22 @@ pub struct KycLanguagePackRequest {
     pub state_snapshot_id: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub objective: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct UpdateStatusLanguagePackRequest {
+    pub subject_id: Uuid,
+    pub subject_kind: String,
+    pub verb: String,
+    pub current_state: String,
+    pub configuration_version: String,
+    pub state_snapshot_id: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub objective: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub subject_uuid_field: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub state_field: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -126,6 +143,8 @@ pub struct TransitionLanguagePackReadiness {
 #[serde(tag = "kind", rename_all = "snake_case")]
 pub enum LanguagePackError {
     PackInvalid { diagnostics: Vec<String> },
+    UnsupportedVerb { verb: String },
+    NoUpdateStatusTransitions { verb: String, current_state: String },
     NoKycUpdateStatusTransitions { current_state: String },
 }
 
@@ -154,16 +173,13 @@ pub fn transition_language_pack_readiness(
 
     let mut missing_requirements = Vec::new();
     let mut blocked_reasons = Vec::new();
-    let generator =
+    let generator = Some(
         if transition.entity_type == "kyc_case" && transition.verb == "kyc-case.update-status" {
-            Some("kyc_update_status_language_pack_v1".to_string())
+            "kyc_update_status_language_pack_v1".to_string()
         } else {
-            missing_requirements.push("language_pack_generator".to_string());
-            blocked_reasons.push(
-                "no bounded language-pack generator is registered for this transition".to_string(),
-            );
-            None
-        };
+            "update_status_language_pack_v1".to_string()
+        },
+    );
 
     if !transition.dry_run_enabled {
         missing_requirements.push("dry_run_enabled".to_string());
@@ -175,6 +191,13 @@ pub fn transition_language_pack_readiness(
     }
     if transition.verb.trim().is_empty() {
         missing_requirements.push("verb".to_string());
+    }
+    if !transition.verb.ends_with(".update-status") {
+        missing_requirements.push("update_status_verb".to_string());
+        blocked_reasons.push(
+            "generic language-pack generator is currently bounded to update-status verbs"
+                .to_string(),
+        );
     }
     if transition.from_state.trim().is_empty() {
         missing_requirements.push("from_state".to_string());
@@ -215,6 +238,36 @@ pub fn build_kyc_update_status_language_pack(
     manifest: &DomainPackManifest,
     request: KycLanguagePackRequest,
 ) -> Result<SemOsLanguagePack, LanguagePackError> {
+    build_update_status_language_pack(
+        manifest,
+        UpdateStatusLanguagePackRequest {
+            subject_id: request.subject_id,
+            subject_kind: "kyc_case".to_string(),
+            verb: "kyc-case.update-status".to_string(),
+            current_state: request.current_state,
+            configuration_version: request.configuration_version,
+            state_snapshot_id: request.state_snapshot_id,
+            objective: request.objective,
+            subject_uuid_field: Some("case_id".to_string()),
+            state_field: Some("status".to_string()),
+        },
+    )
+    .map_err(|error| match error {
+        LanguagePackError::NoUpdateStatusTransitions { current_state, .. } => {
+            LanguagePackError::NoKycUpdateStatusTransitions { current_state }
+        }
+        other => other,
+    })
+}
+
+pub fn build_update_status_language_pack(
+    manifest: &DomainPackManifest,
+    request: UpdateStatusLanguagePackRequest,
+) -> Result<SemOsLanguagePack, LanguagePackError> {
+    if !request.verb.ends_with(".update-status") {
+        return Err(LanguagePackError::UnsupportedVerb { verb: request.verb });
+    }
+
     let validation = manifest.validate();
     if !validation.valid {
         return Err(LanguagePackError::PackInvalid {
@@ -226,25 +279,37 @@ pub fn build_kyc_update_status_language_pack(
         });
     }
 
-    let kyc_transitions: Vec<&DomainTransition> = manifest
+    let transitions: Vec<&DomainTransition> = manifest
         .allowed_transitions
         .iter()
-        .filter(|transition| transition.verb == "kyc-case.update-status")
+        .filter(|transition| {
+            transition.verb == request.verb && transition.entity_type == request.subject_kind
+        })
         .collect();
 
-    if kyc_transitions.is_empty() {
-        return Err(LanguagePackError::NoKycUpdateStatusTransitions {
+    if transitions.is_empty() {
+        return Err(LanguagePackError::NoUpdateStatusTransitions {
+            verb: request.verb,
             current_state: request.current_state,
         });
     }
 
-    let candidate_transitions: Vec<LanguagePackTransition> = kyc_transitions
+    let subject_uuid_field = request
+        .subject_uuid_field
+        .clone()
+        .unwrap_or_else(|| default_subject_uuid_field(&request.subject_kind));
+    let state_field = request
+        .state_field
+        .clone()
+        .unwrap_or_else(|| "status".to_string());
+
+    let candidate_transitions: Vec<LanguagePackTransition> = transitions
         .iter()
         .filter(|transition| transition.from_state == request.current_state)
         .map(|transition| language_transition(transition))
         .collect();
 
-    let blocked_verbs = kyc_transitions
+    let blocked_verbs = transitions
         .iter()
         .filter(|transition| transition.from_state != request.current_state)
         .map(|transition| BlockedVerb {
@@ -260,7 +325,7 @@ pub fn build_kyc_update_status_language_pack(
         .iter()
         .map(|transition| TransitionEffect {
             transition_ref: transition.transition_ref.clone(),
-            field: "status".to_string(),
+            field: state_field.clone(),
             before: transition.from_state.clone(),
             after: transition.to_state.clone(),
             writes_since_push_delta: 1,
@@ -277,8 +342,8 @@ pub fn build_kyc_update_status_language_pack(
     Ok(SemOsLanguagePack {
         objective: request.objective.unwrap_or_else(|| {
             format!(
-                "Draft a dry-run workbook for kyc-case.update-status from {}",
-                request.current_state
+                "Draft a dry-run workbook for {} from {}",
+                request.verb, request.current_state
             )
         }),
         pack_id: manifest.pack_id.clone(),
@@ -286,17 +351,20 @@ pub fn build_kyc_update_status_language_pack(
         configuration_version: request.configuration_version,
         state_snapshot_id: request.state_snapshot_id,
         subject: LanguagePackSubject {
-            kind: "kyc_case".to_string(),
+            kind: request.subject_kind.clone(),
             id: request.subject_id,
         },
         current_state: request.current_state,
         candidate_transitions,
         valid_verbs: vec![LanguagePackVerb {
-            verb: "kyc-case.update-status".to_string(),
-            reason: "Only KYC status transition workbook drafting is in scope".to_string(),
+            verb: request.verb.clone(),
+            reason: format!(
+                "Only {} workbook drafting is in scope for this language pack",
+                request.verb
+            ),
         }],
         blocked_verbs,
-        argument_schema: argument_schema(),
+        argument_schema: argument_schema(&subject_uuid_field, &request.subject_kind, &state_field),
         transition_effects,
         evidence_policy: EvidencePolicySummary {
             required_evidence_refs,
@@ -305,12 +373,16 @@ pub fn build_kyc_update_status_language_pack(
             hitl_required: true,
         },
         uuid_bindings: vec![UuidBindingRequirement {
-            field: "case_id".to_string(),
-            subject_kind: "kyc_case".to_string(),
+            field: subject_uuid_field.clone(),
+            subject_kind: request.subject_kind.clone(),
             required: true,
             expected_uuid: request.subject_id,
         }],
-        canonical_patterns: canonical_patterns(),
+        canonical_patterns: canonical_patterns(
+            &request.verb,
+            &subject_uuid_field,
+            &request.subject_kind,
+        ),
     })
 }
 
@@ -327,16 +399,32 @@ fn language_transition(transition: &DomainTransition) -> LanguagePackTransition 
     }
 }
 
-fn argument_schema() -> Vec<LanguagePackArg> {
+fn argument_schema(
+    subject_uuid_field: &str,
+    subject_kind: &str,
+    state_field: &str,
+) -> Vec<LanguagePackArg> {
     vec![
-        arg("case_id", "uuid", "active kyc_case subject UUID"),
+        arg(
+            subject_uuid_field,
+            "uuid",
+            &format!("active {subject_kind} subject UUID"),
+        ),
         arg(
             "transition_ref",
             "string",
             "declared Domain Pack transition_ref",
         ),
-        arg("current_state", "enum", "observed current status"),
-        arg("requested_state", "enum", "requested target status"),
+        arg(
+            "current_state",
+            "enum",
+            &format!("observed current {state_field}"),
+        ),
+        arg(
+            "requested_state",
+            "enum",
+            &format!("requested target {state_field}"),
+        ),
         arg(
             "configuration_version",
             "string",
@@ -360,15 +448,23 @@ fn arg(name: &str, arg_type: &str, binding: &str) -> LanguagePackArg {
     }
 }
 
-fn canonical_patterns() -> Vec<CanonicalMicroPattern> {
+fn canonical_patterns(
+    verb: &str,
+    subject_uuid_field: &str,
+    subject_kind: &str,
+) -> Vec<CanonicalMicroPattern> {
     vec![
         pattern(
             "happy_path",
-            "Use verb kyc-case.update-status with the candidate transition whose from_state equals current_state.",
+            &format!(
+                "Use verb {verb} with the candidate transition whose from_state equals current_state."
+            ),
         ),
         pattern(
             "uuid_binding",
-            "Bind case_id to the active kyc_case UUID from uuid_bindings; do not invent a UUID.",
+            &format!(
+                "Bind {subject_uuid_field} to the active {subject_kind} UUID from uuid_bindings; do not invent a UUID."
+            ),
         ),
         pattern(
             "state_binding",
@@ -383,6 +479,14 @@ fn canonical_patterns() -> Vec<CanonicalMicroPattern> {
             "Produce a dry-run workbook only; ACP mutation and direct execution are out of scope.",
         ),
     ]
+}
+
+fn default_subject_uuid_field(subject_kind: &str) -> String {
+    match subject_kind {
+        "kyc_case" => "case_id".to_string(),
+        "deal" => "deal_id".to_string(),
+        other => format!("{}_id", other.trim_end_matches("_case")),
+    }
 }
 
 fn pattern(name: &str, draft_shape: &str) -> CanonicalMicroPattern {
@@ -424,7 +528,7 @@ mod tests {
     }
 
     #[test]
-    fn transition_language_pack_readiness_blocks_unsupported_generator() {
+    fn transition_language_pack_readiness_marks_generic_dry_run_transition_ready() {
         let mut manifest = manifest();
         manifest.allowed_transitions.push(DomainTransition {
             transition_ref: "screening.ready-to-reviewed".to_string(),
@@ -442,10 +546,81 @@ mod tests {
         let readiness =
             transition_language_pack_readiness(&manifest, "screening.ready-to-reviewed");
 
-        assert!(!readiness.ready);
-        assert!(readiness
-            .missing_requirements
-            .contains(&"language_pack_generator".to_string()));
-        assert!(readiness.generator.is_none());
+        assert!(readiness.ready);
+        assert!(readiness.missing_requirements.is_empty());
+        assert_eq!(
+            readiness.generator.as_deref(),
+            Some("update_status_language_pack_v1")
+        );
+    }
+
+    #[test]
+    fn build_update_status_language_pack_uses_requested_verb_and_subject() {
+        let subject_id = Uuid::parse_str("11111111-1111-1111-1111-111111111111").unwrap();
+        let mut manifest = manifest();
+        manifest.allowed_transitions.push(DomainTransition {
+            transition_ref: "screening.ready-to-reviewed".to_string(),
+            entity_type: "screening_case".to_string(),
+            state_machine: "screening_lifecycle".to_string(),
+            verb: "screening.update-status".to_string(),
+            from_state: "READY".to_string(),
+            to_state: "REVIEWED".to_string(),
+            dry_run_enabled: true,
+            mutation_enabled: false,
+            hitl_required: true,
+            evidence_refs_required: vec!["screening_id".to_string()],
+        });
+
+        let pack = build_update_status_language_pack(
+            &manifest,
+            UpdateStatusLanguagePackRequest {
+                subject_id,
+                subject_kind: "screening_case".to_string(),
+                verb: "screening.update-status".to_string(),
+                current_state: "READY".to_string(),
+                configuration_version: "config-screening".to_string(),
+                state_snapshot_id: "snapshot-screening".to_string(),
+                objective: None,
+                subject_uuid_field: Some("screening_id".to_string()),
+                state_field: Some("screening_status".to_string()),
+            },
+        )
+        .expect("generic language pack");
+
+        assert_eq!(pack.subject.kind, "screening_case");
+        assert_eq!(pack.valid_verbs[0].verb, "screening.update-status");
+        assert_eq!(
+            pack.candidate_transitions[0].transition_ref,
+            "screening.ready-to-reviewed"
+        );
+        assert_eq!(pack.transition_effects[0].field, "screening_status");
+        assert_eq!(pack.uuid_bindings[0].field, "screening_id");
+    }
+
+    #[test]
+    fn build_update_status_language_pack_refuses_non_update_status_verbs() {
+        let subject_id = Uuid::parse_str("11111111-1111-1111-1111-111111111111").unwrap();
+        let err = build_update_status_language_pack(
+            &manifest(),
+            UpdateStatusLanguagePackRequest {
+                subject_id,
+                subject_kind: "kyc_case".to_string(),
+                verb: "kyc-case.close".to_string(),
+                current_state: "DISCOVERY".to_string(),
+                configuration_version: "config-1".to_string(),
+                state_snapshot_id: "snapshot-1".to_string(),
+                objective: None,
+                subject_uuid_field: Some("case_id".to_string()),
+                state_field: Some("status".to_string()),
+            },
+        )
+        .expect_err("non update-status verb refused");
+
+        assert_eq!(
+            err,
+            LanguagePackError::UnsupportedVerb {
+                verb: "kyc-case.close".to_string()
+            }
+        );
     }
 }

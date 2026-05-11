@@ -35,6 +35,7 @@ pub struct LlmDraftAdapterRefusal {
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "kind", rename_all = "snake_case")]
+#[allow(clippy::large_enum_variant)]
 pub enum LlmDraftLoopOutcome {
     HarnessCompleted {
         llm_trace: LlmInferenceTrace,

@@ -227,6 +227,50 @@ pub enum TraceOp {
         diagnostic_source_path: Option<String>,
         #[serde(default, skip_serializing_if = "Option::is_none")]
         prompt_context_variant: Option<String>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        registry_schema_version: Option<String>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        registry_projection_hash: Option<String>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        registry_verified: Option<bool>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        envelope_schema_version: Option<String>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        envelope_hash: Option<String>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        envelope_pack_id: Option<String>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        envelope_projection_hash: Option<String>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        envelope_verified: Option<bool>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        runtime_schema_version: Option<String>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        runtime_pack_id: Option<String>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        runtime_snapshot_id: Option<String>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        runtime_hash: Option<String>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        runtime_redaction_policy: Option<String>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        runtime_freshness_policy: Option<String>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        runtime_static_envelope_hash: Option<String>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        runtime_projection_hash: Option<String>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        runtime_verified: Option<bool>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        runtime_redacted_count: Option<usize>,
+        #[serde(default)]
+        runtime_blocked_field_codes: Vec<String>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        projection_hash: Option<String>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        selected_template_id: Option<String>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        selected_macro_id: Option<String>,
         #[serde(default)]
         decode_repair_count: u64,
         #[serde(default)]
@@ -497,6 +541,28 @@ mod tests {
                 llm_response_hash: None,
                 diagnostic_source_path: None,
                 prompt_context_variant: None,
+                registry_schema_version: None,
+                registry_projection_hash: None,
+                registry_verified: None,
+                envelope_schema_version: None,
+                envelope_hash: None,
+                envelope_pack_id: None,
+                envelope_projection_hash: None,
+                envelope_verified: None,
+                runtime_schema_version: None,
+                runtime_pack_id: None,
+                runtime_snapshot_id: None,
+                runtime_hash: None,
+                runtime_redaction_policy: None,
+                runtime_freshness_policy: None,
+                runtime_static_envelope_hash: None,
+                runtime_projection_hash: None,
+                runtime_verified: None,
+                runtime_redacted_count: None,
+                runtime_blocked_field_codes: vec![],
+                projection_hash: None,
+                selected_template_id: None,
+                selected_macro_id: None,
                 decode_repair_count: 0,
                 outcome_layer: "dry_run_validated".into(),
                 diagnostic_codes: vec![],

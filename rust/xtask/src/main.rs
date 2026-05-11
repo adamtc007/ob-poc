@@ -29,6 +29,7 @@ mod harness;
 mod instrument_harness;
 mod lexicon;
 mod onboarding_harness;
+mod pub_lint;
 mod reconcile;
 mod replay_tuner;
 mod seed_allianz;
@@ -106,6 +107,13 @@ enum Command {
 
     /// Pre-commit hook: check + clippy + test
     PreCommit,
+
+    /// Check root-crate public API against the reviewed allowlist
+    PubLint {
+        /// Refresh the allowlist after reviewing intentional API changes
+        #[arg(long)]
+        bless: bool,
+    },
 
     /// Build and deploy web server, then start
     Deploy {
@@ -1341,6 +1349,7 @@ fn main() -> Result<()> {
         Command::Serve { port } => serve(&sh, port),
         Command::Ci => ci(&sh),
         Command::PreCommit => pre_commit(&sh),
+        Command::PubLint { bless } => pub_lint::run(bless),
         Command::Deploy {
             release,
             port,
@@ -2082,6 +2091,9 @@ fn check(sh: &Shell, db: bool) -> Result<()> {
     println!("  Checking compilation...");
     cmd!(sh, "cargo check --workspace").run()?;
 
+    println!("  Checking public API allowlist...");
+    pub_lint::run(false)?;
+
     // Clippy (workspace, all targets)
     println!("  Running clippy...");
     cmd!(sh, "cargo clippy --workspace --all-targets -- -D warnings").run()?;
@@ -2267,6 +2279,9 @@ fn ci(sh: &Shell) -> Result<()> {
     println!("\n=== Format Check ===");
     fmt(sh, true)?;
 
+    println!("\n=== Public API Allowlist ===");
+    pub_lint::run(false)?;
+
     println!("\n=== Clippy (workspace) ===");
     cmd!(sh, "cargo clippy --workspace --all-targets -- -D warnings").run()?;
 
@@ -2312,6 +2327,9 @@ fn pre_commit(sh: &Shell) -> Result<()> {
     // Fast checks only
     println!("\n=== Format Check ===");
     fmt(sh, true)?;
+
+    println!("\n=== Public API Allowlist ===");
+    pub_lint::run(false)?;
 
     println!("\n=== Clippy (workspace) ===");
     cmd!(sh, "cargo clippy --workspace --all-targets -- -D warnings").run()?;

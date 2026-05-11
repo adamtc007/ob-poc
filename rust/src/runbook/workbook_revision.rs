@@ -414,6 +414,7 @@ fn refused(
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 fn metrics(
     pack: &SemOsLanguagePack,
     attempts: &[WorkbookDraftAttempt],

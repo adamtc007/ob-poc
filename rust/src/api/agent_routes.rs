@@ -42,7 +42,7 @@ use crate::dsl_v2::tooling::SemanticValidator;
 use crate::dsl_v2::{expand_templates_simple, BatchPolicy};
 use crate::ontology::SemanticStageRegistry;
 use ob_poc_types::chat::{ChatResponse, SessionStateEnum};
-use ob_poc_types::{SessionInputRequest, SessionInputResponse};
+use ob_poc_types::{DslState, SessionInputRequest, SessionInputResponse};
 use std::time::Instant;
 
 use axum::{
@@ -277,19 +277,17 @@ async fn try_route_supported_acp_prompt_with_draft_mode(
     let prompt = vec![crate::acp_protocol::AcpContentBlock::Text {
         text: prompt_text.to_string(),
     }];
-    let task = crate::api::acp_state_anchor::acp_prompt_supported_provider_task(&prompt)?;
-    if orchestrator.get_session(session_id).await.is_none() {
-        return None;
-    }
+    let supported_provider_task =
+        crate::api::acp_state_anchor::acp_prompt_supported_provider_task(&prompt);
+    orchestrator.get_session(session_id).await.as_ref()?;
 
     let route_state = crate::api::repl_routes_v2::ReplV2RouteState {
         orchestrator: orchestrator.clone(),
     };
-    let mut effective_draft_mode = if requested_draft_mode.can_run_for_task(task) {
-        requested_draft_mode
-    } else {
-        AcpSessionInputDraftMode::Deterministic
-    };
+    let mut effective_draft_mode = supported_provider_task
+        .filter(|task| requested_draft_mode.can_run_for_task(task))
+        .map(|_| requested_draft_mode)
+        .unwrap_or(AcpSessionInputDraftMode::Deterministic);
     let mut envelope = match effective_draft_mode {
         AcpSessionInputDraftMode::Deterministic => {
             crate::api::repl_routes_v2::process_acp_prompt_deterministic_envelope(
@@ -315,9 +313,10 @@ async fn try_route_supported_acp_prompt_with_draft_mode(
             {
                 Ok(envelope) => envelope,
                 Err((status, error)) => {
+                    let provider_task = supported_provider_task.unwrap_or("dag.semantic");
                     tracing::warn!(
                         session_id = %session_id,
-                        task,
+                        task = provider_task,
                         requested_draft_source = requested_draft_mode.as_str(),
                         status = %status,
                         error = %error.0.error,
@@ -338,9 +337,10 @@ async fn try_route_supported_acp_prompt_with_draft_mode(
             }
         }
     };
+    let task = acp_session_input_task_label(supported_provider_task, &envelope);
     annotate_acp_session_input_envelope(
         &mut envelope,
-        task,
+        &task,
         requested_draft_mode,
         effective_draft_mode,
         route_started_at,
@@ -349,11 +349,11 @@ async fn try_route_supported_acp_prompt_with_draft_mode(
     let result_status = result.get("status").and_then(serde_json::Value::as_str)?;
     if !matches!(
         result_status,
-        "dry_run_validated" | "structured_refusal" | "pending_question"
+        "dry_run_validated" | "structured_refusal" | "pending_question" | "dag_semantic_proposal"
     ) {
         tracing::warn!(
             session_id = %session_id,
-            task,
+            task = %task,
             result_status,
             "ACP prompt returned non-structured result; falling back to REPL"
         );
@@ -362,7 +362,7 @@ async fn try_route_supported_acp_prompt_with_draft_mode(
 
     emit_acp_session_input_observability(
         session_id,
-        task,
+        &task,
         requested_draft_mode,
         effective_draft_mode,
         &envelope,
@@ -376,6 +376,7 @@ async fn try_route_supported_acp_prompt_with_draft_mode(
                 .to_string()
         });
     let acp_trace = acp_chat_trace_summary(&envelope);
+    let dsl = acp_valid_dag_semantic_draft_dsl(&envelope);
     if let Err(error) = orchestrator
         .record_external_chat_exchange(
             session_id,
@@ -386,7 +387,7 @@ async fn try_route_supported_acp_prompt_with_draft_mode(
     {
         tracing::warn!(
             session_id = %session_id,
-            task,
+            task = %task,
             error = %error,
             "Failed to record ACP chat exchange in REPL session history"
         );
@@ -399,7 +400,7 @@ async fn try_route_supported_acp_prompt_with_draft_mode(
 
     Some(ChatResponse {
         message: assistant_message,
-        dsl: None,
+        dsl,
         session_state: SessionStateEnum::Scoped,
         commands: None,
         disambiguation_request: None,
@@ -422,6 +423,23 @@ async fn try_route_supported_acp_prompt_with_draft_mode(
         acp_trace,
         trace_id: None,
     })
+}
+
+fn acp_session_input_task_label(
+    supported_provider_task: Option<&'static str>,
+    envelope: &serde_json::Value,
+) -> String {
+    supported_provider_task
+        .map(str::to_string)
+        .or_else(|| value_string(envelope, &["result", "dag_semantic", "selected_verb"]))
+        .or_else(|| {
+            envelope
+                .get("result")
+                .and_then(dag_semantic_candidate_verbs)
+                .and_then(|candidates| candidates.into_iter().next())
+        })
+        .or_else(|| value_string(envelope, &["state_anchor_provider", "task"]))
+        .unwrap_or_else(|| "dag.semantic".to_string())
 }
 
 fn annotate_acp_session_input_envelope(
@@ -544,7 +562,7 @@ fn acp_chat_trace_summary(envelope: &serde_json::Value) -> Option<serde_json::Va
         .or_else(|| result.get("session_input").cloned())
         .unwrap_or_else(|| serde_json::json!({}));
 
-    Some(serde_json::json!({
+    let mut summary = serde_json::json!({
         "status": value_string(result, &["status"]).unwrap_or_else(|| "unknown".to_string()),
         "outcome": value_string(&trace_projection, &["outcome"])
             .or_else(|| value_string(result, &["status"])),
@@ -566,6 +584,21 @@ fn acp_chat_trace_summary(envelope: &serde_json::Value) -> Option<serde_json::Va
             .or_else(|| value_string(result, &["refusal", "refusal_code"])),
         "pending_question_code": value_string(&trace_projection, &["pendingQuestionCode"])
             .or_else(|| value_string(result, &["pending_question", "code"])),
+        "selected_verb": value_string(result, &["dag_semantic", "selected_verb"])
+            .or_else(|| value_string(&trace_projection, &["selectedVerb"])),
+        "pack_id": value_string(result, &["dag_semantic", "pack", "pack_id"]),
+        "pack_name": value_string(result, &["dag_semantic", "pack", "pack_name"]),
+        "pack_ref": dag_semantic_pack_ref(result),
+        "pack_allowed_verb_count": value_u64(result, &["dag_semantic", "pack", "allowed_verb_count"]),
+        "candidate_verbs": dag_semantic_candidate_verbs(result),
+        "workflow_plan_id": value_string(result, &["dag_semantic", "workflow_plan", "plan_id"]),
+        "workflow_plan_verb": value_string(result, &["dag_semantic", "workflow_plan", "verb"]),
+        "workflow_plan_dry_run_only": value_bool(result, &["dag_semantic", "workflow_plan", "dry_run_only"]),
+        "workflow_plan_needed_from_user": value_string_array(result, &["dag_semantic", "workflow_plan", "needed_from_user"]),
+        "selected_template_id": value_string(result, &["dag_semantic", "selected_template", "template_id"])
+            .or_else(|| value_string(&trace_projection, &["selectedTemplate", "template_id"])),
+        "structured_failure_mode": value_string(&efficiency, &["structuredFailureMode"])
+            .or_else(|| value_string(result, &["observability", "conversationEfficiency", "structuredFailureMode"])),
         "needed_from_user": value_string_array(&trace_projection, &["neededFromUser"]),
         "diagnostic_codes": value_string_array(&trace_projection, &["diagnosticCodes"]),
         "dry_run_valid": value_bool(&trace_projection, &["dryRunValid"]),
@@ -576,7 +609,247 @@ fn acp_chat_trace_summary(envelope: &serde_json::Value) -> Option<serde_json::Va
         "estimated_user_repair_turns_avoided": value_u64(&efficiency, &["estimatedUserRepairTurnsAvoided"]),
         "performance": performance,
         "state_anchor_provider": envelope.get("state_anchor_provider").cloned(),
-    }))
+    });
+    if let Some(object) = summary.as_object_mut() {
+        object.insert(
+            "registry_schema_version".to_string(),
+            serde_json::json!(value_string(
+                &trace_projection,
+                &["registryTrace", "schema_version"]
+            )
+            .or_else(|| value_string(
+                result,
+                &["dag_semantic", "registry_trace", "schema_version"]
+            ))),
+        );
+        object.insert(
+            "registry_projection_hash".to_string(),
+            serde_json::json!(value_string(
+                &trace_projection,
+                &["registryTrace", "source_projection_hash"]
+            )
+            .or_else(|| value_string(
+                result,
+                &["dag_semantic", "registry_trace", "source_projection_hash"]
+            ))),
+        );
+        object.insert(
+            "registry_verified".to_string(),
+            serde_json::json!(
+                value_bool(&trace_projection, &["registryTrace", "verified"]).or_else(|| {
+                    value_bool(result, &["dag_semantic", "registry_trace", "verified"])
+                })
+            ),
+        );
+        object.insert(
+            "envelope_schema_version".to_string(),
+            serde_json::json!(value_string(
+                &trace_projection,
+                &["envelopeTrace", "schema_version"]
+            )
+            .or_else(|| value_string(
+                result,
+                &["dag_semantic", "envelope_trace", "schema_version"]
+            ))),
+        );
+        object.insert(
+            "envelope_hash".to_string(),
+            serde_json::json!(
+                value_string(&trace_projection, &["envelopeTrace", "envelope_hash"]).or_else(
+                    || value_string(result, &["dag_semantic", "envelope_trace", "envelope_hash"])
+                )
+            ),
+        );
+        object.insert(
+            "envelope_pack_id".to_string(),
+            serde_json::json!(
+                value_string(&trace_projection, &["envelopeTrace", "pack_id"]).or_else(|| {
+                    value_string(result, &["dag_semantic", "envelope_trace", "pack_id"])
+                })
+            ),
+        );
+        object.insert(
+            "projection_hash".to_string(),
+            serde_json::json!(value_string(
+                &trace_projection,
+                &["envelopeTrace", "source_projection_hash"]
+            )
+            .or_else(|| value_string(
+                result,
+                &["dag_semantic", "envelope_trace", "source_projection_hash"]
+            ))
+            .or_else(|| value_string(
+                &trace_projection,
+                &["registryTrace", "source_projection_hash"]
+            ))
+            .or_else(|| value_string(
+                result,
+                &["dag_semantic", "registry_trace", "source_projection_hash"]
+            ))),
+        );
+        object.insert(
+            "envelope_verified".to_string(),
+            serde_json::json!(
+                value_bool(&trace_projection, &["envelopeTrace", "verified"]).or_else(|| {
+                    value_bool(result, &["dag_semantic", "envelope_trace", "verified"])
+                })
+            ),
+        );
+        object.insert(
+            "runtime_schema_version".to_string(),
+            serde_json::json!(
+                value_string(&trace_projection, &["runtimeTrace", "schema_version"]).or_else(
+                    || value_string(result, &["dag_semantic", "runtime_trace", "schema_version"])
+                )
+            ),
+        );
+        object.insert(
+            "runtime_pack_id".to_string(),
+            serde_json::json!(
+                value_string(&trace_projection, &["runtimeTrace", "pack_id"]).or_else(|| {
+                    value_string(result, &["dag_semantic", "runtime_trace", "pack_id"])
+                })
+            ),
+        );
+        object.insert(
+            "runtime_snapshot_id".to_string(),
+            serde_json::json!(
+                value_string(&trace_projection, &["runtimeTrace", "snapshot_id"]).or_else(|| {
+                    value_string(result, &["dag_semantic", "runtime_trace", "snapshot_id"])
+                })
+            ),
+        );
+        object.insert(
+            "runtime_hash".to_string(),
+            serde_json::json!(
+                value_string(&trace_projection, &["runtimeTrace", "runtime_hash"]).or_else(|| {
+                    value_string(result, &["dag_semantic", "runtime_trace", "runtime_hash"])
+                })
+            ),
+        );
+        object.insert(
+            "runtime_redaction_policy".to_string(),
+            serde_json::json!(value_string(
+                &trace_projection,
+                &["runtimeTrace", "redaction_policy"]
+            )
+            .or_else(|| value_string(
+                result,
+                &["dag_semantic", "runtime_trace", "redaction_policy"]
+            ))),
+        );
+        object.insert(
+            "runtime_freshness_policy".to_string(),
+            serde_json::json!(value_string(
+                &trace_projection,
+                &["runtimeTrace", "freshness_policy"]
+            )
+            .or_else(|| value_string(
+                result,
+                &["dag_semantic", "runtime_trace", "freshness_policy"]
+            ))),
+        );
+        object.insert(
+            "runtime_static_envelope_hash".to_string(),
+            serde_json::json!(value_string(
+                &trace_projection,
+                &["runtimeTrace", "static_envelope_hash"]
+            )
+            .or_else(|| value_string(
+                result,
+                &["dag_semantic", "runtime_trace", "static_envelope_hash"]
+            ))),
+        );
+        object.insert(
+            "runtime_projection_hash".to_string(),
+            serde_json::json!(value_string(
+                &trace_projection,
+                &["runtimeTrace", "projection_hash"]
+            )
+            .or_else(|| value_string(
+                result,
+                &["dag_semantic", "runtime_trace", "projection_hash"]
+            ))),
+        );
+        object.insert(
+            "runtime_verified".to_string(),
+            serde_json::json!(value_bool(&trace_projection, &["runtimeTrace", "verified"])
+                .or_else(|| {
+                    value_bool(result, &["dag_semantic", "runtime_trace", "verified"])
+                })),
+        );
+        object.insert(
+            "runtime_redacted_count".to_string(),
+            serde_json::json!(
+                value_u64(&trace_projection, &["runtimeTrace", "redacted_count"]).or_else(|| {
+                    value_u64(result, &["dag_semantic", "runtime_trace", "redacted_count"])
+                })
+            ),
+        );
+        object.insert(
+            "runtime_blocked_field_codes".to_string(),
+            serde_json::json!(value_string_array(
+                &trace_projection,
+                &["runtimeTrace", "blocked_field_codes"]
+            )
+            .or_else(|| value_string_array(
+                result,
+                &["dag_semantic", "runtime_trace", "blocked_field_codes"]
+            ))),
+        );
+        object.insert(
+            "selected_macro_id".to_string(),
+            serde_json::json!(dag_semantic_selected_macro_id(result)),
+        );
+    }
+    Some(summary)
+}
+
+fn acp_valid_dag_semantic_draft_dsl(envelope: &serde_json::Value) -> Option<DslState> {
+    let result = envelope.get("result")?;
+    let first_pass_valid = result
+        .pointer("/traceProjection/firstPassValid")
+        .and_then(serde_json::Value::as_bool)
+        .unwrap_or(false);
+    if !first_pass_valid {
+        return None;
+    }
+    value_string(result, &["dsl"])
+        .or_else(|| value_string(result, &["dag_semantic", "draft_dsl"]))
+        .map(|source| DslState {
+            source: Some(source),
+            ast: None,
+            can_execute: false,
+            bindings: Default::default(),
+        })
+}
+
+fn dag_semantic_pack_ref(result: &serde_json::Value) -> Option<String> {
+    let pack_id = value_string(result, &["dag_semantic", "pack", "pack_id"])?;
+    let version = value_string(result, &["dag_semantic", "pack", "pack_version"])?;
+    Some(format!("{pack_id}@{version}"))
+}
+
+fn dag_semantic_candidate_verbs(result: &serde_json::Value) -> Option<Vec<String>> {
+    let candidates = result
+        .pointer("/dag_semantic/top_candidates")?
+        .as_array()?
+        .iter()
+        .filter_map(|candidate| value_string(candidate, &["verb"]))
+        .collect::<Vec<_>>();
+    (!candidates.is_empty()).then_some(candidates)
+}
+
+fn dag_semantic_selected_macro_id(result: &serde_json::Value) -> Option<String> {
+    let selected_verb = value_string(result, &["dag_semantic", "selected_verb"])
+        .or_else(|| value_string(result, &["traceProjection", "selectedVerb"]))?;
+    let candidates = result.pointer("/dag_semantic/top_candidates")?.as_array()?;
+    candidates.iter().find_map(|candidate| {
+        let candidate_verb = candidate.get("verb")?.as_str()?;
+        let side_effects = candidate.get("side_effects")?.as_str()?;
+        (candidate_verb == selected_verb && side_effects == "macro_projection_only")
+            .then(|| selected_verb.clone())
+    })
 }
 
 fn value_at_path<'a>(value: &'a serde_json::Value, path: &[&str]) -> Option<&'a serde_json::Value> {
@@ -3470,6 +3743,10 @@ mod tests {
         assert_eq!(trace["transition_ref"], "deal.prospect-to-qualifying");
         assert_eq!(trace["state_anchor_provider"]["task"], "deal.update-status");
         assert_eq!(
+            trace["state_anchor_provider"]["language_pack_boundary"],
+            "update_status_language_pack_v1"
+        );
+        assert_eq!(
             trace["state_anchor_provider"]["no_mutation_authority"],
             true
         );
@@ -3513,7 +3790,80 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_unsupported_stateful_dag_stays_on_repl_input_path() {
+    async fn test_generic_dag_prompt_routes_through_acp_before_repl_on_normal_input() {
+        let orchestrator = Arc::new(ReplOrchestratorV2::new(
+            PackRouter::new(vec![]),
+            Arc::new(StubExecutor),
+        ));
+        let session_id = orchestrator.create_session().await;
+
+        let chat = try_route_supported_acp_prompt(&orchestrator, session_id, "assign role to cbu")
+            .await
+            .expect("authored DAG prompt should route through ACP semantic surface");
+
+        assert!(chat.message.contains("No mutation has run"));
+        let trace = chat.acp_trace.expect("normal chat should carry ACP trace");
+        assert_eq!(trace["status"], "pending_question");
+        assert_eq!(trace["route"], "session_input");
+        assert_eq!(trace["provider_task"], "cbu.assign-role");
+        assert_eq!(trace["selected_verb"], "cbu.assign-role");
+        assert_eq!(trace["registry_verified"], true);
+        assert_eq!(trace["envelope_verified"], true);
+        assert_eq!(trace["envelope_pack_id"], "cbu-maintenance");
+        assert!(trace["envelope_hash"]
+            .as_str()
+            .expect("envelope hash")
+            .starts_with("sha256:"));
+        assert!(
+            trace["projection_hash"]
+                .as_str()
+                .expect("projection hash")
+                .len()
+                >= 64
+        );
+        assert_eq!(trace["structured_failure_mode"], "missing_required_args");
+        assert!(trace["candidate_verbs"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|verb| verb == "cbu.assign-role"));
+        assert_eq!(trace["prose_only_failure"], false);
+    }
+
+    #[tokio::test]
+    async fn test_instrument_matrix_pack_routes_through_acp_before_repl_on_normal_input() {
+        let orchestrator = Arc::new(ReplOrchestratorV2::new(
+            PackRouter::new(vec![]),
+            Arc::new(StubExecutor),
+        ));
+        let session_id = orchestrator.create_session().await;
+
+        let chat = try_route_supported_acp_prompt(&orchestrator, session_id, "show trading matrix")
+            .await
+            .expect("instrument matrix pack prompt should route through ACP semantic surface");
+
+        assert!(chat.message.contains("Instrument Matrix"));
+        assert!(chat.message.contains("No mutation has run"));
+        let trace = chat.acp_trace.expect("normal chat should carry ACP trace");
+        assert_eq!(trace["status"], "pending_question");
+        assert_eq!(trace["route"], "session_input");
+        assert_eq!(trace["provider_task"], "trading-profile.read");
+        assert_eq!(trace["selected_verb"], "trading-profile.read");
+        assert_eq!(trace["pack_id"], "instrument-matrix");
+        assert_eq!(trace["pack_name"], "Instrument Matrix");
+        assert_eq!(trace["pack_ref"], "instrument-matrix@1.0");
+        assert!(trace["pack_allowed_verb_count"].as_u64().unwrap() > 100);
+        assert!(trace["candidate_verbs"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|verb| verb == "trading-profile.read"));
+        assert_eq!(trace["structured_failure_mode"], "missing_required_args");
+        assert_eq!(trace["prose_only_failure"], false);
+    }
+
+    #[tokio::test]
+    async fn test_onboarding_dictionary_routes_through_acp_workflow_plan_on_normal_input() {
         let orchestrator = Arc::new(ReplOrchestratorV2::new(
             PackRouter::new(vec![]),
             Arc::new(StubExecutor),
@@ -3523,13 +3873,52 @@ mod tests {
         let chat = try_route_supported_acp_prompt(
             &orchestrator,
             session_id,
-            "Advance loan 11111111-1111-1111-1111-111111111111 from INTAKE to REVIEW with evidence sha256:evidence",
+            "resource dictionary for product onboarding",
         )
-        .await;
+        .await
+        .expect("onboarding dictionary prompt should route through ACP semantic surface");
+
+        assert!(chat.message.contains("Onboarding Request"));
+        assert!(chat.message.contains("workflow plan"));
+        let trace = chat.acp_trace.expect("normal chat should carry ACP trace");
+        assert_eq!(trace["status"], "pending_question");
+        assert_eq!(trace["route"], "session_input");
+        assert_eq!(trace["provider_task"], "onboarding.compile-data-request");
+        assert_eq!(trace["selected_verb"], "onboarding.compile-data-request");
+        assert_eq!(trace["pack_id"], "onboarding-request");
+        assert_eq!(trace["pack_name"], "Onboarding Request");
+        assert_eq!(
+            trace["workflow_plan_id"],
+            "onboarding.compile-data-request.preview.v1"
+        );
+        assert_eq!(
+            trace["workflow_plan_verb"],
+            "onboarding.compile-data-request"
+        );
+        assert_eq!(trace["workflow_plan_dry_run_only"], true);
+        assert!(trace["workflow_plan_needed_from_user"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|field| field == "onboarding-request-id"));
+        assert_eq!(trace["structured_failure_mode"], "missing_required_args");
+        assert_eq!(trace["prose_only_failure"], false);
+    }
+
+    #[tokio::test]
+    async fn test_non_authored_prompt_still_falls_through_to_repl_input_path() {
+        let orchestrator = Arc::new(ReplOrchestratorV2::new(
+            PackRouter::new(vec![]),
+            Arc::new(StubExecutor),
+        ));
+        let session_id = orchestrator.create_session().await;
+
+        let chat =
+            try_route_supported_acp_prompt(&orchestrator, session_id, "assemble context").await;
 
         assert!(
             chat.is_none(),
-            "unsupported stateful DAGs should not bypass normal REPL input"
+            "non-DAG control prompts should still fall through to the normal REPL path"
         );
     }
 }

@@ -16,9 +16,9 @@ use super::decision_log::SessionDecisionLog;
 use super::proposal_engine::ProposalSet;
 use super::runbook::{ArgExtractionAudit, Runbook, SlotSource};
 use super::types_v2::{
-    ActionHint, AgentMode, ConversationMode, ReplStateV2, SessionFeedback, SessionScope,
-    SubjectKind, SubjectRef, VerbRef, WorkspaceFrame, WorkspaceHint, WorkspaceKind,
-    WorkspaceStateView,
+    ActionHint, AgentMode, ConversationMode, ReplStateV2, SessionEntityResolutionFeedback,
+    SessionFeedback, SessionScope, SubjectKind, SubjectRef, VerbRef, WorkspaceFrame, WorkspaceHint,
+    WorkspaceKind, WorkspaceStateView,
 };
 use crate::agent::sem_os_context_envelope::SemOsContextEnvelope;
 use crate::journey::handoff::PackHandoff;
@@ -60,6 +60,9 @@ pub struct ReplSessionV2 {
     pub pending_sem_os_envelope: Option<SemOsContextEnvelope>,
     #[serde(skip)]
     pub pending_lookup_result: Option<LookupResult>,
+    /// Last entity-resolution projection produced by the Sage lookup service.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub last_entity_resolution: Option<SessionEntityResolutionFeedback>,
     #[serde(skip)]
     pub pending_execution_rechecks: Vec<serde_json::Value>,
     #[serde(default)]
@@ -156,6 +159,7 @@ impl ReplSessionV2 {
             pending_trace_id: None,
             pending_sem_os_envelope: None,
             pending_lookup_result: None,
+            last_entity_resolution: None,
             pending_execution_rechecks: Vec::new(),
             active_workspace: None,
             workspace_stack: Vec::new(),
@@ -779,6 +783,7 @@ impl ReplSessionV2 {
             available_workspaces,
             pending_verb: self.pending_verb.clone(),
             conversation_mode: self.conversation_mode,
+            entity_resolution: self.last_entity_resolution.clone(),
         }
     }
 
@@ -1161,6 +1166,63 @@ required_context:
         let pack = sample_pack();
         session.activate_pack(pack.clone(), "hash".to_string(), None);
         assert_eq!(session.active_pack_id(), Some(pack.id.clone()));
+    }
+
+    #[test]
+    fn test_session_feedback_exposes_entity_resolution() {
+        let entity_id = Uuid::new_v4();
+        let lookup = crate::lookup::LookupResult {
+            entity_snapshot: crate::lookup::EntitySnapshotMetadata {
+                hash: "snapshot-hash".to_string(),
+                version: 1,
+                entity_count: 7,
+            },
+            verbs: Vec::new(),
+            entities: vec![crate::entity_linking::EntityResolution {
+                mention_span: (0, 7),
+                mention_text: "Allianz".to_string(),
+                candidates: vec![crate::entity_linking::EntityCandidate {
+                    entity_id,
+                    entity_kind: "company".to_string(),
+                    canonical_name: "Allianz SE".to_string(),
+                    score: 0.92,
+                    evidence: Vec::new(),
+                }],
+                selected: Some(entity_id),
+                confidence: 0.92,
+                evidence: Vec::new(),
+            }],
+            dominant_entity: Some(crate::lookup::service::DominantEntity {
+                entity_id,
+                canonical_name: "Allianz SE".to_string(),
+                entity_kind: "company".to_string(),
+                confidence: 0.92,
+                mention_span: (0, 7),
+            }),
+            expected_kinds: vec!["company".to_string()],
+            concepts: Vec::new(),
+            verb_matched: false,
+            entities_resolved: true,
+        };
+
+        let mut session = ReplSessionV2::new();
+        session.last_entity_resolution = Some((&lookup).into());
+
+        let feedback = session.build_session_feedback(false);
+        let entity_resolution = feedback
+            .entity_resolution
+            .expect("entity resolution feedback");
+
+        assert_eq!(entity_resolution.snapshot_hash, "snapshot-hash");
+        assert_eq!(
+            entity_resolution
+                .dominant_entity
+                .as_ref()
+                .map(|entity| entity.entity_id),
+            Some(entity_id)
+        );
+        assert_eq!(entity_resolution.mentions.len(), 1);
+        assert_eq!(entity_resolution.mentions[0].selected_id, Some(entity_id));
     }
 
     #[test]

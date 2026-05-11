@@ -18,6 +18,15 @@ invocation_phrases:
   - "deal onboarding"
   - "start onboarding"
   - "ops handoff"
+  - "compile onboarding data request"
+  - "onboarding data dictionary"
+  - "product onboarding resource dictionary"
+  - "resource dictionary for product onboarding"
+  - "resource data requirements"
+  - "cbu resource requirements"
+  - "consolidate resource requirements"
+  - "resource owner data request"
+  - "complete product onboarding requirements"
 
 required_context:
   - client_group_id

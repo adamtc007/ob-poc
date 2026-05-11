@@ -87,11 +87,12 @@ pub use kyc_dry_run::{
     KycUpdateStatusDryRunInput, KycUpdateStatusDryRunOutput, KycUpdateStatusDryRunRefusal,
 };
 pub use language_pack::{
-    build_kyc_update_status_language_pack, transition_language_pack_readiness,
-    transition_language_pack_readiness_report, BlockedVerb, CanonicalMicroPattern,
-    EvidencePolicySummary, KycLanguagePackRequest, LanguagePackArg, LanguagePackError,
-    LanguagePackSubject, LanguagePackTransition, LanguagePackVerb, SemOsLanguagePack,
-    TransitionEffect, TransitionLanguagePackReadiness, UuidBindingRequirement,
+    build_kyc_update_status_language_pack, build_update_status_language_pack,
+    transition_language_pack_readiness, transition_language_pack_readiness_report, BlockedVerb,
+    CanonicalMicroPattern, EvidencePolicySummary, KycLanguagePackRequest, LanguagePackArg,
+    LanguagePackError, LanguagePackSubject, LanguagePackTransition, LanguagePackVerb,
+    SemOsLanguagePack, TransitionEffect, TransitionLanguagePackReadiness,
+    UpdateStatusLanguagePackRequest, UuidBindingRequirement,
 };
 pub use llm_draft_adapter::{
     run_kyc_update_status_llm_draft_loop, run_kyc_update_status_llm_draft_loop_with_prompt_pack,

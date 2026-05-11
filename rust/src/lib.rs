@@ -26,7 +26,13 @@ pub mod error;
 
 // ACP-facing transport-neutral adapter contracts.
 pub mod acp;
+pub mod acp_dag_semantic;
+pub mod acp_pack_context_envelope_v2;
 pub mod acp_protocol;
+pub mod acp_registry_projection;
+pub mod acp_runtime_context;
+pub(crate) mod acp_runtime_context_sources;
+pub mod acp_static_context_acceptance;
 
 // LLM inference trace hashing and workbook binding.
 pub mod llm_trace;

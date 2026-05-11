@@ -92,7 +92,7 @@ pub fn build_kyc_update_status_dry_run_with_manifest(
     }
 
     let simulation = simulate_transition_from_pack(
-        &manifest,
+        manifest,
         &StateSimulationRequest {
             pack_id: manifest.pack_id.clone(),
             transition_ref: input.transition_ref.clone(),

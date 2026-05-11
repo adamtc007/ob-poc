@@ -64,6 +64,7 @@ pub enum RestrictedMutationRunbookCompilationError {
     },
 }
 
+#[allow(clippy::result_large_err)]
 pub fn compile_restricted_mutation_preflight(
     session_id: Uuid,
     runbook_version: u64,
@@ -170,6 +171,7 @@ pub fn compile_restricted_mutation_preflight(
     })
 }
 
+#[allow(clippy::result_large_err)]
 pub fn record_restricted_mutation_execution_receipt(
     compilation: &RestrictedMutationRunbookCompilation,
     preflight: &RestrictedMutationPreflight,
@@ -221,6 +223,7 @@ pub fn record_restricted_mutation_execution_receipt(
     })
 }
 
+#[allow(clippy::result_large_err)]
 fn require_arg(
     preflight: &RestrictedMutationPreflight,
     field: &str,
@@ -237,6 +240,7 @@ fn require_arg(
     Ok(())
 }
 
+#[allow(clippy::result_large_err)]
 fn require_receipt_binding(
     field: &str,
     expected: &str,

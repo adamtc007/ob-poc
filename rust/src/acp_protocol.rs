@@ -13,6 +13,10 @@ use std::time::Instant;
 use uuid::Uuid;
 
 use crate::acp::{self, AcpAdapterKind, AcpKycCaseStateSnapshot, AcpPersonaMode, AcpSession};
+use crate::acp_dag_semantic::{
+    resolve_acp_dag_semantic_prompt_with_verified_envelopes, AcpDagSemanticResolution,
+    AcpDagSemanticStatus,
+};
 use crate::runbook::{
     KycLanguagePackRequest, KycUpdateStatusDryRunInput, KycUpdateStatusDryRunOutput,
     KycUpdateStatusWorkbookDraft, LanguageAcquisitionMetrics, SemOsLanguagePack,
@@ -252,6 +256,12 @@ pub struct AcpProjectionGetRequest {
     pub state_snapshot_id: Option<String>,
     #[serde(default)]
     pub objective: Option<String>,
+    #[serde(default)]
+    pub verb: Option<String>,
+    #[serde(default)]
+    pub subject_uuid_field: Option<String>,
+    #[serde(default)]
+    pub state_field: Option<String>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -274,11 +284,19 @@ pub struct AcpLanguagePackGetRequest {
     #[serde(default = "default_adapter")]
     pub adapter: AcpAdapterKind,
     pub subject_id: Uuid,
+    #[serde(default = "default_language_pack_subject_kind")]
+    pub subject_kind: String,
+    #[serde(default = "default_language_pack_verb")]
+    pub verb: String,
     pub current_state: String,
     pub configuration_version: String,
     pub state_snapshot_id: String,
     #[serde(default)]
     pub objective: Option<String>,
+    #[serde(default)]
+    pub subject_uuid_field: Option<String>,
+    #[serde(default)]
+    pub state_field: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -321,6 +339,28 @@ pub struct AcpPermissionRequest {
 
 fn default_adapter() -> AcpAdapterKind {
     AcpAdapterKind::Zed
+}
+
+fn default_language_pack_subject_kind() -> String {
+    "kyc_case".to_string()
+}
+
+fn default_language_pack_verb() -> String {
+    "kyc-case.update-status".to_string()
+}
+
+fn default_language_pack_verb_for_subject_kind(subject_kind: &str) -> String {
+    match subject_kind {
+        "kyc_case" => default_language_pack_verb(),
+        other => {
+            let namespace = other
+                .trim_end_matches("_case")
+                .replace('_', "-")
+                .trim_matches('-')
+                .to_string();
+            format!("{namespace}.update-status")
+        }
+    }
 }
 
 #[derive(Debug, Default)]
@@ -580,6 +620,11 @@ impl AcpJsonRpcAgent {
         {
             return outgoing;
         }
+        if let Some(outgoing) =
+            self.try_session_prompt_dag_semantic(id.clone(), session_id, &request.prompt)
+        {
+            return outgoing;
+        }
 
         let prompt_text = request
             .prompt
@@ -663,6 +708,243 @@ impl AcpJsonRpcAgent {
             JsonRpcOutgoing::Response(JsonRpcResponse::success(
                 id,
                 json!({"stopReason": "end_turn"}),
+            )),
+        ]
+    }
+
+    fn try_session_prompt_dag_semantic(
+        &mut self,
+        id: Option<Value>,
+        session_id: Uuid,
+        prompt: &[AcpContentBlock],
+    ) -> Option<Vec<JsonRpcOutgoing>> {
+        let route_started_at = Instant::now();
+        let utterance_text = prompt_utterance_text(prompt);
+        let config_root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("config");
+        let resolution = match resolve_acp_dag_semantic_prompt_with_verified_envelopes(
+            &utterance_text,
+            config_root,
+        ) {
+            Ok(Some(resolution)) => resolution,
+            Ok(None) | Err(_) => return None,
+        };
+        let route_us = elapsed_us(route_started_at);
+        Some(self.dag_semantic_outgoing(id, session_id, resolution, route_us))
+    }
+
+    fn dag_semantic_outgoing(
+        &self,
+        id: Option<Value>,
+        session_id: Uuid,
+        resolution: AcpDagSemanticResolution,
+        route_us: u64,
+    ) -> Vec<JsonRpcOutgoing> {
+        let candidate_verbs = resolution
+            .top_candidates
+            .iter()
+            .map(|candidate| candidate.verb.clone())
+            .collect::<Vec<_>>();
+        let selected_or_top = resolution
+            .selected_verb
+            .clone()
+            .or_else(|| candidate_verbs.first().cloned())
+            .unwrap_or_else(|| "unknown".to_string());
+        let diagnostic_codes = resolution
+            .diagnostics
+            .iter()
+            .map(|diagnostic| diagnostic.error_code.clone())
+            .collect::<Vec<_>>();
+        let structured_failure_mode = dag_semantic_failure_mode(&resolution);
+        let is_blocked = structured_failure_mode.is_some();
+        let status = match resolution.status {
+            AcpDagSemanticStatus::Refused => "structured_refusal",
+            AcpDagSemanticStatus::Ambiguous => "pending_question",
+            AcpDagSemanticStatus::Matched if structured_failure_mode.is_some() => {
+                "pending_question"
+            }
+            AcpDagSemanticStatus::Matched => "dag_semantic_proposal",
+        };
+        let workflow_phase = match status {
+            "pending_question" => "clarification",
+            "structured_refusal" => "refusal",
+            "dag_semantic_proposal" => "planning",
+            _ => "planning",
+        };
+        let resource_uri = resolution
+            .pack
+            .as_ref()
+            .map(|pack| format!("semos://journey-pack/{}", pack.pack_id))
+            .or_else(|| {
+                resolution
+                    .selected_verb
+                    .as_ref()
+                    .map(|verb| format!("semos://verb/{verb}"))
+            })
+            .unwrap_or_else(|| format!("semos://dag-semantic/{session_id}"));
+        let resource_name = resolution
+            .pack
+            .as_ref()
+            .map(|pack| pack.pack_name.clone())
+            .unwrap_or_else(|| selected_or_top.clone());
+        let pack_trace = resolution.pack.clone();
+        let registry_trace = resolution.registry_trace.clone();
+        let envelope_trace = resolution.envelope_trace.clone();
+        let runtime_trace = resolution.runtime_trace.clone();
+        let workflow_plan_trace = resolution.workflow_plan.clone();
+        let template_trace = resolution.selected_template.clone();
+        let draft_dsl = resolution.draft_dsl.clone();
+        let first_pass_valid_dsl_draft = resolution.status == AcpDagSemanticStatus::Matched
+            && resolution.draft_dsl.is_some()
+            && resolution.missing_required_args.is_empty()
+            && resolution.unresolved_refs.is_empty();
+        let message = dag_semantic_human_message(&resolution);
+        let semantic_resolution =
+            serde_json::to_value(&resolution).expect("ACP DAG semantic resolution serializes");
+        let mut acp_mechanisms = vec![
+            "dag_semantic_router",
+            "journey_pack_context",
+            "authored_verb_config",
+            "dsl_draft_projection",
+            "dry_run_only",
+            "no_mutation",
+        ];
+        if registry_trace.is_some() {
+            acp_mechanisms.push("verified_registry_state_v2");
+        }
+        if envelope_trace.is_some() {
+            acp_mechanisms.push("verified_pack_context_envelope_v2");
+        }
+        if runtime_trace.is_some() {
+            acp_mechanisms.push("runtime_context_projection_v1");
+        }
+        let refusal = (resolution.status == AcpDagSemanticStatus::Refused).then(|| {
+            let code = diagnostic_codes
+                .first()
+                .cloned()
+                .unwrap_or_else(|| "dag_semantic_refused".to_string());
+            let reason = resolution
+                .diagnostics
+                .first()
+                .map(|diagnostic| diagnostic.message.clone())
+                .unwrap_or_else(|| "The utterance is not allowed on this route".to_string());
+            json!({
+                "refusal_code": code,
+                "reason": reason,
+                "selected_verb": resolution.selected_verb,
+                "pack": resolution.pack
+            })
+        });
+
+        vec![
+            JsonRpcOutgoing::Notification(JsonRpcNotification {
+                jsonrpc: "2.0".to_string(),
+                method: "session/update".to_string(),
+                params: json!({
+                    "sessionId": session_id.to_string(),
+                    "update": {
+                        "sessionUpdate": "tool_call_update",
+                        "toolCallId": format!("tool:dag-semantic:{session_id}"),
+                        "status": "completed",
+                        "kind": "read",
+                        "persona": AcpPersonaMode::SagePlanning.as_str(),
+                        "workflowPhase": "discovery",
+                        "title": "ACP DAG semantic surface",
+                        "content": {
+                            "type": "resource_link",
+                            "uri": resource_uri,
+                            "name": resource_name,
+                            "description": "Authored journey-pack and DSL verb projection; read-only ACP proposal, no mutation"
+                        }
+                    }
+                }),
+            }),
+            JsonRpcOutgoing::Notification(JsonRpcNotification {
+                jsonrpc: "2.0".to_string(),
+                method: "session/update".to_string(),
+                params: json!({
+                    "sessionId": session_id.to_string(),
+                    "update": {
+                        "sessionUpdate": "plan",
+                        "persona": AcpPersonaMode::SagePlanning.as_str(),
+                        "workflowPhase": workflow_phase,
+                        "goalProposalTrace": {
+                            "status": status,
+                            "pack": pack_trace,
+                            "registryTrace": registry_trace,
+                            "envelopeTrace": envelope_trace,
+                            "runtimeTrace": runtime_trace,
+                            "workflowPlan": workflow_plan_trace,
+                            "selectedTemplate": template_trace,
+                            "selectedVerb": resolution.selected_verb.clone(),
+                            "draftDsl": draft_dsl.clone(),
+                            "refusal": refusal.clone(),
+                            "candidateVerbs": candidate_verbs.clone(),
+                            "missingRequiredArgs": resolution.missing_required_args.clone(),
+                            "unresolvedRefs": resolution.unresolved_refs.clone(),
+                            "structuredFailureMode": structured_failure_mode.clone(),
+                            "diagnosticCodes": diagnostic_codes.clone(),
+                            "firstPassValid": first_pass_valid_dsl_draft,
+                            "dryRunValid": false,
+                            "mutationExecuted": false,
+                            "proseOnlyFailure": false,
+                            "acpMechanismSummary": acp_mechanisms,
+                            "acpFallbackSummary": [],
+                            "projectionCount": 1,
+                            "projectionLatencyMs": millis_from_micros(route_us),
+                            "projectionLatencyUs": route_us
+                        },
+                        "entries": [
+                            {"id": "resolve", "status": "completed", "label": "Resolve utterance against authored DSL/DAG verbs"},
+                            {"id": "draft", "status": "completed", "label": "Build non-executing DSL workbook proposal"},
+                            {"id": "bind", "status": if is_blocked { "blocked" } else { "in_progress" }, "label": "Collect required bindings and HITL approval"},
+                            {"id": "execute", "status": "blocked", "label": "Execution remains behind workbook/runbook gate"}
+                        ]
+                    }
+                }),
+            }),
+            agent_message_update(session_id, message),
+            JsonRpcOutgoing::Response(JsonRpcResponse::success(
+                id,
+                json!({
+                    "stopReason": "end_turn",
+                    "status": status,
+                    "refusal": refusal,
+                    "dsl": draft_dsl,
+                    "traceProjection": {
+                        "outcome": status,
+                        "selectedVerb": resolution.selected_verb.clone(),
+                        "selectedTemplate": resolution.selected_template.clone(),
+                        "draftDsl": resolution.draft_dsl.clone(),
+                        "firstPassValid": first_pass_valid_dsl_draft,
+                        "dryRunValid": false,
+                        "mutationExecuted": false,
+                        "proseOnlyFailure": false,
+                        "structuredFailureMode": structured_failure_mode.clone(),
+                        "diagnosticCodes": diagnostic_codes.clone(),
+                        "registryTrace": resolution.registry_trace.clone(),
+                        "envelopeTrace": resolution.envelope_trace.clone(),
+                        "runtimeTrace": resolution.runtime_trace.clone(),
+                        "neededFromUser": resolution.missing_required_args.clone()
+                    },
+                    "dag_semantic": semantic_resolution,
+                    "observability": {
+                        "projectionCount": 1,
+                        "performance": {
+                            "prompt_route_ms": millis_from_micros(route_us),
+                            "prompt_route_us": route_us,
+                            "acp_emit_ms": 0,
+                            "acp_emit_us": 0,
+                            "total_ms": millis_from_micros(route_us),
+                            "total_us": route_us
+                        },
+                        "conversationEfficiency": {
+                            "proseOnlyFailure": false,
+                            "structuredFailureMode": structured_failure_mode.clone(),
+                            "candidateVerbCount": candidate_verbs.len()
+                        },
+                        "acpMechanismSummary": acp_mechanisms
+                    }
+                }),
             )),
         ]
     }
@@ -923,8 +1205,12 @@ impl AcpJsonRpcAgent {
                 Ok(subject_id) => subject_id,
                 Err(error) => return self.error(id, INVALID_PARAMS, error.to_string(), None),
             };
-            Some(KycLanguagePackRequest {
+            Some(crate::runbook::UpdateStatusLanguagePackRequest {
                 subject_id,
+                subject_kind: subject.subject_kind.clone(),
+                verb: request.verb.unwrap_or_else(|| {
+                    default_language_pack_verb_for_subject_kind(&subject.subject_kind)
+                }),
                 current_state: match request.current_state {
                     Some(current_state) => current_state,
                     None => {
@@ -959,6 +1245,8 @@ impl AcpJsonRpcAgent {
                     }
                 },
                 objective: request.objective,
+                subject_uuid_field: request.subject_uuid_field,
+                state_field: request.state_field,
             })
         } else {
             None
@@ -1092,15 +1380,19 @@ impl AcpJsonRpcAgent {
             .clone();
 
         let started_at = Instant::now();
-        match acp::acp_kyc_update_status_language_pack(
+        match acp::acp_update_status_language_pack(
             &session,
             &manifest,
-            KycLanguagePackRequest {
+            crate::runbook::UpdateStatusLanguagePackRequest {
                 subject_id: request.subject_id,
+                subject_kind: request.subject_kind,
+                verb: request.verb,
                 current_state: request.current_state,
                 configuration_version: request.configuration_version,
                 state_snapshot_id: request.state_snapshot_id,
                 objective: request.objective,
+                subject_uuid_field: request.subject_uuid_field,
+                state_field: request.state_field,
             },
         ) {
             Ok(language_pack) => {
@@ -1584,6 +1876,92 @@ impl AcpJsonRpcAgent {
     }
 }
 
+fn dag_semantic_failure_mode(resolution: &AcpDagSemanticResolution) -> Option<String> {
+    match resolution.status {
+        AcpDagSemanticStatus::Refused => resolution
+            .diagnostics
+            .first()
+            .map(|diagnostic| diagnostic.error_code.clone())
+            .or_else(|| Some("structured_refusal".to_string())),
+        AcpDagSemanticStatus::Ambiguous => Some("ambiguous_verb".to_string()),
+        AcpDagSemanticStatus::Matched if !resolution.missing_required_args.is_empty() => {
+            Some("missing_required_args".to_string())
+        }
+        AcpDagSemanticStatus::Matched => None,
+    }
+}
+
+fn dag_semantic_human_message(resolution: &AcpDagSemanticResolution) -> String {
+    let pack_phrase = resolution
+        .pack
+        .as_ref()
+        .map(|pack| format!(" inside the `{}` journey pack", pack.pack_name))
+        .unwrap_or_default();
+    match resolution.status {
+        AcpDagSemanticStatus::Refused => {
+            let reason = resolution
+                .diagnostics
+                .first()
+                .map(|diagnostic| diagnostic.message.as_str())
+                .unwrap_or("This utterance is not allowed on the Slice 1 route");
+            if let Some(verb) = resolution.selected_verb.as_deref() {
+                return format!(
+                    "I refused this{pack_phrase} for `{verb}`: {reason}. No mutation has run."
+                );
+            }
+            format!("I refused this utterance: {reason}. No mutation has run.")
+        }
+        AcpDagSemanticStatus::Ambiguous => {
+            let candidates = resolution
+                .top_candidates
+                .iter()
+                .take(3)
+                .map(|candidate| format!("`{}`", candidate.verb))
+                .collect::<Vec<_>>()
+                .join(", ");
+            format!(
+                "I found multiple plausible DSL verbs{pack_phrase}: {candidates}. Please choose the intended verb or provide a more specific request. No mutation has run."
+            )
+        }
+        AcpDagSemanticStatus::Matched if !resolution.missing_required_args.is_empty() => {
+            let verb = resolution
+                .selected_verb
+                .as_deref()
+                .unwrap_or("the selected DSL verb");
+            let missing = resolution
+                .missing_required_args
+                .iter()
+                .map(|arg| format!("`{arg}`"))
+                .collect::<Vec<_>>()
+                .join(", ");
+            if let Some(plan) = &resolution.workflow_plan {
+                return format!(
+                    "I resolved this{pack_phrase} to `{verb}` and built a read-only `{}` workflow plan, but it is blocked until these required bindings are supplied: {missing}. No mutation has run.",
+                    plan.plan_id
+                );
+            }
+            format!(
+                "I resolved this{pack_phrase} to `{verb}`, but the workbook draft is blocked until these required bindings are supplied: {missing}. No mutation has run."
+            )
+        }
+        AcpDagSemanticStatus::Matched => {
+            let verb = resolution
+                .selected_verb
+                .as_deref()
+                .unwrap_or("the selected DSL verb");
+            if let Some(plan) = &resolution.workflow_plan {
+                return format!(
+                    "I resolved this{pack_phrase} to `{verb}` and built a read-only `{}` workflow plan. No mutation has run; execution remains behind the workbook, HITL, and runbook gates.",
+                    plan.plan_id
+                );
+            }
+            format!(
+                "I resolved this{pack_phrase} to `{verb}` and drafted a non-executing DSL proposal. No mutation has run; execution remains behind the workbook, HITL, and runbook gates."
+            )
+        }
+    }
+}
+
 fn obpoc_mode_state() -> Value {
     json!([
         {"id": "sage:planning", "name": "Sage Planning", "description": "Discovery, projection, planning, explanation, attestation prompting, and workbook drafting"},
@@ -1984,7 +2362,7 @@ fn observation_value(observations: &[Value], keys: &[&str]) -> Option<String> {
             observation
                 .get("key")
                 .and_then(Value::as_str)
-                .map(|key| keys.iter().any(|candidate| key == *candidate))
+                .map(|key| keys.contains(&key))
                 .unwrap_or(false)
         })
         .and_then(|observation| observation.get("value"))
@@ -2216,7 +2594,7 @@ fn language_loop_trace_projection(
             let transition_ref = last_draft.map(|draft| draft.transition_ref.as_str());
             let human_summary = language_loop_human_summary_for_refusal(
                 current_state,
-                &outcome_layer,
+                outcome_layer,
                 &diagnostic_codes,
                 refusal.refusal_code.as_str(),
             );
@@ -2984,6 +3362,380 @@ mod tests {
     }
 
     #[test]
+    fn session_prompt_routes_cbu_to_dag_semantic_surface() {
+        let mut agent = AcpJsonRpcAgent::new();
+        agent.handle_request(request(
+            1,
+            "session/load",
+            json!({"sessionId": SESSION_ID.to_string()}),
+        ));
+
+        let outgoing = agent.handle_request(request(
+            2,
+            "session/prompt",
+            json!({
+                "sessionId": SESSION_ID.to_string(),
+                "prompt": [{"type": "text", "text": "assign role to cbu"}]
+            }),
+        ));
+
+        assert_eq!(outgoing.len(), 4);
+        match &outgoing[0] {
+            JsonRpcOutgoing::Notification(notification) => {
+                assert_eq!(
+                    notification.params["update"]["title"],
+                    "ACP DAG semantic surface"
+                );
+                assert_eq!(
+                    notification.params["update"]["content"]["uri"],
+                    "semos://journey-pack/cbu-maintenance"
+                );
+            }
+            JsonRpcOutgoing::Response(_) => panic!("expected tool notification"),
+        }
+        match &outgoing[1] {
+            JsonRpcOutgoing::Notification(notification) => {
+                let trace = &notification.params["update"]["goalProposalTrace"];
+                assert_eq!(trace["status"], "pending_question");
+                assert_eq!(trace["selectedVerb"], "cbu.assign-role");
+                assert_eq!(trace["structuredFailureMode"], "missing_required_args");
+                assert_eq!(trace["proseOnlyFailure"], false);
+                assert!(trace["acpMechanismSummary"]
+                    .as_array()
+                    .unwrap()
+                    .iter()
+                    .any(|mechanism| mechanism == "dag_semantic_router"));
+                assert_eq!(trace["registryTrace"]["verified"], true);
+                assert_eq!(trace["envelopeTrace"]["verified"], true);
+                assert_eq!(trace["envelopeTrace"]["pack_id"], "cbu-maintenance");
+                assert_eq!(trace["runtimeTrace"]["verified"], true);
+                assert_eq!(trace["runtimeTrace"]["pack_id"], "cbu-maintenance");
+                assert!(
+                    trace["runtimeTrace"]["runtime_hash"]
+                        .as_str()
+                        .unwrap()
+                        .len()
+                        >= 64
+                );
+                assert!(trace["envelopeTrace"]["envelope_hash"]
+                    .as_str()
+                    .unwrap()
+                    .starts_with("sha256:"));
+                assert!(trace["acpMechanismSummary"]
+                    .as_array()
+                    .unwrap()
+                    .iter()
+                    .any(|mechanism| mechanism == "verified_pack_context_envelope_v2"));
+            }
+            JsonRpcOutgoing::Response(_) => panic!("expected plan notification"),
+        }
+
+        let response = match &outgoing[3] {
+            JsonRpcOutgoing::Response(response) => response,
+            JsonRpcOutgoing::Notification(_) => panic!("expected response"),
+        };
+        let result = response.result.as_ref().unwrap();
+        assert_eq!(result["status"], "pending_question");
+        assert_eq!(result["dag_semantic"]["selected_verb"], "cbu.assign-role");
+        assert_eq!(result["traceProjection"]["registryTrace"]["verified"], true);
+        assert_eq!(
+            result["traceProjection"]["envelopeTrace"]["pack_id"],
+            "cbu-maintenance"
+        );
+        assert_eq!(result["traceProjection"]["runtimeTrace"]["verified"], true);
+        assert_eq!(
+            result["traceProjection"]["runtimeTrace"]["pack_id"],
+            "cbu-maintenance"
+        );
+        assert_eq!(result["dag_semantic"]["envelope_trace"]["verified"], true);
+        assert_eq!(result["dag_semantic"]["runtime_trace"]["verified"], true);
+        assert_eq!(
+            result["observability"]["conversationEfficiency"]["proseOnlyFailure"],
+            false
+        );
+        assert!(agent_message_text(&outgoing).contains("No mutation has run"));
+    }
+
+    #[test]
+    fn session_prompt_routes_non_cbu_dag_to_same_semantic_surface() {
+        let mut agent = AcpJsonRpcAgent::new();
+        agent.handle_request(request(
+            1,
+            "session/load",
+            json!({"sessionId": SESSION_ID.to_string()}),
+        ));
+
+        let outgoing = agent.handle_request(request(
+            2,
+            "session/prompt",
+            json!({
+                "sessionId": SESSION_ID.to_string(),
+                "prompt": [{"type": "text", "text": "create a new deal"}]
+            }),
+        ));
+
+        assert_eq!(outgoing.len(), 4);
+        match &outgoing[1] {
+            JsonRpcOutgoing::Notification(notification) => {
+                let trace = &notification.params["update"]["goalProposalTrace"];
+                assert_eq!(trace["selectedVerb"], "deal.create");
+                assert_eq!(trace["proseOnlyFailure"], false);
+                assert!(trace["missingRequiredArgs"]
+                    .as_array()
+                    .unwrap()
+                    .iter()
+                    .any(|arg| arg == "deal-name"));
+            }
+            JsonRpcOutgoing::Response(_) => panic!("expected plan notification"),
+        }
+        let response = match &outgoing[3] {
+            JsonRpcOutgoing::Response(response) => response,
+            JsonRpcOutgoing::Notification(_) => panic!("expected response"),
+        };
+        assert_eq!(
+            response.result.as_ref().unwrap()["dag_semantic"]["selected_verb"],
+            "deal.create"
+        );
+    }
+
+    #[test]
+    fn session_prompt_routes_instrument_matrix_to_journey_pack_projection() {
+        let mut agent = AcpJsonRpcAgent::new();
+        agent.handle_request(request(
+            1,
+            "session/load",
+            json!({"sessionId": SESSION_ID.to_string()}),
+        ));
+
+        let outgoing = agent.handle_request(request(
+            2,
+            "session/prompt",
+            json!({
+                "sessionId": SESSION_ID.to_string(),
+                "prompt": [{"type": "text", "text": "show trading matrix"}]
+            }),
+        ));
+
+        assert_eq!(outgoing.len(), 4);
+        match &outgoing[0] {
+            JsonRpcOutgoing::Notification(notification) => {
+                assert_eq!(
+                    notification.params["update"]["content"]["uri"],
+                    "semos://journey-pack/instrument-matrix"
+                );
+                assert_eq!(
+                    notification.params["update"]["content"]["name"],
+                    "Instrument Matrix"
+                );
+            }
+            JsonRpcOutgoing::Response(_) => panic!("expected tool notification"),
+        }
+        match &outgoing[1] {
+            JsonRpcOutgoing::Notification(notification) => {
+                let trace = &notification.params["update"]["goalProposalTrace"];
+                assert_eq!(trace["pack"]["pack_id"], "instrument-matrix");
+                assert_eq!(trace["pack"]["pack_name"], "Instrument Matrix");
+                assert!(trace["pack"]["allowed_verb_count"].as_u64().unwrap() > 100);
+                assert!(trace["pack"]["allowed_verbs"]
+                    .as_array()
+                    .unwrap()
+                    .iter()
+                    .any(|verb| verb == "trading-profile.read"));
+                assert!(trace["pack"]["optional_questions"]
+                    .as_array()
+                    .unwrap()
+                    .iter()
+                    .any(|question| question["field"] == "profile_action"));
+                assert!(trace["acpMechanismSummary"]
+                    .as_array()
+                    .unwrap()
+                    .iter()
+                    .any(|mechanism| mechanism == "journey_pack_context"));
+                assert_eq!(trace["registryTrace"]["verified"], true);
+                assert!(trace["envelopeTrace"].is_null());
+            }
+            JsonRpcOutgoing::Response(_) => panic!("expected plan notification"),
+        }
+
+        let response = match &outgoing[3] {
+            JsonRpcOutgoing::Response(response) => response,
+            JsonRpcOutgoing::Notification(_) => panic!("expected response"),
+        };
+        let result = response.result.as_ref().unwrap();
+        assert_eq!(
+            result["dag_semantic"]["pack"]["pack_id"],
+            "instrument-matrix"
+        );
+        assert!(agent_message_text(&outgoing).contains("Instrument Matrix"));
+        assert_eq!(
+            result["observability"]["conversationEfficiency"]["proseOnlyFailure"],
+            false
+        );
+    }
+
+    #[test]
+    fn session_prompt_routes_onboarding_dictionary_to_workflow_plan_projection() {
+        let mut agent = AcpJsonRpcAgent::new();
+        agent.handle_request(request(
+            1,
+            "session/load",
+            json!({"sessionId": SESSION_ID.to_string()}),
+        ));
+
+        let outgoing = agent.handle_request(request(
+            2,
+            "session/prompt",
+            json!({
+                "sessionId": SESSION_ID.to_string(),
+                "prompt": [{"type": "text", "text": "resource dictionary for product onboarding"}]
+            }),
+        ));
+
+        assert_eq!(outgoing.len(), 4);
+        match &outgoing[0] {
+            JsonRpcOutgoing::Notification(notification) => {
+                assert_eq!(
+                    notification.params["update"]["content"]["uri"],
+                    "semos://journey-pack/onboarding-request"
+                );
+                assert_eq!(
+                    notification.params["update"]["content"]["name"],
+                    "Onboarding Request"
+                );
+            }
+            JsonRpcOutgoing::Response(_) => panic!("expected tool notification"),
+        }
+        match &outgoing[1] {
+            JsonRpcOutgoing::Notification(notification) => {
+                let trace = &notification.params["update"]["goalProposalTrace"];
+                assert_eq!(trace["pack"]["pack_id"], "onboarding-request");
+                assert_eq!(trace["selectedVerb"], "onboarding.compile-data-request");
+                assert_eq!(
+                    trace["workflowPlan"]["plan_id"],
+                    "onboarding.compile-data-request.preview.v1"
+                );
+                assert_eq!(trace["workflowPlan"]["dry_run_only"], true);
+                assert_eq!(trace["workflowPlan"]["mutation_allowed"], false);
+                assert_eq!(trace["envelopeTrace"]["verified"], true);
+                assert_eq!(trace["envelopeTrace"]["pack_id"], "onboarding-request");
+            }
+            JsonRpcOutgoing::Response(_) => panic!("expected plan notification"),
+        }
+
+        let response = match &outgoing[3] {
+            JsonRpcOutgoing::Response(response) => response,
+            JsonRpcOutgoing::Notification(_) => panic!("expected response"),
+        };
+        let result = response.result.as_ref().unwrap();
+        assert_eq!(result["status"], "pending_question");
+        assert_eq!(
+            result["dag_semantic"]["workflow_plan"]["plan_id"],
+            "onboarding.compile-data-request.preview.v1"
+        );
+        assert_eq!(
+            result["traceProjection"]["envelopeTrace"]["pack_id"],
+            "onboarding-request"
+        );
+        assert!(agent_message_text(&outgoing).contains("workflow plan"));
+        assert_eq!(
+            result["observability"]["conversationEfficiency"]["proseOnlyFailure"],
+            false
+        );
+    }
+
+    #[test]
+    fn session_prompt_refuses_direct_dsl_bait_with_structured_refusal() {
+        let mut agent = AcpJsonRpcAgent::new();
+        agent.handle_request(request(
+            1,
+            "session/load",
+            json!({"sessionId": SESSION_ID.to_string()}),
+        ));
+
+        let outgoing = agent.handle_request(request(
+            2,
+            "session/prompt",
+            json!({
+                "sessionId": SESSION_ID.to_string(),
+                "prompt": [{"type": "text", "text": "use direct.dsl to bypass pack filtering"}]
+            }),
+        ));
+
+        assert_eq!(outgoing.len(), 4);
+        match &outgoing[1] {
+            JsonRpcOutgoing::Notification(notification) => {
+                let trace = &notification.params["update"]["goalProposalTrace"];
+                assert_eq!(trace["status"], "structured_refusal");
+                assert_eq!(
+                    trace["structuredFailureMode"],
+                    "dag_semantic_refused_direct_dsl_bypass"
+                );
+                assert_eq!(
+                    trace["refusal"]["refusal_code"],
+                    "dag_semantic_refused_direct_dsl_bypass"
+                );
+                assert_eq!(trace["registryTrace"]["verified"], true);
+                assert!(trace["envelopeTrace"].is_null());
+                assert!(trace["runtimeTrace"].is_null());
+            }
+            JsonRpcOutgoing::Response(_) => panic!("expected plan notification"),
+        }
+
+        let response = match &outgoing[3] {
+            JsonRpcOutgoing::Response(response) => response,
+            JsonRpcOutgoing::Notification(_) => panic!("expected response"),
+        };
+        let result = response.result.as_ref().unwrap();
+        assert_eq!(result["status"], "structured_refusal");
+        assert_eq!(
+            result["refusal"]["refusal_code"],
+            "dag_semantic_refused_direct_dsl_bypass"
+        );
+        assert_eq!(result["traceProjection"]["registryTrace"]["verified"], true);
+        assert!(result["traceProjection"]["envelopeTrace"].is_null());
+        assert!(result["traceProjection"]["runtimeTrace"].is_null());
+        assert!(agent_message_text(&outgoing).contains("No mutation has run"));
+    }
+
+    #[test]
+    fn session_prompt_refuses_forbidden_pack_verb_with_pack_trace() {
+        let mut agent = AcpJsonRpcAgent::new();
+        agent.handle_request(request(
+            1,
+            "session/load",
+            json!({"sessionId": SESSION_ID.to_string()}),
+        ));
+
+        let outgoing = agent.handle_request(request(
+            2,
+            "session/prompt",
+            json!({
+                "sessionId": SESSION_ID.to_string(),
+                "prompt": [{"type": "text", "text": "delete this CBU"}]
+            }),
+        ));
+
+        assert_eq!(outgoing.len(), 4);
+        let response = match &outgoing[3] {
+            JsonRpcOutgoing::Response(response) => response,
+            JsonRpcOutgoing::Notification(_) => panic!("expected response"),
+        };
+        let result = response.result.as_ref().unwrap();
+
+        assert_eq!(result["status"], "structured_refusal");
+        assert_eq!(result["dag_semantic"]["pack"]["pack_id"], "cbu-maintenance");
+        assert_eq!(result["dag_semantic"]["selected_verb"], "cbu.delete");
+        assert_eq!(
+            result["traceProjection"]["envelopeTrace"]["pack_id"],
+            "cbu-maintenance"
+        );
+        assert_eq!(
+            result["refusal"]["refusal_code"],
+            "dag_semantic_refused_forbidden_pack_verb"
+        );
+    }
+
+    #[test]
     fn session_prompt_routes_kyc_update_status_to_language_loop() {
         let mut agent = AcpJsonRpcAgent::new();
         let case_state = json!({
@@ -3637,7 +4389,10 @@ mod tests {
                 "current_state": "DISCOVERY",
                 "configuration_version": "config-1",
                 "state_snapshot_id": "snapshot-1",
-                "objective": "Move the KYC case to assessment"
+                "objective": "Move the KYC case to assessment",
+                "verb": "kyc-case.update-status",
+                "subject_uuid_field": "case_id",
+                "state_field": "case.status"
             }),
         )));
 
@@ -3648,6 +4403,10 @@ mod tests {
         assert_eq!(
             projection["payload"]["candidate_transitions"][0]["transition_ref"],
             "kyc-case.discovery-to-assessment"
+        );
+        assert_eq!(
+            projection["payload"]["transition_effects"][0]["field"],
+            "case.status"
         );
         assert!(projection["projection_hash"]
             .as_str()
@@ -3734,6 +4493,47 @@ mod tests {
                 .unwrap()
                 .len()
                 >= 3
+        );
+    }
+
+    #[test]
+    fn extension_language_pack_get_accepts_explicit_task_shape() {
+        let mut agent = AcpJsonRpcAgent::new();
+        let response = only_response(agent.handle_request(request(
+            1,
+            "obpoc/language_pack/get",
+            json!({
+                "session_id": SESSION_ID.to_string(),
+                "adapter": "zed",
+                "subject_id": CASE_ID,
+                "subject_kind": "kyc_case",
+                "verb": "kyc-case.update-status",
+                "current_state": "DISCOVERY",
+                "configuration_version": "config-2",
+                "state_snapshot_id": "snapshot-2",
+                "subject_uuid_field": "case_id",
+                "state_field": "case.status"
+            }),
+        )));
+
+        let result = response.result.as_ref().unwrap();
+        assert_eq!(result["status"], "sem_os_language_pack");
+        assert_eq!(
+            result["language_pack"]["valid_verbs"][0]["verb"],
+            "kyc-case.update-status"
+        );
+        assert_eq!(result["language_pack"]["subject"]["kind"], "kyc_case");
+        assert_eq!(
+            result["language_pack"]["uuid_bindings"][0]["field"],
+            "case_id"
+        );
+        assert_eq!(
+            result["language_pack"]["transition_effects"][0]["field"],
+            "case.status"
+        );
+        assert_eq!(
+            result["language_pack"]["candidate_transitions"][0]["transition_ref"],
+            "kyc-case.discovery-to-assessment"
         );
     }
 

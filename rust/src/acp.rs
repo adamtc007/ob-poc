@@ -23,10 +23,10 @@ use uuid::Uuid;
 
 use crate::runbook::{
     build_kyc_update_status_dry_run, build_kyc_update_status_language_pack,
-    run_kyc_update_status_revision_loop, transition_language_pack_readiness_report,
-    KycLanguagePackRequest, KycUpdateStatusDryRunInput, KycUpdateStatusDryRunOutput,
-    KycUpdateStatusDryRunRefusal, KycUpdateStatusWorkbookDraft, LanguagePackError,
-    SemOsLanguagePack, WorkbookRevisionOutcome,
+    build_update_status_language_pack, run_kyc_update_status_revision_loop,
+    transition_language_pack_readiness_report, KycLanguagePackRequest, KycUpdateStatusDryRunInput,
+    KycUpdateStatusDryRunOutput, KycUpdateStatusDryRunRefusal, KycUpdateStatusWorkbookDraft,
+    LanguagePackError, SemOsLanguagePack, UpdateStatusLanguagePackRequest, WorkbookRevisionOutcome,
 };
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -197,7 +197,7 @@ pub struct AcpProjectionRequest {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub subject: Option<AcpProjectionSubject>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub language_pack_request: Option<KycLanguagePackRequest>,
+    pub language_pack_request: Option<UpdateStatusLanguagePackRequest>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -604,7 +604,7 @@ pub fn build_acp_projection(
                 }
             })?;
             serde_json::to_value(
-                build_kyc_update_status_language_pack(manifest, language_pack_request)
+                build_update_status_language_pack(manifest, language_pack_request)
                     .map_err(map_language_pack_error)?,
             )
             .expect("SemOS language pack serializes as ACP projection")
@@ -670,6 +670,16 @@ pub fn acp_kyc_update_status_language_pack(
     require_open(session)?;
     require_valid_pack(manifest)?;
     build_kyc_update_status_language_pack(manifest, request).map_err(map_language_pack_error)
+}
+
+pub fn acp_update_status_language_pack(
+    session: &AcpSession,
+    manifest: &DomainPackManifest,
+    request: UpdateStatusLanguagePackRequest,
+) -> Result<SemOsLanguagePack, AcpAdapterError> {
+    require_open(session)?;
+    require_valid_pack(manifest)?;
+    build_update_status_language_pack(manifest, request).map_err(map_language_pack_error)
 }
 
 pub fn acp_run_kyc_update_status_language_loop(

@@ -51,13 +51,64 @@ pub fn provider_registry() -> &'static [AcpStateAnchorProviderDescriptor] {
             task: DEAL_UPDATE_STATUS_TASK,
             subject_kind: "deal",
             live_state_source: "postgres.ob-poc.deals.deal_status",
-            language_pack_boundary: "deal_update_status_language_pack_v1",
+            language_pack_boundary: "update_status_language_pack_v1",
             dry_run_only: true,
             mutation_authority: false,
             supported_verbs: &[DEAL_UPDATE_STATUS_TASK],
         },
     ];
     PROVIDERS
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct AcpStateAnchorProviderSupportedTransition {
+    pub provider_id: String,
+    pub task: String,
+    pub transition_ref: String,
+    pub from_state: String,
+    pub to_state: String,
+}
+
+pub fn provider_supported_transition_registry() -> Vec<AcpStateAnchorProviderSupportedTransition> {
+    let mut transitions = Vec::new();
+
+    if let Some(provider) = provider_registry()
+        .iter()
+        .find(|provider| provider.task == KYC_UPDATE_STATUS_TASK)
+    {
+        if let Ok(manifest) = load_ob_poc_kyc_domain_pack() {
+            transitions.extend(
+                manifest
+                    .allowed_transitions
+                    .iter()
+                    .filter(|transition| transition.verb == KYC_UPDATE_STATUS_TASK)
+                    .map(|transition| AcpStateAnchorProviderSupportedTransition {
+                        provider_id: provider.provider_id.to_string(),
+                        task: provider.task.to_string(),
+                        transition_ref: transition.transition_ref.clone(),
+                        from_state: transition.from_state.clone(),
+                        to_state: transition.to_state.clone(),
+                    }),
+            );
+        }
+    }
+
+    if let Some(provider) = provider_registry()
+        .iter()
+        .find(|provider| provider.task == DEAL_UPDATE_STATUS_TASK)
+    {
+        transitions.extend(DEAL_UPDATE_STATUS_TRANSITIONS.iter().map(|transition| {
+            AcpStateAnchorProviderSupportedTransition {
+                provider_id: provider.provider_id.to_string(),
+                task: provider.task.to_string(),
+                transition_ref: transition.transition_ref.to_string(),
+                from_state: transition.from_state.to_string(),
+                to_state: transition.to_state.to_string(),
+            }
+        }));
+    }
+
+    transitions
 }
 
 fn supported_tasks() -> Vec<&'static str> {
@@ -87,12 +138,21 @@ impl AcpPromptStateAnchorProvider {
             Self::DealUpdateStatus => DEAL_UPDATE_STATUS_TASK,
         }
     }
+
+    fn language_pack_boundary(self) -> &'static str {
+        provider_registry()
+            .iter()
+            .find(|provider| provider.task == self.task())
+            .map(|provider| provider.language_pack_boundary)
+            .unwrap_or("unknown_language_pack_boundary")
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct AcpPromptStateAnchorProviderReport {
     provider_id: Option<&'static str>,
     task: Option<&'static str>,
+    language_pack_boundary: Option<&'static str>,
     status: &'static str,
     state_anchor_source: Option<&'static str>,
     subject_id: Option<Uuid>,
@@ -105,6 +165,7 @@ impl AcpPromptStateAnchorProviderReport {
         Self {
             provider_id: None,
             task: None,
+            language_pack_boundary: None,
             status: "not_applicable",
             state_anchor_source: None,
             subject_id: None,
@@ -117,6 +178,7 @@ impl AcpPromptStateAnchorProviderReport {
         Self {
             provider_id: Some(provider.id()),
             task: Some(provider.task()),
+            language_pack_boundary: Some(provider.language_pack_boundary()),
             status,
             state_anchor_source: None,
             subject_id: None,
@@ -129,6 +191,7 @@ impl AcpPromptStateAnchorProviderReport {
         Self {
             provider_id: None,
             task: None,
+            language_pack_boundary: None,
             status: "provider_unavailable",
             state_anchor_source: None,
             subject_id: None,
@@ -161,7 +224,10 @@ impl AcpPromptStateAnchorProviderReport {
             .map(|status| {
                 matches!(
                     status,
-                    "dry_run_validated" | "structured_refusal" | "pending_question"
+                    "dry_run_validated"
+                        | "structured_refusal"
+                        | "pending_question"
+                        | "dag_semantic_proposal"
                 )
             })
             .unwrap_or(false);
@@ -170,6 +236,7 @@ impl AcpPromptStateAnchorProviderReport {
             "provider_selected": self.provider_id.is_some(),
             "provider_id": self.provider_id,
             "task": self.task,
+            "language_pack_boundary": self.language_pack_boundary,
             "status": self.status,
             "state_anchor_source": self.state_anchor_source,
             "subject_id": self.subject_id,
@@ -900,10 +967,7 @@ fn acp_subject_id_from_embedded_resource_text(text: &str) -> Option<Uuid> {
 
 fn acp_entity_uuid_from_uri(uri: &str) -> Option<Uuid> {
     let rest = uri.strip_prefix("semos://entity/")?;
-    let id = rest
-        .split(|ch| matches!(ch, '/' | '?' | '#'))
-        .next()
-        .unwrap_or(rest);
+    let id = rest.split(['/', '?', '#']).next().unwrap_or(rest);
     Uuid::parse_str(id).ok()
 }
 
@@ -1356,6 +1420,7 @@ fn build_deal_update_status_dry_run_value(
     }))
 }
 
+#[allow(clippy::too_many_arguments)]
 fn acp_deal_update_status_structured_refusal_value(
     language_pack: &crate::runbook::SemOsLanguagePack,
     refusal_code: &str,
@@ -1505,6 +1570,7 @@ fn acp_state_anchor_pending_question_value(code: &str, needs: Vec<&str>, total_u
     })
 }
 
+#[allow(clippy::too_many_arguments)]
 fn deal_trace_projection(
     outcome: &str,
     language_pack: &crate::runbook::SemOsLanguagePack,
@@ -1831,6 +1897,10 @@ mod tests {
         assert!(registry
             .iter()
             .any(|provider| provider.task == DEAL_UPDATE_STATUS_TASK));
+        assert!(registry
+            .iter()
+            .any(|provider| provider.task == DEAL_UPDATE_STATUS_TASK
+                && provider.language_pack_boundary == "update_status_language_pack_v1"));
         assert!(registry.iter().all(|provider| provider.dry_run_only));
         assert!(registry.iter().all(|provider| !provider.mutation_authority));
         assert!(registry
