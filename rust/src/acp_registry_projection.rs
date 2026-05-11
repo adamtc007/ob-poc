@@ -48,6 +48,21 @@ pub struct AcpRegistryProjection {
     pub packs: Vec<AcpRegistryPackProjection>,
     pub diagnostic_taxonomy: Vec<AcpDiagnosticTaxonomyProjection>,
     pub diagnostics: Vec<AcpRegistryProjectionDiagnostic>,
+    /// R2b — v0.5 §14 neighbour hints. Keyed by `from_pack_id`.
+    pub pack_neighbours: Vec<AcpPackNeighbourEdgeProjection>,
+    /// R2b — v0.5 §14 known collision policy.
+    pub known_collision_policy: Vec<AcpKnownCollisionProjection>,
+    /// R2b — v0.5 §7.8 cross-DAG handoff references.
+    pub cross_dag_handoffs: Vec<AcpCrossDagHandoffProjection>,
+    /// R2b — v0.5 §15 canonical example utterances (positive + negative).
+    pub example_utterances: Vec<AcpExampleUtteranceProjection>,
+}
+
+/// One side of a neighbour-hint edge (pack→neighbours).
+#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+pub struct AcpPackNeighbourEdgeProjection {
+    pub from_pack_id: String,
+    pub neighbours: Vec<AcpPackNeighbourProjection>,
 }
 
 /// Pack-level projection row used by ACP routing and future envelope builders.
@@ -66,6 +81,13 @@ pub struct AcpRegistryPackProjection {
     pub verb_bindings: Vec<AcpVerbBindingProjection>,
     pub verb_effects: Vec<AcpVerbEffectProjection>,
     pub macro_tiers: Vec<AcpMacroTierProjection>,
+    /// R2a unified visibility surface — verbs + macros under one shape.
+    /// This is the projection consumed by the envelope v3 `dsl_atoms`
+    /// section. The legacy `verb_bindings` / `verb_effects` / `macro_tiers`
+    /// fields remain on the in-process projection for backward compat
+    /// with non-envelope consumers; they are no longer projected to the
+    /// envelope.
+    pub dsl_atoms: Vec<AcpDslAtomProjection>,
     pub risk_policy: AcpRegistryRiskPolicyProjection,
     pub required_questions: Vec<AcpRegistryQuestionProjection>,
     pub optional_questions: Vec<AcpRegistryQuestionProjection>,
@@ -225,6 +247,282 @@ pub struct AcpDiagnosticTaxonomyProjection {
     pub applies_to: String,
     pub message: String,
     pub refusal_condition: String,
+}
+
+// ============================================================================
+// R2b — v0.5 §8 / §14 / §15 new top-level envelope projections
+// ============================================================================
+
+/// Neighbour pack hint per v0.5 §14.
+///
+/// Tells Sage which sibling packs to consider for redirection when a phrase
+/// matches the current pack only weakly. One-line trigger phrases per
+/// neighbour signal when to redirect.
+#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+pub struct AcpPackNeighbourProjection {
+    /// FQN of the neighbour pack.
+    pub pack_id: String,
+    /// One-line phrases that signal "consider redirecting to this neighbour."
+    pub trigger_phrases: Vec<String>,
+    /// Short human rationale (audit-grade, agent-readable).
+    pub rationale: String,
+}
+
+/// Known-collision routing policy per v0.5 §14.
+///
+/// Phrases that legitimately match multiple Slice 1 packs but should route
+/// to a specific pack based on intent (browse vs. compile, etc.).
+#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+pub struct AcpKnownCollisionProjection {
+    /// The colliding phrase fragment, normalized.
+    pub phrase: String,
+    /// Pack the phrase should route to (canonical winner).
+    pub winner_pack_id: String,
+    /// Packs the phrase should NOT route to despite a weak match.
+    pub loser_pack_ids: Vec<String>,
+    /// Short rationale (e.g., "browse intent, not compile intent").
+    pub rationale: String,
+}
+
+/// Cross-DAG handoff reference per v0.5 §7.8.
+///
+/// Slice 1 supports single-DAG plans + explicit handoff references. A
+/// handoff says "this pack/macro completes DAG A and creates handoff
+/// condition X for DAG B." Free-form cross-DAG composition is out of
+/// scope for Slice 1.
+#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+pub struct AcpCrossDagHandoffProjection {
+    /// FQN of the originating pack (DAG A).
+    pub from_pack_id: String,
+    /// FQN of the destination pack (DAG B).
+    pub to_pack_id: String,
+    /// Optional macro/verb FQN in DAG A that triggers the handoff.
+    pub completes_atom: Option<String>,
+    /// Stable handoff-condition code that DAG B reads.
+    pub handoff_condition: String,
+    /// Short rationale (audit-grade).
+    pub rationale: String,
+}
+
+/// Whether an example utterance is a positive (should-match) or negative
+/// (should-not-match-as-X) shape per v0.5 §15.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum AcpExampleShape {
+    /// Positive shape: utterance should route to this pack/macro/verb.
+    Positive,
+    /// Negative — cross-pack collision: should NOT route to this pack
+    /// (alternate `expected_pack_id` named).
+    NegativeCrossPackCollision,
+    /// Negative — refusal required: utterance should produce a refusal,
+    /// not a draft.
+    NegativeRefusalRequired,
+    /// Negative — should not bind to this macro/verb (alternate naming
+    /// expected).
+    NegativeShouldNotBind,
+}
+
+/// Canonical example utterance with positive + negative shapes per §15.
+///
+/// Hand-authored, registered as a governed fixture with `example_hash`.
+/// Macros are the primary language-acquisition surface; examples are a
+/// fallback for cases no registered macro covers.
+#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+pub struct AcpExampleUtteranceProjection {
+    pub example_id: String,
+    pub shape: AcpExampleShape,
+    pub utterance: String,
+    /// Pack id this example is associated with (for positive: the
+    /// expected pack; for negative shapes: the *wrong* pack to route to,
+    /// with `expected_pack_id` carrying the right one).
+    pub pack_id: String,
+    /// For negative cross-pack-collision: the pack the utterance *should*
+    /// route to instead. None for positive examples and other negatives.
+    pub expected_pack_id: Option<String>,
+    /// Expected macro/verb FQN for positive shapes; the FQN that the
+    /// utterance should NOT bind to for `NegativeShouldNotBind`.
+    pub expected_atom_fqn: Option<String>,
+    /// Required slot bindings for positive shapes.
+    pub required_bindings: Vec<String>,
+    /// Expected response status: `draft`, `pending_question`, `refusal`.
+    pub expected_status: String,
+    /// Pending-question text expected (for positive shapes with status
+    /// `pending_question`).
+    pub pending_question: Option<String>,
+    /// Audit-grade rationale.
+    pub rationale: String,
+    /// Deterministic content hash.
+    pub example_hash: String,
+}
+
+#[derive(Serialize)]
+struct ExampleUtteranceHashMaterial<'a> {
+    example_id: &'a str,
+    shape: &'a AcpExampleShape,
+    utterance: &'a str,
+    pack_id: &'a str,
+    expected_pack_id: &'a Option<String>,
+    expected_atom_fqn: &'a Option<String>,
+    required_bindings: &'a [String],
+    expected_status: &'a str,
+    pending_question: &'a Option<String>,
+    rationale: &'a str,
+}
+
+// ============================================================================
+// DslAtom projection — R2a unified visibility surface
+// ============================================================================
+//
+// `AcpDslAtomProjection` is the kind-agnostic visibility shape projected into
+// the v3 envelope's `dsl_atoms` section. It unifies verb and macro projections
+// behind a `dispatch_type` discriminator so the Sage/ACP agent reads one list.
+//
+// **Architectural invariants** (see r1-schema-parity-adr.md):
+// - Macros are a planning and compilation surface, not an execution surface.
+// - A macro has no mutation authority after expansion; the REPL executes only
+//   compiled DSL atomics.
+// - Per the redaction principle, macro atoms expose an `expansion_summary`
+//   (step count, distinct verb/entity touch, external-correlation flag).
+//   The full ordered `expands_to` body is NOT projected; it stays
+//   SemOS-internal for the compiler.
+
+/// Dispatch type discriminator on a `DslAtom`.
+///
+/// Determines which optional fields are populated. Consumers read this once
+/// per atom and can either branch on it or treat the unified shape uniformly.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum AcpDslAtomKind {
+    Verb,
+    Macro,
+}
+
+/// Redacted summary of a macro's expansion body.
+///
+/// Carries enough information for the agent to estimate cost and scope
+/// without exposing the ordered DSL primitive sequence (which is the
+/// compiler's surface, not the agent's).
+#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+pub struct AcpDslAtomExpansionSummary {
+    /// Total number of expansion steps (verb calls + nested macro invocations).
+    pub step_count: usize,
+    /// Distinct verb FQNs appearing in the expansion. Sorted, deduped.
+    pub distinct_verb_fqns: Vec<String>,
+    /// Distinct nested macros invoked. Sorted, deduped.
+    pub distinct_macro_fqns: Vec<String>,
+    /// Distinct entity kinds touched (read or write). Sorted, deduped.
+    pub distinct_entity_kinds_touched: Vec<String>,
+    /// True if the macro has durable waiting / external correlation
+    /// (workflow_plan kind). Used by the agent for cost framing.
+    pub has_external_correlation: bool,
+}
+
+/// Unified visibility-surface shape for a single DSL atom (verb OR macro).
+///
+/// Verb-only fields are Some when `dispatch_type == Verb`; macro-only fields
+/// are Some when `dispatch_type == Macro`. Shared fields are always populated.
+#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+pub struct AcpDslAtomProjection {
+    /// Discriminator: verb vs macro.
+    pub dispatch_type: AcpDslAtomKind,
+
+    /// Fully qualified name (verb FQN or macro FQN).
+    pub fqn: String,
+
+    /// Human-readable description.
+    pub description: String,
+
+    /// Allowed/forbidden surface (mirrors `AcpVerbEffectProjection.exposure`
+    /// / `AcpMacroTierProjection.exposure`).
+    pub exposure: String,
+
+    /// Deterministic hash over the canonical atom body. Drift detection
+    /// without exposing the body. For verbs: combined binding + effect
+    /// hash. For macros: the per-macro hash.
+    pub atom_hash: String,
+
+    // -------- Shared planning surface --------
+    pub args: Vec<AcpVerbArgBindingProjection>,
+    pub required_args: Vec<String>,
+    pub optional_args: Vec<String>,
+
+    /// Mirrors verb's `lifecycle.requires_states` and macro's
+    /// `requires_states` (R1.3-5 parity field).
+    pub requires_states: Vec<String>,
+
+    /// Mirrors verb's `lifecycle.precondition_checks` and macro's
+    /// `precondition_checks`.
+    pub precondition_checks: Vec<String>,
+
+    /// "preserving" | "transition".
+    pub state_effect: Option<String>,
+
+    /// "state_write" | "facts_only".
+    pub side_effects: Option<String>,
+
+    /// `entity_id_arg` / `target_workspace` / `target_slot` flattened to
+    /// a JSON object for projection symmetry across verb + macro.
+    pub transition_args: Option<serde_json::Value>,
+
+    /// Execution policy (refusal/HITL/dry-run gaps).
+    pub policy: AcpExecutionPolicyProjection,
+
+    // -------- Verb-specific (None for macros) --------
+    pub crud_operation: Option<String>,
+    pub return_type: Option<String>,
+    pub produces_entity_grain: Option<String>,
+    pub subject_entity_grains: Vec<String>,
+    pub read_entity_grains: Vec<String>,
+    pub write_entity_grains: Vec<String>,
+    pub source_tables: Vec<String>,
+    pub behavior: Option<String>,
+
+    // -------- Macro-specific (None for verbs) --------
+    /// composite_sequence | workflow_plan | workbook_plan_step
+    pub plan_kind: Option<String>,
+
+    /// draft | active | deprecated | retired
+    pub lifecycle_state: Option<String>,
+
+    /// Redacted expansion summary per the projection-vs-implementation
+    /// principle. Some for macros, None for verbs.
+    pub expansion_summary: Option<AcpDslAtomExpansionSummary>,
+
+    /// Pack-scope tier classification ("project" / "lift" / "quarantine").
+    /// Mirrors `AcpMacroTierProjection.tier`.
+    pub macro_tier: Option<String>,
+
+    /// Source-file path for macro provenance (auditing). Mirrors
+    /// `AcpMacroTierProjection.source_path`.
+    pub macro_source_path: Option<String>,
+}
+
+#[derive(Serialize)]
+struct DslAtomHashMaterial<'a> {
+    dispatch_type: &'a AcpDslAtomKind,
+    fqn: &'a str,
+    description: &'a str,
+    exposure: &'a str,
+    args: &'a [AcpVerbArgBindingProjection],
+    requires_states: &'a [String],
+    precondition_checks: &'a [String],
+    state_effect: &'a Option<String>,
+    side_effects: &'a Option<String>,
+    transition_args: &'a Option<serde_json::Value>,
+    policy: &'a AcpExecutionPolicyProjection,
+    crud_operation: &'a Option<String>,
+    return_type: &'a Option<String>,
+    produces_entity_grain: &'a Option<String>,
+    subject_entity_grains: &'a [String],
+    read_entity_grains: &'a [String],
+    write_entity_grains: &'a [String],
+    source_tables: &'a [String],
+    behavior: &'a Option<String>,
+    plan_kind: &'a Option<String>,
+    lifecycle_state: &'a Option<String>,
+    expansion_summary: &'a Option<AcpDslAtomExpansionSummary>,
+    macro_tier: &'a Option<String>,
+    macro_source_path: &'a Option<String>,
 }
 
 #[derive(Serialize)]
@@ -413,6 +711,12 @@ pub fn build_slice1_acp_registry_projection(
     };
     let projection_hash = stable_json_hash(&hash_material)?;
 
+    // R2b: author Slice 1 §8/§14/§15 surfaces deterministically.
+    let pack_neighbours = build_slice1_pack_neighbours();
+    let known_collision_policy = build_slice1_known_collision_policy();
+    let cross_dag_handoffs = build_slice1_cross_dag_handoffs();
+    let example_utterances = build_slice1_example_utterances()?;
+
     Ok(AcpRegistryProjection {
         schema_version: ACP_REGISTRY_PROJECTION_SCHEMA_VERSION,
         config_root: config_root.display().to_string(),
@@ -427,7 +731,325 @@ pub fn build_slice1_acp_registry_projection(
         packs,
         diagnostic_taxonomy,
         diagnostics,
+        pack_neighbours,
+        known_collision_policy,
+        cross_dag_handoffs,
+        example_utterances,
     })
+}
+
+// ============================================================================
+// R2b — Slice 1 authored content for the four new envelope sections.
+// All content is deterministic, hashable, and reproducible. The neighbour
+// map and collision policy reflect the actual Slice 1 pack topology and
+// the cross-pack collisions observed in the baseline fixtures.
+// ============================================================================
+
+fn build_slice1_pack_neighbours() -> Vec<AcpPackNeighbourEdgeProjection> {
+    vec![
+        AcpPackNeighbourEdgeProjection {
+            from_pack_id: "cbu-maintenance".to_string(),
+            neighbours: vec![
+                AcpPackNeighbourProjection {
+                    pack_id: "onboarding-request".to_string(),
+                    trigger_phrases: vec![
+                        "onboarding request".to_string(),
+                        "compile data request".to_string(),
+                        "dispatch slices".to_string(),
+                    ],
+                    rationale: "Once CBU structure exists, onboarding-request governs the data-request workflow.".to_string(),
+                },
+                AcpPackNeighbourProjection {
+                    pack_id: "product-service-taxonomy".to_string(),
+                    trigger_phrases: vec![
+                        "browse products".to_string(),
+                        "show me the resource dictionary".to_string(),
+                        "list services for product".to_string(),
+                    ],
+                    rationale: "Browse/read intent over the product/service catalogue routes to taxonomy pack.".to_string(),
+                },
+            ],
+        },
+        AcpPackNeighbourEdgeProjection {
+            from_pack_id: "onboarding-request".to_string(),
+            neighbours: vec![
+                AcpPackNeighbourProjection {
+                    pack_id: "cbu-maintenance".to_string(),
+                    trigger_phrases: vec![
+                        "create cbu".to_string(),
+                        "add product to cbu".to_string(),
+                        "assign role".to_string(),
+                    ],
+                    rationale: "CBU mutation and product attachment belong to cbu-maintenance.".to_string(),
+                },
+                AcpPackNeighbourProjection {
+                    pack_id: "product-service-taxonomy".to_string(),
+                    trigger_phrases: vec![
+                        "show me the resource dictionary".to_string(),
+                        "list attributes for resource".to_string(),
+                    ],
+                    rationale: "Browse-only taxonomy queries should not enter an onboarding compile path.".to_string(),
+                },
+            ],
+        },
+        AcpPackNeighbourEdgeProjection {
+            from_pack_id: "product-service-taxonomy".to_string(),
+            neighbours: vec![
+                AcpPackNeighbourProjection {
+                    pack_id: "cbu-maintenance".to_string(),
+                    trigger_phrases: vec![
+                        "attach service to cbu".to_string(),
+                        "add product to cbu".to_string(),
+                    ],
+                    rationale: "Attaching products/services to a live CBU is a cbu-maintenance mutation.".to_string(),
+                },
+                AcpPackNeighbourProjection {
+                    pack_id: "onboarding-request".to_string(),
+                    trigger_phrases: vec![
+                        "compile resource dictionary".to_string(),
+                        "freeze data request".to_string(),
+                    ],
+                    rationale: "Compile/freeze intent leaves browse mode and enters onboarding-request.".to_string(),
+                },
+            ],
+        },
+    ]
+}
+
+fn build_slice1_known_collision_policy() -> Vec<AcpKnownCollisionProjection> {
+    vec![
+        AcpKnownCollisionProjection {
+            phrase: "resource dictionary".to_string(),
+            winner_pack_id: "product-service-taxonomy".to_string(),
+            loser_pack_ids: vec!["onboarding-request".to_string()],
+            rationale: "Bare 'resource dictionary' is a browse query, not a compile/freeze request.".to_string(),
+        },
+        AcpKnownCollisionProjection {
+            phrase: "compile resource dictionary".to_string(),
+            winner_pack_id: "onboarding-request".to_string(),
+            loser_pack_ids: vec!["product-service-taxonomy".to_string()],
+            rationale: "Compile verb signals onboarding-request data-request workflow.".to_string(),
+        },
+        AcpKnownCollisionProjection {
+            phrase: "attach service to product".to_string(),
+            winner_pack_id: "product-service-taxonomy".to_string(),
+            loser_pack_ids: vec!["cbu-maintenance".to_string()],
+            rationale: "Service-to-product binding lives in the taxonomy, not CBU maintenance.".to_string(),
+        },
+        AcpKnownCollisionProjection {
+            phrase: "attach product to cbu".to_string(),
+            winner_pack_id: "cbu-maintenance".to_string(),
+            loser_pack_ids: vec!["product-service-taxonomy".to_string()],
+            rationale: "Attaching a product to a live CBU mutates CBU state, not taxonomy.".to_string(),
+        },
+        AcpKnownCollisionProjection {
+            phrase: "set up onboarding".to_string(),
+            winner_pack_id: "onboarding-request".to_string(),
+            loser_pack_ids: vec!["cbu-maintenance".to_string()],
+            rationale: "'Set up onboarding' = data-request workflow, not CBU structure setup.".to_string(),
+        },
+    ]
+}
+
+fn build_slice1_cross_dag_handoffs() -> Vec<AcpCrossDagHandoffProjection> {
+    // Slice 1 explicitly narrowed to single-DAG-plus-handoff per v0.5 §7.8.
+    // One handoff: CBU structure setup completes the cbu-maintenance DAG,
+    // creating a handoff condition for onboarding-request to compile a
+    // data request against the freshly-built CBU.
+    vec![AcpCrossDagHandoffProjection {
+        from_pack_id: "cbu-maintenance".to_string(),
+        to_pack_id: "onboarding-request".to_string(),
+        completes_atom: Some("structure.product-suite-full".to_string()),
+        handoff_condition: "cbu_ready_for_onboarding".to_string(),
+        rationale: "Once a CBU is operational with its product suite, onboarding-request can compile a data request against it.".to_string(),
+    }]
+}
+
+fn build_slice1_example_utterances() -> Result<Vec<AcpExampleUtteranceProjection>> {
+    let mut examples = vec![
+        // -- Positive examples --
+        ExampleSeed {
+            example_id: "ex-positive-create-cbu-sicav",
+            shape: AcpExampleShape::Positive,
+            utterance: "set up a Luxembourg UCITS SICAV named Apex",
+            pack_id: "cbu-maintenance",
+            expected_pack_id: None,
+            expected_atom_fqn: Some("struct.lux.ucits.sicav"),
+            required_bindings: vec!["name", "management_company", "depositary"],
+            expected_status: "pending_question",
+            pending_question: Some("Which management company should sponsor the SICAV?"),
+            rationale: "Canonical structure macro happy path with pending question for required slot.",
+        },
+        ExampleSeed {
+            example_id: "ex-positive-add-product-suite",
+            shape: AcpExampleShape::Positive,
+            utterance: "add the standard product suite to the Apex CBU",
+            pack_id: "cbu-maintenance",
+            expected_pack_id: None,
+            expected_atom_fqn: Some("structure.product-suite-custody-fa-ta"),
+            required_bindings: vec!["cbu"],
+            expected_status: "pending_question",
+            pending_question: Some("Which CBU should receive the product suite?"),
+            rationale: "Modifying macro asks for the entity arg when not bound.",
+        },
+        ExampleSeed {
+            example_id: "ex-positive-list-products",
+            shape: AcpExampleShape::Positive,
+            utterance: "browse products in the catalogue",
+            pack_id: "product-service-taxonomy",
+            expected_pack_id: None,
+            expected_atom_fqn: Some("product.list"),
+            required_bindings: vec![],
+            expected_status: "draft",
+            pending_question: None,
+            rationale: "Bare browse query against the taxonomy emits a draft directly.",
+        },
+        ExampleSeed {
+            example_id: "ex-positive-compile-request",
+            shape: AcpExampleShape::Positive,
+            utterance: "compile the onboarding data request for the Apex CBU",
+            pack_id: "onboarding-request",
+            expected_pack_id: None,
+            expected_atom_fqn: Some("onboarding.compile-data-request"),
+            required_bindings: vec!["onboarding-request-id"],
+            expected_status: "pending_question",
+            pending_question: Some("Which onboarding request should I compile?"),
+            rationale: "Compile verb routes to onboarding-request, asks for the request id.",
+        },
+        // -- Negative: cross-pack collision --
+        ExampleSeed {
+            example_id: "ex-negative-collision-resource-dictionary",
+            shape: AcpExampleShape::NegativeCrossPackCollision,
+            utterance: "show me the resource dictionary",
+            pack_id: "onboarding-request",
+            expected_pack_id: Some("product-service-taxonomy".to_string()),
+            expected_atom_fqn: None,
+            required_bindings: vec![],
+            expected_status: "draft",
+            pending_question: None,
+            rationale: "Browse intent — must not enter the onboarding compile path.",
+        },
+        ExampleSeed {
+            example_id: "ex-negative-collision-attach-service-product",
+            shape: AcpExampleShape::NegativeCrossPackCollision,
+            utterance: "attach service to product",
+            pack_id: "cbu-maintenance",
+            expected_pack_id: Some("product-service-taxonomy".to_string()),
+            expected_atom_fqn: None,
+            required_bindings: vec![],
+            expected_status: "pending_question",
+            pending_question: None,
+            rationale: "Service-to-product binding belongs in the taxonomy, not CBU maintenance.",
+        },
+        // -- Negative: refusal required --
+        ExampleSeed {
+            example_id: "ex-negative-refusal-cbu-delete",
+            shape: AcpExampleShape::NegativeRefusalRequired,
+            utterance: "delete the Apex CBU permanently",
+            pack_id: "cbu-maintenance",
+            expected_pack_id: None,
+            expected_atom_fqn: None,
+            required_bindings: vec![],
+            expected_status: "refusal",
+            pending_question: None,
+            rationale: "CBU deletion is a forbidden mutation on the cbu-maintenance pack.",
+        },
+        ExampleSeed {
+            example_id: "ex-negative-refusal-direct-dsl",
+            shape: AcpExampleShape::NegativeRefusalRequired,
+            utterance: "run this raw DSL: (cbu.create :name \"Apex\")",
+            pack_id: "cbu-maintenance",
+            expected_pack_id: None,
+            expected_atom_fqn: None,
+            required_bindings: vec![],
+            expected_status: "refusal",
+            pending_question: None,
+            rationale: "Raw DSL bait must produce a structured refusal, never reach execution.",
+        },
+        ExampleSeed {
+            example_id: "ex-negative-refusal-dispatch-slices",
+            shape: AcpExampleShape::NegativeRefusalRequired,
+            utterance: "dispatch ready slices for the Apex onboarding request",
+            pack_id: "onboarding-request",
+            expected_pack_id: None,
+            expected_atom_fqn: None,
+            required_bindings: vec![],
+            expected_status: "refusal",
+            pending_question: None,
+            rationale: "Owner/HITL gate on dispatch — must refuse unless approved.",
+        },
+        // -- Negative: should not bind --
+        ExampleSeed {
+            example_id: "ex-negative-should-not-bind-attach-cbu-as-product",
+            shape: AcpExampleShape::NegativeShouldNotBind,
+            utterance: "attach service to product Apex",
+            pack_id: "product-service-taxonomy",
+            expected_pack_id: None,
+            expected_atom_fqn: Some("structure.product-suite-custody-fa-ta"),
+            required_bindings: vec![],
+            expected_status: "refusal",
+            pending_question: None,
+            rationale: "'Apex' is a CBU name, not a product — must not bind to the product-suite macro.",
+        },
+    ];
+
+    examples.sort_by(|a, b| a.example_id.cmp(b.example_id));
+
+    examples
+        .into_iter()
+        .map(|seed| seed.into_projection())
+        .collect::<Result<Vec<_>>>()
+}
+
+struct ExampleSeed {
+    example_id: &'static str,
+    shape: AcpExampleShape,
+    utterance: &'static str,
+    pack_id: &'static str,
+    expected_pack_id: Option<String>,
+    expected_atom_fqn: Option<&'static str>,
+    required_bindings: Vec<&'static str>,
+    expected_status: &'static str,
+    pending_question: Option<&'static str>,
+    rationale: &'static str,
+}
+
+impl ExampleSeed {
+    fn into_projection(self) -> Result<AcpExampleUtteranceProjection> {
+        let required_bindings: Vec<String> = self
+            .required_bindings
+            .into_iter()
+            .map(String::from)
+            .collect();
+        let expected_atom_fqn = self.expected_atom_fqn.map(String::from);
+        let pending_question = self.pending_question.map(String::from);
+        let material = ExampleUtteranceHashMaterial {
+            example_id: self.example_id,
+            shape: &self.shape,
+            utterance: self.utterance,
+            pack_id: self.pack_id,
+            expected_pack_id: &self.expected_pack_id,
+            expected_atom_fqn: &expected_atom_fqn,
+            required_bindings: &required_bindings,
+            expected_status: self.expected_status,
+            pending_question: &pending_question,
+            rationale: self.rationale,
+        };
+        let example_hash = stable_json_hash(&material)?;
+        Ok(AcpExampleUtteranceProjection {
+            example_id: self.example_id.to_string(),
+            shape: self.shape,
+            utterance: self.utterance.to_string(),
+            pack_id: self.pack_id.to_string(),
+            expected_pack_id: self.expected_pack_id,
+            expected_atom_fqn,
+            required_bindings,
+            expected_status: self.expected_status.to_string(),
+            pending_question,
+            rationale: self.rationale.to_string(),
+            example_hash,
+        })
+    }
 }
 
 fn pack_projection_from_manifest(
@@ -522,6 +1144,15 @@ fn pack_projection_from_manifest(
         .collect::<Vec<_>>();
     workbook_plans.sort_by(|left, right| left.plan_id.cmp(&right.plan_id));
 
+    // R2a: build unified `dsl_atoms` from verb projections + macro tiers.
+    // This consumes the per-source projections built above and emits the
+    // kind-agnostic visibility shape used by the envelope v3 section.
+    let dsl_atoms = build_dsl_atoms(&verb_bindings, &verb_effects, &macro_tiers, macro_registry)
+        .unwrap_or_else(|err| {
+            tracing::warn!("dsl_atoms projection failed: {err:#}");
+            Vec::new()
+        });
+
     AcpRegistryPackProjection {
         pack_id: manifest.id,
         pack_name: manifest.name,
@@ -542,11 +1173,281 @@ fn pack_projection_from_manifest(
         verb_bindings,
         verb_effects,
         macro_tiers,
+        dsl_atoms,
         risk_policy,
         required_questions,
         optional_questions,
         workbook_plans,
     }
+}
+
+/// Build the unified `dsl_atoms` projection (R2a).
+///
+/// Joins verb bindings and verb effects on `verb` FQN to produce verb-kind
+/// atoms; emits macro-kind atoms from `AcpMacroTierProjection` entries with
+/// redacted expansion summaries lifted from `macro_sources` YAML.
+///
+/// The result is sorted deterministically by (dispatch_type, fqn) so the
+/// envelope hash is stable across rebuilds.
+fn build_dsl_atoms(
+    verb_bindings: &[AcpVerbBindingProjection],
+    verb_effects: &[AcpVerbEffectProjection],
+    macro_tiers: &[AcpMacroTierProjection],
+    macro_sources: &BTreeMap<String, MacroDefinitionSource>,
+) -> Result<Vec<AcpDslAtomProjection>> {
+    let mut atoms: Vec<AcpDslAtomProjection> = Vec::new();
+
+    // Join verb bindings + effects on FQN. Bindings own arg shape;
+    // effects own state/policy/CRUD. Both must exist for a verb to
+    // become a fully-formed atom.
+    let mut effect_by_verb: BTreeMap<&str, &AcpVerbEffectProjection> = BTreeMap::new();
+    for effect in verb_effects {
+        effect_by_verb.insert(effect.verb.as_str(), effect);
+    }
+
+    for binding in verb_bindings {
+        let effect = match effect_by_verb.get(binding.verb.as_str()) {
+            Some(e) => *e,
+            None => continue,
+        };
+
+        let required_args: Vec<String> = binding
+            .args
+            .iter()
+            .filter(|a| a.required)
+            .map(|a| a.name.clone())
+            .collect();
+        let optional_args: Vec<String> = binding
+            .args
+            .iter()
+            .filter(|a| !a.required)
+            .map(|a| a.name.clone())
+            .collect();
+
+        let transition_args = effect
+            .transition_entity_id_arg
+            .as_ref()
+            .map(|arg| serde_json::json!({ "entity_id_arg": arg }));
+
+        let state_effect = if effect.behavior == "transition" {
+            Some("transition".to_string())
+        } else if effect.behavior == "preserving" {
+            Some("preserving".to_string())
+        } else {
+            None
+        };
+
+        let atom = AcpDslAtomProjection {
+            dispatch_type: AcpDslAtomKind::Verb,
+            fqn: binding.verb.clone(),
+            description: binding.description.clone(),
+            exposure: effect.exposure.clone(),
+            atom_hash: String::new(), // filled in below
+            args: binding.args.clone(),
+            required_args,
+            optional_args,
+            requires_states: Vec::new(),
+            precondition_checks: Vec::new(),
+            state_effect,
+            side_effects: effect.side_effects.clone(),
+            transition_args,
+            policy: effect.policy.clone(),
+            crud_operation: effect.crud_operation.clone(),
+            return_type: effect.return_type.clone(),
+            produces_entity_grain: effect.produces_entity_grain.clone(),
+            subject_entity_grains: effect.subject_entity_grains.clone(),
+            read_entity_grains: effect.read_entity_grains.clone(),
+            write_entity_grains: effect.write_entity_grains.clone(),
+            source_tables: effect.source_tables.clone(),
+            behavior: Some(effect.behavior.clone()),
+            plan_kind: None,
+            lifecycle_state: None,
+            expansion_summary: None,
+            macro_tier: None,
+            macro_source_path: None,
+        };
+        atoms.push(seal_atom_hash(atom)?);
+    }
+
+    // Macro atoms — one per macro_tier entry. Skip macros classified for
+    // quarantine; they are not projected per the §5.7 quarantine
+    // discipline.
+    for tier in macro_tiers {
+        if tier.tier == "quarantine" {
+            continue;
+        }
+        let source = macro_sources.get(&tier.macro_id);
+        let (required_args, optional_args) = (tier.required_args.clone(), tier.optional_args.clone());
+
+        // Build expansion summary from macro_tier counts plus optional
+        // YAML source for distinct entity kinds.
+        let expansion_summary = AcpDslAtomExpansionSummary {
+            step_count: tier.step_count,
+            distinct_verb_fqns: sorted_unique(tier.expands_to_verbs.clone()),
+            distinct_macro_fqns: sorted_unique(tier.invokes_macros.clone()),
+            distinct_entity_kinds_touched: Vec::new(), // future enrichment
+            has_external_correlation: false,           // future enrichment
+        };
+
+        // Extract R1.3-5 parity fields from the macro YAML body
+        let (plan_kind, lifecycle_state, state_effect, side_effects,
+             requires_states, precondition_checks, transition_args, description) =
+            extract_macro_parity_fields(source);
+
+        let atom = AcpDslAtomProjection {
+            dispatch_type: AcpDslAtomKind::Macro,
+            fqn: tier.macro_id.clone(),
+            description,
+            exposure: tier.exposure.clone(),
+            atom_hash: String::new(),
+            args: Vec::new(), // macro arg shapes differ; future R1.5 extension
+            required_args,
+            optional_args,
+            requires_states,
+            precondition_checks,
+            state_effect,
+            side_effects,
+            transition_args,
+            policy: tier.policy.clone(),
+            crud_operation: None,
+            return_type: None,
+            produces_entity_grain: None,
+            subject_entity_grains: Vec::new(),
+            read_entity_grains: Vec::new(),
+            write_entity_grains: Vec::new(),
+            source_tables: Vec::new(),
+            behavior: None,
+            plan_kind,
+            lifecycle_state,
+            expansion_summary: Some(expansion_summary),
+            macro_tier: Some(tier.tier.clone()),
+            macro_source_path: tier.source_path.clone(),
+        };
+        atoms.push(seal_atom_hash(atom)?);
+    }
+
+    // Deterministic sort: dispatch_type (verb before macro), then fqn.
+    atoms.sort_by(|a, b| {
+        let kind_order = |k: &AcpDslAtomKind| match k {
+            AcpDslAtomKind::Verb => 0,
+            AcpDslAtomKind::Macro => 1,
+        };
+        kind_order(&a.dispatch_type)
+            .cmp(&kind_order(&b.dispatch_type))
+            .then_with(|| a.fqn.cmp(&b.fqn))
+    });
+
+    Ok(atoms)
+}
+
+fn seal_atom_hash(mut atom: AcpDslAtomProjection) -> Result<AcpDslAtomProjection> {
+    let material = DslAtomHashMaterial {
+        dispatch_type: &atom.dispatch_type,
+        fqn: &atom.fqn,
+        description: &atom.description,
+        exposure: &atom.exposure,
+        args: &atom.args,
+        requires_states: &atom.requires_states,
+        precondition_checks: &atom.precondition_checks,
+        state_effect: &atom.state_effect,
+        side_effects: &atom.side_effects,
+        transition_args: &atom.transition_args,
+        policy: &atom.policy,
+        crud_operation: &atom.crud_operation,
+        return_type: &atom.return_type,
+        produces_entity_grain: &atom.produces_entity_grain,
+        subject_entity_grains: &atom.subject_entity_grains,
+        read_entity_grains: &atom.read_entity_grains,
+        write_entity_grains: &atom.write_entity_grains,
+        source_tables: &atom.source_tables,
+        behavior: &atom.behavior,
+        plan_kind: &atom.plan_kind,
+        lifecycle_state: &atom.lifecycle_state,
+        expansion_summary: &atom.expansion_summary,
+        macro_tier: &atom.macro_tier,
+        macro_source_path: &atom.macro_source_path,
+    };
+    atom.atom_hash = stable_json_hash(&material)?;
+    Ok(atom)
+}
+
+/// Pull R1.3-5 parity fields out of the macro YAML body.
+/// Returns:
+/// (plan_kind, lifecycle_state, state_effect, side_effects,
+///  requires_states, precondition_checks, transition_args, description)
+#[allow(clippy::type_complexity)]
+fn extract_macro_parity_fields(
+    source: Option<&MacroDefinitionSource>,
+) -> (
+    Option<String>,
+    Option<String>,
+    Option<String>,
+    Option<String>,
+    Vec<String>,
+    Vec<String>,
+    Option<serde_json::Value>,
+    String,
+) {
+    let body = match source.map(|s| &s.value) {
+        Some(serde_yaml::Value::Mapping(m)) => m,
+        _ => {
+            return (
+                None,
+                None,
+                None,
+                None,
+                Vec::new(),
+                Vec::new(),
+                None,
+                String::new(),
+            )
+        }
+    };
+    let get_str = |key: &str| -> Option<String> {
+        body.get(serde_yaml::Value::String(key.to_string()))
+            .and_then(|v| v.as_str())
+            .map(|s| s.to_string())
+    };
+    let get_vec_str = |key: &str| -> Vec<String> {
+        body.get(serde_yaml::Value::String(key.to_string()))
+            .and_then(|v| v.as_sequence())
+            .map(|seq| {
+                seq.iter()
+                    .filter_map(|v| v.as_str().map(|s| s.to_string()))
+                    .collect()
+            })
+            .unwrap_or_default()
+    };
+
+    let plan_kind = get_str("plan-kind");
+    let lifecycle_state = get_str("lifecycle-state");
+    let state_effect = get_str("state-effect");
+    let side_effects = get_str("side-effects");
+    let requires_states = get_vec_str("requires-states");
+    let precondition_checks = get_vec_str("precondition-checks");
+
+    let transition_args = body
+        .get(serde_yaml::Value::String("transition-args".to_string()))
+        .and_then(|v| serde_json::to_value(v).ok());
+
+    let description = body
+        .get(serde_yaml::Value::String("ui".to_string()))
+        .and_then(|ui| ui.as_mapping())
+        .and_then(|m| m.get(serde_yaml::Value::String("description".to_string())))
+        .and_then(|v| v.as_str())
+        .map(|s| s.to_string())
+        .unwrap_or_default();
+
+    (
+        plan_kind,
+        lifecycle_state,
+        state_effect,
+        side_effects,
+        requires_states,
+        precondition_checks,
+        transition_args,
+        description,
+    )
 }
 
 fn diagnostic_taxonomy_projection() -> Vec<AcpDiagnosticTaxonomyProjection> {

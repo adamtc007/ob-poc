@@ -138,6 +138,44 @@ SemOS Maintenance workspace (2026-03-28):
 
 ---
 
+## What "macro" means in ob-poc
+
+> **Macros are governed recipes: pack-scoped, hashable, versioned multi-step
+> domain patterns that Sage may discover and bind, but which the compiler
+> must expand into ordinary DSL atomics before any REPL execution occurs.**
+
+This definition is load-bearing. The word "macro" carries different meanings
+in other ecosystems (C preprocessor text substitution, Rust `macro_rules!`
+hygienic AST transformation, Lisp symbolic code rewriting) — none of those
+apply here.
+
+In ob-poc, a macro is:
+
+- **A first-class SemOS registry entity.** Hashed, versioned, lifecycle
+  FSM (`draft → active → deprecated → retired`). Authored as YAML,
+  catalogued like a verb.
+- **Pack-scoped and governed.** Pack manifests gate which macros are
+  allowed. The pack governs; the macro proposes affinity via `mode_tags`.
+- **A multi-step domain recipe.** Each macro encodes an expert outcome
+  pattern — slot contract, preconditions, ordered expansion, expected
+  state transitions, refusal/pending-question conditions.
+- **A planning + compilation surface, not an execution surface.** ACP
+  exposes macros to Sage so the agent picks the right recipe. The
+  compiler then expands the macro into an ordered DSL atomic sequence,
+  and the REPL executes only those atomics. Macros have **no mutation
+  authority after expansion** — execution is verb-only.
+
+The reason for the macro tier to exist: without it, Sage is operating at
+the verb floor (one mutation at a time) and has to invent multi-step arcs
+itself. Macros encode the multi-step pattern as a registered, hashed,
+versioned, governed object, which Sage chooses as an atomic option. This
+reduces hallucination surface and encodes expert domain knowledge into
+the dispatch surface itself.
+
+See `todo/acp-pack-context-parity-gate-a/r1-schema-parity-adr.md` for the
+two invariants and the projection redaction principle that protect this
+discipline under LLM pressure.
+
 ## Non-Negotiable Implementation Rules
 
 ### 1. Type Safety First

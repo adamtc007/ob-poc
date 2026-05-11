@@ -12,7 +12,7 @@ use std::collections::BTreeMap;
 use std::time::Instant;
 use uuid::Uuid;
 
-use super::repl_routes_v2::{
+use crate::api::repl_routes_v2::{
     handle_repl_acp_request, load_ob_poc_kyc_domain_pack, ReplV2RouteState,
 };
 

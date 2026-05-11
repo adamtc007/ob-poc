@@ -17,18 +17,25 @@ use crate::acp_registry_projection::{
 };
 
 /// Schema version for deterministic ACP pack context envelopes.
-pub const ACP_PACK_CONTEXT_ENVELOPE_V2_SCHEMA_VERSION: &str = "acp_pack_context_envelope_v2";
+///
+/// **v3** (R2a, 2026-05-11): replaces the three sections
+/// `verb_bindings` / `verb_effects` / `macro_tiers` with one unified
+/// `dsl_atoms` section. See `r1-schema-parity-adr.md` for the
+/// architectural framing — macros and verbs are peers on the Sage/ACP
+/// visibility surface (planning + compilation only); REPL execution
+/// remains verb-only.
+pub const ACP_PACK_CONTEXT_ENVELOPE_V2_SCHEMA_VERSION: &str = "acp_pack_context_envelope_v3";
 
 /// Schema version for deterministic ACP pack context envelope bundles.
 pub const ACP_PACK_CONTEXT_ENVELOPE_V2_BUNDLE_SCHEMA_VERSION: &str =
-    "acp_pack_context_envelope_v2_bundle";
+    "acp_pack_context_envelope_v3_bundle";
 
 /// Schema version for persisted ACP pack context registry state.
 pub const ACP_PACK_CONTEXT_REGISTRY_STATE_V2_SCHEMA_VERSION: &str =
-    "acp_pack_context_registry_state_v2";
+    "acp_pack_context_registry_state_v3";
 
-/// Builder version pinned into every Gate D envelope.
-pub const ACP_PACK_CONTEXT_ENVELOPE_BUILDER_VERSION: &str = "gate-d-builder-v0.1";
+/// Builder version pinned into every envelope build.
+pub const ACP_PACK_CONTEXT_ENVELOPE_BUILDER_VERSION: &str = "gate-d-builder-v0.2-r2a";
 
 /// Deterministic development signer key id.
 pub const ACP_PACK_CONTEXT_DEV_SIGNING_KEY_ID: &str = "acp-pack-context-dev-key-v1";
@@ -193,15 +200,32 @@ pub struct AcpPackContextOmission {
 }
 
 /// Envelope sections split for budget accounting and future context assembly.
+///
+/// **v3 (R2a):** `verb_bindings`, `verb_effects`, and `macro_tiers` were
+/// replaced by a single `dsl_atoms` section carrying the kind-agnostic
+/// visibility projection. See `r1-schema-parity-adr.md`.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct AcpPackContextEnvelopeSections {
     pub pack_summary: serde_json::Value,
-    pub verb_bindings: serde_json::Value,
-    pub verb_effects: serde_json::Value,
+    /// R2a unified visibility surface — verbs + macros as DSL atoms.
+    /// Replaces v2's separate verb_bindings / verb_effects / macro_tiers
+    /// sections. Each atom carries a `dispatch_type: verb | macro`
+    /// discriminator. The full ordered macro `expands_to` body is NOT
+    /// projected here; see `AcpDslAtomExpansionSummary` for the
+    /// redacted summary the agent reads.
+    pub dsl_atoms: serde_json::Value,
     pub production_contracts: serde_json::Value,
-    pub macro_tiers: serde_json::Value,
     pub workbook_plans: serde_json::Value,
     pub diagnostic_taxonomy: serde_json::Value,
+    /// R2b — v0.5 §14 neighbour hints (this pack's outbound edges only).
+    pub pack_neighbours: serde_json::Value,
+    /// R2b — v0.5 §14 known collision routing policy.
+    pub known_collision_policy: serde_json::Value,
+    /// R2b — v0.5 §7.8 cross-DAG handoff refs (outbound from this pack only).
+    pub cross_dag_handoffs: serde_json::Value,
+    /// R2b — v0.5 §15 canonical example utterances (positive + negative
+    /// shapes), filtered to this pack.
+    pub example_utterances: serde_json::Value,
 }
 
 /// Normalized return/produce contract derived from verb effect metadata.
@@ -408,20 +432,15 @@ const SECTION_BUDGETS: &[SectionBudget] = &[
         name: "pack_summary",
         byte_limit: 24 * 1024,
     },
+    // R2a: dsl_atoms replaces verb_bindings + verb_effects + macro_tiers.
+    // Combined v2 budget was 128+160+96 = 384 KiB; the unified surface
+    // carries the same content density so the budget is retained.
     SectionBudget {
-        name: "verb_bindings",
-        byte_limit: 128 * 1024,
-    },
-    SectionBudget {
-        name: "verb_effects",
-        byte_limit: 160 * 1024,
+        name: "dsl_atoms",
+        byte_limit: 384 * 1024,
     },
     SectionBudget {
         name: "production_contracts",
-        byte_limit: 96 * 1024,
-    },
-    SectionBudget {
-        name: "macro_tiers",
         byte_limit: 96 * 1024,
     },
     SectionBudget {
@@ -431,6 +450,25 @@ const SECTION_BUDGETS: &[SectionBudget] = &[
     SectionBudget {
         name: "diagnostic_taxonomy",
         byte_limit: 16 * 1024,
+    },
+    // R2b — v0.5 §8 / §14 / §15 new top-level sections. Conservative
+    // budgets sized for Slice 1 content; per-section omission triggers
+    // a structured diagnostic per §8.1 budget policy.
+    SectionBudget {
+        name: "pack_neighbours",
+        byte_limit: 12 * 1024,
+    },
+    SectionBudget {
+        name: "known_collision_policy",
+        byte_limit: 12 * 1024,
+    },
+    SectionBudget {
+        name: "cross_dag_handoffs",
+        byte_limit: 8 * 1024,
+    },
+    SectionBudget {
+        name: "example_utterances",
+        byte_limit: 32 * 1024,
     },
 ];
 
@@ -500,7 +538,7 @@ pub fn build_acp_pack_context_envelope_v2_with_signing_key(
         .find(|pack| pack.pack_id == pack_id)
         .with_context(|| format!("pack {pack_id} is not present in projection"))?;
     let build_inputs = build_inputs(projection, config_root)?;
-    let sections = envelope_sections(pack, &projection.diagnostic_taxonomy)?;
+    let sections = envelope_sections(pack, projection)?;
     let (section_hashes, budget) = budget_and_hash_sections(&sections)?;
     let content_hash_chain = content_hash_chain(&section_hashes);
 
@@ -1513,8 +1551,41 @@ fn build_inputs(
 
 fn envelope_sections(
     pack: &AcpRegistryPackProjection,
-    diagnostic_taxonomy: &[crate::acp_registry_projection::AcpDiagnosticTaxonomyProjection],
+    projection: &AcpRegistryProjection,
 ) -> Result<AcpPackContextEnvelopeSections> {
+    // R2b: per-pack slices of the top-level §8/§14/§15 sections.
+    let pack_id = pack.pack_id.as_str();
+
+    let pack_neighbours = projection
+        .pack_neighbours
+        .iter()
+        .find(|edge| edge.from_pack_id == pack_id)
+        .map(|edge| edge.neighbours.clone())
+        .unwrap_or_default();
+
+    let known_collision_policy: Vec<_> = projection
+        .known_collision_policy
+        .iter()
+        .filter(|c| c.winner_pack_id == pack_id || c.loser_pack_ids.iter().any(|p| p == pack_id))
+        .cloned()
+        .collect();
+
+    let cross_dag_handoffs: Vec<_> = projection
+        .cross_dag_handoffs
+        .iter()
+        .filter(|h| h.from_pack_id == pack_id)
+        .cloned()
+        .collect();
+
+    let example_utterances: Vec<_> = projection
+        .example_utterances
+        .iter()
+        .filter(|ex| {
+            ex.pack_id == pack_id || ex.expected_pack_id.as_deref() == Some(pack_id)
+        })
+        .cloned()
+        .collect();
+
     Ok(AcpPackContextEnvelopeSections {
         pack_summary: serde_json::json!({
             "pack_id": pack.pack_id,
@@ -1530,18 +1601,22 @@ fn envelope_sections(
             "required_questions": pack.required_questions,
             "optional_questions": pack.optional_questions,
         }),
-        verb_bindings: serde_json::to_value(&pack.verb_bindings)
-            .context("serializing verb binding section")?,
-        verb_effects: serde_json::to_value(&pack.verb_effects)
-            .context("serializing verb effect section")?,
+        dsl_atoms: serde_json::to_value(&pack.dsl_atoms)
+            .context("serializing dsl_atoms section")?,
         production_contracts: serde_json::to_value(production_contracts(&pack.verb_effects)?)
             .context("serializing production contract section")?,
-        macro_tiers: serde_json::to_value(&pack.macro_tiers)
-            .context("serializing macro tier section")?,
         workbook_plans: serde_json::to_value(workbook_plan_summaries(&pack.workbook_plans))
             .context("serializing workbook plan section")?,
-        diagnostic_taxonomy: serde_json::to_value(diagnostic_taxonomy)
+        diagnostic_taxonomy: serde_json::to_value(&projection.diagnostic_taxonomy)
             .context("serializing diagnostic taxonomy section")?,
+        pack_neighbours: serde_json::to_value(pack_neighbours)
+            .context("serializing pack_neighbours section")?,
+        known_collision_policy: serde_json::to_value(known_collision_policy)
+            .context("serializing known_collision_policy section")?,
+        cross_dag_handoffs: serde_json::to_value(cross_dag_handoffs)
+            .context("serializing cross_dag_handoffs section")?,
+        example_utterances: serde_json::to_value(example_utterances)
+            .context("serializing example_utterances section")?,
     })
 }
 
@@ -1671,12 +1746,14 @@ fn section_value<'a>(
 ) -> &'a serde_json::Value {
     match name {
         "pack_summary" => &sections.pack_summary,
-        "verb_bindings" => &sections.verb_bindings,
-        "verb_effects" => &sections.verb_effects,
+        "dsl_atoms" => &sections.dsl_atoms,
         "production_contracts" => &sections.production_contracts,
-        "macro_tiers" => &sections.macro_tiers,
         "workbook_plans" => &sections.workbook_plans,
         "diagnostic_taxonomy" => &sections.diagnostic_taxonomy,
+        "pack_neighbours" => &sections.pack_neighbours,
+        "known_collision_policy" => &sections.known_collision_policy,
+        "cross_dag_handoffs" => &sections.cross_dag_handoffs,
+        "example_utterances" => &sections.example_utterances,
         _ => &serde_json::Value::Null,
     }
 }
@@ -2299,7 +2376,7 @@ mod tests {
             .iter()
             .find(|pack| pack.pack_id == "cbu-maintenance")
             .unwrap();
-        let sections = envelope_sections(pack, &projection.diagnostic_taxonomy).unwrap();
+        let sections = envelope_sections(pack, &projection).unwrap();
         let budgets = [
             SectionBudget {
                 name: "pack_summary",

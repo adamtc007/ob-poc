@@ -77,6 +77,13 @@ mod tests {
                 id: None,
                 kind: MacroKind::Macro,
                 tier: None,
+                plan_kind: None,
+                lifecycle_state: None,
+                requires_states: vec![],
+                precondition_checks: vec![],
+                state_effect: None,
+                transition_args: None,
+                side_effects: None,
                 aliases: vec![],
                 taxonomy: None,
                 ui: MacroUi {

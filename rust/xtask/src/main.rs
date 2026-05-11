@@ -29,6 +29,7 @@ mod harness;
 mod instrument_harness;
 mod lexicon;
 mod onboarding_harness;
+mod acp_envelope_byte_equality;
 mod pub_lint;
 mod reconcile;
 mod replay_tuner;
@@ -111,6 +112,15 @@ enum Command {
     /// Check root-crate public API against the reviewed allowlist
     PubLint {
         /// Refresh the allowlist after reviewing intentional API changes
+        #[arg(long)]
+        bless: bool,
+    },
+
+    /// R6 — rebuild Slice 1 ACP pack context envelopes and assert
+    /// byte-equality + hash-equality against the persisted CLI baseline.
+    /// Fails the build on envelope drift. PR-gated.
+    AcpEnvelopeByteEqualityCheck {
+        /// Refresh the persisted baseline after reviewing the drift.
         #[arg(long)]
         bless: bool,
     },
@@ -1350,6 +1360,9 @@ fn main() -> Result<()> {
         Command::Ci => ci(&sh),
         Command::PreCommit => pre_commit(&sh),
         Command::PubLint { bless } => pub_lint::run(bless),
+        Command::AcpEnvelopeByteEqualityCheck { bless } => {
+            acp_envelope_byte_equality::run(bless)
+        }
         Command::Deploy {
             release,
             port,
@@ -2094,6 +2107,9 @@ fn check(sh: &Shell, db: bool) -> Result<()> {
     println!("  Checking public API allowlist...");
     pub_lint::run(false)?;
 
+    println!("  Checking ACP envelope byte-equality (R6)...");
+    acp_envelope_byte_equality::run(false)?;
+
     // Clippy (workspace, all targets)
     println!("  Running clippy...");
     cmd!(sh, "cargo clippy --workspace --all-targets -- -D warnings").run()?;
@@ -2282,6 +2298,9 @@ fn ci(sh: &Shell) -> Result<()> {
     println!("\n=== Public API Allowlist ===");
     pub_lint::run(false)?;
 
+    println!("\n=== ACP Envelope Byte-Equality (R6) ===");
+    acp_envelope_byte_equality::run(false)?;
+
     println!("\n=== Clippy (workspace) ===");
     cmd!(sh, "cargo clippy --workspace --all-targets -- -D warnings").run()?;
 
@@ -2330,6 +2349,9 @@ fn pre_commit(sh: &Shell) -> Result<()> {
 
     println!("\n=== Public API Allowlist ===");
     pub_lint::run(false)?;
+
+    println!("\n=== ACP Envelope Byte-Equality (R6) ===");
+    acp_envelope_byte_equality::run(false)?;
 
     println!("\n=== Clippy (workspace) ===");
     cmd!(sh, "cargo clippy --workspace --all-targets -- -D warnings").run()?;

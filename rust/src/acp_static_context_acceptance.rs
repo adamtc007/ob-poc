@@ -21,13 +21,19 @@ use crate::acp_registry_projection::{
     AcpRegistryProjection, SLICE_1_ACP_PACK_IDS,
 };
 
+// R2a: envelope v3 sections. verb_bindings + verb_effects + macro_tiers
+// were unified into `dsl_atoms`.
+// R2b: added the four v0.5 §8/§14/§15 sections: pack_neighbours,
+// known_collision_policy, cross_dag_handoffs, example_utterances.
 const REQUIRED_ENVELOPE_SECTIONS: &[&str] = &[
+    "cross_dag_handoffs",
     "diagnostic_taxonomy",
-    "macro_tiers",
+    "dsl_atoms",
+    "example_utterances",
+    "known_collision_policy",
+    "pack_neighbours",
     "pack_summary",
     "production_contracts",
-    "verb_bindings",
-    "verb_effects",
     "workbook_plans",
 ];
 
@@ -370,30 +376,128 @@ fn check_envelope_surface(
             None,
             Some(pack_id),
         );
+        // R2a: the v3 envelope replaces verb_bindings + verb_effects +
+        // macro_tiers with a single `dsl_atoms` section. Fidelity is
+        // checked against `pack.dsl_atoms`.
         push_check(
             checks,
-            "envelope_verb_binding_fidelity",
-            serde_json::to_value(&pack.verb_bindings).ok()
-                == Some(envelope.body.sections.verb_bindings.clone()),
-            "Envelope verb binding section matches the registry projection",
+            "envelope_dsl_atoms_fidelity",
+            serde_json::to_value(&pack.dsl_atoms).ok()
+                == Some(envelope.body.sections.dsl_atoms.clone()),
+            "Envelope dsl_atoms section matches the unified registry projection",
             None,
             Some(pack_id),
         );
+        // Confirm both dispatch kinds appear in the unified surface so the
+        // agent sees macros as peers to verbs (R2a invariant).
+        let atoms_value = &envelope.body.sections.dsl_atoms;
+        let has_verb_atom = atoms_value
+            .as_array()
+            .map(|a| {
+                a.iter().any(|atom| {
+                    atom.get("dispatch_type").and_then(|v| v.as_str()) == Some("verb")
+                })
+            })
+            .unwrap_or(false);
+        let has_macro_atom = atoms_value
+            .as_array()
+            .map(|a| {
+                a.iter().any(|atom| {
+                    atom.get("dispatch_type").and_then(|v| v.as_str()) == Some("macro")
+                })
+            })
+            .unwrap_or(false);
         push_check(
             checks,
-            "envelope_verb_effect_fidelity",
-            serde_json::to_value(&pack.verb_effects).ok()
-                == Some(envelope.body.sections.verb_effects.clone()),
-            "Envelope verb effect section matches the registry projection",
+            "envelope_dsl_atoms_includes_verb_kind",
+            has_verb_atom,
+            "Envelope dsl_atoms section includes at least one verb-kind atom",
             None,
             Some(pack_id),
         );
+        // Macros are only required for packs that reference them.
+        // cbu-maintenance references 21; other Slice 1 packs reference 0.
+        // So we require macro presence only when the pack has macro_tiers.
+        if !pack.macro_tiers.is_empty() {
+            push_check(
+                checks,
+                "envelope_dsl_atoms_includes_macro_kind",
+                has_macro_atom,
+                "Envelope dsl_atoms section includes at least one macro-kind atom for packs with registered macros",
+                None,
+                Some(pack_id),
+            );
+        }
+
+        // R2b — v0.5 §14 / §15 fidelity: each Slice 1 pack carries at least
+        // one neighbour edge, at least one collision policy entry, and at
+        // least one example utterance. Cross-DAG handoffs are pack-specific.
+        let neighbours_len = envelope
+            .body
+            .sections
+            .pack_neighbours
+            .as_array()
+            .map(|a| a.len())
+            .unwrap_or(0);
         push_check(
             checks,
-            "envelope_macro_tier_fidelity",
-            serde_json::to_value(&pack.macro_tiers).ok()
-                == Some(envelope.body.sections.macro_tiers.clone()),
-            "Envelope macro tier section matches the registry projection",
+            "envelope_pack_neighbours_non_empty",
+            neighbours_len > 0,
+            "Envelope carries at least one pack_neighbour edge per v0.5 §14",
+            None,
+            Some(pack_id),
+        );
+        let collisions_len = envelope
+            .body
+            .sections
+            .known_collision_policy
+            .as_array()
+            .map(|a| a.len())
+            .unwrap_or(0);
+        push_check(
+            checks,
+            "envelope_known_collision_policy_non_empty",
+            collisions_len > 0,
+            "Envelope carries at least one known_collision_policy entry per v0.5 §14",
+            None,
+            Some(pack_id),
+        );
+        let examples_len = envelope
+            .body
+            .sections
+            .example_utterances
+            .as_array()
+            .map(|a| a.len())
+            .unwrap_or(0);
+        push_check(
+            checks,
+            "envelope_example_utterances_non_empty",
+            examples_len > 0,
+            "Envelope carries at least one example utterance per v0.5 §15",
+            None,
+            Some(pack_id),
+        );
+        // Negative example shapes per v0.5 §15 must be present in the
+        // envelope so the agent has explicit "should-not" guidance.
+        let has_negative_shape = envelope
+            .body
+            .sections
+            .example_utterances
+            .as_array()
+            .map(|a| {
+                a.iter().any(|ex| {
+                    ex.get("shape")
+                        .and_then(|v| v.as_str())
+                        .map(|s| s.starts_with("negative_"))
+                        .unwrap_or(false)
+                })
+            })
+            .unwrap_or(false);
+        push_check(
+            checks,
+            "envelope_example_utterances_includes_negative_shapes",
+            has_negative_shape,
+            "Envelope example_utterances includes at least one negative shape per v0.5 §15",
             None,
             Some(pack_id),
         );

@@ -27,7 +27,7 @@ use std::sync::{Arc, LazyLock};
 use std::time::Instant;
 use uuid::Uuid;
 
-use crate::api::acp_state_anchor::{
+use crate::acp_state_anchor::{
     acp_prompt_blocks_from_params, acp_prompt_state_anchor_provider_outcome,
     AcpPromptStateAnchorProviderOutcome,
 };
@@ -676,6 +676,7 @@ async fn create_session_v2(
         session_feedback: Some(session_feedback),
         narration: None,
         trace_id: None,
+        acp_dag_semantic: None,
     };
 
     Ok(Json(CreateSessionResponseV2 {
@@ -1891,28 +1892,34 @@ pub(crate) async fn process_acp_prompt_deterministic_envelope(
     })
 }
 
-fn attach_session_runtime_trace_to_result(result: &mut serde_json::Value, session: &ReplSessionV2) {
-    let Some(pack_id) = value_string(result, &["dag_semantic", "pack", "pack_id"]) else {
-        return;
-    };
-    let Some(static_envelope_hash) = value_string(
-        result,
-        &["traceProjection", "envelopeTrace", "envelope_hash"],
-    )
-    .or_else(|| value_string(result, &["dag_semantic", "envelope_trace", "envelope_hash"])) else {
-        return;
-    };
-    let selected_ref = value_string(result, &["dag_semantic", "selected_verb"])
-        .or_else(|| value_string(result, &["traceProjection", "selectedVerb"]))
+/// R8 Phase B.8 (2026-05-11): typed computation of the session-aware
+/// runtime trace. Reads typed fields off `&AcpDagSemanticResolution`
+/// and `&ReplSessionV2`, produces a typed `AcpDagSemanticRuntimeTrace`.
+///
+/// Replaces the previous JSON-mutation implementation. The typed value
+/// is the canonical source; `attach_session_runtime_trace_to_result`
+/// (below) serializes it back into the JSON envelope for non-typed
+/// consumers (ACP JSON-RPC server, envelope byte-equality baseline).
+pub(crate) fn compute_session_aware_runtime_trace_typed(
+    resolution: &crate::acp_dag_semantic::AcpDagSemanticResolution,
+    session: &ReplSessionV2,
+) -> Option<crate::acp_dag_semantic::AcpDagSemanticRuntimeTrace> {
+    let pack_id = resolution.pack.as_ref()?.pack_id.clone();
+    let static_envelope_hash = resolution
+        .envelope_trace
+        .as_ref()
+        .map(|t| t.envelope_hash.clone())?;
+    let selected_ref = resolution
+        .selected_verb
+        .clone()
         .or_else(|| {
-            value_string(
-                result,
-                &["dag_semantic", "selected_template", "template_id"],
-            )
+            resolution
+                .selected_template
+                .as_ref()
+                .map(|t| t.template_id.clone())
         })
         .unwrap_or_else(|| "unknown".to_string());
-    let missing_required_args =
-        value_string_array(result, &["dag_semantic", "missing_required_args"]);
+    let missing_required_args = resolution.missing_required_args.clone();
     let source = crate::acp_runtime_context_sources::build_session_runtime_context_source(
         crate::acp_runtime_context_sources::AcpRuntimeContextBuildInput {
             pack_id,
@@ -1923,19 +1930,44 @@ fn attach_session_runtime_trace_to_result(result: &mut serde_json::Value, sessio
         },
     );
     let projection = crate::acp_runtime_context::build_acp_runtime_context_projection(source);
-    let trace = serde_json::json!({
-        "schema_version": projection.schema_version,
-        "pack_id": projection.pack_id,
-        "snapshot_id": projection.snapshot_id,
-        "runtime_hash": projection.runtime_hash,
-        "redaction_policy": projection.redaction_policy,
-        "freshness_policy": projection.freshness_policy,
-        "static_envelope_hash": projection.static_envelope_hash,
-        "projection_hash": projection.projection_hash,
-        "verified": projection.verified,
-        "redacted_count": projection.redacted_count,
-        "blocked_field_codes": projection.blocked_field_codes,
-    });
+    Some(crate::acp_dag_semantic::AcpDagSemanticRuntimeTrace {
+        schema_version: projection.schema_version,
+        pack_id: projection.pack_id,
+        snapshot_id: projection.snapshot_id,
+        runtime_hash: projection.runtime_hash,
+        redaction_policy: projection.redaction_policy,
+        freshness_policy: projection.freshness_policy,
+        static_envelope_hash: projection.static_envelope_hash,
+        projection_hash: projection.projection_hash,
+        verified: projection.verified,
+        redacted_count: projection.redacted_count,
+        blocked_field_codes: projection.blocked_field_codes,
+    })
+}
+
+/// R8 Phase B.8 (2026-05-11): JSON wrapper around the typed runtime
+/// trace computation. Parses the result's `dag_semantic` block into the
+/// typed resolution, calls the typed computation, then serializes the
+/// typed trace back into both legacy JSON paths (`traceProjection.
+/// runtimeTrace` and `dag_semantic.runtime_trace`). This keeps the
+/// envelope wire shape unchanged while making typed code the canonical
+/// source of truth.
+fn attach_session_runtime_trace_to_result(result: &mut serde_json::Value, session: &ReplSessionV2) {
+    let Some(resolution) = result
+        .get("dag_semantic")
+        .and_then(|v| {
+            serde_json::from_value::<crate::acp_dag_semantic::AcpDagSemanticResolution>(v.clone())
+                .ok()
+        })
+    else {
+        return;
+    };
+    let Some(typed_trace) = compute_session_aware_runtime_trace_typed(&resolution, session) else {
+        return;
+    };
+    let Ok(trace) = serde_json::to_value(&typed_trace) else {
+        return;
+    };
     if let Some(trace_projection) = result
         .get_mut("traceProjection")
         .and_then(serde_json::Value::as_object_mut)
@@ -4505,7 +4537,7 @@ impl ReplV2RouteState {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::api::acp_state_anchor::acp_prompt_session_case_id;
+    use crate::acp_state_anchor::acp_prompt_session_case_id;
     use async_trait::async_trait;
     use chrono::TimeZone;
     use ob_agentic::llm_client::{LlmClient, ToolCallResult, ToolDefinition};

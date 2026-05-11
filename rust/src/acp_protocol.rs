@@ -742,7 +742,7 @@ impl AcpJsonRpcAgent {
         let candidate_verbs = resolution
             .top_candidates
             .iter()
-            .map(|candidate| candidate.verb.clone())
+            .map(|candidate| candidate.fqn.clone())
             .collect::<Vec<_>>();
         let selected_or_top = resolution
             .selected_verb
@@ -1891,7 +1891,7 @@ fn dag_semantic_failure_mode(resolution: &AcpDagSemanticResolution) -> Option<St
     }
 }
 
-fn dag_semantic_human_message(resolution: &AcpDagSemanticResolution) -> String {
+pub(crate) fn dag_semantic_human_message(resolution: &AcpDagSemanticResolution) -> String {
     let pack_phrase = resolution
         .pack
         .as_ref()
@@ -1916,7 +1916,7 @@ fn dag_semantic_human_message(resolution: &AcpDagSemanticResolution) -> String {
                 .top_candidates
                 .iter()
                 .take(3)
-                .map(|candidate| format!("`{}`", candidate.verb))
+                .map(|candidate| format!("`{}`", candidate.fqn))
                 .collect::<Vec<_>>()
                 .join(", ");
             format!(

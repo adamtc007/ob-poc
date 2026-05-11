@@ -2,7 +2,25 @@
 //!
 //! Type definitions for macro YAML schemas. These match the format in
 //! `config/verb_schemas/macros/*.yaml`.
+//!
+//! ## ACP visibility parity (v0.5 §7.2 / §7.7)
+//!
+//! For the ACP/Sage projection surface, macros are first-class peers to
+//! verbs at the DAG dispatch decision level. To support that without
+//! collapsing the runtime distinction (macros still expand to verbs;
+//! verbs do not), this schema mirrors a subset of `VerbConfig` fields
+//! using **identical field names and shapes**:
+//!
+//! - `requires_states` / `precondition_checks`  (cf. `VerbLifecycle`)
+//! - `state_effect`                            (cf. `ThreeAxisDeclaration.state_effect`)
+//! - `transition_args`                         (reused directly from `dsl_core`)
+//! - `side_effects`                            (typed mirror — verb side is currently `Option<String>`)
+//!
+//! The naming discipline lets the envelope projection layer flatten both
+//! schemas into a single dispatch-option surface without a translation
+//! table. See `todo/acp-pack-context-parity-gate-a/r1-schema-parity-adr.md`.
 
+use dsl_core::config::{StateEffect, TransitionArgs};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
@@ -17,9 +35,50 @@ pub struct MacroSchema {
     /// Must be "macro" for operator macros
     pub kind: MacroKind,
 
-    /// Macro tier classification
+    /// Macro tier classification (legacy: primitive/composite/template).
+    /// For new planning semantics see `plan_kind`.
     #[serde(default)]
     pub tier: Option<MacroTier>,
+
+    /// Macro planning tier per ACP pack context parity v0.5 §7.2.
+    /// Required at envelope projection time for Slice 1 macros.
+    #[serde(default)]
+    pub plan_kind: Option<MacroPlanKind>,
+
+    /// Macro lifecycle FSM per ACP pack context parity v0.5 §7.7.
+    /// Required at envelope projection time for Slice 1 macros.
+    #[serde(default)]
+    pub lifecycle_state: Option<MacroLifecycleState>,
+
+    /// Entity lifecycle states the operative entity must be in before this
+    /// macro is callable. Mirrors `VerbLifecycle.requires_states`. Reused
+    /// by the ACP envelope projection so macros and verbs share a
+    /// precondition surface.
+    #[serde(default)]
+    pub requires_states: Vec<String>,
+
+    /// String-form predicates that must hold before the macro is callable
+    /// (e.g. `"requires_scope:cbu"`). Mirrors
+    /// `VerbLifecycle.precondition_checks`.
+    #[serde(default)]
+    pub precondition_checks: Vec<String>,
+
+    /// Whether this macro transitions DAG state or preserves it. Reused
+    /// directly from `dsl_core::config::StateEffect` so macros and verbs
+    /// share one enum.
+    #[serde(default)]
+    pub state_effect: Option<StateEffect>,
+
+    /// Runtime gate-hook metadata. Reused directly from
+    /// `dsl_core::config::TransitionArgs` so the envelope projection
+    /// doesn't need a translation table.
+    #[serde(default)]
+    pub transition_args: Option<TransitionArgs>,
+
+    /// Coarse side-effect class. Typed mirror of the verb side's
+    /// `Option<String>` (verb-side enum extraction is a follow-up).
+    #[serde(default)]
+    pub side_effects: Option<MacroSideEffect>,
 
     /// Alternative names for this macro
     #[serde(default)]
@@ -122,6 +181,65 @@ pub enum RoleCardinality {
 pub enum MacroKind {
     Macro,
     Primitive,
+}
+
+/// Macro planning tier per ACP pack context parity v0.5 §7.2.
+///
+/// SemOS uses the macro type to catalogue DSL compositions; macros are not
+/// DSL atomics. Single-verb operations are verbs, not macros. v0.5's
+/// `atomic_sequence` variant therefore does not apply here.
+///
+/// Field is named `plan_kind` in Rust / `plan-kind` in YAML to avoid
+/// colliding with the existing `kind` schema discriminator.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum MacroPlanKind {
+    /// Multi-step but bounded; no durable waiting.
+    CompositeSequence,
+    /// Durable, recoverable; may have external correlation.
+    WorkflowPlan,
+    /// Participates as a step inside a workbook plan.
+    WorkbookPlanStep,
+}
+
+/// Macro lifecycle FSM per ACP pack context parity v0.5 §7.7.
+///
+/// Verb-gated transitions: `Draft → Active → Deprecated → Retired`.
+/// Backward transitions are governance-only and not permitted by the
+/// envelope projection path.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum MacroLifecycleState {
+    Draft,
+    Active,
+    Deprecated,
+    Retired,
+}
+
+impl MacroLifecycleState {
+    /// Returns true when an envelope may project this macro.
+    /// Per v0.5 §10: "Active state for production envelopes; Draft macros
+    /// may appear in development envelopes with a tag."
+    pub fn projectable_for_production(self) -> bool {
+        matches!(self, MacroLifecycleState::Active)
+    }
+}
+
+/// Coarse side-effect class for ACP visibility parity.
+///
+/// Typed mirror of the verb side's `VerbMetadata.side_effects` field,
+/// which is currently `Option<String>`. The same YAML strings deserialize
+/// into both: a follow-up cleanup can converge the verb side onto this
+/// enum once the consumers are audited.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum MacroSideEffect {
+    /// The macro writes to durable state. Equivalent to the verb-side
+    /// string `"state_write"`.
+    StateWrite,
+    /// The macro emits facts/observations only, no state writes.
+    /// Equivalent to the verb-side string `"facts_only"`.
+    FactsOnly,
 }
 
 /// UI presentation configuration
@@ -279,6 +397,8 @@ pub enum MacroArgType {
     // Operator reference types (UI-safe)
     #[serde(rename = "client-ref")]
     ClientRef,
+    #[serde(rename = "cbu-ref")]
+    CbuRef,
     #[serde(rename = "structure-ref")]
     StructureRef,
     #[serde(rename = "party-ref")]

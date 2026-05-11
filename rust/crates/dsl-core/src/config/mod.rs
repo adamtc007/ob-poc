@@ -67,8 +67,9 @@ pub use types::{
     EscalationRule, ExternalEffect, FuzzyCheckConfig, GraphQueryConfig, GraphQueryOperation,
     HarmClass, JurisdictionCondition, JurisdictionRule, LookupConfig, ResolutionMode,
     ReturnTypeConfig, ReturnsConfig, RuleCondition, RuleRequirement, RuleSeverity, SearchKeyConfig,
-    SlotType, SourceOfTruth, StateEffect, ThreeAxisDeclaration, TransitionEdge, VerbBehavior,
-    VerbConfig, VerbConsumes, VerbFlavour, VerbLifecycle, VerbMetadata, VerbOutputConfig,
+    SlotType, SourceOfTruth, StateEffect, ThreeAxisDeclaration, TransitionArgs, TransitionEdge,
+    VerbBehavior, VerbConfig, VerbConsumes, VerbFlavour, VerbLifecycle, VerbMetadata,
+    VerbOutputConfig,
     VerbProduces, VerbRoleGuard, VerbScope, VerbSentences, VerbStatus, VerbTier, VerbTransitions,
     VerbsConfig, WarningRule,
 };

@@ -52,6 +52,29 @@ pub struct ReplResponseV2 {
     /// single grep.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub trace_id: Option<Uuid>,
+
+    /// **R8 single-path unification (2026-05-11):** ACP DAG semantic
+    /// resolution payload. Populated when the orchestrator's first-step
+    /// ACP resolution matched a Slice 1 pack-bound utterance; absent
+    /// otherwise. The response adapter projects this into `acp_trace`
+    /// on the chat response.
+    ///
+    /// See `todo/acp-pack-context-parity-gate-a/r8-unification-plan.md`
+    /// for the architectural framing — macros + verbs are peers on the
+    /// Sage/ACP visibility surface; the resolver lives inside
+    /// `ReplOrchestratorV2::process()` as a single-path ingress step.
+    ///
+    /// `AcpDagSemanticResolution` is only `Serialize` (not `Deserialize`)
+    /// — the value is produced inside the orchestrator and serialized
+    /// out to clients; it doesn't need to round-trip back. The
+    /// `skip_deserializing` attribute keeps `ReplResponseV2`'s
+    /// `Deserialize` derive valid.
+    /// **R8 single-path unification (2026-05-11):** ACP DAG semantic
+    /// resolution. Populated when the orchestrator's ACP step matched
+    /// a Slice 1 pack-bound utterance. Adapter projects via
+    /// `acp_chat_trace_summary_typed` into `ChatResponse.acp_trace`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub acp_dag_semantic: Option<crate::acp_dag_semantic::AcpDagSemanticResolution>,
 }
 
 // ---------------------------------------------------------------------------
@@ -127,6 +150,21 @@ pub enum ReplResponseKindV2 {
 
     /// Something went wrong.
     Error { error: String, recoverable: bool },
+
+    /// **R8 single-path unification (2026-05-11):** ACP-resolved short-
+    /// circuit. The orchestrator's first-step ACP resolution produced
+    /// a Slice 1 pack-bound match. Session state is left intact — this
+    /// is a side-channel response, not a state transition.
+    ///
+    /// `ReplResponseV2.message` carries the human-readable text.
+    /// `ReplResponseV2.acp_dag_semantic` carries the typed resolution.
+    /// `dsl` is `Some(_)` only when the resolution is a valid first-
+    /// pass draft (see `AcpDagSemanticResolution::first_pass_valid_draft_dsl`).
+    AcpResolved {
+        /// Draft DSL when status is Matched, draft is present, and no
+        /// missing args / unresolved refs.
+        dsl: Option<String>,
+    },
 }
 
 // ---------------------------------------------------------------------------
@@ -194,6 +232,7 @@ mod tests {
             session_feedback: None,
             narration: None,
             trace_id: None,
+            acp_dag_semantic: None,
         };
 
         let json = serde_json::to_string(&response).unwrap();
@@ -216,6 +255,7 @@ mod tests {
             session_feedback: None,
             narration: None,
             trace_id: None,
+            acp_dag_semantic: None,
         };
 
         let json = serde_json::to_string(&response).unwrap();
@@ -248,6 +288,7 @@ mod tests {
             session_feedback: None,
             narration: None,
             trace_id: None,
+            acp_dag_semantic: None,
         };
 
         let json = serde_json::to_string(&response).unwrap();
@@ -277,6 +318,7 @@ mod tests {
             session_feedback: None,
             narration: None,
             trace_id: None,
+            acp_dag_semantic: None,
         };
 
         let json = serde_json::to_string(&response).unwrap();

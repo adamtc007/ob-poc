@@ -13,6 +13,12 @@
 # =============================================================================
 struct.ie.ucits.icav:
   kind: macro
+  plan-kind: composite_sequence
+  lifecycle-state: active
+  requires-states: []
+  precondition-checks: ["requires_scope:client"]
+  state-effect: transition
+  side-effects: state_write
 
   ui:
     label: "Ireland UCITS ICAV"
@@ -228,6 +234,12 @@ struct.ie.ucits.icav:
 # =============================================================================
 struct.ie.aif.icav:
   kind: macro
+  plan-kind: composite_sequence
+  lifecycle-state: active
+  requires-states: []
+  precondition-checks: ["requires_scope:client"]
+  state-effect: transition
+  side-effects: state_write
 
   ui:
     label: "Ireland AIF ICAV"
@@ -456,6 +468,12 @@ struct.ie.aif.icav:
 # =============================================================================
 struct.ie.hedge.icav:
   kind: macro
+  plan-kind: composite_sequence
+  lifecycle-state: active
+  requires-states: []
+  precondition-checks: ["requires_scope:client"]
+  state-effect: transition
+  side-effects: state_write
 
   ui:
     label: "Ireland Hedge Fund ICAV"

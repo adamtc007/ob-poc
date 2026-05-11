@@ -22,14 +22,43 @@ Completed in this slice:
 16. [x] Added development and production online registry-state load paths.
 17. [x] Replaced the id-only development signer with explicit signing key material and production keyring support.
 
-Current deterministic output evidence:
+Current deterministic output evidence (refreshed for R2b §8/§14/§15 sections, 2026-05-11):
 
 - `cargo run --bin acp_pack_context_envelope_v2 -- config all`
-  - bytes: `380875`
-  - SHA-256: `736a03b03e3cf9a97815afb280ac38c2d2b770fdb0015639e8a11048b651a8c8`
+  - schema_version: `acp_pack_context_envelope_v3_bundle`
+  - bytes: `429083`
+  - SHA-256: `7a8c77517d4882f8761bb6ab94c2c1e3414a2550cb1020a286712f542479a623`
 - `cargo run --bin acp_pack_context_envelope_v2 -- config cbu-maintenance`
-  - bytes: `133761`
-  - SHA-256: `d1f624ac5832c206f1f2c7208212a394a103293970886d0dd131e28ccbd9cd7d`
+  - schema_version: `acp_pack_context_envelope_v3`
+  - bytes: `162783`
+  - SHA-256: `d6a155be817adb17346cb7de41312238cffb7f348fdd5d6c7c98bfdc1616b229`
+
+R2a baseline (pre-§8 sections, 2026-05-11):
+- `config all`: bytes 409271, SHA-256 `d80b2abda10e6b539294ea001d5d8f6cf471a16da916af15add59ae92c38ad34`
+- `config cbu-maintenance`: bytes 155866, SHA-256 `7dd69c92c0183f89ce6a5fe740242fdbf8eb0697091a588b3a087f08528effa1`
+
+R6 byte-equality CI gate (2026-05-11):
+
+- xtask command: `cargo run -p xtask -- acp-envelope-byte-equality-check`
+- bless command: `cargo run -p xtask -- acp-envelope-byte-equality-check --bless`
+- persisted baseline: `rust/tools/acp_envelope_baseline_v3.json`
+- wired into `xtask check`, `xtask ci`, `xtask pre-commit`
+- captures all 4 configs (`all`, `onboarding-request`, `cbu-maintenance`,
+  `product-service-taxonomy`) — byte count + SHA-256 per entry
+- baseline measured *with* trailing newline (matches what CLI emits to
+  stdout); slightly different from shell-captured `printf %s` values
+
+Current R6 baseline (4 entries, blessed 2026-05-11):
+
+- `all`: bytes 429084, SHA-256 `3c83898c8195b6aee67b4c8c1e7cd664599fd381e6b1d1243a754a056ca8dda3`
+- `onboarding-request`: bytes 73273, SHA-256 `a3e5ce80b33f06a158a2a913dbb684224de4262e459ab5c936aa63e13ef9d877`
+- `cbu-maintenance`: bytes 162784, SHA-256 `6e83bba163b0fb55f02bb153ec4fcb621a086e18f505e5be69d3c878ebb36603`
+- `product-service-taxonomy`: bytes 147102, SHA-256 `1f943a1f52c15e1e0017c6d03ae064083916f5755e9f500107ae9fbda3b00b3f`
+
+Earlier v2 baseline (pre-R2a, 2026-05-10):
+
+- `config all`: bytes 380875, SHA-256 `736a03b03e3cf9a97815afb280ac38c2d2b770fdb0015639e8a11048b651a8c8`
+- `config cbu-maintenance`: bytes 133761, SHA-256 `d1f624ac5832c206f1f2c7208212a394a103293970886d0dd131e28ccbd9cd7d`
 
 Current verification coverage:
 

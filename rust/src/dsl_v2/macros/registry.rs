@@ -459,4 +459,134 @@ structure.setup:
         let by_tag = registry.by_mode_tag("kyc");
         assert_eq!(by_tag.len(), 1);
     }
+
+    /// R1 acceptance: every Slice 1 macro declares the ACP-visibility
+    /// parity surface per v0.5 §7.2 / §7.7 plus the verb-mirror parity
+    /// fields lifted in R1.3-5:
+    ///
+    /// - `plan_kind` and `lifecycle_state`
+    /// - `state_effect`
+    /// - `side_effects`
+    /// - `requires_states` (Vec) and `precondition_checks` (Vec)
+    /// - `transition_args` (where the macro takes a known entity arg —
+    ///   present on the 3 modifying `structure.*` macros; absent on the
+    ///   18 creating `struct.*` macros, which produce a new entity).
+    ///
+    /// Slice 1 macros are the 21 FQNs referenced from the
+    /// `cbu-maintenance` pack (18 `struct.*` + 3 `structure.*`).
+    #[test]
+    fn test_slice1_macros_declare_plan_kind_and_lifecycle_state() {
+        use super::super::schema::{
+            MacroLifecycleState, MacroPlanKind, MacroSideEffect,
+        };
+        use dsl_core::config::StateEffect;
+
+        let slice1_fqns: &[&str] = &[
+            "struct.lux.ucits.sicav",
+            "struct.lux.aif.raif",
+            "struct.lux.pe.scsp",
+            "struct.ie.ucits.icav",
+            "struct.ie.aif.icav",
+            "struct.ie.hedge.icav",
+            "struct.uk.authorised.oeic",
+            "struct.uk.authorised.aut",
+            "struct.uk.authorised.acs",
+            "struct.uk.authorised.ltaf",
+            "struct.uk.manager.llp",
+            "struct.uk.private-equity.lp",
+            "struct.us.40act.open-end",
+            "struct.us.40act.closed-end",
+            "struct.us.etf.40act",
+            "struct.us.private-fund.delaware-lp",
+            "struct.hedge.cross-border",
+            "struct.pe.cross-border",
+            "structure.product-suite-custody-fa-ta",
+            "structure.product-suite-full",
+            "structure.remove-all-products",
+        ];
+
+        let modifying_fqns = [
+            "structure.product-suite-custody-fa-ta",
+            "structure.product-suite-full",
+            "structure.remove-all-products",
+        ];
+
+        let registry = load_macro_registry().expect("macro registry should load");
+
+        for fqn in slice1_fqns {
+            let schema = registry
+                .get(fqn)
+                .unwrap_or_else(|| panic!("Slice 1 macro {} should be in the registry", fqn));
+
+            // R1.1 + R1.2
+            assert_eq!(
+                schema.plan_kind,
+                Some(MacroPlanKind::CompositeSequence),
+                "Slice 1 macro {} must declare `plan-kind: composite_sequence` per v0.5 §7.2",
+                fqn,
+            );
+            assert_eq!(
+                schema.lifecycle_state,
+                Some(MacroLifecycleState::Active),
+                "Slice 1 macro {} must declare `lifecycle-state: active` per v0.5 §7.7",
+                fqn,
+            );
+            assert!(
+                schema.lifecycle_state.unwrap().projectable_for_production(),
+                "Slice 1 macro {} must be projectable for production",
+                fqn,
+            );
+
+            // R1.3-5 verb-mirror parity fields
+            assert_eq!(
+                schema.state_effect,
+                Some(StateEffect::Transition),
+                "Slice 1 macro {} must declare `state-effect: transition`",
+                fqn,
+            );
+            assert_eq!(
+                schema.side_effects,
+                Some(MacroSideEffect::StateWrite),
+                "Slice 1 macro {} must declare `side-effects: state_write`",
+                fqn,
+            );
+            assert!(
+                !schema.precondition_checks.is_empty(),
+                "Slice 1 macro {} must declare at least one `precondition-checks` entry",
+                fqn,
+            );
+
+            // Modifying macros take a real entity arg and must declare
+            // transition_args; creating macros produce a new entity and
+            // legitimately leave transition_args = None.
+            if modifying_fqns.contains(fqn) {
+                let ta = schema
+                    .transition_args
+                    .as_ref()
+                    .unwrap_or_else(|| panic!(
+                        "Modifying Slice 1 macro {} must declare `transition-args`", fqn
+                    ));
+                assert!(
+                    !ta.entity_id_arg.is_empty(),
+                    "Modifying Slice 1 macro {} must declare `transition-args.entity_id_arg`",
+                    fqn,
+                );
+                assert!(
+                    !schema.requires_states.is_empty(),
+                    "Modifying Slice 1 macro {} must declare at least one `requires-states` entry",
+                    fqn,
+                );
+            } else {
+                // Creating macros may legitimately have empty
+                // requires_states and absent transition_args.
+                assert!(
+                    schema.transition_args.is_none(),
+                    "Creating Slice 1 macro {} must NOT declare transition-args \
+                     (it produces a new entity rather than transitioning one). \
+                     If this macro now takes an entity arg, reclassify it.",
+                    fqn,
+                );
+            }
+        }
+    }
 }

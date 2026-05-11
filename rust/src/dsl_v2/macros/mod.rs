@@ -57,4 +57,9 @@ pub use schema::{
     ArgStyle, MacroArg, MacroArgType, MacroArgs, MacroExpansionStep, MacroKind, MacroRouting,
     MacroTarget, MacroUi, SetState, VerbCallStep,
 };
+// ACP visibility parity types (v0.5 §7.2 / §7.7). Consumed by the
+// envelope projection landing in R2. Re-exported here so consumers don't
+// have to reach into `schema::`.
+#[allow(unused_imports)]
+pub use schema::{MacroLifecycleState, MacroPlanKind, MacroSideEffect};
 pub use schema::{MacroPrereq, MacroSchema};

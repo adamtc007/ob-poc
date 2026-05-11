@@ -83,3 +83,18 @@ Run V4 immediately if any of these happen:
 ## Proposed Decision
 
 Use V0 for the current planning-only Slice 2 work. Schedule exactly one V4 full validation at the next material implementation closeout or before merge/release, whichever comes first.
+
+## R4 fuzz lane cadence
+
+The `gate_e_single_path_invariant_termination` property test runs in two
+modes via the `GATE_E_FUZZ_CASES` env var:
+
+| Lane | Cases | Wall clock | When |
+| --- | --- | --- | --- |
+| PR (default) | `N=256` | ~80–90s | every `cargo test` |
+| Nightly | `N=4096` | ~20–25 min | nightly CI: `GATE_E_FUZZ_CASES=4096 cargo test --test gate_e_single_path_invariant` |
+
+The deterministic seed lane (`gate_e_seed_corpus_all_terminate_at_verified_envelope_or_refusal`)
+always runs over the full 51-entry corpus in `tests/fixtures/single_path_corpus.jsonl`.
+Adding a new adversarial shape after a P1 incident: append to the JSONL,
+bump the line count assertion in the seed test, commit.

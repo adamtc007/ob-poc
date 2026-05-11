@@ -257,6 +257,13 @@ pub struct ReplOrchestratorV2 {
     /// loaded DAG taxonomies before execution. See
     /// `docs/backlog/catalogue-platform-refinement-v1_3.md` §3.3.
     gate_pipeline: Option<crate::runbook::step_executor_bridge::GatePipeline>,
+    /// R8 single-path unification (2026-05-11): ACP session-input draft-mode
+    /// selection. Configured once at orchestrator construction (typically
+    /// via [`crate::acp_session_input_draft_mode::AcpSessionInputDraftMode::from_env`])
+    /// rather than read per request. Used by the orchestrator's internal
+    /// ACP resolution step (R8 §13.5).
+    acp_session_input_draft_mode:
+        crate::acp_session_input_draft_mode::AcpSessionInputDraftMode,
 }
 
 impl ReplOrchestratorV2 {
@@ -287,7 +294,31 @@ impl ReplOrchestratorV2 {
             lookup_service: None,
             orchestrated_verbs: HashSet::new(),
             gate_pipeline: None,
+            acp_session_input_draft_mode:
+                crate::acp_session_input_draft_mode::AcpSessionInputDraftMode::Deterministic,
         }
+    }
+
+    /// Configure the orchestrator's ACP session-input draft mode (R8).
+    ///
+    /// Replaces the per-request env-var read that used to live in
+    /// `agent_routes::acp_session_input_draft_mode()`. Production wiring in
+    /// `crates/ob-poc-web/src/main.rs` calls
+    /// `with_acp_draft_mode(AcpSessionInputDraftMode::from_env())` once at
+    /// startup.
+    pub fn with_acp_draft_mode(
+        mut self,
+        mode: crate::acp_session_input_draft_mode::AcpSessionInputDraftMode,
+    ) -> Self {
+        self.acp_session_input_draft_mode = mode;
+        self
+    }
+
+    /// Return the configured ACP session-input draft mode.
+    pub fn acp_session_input_draft_mode(
+        &self,
+    ) -> crate::acp_session_input_draft_mode::AcpSessionInputDraftMode {
+        self.acp_session_input_draft_mode
     }
 
     /// Attach a VerbConfigIndex for sentence generation and confirm policies.
@@ -927,6 +958,7 @@ impl ReplOrchestratorV2 {
                     session_feedback: Some(session.build_session_feedback(false)),
                     narration: None,
                     trace_id: None,
+                    acp_dag_semantic: None,
                 };
                 failed_response = Some(response);
             }
@@ -958,6 +990,72 @@ impl ReplOrchestratorV2 {
     }
 
     /// Process user input and return a response.
+    /// R8 single-path unification §13.5 (2026-05-11): ACP-aware ingress
+    /// for HTTP callers that already hold an `Arc<Self>`.
+    ///
+    /// This is the canonical entry point from `session_input`. It tries
+    /// the ACP DAG semantic resolution first (`Message` inputs only) —
+    /// state-independent, Slice 1 pack-bound utterances bind regardless
+    /// of current REPL state. On no match, falls through to the standard
+    /// `process()`.
+    ///
+    /// Tests and other in-process callers without an `Arc` continue to
+    /// use `process()` directly; they don't exercise the ACP path. The
+    /// source-scan invariant in `gate_e_single_path_invariant.rs`
+    /// requires that the resolver call site live in this module — this
+    /// method (not `session_input`) is the single ingress for the ACP
+    /// decision.
+    pub async fn process_with_acp(
+        self: &std::sync::Arc<Self>,
+        session_id: Uuid,
+        input: UserInputV2,
+    ) -> Result<ReplResponseV2, OrchestratorError> {
+        // ACP runs BEFORE the sessions write lock acquired by `process()`
+        // to avoid deadlocking against the lookups inside the ACP route
+        // helper (`get_session`, `record_external_chat_exchange`,
+        // `session_feedback` — all of which take read/write locks).
+        //
+        // Phase A transitional shape: the lifted route helper returns a
+        // pre-built `ChatResponse`. We stash it on `ReplResponseV2.
+        // prebuilt_chat_response` so the response adapter passes it
+        // through unchanged. Phase B replaces this with typed-only
+        // projection through `acp_dag_semantic` + `AcpRouteMetadata`.
+        if let UserInputV2::Message { ref content } = input {
+            if let Some(bundle) = crate::api::agent_routes::try_route_supported_acp_prompt(
+                self,
+                session_id,
+                content,
+            )
+            .await
+            {
+                let sessions = self.sessions.read().await;
+                let state = sessions
+                    .get(&session_id)
+                    .map(|s| s.state.clone())
+                    .unwrap_or(ReplStateV2::RunbookEditing);
+                drop(sessions);
+                let dsl_source = bundle.dsl.as_ref().and_then(|d| d.source.clone());
+                let session_feedback_typed = bundle
+                    .session_feedback
+                    .as_ref()
+                    .and_then(|v| serde_json::from_value(v.clone()).ok());
+                return Ok(ReplResponseV2 {
+                    state,
+                    kind: ReplResponseKindV2::AcpResolved { dsl: dsl_source },
+                    message: bundle.message,
+                    runbook_summary: None,
+                    step_count: 0,
+                    session_feedback: session_feedback_typed,
+                    narration: None,
+                    trace_id: None,
+                    acp_dag_semantic: Some(bundle.resolution),
+                });
+            }
+        }
+
+        self.process(session_id, input).await
+    }
+
     pub async fn process(
         &self,
         session_id: Uuid,
@@ -1685,6 +1783,7 @@ impl ReplOrchestratorV2 {
                     session_feedback: Some(session.build_session_feedback(false)),
                     narration: None,
                     trace_id: None,
+                    acp_dag_semantic: None,
                 }
             }
             _ => self.invalid_input(session, "Please select a scope first."),
@@ -1756,6 +1855,7 @@ impl ReplOrchestratorV2 {
                 session_feedback: Some(session.build_session_feedback(false)),
                 narration: None,
                 trace_id: None,
+                acp_dag_semantic: None,
             };
         }
 
@@ -1814,6 +1914,7 @@ impl ReplOrchestratorV2 {
             session_feedback: Some(session.build_session_feedback(false)),
             narration: None,
             trace_id: None,
+            acp_dag_semantic: None,
         }
     }
 
@@ -1917,6 +2018,7 @@ impl ReplOrchestratorV2 {
                 session_feedback: Some(session.build_session_feedback(false)),
                 narration: None,
                 trace_id: None,
+                acp_dag_semantic: None,
             };
         };
 
@@ -1966,6 +2068,7 @@ impl ReplOrchestratorV2 {
             session_feedback: Some(session.build_session_feedback(false)),
             narration: None,
             trace_id: None,
+            acp_dag_semantic: None,
         }
     }
 
@@ -2273,6 +2376,7 @@ impl ReplOrchestratorV2 {
                             session_feedback: Some(session.build_session_feedback(false)),
                             narration: None,
                             trace_id: None,
+                            acp_dag_semantic: None,
                         }
                     }
                     PackRouteOutcome::NoMatch => {
@@ -2291,6 +2395,7 @@ impl ReplOrchestratorV2 {
             session_feedback: Some(session.build_session_feedback(false)),
                     narration: None,
                     trace_id: None,
+                    acp_dag_semantic: None,
                         }
                     }
                 }
@@ -2383,6 +2488,7 @@ impl ReplOrchestratorV2 {
                             session_feedback: Some(session.build_session_feedback(false)),
                             narration: None,
                             trace_id: None,
+                            acp_dag_semantic: None,
                         };
                     }
 
@@ -2424,6 +2530,7 @@ impl ReplOrchestratorV2 {
                             session_feedback: Some(session.build_session_feedback(false)),
                             narration: None,
                             trace_id: None,
+                            acp_dag_semantic: None,
                         }
                     } else {
                         self.invalid_input(session, "Step not found.")
@@ -2444,6 +2551,7 @@ impl ReplOrchestratorV2 {
                         session_feedback: Some(session.build_session_feedback(false)),
                         narration: None,
                         trace_id: None,
+                        acp_dag_semantic: None,
                     }
                 }
                 ReplCommandV2::Disable(id) => self.handle_disable(session, id),
@@ -2486,6 +2594,7 @@ impl ReplOrchestratorV2 {
                     session_feedback: Some(session.build_session_feedback(false)),
                     narration: None,
                     trace_id: None,
+                    acp_dag_semantic: None,
                 }
             }
             UserInputV2::Command {
@@ -2550,6 +2659,7 @@ impl ReplOrchestratorV2 {
                         session_feedback: Some(session.build_session_feedback(false)),
                         narration: None,
                         trace_id: None,
+                        acp_dag_semantic: None,
                     }
                 } else {
                     self.invalid_input(session, "No sentence to confirm.")
@@ -2580,6 +2690,7 @@ impl ReplOrchestratorV2 {
                     session_feedback: Some(session.build_session_feedback(false)),
                     narration: None,
                     trace_id: None,
+                    acp_dag_semantic: None,
                 }
             }
             _ => self.invalid_input(session, "Please confirm or reject the proposed step."),
@@ -2620,6 +2731,7 @@ impl ReplOrchestratorV2 {
                             session_feedback: Some(session.build_session_feedback(false)),
                             narration: None,
                             trace_id: None,
+                            acp_dag_semantic: None,
                         }
                     } else {
                         self.invalid_input(session, "Step not found.")
@@ -2640,6 +2752,7 @@ impl ReplOrchestratorV2 {
                         session_feedback: Some(session.build_session_feedback(false)),
                         narration: None,
                         trace_id: None,
+                        acp_dag_semantic: None,
                     }
                 }
                 ReplCommandV2::Disable(id) => self.handle_disable(session, id),
@@ -2755,6 +2868,7 @@ impl ReplOrchestratorV2 {
             session_feedback: Some(session.build_session_feedback(false)),
             narration: None,
             trace_id: None,
+            acp_dag_semantic: None,
         }
     }
 
@@ -2954,6 +3068,7 @@ impl ReplOrchestratorV2 {
             session_feedback: Some(session.build_session_feedback(false)),
             narration: None,
             trace_id: None,
+            acp_dag_semantic: None,
         }
     }
 
@@ -2985,6 +3100,7 @@ impl ReplOrchestratorV2 {
             session_feedback: Some(session.build_session_feedback(false)),
             narration: None,
             trace_id: None,
+            acp_dag_semantic: None,
         }
     }
 
@@ -3172,6 +3288,7 @@ impl ReplOrchestratorV2 {
             session_feedback: Some(session.build_session_feedback(false)),
             narration: None,
             trace_id: None,
+            acp_dag_semantic: None,
         }
     }
 
@@ -3223,6 +3340,7 @@ impl ReplOrchestratorV2 {
                 session_feedback: Some(session.build_session_feedback(false)),
                 narration: None,
                 trace_id: None,
+                acp_dag_semantic: None,
             });
         }
 
@@ -3289,6 +3407,7 @@ impl ReplOrchestratorV2 {
                 session_feedback: Some(session.build_session_feedback(false)),
                 narration: None,
                 trace_id: None,
+                acp_dag_semantic: None,
             });
         }
 
@@ -3316,6 +3435,7 @@ impl ReplOrchestratorV2 {
             session_feedback: Some(session.build_session_feedback(false)),
             narration: None,
             trace_id: None,
+            acp_dag_semantic: None,
         })
     }
 
@@ -3345,6 +3465,7 @@ impl ReplOrchestratorV2 {
             session_feedback: Some(session.build_session_feedback(false)),
             narration: None,
             trace_id: None,
+            acp_dag_semantic: None,
         }
     }
 
@@ -3471,6 +3592,7 @@ impl ReplOrchestratorV2 {
                     session_feedback: Some(session.build_session_feedback(false)),
                     narration: None,
                     trace_id: None,
+                    acp_dag_semantic: None,
                 }
             }
 
@@ -3496,6 +3618,7 @@ impl ReplOrchestratorV2 {
             session_feedback: Some(session.build_session_feedback(false)),
                     narration: None,
                     trace_id: None,
+                    acp_dag_semantic: None,
                 }
             }
 
@@ -3523,6 +3646,7 @@ impl ReplOrchestratorV2 {
                     session_feedback: Some(session.build_session_feedback(false)),
                     narration: None,
                     trace_id: None,
+                    acp_dag_semantic: None,
                 }
             }
 
@@ -3740,6 +3864,7 @@ impl ReplOrchestratorV2 {
                 session_feedback: Some(session.build_session_feedback(false)),
                 narration: None,
                 trace_id: None,
+                acp_dag_semantic: None,
             }
         } else {
             ReplResponseV2 {
@@ -3755,6 +3880,7 @@ impl ReplOrchestratorV2 {
                 session_feedback: Some(session.build_session_feedback(false)),
                 narration: None,
                 trace_id: None,
+                acp_dag_semantic: None,
             }
         }
     }
@@ -3875,6 +4001,7 @@ impl ReplOrchestratorV2 {
                     session_feedback: Some(session.build_session_feedback(false)),
                     narration: None,
                     trace_id: None,
+                    acp_dag_semantic: None,
                 }
             }
             FastCommand::DropStep(n) => {
@@ -3900,6 +4027,7 @@ impl ReplOrchestratorV2 {
                                 session_feedback: Some(session.build_session_feedback(false)),
                                 narration: None,
                                 trace_id: None,
+                                acp_dag_semantic: None,
                             }
                         } else {
                             self.invalid_input(session, &format!("Could not remove step {}.", n))
@@ -3935,6 +4063,7 @@ impl ReplOrchestratorV2 {
                     session_feedback: Some(session.build_session_feedback(false)),
                     narration: None,
                     trace_id: None,
+                    acp_dag_semantic: None,
                 }
             }
             FastCommand::Options => {
@@ -3954,6 +4083,7 @@ impl ReplOrchestratorV2 {
                     session_feedback: Some(session.build_session_feedback(false)),
                     narration: None,
                     trace_id: None,
+                    acp_dag_semantic: None,
                 }
             }
             FastCommand::SwitchJourney => {
@@ -3971,6 +4101,7 @@ impl ReplOrchestratorV2 {
                     session_feedback: Some(session.build_session_feedback(false)),
                     narration: None,
                     trace_id: None,
+                    acp_dag_semantic: None,
                 }
             }
             FastCommand::Cancel => self.handle_cancel(session),
@@ -3997,6 +4128,7 @@ impl ReplOrchestratorV2 {
                     session_feedback: Some(session.build_session_feedback(false)),
                     narration: None,
                     trace_id: None,
+                    acp_dag_semantic: None,
                 }
             }
             FastCommand::Help => self.handle_help(session),
@@ -4120,6 +4252,7 @@ impl ReplOrchestratorV2 {
             session_feedback: Some(session.build_session_feedback(false)),
             narration: Some(narration),
             trace_id: None,
+            acp_dag_semantic: None,
         })
     }
 
@@ -4245,6 +4378,7 @@ impl ReplOrchestratorV2 {
                     session_feedback: Some(session.build_session_feedback(false)),
                     narration: None,
                     trace_id: None,
+                    acp_dag_semantic: None,
                 };
             }
 
@@ -4273,6 +4407,7 @@ impl ReplOrchestratorV2 {
                 session_feedback: Some(session.build_session_feedback(false)),
                 narration: None,
                 trace_id: None,
+                acp_dag_semantic: None,
             };
         }
 
@@ -4301,6 +4436,7 @@ impl ReplOrchestratorV2 {
             session_feedback: Some(session.build_session_feedback(false)),
             narration: None,
             trace_id: None,
+            acp_dag_semantic: None,
         };
         session.last_proposal_set = Some(proposal_set);
         response
@@ -4345,6 +4481,7 @@ impl ReplOrchestratorV2 {
                     session_feedback: Some(session.build_session_feedback(false)),
                     narration: None,
                     trace_id: None,
+                    acp_dag_semantic: None,
                 }
             }
             None => self.invalid_input(session, "Proposal not found. Please try again."),
@@ -4808,6 +4945,7 @@ impl ReplOrchestratorV2 {
                             session_feedback: Some(session.build_session_feedback(false)),
                             narration: None,
                             trace_id: None,
+                            acp_dag_semantic: None,
                         };
                     }
                     ClarificationOutcome::Complete => {
@@ -4881,6 +5019,7 @@ impl ReplOrchestratorV2 {
                         session_feedback: Some(session.build_session_feedback(false)),
                         narration: None,
                         trace_id: None,
+                        acp_dag_semantic: None,
                     };
                 }
 
@@ -4901,6 +5040,7 @@ impl ReplOrchestratorV2 {
                     session_feedback: Some(session.build_session_feedback(false)),
                     narration: None,
                     trace_id: None,
+                    acp_dag_semantic: None,
                 }
             }
 
@@ -4986,6 +5126,7 @@ impl ReplOrchestratorV2 {
                     session_feedback: Some(session.build_session_feedback(false)),
                     narration: None,
                     trace_id: None,
+                    acp_dag_semantic: None,
                 }
             }
 
@@ -5052,6 +5193,7 @@ impl ReplOrchestratorV2 {
                     session_feedback: Some(session.build_session_feedback(false)),
                     narration: None,
                     trace_id: None,
+                    acp_dag_semantic: None,
                 }
             }
 
@@ -5196,6 +5338,7 @@ impl ReplOrchestratorV2 {
                         session_feedback: Some(session.build_session_feedback(false)),
                         narration: None,
                         trace_id: None,
+                        acp_dag_semantic: None,
                     };
                 }
 
@@ -5216,6 +5359,7 @@ impl ReplOrchestratorV2 {
                     session_feedback: Some(session.build_session_feedback(false)),
                     narration: None,
                     trace_id: None,
+                    acp_dag_semantic: None,
                 }
             }
 
@@ -5264,6 +5408,7 @@ impl ReplOrchestratorV2 {
                     session_feedback: Some(session.build_session_feedback(false)),
                     narration: None,
                     trace_id: None,
+                    acp_dag_semantic: None,
                 }
             }
 
@@ -5298,6 +5443,7 @@ impl ReplOrchestratorV2 {
                     session_feedback: Some(session.build_session_feedback(false)),
                     narration: None,
                     trace_id: None,
+                    acp_dag_semantic: None,
                 }
             }
 
@@ -5358,6 +5504,7 @@ impl ReplOrchestratorV2 {
             session_feedback: Some(session.build_session_feedback(false)),
             narration: None,
             trace_id: None,
+            acp_dag_semantic: None,
         }
     }
 
@@ -5385,6 +5532,7 @@ impl ReplOrchestratorV2 {
                     session_feedback: Some(session.build_session_feedback(false)),
                     narration: None,
                     trace_id: None,
+                    acp_dag_semantic: None,
                 };
             }
         };
@@ -5475,6 +5623,7 @@ impl ReplOrchestratorV2 {
                     session_feedback: Some(session.build_session_feedback(false)),
                     narration: None,
                     trace_id: None,
+                    acp_dag_semantic: None,
                 }
             }
             Err(e) => ReplResponseV2 {
@@ -5489,6 +5638,7 @@ impl ReplOrchestratorV2 {
                 session_feedback: Some(session.build_session_feedback(false)),
                 narration: None,
                 trace_id: None,
+                acp_dag_semantic: None,
             },
         }
     }
@@ -5577,6 +5727,7 @@ impl ReplOrchestratorV2 {
             session_feedback: Some(session.build_session_feedback(false)),
             narration: None,
             trace_id: None,
+            acp_dag_semantic: None,
         }
     }
 
@@ -5605,6 +5756,7 @@ impl ReplOrchestratorV2 {
             session_feedback: Some(session.build_session_feedback(false)),
             narration: None,
             trace_id: None,
+            acp_dag_semantic: None,
         }
     }
 
@@ -5627,6 +5779,7 @@ impl ReplOrchestratorV2 {
                 session_feedback: Some(session.build_session_feedback(false)),
                 narration: None,
                 trace_id: None,
+                acp_dag_semantic: None,
             }
         } else {
             self.invalid_input(session, "Nothing to undo.")
@@ -5651,6 +5804,7 @@ impl ReplOrchestratorV2 {
                 session_feedback: Some(session.build_session_feedback(false)),
                 narration: None,
                 trace_id: None,
+                acp_dag_semantic: None,
             }
         } else {
             self.invalid_input(session, "Nothing to redo.")
@@ -5673,6 +5827,7 @@ impl ReplOrchestratorV2 {
             session_feedback: Some(session.build_session_feedback(false)),
             narration: None,
             trace_id: None,
+            acp_dag_semantic: None,
         }
     }
 
@@ -5722,6 +5877,7 @@ impl ReplOrchestratorV2 {
             session_feedback: Some(session.build_session_feedback(false)),
             narration: None,
             trace_id: None,
+            acp_dag_semantic: None,
         }
     }
 
@@ -5748,6 +5904,7 @@ impl ReplOrchestratorV2 {
             session_feedback: Some(session.build_session_feedback(false)),
             narration: None,
             trace_id: None,
+            acp_dag_semantic: None,
         }
     }
 
@@ -5767,6 +5924,7 @@ impl ReplOrchestratorV2 {
                 session_feedback: Some(session.build_session_feedback(false)),
                 narration: None,
                 trace_id: None,
+                acp_dag_semantic: None,
             }
         } else {
             self.invalid_input(session, "Step not found or already disabled.")
@@ -5789,6 +5947,7 @@ impl ReplOrchestratorV2 {
                 session_feedback: Some(session.build_session_feedback(false)),
                 narration: None,
                 trace_id: None,
+                acp_dag_semantic: None,
             }
         } else {
             self.invalid_input(session, "Step not found or not disabled.")
@@ -5817,6 +5976,7 @@ impl ReplOrchestratorV2 {
                     session_feedback: Some(session.build_session_feedback(false)),
                     narration: None,
                     trace_id: None,
+                    acp_dag_semantic: None,
                 }
             }
             None => self.invalid_input(session, "Step not found."),
@@ -5866,6 +6026,7 @@ impl ReplOrchestratorV2 {
                     session_feedback: Some(session.build_session_feedback(false)),
                     narration: None,
                     trace_id: None,
+                    acp_dag_semantic: None,
                 };
             }
         }
@@ -6436,6 +6597,7 @@ impl ReplOrchestratorV2 {
                 session_feedback: Some(session.build_session_feedback(false)),
                 narration: None,
                 trace_id: None,
+                acp_dag_semantic: None,
             }
         } else {
             // All entries processed — back to editing.
@@ -6534,6 +6696,7 @@ impl ReplOrchestratorV2 {
                 session_feedback: Some(session.build_session_feedback(false)),
                 narration: None,
                 trace_id: None,
+                acp_dag_semantic: None,
             }
         }
     }
@@ -7225,6 +7388,7 @@ impl ReplOrchestratorV2 {
                 session_feedback: Some(session.build_session_feedback(false)),
                 narration: None,
                 trace_id: None,
+                acp_dag_semantic: None,
             }),
             crate::runbook::OrchestratorResponse::ConstraintViolation(v) => {
                 let msg = format!("Pack constraint violation: {}", v.explanation,);
@@ -7240,6 +7404,7 @@ impl ReplOrchestratorV2 {
                     session_feedback: Some(session.build_session_feedback(false)),
                     narration: None,
                     trace_id: None,
+                    acp_dag_semantic: None,
                 })
             }
             crate::runbook::OrchestratorResponse::CompilationError(e) => {
@@ -7256,6 +7421,7 @@ impl ReplOrchestratorV2 {
                     session_feedback: Some(session.build_session_feedback(false)),
                     narration: None,
                     trace_id: None,
+                    acp_dag_semantic: None,
                 })
             }
         }
@@ -7305,6 +7471,7 @@ impl ReplOrchestratorV2 {
             session_feedback: Some(session.build_session_feedback(false)),
             narration: None,
             trace_id: None,
+            acp_dag_semantic: None,
         }
     }
 
@@ -7519,7 +7686,11 @@ fn update_repl_trace_lineage(
         | ReplResponseKindV2::RunbookSummary { .. }
         | ReplResponseKindV2::Info { .. }
         | ReplResponseKindV2::Prompt { .. }
-        | ReplResponseKindV2::Error { .. } => None,
+        | ReplResponseKindV2::Error { .. }
+        // R8 single-path unification: ACP-resolved short-circuit is a
+        // side-channel response that doesn't await user follow-up on
+        // the trace ring.
+        | ReplResponseKindV2::AcpResolved { .. } => None,
     };
 }
 
@@ -7554,7 +7725,10 @@ fn classify_repl_trace_outcome(response: &ReplResponseV2) -> crate::traceability
         | ReplResponseKindV2::StepProposals { .. }
         | ReplResponseKindV2::Info { .. }
         | ReplResponseKindV2::Prompt { .. }
-        | ReplResponseKindV2::RunbookSummary { .. } => {
+        | ReplResponseKindV2::RunbookSummary { .. }
+        // R8 single-path unification: ACP-resolved is a side-channel
+        // proposal that may invite Sage clarification on the next turn.
+        | ReplResponseKindV2::AcpResolved { .. } => {
             crate::traceability::TraceOutcome::ClarificationTriggered
         }
     }
@@ -9357,6 +9531,7 @@ definition_of_done:
             session_feedback: Some(session.build_session_feedback(false)),
             narration: None,
             trace_id: None,
+            acp_dag_semantic: None,
         };
 
         assert_eq!(
@@ -9417,6 +9592,7 @@ definition_of_done:
             session_feedback: Some(session.build_session_feedback(false)),
             narration: None,
             trace_id: None,
+            acp_dag_semantic: None,
         };
 
         assert_eq!(
@@ -9544,6 +9720,7 @@ definition_of_done:
             session_feedback: Some(session.build_session_feedback(false)),
             narration: None,
             trace_id: None,
+            acp_dag_semantic: None,
         };
 
         let payload = build_repl_phase4_evaluation(

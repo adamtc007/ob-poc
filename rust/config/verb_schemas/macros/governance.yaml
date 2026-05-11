@@ -210,6 +210,16 @@ governance.reconcile-registry:
 
 structure.product-suite-custody-fa-ta:
   kind: macro
+  plan-kind: composite_sequence
+  lifecycle-state: active
+  requires-states: [STRUCTURE_SETUP, READY_FOR_KYC]
+  precondition-checks: ["requires_scope:cbu"]
+  state-effect: transition
+  side-effects: state_write
+  transition-args:
+    entity_id_arg: cbu
+    target_workspace: cbu
+    target_slot: products
 
   ui:
     label: "Standard Product Suite (Custody + FA + TA)"
@@ -255,6 +265,16 @@ structure.product-suite-custody-fa-ta:
 
 structure.product-suite-full:
   kind: macro
+  plan-kind: composite_sequence
+  lifecycle-state: active
+  requires-states: [STRUCTURE_SETUP, READY_FOR_KYC]
+  precondition-checks: ["requires_scope:cbu"]
+  state-effect: transition
+  side-effects: state_write
+  transition-args:
+    entity_id_arg: cbu
+    target_workspace: cbu
+    target_slot: products
 
   ui:
     label: "Full Product Suite"
@@ -308,6 +328,16 @@ structure.product-suite-full:
 
 structure.remove-all-products:
   kind: macro
+  plan-kind: composite_sequence
+  lifecycle-state: active
+  requires-states: [STRUCTURE_SETUP, READY_FOR_KYC]
+  precondition-checks: ["requires_scope:cbu"]
+  state-effect: transition
+  side-effects: state_write
+  transition-args:
+    entity_id_arg: cbu
+    target_workspace: cbu
+    target_slot: products
 
   ui:
     label: "Remove All Products"

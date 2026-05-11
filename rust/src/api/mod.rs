@@ -97,7 +97,6 @@ pub mod catalogue_routes;
 pub mod stewardship_routes;
 
 pub mod acp_dsl_dag_coverage;
-pub mod acp_state_anchor;
 pub mod agent_enrichment;
 pub mod repl_routes_v2;
 pub mod response_adapter;

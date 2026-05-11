@@ -1224,11 +1224,18 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             ob_poc::repl::session_repository::SessionRepositoryV2::new(pool.clone()),
         );
 
+        // R8 §13.1 (2026-05-11): read ACP session-input draft mode from env
+        // once at orchestrator construction. Replaces the per-request env
+        // read previously in `agent_routes::acp_session_input_draft_mode()`.
+        let acp_draft_mode =
+            ob_poc::acp_session_input_draft_mode::AcpSessionInputDraftMode::from_env();
+
         let mut orchestrator = ReplOrchestratorV2::new(pack_router, legacy_executor)
             .with_pool(pool.clone())
             .with_session_repository(session_repository)
             .with_runbook_store(runbook_store)
-            .with_orchestrated_verbs(orchestrated_verbs);
+            .with_orchestrated_verbs(orchestrated_verbs)
+            .with_acp_draft_mode(acp_draft_mode);
 
         // v1.2 Tranche 1 T1.F (DoD item 13): wire GatePipeline default-on
         // in production. The runtime gate (GateChecker for Mode A blocking,

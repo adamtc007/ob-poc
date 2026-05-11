@@ -686,6 +686,58 @@ Verified smoke behavior on the live `ob-poc-web` path:
 
 ## 5. Core Domain Model
 
+### 5.0 What "macro" means in this system
+
+> **Macros are governed recipes: pack-scoped, hashable, versioned multi-step
+> domain patterns that Sage may discover and bind, but which the compiler
+> must expand into ordinary DSL atomics before any REPL execution occurs.**
+
+This is the load-bearing definition of "macro" in ob-poc's SemOS. The
+word means something very different in adjacent ecosystems:
+
+| Ecosystem | "Macro" means |
+|---|---|
+| C/C++ preprocessor | Textual substitution at compile time |
+| Rust `macro_rules!` / proc-macros | Hygienic AST transformation at compile time |
+| Lisp / Scheme | Symbolic code rewriting via the macro expander |
+| **ob-poc SemOS** | **Governed multi-step domain recipe; first-class registry entity** |
+
+A SemOS macro is:
+
+- **A first-class registry entity**, alongside verbs, attribute defs,
+  entity-type defs, etc. It has identity (FQN), a content hash, a
+  lifecycle FSM (`draft → active → deprecated → retired`), a pack-scope
+  governance boundary, and an audit trail.
+- **A multi-step recipe.** It declares a slot contract, preconditions,
+  ordered expansion, expected FSM transitions, refusal conditions,
+  pending-question conditions, and a redacted expansion summary that
+  the agent reads.
+- **A planning + compilation surface, not an execution surface.** ACP
+  exposes macros to Sage as peers to verbs at the dispatch decision
+  point. The compiler expands a selected macro into an ordered DSL
+  atomic sequence; the REPL executes only those atomics. **Macros have
+  no mutation authority after expansion** — see the two invariants in
+  `todo/acp-pack-context-parity-gate-a/r1-schema-parity-adr.md`.
+
+The three-tier ob-poc planning hierarchy:
+
+```text
+DAG pack    — workspace boundary, governance, allowed verbs, neighbours
+  └─ Macro  — bounded outcome pattern (this entity)
+       └─ Verb — atomic DSL primitive (one read/mutation shape)
+```
+
+The pack governs the macro; the macro governs the verb sequence. Authority
+flows one direction; no tier may override a higher tier's gate.
+
+The reason the macro tier exists at all: without it, the agent operates
+at the verb floor (one mutation at a time) and has to invent multi-step
+arcs itself. Macros catalogue expert domain knowledge as registered,
+hashed, versioned objects that the agent picks as an atomic option.
+This reduces hallucination surface and lets ACP project expert recipes
+without leaking implementation detail (the full ordered expansion stays
+SemOS-internal; only a redacted summary is projected).
+
 ### 13 Object Types
 
 All 13 types share a single table (`sem_reg.snapshots`) with type-specific bodies stored as JSONB:

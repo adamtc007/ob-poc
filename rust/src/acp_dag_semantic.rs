@@ -6,7 +6,7 @@
 
 use dsl_core::config::loader::ConfigLoader;
 use dsl_core::config::types::{HarmClass, VerbConfig};
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::Path;
 use std::sync::OnceLock;
@@ -27,16 +27,30 @@ const MATCH_THRESHOLD: f32 = 0.42;
 const AMBIGUITY_MARGIN: f32 = 0.08;
 const PACK_MATCH_THRESHOLD: f32 = 0.48;
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AcpDagSemanticResolution {
     pub status: AcpDagSemanticStatus,
     pub utterance: String,
+    /// **R3 route trace v2:** kind-agnostic winner. Replaces the v1
+    /// `selected_verb` field — the dispatch kind (verb vs macro vs
+    /// pack template) is carried inline so consumers don't have to
+    /// inspect three fields to know what was selected.
+    pub selected_dispatch: Option<AcpDagSemanticSelectedDispatch>,
+    /// Legacy field. Retained as a thin alias of
+    /// `selected_dispatch.fqn` for the migration window only. New
+    /// consumers MUST read `selected_dispatch`.
     pub selected_verb: Option<String>,
     pub selected_domain: Option<String>,
     pub selected_description: Option<String>,
     pub pack: Option<AcpDagSemanticPackContext>,
     pub selected_template: Option<AcpDagSemanticPackTemplate>,
+    /// R3: candidate set including the winner. Carries `dispatch_kind`
+    /// + `confidence_band` per v0.5 §17.3.
     pub top_candidates: Vec<AcpDagSemanticCandidate>,
+    /// **R3 route trace v2:** rejected candidates with diagnostic codes
+    /// per v0.5 §17.3. Lets HITL reviewers see *why* Sage picked X over
+    /// Y from the persisted trace alone.
+    pub rejected_candidates: Vec<AcpDagSemanticRejectedCandidate>,
     pub draft_dsl: Option<String>,
     pub workflow_plan: Option<AcpDagSemanticWorkflowPlan>,
     pub missing_required_args: Vec<String>,
@@ -49,9 +63,726 @@ pub struct AcpDagSemanticResolution {
     pub envelope_trace: Option<AcpDagSemanticEnvelopeTrace>,
     pub runtime_trace: Option<AcpDagSemanticRuntimeTrace>,
     pub diagnostics: Vec<AcpDagSemanticDiagnostic>,
+    /// **R8 single-path unification (2026-05-11):** ACP route metadata.
+    /// Populated by the orchestrator when ACP resolution fires as the
+    /// first step of `process()`. Carries the same route/latency/draft-
+    /// source fields that the HTTP envelope used to attach via
+    /// `annotate_acp_session_input_envelope`. The response adapter reads
+    /// these into the flat `acp_trace` summary so the chat UI sees the
+    /// same keys post-R8.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub route_metadata: Option<AcpRouteMetadata>,
+
+    /// **R8 Phase B.7 (2026-05-11):** typed state-anchor provider trace.
+    /// Populated when the ACP flow routed through a language-pack
+    /// provider (KYC, deal). Carries the same fields the HTTP envelope
+    /// previously produced under `result.observability.stateAnchorProvider`
+    /// and `envelope.state_anchor_provider`, projected into the chat
+    /// UI's flat `acp_trace.state_anchor_provider` sub-object.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub state_anchor_provider: Option<AcpStateAnchorProvider>,
+
+    /// **R8 Phase B.7 (2026-05-11):** observability summary (typed
+    /// mirror of the HTTP envelope's `result.observability.conversationEfficiency`
+    /// block). Phase A's prebuilt path read these from the JSON envelope;
+    /// Phase B.7 lifts them onto the typed resolution.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub observability: Option<AcpObservabilitySummary>,
+
+    /// **R8 Phase B.7 (2026-05-11):** override status when the
+    /// language-pack flow produced an outcome the resolver's three-
+    /// variant enum (`Refused`/`Ambiguous`/`Matched`) doesn't cover.
+    /// Today's HTTP envelope can emit `dry_run_validated` from the
+    /// deal language pack dry-run flow; that's stored here so
+    /// `acp_chat_trace_summary_typed` can override the default status
+    /// derivation.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub override_status: Option<String>,
 }
 
-#[derive(Debug, Clone, Serialize)]
+/// R8 Phase B.7 (2026-05-11): typed state-anchor provider trace.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AcpStateAnchorProvider {
+    pub provider_selected: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub provider_id: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub task: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub language_pack_boundary: Option<String>,
+    pub status: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub state_anchor_source: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub subject_id: Option<String>,
+    #[serde(default)]
+    pub supported_tasks: Vec<String>,
+    #[serde(default)]
+    pub needed: Vec<String>,
+    pub language_pack_generated: bool,
+    pub dry_run_valid: bool,
+    pub structured_outcome: bool,
+    pub no_mutation_authority: bool,
+}
+
+/// R8 Phase B.7 (2026-05-11): observability summary for the chat-trace
+/// projection. Sourced from the HTTP envelope's
+/// `result.observability.conversationEfficiency` block today; future
+/// slices will compute these typed at the orchestrator boundary.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AcpObservabilitySummary {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub structured_failure_mode: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub prose_only_failure: Option<bool>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub revision_count: Option<u64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub pending_user_turn_required: Option<bool>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub estimated_user_repair_turns_avoided: Option<u64>,
+    /// Language-pack-produced transition reference (e.g.
+    /// `deal.prospect-to-qualifying`). Pre-R8 came from
+    /// `result.traceProjection.transitionRef` or
+    /// `result.output.dry_run.transition_ref` in the HTTP envelope.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub transition_ref: Option<String>,
+}
+
+impl AcpDagSemanticResolution {
+    /// R8 single-path unification (2026-05-11): typed equivalent of the
+    /// HTTP-side `acp_valid_dag_semantic_draft_dsl(envelope)` predicate.
+    ///
+    /// Returns the draft DSL string only when the resolution is a
+    /// `dag_semantic_proposal` (Matched status + draft_dsl present +
+    /// no missing required args + no unresolved refs). Mirrors the
+    /// `first_pass_valid_dsl_draft` predicate at
+    /// `acp_protocol.rs::dag_semantic_outgoing`.
+    pub fn first_pass_valid_draft_dsl(&self) -> Option<&str> {
+        if self.status == AcpDagSemanticStatus::Matched
+            && self.draft_dsl.is_some()
+            && self.missing_required_args.is_empty()
+            && self.unresolved_refs.is_empty()
+        {
+            self.draft_dsl.as_deref()
+        } else {
+            None
+        }
+    }
+}
+
+/// R8 Phase B (2026-05-11): typed mirror of the chat-UI `acp_trace`
+/// summary previously built from a JSON envelope in
+/// `agent_routes::acp_chat_trace_summary`. Reads typed fields off the
+/// resolution + `route_metadata` and produces the same flat key shape
+/// the frontend's `AcpTraceCard` expects.
+///
+/// Fields that today's HTTP path computes from HTTP-only envelope
+/// blocks (`traceProjection.*`, `observability.*`) are emitted as
+/// `null` until the orchestrator computes typed equivalents. The chat
+/// UI treats these as optional.
+pub fn acp_chat_trace_summary_typed(resolution: &AcpDagSemanticResolution) -> serde_json::Value {
+    // R8 Phase B.7: prefer the override status when the language-pack
+    // flow produced an outcome the resolver's three-variant enum
+    // doesn't cover (e.g. `dry_run_validated` from the deal pack).
+    let status_str: String = if let Some(ref override_status) = resolution.override_status {
+        override_status.clone()
+    } else {
+        match resolution.status {
+            AcpDagSemanticStatus::Refused => "structured_refusal".to_string(),
+            AcpDagSemanticStatus::Ambiguous => "pending_question".to_string(),
+            AcpDagSemanticStatus::Matched => {
+                if resolution.first_pass_valid_draft_dsl().is_some() {
+                    "dag_semantic_proposal".to_string()
+                } else {
+                    "pending_question".to_string()
+                }
+            }
+        }
+    };
+
+    let outcome_layer = if status_str == "dry_run_validated" {
+        Some("language_loop")
+    } else {
+        match resolution.status {
+            AcpDagSemanticStatus::Refused => Some("structured_refusal"),
+            AcpDagSemanticStatus::Ambiguous => Some("pending_question"),
+            AcpDagSemanticStatus::Matched => Some("language_loop"),
+        }
+    };
+
+    let route_metadata = resolution.route_metadata.as_ref();
+
+    let refusal_code = if resolution.status == AcpDagSemanticStatus::Refused {
+        resolution
+            .diagnostics
+            .first()
+            .map(|d| d.error_code.clone())
+    } else {
+        None
+    };
+
+    let pending_question_code = if resolution.status == AcpDagSemanticStatus::Ambiguous
+        || (resolution.status == AcpDagSemanticStatus::Matched
+            && resolution.first_pass_valid_draft_dsl().is_none())
+    {
+        resolution
+            .diagnostics
+            .first()
+            .map(|d| d.error_code.clone())
+    } else {
+        None
+    };
+
+    let candidate_verbs: Vec<String> = resolution
+        .top_candidates
+        .iter()
+        .map(|c| c.fqn.clone())
+        .collect();
+
+    let candidate_verbs_value = if candidate_verbs.is_empty() {
+        serde_json::Value::Null
+    } else {
+        serde_json::Value::Array(
+            candidate_verbs
+                .into_iter()
+                .map(serde_json::Value::String)
+                .collect(),
+        )
+    };
+
+    let diagnostic_codes: Vec<String> = resolution
+        .diagnostics
+        .iter()
+        .map(|d| d.error_code.clone())
+        .collect();
+    let diagnostic_codes_value = if diagnostic_codes.is_empty() {
+        serde_json::Value::Null
+    } else {
+        serde_json::Value::Array(
+            diagnostic_codes
+                .into_iter()
+                .map(serde_json::Value::String)
+                .collect(),
+        )
+    };
+
+    let needed_from_user_value = if resolution.missing_required_args.is_empty() {
+        serde_json::Value::Null
+    } else {
+        serde_json::Value::Array(
+            resolution
+                .missing_required_args
+                .iter()
+                .cloned()
+                .map(serde_json::Value::String)
+                .collect(),
+        )
+    };
+
+    let pack_ref = resolution
+        .pack
+        .as_ref()
+        .map(|p| format!("{}@{}", p.pack_id, p.pack_version));
+
+    let workflow_plan_needed_from_user = resolution
+        .workflow_plan
+        .as_ref()
+        .map(|plan| plan.needed_from_user.clone())
+        .filter(|v| !v.is_empty());
+
+    let selected_macro_id = resolution.selected_verb.as_ref().and_then(|selected| {
+        resolution.top_candidates.iter().find_map(|c| {
+            if &c.fqn == selected
+                && c.side_effects.as_deref() == Some("macro_projection_only")
+            {
+                Some(c.fqn.clone())
+            } else {
+                None
+            }
+        })
+    });
+
+    let performance = route_metadata.map(|rm| {
+        serde_json::json!({
+            "total_ms": rm.route_latency_ms,
+            "llm_draft_ms": 0u64,
+        })
+    });
+
+    // Build via serde_json::Map to avoid the recursion limit of the
+    // `json!` macro at ~40+ keys.
+    use serde_json::{Map, Value};
+    let mut summary: Map<String, Value> = Map::new();
+    let mut put = |key: &str, value: Value| {
+        summary.insert(key.to_string(), value);
+    };
+    let opt_str = |v: Option<String>| -> Value {
+        v.map(Value::String).unwrap_or(Value::Null)
+    };
+    let opt_u64 = |v: Option<u64>| -> Value {
+        v.map(|n| Value::Number(n.into())).unwrap_or(Value::Null)
+    };
+    let opt_bool = |v: Option<bool>| -> Value { v.map(Value::Bool).unwrap_or(Value::Null) };
+
+    put("status", Value::String(status_str.clone()));
+    put("outcome", Value::String(status_str.clone()));
+    put("route", opt_str(route_metadata.map(|rm| rm.route.clone())));
+    put(
+        "provider_task",
+        opt_str(route_metadata.map(|rm| rm.provider_task.clone())),
+    );
+    put(
+        "requested_draft_source",
+        opt_str(route_metadata.map(|rm| rm.requested_draft_source.clone())),
+    );
+    put(
+        "draft_source",
+        opt_str(route_metadata.map(|rm| rm.effective_draft_source.clone())),
+    );
+    put(
+        "route_latency_ms",
+        opt_u64(route_metadata.map(|rm| rm.route_latency_ms)),
+    );
+    put(
+        "route_latency_us",
+        opt_u64(route_metadata.map(|rm| rm.route_latency_us)),
+    );
+    put("outcome_layer", opt_str(outcome_layer.map(str::to_string)));
+    put(
+        "human_summary",
+        Value::String(crate::acp_protocol::dag_semantic_human_message(resolution)),
+    );
+    put("prompt_context_variant", Value::Null);
+    put(
+        "transition_ref",
+        opt_str(
+            resolution
+                .observability
+                .as_ref()
+                .and_then(|o| o.transition_ref.clone())
+                .or_else(|| {
+                    resolution
+                        .workflow_plan
+                        .as_ref()
+                        .map(|p| p.plan_id.clone())
+                })
+                .or_else(|| {
+                    resolution
+                        .selected_template
+                        .as_ref()
+                        .map(|t| t.template_id.clone())
+                }),
+        ),
+    );
+    put("semantic_diff_uri", Value::Null);
+    put("refusal_code", opt_str(refusal_code));
+    put("pending_question_code", opt_str(pending_question_code));
+    put("selected_verb", opt_str(resolution.selected_verb.clone()));
+    put(
+        "selected_dispatch_kind",
+        resolution
+            .selected_dispatch
+            .as_ref()
+            .map(|d| serde_json::to_value(d.dispatch_kind).unwrap_or(Value::Null))
+            .unwrap_or(Value::Null),
+    );
+    put(
+        "selected_dispatch_fqn",
+        opt_str(resolution.selected_dispatch.as_ref().map(|d| d.fqn.clone())),
+    );
+    put(
+        "selected_dispatch_confidence_band",
+        resolution
+            .selected_dispatch
+            .as_ref()
+            .map(|d| serde_json::to_value(d.confidence_band).unwrap_or(Value::Null))
+            .unwrap_or(Value::Null),
+    );
+    put(
+        "rejected_candidate_count",
+        Value::Number((resolution.rejected_candidates.len() as u64).into()),
+    );
+    put(
+        "pack_id",
+        opt_str(resolution.pack.as_ref().map(|p| p.pack_id.clone())),
+    );
+    put(
+        "pack_name",
+        opt_str(resolution.pack.as_ref().map(|p| p.pack_name.clone())),
+    );
+    put("pack_ref", opt_str(pack_ref));
+    put(
+        "pack_allowed_verb_count",
+        opt_u64(resolution.pack.as_ref().map(|p| p.allowed_verb_count as u64)),
+    );
+    put("candidate_verbs", candidate_verbs_value);
+    put(
+        "workflow_plan_id",
+        opt_str(resolution.workflow_plan.as_ref().map(|p| p.plan_id.clone())),
+    );
+    put(
+        "workflow_plan_verb",
+        opt_str(resolution.workflow_plan.as_ref().map(|p| p.verb.clone())),
+    );
+    put(
+        "workflow_plan_dry_run_only",
+        opt_bool(resolution.workflow_plan.as_ref().map(|p| p.dry_run_only)),
+    );
+    put(
+        "workflow_plan_needed_from_user",
+        workflow_plan_needed_from_user
+            .map(|v| {
+                Value::Array(v.into_iter().map(Value::String).collect())
+            })
+            .unwrap_or(Value::Null),
+    );
+    put(
+        "selected_template_id",
+        opt_str(
+            resolution
+                .selected_template
+                .as_ref()
+                .map(|t| t.template_id.clone()),
+        ),
+    );
+    put(
+        "structured_failure_mode",
+        opt_str(
+            resolution
+                .observability
+                .as_ref()
+                .and_then(|o| o.structured_failure_mode.clone()),
+        ),
+    );
+    put("needed_from_user", needed_from_user_value);
+    put("diagnostic_codes", diagnostic_codes_value);
+    put(
+        "dry_run_valid",
+        Value::Bool(
+            resolution.status == AcpDagSemanticStatus::Matched
+                && resolution.first_pass_valid_draft_dsl().is_some(),
+        ),
+    );
+    put(
+        "first_pass_valid",
+        Value::Bool(resolution.first_pass_valid_draft_dsl().is_some()),
+    );
+    put(
+        "revision_count",
+        opt_u64(resolution.observability.as_ref().and_then(|o| o.revision_count)),
+    );
+    put(
+        "prose_only_failure",
+        opt_bool(
+            resolution
+                .observability
+                .as_ref()
+                .and_then(|o| o.prose_only_failure),
+        ),
+    );
+    put(
+        "pending_user_turn_required",
+        opt_bool(
+            resolution
+                .observability
+                .as_ref()
+                .and_then(|o| o.pending_user_turn_required),
+        ),
+    );
+    put(
+        "estimated_user_repair_turns_avoided",
+        opt_u64(
+            resolution
+                .observability
+                .as_ref()
+                .and_then(|o| o.estimated_user_repair_turns_avoided),
+        ),
+    );
+    put("performance", performance.unwrap_or(Value::Null));
+    put(
+        "state_anchor_provider",
+        resolution
+            .state_anchor_provider
+            .as_ref()
+            .map(|p| serde_json::to_value(p).unwrap_or(Value::Null))
+            .unwrap_or(Value::Null),
+    );
+
+    // Registry trace.
+    put(
+        "registry_schema_version",
+        opt_str(
+            resolution
+                .registry_trace
+                .as_ref()
+                .map(|t| t.schema_version.clone()),
+        ),
+    );
+    put(
+        "registry_projection_hash",
+        opt_str(
+            resolution
+                .registry_trace
+                .as_ref()
+                .map(|t| t.source_projection_hash.clone()),
+        ),
+    );
+    put(
+        "registry_verified",
+        opt_bool(resolution.registry_trace.as_ref().map(|t| t.verified)),
+    );
+
+    // Envelope trace.
+    put(
+        "envelope_schema_version",
+        opt_str(
+            resolution
+                .envelope_trace
+                .as_ref()
+                .map(|t| t.schema_version.clone()),
+        ),
+    );
+    put(
+        "envelope_hash",
+        opt_str(
+            resolution
+                .envelope_trace
+                .as_ref()
+                .map(|t| t.envelope_hash.clone()),
+        ),
+    );
+    put(
+        "envelope_pack_id",
+        opt_str(
+            resolution
+                .envelope_trace
+                .as_ref()
+                .map(|t| t.pack_id.clone()),
+        ),
+    );
+    put(
+        "projection_hash",
+        opt_str(
+            resolution
+                .envelope_trace
+                .as_ref()
+                .map(|t| t.source_projection_hash.clone())
+                .or_else(|| {
+                    resolution
+                        .registry_trace
+                        .as_ref()
+                        .map(|t| t.source_projection_hash.clone())
+                }),
+        ),
+    );
+    put(
+        "envelope_verified",
+        opt_bool(resolution.envelope_trace.as_ref().map(|t| t.verified)),
+    );
+
+    // Runtime trace.
+    put(
+        "runtime_schema_version",
+        opt_str(
+            resolution
+                .runtime_trace
+                .as_ref()
+                .map(|t| t.schema_version.clone()),
+        ),
+    );
+    put(
+        "runtime_pack_id",
+        opt_str(
+            resolution
+                .runtime_trace
+                .as_ref()
+                .map(|t| t.pack_id.clone()),
+        ),
+    );
+    put(
+        "runtime_snapshot_id",
+        opt_str(
+            resolution
+                .runtime_trace
+                .as_ref()
+                .map(|t| t.snapshot_id.clone()),
+        ),
+    );
+    put(
+        "runtime_hash",
+        opt_str(
+            resolution
+                .runtime_trace
+                .as_ref()
+                .map(|t| t.runtime_hash.clone()),
+        ),
+    );
+    put(
+        "runtime_redaction_policy",
+        opt_str(
+            resolution
+                .runtime_trace
+                .as_ref()
+                .map(|t| t.redaction_policy.clone()),
+        ),
+    );
+    put(
+        "runtime_freshness_policy",
+        opt_str(
+            resolution
+                .runtime_trace
+                .as_ref()
+                .map(|t| t.freshness_policy.clone()),
+        ),
+    );
+    put(
+        "runtime_static_envelope_hash",
+        opt_str(
+            resolution
+                .runtime_trace
+                .as_ref()
+                .map(|t| t.static_envelope_hash.clone()),
+        ),
+    );
+    put(
+        "runtime_projection_hash",
+        opt_str(
+            resolution
+                .runtime_trace
+                .as_ref()
+                .map(|t| t.projection_hash.clone()),
+        ),
+    );
+    put(
+        "runtime_verified",
+        opt_bool(resolution.runtime_trace.as_ref().map(|t| t.verified)),
+    );
+    put(
+        "runtime_redacted_count",
+        opt_u64(
+            resolution
+                .runtime_trace
+                .as_ref()
+                .map(|t| t.redacted_count as u64),
+        ),
+    );
+    put(
+        "runtime_blocked_field_codes",
+        resolution
+            .runtime_trace
+            .as_ref()
+            .map(|t| t.blocked_field_codes.clone())
+            .filter(|v| !v.is_empty())
+            .map(|v| Value::Array(v.into_iter().map(Value::String).collect()))
+            .unwrap_or(Value::Null),
+    );
+    put("selected_macro_id", opt_str(selected_macro_id));
+
+    Value::Object(summary)
+}
+
+/// R8 single-path unification (2026-05-11): route-layer metadata
+/// attached to an `AcpDagSemanticResolution` when the orchestrator
+/// resolved the ACP step.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AcpRouteMetadata {
+    /// Route discriminator. `"session_input"` for the unified session
+    /// pipeline path. Other values may appear if additional routes
+    /// adopt the typed metadata in the future.
+    pub route: String,
+    /// Provider task tag, e.g. `"kyc-case.update-status"`. Resolved
+    /// from `acp_prompt_supported_provider_task(&prompt)` or falls back
+    /// to `"dag.semantic"`.
+    pub provider_task: String,
+    /// Draft mode the orchestrator was configured to attempt.
+    pub requested_draft_source: String,
+    /// Draft mode that actually ran (may differ on LLM→deterministic
+    /// fallback).
+    pub effective_draft_source: String,
+    /// End-to-end resolution latency in microseconds.
+    pub route_latency_us: u64,
+    /// Same latency, rounded up to milliseconds. Mirrored from the
+    /// pre-R8 envelope shape so existing chat UI consumers keep the
+    /// same key.
+    pub route_latency_ms: u64,
+}
+
+/// R3 — kind-agnostic dispatch winner. Replaces `selected_verb`.
+///
+/// The agent reads `dispatch_kind` once to know whether the winner was a
+/// verb, a macro, or a pack template; all three share the same outer
+/// shape so consumers don't branch on field presence.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AcpDagSemanticSelectedDispatch {
+    pub dispatch_kind: AcpDagSemanticDispatchKind,
+    pub fqn: String,
+    pub confidence: f32,
+    pub confidence_band: AcpDagSemanticConfidenceBand,
+    pub matched_phrase: Option<String>,
+    pub description: Option<String>,
+}
+
+/// Dispatch kind discriminator for the route trace.
+///
+/// Mirrors `AcpDslAtomKind` from the envelope projection, plus a
+/// `Template` variant for pack-local workbook-plan templates that
+/// haven't yet been lifted to registry-grade macros.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum AcpDagSemanticDispatchKind {
+    Verb,
+    Macro,
+    Template,
+}
+
+/// Confidence band for human-readable diagnostics.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum AcpDagSemanticConfidenceBand {
+    /// score ≥ 0.85
+    High,
+    /// 0.60 ≤ score < 0.85
+    Medium,
+    /// 0.40 ≤ score < 0.60 — Sage may ask a clarifying question
+    Low,
+    /// score < 0.40 — refusal or pending question expected
+    BelowThreshold,
+}
+
+impl AcpDagSemanticConfidenceBand {
+    pub fn from_score(score: f32) -> Self {
+        if score >= 0.85 {
+            Self::High
+        } else if score >= 0.60 {
+            Self::Medium
+        } else if score >= 0.40 {
+            Self::Low
+        } else {
+            Self::BelowThreshold
+        }
+    }
+}
+
+/// R3 — rejected candidate with diagnostic code.
+///
+/// Carries enough information for HITL reviewers to answer "why X
+/// instead of Y" without re-running the resolver.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AcpDagSemanticRejectedCandidate {
+    pub dispatch_kind: AcpDagSemanticDispatchKind,
+    pub fqn: String,
+    pub score: f32,
+    pub confidence_band: AcpDagSemanticConfidenceBand,
+    /// Diagnostic code from the projected taxonomy: `ambiguous_pack`,
+    /// `forbidden_verb`, `missing_binding`, `unsupported_macro_tier`,
+    /// `legacy_route_bait`, `below_match_threshold`, `lost_to_higher_scorer`.
+    pub rejection_code: String,
+    /// Short human-readable rationale (audit-grade).
+    pub rejection_reason: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AcpDagSemanticRegistryTrace {
     pub schema_version: String,
     pub source_projection_hash: String,
@@ -59,7 +790,7 @@ pub struct AcpDagSemanticRegistryTrace {
     pub verified: bool,
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AcpDagSemanticEnvelopeTrace {
     pub schema_version: String,
     pub registry_schema_version: String,
@@ -72,7 +803,7 @@ pub struct AcpDagSemanticEnvelopeTrace {
     pub verified: bool,
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AcpDagSemanticRuntimeTrace {
     pub schema_version: String,
     pub pack_id: String,
@@ -87,7 +818,7 @@ pub struct AcpDagSemanticRuntimeTrace {
     pub blocked_field_codes: Vec<String>,
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AcpDagSemanticPackContext {
     pub pack_id: String,
     pub pack_name: String,
@@ -115,19 +846,19 @@ pub struct AcpDagSemanticPackContext {
     pub handoff_target: Option<String>,
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AcpDagSemanticPackRiskPolicy {
     pub require_confirm_before_execute: bool,
     pub max_steps_without_confirm: u32,
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AcpDagSemanticPackSection {
     pub title: String,
     pub verb_prefixes: Vec<String>,
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AcpDagSemanticPackQuestion {
     pub field: String,
     pub prompt: String,
@@ -137,14 +868,14 @@ pub struct AcpDagSemanticPackQuestion {
     pub ask_when: Option<String>,
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AcpDagSemanticPackTemplate {
     pub template_id: String,
     pub when_to_use: String,
     pub steps: Vec<AcpDagSemanticPackTemplateStep>,
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AcpDagSemanticPackTemplateStep {
     pub verb: String,
     pub args: BTreeMap<String, serde_json::Value>,
@@ -153,13 +884,13 @@ pub struct AcpDagSemanticPackTemplateStep {
     pub execution_mode: Option<String>,
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AcpDagSemanticPackProgressSignal {
     pub signal: String,
     pub description: String,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum AcpDagSemanticStatus {
     Matched,
@@ -167,11 +898,20 @@ pub enum AcpDagSemanticStatus {
     Refused,
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AcpDagSemanticCandidate {
-    pub verb: String,
+    /// **R3:** kind discriminator. The resolver currently only scores
+    /// verbs (this is the existing pre-R3 behaviour). Macro and template
+    /// scoring ride on R2a's `dsl_atoms` and land in a follow-up slice;
+    /// R3 ships the schema so the wire shape is stable.
+    pub dispatch_kind: AcpDagSemanticDispatchKind,
+    /// Kind-agnostic FQN (verb FQN, macro FQN, or pack template id).
+    /// Renamed from the v1 `verb` field per the kind-agnostic discipline.
+    pub fqn: String,
     pub domain: String,
     pub score: f32,
+    /// **R3:** confidence band for human-readable diagnostics.
+    pub confidence_band: AcpDagSemanticConfidenceBand,
     pub read_only: bool,
     pub harm_class: String,
     pub side_effects: Option<String>,
@@ -180,7 +920,7 @@ pub struct AcpDagSemanticCandidate {
     pub description: String,
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AcpDagSemanticDiagnostic {
     pub error_code: String,
     pub source: String,
@@ -189,7 +929,7 @@ pub struct AcpDagSemanticDiagnostic {
     pub actual: Option<String>,
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AcpDagSemanticWorkflowPlan {
     pub plan_id: String,
     pub verb: String,
@@ -207,7 +947,7 @@ pub struct AcpDagSemanticWorkflowPlan {
     pub context_requirements: Vec<String>,
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AcpDagSemanticWorkflowBinding {
     pub field: String,
     pub required: bool,
@@ -215,7 +955,7 @@ pub struct AcpDagSemanticWorkflowBinding {
     pub value: Option<String>,
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AcpDagSemanticWorkflowTransition {
     pub entity: String,
     pub from: String,
@@ -223,7 +963,7 @@ pub struct AcpDagSemanticWorkflowTransition {
     pub verb: String,
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AcpDagSemanticDictionaryProjection {
     pub grain: String,
     pub slice_rule: String,
@@ -349,15 +1089,43 @@ pub fn resolve_acp_dag_semantic_prompt(
     }
 
     let read_only = selected.as_ref().map(|row| row.read_only).unwrap_or(false);
+    let selected_fqn = selected.as_ref().map(|row| row.fqn.clone());
+    let candidates: Vec<AcpDagSemanticCandidate> =
+        scored.into_iter().map(candidate_from_scored).collect();
+    // R3: look up the winner's confidence + matched_phrase from the
+    // scored candidate set (the resolver returns a bare row from the
+    // (dis)ambiguation step; the scored entry carries score/phrase).
+    let selected_dispatch =
+        selected
+            .as_ref()
+            .map(|row| {
+                let winner_candidate =
+                    candidates.iter().find(|c| c.fqn == row.fqn);
+                let score = winner_candidate.map(|c| c.score).unwrap_or(1.0);
+                AcpDagSemanticSelectedDispatch {
+                    dispatch_kind: AcpDagSemanticDispatchKind::Verb,
+                    fqn: row.fqn.clone(),
+                    confidence: score,
+                    confidence_band: AcpDagSemanticConfidenceBand::from_score(score),
+                    matched_phrase: winner_candidate.and_then(|c| c.matched_phrase.clone()),
+                    description: Some(row.description.clone()),
+                }
+            });
+    // R3: split the scored list into winner-retained `top_candidates` and
+    // structured `rejected_candidates` so HITL reviewers can answer
+    // "why X over Y" from the trace alone.
+    let rejected_candidates = build_rejected_candidates(&candidates, selected_fqn.as_deref());
     Ok(Some(AcpDagSemanticResolution {
         status,
         utterance: utterance.to_string(),
-        selected_verb: selected.as_ref().map(|row| row.fqn.clone()),
+        selected_verb: selected_fqn,
+        selected_dispatch,
         selected_domain: selected.as_ref().map(|row| row.domain.clone()),
         selected_description: selected.as_ref().map(|row| row.description.clone()),
         pack: selected_pack.as_ref().map(pack_context_from_scored),
         selected_template,
-        top_candidates: scored.into_iter().map(candidate_from_scored).collect(),
+        top_candidates: candidates,
+        rejected_candidates,
         draft_dsl,
         workflow_plan,
         missing_required_args,
@@ -370,7 +1138,54 @@ pub fn resolve_acp_dag_semantic_prompt(
         envelope_trace: None,
         runtime_trace: None,
         diagnostics,
+        route_metadata: None,
+        state_anchor_provider: None,
+        observability: None,
+        override_status: None,
     }))
+}
+
+/// Build rejected-candidate trace entries with diagnostic codes.
+///
+/// Each non-winning candidate is tagged with one of the diagnostic
+/// taxonomy codes the envelope projects (`lost_to_higher_scorer`,
+/// `below_match_threshold`). Future iterations can layer in
+/// `forbidden_verb`, `missing_binding`, etc. when those gates fail.
+fn build_rejected_candidates(
+    candidates: &[AcpDagSemanticCandidate],
+    winner_fqn: Option<&str>,
+) -> Vec<AcpDagSemanticRejectedCandidate> {
+    candidates
+        .iter()
+        .filter(|c| Some(c.fqn.as_str()) != winner_fqn)
+        .map(|c| {
+            let (code, reason) = if c.score < PACK_MATCH_THRESHOLD {
+                (
+                    "below_match_threshold".to_string(),
+                    format!(
+                        "score {:.2} below match threshold {:.2}",
+                        c.score, PACK_MATCH_THRESHOLD
+                    ),
+                )
+            } else {
+                (
+                    "lost_to_higher_scorer".to_string(),
+                    format!(
+                        "scored {:.2}; outranked by the winning candidate",
+                        c.score
+                    ),
+                )
+            };
+            AcpDagSemanticRejectedCandidate {
+                dispatch_kind: c.dispatch_kind,
+                fqn: c.fqn.clone(),
+                score: c.score,
+                confidence_band: c.confidence_band,
+                rejection_code: code,
+                rejection_reason: reason,
+            }
+        })
+        .collect()
 }
 
 /// Resolve an ACP DAG semantic utterance with verified Slice 1 envelope context.
@@ -608,19 +1423,30 @@ fn refused_resolution(
     actual: Option<String>,
 ) -> AcpDagSemanticResolution {
     let selected_verb = actual.clone();
+    let selected_dispatch = selected_verb.as_ref().map(|fqn| AcpDagSemanticSelectedDispatch {
+        dispatch_kind: AcpDagSemanticDispatchKind::Verb,
+        fqn: fqn.clone(),
+        confidence: 1.0,
+        confidence_band: AcpDagSemanticConfidenceBand::High,
+        matched_phrase: None,
+        description: row.as_ref().map(|row| row.description.clone()),
+    });
     AcpDagSemanticResolution {
         status: AcpDagSemanticStatus::Refused,
         utterance: utterance.to_string(),
         selected_verb,
+        selected_dispatch,
         selected_domain: row.as_ref().map(|row| row.domain.clone()),
         selected_description: row.as_ref().map(|row| row.description.clone()),
         pack,
         selected_template: None,
         top_candidates: row
             .map(|row| AcpDagSemanticCandidate {
-                verb: row.fqn,
+                dispatch_kind: AcpDagSemanticDispatchKind::Verb,
+                fqn: row.fqn,
                 domain: row.domain,
                 score: 1.0,
+                confidence_band: AcpDagSemanticConfidenceBand::High,
                 read_only: row.read_only,
                 harm_class: row.harm_class,
                 side_effects: row.side_effects,
@@ -630,6 +1456,7 @@ fn refused_resolution(
             })
             .into_iter()
             .collect(),
+        rejected_candidates: Vec::new(),
         draft_dsl: None,
         workflow_plan: None,
         missing_required_args: Vec::new(),
@@ -648,6 +1475,10 @@ fn refused_resolution(
             expected,
             actual,
         }],
+        route_metadata: None,
+        state_anchor_provider: None,
+        observability: None,
+        override_status: None,
     }
 }
 
@@ -1721,10 +2552,16 @@ fn domain_aliases(domain: &str) -> Vec<String> {
 }
 
 fn candidate_from_scored(scored: ScoredRow) -> AcpDagSemanticCandidate {
+    let confidence_band = AcpDagSemanticConfidenceBand::from_score(scored.score);
     AcpDagSemanticCandidate {
-        verb: scored.row.fqn,
+        // R3: candidate kind is `Verb` for everything the resolver
+        // currently scores. Macro/template scoring will populate the
+        // other variants when those scorers wire in.
+        dispatch_kind: AcpDagSemanticDispatchKind::Verb,
+        fqn: scored.row.fqn,
         domain: scored.row.domain,
         score: scored.score,
+        confidence_band,
         read_only: scored.row.read_only,
         harm_class: scored.row.harm_class,
         side_effects: scored.row.side_effects,
@@ -2024,6 +2861,79 @@ const STOP_WORDS: &[&str] = &[
 mod tests {
     use super::*;
 
+    /// R3 acceptance: every matched resolution carries a `selected_dispatch`
+    /// with kind + confidence band, candidates carry kind + confidence
+    /// band, and non-winners populate `rejected_candidates` with a
+    /// diagnostic code.
+    #[test]
+    fn r3_route_trace_v2_populates_dispatch_and_rejected_candidates() {
+        let resolved = resolve_acp_dag_semantic_prompt("assign role to cbu")
+            .expect("resolver should not error")
+            .expect("utterance should match");
+
+        // selected_dispatch present + populated
+        let dispatch = resolved
+            .selected_dispatch
+            .as_ref()
+            .expect("selected_dispatch must be Some on matched resolution");
+        assert_eq!(dispatch.dispatch_kind, AcpDagSemanticDispatchKind::Verb);
+        assert!(!dispatch.fqn.is_empty());
+        assert!(dispatch.confidence > 0.0);
+        // legacy alias still populated for migration window
+        assert_eq!(resolved.selected_verb.as_deref(), Some(dispatch.fqn.as_str()));
+
+        // every candidate carries kind + confidence band
+        for candidate in &resolved.top_candidates {
+            assert_eq!(candidate.dispatch_kind, AcpDagSemanticDispatchKind::Verb);
+            // band derives from score
+            let derived =
+                AcpDagSemanticConfidenceBand::from_score(candidate.score);
+            assert_eq!(candidate.confidence_band, derived);
+        }
+
+        // rejected_candidates carry diagnostic codes — at least one
+        // expected when top_candidates exceeds 1.
+        if resolved.top_candidates.len() > 1 {
+            assert!(
+                !resolved.rejected_candidates.is_empty(),
+                "expected rejected_candidates when scored set has multiple entries"
+            );
+            for rejected in &resolved.rejected_candidates {
+                assert!(
+                    matches!(
+                        rejected.rejection_code.as_str(),
+                        "lost_to_higher_scorer" | "below_match_threshold"
+                    ),
+                    "rejection_code {} not in expected set",
+                    rejected.rejection_code,
+                );
+                assert!(!rejected.rejection_reason.is_empty());
+                assert!(Some(rejected.fqn.as_str()) != Some(dispatch.fqn.as_str()));
+            }
+        }
+    }
+
+    #[test]
+    fn r3_confidence_band_bucketing_is_correct() {
+        assert_eq!(
+            AcpDagSemanticConfidenceBand::from_score(0.9),
+            AcpDagSemanticConfidenceBand::High
+        );
+        assert_eq!(
+            AcpDagSemanticConfidenceBand::from_score(0.7),
+            AcpDagSemanticConfidenceBand::Medium
+        );
+        assert_eq!(
+            AcpDagSemanticConfidenceBand::from_score(0.45),
+            AcpDagSemanticConfidenceBand::Low
+        );
+        assert_eq!(
+            AcpDagSemanticConfidenceBand::from_score(0.1),
+            AcpDagSemanticConfidenceBand::BelowThreshold
+        );
+    }
+
+
     #[test]
     fn resolves_cbu_assign_role_prompt() {
         let resolved = resolve_acp_dag_semantic_prompt("assign role to cbu")
@@ -2033,6 +2943,148 @@ mod tests {
         assert_eq!(resolved.selected_verb.as_deref(), Some("cbu.assign-role"));
         assert_eq!(resolved.mutation_allowed, false);
         assert!(resolved.requires_hitl);
+    }
+
+    /// R8 Phase B (2026-05-11): the typed trace summary mirrors the
+    /// ~30-key flat shape the chat UI's `AcpTraceCard` consumes.
+    /// Pre-R8 this came from `agent_routes::acp_chat_trace_summary`
+    /// reading a JSON envelope. This test locks the key set + the
+    /// values that are directly typed (resolution + route_metadata
+    /// fields) so a regression in `acp_chat_trace_summary_typed`
+    /// can't silently drop a key the frontend reads.
+    #[test]
+    fn r8_phase_b_typed_trace_summary_has_expected_key_shape() {
+        // Build a resolution with route_metadata + a registry trace +
+        // an envelope trace populated so the corresponding keys fire.
+        let mut resolution = resolve_acp_dag_semantic_prompt("assign role to cbu")
+            .expect("resolver")
+            .expect("semantic match");
+        resolution.route_metadata = Some(AcpRouteMetadata {
+            route: "session_input".to_string(),
+            provider_task: "dag.semantic".to_string(),
+            requested_draft_source: "deterministic".to_string(),
+            effective_draft_source: "deterministic".to_string(),
+            route_latency_us: 1234,
+            route_latency_ms: 2,
+        });
+
+        let summary = acp_chat_trace_summary_typed(&resolution);
+        let obj = summary.as_object().expect("summary is an object");
+
+        // The frontend's `AcpTraceCard` (ChatMessage.tsx) reads these
+        // keys directly. Locking the shape — values may be Null but the
+        // keys must be present.
+        let expected_keys = [
+            // Status + outcome layer
+            "status",
+            "outcome",
+            "outcome_layer",
+            "structured_failure_mode",
+            // Route metadata
+            "route",
+            "provider_task",
+            "requested_draft_source",
+            "draft_source",
+            "route_latency_ms",
+            "route_latency_us",
+            "performance",
+            // Human-facing
+            "human_summary",
+            "prompt_context_variant",
+            "transition_ref",
+            "semantic_diff_uri",
+            "refusal_code",
+            "pending_question_code",
+            // Selected dispatch
+            "selected_verb",
+            "selected_dispatch_kind",
+            "selected_dispatch_fqn",
+            "selected_dispatch_confidence_band",
+            "rejected_candidate_count",
+            "selected_macro_id",
+            // Pack
+            "pack_id",
+            "pack_name",
+            "pack_ref",
+            "pack_allowed_verb_count",
+            "candidate_verbs",
+            // Workflow / template
+            "workflow_plan_id",
+            "workflow_plan_verb",
+            "workflow_plan_dry_run_only",
+            "workflow_plan_needed_from_user",
+            "selected_template_id",
+            // Diagnostics
+            "needed_from_user",
+            "diagnostic_codes",
+            "dry_run_valid",
+            "first_pass_valid",
+            // Observability (Phase B deferred — Null until orchestrator
+            // populates from typed sources)
+            "revision_count",
+            "prose_only_failure",
+            "pending_user_turn_required",
+            "estimated_user_repair_turns_avoided",
+            "state_anchor_provider",
+            // Registry trace
+            "registry_schema_version",
+            "registry_projection_hash",
+            "registry_verified",
+            // Envelope trace
+            "envelope_schema_version",
+            "envelope_hash",
+            "envelope_pack_id",
+            "projection_hash",
+            "envelope_verified",
+            // Runtime trace
+            "runtime_schema_version",
+            "runtime_pack_id",
+            "runtime_snapshot_id",
+            "runtime_hash",
+            "runtime_redaction_policy",
+            "runtime_freshness_policy",
+            "runtime_static_envelope_hash",
+            "runtime_projection_hash",
+            "runtime_verified",
+            "runtime_redacted_count",
+            "runtime_blocked_field_codes",
+        ];
+        for key in expected_keys {
+            assert!(
+                obj.contains_key(key),
+                "typed trace summary missing key `{key}` — chat UI reads this"
+            );
+        }
+
+        // Values that should be populated typed from the resolution +
+        // route_metadata. Locking these so regressions surface fast.
+        // "assign role to cbu" matches but has missing required args,
+        // so the typed status maps to `pending_question` per
+        // `acp_chat_trace_summary_typed`'s Matched + invalid-draft rule.
+        assert_eq!(obj["status"], "pending_question");
+        assert_eq!(obj["route"], "session_input");
+        assert_eq!(obj["provider_task"], "dag.semantic");
+        assert_eq!(obj["draft_source"], "deterministic");
+        assert_eq!(obj["route_latency_us"], 1234);
+        assert_eq!(obj["route_latency_ms"], 2);
+        assert_eq!(obj["outcome_layer"], "language_loop");
+        assert_eq!(obj["selected_verb"], "cbu.assign-role");
+        assert_eq!(obj["selected_dispatch_fqn"], "cbu.assign-role");
+        assert!(obj["human_summary"].is_string(),
+            "human_summary must be populated typed");
+        assert!(obj["candidate_verbs"].is_array() || obj["candidate_verbs"].is_null());
+        assert!(obj["pack_id"].is_string(), "pack_id should be populated");
+
+        // The performance block must carry route_latency_ms as
+        // total_ms — pre-R8 the chat UI's AcpTraceCard preferred
+        // performance.total_ms over route_latency_ms.
+        let performance = obj["performance"].as_object().expect("performance object");
+        assert_eq!(performance["total_ms"], 2);
+
+        // Phase B deferred fields are Null on purpose. If the
+        // orchestrator later populates them typed, update this test.
+        assert!(obj["state_anchor_provider"].is_null());
+        assert!(obj["revision_count"].is_null());
     }
 
     #[test]
@@ -2084,8 +3136,8 @@ mod tests {
             .iter()
             .any(|section| section.title == "Trading Profile"));
         assert!(resolved.top_candidates.iter().any(|candidate| {
-            candidate.verb == "trading-profile.read"
-                || candidate.verb == "matrix-overlay.effective-matrix"
+            candidate.fqn == "trading-profile.read"
+                || candidate.fqn == "matrix-overlay.effective-matrix"
         }));
     }
 

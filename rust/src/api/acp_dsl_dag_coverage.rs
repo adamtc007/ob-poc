@@ -12,7 +12,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use super::acp_state_anchor::{
+use crate::acp_state_anchor::{
     provider_registry, provider_supported_transition_registry, AcpStateAnchorProviderDescriptor,
 };
 use crate::runbook::{transition_language_pack_readiness, TransitionLanguagePackReadiness};

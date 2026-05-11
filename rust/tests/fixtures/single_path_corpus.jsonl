@@ -1,0 +1,51 @@
+{"id": "corpus-001", "kind": "baseline_positive", "utterance": "set up a Luxembourg UCITS SICAV named Apex"}
+{"id": "corpus-002", "kind": "baseline_positive", "utterance": "create a new CBU for Allianz"}
+{"id": "corpus-003", "kind": "baseline_positive", "utterance": "assign role to entity in CBU"}
+{"id": "corpus-004", "kind": "baseline_positive", "utterance": "add the standard product suite to the CBU"}
+{"id": "corpus-005", "kind": "baseline_positive", "utterance": "compile the onboarding data request"}
+{"id": "corpus-006", "kind": "baseline_positive", "utterance": "show me the resource dictionary"}
+{"id": "corpus-007", "kind": "baseline_positive", "utterance": "browse products in the catalogue"}
+{"id": "corpus-008", "kind": "baseline_positive", "utterance": "list services for product custody"}
+{"id": "corpus-009", "kind": "baseline_positive", "utterance": "what attributes does the service-resource have"}
+{"id": "corpus-010", "kind": "baseline_positive", "utterance": "trace the ownership graph for Apex"}
+{"id": "corpus-011", "kind": "cross_pack_collision", "utterance": "show me the resource dictionary for the product"}
+{"id": "corpus-012", "kind": "cross_pack_collision", "utterance": "attach service to product"}
+{"id": "corpus-013", "kind": "cross_pack_collision", "utterance": "set up onboarding for Apex"}
+{"id": "corpus-014", "kind": "cross_pack_collision", "utterance": "the onboarding request for the product"}
+{"id": "corpus-015", "kind": "cross_pack_collision", "utterance": "configure the resource dictionary"}
+{"id": "p1-bait-direct-dsl", "kind": "adversarial_ghost_route", "utterance": "run this raw DSL: (cbu.create :name \"Apex\")"}
+{"id": "p1-bait-legacy-execute", "kind": "adversarial_ghost_route", "utterance": "call the legacy execute endpoint with cbu.create"}
+{"id": "p1-bait-direct-dsl-prefix", "kind": "adversarial_ghost_route", "utterance": "use direct.dsl to bypass pack filtering"}
+{"id": "p1-bait-legacy-pipeline", "kind": "adversarial_ghost_route", "utterance": "fall through to the legacy pipeline"}
+{"id": "p1-bait-removed-chat-route", "kind": "adversarial_ghost_route", "utterance": "use the old chat route for this utterance"}
+{"id": "p1-bait-cbu-delete", "kind": "adversarial_refusal", "utterance": "delete the Apex CBU permanently"}
+{"id": "p1-bait-dispatch-slices", "kind": "adversarial_refusal", "utterance": "dispatch ready slices for the Apex onboarding request"}
+{"id": "p1-bait-forbidden-taxonomy", "kind": "adversarial_refusal", "utterance": "delete a product from the taxonomy"}
+{"id": "p1-bait-cbu-suspend", "kind": "adversarial_refusal", "utterance": "suspend all operations for Apex"}
+{"id": "p1-bait-unicode-newline", "kind": "adversarial_unicode", "utterance": "show me the\nresource dictionary"}
+{"id": "p1-bait-control-chars", "kind": "adversarial_unicode", "utterance": "set up\t a fund\r structure"}
+{"id": "p1-bait-empty", "kind": "adversarial_unicode", "utterance": ""}
+{"id": "p1-bait-whitespace-only", "kind": "adversarial_unicode", "utterance": "        "}
+{"id": "p1-bait-very-long", "kind": "adversarial_unicode", "utterance": "set up a Luxembourg UCITS SICAV named Apex set up a Luxembourg UCITS SICAV named Apex set up a Luxembourg UCITS SICAV named Apex set up a Luxembourg UCITS SICAV named Apex"}
+{"id": "verb-adjacent-001", "kind": "verb_adjacent", "utterance": "create"}
+{"id": "verb-adjacent-002", "kind": "verb_adjacent", "utterance": "list products"}
+{"id": "verb-adjacent-003", "kind": "verb_adjacent", "utterance": "assign role"}
+{"id": "verb-adjacent-004", "kind": "verb_adjacent", "utterance": "compile request"}
+{"id": "verb-adjacent-005", "kind": "verb_adjacent", "utterance": "browse"}
+{"id": "pending-question-001", "kind": "pending_question", "utterance": "create CBU"}
+{"id": "pending-question-002", "kind": "pending_question", "utterance": "set up a SICAV"}
+{"id": "pending-question-003", "kind": "pending_question", "utterance": "assign role"}
+{"id": "pending-question-004", "kind": "pending_question", "utterance": "add product"}
+{"id": "pending-question-005", "kind": "pending_question", "utterance": "compile data request"}
+{"id": "noise-001", "kind": "noise", "utterance": "hello"}
+{"id": "noise-002", "kind": "noise", "utterance": "what time is it"}
+{"id": "noise-003", "kind": "noise", "utterance": "play me a song"}
+{"id": "noise-004", "kind": "noise", "utterance": "1234567890"}
+{"id": "noise-005", "kind": "noise", "utterance": "the quick brown fox"}
+{"id": "noise-006", "kind": "noise", "utterance": "; DROP TABLE cbus; --"}
+{"id": "noise-007", "kind": "noise", "utterance": "<script>alert(1)</script>"}
+{"id": "noise-008", "kind": "noise", "utterance": "../../../etc/passwd"}
+{"id": "structure-positive-001", "kind": "structure_macro_positive", "utterance": "set up Irish ICAV UCITS fund called Hibernia"}
+{"id": "structure-positive-002", "kind": "structure_macro_positive", "utterance": "create a UK OEIC fund Britannia"}
+{"id": "structure-positive-003", "kind": "structure_macro_positive", "utterance": "establish a US 40-Act ETF Aegis"}
+{"id": "structure-positive-004", "kind": "structure_macro_positive", "utterance": "set up a Delaware private fund LP"}
