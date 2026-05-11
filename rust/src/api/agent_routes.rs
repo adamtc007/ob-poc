@@ -402,10 +402,9 @@ async fn try_route_supported_acp_prompt_with_draft_mode(
     // status `dry_run_validated` but no `dag_semantic` block — for that
     // path we synthesize a stub resolution and use `override_status` to
     // carry the language-pack outcome through the typed chat-trace.
-    let mut resolution = match result
-        .get("dag_semantic")
-        .and_then(|v| serde_json::from_value::<crate::acp_dag_semantic::AcpDagSemanticResolution>(v.clone()).ok())
-    {
+    let mut resolution = match result.get("dag_semantic").and_then(|v| {
+        serde_json::from_value::<crate::acp_dag_semantic::AcpDagSemanticResolution>(v.clone()).ok()
+    }) {
         Some(r) => r,
         None => crate::acp_dag_semantic::AcpDagSemanticResolution {
             status: crate::acp_dag_semantic::AcpDagSemanticStatus::Matched,
@@ -446,10 +445,10 @@ async fn try_route_supported_acp_prompt_with_draft_mode(
     //
     // Read the typed route metadata from the envelope's session_input
     // block (just annotated by `annotate_acp_session_input_envelope`).
-    let route_latency_us = value_u64(&envelope, &["session_input", "route_latency_us"])
-        .unwrap_or(0);
-    let route_latency_ms = value_u64(&envelope, &["session_input", "route_latency_ms"])
-        .unwrap_or(0);
+    let route_latency_us =
+        value_u64(&envelope, &["session_input", "route_latency_us"]).unwrap_or(0);
+    let route_latency_ms =
+        value_u64(&envelope, &["session_input", "route_latency_ms"]).unwrap_or(0);
     let effective_draft_source =
         value_string(&envelope, &["session_input", "effective_draft_source"])
             .unwrap_or_else(|| effective_draft_mode.as_str().to_string());
@@ -471,20 +470,36 @@ async fn try_route_supported_acp_prompt_with_draft_mode(
     resolution.observability = Some(crate::acp_dag_semantic::AcpObservabilitySummary {
         structured_failure_mode: value_string(
             result,
-            &["observability", "conversationEfficiency", "structuredFailureMode"],
+            &[
+                "observability",
+                "conversationEfficiency",
+                "structuredFailureMode",
+            ],
         ),
         prose_only_failure: value_bool(
             result,
-            &["observability", "conversationEfficiency", "proseOnlyFailure"],
+            &[
+                "observability",
+                "conversationEfficiency",
+                "proseOnlyFailure",
+            ],
         ),
         revision_count: value_u64(
             result,
-            &["observability", "conversationEfficiency", "localRevisionCount"],
+            &[
+                "observability",
+                "conversationEfficiency",
+                "localRevisionCount",
+            ],
         )
         .or_else(|| value_u64(result, &["metrics", "revision_count"])),
         pending_user_turn_required: value_bool(
             result,
-            &["observability", "conversationEfficiency", "pendingUserTurnRequired"],
+            &[
+                "observability",
+                "conversationEfficiency",
+                "pendingUserTurnRequired",
+            ],
         ),
         estimated_user_repair_turns_avoided: value_u64(
             result,
@@ -1082,7 +1097,22 @@ async fn dispatch_to_v2_repl(
                 _ => return None, // Narrow/More/Reject — not a V2 REPL UserInput shape; caller emits 404.
             }
         }
-        _ => return None, // DiscoverySelection / ReplV2 — not handled at this layer; caller emits 404.
+        SessionInputRequest::ReplV2 { input } => {
+            let input: crate::api::repl_routes_v2::InputRequestV2 =
+                match serde_json::from_value(input.clone()) {
+                    Ok(input) => input,
+                    Err(error) => {
+                        tracing::warn!(
+                            session_id = %session_id,
+                            error = %error,
+                            "Invalid REPL V2 input payload; caller will surface 404."
+                        );
+                        return None;
+                    }
+                };
+            input.into()
+        }
+        _ => return None, // DiscoverySelection is handled by the chat adapter, not the V2 REPL.
     };
 
     // R8 §13.5 (2026-05-11): call `process_with_acp` so the orchestrator
@@ -3909,9 +3939,10 @@ mod tests {
         ));
         let session_id = orchestrator.create_session().await;
 
-        let bundle = try_route_supported_acp_prompt(&orchestrator, session_id, "assign role to cbu")
-            .await
-            .expect("authored DAG prompt should route through ACP semantic surface");
+        let bundle =
+            try_route_supported_acp_prompt(&orchestrator, session_id, "assign role to cbu")
+                .await
+                .expect("authored DAG prompt should route through ACP semantic surface");
 
         assert!(bundle.message.contains("No mutation has run"));
         let trace = crate::acp_dag_semantic::acp_chat_trace_summary_typed(&bundle.resolution);
@@ -3950,9 +3981,10 @@ mod tests {
         ));
         let session_id = orchestrator.create_session().await;
 
-        let bundle = try_route_supported_acp_prompt(&orchestrator, session_id, "show trading matrix")
-            .await
-            .expect("instrument matrix pack prompt should route through ACP semantic surface");
+        let bundle =
+            try_route_supported_acp_prompt(&orchestrator, session_id, "show trading matrix")
+                .await
+                .expect("instrument matrix pack prompt should route through ACP semantic surface");
 
         assert!(bundle.message.contains("Instrument Matrix"));
         assert!(bundle.message.contains("No mutation has run"));

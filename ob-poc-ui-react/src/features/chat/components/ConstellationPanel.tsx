@@ -31,7 +31,7 @@ import {
 import type { CbuSummary } from "../../../api/scope";
 import { queryKeys } from "../../../lib/query";
 import { cn } from "../../../lib/utils";
-import type { SessionFeedback } from "../../../api/replV2";
+import type { SessionFeedback, WorkspaceKind } from "../../../api/replV2";
 
 const DEFAULT_MAP_NAME = "struct.lux.ucits.sicav";
 const UNSELECTED_CBU_MAP_NAME = "cbu.structure.unselected";
@@ -785,11 +785,13 @@ export function ConstellationPanel({
   sessionFeedback,
   className,
   onPromptAgent,
+  onSelectWorkspace,
 }: {
   selectedCbu: CbuSummary | null;
   sessionFeedback?: SessionFeedback;
   className?: string;
   onPromptAgent?: (prompt: string) => void;
+  onSelectWorkspace?: (workspace: WorkspaceKind, label: string) => void;
 }) {
   const [caseIdSelection, setCaseIdSelection] = useState<
     string | null | undefined
@@ -1022,7 +1024,11 @@ export function ConstellationPanel({
                 <button
                   type="button"
                   key={ws.workspace}
-                  onClick={() => onPromptAgent?.(ws.label)}
+                  onClick={() =>
+                    onSelectWorkspace
+                      ? onSelectWorkspace(ws.workspace, ws.label)
+                      : onPromptAgent?.(ws.label)
+                  }
                   className="w-full flex items-start gap-3 rounded-lg border border-[var(--border-primary)] bg-[var(--bg-primary)] px-3 py-2.5 text-left hover:bg-[var(--bg-hover)] transition-colors"
                 >
                   <Waypoints

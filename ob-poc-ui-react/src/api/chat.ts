@@ -28,6 +28,7 @@ import type {
   AcpTraceSummary,
 } from "../types/chat";
 import type { SessionFeedback } from "./replV2";
+import type { InputRequestV2 } from "./replV2";
 
 /**
  * Backend session response structure
@@ -382,6 +383,50 @@ export const chatApi = {
       session = await chatApi.getSession(sessionId);
     } catch (e) {
       console.warn("[chat] Failed to re-fetch session after chat:", e);
+    }
+
+    return {
+      message: assistantMessage,
+      session: session || {
+        id: sessionId,
+        title: "",
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+        messages: [],
+      },
+      available_verbs: response.available_verbs,
+      surface_fingerprint: response.surface_fingerprint,
+    };
+  },
+
+  async sendReplInput(
+    sessionId: string,
+    input: InputRequestV2,
+  ): Promise<SendMessageResponse> {
+    let envelope: ChatInputEnvelope;
+    try {
+      envelope = await api.post<ChatInputEnvelope>(
+        `/session/${sessionId}/input`,
+        {
+          kind: "repl_v2",
+          input,
+        },
+      );
+    } catch (error) {
+      if (isSessionMissingError(error)) {
+        pruneSessionIdFromStorage(sessionId);
+      }
+      throw error;
+    }
+
+    const response = envelope.response;
+    const assistantMessage = buildAssistantMessage(sessionId, response);
+
+    let session: ChatSession | undefined;
+    try {
+      session = await chatApi.getSession(sessionId);
+    } catch (e) {
+      console.warn("[chat] Failed to re-fetch session after REPL input:", e);
     }
 
     return {

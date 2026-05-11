@@ -262,8 +262,7 @@ pub struct ReplOrchestratorV2 {
     /// via [`crate::acp_session_input_draft_mode::AcpSessionInputDraftMode::from_env`])
     /// rather than read per request. Used by the orchestrator's internal
     /// ACP resolution step (R8 §13.5).
-    acp_session_input_draft_mode:
-        crate::acp_session_input_draft_mode::AcpSessionInputDraftMode,
+    acp_session_input_draft_mode: crate::acp_session_input_draft_mode::AcpSessionInputDraftMode,
 }
 
 impl ReplOrchestratorV2 {
@@ -1020,13 +1019,42 @@ impl ReplOrchestratorV2 {
         // prebuilt_chat_response` so the response adapter passes it
         // through unchanged. Phase B replaces this with typed-only
         // projection through `acp_dag_semantic` + `AcpRouteMetadata`.
-        if let UserInputV2::Message { ref content } = input {
-            if let Some(bundle) = crate::api::agent_routes::try_route_supported_acp_prompt(
-                self,
-                session_id,
-                content,
+        // Tollgate answers are selections, not semantic work requests. Let the
+        // state machine consume them before ACP attempts verb-level routing.
+        let should_try_acp = if matches!(input, UserInputV2::Message { .. }) {
+            let sessions = self.sessions.read().await;
+            let state = sessions.get(&session_id).map(|session| &session.state);
+            !matches!(
+                state,
+                Some(ReplStateV2::ScopeGate { .. })
+                    | Some(ReplStateV2::WorkspaceSelection { .. })
+                    | Some(ReplStateV2::ConstellationMapSelection { .. })
+                    | Some(ReplStateV2::JourneySelection { .. })
             )
-            .await
+        } else {
+            false
+        };
+
+        if should_try_acp {
+            let content = match &input {
+                UserInputV2::Message { content } => content,
+                UserInputV2::Confirm
+                | UserInputV2::Reject
+                | UserInputV2::Edit { .. }
+                | UserInputV2::Command { .. }
+                | UserInputV2::SelectPack { .. }
+                | UserInputV2::SelectVerb { .. }
+                | UserInputV2::SelectProposal { .. }
+                | UserInputV2::SelectEntity { .. }
+                | UserInputV2::SelectScope { .. }
+                | UserInputV2::SelectWorkspace { .. }
+                | UserInputV2::SelectConstellationMap { .. }
+                | UserInputV2::Approve { .. }
+                | UserInputV2::RejectGate { .. } => "",
+            };
+            if let Some(bundle) =
+                crate::api::agent_routes::try_route_supported_acp_prompt(self, session_id, content)
+                    .await
             {
                 let sessions = self.sessions.read().await;
                 let state = sessions
