@@ -84,3 +84,6 @@ required-features = ["harness"]
 [[test]]
 name = "cross_workspace_dag_live_scenarios"
 required-features = ["harness"]
+
+[lints.rust]
+unreachable_pub = "deny"
