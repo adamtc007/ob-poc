@@ -1,7 +1,7 @@
 use thiserror::Error;
 
 // Re-export GateSeverity from gates module — single canonical definition.
-pub use crate::gates::GateSeverity;
+pub(crate) use crate::gates::GateSeverity;
 
 #[derive(Debug, Error)]
 pub enum SemOsError {

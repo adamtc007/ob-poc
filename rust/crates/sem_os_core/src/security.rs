@@ -19,19 +19,19 @@ use crate::types::{Classification, HandlingControl, SecurityLabel};
 
 /// Override declaration for less-restrictive labels on derived outputs.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct SecurityLabelOverride {
+pub(crate) struct SecurityLabelOverride {
     /// Human-readable justification for the override.
-    pub rationale: String,
+    pub(crate) rationale: String,
     /// Whether a data steward has approved this override.
-    pub steward_approved: bool,
+    pub(crate) steward_approved: bool,
     /// Which fields are being overridden (for audit trail).
-    pub override_fields: Vec<OverrideField>,
+    pub(crate) override_fields: Vec<OverrideField>,
 }
 
 /// Which aspect of the label is being overridden.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
-pub enum OverrideField {
+pub(crate) enum OverrideField {
     Classification,
     Pii,
     Jurisdictions,
@@ -41,7 +41,7 @@ pub enum OverrideField {
 
 /// Errors from security inheritance computation.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum SecurityInheritanceError {
+pub(crate) enum SecurityInheritanceError {
     /// Override not approved by steward.
     StewardApprovalRequired {
         field: OverrideField,
@@ -91,15 +91,15 @@ impl std::error::Error for SecurityInheritanceError {}
 
 /// Warning from verb-security compatibility checks.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct SecurityWarning {
-    pub kind: SecurityWarningKind,
-    pub message: String,
-    pub severity: WarningSeverity,
+pub(crate) struct SecurityWarning {
+    pub(crate) kind: SecurityWarningKind,
+    pub(crate) message: String,
+    pub(crate) severity: WarningSeverity,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
-pub enum SecurityWarningKind {
+pub(crate) enum SecurityWarningKind {
     /// Verb purpose doesn't match output purpose — potential label laundering.
     PurposeMismatch,
     /// Output has lower classification than verb context.
@@ -110,7 +110,7 @@ pub enum SecurityWarningKind {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
-pub enum WarningSeverity {
+pub(crate) enum WarningSeverity {
     Low,
     Medium,
     High,
@@ -128,7 +128,7 @@ pub enum WarningSeverity {
 /// - Handling controls: union of all
 ///
 /// If `inputs` is empty, returns `default_label()`.
-pub fn compute_inherited_label(inputs: &[SecurityLabel]) -> SecurityLabel {
+pub(crate) fn compute_inherited_label(inputs: &[SecurityLabel]) -> SecurityLabel {
     if inputs.is_empty() {
         return default_label();
     }
@@ -191,7 +191,7 @@ pub fn compute_inherited_label(inputs: &[SecurityLabel]) -> SecurityLabel {
 /// Returns error if override violates hard constraints:
 /// - Empty rationale is always rejected
 /// - Steward approval is required for classification downgrade or PII removal
-pub fn compute_inherited_label_with_override(
+pub(crate) fn compute_inherited_label_with_override(
     inputs: &[SecurityLabel],
     declared_override: &SecurityLabelOverride,
 ) -> Result<SecurityLabel, SecurityInheritanceError> {
@@ -256,7 +256,7 @@ pub fn compute_inherited_label_with_override(
 ///
 /// Prevents "label laundering" — a verb under purpose P producing output
 /// for a different purpose without explicit authorization.
-pub fn validate_verb_security_compatibility(
+pub(crate) fn validate_verb_security_compatibility(
     verb_label: &SecurityLabel,
     output_label: &SecurityLabel,
 ) -> Vec<SecurityWarning> {
@@ -313,12 +313,12 @@ pub fn validate_verb_security_compatibility(
 }
 
 /// Default security label: Internal classification, no PII, no restrictions.
-pub fn default_label() -> SecurityLabel {
+pub(crate) fn default_label() -> SecurityLabel {
     SecurityLabel::default()
 }
 
 /// Named label templates for common security postures.
-pub fn label_template(name: &str) -> Option<SecurityLabel> {
+pub(crate) fn label_template(name: &str) -> Option<SecurityLabel> {
     match name {
         "standard_pii_eu" => Some(SecurityLabel {
             classification: Classification::Confidential,

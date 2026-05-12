@@ -4,25 +4,25 @@ use serde::{Deserialize, Serialize};
 
 /// Body of a `macro_def` registry snapshot.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct MacroDefBody {
-    pub fqn: String,
-    pub kind: String,
+pub(crate) struct MacroDefBody {
+    pub(crate) fqn: String,
+    pub(crate) kind: String,
     #[serde(default)]
-    pub ui: Option<serde_json::Value>,
+    pub(crate) ui: Option<serde_json::Value>,
     #[serde(default)]
-    pub routing: Option<serde_json::Value>,
+    pub(crate) routing: Option<serde_json::Value>,
     #[serde(default)]
-    pub target: Option<serde_json::Value>,
+    pub(crate) target: Option<serde_json::Value>,
     #[serde(default)]
-    pub args: Option<serde_json::Value>,
+    pub(crate) args: Option<serde_json::Value>,
     #[serde(default)]
-    pub prereqs: Vec<serde_json::Value>,
+    pub(crate) prereqs: Vec<serde_json::Value>,
     #[serde(default)]
-    pub expands_to: Vec<serde_json::Value>,
+    pub(crate) expands_to: Vec<serde_json::Value>,
     #[serde(default)]
-    pub sets_state: Vec<serde_json::Value>,
+    pub(crate) sets_state: Vec<serde_json::Value>,
     #[serde(default)]
-    pub unlocks: Vec<String>,
+    pub(crate) unlocks: Vec<String>,
 }
 
 #[cfg(test)]
