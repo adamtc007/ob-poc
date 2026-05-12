@@ -117,7 +117,7 @@ pub struct EntityDiscriminatorConfig {
 
 /// Match mode for date discriminators
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum DateMatchMode {
+pub(crate) enum DateMatchMode {
     /// Exact date match required
     Exact,
     /// Year match only (for approximate DOB)

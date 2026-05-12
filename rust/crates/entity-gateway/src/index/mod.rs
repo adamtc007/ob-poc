@@ -4,4 +4,4 @@ mod traits;
 
 pub use registry::*;
 pub use tantivy_index::*;
-pub use traits::*;
+pub(crate) use traits::*;

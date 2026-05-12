@@ -62,13 +62,19 @@ mod search_engine;
 mod search_expr;
 mod server;
 
-// Re-export main types
+// Re-export the external API surface only. Workspace-grep (Phase 2 audit,
+// 2026-05-12) confirmed:
+//   - GatewayConfig, EntityConfig, RefreshConfig, StartupMode — consumed
+//     by ob-poc-web's main.rs (Clone, field traversal, struct iteration).
+//   - IndexRegistry, TantivyIndex, run_refresh_loop, RefreshPipeline,
+//     EntityGatewayService — same caller.
+//   - The rest (SearchEngine/SearchResult/RankedMatch; SearchExpr +
+//     SearchExprQuery/SearchSchema/search_expr::ParseError; IndexError,
+//     IndexRecord, MatchMode, SearchIndex, SearchMatch, SearchQuery) had
+//     zero external imports. Removed from the public surface so
+//     unreachable_pub can flag the now-orphaned items for demotion to
+//     pub(crate).
 pub use config::{EntityConfig, GatewayConfig, RefreshConfig, StartupMode};
-pub use index::{
-    IndexError, IndexRecord, IndexRegistry, MatchMode, SearchIndex, SearchMatch, SearchQuery,
-    TantivyIndex,
-};
+pub use index::{IndexRegistry, TantivyIndex};
 pub use refresh::{run_refresh_loop, RefreshPipeline};
-pub use search_engine::{RankedMatch, SearchEngine, SearchResult};
-pub use search_expr::{ParseError, SearchExpr, SearchQuery as SearchExprQuery, SearchSchema};
 pub use server::EntityGatewayService;

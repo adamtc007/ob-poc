@@ -39,7 +39,7 @@ use std::collections::HashMap;
 
 /// A parsed search expression
 #[derive(Debug, Clone, PartialEq)]
-pub enum SearchExpr {
+pub(crate) enum SearchExpr {
     /// A symbol (field name or keyword)
     Symbol(String),
     /// A string literal value
@@ -52,18 +52,18 @@ pub enum SearchExpr {
 
 impl SearchExpr {
     /// Parse an s-expression string into a SearchExpr
-    pub fn parse(input: &str) -> Result<Self, ParseError> {
+    pub(crate) fn parse(input: &str) -> Result<Self, ParseError> {
         let mut chars = input.trim().chars().peekable();
         parse_expr(&mut chars)
     }
 
     /// Check if this is a list
-    pub fn is_list(&self) -> bool {
+    pub(crate) fn is_list(&self) -> bool {
         matches!(self, SearchExpr::List(_))
     }
 
     /// Get as symbol string
-    pub fn as_symbol(&self) -> Option<&str> {
+    pub(crate) fn as_symbol(&self) -> Option<&str> {
         match self {
             SearchExpr::Symbol(s) => Some(s),
             _ => None,
@@ -71,7 +71,7 @@ impl SearchExpr {
     }
 
     /// Get as string value
-    pub fn as_string(&self) -> Option<&str> {
+    pub(crate) fn as_string(&self) -> Option<&str> {
         match self {
             SearchExpr::String(s) => Some(s),
             _ => None,
@@ -79,7 +79,7 @@ impl SearchExpr {
     }
 
     /// Get as number
-    pub fn as_number(&self) -> Option<f64> {
+    pub(crate) fn as_number(&self) -> Option<f64> {
         match self {
             SearchExpr::Number(n) => Some(*n),
             _ => None,
@@ -87,7 +87,7 @@ impl SearchExpr {
     }
 
     /// Get as list
-    pub fn as_list(&self) -> Option<&[SearchExpr]> {
+    pub(crate) fn as_list(&self) -> Option<&[SearchExpr]> {
         match self {
             SearchExpr::List(l) => Some(l),
             _ => None,
@@ -96,9 +96,9 @@ impl SearchExpr {
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub struct ParseError {
-    pub message: String,
-    pub position: usize,
+pub(crate) struct ParseError {
+    pub(crate) message: String,
+    pub(crate) position: usize,
 }
 
 impl std::fmt::Display for ParseError {
@@ -246,26 +246,26 @@ fn skip_whitespace(chars: &mut std::iter::Peekable<std::str::Chars>) {
 ///
 /// Parsed from verb YAML `search_key` field.
 #[derive(Debug, Clone)]
-pub struct SearchSchema {
+pub(crate) struct SearchSchema {
     /// Primary search field (required in all queries)
-    pub primary_field: String,
+    pub(crate) primary_field: String,
     /// Discriminator fields with their selectivity scores
-    pub discriminators: Vec<DiscriminatorDef>,
+    pub(crate) discriminators: Vec<DiscriminatorDef>,
     /// Minimum confidence for auto-resolution
-    pub min_confidence: f32,
+    pub(crate) min_confidence: f32,
 }
 
 /// A discriminator field definition
 #[derive(Debug, Clone)]
-pub struct DiscriminatorDef {
+pub(crate) struct DiscriminatorDef {
     /// Database column name
-    pub field: String,
+    pub(crate) field: String,
     /// Selectivity score (0.0-1.0, higher = more unique)
-    pub selectivity: f32,
+    pub(crate) selectivity: f32,
     /// Is this field required for resolution?
-    pub required: bool,
+    pub(crate) required: bool,
     /// Match mode for special types (e.g., "year-or-exact" for dates)
-    pub match_mode: Option<String>,
+    pub(crate) match_mode: Option<String>,
 }
 
 impl SearchSchema {
@@ -274,13 +274,13 @@ impl SearchSchema {
     /// ```text
     /// (search_name (date_of_birth :selectivity 0.95) (nationality :selectivity 0.7))
     /// ```
-    pub fn parse(input: &str) -> Result<Self, ParseError> {
+    pub(crate) fn parse(input: &str) -> Result<Self, ParseError> {
         let expr = SearchExpr::parse(input)?;
         Self::from_expr(&expr)
     }
 
     /// Build schema from parsed expression
-    pub fn from_expr(expr: &SearchExpr) -> Result<Self, ParseError> {
+    pub(crate) fn from_expr(expr: &SearchExpr) -> Result<Self, ParseError> {
         let list = expr.as_list().ok_or_else(|| ParseError {
             message: "Schema must be a list".to_string(),
             position: 0,
@@ -412,7 +412,7 @@ impl SearchSchema {
     }
 
     /// Get all column names needed for this schema
-    pub fn all_columns(&self) -> Vec<&str> {
+    pub(crate) fn all_columns(&self) -> Vec<&str> {
         let mut cols = vec![self.primary_field.as_str()];
         for d in &self.discriminators {
             cols.push(d.field.as_str());
@@ -432,22 +432,22 @@ impl SearchSchema {
 /// (search_name "John Smith" (date_of_birth "1980-01-15"))
 /// ```
 #[derive(Debug, Clone)]
-pub struct SearchQuery {
+pub(crate) struct SearchQuery {
     /// Primary field value (required)
-    pub primary_value: String,
+    pub(crate) primary_value: String,
     /// Discriminator values (field -> value)
-    pub discriminators: HashMap<String, String>,
+    pub(crate) discriminators: HashMap<String, String>,
 }
 
 impl SearchQuery {
     /// Parse a query from s-expression
-    pub fn parse(input: &str) -> Result<Self, ParseError> {
+    pub(crate) fn parse(input: &str) -> Result<Self, ParseError> {
         let expr = SearchExpr::parse(input)?;
         Self::from_expr(&expr)
     }
 
     /// Build query from parsed expression
-    pub fn from_expr(expr: &SearchExpr) -> Result<Self, ParseError> {
+    pub(crate) fn from_expr(expr: &SearchExpr) -> Result<Self, ParseError> {
         let list = expr.as_list().ok_or_else(|| ParseError {
             message: "Query must be a list".to_string(),
             position: 0,
@@ -491,7 +491,7 @@ impl SearchQuery {
     }
 
     /// Create a simple query (primary value only)
-    pub fn simple(value: &str) -> Self {
+    pub(crate) fn simple(value: &str) -> Self {
         SearchQuery {
             primary_value: value.to_string(),
             discriminators: HashMap::new(),
@@ -499,7 +499,7 @@ impl SearchQuery {
     }
 
     /// Create a query from a map of field -> value
-    pub fn from_map(primary_field: &str, values: HashMap<String, String>) -> Option<Self> {
+    pub(crate) fn from_map(primary_field: &str, values: HashMap<String, String>) -> Option<Self> {
         let primary_value = values.get(primary_field)?.clone();
         let mut discriminators = values;
         discriminators.remove(primary_field);

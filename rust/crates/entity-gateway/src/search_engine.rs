@@ -76,39 +76,39 @@ fn normalize_date(date_str: &str) -> String {
 
 /// Result of a search operation
 #[derive(Debug, Clone)]
-pub struct SearchResult {
+pub(crate) struct SearchResult {
     /// Matched entities, ranked by score
-    pub matches: Vec<RankedMatch>,
+    pub(crate) matches: Vec<RankedMatch>,
     /// Whether a unique match was found (score >= min_confidence)
-    pub resolved: bool,
+    pub(crate) resolved: bool,
     /// The resolved entity ID (if unique match found)
-    pub resolved_id: Option<String>,
+    pub(crate) resolved_id: Option<String>,
 }
 
 /// A match with combined score from primary + discriminators
 #[derive(Debug, Clone)]
-pub struct RankedMatch {
+pub(crate) struct RankedMatch {
     /// Entity ID (token)
-    pub id: String,
+    pub(crate) id: String,
     /// Display value
-    pub display: String,
+    pub(crate) display: String,
     /// Primary search score (from Tantivy)
-    pub primary_score: f32,
+    pub(crate) primary_score: f32,
     /// Discriminator match scores
-    pub discriminator_scores: HashMap<String, f32>,
+    pub(crate) discriminator_scores: HashMap<String, f32>,
     /// Combined score (weighted by selectivity)
-    pub combined_score: f32,
+    pub(crate) combined_score: f32,
 }
 
 /// Search engine that interprets s-expression queries
-pub struct SearchEngine {
+pub(crate) struct SearchEngine {
     /// The search schema (from verb YAML)
     schema: SearchSchema,
 }
 
 impl SearchEngine {
     /// Create a new search engine with the given schema
-    pub fn new(schema: SearchSchema) -> Self {
+    pub(crate) fn new(schema: SearchSchema) -> Self {
         Self { schema }
     }
 
@@ -116,7 +116,7 @@ impl SearchEngine {
     ///
     /// The query contains values, the schema defines the structure.
     /// Returns ranked matches with combined scores.
-    pub async fn search(
+    pub(crate) async fn search(
         &self,
         index: Arc<dyn SearchIndex + Send + Sync>,
         query: &SearchQuery,
@@ -236,7 +236,7 @@ impl SearchEngine {
     /// This is a two-phase search:
     /// 1. Primary search for candidates
     /// 2. Filter/boost by discriminator values
-    pub async fn search_with_filter(
+    pub(crate) async fn search_with_filter(
         &self,
         index: Arc<dyn SearchIndex + Send + Sync>,
         query: &SearchQuery,
