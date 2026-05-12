@@ -3,7 +3,6 @@
 //! Provides a thread-safe, lazily-loaded global accessor for the entity taxonomy
 //! and verb lifecycle information.
 
-use crate::dsl_v2::config::types::VerbLifecycle;
 use crate::ontology::taxonomy::EntityTaxonomy;
 use crate::ontology::types::{EntityDef, EntityLifecycle};
 use std::path::PathBuf;
@@ -121,19 +120,6 @@ impl OntologyService {
     // Verb lifecycle accessors
     // =========================================================================
 
-    /// Get verb lifecycle configuration from the runtime registry.
-    ///
-    /// This bridges to the existing verb YAML config loaded by RuntimeVerbRegistry.
-    pub fn get_verb_lifecycle(&self, domain: &str, verb: &str) -> Option<VerbLifecycle> {
-        // The verb lifecycle is stored in the verb YAML and loaded by RuntimeVerbRegistry.
-        // We access it through the runtime registry to avoid duplicating the verb config loading.
-        use crate::dsl_v2::execution::runtime_registry;
-
-        runtime_registry()
-            .get(domain, verb)
-            .and_then(|rv| rv.lifecycle.clone())
-    }
-
     /// Check if a verb is a canonical creator for an entity type.
     pub fn is_canonical_creator(&self, domain: &str, verb: &str, entity_type: &str) -> bool {
         let full_verb = format!("{}.{}", domain, verb);
@@ -159,16 +145,6 @@ impl OntologyService {
         }
 
         false
-    }
-
-    /// Get entity types that this verb can create.
-    pub fn verb_produces_entity_type(&self, domain: &str, verb: &str) -> Option<String> {
-        use crate::dsl_v2::execution::runtime_registry;
-
-        runtime_registry()
-            .get(domain, verb)
-            .and_then(|rv| rv.produces.as_ref())
-            .map(|p| p.produced_type.clone())
     }
 
     /// Get all entity type names.

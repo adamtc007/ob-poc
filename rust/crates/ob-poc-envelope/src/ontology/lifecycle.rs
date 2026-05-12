@@ -33,22 +33,22 @@ pub fn is_valid_state(lifecycle: &EntityLifecycle, state: &str) -> bool {
 /// Result of a lifecycle validation check.
 #[derive(Debug, Clone)]
 #[allow(dead_code)]
-pub struct LifecycleValidation {
+pub(crate) struct LifecycleValidation {
     /// Whether the validation passed
-    pub valid: bool,
+    pub(crate) valid: bool,
     /// Current state of the entity
-    pub current_state: String,
+    pub(crate) current_state: String,
     /// Required states for the operation
-    pub required_states: Vec<String>,
+    pub(crate) required_states: Vec<String>,
     /// Target state after operation (if applicable)
-    pub target_state: Option<String>,
+    pub(crate) target_state: Option<String>,
     /// Error message if validation failed
-    pub error: Option<String>,
+    pub(crate) error: Option<String>,
 }
 
 impl LifecycleValidation {
     /// Create a successful validation result.
-    pub fn success(current_state: &str) -> Self {
+    pub(crate) fn success(current_state: &str) -> Self {
         Self {
             valid: true,
             current_state: current_state.to_string(),
@@ -59,7 +59,7 @@ impl LifecycleValidation {
     }
 
     /// Create a failed validation result.
-    pub fn failure(
+    pub(crate) fn failure(
         current_state: &str,
         required_states: Vec<String>,
         target_state: Option<String>,
@@ -77,7 +77,7 @@ impl LifecycleValidation {
 
 /// Validate that an entity is in one of the required states.
 #[allow(dead_code)]
-pub fn validate_required_state(
+pub(crate) fn validate_required_state(
     _lifecycle: &EntityLifecycle,
     current_state: &str,
     required_states: &[String],
@@ -103,7 +103,7 @@ pub fn validate_required_state(
 
 /// Validate that a state transition is allowed.
 #[allow(dead_code)]
-pub fn validate_transition(
+pub(crate) fn validate_transition(
     lifecycle: &EntityLifecycle,
     current_state: &str,
     target_state: &str,
@@ -138,7 +138,7 @@ pub fn is_terminal_state(lifecycle: &EntityLifecycle, state: &str) -> bool {
 
 /// Get all terminal states for a lifecycle.
 #[allow(dead_code)]
-pub fn terminal_states(lifecycle: &EntityLifecycle) -> Vec<&str> {
+pub(crate) fn terminal_states(lifecycle: &EntityLifecycle) -> Vec<&str> {
     lifecycle
         .states
         .iter()

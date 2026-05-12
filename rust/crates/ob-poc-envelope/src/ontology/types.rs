@@ -212,8 +212,8 @@ pub struct ReferenceTableDef {
 // Note: VerbLifecycle is defined in dsl_v2::config::types and re-exported here.
 // This avoids duplication while keeping the ontology module self-contained for docs.
 
-// Re-export VerbLifecycle from dsl_v2 config
-pub use crate::dsl_v2::config::types::VerbLifecycle;
+// Re-export VerbLifecycle from dsl-core (lives one tier down from envelope).
+pub use dsl_core::config::types::VerbLifecycle;
 
 /// Extended VerbProduces with lifecycle info.
 #[derive(Debug, Clone, Default, Deserialize, Serialize)]

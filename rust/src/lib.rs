@@ -71,7 +71,8 @@ pub mod dsl_v2;
 pub mod domain_ops;
 
 // Ontology - Entity taxonomy and lifecycle management
-pub mod ontology;
+// Phase 3 slice 2l (2026-05-12): relocated to ob-poc-envelope; compat re-export.
+pub use ob_poc_envelope::ontology;
 
 // REST API module (when server feature is enabled)
 #[cfg(feature = "server")]

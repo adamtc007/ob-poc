@@ -34,7 +34,7 @@ impl SemanticStageRegistry {
             "config/ontology/semantic_stage_map.yaml",
             concat!(
                 env!("CARGO_MANIFEST_DIR"),
-                "/config/ontology/semantic_stage_map.yaml"
+                "/../../config/ontology/semantic_stage_map.yaml"
             ),
         ];
 
