@@ -19,7 +19,7 @@ impl TraceKind {
     ///
     /// # Examples
     /// ```rust
-    /// use ob_poc::traceability::TraceKind;
+    /// use ob_poc_envelope::traceability::types::TraceKind;
     ///
     /// assert_eq!(TraceKind::Original.as_str(), "original");
     /// ```
@@ -50,7 +50,7 @@ impl TraceOutcome {
     ///
     /// # Examples
     /// ```rust
-    /// use ob_poc::traceability::TraceOutcome;
+    /// use ob_poc_envelope::traceability::types::TraceOutcome;
     ///
     /// assert_eq!(TraceOutcome::InProgress.as_str(), "in_progress");
     /// ```
@@ -85,7 +85,7 @@ impl SurfaceVersions {
     ///
     /// # Examples
     /// ```rust
-    /// use ob_poc::traceability::SurfaceVersions;
+    /// use ob_poc_envelope::traceability::types::SurfaceVersions;
     ///
     /// let versions = SurfaceVersions::current_defaults();
     /// assert!(versions.parser_version.is_some());
@@ -97,9 +97,7 @@ impl SurfaceVersions {
             entity_fsm_version: None,
             constellation_template_version: None,
             #[cfg(feature = "database")]
-            embedding_model_version: Some(
-                crate::agent::learning::embedder::EMBEDDING_MODEL_VERSION.to_string(),
-            ),
+            embedding_model_version: Some("bge-small-en-v1.5".to_string()),
             #[cfg(not(feature = "database"))]
             embedding_model_version: None,
             threshold_policy_version: Some("policy_gate/v1".to_string()),
@@ -171,7 +169,7 @@ impl NewUtteranceTrace {
     ///
     /// # Examples
     /// ```rust
-    /// use ob_poc::traceability::{NewUtteranceTrace, TraceKind};
+    /// use ob_poc_envelope::traceability::types::{NewUtteranceTrace, TraceKind};
     /// use uuid::Uuid;
     ///
     /// let trace = NewUtteranceTrace::in_progress(

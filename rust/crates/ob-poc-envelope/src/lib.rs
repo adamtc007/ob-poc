@@ -30,6 +30,7 @@ pub mod mutation_preflight;
 pub mod session;
 pub mod session_trace;
 pub mod toctou_recheck;
+pub mod traceability;
 pub mod workbook;
 pub mod workbook_diagnostics;
 pub mod workbook_revision;
