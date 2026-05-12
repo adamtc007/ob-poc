@@ -168,8 +168,9 @@ pub use ob_poc_envelope::macros;
 pub use ob_poc_envelope::lexicon;
 
 // Entity Linking module - In-memory entity resolution from utterances
+// Phase 3 slice 2m (2026-05-12): relocated to ob-poc-envelope; compat re-export.
 #[cfg(feature = "database")]
-pub mod entity_linking;
+pub use ob_poc_envelope::entity_linking;
 
 // Lookup module - Unified verb search + entity linking with verb-first ordering
 #[cfg(feature = "database")]
