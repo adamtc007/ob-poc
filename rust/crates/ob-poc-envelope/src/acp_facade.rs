@@ -48,10 +48,10 @@ use crate::acp::{
     self, AcpAdapterError, AcpAdapterKind, AcpKycCaseStateSnapshot, AcpKycLanguageLoopTimedOutcome,
     AcpPersonaMode, AcpPolicyCapabilities, AcpProjectionRequest, AcpSageContextBundle, AcpSession,
 };
-use crate::runbook::{
-    KycLanguagePackRequest, KycUpdateStatusWorkbookDraft, SemOsLanguagePack,
-    UpdateStatusLanguagePackRequest,
+use crate::language_pack::{
+    KycLanguagePackRequest, SemOsLanguagePack, UpdateStatusLanguagePackRequest,
 };
+use crate::workbook_revision::KycUpdateStatusWorkbookDraft;
 
 /// Domain facade for ACP operations. Owns the manifest; mediates between
 /// transport handlers and `crate::acp::*` domain functions.
@@ -202,7 +202,7 @@ impl AcpFacade {
 /// in `acp_protocol.rs` and `api::repl_routes_v2`.
 pub fn load_ob_poc_kyc_domain_pack() -> Result<DomainPackManifest, AcpAdapterError> {
     serde_yaml::from_str(include_str!(
-        "../config/sem_os_seeds/domain_packs/ob_poc_kyc.yaml"
+        "../../../config/sem_os_seeds/domain_packs/ob_poc_kyc.yaml"
     ))
     .map_err(|err| AcpAdapterError::PackInvalid {
         reason: err.to_string(),

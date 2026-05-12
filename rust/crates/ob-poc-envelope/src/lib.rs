@@ -6,6 +6,8 @@
 //! (no `runbook`, no `sequencer`, no `domain_ops`, no `database`, no
 //! `services`). The only allowed downstream is `ob-poc-types`.
 
+pub mod acp;
+pub mod acp_facade;
 pub mod acp_session_input_draft_mode;
 pub mod approval_token;
 pub mod audit_chain;

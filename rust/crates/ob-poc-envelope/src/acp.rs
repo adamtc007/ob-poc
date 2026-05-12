@@ -21,12 +21,17 @@ use serde_json::json;
 use std::time::Instant;
 use uuid::Uuid;
 
-use crate::runbook::{
-    build_kyc_update_status_dry_run, build_kyc_update_status_language_pack,
-    build_update_status_language_pack, run_kyc_update_status_revision_loop,
-    transition_language_pack_readiness_report, KycLanguagePackRequest, KycUpdateStatusDryRunInput,
-    KycUpdateStatusDryRunOutput, KycUpdateStatusDryRunRefusal, KycUpdateStatusWorkbookDraft,
-    LanguagePackError, SemOsLanguagePack, UpdateStatusLanguagePackRequest, WorkbookRevisionOutcome,
+use crate::kyc_dry_run::{
+    build_kyc_update_status_dry_run, KycUpdateStatusDryRunInput, KycUpdateStatusDryRunOutput,
+    KycUpdateStatusDryRunRefusal,
+};
+use crate::language_pack::{
+    build_kyc_update_status_language_pack, build_update_status_language_pack,
+    transition_language_pack_readiness_report, KycLanguagePackRequest, LanguagePackError,
+    SemOsLanguagePack, UpdateStatusLanguagePackRequest,
+};
+use crate::workbook_revision::{
+    run_kyc_update_status_revision_loop, KycUpdateStatusWorkbookDraft, WorkbookRevisionOutcome,
 };
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -836,7 +841,7 @@ mod tests {
 
     fn manifest() -> DomainPackManifest {
         serde_yaml::from_str(include_str!(
-            "../config/sem_os_seeds/domain_packs/ob_poc_kyc.yaml"
+            "../../../config/sem_os_seeds/domain_packs/ob_poc_kyc.yaml"
         ))
         .expect("domain pack parses")
     }

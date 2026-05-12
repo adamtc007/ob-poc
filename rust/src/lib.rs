@@ -24,9 +24,10 @@
 pub use ob_poc_diagnostics::error;
 
 // ACP-facing transport-neutral adapter contracts.
-pub mod acp;
+// Phase 3 slice 2d.1 (2026-05-12): acp + acp_facade relocated to ob-poc-envelope.
+pub use ob_poc_envelope::acp;
 pub mod acp_dag_semantic;
-pub mod acp_facade;
+pub use ob_poc_envelope::acp_facade;
 pub mod acp_pack_context_envelope_v2;
 pub mod acp_protocol;
 pub mod acp_registry_projection;
