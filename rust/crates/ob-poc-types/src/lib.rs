@@ -96,15 +96,54 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
-// Re-export sub-module types for convenience (backward compatible)
-pub use chat::*;
-pub use commands::*;
-pub use decision::*;
-pub use disambiguation::*;
-pub use onboarding_state::*;
-pub use resolution::*;
-pub use session_input::*;
-pub use session_stack::*;
+// Explicit re-exports per feedback_no_wildcard_reexports.md.
+// Replaces 8 wildcard re-exports — surface unchanged, but every type is now
+// reviewable at a glance and follow-on dead-surface audits can prune the list.
+pub use chat::{
+    BindingSummary, ChatDebugInfo, ChatMessage, ChatMessageRole, ChatPayload, ChatRequest,
+    ChatResponse, ChatResponseV2, ChatStreamEvent, CoderProposalPayload, DiscoveryBootstrapPayload,
+    DiscoveryConstellationOption, DiscoveryDomainOption, DiscoveryFamilyOption,
+    DiscoveryInputPrompt, DiscoveryQuestionPrompt, DiscoveryUniverseOption, DslDisplaySegment,
+    EnrichedDsl, EntityCandidateDebug, EntityMentionDebug, EntityResolutionDebug, ParkedEntryPayload,
+    SageExplainPayload, SessionStateEnum, VerbArgProfile, VerbCandidateDebug, VerbEvidenceDebug,
+    VerbMatchDebug, VerbMatchSource, VerbProfile, VerbSelectionPolicyDebug, VerbSurfaceEntry,
+    VerbSurfaceExcludedEntry, VerbSurfaceFilterSummary, VerbSurfacePruneReason, VerbSurfaceResponse,
+};
+pub use commands::{AgentCommand, PanDirection};
+pub use decision::{
+    AffectedEntityPreview, ClarificationPayload, DealClarificationPayload, DealOption,
+    DecisionKind, DecisionPacket, DecisionReplyRequest, DecisionReplyResponse, DecisionTrace,
+    EffectMode, EffectsPreview, EntityChoice, EntityClarificationPayload, GroupClarificationPayload,
+    GroupOption, PlanPreview, ProposalPayload, RefusePayload, ScopeOption, ScopePayload,
+    ScopeSample, SessionStateView, UserChoice, UserReply, VerbPayload,
+};
+pub use disambiguation::{
+    ClientGroupCandidate, DisambiguationItem, DisambiguationRequest, DisambiguationResponse,
+    DisambiguationSelection, EntityMatch, IntentTierNextStep, IntentTierOption, IntentTierRequest,
+    IntentTierSelection, IntentTierSelectionRequest, IntentTierSelectionResponse, Interpretation,
+    VerbDisambiguationRequest, VerbOption, VerbSelectionRequest, VerbSelectionResponse,
+};
+pub use onboarding_state::{
+    BlockedVerb, CbuPhaseStatus, CbuStateCard, ContextResetHint, LayerState, OnboardingLayer,
+    OnboardingStateView, SuggestedVerb, UnreachableVerb, VerbDirection,
+};
+pub use resolution::{
+    CancelResolutionResponse, CommitResolutionResponse, ConfirmAllRequest, ConfirmResolutionRequest,
+    DiscriminatorField, DiscriminatorFieldType, EntityMatchResponse, EntityStatus, EnumValue,
+    RefContext, ResolutionContextInfo, ResolutionMethod, ResolutionModeHint,
+    ResolutionRequiredPayload, ResolutionSearchRequest, ResolutionSearchResponse,
+    ResolutionSessionResponse, ResolutionStateResponse, ResolutionSummary, ResolutionWarning,
+    ResolvedRefResponse, ReviewRequirement, SearchKeyField, SearchKeyFieldType, SearchSuggestions,
+    SelectResolutionRequest, SelectResolutionResponse, StartResolutionRequest, SuggestedAction,
+    SuggestedActionType, UnresolvedRefResponse, WarningSeverity,
+};
+pub use session_input::{
+    DiscoverySelection, DiscoverySelectionKind, SessionInputRequest, SessionInputResponse,
+};
+pub use session_stack::{
+    ConstraintCascadeState, SessionScopeState, SessionStackFrame, SessionStackState,
+    SessionSubjectKind, SessionWorkspaceKind,
+};
 
 // ============================================================================
 // RESOLVED KEY - UUID vs Code distinction
