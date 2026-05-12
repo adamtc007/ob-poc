@@ -7,7 +7,7 @@
 //! ## Usage
 //!
 //! ```rust,no_run
-//! use ob_poc::lint::{lint_macro_file, Severity};
+//! use ob_poc_envelope::lint::{lint_macro_file, Severity};
 //!
 //! let yaml = r#"
 //! structure.setup:

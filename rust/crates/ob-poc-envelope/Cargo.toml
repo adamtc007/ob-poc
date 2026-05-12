@@ -29,6 +29,7 @@ hex = "0.4"
 bincode = "1"
 base64 = "0.22"
 thiserror = "1"
+regex = "1.12.2"
 uuid = { version = "1", features = ["v4", "serde"] }
 # Optional — only needed by the SqlRowVersionProvider gated behind the
 # `database` feature in toctou_recheck.

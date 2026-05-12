@@ -154,7 +154,8 @@ pub mod calibration;
 pub mod taxonomy;
 
 // Lint module - schema validation for macro and verb definitions
-pub mod lint;
+// Phase 3 slice 2g (2026-05-12): relocated to ob-poc-envelope; compat re-export.
+pub use ob_poc_envelope::lint;
 
 // Macros module - Operator macro registry for business vocabulary
 pub mod macros;
