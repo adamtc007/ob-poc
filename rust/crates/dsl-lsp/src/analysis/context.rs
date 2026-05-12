@@ -18,7 +18,7 @@ use crate::encoding::{position_to_offset, PositionEncoding};
 /// Context for completion.
 #[derive(Debug, Clone)]
 #[allow(dead_code)]
-pub enum CompletionContext {
+pub(crate) enum CompletionContext {
     /// Completing a verb name (after open paren)
     VerbName { prefix: String },
     /// Completing a keyword name (after colon)
@@ -73,7 +73,10 @@ fn get_text_up_to_position(doc: &DocumentState, position: Position) -> String {
 }
 
 /// Detect the completion context at a position.
-pub fn detect_completion_context(doc: &DocumentState, position: Position) -> CompletionContext {
+pub(crate) fn detect_completion_context(
+    doc: &DocumentState,
+    position: Position,
+) -> CompletionContext {
     // Get all text up to the cursor position for proper multiline context
     let prefix = get_text_up_to_position(doc, position);
 

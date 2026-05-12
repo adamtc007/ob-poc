@@ -40,7 +40,7 @@ use crate::encoding::{span_to_range as encoding_span_to_range, PositionEncoding}
 /// Parse document using v2 parser and convert to LSP types.
 ///
 /// This uses the SAME parser as the agent pipeline, ensuring consistency.
-pub fn parse_with_v2(text: &str) -> (DocumentState, Vec<Diagnostic>) {
+pub(crate) fn parse_with_v2(text: &str) -> (DocumentState, Vec<Diagnostic>) {
     let mut state = DocumentState::new(text.to_string());
     let mut diagnostics = Vec::new();
 

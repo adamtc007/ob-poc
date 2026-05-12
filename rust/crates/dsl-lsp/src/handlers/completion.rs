@@ -13,7 +13,7 @@ use ob_poc::dsl_v2::tooling::{find_unified_verb, registry};
 use ob_poc::dsl_v2::{execution::runtime_registry, load_macro_registry};
 
 /// Generate completions based on cursor position.
-pub async fn get_completions(
+pub(crate) async fn get_completions(
     doc: &DocumentState,
     position: Position,
     symbols: &SymbolTable,
@@ -550,7 +550,7 @@ fn infer_type_from_keyword_pattern(keyword: &str) -> Option<String> {
 }
 
 /// Get verb completions for playbook files (macro verbs + primitive verbs)
-pub fn playbook_verb_completions() -> Vec<CompletionItem> {
+pub(crate) fn playbook_verb_completions() -> Vec<CompletionItem> {
     let mut items = Vec::new();
 
     // First, add macro verbs (operator vocabulary)

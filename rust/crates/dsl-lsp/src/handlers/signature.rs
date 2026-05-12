@@ -7,7 +7,7 @@ use crate::analysis::DocumentState;
 use ob_poc::dsl_v2::tooling::find_unified_verb;
 
 /// Get signature help at position.
-pub fn get_signature_help(doc: &DocumentState, position: Position) -> Option<SignatureHelp> {
+pub(crate) fn get_signature_help(doc: &DocumentState, position: Position) -> Option<SignatureHelp> {
     // Find which verb call we're in
     for expr in &doc.expressions {
         if let crate::analysis::document::ExprKind::Call {

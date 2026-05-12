@@ -8,20 +8,20 @@ use super::document::DocumentState;
 
 /// Symbol information.
 #[derive(Debug, Clone)]
-pub struct SymbolInfo {
+pub(crate) struct SymbolInfo {
     /// Where the symbol is defined
-    pub definition: Location,
+    pub(crate) definition: Location,
     /// What verb defined it
-    pub defined_by: String,
+    pub(crate) defined_by: String,
     /// What type of ID it holds (e.g., "CbuId", "EntityId")
-    pub id_type: String,
+    pub(crate) id_type: String,
     /// All references to this symbol
-    pub references: Vec<Location>,
+    pub(crate) references: Vec<Location>,
 }
 
 /// Cross-document symbol table.
 #[derive(Debug, Clone, Default)]
-pub struct SymbolTable {
+pub(crate) struct SymbolTable {
     /// Symbols by name
     symbols: HashMap<String, SymbolInfo>,
     /// Symbols by document URI (for cleanup on close)
@@ -30,12 +30,12 @@ pub struct SymbolTable {
 
 impl SymbolTable {
     /// Create a new empty symbol table.
-    pub fn new() -> Self {
+    pub(crate) fn new() -> Self {
         Self::default()
     }
 
     /// Merge symbols from a document into the table.
-    pub fn merge_from_document(&mut self, uri: &Url, doc: &DocumentState) {
+    pub(crate) fn merge_from_document(&mut self, uri: &Url, doc: &DocumentState) {
         // Clear existing symbols from this document
         if let Some(old_symbols) = self.by_document.remove(uri) {
             for name in old_symbols {
@@ -73,22 +73,22 @@ impl SymbolTable {
     }
 
     /// Get symbol info by name.
-    pub fn get(&self, name: &str) -> Option<&SymbolInfo> {
+    pub(crate) fn get(&self, name: &str) -> Option<&SymbolInfo> {
         self.symbols.get(name)
     }
 
     /// Get all symbol names.
-    pub fn all_names(&self) -> Vec<&str> {
+    pub(crate) fn all_names(&self) -> Vec<&str> {
         self.symbols.keys().map(|s| s.as_str()).collect()
     }
 
     /// Get all symbols.
-    pub fn all(&self) -> impl Iterator<Item = (&str, &SymbolInfo)> {
+    pub(crate) fn all(&self) -> impl Iterator<Item = (&str, &SymbolInfo)> {
         self.symbols.iter().map(|(k, v)| (k.as_str(), v))
     }
 
     /// Find symbol at location.
-    pub fn find_at_location(&self, uri: &Url, range: Range) -> Option<(&str, &SymbolInfo)> {
+    pub(crate) fn find_at_location(&self, uri: &Url, range: Range) -> Option<(&str, &SymbolInfo)> {
         for (name, info) in &self.symbols {
             // Check definition
             if info.definition.uri == *uri && ranges_overlap(&info.definition.range, &range) {

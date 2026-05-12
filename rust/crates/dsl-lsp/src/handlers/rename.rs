@@ -10,7 +10,10 @@ use tower_lsp::lsp_types::*;
 use crate::analysis::DocumentState;
 
 /// Prepare rename - check if rename is valid at position.
-pub fn prepare_rename(doc: &DocumentState, position: Position) -> Option<PrepareRenameResponse> {
+pub(crate) fn prepare_rename(
+    doc: &DocumentState,
+    position: Position,
+) -> Option<PrepareRenameResponse> {
     // Check if cursor is on a symbol definition
     for def in &doc.symbol_defs {
         if position_in_range(position, &def.range) {
@@ -29,7 +32,7 @@ pub fn prepare_rename(doc: &DocumentState, position: Position) -> Option<Prepare
 }
 
 /// Execute rename - return workspace edit.
-pub fn rename_symbol(
+pub(crate) fn rename_symbol(
     doc: &DocumentState,
     position: Position,
     new_name: &str,

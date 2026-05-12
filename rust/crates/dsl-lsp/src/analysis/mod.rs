@@ -7,7 +7,7 @@ pub mod document;
 mod symbols;
 mod v2_adapter;
 
-pub use context::{detect_completion_context, CompletionContext};
-pub use document::DocumentState;
-pub use symbols::SymbolTable;
-pub use v2_adapter::parse_with_v2;
+pub(crate) use context::{detect_completion_context, CompletionContext};
+pub(crate) use document::DocumentState;
+pub(crate) use symbols::SymbolTable;
+pub(crate) use v2_adapter::parse_with_v2;

@@ -12,25 +12,25 @@ use tonic::transport::Channel;
 
 /// Result of an entity lookup
 #[derive(Debug, Clone)]
-pub struct EntityMatch {
+pub(crate) struct EntityMatch {
     /// The input that produced this match
-    pub input: String,
+    pub(crate) input: String,
     /// Human-readable display name
-    pub display: String,
+    pub(crate) display: String,
     /// The resolved ID (UUID)
-    pub id: String,
+    pub(crate) id: String,
     /// Relevance score (0.0 - 1.0)
-    pub score: f32,
+    pub(crate) score: f32,
 }
 
 /// Client for entity lookups via the EntityGateway service.
-pub struct EntityLookupClient {
+pub(crate) struct EntityLookupClient {
     client: EntityGatewayClient<Channel>,
 }
 
 impl EntityLookupClient {
     /// Connect to the EntityGateway service.
-    pub async fn connect(addr: &str) -> Result<Self, tonic::transport::Error> {
+    pub(crate) async fn connect(addr: &str) -> Result<Self, tonic::transport::Error> {
         let client = EntityGatewayClient::connect(addr.to_string()).await?;
         Ok(Self { client })
     }
@@ -41,7 +41,7 @@ impl EntityLookupClient {
     /// * `nickname` - Entity type (e.g., "CBU", "PERSON", "ENTITY")
     /// * `prefix` - Search prefix for fuzzy matching
     /// * `limit` - Maximum results to return
-    pub async fn search(
+    pub(crate) async fn search(
         &mut self,
         nickname: &str,
         prefix: &str,
@@ -75,7 +75,7 @@ impl EntityLookupClient {
     }
 
     /// Search for CBUs by name prefix.
-    pub async fn find_cbu(
+    pub(crate) async fn find_cbu(
         &mut self,
         prefix: &str,
         limit: usize,
@@ -84,7 +84,7 @@ impl EntityLookupClient {
     }
 
     /// Search for entities (all types) by name prefix.
-    pub async fn find_entity(
+    pub(crate) async fn find_entity(
         &mut self,
         prefix: &str,
         limit: usize,
@@ -93,7 +93,7 @@ impl EntityLookupClient {
     }
 
     /// Search for persons by name prefix.
-    pub async fn find_person(
+    pub(crate) async fn find_person(
         &mut self,
         prefix: &str,
         limit: usize,
@@ -102,7 +102,7 @@ impl EntityLookupClient {
     }
 
     /// Search for products by name prefix.
-    pub async fn find_product(
+    pub(crate) async fn find_product(
         &mut self,
         prefix: &str,
         limit: usize,
@@ -111,7 +111,7 @@ impl EntityLookupClient {
     }
 
     /// Search for legal entities (companies) by name prefix.
-    pub async fn find_legal_entity(
+    pub(crate) async fn find_legal_entity(
         &mut self,
         prefix: &str,
         limit: usize,
@@ -121,9 +121,9 @@ impl EntityLookupClient {
 }
 
 /// Default EntityGateway address
-pub const DEFAULT_GATEWAY_ADDR: &str = "http://[::1]:50051";
+pub(crate) const DEFAULT_GATEWAY_ADDR: &str = "http://[::1]:50051";
 
 /// Get gateway address from environment or use default
-pub fn gateway_addr() -> String {
+pub(crate) fn gateway_addr() -> String {
     std::env::var("ENTITY_GATEWAY_URL").unwrap_or_else(|_| DEFAULT_GATEWAY_ADDR.to_string())
 }

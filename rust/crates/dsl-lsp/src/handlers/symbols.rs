@@ -7,7 +7,7 @@ use crate::analysis::DocumentState;
 
 /// Get document symbols (outline).
 #[allow(deprecated)]
-pub fn get_document_symbols(doc: &DocumentState) -> Vec<SymbolInformation> {
+pub(crate) fn get_document_symbols(doc: &DocumentState) -> Vec<SymbolInformation> {
     let mut symbols = Vec::new();
 
     for expr in &doc.expressions {

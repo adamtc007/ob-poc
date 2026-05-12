@@ -33,7 +33,7 @@ fn file_type(uri: &Url) -> FileType {
 }
 
 /// DSL Language Server state.
-pub struct DslLanguageServer {
+pub(crate) struct DslLanguageServer {
     /// LSP client for sending notifications
     client: Client,
     /// Open documents and their state
@@ -52,7 +52,7 @@ pub struct DslLanguageServer {
 
 impl DslLanguageServer {
     /// Create a new language server instance.
-    pub fn new(client: Client) -> Self {
+    pub(crate) fn new(client: Client) -> Self {
         Self {
             client,
             documents: Arc::new(RwLock::new(HashMap::new())),
@@ -84,14 +84,14 @@ impl DslLanguageServer {
     }
 
     /// Get the entity client (if connected)
-    pub async fn get_entity_client(&self) -> Option<EntityLookupClient> {
+    pub(crate) async fn get_entity_client(&self) -> Option<EntityLookupClient> {
         // Clone the client for use - we need to reconnect each time since gRPC clients are !Clone
         let addr = gateway_addr();
         (EntityLookupClient::connect(&addr).await).ok()
     }
 
     /// Get a document by URL.
-    pub async fn get_document(&self, uri: &Url) -> Option<DocumentState> {
+    pub(crate) async fn get_document(&self, uri: &Url) -> Option<DocumentState> {
         self.documents.read().await.get(uri).cloned()
     }
 
@@ -152,12 +152,12 @@ impl DslLanguageServer {
     }
 
     /// Get planning output for a document (for code actions)
-    pub async fn get_planning_output(&self, uri: &Url) -> Option<PlanningOutput> {
+    pub(crate) async fn get_planning_output(&self, uri: &Url) -> Option<PlanningOutput> {
         self.planning_outputs.read().await.get(uri).cloned()
     }
 
     /// Get semantic diagnostics for a document (for entity suggestion code actions)
-    pub async fn get_semantic_diagnostics(&self, uri: &Url) -> Vec<SemanticDiagnostic> {
+    pub(crate) async fn get_semantic_diagnostics(&self, uri: &Url) -> Vec<SemanticDiagnostic> {
         self.semantic_diagnostics
             .read()
             .await

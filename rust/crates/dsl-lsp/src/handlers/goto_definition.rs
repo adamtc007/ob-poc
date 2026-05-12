@@ -10,7 +10,7 @@ use crate::analysis::{DocumentState, SymbolTable};
 ///
 /// The `uri` parameter is the document URI, passed by the caller
 /// so we can build proper Location objects.
-pub fn get_definition(
+pub(crate) fn get_definition(
     doc: &DocumentState,
     position: Position,
     symbols: &SymbolTable,
@@ -42,7 +42,7 @@ pub fn get_definition(
 }
 
 /// Get definition with proper URI (called from server with document URI).
-pub fn get_definition_with_uri(
+pub(crate) fn get_definition_with_uri(
     doc: &DocumentState,
     position: Position,
     symbols: &SymbolTable,
@@ -74,7 +74,7 @@ pub fn get_definition_with_uri(
 }
 
 /// Get all references to symbol at position.
-pub fn get_references(
+pub(crate) fn get_references(
     doc: &DocumentState,
     position: Position,
     symbols: &SymbolTable,
@@ -99,7 +99,7 @@ pub fn get_references(
 }
 
 /// Get all references with proper URI for document-local fallback.
-pub fn get_references_with_uri(
+pub(crate) fn get_references_with_uri(
     doc: &DocumentState,
     position: Position,
     symbols: &SymbolTable,

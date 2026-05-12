@@ -18,7 +18,7 @@ use ob_poc::dsl_v2::tooling::{
 /// - Quick fixes for implicit creates (undefined symbols)
 /// - Refactoring actions for reordering
 /// - Entity suggestion quick fixes (e.g., "Did you mean 'John Smith'?")
-pub fn get_code_actions(
+pub(crate) fn get_code_actions(
     planning_output: &PlanningOutput,
     semantic_diagnostics: &[SemanticDiagnostic],
     range: Range,

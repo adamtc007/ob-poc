@@ -5,7 +5,7 @@ use playbook_lower::{lower_playbook, SlotState};
 use tower_lsp::lsp_types::*;
 
 /// Analyze a playbook YAML file and return diagnostics
-pub async fn analyze_playbook(source: &str) -> Vec<Diagnostic> {
+pub(crate) async fn analyze_playbook(source: &str) -> Vec<Diagnostic> {
     let mut diagnostics = Vec::new();
 
     // Parse the playbook

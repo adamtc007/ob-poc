@@ -50,25 +50,25 @@ fn create_planning_registry() -> Option<Arc<RuntimeVerbRegistry>> {
 }
 
 /// Result of document analysis including planning info for code actions
-pub struct AnalysisResult {
-    pub state: DocumentState,
-    pub diagnostics: Vec<Diagnostic>,
-    pub planning_output: PlanningOutput,
+pub(crate) struct AnalysisResult {
+    pub(crate) state: DocumentState,
+    pub(crate) diagnostics: Vec<Diagnostic>,
+    pub(crate) planning_output: PlanningOutput,
     /// Semantic diagnostics with entity suggestions (for code actions)
-    pub semantic_diagnostics: Vec<SemanticDiagnostic>,
+    pub(crate) semantic_diagnostics: Vec<SemanticDiagnostic>,
 }
 
 /// Analyze a document with full semantic validation via EntityGateway.
 ///
 /// This is the primary validation path - uses the same validator as the server,
 /// plus the planning facade for DAG-based dependency analysis.
-pub async fn analyze_document_async(text: &str) -> (DocumentState, Vec<Diagnostic>) {
+pub(crate) async fn analyze_document_async(text: &str) -> (DocumentState, Vec<Diagnostic>) {
     let result = analyze_document_full(text).await;
     (result.state, result.diagnostics)
 }
 
 /// Full analysis returning planning output for code actions
-pub async fn analyze_document_full(text: &str) -> AnalysisResult {
+pub(crate) async fn analyze_document_full(text: &str) -> AnalysisResult {
     // Step 1: Parse to get DocumentState (for LSP features like symbols, completions)
     let (state, mut diagnostics) = parse_with_v2(text);
 
