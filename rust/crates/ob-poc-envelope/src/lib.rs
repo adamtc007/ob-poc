@@ -7,9 +7,12 @@
 //! `services`). The only allowed downstream is `ob-poc-types`.
 
 pub mod acp;
+pub mod acp_dag_semantic;
 pub mod acp_facade;
 pub mod acp_pack_context_envelope_v2;
+pub mod acp_protocol;
 pub mod acp_registry_projection;
+pub mod acp_runtime_context;
 pub mod acp_session_input_draft_mode;
 pub mod journey;
 pub mod approval_token;

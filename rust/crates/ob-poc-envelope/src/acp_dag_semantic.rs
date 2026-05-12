@@ -1199,7 +1199,7 @@ fn build_rejected_candidates(
 /// # Examples
 ///
 /// ```rust,no_run
-/// use ob_poc::acp_dag_semantic::resolve_acp_dag_semantic_prompt_with_verified_envelopes;
+/// use ob_poc_envelope::acp_dag_semantic::resolve_acp_dag_semantic_prompt_with_verified_envelopes;
 ///
 /// let config_root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("config");
 /// let resolution = resolve_acp_dag_semantic_prompt_with_verified_envelopes(
@@ -1653,7 +1653,9 @@ fn semantic_index() -> Result<&'static AcpDagSemanticIndex, String> {
                 }
             }
             rows.extend(slice_macro_rows());
-            let packs_dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("config/packs");
+            // CARGO_MANIFEST_DIR resolves to repo/rust/crates/ob-poc-envelope; the
+            // shared config tree lives at repo/rust/config (two levels up).
+            let packs_dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../config/packs");
             let packs = load_packs_from_dir(&packs_dir)
                 .map_err(|error| error.to_string())?
                 .into_iter()
@@ -2185,7 +2187,7 @@ fn template_context_for_selected_verb(
         })
 }
 
-fn workspace_context_name(workspace: &crate::repl::types_v2::WorkspaceKind) -> String {
+fn workspace_context_name(workspace: &crate::session::WorkspaceKind) -> String {
     serde_json::to_value(workspace)
         .ok()
         .and_then(|value| value.as_str().map(str::to_string))

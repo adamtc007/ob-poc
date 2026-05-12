@@ -17,10 +17,12 @@ use crate::acp_dag_semantic::{
     resolve_acp_dag_semantic_prompt_with_verified_envelopes, AcpDagSemanticResolution,
     AcpDagSemanticStatus,
 };
-use crate::runbook::{
-    KycLanguagePackRequest, KycUpdateStatusDryRunInput, KycUpdateStatusDryRunOutput,
-    KycUpdateStatusWorkbookDraft, LanguageAcquisitionMetrics, SemOsLanguagePack,
-    StructuredWorkbookRefusal, WorkbookDiagnostic, WorkbookDraftAttempt, WorkbookRevisionOutcome,
+use crate::kyc_dry_run::{KycUpdateStatusDryRunInput, KycUpdateStatusDryRunOutput};
+use crate::language_pack::{KycLanguagePackRequest, SemOsLanguagePack};
+use crate::workbook_diagnostics::WorkbookDiagnostic;
+use crate::workbook_revision::{
+    KycUpdateStatusWorkbookDraft, LanguageAcquisitionMetrics, StructuredWorkbookRefusal,
+    WorkbookDraftAttempt, WorkbookRevisionOutcome,
 };
 
 pub const ACP_PROTOCOL_VERSION: &str = "0.4.3";
@@ -730,7 +732,9 @@ impl AcpJsonRpcAgent {
     ) -> Option<Vec<JsonRpcOutgoing>> {
         let route_started_at = Instant::now();
         let utterance_text = prompt_utterance_text(prompt);
-        let config_root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("config");
+        // CARGO_MANIFEST_DIR resolves to repo/rust/crates/ob-poc-envelope; the
+        // shared config tree lives at repo/rust/config (two levels up).
+        let config_root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../config");
         let resolution = match resolve_acp_dag_semantic_prompt_with_verified_envelopes(
             &utterance_text,
             config_root,
@@ -1211,7 +1215,7 @@ impl AcpJsonRpcAgent {
                 Ok(subject_id) => subject_id,
                 Err(error) => return self.error(id, INVALID_PARAMS, error.to_string(), None),
             };
-            Some(crate::runbook::UpdateStatusLanguagePackRequest {
+            Some(crate::language_pack::UpdateStatusLanguagePackRequest {
                 subject_id,
                 subject_kind: subject.subject_kind.clone(),
                 verb: request.verb.unwrap_or_else(|| {
@@ -1387,7 +1391,7 @@ impl AcpJsonRpcAgent {
         let started_at = Instant::now();
         match facade.language_pack_for(
             &session,
-            crate::runbook::UpdateStatusLanguagePackRequest {
+            crate::language_pack::UpdateStatusLanguagePackRequest {
                 subject_id: request.subject_id,
                 subject_kind: request.subject_kind,
                 verb: request.verb,
