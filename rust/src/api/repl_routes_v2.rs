@@ -2014,7 +2014,7 @@ async fn run_acp_prompt_llm_draft_value_with_client(
     req: KycUpdateStatusLlmDraftInput,
     client: Result<std::sync::Arc<dyn ob_agentic::llm_client::LlmClient>, String>,
 ) -> Result<serde_json::Value, crate::acp::AcpAdapterError> {
-    let manifest = load_ob_poc_kyc_domain_pack()?;
+    let facade = crate::acp_facade::AcpFacade::for_default_pack(req.adapter)?;
     let session = crate::acp::open_acp_session(session_id, req.adapter);
     let total_started_at = Instant::now();
     let actor_id = req
@@ -2029,7 +2029,7 @@ async fn run_acp_prompt_llm_draft_value_with_client(
 
     let case_state = crate::acp::AcpKycCaseStateSnapshot {
         session_id,
-        pack_id: manifest.pack_id.clone(),
+        pack_id: facade.manifest().pack_id.clone(),
         subject_kind: "kyc_case".to_string(),
         subject_id: req.subject_id,
         current_state: req.current_state.clone(),
@@ -2039,9 +2039,8 @@ async fn run_acp_prompt_llm_draft_value_with_client(
     };
 
     let language_pack_started_at = Instant::now();
-    let language_pack = crate::acp::acp_kyc_update_status_language_pack(
+    let language_pack = facade.kyc_language_pack_for(
         &session,
-        &manifest,
         crate::runbook::KycLanguagePackRequest {
             subject_id: case_state.subject_id,
             current_state: case_state.current_state.clone(),
@@ -2071,7 +2070,7 @@ async fn run_acp_prompt_llm_draft_value_with_client(
 
     let adapter_started_at = Instant::now();
     let outcome = crate::runbook::run_kyc_update_status_llm_draft_loop(
-        &manifest,
+        facade.manifest(),
         &language_pack,
         session_id,
         actor_id,
@@ -5615,12 +5614,12 @@ mod tests {
         client: Result<std::sync::Arc<dyn ob_agentic::llm_client::LlmClient>, String>,
     ) -> Result<(serde_json::Value, crate::runbook::SemOsLanguagePack), crate::acp::AcpAdapterError>
     {
-        let manifest = load_ob_poc_kyc_domain_pack()?;
         let prompt_request = crate::acp_protocol::AcpJsonRpcAgent::new()
             .kyc_update_status_language_loop_request_from_prompt(session_id, &req.prompt)
             .map_err(|missing| crate::acp::AcpAdapterError::LanguagePackRefused {
                 reason: format!("prompt missing {}", missing.join(", ")),
             })?;
+        let facade = crate::acp_facade::AcpFacade::for_default_pack(prompt_request.adapter)?;
         let session = crate::acp::open_acp_session(session_id, prompt_request.adapter);
         let total_started_at = Instant::now();
         let actor_id = prompt_request.draft.actor_id.clone();
@@ -5631,7 +5630,7 @@ mod tests {
         };
         let case_state = crate::acp::AcpKycCaseStateSnapshot {
             session_id,
-            pack_id: manifest.pack_id.clone(),
+            pack_id: facade.manifest().pack_id.clone(),
             subject_kind: "kyc_case".to_string(),
             subject_id: prompt_request.subject_id,
             current_state: prompt_request.current_state.clone(),
@@ -5652,9 +5651,8 @@ mod tests {
         };
 
         let language_pack_started_at = Instant::now();
-        let validation_pack = crate::acp::acp_kyc_update_status_language_pack(
+        let validation_pack = facade.kyc_language_pack_for(
             &session,
-            &manifest,
             crate::runbook::KycLanguagePackRequest {
                 subject_id: case_state.subject_id,
                 current_state: case_state.current_state.clone(),
@@ -5686,7 +5684,7 @@ mod tests {
 
         let adapter_started_at = Instant::now();
         let outcome = crate::runbook::run_kyc_update_status_llm_draft_loop_with_prompt_pack(
-            &manifest,
+            facade.manifest(),
             &prompt_pack,
             &validation_pack,
             session_id,

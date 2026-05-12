@@ -179,6 +179,14 @@ impl AcpFacade {
         acp::acp_update_status_language_pack(session, &self.manifest, request)
     }
 
+    pub fn kyc_language_pack_for(
+        &self,
+        session: &AcpSession,
+        request: KycLanguagePackRequest,
+    ) -> Result<SemOsLanguagePack, AcpAdapterError> {
+        acp::acp_kyc_update_status_language_pack(session, &self.manifest, request)
+    }
+
     pub fn kyc_language_loop_timed_for(
         &self,
         session: &AcpSession,
