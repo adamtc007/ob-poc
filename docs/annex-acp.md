@@ -1,9 +1,12 @@
 # ACP Annex
 
-> **Status:** Partial — Phase A/B/C of the ACP audit remediation plan have landed.
-> Phase C is partial (REST fully through the facade; stdio partially). Follow-up work
-> (remaining stdio handlers, AcpPromptRouter, live-overlay folding into the facade) is
-> tracked at the bottom of this annex.
+> **Status:** Phases A/B/C/D/E/F of the ACP audit remediation plan have landed.
+> REST and stdio both route through the `AcpFacade` for every domain operation
+> that takes the Domain Pack manifest. `obpoc_kyc_dry_run` is the lone direct
+> `acp::*` caller (no manifest dependence, no duplication to collapse).
+> Determinism replay (`xtask acp-envelope-byte-equality-check`) passes
+> byte-for-byte against the v3 baseline. Remaining follow-ups (AcpPromptRouter,
+> live-overlay → facade) are tracked at the bottom of this annex.
 
 ## What ACP is
 
@@ -149,29 +152,36 @@ without taking a `ReplSessionV2` dependency.
 
 ## Follow-up work
 
-These items were scoped to a later slice when Phase C of the audit landed:
+These items were considered during the audit and either deferred with a plan
+or parked correctly:
 
-- **Stdio facade adoption — remaining handlers.** `obpoc_projection_get`,
-  `obpoc_kyc_case_state_discover`, `obpoc_language_pack_get`,
-  `obpoc_kyc_update_status_language_loop`, and `obpoc_kyc_dry_run` still
-  inline the `(load_manifest, cache_lookup_or_open_session, domain_fn)`
-  pattern. They will follow the same conversion as `obpoc_policy` /
-  `obpoc_projection_list` / `obpoc_context` after the arg-extraction blocks
-  in each handler are refactored.
+- **`obpoc_kyc_dry_run` not on the facade — by design.** Unlike every other
+  stdio handler, dry-run does not load the Domain Pack manifest (it only
+  needs the cached session). Routing it through the facade would force an
+  unnecessary YAML reload per call. The single-path invariant is satisfied
+  by simple non-duplication — there is one production caller of
+  `acp::acp_dry_run_kyc_update_status`, no parallel path.
 
 - **`AcpPromptRouter`.** `session_prompt` (`acp_protocol.rs:601`) currently
   has implicit probe ordering — `try_session_prompt_kyc_update_status` runs
   first and can short-circuit before `try_session_prompt_dag_semantic` is
-  evaluated. Centralize this into an explicit prompt router with a stable
-  order rule documented in one place.
+  evaluated. Parked correctly: a behavior-preserving refactor adds a routing
+  struct without changing the order, and a behavior-changing refactor needs
+  an owner decision on what the order should be. Reactivate when either a
+  third probe lands or the order needs to change.
 
 - **Live overlay → facade.** See the model section above. Requires either an
-  overlay trait or moving the overlay closer to the facade.
+  overlay trait (`LiveProjectionOverlay`) or moving the overlay closer to
+  the facade. Not yet sketched in code; deferred until a real consumer asks
+  for stdio to receive live overlay data.
 
-- **Determinism replay.** Per v0.5 §16 the build-determinism invariant
-  requires byte-equal envelope output for the same inputs. Phase C touched
-  the gateway path; a fixture-replay before/after is recommended before
-  the remaining stdio handlers are migrated.
+- **Determinism replay — running.** Per v0.5 §16, byte-equal envelope output
+  for the same inputs is enforced by the xtask harness
+  `acp-envelope-byte-equality-check` against `tools/acp_envelope_baseline_v3.json`.
+  The harness was run after every audit phase (A→F) and continues to pass
+  byte-for-byte across all 4 baseline entries. Bump the baseline via
+  `cargo run -p xtask -- acp-envelope-byte-equality-check --bless` after
+  reviewing intentional envelope changes.
 
 ## See also
 
