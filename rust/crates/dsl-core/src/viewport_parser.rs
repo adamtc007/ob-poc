@@ -1,3 +1,5 @@
+#![allow(dead_code)] // Dormant module: viewport parser kept for forthcoming React cockpit work.
+
 //! Viewport verb parser - converts VerbCall AST to ViewportVerb types
 //!
 //! This module handles the semantic parsing of viewport domain verbs.
@@ -38,20 +40,20 @@ use crate::ast::{
 
 /// Error type for viewport verb parsing
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct ViewportParseError {
-    pub message: String,
-    pub span: Option<Span>,
+pub(crate) struct ViewportParseError {
+    pub(crate) message: String,
+    pub(crate) span: Option<Span>,
 }
 
 impl ViewportParseError {
-    pub fn new(message: impl Into<String>) -> Self {
+    pub(crate) fn new(message: impl Into<String>) -> Self {
         Self {
             message: message.into(),
             span: None,
         }
     }
 
-    pub fn with_span(mut self, span: Span) -> Self {
+    pub(crate) fn with_span(mut self, span: Span) -> Self {
         self.span = Some(span);
         self
     }
@@ -66,10 +68,10 @@ impl std::fmt::Display for ViewportParseError {
 impl std::error::Error for ViewportParseError {}
 
 /// Result type for viewport parsing operations
-pub type ViewportParseResult<T> = Result<T, ViewportParseError>;
+pub(crate) type ViewportParseResult<T> = Result<T, ViewportParseError>;
 
 /// Check if a VerbCall is a viewport domain verb
-pub fn is_viewport_verb(verb_call: &VerbCall) -> bool {
+pub(crate) fn is_viewport_verb(verb_call: &VerbCall) -> bool {
     verb_call.domain.eq_ignore_ascii_case("viewport")
 }
 
@@ -78,7 +80,7 @@ pub fn is_viewport_verb(verb_call: &VerbCall) -> bool {
 /// Returns `Ok(None)` if the verb is not in the viewport domain.
 /// Returns `Ok(Some(ViewportVerb))` if parsing succeeds.
 /// Returns `Err(ViewportParseError)` if the verb is viewport but malformed.
-pub fn parse_viewport_verb(verb_call: &VerbCall) -> ViewportParseResult<Option<ViewportVerb>> {
+pub(crate) fn parse_viewport_verb(verb_call: &VerbCall) -> ViewportParseResult<Option<ViewportVerb>> {
     if !is_viewport_verb(verb_call) {
         return Ok(None);
     }
@@ -371,7 +373,7 @@ fn parse_enhance_arg(arg: &str) -> ViewportParseResult<EnhanceArg> {
 // ============================================================================
 
 /// Parse all viewport verbs from a program
-pub fn extract_viewport_verbs(
+pub(crate) fn extract_viewport_verbs(
     program: &crate::ast::Program,
 ) -> ViewportParseResult<Vec<ViewportVerb>> {
     let mut verbs = Vec::new();
