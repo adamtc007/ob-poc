@@ -7,7 +7,7 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
-use super::types_v2::{AgentMode, WorkspaceKind};
+use crate::session::{AgentMode, WorkspaceKind};
 
 // ---------------------------------------------------------------------------
 // SnapshotPolicy

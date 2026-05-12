@@ -40,8 +40,8 @@ pub mod acp_state_anchor;
 pub use ob_poc_envelope::llm_trace;
 
 // Audit-chain reconstruction for ACP/workbook/dry-run traces.
-#[cfg(feature = "database")]
-pub mod audit_chain;
+// Phase 3 slice 2c.3 (2026-05-12): relocated to ob-poc-envelope crate; compat re-export.
+pub use ob_poc_envelope::audit_chain;
 
 // Data dictionary
 pub mod data_dictionary;

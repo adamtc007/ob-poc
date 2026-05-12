@@ -9,12 +9,12 @@ use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 use uuid::Uuid;
 
+use crate::approval_token::ApprovalTokenId;
+use crate::dsl_coder::{DslCoderDryRunResult, DslCoderValidationStepStatus};
 use crate::llm_trace::LlmInferenceTrace;
-use crate::repl::session_trace::{TraceEntry, TraceOp, TraceValidationStep};
-use crate::runbook::{
-    ApprovalTokenId, DslCoderDryRunResult, DslCoderValidationStepStatus, ExecutionWorkbook,
-    ExecutionWorkbookId, ExecutionWorkbookValidationError, RestrictedMutationPreflight,
-};
+use crate::mutation_preflight::RestrictedMutationPreflight;
+use crate::session_trace::{TraceEntry, TraceOp, TraceValidationStep};
+use crate::workbook::{ExecutionWorkbook, ExecutionWorkbookId, ExecutionWorkbookValidationError};
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct AuditChainProof {
@@ -324,14 +324,18 @@ mod tests {
     use crate::llm_trace::{
         record_llm_inference_trace, workbook_llm_trace_ref, LlmInferenceTraceInput,
     };
-    use crate::repl::session_trace::TraceEntry;
-    use crate::repl::types_v2::AgentMode;
-    use crate::runbook::{
-        ApprovalTokenId, DslCoderDryRunResult, DslCoderValidationStep,
-        DslCoderValidationStepStatus, EvidenceRef, ExecutionWorkbook, ExecutionWorkbookCore,
-        MutationExecutor, MutationSemanticDiff, RestrictedMutationApprovalCheck,
-        RestrictedMutationPreflight, StaleWorkbookPolicy, WorkbookActor, WorkbookExecutionMode,
-        WorkbookSubject,
+    use crate::approval_token::{ApprovalTokenId, RestrictedMutationApprovalCheck};
+    use crate::dsl_coder::{
+        DslCoderDryRunResult, DslCoderValidationStep, DslCoderValidationStepStatus,
+    };
+    use crate::mutation_preflight::{
+        MutationExecutor, MutationSemanticDiff, RestrictedMutationPreflight,
+    };
+    use crate::session::AgentMode;
+    use crate::session_trace::TraceEntry;
+    use crate::workbook::{
+        EvidenceRef, ExecutionWorkbook, ExecutionWorkbookCore, StaleWorkbookPolicy, WorkbookActor,
+        WorkbookExecutionMode, WorkbookSubject,
     };
     use chrono::Utc;
     use sem_os_core::state_simulation::{
@@ -553,7 +557,7 @@ mod tests {
         let trace = llm_trace();
         let mut workbook = workbook(true);
         workbook.core.llm_trace_ref.as_mut().unwrap().prompt_hash = "sha256:other".to_string();
-        workbook.id = crate::runbook::compute_workbook_id(&workbook.core);
+        workbook.id = crate::workbook::compute_workbook_id(&workbook.core);
         let dry_run = dry_run(&workbook);
         let err = validate_audit_chain(
             SESSION_ID,

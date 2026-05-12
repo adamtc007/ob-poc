@@ -8,9 +8,12 @@
 
 pub mod acp_session_input_draft_mode;
 pub mod approval_token;
+pub mod audit_chain;
 pub mod dsl_coder;
 pub mod envelope_builder;
 pub mod llm_trace;
 pub mod mutation_preflight;
+pub mod session;
+pub mod session_trace;
 pub mod toctou_recheck;
 pub mod workbook;
