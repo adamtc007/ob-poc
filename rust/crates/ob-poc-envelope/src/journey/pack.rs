@@ -18,7 +18,7 @@
 
 use std::path::Path;
 
-use crate::repl::types_v2::WorkspaceKind;
+use crate::session::WorkspaceKind;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
@@ -609,7 +609,9 @@ templates:
 
     #[test]
     fn test_repo_pack_manifests_parse_strictly() {
-        let packs_dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("config/packs");
+        // CARGO_MANIFEST_DIR resolves to repo/rust/crates/ob-poc-envelope; the
+        // shared config tree lives at repo/rust/config (two levels up).
+        let packs_dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../config/packs");
         let packs = load_packs_from_dir(&packs_dir).unwrap();
 
         assert!(!packs.is_empty());

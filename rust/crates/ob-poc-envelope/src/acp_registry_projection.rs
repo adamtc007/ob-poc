@@ -20,7 +20,7 @@ use crate::journey::pack::{
     load_packs_from_dir, AnswerKind, PackManifest, PackQuestion, PackTemplate, RiskPolicy,
     TemplateStep,
 };
-use crate::repl::types_v2::WorkspaceKind;
+use crate::session::WorkspaceKind;
 
 /// Schema version for the Slice 1 ACP registry projection.
 pub const ACP_REGISTRY_PROJECTION_SCHEMA_VERSION: &str = "acp_registry_projection_v1";
@@ -611,7 +611,7 @@ struct PlanHashMaterial<'a> {
 /// # Examples
 ///
 /// ```rust,no_run
-/// use ob_poc::acp_registry_projection::build_slice1_acp_registry_projection;
+/// use ob_poc_envelope::acp_registry_projection::build_slice1_acp_registry_projection;
 ///
 /// let config_root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("config");
 /// let projection = build_slice1_acp_registry_projection(config_root).unwrap();
@@ -2664,7 +2664,9 @@ mod tests {
     use super::*;
 
     fn repo_config_root() -> std::path::PathBuf {
-        std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("config")
+        // CARGO_MANIFEST_DIR resolves to repo/rust/crates/ob-poc-envelope; the
+        // shared config tree lives at repo/rust/config (two levels up).
+        std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../config")
     }
 
     #[test]

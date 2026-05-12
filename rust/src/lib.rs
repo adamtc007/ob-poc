@@ -24,13 +24,13 @@
 pub use ob_poc_diagnostics::error;
 
 // ACP-facing transport-neutral adapter contracts.
-// Phase 3 slice 2d.1 (2026-05-12): acp + acp_facade relocated to ob-poc-envelope.
+// Phase 3 slice 2d.1/2d.2 (2026-05-12): partial extraction to ob-poc-envelope.
 pub use ob_poc_envelope::acp;
 pub mod acp_dag_semantic;
 pub use ob_poc_envelope::acp_facade;
-pub mod acp_pack_context_envelope_v2;
+pub use ob_poc_envelope::acp_pack_context_envelope_v2;
 pub mod acp_protocol;
-pub mod acp_registry_projection;
+pub use ob_poc_envelope::acp_registry_projection;
 pub mod acp_runtime_context;
 // Phase 3 slice 2a (2026-05-12): relocated to ob-poc-envelope crate; compat re-export.
 pub use ob_poc_envelope::acp_session_input_draft_mode;

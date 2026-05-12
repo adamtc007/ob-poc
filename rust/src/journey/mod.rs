@@ -13,7 +13,8 @@
 //! - **Pack Handoff** (`handoff.rs`): Context forwarding between packs.
 
 pub mod handoff;
-pub mod pack;
+// Phase 3 slice 2d.2 (2026-05-12): pack manifest types relocated to ob-poc-envelope.
+pub use ob_poc_envelope::journey::pack;
 pub mod pack_manager;
 pub mod pack_state;
 pub mod playback;
