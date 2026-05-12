@@ -128,12 +128,6 @@ pub mod sem_os_runtime;
 #[cfg(feature = "database")]
 pub mod derived_attributes;
 
-// Service-options framework (Phase 2): repository and pure planning logic.
-#[cfg(feature = "database")]
-pub mod service_options {
-    pub use sem_os_postgres::service_options::*;
-}
-
 // Phase 5a composite #2 — `cross_workspace` relocated to
 // `dsl-runtime::cross_workspace`. External callers reach it via
 // `dsl_runtime::cross_workspace::*` now. `WorkspaceKind` dep was

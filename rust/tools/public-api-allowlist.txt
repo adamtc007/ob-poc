@@ -182,5 +182,4 @@ src/lib.rs:pub use domains::{DomainHandler, DomainRegistry, DomainResult};
 src/lib.rs:pub use dsl_v2::execution::{
 src/lib.rs:pub use dsl_v2::{
 src/lib.rs:pub use error::{DSLError, ParseError};
-src/lib.rs:pub use sem_os_postgres::service_options::*;
 src/lib.rs:pub use system_info as get_system_info;
