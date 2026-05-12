@@ -19,81 +19,81 @@ use uuid::Uuid;
 
 /// Input data for generating a deal projection.
 #[derive(Debug, Clone)]
-pub struct DealInput {
-    pub deal_id: Uuid,
-    pub deal_name: String,
-    pub deal_status: String,
-    pub client_group_name: Option<String>,
-    pub product_count: i32,
-    pub rate_card_count: i32,
-    pub products: Vec<DealProductInput>,
-    pub participants: Vec<DealParticipantInput>,
-    pub contracts: Vec<DealContractInput>,
-    pub onboarding_requests: Vec<OnboardingRequestInput>,
+pub(crate) struct DealInput {
+    pub(crate) deal_id: Uuid,
+    pub(crate) deal_name: String,
+    pub(crate) deal_status: String,
+    pub(crate) client_group_name: Option<String>,
+    pub(crate) product_count: i32,
+    pub(crate) rate_card_count: i32,
+    pub(crate) products: Vec<DealProductInput>,
+    pub(crate) participants: Vec<DealParticipantInput>,
+    pub(crate) contracts: Vec<DealContractInput>,
+    pub(crate) onboarding_requests: Vec<OnboardingRequestInput>,
 }
 
 /// Product within a deal.
 #[derive(Debug, Clone)]
-pub struct DealProductInput {
-    pub deal_product_id: Uuid,
-    pub product_name: String,
-    pub product_code: Option<String>,
-    pub product_category: Option<String>,
-    pub product_status: String,
-    pub rate_cards: Vec<RateCardInput>,
+pub(crate) struct DealProductInput {
+    pub(crate) deal_product_id: Uuid,
+    pub(crate) product_name: String,
+    pub(crate) product_code: Option<String>,
+    pub(crate) product_category: Option<String>,
+    pub(crate) product_status: String,
+    pub(crate) rate_cards: Vec<RateCardInput>,
 }
 
 /// Rate card within a product.
 #[derive(Debug, Clone)]
-pub struct RateCardInput {
-    pub rate_card_id: Uuid,
-    pub rate_card_name: String,
-    pub effective_from: String,
-    pub effective_to: Option<String>,
-    pub status: Option<String>,
-    pub lines: Vec<RateCardLineInput>,
+pub(crate) struct RateCardInput {
+    pub(crate) rate_card_id: Uuid,
+    pub(crate) rate_card_name: String,
+    pub(crate) effective_from: String,
+    pub(crate) effective_to: Option<String>,
+    pub(crate) status: Option<String>,
+    pub(crate) lines: Vec<RateCardLineInput>,
 }
 
 /// Line item within a rate card.
 #[derive(Debug, Clone)]
-pub struct RateCardLineInput {
-    pub line_id: Uuid,
-    pub fee_type: String,
-    pub fee_subtype: String,
-    pub pricing_model: String,
-    pub rate_value: Option<String>,
-    pub currency: Option<String>,
+pub(crate) struct RateCardLineInput {
+    pub(crate) line_id: Uuid,
+    pub(crate) fee_type: String,
+    pub(crate) fee_subtype: String,
+    pub(crate) pricing_model: String,
+    pub(crate) rate_value: Option<String>,
+    pub(crate) currency: Option<String>,
 }
 
 /// Participant in a deal.
 #[derive(Debug, Clone)]
-pub struct DealParticipantInput {
-    pub participant_id: Uuid,
-    pub entity_id: Uuid,
-    pub entity_name: String,
-    pub role: String,
-    pub jurisdiction: Option<String>,
+pub(crate) struct DealParticipantInput {
+    pub(crate) participant_id: Uuid,
+    pub(crate) entity_id: Uuid,
+    pub(crate) entity_name: String,
+    pub(crate) role: String,
+    pub(crate) jurisdiction: Option<String>,
 }
 
 /// Contract within a deal.
 #[derive(Debug, Clone)]
-pub struct DealContractInput {
-    pub contract_id: Uuid,
-    pub contract_name: String,
-    pub contract_type: String,
-    pub effective_date: Option<String>,
-    pub status: String,
+pub(crate) struct DealContractInput {
+    pub(crate) contract_id: Uuid,
+    pub(crate) contract_name: String,
+    pub(crate) contract_type: String,
+    pub(crate) effective_date: Option<String>,
+    pub(crate) status: String,
 }
 
 /// Onboarding request linked to a deal.
 #[derive(Debug, Clone)]
-pub struct OnboardingRequestInput {
-    pub request_id: Uuid,
-    pub request_type: String,
-    pub status: String,
-    pub cbu_id: Option<Uuid>,
-    pub cbu_name: Option<String>,
-    pub created_at: String,
+pub(crate) struct OnboardingRequestInput {
+    pub(crate) request_id: Uuid,
+    pub(crate) request_type: String,
+    pub(crate) status: String,
+    pub(crate) cbu_id: Option<Uuid>,
+    pub(crate) cbu_name: Option<String>,
+    pub(crate) created_at: String,
 }
 
 // ============================================================================
@@ -101,18 +101,18 @@ pub struct OnboardingRequestInput {
 // ============================================================================
 
 /// Generator for deal taxonomy projections.
-pub struct DealGenerator {
+pub(crate) struct DealGenerator {
     policy: RenderPolicy,
 }
 
 impl DealGenerator {
     /// Create a new generator with the given render policy.
-    pub fn new(policy: RenderPolicy) -> Self {
+    pub(crate) fn new(policy: RenderPolicy) -> Self {
         Self { policy }
     }
 
     /// Generate an InspectorProjection from deal input data.
-    pub fn generate(&self, deal: &DealInput) -> InspectorProjection {
+    pub(crate) fn generate(&self, deal: &DealInput) -> InspectorProjection {
         let mut projection = InspectorProjection::new();
 
         // Set snapshot metadata
