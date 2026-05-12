@@ -171,8 +171,9 @@ pub mod gleif;
 #[cfg(feature = "database")]
 pub mod research;
 
-// Event infrastructure - always-on, zero-overhead event capture from DSL pipeline
-pub mod events;
+// Event infrastructure — relocated to ob-poc-diagnostics (Phase 3 Slice 1b).
+// Re-exported to keep the `ob_poc::events::*` path stable.
+pub use ob_poc_diagnostics::events;
 
 // Agent learning infrastructure - continuous improvement from user interactions
 #[cfg(feature = "database")]
