@@ -65,7 +65,7 @@ fn with_fqn(mut payload: serde_json::Value, fqn: &str) -> serde_json::Value {
 }
 
 /// Scan operator macro YAML into Sem OS `MacroDefSeed` objects.
-pub fn scan_macro_defs() -> Result<Vec<MacroDefSeed>> {
+pub(crate) fn scan_macro_defs() -> Result<Vec<MacroDefSeed>> {
     let dir = repo_rust_root().join("config/verb_schemas/macros");
     let mut seeds = Vec::new();
     for (path, value) in read_yaml_files(&dir)? {
@@ -89,7 +89,7 @@ pub fn scan_macro_defs() -> Result<Vec<MacroDefSeed>> {
 }
 
 /// Scan constellation map YAML into Sem OS `ConstellationMapSeed` objects.
-pub fn scan_universes() -> Result<Vec<UniverseSeed>> {
+pub(crate) fn scan_universes() -> Result<Vec<UniverseSeed>> {
     let dir = repo_rust_root().join("config/sem_os_seeds/universes");
     let mut seeds = Vec::new();
     for (_path, value) in read_yaml_files(&dir)? {
@@ -108,7 +108,7 @@ pub fn scan_universes() -> Result<Vec<UniverseSeed>> {
 }
 
 /// Scan constellation family YAML into Sem OS `ConstellationFamilySeed` objects.
-pub fn scan_constellation_families() -> Result<Vec<ConstellationFamilySeed>> {
+pub(crate) fn scan_constellation_families() -> Result<Vec<ConstellationFamilySeed>> {
     let dir = repo_rust_root().join("config/sem_os_seeds/constellation_families");
     let mut seeds = Vec::new();
     for (_path, value) in read_yaml_files(&dir)? {
@@ -127,7 +127,7 @@ pub fn scan_constellation_families() -> Result<Vec<ConstellationFamilySeed>> {
 }
 
 /// Scan constellation map YAML into Sem OS `ConstellationMapSeed` objects.
-pub fn scan_constellation_maps() -> Result<Vec<ConstellationMapSeed>> {
+pub(crate) fn scan_constellation_maps() -> Result<Vec<ConstellationMapSeed>> {
     let dir = repo_rust_root().join("config/sem_os_seeds/constellation_maps");
     let mut seeds = Vec::new();
     for (_path, value) in read_yaml_files(&dir)? {
@@ -146,7 +146,7 @@ pub fn scan_constellation_maps() -> Result<Vec<ConstellationMapSeed>> {
 }
 
 /// Scan reducer state machine YAML into Sem OS `StateMachineSeed` objects.
-pub fn scan_state_machines() -> Result<Vec<StateMachineSeed>> {
+pub(crate) fn scan_state_machines() -> Result<Vec<StateMachineSeed>> {
     let dir = repo_rust_root().join("config/sem_os_seeds/state_machines");
     let mut seeds = Vec::new();
     for (_path, value) in read_yaml_files(&dir)? {
@@ -165,7 +165,7 @@ pub fn scan_state_machines() -> Result<Vec<StateMachineSeed>> {
 }
 
 /// Scan stategraph YAML into Sem OS `StateGraphSeed` objects.
-pub fn scan_state_graphs() -> Result<Vec<StateGraphSeed>> {
+pub(crate) fn scan_state_graphs() -> Result<Vec<StateGraphSeed>> {
     let dir = repo_rust_root().join("config/stategraphs");
     let mut seeds = Vec::new();
     for (_path, value) in read_yaml_files(&dir)? {
@@ -185,7 +185,7 @@ pub fn scan_state_graphs() -> Result<Vec<StateGraphSeed>> {
 }
 
 /// Scan DAG taxonomy YAML into Sem OS `DagTaxonomySeed` objects.
-pub fn scan_dag_taxonomies() -> Result<Vec<DagTaxonomySeed>> {
+pub(crate) fn scan_dag_taxonomies() -> Result<Vec<DagTaxonomySeed>> {
     let dir = repo_rust_root().join("config/sem_os_seeds/dag_taxonomies");
     let mut seeds = Vec::new();
     for (_path, value) in read_yaml_files(&dir)? {
