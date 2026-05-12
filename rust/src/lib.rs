@@ -31,7 +31,8 @@ pub mod acp_pack_context_envelope_v2;
 pub mod acp_protocol;
 pub mod acp_registry_projection;
 pub mod acp_runtime_context;
-pub mod acp_session_input_draft_mode;
+// Phase 3 slice 2a (2026-05-12): relocated to ob-poc-envelope crate; compat re-export.
+pub use ob_poc_envelope::acp_session_input_draft_mode;
 pub mod acp_state_anchor;
 
 // LLM inference trace hashing and workbook binding.
@@ -80,14 +81,16 @@ pub mod agentic;
 // Builds a `GatedVerbEnvelope` alongside the existing dispatch path as a
 // determinism-harness observable. Does not gate execution yet — Phase B
 // (F6) is the slice that makes the envelope the primary dispatch contract.
-pub mod envelope_builder;
+// Phase 3 slice 2a (2026-05-12): relocated to ob-poc-envelope crate; compat re-export.
+pub use ob_poc_envelope::envelope_builder;
 
 // Phase D.3 — TOCTOU recheck scaffold (2026-04-22). Verifies the
 // state_gate_hash computed at gate time still matches the current DB
 // state after the Sequencer has acquired row locks inside its outer
 // transaction. Pure scaffolding until D.2 migration is applied
 // AND real envelopes are constructed at stage 6.
-pub mod toctou_recheck;
+// Phase 3 slice 2a (2026-05-12): relocated to ob-poc-envelope crate; compat re-export.
+pub use ob_poc_envelope::toctou_recheck;
 
 // Graph visualization module
 #[cfg(feature = "database")]
