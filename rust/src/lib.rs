@@ -34,6 +34,10 @@ pub use ob_poc_envelope::acp_registry_projection;
 pub mod acp_runtime_context;
 // Phase 3 slice 2a (2026-05-12): relocated to ob-poc-envelope crate; compat re-export.
 pub use ob_poc_envelope::acp_session_input_draft_mode;
+// Phase 3 slice 2d.5 (2026-05-12): mixed-purity split — pure boundary types
+// (descriptors, registries, reports, outcomes, DealTransitionSpec) live in
+// ob-poc-envelope; Repl-coupled async drivers stay in src/ and re-export the
+// envelope surface at module top.
 pub mod acp_state_anchor;
 
 // LLM inference trace hashing and workbook binding.
