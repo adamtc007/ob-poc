@@ -121,7 +121,8 @@ pub mod session;
 pub mod workflow;
 
 // Trading profile document types and materialization
-pub mod trading_profile;
+// Phase 3 slice 2k (2026-05-12): relocated to ob-poc-envelope; compat re-export.
+pub use ob_poc_envelope::trading_profile;
 
 // Template system for DSL generation
 pub mod templates;

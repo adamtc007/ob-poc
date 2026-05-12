@@ -33,6 +33,7 @@ pub mod session;
 pub mod session_trace;
 pub mod toctou_recheck;
 pub mod traceability;
+pub mod trading_profile;
 pub mod workbook;
 pub mod workbook_diagnostics;
 pub mod workbook_revision;
