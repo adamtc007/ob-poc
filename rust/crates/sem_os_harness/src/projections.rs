@@ -111,7 +111,7 @@ fn make_evidence_strategy_seed(fqn: &str, obligation_fqn: &str) -> EvidenceStrat
 /// Run the projection scenario suite against any SemOsClient + pool.
 ///
 /// The pool is needed to query sem_reg_pub tables directly for assertions.
-pub async fn run_projection_scenario_suite(client: &dyn SemOsClient, pool: &PgPool) {
+pub(crate) async fn run_projection_scenario_suite(client: &dyn SemOsClient, pool: &PgPool) {
     test_projection_watermark_advances(client, pool).await;
 }
 

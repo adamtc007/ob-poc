@@ -18,7 +18,7 @@ use std::str::FromStr;
 /// **Prerequisites:** The roles and privileges SQL scripts must have been applied to the
 /// test database before running these tests. The caller (test harness) is responsible for
 /// running `sem_os_roles.sql` and `sem_os_privileges.sql` against the test DB.
-pub async fn run_permission_scenario_suite(admin_pool: &PgPool, admin_url: &str, dbname: &str) {
+pub(crate) async fn run_permission_scenario_suite(admin_pool: &PgPool, admin_url: &str, dbname: &str) {
     // First, ensure the roles exist and privileges are applied in the test DB.
     setup_roles_and_privileges(admin_pool).await;
 

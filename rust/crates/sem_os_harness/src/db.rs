@@ -11,7 +11,7 @@ use std::path::Path;
 use std::str::FromStr;
 
 /// Holds the test database pool, name, and admin connection for cleanup.
-pub struct IsolatedDb {
+pub(crate) struct IsolatedDb {
     /// Pool connected to the isolated test database.
     pub(crate) pool: PgPool,
     /// Name of the temporary database.
@@ -36,7 +36,7 @@ fn is_sem_reg_migration(filename: &str) -> bool {
 ///
 /// `admin_url` should point to a database that allows CREATE/DROP DATABASE
 /// (typically `postgresql:///postgres` or `postgresql:///data_designer`).
-pub async fn isolated_db(admin_url: &str) -> IsolatedDb {
+pub(crate) async fn isolated_db(admin_url: &str) -> IsolatedDb {
     let dbname = format!("sem_os_test_{}", uuid::Uuid::new_v4().simple());
 
     let admin_opts = PgConnectOptions::from_str(admin_url).expect("admin_url parse failed");
@@ -101,7 +101,7 @@ async fn run_sem_reg_migrations(pool: &PgPool, dir: &Path) {
 }
 
 /// Drop the isolated test database. Call this in cleanup, even on failure.
-pub async fn drop_db(iso: IsolatedDb) {
+pub(crate) async fn drop_db(iso: IsolatedDb) {
     // Close the test pool first so connections don't block the DROP.
     iso.pool.close().await;
 

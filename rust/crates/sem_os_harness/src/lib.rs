@@ -19,17 +19,24 @@ mod permissions;
 #[cfg(test)]
 mod projections;
 
+#[cfg(test)]
 use sem_os_client::SemOsClient;
+#[cfg(test)]
 use sem_os_core::context_resolution::{EvidenceMode, ResolutionConstraints, SubjectRef};
+#[cfg(test)]
 use sem_os_core::error::SemOsError;
+#[cfg(test)]
 use sem_os_core::principal::Principal;
+#[cfg(test)]
 use sem_os_core::seeds::*;
+#[cfg(test)]
 use uuid::Uuid;
 
 /// Run the core scenario suite against any SemOsClient implementation.
 ///
 /// This is the regression gate for all subsequent stages.
-pub async fn run_core_scenario_suite(client: &dyn SemOsClient) {
+#[cfg(test)]
+pub(crate) async fn run_core_scenario_suite(client: &dyn SemOsClient) {
     test_gate_suite_outcomes(client).await;
     test_publish_invariants(client).await;
     test_context_resolution_determinism(client).await;
@@ -38,10 +45,12 @@ pub async fn run_core_scenario_suite(client: &dyn SemOsClient) {
 
 // ── Helpers ───────────────────────────────────────────────────
 
+#[cfg(test)]
 fn test_principal() -> Principal {
     Principal::in_process("harness-agent", vec!["admin".into(), "analyst".into()])
 }
 
+#[cfg(test)]
 fn make_verb_contract_seed(fqn: &str, domain: &str, description: &str) -> VerbContractSeed {
     VerbContractSeed {
         fqn: fqn.into(),
@@ -57,6 +66,7 @@ fn make_verb_contract_seed(fqn: &str, domain: &str, description: &str) -> VerbCo
     }
 }
 
+#[cfg(test)]
 fn make_attribute_seed(fqn: &str, domain: &str, name: &str) -> AttributeSeed {
     AttributeSeed {
         fqn: fqn.into(),
@@ -71,6 +81,7 @@ fn make_attribute_seed(fqn: &str, domain: &str, name: &str) -> AttributeSeed {
     }
 }
 
+#[cfg(test)]
 fn make_entity_type_seed(fqn: &str, domain: &str, name: &str) -> EntityTypeSeed {
     EntityTypeSeed {
         fqn: fqn.into(),
@@ -84,6 +95,7 @@ fn make_entity_type_seed(fqn: &str, domain: &str, name: &str) -> EntityTypeSeed 
     }
 }
 
+#[cfg(test)]
 fn make_taxonomy_seed(fqn: &str, domain: &str, name: &str) -> TaxonomySeed {
     TaxonomySeed {
         fqn: fqn.into(),
@@ -96,6 +108,7 @@ fn make_taxonomy_seed(fqn: &str, domain: &str, name: &str) -> TaxonomySeed {
     }
 }
 
+#[cfg(test)]
 fn make_policy_seed(fqn: &str, domain: &str, name: &str) -> PolicySeed {
     PolicySeed {
         fqn: fqn.into(),
@@ -111,6 +124,7 @@ fn make_policy_seed(fqn: &str, domain: &str, name: &str) -> PolicySeed {
     }
 }
 
+#[cfg(test)]
 fn make_view_seed(fqn: &str, domain: &str, name: &str, entity_type: &str) -> ViewSeed {
     ViewSeed {
         fqn: fqn.into(),
@@ -128,6 +142,7 @@ fn make_view_seed(fqn: &str, domain: &str, name: &str, entity_type: &str) -> Vie
     }
 }
 
+#[cfg(test)]
 fn build_test_seed_bundle() -> SeedBundle {
     let verb_contracts = vec![
         make_verb_contract_seed("kyc-case.create", "kyc", "Open a KYC case"),
@@ -190,6 +205,7 @@ fn build_test_seed_bundle() -> SeedBundle {
 /// 1. Bootstrap a known seed bundle (should succeed).
 /// 2. Bootstrap the same bundle again (should be idempotent — all skipped).
 /// 3. Verify created + skipped counts.
+#[cfg(test)]
 async fn test_gate_suite_outcomes(client: &dyn SemOsClient) {
     tracing::info!("test_gate_suite_outcomes: starting");
     let principal = test_principal();
@@ -253,6 +269,7 @@ async fn test_gate_suite_outcomes(client: &dyn SemOsClient) {
 /// 3. Verify that drain completes without error (meaning outbox events existed
 ///    and were processed, or there were none to process — either way, no orphans).
 /// 4. Bootstrap again to confirm no duplicate outbox events.
+#[cfg(test)]
 async fn test_publish_invariants(client: &dyn SemOsClient) {
     tracing::info!("test_publish_invariants: starting");
     let principal = test_principal();
@@ -303,6 +320,7 @@ async fn test_publish_invariants(client: &dyn SemOsClient) {
 
 /// Test that context resolution is deterministic:
 /// same input + same data = same output, every time.
+#[cfg(test)]
 async fn test_context_resolution_determinism(client: &dyn SemOsClient) {
     tracing::info!("test_context_resolution_determinism: starting");
     let principal = test_principal();
@@ -383,6 +401,7 @@ async fn test_context_resolution_determinism(client: &dyn SemOsClient) {
 /// 1. Bootstrap seed data, capturing a snapshot_set_id.
 /// 2. Query the manifest twice.
 /// 3. Assert entry count and FQNs are identical.
+#[cfg(test)]
 async fn test_manifest_stability(client: &dyn SemOsClient) {
     tracing::info!("test_manifest_stability: starting");
     let principal = test_principal();
@@ -491,13 +510,15 @@ async fn test_manifest_stability(client: &dyn SemOsClient) {
 /// handles verb dispatch, symbol propagation, unknown verbs, and outcome types.
 /// The scenarios use a pre-loaded MockVerbExecutor; for integration testing with
 /// a real executor, use the external harness in `tests/verb_execution_port_test.rs`.
-pub async fn run_execution_scenario_suite(executor: &dyn dsl_runtime::VerbExecutionPort) {
+#[cfg(test)]
+pub(crate) async fn run_execution_scenario_suite(executor: &dyn dsl_runtime::VerbExecutionPort) {
     test_execution_uuid_outcome(executor).await;
     test_execution_record_outcome(executor).await;
     test_execution_symbol_propagation(executor).await;
     test_execution_unknown_verb_error(executor).await;
 }
 
+#[cfg(test)]
 async fn test_execution_uuid_outcome(executor: &dyn dsl_runtime::VerbExecutionPort) {
     let mut ctx = dsl_runtime::VerbExecutionContext::new(test_principal());
     let result = executor
@@ -525,6 +546,7 @@ async fn test_execution_uuid_outcome(executor: &dyn dsl_runtime::VerbExecutionPo
     }
 }
 
+#[cfg(test)]
 async fn test_execution_record_outcome(executor: &dyn dsl_runtime::VerbExecutionPort) {
     let mut ctx = dsl_runtime::VerbExecutionContext::new(test_principal());
     let result = executor
@@ -550,6 +572,7 @@ async fn test_execution_record_outcome(executor: &dyn dsl_runtime::VerbExecution
     }
 }
 
+#[cfg(test)]
 async fn test_execution_symbol_propagation(executor: &dyn dsl_runtime::VerbExecutionPort) {
     let mut ctx = dsl_runtime::VerbExecutionContext::new(test_principal());
     let result = executor
@@ -583,6 +606,7 @@ async fn test_execution_symbol_propagation(executor: &dyn dsl_runtime::VerbExecu
     }
 }
 
+#[cfg(test)]
 async fn test_execution_unknown_verb_error(executor: &dyn dsl_runtime::VerbExecutionPort) {
     let mut ctx = dsl_runtime::VerbExecutionContext::new(test_principal());
     let result = executor
