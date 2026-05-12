@@ -18,7 +18,6 @@ pub mod agent_types;
 pub mod agent_routes;
 
 #[cfg(feature = "server")]
-#[allow(dead_code)]
 pub mod agent_state;
 
 #[cfg(feature = "server")]

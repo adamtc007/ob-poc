@@ -49,8 +49,8 @@ use crate::acp::{
     AcpPersonaMode, AcpPolicyCapabilities, AcpProjectionRequest, AcpSageContextBundle, AcpSession,
 };
 use crate::runbook::{
-    KycLanguagePackRequest, KycUpdateStatusDryRunInput, KycUpdateStatusDryRunOutput,
-    KycUpdateStatusWorkbookDraft, SemOsLanguagePack, UpdateStatusLanguagePackRequest,
+    KycLanguagePackRequest, KycUpdateStatusWorkbookDraft, SemOsLanguagePack,
+    UpdateStatusLanguagePackRequest,
 };
 
 /// Domain facade for ACP operations. Owns the manifest; mediates between
@@ -91,11 +91,6 @@ impl AcpFacade {
         persona: AcpPersonaMode,
     ) -> AcpSession {
         acp::open_acp_session_with_persona(session_id, self.adapter, persona)
-    }
-
-    /// Close a session.
-    pub fn close_session(&self, session: &mut AcpSession) {
-        acp::close_acp_session(session);
     }
 
     // Domain operations are exposed in two variants:
@@ -167,15 +162,6 @@ impl AcpFacade {
         acp::assemble_sage_context_for_acp(session, &self.manifest, request, response)
     }
 
-    pub fn kyc_case_state_discover(
-        &self,
-        session_id: Uuid,
-        case_id: Uuid,
-        response: DiscoveryResponse,
-    ) -> Result<AcpKycCaseStateSnapshot, AcpAdapterError> {
-        self.kyc_case_state_discover_for(&self.session(session_id), case_id, response)
-    }
-
     pub fn kyc_case_state_discover_for(
         &self,
         session: &AcpSession,
@@ -185,53 +171,12 @@ impl AcpFacade {
         acp::acp_discover_kyc_case_state(session, &self.manifest, case_id, response)
     }
 
-    pub fn kyc_dry_run(
-        &self,
-        session_id: Uuid,
-        input: KycUpdateStatusDryRunInput,
-    ) -> Result<KycUpdateStatusDryRunOutput, AcpAdapterError> {
-        acp::acp_dry_run_kyc_update_status(&self.session(session_id), input)
-    }
-
-    pub fn language_pack(
-        &self,
-        session_id: Uuid,
-        request: UpdateStatusLanguagePackRequest,
-    ) -> Result<SemOsLanguagePack, AcpAdapterError> {
-        self.language_pack_for(&self.session(session_id), request)
-    }
-
     pub fn language_pack_for(
         &self,
         session: &AcpSession,
         request: UpdateStatusLanguagePackRequest,
     ) -> Result<SemOsLanguagePack, AcpAdapterError> {
         acp::acp_update_status_language_pack(session, &self.manifest, request)
-    }
-
-    pub fn kyc_language_pack(
-        &self,
-        session_id: Uuid,
-        request: KycLanguagePackRequest,
-    ) -> Result<SemOsLanguagePack, AcpAdapterError> {
-        self.kyc_language_pack_for(&self.session(session_id), request)
-    }
-
-    pub fn kyc_language_pack_for(
-        &self,
-        session: &AcpSession,
-        request: KycLanguagePackRequest,
-    ) -> Result<SemOsLanguagePack, AcpAdapterError> {
-        acp::acp_kyc_update_status_language_pack(session, &self.manifest, request)
-    }
-
-    pub fn kyc_language_loop_timed(
-        &self,
-        session_id: Uuid,
-        request: KycLanguagePackRequest,
-        draft: KycUpdateStatusWorkbookDraft,
-    ) -> Result<AcpKycLanguageLoopTimedOutcome, AcpAdapterError> {
-        self.kyc_language_loop_timed_for(&self.session(session_id), request, draft)
     }
 
     pub fn kyc_language_loop_timed_for(

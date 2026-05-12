@@ -477,12 +477,11 @@ pub async fn extract_entity_ref_opt(
 }
 
 // ============================================================================
-// VerbExecutionContext extensions transport (Phase 2.5 Slice B+)
+// VerbExecutionContext extensions transport
 // ============================================================================
-// Native `execute_json` bodies read/write session-scoped side-channel state
-// through `VerbExecutionContext.extensions` under stable JSON keys. These
-// helpers replace the legacy `ExecutionContext.pending_*` field access
-// pattern used by session/view/agent ops.
+// Op bodies read/write session-scoped side-channel state through
+// `VerbExecutionContext.extensions` under stable JSON keys. These helpers
+// pack/unpack that state for session/view/agent ops.
 
 use crate::session::{UnifiedSession, ViewState};
 

@@ -700,7 +700,6 @@ async fn get_session_v2(
 }
 
 /// Internal REPL V2 input adapter — retained for direct REPL access.
-#[allow(dead_code)]
 pub(crate) async fn input_v2(
     State(state): State<ReplV2RouteState>,
     Path(session_id): Path<Uuid>,
@@ -733,23 +732,6 @@ async fn delete_session_v2(
     }
 
     Ok(StatusCode::NO_CONTENT)
-}
-
-#[allow(dead_code)] // Route provided by create_constellation_router; retained for reference
-async fn get_constellation_context(
-    State(state): State<ReplV2RouteState>,
-    axum::extract::Query(query): axum::extract::Query<SessionContextQuery>,
-) -> Result<Json<SessionFeedback>, (StatusCode, Json<ErrorResponseV2>)> {
-    match state.orchestrator.session_feedback(query.session_id).await {
-        Ok(feedback) => Ok(Json(feedback)),
-        Err(error) => Err((
-            StatusCode::NOT_FOUND,
-            Json(ErrorResponseV2 {
-                error: error.to_string(),
-                recoverable: true,
-            }),
-        )),
-    }
 }
 
 async fn push_session_context(

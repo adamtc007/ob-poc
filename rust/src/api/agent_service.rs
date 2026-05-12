@@ -395,7 +395,8 @@ pub struct AgentService {
     service_registry: Option<Arc<dsl_runtime::ServiceRegistry>>,
 }
 
-#[allow(dead_code)] // Remaining helpers pending further decomposition
+#[allow(dead_code)] // Phase-5 recheck helpers + execution-artifact projection are retained
+// pending decomposition into a dedicated agent_service_phase5 module.
 impl AgentService {
     fn response_needs_follow_up(response: &AgentChatResponse) -> bool {
         response.decision.is_some()

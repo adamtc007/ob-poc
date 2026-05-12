@@ -404,93 +404,10 @@ pub fn to_verb_outcome_pub(result: &ExecutionResult) -> VerbExecutionOutcome {
     to_verb_outcome(result)
 }
 
-/// Sync mutations from a thunk's fresh `ExecutionContext` back into the
-/// caller's `VerbExecutionContext` — used by the Phase 2c compatibility
-/// shim so `execute_json_via_legacy` no longer drops mutations.
-///
-/// Propagates:
-/// - new/changed `symbols` + `symbol_types` entries
-/// - `pending_*` side-channel state into `sem_ctx.extensions` under stable
-///   JSON keys (later unpacked by `apply_sem_ctx_extensions_to_exec_ctx`
-///   at the dispatch boundary)
-pub fn sync_exec_ctx_to_sem_ctx(exec_ctx: &ExecutionContext, sem_ctx: &mut VerbExecutionContext) {
-    // 1. Symbols.
-    for (name, uuid) in &exec_ctx.symbols {
-        sem_ctx.symbols.insert(name.clone(), *uuid);
-    }
-    for (name, ty) in &exec_ctx.symbol_types {
-        sem_ctx.symbol_types.insert(name.clone(), ty.clone());
-    }
-
-    // 2. Side-channel state → sem_ctx.extensions.
-    // Ensure extensions is an object (default state is Null).
-    if !sem_ctx.extensions.is_object() {
-        sem_ctx.extensions = serde_json::Value::Object(serde_json::Map::new());
-    }
-    let ext = sem_ctx.extensions.as_object_mut().unwrap();
-
-    macro_rules! pack_opt {
-        ($field:ident) => {
-            if let Some(ref v) = exec_ctx.$field {
-                if let Ok(j) = serde_json::to_value(v) {
-                    ext.insert(stringify!($field).to_string(), j);
-                }
-            }
-        };
-    }
-    macro_rules! pack_opt_opt {
-        ($field:ident) => {
-            if let Some(ref outer) = exec_ctx.$field {
-                let inner = match outer {
-                    Some(v) => serde_json::to_value(v).unwrap_or(serde_json::Value::Null),
-                    None => serde_json::Value::Null,
-                };
-                ext.insert(
-                    stringify!($field).to_string(),
-                    serde_json::json!({ "set": true, "value": inner }),
-                );
-            }
-        };
-    }
-
-    pack_opt!(pending_view_state);
-    pack_opt!(pending_viewport_state);
-    pack_opt!(pending_scope_change);
-    pack_opt!(pending_session);
-    pack_opt!(pending_session_name);
-    pack_opt!(pending_structure_id);
-    pack_opt!(pending_structure_name);
-    pack_opt!(pending_case_id);
-    pack_opt!(pending_mandate_id);
-    pack_opt_opt!(pending_deal_id);
-    pack_opt_opt!(pending_deal_name);
-
-    if !exec_ctx.pending_dag_flags.is_empty() {
-        if let Ok(j) = serde_json::to_value(&exec_ctx.pending_dag_flags) {
-            ext.insert("pending_dag_flags".to_string(), j);
-        }
-    }
-    if exec_ctx.cbu_scope_dirty {
-        ext.insert("cbu_scope_dirty".to_string(), serde_json::Value::Bool(true));
-    }
-    if !exec_ctx.session_cbu_ids.is_empty() {
-        let ids: Vec<serde_json::Value> = exec_ctx
-            .session_cbu_ids
-            .iter()
-            .map(|u| serde_json::Value::String(u.to_string()))
-            .collect();
-        ext.insert("session_cbu_ids".to_string(), serde_json::Value::Array(ids));
-    }
-
-    // Agent control: signals are stored in json_bindings["_agent_control"].
-    if let Some(agent_ctrl) = exec_ctx.json_bindings.get("_agent_control") {
-        ext.insert("pending_agent_control".to_string(), agent_ctrl.clone());
-    }
-}
-
 /// Unpack `VerbExecutionContext.extensions` side-channel keys back into an
-/// `ExecutionContext`'s `pending_*` fields. Used by the post-dispatch-flip
-/// caller to carry forward mutations that happened inside `execute_json`.
+/// `ExecutionContext`'s `pending_*` fields. Called by `dsl_v2::executor`
+/// after dispatch to propagate session/view/agent mutations the op staged
+/// on its `VerbExecutionContext`.
 pub fn apply_sem_ctx_extensions_to_exec_ctx(
     sem_ctx: &VerbExecutionContext,
     exec_ctx: &mut ExecutionContext,
@@ -556,9 +473,8 @@ pub fn apply_sem_ctx_extensions_to_exec_ctx(
 }
 
 /// Convert a `VerbCall`'s argument list back into a JSON object — inverse
-/// of [`build_verb_call`]. Used by the Phase 2c dispatch flip when
-/// `DslExecutor` receives a `VerbCall` but needs to call `execute_json`
-/// which wants JSON args.
+/// of [`build_verb_call`]. Used by `dsl_v2::executor` when invoking ops
+/// whose execute path takes a JSON args object.
 pub fn verb_call_to_json(vc: &VerbCall) -> serde_json::Value {
     let mut map = serde_json::Map::new();
     for arg in &vc.arguments {
