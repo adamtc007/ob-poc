@@ -50,7 +50,8 @@ pub(crate) mod sem_os_filter;
 pub(crate) mod step_executor_bridge;
 pub(crate) mod types;
 pub(crate) mod verb_classifier;
-pub(crate) mod workbook;
+// Phase 3 slice 2c (2026-05-12): workbook relocated to ob-poc-envelope; alias for crate use.
+pub(crate) use ob_poc_envelope::workbook;
 pub(crate) mod workbook_diagnostics;
 pub(crate) mod workbook_revision;
 pub(crate) mod write_set;
