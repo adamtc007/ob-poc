@@ -176,7 +176,7 @@ fn refusal(code: DslCoderRefusalCode, message: impl Into<String>) -> DslCoderVal
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::runbook::workbook::{
+    use crate::workbook::{
         EvidenceRef, ExecutionWorkbook, ExecutionWorkbookCore, ExecutionWorkbookId, LlmTraceRef,
         StaleWorkbookPolicy, WorkbookActor, WorkbookExecutionMode, WorkbookSubject,
     };
@@ -292,7 +292,7 @@ mod tests {
     fn refuses_non_dry_run_workbook_mode() {
         let mut workbook = workbook();
         workbook.core.execution_mode = WorkbookExecutionMode::ExecuteAfterApproval;
-        workbook.id = crate::runbook::compute_workbook_id(&workbook.core);
+        workbook.id = crate::workbook::compute_workbook_id(&workbook.core);
 
         let err = validate_workbook_for_dry_run(&workbook, DslCoderExecutionMode::DryRun)
             .expect_err("non-dry-run workbook refused");
@@ -326,7 +326,7 @@ mod tests {
     fn refuses_binding_mismatch() {
         let mut workbook = workbook();
         workbook.core.subject.subject_id = uuid!("33333333-3333-3333-3333-333333333333");
-        workbook.id = crate::runbook::compute_workbook_id(&workbook.core);
+        workbook.id = crate::workbook::compute_workbook_id(&workbook.core);
 
         let err = validate_workbook_for_dry_run(&workbook, DslCoderExecutionMode::DryRun)
             .expect_err("binding mismatch refused");

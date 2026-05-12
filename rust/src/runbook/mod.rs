@@ -28,18 +28,21 @@
 //! existing orchestrator pipeline. Full macro/pack/constraint integration
 //! is wired in Phases 1-3.
 
-pub(crate) mod approval_token;
+// Phase 3 slice 2c.2 (2026-05-12): relocated to ob-poc-envelope.
+pub(crate) use ob_poc_envelope::approval_token;
 pub(crate) mod canonical;
 pub(crate) mod compiler;
 pub(crate) mod constraint_gate;
-pub(crate) mod dsl_coder;
+// Phase 3 slice 2c.2 (2026-05-12): relocated to ob-poc-envelope.
+pub(crate) use ob_poc_envelope::dsl_coder;
 pub(crate) mod envelope;
 pub(crate) mod errors;
 pub(crate) mod executor;
 pub(crate) mod kyc_dry_run;
 pub(crate) mod language_pack;
 pub(crate) mod llm_draft_adapter;
-pub(crate) mod mutation_preflight;
+// Phase 3 slice 2c.2 (2026-05-12): relocated to ob-poc-envelope.
+pub(crate) use ob_poc_envelope::mutation_preflight;
 pub(crate) mod narration;
 pub(crate) mod plan_compiler;
 pub(crate) mod plan_executor;

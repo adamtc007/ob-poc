@@ -391,7 +391,7 @@ fn require_non_empty(field: &'static str, value: &str) -> Result<(), ApprovalTok
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::runbook::{
+    use crate::workbook::{
         EvidenceRef, ExecutionWorkbook, ExecutionWorkbookCore, StaleWorkbookPolicy, WorkbookActor,
         WorkbookExecutionMode, WorkbookSubject,
     };

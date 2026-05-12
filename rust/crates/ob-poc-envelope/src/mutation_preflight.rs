@@ -135,9 +135,10 @@ pub fn prepare_restricted_mutation_preflight(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::runbook::{
-        create_approval_token_for_workbook, EvidenceRef, ExecutionWorkbook, ExecutionWorkbookCore,
-        StaleWorkbookPolicy, WorkbookActor, WorkbookExecutionMode, WorkbookSubject,
+    use crate::approval_token::create_approval_token_for_workbook;
+    use crate::workbook::{
+        EvidenceRef, ExecutionWorkbook, ExecutionWorkbookCore, StaleWorkbookPolicy, WorkbookActor,
+        WorkbookExecutionMode, WorkbookSubject,
     };
     use chrono::TimeZone;
     use sem_os_core::domain_pack::{
@@ -363,7 +364,7 @@ mod tests {
     fn refuses_preflight_when_predicted_diff_does_not_match_intent() {
         let mut workbook = workbook();
         workbook.core.simulation.semantic_diff.after = "REVIEW".to_string();
-        workbook.id = crate::runbook::compute_workbook_id(&workbook.core);
+        workbook.id = crate::workbook::compute_workbook_id(&workbook.core);
         let token = create_approval_token_for_workbook(
             &workbook,
             "approver@example.com",

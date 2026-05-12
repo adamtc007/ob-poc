@@ -7,7 +7,10 @@
 //! `services`). The only allowed downstream is `ob-poc-types`.
 
 pub mod acp_session_input_draft_mode;
+pub mod approval_token;
+pub mod dsl_coder;
 pub mod envelope_builder;
 pub mod llm_trace;
+pub mod mutation_preflight;
 pub mod toctou_recheck;
 pub mod workbook;
