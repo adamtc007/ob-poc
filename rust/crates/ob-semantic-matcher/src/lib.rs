@@ -51,7 +51,7 @@ pub use client_group_resolver::{
 pub use embedder::Embedder;
 pub use matcher::SemanticMatcher;
 pub use phonetic::PhoneticMatcher;
-pub use types::*;
+pub use types::{MatchMethod, MatchResult, MatcherConfig, MatcherError, VerbPattern};
 
 // Re-export key feedback types for convenience
 pub use feedback::{
