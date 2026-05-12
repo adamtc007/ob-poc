@@ -170,12 +170,10 @@ pub struct EvidenceRef {
     pub classification: Option<String>,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct LlmTraceRef {
-    pub trace_id: Uuid,
-    pub prompt_hash: String,
-    pub response_hash: String,
-}
+// Phase 3 slice 2b (2026-05-12): relocated to ob-poc-envelope::llm_trace —
+// LlmTraceRef is the boundary-tier handoff between Sage's llm_trace recorder
+// and the runbook's workbook binding. Re-exported here for backward compat.
+pub use ob_poc_envelope::llm_trace::LlmTraceRef;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]

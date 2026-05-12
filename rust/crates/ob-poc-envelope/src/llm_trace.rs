@@ -11,7 +11,16 @@ use sha2::{Digest, Sha256};
 use std::collections::BTreeSet;
 use uuid::Uuid;
 
-use crate::runbook::LlmTraceRef;
+/// Boundary handoff: links an executed workbook to the LLM inference trace
+/// that produced it. Defined here (not in `runbook::workbook`) because the
+/// recorder lives in this crate and `runbook` (execution tier) must depend
+/// on the boundary tier, not vice-versa.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct LlmTraceRef {
+    pub trace_id: Uuid,
+    pub prompt_hash: String,
+    pub response_hash: String,
+}
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct LlmInferenceTrace {
@@ -327,7 +336,12 @@ mod tests {
     #[test]
     fn raw_llm_provider_calls_are_confined_to_approved_wrappers() {
         let manifest_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-        let repo_root = manifest_dir.parent().expect("rust crate has repo parent");
+        // manifest_dir = repo/rust/crates/ob-poc-envelope; repo_root = repo/
+        let repo_root = manifest_dir
+            .parent()
+            .and_then(|p| p.parent())
+            .and_then(|p| p.parent())
+            .expect("ob-poc-envelope crate has repo grand-grandparent");
         let search_roots = [
             repo_root.join("rust/src"),
             repo_root.join("rust/crates/ob-agentic/src"),

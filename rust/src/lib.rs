@@ -36,7 +36,8 @@ pub use ob_poc_envelope::acp_session_input_draft_mode;
 pub mod acp_state_anchor;
 
 // LLM inference trace hashing and workbook binding.
-pub mod llm_trace;
+// Phase 3 slice 2b (2026-05-12): relocated to ob-poc-envelope crate; compat re-export.
+pub use ob_poc_envelope::llm_trace;
 
 // Audit-chain reconstruction for ACP/workbook/dry-run traces.
 #[cfg(feature = "database")]

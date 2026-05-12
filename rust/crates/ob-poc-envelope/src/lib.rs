@@ -8,4 +8,5 @@
 
 pub mod acp_session_input_draft_mode;
 pub mod envelope_builder;
+pub mod llm_trace;
 pub mod toctou_recheck;
