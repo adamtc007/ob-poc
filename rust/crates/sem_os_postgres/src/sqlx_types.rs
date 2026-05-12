@@ -20,26 +20,26 @@ use sem_os_core::types::{
 /// All enum columns are decoded as `String` (Postgres custom types come
 /// over the wire as strings) and converted to core enums in the `TryFrom` impl.
 #[derive(Debug, Clone, sqlx::FromRow)]
-pub struct PgSnapshotRow {
-    pub snapshot_id: Uuid,
-    pub snapshot_set_id: Option<Uuid>,
-    pub object_type: String,
-    pub object_id: Uuid,
-    pub version_major: i32,
-    pub version_minor: i32,
-    pub status: String,
-    pub governance_tier: String,
-    pub trust_class: String,
-    pub security_label: serde_json::Value,
-    pub effective_from: DateTime<Utc>,
-    pub effective_until: Option<DateTime<Utc>>,
-    pub predecessor_id: Option<Uuid>,
-    pub change_type: String,
-    pub change_rationale: Option<String>,
-    pub created_by: String,
-    pub approved_by: Option<String>,
-    pub definition: serde_json::Value,
-    pub created_at: DateTime<Utc>,
+pub(crate) struct PgSnapshotRow {
+    pub(crate) snapshot_id: Uuid,
+    pub(crate) snapshot_set_id: Option<Uuid>,
+    pub(crate) object_type: String,
+    pub(crate) object_id: Uuid,
+    pub(crate) version_major: i32,
+    pub(crate) version_minor: i32,
+    pub(crate) status: String,
+    pub(crate) governance_tier: String,
+    pub(crate) trust_class: String,
+    pub(crate) security_label: serde_json::Value,
+    pub(crate) effective_from: DateTime<Utc>,
+    pub(crate) effective_until: Option<DateTime<Utc>>,
+    pub(crate) predecessor_id: Option<Uuid>,
+    pub(crate) change_type: String,
+    pub(crate) change_rationale: Option<String>,
+    pub(crate) created_by: String,
+    pub(crate) approved_by: Option<String>,
+    pub(crate) definition: serde_json::Value,
+    pub(crate) created_at: DateTime<Utc>,
 }
 
 impl TryFrom<PgSnapshotRow> for SnapshotRow {

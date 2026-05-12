@@ -42,3 +42,6 @@ entity-gateway = { path = "../entity-gateway" }
 tonic = "0.12"
 
 [dev-dependencies]
+
+[lints.rust]
+unreachable_pub = "deny"

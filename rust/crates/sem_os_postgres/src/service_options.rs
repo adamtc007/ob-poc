@@ -14,7 +14,7 @@ use uuid::Uuid;
 /// Canonical source-kind values for service options and resource attributes.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
-pub enum SourceKind {
+pub(crate) enum SourceKind {
     Derived,
     CbuProfile,
     InstrumentMatrix,
@@ -35,7 +35,7 @@ impl SourceKind {
     ///
     /// assert_eq!(SourceKind::InstrumentMatrix.as_db_str(), "instrument_matrix");
     /// ```
-    pub fn as_db_str(self) -> &'static str {
+    pub(crate) fn as_db_str(self) -> &'static str {
         match self {
             SourceKind::Derived => "derived",
             SourceKind::CbuProfile => "cbu_profile",
@@ -70,7 +70,7 @@ impl TryFrom<&str> for SourceKind {
 /// Axes along which an option can drive resource fan-out.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
-pub enum FanoutAxis {
+pub(crate) enum FanoutAxis {
     None,
     Market,
     Currency,
@@ -94,7 +94,7 @@ impl FanoutAxis {
     ///
     /// assert_eq!(FanoutAxis::Market.as_db_str(), "market");
     /// ```
-    pub fn as_db_str(self) -> &'static str {
+    pub(crate) fn as_db_str(self) -> &'static str {
         match self {
             FanoutAxis::None => "none",
             FanoutAxis::Market => "market",
@@ -135,7 +135,7 @@ impl TryFrom<&str> for FanoutAxis {
 /// Resource fan-out materialisation mode.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
-pub enum FanoutMode {
+pub(crate) enum FanoutMode {
     PerValue,
     Shared,
     Grouped,
@@ -152,7 +152,7 @@ impl FanoutMode {
     ///
     /// assert_eq!(FanoutMode::PerValue.as_db_str(), "per_value");
     /// ```
-    pub fn as_db_str(self) -> &'static str {
+    pub(crate) fn as_db_str(self) -> &'static str {
         match self {
             FanoutMode::PerValue => "per_value",
             FanoutMode::Shared => "shared",
@@ -178,124 +178,124 @@ impl TryFrom<&str> for FanoutMode {
 
 /// Active service option definition row.
 #[derive(Debug, Clone, FromRow)]
-pub struct ServiceOptionDefRow {
-    pub service_option_def_id: Uuid,
-    pub service_id: Uuid,
-    pub service_version_id: Uuid,
-    pub option_key: String,
-    pub option_kind: String,
-    pub allowed_values: Option<Value>,
-    pub default_value: Option<Value>,
-    pub is_required: bool,
-    pub is_fanout_driver: bool,
-    pub fanout_axis: String,
-    pub default_source_kind: String,
-    pub source_path: Option<String>,
-    pub fallback_policy: Value,
-    pub override_policy: String,
-    pub lifecycle_status: String,
-    pub description: Option<String>,
+pub(crate) struct ServiceOptionDefRow {
+    pub(crate) service_option_def_id: Uuid,
+    pub(crate) service_id: Uuid,
+    pub(crate) service_version_id: Uuid,
+    pub(crate) option_key: String,
+    pub(crate) option_kind: String,
+    pub(crate) allowed_values: Option<Value>,
+    pub(crate) default_value: Option<Value>,
+    pub(crate) is_required: bool,
+    pub(crate) is_fanout_driver: bool,
+    pub(crate) fanout_axis: String,
+    pub(crate) default_source_kind: String,
+    pub(crate) source_path: Option<String>,
+    pub(crate) fallback_policy: Value,
+    pub(crate) override_policy: String,
+    pub(crate) lifecycle_status: String,
+    pub(crate) description: Option<String>,
 }
 
 /// Current product-service option override row.
 #[derive(Debug, Clone, FromRow)]
-pub struct ProductServiceOptionOverrideRow {
-    pub override_id: Uuid,
-    pub product_id: Uuid,
-    pub service_id: Uuid,
-    pub service_option_def_id: Uuid,
-    pub default_value_override: Option<Value>,
-    pub allowed_values_override: Option<Value>,
-    pub is_required_override: Option<bool>,
-    pub source_precedence_override: Option<Value>,
-    pub activation_condition_ref: Option<Uuid>,
-    pub effective_from: DateTime<Utc>,
-    pub effective_to: Option<DateTime<Utc>>,
+pub(crate) struct ProductServiceOptionOverrideRow {
+    pub(crate) override_id: Uuid,
+    pub(crate) product_id: Uuid,
+    pub(crate) service_id: Uuid,
+    pub(crate) service_option_def_id: Uuid,
+    pub(crate) default_value_override: Option<Value>,
+    pub(crate) allowed_values_override: Option<Value>,
+    pub(crate) is_required_override: Option<bool>,
+    pub(crate) source_precedence_override: Option<Value>,
+    pub(crate) activation_condition_ref: Option<Uuid>,
+    pub(crate) effective_from: DateTime<Utc>,
+    pub(crate) effective_to: Option<DateTime<Utc>>,
 }
 
 /// Runtime service option binding row.
 #[derive(Debug, Clone, FromRow)]
-pub struct CbuServiceOptionBindingRow {
-    pub binding_id: Uuid,
-    pub cbu_id: Uuid,
-    pub product_id: Option<Uuid>,
-    pub service_id: Uuid,
-    pub service_version_id: Uuid,
-    pub service_option_def_id: Uuid,
-    pub option_key: String,
-    pub value: Value,
-    pub source_kind: String,
-    pub source_ref: Option<Value>,
-    pub source_version: Option<String>,
-    pub value_hash: String,
-    pub coherence_status: String,
-    pub is_locked: bool,
-    pub valid_from: DateTime<Utc>,
-    pub valid_to: Option<DateTime<Utc>>,
-    pub supersedes_binding_id: Option<Uuid>,
-    pub activation_run_id: Option<Uuid>,
+pub(crate) struct CbuServiceOptionBindingRow {
+    pub(crate) binding_id: Uuid,
+    pub(crate) cbu_id: Uuid,
+    pub(crate) product_id: Option<Uuid>,
+    pub(crate) service_id: Uuid,
+    pub(crate) service_version_id: Uuid,
+    pub(crate) service_option_def_id: Uuid,
+    pub(crate) option_key: String,
+    pub(crate) value: Value,
+    pub(crate) source_kind: String,
+    pub(crate) source_ref: Option<Value>,
+    pub(crate) source_version: Option<String>,
+    pub(crate) value_hash: String,
+    pub(crate) coherence_status: String,
+    pub(crate) is_locked: bool,
+    pub(crate) valid_from: DateTime<Utc>,
+    pub(crate) valid_to: Option<DateTime<Utc>>,
+    pub(crate) supersedes_binding_id: Option<Uuid>,
+    pub(crate) activation_run_id: Option<Uuid>,
 }
 
 /// Resource eligibility constraint row.
 #[derive(Debug, Clone, FromRow)]
-pub struct ResourceOptionConstraintRow {
-    pub constraint_id: Uuid,
-    pub service_id: Uuid,
-    pub resource_id: Uuid,
-    pub service_option_def_id: Uuid,
-    pub supported_values: Value,
-    pub match_operator: String,
-    pub priority: i32,
-    pub is_required_for_coverage: bool,
-    pub is_active: bool,
+pub(crate) struct ResourceOptionConstraintRow {
+    pub(crate) constraint_id: Uuid,
+    pub(crate) service_id: Uuid,
+    pub(crate) resource_id: Uuid,
+    pub(crate) service_option_def_id: Uuid,
+    pub(crate) supported_values: Value,
+    pub(crate) match_operator: String,
+    pub(crate) priority: i32,
+    pub(crate) is_required_for_coverage: bool,
+    pub(crate) is_active: bool,
 }
 
 /// Resource fan-out rule row.
 #[derive(Debug, Clone, FromRow)]
-pub struct ResourceFanoutRuleRow {
-    pub fanout_rule_id: Uuid,
-    pub service_id: Uuid,
-    pub resource_id: Uuid,
-    pub service_option_def_id: Option<Uuid>,
-    pub fanout_axis: String,
-    pub fanout_mode: String,
-    pub group_by_policy: Value,
-    pub shared_when_null: bool,
-    pub priority: i32,
-    pub is_active: bool,
+pub(crate) struct ResourceFanoutRuleRow {
+    pub(crate) fanout_rule_id: Uuid,
+    pub(crate) service_id: Uuid,
+    pub(crate) resource_id: Uuid,
+    pub(crate) service_option_def_id: Option<Uuid>,
+    pub(crate) fanout_axis: String,
+    pub(crate) fanout_mode: String,
+    pub(crate) group_by_policy: Value,
+    pub(crate) shared_when_null: bool,
+    pub(crate) priority: i32,
+    pub(crate) is_active: bool,
 }
 
 /// Runtime activation run row.
 #[derive(Debug, Clone, FromRow)]
-pub struct ActivationRunRow {
-    pub activation_run_id: Uuid,
-    pub cbu_id: Uuid,
-    pub product_id: Option<Uuid>,
-    pub run_kind: String,
-    pub status: String,
-    pub triggered_by: Option<String>,
-    pub started_at: DateTime<Utc>,
-    pub completed_at: Option<DateTime<Utc>>,
-    pub failed_at: Option<DateTime<Utc>>,
-    pub failure_reason: Option<String>,
-    pub input_snapshot: Value,
-    pub result_summary: Value,
+pub(crate) struct ActivationRunRow {
+    pub(crate) activation_run_id: Uuid,
+    pub(crate) cbu_id: Uuid,
+    pub(crate) product_id: Option<Uuid>,
+    pub(crate) run_kind: String,
+    pub(crate) status: String,
+    pub(crate) triggered_by: Option<String>,
+    pub(crate) started_at: DateTime<Utc>,
+    pub(crate) completed_at: Option<DateTime<Utc>>,
+    pub(crate) failed_at: Option<DateTime<Utc>>,
+    pub(crate) failure_reason: Option<String>,
+    pub(crate) input_snapshot: Value,
+    pub(crate) result_summary: Value,
 }
 
 /// Resource instance option-lineage row.
 #[derive(Debug, Clone, FromRow)]
-pub struct ResourceInstanceOptionLineageRow {
-    pub lineage_id: Uuid,
-    pub resource_instance_id: Uuid,
-    pub binding_id: Uuid,
-    pub contribution_type: String,
-    pub fanout_axis: Option<String>,
-    pub fanout_value: Option<Value>,
+pub(crate) struct ResourceInstanceOptionLineageRow {
+    pub(crate) lineage_id: Uuid,
+    pub(crate) resource_instance_id: Uuid,
+    pub(crate) binding_id: Uuid,
+    pub(crate) contribution_type: String,
+    pub(crate) fanout_axis: Option<String>,
+    pub(crate) fanout_value: Option<Value>,
 }
 
 /// Repository for service-options framework tables.
 #[derive(Debug, Clone)]
-pub struct ServiceOptionsRepository {
+pub(crate) struct ServiceOptionsRepository {
     pool: PgPool,
 }
 
@@ -310,7 +310,7 @@ impl ServiceOptionsRepository {
     /// let _pool = repo.pool();
     /// # }
     /// ```
-    pub fn new(pool: PgPool) -> Self {
+    pub(crate) fn new(pool: PgPool) -> Self {
         Self { pool }
     }
 
@@ -324,7 +324,7 @@ impl ServiceOptionsRepository {
     /// let _ = repo.pool();
     /// # }
     /// ```
-    pub fn pool(&self) -> &PgPool {
+    pub(crate) fn pool(&self) -> &PgPool {
         &self.pool
     }
 
@@ -339,7 +339,7 @@ impl ServiceOptionsRepository {
     /// # Ok(())
     /// # }
     /// ```
-    pub async fn current_published_service_version(&self, service_id: Uuid) -> Result<Uuid> {
+    pub(crate) async fn current_published_service_version(&self, service_id: Uuid) -> Result<Uuid> {
         sqlx::query_scalar::<_, Uuid>(
             r#"
             SELECT id
@@ -367,7 +367,7 @@ impl ServiceOptionsRepository {
     /// # Ok(())
     /// # }
     /// ```
-    pub async fn active_option_defs_for_version(
+    pub(crate) async fn active_option_defs_for_version(
         &self,
         service_version_id: Uuid,
     ) -> Result<Vec<ServiceOptionDefRow>> {
@@ -400,7 +400,7 @@ impl ServiceOptionsRepository {
     /// # Ok(())
     /// # }
     /// ```
-    pub async fn current_overrides(
+    pub(crate) async fn current_overrides(
         &self,
         product_id: Uuid,
         service_id: Uuid,
@@ -436,7 +436,7 @@ impl ServiceOptionsRepository {
     /// # Ok(())
     /// # }
     /// ```
-    pub async fn current_bindings_for_cbu_service(
+    pub(crate) async fn current_bindings_for_cbu_service(
         &self,
         cbu_id: Uuid,
         service_id: Uuid,
@@ -472,7 +472,7 @@ impl ServiceOptionsRepository {
     /// # Ok(())
     /// # }
     /// ```
-    pub async fn active_constraints_for_service(
+    pub(crate) async fn active_constraints_for_service(
         &self,
         service_id: Uuid,
     ) -> Result<Vec<ResourceOptionConstraintRow>> {
@@ -504,7 +504,7 @@ impl ServiceOptionsRepository {
     /// # Ok(())
     /// # }
     /// ```
-    pub async fn active_fanout_rules_for_service(
+    pub(crate) async fn active_fanout_rules_for_service(
         &self,
         service_id: Uuid,
     ) -> Result<Vec<ResourceFanoutRuleRow>> {
@@ -536,7 +536,10 @@ impl ServiceOptionsRepository {
     /// # Ok(())
     /// # }
     /// ```
-    pub async fn insert_service_option_def(&self, def: &NewServiceOptionDef) -> Result<Uuid> {
+    pub(crate) async fn insert_service_option_def(
+        &self,
+        def: &NewServiceOptionDef,
+    ) -> Result<Uuid> {
         sqlx::query_scalar::<_, Uuid>(
             r#"
             INSERT INTO "ob-poc".service_option_defs
@@ -595,7 +598,7 @@ impl ServiceOptionsRepository {
     /// # Ok(())
     /// # }
     /// ```
-    pub async fn insert_product_service_override(
+    pub(crate) async fn insert_product_service_override(
         &self,
         row: &NewProductServiceOptionOverride,
     ) -> Result<Uuid> {
@@ -635,7 +638,7 @@ impl ServiceOptionsRepository {
     /// # Ok(())
     /// # }
     /// ```
-    pub async fn insert_resource_option_constraint(
+    pub(crate) async fn insert_resource_option_constraint(
         &self,
         row: &NewResourceOptionConstraint,
     ) -> Result<Uuid> {
@@ -672,7 +675,7 @@ impl ServiceOptionsRepository {
     /// # Ok(())
     /// # }
     /// ```
-    pub async fn insert_fanout_rule(&self, row: &NewResourceFanoutRule) -> Result<Uuid> {
+    pub(crate) async fn insert_fanout_rule(&self, row: &NewResourceFanoutRule) -> Result<Uuid> {
         sqlx::query_scalar::<_, Uuid>(
             r#"
             INSERT INTO "ob-poc".service_resource_fanout_rules
@@ -709,7 +712,7 @@ impl ServiceOptionsRepository {
     /// # Ok(())
     /// # }
     /// ```
-    pub async fn insert_activation_run(
+    pub(crate) async fn insert_activation_run(
         &self,
         cbu_id: Uuid,
         product_id: Option<Uuid>,
@@ -746,7 +749,11 @@ impl ServiceOptionsRepository {
     /// # Ok(())
     /// # }
     /// ```
-    pub async fn complete_activation_run(&self, run_id: Uuid, result_summary: Value) -> Result<()> {
+    pub(crate) async fn complete_activation_run(
+        &self,
+        run_id: Uuid,
+        result_summary: Value,
+    ) -> Result<()> {
         sqlx::query(
             r#"
             UPDATE "ob-poc".activation_runs
@@ -777,7 +784,7 @@ impl ServiceOptionsRepository {
     /// # Ok(())
     /// # }
     /// ```
-    pub async fn fail_activation_run(&self, run_id: Uuid, reason: &str) -> Result<()> {
+    pub(crate) async fn fail_activation_run(&self, run_id: Uuid, reason: &str) -> Result<()> {
         sqlx::query(
             r#"
             UPDATE "ob-poc".activation_runs
@@ -808,7 +815,7 @@ impl ServiceOptionsRepository {
     /// # Ok(())
     /// # }
     /// ```
-    pub async fn insert_binding(&self, binding: &NewOptionBinding) -> Result<Uuid> {
+    pub(crate) async fn insert_binding(&self, binding: &NewOptionBinding) -> Result<Uuid> {
         sqlx::query_scalar::<_, Uuid>(
             r#"
             INSERT INTO "ob-poc".cbu_service_option_bindings
@@ -853,7 +860,7 @@ impl ServiceOptionsRepository {
     /// # Ok(())
     /// # }
     /// ```
-    pub async fn supersede_binding(
+    pub(crate) async fn supersede_binding(
         &self,
         previous_binding_id: Uuid,
         binding: &NewOptionBinding,
@@ -928,7 +935,10 @@ impl ServiceOptionsRepository {
     /// # Ok(())
     /// # }
     /// ```
-    pub async fn insert_lineage(&self, lineage: &NewResourceInstanceOptionLineage) -> Result<Uuid> {
+    pub(crate) async fn insert_lineage(
+        &self,
+        lineage: &NewResourceInstanceOptionLineage,
+    ) -> Result<Uuid> {
         sqlx::query_scalar::<_, Uuid>(
             r#"
             INSERT INTO "ob-poc".cbu_resource_instance_option_lineage
@@ -960,7 +970,7 @@ impl ServiceOptionsRepository {
     /// # Ok(())
     /// # }
     /// ```
-    pub async fn lineage_for_resource_instance(
+    pub(crate) async fn lineage_for_resource_instance(
         &self,
         resource_instance_id: Uuid,
     ) -> Result<Vec<ResourceInstanceOptionLineageRow>> {
@@ -982,90 +992,90 @@ impl ServiceOptionsRepository {
 
 /// Input row for inserting a CBU option binding.
 #[derive(Debug, Clone)]
-pub struct NewOptionBinding {
-    pub cbu_id: Uuid,
-    pub product_id: Option<Uuid>,
-    pub service_id: Uuid,
-    pub service_version_id: Uuid,
-    pub service_option_def_id: Uuid,
-    pub option_key: String,
-    pub value: Value,
-    pub source_kind: SourceKind,
-    pub source_ref: Option<Value>,
-    pub source_version: Option<String>,
-    pub value_hash: String,
-    pub coherence_status: String,
-    pub is_locked: bool,
-    pub supersedes_binding_id: Option<Uuid>,
-    pub activation_run_id: Option<Uuid>,
+pub(crate) struct NewOptionBinding {
+    pub(crate) cbu_id: Uuid,
+    pub(crate) product_id: Option<Uuid>,
+    pub(crate) service_id: Uuid,
+    pub(crate) service_version_id: Uuid,
+    pub(crate) service_option_def_id: Uuid,
+    pub(crate) option_key: String,
+    pub(crate) value: Value,
+    pub(crate) source_kind: SourceKind,
+    pub(crate) source_ref: Option<Value>,
+    pub(crate) source_version: Option<String>,
+    pub(crate) value_hash: String,
+    pub(crate) coherence_status: String,
+    pub(crate) is_locked: bool,
+    pub(crate) supersedes_binding_id: Option<Uuid>,
+    pub(crate) activation_run_id: Option<Uuid>,
 }
 
 /// Input row for declaring or updating a service option definition.
 #[derive(Debug, Clone)]
-pub struct NewServiceOptionDef {
-    pub service_id: Uuid,
-    pub service_version_id: Uuid,
-    pub option_key: String,
-    pub option_kind: String,
-    pub allowed_values: Option<Value>,
-    pub default_value: Option<Value>,
-    pub is_required: bool,
-    pub is_fanout_driver: bool,
-    pub fanout_axis: FanoutAxis,
-    pub default_source_kind: SourceKind,
-    pub source_path: Option<String>,
-    pub fallback_policy: Value,
-    pub override_policy: String,
-    pub lifecycle_status: String,
-    pub description: Option<String>,
+pub(crate) struct NewServiceOptionDef {
+    pub(crate) service_id: Uuid,
+    pub(crate) service_version_id: Uuid,
+    pub(crate) option_key: String,
+    pub(crate) option_kind: String,
+    pub(crate) allowed_values: Option<Value>,
+    pub(crate) default_value: Option<Value>,
+    pub(crate) is_required: bool,
+    pub(crate) is_fanout_driver: bool,
+    pub(crate) fanout_axis: FanoutAxis,
+    pub(crate) default_source_kind: SourceKind,
+    pub(crate) source_path: Option<String>,
+    pub(crate) fallback_policy: Value,
+    pub(crate) override_policy: String,
+    pub(crate) lifecycle_status: String,
+    pub(crate) description: Option<String>,
 }
 
 /// Input row for product-service option overrides.
 #[derive(Debug, Clone)]
-pub struct NewProductServiceOptionOverride {
-    pub product_id: Uuid,
-    pub service_id: Uuid,
-    pub service_option_def_id: Uuid,
-    pub default_value_override: Option<Value>,
-    pub allowed_values_override: Option<Value>,
-    pub is_required_override: Option<bool>,
-    pub source_precedence_override: Option<Value>,
-    pub activation_condition_ref: Option<Uuid>,
-    pub effective_from: Option<DateTime<Utc>>,
-    pub supersedes_override_id: Option<Uuid>,
+pub(crate) struct NewProductServiceOptionOverride {
+    pub(crate) product_id: Uuid,
+    pub(crate) service_id: Uuid,
+    pub(crate) service_option_def_id: Uuid,
+    pub(crate) default_value_override: Option<Value>,
+    pub(crate) allowed_values_override: Option<Value>,
+    pub(crate) is_required_override: Option<bool>,
+    pub(crate) source_precedence_override: Option<Value>,
+    pub(crate) activation_condition_ref: Option<Uuid>,
+    pub(crate) effective_from: Option<DateTime<Utc>>,
+    pub(crate) supersedes_override_id: Option<Uuid>,
 }
 
 /// Input row for service/resource option eligibility.
 #[derive(Debug, Clone)]
-pub struct NewResourceOptionConstraint {
-    pub service_id: Uuid,
-    pub resource_id: Uuid,
-    pub service_option_def_id: Uuid,
-    pub supported_values: Value,
-    pub match_operator: String,
-    pub priority: i32,
-    pub is_required_for_coverage: bool,
-    pub is_active: bool,
+pub(crate) struct NewResourceOptionConstraint {
+    pub(crate) service_id: Uuid,
+    pub(crate) resource_id: Uuid,
+    pub(crate) service_option_def_id: Uuid,
+    pub(crate) supported_values: Value,
+    pub(crate) match_operator: String,
+    pub(crate) priority: i32,
+    pub(crate) is_required_for_coverage: bool,
+    pub(crate) is_active: bool,
 }
 
 /// Input row for service/resource fan-out planning.
 #[derive(Debug, Clone)]
-pub struct NewResourceFanoutRule {
-    pub service_id: Uuid,
-    pub resource_id: Uuid,
-    pub service_option_def_id: Option<Uuid>,
-    pub fanout_axis: FanoutAxis,
-    pub fanout_mode: FanoutMode,
-    pub group_by_policy: Value,
-    pub shared_when_null: bool,
-    pub priority: i32,
-    pub is_active: bool,
+pub(crate) struct NewResourceFanoutRule {
+    pub(crate) service_id: Uuid,
+    pub(crate) resource_id: Uuid,
+    pub(crate) service_option_def_id: Option<Uuid>,
+    pub(crate) fanout_axis: FanoutAxis,
+    pub(crate) fanout_mode: FanoutMode,
+    pub(crate) group_by_policy: Value,
+    pub(crate) shared_when_null: bool,
+    pub(crate) priority: i32,
+    pub(crate) is_active: bool,
 }
 
 /// Contribution type recorded for resource-instance option lineage.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
-pub enum LineageContributionType {
+pub(crate) enum LineageContributionType {
     Eligibility,
     Fanout,
     AttributeSource,
@@ -1081,7 +1091,7 @@ impl LineageContributionType {
     ///
     /// assert_eq!(LineageContributionType::Fanout.as_db_str(), "fanout");
     /// ```
-    pub fn as_db_str(self) -> &'static str {
+    pub(crate) fn as_db_str(self) -> &'static str {
         match self {
             LineageContributionType::Eligibility => "eligibility",
             LineageContributionType::Fanout => "fanout",
@@ -1092,39 +1102,39 @@ impl LineageContributionType {
 
 /// Input row for recording resource-instance option lineage.
 #[derive(Debug, Clone)]
-pub struct NewResourceInstanceOptionLineage {
-    pub resource_instance_id: Uuid,
-    pub binding_id: Uuid,
-    pub contribution_type: LineageContributionType,
-    pub fanout_axis: Option<FanoutAxis>,
-    pub fanout_value: Option<Value>,
+pub(crate) struct NewResourceInstanceOptionLineage {
+    pub(crate) resource_instance_id: Uuid,
+    pub(crate) binding_id: Uuid,
+    pub(crate) contribution_type: LineageContributionType,
+    pub(crate) fanout_axis: Option<FanoutAxis>,
+    pub(crate) fanout_value: Option<Value>,
 }
 
 /// Source value available to the option resolver.
 #[derive(Debug, Clone)]
-pub struct OptionSourceValue {
-    pub source_kind: SourceKind,
-    pub source_path: String,
-    pub value: Value,
-    pub source_ref: Option<Value>,
-    pub source_version: Option<String>,
+pub(crate) struct OptionSourceValue {
+    pub(crate) source_kind: SourceKind,
+    pub(crate) source_path: String,
+    pub(crate) value: Value,
+    pub(crate) source_ref: Option<Value>,
+    pub(crate) source_version: Option<String>,
 }
 
 /// Resolved option value ready to become a binding row.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct ResolvedOptionValue {
-    pub service_option_def_id: Uuid,
-    pub option_key: String,
-    pub value: Value,
-    pub source_kind: SourceKind,
-    pub source_ref: Option<Value>,
-    pub source_version: Option<String>,
-    pub value_hash: String,
+pub(crate) struct ResolvedOptionValue {
+    pub(crate) service_option_def_id: Uuid,
+    pub(crate) option_key: String,
+    pub(crate) value: Value,
+    pub(crate) source_kind: SourceKind,
+    pub(crate) source_ref: Option<Value>,
+    pub(crate) source_version: Option<String>,
+    pub(crate) value_hash: String,
 }
 
 /// Pure option resolution helper.
 #[derive(Debug, Default, Clone)]
-pub struct OptionResolver;
+pub(crate) struct OptionResolver;
 
 impl OptionResolver {
     /// Create an option resolver.
@@ -1134,7 +1144,7 @@ impl OptionResolver {
     /// ```
     /// let _resolver = sem_os_postgres::service_options::OptionResolver::new();
     /// ```
-    pub fn new() -> Self {
+    pub(crate) fn new() -> Self {
         Self
     }
 
@@ -1157,7 +1167,7 @@ impl OptionResolver {
     /// assert_eq!(source.value, json!(["US_EQUITY"]));
     /// let _resolver = OptionResolver::new();
     /// ```
-    pub fn resolve(
+    pub(crate) fn resolve(
         &self,
         def: &ServiceOptionDefRow,
         override_row: Option<&ProductServiceOptionOverrideRow>,
@@ -1213,15 +1223,15 @@ impl OptionResolver {
 
 /// Validation gap emitted by coverage checks.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct CoverageGap {
-    pub level: u8,
-    pub code: String,
-    pub message: String,
+pub(crate) struct CoverageGap {
+    pub(crate) level: u8,
+    pub(crate) code: String,
+    pub(crate) message: String,
 }
 
 /// Pure coverage validator for option/resource planning inputs.
 #[derive(Debug, Default, Clone)]
-pub struct CoverageValidator;
+pub(crate) struct CoverageValidator;
 
 impl CoverageValidator {
     /// Create a coverage validator.
@@ -1231,7 +1241,7 @@ impl CoverageValidator {
     /// ```
     /// let _validator = sem_os_postgres::service_options::CoverageValidator::new();
     /// ```
-    pub fn new() -> Self {
+    pub(crate) fn new() -> Self {
         Self
     }
 
@@ -1244,7 +1254,7 @@ impl CoverageValidator {
     /// let gaps = validator.required_binding_gaps(&[], &[]);
     /// assert!(gaps.is_empty());
     /// ```
-    pub fn required_binding_gaps(
+    pub(crate) fn required_binding_gaps(
         &self,
         defs: &[ServiceOptionDefRow],
         bindings: &[ResolvedOptionValue],
@@ -1268,16 +1278,16 @@ impl CoverageValidator {
 
 /// Planned resource instance before materialisation through `service-resource.provision`.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct PlannedResourceInstance {
-    pub service_id: Uuid,
-    pub resource_id: Uuid,
-    pub fanout_axis: FanoutAxis,
-    pub fanout_value: Option<Value>,
+pub(crate) struct PlannedResourceInstance {
+    pub(crate) service_id: Uuid,
+    pub(crate) resource_id: Uuid,
+    pub(crate) fanout_axis: FanoutAxis,
+    pub(crate) fanout_value: Option<Value>,
 }
 
 /// Pure resource fan-out planner.
 #[derive(Debug, Default, Clone)]
-pub struct ResourceFanoutPlanner;
+pub(crate) struct ResourceFanoutPlanner;
 
 impl ResourceFanoutPlanner {
     /// Create a fan-out planner.
@@ -1287,7 +1297,7 @@ impl ResourceFanoutPlanner {
     /// ```
     /// let _planner = sem_os_postgres::service_options::ResourceFanoutPlanner::new();
     /// ```
-    pub fn new() -> Self {
+    pub(crate) fn new() -> Self {
         Self
     }
 
@@ -1300,7 +1310,7 @@ impl ResourceFanoutPlanner {
     /// let planned = planner.plan(&[], &[]).unwrap();
     /// assert!(planned.is_empty());
     /// ```
-    pub fn plan(
+    pub(crate) fn plan(
         &self,
         rules: &[ResourceFanoutRuleRow],
         bindings: &[ResolvedOptionValue],
@@ -1364,7 +1374,7 @@ impl ResourceFanoutPlanner {
 /// let right = json!({"a": 1, "b": 2});
 /// assert_eq!(hash_canonical_json(&left), hash_canonical_json(&right));
 /// ```
-pub fn hash_canonical_json(value: &Value) -> String {
+pub(crate) fn hash_canonical_json(value: &Value) -> String {
     let canonical = canonical_json(value);
     let digest = Sha256::digest(canonical.as_bytes());
     hex::encode(digest)
