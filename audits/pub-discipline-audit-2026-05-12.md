@@ -729,3 +729,167 @@ No file in the repository has been modified by this audit other than the two new
 ---
 
 **Audit complete. Stop. Awaiting review before any remediation.**
+
+---
+
+## Phase 1 closing note (2026-05-12)
+
+Phase 1 of the §7 remediation plan landed today as a sequence of nine commits on
+branch `codex/acp-workflow-validity-harness`, plus this audit's own delivery
+commit (`f6837f00`). All commits were made with the working-tree's pre-existing
+R8 unification WIP left in place (Option A from the start-of-Phase-1
+discussion); each step staged only its own files.
+
+### Commits
+
+| # | Hash | Scope |
+|---|---|---|
+| 0a | `82e20d21` | rip: remove ob-poc → `sem_os_postgres::service_options::*` re-export |
+| 0b | `f92e3809` | rip: remove ob-poc → `ob_agentic::lexicon_agent::*` re-export |
+| 1 | `4171ef78` | tighten: sem_os_harness pub → pub(crate) |
+| 2 | `93e90fa8` | tighten: sem_os_server pub → pub(crate) |
+| 3 | `0774460f` | tighten: ob-poc-web pub → pub(crate) |
+| 4 | `9b4ea859` | tighten: dsl-lsp pub → pub(crate) |
+| 5 | `261d5255` | tighten: inspector-projection deal generator pub → pub(crate) |
+| 6 | `5156f8a8` | tighten: sem_os_obpoc_adapter pipeline_seeds pub → pub(crate) |
+| 7 | `dc1a7e30` | lint: deny unreachable_pub on six tightened crates |
+
+### Per-crate `pub` reduction
+
+| Crate | `pub` before | `pub` after | Δ | unreachable_pub before | unreachable_pub after |
+|---|---:|---:|---:|---:|---:|
+| sem_os_harness | 7 | 0 | -7 | 5 | 0 |
+| sem_os_server | 57 | 21 | -36 | 39 | 0 |
+| ob-poc-web | 63 | 0 | -63 | 28 | 0 |
+| dsl-lsp | 109 | 6 | -103 | 79 | 0 |
+| inspector-projection (deal.rs only) | 224 | 170 | -54 | 10 | 0 |
+| sem_os_obpoc_adapter (pipeline_seeds.rs only) | 119 | 112 | -7 | 7 | 0 |
+| ob-poc (cross-crate re-export rips, steps 0a/0b only) | 17,794 | 17,785 | -9 | 563 | 563 |
+| **Phase 1 totals (excluding ob-poc rips)** | **579** | **309** | **-270** | **168** | **0** |
+
+### Workspace `unreachable_pub` count
+
+| Checkpoint | Total |
+|---|---:|
+| Baseline (pre-Phase-1) | 738 |
+| Post step 0a (re-export rip — not a lint finding) | 738 |
+| Post step 0b (re-export rip — not a lint finding) | 738 |
+| Post step 1 (sem_os_harness) | 733 |
+| Post step 2 (sem_os_server) | 694 |
+| Post step 3 (ob-poc-web) | 666 |
+| Post step 4 (dsl-lsp) | 587 |
+| Post step 5 (inspector-projection) | 577 |
+| Post step 6 (sem_os_obpoc_adapter) | 570 |
+| Post step 7 (lint deny — no source change) | 570 |
+| **Phase 1 net reduction** | **-168** |
+
+Remaining 570 unreachable_pub warnings break down as:
+
+| Crate | Remaining unreachable_pub | Notes |
+|---|---:|---|
+| ob-poc | 563 | Super-crate. Untouched in Phase 1; targeted in audit §7 step 16 (the multi-week ob-poc split, Phase 3). |
+| ob-agentic | 4 | Audit §7 step 7 — Phase 2 (call-graph audit). |
+| ob-workflow | 2 | Audit §7 step 8 — Phase 2. |
+| entity-gateway | 1 | Round-out pass in Phase 2. |
+| dsl-lsp, sem_os_server, ob-poc-web, sem_os_harness, inspector-projection, sem_os_obpoc_adapter | 0 each | **Now ratcheted with `[lints.rust] unreachable_pub = "deny"`.** |
+
+### Items left as `pub` that the audit suggested could be tightened
+
+These are external contract items that the audit's wholesale-tightening
+instruction would have demoted, but which workspace consumers (main.rs binary
+targets, integration tests, or other crates) actually import. Each one stays
+`pub` with explicit rationale.
+
+**sem_os_harness:** none. Wholesale tightening succeeded (all 7 → pub(crate))
+because zero external consumers exist. The two `run_*_scenario_suite` entry
+points and their 16-fn helper chain were further gated under `#[cfg(test)]`
+to silence the dead_code cascade triggered when their only consumers
+(`#[cfg(test)] mod tests`) became the sole reachable callers.
+
+**sem_os_server:** 6 symbols retained as `pub` for `main.rs` (bin target) and
+`tests/authoring_http_integration.rs` consumption:
+- `dispatcher::OutboxDispatcher` struct
+- `dispatcher::OutboxDispatcher::new` constructor
+- `dispatcher::OutboxDispatcher::run` async method
+- `middleware::jwt::JwtConfig` struct
+- `middleware::jwt::JwtConfig::from_secret` constructor
+- `router::build_router` function
+- (plus 3 `pub use` re-exports in lib.rs lifting the three above to crate root)
+
+**ob-poc-web:** none. Bin-only crate (no `src/lib.rs`) — zero possible external
+consumers — all 63 `pub` items demoted.
+
+**dsl-lsp:** 6 path components retained as `pub` to support the integration
+test `tests/lsp_harness.rs` which imports `dsl_lsp::analyze_document`:
+- `handlers::diagnostics::analyze_document` function (the only externally-used item)
+- `analysis::document::DocumentState` struct (return type of analyze_document; required to keep `pub fn` signature valid under the `private_interfaces` lint)
+- `pub mod analysis` in lib.rs + main.rs (re-export path)
+- `pub mod handlers` in lib.rs + main.rs (re-export path)
+- `pub mod document` in analysis/mod.rs (re-export path)
+- `pub mod diagnostics` in handlers/mod.rs (re-export path)
+- `pub use handlers::diagnostics::analyze_document` re-export in lib.rs
+
+  The `pub mod` chain in both `lib.rs` and `main.rs` keeps the bin and lib
+  compilation targets aligned on visibility — without the mirroring,
+  unreachable_pub fires on the bin target's private mod tree.
+
+**inspector-projection:** none in deal.rs (test-only generator, all internal).
+The crate's broader external contract (cbu, matrix, NodeId, RefValue,
+InspectorProjection, RenderPolicy, etc.) was deliberately left untouched in
+Phase 1 — it has confirmed consumers in `ob-poc/src/api/projection_routes.rs`
+and `graph_routes.rs`. Phase 2 step 5 in audit §7 was effectively scoped
+narrower than the audit suggested (only the lint-flagged 10 items, not
+"sample on sibling generators") because the sibling generators are clean
+under the current lint.
+
+**sem_os_obpoc_adapter:** none in pipeline_seeds (private module). External
+contract (`scanner::*`, `seeds::*`, `metadata::DomainMetadata`, `onboarding::*`,
+`build_seed_bundle`, `build_seed_bundle_with_metadata`) untouched and verified
+in use by ob-poc, tests, and `src/bin/sem_os_footprint_audit.rs`.
+
+### Crates now under `deny(unreachable_pub)`
+
+Per-crate `[lints.rust] unreachable_pub = "deny"` landed in:
+- `crates/sem_os_harness/Cargo.toml`
+- `crates/sem_os_server/Cargo.toml`
+- `crates/ob-poc-web/Cargo.toml`
+- `crates/dsl-lsp/Cargo.toml`
+- `crates/inspector-projection/Cargo.toml`
+- `crates/sem_os_obpoc_adapter/Cargo.toml`
+
+Build verification: `cargo build --workspace` on stable 1.95 (project pin):
+PASS, 0 errors. `cargo +nightly clippy --workspace --all-targets --no-deps`
+without `-W unreachable_pub` flag (relying solely on per-crate config):
+PASS, 0 errors. Live deny-fires-on-violation test in step 7 confirmed.
+
+The workspace-wide `[workspace.lints]` ratchet is **not** enabled — it would
+fail immediately on the remaining 570 warnings in the 4 untightened crates.
+That ratchet waits until Phase 2 (call-graph audits on ob-agentic,
+ob-workflow, entity-gateway, ob-semantic-matcher, dsl-core, sem_os_postgres,
+dsl_types, ob-poc-types, sem_os_core, dsl-runtime) and Phase 3 (the ob-poc
+super-crate split per audit §4.1) close the remaining lint cohort.
+
+### Phase 1 side-effects flagged for review
+
+These were caused by tightening and noted in commit messages, not addressed
+in Phase 1 (per the "no design changes" rule):
+
+- **dsl-lsp**: 22 `dead_code` warnings now visible in the lib compile target
+  (server.rs's `DslLanguageServer` impl is consumed only by the bin target's
+  duplicated mod tree; hover/code_actions/playbook handler fns have no callers).
+  These are pre-existing latent issues now surfaced by the visibility tightening.
+  4 handler files already carry `#![allow(dead_code)]` for this pattern;
+  the 4 newly-warning files do not. The cleanest fix is a structural
+  refactor (remove the lib/bin duplication, or extract a thin lib crate
+  exposing only `analyze_document`), which belongs in a future phase.
+
+- **ob-poc/src/lib.rs**: had `pub mod service_options { pub use sem_os_postgres::service_options::*; }` and `pub mod lexicon_agent { pub use ob_agentic::lexicon_agent::*; }` — both wrappers around full-crate-boundary wildcard re-exports. Both removed in steps 0a/0b. The matching entry in `rust/tools/public-api-allowlist.txt` was cleaned up in lockstep so the public-API freeze check stays consistent.
+
+### Phase 2 entry conditions
+
+Phase 2 is not started. When the user is ready to schedule it, the scope is
+audit §7 steps 7-15: call-graph audits on the 9 remaining tighten-candidate
+crates plus the round-out pass on smaller crates. Phase 3 is audit §7 step 16
+(the ob-poc super-crate split per §4.1) and is a multi-week effort.
+
+**Phase 1 complete. Stop. Awaiting decision on Phase 2.**
