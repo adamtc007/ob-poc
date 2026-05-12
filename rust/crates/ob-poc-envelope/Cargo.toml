@@ -6,6 +6,10 @@ description = "Envelope construction + TOCTOU recheck + ACP session-input draft-
 
 [dependencies]
 ob-poc-types = { path = "../ob-poc-types" }
+# ob-poc-macros supplies the #[derive(IdType)] proc macro used by
+# data_dictionary's AttributeId. Proc-macro crate — tooling tier, not
+# execution tier.
+ob-poc-macros = { path = "../ob-poc-macros" }
 # llm_trace builds PromptContextAssembly audits — sem_os_core is the
 # control-plane (canonical domain types) and acceptable here. Not the
 # execution tier — see the boundary-tier discipline in lib.rs.

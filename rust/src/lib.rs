@@ -49,7 +49,8 @@ pub use ob_poc_envelope::llm_trace;
 pub use ob_poc_envelope::audit_chain;
 
 // Data dictionary
-pub mod data_dictionary;
+// Phase 3 slice 2e (2026-05-12): relocated to ob-poc-envelope; compat re-export.
+pub use ob_poc_envelope::data_dictionary;
 
 // Domain handlers for business logic
 pub mod domains;
