@@ -6,7 +6,7 @@ use axum::response::Html;
 ///
 /// Tries to serve from React dist directory first (set via REACT_DIST_DIR env var),
 /// falls back to the embedded placeholder HTML.
-pub async fn serve_index() -> Html<String> {
+pub(crate) async fn serve_index() -> Html<String> {
     // Try to read from React dist directory
     let react_dist_dir = std::env::var("REACT_DIST_DIR").ok();
 

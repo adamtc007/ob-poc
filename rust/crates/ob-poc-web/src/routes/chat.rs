@@ -14,15 +14,15 @@ use std::convert::Infallible;
 use uuid::Uuid;
 
 #[derive(Debug, Deserialize)]
-pub struct StreamParams {
+pub(crate) struct StreamParams {
     #[allow(dead_code)]
-    pub id: Uuid,
+    pub(crate) id: Uuid,
 }
 
 #[derive(Debug, Serialize)]
 #[serde(tag = "type")]
 #[allow(dead_code)] // Variants for SSE protocol, not all paths exercised yet
-pub enum StreamChunk {
+pub(crate) enum StreamChunk {
     #[serde(rename = "chunk")]
     Chunk { content: String },
     #[serde(rename = "dsl")]
@@ -39,7 +39,7 @@ pub enum StreamChunk {
 ///
 /// Currently returns an immediate "not implemented" error and closes.
 /// The chat panel falls back to polling `/api/session/:id/chat`.
-pub async fn chat_stream(
+pub(crate) async fn chat_stream(
     Query(_params): Query<StreamParams>,
 ) -> Sse<impl Stream<Item = Result<Event, Infallible>>> {
     // Return a single error event and close the stream
