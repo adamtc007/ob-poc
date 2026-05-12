@@ -1082,8 +1082,8 @@ impl AcpJsonRpcAgent {
             Ok(request) => request,
             Err(error) => return self.error(id, INVALID_PARAMS, error.to_string(), None),
         };
-        let manifest = match load_ob_poc_kyc_domain_pack() {
-            Ok(manifest) => manifest,
+        let facade = match crate::acp_facade::AcpFacade::for_default_pack(request.adapter) {
+            Ok(facade) => facade,
             Err(error) => return self.acp_error(id, error),
         };
         let session = self
@@ -1096,7 +1096,7 @@ impl AcpJsonRpcAgent {
             subject_id: request.subject_id,
         };
         let discovery_request = sem_os_core::domain_pack::DiscoveryRequest {
-            pack_id: manifest.pack_id.clone(),
+            pack_id: facade.manifest().pack_id.clone(),
             probe_id: request.probe_id.clone(),
             subject: subject.clone(),
             context: request.context,
@@ -1108,12 +1108,7 @@ impl AcpJsonRpcAgent {
             provenance: request.provenance,
             first_class_state_mutated: request.first_class_state_mutated,
         };
-        match acp::assemble_sage_context_for_acp(
-            &session,
-            &manifest,
-            discovery_request,
-            discovery_response,
-        ) {
+        match facade.context_assemble_for(&session, discovery_request, discovery_response) {
             Ok(bundle) => self.response(id, json!({"bundle": bundle})),
             Err(error) => self.acp_error(id, error),
         }
@@ -1129,8 +1124,8 @@ impl AcpJsonRpcAgent {
             .cloned()
             .and_then(|value| serde_json::from_value::<AcpAdapterKind>(value).ok())
             .unwrap_or(AcpAdapterKind::Zed);
-        let manifest = match load_ob_poc_kyc_domain_pack() {
-            Ok(manifest) => manifest,
+        let facade = match crate::acp_facade::AcpFacade::for_default_pack(adapter) {
+            Ok(facade) => facade,
             Err(error) => return self.acp_error(id, error),
         };
         let session = self
@@ -1139,7 +1134,7 @@ impl AcpJsonRpcAgent {
             .or_insert_with(|| acp::open_acp_session(session_id, adapter))
             .clone();
 
-        match acp::acp_policy_capabilities(&session, &manifest) {
+        match facade.policy_for(&session) {
             Ok(policy) => self.response(id, json!({"policy": policy})),
             Err(error) => self.acp_error(id, error),
         }
@@ -1155,23 +1150,24 @@ impl AcpJsonRpcAgent {
             .cloned()
             .and_then(|value| serde_json::from_value::<AcpAdapterKind>(value).ok())
             .unwrap_or(AcpAdapterKind::Zed);
-        let manifest = match load_ob_poc_kyc_domain_pack() {
-            Ok(manifest) => manifest,
+        let facade = match crate::acp_facade::AcpFacade::for_default_pack(adapter) {
+            Ok(facade) => facade,
             Err(error) => return self.acp_error(id, error),
         };
+        let pack_id = facade.manifest().pack_id.clone();
         let session = self
             .sessions
             .entry(session_id)
             .or_insert_with(|| acp::open_acp_session(session_id, adapter))
             .clone();
 
-        match acp::list_acp_projections(&session, &manifest) {
+        match facade.projections_list_for(&session) {
             Ok(projections) => self.response(
                 id,
                 json!({
                     "status": "acp_projection_catalog",
                     "session_id": session_id,
-                    "pack_id": manifest.pack_id,
+                    "pack_id": pack_id,
                     "projections": projections,
                 }),
             ),
@@ -3191,12 +3187,7 @@ where
 
 fn load_ob_poc_kyc_domain_pack(
 ) -> Result<sem_os_core::domain_pack::DomainPackManifest, acp::AcpAdapterError> {
-    serde_yaml::from_str(include_str!(
-        "../config/sem_os_seeds/domain_packs/ob_poc_kyc.yaml"
-    ))
-    .map_err(|err| acp::AcpAdapterError::PackInvalid {
-        reason: err.to_string(),
-    })
+    crate::acp_facade::load_ob_poc_kyc_domain_pack()
 }
 
 #[cfg(test)]

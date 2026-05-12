@@ -1097,9 +1097,8 @@ async fn get_acp_policy_route(
 }
 
 fn acp_policy_value(session_id: Uuid) -> Result<serde_json::Value, crate::acp::AcpAdapterError> {
-    let manifest = load_ob_poc_kyc_domain_pack()?;
-    let session = crate::acp::open_acp_session(session_id, crate::acp::AcpAdapterKind::Zed);
-    let policy = crate::acp::acp_policy_capabilities(&session, &manifest)?;
+    let facade = crate::acp_facade::AcpFacade::for_default_pack(crate::acp::AcpAdapterKind::Zed)?;
+    let policy = facade.policy(session_id)?;
 
     Ok(serde_json::json!({
         "status": "acp_policy",
@@ -1119,14 +1118,14 @@ async fn list_acp_projections_route(
 fn list_acp_projections_value(
     session_id: Uuid,
 ) -> Result<serde_json::Value, crate::acp::AcpAdapterError> {
-    let manifest = load_ob_poc_kyc_domain_pack()?;
-    let session = crate::acp::open_acp_session(session_id, crate::acp::AcpAdapterKind::Zed);
-    let projections = crate::acp::list_acp_projections(&session, &manifest)?;
+    let facade = crate::acp_facade::AcpFacade::for_default_pack(crate::acp::AcpAdapterKind::Zed)?;
+    let pack_id = facade.manifest().pack_id.clone();
+    let projections = facade.projections_list(session_id)?;
 
     Ok(serde_json::json!({
         "status": "acp_projection_catalog",
         "session_id": session_id,
-        "pack_id": manifest.pack_id,
+        "pack_id": pack_id,
         "projections": projections,
     }))
 }
@@ -1207,17 +1206,20 @@ async fn get_acp_projection_value_for_state(
     session_id: Uuid,
     kind: &str,
 ) -> Result<serde_json::Value, crate::acp::AcpAdapterError> {
-    let manifest = load_ob_poc_kyc_domain_pack()?;
-    let session = crate::acp::open_acp_session(session_id, crate::acp::AcpAdapterKind::Zed);
-    let kind = kind.parse::<AcpProjectionKind>().map_err(|_| {
+    let facade = crate::acp_facade::AcpFacade::for_default_pack(crate::acp::AcpAdapterKind::Zed)?;
+    let parsed_kind = kind.parse::<AcpProjectionKind>().map_err(|_| {
         crate::acp::AcpAdapterError::ProjectionUnknown {
             projection_kind: kind.to_string(),
         }
     })?;
 
     if let Some(repl_session) = state.orchestrator.get_session(session_id).await {
+        let session = facade.open_session_with_persona(
+            session_id,
+            crate::acp::AcpPersonaMode::SagePlanning,
+        );
         if let Some(projection) =
-            build_live_acp_projection(&session, &manifest, &repl_session, kind)?
+            build_live_acp_projection(&session, facade.manifest(), &repl_session, parsed_kind)?
         {
             return Ok(serde_json::json!({
                 "status": "acp_projection",
@@ -1226,23 +1228,21 @@ async fn get_acp_projection_value_for_state(
         }
     }
 
-    get_acp_projection_value(session_id, kind.as_str())
+    get_acp_projection_value(session_id, parsed_kind.as_str())
 }
 
 fn get_acp_projection_value(
     session_id: Uuid,
     kind: &str,
 ) -> Result<serde_json::Value, crate::acp::AcpAdapterError> {
-    let manifest = load_ob_poc_kyc_domain_pack()?;
-    let session = crate::acp::open_acp_session(session_id, crate::acp::AcpAdapterKind::Zed);
+    let facade = crate::acp_facade::AcpFacade::for_default_pack(crate::acp::AcpAdapterKind::Zed)?;
     let kind = kind
         .parse::<sem_os_core::acp_projection::AcpProjectionKind>()
         .map_err(|_| crate::acp::AcpAdapterError::ProjectionUnknown {
             projection_kind: kind.to_string(),
         })?;
-    let projection = crate::acp::build_acp_projection(
-        &session,
-        &manifest,
+    let projection = facade.projection_get(
+        session_id,
         crate::acp::AcpProjectionRequest {
             kind,
             subject: None,
@@ -1517,6 +1517,9 @@ async fn open_acp_session_route(
 }
 
 fn open_acp_session_value(session_id: Uuid, req: AcpOpenSessionRequest) -> serde_json::Value {
+    // open_session_with_persona is a transport convenience; manifest is not
+    // needed for session-only operations so we construct the facade lazily
+    // only when domain calls are required.
     let session = crate::acp::open_acp_session_with_persona(
         session_id,
         req.adapter,
@@ -1589,15 +1592,14 @@ fn assemble_acp_context_value(
     session_id: Uuid,
     req: AcpContextAssemblyRequest,
 ) -> Result<serde_json::Value, crate::acp::AcpAdapterError> {
-    let manifest = load_ob_poc_kyc_domain_pack()?;
-    let session = crate::acp::open_acp_session(session_id, req.adapter);
+    let facade = crate::acp_facade::AcpFacade::for_default_pack(req.adapter)?;
     let subject = sem_os_core::domain_pack::DiscoverySubject {
         subject_kind: req.subject_kind,
         subject_id: req.subject_id,
     };
     let probe_id = req.probe_id;
     let discovery_request = sem_os_core::domain_pack::DiscoveryRequest {
-        pack_id: manifest.pack_id.clone(),
+        pack_id: facade.manifest().pack_id.clone(),
         probe_id: probe_id.clone(),
         subject: subject.clone(),
         context: req.context,
@@ -1610,12 +1612,7 @@ fn assemble_acp_context_value(
         first_class_state_mutated: req.first_class_state_mutated,
     };
 
-    let bundle = crate::acp::assemble_sage_context_for_acp(
-        &session,
-        &manifest,
-        discovery_request,
-        discovery_response,
-    )?;
+    let bundle = facade.context_assemble(session_id, discovery_request, discovery_response)?;
 
     Ok(serde_json::json!({
         "status": "acp_context_assembled",
@@ -3610,12 +3607,7 @@ fn compilation_json_error(
 
 pub(crate) fn load_ob_poc_kyc_domain_pack(
 ) -> Result<sem_os_core::domain_pack::DomainPackManifest, crate::acp::AcpAdapterError> {
-    serde_yaml::from_str(include_str!(
-        "../../config/sem_os_seeds/domain_packs/ob_poc_kyc.yaml"
-    ))
-    .map_err(|err| crate::acp::AcpAdapterError::PackInvalid {
-        reason: err.to_string(),
-    })
+    crate::acp_facade::load_ob_poc_kyc_domain_pack()
 }
 
 fn acp_json_error(error: crate::acp::AcpAdapterError) -> (StatusCode, Json<ErrorResponseV2>) {

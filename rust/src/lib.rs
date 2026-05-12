@@ -27,6 +27,7 @@ pub mod error;
 // ACP-facing transport-neutral adapter contracts.
 pub mod acp;
 pub mod acp_dag_semantic;
+pub mod acp_facade;
 pub mod acp_pack_context_envelope_v2;
 pub mod acp_protocol;
 pub mod acp_registry_projection;
