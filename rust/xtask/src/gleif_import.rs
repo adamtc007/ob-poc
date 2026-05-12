@@ -38,134 +38,134 @@ const BACKOFF_MULTIPLIER: u64 = 2; // Exponential backoff multiplier
 // =============================================================================
 
 #[derive(Debug, Deserialize)]
-pub struct GleifResponse {
-    pub data: Vec<GleifRecord>,
-    pub meta: GleifMeta,
+pub(crate) struct GleifResponse {
+    pub(crate) data: Vec<GleifRecord>,
+    pub(crate) meta: GleifMeta,
 }
 
 #[derive(Debug, Deserialize)]
-pub struct GleifSingleResponse {
-    pub data: GleifRecord,
+pub(crate) struct GleifSingleResponse {
+    pub(crate) data: GleifRecord,
 }
 
 #[derive(Debug, Deserialize)]
-pub struct GleifMeta {
-    pub pagination: GleifPagination,
+pub(crate) struct GleifMeta {
+    pub(crate) pagination: GleifPagination,
 }
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct GleifPagination {
-    pub total: usize,
-    pub current_page: usize,
-    pub last_page: usize,
+pub(crate) struct GleifPagination {
+    pub(crate) total: usize,
+    pub(crate) current_page: usize,
+    pub(crate) last_page: usize,
 }
 
 #[derive(Debug, Deserialize, Clone)]
 #[allow(dead_code)] // Fields used for JSON deserialization from GLEIF API
-pub struct GleifRecord {
-    pub attributes: GleifAttributes,
+pub(crate) struct GleifRecord {
+    pub(crate) attributes: GleifAttributes,
     #[serde(default)]
-    pub relationships: Option<GleifRelationships>,
+    pub(crate) relationships: Option<GleifRelationships>,
 }
 
 #[derive(Debug, Deserialize, Clone)]
-pub struct GleifAttributes {
-    pub lei: String,
-    pub entity: GleifEntity,
-    pub registration: GleifRegistration,
-}
-
-#[derive(Debug, Deserialize, Clone)]
-#[serde(rename_all = "camelCase")]
-pub struct GleifEntity {
-    pub legal_name: GleifLegalName,
-    pub jurisdiction: Option<String>,
-    pub category: Option<String>,
-    pub status: Option<String>,
-    pub legal_form: Option<GleifLegalForm>,
-    pub registered_as: Option<String>,
-    pub registered_at: Option<GleifRegisteredAt>,
-    pub legal_address: Option<GleifAddress>,
-    pub headquarters_address: Option<GleifAddress>,
-}
-
-#[derive(Debug, Deserialize, Clone)]
-pub struct GleifLegalName {
-    pub name: String,
-}
-
-#[derive(Debug, Deserialize, Clone)]
-pub struct GleifLegalForm {
-    pub id: Option<String>,
-}
-
-#[derive(Debug, Deserialize, Clone)]
-pub struct GleifRegisteredAt {
-    pub id: Option<String>,
+pub(crate) struct GleifAttributes {
+    pub(crate) lei: String,
+    pub(crate) entity: GleifEntity,
+    pub(crate) registration: GleifRegistration,
 }
 
 #[derive(Debug, Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
-pub struct GleifAddress {
-    pub city: Option<String>,
-    pub country: Option<String>,
+pub(crate) struct GleifEntity {
+    pub(crate) legal_name: GleifLegalName,
+    pub(crate) jurisdiction: Option<String>,
+    pub(crate) category: Option<String>,
+    pub(crate) status: Option<String>,
+    pub(crate) legal_form: Option<GleifLegalForm>,
+    pub(crate) registered_as: Option<String>,
+    pub(crate) registered_at: Option<GleifRegisteredAt>,
+    pub(crate) legal_address: Option<GleifAddress>,
+    pub(crate) headquarters_address: Option<GleifAddress>,
+}
+
+#[derive(Debug, Deserialize, Clone)]
+pub(crate) struct GleifLegalName {
+    pub(crate) name: String,
+}
+
+#[derive(Debug, Deserialize, Clone)]
+pub(crate) struct GleifLegalForm {
+    pub(crate) id: Option<String>,
+}
+
+#[derive(Debug, Deserialize, Clone)]
+pub(crate) struct GleifRegisteredAt {
+    pub(crate) id: Option<String>,
 }
 
 #[derive(Debug, Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
-pub struct GleifRegistration {
-    pub corroboration_level: Option<String>,
-    pub managing_lou: Option<String>,
-    pub last_update_date: Option<String>,
+pub(crate) struct GleifAddress {
+    pub(crate) city: Option<String>,
+    pub(crate) country: Option<String>,
+}
+
+#[derive(Debug, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct GleifRegistration {
+    pub(crate) corroboration_level: Option<String>,
+    pub(crate) managing_lou: Option<String>,
+    pub(crate) last_update_date: Option<String>,
 }
 
 #[derive(Debug, Deserialize, Clone, Default)]
 #[serde(rename_all = "kebab-case")]
 #[allow(dead_code)] // Fields used for JSON deserialization from GLEIF API
-pub struct GleifRelationships {
-    pub direct_parent: Option<GleifRelationshipLink>,
-    pub ultimate_parent: Option<GleifRelationshipLink>,
+pub(crate) struct GleifRelationships {
+    pub(crate) direct_parent: Option<GleifRelationshipLink>,
+    pub(crate) ultimate_parent: Option<GleifRelationshipLink>,
 }
 
 #[derive(Debug, Deserialize, Clone)]
 #[allow(dead_code)] // Fields used for JSON deserialization from GLEIF API
-pub struct GleifRelationshipLink {
-    pub links: Option<GleifLinks>,
+pub(crate) struct GleifRelationshipLink {
+    pub(crate) links: Option<GleifLinks>,
 }
 
 #[derive(Debug, Deserialize, Clone)]
 #[allow(dead_code)] // Fields used for JSON deserialization from GLEIF API
-pub struct GleifLinks {
-    pub related: Option<String>,
+pub(crate) struct GleifLinks {
+    pub(crate) related: Option<String>,
 }
 
 // Parent relationship response
 #[derive(Debug, Deserialize)]
-pub struct GleifParentResponse {
-    pub data: Option<GleifParentData>,
+pub(crate) struct GleifParentResponse {
+    pub(crate) data: Option<GleifParentData>,
 }
 
 #[derive(Debug, Deserialize)]
-pub struct GleifParentData {
-    pub attributes: Option<GleifParentAttributes>,
+pub(crate) struct GleifParentData {
+    pub(crate) attributes: Option<GleifParentAttributes>,
 }
 
 #[derive(Debug, Deserialize)]
-pub struct GleifParentAttributes {
-    pub relationship: Option<GleifParentRelationship>,
+pub(crate) struct GleifParentAttributes {
+    pub(crate) relationship: Option<GleifParentRelationship>,
 }
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct GleifParentRelationship {
-    pub start_node: Option<GleifNode>,
-    pub end_node: Option<GleifNode>,
+pub(crate) struct GleifParentRelationship {
+    pub(crate) start_node: Option<GleifNode>,
+    pub(crate) end_node: Option<GleifNode>,
 }
 
 #[derive(Debug, Deserialize)]
-pub struct GleifNode {
-    pub id: Option<String>,
+pub(crate) struct GleifNode {
+    pub(crate) id: Option<String>,
 }
 
 // =============================================================================
@@ -173,15 +173,15 @@ pub struct GleifNode {
 // =============================================================================
 
 #[derive(Debug, Default)]
-pub struct ImportStats {
-    pub fetched: usize,
-    pub upserted: usize,
-    pub parents_discovered: usize,
-    pub relationships_created: usize,
-    pub cbus_linked: usize,
-    pub cbus_created: usize,
-    pub roles_assigned: usize,
-    pub errors: usize,
+pub(crate) struct ImportStats {
+    pub(crate) fetched: usize,
+    pub(crate) upserted: usize,
+    pub(crate) parents_discovered: usize,
+    pub(crate) relationships_created: usize,
+    pub(crate) cbus_linked: usize,
+    pub(crate) cbus_created: usize,
+    pub(crate) roles_assigned: usize,
+    pub(crate) errors: usize,
 }
 
 // =============================================================================
@@ -272,7 +272,7 @@ async fn gleif_import_via_dsl(
 // Main Import Function (Legacy for search mode)
 // =============================================================================
 
-pub async fn gleif_import(
+pub(crate) async fn gleif_import(
     search_term: Option<&str>,
     manager_lei: Option<&str>,
     limit: Option<usize>,

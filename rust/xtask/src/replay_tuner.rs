@@ -35,7 +35,7 @@ use ob_poc::repl::decision_log::{
 // ============================================================================
 
 /// Load all golden corpus YAML files from a directory.
-pub fn load_golden_corpus(dir: &Path) -> Result<Vec<GoldenTestCase>> {
+pub(crate) fn load_golden_corpus(dir: &Path) -> Result<Vec<GoldenTestCase>> {
     let mut cases = Vec::new();
 
     let yaml_files: Vec<PathBuf> = std::fs::read_dir(dir)
@@ -122,7 +122,7 @@ struct LegacySeedEntry {
 ///
 /// In offline mode (no live pipeline), we use the decision log's recorded
 /// candidates and re-apply scoring with the given config.
-pub fn evaluate_test_case_offline(
+pub(crate) fn evaluate_test_case_offline(
     test: &GoldenTestCase,
     candidates: &[VerbCandidateSnapshot],
     config: &ScoringConfig,
@@ -253,7 +253,7 @@ fn rescore_candidates(
 }
 
 /// Run the full golden corpus with a given scoring config.
-pub fn run_corpus(
+pub(crate) fn run_corpus(
     cases: &[GoldenTestCase],
     session_logs: &[SessionDecisionLog],
     config: &ScoringConfig,
@@ -357,7 +357,7 @@ fn find_matching_log<'a>(
 
 /// Which scoring parameter to sweep.
 #[derive(Debug, Clone)]
-pub enum SweepParam {
+pub(crate) enum SweepParam {
     PackVerbBoost,
     PackVerbPenalty,
     TemplateStepBoost,
@@ -369,7 +369,7 @@ pub enum SweepParam {
 }
 
 impl SweepParam {
-    pub fn from_str(s: &str) -> Result<Self> {
+    pub(crate) fn from_str(s: &str) -> Result<Self> {
         match s {
             "pack_verb_boost" => Ok(Self::PackVerbBoost),
             "pack_verb_penalty" => Ok(Self::PackVerbPenalty),
@@ -417,17 +417,17 @@ impl SweepParam {
 
 /// Result of a single sweep point.
 #[derive(Debug, Clone, serde::Serialize)]
-pub struct SweepPoint {
-    pub param_name: String,
-    pub param_value: f32,
-    pub accuracy_pct: f32,
-    pub passed: usize,
-    pub failed: usize,
-    pub total: usize,
+pub(crate) struct SweepPoint {
+    pub(crate) param_name: String,
+    pub(crate) param_value: f32,
+    pub(crate) accuracy_pct: f32,
+    pub(crate) passed: usize,
+    pub(crate) failed: usize,
+    pub(crate) total: usize,
 }
 
 /// Run a sweep over a single parameter.
-pub fn run_sweep(
+pub(crate) fn run_sweep(
     cases: &[GoldenTestCase],
     session_logs: &[SessionDecisionLog],
     param: &SweepParam,
@@ -464,7 +464,7 @@ pub fn run_sweep(
 // ============================================================================
 
 /// Print a corpus report to stdout.
-pub fn print_report(report: &GoldenCorpusReport) {
+pub(crate) fn print_report(report: &GoldenCorpusReport) {
     println!("===========================================");
     println!("  Golden Corpus Report");
     println!("===========================================\n");
@@ -521,7 +521,7 @@ pub fn print_report(report: &GoldenCorpusReport) {
 }
 
 /// Print sweep results to stdout.
-pub fn print_sweep(points: &[SweepPoint]) {
+pub(crate) fn print_sweep(points: &[SweepPoint]) {
     println!("===========================================");
     println!("  Scoring Parameter Sweep");
     println!("===========================================\n");
@@ -563,7 +563,7 @@ pub fn print_sweep(points: &[SweepPoint]) {
 }
 
 /// Print comparison of two reports.
-pub fn print_comparison(baseline: &GoldenCorpusReport, candidate: &GoldenCorpusReport) {
+pub(crate) fn print_comparison(baseline: &GoldenCorpusReport, candidate: &GoldenCorpusReport) {
     println!("===========================================");
     println!("  Scoring Config Comparison");
     println!("===========================================\n");
@@ -675,7 +675,7 @@ pub fn print_comparison(baseline: &GoldenCorpusReport, candidate: &GoldenCorpusR
 // ============================================================================
 
 /// Run golden corpus with current scoring constants.
-pub fn run(
+pub(crate) fn run(
     corpus_dir: Option<&Path>,
     session_log_path: Option<&Path>,
     verbose: bool,
@@ -741,7 +741,7 @@ pub fn run(
 }
 
 /// Sweep a scoring parameter.
-pub fn sweep(
+pub(crate) fn sweep(
     corpus_dir: Option<&Path>,
     session_log_path: Option<&Path>,
     param_name: &str,
@@ -779,7 +779,7 @@ pub fn sweep(
 }
 
 /// Compare two scoring configs.
-pub fn compare(baseline_path: &Path, candidate_path: &Path) -> Result<()> {
+pub(crate) fn compare(baseline_path: &Path, candidate_path: &Path) -> Result<()> {
     let baseline_json = std::fs::read_to_string(baseline_path)
         .with_context(|| format!("Cannot read baseline: {}", baseline_path.display()))?;
     let baseline: GoldenCorpusReport = serde_json::from_str(&baseline_json)
@@ -795,7 +795,7 @@ pub fn compare(baseline_path: &Path, candidate_path: &Path) -> Result<()> {
 }
 
 /// Generate report from a session decision log.
-pub fn report(session_log_path: &Path, verbose: bool) -> Result<()> {
+pub(crate) fn report(session_log_path: &Path, verbose: bool) -> Result<()> {
     let content = std::fs::read_to_string(session_log_path)
         .with_context(|| format!("Cannot read session log: {}", session_log_path.display()))?;
     let session_log = SessionDecisionLog::from_json(&content)?;

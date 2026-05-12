@@ -39,7 +39,12 @@ pub(crate) fn run(bless: bool) -> Result<()> {
     let baseline_path = workspace_root.join(BASELINE_PATH);
 
     // Rebuild current envelopes.
-    let configs = ["all", "onboarding-request", "cbu-maintenance", "product-service-taxonomy"];
+    let configs = [
+        "all",
+        "onboarding-request",
+        "cbu-maintenance",
+        "product-service-taxonomy",
+    ];
     let mut current_entries: Vec<BaselineEntry> = Vec::new();
     for config in configs {
         let output = run_envelope_cli(&workspace_root, config)?;
@@ -117,7 +122,10 @@ pub(crate) fn run(bless: bool) -> Result<()> {
 
     // Detect entries in baseline but missing from current build (e.g. pack removed).
     for baseline_entry in &baseline.entries {
-        if !current_entries.iter().any(|c| c.config == baseline_entry.config) {
+        if !current_entries
+            .iter()
+            .any(|c| c.config == baseline_entry.config)
+        {
             drifted.push(format!(
                 "  {} — present in baseline but not in current build",
                 baseline_entry.config

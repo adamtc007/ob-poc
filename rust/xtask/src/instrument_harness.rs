@@ -31,25 +31,25 @@ const TEST_CBU_NAME: &str = "Harness Trading Fund";
 // =============================================================================
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct InstrumentHarnessState {
-    pub started_at: String,
-    pub cbu_id: Option<Uuid>,
-    pub profile_id: Option<Uuid>,
-    pub custody_id: Option<Uuid>,
-    pub principal_id: Option<Uuid>,
-    pub chain_id: Option<Uuid>,
-    pub sweep_id: Option<Uuid>,
-    pub phases_completed: Vec<String>,
-    pub errors: Vec<String>,
-    pub verb_count: usize,
-    pub total_ms: u64,
+pub(crate) struct InstrumentHarnessState {
+    pub(crate) started_at: String,
+    pub(crate) cbu_id: Option<Uuid>,
+    pub(crate) profile_id: Option<Uuid>,
+    pub(crate) custody_id: Option<Uuid>,
+    pub(crate) principal_id: Option<Uuid>,
+    pub(crate) chain_id: Option<Uuid>,
+    pub(crate) sweep_id: Option<Uuid>,
+    pub(crate) phases_completed: Vec<String>,
+    pub(crate) errors: Vec<String>,
+    pub(crate) verb_count: usize,
+    pub(crate) total_ms: u64,
 }
 
 // =============================================================================
 // Harness
 // =============================================================================
 
-pub struct InstrumentHarness {
+pub(crate) struct InstrumentHarness {
     pool: PgPool,
     executor: DslExecutor,
     state: InstrumentHarnessState,
@@ -57,7 +57,7 @@ pub struct InstrumentHarness {
 }
 
 impl InstrumentHarness {
-    pub async fn new(pool: PgPool, verbose: bool) -> Result<Self> {
+    pub(crate) async fn new(pool: PgPool, verbose: bool) -> Result<Self> {
         let executor = DslExecutor::new(pool.clone());
         Ok(Self {
             pool,
@@ -120,7 +120,7 @@ impl InstrumentHarness {
     // Phase 1: CBU + Trading Profile
     // =========================================================================
 
-    pub async fn phase_setup(&mut self) -> Result<()> {
+    pub(crate) async fn phase_setup(&mut self) -> Result<()> {
         println!("\n=== Phase 1: CBU + Trading Profile ===");
 
         // Create CBU
@@ -214,7 +214,7 @@ impl InstrumentHarness {
     // Phase 2: Custody + SSI
     // =========================================================================
 
-    pub async fn phase_custody(&mut self) -> Result<()> {
+    pub(crate) async fn phase_custody(&mut self) -> Result<()> {
         println!("\n=== Phase 2: Custody ===");
 
         let cbu_id = self.state.cbu_id.context("CBU not created")?;
@@ -257,7 +257,7 @@ impl InstrumentHarness {
     // Phase 3: Booking Principal
     // =========================================================================
 
-    pub async fn phase_booking(&mut self) -> Result<()> {
+    pub(crate) async fn phase_booking(&mut self) -> Result<()> {
         println!("\n=== Phase 3: Booking Principal ===");
 
         let _cbu_id = self.state.cbu_id.context("CBU not created")?;
@@ -309,7 +309,7 @@ impl InstrumentHarness {
     // Phase 4: Settlement Chain
     // =========================================================================
 
-    pub async fn phase_settlement(&mut self) -> Result<()> {
+    pub(crate) async fn phase_settlement(&mut self) -> Result<()> {
         println!("\n=== Phase 4: Settlement Chain ===");
 
         let cbu_id = self.state.cbu_id.context("CBU not created")?;
@@ -356,7 +356,7 @@ impl InstrumentHarness {
     // Phase 5: Corporate Actions
     // =========================================================================
 
-    pub async fn phase_corporate_actions(&mut self) -> Result<()> {
+    pub(crate) async fn phase_corporate_actions(&mut self) -> Result<()> {
         println!("\n=== Phase 5: Corporate Actions ===");
 
         // List event types (should work without CBU context)
@@ -382,7 +382,7 @@ impl InstrumentHarness {
     // Phase 6: Validation
     // =========================================================================
 
-    pub async fn phase_validation(&mut self) -> Result<()> {
+    pub(crate) async fn phase_validation(&mut self) -> Result<()> {
         println!("\n=== Phase 6: Validation ===");
 
         if let Some(profile_id) = self.state.profile_id {
@@ -428,7 +428,7 @@ impl InstrumentHarness {
     // Cleanup
     // =========================================================================
 
-    pub async fn phase_cleanup(&mut self) -> Result<()> {
+    pub(crate) async fn phase_cleanup(&mut self) -> Result<()> {
         println!("\n=== Cleanup ===");
 
         if let Some(cbu_id) = self.state.cbu_id {
@@ -467,7 +467,7 @@ impl InstrumentHarness {
     // Run modes
     // =========================================================================
 
-    pub async fn run_full(&mut self) -> Result<()> {
+    pub(crate) async fn run_full(&mut self) -> Result<()> {
         println!("╔══════════════════════════════════════════╗");
         println!("║  Instrument Matrix Harness — Full Run   ║");
         println!("╚══════════════════════════════════════════╝");
@@ -496,7 +496,7 @@ impl InstrumentHarness {
     // Two-Stage Test: Group Template → CBU Instance
     // =========================================================================
 
-    pub async fn run_two_stage(&mut self) -> Result<()> {
+    pub(crate) async fn run_two_stage(&mut self) -> Result<()> {
         println!("╔══════════════════════════════════════════════════╗");
         println!("║  Two-Stage Test: Template → CBU Instance        ║");
         println!("╚══════════════════════════════════════════════════╝");
@@ -713,7 +713,7 @@ impl InstrumentHarness {
 // Entry Point
 // =============================================================================
 
-pub async fn run_instrument_harness(pool: &PgPool, mode: &str, verbose: bool) -> Result<()> {
+pub(crate) async fn run_instrument_harness(pool: &PgPool, mode: &str, verbose: bool) -> Result<()> {
     let mut harness = InstrumentHarness::new(pool.clone(), verbose).await?;
 
     match mode {

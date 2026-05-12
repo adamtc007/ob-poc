@@ -124,67 +124,67 @@ struct SageExplain {
 }
 
 #[derive(Debug, Serialize)]
-pub struct HarnessReport {
-    pub summary: Summary,
-    pub by_domain: BTreeMap<String, Bucket>,
-    pub by_root_cause: BTreeMap<String, Bucket>,
-    pub metadata_gap_signals: MetadataGapSignals,
-    pub rows: Vec<Row>,
+pub(crate) struct HarnessReport {
+    pub(crate) summary: Summary,
+    pub(crate) by_domain: BTreeMap<String, Bucket>,
+    pub(crate) by_root_cause: BTreeMap<String, Bucket>,
+    pub(crate) metadata_gap_signals: MetadataGapSignals,
+    pub(crate) rows: Vec<Row>,
 }
 
 #[derive(Debug, Serialize)]
-pub struct Summary {
-    pub total: usize,
-    pub passed: usize,
-    pub failed: usize,
-    pub executable: usize,
-    pub discovery_stage: usize,
-    pub no_proposal: usize,
-    pub metadata_gap_failures: usize,
+pub(crate) struct Summary {
+    pub(crate) total: usize,
+    pub(crate) passed: usize,
+    pub(crate) failed: usize,
+    pub(crate) executable: usize,
+    pub(crate) discovery_stage: usize,
+    pub(crate) no_proposal: usize,
+    pub(crate) metadata_gap_failures: usize,
 }
 
 #[derive(Debug, Serialize, Default)]
-pub struct Bucket {
-    pub total: usize,
-    pub passed: usize,
+pub(crate) struct Bucket {
+    pub(crate) total: usize,
+    pub(crate) passed: usize,
 }
 
 #[derive(Debug, Serialize, Default)]
-pub struct MetadataGapSignals {
-    pub top_missing_inputs: Vec<CountRow>,
-    pub top_discovery_domains: Vec<CountRow>,
-    pub top_discovery_families: Vec<CountRow>,
-    pub top_wrong_predictions: Vec<CountRow>,
+pub(crate) struct MetadataGapSignals {
+    pub(crate) top_missing_inputs: Vec<CountRow>,
+    pub(crate) top_discovery_domains: Vec<CountRow>,
+    pub(crate) top_discovery_families: Vec<CountRow>,
+    pub(crate) top_wrong_predictions: Vec<CountRow>,
 }
 
 #[derive(Debug, Serialize)]
-pub struct CountRow {
-    pub key: String,
-    pub count: usize,
+pub(crate) struct CountRow {
+    pub(crate) key: String,
+    pub(crate) count: usize,
 }
 
 #[derive(Debug, Serialize)]
-pub struct Row {
-    pub name: String,
-    pub domain: String,
-    pub utterance: String,
-    pub expected_verb: String,
-    pub predicted_verb: Option<String>,
-    pub predicted_dsl: Option<String>,
-    pub ready_to_execute: bool,
-    pub requires_confirmation: bool,
-    pub pass: bool,
-    pub root_cause: String,
-    pub likely_metadata_gap: bool,
-    pub grounding_readiness: Option<String>,
-    pub top_discovery_domain: Option<String>,
-    pub top_discovery_family: Option<String>,
-    pub top_discovery_constellation: Option<String>,
-    pub missing_inputs: Vec<String>,
-    pub entry_question: Option<String>,
-    pub scope_summary: Option<String>,
-    pub message: Option<String>,
-    pub notes: Option<String>,
+pub(crate) struct Row {
+    pub(crate) name: String,
+    pub(crate) domain: String,
+    pub(crate) utterance: String,
+    pub(crate) expected_verb: String,
+    pub(crate) predicted_verb: Option<String>,
+    pub(crate) predicted_dsl: Option<String>,
+    pub(crate) ready_to_execute: bool,
+    pub(crate) requires_confirmation: bool,
+    pub(crate) pass: bool,
+    pub(crate) root_cause: String,
+    pub(crate) likely_metadata_gap: bool,
+    pub(crate) grounding_readiness: Option<String>,
+    pub(crate) top_discovery_domain: Option<String>,
+    pub(crate) top_discovery_family: Option<String>,
+    pub(crate) top_discovery_constellation: Option<String>,
+    pub(crate) missing_inputs: Vec<String>,
+    pub(crate) entry_question: Option<String>,
+    pub(crate) scope_summary: Option<String>,
+    pub(crate) message: Option<String>,
+    pub(crate) notes: Option<String>,
 }
 
 /// Run the live utterance round-trip harness.
@@ -194,7 +194,7 @@ pub struct Row {
 /// cargo xtask utterance-roundtrip --base-url http://127.0.0.1:3000
 /// cargo xtask utterance-roundtrip --filter cbu --strict
 /// ```
-pub async fn run(
+pub(crate) async fn run(
     base_url: &str,
     fixture_path: &Path,
     out_dir: &Path,

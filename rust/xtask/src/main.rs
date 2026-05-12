@@ -9,6 +9,7 @@ use anyhow::{Context, Result};
 use clap::{Parser, Subcommand};
 use xshell::{cmd, Shell};
 
+mod acp_envelope_byte_equality;
 mod allianz_harness;
 mod aviva_deal_harness;
 mod bpmn_lite;
@@ -29,7 +30,6 @@ mod harness;
 mod instrument_harness;
 mod lexicon;
 mod onboarding_harness;
-mod acp_envelope_byte_equality;
 mod pub_lint;
 mod reconcile;
 mod replay_tuner;
@@ -1360,9 +1360,7 @@ fn main() -> Result<()> {
         Command::Ci => ci(&sh),
         Command::PreCommit => pre_commit(&sh),
         Command::PubLint { bless } => pub_lint::run(bless),
-        Command::AcpEnvelopeByteEqualityCheck { bless } => {
-            acp_envelope_byte_equality::run(bless)
-        }
+        Command::AcpEnvelopeByteEqualityCheck { bless } => acp_envelope_byte_equality::run(bless),
         Command::Deploy {
             release,
             port,

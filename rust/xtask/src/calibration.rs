@@ -20,14 +20,14 @@ use std::sync::Arc;
 use uuid::Uuid;
 
 #[derive(Clone, Copy, Debug, ValueEnum)]
-pub enum OutputFormat {
+pub(crate) enum OutputFormat {
     Text,
     Json,
     Yaml,
 }
 
 #[derive(Subcommand)]
-pub enum CalibrationAction {
+pub(crate) enum CalibrationAction {
     /// Build and persist one scenario seed from live runtime metadata.
     Seed {
         #[arg(long)]
@@ -147,7 +147,7 @@ pub enum CalibrationAction {
     },
 }
 
-pub async fn run(action: CalibrationAction) -> Result<()> {
+pub(crate) async fn run(action: CalibrationAction) -> Result<()> {
     let database_url =
         std::env::var("DATABASE_URL").context("DATABASE_URL must be set for calibration xtask")?;
     let pool = PgPool::connect(&database_url)

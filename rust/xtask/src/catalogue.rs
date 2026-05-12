@@ -17,7 +17,7 @@ use sqlx::{postgres::PgPoolOptions, PgPool, Row};
 use uuid::Uuid;
 
 #[derive(Subcommand)]
-pub enum CatalogueAction {
+pub(crate) enum CatalogueAction {
     /// Propose a new or updated verb declaration (DRAFT row insert).
     ///
     /// The proposed declaration JSON is read from --file or --json. The
@@ -91,7 +91,7 @@ async fn pool() -> Result<PgPool> {
         .context("failed to connect to Postgres")
 }
 
-pub async fn run(action: CatalogueAction) -> Result<()> {
+pub(crate) async fn run(action: CatalogueAction) -> Result<()> {
     let pool = pool().await?;
     match action {
         CatalogueAction::Propose {

@@ -33,90 +33,90 @@ use ob_poc::dsl_v2::syntax::parse_program;
 // =============================================================================
 
 /// Allianz Global Investors GmbH LEI (fund manager)
-pub const ALLIANZ_GI_LEI: &str = "529900FAHFDMSXCPII15";
+pub(crate) const ALLIANZ_GI_LEI: &str = "529900FAHFDMSXCPII15";
 
 /// Jurisdictions to filter for (Luxembourg focus)
-pub const TARGET_JURISDICTIONS: &[&str] = &["LU", "DE", "IE"];
+pub(crate) const TARGET_JURISDICTIONS: &[&str] = &["LU", "DE", "IE"];
 
 // =============================================================================
 // Harness State Types
 // =============================================================================
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct AllianzHarnessState {
+pub(crate) struct AllianzHarnessState {
     /// Run timestamp
-    pub started_at: DateTime<Utc>,
+    pub(crate) started_at: DateTime<Utc>,
 
     /// Discovery phase results
-    pub discovery: Option<DiscoveryPhaseResult>,
+    pub(crate) discovery: Option<DiscoveryPhaseResult>,
 
     /// Entity creation phase results
-    pub entity_import: Option<EntityImportResult>,
+    pub(crate) entity_import: Option<EntityImportResult>,
 
     /// CBU creation phase results
-    pub cbu_creation: Option<CbuCreationResult>,
+    pub(crate) cbu_creation: Option<CbuCreationResult>,
 
     /// UBO tracing phase results
-    pub ubo_tracing: Option<UboTracingResult>,
+    pub(crate) ubo_tracing: Option<UboTracingResult>,
 
     /// Errors encountered
-    pub errors: Vec<HarnessError>,
+    pub(crate) errors: Vec<HarnessError>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct DiscoveredFund {
-    pub lei: String,
-    pub name: String,
-    pub jurisdiction: Option<String>,
-    pub manager_lei: Option<String>,
-    pub manager_name: Option<String>,
+pub(crate) struct DiscoveredFund {
+    pub(crate) lei: String,
+    pub(crate) name: String,
+    pub(crate) jurisdiction: Option<String>,
+    pub(crate) manager_lei: Option<String>,
+    pub(crate) manager_name: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct DiscoveryPhaseResult {
-    pub manager_lei: String,
-    pub manager_name: String,
-    pub funds_found: usize,
-    pub funds: Vec<DiscoveredFund>,
-    pub duration_ms: u64,
+pub(crate) struct DiscoveryPhaseResult {
+    pub(crate) manager_lei: String,
+    pub(crate) manager_name: String,
+    pub(crate) funds_found: usize,
+    pub(crate) funds: Vec<DiscoveredFund>,
+    pub(crate) duration_ms: u64,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct EntityImportResult {
-    pub entities_created: usize,
-    pub entities_skipped: usize,
-    pub lei_to_entity_id: HashMap<String, Uuid>,
-    pub duration_ms: u64,
+pub(crate) struct EntityImportResult {
+    pub(crate) entities_created: usize,
+    pub(crate) entities_skipped: usize,
+    pub(crate) lei_to_entity_id: HashMap<String, Uuid>,
+    pub(crate) duration_ms: u64,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct CbuCreationResult {
-    pub cbus_created: usize,
-    pub roles_assigned: usize,
-    pub lei_to_cbu_id: HashMap<String, Uuid>,
-    pub duration_ms: u64,
+pub(crate) struct CbuCreationResult {
+    pub(crate) cbus_created: usize,
+    pub(crate) roles_assigned: usize,
+    pub(crate) lei_to_cbu_id: HashMap<String, Uuid>,
+    pub(crate) duration_ms: u64,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct UboTracingResult {
-    pub chains_traced: usize,
-    pub public_float_termini: usize,
-    pub duration_ms: u64,
+pub(crate) struct UboTracingResult {
+    pub(crate) chains_traced: usize,
+    pub(crate) public_float_termini: usize,
+    pub(crate) duration_ms: u64,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct HarnessError {
-    pub phase: String,
-    pub message: String,
-    pub lei: Option<String>,
-    pub recoverable: bool,
+pub(crate) struct HarnessError {
+    pub(crate) phase: String,
+    pub(crate) message: String,
+    pub(crate) lei: Option<String>,
+    pub(crate) recoverable: bool,
 }
 
 // =============================================================================
 // Main Harness Struct
 // =============================================================================
 
-pub struct AllianzTestHarness {
+pub(crate) struct AllianzTestHarness {
     pool: PgPool,
     executor: DslExecutor,
     state: AllianzHarnessState,
@@ -126,7 +126,7 @@ pub struct AllianzTestHarness {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum HarnessMode {
+pub(crate) enum HarnessMode {
     /// Discovery only - query GLEIF but don't persist
     Discover,
     /// Full import - discovery + entity creation + CBUs + roles
@@ -138,7 +138,7 @@ pub enum HarnessMode {
 }
 
 impl AllianzTestHarness {
-    pub fn new(pool: PgPool) -> Self {
+    pub(crate) fn new(pool: PgPool) -> Self {
         let executor = DslExecutor::new(pool.clone());
         Self {
             pool,
@@ -157,23 +157,23 @@ impl AllianzTestHarness {
         }
     }
 
-    pub fn with_dry_run(mut self, dry_run: bool) -> Self {
+    pub(crate) fn with_dry_run(mut self, dry_run: bool) -> Self {
         self.dry_run = dry_run;
         self
     }
 
-    pub fn with_verbose(mut self, verbose: bool) -> Self {
+    pub(crate) fn with_verbose(mut self, verbose: bool) -> Self {
         self.verbose = verbose;
         self
     }
 
-    pub fn with_limit(mut self, limit: Option<usize>) -> Self {
+    pub(crate) fn with_limit(mut self, limit: Option<usize>) -> Self {
         self.limit = limit;
         self
     }
 
     /// Run the harness with the specified mode
-    pub async fn run(&mut self, mode: HarnessMode) -> Result<&AllianzHarnessState> {
+    pub(crate) async fn run(&mut self, mode: HarnessMode) -> Result<&AllianzHarnessState> {
         self.log_header(&format!("Allianz Test Harness (DSL Mode) - {:?}", mode));
 
         match mode {

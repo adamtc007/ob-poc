@@ -22,43 +22,43 @@ use std::path::PathBuf;
 // ── Finding model ────────────────────────────────────────────────
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum Severity {
+pub(crate) enum Severity {
     Error,
     Warning,
     Info,
 }
 
 #[derive(Debug)]
-pub struct Finding {
-    pub code: &'static str,
-    pub severity: Severity,
-    pub file: String,
-    pub line: usize,
-    pub verb: String,
-    pub message: String,
+pub(crate) struct Finding {
+    pub(crate) code: &'static str,
+    pub(crate) severity: Severity,
+    pub(crate) file: String,
+    pub(crate) line: usize,
+    pub(crate) verb: String,
+    pub(crate) message: String,
 }
 
 #[derive(Debug, Default)]
-pub struct CheckResult {
-    pub findings: Vec<Finding>,
+pub(crate) struct CheckResult {
+    pub(crate) findings: Vec<Finding>,
 }
 
 impl CheckResult {
-    pub fn error_count(&self) -> usize {
+    pub(crate) fn error_count(&self) -> usize {
         self.findings
             .iter()
             .filter(|f| f.severity == Severity::Error)
             .count()
     }
 
-    pub fn warning_count(&self) -> usize {
+    pub(crate) fn warning_count(&self) -> usize {
         self.findings
             .iter()
             .filter(|f| f.severity == Severity::Warning)
             .count()
     }
 
-    pub fn info_count(&self) -> usize {
+    pub(crate) fn info_count(&self) -> usize {
         self.findings
             .iter()
             .filter(|f| f.severity == Severity::Info)
@@ -91,7 +91,7 @@ struct SnapshotWithSuccessor {
 
 // ── Entry point ──────────────────────────────────────────────────
 
-pub async fn run_check(strict: bool) -> Result<()> {
+pub(crate) async fn run_check(strict: bool) -> Result<()> {
     let pool = connect().await?;
 
     // 1. Scan source files for annotations
@@ -529,14 +529,14 @@ mod governed_cache_types {
 
     #[derive(Debug, Deserialize)]
     #[serde(rename_all = "snake_case")]
-    pub enum GovernanceTier {
+    pub(crate) enum GovernanceTier {
         Governed,
         Operational,
     }
 
     #[derive(Debug, Deserialize)]
     #[serde(rename_all = "snake_case")]
-    pub enum TrustClass {
+    pub(crate) enum TrustClass {
         Proof,
         DecisionSupport,
         Convenience,
@@ -544,7 +544,7 @@ mod governed_cache_types {
 
     #[derive(Debug, Deserialize)]
     #[serde(rename_all = "snake_case")]
-    pub enum SnapshotStatus {
+    pub(crate) enum SnapshotStatus {
         Draft,
         Active,
         Deprecated,
@@ -553,7 +553,7 @@ mod governed_cache_types {
 
     #[derive(Debug, Deserialize)]
     #[serde(rename_all = "snake_case")]
-    pub enum ObjectType {
+    pub(crate) enum ObjectType {
         AttributeDef,
         EntityTypeDef,
         RelationshipTypeDef,
@@ -571,7 +571,7 @@ mod governed_cache_types {
 
     #[derive(Debug, Deserialize)]
     #[serde(rename_all = "snake_case")]
-    pub enum Classification {
+    pub(crate) enum Classification {
         Public,
         Internal,
         Confidential,
@@ -579,28 +579,28 @@ mod governed_cache_types {
     }
 
     #[derive(Debug, Deserialize)]
-    pub struct GovernedCache {
+    pub(crate) struct GovernedCache {
         #[allow(dead_code)]
-        pub version: u32,
-        pub generated_at: String,
-        pub entries: HashMap<String, CacheEntry>,
+        pub(crate) version: u32,
+        pub(crate) generated_at: String,
+        pub(crate) entries: HashMap<String, CacheEntry>,
     }
 
     #[derive(Debug, Deserialize)]
-    pub struct CacheEntry {
+    pub(crate) struct CacheEntry {
         #[allow(dead_code)]
-        pub fqn: String,
+        pub(crate) fqn: String,
         #[allow(dead_code)]
-        pub object_type: ObjectType,
+        pub(crate) object_type: ObjectType,
         #[allow(dead_code)]
-        pub status: SnapshotStatus,
+        pub(crate) status: SnapshotStatus,
         #[allow(dead_code)]
-        pub governance_tier: GovernanceTier,
+        pub(crate) governance_tier: GovernanceTier,
         #[allow(dead_code)]
-        pub trust_class: TrustClass,
+        pub(crate) trust_class: TrustClass,
         #[allow(dead_code)]
-        pub pii: bool,
+        pub(crate) pii: bool,
         #[allow(dead_code)]
-        pub classification: Classification,
+        pub(crate) classification: Classification,
     }
 }

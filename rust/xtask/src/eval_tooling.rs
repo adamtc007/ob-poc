@@ -8,7 +8,7 @@ use sqlx::{PgPool, Row};
 use std::path::{Path, PathBuf};
 
 #[derive(Subcommand)]
-pub enum EvalDbAction {
+pub(crate) enum EvalDbAction {
     /// Drop all schemas matching eval_fixture_*.
     Cleanout {
         /// Show schemas that would be dropped without dropping them.
@@ -42,7 +42,7 @@ pub enum EvalDbAction {
 }
 
 #[derive(Subcommand)]
-pub enum EvalBundleAction {
+pub(crate) enum EvalBundleAction {
     /// Create a local seed-bundle directory skeleton.
     New {
         /// Seed bundle identifier.
@@ -63,7 +63,7 @@ pub enum EvalBundleAction {
 }
 
 #[derive(Subcommand)]
-pub enum EvalFixtureAction {
+pub(crate) enum EvalFixtureAction {
     /// Spin up an eval fixture from a seed bundle.
     SpinUp {
         /// Seed bundle identifier.
@@ -90,7 +90,7 @@ pub enum EvalFixtureAction {
 }
 
 #[derive(Subcommand)]
-pub enum EvalProbeAction {
+pub(crate) enum EvalProbeAction {
     /// Record a live probe response for later deterministic replay.
     Record {
         /// Probe name, such as lei_lookup.
@@ -108,7 +108,7 @@ pub enum EvalProbeAction {
     },
 }
 
-pub async fn run_db(action: EvalDbAction) -> Result<()> {
+pub(crate) async fn run_db(action: EvalDbAction) -> Result<()> {
     match action {
         EvalDbAction::Cleanout { dry_run } => cleanout(dry_run).await,
         EvalDbAction::Migrate => phase_2b_stub("db migrate"),
@@ -122,7 +122,7 @@ pub async fn run_db(action: EvalDbAction) -> Result<()> {
     }
 }
 
-pub fn run_bundle(action: EvalBundleAction) -> Result<()> {
+pub(crate) fn run_bundle(action: EvalBundleAction) -> Result<()> {
     match action {
         EvalBundleAction::New { id } => phase_2b_stub(&format!("bundle new {id}")),
         EvalBundleAction::Freeze { id } => phase_2b_stub(&format!("bundle freeze {id}")),
@@ -131,7 +131,7 @@ pub fn run_bundle(action: EvalBundleAction) -> Result<()> {
     }
 }
 
-pub async fn run_fixture(action: EvalFixtureAction) -> Result<()> {
+pub(crate) async fn run_fixture(action: EvalFixtureAction) -> Result<()> {
     match action {
         EvalFixtureAction::SpinUp { bundle, name } => {
             let schema = eval_fixture_schema_name(&name)?;
@@ -145,7 +145,7 @@ pub async fn run_fixture(action: EvalFixtureAction) -> Result<()> {
     }
 }
 
-pub fn run_probe(action: EvalProbeAction) -> Result<()> {
+pub(crate) fn run_probe(action: EvalProbeAction) -> Result<()> {
     match action {
         EvalProbeAction::Record { probe, args } => {
             phase_2b_stub(&format!("probe record --probe {probe} {}", args.join(" ")))

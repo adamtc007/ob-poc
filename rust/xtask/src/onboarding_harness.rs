@@ -43,35 +43,35 @@ const TEST_FUND_NAME: &str = "Harness UCITS Fund";
 // =============================================================================
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct OnboardingHarnessState {
-    pub started_at: String,
-    pub group_id: Option<Uuid>,
-    pub manco_entity_id: Option<Uuid>,
-    pub depositary_entity_id: Option<Uuid>,
-    pub director_entity_id: Option<Uuid>,
-    pub ubo_entity_id: Option<Uuid>,
-    pub cbu_id: Option<Uuid>,
-    pub case_id: Option<Uuid>,
-    pub workstream_id: Option<Uuid>,
-    pub phases_completed: Vec<String>,
-    pub errors: Vec<String>,
-    pub verb_log: Vec<VerbExecution>,
+pub(crate) struct OnboardingHarnessState {
+    pub(crate) started_at: String,
+    pub(crate) group_id: Option<Uuid>,
+    pub(crate) manco_entity_id: Option<Uuid>,
+    pub(crate) depositary_entity_id: Option<Uuid>,
+    pub(crate) director_entity_id: Option<Uuid>,
+    pub(crate) ubo_entity_id: Option<Uuid>,
+    pub(crate) cbu_id: Option<Uuid>,
+    pub(crate) case_id: Option<Uuid>,
+    pub(crate) workstream_id: Option<Uuid>,
+    pub(crate) phases_completed: Vec<String>,
+    pub(crate) errors: Vec<String>,
+    pub(crate) verb_log: Vec<VerbExecution>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct VerbExecution {
-    pub phase: String,
-    pub dsl: String,
-    pub success: bool,
-    pub result_summary: String,
-    pub duration_ms: u64,
+pub(crate) struct VerbExecution {
+    pub(crate) phase: String,
+    pub(crate) dsl: String,
+    pub(crate) success: bool,
+    pub(crate) result_summary: String,
+    pub(crate) duration_ms: u64,
 }
 
 // =============================================================================
 // Harness Runner
 // =============================================================================
 
-pub struct OnboardingHarness {
+pub(crate) struct OnboardingHarness {
     pool: PgPool,
     executor: DslExecutor,
     state: OnboardingHarnessState,
@@ -79,7 +79,7 @@ pub struct OnboardingHarness {
 }
 
 impl OnboardingHarness {
-    pub async fn new(pool: PgPool, verbose: bool) -> Result<Self> {
+    pub(crate) async fn new(pool: PgPool, verbose: bool) -> Result<Self> {
         let executor = DslExecutor::new(pool.clone());
         Ok(Self {
             pool,
@@ -156,7 +156,7 @@ impl OnboardingHarness {
     // Phase 1: Group Setup
     // =========================================================================
 
-    pub async fn phase_group_setup(&mut self) -> Result<()> {
+    pub(crate) async fn phase_group_setup(&mut self) -> Result<()> {
         println!("\n=== Phase 1: Group Setup ===");
 
         // Create client group
@@ -253,7 +253,7 @@ impl OnboardingHarness {
     // Phase 2: UBO Discovery
     // =========================================================================
 
-    pub async fn phase_ubo_discovery(&mut self) -> Result<()> {
+    pub(crate) async fn phase_ubo_discovery(&mut self) -> Result<()> {
         println!("\n=== Phase 2: UBO Discovery ===");
 
         let manco_id = self
@@ -287,7 +287,7 @@ impl OnboardingHarness {
     // Phase 3: KYC Case
     // =========================================================================
 
-    pub async fn phase_kyc_case(&mut self) -> Result<()> {
+    pub(crate) async fn phase_kyc_case(&mut self) -> Result<()> {
         println!("\n=== Phase 3: KYC Case ===");
 
         let cbu_id = self.state.cbu_id.context("CBU not created")?;
@@ -340,7 +340,7 @@ impl OnboardingHarness {
     // Phase 4: Document Evidence (bypass BPMN — CRUD path)
     // =========================================================================
 
-    pub async fn phase_documents(&mut self) -> Result<()> {
+    pub(crate) async fn phase_documents(&mut self) -> Result<()> {
         println!("\n=== Phase 4: Document Evidence ===");
 
         let _case_id = self.state.case_id.context("KYC case not created")?;
@@ -468,7 +468,7 @@ impl OnboardingHarness {
     // Phase 5: Screening
     // =========================================================================
 
-    pub async fn phase_screening(&mut self) -> Result<()> {
+    pub(crate) async fn phase_screening(&mut self) -> Result<()> {
         println!("\n=== Phase 5: Screening ===");
 
         let workstream_id = self.state.workstream_id.context("Workstream not created")?;
@@ -497,7 +497,7 @@ impl OnboardingHarness {
     // Phase 6: Tollgate Evaluation
     // =========================================================================
 
-    pub async fn phase_tollgate(&mut self) -> Result<()> {
+    pub(crate) async fn phase_tollgate(&mut self) -> Result<()> {
         println!("\n=== Phase 6: Tollgate Evaluation ===");
 
         let case_id = self.state.case_id.context("KYC case not created")?;
@@ -549,7 +549,7 @@ impl OnboardingHarness {
     // Phase 7: Cleanup
     // =========================================================================
 
-    pub async fn phase_cleanup(&mut self) -> Result<()> {
+    pub(crate) async fn phase_cleanup(&mut self) -> Result<()> {
         println!("\n=== Phase: Cleanup ===");
 
         // Delete CBU cascade (removes case, workstreams, screenings)
@@ -608,7 +608,7 @@ impl OnboardingHarness {
     // Full Run
     // =========================================================================
 
-    pub async fn run_full(&mut self) -> Result<()> {
+    pub(crate) async fn run_full(&mut self) -> Result<()> {
         println!("╔══════════════════════════════════════════╗");
         println!("║  Onboarding Test Harness — Full Run     ║");
         println!("╚══════════════════════════════════════════╝");
@@ -641,13 +641,13 @@ impl OnboardingHarness {
         Ok(())
     }
 
-    pub async fn run_setup_only(&mut self) -> Result<()> {
+    pub(crate) async fn run_setup_only(&mut self) -> Result<()> {
         self.phase_group_setup().await?;
         self.phase_ubo_discovery().await?;
         Ok(())
     }
 
-    pub async fn run_kyc_only(&mut self) -> Result<()> {
+    pub(crate) async fn run_kyc_only(&mut self) -> Result<()> {
         // Load existing state from DB
         self.load_existing_state().await?;
         self.phase_kyc_case().await?;
@@ -679,7 +679,7 @@ impl OnboardingHarness {
 // Entry Point (called from xtask main)
 // =============================================================================
 
-pub async fn run_onboarding_harness(pool: &PgPool, mode: &str, verbose: bool) -> Result<()> {
+pub(crate) async fn run_onboarding_harness(pool: &PgPool, mode: &str, verbose: bool) -> Result<()> {
     let mut harness = OnboardingHarness::new(pool.clone(), verbose).await?;
 
     match mode {

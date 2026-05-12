@@ -28,7 +28,7 @@ use std::collections::HashSet;
 use std::path::PathBuf;
 
 #[derive(Debug, Subcommand)]
-pub enum ReconcileAction {
+pub(crate) enum ReconcileAction {
     /// Run catalogue validator (structural + well-formedness + warnings)
     Validate {
         /// Fail on policy-sanity warnings too (default: warnings are
@@ -49,7 +49,7 @@ pub enum ReconcileAction {
     HygieneReport,
 }
 
-pub async fn run(action: ReconcileAction) -> Result<()> {
+pub(crate) async fn run(action: ReconcileAction) -> Result<()> {
     match action {
         ReconcileAction::Validate { strict_warnings } => validate(strict_warnings).await,
         ReconcileAction::Status => status().await,

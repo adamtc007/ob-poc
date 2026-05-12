@@ -14,14 +14,14 @@ use std::path::PathBuf;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
-pub enum GovernanceTier {
+pub(crate) enum GovernanceTier {
     Governed,
     Operational,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
-pub enum TrustClass {
+pub(crate) enum TrustClass {
     Proof,
     DecisionSupport,
     Convenience,
@@ -29,7 +29,7 @@ pub enum TrustClass {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
-pub enum SnapshotStatus {
+pub(crate) enum SnapshotStatus {
     Draft,
     Active,
     Deprecated,
@@ -38,7 +38,7 @@ pub enum SnapshotStatus {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
-pub enum ObjectType {
+pub(crate) enum ObjectType {
     AttributeDef,
     EntityTypeDef,
     RelationshipTypeDef,
@@ -59,7 +59,7 @@ pub enum ObjectType {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
-pub enum Classification {
+pub(crate) enum Classification {
     Public,
     Internal,
     Confidential,
@@ -67,21 +67,21 @@ pub enum Classification {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct CacheEntry {
-    pub fqn: String,
-    pub object_type: ObjectType,
-    pub status: SnapshotStatus,
-    pub governance_tier: GovernanceTier,
-    pub trust_class: TrustClass,
-    pub pii: bool,
-    pub classification: Classification,
+pub(crate) struct CacheEntry {
+    pub(crate) fqn: String,
+    pub(crate) object_type: ObjectType,
+    pub(crate) status: SnapshotStatus,
+    pub(crate) governance_tier: GovernanceTier,
+    pub(crate) trust_class: TrustClass,
+    pub(crate) pii: bool,
+    pub(crate) classification: Classification,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct GovernedCache {
-    pub version: u32,
-    pub generated_at: String,
-    pub entries: HashMap<String, CacheEntry>,
+pub(crate) struct GovernedCache {
+    pub(crate) version: u32,
+    pub(crate) generated_at: String,
+    pub(crate) entries: HashMap<String, CacheEntry>,
 }
 
 // ── DB row type for sqlx ─────────────────────────────────────────
@@ -98,7 +98,7 @@ struct SnapshotCacheRow {
 
 // ── Commands ─────────────────────────────────────────────────────
 
-pub async fn refresh(output: Option<PathBuf>) -> Result<()> {
+pub(crate) async fn refresh(output: Option<PathBuf>) -> Result<()> {
     let pool = connect().await?;
 
     println!("Querying sem_reg.snapshots for all active entries...");
@@ -233,7 +233,7 @@ pub async fn refresh(output: Option<PathBuf>) -> Result<()> {
     Ok(())
 }
 
-pub async fn stats(path: Option<PathBuf>) -> Result<()> {
+pub(crate) async fn stats(path: Option<PathBuf>) -> Result<()> {
     let cache_path = path.unwrap_or_else(default_cache_path);
 
     let bytes = std::fs::read(&cache_path).with_context(|| {

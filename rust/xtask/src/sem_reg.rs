@@ -11,7 +11,7 @@ use ob_poc::sem_reg::types::{
 use ob_poc::sem_reg::{ObjectType, RegistryService, SnapshotStore};
 
 /// Show registry statistics (counts by object type).
-pub async fn stats() -> Result<()> {
+pub(crate) async fn stats() -> Result<()> {
     let pool = connect().await?;
     let counts = RegistryService::stats(&pool).await?;
 
@@ -34,7 +34,7 @@ pub async fn stats() -> Result<()> {
 }
 
 /// Describe an attribute definition by FQN.
-pub async fn attr_describe(fqn: &str) -> Result<()> {
+pub(crate) async fn attr_describe(fqn: &str) -> Result<()> {
     let pool = connect().await?;
     match RegistryService::resolve_attribute_def_by_fqn(&pool, fqn).await? {
         Some((row, body)) => {
@@ -68,7 +68,7 @@ pub async fn attr_describe(fqn: &str) -> Result<()> {
 }
 
 /// List active attribute definitions.
-pub async fn attr_list(limit: i64) -> Result<()> {
+pub(crate) async fn attr_list(limit: i64) -> Result<()> {
     let pool = connect().await?;
     let rows = SnapshotStore::list_active(&pool, ObjectType::AttributeDef, limit, 0).await?;
     if rows.is_empty() {
@@ -104,7 +104,7 @@ pub async fn attr_list(limit: i64) -> Result<()> {
 }
 
 /// Describe an entity type definition by FQN.
-pub async fn entity_type_describe(fqn: &str) -> Result<()> {
+pub(crate) async fn entity_type_describe(fqn: &str) -> Result<()> {
     let pool = connect().await?;
     match RegistryService::resolve_entity_type_def_by_fqn(&pool, fqn).await? {
         Some((row, body)) => {
@@ -145,7 +145,7 @@ pub async fn entity_type_describe(fqn: &str) -> Result<()> {
 }
 
 /// Describe a verb contract by FQN.
-pub async fn verb_describe(fqn: &str) -> Result<()> {
+pub(crate) async fn verb_describe(fqn: &str) -> Result<()> {
     let pool = connect().await?;
     match RegistryService::resolve_verb_contract_by_fqn(&pool, fqn).await? {
         Some((row, body)) => {
@@ -212,7 +212,7 @@ pub async fn verb_describe(fqn: &str) -> Result<()> {
 }
 
 /// List active verb contracts.
-pub async fn verb_list(limit: i64) -> Result<()> {
+pub(crate) async fn verb_list(limit: i64) -> Result<()> {
     let pool = connect().await?;
     let rows = SnapshotStore::list_active(&pool, ObjectType::VerbContract, limit, 0).await?;
     if rows.is_empty() {
@@ -255,7 +255,7 @@ pub async fn verb_list(limit: i64) -> Result<()> {
 }
 
 /// Show snapshot history for an object.
-pub async fn history(object_type_str: &str, fqn: &str) -> Result<()> {
+pub(crate) async fn history(object_type_str: &str, fqn: &str) -> Result<()> {
     let pool = connect().await?;
 
     let object_type = parse_object_type(object_type_str)?;
@@ -293,7 +293,7 @@ pub async fn history(object_type_str: &str, fqn: &str) -> Result<()> {
 }
 
 /// Run the onboarding scan (bootstrap registry from verb YAML).
-pub async fn scan(dry_run: bool, verbose: bool) -> Result<()> {
+pub(crate) async fn scan(dry_run: bool, verbose: bool) -> Result<()> {
     let pool = connect().await?;
     println!("Scanning verb YAML definitions...\n");
     let report = ob_poc::sem_reg::scanner::run_onboarding_scan(&pool, dry_run, verbose).await?;
@@ -302,7 +302,7 @@ pub async fn scan(dry_run: bool, verbose: bool) -> Result<()> {
 }
 
 /// Describe a derivation spec by FQN.
-pub async fn derivation_describe(fqn: &str) -> Result<()> {
+pub(crate) async fn derivation_describe(fqn: &str) -> Result<()> {
     let pool = connect().await?;
     match RegistryService::resolve_derivation_spec_by_fqn(&pool, fqn).await? {
         Some((row, body)) => {
@@ -346,7 +346,7 @@ pub async fn derivation_describe(fqn: &str) -> Result<()> {
 }
 
 /// Backfill security labels on existing snapshots using heuristics.
-pub async fn backfill_labels(dry_run: bool) -> Result<()> {
+pub(crate) async fn backfill_labels(dry_run: bool) -> Result<()> {
     let pool = connect().await?;
 
     // Query snapshots with default/empty security labels
@@ -441,7 +441,7 @@ pub async fn backfill_labels(dry_run: bool) -> Result<()> {
 }
 
 /// Run all publish gates against active snapshots and report results.
-pub async fn validate(enforce: bool) -> Result<()> {
+pub(crate) async fn validate(enforce: bool) -> Result<()> {
     use ob_poc::sem_reg::gates::{evaluate_publish_gates, GateMode};
     use ob_poc::sem_reg::gates_technical::check_security_label_presence;
 
@@ -531,7 +531,7 @@ pub async fn validate(enforce: bool) -> Result<()> {
 }
 
 /// Resolve context for a subject using the 12-step pipeline.
-pub async fn ctx_resolve(
+pub(crate) async fn ctx_resolve(
     subject_str: &str,
     subject_type: &str,
     actor_type: &str,
@@ -746,7 +746,7 @@ pub async fn ctx_resolve(
 }
 
 /// List available Semantic Registry MCP tools.
-pub async fn agent_tools() -> Result<()> {
+pub(crate) async fn agent_tools() -> Result<()> {
     let specs = ob_poc::sem_reg::all_tool_specs();
 
     println!("Semantic Registry MCP Tools ({} tools)", specs.len());
@@ -795,7 +795,7 @@ pub async fn agent_tools() -> Result<()> {
 }
 
 /// Show governance coverage report.
-pub async fn coverage(tier_str: &str, json_output: bool) -> Result<()> {
+pub(crate) async fn coverage(tier_str: &str, json_output: bool) -> Result<()> {
     let pool = connect().await?;
 
     let tier_filter = match tier_str {
@@ -874,7 +874,7 @@ pub async fn coverage(tier_str: &str, json_output: bool) -> Result<()> {
 const DEFAULT_MANIFEST_PATH: &str = "data/onboarding-manifest.json";
 
 /// Run the 5-step extraction pipeline and write an onboarding manifest.
-pub async fn onboard_scan(verbose: bool) -> Result<()> {
+pub(crate) async fn onboard_scan(verbose: bool) -> Result<()> {
     use ob_poc::sem_reg::onboarding::{entity_infer, manifest, schema_extract, verb_extract, xref};
 
     println!("Registry Onboarding Scan");
@@ -1030,7 +1030,7 @@ pub async fn onboard_scan(verbose: bool) -> Result<()> {
 }
 
 /// Display a summary report from an onboarding manifest file.
-pub async fn onboard_report(manifest_path: Option<&str>) -> Result<()> {
+pub(crate) async fn onboard_report(manifest_path: Option<&str>) -> Result<()> {
     use ob_poc::sem_reg::onboarding::manifest;
 
     let path_str = manifest_path.unwrap_or(DEFAULT_MANIFEST_PATH);
@@ -1127,7 +1127,7 @@ pub async fn onboard_report(manifest_path: Option<&str>) -> Result<()> {
 }
 
 /// Apply bootstrap seed from manifest to sem_reg.snapshots.
-pub async fn onboard_apply(manifest_path: Option<&str>) -> Result<()> {
+pub(crate) async fn onboard_apply(manifest_path: Option<&str>) -> Result<()> {
     use ob_poc::sem_reg::onboarding::{manifest, seed};
 
     let path_str = manifest_path.unwrap_or(DEFAULT_MANIFEST_PATH);
@@ -1195,7 +1195,7 @@ pub async fn onboard_apply(manifest_path: Option<&str>) -> Result<()> {
 // ── Authoring Pipeline CLI ────────────────────────────────────
 
 /// List authoring pipeline ChangeSets with optional status filter.
-pub async fn authoring_list(status: Option<&str>, limit: i64) -> Result<()> {
+pub(crate) async fn authoring_list(status: Option<&str>, limit: i64) -> Result<()> {
     let pool = connect().await?;
     let store = sem_os_postgres::PgAuthoringStore::new(pool);
 
@@ -1243,7 +1243,7 @@ pub async fn authoring_list(status: Option<&str>, limit: i64) -> Result<()> {
 }
 
 /// Get details for a single ChangeSet.
-pub async fn authoring_get(id: &str) -> Result<()> {
+pub(crate) async fn authoring_get(id: &str) -> Result<()> {
     let pool = connect().await?;
     let store = sem_os_postgres::PgAuthoringStore::new(pool);
     let cs_id = uuid::Uuid::parse_str(id).context("Invalid UUID")?;
@@ -1311,7 +1311,7 @@ pub async fn authoring_get(id: &str) -> Result<()> {
 }
 
 /// Validate a ChangeSet (Stage 1 — Draft → Validated/Rejected).
-pub async fn authoring_validate(id: &str) -> Result<()> {
+pub(crate) async fn authoring_validate(id: &str) -> Result<()> {
     let pool = connect().await?;
     let store = sem_os_postgres::PgAuthoringStore::new(pool.clone());
     let scratch = sem_os_postgres::PgScratchSchemaRunner::new(pool);
@@ -1342,7 +1342,7 @@ pub async fn authoring_validate(id: &str) -> Result<()> {
 }
 
 /// Dry-run a ChangeSet (Stage 2 — Validated → DryRunPassed/DryRunFailed).
-pub async fn authoring_dry_run(id: &str) -> Result<()> {
+pub(crate) async fn authoring_dry_run(id: &str) -> Result<()> {
     let pool = connect().await?;
     let store = sem_os_postgres::PgAuthoringStore::new(pool.clone());
     let scratch = sem_os_postgres::PgScratchSchemaRunner::new(pool);
@@ -1379,7 +1379,7 @@ pub async fn authoring_dry_run(id: &str) -> Result<()> {
 }
 
 /// Generate a publish plan (diff) for a ChangeSet. Read-only.
-pub async fn authoring_plan(id: &str) -> Result<()> {
+pub(crate) async fn authoring_plan(id: &str) -> Result<()> {
     let pool = connect().await?;
     let store = sem_os_postgres::PgAuthoringStore::new(pool.clone());
     let scratch = sem_os_postgres::PgScratchSchemaRunner::new(pool);
@@ -1401,7 +1401,7 @@ pub async fn authoring_plan(id: &str) -> Result<()> {
 }
 
 /// Publish a ChangeSet (DryRunPassed → Published).
-pub async fn authoring_publish(id: &str, publisher: &str) -> Result<()> {
+pub(crate) async fn authoring_publish(id: &str, publisher: &str) -> Result<()> {
     let pool = connect().await?;
     let store = sem_os_postgres::PgAuthoringStore::new(pool.clone());
     let scratch = sem_os_postgres::PgScratchSchemaRunner::new(pool);
@@ -1423,7 +1423,7 @@ pub async fn authoring_publish(id: &str, publisher: &str) -> Result<()> {
 }
 
 /// Publish multiple ChangeSets atomically in topological order.
-pub async fn authoring_publish_batch(ids: &[String], publisher: &str) -> Result<()> {
+pub(crate) async fn authoring_publish_batch(ids: &[String], publisher: &str) -> Result<()> {
     let pool = connect().await?;
     let store = sem_os_postgres::PgAuthoringStore::new(pool.clone());
     let scratch = sem_os_postgres::PgScratchSchemaRunner::new(pool);
@@ -1455,7 +1455,7 @@ pub async fn authoring_publish_batch(ids: &[String], publisher: &str) -> Result<
 }
 
 /// Compute structural diff between two ChangeSets.
-pub async fn authoring_diff(base_id: &str, target_id: &str) -> Result<()> {
+pub(crate) async fn authoring_diff(base_id: &str, target_id: &str) -> Result<()> {
     let pool = connect().await?;
     let store = sem_os_postgres::PgAuthoringStore::new(pool.clone());
     let scratch = sem_os_postgres::PgScratchSchemaRunner::new(pool);
@@ -1476,7 +1476,7 @@ pub async fn authoring_diff(base_id: &str, target_id: &str) -> Result<()> {
 }
 
 /// Show authoring pipeline health (pending changesets, stale dry-runs).
-pub async fn authoring_health() -> Result<()> {
+pub(crate) async fn authoring_health() -> Result<()> {
     let pool = connect().await?;
     let store = sem_os_postgres::PgAuthoringStore::new(pool);
 
@@ -1523,7 +1523,7 @@ pub async fn authoring_health() -> Result<()> {
 }
 
 /// Propose a ChangeSet from a bundle directory or inline YAML.
-pub async fn authoring_propose(bundle_path: &str) -> Result<()> {
+pub(crate) async fn authoring_propose(bundle_path: &str) -> Result<()> {
     use sem_os_core::authoring::bundle::{build_bundle, parse_manifest};
     use sem_os_core::principal::Principal;
 
@@ -1568,7 +1568,10 @@ pub async fn authoring_propose(bundle_path: &str) -> Result<()> {
 }
 
 /// Run cleanup to archive old terminal/orphan ChangeSets.
-pub async fn authoring_cleanup(terminal_days: Option<u32>, orphan_days: Option<u32>) -> Result<()> {
+pub(crate) async fn authoring_cleanup(
+    terminal_days: Option<u32>,
+    orphan_days: Option<u32>,
+) -> Result<()> {
     let pool = connect().await?;
 
     let policy = sem_os_core::authoring::cleanup::CleanupPolicy {

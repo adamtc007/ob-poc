@@ -13,28 +13,28 @@ use uuid::Uuid;
 
 /// Test scenario definition
 #[derive(Debug, Clone)]
-pub struct Scenario {
-    pub name: &'static str,
-    pub description: &'static str,
+pub(crate) struct Scenario {
+    pub(crate) name: &'static str,
+    pub(crate) description: &'static str,
 }
 
-pub const SCENARIO_1: Scenario = Scenario {
+pub(crate) const SCENARIO_1: Scenario = Scenario {
     name: "scenario-1",
     description: "Simple Allianz Fund: 2-level ownership chain, 100% ManCo ownership",
 };
 
-pub const SCENARIO_2: Scenario = Scenario {
+pub(crate) const SCENARIO_2: Scenario = Scenario {
     name: "scenario-2",
     description: "Hedge Fund LLP: 6 entities, multiple ownership percentages (45%, 35%, 20%)",
 };
 
-pub const SCENARIO_3: Scenario = Scenario {
+pub(crate) const SCENARIO_3: Scenario = Scenario {
     name: "scenario-3",
     description: "Trust Structure: 7 entities, trust roles (settlor/trustee/beneficiaries)",
 };
 
 /// Main entry point for UBO test harness
-pub async fn run_ubo_test(command: &str, verbose: bool) -> Result<()> {
+pub(crate) async fn run_ubo_test(command: &str, verbose: bool) -> Result<()> {
     let database_url =
         std::env::var("DATABASE_URL").unwrap_or_else(|_| "postgresql:///data_designer".to_string());
     let pool = PgPool::connect(&database_url).await?;
@@ -109,7 +109,7 @@ pub async fn run_ubo_test(command: &str, verbose: bool) -> Result<()> {
 }
 
 /// Clean all UBO test data
-pub async fn clean_test_data(pool: &PgPool) -> Result<()> {
+pub(crate) async fn clean_test_data(pool: &PgPool) -> Result<()> {
     println!("Cleaning UBO test data...");
 
     // Find test CBUs (using naming convention)
@@ -264,7 +264,7 @@ async fn delete_cbu_cascade(pool: &PgPool, cbu_id: Uuid) -> Result<()> {
 }
 
 /// Seed all test data
-pub async fn seed_test_data(pool: &PgPool, verbose: bool) -> Result<()> {
+pub(crate) async fn seed_test_data(pool: &PgPool, verbose: bool) -> Result<()> {
     println!("Seeding UBO test data...");
 
     // Clean first

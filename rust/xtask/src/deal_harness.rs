@@ -10,24 +10,24 @@ use std::collections::HashMap;
 /// Test result for a single step
 #[derive(Debug)]
 #[allow(dead_code)]
-pub struct StepResult {
-    pub step: String,
-    pub dsl: String,
-    pub success: bool,
-    pub output: String,
-    pub error: Option<String>,
+pub(crate) struct StepResult {
+    pub(crate) step: String,
+    pub(crate) dsl: String,
+    pub(crate) success: bool,
+    pub(crate) output: String,
+    pub(crate) error: Option<String>,
 }
 
 /// Results from the full harness run
 #[derive(Debug)]
-pub struct HarnessResults {
-    pub steps: Vec<StepResult>,
-    pub deal_id: Option<String>,
-    pub contract_ids: Vec<String>,
-    pub product_ids: Vec<String>,
-    pub rate_card_ids: Vec<String>,
-    pub passed: usize,
-    pub failed: usize,
+pub(crate) struct HarnessResults {
+    pub(crate) steps: Vec<StepResult>,
+    pub(crate) deal_id: Option<String>,
+    pub(crate) contract_ids: Vec<String>,
+    pub(crate) product_ids: Vec<String>,
+    pub(crate) rate_card_ids: Vec<String>,
+    pub(crate) passed: usize,
+    pub(crate) failed: usize,
 }
 
 impl HarnessResults {
@@ -129,7 +129,7 @@ fn extract_uuid(result: &serde_json::Value) -> Option<String> {
 }
 
 /// Run the deal hierarchy test harness
-pub async fn run_deal_harness(
+pub(crate) async fn run_deal_harness(
     pool: PgPool,
     verbose: bool,
     dry_run: bool,

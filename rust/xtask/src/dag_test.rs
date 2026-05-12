@@ -11,7 +11,7 @@ const FIXTURES_DIR: &str = "rust/crates/dsl-runtime/tests/fixtures/cross_workspa
 const DAG_TAXONOMIES_DIR: &str = "rust/config/sem_os_seeds/dag_taxonomies";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum DagTestMode {
+pub(crate) enum DagTestMode {
     Both,
     MockOnly,
     LiveOnly,
@@ -21,7 +21,12 @@ pub enum DagTestMode {
 ///
 /// `--reset` clears artifacts under target/ that may shadow fresh runs.
 /// `--filter <name>` runs only test functions matching the substring.
-pub fn run(sh: &Shell, mode: DagTestMode, reset: bool, filter: Option<String>) -> Result<()> {
+pub(crate) fn run(
+    sh: &Shell,
+    mode: DagTestMode,
+    reset: bool,
+    filter: Option<String>,
+) -> Result<()> {
     if reset {
         println!("[dag-test] Resetting test artifacts…");
         let workspace_target = repo_root().join("rust/target");
@@ -86,7 +91,7 @@ pub fn run(sh: &Shell, mode: DagTestMode, reset: bool, filter: Option<String>) -
 /// Coverage report — enumerate every cross_workspace_constraint, derived
 /// state, and cascade rule across all DAG taxonomies, cross-reference
 /// against fixtures, report gaps.
-pub fn coverage(workspace_filter: Option<String>, json: bool) -> Result<()> {
+pub(crate) fn coverage(workspace_filter: Option<String>, json: bool) -> Result<()> {
     use dsl_core::config::DagRegistry;
 
     let dag_path = repo_root().join(DAG_TAXONOMIES_DIR);
@@ -160,7 +165,7 @@ pub fn coverage(workspace_filter: Option<String>, json: bool) -> Result<()> {
 }
 
 /// Scaffold a new fixture YAML.
-pub fn scaffold_fixture(name: &str, mode: &str) -> Result<()> {
+pub(crate) fn scaffold_fixture(name: &str, mode: &str) -> Result<()> {
     let path = repo_root()
         .join(FIXTURES_DIR)
         .join(format!("{}.yaml", name));

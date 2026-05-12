@@ -57,7 +57,7 @@ struct FundData {
 }
 
 /// Clean all Allianz-related data from the database
-pub async fn clean_allianz(dry_run: bool) -> Result<()> {
+pub(crate) async fn clean_allianz(dry_run: bool) -> Result<()> {
     println!("===========================================");
     println!("  Allianz Data Cleanup");
     println!("===========================================\n");
@@ -96,7 +96,7 @@ pub async fn clean_allianz(dry_run: bool) -> Result<()> {
 }
 
 /// Seed Allianz fund entities from scraped JSON
-pub async fn seed_allianz(
+pub(crate) async fn seed_allianz(
     file: Option<PathBuf>,
     limit: Option<usize>,
     no_clean: bool,
