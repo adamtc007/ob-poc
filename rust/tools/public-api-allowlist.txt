@@ -117,11 +117,6 @@ src/acp_runtime_context.rs:pub fn build_acp_runtime_context_projection(
 src/acp_runtime_context.rs:pub struct AcpRuntimeContextDiagnostic {
 src/acp_runtime_context.rs:pub struct AcpRuntimeContextProjection {
 src/acp_runtime_context.rs:pub struct AcpRuntimeContextSource {
-src/acp_static_context_acceptance.rs:pub enum AcpStaticContextAcceptanceStatus {
-src/acp_static_context_acceptance.rs:pub fn evaluate_slice1_static_context_acceptance(
-src/acp_static_context_acceptance.rs:pub fn evaluate_slice1_static_context_acceptance_from_jsonl(
-src/acp_static_context_acceptance.rs:pub struct AcpStaticContextAcceptanceCheck {
-src/acp_static_context_acceptance.rs:pub struct AcpStaticContextAcceptanceReport {
 src/lib.rs:pub fn get_system_info() -> String {
 src/lib.rs:pub mod acp;
 src/lib.rs:pub mod acp_dag_semantic;
@@ -129,7 +124,6 @@ src/lib.rs:pub mod acp_pack_context_envelope_v2;
 src/lib.rs:pub mod acp_protocol;
 src/lib.rs:pub mod acp_registry_projection;
 src/lib.rs:pub mod acp_runtime_context;
-src/lib.rs:pub mod acp_static_context_acceptance;
 src/lib.rs:pub mod agent;
 src/lib.rs:pub mod agentic;
 src/lib.rs:pub mod api;

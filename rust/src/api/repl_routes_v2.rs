@@ -1920,8 +1920,8 @@ pub(crate) fn compute_session_aware_runtime_trace_typed(
         })
         .unwrap_or_else(|| "unknown".to_string());
     let missing_required_args = resolution.missing_required_args.clone();
-    let source = crate::acp_runtime_context_sources::build_session_runtime_context_source(
-        crate::acp_runtime_context_sources::AcpRuntimeContextBuildInput {
+    let source = crate::acp_runtime_context::build_session_runtime_context_source(
+        crate::acp_runtime_context::AcpRuntimeContextBuildInput {
             pack_id,
             selected_ref,
             static_envelope_hash,

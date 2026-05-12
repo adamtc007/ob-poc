@@ -41,7 +41,6 @@ use crate::dsl_v2::syntax::parse_program;
 use crate::dsl_v2::tooling::SemanticValidator;
 use crate::dsl_v2::{expand_templates_simple, BatchPolicy};
 use crate::ontology::SemanticStageRegistry;
-use ob_poc_types::chat::{ChatResponse, SessionStateEnum};
 use ob_poc_types::{DslState, SessionInputRequest, SessionInputResponse};
 use std::time::Instant;
 
@@ -641,285 +640,6 @@ fn acp_agent_message_text(envelope: &serde_json::Value) -> Option<String> {
         })
 }
 
-fn acp_chat_trace_summary(envelope: &serde_json::Value) -> Option<serde_json::Value> {
-    let result = envelope.get("result")?;
-    let trace_projection = result
-        .get("traceProjection")
-        .cloned()
-        .unwrap_or_else(|| serde_json::json!({}));
-    let efficiency = result
-        .pointer("/observability/conversationEfficiency")
-        .cloned()
-        .unwrap_or_else(|| serde_json::json!({}));
-    let performance = result
-        .pointer("/observability/performance")
-        .cloned()
-        .unwrap_or_else(|| serde_json::json!({}));
-    let session_input = envelope
-        .get("session_input")
-        .cloned()
-        .or_else(|| result.get("session_input").cloned())
-        .unwrap_or_else(|| serde_json::json!({}));
-
-    let mut summary = serde_json::json!({
-        "status": value_string(result, &["status"]).unwrap_or_else(|| "unknown".to_string()),
-        "outcome": value_string(&trace_projection, &["outcome"])
-            .or_else(|| value_string(result, &["status"])),
-        "route": value_string(&session_input, &["route"]),
-        "provider_task": value_string(&session_input, &["provider_task"]),
-        "requested_draft_source": value_string(&session_input, &["requested_draft_source"]),
-        "draft_source": value_string(&session_input, &["effective_draft_source"])
-            .or_else(|| value_string(result, &["draft_source"])),
-        "route_latency_ms": value_u64(&session_input, &["route_latency_ms"]),
-        "route_latency_us": value_u64(&session_input, &["route_latency_us"]),
-        "outcome_layer": value_string(&trace_projection, &["outcomeLayer"]),
-        "human_summary": value_string(&trace_projection, &["humanSummary"]),
-        "prompt_context_variant": value_string(&trace_projection, &["promptContextVariant"]),
-        "transition_ref": value_string(&trace_projection, &["transitionRef"])
-            .or_else(|| value_string(result, &["output", "dry_run", "transition_ref"])),
-        "semantic_diff_uri": value_string(&trace_projection, &["semanticDiffUri"])
-            .or_else(|| value_string(result, &["output", "dry_run", "semantic_diff_uri"])),
-        "refusal_code": value_string(&trace_projection, &["refusalCode"])
-            .or_else(|| value_string(result, &["refusal", "refusal_code"])),
-        "pending_question_code": value_string(&trace_projection, &["pendingQuestionCode"])
-            .or_else(|| value_string(result, &["pending_question", "code"])),
-        "selected_verb": value_string(result, &["dag_semantic", "selected_verb"])
-            .or_else(|| value_string(&trace_projection, &["selectedVerb"])),
-        // R3 — kind-agnostic selected dispatch trace.
-        "selected_dispatch_kind": value_string(
-            result,
-            &["dag_semantic", "selected_dispatch", "dispatch_kind"],
-        ),
-        "selected_dispatch_fqn": value_string(
-            result,
-            &["dag_semantic", "selected_dispatch", "fqn"],
-        ),
-        "selected_dispatch_confidence_band": value_string(
-            result,
-            &["dag_semantic", "selected_dispatch", "confidence_band"],
-        ),
-        "rejected_candidate_count": result
-            .pointer("/dag_semantic/rejected_candidates")
-            .and_then(|v| v.as_array())
-            .map(|a| a.len() as u64),
-        "pack_id": value_string(result, &["dag_semantic", "pack", "pack_id"]),
-        "pack_name": value_string(result, &["dag_semantic", "pack", "pack_name"]),
-        "pack_ref": dag_semantic_pack_ref(result),
-        "pack_allowed_verb_count": value_u64(result, &["dag_semantic", "pack", "allowed_verb_count"]),
-        "candidate_verbs": dag_semantic_candidate_verbs(result),
-        "workflow_plan_id": value_string(result, &["dag_semantic", "workflow_plan", "plan_id"]),
-        "workflow_plan_verb": value_string(result, &["dag_semantic", "workflow_plan", "verb"]),
-        "workflow_plan_dry_run_only": value_bool(result, &["dag_semantic", "workflow_plan", "dry_run_only"]),
-        "workflow_plan_needed_from_user": value_string_array(result, &["dag_semantic", "workflow_plan", "needed_from_user"]),
-        "selected_template_id": value_string(result, &["dag_semantic", "selected_template", "template_id"])
-            .or_else(|| value_string(&trace_projection, &["selectedTemplate", "template_id"])),
-        "structured_failure_mode": value_string(&efficiency, &["structuredFailureMode"])
-            .or_else(|| value_string(result, &["observability", "conversationEfficiency", "structuredFailureMode"])),
-        "needed_from_user": value_string_array(&trace_projection, &["neededFromUser"]),
-        "diagnostic_codes": value_string_array(&trace_projection, &["diagnosticCodes"]),
-        "dry_run_valid": value_bool(&trace_projection, &["dryRunValid"]),
-        "first_pass_valid": value_bool(&trace_projection, &["firstPassValid"]),
-        "revision_count": value_u64(&trace_projection, &["revisionCount"]),
-        "prose_only_failure": value_bool(&efficiency, &["proseOnlyFailure"]),
-        "pending_user_turn_required": value_bool(&efficiency, &["pendingUserTurnRequired"]),
-        "estimated_user_repair_turns_avoided": value_u64(&efficiency, &["estimatedUserRepairTurnsAvoided"]),
-        "performance": performance,
-        "state_anchor_provider": envelope.get("state_anchor_provider").cloned(),
-    });
-    if let Some(object) = summary.as_object_mut() {
-        object.insert(
-            "registry_schema_version".to_string(),
-            serde_json::json!(value_string(
-                &trace_projection,
-                &["registryTrace", "schema_version"]
-            )
-            .or_else(|| value_string(
-                result,
-                &["dag_semantic", "registry_trace", "schema_version"]
-            ))),
-        );
-        object.insert(
-            "registry_projection_hash".to_string(),
-            serde_json::json!(value_string(
-                &trace_projection,
-                &["registryTrace", "source_projection_hash"]
-            )
-            .or_else(|| value_string(
-                result,
-                &["dag_semantic", "registry_trace", "source_projection_hash"]
-            ))),
-        );
-        object.insert(
-            "registry_verified".to_string(),
-            serde_json::json!(
-                value_bool(&trace_projection, &["registryTrace", "verified"]).or_else(|| {
-                    value_bool(result, &["dag_semantic", "registry_trace", "verified"])
-                })
-            ),
-        );
-        object.insert(
-            "envelope_schema_version".to_string(),
-            serde_json::json!(value_string(
-                &trace_projection,
-                &["envelopeTrace", "schema_version"]
-            )
-            .or_else(|| value_string(
-                result,
-                &["dag_semantic", "envelope_trace", "schema_version"]
-            ))),
-        );
-        object.insert(
-            "envelope_hash".to_string(),
-            serde_json::json!(
-                value_string(&trace_projection, &["envelopeTrace", "envelope_hash"]).or_else(
-                    || value_string(result, &["dag_semantic", "envelope_trace", "envelope_hash"])
-                )
-            ),
-        );
-        object.insert(
-            "envelope_pack_id".to_string(),
-            serde_json::json!(
-                value_string(&trace_projection, &["envelopeTrace", "pack_id"]).or_else(|| {
-                    value_string(result, &["dag_semantic", "envelope_trace", "pack_id"])
-                })
-            ),
-        );
-        object.insert(
-            "projection_hash".to_string(),
-            serde_json::json!(value_string(
-                &trace_projection,
-                &["envelopeTrace", "source_projection_hash"]
-            )
-            .or_else(|| value_string(
-                result,
-                &["dag_semantic", "envelope_trace", "source_projection_hash"]
-            ))
-            .or_else(|| value_string(
-                &trace_projection,
-                &["registryTrace", "source_projection_hash"]
-            ))
-            .or_else(|| value_string(
-                result,
-                &["dag_semantic", "registry_trace", "source_projection_hash"]
-            ))),
-        );
-        object.insert(
-            "envelope_verified".to_string(),
-            serde_json::json!(
-                value_bool(&trace_projection, &["envelopeTrace", "verified"]).or_else(|| {
-                    value_bool(result, &["dag_semantic", "envelope_trace", "verified"])
-                })
-            ),
-        );
-        object.insert(
-            "runtime_schema_version".to_string(),
-            serde_json::json!(
-                value_string(&trace_projection, &["runtimeTrace", "schema_version"]).or_else(
-                    || value_string(result, &["dag_semantic", "runtime_trace", "schema_version"])
-                )
-            ),
-        );
-        object.insert(
-            "runtime_pack_id".to_string(),
-            serde_json::json!(
-                value_string(&trace_projection, &["runtimeTrace", "pack_id"]).or_else(|| {
-                    value_string(result, &["dag_semantic", "runtime_trace", "pack_id"])
-                })
-            ),
-        );
-        object.insert(
-            "runtime_snapshot_id".to_string(),
-            serde_json::json!(
-                value_string(&trace_projection, &["runtimeTrace", "snapshot_id"]).or_else(|| {
-                    value_string(result, &["dag_semantic", "runtime_trace", "snapshot_id"])
-                })
-            ),
-        );
-        object.insert(
-            "runtime_hash".to_string(),
-            serde_json::json!(
-                value_string(&trace_projection, &["runtimeTrace", "runtime_hash"]).or_else(|| {
-                    value_string(result, &["dag_semantic", "runtime_trace", "runtime_hash"])
-                })
-            ),
-        );
-        object.insert(
-            "runtime_redaction_policy".to_string(),
-            serde_json::json!(value_string(
-                &trace_projection,
-                &["runtimeTrace", "redaction_policy"]
-            )
-            .or_else(|| value_string(
-                result,
-                &["dag_semantic", "runtime_trace", "redaction_policy"]
-            ))),
-        );
-        object.insert(
-            "runtime_freshness_policy".to_string(),
-            serde_json::json!(value_string(
-                &trace_projection,
-                &["runtimeTrace", "freshness_policy"]
-            )
-            .or_else(|| value_string(
-                result,
-                &["dag_semantic", "runtime_trace", "freshness_policy"]
-            ))),
-        );
-        object.insert(
-            "runtime_static_envelope_hash".to_string(),
-            serde_json::json!(value_string(
-                &trace_projection,
-                &["runtimeTrace", "static_envelope_hash"]
-            )
-            .or_else(|| value_string(
-                result,
-                &["dag_semantic", "runtime_trace", "static_envelope_hash"]
-            ))),
-        );
-        object.insert(
-            "runtime_projection_hash".to_string(),
-            serde_json::json!(value_string(
-                &trace_projection,
-                &["runtimeTrace", "projection_hash"]
-            )
-            .or_else(|| value_string(
-                result,
-                &["dag_semantic", "runtime_trace", "projection_hash"]
-            ))),
-        );
-        object.insert(
-            "runtime_verified".to_string(),
-            serde_json::json!(value_bool(&trace_projection, &["runtimeTrace", "verified"])
-                .or_else(|| {
-                    value_bool(result, &["dag_semantic", "runtime_trace", "verified"])
-                })),
-        );
-        object.insert(
-            "runtime_redacted_count".to_string(),
-            serde_json::json!(
-                value_u64(&trace_projection, &["runtimeTrace", "redacted_count"]).or_else(|| {
-                    value_u64(result, &["dag_semantic", "runtime_trace", "redacted_count"])
-                })
-            ),
-        );
-        object.insert(
-            "runtime_blocked_field_codes".to_string(),
-            serde_json::json!(value_string_array(
-                &trace_projection,
-                &["runtimeTrace", "blocked_field_codes"]
-            )
-            .or_else(|| value_string_array(
-                result,
-                &["dag_semantic", "runtime_trace", "blocked_field_codes"]
-            ))),
-        );
-        object.insert(
-            "selected_macro_id".to_string(),
-            serde_json::json!(dag_semantic_selected_macro_id(result)),
-        );
-    }
-    Some(summary)
-}
 
 fn acp_valid_dag_semantic_draft_dsl(envelope: &serde_json::Value) -> Option<DslState> {
     let result = envelope.get("result")?;
@@ -940,11 +660,6 @@ fn acp_valid_dag_semantic_draft_dsl(envelope: &serde_json::Value) -> Option<DslS
         })
 }
 
-fn dag_semantic_pack_ref(result: &serde_json::Value) -> Option<String> {
-    let pack_id = value_string(result, &["dag_semantic", "pack", "pack_id"])?;
-    let version = value_string(result, &["dag_semantic", "pack", "pack_version"])?;
-    Some(format!("{pack_id}@{version}"))
-}
 
 fn dag_semantic_candidate_verbs(result: &serde_json::Value) -> Option<Vec<String>> {
     let candidates = result
@@ -960,20 +675,6 @@ fn dag_semantic_candidate_verbs(result: &serde_json::Value) -> Option<Vec<String
     (!candidates.is_empty()).then_some(candidates)
 }
 
-fn dag_semantic_selected_macro_id(result: &serde_json::Value) -> Option<String> {
-    let selected_verb = value_string(result, &["dag_semantic", "selected_verb"])
-        .or_else(|| value_string(result, &["traceProjection", "selectedVerb"]))?;
-    let candidates = result.pointer("/dag_semantic/top_candidates")?.as_array()?;
-    candidates.iter().find_map(|candidate| {
-        let candidate_verb = candidate
-            .get("fqn")
-            .or_else(|| candidate.get("verb"))?
-            .as_str()?;
-        let side_effects = candidate.get("side_effects")?.as_str()?;
-        (candidate_verb == selected_verb && side_effects == "macro_projection_only")
-            .then(|| selected_verb.clone())
-    })
-}
 
 fn value_at_path<'a>(value: &'a serde_json::Value, path: &[&str]) -> Option<&'a serde_json::Value> {
     path.iter()
@@ -994,14 +695,6 @@ fn value_u64(value: &serde_json::Value, path: &[&str]) -> Option<u64> {
     value_at_path(value, path).and_then(serde_json::Value::as_u64)
 }
 
-fn value_string_array(value: &serde_json::Value, path: &[&str]) -> Option<Vec<String>> {
-    let items = value_at_path(value, path)?
-        .as_array()?
-        .iter()
-        .filter_map(|item| item.as_str().map(str::to_string))
-        .collect::<Vec<_>>();
-    (!items.is_empty()).then_some(items)
-}
 
 async fn dispatch_to_v2_repl(
     req: &SessionInputRequest,

@@ -11,7 +11,6 @@ const SCANNED_FILES: &[&str] = &[
     "src/acp_pack_context_envelope_v2.rs",
     "src/acp_registry_projection.rs",
     "src/acp_runtime_context.rs",
-    "src/acp_static_context_acceptance.rs",
 ];
 
 /// Run the public API allowlist check.

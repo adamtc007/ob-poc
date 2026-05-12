@@ -31,10 +31,8 @@ pub mod acp_pack_context_envelope_v2;
 pub mod acp_protocol;
 pub mod acp_registry_projection;
 pub mod acp_runtime_context;
-pub(crate) mod acp_runtime_context_sources;
 pub mod acp_session_input_draft_mode;
 pub mod acp_state_anchor;
-pub mod acp_static_context_acceptance;
 
 // LLM inference trace hashing and workbook binding.
 pub mod llm_trace;

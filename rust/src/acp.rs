@@ -358,7 +358,7 @@ pub fn acp_policy_capabilities(
     })
 }
 
-pub fn acp_authority_surfaces(manifest: &DomainPackManifest) -> Vec<AcpAuthoritySurfaceDecision> {
+fn acp_authority_surfaces(manifest: &DomainPackManifest) -> Vec<AcpAuthoritySurfaceDecision> {
     vec![
         AcpAuthoritySurfaceDecision {
             surface: "session/prompt".to_string(),
@@ -733,7 +733,8 @@ pub fn acp_run_kyc_update_status_language_loop_timed(
     })
 }
 
-pub fn refuse_acp_mutation(session: &AcpSession) -> Result<(), AcpAdapterError> {
+#[cfg(test)]
+fn refuse_acp_mutation(session: &AcpSession) -> Result<(), AcpAdapterError> {
     require_open(session)?;
     Err(AcpAdapterError::MutationNotSupported)
 }
