@@ -9,10 +9,12 @@ use serde::{Deserialize, Serialize};
 use std::time::Instant;
 use uuid::Uuid;
 
-use super::{
-    build_kyc_update_status_dry_run_with_manifest, diagnostics_from_dry_run_refusal,
-    KycUpdateStatusDryRunInput, KycUpdateStatusDryRunOutput, SemOsLanguagePack, WorkbookDiagnostic,
+use crate::kyc_dry_run::{
+    build_kyc_update_status_dry_run_with_manifest, KycUpdateStatusDryRunInput,
+    KycUpdateStatusDryRunOutput,
 };
+use crate::language_pack::SemOsLanguagePack;
+use crate::workbook_diagnostics::{diagnostics_from_dry_run_refusal, WorkbookDiagnostic};
 
 pub const MAX_WORKBOOK_REVISIONS: u8 = 2;
 const KYC_UPDATE_STATUS_VERB: &str = "kyc-case.update-status";
@@ -35,7 +37,7 @@ pub struct KycUpdateStatusWorkbookDraft {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub evidence_digest: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub llm_trace_ref: Option<super::LlmTraceRef>,
+    pub llm_trace_ref: Option<crate::llm_trace::LlmTraceRef>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -342,7 +344,7 @@ fn revise_draft(
 fn transition_for_requested_state<'a>(
     pack: &'a SemOsLanguagePack,
     requested_state: &str,
-) -> Option<&'a super::LanguagePackTransition> {
+) -> Option<&'a crate::language_pack::LanguagePackTransition> {
     pack.candidate_transitions
         .iter()
         .find(|transition| transition.to_state == requested_state)
@@ -351,7 +353,7 @@ fn transition_for_requested_state<'a>(
 fn transition_by_ref<'a>(
     pack: &'a SemOsLanguagePack,
     transition_ref: &str,
-) -> Option<&'a super::LanguagePackTransition> {
+) -> Option<&'a crate::language_pack::LanguagePackTransition> {
     pack.candidate_transitions
         .iter()
         .find(|transition| transition.transition_ref == transition_ref)

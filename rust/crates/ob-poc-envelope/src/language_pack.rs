@@ -502,7 +502,7 @@ mod tests {
 
     fn manifest() -> DomainPackManifest {
         serde_yaml::from_str(include_str!(
-            "../../config/sem_os_seeds/domain_packs/ob_poc_kyc.yaml"
+            "../../../config/sem_os_seeds/domain_packs/ob_poc_kyc.yaml"
         ))
         .expect("KYC Domain Pack parses")
     }

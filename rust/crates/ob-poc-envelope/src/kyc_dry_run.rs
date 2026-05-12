@@ -13,17 +13,17 @@ use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 use uuid::Uuid;
 
-use super::dsl_coder::{
+use crate::dsl_coder::{
     validate_workbook_for_dry_run, DslCoderDryRunResult, DslCoderExecutionMode,
     DslCoderValidationError,
 };
-use super::workbook::{
+use crate::workbook::{
     EvidenceRef, ExecutionWorkbook, ExecutionWorkbookCore, LlmTraceRef, StaleWorkbookPolicy,
     WorkbookActor, WorkbookExecutionMode, WorkbookSubject,
 };
 
 const OB_POC_KYC_PACK: &str =
-    include_str!("../../config/sem_os_seeds/domain_packs/ob_poc_kyc.yaml");
+    include_str!("../../../config/sem_os_seeds/domain_packs/ob_poc_kyc.yaml");
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct KycUpdateStatusDryRunInput {

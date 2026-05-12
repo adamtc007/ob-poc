@@ -6,10 +6,10 @@
 use sem_os_core::state_simulation::StateSimulationError;
 use serde::{Deserialize, Serialize};
 
-use super::{
-    DslCoderValidationError, ExecutionWorkbookValidationError, KycUpdateStatusDryRunRefusal,
-    SemOsLanguagePack,
-};
+use crate::dsl_coder::DslCoderValidationError;
+use crate::kyc_dry_run::KycUpdateStatusDryRunRefusal;
+use crate::language_pack::SemOsLanguagePack;
+use crate::workbook::ExecutionWorkbookValidationError;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct WorkbookDiagnostic {

@@ -38,8 +38,10 @@ pub(crate) use ob_poc_envelope::dsl_coder;
 pub(crate) mod envelope;
 pub(crate) mod errors;
 pub(crate) mod executor;
-pub(crate) mod kyc_dry_run;
-pub(crate) mod language_pack;
+// Phase 3 slice 2d-prep (2026-05-12): relocated to ob-poc-envelope.
+pub(crate) use ob_poc_envelope::kyc_dry_run;
+// Phase 3 slice 2d-prep (2026-05-12): relocated to ob-poc-envelope.
+pub(crate) use ob_poc_envelope::language_pack;
 pub(crate) mod llm_draft_adapter;
 // Phase 3 slice 2c.2 (2026-05-12): relocated to ob-poc-envelope.
 pub(crate) use ob_poc_envelope::mutation_preflight;
@@ -55,8 +57,9 @@ pub(crate) mod types;
 pub(crate) mod verb_classifier;
 // Phase 3 slice 2c (2026-05-12): workbook relocated to ob-poc-envelope; alias for crate use.
 pub(crate) use ob_poc_envelope::workbook;
-pub(crate) mod workbook_diagnostics;
-pub(crate) mod workbook_revision;
+// Phase 3 slice 2d-prep (2026-05-12): relocated to ob-poc-envelope.
+pub(crate) use ob_poc_envelope::workbook_diagnostics;
+pub(crate) use ob_poc_envelope::workbook_revision;
 pub(crate) mod write_set;
 
 // Re-export key types at module boundary
