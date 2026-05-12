@@ -1062,10 +1062,9 @@ pub fn session_scoped_router() -> Router<ReplV2RouteState> {
             post(record_kyc_restricted_mutation_receipt),
         )
         // ACP adapter lifecycle/context routes
-        .route(
-            "/api/session/:id/acp/capabilities",
-            get(get_acp_capabilities_route),
-        )
+        // (capabilities route removed — ACP clients use stdio init; HTTP
+        // consumers should call /acp/policy for policy and the ob_poc_acp
+        // binary docs for stdio launch metadata.)
         .route("/api/session/:id/acp/policy", get(get_acp_policy_route))
         .route(
             "/api/session/:id/acp/projections",
@@ -1086,56 +1085,6 @@ pub fn session_scoped_router() -> Router<ReplV2RouteState> {
         .route("/api/session/:id/trace", get(get_session_trace))
         .route("/api/session/:id/trace/:seq", get(get_trace_entry))
         .route("/api/session/:id/trace/replay", post(replay_session_trace))
-}
-
-/// GET /api/session/:id/acp/capabilities
-///
-/// Returns both the protocol-level initialize response and the
-/// session-level `AcpPolicyCapabilities` (Domain Pack policy +
-/// projection catalogue + transition mode). One-stop discovery for
-/// ACP consumers — they get protocol metadata and what the live
-/// SemOS-aware adapter actually supports without a second call.
-async fn get_acp_capabilities_route(
-    Path(session_id): Path<Uuid>,
-) -> Result<Json<serde_json::Value>, (StatusCode, Json<ErrorResponseV2>)> {
-    acp_capabilities_value(session_id)
-        .map(Json)
-        .map_err(acp_json_error)
-}
-
-fn acp_capabilities_value(
-    session_id: Uuid,
-) -> Result<serde_json::Value, crate::acp::AcpAdapterError> {
-    let mut agent = crate::acp_protocol::AcpJsonRpcAgent::new();
-    let protocol = agent
-        .handle_request(crate::acp_protocol::JsonRpcRequest {
-            jsonrpc: "2.0".to_string(),
-            id: Some(serde_json::json!(1)),
-            method: "initialize".to_string(),
-            params: serde_json::json!({}),
-        })
-        .into_iter()
-        .find_map(|outgoing| match outgoing {
-            crate::acp_protocol::JsonRpcOutgoing::Response(response) => response.result,
-            crate::acp_protocol::JsonRpcOutgoing::Notification(_) => None,
-        })
-        .unwrap_or_else(|| serde_json::json!({}));
-
-    let manifest = load_ob_poc_kyc_domain_pack()?;
-    let session = crate::acp::open_acp_session(session_id, crate::acp::AcpAdapterKind::Zed);
-    let policy = crate::acp::acp_policy_capabilities(&session, &manifest)?;
-
-    Ok(serde_json::json!({
-        "status": "acp_capabilities",
-        "session_id": session_id,
-        "protocol": protocol,
-        "policy": policy,
-        "stdio": {
-            "command": "ob_poc_acp",
-            "transport": "jsonrpc_stdio",
-            "message_delimiter": "newline"
-        }
-    }))
 }
 
 /// GET /api/session/:id/acp/policy
@@ -1363,6 +1312,16 @@ fn live_affinity_edges(repl_session: &ReplSessionV2) -> Vec<serde_json::Value> {
     edges
 }
 
+/// HTTP-only live overlay for ACP projection envelopes.
+///
+/// Returns `Some(envelope)` when this projection kind has a live materializer
+/// against the current `ReplSessionV2`, or `None` to let the caller fall back
+/// to the declared-source view in `acp::build_acp_projection`. Stdio (Zed)
+/// clients do not call this — they get the declared-source view as designed.
+///
+/// Phase C will fold this overlay into a single `AcpDomainFacade` entry point
+/// shared by REST and stdio. See `acp::build_acp_projection` for the
+/// canonical declared-source contract.
 fn build_live_acp_projection(
     session: &crate::acp::AcpSession,
     manifest: &DomainPackManifest,
@@ -6415,26 +6374,6 @@ mod tests {
         assert_eq!(value["status"], "acp_session_open");
         assert_eq!(value["session"]["adapter"], "zed");
         assert_eq!(value["session"]["mutation_capability"], "none");
-    }
-
-    #[test]
-    fn test_acp_capabilities_value_advertises_stdio_and_session_lifecycle() {
-        let session_id = Uuid::parse_str("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa").unwrap();
-
-        let value = acp_capabilities_value(session_id).expect("capabilities resolves");
-
-        assert_eq!(value["status"], "acp_capabilities");
-        assert_eq!(value["stdio"]["command"], "ob_poc_acp");
-        assert_eq!(
-            value["protocol"]["agentCapabilities"]["sessionCapabilities"]["close"],
-            true
-        );
-        assert_eq!(
-            value["protocol"]["agentCapabilities"]["sessionCapabilities"]["list"],
-            true
-        );
-        // Session-level Domain Pack policy is now surfaced in the same response.
-        assert!(value["policy"].is_object());
     }
 
     #[test]

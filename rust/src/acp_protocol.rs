@@ -437,9 +437,19 @@ impl AcpJsonRpcAgent {
             }
             "obpoc/context" => self.obpoc_context(id, request.params),
             "obpoc/kyc_update_status_dry_run" => self.obpoc_kyc_dry_run(id, request.params),
+            // `request_permission` is the ACP-standard method name; the
+            // `obpoc/` prefix is the namespaced form. Both dispatch to the
+            // same handler so ACP clients can use either convention.
             "request_permission" | "obpoc/request_permission" => {
                 self.obpoc_request_permission(id, request.params)
             }
+            // Explicit-refuse list. These ACP-standard method names cover
+            // editor file/terminal authority that ACP visibility never grants
+            // here. Variants (`write_text_file` vs `fs/write_text_file`,
+            // `terminal/new` vs `terminal/create`) exist because different
+            // ACP client implementations use different forms — we refuse
+            // every form so clients get a structured authority-denied error
+            // rather than a generic METHOD_NOT_FOUND from the catch-all.
             "write_text_file" | "fs/write_text_file" | "create_text_file" | "terminal/new"
             | "terminal/create" => self.error(
                 id,

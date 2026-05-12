@@ -551,6 +551,22 @@ pub fn list_acp_projections(
     Ok(manifest.projection_catalog.clone())
 }
 
+/// Build the canonical ACP projection envelope from the Domain Pack manifest.
+///
+/// This returns the **declared-source** view of a projection: schema, source
+/// reference, classification, and a `declared_projection_source` placeholder
+/// payload for kinds that require host materialization. It is transport-neutral
+/// and session-data-free.
+///
+/// HTTP callers that have a live `ReplSessionV2` should overlay live data via
+/// `repl_routes_v2::build_live_acp_projection` before calling this — the live
+/// overlay returns `Some(envelope)` for kinds with a live implementation and
+/// falls through to this function otherwise. Stdio (Zed) callers do not have a
+/// live REPL session in scope and use this function directly; they receive the
+/// declared-source view, which is the correct ACP discovery surface.
+///
+/// Phase C of the ACP audit will encapsulate this overlay-then-static pattern
+/// behind a single `AcpDomainFacade` so both transports use one entry point.
 pub fn build_acp_projection(
     session: &AcpSession,
     manifest: &DomainPackManifest,

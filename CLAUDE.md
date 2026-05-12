@@ -363,7 +363,6 @@ The egui canvas renders `GraphSceneModel` from the Observatory API (polled every
 | `POST /api/session/:id/runbook/execute` | Execute next plan step (INV-3 gate) |
 | `POST /api/session/:id/runbook/cancel` | Cancel plan mid-execution |
 | `GET /api/session/:id/runbook/status` | Current plan status + cursor |
-| `GET /api/session/:id/acp/capabilities` | ACP protocol capabilities + stdio launch metadata |
 | `GET /api/session/:id/acp/policy` | ACP-visible SemOS policy/capability decisions |
 | `GET /api/session/:id/acp/projections` | ACP-visible SemOS projection catalogue |
 | `GET /api/session/:id/acp/projections/:kind` | Typed ACP projection envelope with hash/classification metadata |
