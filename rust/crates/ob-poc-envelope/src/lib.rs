@@ -19,6 +19,7 @@ pub mod clarify;
 pub mod data_dictionary;
 pub mod journey;
 pub mod lint;
+pub mod macros;
 pub mod approval_token;
 pub mod audit_chain;
 pub mod dsl_coder;

@@ -222,18 +222,6 @@ impl OperatorMacroDef {
             .or_else(|| self.args.optional.get(name))
     }
 
-    /// Check if prerequisites are satisfied given current DAG state
-    pub fn check_prereqs(&self, dag_state: &crate::session::unified::DagState) -> bool {
-        self.prereqs.iter().all(|p| check_prereq(p, dag_state))
-    }
-}
-
-fn check_prereq(prereq: &MacroPrereq, dag_state: &crate::session::unified::DagState) -> bool {
-    match prereq {
-        MacroPrereq::StateExists { key } => dag_state.get_flag(key),
-        MacroPrereq::VerbCompleted { verb } => dag_state.is_completed(verb),
-        MacroPrereq::AnyOf { conditions } => conditions.iter().any(|c| check_prereq(c, dag_state)),
-    }
 }
 
 /// Summary of a macro for API responses
