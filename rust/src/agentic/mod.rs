@@ -21,12 +21,6 @@ pub use ob_agentic::patterns;
 pub use ob_agentic::planner;
 pub use ob_agentic::validator;
 
-// Lexicon agent requires gateway feature in ob-agentic
-#[cfg(feature = "database")]
-pub mod lexicon_agent {
-    pub use ob_agentic::lexicon_agent::*;
-}
-
 // Re-export LLM client types
 pub use client_factory::{create_llm_client_with_key, current_backend};
 pub use ob_agentic::create_llm_client;
