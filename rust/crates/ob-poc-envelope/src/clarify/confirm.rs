@@ -8,7 +8,7 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use thiserror::Error;
 
 /// Default token validity duration (30 seconds)
-pub const DEFAULT_TOKEN_TTL_SECS: u64 = 30;
+pub(crate) const DEFAULT_TOKEN_TTL_SECS: u64 = 30;
 
 /// Token format: base64(random_bytes || timestamp_secs)
 const RANDOM_BYTES_LEN: usize = 16;

@@ -255,7 +255,8 @@ pub mod plan_builder;
 // `dsl-runtime::placeholder`; consumer `entity_ops` moved alongside it.
 
 // Clarify module - Unified DecisionPacket-based clarification UX
-pub mod clarify;
+// Phase 3 slice 2f (2026-05-12): relocated to ob-poc-envelope; compat re-export.
+pub use ob_poc_envelope::clarify;
 
 // Policy module — server-side enforcement for single-pipeline invariants
 pub mod policy;

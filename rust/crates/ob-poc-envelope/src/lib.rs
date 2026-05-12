@@ -15,6 +15,7 @@ pub mod acp_registry_projection;
 pub mod acp_runtime_context;
 pub mod acp_session_input_draft_mode;
 pub mod acp_state_anchor;
+pub mod clarify;
 pub mod data_dictionary;
 pub mod journey;
 pub mod approval_token;
