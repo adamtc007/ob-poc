@@ -162,7 +162,8 @@ pub use ob_poc_envelope::lint;
 pub use ob_poc_envelope::macros;
 
 // Lexicon module - In-memory vocabulary lookup for verb discovery
-pub mod lexicon;
+// Phase 3 slice 2j (2026-05-12): relocated to ob-poc-envelope; compat re-export.
+pub use ob_poc_envelope::lexicon;
 
 // Entity Linking module - In-memory entity resolution from utterances
 #[cfg(feature = "database")]

@@ -18,6 +18,7 @@ pub mod acp_state_anchor;
 pub mod clarify;
 pub mod data_dictionary;
 pub mod journey;
+pub mod lexicon;
 pub mod lint;
 pub mod macros;
 pub mod approval_token;
