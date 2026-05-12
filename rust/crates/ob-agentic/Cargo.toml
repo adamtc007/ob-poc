@@ -45,3 +45,6 @@ gateway = ["dep:entity-gateway", "dep:tonic"]
 
 [dev-dependencies]
 clap = { version = "4", features = ["derive"] }
+
+[lints.rust]
+unreachable_pub = "deny"

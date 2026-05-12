@@ -16,7 +16,7 @@ use tracing::{debug, warn};
 use super::tokenizer::{EntityResolver, ResolvedEntity};
 
 /// Default EntityGateway address.
-pub const DEFAULT_GATEWAY_ADDR: &str = "http://[::1]:50051";
+pub(crate) const DEFAULT_GATEWAY_ADDR: &str = "http://[::1]:50051";
 
 /// Get gateway address from environment or use default.
 fn gateway_addr() -> String {

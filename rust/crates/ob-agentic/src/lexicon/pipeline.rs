@@ -96,9 +96,9 @@ pub struct LexiconPipeline {
 /// Active CBU context.
 #[derive(Debug, Clone)]
 #[allow(dead_code)] // name used for display/logging in future
-pub struct ActiveCbu {
-    pub id: String,
-    pub name: String,
+pub(crate) struct ActiveCbu {
+    pub(crate) id: String,
+    pub(crate) name: String,
 }
 
 impl LexiconPipeline {
