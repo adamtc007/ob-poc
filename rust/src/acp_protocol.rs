@@ -1184,8 +1184,8 @@ impl AcpJsonRpcAgent {
             Ok(session_id) => session_id,
             Err(error) => return self.error(id, INVALID_PARAMS, error.to_string(), None),
         };
-        let manifest = match load_ob_poc_kyc_domain_pack() {
-            Ok(manifest) => manifest,
+        let facade = match crate::acp_facade::AcpFacade::for_default_pack(request.adapter) {
+            Ok(facade) => facade,
             Err(error) => return self.acp_error(id, error),
         };
         let session = self
@@ -1259,9 +1259,8 @@ impl AcpJsonRpcAgent {
         };
 
         let started_at = Instant::now();
-        match acp::build_acp_projection(
+        match facade.projection_get_for(
             &session,
-            &manifest,
             acp::AcpProjectionRequest {
                 kind: request.kind,
                 subject: request.subject,
@@ -1310,8 +1309,8 @@ impl AcpJsonRpcAgent {
             Ok(session_id) => session_id,
             Err(error) => return self.error(id, INVALID_PARAMS, error.to_string(), None),
         };
-        let manifest = match load_ob_poc_kyc_domain_pack() {
-            Ok(manifest) => manifest,
+        let facade = match crate::acp_facade::AcpFacade::for_default_pack(request.adapter) {
+            Ok(facade) => facade,
             Err(error) => return self.acp_error(id, error),
         };
         let session = self
@@ -1331,7 +1330,7 @@ impl AcpJsonRpcAgent {
         };
 
         let started_at = Instant::now();
-        match acp::acp_discover_kyc_case_state(&session, &manifest, request.subject_id, response) {
+        match facade.kyc_case_state_discover_for(&session, request.subject_id, response) {
             Ok(case_state) => {
                 self.case_state_cache
                     .insert((session_id, case_state.subject_id), case_state.clone());
@@ -1375,8 +1374,8 @@ impl AcpJsonRpcAgent {
             Ok(session_id) => session_id,
             Err(error) => return self.error(id, INVALID_PARAMS, error.to_string(), None),
         };
-        let manifest = match load_ob_poc_kyc_domain_pack() {
-            Ok(manifest) => manifest,
+        let facade = match crate::acp_facade::AcpFacade::for_default_pack(request.adapter) {
+            Ok(facade) => facade,
             Err(error) => return self.acp_error(id, error),
         };
         let session = self
@@ -1386,9 +1385,8 @@ impl AcpJsonRpcAgent {
             .clone();
 
         let started_at = Instant::now();
-        match acp::acp_update_status_language_pack(
+        match facade.language_pack_for(
             &session,
-            &manifest,
             crate::runbook::UpdateStatusLanguagePackRequest {
                 subject_id: request.subject_id,
                 subject_kind: request.subject_kind,
@@ -1457,8 +1455,8 @@ impl AcpJsonRpcAgent {
             Ok(session_id) => session_id,
             Err(error) => return self.error(id, INVALID_PARAMS, error.to_string(), None),
         };
-        let manifest = match load_ob_poc_kyc_domain_pack() {
-            Ok(manifest) => manifest,
+        let facade = match crate::acp_facade::AcpFacade::for_default_pack(request.adapter) {
+            Ok(facade) => facade,
             Err(error) => return self.acp_error(id, error),
         };
         let session = self
@@ -1472,9 +1470,8 @@ impl AcpJsonRpcAgent {
         let state_discovery = request.state_discovery.clone();
 
         let started_at = Instant::now();
-        let outcome = match acp::acp_run_kyc_update_status_language_loop_timed(
+        let outcome = match facade.kyc_language_loop_timed_for(
             &session,
-            &manifest,
             KycLanguagePackRequest {
                 subject_id: request.subject_id,
                 current_state: request.current_state,

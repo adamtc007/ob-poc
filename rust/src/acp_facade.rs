@@ -173,12 +173,16 @@ impl AcpFacade {
         case_id: Uuid,
         response: DiscoveryResponse,
     ) -> Result<AcpKycCaseStateSnapshot, AcpAdapterError> {
-        acp::acp_discover_kyc_case_state(
-            &self.session(session_id),
-            &self.manifest,
-            case_id,
-            response,
-        )
+        self.kyc_case_state_discover_for(&self.session(session_id), case_id, response)
+    }
+
+    pub fn kyc_case_state_discover_for(
+        &self,
+        session: &AcpSession,
+        case_id: Uuid,
+        response: DiscoveryResponse,
+    ) -> Result<AcpKycCaseStateSnapshot, AcpAdapterError> {
+        acp::acp_discover_kyc_case_state(session, &self.manifest, case_id, response)
     }
 
     pub fn kyc_dry_run(
@@ -194,7 +198,15 @@ impl AcpFacade {
         session_id: Uuid,
         request: UpdateStatusLanguagePackRequest,
     ) -> Result<SemOsLanguagePack, AcpAdapterError> {
-        acp::acp_update_status_language_pack(&self.session(session_id), &self.manifest, request)
+        self.language_pack_for(&self.session(session_id), request)
+    }
+
+    pub fn language_pack_for(
+        &self,
+        session: &AcpSession,
+        request: UpdateStatusLanguagePackRequest,
+    ) -> Result<SemOsLanguagePack, AcpAdapterError> {
+        acp::acp_update_status_language_pack(session, &self.manifest, request)
     }
 
     pub fn kyc_language_pack(
@@ -202,11 +214,15 @@ impl AcpFacade {
         session_id: Uuid,
         request: KycLanguagePackRequest,
     ) -> Result<SemOsLanguagePack, AcpAdapterError> {
-        acp::acp_kyc_update_status_language_pack(
-            &self.session(session_id),
-            &self.manifest,
-            request,
-        )
+        self.kyc_language_pack_for(&self.session(session_id), request)
+    }
+
+    pub fn kyc_language_pack_for(
+        &self,
+        session: &AcpSession,
+        request: KycLanguagePackRequest,
+    ) -> Result<SemOsLanguagePack, AcpAdapterError> {
+        acp::acp_kyc_update_status_language_pack(session, &self.manifest, request)
     }
 
     pub fn kyc_language_loop_timed(
@@ -215,12 +231,16 @@ impl AcpFacade {
         request: KycLanguagePackRequest,
         draft: KycUpdateStatusWorkbookDraft,
     ) -> Result<AcpKycLanguageLoopTimedOutcome, AcpAdapterError> {
-        acp::acp_run_kyc_update_status_language_loop_timed(
-            &self.session(session_id),
-            &self.manifest,
-            request,
-            draft,
-        )
+        self.kyc_language_loop_timed_for(&self.session(session_id), request, draft)
+    }
+
+    pub fn kyc_language_loop_timed_for(
+        &self,
+        session: &AcpSession,
+        request: KycLanguagePackRequest,
+        draft: KycUpdateStatusWorkbookDraft,
+    ) -> Result<AcpKycLanguageLoopTimedOutcome, AcpAdapterError> {
+        acp::acp_run_kyc_update_status_language_loop_timed(session, &self.manifest, request, draft)
     }
 }
 
