@@ -17,9 +17,10 @@ ob-agentic = { path = "crates/ob-agentic", features = ["gateway"] }
 ob-semantic-matcher = { path = "crates/ob-semantic-matcher" }
 ob-templates = { path = "crates/ob-templates" }
 ob-workflow = { path = "crates/ob-workflow", features = ["database"] }
-dsl_types = { path = "../dsl_types" }
+dsl_types = { path = "crates/dsl_types" }
 entity-gateway = { path = "crates/entity-gateway", optional = true }
 ob-poc-types = { path = "crates/ob-poc-types" }
+ob-poc-diagnostics = { path = "crates/ob-poc-diagnostics" }
 ob-poc-macros = { path = "crates/ob-poc-macros" }
 sem_os_core = { path = "crates/sem_os_core" }
 sem_os_client = { path = "crates/sem_os_client" }
@@ -211,7 +212,7 @@ path = "src/bin/sem_os_footprint_audit.rs"
 [features]
 default = ["server"]  # Enable for sqlx prepare; use --no-default-features to disable
 
-database = ["dep:sqlx", "dep:bigdecimal", "dep:entity-gateway", "dep:pgvector"]  # Only enable database functionality when needed
+database = ["dep:sqlx", "dep:bigdecimal", "dep:entity-gateway", "dep:pgvector", "ob-poc-diagnostics/database"]  # Only enable database functionality when needed
 server = ["database", "mcp", "dep:axum", "dep:tower", "dep:tower-http"]  # REST API server with intent pipeline
 cli = ["dep:clap", "dep:colored", "dep:atty", "dep:rustyline"]  # CLI tool for DSL testing
 mcp = ["database"]  # MCP/intent pipeline for semantic verb search
@@ -244,6 +245,7 @@ members = [
 
     "crates/ob-poc-web",
     "crates/ob-poc-types",
+    "crates/ob-poc-diagnostics",
     "crates/entity-gateway",
     "crates/ob-semantic-matcher",
 

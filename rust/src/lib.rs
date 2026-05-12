@@ -17,12 +17,11 @@
 //! // Execute with DslExecutor
 //! ```
 
-// Core error handling
-// Phase 5a composite-blocker #23 — entity_kind relocated to dsl-runtime
-// (alongside discovery_ops which consumed it). Other ob-poc consumers
-// (mcp::verb_search, dsl_v2::runtime_registry, service_resources::discovery,
-// sage::verb_resolve) now import from `dsl_runtime::entity_kind`.
-pub mod error;
+// Core error handling. Phase 3 Slice 1a (2026-05-12) — relocated to
+// ob-poc-diagnostics. The `pub use` below preserves `ob_poc::error::*`
+// as a back-compat path so downstream consumers don't break in this
+// slice; future Phase 3 slices may re-evaluate.
+pub use ob_poc_diagnostics::error;
 
 // ACP-facing transport-neutral adapter contracts.
 pub mod acp;
@@ -272,8 +271,9 @@ pub mod sage;
 // Core domain capabilities
 pub use domains::{DomainHandler, DomainRegistry, DomainResult};
 
-// Essential error types
-pub use error::{DSLError, ParseError};
+// Essential error types — re-exported from ob-poc-diagnostics so the
+// crate-root API (`ob_poc::DSLError`, `ob_poc::ParseError`) stays stable.
+pub use ob_poc_diagnostics::error::{DSLError, ParseError};
 
 // DSL v2 types - unified S-expression DSL
 pub use dsl_v2::execution::{
