@@ -20,7 +20,7 @@ use crate::error::AppError;
 /// Response for the bootstrap endpoint — covers both fresh and idempotent-hit cases.
 #[derive(Debug, Clone, Serialize)]
 #[serde(tag = "status")]
-pub enum BootstrapResponse {
+pub(crate) enum BootstrapResponse {
     #[serde(rename = "already_published")]
     AlreadyPublished {
         bundle_hash: String,
@@ -30,7 +30,7 @@ pub enum BootstrapResponse {
     Published(BootstrapSeedBundleResponse),
 }
 
-pub async fn bootstrap_seed_bundle(
+pub(crate) async fn bootstrap_seed_bundle(
     Extension(principal): Extension<Principal>,
     Extension(service): Extension<Arc<dyn CoreService>>,
     Json(bundle): Json<SeedBundle>,

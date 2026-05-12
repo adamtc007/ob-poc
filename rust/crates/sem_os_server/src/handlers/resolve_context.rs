@@ -10,7 +10,7 @@ use sem_os_core::{
 
 use crate::error::AppError;
 
-pub async fn resolve_context(
+pub(crate) async fn resolve_context(
     Extension(principal): Extension<Principal>,
     Extension(service): Extension<Arc<dyn CoreService>>,
     Json(req): Json<ResolveContextRequest>,

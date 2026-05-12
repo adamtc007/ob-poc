@@ -23,7 +23,7 @@ use sem_os_core::{
 
 use crate::error::AppError;
 
-pub async fn list_changesets(
+pub(crate) async fn list_changesets(
     Extension(service): Extension<Arc<dyn CoreService>>,
     Query(query): Query<ListChangesetsQuery>,
 ) -> Result<Json<ListChangesetsResponse>, AppError> {
@@ -31,7 +31,7 @@ pub async fn list_changesets(
     Ok(Json(resp))
 }
 
-pub async fn changeset_diff(
+pub(crate) async fn changeset_diff(
     Extension(service): Extension<Arc<dyn CoreService>>,
     Path(id): Path<String>,
 ) -> Result<Json<ChangesetDiffResponse>, AppError> {
@@ -39,7 +39,7 @@ pub async fn changeset_diff(
     Ok(Json(resp))
 }
 
-pub async fn changeset_impact(
+pub(crate) async fn changeset_impact(
     Extension(service): Extension<Arc<dyn CoreService>>,
     Path(id): Path<String>,
 ) -> Result<Json<ChangesetImpactResponse>, AppError> {
@@ -47,7 +47,7 @@ pub async fn changeset_impact(
     Ok(Json(resp))
 }
 
-pub async fn changeset_gate_preview(
+pub(crate) async fn changeset_gate_preview(
     Extension(service): Extension<Arc<dyn CoreService>>,
     Path(id): Path<String>,
 ) -> Result<Json<GatePreviewResponse>, AppError> {
@@ -55,7 +55,7 @@ pub async fn changeset_gate_preview(
     Ok(Json(resp))
 }
 
-pub async fn publish_changeset(
+pub(crate) async fn publish_changeset(
     Extension(principal): Extension<Principal>,
     Extension(service): Extension<Arc<dyn CoreService>>,
     Path(id): Path<String>,

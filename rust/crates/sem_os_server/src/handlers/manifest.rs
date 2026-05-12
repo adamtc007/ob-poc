@@ -7,7 +7,7 @@ use sem_os_core::{proto::GetManifestResponse, service::CoreService};
 
 use crate::error::AppError;
 
-pub async fn get_manifest(
+pub(crate) async fn get_manifest(
     Extension(service): Extension<Arc<dyn CoreService>>,
     Path(id): Path<String>,
 ) -> Result<Json<GetManifestResponse>, AppError> {

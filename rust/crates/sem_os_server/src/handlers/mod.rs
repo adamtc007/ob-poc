@@ -1,8 +1,8 @@
-pub mod authoring;
-pub mod bootstrap;
-pub mod changesets;
-pub mod export;
-pub mod health;
-pub mod manifest;
-pub mod publish;
-pub mod resolve_context;
+pub(crate) mod authoring;
+pub(crate) mod bootstrap;
+pub(crate) mod changesets;
+pub(crate) mod export;
+pub(crate) mod health;
+pub(crate) mod manifest;
+pub(crate) mod publish;
+pub(crate) mod resolve_context;
