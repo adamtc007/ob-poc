@@ -676,6 +676,7 @@ Automated browser testing via Chrome DevTools MCP. Claude Code can navigate, typ
 | Macros: operator vocabulary, expansion engine, MacroIndex, lint, composite macros, state DAG, pack mapping | `docs/annex-macros.md` |
 | Contracts, deals, billing, client groups, documents, entity linking, inspector, lexicon, lookup, playbooks, transactional execution | `docs/annex-domain-features.md` |
 | React frontend details, Zed extension, LSP, ob-agentic onboarding pipeline | `docs/annex-frontend-and-tools.md` |
+| ACP: stdio JSON-RPC server, REST surface, `AcpFacade`, projection live-overlay model, persona modes | `docs/annex-acp.md` |
 | Observatory: egui WASM app, OrientationContract, GraphSceneModel, navigation verbs | `docs/observatory-implementation-plan.md` |
 | **Catalogue Platform v1.3** — DAG taxonomies, cross_workspace_constraints (Mode A blocking), derived_cross_workspace_state (Mode B aggregation/tollgate), parent_slot + state_dependency (Mode C cascade), TransitionArgs verb metadata, GatePipeline | `docs/todo/catalogue-platform-refinement-v1_3.md` |
 
