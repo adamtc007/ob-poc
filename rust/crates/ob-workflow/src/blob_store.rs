@@ -8,7 +8,7 @@ use std::path::PathBuf;
 
 /// Error type for blob storage operations
 #[derive(Debug, thiserror::Error)]
-pub enum BlobStoreError {
+pub(crate) enum BlobStoreError {
     #[error("IO error: {0}")]
     Io(#[from] std::io::Error),
 
@@ -24,7 +24,7 @@ pub enum BlobStoreError {
 
 /// Abstract blob storage for document binaries
 #[async_trait]
-pub trait BlobStore: Send + Sync {
+pub(crate) trait BlobStore: Send + Sync {
     /// Store binary content, return reference URI
     async fn store(
         &self,
@@ -53,12 +53,12 @@ pub trait BlobStore: Send + Sync {
 }
 
 /// Local filesystem implementation (for POC)
-pub struct LocalBlobStore {
+pub(crate) struct LocalBlobStore {
     base_path: PathBuf,
 }
 
 impl LocalBlobStore {
-    pub fn new(base_path: impl Into<PathBuf>) -> Self {
+    pub(crate) fn new(base_path: impl Into<PathBuf>) -> Self {
         Self {
             base_path: base_path.into(),
         }
@@ -127,13 +127,13 @@ impl BlobStore for LocalBlobStore {
 
 /// In-memory blob store (for testing)
 #[cfg(test)]
-pub struct InMemoryBlobStore {
+pub(crate) struct InMemoryBlobStore {
     blobs: std::sync::Arc<tokio::sync::RwLock<std::collections::HashMap<String, Vec<u8>>>>,
 }
 
 #[cfg(test)]
 impl InMemoryBlobStore {
-    pub fn new() -> Self {
+    pub(crate) fn new() -> Self {
         Self {
             blobs: std::sync::Arc::new(tokio::sync::RwLock::new(std::collections::HashMap::new())),
         }

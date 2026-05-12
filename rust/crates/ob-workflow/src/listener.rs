@@ -29,7 +29,7 @@ const POLL_INTERVAL_MS: u64 = 100;
 const ERROR_BACKOFF_MS: u64 = 1000;
 
 /// Task queue listener that processes results and advances workflows
-pub struct TaskQueueListener {
+pub(crate) struct TaskQueueListener {
     pool: PgPool,
     engine: Arc<WorkflowEngine>,
 }
@@ -56,12 +56,12 @@ struct PendingTaskRow {
 }
 
 impl TaskQueueListener {
-    pub fn new(pool: PgPool, engine: Arc<WorkflowEngine>) -> Self {
+    pub(crate) fn new(pool: PgPool, engine: Arc<WorkflowEngine>) -> Self {
         Self { pool, engine }
     }
 
     /// Start the listener loop (blocks until shutdown signal)
-    pub async fn run(&self, mut shutdown: watch::Receiver<bool>) {
+    pub(crate) async fn run(&self, mut shutdown: watch::Receiver<bool>) {
         info!("Task queue listener started");
 
         loop {
@@ -462,7 +462,7 @@ impl TaskQueueListener {
 
 /// Errors that can occur in the listener
 #[derive(Debug, thiserror::Error)]
-pub enum ListenerError {
+pub(crate) enum ListenerError {
     #[error("Database error: {0}")]
     Database(#[from] sqlx::Error),
 

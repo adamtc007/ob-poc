@@ -17,14 +17,14 @@ use crate::cargo_ref::CargoRef;
     feature = "database",
     sqlx(type_name = "text", rename_all = "lowercase")
 )]
-pub enum TaskStatus {
+pub(crate) enum TaskStatus {
     Completed,
     Failed,
     Expired,
 }
 
 impl TaskStatus {
-    pub fn as_str(&self) -> &'static str {
+    pub(crate) fn as_str(&self) -> &'static str {
         match self {
             Self::Completed => "completed",
             Self::Failed => "failed",
@@ -42,32 +42,32 @@ impl std::fmt::Display for TaskStatus {
 /// Queue row (from database)
 #[derive(Debug, Clone)]
 #[cfg_attr(feature = "database", derive(sqlx::FromRow))]
-pub struct TaskResultRow {
-    pub id: i64,
-    pub task_id: Uuid,
+pub(crate) struct TaskResultRow {
+    pub(crate) id: i64,
+    pub(crate) task_id: Uuid,
     #[cfg_attr(feature = "database", sqlx(try_from = "String"))]
-    pub status: TaskStatus,
-    pub cargo_type: Option<String>,
-    pub cargo_ref: Option<String>,
-    pub error: Option<String>,
-    pub payload: Option<serde_json::Value>,
-    pub queued_at: DateTime<Utc>,
-    pub retry_count: i32,
-    pub idempotency_key: String,
+    pub(crate) status: TaskStatus,
+    pub(crate) cargo_type: Option<String>,
+    pub(crate) cargo_ref: Option<String>,
+    pub(crate) error: Option<String>,
+    pub(crate) payload: Option<serde_json::Value>,
+    pub(crate) queued_at: DateTime<Utc>,
+    pub(crate) retry_count: i32,
+    pub(crate) idempotency_key: String,
 }
 
 /// Parsed task result (from queue row)
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct TaskResult {
-    pub task_id: Uuid,
-    pub status: TaskStatus,
-    pub cargo_type: Option<String>,
-    pub cargo_ref: Option<CargoRef>,
-    pub error: Option<String>,
+pub(crate) struct TaskResult {
+    pub(crate) task_id: Uuid,
+    pub(crate) status: TaskStatus,
+    pub(crate) cargo_type: Option<String>,
+    pub(crate) cargo_ref: Option<CargoRef>,
+    pub(crate) error: Option<String>,
     /// REQUIRED for deduplication (scoped to task_id)
-    pub idempotency_key: String,
+    pub(crate) idempotency_key: String,
     /// Raw webhook body for audit
-    pub payload: Option<serde_json::Value>,
+    pub(crate) payload: Option<serde_json::Value>,
 }
 
 impl From<&TaskResultRow> for TaskResult {
@@ -100,7 +100,7 @@ impl TryFrom<String> for TaskStatus {
 /// Status of a pending task
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
-pub enum PendingTaskStatus {
+pub(crate) enum PendingTaskStatus {
     Pending,
     Partial,
     Completed,
@@ -110,7 +110,7 @@ pub enum PendingTaskStatus {
 }
 
 impl PendingTaskStatus {
-    pub fn as_str(&self) -> &'static str {
+    pub(crate) fn as_str(&self) -> &'static str {
         match self {
             Self::Pending => "pending",
             Self::Partial => "partial",
@@ -121,7 +121,7 @@ impl PendingTaskStatus {
         }
     }
 
-    pub fn is_terminal(&self) -> bool {
+    pub(crate) fn is_terminal(&self) -> bool {
         matches!(
             self,
             Self::Completed | Self::Failed | Self::Expired | Self::Cancelled
@@ -148,79 +148,79 @@ impl std::str::FromStr for PendingTaskStatus {
 /// Outbound pending task
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[cfg_attr(feature = "database", derive(sqlx::FromRow))]
-pub struct PendingTask {
-    pub task_id: Uuid,
-    pub instance_id: Uuid,
-    pub blocker_type: String,
-    pub blocker_key: Option<String>,
-    pub verb: String,
-    pub args: Option<serde_json::Value>,
-    pub expected_cargo_count: i32,
-    pub received_cargo_count: i32,
-    pub failed_count: Option<i32>,
-    pub status: String,
-    pub created_at: DateTime<Utc>,
-    pub expires_at: Option<DateTime<Utc>>,
-    pub completed_at: Option<DateTime<Utc>>,
-    pub last_error: Option<String>,
+pub(crate) struct PendingTask {
+    pub(crate) task_id: Uuid,
+    pub(crate) instance_id: Uuid,
+    pub(crate) blocker_type: String,
+    pub(crate) blocker_key: Option<String>,
+    pub(crate) verb: String,
+    pub(crate) args: Option<serde_json::Value>,
+    pub(crate) expected_cargo_count: i32,
+    pub(crate) received_cargo_count: i32,
+    pub(crate) failed_count: Option<i32>,
+    pub(crate) status: String,
+    pub(crate) created_at: DateTime<Utc>,
+    pub(crate) expires_at: Option<DateTime<Utc>>,
+    pub(crate) completed_at: Option<DateTime<Utc>>,
+    pub(crate) last_error: Option<String>,
 }
 
 impl PendingTask {
     /// Check if all expected cargo has been received successfully
-    pub fn is_complete(&self) -> bool {
+    pub(crate) fn is_complete(&self) -> bool {
         self.received_cargo_count >= self.expected_cargo_count
     }
 
     /// Check if task has reached a terminal state (all results in, success or failure)
-    pub fn is_terminal(&self) -> bool {
+    pub(crate) fn is_terminal(&self) -> bool {
         let total = self.received_cargo_count + self.failed_count.unwrap_or(0);
         total >= self.expected_cargo_count
     }
 
     /// Get parsed status enum
-    pub fn parsed_status(&self) -> Result<PendingTaskStatus, String> {
+    pub(crate) fn parsed_status(&self) -> Result<PendingTaskStatus, String> {
         self.status.parse()
     }
 
     /// Check if task is past its expiration time
-    pub fn is_expired(&self) -> bool {
+    pub(crate) fn is_expired(&self) -> bool {
         self.expires_at.map(|exp| Utc::now() > exp).unwrap_or(false)
     }
 }
 
 /// Single item in a bundle callback
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct BundleItem {
+pub(crate) struct BundleItem {
     /// URI: `version://ob-poc/{version_id}`
-    pub cargo_ref: String,
+    pub(crate) cargo_ref: String,
     /// Document type: 'passport', 'proof_of_address'
-    pub doc_type: String,
+    pub(crate) doc_type: String,
     /// Status of this item
-    pub status: TaskStatus,
+    pub(crate) status: TaskStatus,
     /// Error message if failed
     #[serde(default)]
-    pub error: Option<String>,
+    pub(crate) error: Option<String>,
 }
 
 /// Request payload for task completion webhook
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct TaskCompleteRequest {
-    pub task_id: Uuid,
+pub(crate) struct TaskCompleteRequest {
+    pub(crate) task_id: Uuid,
     /// Overall bundle status
-    pub status: TaskStatus,
+    pub(crate) status: TaskStatus,
     /// REQUIRED: unique key for deduplication (scoped to task_id)
-    pub idempotency_key: String,
+    pub(crate) idempotency_key: String,
     /// Bundle items - always present, even for single-doc returns
-    pub items: Vec<BundleItem>,
+    pub(crate) items: Vec<BundleItem>,
     /// Overall error if all failed
     #[serde(default)]
-    pub error: Option<String>,
+    pub(crate) error: Option<String>,
 }
 
 /// Task event types for audit trail
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
-pub enum TaskEventType {
+pub(crate) enum TaskEventType {
     Created,
     ResultReceived,
     Completed,
@@ -230,7 +230,7 @@ pub enum TaskEventType {
 }
 
 impl TaskEventType {
-    pub fn as_str(&self) -> &'static str {
+    pub(crate) fn as_str(&self) -> &'static str {
         match self {
             Self::Created => "created",
             Self::ResultReceived => "result_received",
@@ -244,18 +244,18 @@ impl TaskEventType {
 
 /// Task event for audit trail
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct TaskEvent {
-    pub event_id: Uuid,
-    pub task_id: Uuid,
-    pub event_type: String,
-    pub result_status: Option<String>,
-    pub cargo_type: Option<String>,
-    pub cargo_ref: Option<String>,
-    pub error: Option<String>,
-    pub payload: Option<serde_json::Value>,
-    pub source: Option<String>,
-    pub idempotency_key: Option<String>,
-    pub occurred_at: DateTime<Utc>,
+pub(crate) struct TaskEvent {
+    pub(crate) event_id: Uuid,
+    pub(crate) task_id: Uuid,
+    pub(crate) event_type: String,
+    pub(crate) result_status: Option<String>,
+    pub(crate) cargo_type: Option<String>,
+    pub(crate) cargo_ref: Option<String>,
+    pub(crate) error: Option<String>,
+    pub(crate) payload: Option<serde_json::Value>,
+    pub(crate) source: Option<String>,
+    pub(crate) idempotency_key: Option<String>,
+    pub(crate) occurred_at: DateTime<Utc>,
 }
 
 #[cfg(test)]

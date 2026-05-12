@@ -65,6 +65,13 @@ mod repository;
 #[cfg(feature = "database")]
 mod requirements;
 
+// External contract (verified by workspace grep, Phase 2 audit 2026-05-12):
+// every symbol below has at least one `use ob_workflow::...` consumer in
+// rust/src/. The blob_store, document, task_queue, and listener modules
+// re-exported a further ~190 symbols whose sole consumer was the crate
+// itself — those are demoted to pub(crate) in this slice and dropped from
+// the public surface.
+pub use cargo_ref::{CargoRef, CargoRefParseError};
 pub use definition::{
     ActionDef, RequirementDef, StateDef, TransitionDef, TriggerDef, WorkflowDefinition,
     WorkflowLoader,
@@ -74,27 +81,12 @@ pub use state::{Blocker, BlockerType, StateTransition, WorkflowInstance};
 #[cfg(feature = "database")]
 pub use requirements::RequirementEvaluator;
 
-// Re-export key types from new modules
-pub use blob_store::{BlobStore, BlobStoreError, LocalBlobStore};
-pub use cargo_ref::{CargoRef, CargoRefParseError};
-pub use document::{
-    Document, DocumentEvent, DocumentEventType, DocumentRequirement, DocumentVersion,
-    DocumentWithStatus, RejectionCode, RequirementState, RequirementStateError,
-    UnsatisfiedRequirement, VerificationStatus,
-};
-pub use task_queue::{
-    BundleItem, PendingTask, PendingTaskStatus, TaskCompleteRequest, TaskEvent, TaskEventType,
-    TaskResult, TaskResultRow, TaskStatus,
-};
-
 #[cfg(feature = "database")]
 pub use engine::{
     AvailableAction, AvailableTransition, GuardStatus, WorkflowEngine, WorkflowStatus,
 };
 #[cfg(feature = "database")]
 pub use guards::{GuardEvaluator, GuardResult};
-#[cfg(feature = "database")]
-pub use listener::{ListenerError, TaskQueueListener};
 #[cfg(feature = "database")]
 pub use repository::WorkflowRepository;
 
