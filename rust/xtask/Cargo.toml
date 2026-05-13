@@ -18,6 +18,7 @@ chrono = { version = "0.4", features = ["serde"] }
 reqwest = { version = "0.12", features = ["json"] }
 urlencoding = "2.1"
 ob-poc = { path = "..", features = ["database"] }
+ob-poc-boundary = { path = "../crates/ob-poc-boundary" }
 sem_os_core = { path = "../crates/sem_os_core" }
 sem_os_client = { path = "../crates/sem_os_client" }
 sem_os_postgres = { path = "../crates/sem_os_postgres" }

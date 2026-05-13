@@ -1,0 +1,43 @@
+{
+  "_comment": "Phase 5.5 runbook envelope determinism baseline. The envelope_hash column is V&S §6.5 / Phase 4.5 (D2=c) replay-grade audit artefact for the canonical RunbookEnvelope shape. Bump via `cargo run -p xtask -- runbook-envelope-determinism-check --bless` only after reviewing whether the upstream serialisation change is intentional.",
+  "captured_at": "2026-05-13",
+  "captured_under": "blessed via xtask --bless",
+  "entries": [
+    {
+      "fixture_id": "minimal_empty_context",
+      "version": 1,
+      "envelope_hash": "51e751d62e15613adbc62f6db5539df5cea17406b6a5470150379ebc7036acbf",
+      "byte_length": 82
+    },
+    {
+      "fixture_id": "single_state_entry",
+      "version": 1,
+      "envelope_hash": "4c8c0c69084433d6d42d2daf2a540c798328903d63e1288751deffaeb507d94f",
+      "byte_length": 125
+    },
+    {
+      "fixture_id": "multi_state_ordering",
+      "version": 1,
+      "envelope_hash": "a13ff6431939ef02100224ba9381e00d55bad62a0734a3988e5c7d4d6317c0c8",
+      "byte_length": 128
+    },
+    {
+      "fixture_id": "after_revise",
+      "version": 2,
+      "envelope_hash": "fabcbcaf6d1f8f02fed9e464a9cde463412bd19267bdfef9fed274e9ca1d3caf",
+      "byte_length": 99
+    },
+    {
+      "fixture_id": "after_state_change",
+      "version": 2,
+      "envelope_hash": "472f5d1287cb37da6b51610be264c6f21f18baa80ba0ac86d24ed3bb83c5524f",
+      "byte_length": 147
+    },
+    {
+      "fixture_id": "mixed_value_types",
+      "version": 1,
+      "envelope_hash": "0da2e9b6b353397ccfd6441d74d2303dc7d63647d7e91e4dfc5b219a35a82427",
+      "byte_length": 171
+    }
+  ]
+}

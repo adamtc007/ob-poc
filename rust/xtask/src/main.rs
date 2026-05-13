@@ -34,6 +34,7 @@ mod onboarding_harness;
 mod pub_lint;
 mod reconcile;
 mod replay_tuner;
+mod runbook_envelope_determinism;
 mod seed_allianz;
 mod sem_reg;
 mod ubo_test;
@@ -124,6 +125,17 @@ enum Command {
     /// `tools/schema-authority-drift-allowlist.txt`.
     Audit {
         /// Refresh the drift allowlist after deliberate review.
+        #[arg(long)]
+        bless: bool,
+    },
+
+    /// Phase 5.5 — runbook envelope determinism check. Hashes a
+    /// fixed set of canonical RunbookEnvelope fixtures and asserts
+    /// the hashes match the persisted baseline at
+    /// `tools/runbook-envelope-determinism-baseline.json`. Replay-
+    /// grade audit gate per V&S §6.5 / Phase 4.5 (D2=c).
+    RunbookEnvelopeDeterminismCheck {
+        /// Refresh the baseline after reviewing intentional changes.
         #[arg(long)]
         bless: bool,
     },
@@ -1373,6 +1385,9 @@ fn main() -> Result<()> {
         Command::PreCommit => pre_commit(&sh),
         Command::PubLint { bless } => pub_lint::run(bless),
         Command::Audit { bless } => audit::run(bless),
+        Command::RunbookEnvelopeDeterminismCheck { bless } => {
+            runbook_envelope_determinism::run(bless)
+        }
         Command::AcpEnvelopeByteEqualityCheck { bless } => acp_envelope_byte_equality::run(bless),
         Command::Deploy {
             release,
