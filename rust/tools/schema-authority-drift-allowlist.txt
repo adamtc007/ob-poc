@@ -5,30 +5,29 @@
 # reviewing whether the mirror is still justified.
 # Run `cargo run -p xtask -- audit` to fail on new mirrors.
 #
-# Baseline captured 2026-05-13 (Phase 4.7 commit). The mirrors fall
-# into three rough buckets:
+# Baseline buckets — current state (29 entries, down from 32 after
+# Phase 4.7 follow-up collapsed `src/sem_reg/entity_type_def.rs` to
+# `sem_os_core::entity_type_def` re-exports):
 #
-# (1) Legitimate distinct types that happen to share a name —
-#     unrelated UI graph nodes, DSL stategraph types, dag config
-#     parsers. Reviewer judgement: low remediation priority.
-#       crates/dsl-core/src/config/dag.rs                — DSL DAG config
-#       crates/dsl-runtime/src/state_reducer/*           — DSL FSM
-#       crates/dsl-runtime/src/stategraph/mod.rs         — DSL stategraph
-#       crates/ob-poc-domain/src/taxonomy/{rules,types}  — taxonomy nodes
-#       crates/ob-poc-types/src/galaxy.rs                — galaxy viz
-#       crates/ob-poc-types/src/lib.rs                   — graph DTOs
-#       crates/ob-workflow/src/definition.rs             — workflow defs
-#       src/api/capital_routes.rs                        — capital graph
-#       src/graph/types.rs                               — UI graph types
+# (1) Legitimate distinct types sharing a name — unrelated UI graph,
+#     DSL stategraph, dag config, taxonomy nodes, workflow defs,
+#     capital graph. Low remediation priority.
+#       crates/dsl-core/src/config/dag.rs               — DSL DAG config
+#       crates/dsl-runtime/src/state_reducer/*          — DSL FSM
+#       crates/dsl-runtime/src/stategraph/mod.rs        — DSL stategraph
+#       crates/ob-poc-domain/src/taxonomy/{rules,types} — taxonomy nodes
+#       crates/ob-poc-types/src/galaxy.rs               — galaxy viz
+#       crates/ob-poc-types/src/lib.rs                  — graph DTOs
+#       crates/ob-workflow/src/definition.rs            — workflow defs
+#       src/api/capital_routes.rs                       — capital graph
+#       src/graph/types.rs                              — UI graph types
 #
-# (2) Verb contract surface in `src/sem_reg/onboarding/`:
-#       src/sem_reg/onboarding/verb_extract.rs           — verb extract DTO
+# (2) Verb-output extract helper in `src/sem_reg/onboarding/`:
+#       src/sem_reg/onboarding/verb_extract.rs          — verb extract DTO
 #
-# (3) Near-duplicates of sem_os_core schema authority — HIGH
-#     priority for remediation. These four files are direct
-#     parallel definitions of the canonical types and should
-#     migrate to sem_os_core re-exports:
-#       src/sem_reg/entity_type_def.rs       (3 names)
+# (3) HIGH-priority near-duplicates of sem_os_core schema authority —
+#     two files left after Phase 4.7 follow-up landed
+#     `entity_type_def`. These 7 names should migrate next:
 #       src/sem_reg/relationship_type_def.rs (1 name)
 #       src/sem_reg/verb_contract.rs         (6 names)
 
@@ -53,9 +52,6 @@ src/api/capital_routes.rs:263:GraphEdge
 src/graph/types.rs:1998:NodeType
 src/graph/types.rs:2062:EdgeType
 src/graph/types.rs:686:GraphNode
-src/sem_reg/entity_type_def.rs:49:LifecycleStateDef
-src/sem_reg/entity_type_def.rs:65:LifecycleTransition
-src/sem_reg/entity_type_def.rs:7:EntityTypeDefBody
 src/sem_reg/onboarding/verb_extract.rs:63:VerbOutput
 src/sem_reg/relationship_type_def.rs:10:RelationshipTypeDefBody
 src/sem_reg/verb_contract.rs:110:VerbCrudMapping

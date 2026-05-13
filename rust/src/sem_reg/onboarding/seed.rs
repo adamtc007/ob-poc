@@ -306,6 +306,11 @@ async fn seed_entity_type_def(pool: &PgPool, entity: &EntityTypeCandidate) -> Re
         required_attributes: vec![],
         optional_attributes: entity.attribute_fqns.clone(),
         parent_type: None,
+        governance_tier: None,
+        security_classification: None,
+        pii: None,
+        read_by_verbs: Vec::new(),
+        written_by_verbs: Vec::new(),
     };
 
     publish_idempotent(pool, ObjectType::EntityTypeDef, fqn, &body).await

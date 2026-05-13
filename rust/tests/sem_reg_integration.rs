@@ -860,6 +860,11 @@ mod integration {
                 required_attributes: vec![attr_name_fqn.clone(), attr_status_fqn.clone()],
                 optional_attributes: vec![attr_notes_fqn.clone()],
                 parent_type: None,
+                governance_tier: None,
+                security_classification: None,
+                pii: None,
+                read_by_verbs: Vec::new(),
+                written_by_verbs: Vec::new(),
             },
             attributes: vec![],     // use defaults
             verb_contracts: vec![], // use defaults
@@ -1281,6 +1286,11 @@ mod integration {
             required_attributes: vec![],
             optional_attributes: vec![],
             parent_type: None,
+            governance_tier: None,
+            security_classification: None,
+            pii: None,
+            read_by_verbs: Vec::new(),
+            written_by_verbs: Vec::new(),
         };
         RegistryService::publish_entity_type_def(&db.pool, &et_meta, &et_body, None).await?;
 
