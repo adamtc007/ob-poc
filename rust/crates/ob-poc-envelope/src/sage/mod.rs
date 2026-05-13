@@ -28,6 +28,12 @@ pub mod disposition;
 pub mod outcome;
 pub mod plane;
 pub mod polarity;
+// Phase 3 slice 2cc (2026-05-13): full pre_classify module relocated —
+// `SagePreClassification` DTO + `pre_classify()` deterministic
+// classifier + helpers. Zero crate-internal deps beyond the already-
+// relocated context/plane/polarity siblings, so the entire 775 LOC
+// engine fits in the boundary tier as-is.
+pub mod pre_classify;
 // Phase 3 slice 2bb (2026-05-13): ScoredVerbCandidate + FilterDiagnostics +
 // the From<FilterDiagnostics> for CoderFilterDiagnostics impl relocated
 // here. Once both sides of the conversion are in envelope the orphan rule

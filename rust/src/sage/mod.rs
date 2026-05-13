@@ -56,7 +56,9 @@ pub mod session_context;
 pub mod valid_verb_set;
 
 // Phase 1.2+
-pub mod pre_classify;
+// Phase 3 slice 2cc (2026-05-13): full pre_classify module relocated to
+// ob-poc-envelope::sage::pre_classify (zero crate-internal deps).
+pub use ob_poc_envelope::sage::pre_classify;
 
 // Phase 1.4
 pub mod arg_assembly;
