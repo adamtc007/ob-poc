@@ -201,7 +201,7 @@ pub mod agent;
 // Feedback Inspector - on-demand failure analysis, repro generation, audit trail
 // Phase 3 slice 2n (2026-05-12): relocated to ob-poc-boundary; compat re-export.
 #[cfg(feature = "database")]
-pub use ob_poc_boundary::feedback;
+pub use ob_poc_authoring::feedback;
 
 // Service Resources Pipeline - CBU Service → Resource Discovery → Provisioning
 #[cfg(feature = "database")]

@@ -52,8 +52,8 @@ pub mod acp_state_anchor;
 // rust/src/lib.rs respectively.
 // Phase 4.2d (2026-05-13): entity_linking relocated to ob-poc-domain;
 // compat re-export in ob-poc::lib.rs.
-#[cfg(feature = "database")]
-pub mod feedback;
+// Phase 5.3 (2026-05-13): feedback relocated to ob-poc-authoring;
+// compat re-export in rust/src/lib.rs.
 // Phase 3C of capability-crate restructure (2026-05-13): journey/{pack,
 // handoff,pack_state} relocated to `ob-poc-journey` per plan §6 decision 2.
 // Boundary's pack-related surface is now `pack_projection` (typed
@@ -73,6 +73,12 @@ pub mod audit_chain;
 pub mod dsl_coder;
 pub mod envelope_builder;
 pub mod kyc_dry_run;
+// language_pack STAYS in boundary (Phase 5.3 evaluated and rejected the
+// move): the module uses sem_os_core::domain_pack types, which the
+// authoring crate's charter forbids; additionally five intra-boundary
+// modules (acp / acp_facade / acp_protocol / workbook_diagnostics /
+// workbook_revision) import `crate::language_pack`, so moving it would
+// cascade. boundary charter permits sem_os_core deps, so it belongs here.
 pub mod language_pack;
 pub mod llm_trace;
 pub mod mutation_preflight;

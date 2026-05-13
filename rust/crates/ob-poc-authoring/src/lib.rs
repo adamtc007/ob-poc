@@ -80,3 +80,12 @@ pub mod display_nouns;
 pub mod lexicon;
 pub mod lint;
 pub mod macros;
+
+// Phase 5.3 (2026-05-13): final Phase 5 slice — on-demand failure
+// inspector. language_pack was evaluated and rejected: it uses
+// sem_os_core::domain_pack types and five intra-boundary modules
+// import it; it stays in ob-poc-boundary where those deps are allowed.
+//   - feedback (7 files) — failure classifier + inspector + redactor
+//     + repro + todo + types. Consumes ob-poc-diagnostics::events::*.
+#[cfg(feature = "database")]
+pub mod feedback;
