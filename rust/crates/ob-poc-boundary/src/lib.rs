@@ -63,11 +63,12 @@ pub mod lint;
 pub mod macros;
 pub mod approval_token;
 pub mod audit_chain;
-#[cfg(feature = "database")]
-pub mod bods_types;
-pub mod booking_principal_types;
-#[cfg(feature = "database")]
-pub mod deal_types;
+// Phase 4.1 of capability-crate restructure (2026-05-13): booking_principal_types,
+// bods_types, and deal_types relocated to `ob-poc-domain` per plan §6 charter.
+// Boundary's anti-charter excludes business-domain DTOs; the three modules
+// were misplaced in slices 2w / 2x / 2y. Callers reach them via the
+// existing `crate::api::*` / `crate::database::*` compat shims in ob-poc,
+// which now point at `ob_poc_domain::*`.
 pub mod display_nouns;
 pub mod dsl_coder;
 pub mod envelope_builder;

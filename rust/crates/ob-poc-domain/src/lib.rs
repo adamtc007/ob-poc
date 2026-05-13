@@ -62,4 +62,16 @@
 //! Helpers `advisory_lock` (paired with `derived_attributes`) follow
 //! their primary consumer per plan §6 decision 3.
 
-// Empty — Phase 4 fills this in.
+// Phase 4.1 (2026-05-13): pure-DTO modules relocated from ob-poc-boundary.
+//   - booking_principal_types (485 LOC, no DB feature)
+//   - bods_types (218 LOC, database feature; rust_decimal)
+//   - deal_types (287 LOC, database feature; rust_decimal/bigdecimal)
+// Callers reach these via `crate::api::*` / `crate::database::*` compat
+// re-exports in ob-poc, now retargeted from ob_poc_boundary::* to
+// ob_poc_domain::*. Boundary no longer hosts these modules.
+
+pub mod booking_principal_types;
+#[cfg(feature = "database")]
+pub mod bods_types;
+#[cfg(feature = "database")]
+pub mod deal_types;

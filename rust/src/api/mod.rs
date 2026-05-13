@@ -6,11 +6,11 @@
 #[cfg(feature = "server")]
 pub mod attribute_routes;
 
-// Phase 3 slice 2w (2026-05-13): pure-DTO module relocated to ob-poc-boundary.
-// Callers continue to use `crate::api::booking_principal_types::*` via this
-// compat re-export; the DTOs themselves moved to a sibling crate with no
-// internal-crate dependencies (chrono/serde/uuid/serde_json::Value only).
-pub use ob_poc_boundary::booking_principal_types;
+// Phase 4.1 (2026-05-13): pure-DTO module now lives in ob-poc-domain
+// (relocated from ob-poc-boundary; slice 2w → 4.1 sequence). Callers continue
+// to use `crate::api::booking_principal_types::*` via this compat re-export.
+// The DTOs depend only on chrono/serde/uuid/serde_json::Value.
+pub use ob_poc_domain::booking_principal_types;
 
 #[cfg(feature = "server")]
 pub mod agent_types;
@@ -91,11 +91,12 @@ pub use ob_poc_boundary::display_nouns;
 #[cfg(feature = "server")]
 pub mod projection_routes;
 
-// Phase 3 slice 2y (2026-05-13): pure-DTO module relocated to ob-poc-boundary.
-// Gated behind `server` to keep the existing visibility profile (envelope
-// gates it behind `database`; ob-poc's `server` feature activates `database`).
+// Phase 4.1 (2026-05-13): pure-DTO module now lives in ob-poc-domain
+// (relocated from ob-poc-boundary; slice 2y → 4.1 sequence). Gated behind
+// `server` to keep the existing visibility profile (domain gates it behind
+// `database`; ob-poc's `server` feature activates `database`).
 #[cfg(feature = "server")]
-pub use ob_poc_boundary::deal_types;
+pub use ob_poc_domain::deal_types;
 
 #[cfg(feature = "server")]
 pub mod deal_routes;
