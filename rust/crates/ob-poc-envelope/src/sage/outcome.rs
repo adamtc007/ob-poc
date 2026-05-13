@@ -7,8 +7,8 @@
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
-use crate::sage::plane::ObservationPlane;
-use crate::sage::polarity::IntentPolarity;
+use super::plane::ObservationPlane;
+use super::polarity::IntentPolarity;
 
 // ---------------------------------------------------------------------------
 // Action

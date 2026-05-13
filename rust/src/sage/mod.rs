@@ -36,9 +36,15 @@
 
 pub mod constrained_match;
 pub mod disposition;
-pub mod outcome;
-pub mod plane;
-pub mod polarity;
+// Phase 3 slice 2v (2026-05-13): pure-type Sage vocabulary relocated to
+// ob-poc-envelope::sage. The four leaf modules have zero internal-crate
+// deps; sibling Sage engines (deterministic, llm_sage, pre_classify,
+// coder, verb_resolve, arg_assembly, etc.) continue to reach them via
+// `super::{outcome, plane, polarity, context}` through these re-exports.
+pub use ob_poc_envelope::sage::context;
+pub use ob_poc_envelope::sage::outcome;
+pub use ob_poc_envelope::sage::plane;
+pub use ob_poc_envelope::sage::polarity;
 pub mod session_context;
 pub mod valid_verb_set;
 
@@ -49,7 +55,6 @@ pub mod pre_classify;
 pub mod arg_assembly;
 pub mod clash_matrix;
 pub mod coder;
-pub mod context;
 pub mod deterministic;
 pub mod llm_sage;
 pub mod verb_index;
