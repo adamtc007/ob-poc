@@ -22,6 +22,10 @@ entity-gateway = { path = "crates/entity-gateway", optional = true }
 ob-poc-types = { path = "crates/ob-poc-types" }
 ob-poc-diagnostics = { path = "crates/ob-poc-diagnostics" }
 ob-poc-boundary = { path = "crates/ob-poc-boundary" }
+# Phase 1 capability crate (see docs/todo/capability-crate-restructure-v1.md).
+# Sage intent understanding. Empty until Phase 2 populates it from
+# ob-poc-boundary::sage::*.
+ob-poc-sage = { path = "crates/ob-poc-sage" }
 ob-poc-macros = { path = "crates/ob-poc-macros" }
 sem_os_core = { path = "crates/sem_os_core" }
 sem_os_client = { path = "crates/sem_os_client" }
@@ -248,6 +252,7 @@ members = [
     "crates/ob-poc-types",
     "crates/ob-poc-diagnostics",
     "crates/ob-poc-boundary",
+    "crates/ob-poc-sage",
     "crates/entity-gateway",
     "crates/ob-semantic-matcher",
 
