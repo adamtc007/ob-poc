@@ -13,7 +13,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 use uuid::Uuid;
 
-use crate::dsl_coder::{
+use crate::dsl_drafter::{
     validate_workbook_for_dry_run, DslDrafterDryRunResult, DslDrafterExecutionMode,
     DslDrafterValidationError,
 };

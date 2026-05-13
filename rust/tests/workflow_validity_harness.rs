@@ -25,7 +25,7 @@ struct WorkflowValidityRow {
     transition_ref: String,
     dry_run_valid: bool,
     workbook_integrity_valid: bool,
-    dsl_coder_valid: bool,
+    dsl_drafter_valid: bool,
     approval_valid: bool,
     preflight_valid: bool,
     compiled_runbook_valid: bool,
@@ -37,7 +37,7 @@ impl WorkflowValidityRow {
     fn success(&self) -> bool {
         self.dry_run_valid
             && self.workbook_integrity_valid
-            && self.dsl_coder_valid
+            && self.dsl_drafter_valid
             && self.approval_valid
             && self.preflight_valid
             && self.compiled_runbook_valid
@@ -84,7 +84,7 @@ fn workflow_validity_harness_reports_valid_repl_workbook_dsl_pack_rates() {
         "dry-run workbook build rate regressed"
     );
     assert_eq!(
-        count(&rows, |r| r.dsl_coder_valid),
+        count(&rows, |r| r.dsl_drafter_valid),
         total,
         "DSL Coder workbook validation rate regressed"
     );
@@ -110,7 +110,7 @@ fn run_workflow_validity_case(
         transition_ref: transition_ref.clone(),
         dry_run_valid: false,
         workbook_integrity_valid: false,
-        dsl_coder_valid: false,
+        dsl_drafter_valid: false,
         approval_valid: false,
         preflight_valid: false,
         compiled_runbook_valid: false,
@@ -141,7 +141,7 @@ fn run_workflow_validity_case(
         row.failure = Some(format!("DSL Coder validation failed: {error:?}"));
         return row;
     }
-    row.dsl_coder_valid = true;
+    row.dsl_drafter_valid = true;
 
     let issued_at = Utc::now();
     let token = match create_approval_token_for_workbook(
@@ -257,9 +257,9 @@ fn print_report(rows: &[WorkflowValidityRow]) {
     );
     println!(
         "  DSL Coder valid:             {}/{} ({:.1}%)",
-        count(rows, |r| r.dsl_coder_valid),
+        count(rows, |r| r.dsl_drafter_valid),
         total,
-        pct(count(rows, |r| r.dsl_coder_valid), total)
+        pct(count(rows, |r| r.dsl_drafter_valid), total)
     );
     println!(
         "  Approval/preflight valid:    {}/{} ({:.1}%)",

@@ -10,7 +10,7 @@ use std::collections::BTreeMap;
 use uuid::Uuid;
 
 use crate::approval_token::ApprovalTokenId;
-use crate::dsl_coder::{DslDrafterDryRunResult, DslDrafterValidationStepStatus};
+use crate::dsl_drafter::{DslDrafterDryRunResult, DslDrafterValidationStepStatus};
 use crate::llm_trace::LlmInferenceTrace;
 use crate::mutation_preflight::RestrictedMutationPreflight;
 use crate::session_trace::{TraceEntry, TraceOp, TraceValidationStep};
@@ -322,7 +322,7 @@ pub fn validate_restricted_mutation_audit_chain(
 mod tests {
     use super::*;
     use crate::approval_token::{ApprovalTokenId, RestrictedMutationApprovalCheck};
-    use crate::dsl_coder::{
+    use crate::dsl_drafter::{
         DslDrafterDryRunResult, DslDrafterValidationStep, DslDrafterValidationStepStatus,
     };
     use crate::llm_trace::{

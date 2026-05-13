@@ -34,7 +34,7 @@ pub(crate) mod canonical;
 pub(crate) mod compiler;
 pub(crate) mod constraint_gate;
 // Phase 3 slice 2c.2 (2026-05-12): relocated to ob-poc-boundary.
-pub(crate) use ob_poc_boundary::dsl_coder;
+pub(crate) use ob_poc_boundary::dsl_drafter;
 pub(crate) mod envelope;
 pub(crate) mod errors;
 pub(crate) mod executor;
@@ -75,7 +75,7 @@ pub use canonical::{
 };
 pub use compiler::compile_verb;
 pub use constraint_gate::check_pack_constraints;
-pub use dsl_coder::{
+pub use dsl_drafter::{
     validate_workbook_for_dry_run, DslDrafterDryRunResult, DslDrafterExecutionMode,
     DslDrafterRefusalCode, DslDrafterValidationError, DslDrafterValidationStep,
     DslDrafterValidationStepStatus,

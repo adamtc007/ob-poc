@@ -6,7 +6,7 @@
 use sem_os_core::state_simulation::StateSimulationError;
 use serde::{Deserialize, Serialize};
 
-use crate::dsl_coder::DslDrafterValidationError;
+use crate::dsl_drafter::DslDrafterValidationError;
 use crate::kyc_dry_run::KycUpdateStatusDryRunRefusal;
 use crate::language_pack::SemOsLanguagePack;
 use crate::workbook::ExecutionWorkbookValidationError;
@@ -210,7 +210,7 @@ pub fn diagnostics_from_dry_run_refusal(
             vec![diag]
         }
         KycUpdateStatusDryRunRefusal::DslDrafterRefused { error } => {
-            vec![diagnostic_from_dsl_coder(error, pack)]
+            vec![diagnostic_from_dsl_drafter(error, pack)]
         }
         KycUpdateStatusDryRunRefusal::PackInvalid { diagnostics } => diagnostics
             .iter()
@@ -338,13 +338,13 @@ pub fn diagnostic_from_workbook_validation(
     }
 }
 
-fn diagnostic_from_dsl_coder(
+fn diagnostic_from_dsl_drafter(
     error: &DslDrafterValidationError,
     pack: &SemOsLanguagePack,
 ) -> WorkbookDiagnostic {
     let mut diag = WorkbookDiagnostic::new(
         format!("{:?}", error.code).to_ascii_lowercase(),
-        "dsl_coder",
+        "dsl_drafter",
         pack,
     );
     diag.blocked_transition_reason = Some(error.message.clone());
