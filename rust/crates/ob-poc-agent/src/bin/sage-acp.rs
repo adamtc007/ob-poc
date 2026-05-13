@@ -41,7 +41,8 @@ use ob_poc_agent::knowledge::SemOsKnowledgeClient;
 use ob_poc_agent::mcp_client::{McpConstellationHydrator, McpKnowledgeClient};
 use ob_poc_agent::planning::PlanningLoop;
 use ob_poc_agent::prompt_handler::try_handle_prompt;
-use ob_poc_agent::repl_channel::LocalParseChannel;
+use ob_poc_agent::repl_channel::LocalRunbookChannel;
+use ob_poc_agent::runbook_handler::try_handle_runbook;
 use ob_poc_boundary::acp_protocol::{AcpJsonRpcAgent, JsonRpcOutgoing, JsonRpcRequest};
 use ob_poc_types::session::kinds::WorkspaceKind;
 use sem_os_mcp::bridge::StubBridge;
@@ -133,7 +134,9 @@ async fn main() -> anyhow::Result<()> {
     );
 
     let planning = PlanningLoop::new(index, llm_client, Some(knowledge), Some(hydrator));
-    let channel = LocalParseChannel::new();
+    // Phase 4.4 — full LSP-shaped runbook lifecycle channel (per-URI
+    // state, open/change/close/validateOnly/validateAndExecute).
+    let channel = LocalRunbookChannel::new();
 
     let frames = GoalFrameStore::new();
 
@@ -183,6 +186,8 @@ async fn main() -> anyhow::Result<()> {
                 {
                     messages
                 } else if let Some(messages) = try_handle_goal_frame(&request, &frames).await {
+                    messages
+                } else if let Some(messages) = try_handle_runbook(&request, &channel).await {
                     messages
                 } else {
                     agent.handle_request(request)

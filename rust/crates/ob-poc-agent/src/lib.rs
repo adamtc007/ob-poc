@@ -134,11 +134,17 @@ pub mod planning;
 /// through to the boundary `AcpJsonRpcAgent` for everything else.
 pub mod prompt_handler;
 
-/// LSP-shaped client surface to the REPL validator — Phase 2.7.
-/// Drafts emitted by the planning loop are validated through this
-/// channel before they reach the editor. The spike runs parse-only
-/// in-process; Phase 4 swaps for a real out-of-process LSP client.
+/// LSP-shaped client surface to the REPL validator — Phase 2.7
+/// (single-shot `validate`) and Phase 4.4 (full open / change /
+/// close / validate-only / validate-and-execute lifecycle with
+/// per-URI state). Drafts emitted by the planning loop are
+/// validated through this channel before they reach the editor.
 pub mod repl_channel;
+
+/// ACP method handlers for the LSP-shaped runbook lifecycle —
+/// Phase 4.4. `runbook/{didOpen,didChange,didClose,validateOnly,
+/// validateAndExecute}` routed through the agent's REPL channel.
+pub mod runbook_handler;
 
 /// SemOS knowledge query surface — Phase 2.8. Trait the planning
 /// loop calls to reach entity resolution / active verb surface /
