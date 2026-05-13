@@ -732,7 +732,7 @@ impl AcpJsonRpcAgent {
     ) -> Option<Vec<JsonRpcOutgoing>> {
         let route_started_at = Instant::now();
         let utterance_text = prompt_utterance_text(prompt);
-        // CARGO_MANIFEST_DIR resolves to repo/rust/crates/ob-poc-envelope; the
+        // CARGO_MANIFEST_DIR resolves to repo/rust/crates/ob-poc-boundary; the
         // shared config tree lives at repo/rust/config (two levels up).
         let config_root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../config");
         let resolution = match resolve_acp_dag_semantic_prompt_with_verified_envelopes(

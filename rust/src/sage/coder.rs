@@ -2,7 +2,7 @@
 //!
 //! Phase 3 slice 2aa (2026-05-13): the result DTOs (`CoderResolution`,
 //! `CoderFailureKind`, `CoderDiagnostics`, `CoderFilterDiagnostics`,
-//! `CoderResult`) moved to `ob_poc_envelope::sage::coder_result`. The
+//! `CoderResult`) moved to `ob_poc_boundary::sage::coder_result`. The
 //! `CoderEngine` itself stays here because it depends on dsl_core verb
 //! config and mcp::intent_pipeline.
 //!

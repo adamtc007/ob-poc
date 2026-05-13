@@ -1,7 +1,7 @@
 //! Traceability domain for utterance-level execution traces.
 //!
 //! Phase 3 slice 2h (2026-05-12): pure DTO contracts (`types`) moved to
-//! `ob_poc_envelope::traceability::types`; phase builders, replay, and
+//! `ob_poc_boundary::traceability::types`; phase builders, replay, and
 //! the Postgres repository remain here.
 
 pub mod payloads;
@@ -13,7 +13,7 @@ pub mod phase3;
 pub mod phase4;
 #[cfg(feature = "database")]
 pub mod phase5;
-pub use ob_poc_envelope::traceability::types;
+pub use ob_poc_boundary::traceability::types;
 
 pub mod replay;
 #[cfg(feature = "database")]

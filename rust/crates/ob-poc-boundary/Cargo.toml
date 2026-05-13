@@ -1,8 +1,8 @@
 [package]
-name = "ob-poc-envelope"
+name = "ob-poc-boundary"
 version = "0.1.0"
 edition = "2021"
-description = "Envelope construction + TOCTOU recheck + ACP session-input draft-mode selector. The boundary tier — must not depend on execution crates."
+description = "The typed boundary between Sage (intent understanding) and the sequencer (execution). Owns envelope construction, TOCTOU recheck, approval tokens, audit chain, workbook DTOs, ACP discovery projection, policy gate, and session-input draft-mode selection. Must not depend on execution crates."
 
 [dependencies]
 ob-poc-types = { path = "../ob-poc-types" }

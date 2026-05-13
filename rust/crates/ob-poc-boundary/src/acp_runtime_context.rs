@@ -108,7 +108,7 @@ pub struct AcpRuntimeContextDiagnostic {
 /// # Examples
 ///
 /// ```rust
-/// use ob_poc_envelope::acp_runtime_context::{
+/// use ob_poc_boundary::acp_runtime_context::{
 ///     build_acp_runtime_context_projection, AcpRuntimeContextSource,
 /// };
 /// use std::collections::BTreeMap;
@@ -226,7 +226,7 @@ pub fn build_acp_runtime_context_projection(
 /// # Examples
 ///
 /// ```rust
-/// use ob_poc_envelope::acp_runtime_context::acp_runtime_context_field_allowed;
+/// use ob_poc_boundary::acp_runtime_context::acp_runtime_context_field_allowed;
 ///
 /// assert!(acp_runtime_context_field_allowed("request_state"));
 /// assert!(!acp_runtime_context_field_allowed("owner_email"));

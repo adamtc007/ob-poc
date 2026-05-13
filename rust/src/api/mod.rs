@@ -6,11 +6,11 @@
 #[cfg(feature = "server")]
 pub mod attribute_routes;
 
-// Phase 3 slice 2w (2026-05-13): pure-DTO module relocated to ob-poc-envelope.
+// Phase 3 slice 2w (2026-05-13): pure-DTO module relocated to ob-poc-boundary.
 // Callers continue to use `crate::api::booking_principal_types::*` via this
 // compat re-export; the DTOs themselves moved to a sibling crate with no
 // internal-crate dependencies (chrono/serde/uuid/serde_json::Value only).
-pub use ob_poc_envelope::booking_principal_types;
+pub use ob_poc_boundary::booking_principal_types;
 
 #[cfg(feature = "server")]
 pub mod agent_types;
@@ -82,20 +82,20 @@ pub mod service_resource_routes;
 pub mod workflow_routes;
 
 // Phase 3 slice 2z (2026-05-13): display-noun translation table relocated to
-// ob-poc-envelope. Zero internal-crate deps; only serde_json/HashMap/LazyLock.
+// ob-poc-boundary. Zero internal-crate deps; only serde_json/HashMap/LazyLock.
 // The pub-use `translate_json` / `translate_string` / `DisplayNounTranslator`
 // re-export below keeps the same external API surface.
 #[cfg(feature = "server")]
-pub use ob_poc_envelope::display_nouns;
+pub use ob_poc_boundary::display_nouns;
 
 #[cfg(feature = "server")]
 pub mod projection_routes;
 
-// Phase 3 slice 2y (2026-05-13): pure-DTO module relocated to ob-poc-envelope.
+// Phase 3 slice 2y (2026-05-13): pure-DTO module relocated to ob-poc-boundary.
 // Gated behind `server` to keep the existing visibility profile (envelope
 // gates it behind `database`; ob-poc's `server` feature activates `database`).
 #[cfg(feature = "server")]
-pub use ob_poc_envelope::deal_types;
+pub use ob_poc_boundary::deal_types;
 
 #[cfg(feature = "server")]
 pub mod deal_routes;

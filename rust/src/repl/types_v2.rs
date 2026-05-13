@@ -92,11 +92,11 @@ pub struct PackCandidate {
 }
 
 // Phase 3 slice 2c.2b (2026-05-12): WorkspaceKind / AgentMode / SubjectKind /
-// WorkspaceRegistryEntry moved to ob-poc-envelope::session so the boundary
+// WorkspaceRegistryEntry moved to ob-poc-boundary::session so the boundary
 // tier (audit_chain, session_trace) can reference them without depending on
 // the execution-tier repl module. Lateral re-export preserves all 46
 // existing `crate::repl::types_v2::*` consumer paths unchanged.
-pub use ob_poc_envelope::session::{AgentMode, SubjectKind, WorkspaceKind, WorkspaceRegistryEntry};
+pub use ob_poc_boundary::session::{AgentMode, SubjectKind, WorkspaceKind, WorkspaceRegistryEntry};
 
 /// A selectable workspace option.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -144,7 +144,7 @@ impl SessionScope {
     }
 }
 
-// AgentMode + SubjectKind relocated to ob-poc-envelope::session (see top-of-file note).
+// AgentMode + SubjectKind relocated to ob-poc-boundary::session (see top-of-file note).
 
 /// A lightweight subject reference for UI and feedback surfaces.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -704,7 +704,7 @@ impl TemporalCue {
     }
 }
 
-// `WorkspaceKind::from_hint` relocated to ob-poc-envelope::session (see top-of-file note).
+// `WorkspaceKind::from_hint` relocated to ob-poc-boundary::session (see top-of-file note).
 
 fn extract_subject_hint(message: &str) -> Option<String> {
     let subject_markers = [" for ", " on ", " about ", " regarding "];
@@ -719,7 +719,7 @@ fn extract_subject_hint(message: &str) -> Option<String> {
     None
 }
 
-// WorkspaceRegistryEntry relocated to ob-poc-envelope::session (see top-of-file note).
+// WorkspaceRegistryEntry relocated to ob-poc-boundary::session (see top-of-file note).
 
 /// A candidate verb for clarification.
 #[derive(Debug, Clone, Serialize, Deserialize)]

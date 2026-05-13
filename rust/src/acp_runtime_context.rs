@@ -3,7 +3,7 @@
 //! Phase 3 slice 2d.4 (2026-05-12): the pure boundary surface (the
 //! `AcpRuntimeContextSource` / `AcpRuntimeContextProjection` types and the
 //! `build_acp_runtime_context_projection` redaction/hashing function) is
-//! relocated to `ob_poc_envelope::acp_runtime_context`. This file retains the
+//! relocated to `ob_poc_boundary::acp_runtime_context`. This file retains the
 //! Repl-coupled internals (`AcpRuntimeContextBuildInput`,
 //! `build_session_runtime_context_source`, helpers) that read a live
 //! `ReplSessionV2` to populate a runtime source. Those helpers reference
@@ -15,7 +15,7 @@
 // AcpRuntimeContextProjection, AcpRuntimeContextDiagnostic,
 // build_acp_runtime_context_projection, acp_runtime_context_field_allowed,
 // ACP_RUNTIME_CONTEXT_*}` callers continue working unchanged.
-pub use ob_poc_envelope::acp_runtime_context::*;
+pub use ob_poc_boundary::acp_runtime_context::*;
 
 use sha2::{Digest, Sha256};
 use std::collections::BTreeMap;

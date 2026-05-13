@@ -24,33 +24,33 @@
 pub use ob_poc_diagnostics::error;
 
 // ACP-facing transport-neutral adapter contracts.
-// Phase 3 slice 2d.1/2d.2/2d.3 (2026-05-12): relocated to ob-poc-envelope.
-pub use ob_poc_envelope::acp;
-pub use ob_poc_envelope::acp_dag_semantic;
-pub use ob_poc_envelope::acp_facade;
-pub use ob_poc_envelope::acp_pack_context_envelope_v2;
-pub use ob_poc_envelope::acp_protocol;
-pub use ob_poc_envelope::acp_registry_projection;
+// Phase 3 slice 2d.1/2d.2/2d.3 (2026-05-12): relocated to ob-poc-boundary.
+pub use ob_poc_boundary::acp;
+pub use ob_poc_boundary::acp_dag_semantic;
+pub use ob_poc_boundary::acp_facade;
+pub use ob_poc_boundary::acp_pack_context_envelope_v2;
+pub use ob_poc_boundary::acp_protocol;
+pub use ob_poc_boundary::acp_registry_projection;
 pub mod acp_runtime_context;
-// Phase 3 slice 2a (2026-05-12): relocated to ob-poc-envelope crate; compat re-export.
-pub use ob_poc_envelope::acp_session_input_draft_mode;
+// Phase 3 slice 2a (2026-05-12): relocated to ob-poc-boundary crate; compat re-export.
+pub use ob_poc_boundary::acp_session_input_draft_mode;
 // Phase 3 slice 2d.5 (2026-05-12): mixed-purity split — pure boundary types
 // (descriptors, registries, reports, outcomes, DealTransitionSpec) live in
-// ob-poc-envelope; Repl-coupled async drivers stay in src/ and re-export the
+// ob-poc-boundary; Repl-coupled async drivers stay in src/ and re-export the
 // envelope surface at module top.
 pub mod acp_state_anchor;
 
 // LLM inference trace hashing and workbook binding.
-// Phase 3 slice 2b (2026-05-12): relocated to ob-poc-envelope crate; compat re-export.
-pub use ob_poc_envelope::llm_trace;
+// Phase 3 slice 2b (2026-05-12): relocated to ob-poc-boundary crate; compat re-export.
+pub use ob_poc_boundary::llm_trace;
 
 // Audit-chain reconstruction for ACP/workbook/dry-run traces.
-// Phase 3 slice 2c.3 (2026-05-12): relocated to ob-poc-envelope crate; compat re-export.
-pub use ob_poc_envelope::audit_chain;
+// Phase 3 slice 2c.3 (2026-05-12): relocated to ob-poc-boundary crate; compat re-export.
+pub use ob_poc_boundary::audit_chain;
 
 // Data dictionary
-// Phase 3 slice 2e (2026-05-12): relocated to ob-poc-envelope; compat re-export.
-pub use ob_poc_envelope::data_dictionary;
+// Phase 3 slice 2e (2026-05-12): relocated to ob-poc-boundary; compat re-export.
+pub use ob_poc_boundary::data_dictionary;
 
 // Domain handlers for business logic
 pub mod domains;
@@ -71,8 +71,8 @@ pub mod dsl_v2;
 pub mod domain_ops;
 
 // Ontology - Entity taxonomy and lifecycle management
-// Phase 3 slice 2l (2026-05-12): relocated to ob-poc-envelope; compat re-export.
-pub use ob_poc_envelope::ontology;
+// Phase 3 slice 2l (2026-05-12): relocated to ob-poc-boundary; compat re-export.
+pub use ob_poc_boundary::ontology;
 
 // REST API module (when server feature is enabled)
 #[cfg(feature = "server")]
@@ -89,16 +89,16 @@ pub mod agentic;
 // Builds a `GatedVerbEnvelope` alongside the existing dispatch path as a
 // determinism-harness observable. Does not gate execution yet — Phase B
 // (F6) is the slice that makes the envelope the primary dispatch contract.
-// Phase 3 slice 2a (2026-05-12): relocated to ob-poc-envelope crate; compat re-export.
-pub use ob_poc_envelope::envelope_builder;
+// Phase 3 slice 2a (2026-05-12): relocated to ob-poc-boundary crate; compat re-export.
+pub use ob_poc_boundary::envelope_builder;
 
 // Phase D.3 — TOCTOU recheck scaffold (2026-04-22). Verifies the
 // state_gate_hash computed at gate time still matches the current DB
 // state after the Sequencer has acquired row locks inside its outer
 // transaction. Pure scaffolding until D.2 migration is applied
 // AND real envelopes are constructed at stage 6.
-// Phase 3 slice 2a (2026-05-12): relocated to ob-poc-envelope crate; compat re-export.
-pub use ob_poc_envelope::toctou_recheck;
+// Phase 3 slice 2a (2026-05-12): relocated to ob-poc-boundary crate; compat re-export.
+pub use ob_poc_boundary::toctou_recheck;
 
 // Graph visualization module
 #[cfg(feature = "database")]
@@ -122,8 +122,8 @@ pub mod session;
 pub mod workflow;
 
 // Trading profile document types and materialization
-// Phase 3 slice 2k (2026-05-12): relocated to ob-poc-envelope; compat re-export.
-pub use ob_poc_envelope::trading_profile;
+// Phase 3 slice 2k (2026-05-12): relocated to ob-poc-boundary; compat re-export.
+pub use ob_poc_boundary::trading_profile;
 
 // Template system for DSL generation
 pub mod templates;
@@ -136,9 +136,9 @@ pub mod traceability;
 pub mod sem_os_runtime;
 
 // Canonical persistence plane for derived attributes
-// Phase 3 slice 2t (2026-05-13): relocated to ob-poc-envelope; compat re-export.
+// Phase 3 slice 2t (2026-05-13): relocated to ob-poc-boundary; compat re-export.
 #[cfg(feature = "database")]
-pub use ob_poc_envelope::derived_attributes;
+pub use ob_poc_boundary::derived_attributes;
 
 // Phase 5a composite #2 — `cross_workspace` relocated to
 // `dsl-runtime::cross_workspace`. External callers reach it via
@@ -154,25 +154,25 @@ pub mod calibration;
 // `dsl-runtime::verification`; consumer `verify_ops` moved alongside it.
 
 // Taxonomy module - generic taxonomy pattern for Product/Instrument domains
-// Phase 3 slice 2r (2026-05-13): relocated to ob-poc-envelope; compat re-export.
-pub use ob_poc_envelope::taxonomy;
+// Phase 3 slice 2r (2026-05-13): relocated to ob-poc-boundary; compat re-export.
+pub use ob_poc_boundary::taxonomy;
 
 // Lint module - schema validation for macro and verb definitions
-// Phase 3 slice 2g (2026-05-12): relocated to ob-poc-envelope; compat re-export.
-pub use ob_poc_envelope::lint;
+// Phase 3 slice 2g (2026-05-12): relocated to ob-poc-boundary; compat re-export.
+pub use ob_poc_boundary::lint;
 
 // Macros module - V1-deprecated operator macro registry
-// Phase 3 slice 2i (2026-05-12): relocated to ob-poc-envelope; compat re-export.
-pub use ob_poc_envelope::macros;
+// Phase 3 slice 2i (2026-05-12): relocated to ob-poc-boundary; compat re-export.
+pub use ob_poc_boundary::macros;
 
 // Lexicon module - In-memory vocabulary lookup for verb discovery
-// Phase 3 slice 2j (2026-05-12): relocated to ob-poc-envelope; compat re-export.
-pub use ob_poc_envelope::lexicon;
+// Phase 3 slice 2j (2026-05-12): relocated to ob-poc-boundary; compat re-export.
+pub use ob_poc_boundary::lexicon;
 
 // Entity Linking module - In-memory entity resolution from utterances
-// Phase 3 slice 2m (2026-05-12): relocated to ob-poc-envelope; compat re-export.
+// Phase 3 slice 2m (2026-05-12): relocated to ob-poc-boundary; compat re-export.
 #[cfg(feature = "database")]
-pub use ob_poc_envelope::entity_linking;
+pub use ob_poc_boundary::entity_linking;
 
 // Lookup module - Unified verb search + entity linking with verb-first ordering
 #[cfg(feature = "database")]
@@ -198,9 +198,9 @@ pub use ob_poc_diagnostics::events;
 pub mod agent;
 
 // Feedback Inspector - on-demand failure analysis, repro generation, audit trail
-// Phase 3 slice 2n (2026-05-12): relocated to ob-poc-envelope; compat re-export.
+// Phase 3 slice 2n (2026-05-12): relocated to ob-poc-boundary; compat re-export.
 #[cfg(feature = "database")]
-pub use ob_poc_envelope::feedback;
+pub use ob_poc_boundary::feedback;
 
 // Service Resources Pipeline - CBU Service → Resource Discovery → Provisioning
 #[cfg(feature = "database")]
@@ -264,15 +264,15 @@ pub mod plan_builder;
 // `dsl-runtime::placeholder`; consumer `entity_ops` moved alongside it.
 
 // Clarify module - Unified DecisionPacket-based clarification UX
-// Phase 3 slice 2f (2026-05-12): relocated to ob-poc-envelope; compat re-export.
-pub use ob_poc_envelope::clarify;
+// Phase 3 slice 2f (2026-05-12): relocated to ob-poc-boundary; compat re-export.
+pub use ob_poc_boundary::clarify;
 
 // Policy module — server-side enforcement for single-pipeline invariants.
-// Phase 3 slice 2o (2026-05-13): relocated to ob-poc-envelope; HTTP-binding
+// Phase 3 slice 2o (2026-05-13): relocated to ob-poc-boundary; HTTP-binding
 // (header → ActorContext) moved to `src/api/policy_headers.rs`. The
 // transport-neutral PolicyGate + ActorResolver::{from_env, from_session_id}
 // live in envelope.
-pub use ob_poc_envelope::policy;
+pub use ob_poc_boundary::policy;
 
 // Semantic Registry — immutable snapshot-based registry for the Semantic OS
 #[cfg(feature = "database")]
@@ -284,8 +284,8 @@ pub mod sem_reg;
 
 // SemTaxonomy — replacement discovery/composition contract for utterance handling
 #[cfg(feature = "database")]
-// Phase 3 slice 2s (2026-05-13): relocated to ob-poc-envelope; compat re-export.
-pub use ob_poc_envelope::semtaxonomy;
+// Phase 3 slice 2s (2026-05-13): relocated to ob-poc-boundary; compat re-export.
+pub use ob_poc_boundary::semtaxonomy;
 
 // SemTaxonomy v2 — three-step rip-and-replace pipeline
 #[cfg(feature = "database")]

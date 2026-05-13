@@ -36,31 +36,31 @@
 
 pub mod constrained_match;
 // Phase 3 slice 2v (2026-05-13): pure-type Sage vocabulary relocated to
-// ob-poc-envelope::sage. The four leaf modules have zero internal-crate
+// ob-poc-boundary::sage. The four leaf modules have zero internal-crate
 // deps; sibling Sage engines (deterministic, llm_sage, pre_classify,
 // coder, verb_resolve, arg_assembly, etc.) continue to reach them via
 // `super::{outcome, plane, polarity, context}` through these re-exports.
 // Slice 2aa (2026-05-13) extends with `coder_result` (5 Coder output DTOs)
 // + `disposition` (UtteranceDisposition routing types); both unblocked by
 // outcome+context already being in envelope.
-pub use ob_poc_envelope::sage::coder_result;
-pub use ob_poc_envelope::sage::context;
-pub use ob_poc_envelope::sage::disposition;
-pub use ob_poc_envelope::sage::outcome;
-pub use ob_poc_envelope::sage::plane;
-pub use ob_poc_envelope::sage::polarity;
+pub use ob_poc_boundary::sage::coder_result;
+pub use ob_poc_boundary::sage::context;
+pub use ob_poc_boundary::sage::disposition;
+pub use ob_poc_boundary::sage::outcome;
+pub use ob_poc_boundary::sage::plane;
+pub use ob_poc_boundary::sage::polarity;
 // Phase 3 slice 2dd (2026-05-13): session_context (SageSession + EntityState +
 // load_entity_states_for_group) — pure sqlx::PgPool helpers + DTOs.
-pub use ob_poc_envelope::sage::session_context;
+pub use ob_poc_boundary::sage::session_context;
 // Phase 3 slice 2bb (2026-05-13): verb-resolve result DTOs +
 // From<FilterDiagnostics> for CoderFilterDiagnostics impl.
-pub use ob_poc_envelope::sage::verb_resolve_types;
+pub use ob_poc_boundary::sage::verb_resolve_types;
 pub mod valid_verb_set;
 
 // Phase 1.2+
 // Phase 3 slice 2cc (2026-05-13): full pre_classify module relocated to
-// ob-poc-envelope::sage::pre_classify (zero crate-internal deps).
-pub use ob_poc_envelope::sage::pre_classify;
+// ob-poc-boundary::sage::pre_classify (zero crate-internal deps).
+pub use ob_poc_boundary::sage::pre_classify;
 
 // Phase 1.4
 pub mod arg_assembly;

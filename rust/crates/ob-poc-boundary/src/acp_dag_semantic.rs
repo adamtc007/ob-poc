@@ -1199,7 +1199,7 @@ fn build_rejected_candidates(
 /// # Examples
 ///
 /// ```rust,no_run
-/// use ob_poc_envelope::acp_dag_semantic::resolve_acp_dag_semantic_prompt_with_verified_envelopes;
+/// use ob_poc_boundary::acp_dag_semantic::resolve_acp_dag_semantic_prompt_with_verified_envelopes;
 ///
 /// let config_root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("config");
 /// let resolution = resolve_acp_dag_semantic_prompt_with_verified_envelopes(
@@ -1653,7 +1653,7 @@ fn semantic_index() -> Result<&'static AcpDagSemanticIndex, String> {
                 }
             }
             rows.extend(slice_macro_rows());
-            // CARGO_MANIFEST_DIR resolves to repo/rust/crates/ob-poc-envelope; the
+            // CARGO_MANIFEST_DIR resolves to repo/rust/crates/ob-poc-boundary; the
             // shared config tree lives at repo/rust/config (two levels up).
             let packs_dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../config/packs");
             let packs = load_packs_from_dir(&packs_dir)

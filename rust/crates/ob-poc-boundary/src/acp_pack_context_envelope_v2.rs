@@ -105,7 +105,7 @@ impl AcpPackContextRegistryLoadOptions {
     /// # Examples
     ///
     /// ```rust
-    /// use ob_poc_envelope::acp_pack_context_envelope_v2::{
+    /// use ob_poc_boundary::acp_pack_context_envelope_v2::{
     ///     AcpPackContextRegistryLoadMode, AcpPackContextRegistryLoadOptions,
     /// };
     ///
@@ -125,7 +125,7 @@ impl AcpPackContextRegistryLoadOptions {
     /// # Examples
     ///
     /// ```rust
-    /// use ob_poc_envelope::acp_pack_context_envelope_v2::{
+    /// use ob_poc_boundary::acp_pack_context_envelope_v2::{
     ///     AcpPackContextRegistryLoadMode, AcpPackContextRegistryLoadOptions,
     /// };
     ///
@@ -265,7 +265,7 @@ impl AcpPackContextSigningKey {
     /// # Examples
     ///
     /// ```rust
-    /// use ob_poc_envelope::acp_pack_context_envelope_v2::{
+    /// use ob_poc_boundary::acp_pack_context_envelope_v2::{
     ///     AcpPackContextSigningKey, ACP_PACK_CONTEXT_SIGNATURE_ALGORITHM,
     /// };
     ///
@@ -293,7 +293,7 @@ impl AcpPackContextSigningKey {
     /// # Examples
     ///
     /// ```rust
-    /// use ob_poc_envelope::acp_pack_context_envelope_v2::AcpPackContextSigningKey;
+    /// use ob_poc_boundary::acp_pack_context_envelope_v2::AcpPackContextSigningKey;
     ///
     /// let key = AcpPackContextSigningKey::new("key-1", "hmac-sha256-v1", b"material");
     /// assert_eq!(key.key_id(), "key-1");
@@ -307,7 +307,7 @@ impl AcpPackContextSigningKey {
     /// # Examples
     ///
     /// ```rust
-    /// use ob_poc_envelope::acp_pack_context_envelope_v2::AcpPackContextSigningKey;
+    /// use ob_poc_boundary::acp_pack_context_envelope_v2::AcpPackContextSigningKey;
     ///
     /// let key = AcpPackContextSigningKey::new("key-1", "hmac-sha256-v1", b"material");
     /// assert_eq!(key.algorithm(), "hmac-sha256-v1");
@@ -329,7 +329,7 @@ impl AcpPackContextSigningKeyring {
     /// # Examples
     ///
     /// ```rust
-    /// use ob_poc_envelope::acp_pack_context_envelope_v2::{
+    /// use ob_poc_boundary::acp_pack_context_envelope_v2::{
     ///     AcpPackContextSigningKey, AcpPackContextSigningKeyring,
     /// };
     ///
@@ -347,7 +347,7 @@ impl AcpPackContextSigningKeyring {
     /// # Examples
     ///
     /// ```rust
-    /// use ob_poc_envelope::acp_pack_context_envelope_v2::AcpPackContextSigningKeyring;
+    /// use ob_poc_boundary::acp_pack_context_envelope_v2::AcpPackContextSigningKeyring;
     ///
     /// let keyring = AcpPackContextSigningKeyring::empty();
     /// assert_eq!(keyring.key_count(), 0);
@@ -361,7 +361,7 @@ impl AcpPackContextSigningKeyring {
     /// # Examples
     ///
     /// ```rust
-    /// use ob_poc_envelope::acp_pack_context_envelope_v2::AcpPackContextSigningKeyring;
+    /// use ob_poc_boundary::acp_pack_context_envelope_v2::AcpPackContextSigningKeyring;
     ///
     /// let keyring = AcpPackContextSigningKeyring::development_fixture();
     /// assert_eq!(keyring.key_count(), 1);
@@ -377,7 +377,7 @@ impl AcpPackContextSigningKeyring {
     /// # Examples
     ///
     /// ```rust,no_run
-    /// use ob_poc_envelope::acp_pack_context_envelope_v2::AcpPackContextSigningKeyring;
+    /// use ob_poc_boundary::acp_pack_context_envelope_v2::AcpPackContextSigningKeyring;
     ///
     /// let keyring = AcpPackContextSigningKeyring::production_from_env().unwrap();
     /// assert_eq!(keyring.key_count(), 1);
@@ -401,7 +401,7 @@ impl AcpPackContextSigningKeyring {
     /// # Examples
     ///
     /// ```rust
-    /// use ob_poc_envelope::acp_pack_context_envelope_v2::AcpPackContextSigningKeyring;
+    /// use ob_poc_boundary::acp_pack_context_envelope_v2::AcpPackContextSigningKeyring;
     ///
     /// assert_eq!(AcpPackContextSigningKeyring::empty().key_count(), 0);
     /// ```
@@ -477,8 +477,8 @@ const SECTION_BUDGETS: &[SectionBudget] = &[
 /// # Examples
 ///
 /// ```rust,no_run
-/// use ob_poc_envelope::acp_pack_context_envelope_v2::build_acp_pack_context_envelope_v2;
-/// use ob_poc_envelope::acp_registry_projection::build_slice1_acp_registry_projection;
+/// use ob_poc_boundary::acp_pack_context_envelope_v2::build_acp_pack_context_envelope_v2;
+/// use ob_poc_boundary::acp_registry_projection::build_slice1_acp_registry_projection;
 ///
 /// let config_root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("config");
 /// let projection = build_slice1_acp_registry_projection(&config_root).unwrap();
@@ -503,11 +503,11 @@ pub fn build_acp_pack_context_envelope_v2(
 /// # Examples
 ///
 /// ```rust,no_run
-/// use ob_poc_envelope::acp_pack_context_envelope_v2::{
+/// use ob_poc_boundary::acp_pack_context_envelope_v2::{
 ///     build_acp_pack_context_envelope_v2_with_signing_key, AcpPackContextSigningKey,
 ///     ACP_PACK_CONTEXT_SIGNATURE_ALGORITHM,
 /// };
-/// use ob_poc_envelope::acp_registry_projection::build_slice1_acp_registry_projection;
+/// use ob_poc_boundary::acp_registry_projection::build_slice1_acp_registry_projection;
 ///
 /// let config_root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("config");
 /// let projection = build_slice1_acp_registry_projection(&config_root).unwrap();
@@ -575,8 +575,8 @@ pub fn build_acp_pack_context_envelope_v2_with_signing_key(
 /// # Examples
 ///
 /// ```rust,no_run
-/// use ob_poc_envelope::acp_pack_context_envelope_v2::build_acp_pack_context_envelope_v2_bundle;
-/// use ob_poc_envelope::acp_registry_projection::build_slice1_acp_registry_projection;
+/// use ob_poc_boundary::acp_pack_context_envelope_v2::build_acp_pack_context_envelope_v2_bundle;
+/// use ob_poc_boundary::acp_registry_projection::build_slice1_acp_registry_projection;
 ///
 /// let config_root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("config");
 /// let projection = build_slice1_acp_registry_projection(&config_root).unwrap();
@@ -605,8 +605,8 @@ pub fn build_acp_pack_context_envelope_v2_bundle(
 /// # Examples
 ///
 /// ```rust,no_run
-/// use ob_poc_envelope::acp_pack_context_envelope_v2::build_active_acp_pack_context_registry_state_v2;
-/// use ob_poc_envelope::acp_registry_projection::build_slice1_acp_registry_projection;
+/// use ob_poc_boundary::acp_pack_context_envelope_v2::build_active_acp_pack_context_registry_state_v2;
+/// use ob_poc_boundary::acp_registry_projection::build_slice1_acp_registry_projection;
 ///
 /// let config_root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("config");
 /// let projection = build_slice1_acp_registry_projection(&config_root).unwrap();
@@ -629,11 +629,11 @@ pub fn build_active_acp_pack_context_registry_state_v2(
 /// # Examples
 ///
 /// ```rust,no_run
-/// use ob_poc_envelope::acp_pack_context_envelope_v2::{
+/// use ob_poc_boundary::acp_pack_context_envelope_v2::{
 ///     build_active_acp_pack_context_registry_state_v2_with_signing_key,
 ///     AcpPackContextSigningKey, ACP_PACK_CONTEXT_SIGNATURE_ALGORITHM,
 /// };
-/// use ob_poc_envelope::acp_registry_projection::build_slice1_acp_registry_projection;
+/// use ob_poc_boundary::acp_registry_projection::build_slice1_acp_registry_projection;
 ///
 /// let config_root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("config");
 /// let projection = build_slice1_acp_registry_projection(&config_root).unwrap();
@@ -691,11 +691,11 @@ pub fn build_active_acp_pack_context_registry_state_v2_with_signing_key(
 /// # Examples
 ///
 /// ```rust,no_run
-/// use ob_poc_envelope::acp_pack_context_envelope_v2::{
+/// use ob_poc_boundary::acp_pack_context_envelope_v2::{
 ///     build_active_acp_pack_context_registry_state_v2,
 ///     write_acp_pack_context_registry_state_v2,
 /// };
-/// use ob_poc_envelope::acp_registry_projection::build_slice1_acp_registry_projection;
+/// use ob_poc_boundary::acp_registry_projection::build_slice1_acp_registry_projection;
 ///
 /// let config_root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("config");
 /// let projection = build_slice1_acp_registry_projection(&config_root).unwrap();
@@ -721,12 +721,12 @@ pub fn write_acp_pack_context_registry_state_v2(
 /// # Examples
 ///
 /// ```rust,no_run
-/// use ob_poc_envelope::acp_pack_context_envelope_v2::{
+/// use ob_poc_boundary::acp_pack_context_envelope_v2::{
 ///     build_active_acp_pack_context_registry_state_v2,
 ///     load_acp_pack_context_registry_state_v2,
 ///     write_acp_pack_context_registry_state_v2,
 /// };
-/// use ob_poc_envelope::acp_registry_projection::build_slice1_acp_registry_projection;
+/// use ob_poc_boundary::acp_registry_projection::build_slice1_acp_registry_projection;
 ///
 /// let config_root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("config");
 /// let projection = build_slice1_acp_registry_projection(&config_root).unwrap();
@@ -753,13 +753,13 @@ pub fn load_acp_pack_context_registry_state_v2(
 /// # Examples
 ///
 /// ```rust,no_run
-/// use ob_poc_envelope::acp_pack_context_envelope_v2::{
+/// use ob_poc_boundary::acp_pack_context_envelope_v2::{
 ///     build_active_acp_pack_context_registry_state_v2,
 ///     load_acp_pack_context_registry_state_v2_with_keyring,
 ///     write_acp_pack_context_registry_state_v2,
 ///     AcpPackContextSigningKeyring,
 /// };
-/// use ob_poc_envelope::acp_registry_projection::build_slice1_acp_registry_projection;
+/// use ob_poc_boundary::acp_registry_projection::build_slice1_acp_registry_projection;
 ///
 /// let config_root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("config");
 /// let projection = build_slice1_acp_registry_projection(&config_root).unwrap();
@@ -809,10 +809,10 @@ pub fn load_acp_pack_context_registry_state_v2_with_keyring(
 /// # Examples
 ///
 /// ```rust,no_run
-/// use ob_poc_envelope::acp_pack_context_envelope_v2::{
+/// use ob_poc_boundary::acp_pack_context_envelope_v2::{
 ///     load_online_acp_pack_context_registry_state_v2, AcpPackContextRegistryLoadOptions,
 /// };
-/// use ob_poc_envelope::acp_registry_projection::build_slice1_acp_registry_projection;
+/// use ob_poc_boundary::acp_registry_projection::build_slice1_acp_registry_projection;
 ///
 /// let config_root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("config");
 /// let projection = build_slice1_acp_registry_projection(&config_root).unwrap();
@@ -842,11 +842,11 @@ pub fn load_online_acp_pack_context_registry_state_v2(
 /// # Examples
 ///
 /// ```rust,no_run
-/// use ob_poc_envelope::acp_pack_context_envelope_v2::{
+/// use ob_poc_boundary::acp_pack_context_envelope_v2::{
 ///     load_online_acp_pack_context_registry_state_v2_with_keyring,
 ///     AcpPackContextRegistryLoadOptions, AcpPackContextSigningKeyring,
 /// };
-/// use ob_poc_envelope::acp_registry_projection::build_slice1_acp_registry_projection;
+/// use ob_poc_boundary::acp_registry_projection::build_slice1_acp_registry_projection;
 ///
 /// let config_root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("config");
 /// let projection = build_slice1_acp_registry_projection(&config_root).unwrap();
@@ -928,11 +928,11 @@ pub fn load_online_acp_pack_context_registry_state_v2_with_keyring(
 /// # Examples
 ///
 /// ```rust,no_run
-/// use ob_poc_envelope::acp_pack_context_envelope_v2::{
+/// use ob_poc_boundary::acp_pack_context_envelope_v2::{
 ///     build_active_acp_pack_context_registry_state_v2,
 ///     verify_acp_pack_context_registry_state_v2,
 /// };
-/// use ob_poc_envelope::acp_registry_projection::build_slice1_acp_registry_projection;
+/// use ob_poc_boundary::acp_registry_projection::build_slice1_acp_registry_projection;
 ///
 /// let config_root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("config");
 /// let projection = build_slice1_acp_registry_projection(&config_root).unwrap();
@@ -957,12 +957,12 @@ pub fn verify_acp_pack_context_registry_state_v2(
 /// # Examples
 ///
 /// ```rust,no_run
-/// use ob_poc_envelope::acp_pack_context_envelope_v2::{
+/// use ob_poc_boundary::acp_pack_context_envelope_v2::{
 ///     build_active_acp_pack_context_registry_state_v2,
 ///     verify_acp_pack_context_registry_state_v2_with_keyring,
 ///     AcpPackContextSigningKeyring,
 /// };
-/// use ob_poc_envelope::acp_registry_projection::build_slice1_acp_registry_projection;
+/// use ob_poc_boundary::acp_registry_projection::build_slice1_acp_registry_projection;
 ///
 /// let config_root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("config");
 /// let projection = build_slice1_acp_registry_projection(&config_root).unwrap();
@@ -1092,8 +1092,8 @@ pub fn verify_acp_pack_context_registry_state_v2_with_keyring(
 /// # Examples
 ///
 /// ```rust,no_run
-/// use ob_poc_envelope::acp_pack_context_envelope_v2::build_acp_pack_context_artifact_bytes_v2;
-/// use ob_poc_envelope::acp_registry_projection::build_slice1_acp_registry_projection;
+/// use ob_poc_boundary::acp_pack_context_envelope_v2::build_acp_pack_context_artifact_bytes_v2;
+/// use ob_poc_boundary::acp_registry_projection::build_slice1_acp_registry_projection;
 ///
 /// let config_root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("config");
 /// let projection = build_slice1_acp_registry_projection(&config_root).unwrap();
@@ -1128,10 +1128,10 @@ pub fn build_acp_pack_context_artifact_bytes_v2(
 /// # Examples
 ///
 /// ```rust,no_run
-/// use ob_poc_envelope::acp_pack_context_envelope_v2::{
+/// use ob_poc_boundary::acp_pack_context_envelope_v2::{
 ///     build_acp_pack_context_artifact_bytes_v2, verify_acp_pack_context_artifact_rebuild_v2,
 /// };
-/// use ob_poc_envelope::acp_registry_projection::build_slice1_acp_registry_projection;
+/// use ob_poc_boundary::acp_registry_projection::build_slice1_acp_registry_projection;
 ///
 /// let config_root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("config");
 /// let projection = build_slice1_acp_registry_projection(&config_root).unwrap();
@@ -1169,10 +1169,10 @@ pub fn verify_acp_pack_context_artifact_rebuild_v2(
 /// # Examples
 ///
 /// ```rust,no_run
-/// use ob_poc_envelope::acp_pack_context_envelope_v2::{
+/// use ob_poc_boundary::acp_pack_context_envelope_v2::{
 ///     build_acp_pack_context_envelope_v2, verify_acp_pack_context_envelope_v2,
 /// };
-/// use ob_poc_envelope::acp_registry_projection::build_slice1_acp_registry_projection;
+/// use ob_poc_boundary::acp_registry_projection::build_slice1_acp_registry_projection;
 ///
 /// let config_root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("config");
 /// let projection = build_slice1_acp_registry_projection(&config_root).unwrap();
@@ -1193,11 +1193,11 @@ pub fn verify_acp_pack_context_envelope_v2(
 /// # Examples
 ///
 /// ```rust,no_run
-/// use ob_poc_envelope::acp_pack_context_envelope_v2::{
+/// use ob_poc_boundary::acp_pack_context_envelope_v2::{
 ///     build_acp_pack_context_envelope_v2, verify_acp_pack_context_envelope_v2_with_keyring,
 ///     AcpPackContextSigningKeyring,
 /// };
-/// use ob_poc_envelope::acp_registry_projection::build_slice1_acp_registry_projection;
+/// use ob_poc_boundary::acp_registry_projection::build_slice1_acp_registry_projection;
 ///
 /// let config_root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("config");
 /// let projection = build_slice1_acp_registry_projection(&config_root).unwrap();
@@ -1291,11 +1291,11 @@ pub fn verify_acp_pack_context_envelope_v2_with_keyring(
 /// # Examples
 ///
 /// ```rust,no_run
-/// use ob_poc_envelope::acp_pack_context_envelope_v2::{
+/// use ob_poc_boundary::acp_pack_context_envelope_v2::{
 ///     build_acp_pack_context_envelope_v2, transition_acp_pack_lifecycle_v2,
 ///     AcpPackLifecycleState,
 /// };
-/// use ob_poc_envelope::acp_registry_projection::build_slice1_acp_registry_projection;
+/// use ob_poc_boundary::acp_registry_projection::build_slice1_acp_registry_projection;
 ///
 /// let config_root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("config");
 /// let projection = build_slice1_acp_registry_projection(&config_root).unwrap();
@@ -1315,12 +1315,12 @@ pub fn transition_acp_pack_lifecycle_v2(
 /// # Examples
 ///
 /// ```rust,no_run
-/// use ob_poc_envelope::acp_pack_context_envelope_v2::{
+/// use ob_poc_boundary::acp_pack_context_envelope_v2::{
 ///     build_acp_pack_context_envelope_v2_with_signing_key,
 ///     transition_acp_pack_lifecycle_v2_with_signing_key, AcpPackContextSigningKey,
 ///     AcpPackLifecycleState, ACP_PACK_CONTEXT_SIGNATURE_ALGORITHM,
 /// };
-/// use ob_poc_envelope::acp_registry_projection::build_slice1_acp_registry_projection;
+/// use ob_poc_boundary::acp_registry_projection::build_slice1_acp_registry_projection;
 ///
 /// let config_root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("config");
 /// let projection = build_slice1_acp_registry_projection(&config_root).unwrap();
@@ -1378,11 +1378,11 @@ pub fn transition_acp_pack_lifecycle_v2_with_signing_key(
 /// # Examples
 ///
 /// ```rust,no_run
-/// use ob_poc_envelope::acp_pack_context_envelope_v2::{
+/// use ob_poc_boundary::acp_pack_context_envelope_v2::{
 ///     build_acp_pack_context_envelope_v2, transition_acp_pack_lifecycle_v2,
 ///     verify_acp_pack_context_rebuild_v2, AcpPackLifecycleState,
 /// };
-/// use ob_poc_envelope::acp_registry_projection::build_slice1_acp_registry_projection;
+/// use ob_poc_boundary::acp_registry_projection::build_slice1_acp_registry_projection;
 ///
 /// let config_root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("config");
 /// let projection = build_slice1_acp_registry_projection(&config_root).unwrap();
@@ -1406,12 +1406,12 @@ pub fn verify_acp_pack_context_rebuild_v2(
 /// # Examples
 ///
 /// ```rust,no_run
-/// use ob_poc_envelope::acp_pack_context_envelope_v2::{
+/// use ob_poc_boundary::acp_pack_context_envelope_v2::{
 ///     build_acp_pack_context_envelope_v2, transition_acp_pack_lifecycle_v2,
 ///     verify_acp_pack_context_rebuild_v2_with_keyring, AcpPackContextSigningKeyring,
 ///     AcpPackLifecycleState,
 /// };
-/// use ob_poc_envelope::acp_registry_projection::build_slice1_acp_registry_projection;
+/// use ob_poc_boundary::acp_registry_projection::build_slice1_acp_registry_projection;
 ///
 /// let config_root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("config");
 /// let projection = build_slice1_acp_registry_projection(&config_root).unwrap();
@@ -1472,7 +1472,7 @@ pub fn verify_acp_pack_context_rebuild_v2_with_keyring(
 /// # Examples
 ///
 /// ```rust
-/// use ob_poc_envelope::acp_pack_context_envelope_v2::{
+/// use ob_poc_boundary::acp_pack_context_envelope_v2::{
 ///     acp_pack_lifecycle_transition_allowed, AcpPackLifecycleState,
 /// };
 ///
@@ -1918,7 +1918,7 @@ mod tests {
     use crate::acp_registry_projection::build_slice1_acp_registry_projection;
 
     fn repo_config_root() -> PathBuf {
-        // CARGO_MANIFEST_DIR resolves to repo/rust/crates/ob-poc-envelope; the
+        // CARGO_MANIFEST_DIR resolves to repo/rust/crates/ob-poc-boundary; the
         // shared config tree lives at repo/rust/config (two levels up).
         Path::new(env!("CARGO_MANIFEST_DIR")).join("../../config")
     }

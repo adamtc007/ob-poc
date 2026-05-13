@@ -9,7 +9,7 @@
 //!
 //! Phase 3 slice 2c.2b (2026-05-12) extracted these from
 //! `rust/src/repl/types_v2.rs`. `repl::types_v2` keeps a `pub use
-//! ob_poc_envelope::session::*` re-export so the 46 existing consumer call
+//! ob_poc_boundary::session::*` re-export so the 46 existing consumer call
 //! sites are unaffected.
 
 use serde::{Deserialize, Serialize};

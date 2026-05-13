@@ -36,11 +36,11 @@ use thiserror::Error;
 // Lock type definitions (LockKey, LockMode, LockAccess) live in the
 // expansion tier — they're tied to verb policy expansion. The typeless
 // SQL primitives (lock_key, advisory_xact_lock, try_advisory_xact_lock)
-// were lifted to ob-poc-envelope in Phase 3 slice 2p so the boundary
+// were lifted to ob-poc-boundary in Phase 3 slice 2p so the boundary
 // tier can call them directly without re-entering src/.
 #[allow(unused_imports)]
 pub use crate::dsl_v2::expansion::{LockAccess, LockKey, LockMode};
-pub use ob_poc_envelope::advisory_lock::{
+pub use ob_poc_boundary::advisory_lock::{
     advisory_xact_lock, lock_key, try_advisory_xact_lock,
 };
 
@@ -242,7 +242,7 @@ mod tests {
     use super::*;
 
     // lock_key determinism + collision tests live in
-    // ob-poc-envelope::advisory_lock — this test covers the LockKey
+    // ob-poc-boundary::advisory_lock — this test covers the LockKey
     // struct overload that stays in src/ because LockKey lives in dsl_v2.
     #[test]
     fn test_lock_key_from_struct() {

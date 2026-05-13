@@ -336,12 +336,12 @@ mod tests {
     #[test]
     fn raw_llm_provider_calls_are_confined_to_approved_wrappers() {
         let manifest_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-        // manifest_dir = repo/rust/crates/ob-poc-envelope; repo_root = repo/
+        // manifest_dir = repo/rust/crates/ob-poc-boundary; repo_root = repo/
         let repo_root = manifest_dir
             .parent()
             .and_then(|p| p.parent())
             .and_then(|p| p.parent())
-            .expect("ob-poc-envelope crate has repo grand-grandparent");
+            .expect("ob-poc-boundary crate has repo grand-grandparent");
         let search_roots = [
             repo_root.join("rust/src"),
             repo_root.join("rust/crates/ob-agentic/src"),

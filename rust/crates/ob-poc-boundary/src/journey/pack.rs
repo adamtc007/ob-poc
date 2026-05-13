@@ -609,7 +609,7 @@ templates:
 
     #[test]
     fn test_repo_pack_manifests_parse_strictly() {
-        // CARGO_MANIFEST_DIR resolves to repo/rust/crates/ob-poc-envelope; the
+        // CARGO_MANIFEST_DIR resolves to repo/rust/crates/ob-poc-boundary; the
         // shared config tree lives at repo/rust/config (two levels up).
         let packs_dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../config/packs");
         let packs = load_packs_from_dir(&packs_dir).unwrap();

@@ -11,12 +11,12 @@ use std::time::Duration;
 
 pub mod attribute_values_service;
 pub mod bods_service;
-// Phase 3 slice 2x (2026-05-13): pure-DTO module relocated to ob-poc-envelope.
+// Phase 3 slice 2x (2026-05-13): pure-DTO module relocated to ob-poc-boundary.
 // Callers (bods_service.rs via `super::bods_types::*`, this module's pub-use
 // alias) keep their existing paths through the compat re-export. The DTOs
 // derive sqlx::FromRow and serde — both available in envelope under the
 // `database` feature.
-pub use ob_poc_envelope::bods_types;
+pub use ob_poc_boundary::bods_types;
 pub mod cbu_entity_roles_service;
 pub mod cbu_service;
 pub mod context_discovery_service;
@@ -43,10 +43,10 @@ pub mod service_resource_service;
 pub mod service_service;
 pub mod session_repository;
 pub mod verb_service;
-// Phase 3 slice 2q (2026-05-13): relocated to ob-poc-envelope. The DB-shaped
+// Phase 3 slice 2q (2026-05-13): relocated to ob-poc-boundary. The DB-shaped
 // helpers in ViewConfigService are pure sqlx::PgPool queries with no
 // execution-tier coupling, so they live at the boundary tier now.
-pub use ob_poc_envelope::view_config_service;
+pub use ob_poc_boundary::view_config_service;
 pub mod view_state_audit;
 pub mod viewport_service;
 pub mod visualization_repository;

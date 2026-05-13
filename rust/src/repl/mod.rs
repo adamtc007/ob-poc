@@ -69,8 +69,8 @@ pub mod decision_log;
 
 pub mod preconditions;
 
-// Phase 3 slice 2c.2b (2026-05-12): relocated to ob-poc-envelope.
-pub use ob_poc_envelope::session_trace;
+// Phase 3 slice 2c.2b (2026-05-12): relocated to ob-poc-boundary.
+pub use ob_poc_boundary::session_trace;
 
 #[cfg(feature = "database")]
 pub mod trace_repository;

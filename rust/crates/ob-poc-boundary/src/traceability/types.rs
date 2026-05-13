@@ -19,7 +19,7 @@ impl TraceKind {
     ///
     /// # Examples
     /// ```rust
-    /// use ob_poc_envelope::traceability::types::TraceKind;
+    /// use ob_poc_boundary::traceability::types::TraceKind;
     ///
     /// assert_eq!(TraceKind::Original.as_str(), "original");
     /// ```
@@ -50,7 +50,7 @@ impl TraceOutcome {
     ///
     /// # Examples
     /// ```rust
-    /// use ob_poc_envelope::traceability::types::TraceOutcome;
+    /// use ob_poc_boundary::traceability::types::TraceOutcome;
     ///
     /// assert_eq!(TraceOutcome::InProgress.as_str(), "in_progress");
     /// ```
@@ -85,7 +85,7 @@ impl SurfaceVersions {
     ///
     /// # Examples
     /// ```rust
-    /// use ob_poc_envelope::traceability::types::SurfaceVersions;
+    /// use ob_poc_boundary::traceability::types::SurfaceVersions;
     ///
     /// let versions = SurfaceVersions::current_defaults();
     /// assert!(versions.parser_version.is_some());
@@ -169,7 +169,7 @@ impl NewUtteranceTrace {
     ///
     /// # Examples
     /// ```rust
-    /// use ob_poc_envelope::traceability::types::{NewUtteranceTrace, TraceKind};
+    /// use ob_poc_boundary::traceability::types::{NewUtteranceTrace, TraceKind};
     /// use uuid::Uuid;
     ///
     /// let trace = NewUtteranceTrace::in_progress(

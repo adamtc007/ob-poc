@@ -611,7 +611,7 @@ struct PlanHashMaterial<'a> {
 /// # Examples
 ///
 /// ```rust,no_run
-/// use ob_poc_envelope::acp_registry_projection::build_slice1_acp_registry_projection;
+/// use ob_poc_boundary::acp_registry_projection::build_slice1_acp_registry_projection;
 ///
 /// let config_root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("config");
 /// let projection = build_slice1_acp_registry_projection(config_root).unwrap();
@@ -2664,7 +2664,7 @@ mod tests {
     use super::*;
 
     fn repo_config_root() -> std::path::PathBuf {
-        // CARGO_MANIFEST_DIR resolves to repo/rust/crates/ob-poc-envelope; the
+        // CARGO_MANIFEST_DIR resolves to repo/rust/crates/ob-poc-boundary; the
         // shared config tree lives at repo/rust/config (two levels up).
         std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../config")
     }

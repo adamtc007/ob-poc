@@ -15,7 +15,7 @@ use super::polarity::IntentPolarity;
 use super::verb_index::{VerbMeta, VerbMetadataIndex};
 
 // Phase 3 slice 2bb (2026-05-13): result DTOs (`ScoredVerbCandidate`,
-// `FilterDiagnostics`) moved to `ob_poc_envelope::sage::verb_resolve_types`
+// `FilterDiagnostics`) moved to `ob_poc_boundary::sage::verb_resolve_types`
 // alongside the `From<FilterDiagnostics> for CoderFilterDiagnostics` impl.
 // Back-compat re-export keeps `sage::verb_resolve::{ScoredVerbCandidate,
 // FilterDiagnostics}` and `crate::sage::ScoredVerbCandidate` (via mod.rs

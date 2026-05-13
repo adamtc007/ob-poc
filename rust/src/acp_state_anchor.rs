@@ -1,12 +1,12 @@
 //! ACP state-anchor provider routing — Repl-coupled drivers.
 //!
 //! Pure boundary types (descriptors, registries, reports, outcomes,
-//! DealTransitionSpec) live in `ob_poc_envelope::acp_state_anchor`
+//! DealTransitionSpec) live in `ob_poc_boundary::acp_state_anchor`
 //! and are re-exported here for compat. The async provider drivers
 //! below depend on `ReplV2RouteState` (an execution-tier handle) and
 //! therefore must stay in this crate.
 
-pub use ob_poc_envelope::acp_state_anchor::*;
+pub use ob_poc_boundary::acp_state_anchor::*;
 
 use sem_os_core::state_simulation::{
     SemanticStateDiff, SimulatedStateAdvance, StateSimulationResult,
