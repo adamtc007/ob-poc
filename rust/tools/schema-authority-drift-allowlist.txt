@@ -33,10 +33,32 @@
 #                                                         marker DTO
 #
 # (2) HIGH-priority near-duplicates of sem_os_core schema authority:
-#     EMPTY — Phase 4.7 follow-up collapsed all three flagged files
-#     (`entity_type_def`, `relationship_type_def`, `verb_contract`)
-#     to `sem_os_core::*` re-exports. All 22 remaining entries above
-#     are bucket-1 namesake collisions.
+#     EMPTY — Phase 4.7 follow-up + walk-by audit together cleared
+#     all near-duplicates (3 src/sem_reg/* files + dsl-runtime
+#     stategraph + state_reducer leaf types collapsed to re-exports).
+#     All 13 remaining entries are bucket-1 namesake collisions
+#     verified by the walk-by audit:
+#
+#     dsl-core::config::dag::TransitionDef
+#         from: YamlValue (string|list), via: Option<YamlValue>,
+#         precondition: Option<String>, args: Option<YamlValue>
+#         — YAML parser shape for compound/parametric transitions
+#         vs sem_os_core's `{from: String, to: String, verbs:
+#         Vec<String>}` registry-snapshot shape.
+#     ob-workflow::definition::TransitionDef
+#         guard / auto / manual flags — workflow-engine shape.
+#     ob-poc-domain::taxonomy::NodeType / EdgeType
+#         Root/Client/Cluster/Cbu/Entity/… nodes and
+#         Ownership/Control/BoardMember/… edges — UBO ownership
+#         graph, not state-graph workflow nodes.
+#     ob-poc-types::galaxy / ob-poc-types::lib / src/api/
+#         capital_routes / src/graph/types
+#         UI visualization DTOs — frontend rendering, not
+#         schema-authority types.
+#     src/sem_reg/onboarding/verb_extract::VerbOutput
+#         {produced_type, initial_state} — verb-extract metadata
+#         vs sem_os_core's {field_name, output_type, entity_kind,
+#         description} output-field declaration.
 
 crates/dsl-core/src/config/dag.rs:497:TransitionDef
 crates/ob-poc-domain/src/taxonomy/rules.rs:523:EdgeType
