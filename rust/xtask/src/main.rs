@@ -2341,6 +2341,15 @@ fn ci(sh: &Shell) -> Result<()> {
     println!("\n=== ACP Envelope Byte-Equality (R6) ===");
     acp_envelope_byte_equality::run(false)?;
 
+    println!("\n=== Schema-authority drift audit (Phase 4.7) ===");
+    audit::run(false)?;
+
+    println!("\n=== Runbook envelope determinism (Phase 5.5) ===");
+    runbook_envelope_determinism::run(false)?;
+
+    println!("\n=== BYOK conformance — stub provider (Phase 5.4) ===");
+    byok_conformance::run("stub")?;
+
     println!("\n=== Clippy (workspace) ===");
     cmd!(sh, "cargo clippy --workspace --all-targets -- -D warnings").run()?;
 
@@ -2392,6 +2401,15 @@ fn pre_commit(sh: &Shell) -> Result<()> {
 
     println!("\n=== ACP Envelope Byte-Equality (R6) ===");
     acp_envelope_byte_equality::run(false)?;
+
+    println!("\n=== Schema-authority drift audit (Phase 4.7) ===");
+    audit::run(false)?;
+
+    println!("\n=== Runbook envelope determinism (Phase 5.5) ===");
+    runbook_envelope_determinism::run(false)?;
+
+    println!("\n=== BYOK conformance — stub provider (Phase 5.4) ===");
+    byok_conformance::run("stub")?;
 
     println!("\n=== Clippy (workspace) ===");
     cmd!(sh, "cargo clippy --workspace --all-targets -- -D warnings").run()?;
