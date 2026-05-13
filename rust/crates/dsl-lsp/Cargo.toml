@@ -21,18 +21,13 @@ lsp-types = "0.95"
 # Async runtime
 tokio = { version = "1", features = ["full", "sync"] }
 
-# Analyser primitives — ast, parser, binding_context, config, diagnostics.
-# §9 item 8 (capability-crate restructure v1) — first surgical step:
-# move dsl-lsp's leaf imports off the application crate. Remaining
-# ob_poc imports (planning, execution, tooling, suggestions, macros)
-# need the §9 item 9 analyser consolidation before they can move.
+# Analyser surface. dsl-lsp's compiler / planner / validator /
+# diagnostics / verb-registry / macros surface lives in dsl-runtime
+# (post §9 item 9 consolidation, 2026-05-13). The previous
+# `ob-poc = { path = "../..", features = ["database"] }` inverted edge
+# is gone; dsl-lsp is now an analyser-tier consumer only.
 dsl-core = { path = "../dsl-core" }
 dsl-runtime = { path = "../dsl-runtime" }
-
-# Main library (for planning, execution, tooling, suggestions, macros).
-# This is the inverted edge — to be removed by §9 item 9 (consolidate
-# analyser surface into dsl-runtime).
-ob-poc = { path = "../..", features = ["database"] }
 
 # Playbook support
 playbook-core = { path = "../playbook-core" }

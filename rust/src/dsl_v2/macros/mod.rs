@@ -36,30 +36,34 @@
 //! Normal DSL Pipeline (parse → enrich → compile → execute)
 //! ```
 
+// §9 item 9 slice 7 (2026-05-13): registry-loader subset (registry +
+// schema + conditions + variable + scope) relocated to
+// dsl_runtime::macros. The expansion engine (expander.rs +
+// attribute_seed.rs) stays here because it reaches UnifiedSession +
+// sem_os_obpoc_adapter.
 mod attribute_seed;
-mod conditions;
 mod expander;
-mod registry;
-mod schema;
-#[cfg(test)]
-mod scope;
-mod variable;
 
+// Re-export the relocated registry surface so existing
+// `crate::dsl_v2::macros::*` callers keep working.
+pub use dsl_runtime::macros::{
+    conditions, load_macro_registry, load_macro_registry_from_dir, registry, schema, variable,
+    MacroRegistry,
+};
 pub use expander::{
     expand_macro, expand_macro_fixpoint, ExpansionLimits, MacroExpansionError,
     MacroExpansionOutput, EXPANSION_LIMITS,
 };
-pub use registry::{load_macro_registry, load_macro_registry_from_dir, MacroRegistry};
 #[cfg(test)]
-pub use schema::MacroTier;
+pub use dsl_runtime::macros::scope;
 #[cfg(test)]
-pub use schema::{
+pub use dsl_runtime::macros::schema::MacroTier;
+#[cfg(test)]
+pub use dsl_runtime::macros::schema::{
     ArgStyle, MacroArg, MacroArgType, MacroArgs, MacroExpansionStep, MacroKind, MacroRouting,
     MacroTarget, MacroUi, SetState, VerbCallStep,
 };
-// ACP visibility parity types (v0.5 §7.2 / §7.7). Consumed by the
-// envelope projection landing in R2. Re-exported here so consumers don't
-// have to reach into `schema::`.
+// ACP visibility parity types (v0.5 §7.2 / §7.7).
 #[allow(unused_imports)]
-pub use schema::{MacroLifecycleState, MacroPlanKind, MacroSideEffect};
-pub use schema::{MacroPrereq, MacroSchema};
+pub use dsl_runtime::macros::schema::{MacroLifecycleState, MacroPlanKind, MacroSideEffect};
+pub use dsl_runtime::macros::schema::{MacroPrereq, MacroSchema};

@@ -28,6 +28,8 @@ dsl-core = { path = "../dsl-core" }
 # §9 item 9 (analyser consolidation) slice 1 — runtime_registry pulled
 # in from rust/src/dsl_v2/ also pulls in template-loader integration.
 ob-templates = { path = "../ob-templates" }
+# §9 item 9 slice 7 — macros::variable uses regex for ${var} substitution.
+regex = "1"
 entity-gateway = { path = "../entity-gateway" }
 tonic = "0.12"
 # Remaining transitional dep — sem_os_core provides Principal, SemOsError,
