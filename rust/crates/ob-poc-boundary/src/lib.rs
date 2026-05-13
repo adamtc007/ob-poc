@@ -43,12 +43,12 @@ pub mod acp_registry_projection;
 pub mod acp_runtime_context;
 pub mod acp_session_input_draft_mode;
 pub mod acp_state_anchor;
-#[cfg(feature = "database")]
-pub mod advisory_lock;
 pub mod clarify;
 pub mod data_dictionary;
-#[cfg(feature = "database")]
-pub mod derived_attributes;
+// Phase 4.2c (2026-05-13): advisory_lock + derived_attributes paired-moved
+// to ob-poc-domain per plan §6 decision 3 (advisory_lock follows primary
+// consumer). Compat re-exports in rust/src/database/locks.rs and
+// rust/src/lib.rs respectively.
 #[cfg(feature = "database")]
 pub mod entity_linking;
 #[cfg(feature = "database")]

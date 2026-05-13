@@ -99,3 +99,16 @@ pub mod semtaxonomy;
 pub mod taxonomy;
 #[cfg(feature = "database")]
 pub mod view_config_service;
+
+// Phase 4.2c (2026-05-13): derived_attributes + advisory_lock paired
+// move per plan §6 decision 3 ("Helpers like advisory_lock go with
+// their primary consumer"). derived_attributes::repository imports
+// `crate::advisory_lock::{advisory_xact_lock, lock_key}`.
+//   - derived_attributes (~739 LOC, 2 files) — canonical derived-value
+//     snapshots + lineage; sqlx::PgPool repository.
+//   - advisory_lock (~90 LOC) — typeless pg advisory-lock helpers
+//     (advisory_xact_lock, try_advisory_xact_lock, lock_key).
+#[cfg(feature = "database")]
+pub mod advisory_lock;
+#[cfg(feature = "database")]
+pub mod derived_attributes;
