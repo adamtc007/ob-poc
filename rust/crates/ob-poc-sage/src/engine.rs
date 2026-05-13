@@ -23,11 +23,19 @@
 
 use anyhow::Result;
 use async_trait::async_trait;
-use uuid::Uuid;
 
 use crate::context::SageContext;
 use crate::outcome::OutcomeIntent;
+
+// `EntityState` and `ValidVerbSet` are surfaced only when the
+// `database` feature is on (session_context lives there). The
+// SageEngine trait below is unconditional; ValidVerbSetEngine and
+// ValidVerbSetScope are gated to match.
+#[cfg(feature = "database")]
+use uuid::Uuid;
+#[cfg(feature = "database")]
 use crate::session_context::EntityState;
+#[cfg(feature = "database")]
 use crate::valid_verb_set::ValidVerbSet;
 
 /// Sage classifier surface.
@@ -51,6 +59,7 @@ pub trait SageEngine: Send + Sync {
 /// The runtime resolves the constellation stack from
 /// `(workspace, constellation_id)` against the SemOS seed corpus and
 /// composes the legal verb set across the stack.
+#[cfg(feature = "database")]
 #[derive(Debug, Clone)]
 pub struct ValidVerbSetScope<'a> {
     /// Client group this session is scoped to.
@@ -69,6 +78,7 @@ pub struct ValidVerbSetScope<'a> {
 /// Used by the Sage ACP runtime to constrain LLM output to
 /// sanctioned primitives — the LLM selects from this set rather than
 /// emitting free-text DSL.
+#[cfg(feature = "database")]
 #[async_trait]
 pub trait ValidVerbSetEngine: Send + Sync {
     /// Compute the valid verb set for the given scope.

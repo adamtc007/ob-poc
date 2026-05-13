@@ -197,9 +197,9 @@ name = "dsl_mcp"
 path = "src/bin/dsl_mcp.rs"
 required-features = ["mcp"]
 
-[[bin]]
-name = "ob_poc_acp"
-path = "src/bin/ob_poc_acp.rs"
+# Phase 2.4 (2026-05-13): `ob_poc_acp` binary relocated to the new
+# `ob-poc-agent` crate as `bin/sage-acp`. Build the relocated binary
+# with `cargo build -p ob-poc-agent --bin sage-acp`.
 
 # Slice 4.1 (2026-04-22): `dsl_api` binary retired per user decision Q2(a).
 # `ob-poc-web` is now the sole authoritative HTTP server for all production
