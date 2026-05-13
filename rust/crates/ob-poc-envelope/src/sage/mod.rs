@@ -18,7 +18,13 @@
 //! `disposition`) stay in ob-poc because they pull in execution-tier
 //! crates (database, dsl_v2, lookup, agent::sem_os_context_envelope).
 
+// Phase 3 slice 2aa (2026-05-13): `coder_result` (CoderResolution +
+// CoderFailureKind + CoderDiagnostics + CoderFilterDiagnostics + CoderResult)
+// + `disposition` (UtteranceDisposition + ServeIntent + DelegateIntent +
+// PendingMutation) relocated. `CoderEngine` itself stays in src/sage/coder.rs.
+pub mod coder_result;
 pub mod context;
+pub mod disposition;
 pub mod outcome;
 pub mod plane;
 pub mod polarity;

@@ -35,13 +35,17 @@
 //! | E-SAGE-6 | data_management_rewrite() unchanged until Sage accuracy exceeds it |
 
 pub mod constrained_match;
-pub mod disposition;
 // Phase 3 slice 2v (2026-05-13): pure-type Sage vocabulary relocated to
 // ob-poc-envelope::sage. The four leaf modules have zero internal-crate
 // deps; sibling Sage engines (deterministic, llm_sage, pre_classify,
 // coder, verb_resolve, arg_assembly, etc.) continue to reach them via
 // `super::{outcome, plane, polarity, context}` through these re-exports.
+// Slice 2aa (2026-05-13) extends with `coder_result` (5 Coder output DTOs)
+// + `disposition` (UtteranceDisposition routing types); both unblocked by
+// outcome+context already being in envelope.
+pub use ob_poc_envelope::sage::coder_result;
 pub use ob_poc_envelope::sage::context;
+pub use ob_poc_envelope::sage::disposition;
 pub use ob_poc_envelope::sage::outcome;
 pub use ob_poc_envelope::sage::plane;
 pub use ob_poc_envelope::sage::polarity;

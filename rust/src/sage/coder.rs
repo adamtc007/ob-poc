@@ -1,9 +1,18 @@
 //! Coder engine — deterministic OutcomeIntent -> verb + DSL resolution.
+//!
+//! Phase 3 slice 2aa (2026-05-13): the result DTOs (`CoderResolution`,
+//! `CoderFailureKind`, `CoderDiagnostics`, `CoderFilterDiagnostics`,
+//! `CoderResult`) moved to `ob_poc_envelope::sage::coder_result`. The
+//! `CoderEngine` itself stays here because it depends on dsl_core verb
+//! config and mcp::intent_pipeline. The `From<FilterDiagnostics>` impl
+//! also stays — the orphan rule allows it since `FilterDiagnostics` is
+//! local to this crate. The `pub use` re-export below preserves
+//! `sage::coder::{CoderResolution, CoderResult, ...}` paths used by
+//! agent::orchestrator and others.
 
 use anyhow::{anyhow, Result};
 use dsl_core::config::loader::ConfigLoader;
 use dsl_core::config::types::{HarmClass, VerbConfig, VerbsConfig};
-use serde::{Deserialize, Serialize};
 
 use crate::mcp::intent_pipeline::IntentArgValue;
 
@@ -12,45 +21,11 @@ use super::outcome::{OutcomeIntent, OutcomeStep};
 use super::verb_index::VerbMetadataIndex;
 use super::verb_resolve::{FilterDiagnostics, ScoredVerbCandidate, StructuredVerbScorer};
 
-/// Resolution state for the Coder output.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-pub enum CoderResolution {
-    Confident,
-    Proposed,
-    NeedsInput,
-}
-
-/// Explicit failure reason when deterministic Coder resolution cannot proceed.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-pub enum CoderFailureKind {
-    NoCandidateAfterFilters,
-    DomainConflict,
-    PhaseConflict,
-    SubjectKindConflict,
-    ActionConflict,
-    BelowThreshold,
-    PolicyConflict,
-}
-
-/// Diagnostics explaining how Coder resolution succeeded or failed.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct CoderDiagnostics {
-    pub failure_kind: Option<CoderFailureKind>,
-    pub filter_diagnostics: CoderFilterDiagnostics,
-    pub top_candidate: Option<String>,
-    pub top_score: Option<f32>,
-    pub threshold: Option<f32>,
-}
-
-/// Serializable copy of scorer filter counts.
-#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
-pub struct CoderFilterDiagnostics {
-    pub base_candidates: usize,
-    pub domain_candidates: usize,
-    pub phase_candidates: usize,
-    pub subject_kind_candidates: usize,
-    pub final_candidates: usize,
-}
+// Back-compat re-export — `sage::coder::CoderResolution`, `sage::coder::CoderResult`,
+// etc. are reached this way by agent::orchestrator and other callers.
+pub use super::coder_result::{
+    CoderDiagnostics, CoderFailureKind, CoderFilterDiagnostics, CoderResolution, CoderResult,
+};
 
 impl From<FilterDiagnostics> for CoderFilterDiagnostics {
     fn from(value: FilterDiagnostics) -> Self {
@@ -62,17 +37,6 @@ impl From<FilterDiagnostics> for CoderFilterDiagnostics {
             final_candidates: value.final_candidates,
         }
     }
-}
-
-/// End-to-end Coder output.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct CoderResult {
-    pub verb_fqn: String,
-    pub dsl: String,
-    pub resolution: CoderResolution,
-    pub missing_args: Vec<String>,
-    pub unresolved_refs: Vec<String>,
-    pub diagnostics: Option<CoderDiagnostics>,
 }
 
 /// Deterministic Coder engine over verb metadata and config.

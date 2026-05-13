@@ -2,7 +2,8 @@
 
 use serde::{Deserialize, Serialize};
 
-use super::{CoderResult, EntityRef, OutcomeAction, OutcomeIntent};
+use super::coder_result::CoderResult;
+use super::outcome::{EntityRef, OutcomeAction, OutcomeIntent};
 
 /// The single routing decision after Sage classification.
 #[derive(Debug, Clone, Serialize, Deserialize)]
