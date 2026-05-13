@@ -72,6 +72,11 @@ pub mod language_pack;
 pub mod llm_trace;
 pub mod mutation_preflight;
 pub mod ontology;
+// Phase 3 of capability-crate restructure (2026-05-13) — pack projection
+// is boundary's typed view of the pack catalogue. The catalogue's
+// authoritative source is SemOS; today the ob-poc integrator registers
+// a provider that loads via ob-poc-journey. See pack_projection.rs.
+pub mod pack_projection;
 pub mod policy;
 // Phase 2 of capability-crate restructure (2026-05-13) — sage subtree
 // fully relocated to ob-poc-sage. The `sage::` submodule no longer
