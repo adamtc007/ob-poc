@@ -15,38 +15,40 @@
 //!   which stays in ob-poc).
 //! - NOT LLM client wiring (`llm_sage` stays in ob-poc).
 //!
-//! ## Public surface contract
+//! ## Public surface
 //!
-//! Consumers should reach for:
-//! - `ObservationPlane`, `IntentPolarity`, `OutcomeAction`, `OutcomeIntent`,
-//!   `OutcomeStep`, `EntityRef`, `Clarification`, `SageConfidence`,
-//!   `UtteranceHints`, `SageExplain`, `CoderHandoff` — the Sage's output
-//!   vocabulary.
-//! - `SageContext`, `RecentIntent` — session context handed INTO the Sage.
-//! - `pre_classify()`, `SagePreClassification` — deterministic
-//!   classification with no LLM call.
-//! - `CoderResult`, `CoderResolution`, `CoderDiagnostics`,
-//!   `CoderFailureKind`, `CoderFilterDiagnostics` — Coder's output handed
-//!   BACK to the orchestrator.
-//! - `UtteranceDisposition`, `ServeIntent`, `DelegateIntent`,
-//!   `PendingMutation` — Sage-primary routing decision.
-//! - `ScoredVerbCandidate`, `FilterDiagnostics` — verb-scorer DTOs.
+//! Eight pure-type modules (Phase 2A, 2026-05-13):
+//! - `plane` — `ObservationPlane`.
+//! - `polarity` — `IntentPolarity` + clue-word lists.
+//! - `context` — `SageContext`, `RecentIntent`.
+//! - `outcome` — `OutcomeIntent`, `OutcomeAction`, `OutcomeStep`,
+//!   `EntityRef`, `Clarification`, `SageConfidence`, `UtteranceHints`,
+//!   `SageExplain`, `CoderHandoff`.
+//! - `coder_result` — `CoderResolution`, `CoderFailureKind`,
+//!   `CoderDiagnostics`, `CoderFilterDiagnostics`, `CoderResult`.
+//! - `verb_resolve_types` — `ScoredVerbCandidate`, `FilterDiagnostics`
+//!   + `From<FilterDiagnostics> for CoderFilterDiagnostics`.
+//! - `disposition` — `UtteranceDisposition`, `ServeIntent`,
+//!   `DelegateIntent`, `PendingMutation`.
+//! - `pre_classify` — `pre_classify()` + `SagePreClassification`.
+//!
+//! One DB-coupled module (Phase 2B, pending):
+//! - `session_context` — `SageSession`, `EntityState`, sqlx::PgPool
+//!   helpers like `load_entity_states_for_group`.
 //!
 //! ## Dependency discipline
 //!
-//! Must depend only on `ob-poc-types` and primitives (`chrono`, `serde`,
-//! `uuid`, `anyhow`, `thiserror`, `async-trait`). Optionally `sqlx` for
-//! `session_context`'s DB-loader helpers, gated behind the `database`
-//! feature. Must NOT depend on `dsl-core`, `dsl-runtime`, `sem_os_*`,
+//! Depends only on `ob-poc-types` and primitives (`chrono`, `serde`,
+//! `uuid`, `anyhow`, `thiserror`, `async-trait`). `sqlx` is optional and
+//! gated behind the `database` feature (used by `session_context`). Does
+//! NOT depend on `dsl-core`, `dsl-runtime`, `sem_os_*`,
 //! `ob-poc-boundary`, or any execution-tier surface in ob-poc.
-//!
-//! ## Migration status (2026-05-13)
-//!
-//! This crate is the destination for Phase 2 of the capability-crate
-//! restructure (`docs/todo/capability-crate-restructure-v1.md`). Phase 2
-//! moves nine sage modules out of `ob-poc-boundary::sage::*` into this
-//! crate's top level. Until Phase 2 lands, this crate is intentionally
-//! empty — adding modules ahead of Phase 2 risks re-introducing the
-//! drift the restructure exists to fix.
 
-// Empty — Phase 2 fills this in.
+pub mod coder_result;
+pub mod context;
+pub mod disposition;
+pub mod outcome;
+pub mod plane;
+pub mod polarity;
+pub mod pre_classify;
+pub mod verb_resolve_types;

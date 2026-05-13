@@ -35,32 +35,26 @@
 //! | E-SAGE-6 | data_management_rewrite() unchanged until Sage accuracy exceeds it |
 
 pub mod constrained_match;
-// Phase 3 slice 2v (2026-05-13): pure-type Sage vocabulary relocated to
-// ob-poc-boundary::sage. The four leaf modules have zero internal-crate
-// deps; sibling Sage engines (deterministic, llm_sage, pre_classify,
-// coder, verb_resolve, arg_assembly, etc.) continue to reach them via
-// `super::{outcome, plane, polarity, context}` through these re-exports.
-// Slice 2aa (2026-05-13) extends with `coder_result` (5 Coder output DTOs)
-// + `disposition` (UtteranceDisposition routing types); both unblocked by
-// outcome+context already being in envelope.
-pub use ob_poc_boundary::sage::coder_result;
-pub use ob_poc_boundary::sage::context;
-pub use ob_poc_boundary::sage::disposition;
-pub use ob_poc_boundary::sage::outcome;
-pub use ob_poc_boundary::sage::plane;
-pub use ob_poc_boundary::sage::polarity;
-// Phase 3 slice 2dd (2026-05-13): session_context (SageSession + EntityState +
-// load_entity_states_for_group) — pure sqlx::PgPool helpers + DTOs.
+// Phase 2A of the capability-crate restructure (2026-05-13) — the eight
+// pure-type sage modules moved out of `ob-poc-boundary::sage::*` into
+// `ob-poc-sage::*` at the top level. Sibling Sage engines in this crate
+// (deterministic, llm_sage, coder, verb_resolve, verb_index,
+// arg_assembly, clash_matrix, valid_verb_set) continue to reach them via
+// `super::{outcome, plane, polarity, context, coder_result,
+// verb_resolve_types, disposition, pre_classify}` through these
+// re-exports. See docs/todo/capability-crate-restructure-v1.md §2.2.
+pub use ob_poc_sage::coder_result;
+pub use ob_poc_sage::context;
+pub use ob_poc_sage::disposition;
+pub use ob_poc_sage::outcome;
+pub use ob_poc_sage::plane;
+pub use ob_poc_sage::polarity;
+pub use ob_poc_sage::pre_classify;
+pub use ob_poc_sage::verb_resolve_types;
+// Phase 2B still pending — session_context's sqlx-backed loaders are
+// staying in ob-poc-boundary one more slice.
 pub use ob_poc_boundary::sage::session_context;
-// Phase 3 slice 2bb (2026-05-13): verb-resolve result DTOs +
-// From<FilterDiagnostics> for CoderFilterDiagnostics impl.
-pub use ob_poc_boundary::sage::verb_resolve_types;
 pub mod valid_verb_set;
-
-// Phase 1.2+
-// Phase 3 slice 2cc (2026-05-13): full pre_classify module relocated to
-// ob-poc-boundary::sage::pre_classify (zero crate-internal deps).
-pub use ob_poc_boundary::sage::pre_classify;
 
 // Phase 1.4
 pub mod arg_assembly;
