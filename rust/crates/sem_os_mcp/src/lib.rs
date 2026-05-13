@@ -62,5 +62,12 @@
 //!   `sem_os_client` → `sem_os_postgres`. No direct sqlx usage
 //!   in this crate.
 
-// Phase 4.1 placeholder — Phase 4.2 fills in modules / tool
-// dispatch / binary.
+/// Minimal JSON-RPC 2.0 primitives — Phase 4.2a.
+pub mod protocol;
+
+/// Knowledge-tool trait + name-keyed registry — Phase 4.2a.
+pub mod tools;
+
+/// Server dispatcher — `initialize` / `tools/list` /
+/// `tools/invoke`. Phase 4.2a.
+pub mod server;
