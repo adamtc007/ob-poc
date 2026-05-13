@@ -52,4 +52,6 @@
 //! own `PackProjection` DTO; the projection function (`fn from(&PackManifest)
 //! -> PackProjection`) lives in `ob-poc` (the application layer).
 
-// Empty — Phase 3 fills this in.
+// Empty — Phase 3C is paused on acp_registry_projection refactor blocker.
+// See `docs/todo/capability-crate-restructure-v1.md` §6 and the journey
+// mod.rs in ob-poc-boundary for the current status.

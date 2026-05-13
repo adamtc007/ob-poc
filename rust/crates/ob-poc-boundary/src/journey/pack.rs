@@ -18,7 +18,7 @@
 
 use std::path::Path;
 
-use crate::session::WorkspaceKind;
+use ob_poc_types::session::kinds::WorkspaceKind;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 

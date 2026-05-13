@@ -10,6 +10,14 @@
 //! The remaining journey modules (router, playback, template instantiation,
 //! pack manager) stay in ob-poc because they reach into the REPL execution
 //! tier (`repl::runbook`, `repl::types_v2`).
+//!
+//! Phase 3C of capability-crate restructure (paused 2026-05-13): a move
+//! into ob-poc-journey was attempted but pack.rs is still needed by
+//! `acp_registry_projection.rs` (a second site with the same deep
+//! coupling pattern that `acp_dag_semantic` had before Phase 3B). Phase
+//! 3C cannot land until that second site is refactored to consume a
+//! boundary-owned projection (Phase 3C-followup). For now journey/*
+//! stays in boundary.
 
 pub mod handoff;
 pub mod pack;
