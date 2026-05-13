@@ -1,20 +1,27 @@
 //! MCP-backed knowledge + hydration clients — Phase 4.3.
 //!
 //! Replaces the Phase 2.8 `StubKnowledgeClient` and Phase 3.2
-//! `StubConstellationHydrator` with implementations that drive the
+//! `StubConstellationHydrator` with implementations that drive a
 //! `sem_os_mcp` server over the standard MCP `tools/invoke`
 //! protocol.
 //!
-//! ## In-process today, subprocess later
+//! ## Transport abstraction
 //!
-//! The Phase 4.3 wiring keeps the MCP server in the same address
-//! space as the agent — both consume the protocol DTOs from
-//! `sem_os_mcp::protocol` and the dispatcher from
-//! `sem_os_mcp::server`. Production deployments will swap the
-//! in-process server for a subprocess client speaking newline-
-//! delimited JSON-RPC over stdio; the trait surface this module
-//! exposes (`SemOsKnowledgeClient`, `ConstellationHydrator`) is
-//! transport-agnostic so the swap is mechanical.
+//! Knowledge + hydration clients depend on the [`McpTransport`]
+//! trait — an async surface that takes a `JsonRpcRequest` and
+//! returns a `JsonRpcResponse`. Two impls live in this crate:
+//!
+//! - [`InProcessTransport`] — wraps an `Arc<McpServer>` and
+//!   dispatches through `handle_request` directly. CI-safe; no
+//!   process spawn. Used by the spike binary.
+//! - [`SubprocessTransport`] (added in §9 item 8 follow-up slice
+//!   B) — spawns the `sem_os_mcp` binary and proxies stdio
+//!   JSON-RPC. The production shape.
+//!
+//! The binary integrator picks the transport at startup and
+//! threads it into the planning loop via `McpKnowledgeClient::new`
+//! / `McpConstellationHydrator::new`. Swapping is mechanical
+//! because the clients only see `Arc<dyn McpTransport>`.
 //!
 //! ## Translation
 //!
@@ -43,17 +50,72 @@ use crate::knowledge::{
     SemOsKnowledgeClient,
 };
 
-/// Wraps an `McpServer` and dispatches knowledge queries through
-/// it. Constructed once at startup; cheap to share via `Arc`.
-pub struct McpKnowledgeClient {
+/// Async transport surface for the MCP protocol. Both in-process
+/// and subprocess implementations satisfy this trait — clients
+/// only see `Arc<dyn McpTransport>` and never touch the
+/// underlying transport directly.
+///
+/// `invoke` takes a fully-formed `JsonRpcRequest` and returns
+/// the matching `JsonRpcResponse`. Transport errors (e.g. the
+/// subprocess died, the in-process dispatcher panicked) surface
+/// as `JsonRpcResponse::error` with the canonical
+/// `INTERNAL_ERROR` code so callers see a uniform shape.
+#[async_trait]
+pub trait McpTransport: Send + Sync {
+    async fn invoke(&self, request: JsonRpcRequest) -> JsonRpcResponse;
+
+    /// Human-readable label for diagnostics / audit. The
+    /// in-process transport returns a fixed label; the subprocess
+    /// transport returns its spawn command + pid.
+    fn provider_label(&self) -> &str {
+        "unknown"
+    }
+}
+
+/// In-process MCP transport — wraps an `Arc<McpServer>` and
+/// dispatches through `handle_request` directly. CI-safe;
+/// no subprocess management.
+pub struct InProcessTransport {
     server: Arc<McpServer>,
+    label: String,
+}
+
+impl InProcessTransport {
+    pub fn new(server: Arc<McpServer>, label: impl Into<String>) -> Self {
+        Self {
+            server,
+            label: label.into(),
+        }
+    }
+}
+
+#[async_trait]
+impl McpTransport for InProcessTransport {
+    async fn invoke(&self, request: JsonRpcRequest) -> JsonRpcResponse {
+        self.server.handle_request(request).await
+    }
+
+    fn provider_label(&self) -> &str {
+        &self.label
+    }
+}
+
+/// Wraps an `McpTransport` and dispatches knowledge queries
+/// through it. Constructed once at startup; cheap to share via
+/// `Arc`. The transport is injectable so the in-process and
+/// subprocess variants share this surface unchanged.
+pub struct McpKnowledgeClient {
+    transport: Arc<dyn McpTransport>,
     provider_label: String,
 }
 
 impl McpKnowledgeClient {
-    pub fn new(server: Arc<McpServer>, provider_label: impl Into<String>) -> Self {
+    pub fn new(
+        transport: Arc<dyn McpTransport>,
+        provider_label: impl Into<String>,
+    ) -> Self {
         Self {
-            server,
+            transport,
             provider_label: provider_label.into(),
         }
     }
@@ -72,7 +134,7 @@ impl McpKnowledgeClient {
                 "arguments": arguments,
             }),
         };
-        let response = self.server.handle_request(request).await;
+        let response = self.transport.invoke(request).await;
         extract_tool_result(name, response)
     }
 }
@@ -136,14 +198,17 @@ impl SemOsKnowledgeClient for McpKnowledgeClient {
 /// `constellation_walk` tool and reshapes its slot tree into the
 /// agent's `ConstellationSnapshot`.
 pub struct McpConstellationHydrator {
-    server: Arc<McpServer>,
+    transport: Arc<dyn McpTransport>,
     provider_label: String,
 }
 
 impl McpConstellationHydrator {
-    pub fn new(server: Arc<McpServer>, provider_label: impl Into<String>) -> Self {
+    pub fn new(
+        transport: Arc<dyn McpTransport>,
+        provider_label: impl Into<String>,
+    ) -> Self {
         Self {
-            server,
+            transport,
             provider_label: provider_label.into(),
         }
     }
@@ -168,7 +233,7 @@ impl ConstellationHydrator for McpConstellationHydrator {
                 "arguments": args,
             }),
         };
-        let response = self.server.handle_request(request).await;
+        let response = self.transport.invoke(request).await;
         let result = match response.result {
             Some(value) => value,
             None => {
@@ -288,10 +353,14 @@ mod tests {
         Arc::new(McpServer::new(registry))
     }
 
+    fn build_transport() -> Arc<dyn McpTransport> {
+        Arc::new(InProcessTransport::new(build_server(), "phase-4-test"))
+    }
+
     #[tokio::test]
     async fn stub_bridge_yields_empty_response_for_resolve_entity() {
         let client =
-            McpKnowledgeClient::new(build_server(), "phase-4-test");
+            McpKnowledgeClient::new(build_transport(), "phase-4-test");
         let response = client
             .query(KnowledgeQuery::ResolveEntity {
                 entity_kind: Some("cbu".to_string()),
@@ -304,7 +373,7 @@ mod tests {
 
     #[tokio::test]
     async fn stub_bridge_yields_empty_response_for_active_verbs() {
-        let client = McpKnowledgeClient::new(build_server(), "phase-4-test");
+        let client = McpKnowledgeClient::new(build_transport(), "phase-4-test");
         let response = client
             .query(KnowledgeQuery::ActiveVerbsAtState {
                 workspace: "cbu".to_string(),
@@ -318,7 +387,7 @@ mod tests {
 
     #[tokio::test]
     async fn stub_bridge_yields_empty_response_for_pack_catalogue() {
-        let client = McpKnowledgeClient::new(build_server(), "phase-4-test");
+        let client = McpKnowledgeClient::new(build_transport(), "phase-4-test");
         let response = client
             .query(KnowledgeQuery::PackCatalogue {
                 workspace: "cbu".to_string(),
@@ -330,13 +399,13 @@ mod tests {
 
     #[tokio::test]
     async fn provider_label_round_trips() {
-        let client = McpKnowledgeClient::new(build_server(), "phase-4-spike");
+        let client = McpKnowledgeClient::new(build_transport(), "phase-4-spike");
         assert_eq!(client.provider_label(), "phase-4-spike");
     }
 
     #[tokio::test]
     async fn hydrator_returns_empty_snapshot_against_stub() {
-        let hydrator = McpConstellationHydrator::new(build_server(), "phase-4-test");
+        let hydrator = McpConstellationHydrator::new(build_transport(), "phase-4-test");
         let snapshot = hydrator
             .hydrate(HydrationScope {
                 workspace: "cbu",

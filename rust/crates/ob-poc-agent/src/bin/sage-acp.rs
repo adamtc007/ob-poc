@@ -42,7 +42,9 @@ use ob_poc_agent::goal_frame_handler::try_handle_goal_frame;
 use ob_poc_agent::goal_proposal_trace::{GoalProposalTraceSink, LoggingTraceSink};
 use ob_poc_agent::index::{DiskPackIndexLoader, IndexLoadRequest, IndexLoader};
 use ob_poc_agent::knowledge::SemOsKnowledgeClient;
-use ob_poc_agent::mcp_client::{McpConstellationHydrator, McpKnowledgeClient};
+use ob_poc_agent::mcp_client::{
+    InProcessTransport, McpConstellationHydrator, McpKnowledgeClient, McpTransport,
+};
 use ob_poc_agent::planning::PlanningLoop;
 use ob_poc_agent::prompt_handler::try_handle_prompt;
 use ob_poc_agent::repl_channel::LocalRunbookChannel;
@@ -105,8 +107,20 @@ async fn main() -> anyhow::Result<()> {
         mcp_server.registry().len(),
     );
 
-    let knowledge: Arc<dyn SemOsKnowledgeClient> = Arc::new(McpKnowledgeClient::new(
+    // §9 item 8 follow-up slice A — the in-process transport is the
+    // CI-safe default; slice B introduces a subprocess transport
+    // that swaps in here under env-var control.
+    let transport: Arc<dyn McpTransport> = Arc::new(InProcessTransport::new(
         mcp_server.clone(),
+        "sem_os_mcp@in-process",
+    ));
+    eprintln!(
+        "[sage-acp] MCP transport wired (provider: {})",
+        transport.provider_label()
+    );
+
+    let knowledge: Arc<dyn SemOsKnowledgeClient> = Arc::new(McpKnowledgeClient::new(
+        transport.clone(),
         "sem_os_mcp@in-process",
     ));
     eprintln!(
@@ -115,7 +129,7 @@ async fn main() -> anyhow::Result<()> {
     );
 
     let hydrator: Arc<dyn ConstellationHydrator> = Arc::new(McpConstellationHydrator::new(
-        mcp_server.clone(),
+        transport.clone(),
         "sem_os_mcp@in-process",
     ));
     eprintln!(
