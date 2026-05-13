@@ -275,6 +275,7 @@ members = [
     "crates/sem_os_client",
     "crates/sem_os_obpoc_adapter",
     "crates/sem_os_harness",
+    "crates/sem_os_mcp",
 
     # Three-plane refactor — dsl-runtime (Phase 1 onwards)
     "crates/dsl-runtime",

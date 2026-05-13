@@ -1,0 +1,44 @@
+[package]
+name = "sem_os_mcp"
+version = "0.1.0"
+edition = "2021"
+description = "Semantic OS MCP server — exposes the SemOS knowledge surface (entity resolution, active verb surface at state, macro / pack catalogue, FSM transitions, constellation walk) as MCP tools. Read-only by construction. Sage ACP runtime is the canonical client; other MCP-speaking editors / agents may also consume."
+
+# Capability discipline (Sage ACP capability plan §6 decision 5,
+# docs/todo/capability-crate-restructure-v1.md §1):
+#   IN-SCOPE  : MCP server (stdio + future tcp/ws transports),
+#               read-only SemOS knowledge tools delegating into
+#               `sem_os_client` (which fronts sem_os_postgres /
+#               sem_os_server). Binary `sem_os_mcp` launches the
+#               server.
+#   OUT-OF-SCOPE: application-side MCP tools (REPL-facing verb
+#                 search etc. — those stay in `rust/src/mcp/`).
+#                 Mutation — every tool returns read-only
+#                 projections; no `dispatch_tool` writes from
+#                 inside this crate. Phase 4 wires the agent as a
+#                 client; future MCP-speaking agents may also
+#                 consume.
+#
+# Forbidden dep: ob-poc. Like ob-poc-agent, sem_os_mcp is intended
+# to ship as a standalone substrate-side surface independent of
+# the ob-poc application crate.
+
+[dependencies]
+sem_os_client = { path = "../sem_os_client" }
+sem_os_core = { path = "../sem_os_core" }
+ob-poc-types = { path = "../ob-poc-types" }
+
+tokio = { version = "1", features = ["full"] }
+async-trait = "0.1"
+
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+anyhow = "1.0"
+thiserror = "1"
+tracing = "0.1"
+
+uuid = { version = "1", features = ["v4", "serde"] }
+chrono = { version = "0.4", features = ["serde"] }
+
+[lints.rust]
+unreachable_pub = "deny"
