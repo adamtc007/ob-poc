@@ -33,8 +33,10 @@
 //!   stored here.
 
 use std::collections::BTreeSet;
+use std::path::Path;
 use std::sync::OnceLock;
 
+use ob_poc_types::journey::pack_types::PackManifest;
 use serde::{Deserialize, Serialize};
 
 use crate::acp_dag_semantic::AcpDagSemanticPackContext;
@@ -122,6 +124,49 @@ pub fn get_pack_projection_provider() -> Result<PackProjectionProvider, &'static
 }
 
 // ---------------------------------------------------------------------------
+// Pack-manifest provider (Phase 3C-prep, 2026-05-13)
+// ---------------------------------------------------------------------------
+//
+// `acp_registry_projection` builds a rich registry projection (verb
+// bindings, macro tiers, workbook plans) that reads `PackManifest`
+// field-by-field, so it can't run off the already-projected
+// `PackProjection`. Boundary still must not depend on `ob-poc-journey`
+// (plan §6 decision 2), so the disk-loading path-to-manifests function
+// is provided through a separate hook below.
+//
+// The integrator (ob-poc) registers both providers at startup; they
+// share the same underlying `load_packs_from_dir` call internally.
+
+/// A registered provider that loads pack manifests from a config root.
+///
+/// Function-pointer hook (allocation-free) matching the
+/// [`PackProjectionProvider`] pattern. The integrator's implementation
+/// calls `ob-poc-journey::pack::load_packs_from_dir(&path.join("packs"))`
+/// and translates the loader error into a string.
+pub type PackManifestProvider = fn(&Path) -> Result<Vec<(PackManifest, String)>, String>;
+
+static MANIFEST_PROVIDER: OnceLock<PackManifestProvider> = OnceLock::new();
+
+/// Register the pack-manifest provider. Idempotent — `OnceLock::set`
+/// semantics; the first registration wins.
+pub fn set_pack_manifest_provider(provider: PackManifestProvider) -> Result<(), ()> {
+    MANIFEST_PROVIDER.set(provider).map_err(|_| ())
+}
+
+/// Fetch the registered pack-manifest provider.
+///
+/// Returns `Err` if no provider has been registered. Surfaced by
+/// `acp_registry_projection::build_slice1_acp_registry_projection` so a
+/// missing integrator registration becomes a visible projection-time
+/// failure, not silent.
+pub fn get_pack_manifest_provider() -> Result<PackManifestProvider, &'static str> {
+    MANIFEST_PROVIDER
+        .get()
+        .copied()
+        .ok_or("pack-manifest provider not registered (ob-poc app startup must call set_pack_manifest_provider)")
+}
+
+// ---------------------------------------------------------------------------
 // Test-only fixture provider
 // ---------------------------------------------------------------------------
 //
@@ -138,10 +183,19 @@ pub fn get_pack_projection_provider() -> Result<PackProjectionProvider, &'static
 
 #[cfg(test)]
 pub(crate) fn ensure_test_provider_registered() {
-    // Idempotent — `set_pack_projection_provider` is a no-op after first
-    // success, matching `OnceLock::set` semantics. Multiple tests
-    // calling this concurrently is safe.
+    // Idempotent — both hooks are `OnceLock::set`, so first registration
+    // wins; concurrent test calls are safe.
     let _ = set_pack_projection_provider(load_test_pack_projections);
+    let _ = set_pack_manifest_provider(load_test_pack_manifests);
+}
+
+#[cfg(test)]
+fn load_test_pack_manifests(
+    config_root: &Path,
+) -> Result<Vec<(PackManifest, String)>, String> {
+    use crate::journey::pack::load_packs_from_dir;
+    let packs_dir = config_root.join("packs");
+    load_packs_from_dir(&packs_dir).map_err(|error| error.to_string())
 }
 
 #[cfg(test)]

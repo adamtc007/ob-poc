@@ -17,10 +17,10 @@ use std::fs;
 use std::path::Path;
 
 // Phase 3C-prep of capability-crate restructure (2026-05-13): pack DTOs
-// hoisted to ob-poc-types per plan §6.5. The YAML loader stays in the
-// catalogue-owning crate (currently `crate::journey::pack` during the
-// transition; will move to ob-poc-journey in Phase 3C proper).
-use crate::journey::pack::load_packs_from_dir;
+// hoisted to ob-poc-types per plan §6.5; the YAML loader is reached via
+// `pack_projection::get_pack_manifest_provider()` so boundary no longer
+// imports anything from `crate::journey::*`.
+use crate::pack_projection::get_pack_manifest_provider;
 use ob_poc_types::journey::pack_types::{
     AnswerKind, PackManifest, PackQuestion, PackTemplate, RiskPolicy, TemplateStep,
 };
@@ -625,9 +625,14 @@ pub fn build_slice1_acp_registry_projection(
     config_root: impl AsRef<Path>,
 ) -> Result<AcpRegistryProjection> {
     let config_root = config_root.as_ref();
-    let packs_dir = config_root.join("packs");
-    let loaded_packs = load_packs_from_dir(&packs_dir)
-        .with_context(|| format!("loading pack manifests from {}", packs_dir.display()))?;
+    #[cfg(test)]
+    crate::pack_projection::ensure_test_provider_registered();
+    let manifest_provider = get_pack_manifest_provider()
+        .map_err(|err| anyhow::anyhow!("{err}"))
+        .with_context(|| "fetching pack-manifest provider")?;
+    let loaded_packs = manifest_provider(config_root)
+        .map_err(|err| anyhow::anyhow!("{err}"))
+        .with_context(|| format!("loading pack manifests under {}", config_root.display()))?;
     let verbs = ConfigLoader::new(config_root.display().to_string())
         .load_verbs()
         .with_context(|| format!("loading verb configs from {}", config_root.display()))?;
