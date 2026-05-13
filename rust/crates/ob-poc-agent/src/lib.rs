@@ -91,3 +91,7 @@ pub mod repl_channel;
 /// macro and pack catalogue / FSM transitions. Phase 2 ships a stub
 /// impl; Phase 4 introduces `sem_os_mcp` as the production transport.
 pub mod knowledge;
+
+/// Audit emission — Phase 2.9. JSONL sink for replay-grade prompt
+/// records. Phase 5.3 adds the OTLP companion sink per V&S §6.9.
+pub mod audit;

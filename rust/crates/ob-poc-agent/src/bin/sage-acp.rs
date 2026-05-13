@@ -31,6 +31,7 @@ use std::sync::Arc;
 
 use ob_agentic::anthropic_client::AnthropicClient;
 use ob_agentic::llm_client::LlmClient;
+use ob_poc_agent::audit::{default_audit_path, AuditPath, AuditSink, JsonlAuditSink, NullAuditSink};
 use ob_poc_agent::index::{DiskPackIndexLoader, IndexLoadRequest, IndexLoader};
 use ob_poc_agent::knowledge::{SemOsKnowledgeClient, StubKnowledgeClient};
 use ob_poc_agent::planning::PlanningLoop;
@@ -101,6 +102,18 @@ async fn main() -> anyhow::Result<()> {
 
     let planning = PlanningLoop::new(index, llm_client, Some(knowledge));
     let channel = LocalParseChannel::new();
+
+    let audit: Arc<dyn AuditSink> = match default_audit_path() {
+        AuditPath::Disabled => {
+            eprintln!("[sage-acp] Audit sink disabled (OBPOC_SAGE_AUDIT=none)");
+            Arc::new(NullAuditSink)
+        }
+        AuditPath::File(path) => {
+            eprintln!("[sage-acp] Audit sink: {}", path.display());
+            Arc::new(JsonlAuditSink::new(path))
+        }
+    };
+
     let mut agent = AcpJsonRpcAgent::new();
 
     let stdin = std::io::stdin();
@@ -113,7 +126,7 @@ async fn main() -> anyhow::Result<()> {
             continue;
         }
         let outgoing = match serde_json::from_str::<JsonRpcRequest>(&line) {
-            Ok(request) => match try_handle_prompt(&request, &planning, &channel).await {
+            Ok(request) => match try_handle_prompt(&request, &planning, &channel, audit.as_ref()).await {
                 Some(messages) => messages,
                 None => agent.handle_request(request),
             },

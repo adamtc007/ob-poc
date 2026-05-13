@@ -18,6 +18,7 @@ use ob_poc_boundary::acp_protocol::{
 };
 use serde_json::{json, Value};
 
+use crate::audit::{AuditRecord, AuditSink};
 use crate::planning::{DraftSource, PlanningLoop, PlanningOutcome};
 use crate::repl_channel::{minimal_source_for_verb, ReplChannelClient, ValidationOutcome};
 
@@ -42,6 +43,7 @@ pub async fn try_handle_prompt(
     request: &JsonRpcRequest,
     planning: &PlanningLoop,
     channel: &dyn ReplChannelClient,
+    audit: &dyn AuditSink,
 ) -> Option<Vec<JsonRpcOutgoing>> {
     if request.method != "session/prompt" {
         return None;
@@ -70,6 +72,12 @@ pub async fn try_handle_prompt(
             // client.
             let source = minimal_source_for_verb(&outcome.verb_fqn);
             let validation = channel.validate(&source).await;
+            // Phase 2.9: persist the record for post-hoc replay /
+            // audit. Best-effort — sink failures do not block the
+            // response.
+            let record =
+                AuditRecord::from_outcome(&outcome, &validation, planning.knowledge_label());
+            audit.emit(record).await;
             Some(success_messages(
                 id,
                 &parsed.session_id,
@@ -223,6 +231,7 @@ fn error_response(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::audit::NullAuditSink;
     use crate::index::SessionIndex;
     use crate::repl_channel::LocalParseChannel;
     use chrono::Utc;
@@ -273,7 +282,8 @@ progress_signals: []
             params: json!({}),
         };
         let channel = LocalParseChannel::new();
-        let outcome = try_handle_prompt(&request, &make_planning_loop(), &channel).await;
+        let audit = NullAuditSink;
+        let outcome = try_handle_prompt(&request, &make_planning_loop(), &channel, &audit).await;
         assert!(outcome.is_none());
     }
 
@@ -289,7 +299,8 @@ progress_signals: []
             }),
         };
         let channel = LocalParseChannel::new();
-        let outcome = try_handle_prompt(&request, &make_planning_loop(), &channel)
+        let audit = NullAuditSink;
+        let outcome = try_handle_prompt(&request, &make_planning_loop(), &channel, &audit)
             .await
             .expect("session/prompt must be handled");
         assert_eq!(outcome.len(), 3, "plan update + diagnostics + response");
@@ -334,7 +345,8 @@ progress_signals: []
             params: json!({"not": "a prompt"}),
         };
         let channel = LocalParseChannel::new();
-        let outcome = try_handle_prompt(&request, &make_planning_loop(), &channel)
+        let audit = NullAuditSink;
+        let outcome = try_handle_prompt(&request, &make_planning_loop(), &channel, &audit)
             .await
             .expect("handled");
         assert_eq!(outcome.len(), 1);
