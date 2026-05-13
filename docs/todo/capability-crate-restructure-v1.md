@@ -19,6 +19,40 @@ Slices 2u → 2dd violated rule 1: I packed `ob-poc-envelope` with anything that
 
 ---
 
+## 1.5 Sage↔REPL is doc-collab over LSP (added 2026-05-13)
+
+The runbook is the **shared artefact**, not a message or a tool-call result. The data flow:
+
+```
+Zed / JetBrains / Observatory  ─ACP─>  Sage
+                                         │
+                       ┌─────────────────┼─────────────────┐
+                       │                                   │
+                     MCP                                 LSP
+                       │                                   │
+                     SemOS                              REPL
+              (what is possible)               (does this draft compile?
+                                                what's unresolved? what's
+                                                the executable order?)
+```
+
+- **Sage** drafts the runbook (DSL text).
+- **REPL** validates it — DSL compiler, linter, DAG re-orderer, unresolved-reference detector.
+- The two iterate over the runbook as a textDocument until the user says **run** or **scrap**.
+- **SemOS** is closed-domain knowledge — what verbs exist, what the constellation FSM allows, what packs apply — served via MCP to Sage.
+
+Three boundaries, three protocols, each doing the job it was designed for. The runbook-as-textDocument is precisely what LSP exists for — `textDocument/didChange` + `publishDiagnostics` + `codeAction`. The same LSP server eventually serves humans who want to inspect/edit the draft directly in Zed or the Observatory.
+
+**This reframing tightens the charters in §2.1 and §2.2** but does not change the crate shape. It also clarifies decision §6.2 (envelope→journey edge BREAK): the pack catalogue is genuinely SemOS knowledge served via MCP, not a journey-internal artefact.
+
+**Out-of-scope follow-ons** (captured in §9 v2 review):
+- `dsl-lsp` currently depends on `ob-poc` (inverted edge). Uninvert it so the LSP server is reusable by Sage AND human editors.
+- The DSL compiler + linter + DAG re-orderer should consolidate into ONE analyser crate consumed by `dsl-lsp`, `ob-poc::repl`, and optionally `ob-poc-sage`.
+- The MCP server fronting SemOS should be the SemOS-side projection of the pack/verb/constellation catalogue.
+- "Coder" is not a separate component in your model — the current `coder.rs` / `verb_resolve.rs` / `arg_assembly.rs` are stages inside the Sage drafter. The CoderResult/CoderEngine names want a rename pass to drafter terminology.
+
+---
+
 ## 2. Target capability map
 
 ### 2.1 Existing crates (charters tightened)
@@ -47,16 +81,18 @@ Slices 2u → 2dd violated rule 1: I packed `ob-poc-envelope` with anything that
 
 | Crate | Charter | Initial modules |
 |-------|---------|-----------------|
-| `ob-poc-sage` *(new)* | **Sage intent understanding — utterance → structured intent.** No DSL assembly, no execution. | `plane`, `polarity`, `outcome`, `context`, `pre_classify`, `coder_result`, `disposition`, `verb_resolve_types`, `session_context`. Later: `coder`, `verb_resolve`, `verb_index`, `arg_assembly`, `clash_matrix`, `deterministic`, `llm_sage`, `valid_verb_set`, `constrained_match`. |
-| `ob-poc-journey` *(new)* | **Pack-guided workflow definitions.** Pack manifests, FSM, handoff. The "what the user is doing" layer. | `pack`, `pack_state`, `handoff`. Later: `pack_manager`, `router`, `playback`, `template`. |
+| `ob-poc-sage` *(new)* | **Sage drafter** — produces runbook drafts from utterances + SemOS knowledge queries. (Pre-reframing charter said "intent understanding"; the reframed view is that intent understanding is *one stage inside* drafting. The crate owns the drafter's type vocabulary plus its deterministic classifier. The drafter→REPL feedback loop is LSP doc-collab, served by `dsl-lsp`, not by this crate.) | `plane`, `polarity`, `outcome`, `context`, `pre_classify`, `coder_result`, `disposition`, `verb_resolve_types`, `session_context`. Later: `coder`, `verb_resolve`, `verb_index`, `arg_assembly`, `clash_matrix`, `deterministic`, `llm_sage`, `valid_verb_set`, `constrained_match`. NOTE: `coder_*` / `CoderEngine` names are artefacts of an earlier design where Coder was a separate component. Rename pass deferred to bed-in v2. |
+| `ob-poc-journey` *(new)* | **Pack catalogue knowledge.** Pack manifests, FSM, handoff. Pre-reframing framed as "pack-guided workflow definitions"; the reframed view is that this crate owns the canonical pack catalogue that SemOS serves to Sage via MCP and that boundary projects to ACP editors. The crate is the disk-loader of record today; tomorrow the loader is one provider behind a SemOS-served catalogue API. | `pack`, `pack_state`, `handoff`. Later: `pack_manager`, `router`, `playback`, `template`. |
 | `ob-poc-domain` *(new)* | **Domain DTOs.** Pure data shapes for the business domains. Reference data, not execution. | `booking_principal_types`, `bods_types`, `deal_types`, `trading_profile`, `taxonomy`, `semtaxonomy`, `ontology`, `derived_attributes`, `view_config_service`, `entity_linking`. |
 | `ob-poc-authoring` *(new)* | **Editor / authoring surface.** Tools that serve the human author: clarification, lexicon lookup, lint, macro registry, data dictionary, display nouns, feedback inspector. | `clarify`, `lexicon`, `macros`, `lint`, `data_dictionary`, `display_nouns`, `feedback`, `language_pack`. |
 
 ### 2.3 Tightened envelope charter
 
-`ob-poc-envelope` shrinks to its real capability:
+`ob-poc-envelope` shrinks to its real capability and renames to `ob-poc-boundary`:
 
-> **The typed contract between Sage and execution.** Envelope construction, TOCTOU recheck, approval tokens, audit chain, workbook DTOs, LLM trace hashing, DSL coder output binding, mutation pre-flight, gate policy, session-input draft mode, ACP discovery projection.
+> **The execution-side gate.** Owns the typed contract that flows FROM an approved runbook TO the sequencer: envelope construction, TOCTOU recheck, approval tokens, audit chain, workbook DTOs, LLM trace hashing, DSL coder output binding, mutation pre-flight, gate policy, session-input draft mode, ACP discovery projection.
+
+Note on framing (added 2026-05-13): pre-reframing this crate was called "the boundary tier" or "the typed contract between Sage and execution," which mixed two distinct surfaces — the doc-collab transport (Sage drafts ↔ REPL validates) and the execution gate (approved runbook → sequencer). The reframing splits those: the doc-collab transport is LSP via `dsl-lsp`; this crate keeps the execution gate plus the ACP editor-discovery projection of what's available. The runbook-draft state is NOT a boundary concern — it lives in `dsl-lsp`'s per-session textDocument tracking and in the REPL's runbook store.
 
 Modules to KEEP in envelope:
 - `envelope_builder`, `toctou_recheck`, `approval_token`, `audit_chain`, `mutation_preflight`
@@ -209,7 +245,7 @@ Run `cargo tree` per crate; verify no capability crate imports another except th
 
 1. **envelope → sage edge: OPAQUE.** ACP exposes pack/verb FQNs, policy reasons, state-hash digests — never `OutcomeIntent` / `ObservationPlane` / Sage taxonomy. Locks in Sage refactor budget; the wire protocol does not move when Sage's internal vocabulary changes.
 
-2. **envelope → journey edge: BREAK.** Envelope owns its own `PackProjection { fqn, allowed_verbs, mode_tags, … }`. The projection function (`fn from(pack: &PackManifest) -> PackProjection`) lives in `ob-poc` (the application). Envelope no longer reaches journey for types.
+2. **boundary → journey edge: BREAK.** Boundary owns its own `PackProjection { indexing, context }`. The projection function (`fn project_pack(&PackManifest, hash) -> PackProjection`) lives in `ob-poc` (the application). Boundary no longer reaches journey for types. **Strengthened by the §1.5 reframing (2026-05-13):** the pack catalogue is genuinely SemOS knowledge served via MCP, not a boundary-internal artefact. The provider-hook seam in boundary is where SemOS will plug in when the MCP-served catalogue API lands.
 
 3. **No `ob-poc-infra` crate.** Helpers like `advisory_lock` go with their primary consumer (`derived_attributes` → `ob-poc-domain`). `view_config_service` goes with `taxonomy`. If a helper proves cross-cutting later, extract then.
 
@@ -255,6 +291,16 @@ This v1 plan draws capability boundaries based on the best information we have *
 5. **Engines that didn't move to `ob-poc-sage`** (§6 item 6). If `valid_verb_set` / `llm_sage` / `deterministic` end up being reused outside ob-poc — promote.
 6. **Helpers that did fold into domain** (§6 item 3). If `advisory_lock` or `view_config_service` get a second non-domain consumer — extract then.
 7. **Dependency edges that crept in** that aren't documented in the §3 graph. Run `cargo tree` per capability crate; the only allowed targets are `ob-poc-types`, `ob-poc-diagnostics`, `dsl-core`, `dsl-runtime`, and (where documented) one other capability crate.
+
+### Added 2026-05-13 (Sage↔REPL doc-collab reframing)
+
+8. **`dsl-lsp` dependency inversion.** Today `dsl-lsp/Cargo.toml` has `ob-poc = { path = "../..", features = ["database"] }` — the LSP server consuming the application is an inverted edge. The reframing wants `dsl-lsp` reusable as both Sage's draft validator and Zed/JetBrains's analyser. Uninvert: LSP server depends on the analyser (`dsl-core` + `dsl-runtime`); runtime context arrives via LSP request payloads or a server-init handshake.
+
+9. **Shared-analyser consolidation.** The DSL compiler + linter + DAG re-orderer is today split across `dsl-core`, `dsl-runtime`, and `ob-poc/src/runbook/`. Consolidate into one analyser crate (or a clearly-named module within an existing one) so `dsl-lsp` / `ob-poc::repl` / optionally `ob-poc-sage` all consume the same primitive. This is the load-bearing change for the LSP wire-up.
+
+10. **MCP server for SemOS knowledge queries.** The MCP server currently lives in `ob-poc/src/mcp/` and serves a variety of tools. Under the reframed architecture, the MCP server should be the SemOS-side projection of the pack/verb/constellation catalogue. The boundary's pack-projection provider hook is the seam where this lands.
+
+11. **Coder → Drafter rename pass.** In `ob-poc-sage`: `CoderResult` → `DraftStep`, `CoderEngine` → `DrafterEngine`, `CoderDiagnostics` → `DraftDiagnostics`, `CoderFailureKind` → `DraftFailureKind`, etc. Update call sites across `ob-poc::sage`, `agent::orchestrator`, traceability payloads. Mechanical rename; ~10 commits worth of work. Defer to v2 to avoid mixing structural and naming changes.
 
 **What v2 is NOT:** a chance to second-guess the v1 charters wholesale. The aim is to converge, not to re-design. Hard cap of 4 weeks of v2 effort.
 
