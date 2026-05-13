@@ -11,7 +11,12 @@ use std::time::Duration;
 
 pub mod attribute_values_service;
 pub mod bods_service;
-pub mod bods_types;
+// Phase 3 slice 2x (2026-05-13): pure-DTO module relocated to ob-poc-envelope.
+// Callers (bods_service.rs via `super::bods_types::*`, this module's pub-use
+// alias) keep their existing paths through the compat re-export. The DTOs
+// derive sqlx::FromRow and serde — both available in envelope under the
+// `database` feature.
+pub use ob_poc_envelope::bods_types;
 pub mod cbu_entity_roles_service;
 pub mod cbu_service;
 pub mod context_discovery_service;

@@ -31,6 +31,8 @@ pub mod lint;
 pub mod macros;
 pub mod approval_token;
 pub mod audit_chain;
+#[cfg(feature = "database")]
+pub mod bods_types;
 pub mod booking_principal_types;
 pub mod dsl_coder;
 pub mod envelope_builder;
