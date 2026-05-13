@@ -68,3 +68,14 @@
 /// loader. The substrate-backed loader lands in Phase 4 once
 /// `sem_os_mcp` exists.
 pub mod index;
+
+/// Sage planning loop — Phase 2.6. Takes a raw utterance + a
+/// `SessionIndex` and returns a constrained-composition draft (verb
+/// FQN bounded to the pack allowlist). LLM call site is optional so
+/// the spike runs offline.
+pub mod planning;
+
+/// ACP `session/prompt` interception — Phase 2.6 wiring. Routes
+/// editor prompt requests through the planning loop and falls
+/// through to the boundary `AcpJsonRpcAgent` for everything else.
+pub mod prompt_handler;

@@ -39,6 +39,11 @@ ob-poc-journey = { path = "../ob-poc-journey" }
 # Analyser surface — runbook validate / plan / diagnostics consumed by
 # the LSP-shaped channel and the planning loop.
 dsl-runtime = { path = "../dsl-runtime" }
+# LLM client (BYOK Anthropic + OpenAI). The planning loop holds an
+# Arc<dyn LlmClient>; the binary integrator wires AnthropicClient at
+# startup. ob-agentic has no `ob-poc` edge so the charter-clean wall
+# holds.
+ob-agentic = { path = "../ob-agentic" }
 # SemOS knowledge client — entity resolution, verb surface, FSM
 # transitions, constellation walk. Read-only.
 sem_os_client = { path = "../sem_os_client" }
