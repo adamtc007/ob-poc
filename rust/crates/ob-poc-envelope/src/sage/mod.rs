@@ -34,6 +34,11 @@ pub mod polarity;
 // relocated context/plane/polarity siblings, so the entire 775 LOC
 // engine fits in the boundary tier as-is.
 pub mod pre_classify;
+// Phase 3 slice 2dd (2026-05-13): session_context module (SageSession +
+// EntityState + load_entity_states_for_group). Pure sqlx::PgPool helpers
+// + DTOs; zero internal-crate deps. Database-feature-gated.
+#[cfg(feature = "database")]
+pub mod session_context;
 // Phase 3 slice 2bb (2026-05-13): ScoredVerbCandidate + FilterDiagnostics +
 // the From<FilterDiagnostics> for CoderFilterDiagnostics impl relocated
 // here. Once both sides of the conversion are in envelope the orphan rule

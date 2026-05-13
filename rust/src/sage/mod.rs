@@ -49,10 +49,12 @@ pub use ob_poc_envelope::sage::disposition;
 pub use ob_poc_envelope::sage::outcome;
 pub use ob_poc_envelope::sage::plane;
 pub use ob_poc_envelope::sage::polarity;
+// Phase 3 slice 2dd (2026-05-13): session_context (SageSession + EntityState +
+// load_entity_states_for_group) — pure sqlx::PgPool helpers + DTOs.
+pub use ob_poc_envelope::sage::session_context;
 // Phase 3 slice 2bb (2026-05-13): verb-resolve result DTOs +
 // From<FilterDiagnostics> for CoderFilterDiagnostics impl.
 pub use ob_poc_envelope::sage::verb_resolve_types;
-pub mod session_context;
 pub mod valid_verb_set;
 
 // Phase 1.2+
