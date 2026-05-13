@@ -37,6 +37,7 @@ pub mod llm_trace;
 pub mod mutation_preflight;
 pub mod ontology;
 pub mod policy;
+pub mod semtaxonomy;
 pub mod session;
 pub mod session_trace;
 pub mod taxonomy;

@@ -283,7 +283,8 @@ pub mod sem_reg;
 
 // SemTaxonomy — replacement discovery/composition contract for utterance handling
 #[cfg(feature = "database")]
-pub mod semtaxonomy;
+// Phase 3 slice 2s (2026-05-13): relocated to ob-poc-envelope; compat re-export.
+pub use ob_poc_envelope::semtaxonomy;
 
 // SemTaxonomy v2 — three-step rip-and-replace pipeline
 #[cfg(feature = "database")]
