@@ -19,6 +19,7 @@ use ob_poc_boundary::acp_protocol::{
 use serde_json::{json, Value};
 
 use crate::planning::{DraftSource, PlanningLoop, PlanningOutcome};
+use crate::repl_channel::{minimal_source_for_verb, ReplChannelClient, ValidationOutcome};
 
 const INVALID_PARAMS: i64 = -32602;
 const INTERNAL_ERROR: i64 = -32603;
@@ -40,6 +41,7 @@ const INTERNAL_ERROR: i64 = -32603;
 pub async fn try_handle_prompt(
     request: &JsonRpcRequest,
     planning: &PlanningLoop,
+    channel: &dyn ReplChannelClient,
 ) -> Option<Vec<JsonRpcOutgoing>> {
     if request.method != "session/prompt" {
         return None;
@@ -61,7 +63,21 @@ pub async fn try_handle_prompt(
     let utterance = collect_utterance(&parsed.prompt);
 
     match planning.propose_draft(&utterance).await {
-        Ok(outcome) => Some(success_messages(id, &parsed.session_id, outcome, &utterance)),
+        Ok(outcome) => {
+            // Phase 2.7: round-trip the draft through the LSP-shaped
+            // channel before the response leaves the agent. The spike
+            // channel is parse-only; Phase 4 swaps for a real LSP
+            // client.
+            let source = minimal_source_for_verb(&outcome.verb_fqn);
+            let validation = channel.validate(&source).await;
+            Some(success_messages(
+                id,
+                &parsed.session_id,
+                outcome,
+                &utterance,
+                validation,
+            ))
+        }
         Err(error) => Some(vec![JsonRpcOutgoing::Response(error_response(
             id,
             INTERNAL_ERROR,
@@ -96,11 +112,15 @@ fn success_messages(
     session_id: &str,
     outcome: PlanningOutcome,
     utterance: &str,
+    validation: ValidationOutcome,
 ) -> Vec<JsonRpcOutgoing> {
     let source = match outcome.source {
         DraftSource::LlmTool => "llm_tool",
         DraftSource::DeterministicFallback => "deterministic_fallback",
     };
+    let validation_passed = validation.passed();
+    let diagnostics_json = serde_json::to_value(&validation.diagnostics).unwrap_or(json!([]));
+
     let plan_update = JsonRpcOutgoing::Notification(JsonRpcNotification {
         jsonrpc: "2.0".to_string(),
         method: "session/update".to_string(),
@@ -118,33 +138,59 @@ fn success_messages(
                     "verbFqn": outcome.verb_fqn,
                     "draftSource": source,
                     "utteranceLength": utterance.len(),
+                    "validationPassed": validation_passed,
                 },
                 "entries": [
                     {
                         "id": "draft",
                         "status": "completed",
                         "label": format!("Drafted {} via {}", outcome.verb_fqn, source)
+                    },
+                    {
+                        "id": "validate",
+                        "status": if validation_passed { "completed" } else { "failed" },
+                        "label": format!(
+                            "Validated draft against REPL channel ({} diagnostics)",
+                            validation.diagnostics.len()
+                        )
                     }
                 ]
             }
         }),
     });
 
+    // LSP-shaped publishDiagnostics — even when there are zero
+    // diagnostics the notification is emitted so the editor can
+    // clear any previously-published markers.
+    let diagnostics_notification = JsonRpcOutgoing::Notification(JsonRpcNotification {
+        jsonrpc: "2.0".to_string(),
+        method: "textDocument/publishDiagnostics".to_string(),
+        params: json!({
+            "uri": format!("runbook://session/{session_id}/draft/{}", outcome.goal_frame.id),
+            "diagnostics": diagnostics_json,
+        }),
+    });
+
     let response = JsonRpcOutgoing::Response(success_response(
         id,
         json!({
-            "stopReason": "drafted",
+            "stopReason": if validation_passed { "drafted" } else { "draft_failed_validation" },
             "draft": {
                 "goalFrameId": outcome.goal_frame.id,
                 "verbFqn": outcome.verb_fqn,
                 "source": source,
                 "packId": outcome.goal_frame.pack_id,
                 "packHash": outcome.goal_frame.pack_hash,
+            },
+            "validation": {
+                "passed": validation_passed,
+                "diagnosticCount": validation.diagnostics.len(),
+                "source": validation.source,
             }
         }),
     ));
 
-    vec![plan_update, response]
+    vec![plan_update, diagnostics_notification, response]
 }
 
 fn success_response(id: Option<Value>, result: Value) -> JsonRpcResponse {
@@ -178,6 +224,7 @@ fn error_response(
 mod tests {
     use super::*;
     use crate::index::SessionIndex;
+    use crate::repl_channel::LocalParseChannel;
     use chrono::Utc;
     use ob_poc_journey::pack::load_pack_from_bytes;
     use ob_poc_types::session::kinds::WorkspaceKind;
@@ -225,12 +272,13 @@ progress_signals: []
             method: "initialize".to_string(),
             params: json!({}),
         };
-        let outcome = try_handle_prompt(&request, &make_planning_loop()).await;
+        let channel = LocalParseChannel::new();
+        let outcome = try_handle_prompt(&request, &make_planning_loop(), &channel).await;
         assert!(outcome.is_none());
     }
 
     #[tokio::test]
-    async fn prompt_emits_plan_update_and_response() {
+    async fn prompt_emits_plan_update_diagnostics_and_response() {
         let request = JsonRpcRequest {
             jsonrpc: "2.0".to_string(),
             id: Some(json!(2)),
@@ -240,26 +288,40 @@ progress_signals: []
                 "prompt": [{"type": "text", "text": "set up a new book"}]
             }),
         };
-        let outcome = try_handle_prompt(&request, &make_planning_loop())
+        let channel = LocalParseChannel::new();
+        let outcome = try_handle_prompt(&request, &make_planning_loop(), &channel)
             .await
             .expect("session/prompt must be handled");
-        assert_eq!(outcome.len(), 2);
+        assert_eq!(outcome.len(), 3, "plan update + diagnostics + response");
         match &outcome[0] {
             JsonRpcOutgoing::Notification(note) => {
                 assert_eq!(note.method, "session/update");
                 let trace = &note.params["update"]["goalProposalTrace"];
                 assert_eq!(trace["verbFqn"], "cbu.create");
                 assert_eq!(trace["draftSource"], "deterministic_fallback");
+                assert_eq!(trace["validationPassed"], true);
             }
             JsonRpcOutgoing::Response(_) => panic!("expected notification first"),
         }
         match &outcome[1] {
-            JsonRpcOutgoing::Response(resp) => {
-                let draft = &resp.result.as_ref().unwrap()["draft"];
-                assert_eq!(draft["verbFqn"], "cbu.create");
-                assert_eq!(draft["source"], "deterministic_fallback");
+            JsonRpcOutgoing::Notification(note) => {
+                assert_eq!(note.method, "textDocument/publishDiagnostics");
+                assert!(note.params["uri"]
+                    .as_str()
+                    .unwrap()
+                    .starts_with("runbook://session/"));
+                assert_eq!(note.params["diagnostics"].as_array().unwrap().len(), 0);
             }
-            JsonRpcOutgoing::Notification(_) => panic!("expected response second"),
+            JsonRpcOutgoing::Response(_) => panic!("expected diagnostics notification second"),
+        }
+        match &outcome[2] {
+            JsonRpcOutgoing::Response(resp) => {
+                let result = resp.result.as_ref().unwrap();
+                assert_eq!(result["stopReason"], "drafted");
+                assert_eq!(result["draft"]["verbFqn"], "cbu.create");
+                assert_eq!(result["validation"]["passed"], true);
+            }
+            JsonRpcOutgoing::Notification(_) => panic!("expected response third"),
         }
     }
 
@@ -271,7 +333,8 @@ progress_signals: []
             method: "session/prompt".to_string(),
             params: json!({"not": "a prompt"}),
         };
-        let outcome = try_handle_prompt(&request, &make_planning_loop())
+        let channel = LocalParseChannel::new();
+        let outcome = try_handle_prompt(&request, &make_planning_loop(), &channel)
             .await
             .expect("handled");
         assert_eq!(outcome.len(), 1);

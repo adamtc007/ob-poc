@@ -34,6 +34,7 @@ use ob_agentic::llm_client::LlmClient;
 use ob_poc_agent::index::{DiskPackIndexLoader, IndexLoadRequest, IndexLoader};
 use ob_poc_agent::planning::PlanningLoop;
 use ob_poc_agent::prompt_handler::try_handle_prompt;
+use ob_poc_agent::repl_channel::LocalParseChannel;
 use ob_poc_boundary::acp_protocol::{AcpJsonRpcAgent, JsonRpcOutgoing, JsonRpcRequest};
 use ob_poc_types::session::kinds::WorkspaceKind;
 
@@ -91,6 +92,7 @@ async fn main() -> anyhow::Result<()> {
     };
 
     let planning = PlanningLoop::new(index, llm_client);
+    let channel = LocalParseChannel::new();
     let mut agent = AcpJsonRpcAgent::new();
 
     let stdin = std::io::stdin();
@@ -103,7 +105,7 @@ async fn main() -> anyhow::Result<()> {
             continue;
         }
         let outgoing = match serde_json::from_str::<JsonRpcRequest>(&line) {
-            Ok(request) => match try_handle_prompt(&request, &planning).await {
+            Ok(request) => match try_handle_prompt(&request, &planning, &channel).await {
                 Some(messages) => messages,
                 None => agent.handle_request(request),
             },

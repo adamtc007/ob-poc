@@ -39,6 +39,12 @@ ob-poc-journey = { path = "../ob-poc-journey" }
 # Analyser surface — runbook validate / plan / diagnostics consumed by
 # the LSP-shaped channel and the planning loop.
 dsl-runtime = { path = "../dsl-runtime" }
+# Parser direct dep — the Phase 2.7 spike channel runs parse-only
+# validation via `dsl_core::parser::parse_program`. Phase 4 swaps the
+# in-process channel for an out-of-process JSON-RPC client speaking
+# real LSP traffic to `dsl-lsp` (which already consumes dsl-runtime's
+# consolidated analyser).
+dsl-core = { path = "../dsl-core" }
 # LLM client (BYOK Anthropic + OpenAI). The planning loop holds an
 # Arc<dyn LlmClient>; the binary integrator wires AnthropicClient at
 # startup. ob-agentic has no `ob-poc` edge so the charter-clean wall

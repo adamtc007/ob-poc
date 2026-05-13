@@ -79,3 +79,9 @@ pub mod planning;
 /// editor prompt requests through the planning loop and falls
 /// through to the boundary `AcpJsonRpcAgent` for everything else.
 pub mod prompt_handler;
+
+/// LSP-shaped client surface to the REPL validator — Phase 2.7.
+/// Drafts emitted by the planning loop are validated through this
+/// channel before they reach the editor. The spike runs parse-only
+/// in-process; Phase 4 swaps for a real out-of-process LSP client.
+pub mod repl_channel;
