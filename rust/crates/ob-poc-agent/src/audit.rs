@@ -253,6 +253,7 @@ mod tests {
                 updated_at: now,
                 status: GoalFrameStatus::Proposed,
                 constellation: None,
+                frontier: None,
             },
             verb_fqn: "cbu.create".to_string(),
             source: DraftSource::DeterministicFallback,

@@ -86,6 +86,13 @@ pub mod goal_frame_handler;
 /// Phase 4 swaps for the `sem_os_mcp`-backed transport.
 pub mod constellation;
 
+/// Frontier computation + gap analysis — Phase 3.3 (C-05 / C-06).
+/// Pure compute over the pack manifest + constellation snapshot.
+/// Identifies open `definition_of_done` / `progress_signals` /
+/// `required_questions` items and pairs them with sanctioned verb
+/// candidates from the pack allowlist.
+pub mod frontier;
+
 /// Sage planning loop — Phase 2.6. Takes a raw utterance + a
 /// `SessionIndex` and returns a constrained-composition draft (verb
 /// FQN bounded to the pack allowlist). LLM call site is optional so

@@ -49,6 +49,7 @@ use tokio::sync::Mutex;
 use uuid::Uuid;
 
 use crate::constellation::ConstellationSnapshot;
+use crate::frontier::Frontier;
 use crate::index::SessionIndex;
 
 /// Lifecycle status of a [`GoalFrame`].
@@ -119,6 +120,12 @@ pub struct GoalFrame {
     /// "fall back to the pack allowlist".
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub constellation: Option<ConstellationSnapshot>,
+    /// Frontier projection computed at draft time (Phase 3.3 —
+    /// C-05 / C-06). `None` until the planning loop has produced
+    /// at least one outcome; consumers reading older audit records
+    /// should treat the absence as "frontier not yet computed".
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub frontier: Option<Frontier>,
 }
 
 impl GoalFrame {
@@ -157,6 +164,7 @@ impl GoalFrame {
             updated_at: now,
             status: GoalFrameStatus::Proposed,
             constellation: None,
+            frontier: None,
         }
     }
 
@@ -165,6 +173,14 @@ impl GoalFrame {
     /// (Phase 3.2 — C-04).
     pub fn attach_constellation(&mut self, snapshot: ConstellationSnapshot) {
         self.constellation = Some(snapshot);
+        self.updated_at = Utc::now();
+    }
+
+    /// Attach (or replace) a frontier projection, bumping
+    /// `updated_at`. Used by the planning loop after each frontier
+    /// computation (Phase 3.3 — C-05 / C-06).
+    pub fn attach_frontier(&mut self, frontier: Frontier) {
+        self.frontier = Some(frontier);
         self.updated_at = Utc::now();
     }
 

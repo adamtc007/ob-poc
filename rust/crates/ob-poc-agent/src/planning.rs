@@ -32,7 +32,8 @@ use anyhow::{anyhow, Result};
 use ob_agentic::llm_client::{LlmClient, ToolDefinition};
 use serde::{Deserialize, Serialize};
 
-use crate::constellation::{ConstellationHydrator, HydrationScope};
+use crate::constellation::{ConstellationHydrator, ConstellationSnapshot, HydrationScope};
+use crate::frontier::FrontierEngine;
 use crate::goal_frame::GoalFrame;
 use crate::index::SessionIndex;
 use crate::knowledge::{active_verbs_query_for_index, KnowledgeResponse, SemOsKnowledgeClient};
@@ -158,6 +159,19 @@ impl PlanningLoop {
                 ),
             }
         }
+
+        // Phase 3.3 — compute the frontier from the manifest +
+        // (possibly empty) constellation snapshot. Always runs:
+        // pure compute, no IO, no async. Attaches to the goal frame
+        // so downstream consumers (motivation prompt, audit) can
+        // inspect what the planner thinks is open.
+        let snapshot_ref = goal_frame
+            .constellation
+            .as_ref()
+            .cloned()
+            .unwrap_or_else(ConstellationSnapshot::empty);
+        let frontier = FrontierEngine::compute(&self.index, &snapshot_ref);
+        goal_frame.attach_frontier(frontier);
 
         // Phase 2.8 — exercise the knowledge surface so the seam is
         // demonstrably wired end-to-end. The spike client returns
