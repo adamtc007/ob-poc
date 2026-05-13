@@ -160,15 +160,15 @@ pub use ob_poc_domain::taxonomy;
 
 // Lint module - schema validation for macro and verb definitions
 // Phase 3 slice 2g (2026-05-12): relocated to ob-poc-boundary; compat re-export.
-pub use ob_poc_boundary::lint;
+pub use ob_poc_authoring::lint;
 
 // Macros module - V1-deprecated operator macro registry
 // Phase 3 slice 2i (2026-05-12): relocated to ob-poc-boundary; compat re-export.
-pub use ob_poc_boundary::macros;
+pub use ob_poc_authoring::macros;
 
 // Lexicon module - In-memory vocabulary lookup for verb discovery
 // Phase 3 slice 2j (2026-05-12): relocated to ob-poc-boundary; compat re-export.
-pub use ob_poc_boundary::lexicon;
+pub use ob_poc_authoring::lexicon;
 
 // Entity Linking module - In-memory entity resolution from utterances
 // Phase 3 slice 2m (2026-05-12): relocated to ob-poc-boundary; compat re-export.

@@ -59,9 +59,8 @@ pub mod feedback;
 // Boundary's pack-related surface is now `pack_projection` (typed
 // projection + provider hook); the raw manifest types live in
 // `ob_poc_types::journey::pack_types`.
-pub mod lexicon;
-pub mod lint;
-pub mod macros;
+// Phase 5.2 (2026-05-13): lexicon + macros + lint relocated to
+// ob-poc-authoring; compat re-exports in rust/src/lib.rs.
 pub mod approval_token;
 pub mod audit_chain;
 // Phase 4.1 of capability-crate restructure (2026-05-13): booking_principal_types,

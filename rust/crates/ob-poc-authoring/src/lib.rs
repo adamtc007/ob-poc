@@ -69,3 +69,14 @@
 pub mod clarify;
 pub mod data_dictionary;
 pub mod display_nouns;
+
+// Phase 5.2 (2026-05-13): vocabulary / definitions / diagnostics
+// authoring modules relocated from ob-poc-boundary. All three
+// self-contained (zero external crate refs beyond ob-poc-types).
+//   - lexicon (5 files) — bincode-backed in-memory vocabulary
+//     (LexiconService + LexiconSnapshot + compiler + types).
+//   - macros (3 files) — operator macro registry + definition schema.
+//   - lint (3 files) — schema-validation diagnostics for verb/macro YAML.
+pub mod lexicon;
+pub mod lint;
+pub mod macros;
