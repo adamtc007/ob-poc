@@ -215,6 +215,50 @@ After phase 2: `ob-poc-envelope::sage::*` no longer exists. The compat re-export
 
 Envelope's ACP projection imports `journey::pack` types; rewrite to import from `ob_poc_journey::pack` directly (envelope → journey dependency edge introduced here, one edge only).
 
+### Phase 3 status (paused 2026-05-13)
+
+| Slice | Status | Commit |
+|-------|--------|--------|
+| 3A — define `PackProjection` + provider hook | landed | `7520bb99` |
+| 3B — `acp_dag_semantic` consumes `PackProjection` | landed | `462076c7` |
+| 3C-prep — hoist session kinds to `ob-poc-types` | landed | `2897d1e2` |
+| 3C — git mv `journey/*` into `ob-poc-journey` | **paused** | `cf99c008` (pause record) |
+| 3D — `ob-poc` registers the provider | blocked behind 3C |
+
+**Blocker discovered during 3C attempt:** A second boundary file,
+`acp_registry_projection.rs` (~3,075 LOC), imports the same
+`crate::journey::pack::*` surface (PackManifest, PackQuestion,
+PackTemplate, RiskPolicy, TemplateStep, AnswerKind + the disk loader
+`load_packs_from_dir`) that Phase 3B refactored out of
+`acp_dag_semantic.rs`. The acp_dag_semantic refactor was ~30 site
+touches over ~100 LOC of edits; the equivalent surgery for
+acp_registry_projection is materially larger (14+ journey-type uses in
+field/arg positions, projection construction over a 3,000-LOC file).
+
+**Why we can't ship 3C without refactoring the second site:** plan §6.2
+locks in BREAK the boundary→journey edge. Moving `journey/*` to
+ob-poc-journey while acp_registry_projection still imports
+`crate::journey::pack::*` would either (a) break the build (current
+state if we tried to land the moves) or (b) require a boundary→journey
+dep — exactly the "material leak" the decision rules out.
+
+**Unblock options (need direction):**
+
+- **3C-deep:** Refactor `acp_registry_projection.rs` to consume a
+  boundary-owned projection the same way `acp_dag_semantic` does
+  today. Extend `PackProjection` with a `registry_context` field that
+  carries the registry-specific subset, or define a parallel
+  `RegistryPackProjection`. ~1–2 sessions of focused editing across
+  one file.
+- **3C-narrow:** Move `handoff` + `pack_state` to ob-poc-journey now
+  (zero crate-internal deps either way) and leave `pack.rs` in
+  boundary until 3C-deep lands. The journey subtree in boundary
+  shrinks; the BREAK is partial. Acceptable as an intermediate step
+  if 3C-deep is going to take time.
+- **Defer Phase 3 entirely:** ship Phases 4–5 (domain DTOs, authoring
+  tools) first; come back to Phase 3 when there's appetite for the
+  refactor.
+
 ### Phase 4: Move domain DTOs out of envelope into ob-poc-domain
 10 modules. Sub-slices by dependency cluster (each commit):
 - 4.1 — `booking_principal_types`, `bods_types`, `deal_types` (independent)
