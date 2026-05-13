@@ -8,11 +8,11 @@
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
-pub(crate) const PARSE_ERROR: i64 = -32700;
-pub(crate) const INVALID_REQUEST: i64 = -32600;
-pub(crate) const METHOD_NOT_FOUND: i64 = -32601;
-pub(crate) const INVALID_PARAMS: i64 = -32602;
-pub(crate) const INTERNAL_ERROR: i64 = -32603;
+pub const PARSE_ERROR: i64 = -32700;
+pub const INVALID_REQUEST: i64 = -32600;
+pub const METHOD_NOT_FOUND: i64 = -32601;
+pub const INVALID_PARAMS: i64 = -32602;
+pub const INTERNAL_ERROR: i64 = -32603;
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct JsonRpcRequest {
