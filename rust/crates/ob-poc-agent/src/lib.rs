@@ -1,0 +1,66 @@
+//! ob-poc-agent — Sage ACP runtime.
+//!
+//! ## Capability claim
+//!
+//! Owns the Sage-ACP-server runtime that an editor (Zed, JetBrains)
+//! launches over stdio. Holds:
+//!
+//! - The Motivated Sage planning loop (GoalFrame, frontier computation,
+//!   blocker detection, motivation prompt assembly, GoalProposalTrace
+//!   emission).
+//! - In-memory SemOS indices (scoped verb surface, pack catalogue, NOM
+//!   equivalent, AffinityGraph) loaded at session start via
+//!   `sem_os_client` and refreshed via dirty-flag propagation.
+//! - The LLM call site (BYOK — Anthropic, OpenAI). Constrained-composition
+//!   discipline: the LLM selects from sanctioned macros/packs/verbs, not
+//!   free-text DSL.
+//! - The LSP-shaped channel client to the REPL (runbook as textDocument,
+//!   `validate-only` + `validate-and-execute` methods, `publishDiagnostics`
+//!   as the feedback channel).
+//! - The MCP client to the SemOS knowledge surface (entity resolution,
+//!   active verb surface at state, macro/pack catalogue, FSM transitions,
+//!   constellation walk).
+//! - Audit emission (local JSONL + OTLP exporter).
+//!
+//! ## Anti-charter
+//!
+//! - NOT the ACP discovery / projection surface (the read-only pack /
+//!   policy / context envelope projection that ACP editors observe). That
+//!   lives in `ob-poc-boundary::acp_*`. The agent constructs the
+//!   `AcpJsonRpcAgent` dispatcher with injected runtime deps; it does not
+//!   re-implement the projection.
+//! - NOT the Drafter type vocabulary (lives in `ob-poc-sage`).
+//! - NOT the validator/executor (lives in `ob-poc::repl`, served to the
+//!   agent over the LSP-shaped channel).
+//! - NOT the SemOS substrate or registry mutation authority (lives in
+//!   `sem_os_*`).
+//!
+//! ## Dependency discipline
+//!
+//! Depends on `ob-poc-types`, `ob-poc-diagnostics`, `ob-poc-sage`,
+//! `ob-poc-boundary`, `dsl-runtime`, `sem_os_client`, `sem_os_core`, plus
+//! primitives (`tokio`, `serde`, `chrono`, `uuid`, `tracing`, `anyhow`,
+//! `thiserror`). Must NOT depend on `ob-poc` — the Sage ACP capability is
+//! intended to ship as a standalone productisable artefact (V&S §3, R5).
+//! Engines that live in `ob-poc` (`llm_sage`, `valid_verb_set`,
+//! `deterministic`) are reached via trait abstractions defined in
+//! `ob-poc-sage`; concrete impls live in `ob-poc`; the binary integrator
+//! wires the impl into the agent at startup.
+//!
+//! ## Migration status (2026-05-13)
+//!
+//! Phase 2 of the Sage ACP capability plan
+//! (`/Users/adamtc007/.claude/plans/context-ref-file-users-adamtc007-downlo-serialized-blum.md`).
+//! Phase 2.1 (this commit) creates the empty skeleton. Subsequent slices
+//! fill in:
+//!   - 2.2: engine traits in ob-poc-sage
+//!   - 2.3: trait impls in ob-poc
+//!   - 2.4: relocate `rust/src/bin/ob_poc_acp.rs` here as `bin/sage-acp`
+//!   - 2.5: in-memory SemOS index loader
+//!   - 2.6: ACP `initialize` + `prompt` handlers wired to a planning loop
+//!   - 2.7: LSP-shaped REPL channel client (consumes `dsl-lsp`)
+//!   - 2.8: SemOS knowledge query trait + temporary impl
+//!   - 2.9: audit emission (JSONL)
+//!   - 2.10: hard-coded GoalFrame for the spike
+
+// Empty — Phase 2.1 fills this in incrementally.

@@ -1,0 +1,57 @@
+[package]
+name = "ob-poc-agent"
+version = "0.1.0"
+edition = "2021"
+description = "Sage ACP runtime — planning loop, GoalFrame, frontier computation, constellation hydration, GoalProposalTrace emission, LSP/MCP/LLM clients, and the launchable `sage-acp` binary."
+
+# Capability discipline (see Sage ACP capability plan Phase 2,
+# docs/todo/capability-crate-restructure-v1.md §6 decision 6):
+#   IN-SCOPE  : the Sage-ACP-server runtime + the binary entrypoint.
+#               Holds in-memory SemOS indices, the LLM call site (BYOK),
+#               an LSP-shaped channel client to the REPL, an MCP client
+#               to the SemOS knowledge surface, audit emission, and the
+#               Motivated Sage planning loop (GoalFrame, frontier,
+#               blocker detection, prompt assembly, GoalProposalTrace).
+#   OUT-OF-SCOPE: ACP discovery/projection (lives in ob-poc-boundary).
+#                 Drafter type vocabulary (lives in ob-poc-sage).
+#                 Validator/executor (lives in ob-poc::repl).
+#                 SemOS substrate (sem_os_*).
+#
+# Forbidden dep: ob-poc. The agent reaches engines in ob-poc via
+# trait abstractions defined in ob-poc-sage; concrete impls live in
+# ob-poc; the binary integrator wires the impl into the agent at
+# startup. Sage ACP is intended to ship as a standalone productisable
+# artefact (V&S §3, R5), so no application-tier dep.
+
+[dependencies]
+ob-poc-types = { path = "../ob-poc-types" }
+ob-poc-diagnostics = { path = "../ob-poc-diagnostics" }
+ob-poc-sage = { path = "../ob-poc-sage" }
+# Boundary owns the ACP protocol dispatcher (AcpJsonRpcAgent), discovery
+# projection, and pack manifest providers. The agent binary constructs
+# the dispatcher with injected runtime deps.
+ob-poc-boundary = { path = "../ob-poc-boundary" }
+# Analyser surface — runbook validate / plan / diagnostics consumed by
+# the LSP-shaped channel and the planning loop.
+dsl-runtime = { path = "../dsl-runtime" }
+# SemOS knowledge client — entity resolution, verb surface, FSM
+# transitions, constellation walk. Read-only.
+sem_os_client = { path = "../sem_os_client" }
+# Cross-capability primitives.
+sem_os_core = { path = "../sem_os_core" }
+
+# Async runtime.
+tokio = { version = "1", features = ["full"] }
+async-trait = "0.1"
+
+# Serde / error / logging primitives.
+anyhow = "1.0"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+thiserror = "1"
+tracing = "0.1"
+uuid = { version = "1", features = ["v4", "serde"] }
+chrono = { version = "0.4", features = ["serde"] }
+
+[lints.rust]
+unreachable_pub = "deny"

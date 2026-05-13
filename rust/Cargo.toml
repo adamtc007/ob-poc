@@ -258,6 +258,7 @@ members = [
     "crates/ob-poc-journey",
     "crates/ob-poc-domain",
     "crates/ob-poc-authoring",
+    "crates/ob-poc-agent",
     "crates/entity-gateway",
     "crates/ob-semantic-matcher",
 
