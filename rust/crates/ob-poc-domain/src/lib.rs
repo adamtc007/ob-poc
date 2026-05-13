@@ -112,3 +112,15 @@ pub mod view_config_service;
 pub mod advisory_lock;
 #[cfg(feature = "database")]
 pub mod derived_attributes;
+
+// Phase 4.2d (2026-05-13): final Phase 4 modules out of boundary into
+// ob-poc-domain. Both are pure DTO trees with only `ob_poc_types::*`
+// external deps (trading_profile carries TradingMatrix re-exports).
+//   - trading_profile (~7 files) — AST + builder + DB ops + resolver
+//     + validator.
+//   - entity_linking (~7 files) — mention extraction + resolver +
+//     snapshot + normalize + compiler + stub.
+#[cfg(feature = "database")]
+pub mod trading_profile;
+#[cfg(feature = "database")]
+pub mod entity_linking;

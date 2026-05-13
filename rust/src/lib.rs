@@ -123,7 +123,7 @@ pub mod workflow;
 
 // Trading profile document types and materialization
 // Phase 3 slice 2k (2026-05-12): relocated to ob-poc-boundary; compat re-export.
-pub use ob_poc_boundary::trading_profile;
+pub use ob_poc_domain::trading_profile;
 
 // Template system for DSL generation
 pub mod templates;
@@ -173,7 +173,7 @@ pub use ob_poc_boundary::lexicon;
 // Entity Linking module - In-memory entity resolution from utterances
 // Phase 3 slice 2m (2026-05-12): relocated to ob-poc-boundary; compat re-export.
 #[cfg(feature = "database")]
-pub use ob_poc_boundary::entity_linking;
+pub use ob_poc_domain::entity_linking;
 
 // Lookup module - Unified verb search + entity linking with verb-first ordering
 #[cfg(feature = "database")]

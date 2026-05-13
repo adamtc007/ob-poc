@@ -49,8 +49,8 @@ pub mod data_dictionary;
 // to ob-poc-domain per plan §6 decision 3 (advisory_lock follows primary
 // consumer). Compat re-exports in rust/src/database/locks.rs and
 // rust/src/lib.rs respectively.
-#[cfg(feature = "database")]
-pub mod entity_linking;
+// Phase 4.2d (2026-05-13): entity_linking relocated to ob-poc-domain;
+// compat re-export in ob-poc::lib.rs.
 #[cfg(feature = "database")]
 pub mod feedback;
 // Phase 3C of capability-crate restructure (2026-05-13): journey/{pack,
@@ -98,7 +98,8 @@ pub mod session_trace;
 // paired move keeps the edge intra-crate). Compat re-exports in ob-poc.
 pub mod toctou_recheck;
 pub mod traceability;
-pub mod trading_profile;
+// Phase 4.2d (2026-05-13): trading_profile relocated to ob-poc-domain;
+// compat re-export in ob-poc::lib.rs.
 pub mod workbook;
 pub mod workbook_diagnostics;
 pub mod workbook_revision;
