@@ -1,0 +1,66 @@
+# Schema-authority drift allowlist (Phase 4.7).
+# Each line is `<path>:<line>:<TypeName>` for a parallel
+# definition of a name V&S §O7 / ADN §7.3 locks to sem_os_core.
+# Regenerate with `cargo run -p xtask -- audit --bless` after
+# reviewing whether the mirror is still justified.
+# Run `cargo run -p xtask -- audit` to fail on new mirrors.
+#
+# Baseline captured 2026-05-13 (Phase 4.7 commit). The mirrors fall
+# into three rough buckets:
+#
+# (1) Legitimate distinct types that happen to share a name —
+#     unrelated UI graph nodes, DSL stategraph types, dag config
+#     parsers. Reviewer judgement: low remediation priority.
+#       crates/dsl-core/src/config/dag.rs                — DSL DAG config
+#       crates/dsl-runtime/src/state_reducer/*           — DSL FSM
+#       crates/dsl-runtime/src/stategraph/mod.rs         — DSL stategraph
+#       crates/ob-poc-domain/src/taxonomy/{rules,types}  — taxonomy nodes
+#       crates/ob-poc-types/src/galaxy.rs                — galaxy viz
+#       crates/ob-poc-types/src/lib.rs                   — graph DTOs
+#       crates/ob-workflow/src/definition.rs             — workflow defs
+#       src/api/capital_routes.rs                        — capital graph
+#       src/graph/types.rs                               — UI graph types
+#
+# (2) Verb contract surface in `src/sem_reg/onboarding/`:
+#       src/sem_reg/onboarding/verb_extract.rs           — verb extract DTO
+#
+# (3) Near-duplicates of sem_os_core schema authority — HIGH
+#     priority for remediation. These four files are direct
+#     parallel definitions of the canonical types and should
+#     migrate to sem_os_core re-exports:
+#       src/sem_reg/entity_type_def.rs       (3 names)
+#       src/sem_reg/relationship_type_def.rs (1 name)
+#       src/sem_reg/verb_contract.rs         (6 names)
+
+crates/dsl-core/src/config/dag.rs:497:TransitionDef
+crates/dsl-runtime/src/state_reducer/state_machine.rs:23:TransitionDef
+crates/dsl-runtime/src/state_reducer/state_machine.rs:31:ReducerDef
+crates/dsl-runtime/src/state_reducer/state_machine.rs:48:ConditionDef
+crates/dsl-runtime/src/stategraph/mod.rs:31:GraphNode
+crates/dsl-runtime/src/stategraph/mod.rs:43:NodeType
+crates/dsl-runtime/src/stategraph/mod.rs:52:GraphEdge
+crates/dsl-runtime/src/stategraph/mod.rs:65:EdgeType
+crates/dsl-runtime/src/stategraph/mod.rs:73:GraphGate
+crates/dsl-runtime/src/stategraph/mod.rs:80:SignalCondition
+crates/ob-poc-domain/src/taxonomy/rules.rs:523:EdgeType
+crates/ob-poc-domain/src/taxonomy/types.rs:109:NodeType
+crates/ob-poc-types/src/galaxy.rs:1417:NodeType
+crates/ob-poc-types/src/lib.rs:784:GraphNode
+crates/ob-poc-types/src/lib.rs:888:GraphEdge
+crates/ob-workflow/src/definition.rs:160:TransitionDef
+src/api/capital_routes.rs:255:GraphNode
+src/api/capital_routes.rs:263:GraphEdge
+src/graph/types.rs:1998:NodeType
+src/graph/types.rs:2062:EdgeType
+src/graph/types.rs:686:GraphNode
+src/sem_reg/entity_type_def.rs:49:LifecycleStateDef
+src/sem_reg/entity_type_def.rs:65:LifecycleTransition
+src/sem_reg/entity_type_def.rs:7:EntityTypeDefBody
+src/sem_reg/onboarding/verb_extract.rs:63:VerbOutput
+src/sem_reg/relationship_type_def.rs:10:RelationshipTypeDefBody
+src/sem_reg/verb_contract.rs:110:VerbCrudMapping
+src/sem_reg/verb_contract.rs:122:VerbArgDef
+src/sem_reg/verb_contract.rs:14:VerbContractBody
+src/sem_reg/verb_contract.rs:164:VerbReturnSpec
+src/sem_reg/verb_contract.rs:175:VerbPrecondition
+src/sem_reg/verb_contract.rs:187:VerbProducesSpec

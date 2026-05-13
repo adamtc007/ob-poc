@@ -31,5 +31,8 @@ glob = "0.3"
 bincode = "1"
 ob-poc-eval-fixtures = { path = "../../eval/ob-poc-eval-fixtures" }
 
+[dev-dependencies]
+tempfile = "3"
+
 [lints.rust]
 unreachable_pub = "deny"

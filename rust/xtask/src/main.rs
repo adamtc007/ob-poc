@@ -11,6 +11,7 @@ use xshell::{cmd, Shell};
 
 mod acp_envelope_byte_equality;
 mod allianz_harness;
+mod audit;
 mod aviva_deal_harness;
 mod bpmn_lite;
 mod calibration;
@@ -112,6 +113,17 @@ enum Command {
     /// Check root-crate public API against the reviewed allowlist
     PubLint {
         /// Refresh the allowlist after reviewing intentional API changes
+        #[arg(long)]
+        bless: bool,
+    },
+
+    /// Phase 4.7 — schema-authority audit. Reports parallel
+    /// definitions of canonical sem_os_core types (DAG primitives,
+    /// verb contracts, entity types, transitions) found outside
+    /// sem_os_core. Fails on drift not in
+    /// `tools/schema-authority-drift-allowlist.txt`.
+    Audit {
+        /// Refresh the drift allowlist after deliberate review.
         #[arg(long)]
         bless: bool,
     },
@@ -1360,6 +1372,7 @@ fn main() -> Result<()> {
         Command::Ci => ci(&sh),
         Command::PreCommit => pre_commit(&sh),
         Command::PubLint { bless } => pub_lint::run(bless),
+        Command::Audit { bless } => audit::run(bless),
         Command::AcpEnvelopeByteEqualityCheck { bless } => acp_envelope_byte_equality::run(bless),
         Command::Deploy {
             release,
