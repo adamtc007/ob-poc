@@ -67,6 +67,10 @@ pub mod runtime_registry;
 // §9 item 9 slice 2 (2026-05-13): verb_registry relocated from
 // rust/src/dsl_v2/. UnifiedVerbDef + find_unified_verb + registry().
 pub mod verb_registry;
+// §9 item 9 slice 3 (2026-05-13): suggestions::predict_next_steps
+// relocated from rust/src/dsl_v2/. Frontier-derived "what verb makes
+// sense next" recommender; pure-Rust over the verb registry.
+pub mod suggestions;
 pub mod service_traits;
 pub mod services;
 pub mod state_reducer;

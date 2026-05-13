@@ -116,7 +116,8 @@ pub(crate) mod semantic_validator;
 #[cfg(feature = "database")]
 pub mod sheet_executor;
 pub mod submission;
-pub mod suggestions;
+// §9 item 9 slice 3 (2026-05-13): suggestions relocated to dsl-runtime.
+pub use dsl_runtime::suggestions;
 pub mod topo_sort;
 pub(crate) mod validation;
 // §9 item 9 slice 2 (2026-05-13): verb_registry relocated to dsl-runtime.
