@@ -5,9 +5,10 @@
 # reviewing whether the mirror is still justified.
 # Run `cargo run -p xtask -- audit` to fail on new mirrors.
 #
-# Baseline buckets — current state (29 entries, down from 32 after
-# Phase 4.7 follow-up collapsed `src/sem_reg/entity_type_def.rs` to
-# `sem_os_core::entity_type_def` re-exports):
+# Baseline buckets — current state (28 entries, down from 32 after
+# Phase 4.7 follow-up collapsed `src/sem_reg/entity_type_def.rs` and
+# `src/sem_reg/relationship_type_def.rs` to `sem_os_core::*`
+# re-exports):
 #
 # (1) Legitimate distinct types sharing a name — unrelated UI graph,
 #     DSL stategraph, dag config, taxonomy nodes, workflow defs,
@@ -26,9 +27,9 @@
 #       src/sem_reg/onboarding/verb_extract.rs          — verb extract DTO
 #
 # (3) HIGH-priority near-duplicates of sem_os_core schema authority —
-#     two files left after Phase 4.7 follow-up landed
-#     `entity_type_def`. These 7 names should migrate next:
-#       src/sem_reg/relationship_type_def.rs (1 name)
+#     one file left after Phase 4.7 follow-up landed
+#     `entity_type_def` + `relationship_type_def`. These 6 names
+#     should migrate next:
 #       src/sem_reg/verb_contract.rs         (6 names)
 
 crates/dsl-core/src/config/dag.rs:497:TransitionDef
@@ -53,7 +54,6 @@ src/graph/types.rs:1998:NodeType
 src/graph/types.rs:2062:EdgeType
 src/graph/types.rs:686:GraphNode
 src/sem_reg/onboarding/verb_extract.rs:63:VerbOutput
-src/sem_reg/relationship_type_def.rs:10:RelationshipTypeDefBody
 src/sem_reg/verb_contract.rs:110:VerbCrudMapping
 src/sem_reg/verb_contract.rs:122:VerbArgDef
 src/sem_reg/verb_contract.rs:14:VerbContractBody
