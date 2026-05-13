@@ -21,6 +21,9 @@ pub mod agent_routes;
 pub mod agent_state;
 
 #[cfg(feature = "server")]
+pub mod policy_headers;
+
+#[cfg(feature = "server")]
 pub mod session;
 
 #[cfg(feature = "server")]

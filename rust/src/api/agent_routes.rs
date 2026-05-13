@@ -1834,7 +1834,7 @@ async fn execute_session_dsl_raw(
         // already passed SemOS) remains the only execution route.
         let dsl_source = if let Some(ref req) = req {
             if req.dsl.is_some() {
-                let actor = crate::policy::ActorResolver::from_headers(&headers);
+                let actor = crate::api::policy_headers::actor_from_headers(&headers);
                 tracing::warn!(
                     session = %session_id,
                     actor_id = %actor.actor_id,

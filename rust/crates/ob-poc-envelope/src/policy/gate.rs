@@ -1,9 +1,12 @@
 //! PolicyGate — server-side enforcement of single-pipeline invariants.
 //!
 //! Loaded once at startup from environment variables or config.
-//! Every bypass/privilege decision flows through here.
+//! Every bypass/privilege decision flows through here. HTTP-binding
+//! (header → ActorContext) lives in `ob_poc::api::policy_headers`
+//! because envelope is transport-neutral.
 
-use crate::sem_reg::abac::ActorContext;
+use sem_os_core::abac::ActorContext;
+use sem_os_core::types::Classification;
 use serde::Serialize;
 
 /// Server-side policy configuration. Loaded once at startup.
@@ -76,50 +79,7 @@ pub struct PolicySnapshot {
 pub struct ActorResolver;
 
 impl ActorResolver {
-    #[cfg(feature = "server")]
-    pub fn from_headers(headers: &axum::http::HeaderMap) -> ActorContext {
-        use crate::sem_reg::types::Classification;
-        let actor_id = headers
-            .get("x-obpoc-actor-id")
-            .and_then(|v| v.to_str().ok())
-            .unwrap_or("anonymous")
-            .to_string();
-        let roles: Vec<String> = headers
-            .get("x-obpoc-roles")
-            .and_then(|v| v.to_str().ok())
-            .map(|r| r.split(',').map(|s| s.trim().to_string()).collect())
-            .unwrap_or_else(|| vec!["analyst".into()]);
-        let department = headers
-            .get("x-obpoc-department")
-            .and_then(|v| v.to_str().ok())
-            .map(String::from);
-        let clearance = headers
-            .get("x-obpoc-clearance")
-            .and_then(|v| v.to_str().ok())
-            .and_then(|s| match s.to_lowercase().as_str() {
-                "public" => Some(Classification::Public),
-                "internal" => Some(Classification::Internal),
-                "confidential" => Some(Classification::Confidential),
-                "restricted" => Some(Classification::Restricted),
-                _ => None,
-            })
-            .or(Some(Classification::Restricted));
-        let jurisdictions: Vec<String> = headers
-            .get("x-obpoc-jurisdictions")
-            .and_then(|v| v.to_str().ok())
-            .map(|j| j.split(',').map(|s| s.trim().to_string()).collect())
-            .unwrap_or_else(|| vec!["*".into()]);
-        ActorContext {
-            actor_id,
-            roles,
-            department,
-            clearance,
-            jurisdictions,
-        }
-    }
-
     pub fn from_env() -> ActorContext {
-        use crate::sem_reg::types::Classification;
         let actor_id = std::env::var("MCP_ACTOR_ID").unwrap_or_else(|_| "mcp_anonymous".into());
         let roles: Vec<String> = std::env::var("MCP_ROLES")
             .map(|r| r.split(',').map(String::from).collect())
@@ -155,7 +115,7 @@ impl ActorResolver {
             actor_id: session_id.to_string(),
             roles,
             department: None,
-            clearance: Some(crate::sem_reg::types::Classification::Restricted),
+            clearance: Some(Classification::Restricted),
             jurisdictions: vec!["*".into()],
         }
     }

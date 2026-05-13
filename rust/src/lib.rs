@@ -265,8 +265,12 @@ pub mod plan_builder;
 // Phase 3 slice 2f (2026-05-12): relocated to ob-poc-envelope; compat re-export.
 pub use ob_poc_envelope::clarify;
 
-// Policy module — server-side enforcement for single-pipeline invariants
-pub mod policy;
+// Policy module — server-side enforcement for single-pipeline invariants.
+// Phase 3 slice 2o (2026-05-13): relocated to ob-poc-envelope; HTTP-binding
+// (header → ActorContext) moved to `src/api/policy_headers.rs`. The
+// transport-neutral PolicyGate + ActorResolver::{from_env, from_session_id}
+// live in envelope.
+pub use ob_poc_envelope::policy;
 
 // Semantic Registry — immutable snapshot-based registry for the Semantic OS
 #[cfg(feature = "database")]
