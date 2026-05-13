@@ -32,6 +32,7 @@ use anyhow::{anyhow, Result};
 use ob_agentic::llm_client::{LlmClient, ToolDefinition};
 use serde::{Deserialize, Serialize};
 
+use crate::blockers::BlockerDetector;
 use crate::constellation::{ConstellationHydrator, ConstellationSnapshot, HydrationScope};
 use crate::frontier::FrontierEngine;
 use crate::goal_frame::GoalFrame;
@@ -229,6 +230,17 @@ impl PlanningLoop {
                 (fallback, DraftSource::DeterministicFallback)
             }
         };
+
+        // Phase 3.4 — detect blockers once the verb is chosen. Runs
+        // unconditionally; the report is attached to the goal frame
+        // even when empty so audit shape is stable.
+        let blocker_report = BlockerDetector::detect(
+            &self.index,
+            goal_frame.frontier.as_ref().expect("attached above"),
+            &snapshot_ref,
+            Some(&verb_fqn),
+        );
+        goal_frame.attach_blockers(blocker_report);
 
         Ok(PlanningOutcome {
             goal_frame,

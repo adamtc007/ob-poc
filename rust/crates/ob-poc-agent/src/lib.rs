@@ -93,6 +93,12 @@ pub mod constellation;
 /// candidates from the pack allowlist.
 pub mod frontier;
 
+/// Blocker detection — Phase 3.4 (C-07 / C-08 / C-09). Three kinds
+/// detected today: RequiredQuestionUnanswered, UnsanctionedDraft,
+/// EmptyConstellation. CrossWorkspaceState + PendingRemediation
+/// variants ship without detectors; Phase 4 wires them.
+pub mod blockers;
+
 /// Sage planning loop — Phase 2.6. Takes a raw utterance + a
 /// `SessionIndex` and returns a constrained-composition draft (verb
 /// FQN bounded to the pack allowlist). LLM call site is optional so

@@ -48,6 +48,7 @@ use serde::{Deserialize, Serialize};
 use tokio::sync::Mutex;
 use uuid::Uuid;
 
+use crate::blockers::BlockerReport;
 use crate::constellation::ConstellationSnapshot;
 use crate::frontier::Frontier;
 use crate::index::SessionIndex;
@@ -126,6 +127,11 @@ pub struct GoalFrame {
     /// should treat the absence as "frontier not yet computed".
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub frontier: Option<Frontier>,
+    /// Blocker report computed at draft time (Phase 3.4 — C-07 /
+    /// C-08 / C-09). `None` for pre-3.4 frames; older audit
+    /// records may omit.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub blockers: Option<BlockerReport>,
 }
 
 impl GoalFrame {
@@ -165,6 +171,7 @@ impl GoalFrame {
             status: GoalFrameStatus::Proposed,
             constellation: None,
             frontier: None,
+            blockers: None,
         }
     }
 
@@ -181,6 +188,14 @@ impl GoalFrame {
     /// computation (Phase 3.3 — C-05 / C-06).
     pub fn attach_frontier(&mut self, frontier: Frontier) {
         self.frontier = Some(frontier);
+        self.updated_at = Utc::now();
+    }
+
+    /// Attach (or replace) a blocker report, bumping `updated_at`.
+    /// Used by the planning loop after each blocker detection
+    /// (Phase 3.4 — C-07 / C-08 / C-09).
+    pub fn attach_blockers(&mut self, blockers: BlockerReport) {
+        self.blockers = Some(blockers);
         self.updated_at = Utc::now();
     }
 

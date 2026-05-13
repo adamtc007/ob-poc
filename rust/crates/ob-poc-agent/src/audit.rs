@@ -254,6 +254,7 @@ mod tests {
                 status: GoalFrameStatus::Proposed,
                 constellation: None,
                 frontier: None,
+                blockers: None,
             },
             verb_fqn: "cbu.create".to_string(),
             source: DraftSource::DeterministicFallback,
