@@ -6,7 +6,7 @@
 use sem_os_core::state_simulation::StateSimulationError;
 use serde::{Deserialize, Serialize};
 
-use crate::dsl_coder::DslCoderValidationError;
+use crate::dsl_coder::DslDrafterValidationError;
 use crate::kyc_dry_run::KycUpdateStatusDryRunRefusal;
 use crate::language_pack::SemOsLanguagePack;
 use crate::workbook::ExecutionWorkbookValidationError;
@@ -209,7 +209,7 @@ pub fn diagnostics_from_dry_run_refusal(
             diag.blocked_transition_reason = Some(reason.clone());
             vec![diag]
         }
-        KycUpdateStatusDryRunRefusal::DslCoderRefused { error } => {
+        KycUpdateStatusDryRunRefusal::DslDrafterRefused { error } => {
             vec![diagnostic_from_dsl_coder(error, pack)]
         }
         KycUpdateStatusDryRunRefusal::PackInvalid { diagnostics } => diagnostics
@@ -339,7 +339,7 @@ pub fn diagnostic_from_workbook_validation(
 }
 
 fn diagnostic_from_dsl_coder(
-    error: &DslCoderValidationError,
+    error: &DslDrafterValidationError,
     pack: &SemOsLanguagePack,
 ) -> WorkbookDiagnostic {
     let mut diag = WorkbookDiagnostic::new(

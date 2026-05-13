@@ -3482,7 +3482,7 @@ fn kyc_dry_run_json_error(
         crate::runbook::KycUpdateStatusDryRunRefusal::PackParseFailed { .. }
         | crate::runbook::KycUpdateStatusDryRunRefusal::PackInvalid { .. }
         | crate::runbook::KycUpdateStatusDryRunRefusal::WorkbookRefused { .. }
-        | crate::runbook::KycUpdateStatusDryRunRefusal::DslCoderRefused { .. } => {
+        | crate::runbook::KycUpdateStatusDryRunRefusal::DslDrafterRefused { .. } => {
             StatusCode::BAD_REQUEST
         }
         crate::runbook::KycUpdateStatusDryRunRefusal::SimulationRefused { .. } => {

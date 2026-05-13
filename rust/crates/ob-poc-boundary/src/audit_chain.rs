@@ -10,7 +10,7 @@ use std::collections::BTreeMap;
 use uuid::Uuid;
 
 use crate::approval_token::ApprovalTokenId;
-use crate::dsl_coder::{DslCoderDryRunResult, DslCoderValidationStepStatus};
+use crate::dsl_coder::{DslDrafterDryRunResult, DslDrafterValidationStepStatus};
 use crate::llm_trace::LlmInferenceTrace;
 use crate::mutation_preflight::RestrictedMutationPreflight;
 use crate::session_trace::{TraceEntry, TraceOp, TraceValidationStep};
@@ -94,7 +94,7 @@ pub fn validate_audit_chain(
     session_id: Uuid,
     trace_entries: &[TraceEntry],
     workbook: &ExecutionWorkbook,
-    dry_run: &DslCoderDryRunResult,
+    dry_run: &DslDrafterDryRunResult,
     llm_trace: Option<&LlmInferenceTrace>,
 ) -> Result<AuditChainProof, AuditChainValidationError> {
     workbook
@@ -236,7 +236,7 @@ pub fn validate_audit_chain(
     })
 }
 
-fn trace_validation_steps(dry_run: &DslCoderDryRunResult) -> Vec<TraceValidationStep> {
+fn trace_validation_steps(dry_run: &DslDrafterDryRunResult) -> Vec<TraceValidationStep> {
     dry_run
         .validation_trace
         .iter()
@@ -244,9 +244,9 @@ fn trace_validation_steps(dry_run: &DslCoderDryRunResult) -> Vec<TraceValidation
             step_number: step.step_number,
             step_id: step.step_id.clone(),
             status: match step.status {
-                DslCoderValidationStepStatus::Passed => "passed",
-                DslCoderValidationStepStatus::Failed => "failed",
-                DslCoderValidationStepStatus::Skipped => "skipped",
+                DslDrafterValidationStepStatus::Passed => "passed",
+                DslDrafterValidationStepStatus::Failed => "failed",
+                DslDrafterValidationStepStatus::Skipped => "skipped",
             }
             .to_string(),
             message: step.message.clone(),
@@ -323,7 +323,7 @@ mod tests {
     use super::*;
     use crate::approval_token::{ApprovalTokenId, RestrictedMutationApprovalCheck};
     use crate::dsl_coder::{
-        DslCoderDryRunResult, DslCoderValidationStep, DslCoderValidationStepStatus,
+        DslDrafterDryRunResult, DslDrafterValidationStep, DslDrafterValidationStepStatus,
     };
     use crate::llm_trace::{
         record_llm_inference_trace, workbook_llm_trace_ref, LlmInferenceTraceInput,
@@ -429,16 +429,16 @@ mod tests {
         .expect("workbook")
     }
 
-    fn dry_run(workbook: &ExecutionWorkbook) -> DslCoderDryRunResult {
-        DslCoderDryRunResult {
+    fn dry_run(workbook: &ExecutionWorkbook) -> DslDrafterDryRunResult {
+        DslDrafterDryRunResult {
             workbook_id: workbook.id.to_string(),
             transition_ref: workbook.core.transition_ref.clone(),
             semantic_diff: workbook.core.simulation.clone(),
             semantic_diff_uri: format!("semos://semantic-diff/{}", workbook.id),
-            validation_trace: vec![DslCoderValidationStep {
+            validation_trace: vec![DslDrafterValidationStep {
                 step_number: 3,
                 step_id: "integrity".to_string(),
-                status: DslCoderValidationStepStatus::Passed,
+                status: DslDrafterValidationStepStatus::Passed,
                 message: "workbook integrity hash verified".to_string(),
             }],
         }

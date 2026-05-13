@@ -1072,7 +1072,7 @@ fn build_deal_update_status_dry_run_value(
     };
     let dry_run = match crate::runbook::validate_workbook_for_dry_run(
         &workbook,
-        crate::runbook::DslCoderExecutionMode::DryRun,
+        crate::runbook::DslDrafterExecutionMode::DryRun,
     ) {
         Ok(dry_run) => dry_run,
         Err(error) => {
@@ -1298,7 +1298,7 @@ fn acp_state_anchor_pending_question_value(code: &str, needs: Vec<&str>, total_u
 fn deal_trace_projection(
     outcome: &str,
     language_pack: &crate::runbook::SemOsLanguagePack,
-    dry_run: Option<&crate::runbook::DslCoderDryRunResult>,
+    dry_run: Option<&crate::runbook::DslDrafterDryRunResult>,
     transition_ref: Option<&str>,
     requested_state: Option<&str>,
     refusal_code: Option<&str>,

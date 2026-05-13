@@ -76,9 +76,9 @@ pub use canonical::{
 pub use compiler::compile_verb;
 pub use constraint_gate::check_pack_constraints;
 pub use dsl_coder::{
-    validate_workbook_for_dry_run, DslCoderDryRunResult, DslCoderExecutionMode,
-    DslCoderRefusalCode, DslCoderValidationError, DslCoderValidationStep,
-    DslCoderValidationStepStatus,
+    validate_workbook_for_dry_run, DslDrafterDryRunResult, DslDrafterExecutionMode,
+    DslDrafterRefusalCode, DslDrafterValidationError, DslDrafterValidationStep,
+    DslDrafterValidationStepStatus,
 };
 pub use envelope::{EnvelopeCore, ReplayEnvelope};
 pub use errors::{CompilationError, CompilationErrorKind};

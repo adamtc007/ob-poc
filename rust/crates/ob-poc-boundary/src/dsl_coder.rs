@@ -14,29 +14,29 @@ use super::workbook::{
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
-pub enum DslCoderExecutionMode {
+pub enum DslDrafterExecutionMode {
     DryRun,
     Mutate,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct DslCoderDryRunResult {
+pub struct DslDrafterDryRunResult {
     pub workbook_id: String,
     pub transition_ref: String,
     pub semantic_diff: StateSimulationResult,
     pub semantic_diff_uri: String,
-    pub validation_trace: Vec<DslCoderValidationStep>,
+    pub validation_trace: Vec<DslDrafterValidationStep>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct DslCoderValidationError {
-    pub code: DslCoderRefusalCode,
+pub struct DslDrafterValidationError {
+    pub code: DslDrafterRefusalCode,
     pub message: String,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
-pub enum DslCoderRefusalCode {
+pub enum DslDrafterRefusalCode {
     WorkbookIntegrityFailed,
     MutationNotEnabled,
     ExecutionModeMismatch,
@@ -47,16 +47,16 @@ pub enum DslCoderRefusalCode {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct DslCoderValidationStep {
+pub struct DslDrafterValidationStep {
     pub step_number: u8,
     pub step_id: String,
-    pub status: DslCoderValidationStepStatus,
+    pub status: DslDrafterValidationStepStatus,
     pub message: String,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
-pub enum DslCoderValidationStepStatus {
+pub enum DslDrafterValidationStepStatus {
     Passed,
     Failed,
     Skipped,
@@ -64,18 +64,18 @@ pub enum DslCoderValidationStepStatus {
 
 pub fn validate_workbook_for_dry_run(
     workbook: &ExecutionWorkbook,
-    mode: DslCoderExecutionMode,
-) -> Result<DslCoderDryRunResult, DslCoderValidationError> {
-    if mode != DslCoderExecutionMode::DryRun {
+    mode: DslDrafterExecutionMode,
+) -> Result<DslDrafterDryRunResult, DslDrafterValidationError> {
+    if mode != DslDrafterExecutionMode::DryRun {
         return Err(refusal(
-            DslCoderRefusalCode::MutationNotEnabled,
+            DslDrafterRefusalCode::MutationNotEnabled,
             "mutation execution is disabled for the MVP dry-run boundary",
         ));
     }
 
     if workbook.core.execution_mode != WorkbookExecutionMode::DryRun {
         return Err(refusal(
-            DslCoderRefusalCode::ExecutionModeMismatch,
+            DslDrafterRefusalCode::ExecutionModeMismatch,
             "dry-run validator only accepts workbooks with execution_mode=dry_run",
         ));
     }
@@ -86,25 +86,25 @@ pub fn validate_workbook_for_dry_run(
         ExecutionWorkbookStatus::Draft | ExecutionWorkbookStatus::Validated => {}
         ExecutionWorkbookStatus::Superseded => {
             return Err(refusal(
-                DslCoderRefusalCode::WorkbookSuperseded,
+                DslDrafterRefusalCode::WorkbookSuperseded,
                 "superseded workbook cannot be dry-run",
             ));
         }
         ExecutionWorkbookStatus::Executed => {
             return Err(refusal(
-                DslCoderRefusalCode::WorkbookAlreadyExecuted,
+                DslDrafterRefusalCode::WorkbookAlreadyExecuted,
                 "executed workbook cannot be dry-run again",
             ));
         }
         ExecutionWorkbookStatus::Rejected => {
             return Err(refusal(
-                DslCoderRefusalCode::WorkbookRejected,
+                DslDrafterRefusalCode::WorkbookRejected,
                 "rejected workbook cannot be dry-run",
             ));
         }
     }
 
-    Ok(DslCoderDryRunResult {
+    Ok(DslDrafterDryRunResult {
         workbook_id: workbook.id.to_string(),
         transition_ref: workbook.core.transition_ref.clone(),
         semantic_diff: workbook.core.simulation.clone(),
@@ -113,7 +113,7 @@ pub fn validate_workbook_for_dry_run(
     })
 }
 
-fn validation_trace() -> Vec<DslCoderValidationStep> {
+fn validation_trace() -> Vec<DslDrafterValidationStep> {
     vec![
         step(1, "schema", "workbook schema received"),
         step(2, "execution-mode", "workbook execution_mode is dry_run"),
@@ -141,33 +141,33 @@ fn validation_trace() -> Vec<DslCoderValidationStep> {
     ]
 }
 
-fn step(step_number: u8, step_id: &str, message: &str) -> DslCoderValidationStep {
-    DslCoderValidationStep {
+fn step(step_number: u8, step_id: &str, message: &str) -> DslDrafterValidationStep {
+    DslDrafterValidationStep {
         step_number,
         step_id: step_id.to_string(),
-        status: DslCoderValidationStepStatus::Passed,
+        status: DslDrafterValidationStepStatus::Passed,
         message: message.to_string(),
     }
 }
 
-fn map_workbook_error(err: ExecutionWorkbookValidationError) -> DslCoderValidationError {
+fn map_workbook_error(err: ExecutionWorkbookValidationError) -> DslDrafterValidationError {
     let code = match err {
         ExecutionWorkbookValidationError::TransitionRefMismatch { .. }
         | ExecutionWorkbookValidationError::SubjectMismatch { .. } => {
-            DslCoderRefusalCode::TransitionBindingMismatch
+            DslDrafterRefusalCode::TransitionBindingMismatch
         }
         ExecutionWorkbookValidationError::HashMismatch { .. }
         | ExecutionWorkbookValidationError::RequiredFieldEmpty { .. }
         | ExecutionWorkbookValidationError::MissingEvidenceRefs => {
-            DslCoderRefusalCode::WorkbookIntegrityFailed
+            DslDrafterRefusalCode::WorkbookIntegrityFailed
         }
     };
 
     refusal(code, format!("{err:?}"))
 }
 
-fn refusal(code: DslCoderRefusalCode, message: impl Into<String>) -> DslCoderValidationError {
-    DslCoderValidationError {
+fn refusal(code: DslDrafterRefusalCode, message: impl Into<String>) -> DslDrafterValidationError {
+    DslDrafterValidationError {
         code,
         message: message.into(),
     }
@@ -265,7 +265,7 @@ mod tests {
     fn validates_workbook_for_dry_run() {
         let workbook = workbook();
 
-        let result = validate_workbook_for_dry_run(&workbook, DslCoderExecutionMode::DryRun)
+        let result = validate_workbook_for_dry_run(&workbook, DslDrafterExecutionMode::DryRun)
             .expect("dry-run accepted");
 
         assert_eq!(result.workbook_id, workbook.id.to_string());
@@ -282,10 +282,10 @@ mod tests {
 
     #[test]
     fn refuses_mutation_mode() {
-        let err = validate_workbook_for_dry_run(&workbook(), DslCoderExecutionMode::Mutate)
+        let err = validate_workbook_for_dry_run(&workbook(), DslDrafterExecutionMode::Mutate)
             .expect_err("mutation refused");
 
-        assert_eq!(err.code, DslCoderRefusalCode::MutationNotEnabled);
+        assert_eq!(err.code, DslDrafterRefusalCode::MutationNotEnabled);
     }
 
     #[test]
@@ -294,10 +294,10 @@ mod tests {
         workbook.core.execution_mode = WorkbookExecutionMode::ExecuteAfterApproval;
         workbook.id = crate::workbook::compute_workbook_id(&workbook.core);
 
-        let err = validate_workbook_for_dry_run(&workbook, DslCoderExecutionMode::DryRun)
+        let err = validate_workbook_for_dry_run(&workbook, DslDrafterExecutionMode::DryRun)
             .expect_err("non-dry-run workbook refused");
 
-        assert_eq!(err.code, DslCoderRefusalCode::ExecutionModeMismatch);
+        assert_eq!(err.code, DslDrafterRefusalCode::ExecutionModeMismatch);
     }
 
     #[test]
@@ -305,10 +305,10 @@ mod tests {
         let mut workbook = workbook();
         workbook.id = ExecutionWorkbookId("ewb:v1:tampered".to_string());
 
-        let err = validate_workbook_for_dry_run(&workbook, DslCoderExecutionMode::DryRun)
+        let err = validate_workbook_for_dry_run(&workbook, DslDrafterExecutionMode::DryRun)
             .expect_err("hash mismatch refused");
 
-        assert_eq!(err.code, DslCoderRefusalCode::WorkbookIntegrityFailed);
+        assert_eq!(err.code, DslDrafterRefusalCode::WorkbookIntegrityFailed);
     }
 
     #[test]
@@ -316,10 +316,10 @@ mod tests {
         let mut workbook = workbook();
         workbook.status = ExecutionWorkbookStatus::Superseded;
 
-        let err = validate_workbook_for_dry_run(&workbook, DslCoderExecutionMode::DryRun)
+        let err = validate_workbook_for_dry_run(&workbook, DslDrafterExecutionMode::DryRun)
             .expect_err("superseded refused");
 
-        assert_eq!(err.code, DslCoderRefusalCode::WorkbookSuperseded);
+        assert_eq!(err.code, DslDrafterRefusalCode::WorkbookSuperseded);
     }
 
     #[test]
@@ -328,9 +328,9 @@ mod tests {
         workbook.core.subject.subject_id = uuid!("33333333-3333-3333-3333-333333333333");
         workbook.id = crate::workbook::compute_workbook_id(&workbook.core);
 
-        let err = validate_workbook_for_dry_run(&workbook, DslCoderExecutionMode::DryRun)
+        let err = validate_workbook_for_dry_run(&workbook, DslDrafterExecutionMode::DryRun)
             .expect_err("binding mismatch refused");
 
-        assert_eq!(err.code, DslCoderRefusalCode::TransitionBindingMismatch);
+        assert_eq!(err.code, DslDrafterRefusalCode::TransitionBindingMismatch);
     }
 }

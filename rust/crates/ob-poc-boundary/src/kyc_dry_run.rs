@@ -14,8 +14,8 @@ use std::collections::BTreeMap;
 use uuid::Uuid;
 
 use crate::dsl_coder::{
-    validate_workbook_for_dry_run, DslCoderDryRunResult, DslCoderExecutionMode,
-    DslCoderValidationError,
+    validate_workbook_for_dry_run, DslDrafterDryRunResult, DslDrafterExecutionMode,
+    DslDrafterValidationError,
 };
 use crate::workbook::{
     EvidenceRef, ExecutionWorkbook, ExecutionWorkbookCore, LlmTraceRef, StaleWorkbookPolicy,
@@ -45,7 +45,7 @@ pub struct KycUpdateStatusDryRunInput {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct KycUpdateStatusDryRunOutput {
     pub workbook: ExecutionWorkbook,
-    pub dry_run: DslCoderDryRunResult,
+    pub dry_run: DslDrafterDryRunResult,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -63,8 +63,8 @@ pub enum KycUpdateStatusDryRunRefusal {
     WorkbookRefused {
         reason: String,
     },
-    DslCoderRefused {
-        error: DslCoderValidationError,
+    DslDrafterRefused {
+        error: DslDrafterValidationError,
     },
 }
 
@@ -151,8 +151,8 @@ pub fn build_kyc_update_status_dry_run_with_manifest(
         reason: format!("{err:?}"),
     })?;
 
-    let dry_run = validate_workbook_for_dry_run(&workbook, DslCoderExecutionMode::DryRun)
-        .map_err(|error| KycUpdateStatusDryRunRefusal::DslCoderRefused { error })?;
+    let dry_run = validate_workbook_for_dry_run(&workbook, DslDrafterExecutionMode::DryRun)
+        .map_err(|error| KycUpdateStatusDryRunRefusal::DslDrafterRefused { error })?;
 
     Ok(KycUpdateStatusDryRunOutput { workbook, dry_run })
 }

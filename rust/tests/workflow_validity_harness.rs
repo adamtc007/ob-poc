@@ -12,7 +12,7 @@ use ob_poc::runbook::{
     build_kyc_update_status_dry_run, compile_restricted_mutation_preflight,
     create_approval_token_for_workbook, prepare_restricted_mutation_preflight,
     record_restricted_mutation_execution_receipt, validate_workbook_for_dry_run,
-    DslCoderExecutionMode, KycUpdateStatusDryRunInput, ObservedMutationAnchors,
+    DslDrafterExecutionMode, KycUpdateStatusDryRunInput, ObservedMutationAnchors,
 };
 use sem_os_core::domain_pack::DomainPackManifest;
 use uuid::{uuid, Uuid};
@@ -136,7 +136,7 @@ fn run_workflow_validity_case(
     row.workbook_integrity_valid = true;
 
     if let Err(error) =
-        validate_workbook_for_dry_run(&output.workbook, DslCoderExecutionMode::DryRun)
+        validate_workbook_for_dry_run(&output.workbook, DslDrafterExecutionMode::DryRun)
     {
         row.failure = Some(format!("DSL Coder validation failed: {error:?}"));
         return row;
