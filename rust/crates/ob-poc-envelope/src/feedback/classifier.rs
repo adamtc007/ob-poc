@@ -3,7 +3,7 @@
 //! Classifies errors by type and determines remediation path.
 //! Generates stable fingerprints for deduplication.
 
-use crate::events::ErrorSnapshot;
+use ob_poc_diagnostics::events::ErrorSnapshot;
 use sha2::{Digest, Sha256};
 
 use super::types::{ErrorType, RemediationPath};

@@ -10,7 +10,7 @@ use sqlx::PgPool;
 use std::path::PathBuf;
 use uuid::Uuid;
 
-use crate::events::{DslEvent, EventPayload};
+use ob_poc_diagnostics::events::{DslEvent, EventPayload};
 
 use super::classifier::FailureClassifier;
 use super::redactor::Redactor;
@@ -409,7 +409,7 @@ impl FeedbackInspector {
         event_timestamp: DateTime<Utc>,
         session_id: Option<Uuid>,
         verb: &str,
-        error: &crate::events::ErrorSnapshot,
+        error: &ob_poc_diagnostics::events::ErrorSnapshot,
     ) -> Result<Uuid> {
         let id = sqlx::query_scalar!(
             r#"

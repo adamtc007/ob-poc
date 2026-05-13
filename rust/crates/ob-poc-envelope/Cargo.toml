@@ -6,6 +6,9 @@ description = "Envelope construction + TOCTOU recheck + ACP session-input draft-
 
 [dependencies]
 ob-poc-types = { path = "../ob-poc-types" }
+# ob-poc-diagnostics carries the canonical events::* types (DslEvent,
+# EventPayload, ErrorSnapshot) consumed by the feedback inspector.
+ob-poc-diagnostics = { path = "../ob-poc-diagnostics" }
 # ob-poc-macros supplies the #[derive(IdType)] proc macro used by
 # data_dictionary's AttributeId. Proc-macro crate — tooling tier, not
 # execution tier.
@@ -39,7 +42,7 @@ sqlx = { version = "0.8", features = ["runtime-tokio-rustls", "postgres", "uuid"
 
 [features]
 default = []
-database = ["dep:sqlx"]
+database = ["dep:sqlx", "ob-poc-diagnostics/database"]
 
 [dev-dependencies]
 tokio = { version = "1", features = ["macros", "rt", "rt-multi-thread"] }
