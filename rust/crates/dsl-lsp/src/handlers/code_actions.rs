@@ -8,9 +8,8 @@
 use tower_lsp::lsp_types::*;
 
 use dsl_core::diagnostics::{DiagnosticCode, SuggestedFix};
-use ob_poc::dsl_v2::tooling::{
-    PlanningOutput, PlanningSyntheticStep, SemanticDiagnostic, Suggestion,
-};
+use dsl_runtime::validation::{Diagnostic as SemanticDiagnostic, Suggestion};
+use ob_poc::dsl_v2::tooling::{PlanningOutput, PlanningSyntheticStep};
 
 /// Generate code actions from planning output and semantic diagnostics
 ///

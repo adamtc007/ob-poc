@@ -71,6 +71,11 @@ pub mod verb_registry;
 // relocated from rust/src/dsl_v2/. Frontier-derived "what verb makes
 // sense next" recommender; pure-Rust over the verb registry.
 pub mod suggestions;
+// §9 item 9 slice 4 (2026-05-13): validation relocated from
+// rust/src/dsl_v2/. Pure-type module (920 LOC, zero internal crate
+// refs) — Diagnostic, Severity, SourceSpan, ValidationContext,
+// ValidationResult, Suggestion, ValidatedProgram, ValidatedStatement.
+pub mod validation;
 pub mod service_traits;
 pub mod services;
 pub mod state_reducer;

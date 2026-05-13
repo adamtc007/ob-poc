@@ -119,7 +119,8 @@ pub mod submission;
 // §9 item 9 slice 3 (2026-05-13): suggestions relocated to dsl-runtime.
 pub use dsl_runtime::suggestions;
 pub mod topo_sort;
-pub(crate) mod validation;
+// §9 item 9 slice 4 (2026-05-13): validation relocated to dsl-runtime.
+pub(crate) use dsl_runtime::validation;
 // §9 item 9 slice 2 (2026-05-13): verb_registry relocated to dsl-runtime.
 // Compat re-export preserves `super::verb_registry::*` (used by the
 // tooling submodule) and `crate::dsl_v2::verb_registry::*` callers.
