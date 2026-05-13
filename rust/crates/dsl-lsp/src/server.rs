@@ -12,8 +12,8 @@ use tower_lsp::{Client, LanguageServer};
 use crate::analysis::{DocumentState, SymbolTable};
 use crate::entity_client::{gateway_addr, EntityLookupClient};
 use crate::handlers;
+use dsl_runtime::planning_facade::PlanningOutput;
 use dsl_runtime::validation::Diagnostic as SemanticDiagnostic;
-use ob_poc::dsl_v2::tooling::PlanningOutput;
 
 /// File type detection for dispatch
 enum FileType {

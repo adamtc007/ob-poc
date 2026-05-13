@@ -76,6 +76,12 @@ pub mod suggestions;
 // refs) — Diagnostic, Severity, SourceSpan, ValidationContext,
 // ValidationResult, Suggestion, ValidatedProgram, ValidatedStatement.
 pub mod validation;
+// §9 item 9 slice 5 (2026-05-13): planning_facade relocated from
+// rust/src/dsl_v2/. The analyse-and-plan orchestrator that parses
+// DSL text, compiles to ops, runs DAG planning, and returns both
+// diagnostics + executable plan. analyse_and_plan, PlanningInput,
+// PlanningOutput, SyntheticStep, quick_validate, ImplicitCreateMode.
+pub mod planning_facade;
 pub mod service_traits;
 pub mod services;
 pub mod state_reducer;

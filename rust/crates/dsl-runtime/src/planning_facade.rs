@@ -9,14 +9,14 @@
 
 use std::sync::Arc;
 
-use super::ast::Program;
-use super::binding_context::BindingContext;
-use super::compiler::compile_to_ops;
-use super::dag::{build_execution_plan as build_dag_plan, describe_plan, CycleError};
-use super::diagnostics::{Diagnostic, DiagnosticCode, SourceSpan};
-use super::ops::Op;
-use super::parser::parse_program;
-use super::runtime_registry::RuntimeVerbRegistry;
+use dsl_core::ast::Program;
+use dsl_core::binding_context::BindingContext;
+use dsl_core::compiler::compile_to_ops;
+use dsl_core::dag::{build_execution_plan as build_dag_plan, describe_plan, CycleError};
+use dsl_core::diagnostics::{Diagnostic, DiagnosticCode, SourceSpan};
+use dsl_core::ops::Op;
+use dsl_core::parser::parse_program;
+use crate::runtime_registry::RuntimeVerbRegistry;
 
 /// Context for implicit create behavior
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Default)]
@@ -102,12 +102,12 @@ pub struct PlannedExecution {
 impl PlannedExecution {
     /// Describe the plan for display
     pub fn describe(&self) -> String {
-        let dag_plan = super::dag::ExecutionPlan {
+        let dag_plan = dsl_core::dag::ExecutionPlan {
             ops: self.ops.clone(),
             phases: self
                 .phases
                 .iter()
-                .map(|(name, indices)| super::dag::ExecutionPhase {
+                .map(|(name, indices)| dsl_core::dag::ExecutionPhase {
                     name: name.clone(),
                     op_indices: indices.clone(),
                 })
@@ -195,7 +195,7 @@ pub fn analyse_and_plan(input: PlanningInput) -> PlanningOutput {
         let mut diag = Diagnostic::error(DiagnosticCode::UndefinedSymbol, err.message.clone());
 
         // Try to get span from the statement
-        if let Some(super::ast::Statement::VerbCall(vc)) = program.statements.get(err.stmt_idx) {
+        if let Some(dsl_core::ast::Statement::VerbCall(vc)) = program.statements.get(err.stmt_idx) {
             diag = diag.with_span(SourceSpan::from_byte_offset(
                 input.source,
                 vc.span.start,
@@ -287,7 +287,7 @@ pub fn quick_validate(source: &str, registry: Arc<RuntimeVerbRegistry>) -> Vec<D
 
 #[cfg(test)]
 mod tests {
-    use super::super::config::loader::ConfigLoader;
+    use dsl_core::config::loader::ConfigLoader;
     use super::*;
 
     fn test_registry() -> Arc<RuntimeVerbRegistry> {

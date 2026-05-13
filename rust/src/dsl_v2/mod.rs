@@ -102,7 +102,8 @@ pub mod intent_tiers;
 pub(crate) mod lsp_validator;
 pub(crate) mod macros;
 pub mod operator_types;
-pub(crate) mod planning_facade;
+// §9 item 9 slice 5 (2026-05-13): planning_facade relocated to dsl-runtime.
+pub(crate) use dsl_runtime::planning_facade;
 #[cfg(feature = "database")]
 pub mod ref_resolver;
 pub mod repl_session;
