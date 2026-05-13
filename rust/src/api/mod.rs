@@ -81,8 +81,12 @@ pub mod service_resource_routes;
 #[cfg(feature = "server")]
 pub mod workflow_routes;
 
+// Phase 3 slice 2z (2026-05-13): display-noun translation table relocated to
+// ob-poc-envelope. Zero internal-crate deps; only serde_json/HashMap/LazyLock.
+// The pub-use `translate_json` / `translate_string` / `DisplayNounTranslator`
+// re-export below keeps the same external API surface.
 #[cfg(feature = "server")]
-pub mod display_nouns;
+pub use ob_poc_envelope::display_nouns;
 
 #[cfg(feature = "server")]
 pub mod projection_routes;

@@ -36,6 +36,7 @@ pub mod bods_types;
 pub mod booking_principal_types;
 #[cfg(feature = "database")]
 pub mod deal_types;
+pub mod display_nouns;
 pub mod dsl_coder;
 pub mod envelope_builder;
 pub mod kyc_dry_run;
