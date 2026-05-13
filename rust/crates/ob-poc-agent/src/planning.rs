@@ -34,6 +34,7 @@ use ob_agentic::llm_client::{LlmClient, ToolDefinition};
 use serde::{Deserialize, Serialize};
 
 use crate::index::SessionIndex;
+use crate::knowledge::{active_verbs_query_for_index, KnowledgeResponse, SemOsKnowledgeClient};
 
 /// Placeholder for the Phase 3.1 [`GoalFrame`] shape. The spike fills
 /// just the fields the audit emission slice (Phase 2.9) needs.
@@ -85,18 +86,33 @@ pub enum DraftSource {
 pub struct PlanningLoop {
     index: SessionIndex,
     llm_client: Option<Arc<dyn LlmClient>>,
+    knowledge: Option<Arc<dyn SemOsKnowledgeClient>>,
 }
 
 impl PlanningLoop {
-    /// Construct a planning loop. `llm_client` is optional so the
-    /// spike runs offline (no API key required).
-    pub fn new(index: SessionIndex, llm_client: Option<Arc<dyn LlmClient>>) -> Self {
-        Self { index, llm_client }
+    /// Construct a planning loop. `llm_client` and `knowledge` are
+    /// optional so the spike runs hermetically (no API key, no MCP
+    /// transport).
+    pub fn new(
+        index: SessionIndex,
+        llm_client: Option<Arc<dyn LlmClient>>,
+        knowledge: Option<Arc<dyn SemOsKnowledgeClient>>,
+    ) -> Self {
+        Self {
+            index,
+            llm_client,
+            knowledge,
+        }
     }
 
     /// Read-only view of the index for handlers / audit.
     pub fn index(&self) -> &SessionIndex {
         &self.index
+    }
+
+    /// Optional knowledge client label for audit / diagnostics.
+    pub fn knowledge_label(&self) -> Option<&str> {
+        self.knowledge.as_ref().map(|k| k.provider_label())
     }
 
     /// One round-trip — utterance → verb FQN.
@@ -119,6 +135,39 @@ impl PlanningLoop {
             pack_hash: self.index.pack_hash.clone(),
             created_at: Utc::now(),
         };
+
+        // Phase 2.8 — exercise the knowledge surface so the seam is
+        // demonstrably wired end-to-end. The spike client returns
+        // Empty for every query; Phase 3.4 / 4 swap for the real
+        // sem_os_mcp transport and hydrate constellation context
+        // before the LLM call.
+        if let (Some(client), Some(query)) = (
+            self.knowledge.as_ref(),
+            active_verbs_query_for_index(&self.index),
+        ) {
+            match client.query(query).await {
+                Ok(KnowledgeResponse::Empty) => {
+                    tracing::debug!(
+                        target: "sage-acp",
+                        "knowledge client returned Empty — using pack allowlist only"
+                    );
+                }
+                Ok(response) => {
+                    tracing::debug!(
+                        target: "sage-acp",
+                        ?response,
+                        "knowledge client hydrated context"
+                    );
+                }
+                Err(error) => {
+                    tracing::warn!(
+                        target: "sage-acp",
+                        %error,
+                        "knowledge client failed — continuing with pack allowlist"
+                    );
+                }
+            }
+        }
 
         let (verb_fqn, source) = match self.llm_client.as_ref() {
             Some(client) => {
@@ -295,7 +344,7 @@ progress_signals: []
 
     #[tokio::test]
     async fn deterministic_fallback_picks_first_allowed_verb() {
-        let loop_ = PlanningLoop::new(make_index(), None);
+        let loop_ = PlanningLoop::new(make_index(), None, None);
         let outcome = loop_.propose_draft("set up a book").await.unwrap();
         assert_eq!(outcome.verb_fqn, "cbu.create");
         assert_eq!(outcome.source, DraftSource::DeterministicFallback);
@@ -307,7 +356,7 @@ progress_signals: []
         let llm: Arc<dyn LlmClient> = Arc::new(StubLlm {
             verb_fqn: "cbu.attach-product".to_string(),
         });
-        let loop_ = PlanningLoop::new(make_index(), Some(llm));
+        let loop_ = PlanningLoop::new(make_index(), Some(llm), None);
         let outcome = loop_.propose_draft("attach the new product").await.unwrap();
         assert_eq!(outcome.verb_fqn, "cbu.attach-product");
         assert_eq!(outcome.source, DraftSource::LlmTool);
@@ -318,7 +367,7 @@ progress_signals: []
         let llm: Arc<dyn LlmClient> = Arc::new(StubLlm {
             verb_fqn: "cbu.delete".to_string(),
         });
-        let loop_ = PlanningLoop::new(make_index(), Some(llm));
+        let loop_ = PlanningLoop::new(make_index(), Some(llm), None);
         let err = loop_
             .propose_draft("wipe the book")
             .await
@@ -334,7 +383,7 @@ progress_signals: []
         let llm: Arc<dyn LlmClient> = Arc::new(StubLlm {
             verb_fqn: "cbu.invent-this".to_string(),
         });
-        let loop_ = PlanningLoop::new(make_index(), Some(llm));
+        let loop_ = PlanningLoop::new(make_index(), Some(llm), None);
         let err = loop_
             .propose_draft("do something new")
             .await

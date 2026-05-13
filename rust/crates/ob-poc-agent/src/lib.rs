@@ -85,3 +85,9 @@ pub mod prompt_handler;
 /// channel before they reach the editor. The spike runs parse-only
 /// in-process; Phase 4 swaps for a real out-of-process LSP client.
 pub mod repl_channel;
+
+/// SemOS knowledge query surface — Phase 2.8. Trait the planning
+/// loop calls to reach entity resolution / active verb surface /
+/// macro and pack catalogue / FSM transitions. Phase 2 ships a stub
+/// impl; Phase 4 introduces `sem_os_mcp` as the production transport.
+pub mod knowledge;

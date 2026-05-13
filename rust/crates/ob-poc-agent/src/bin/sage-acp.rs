@@ -32,6 +32,7 @@ use std::sync::Arc;
 use ob_agentic::anthropic_client::AnthropicClient;
 use ob_agentic::llm_client::LlmClient;
 use ob_poc_agent::index::{DiskPackIndexLoader, IndexLoadRequest, IndexLoader};
+use ob_poc_agent::knowledge::{SemOsKnowledgeClient, StubKnowledgeClient};
 use ob_poc_agent::planning::PlanningLoop;
 use ob_poc_agent::prompt_handler::try_handle_prompt;
 use ob_poc_agent::repl_channel::LocalParseChannel;
@@ -91,7 +92,14 @@ async fn main() -> anyhow::Result<()> {
         }
     };
 
-    let planning = PlanningLoop::new(index, llm_client);
+    let knowledge: Arc<dyn SemOsKnowledgeClient> =
+        Arc::new(StubKnowledgeClient::with_label("phase-2-spike"));
+    eprintln!(
+        "[sage-acp] SemOS knowledge client wired (provider: {})",
+        knowledge.provider_label()
+    );
+
+    let planning = PlanningLoop::new(index, llm_client, Some(knowledge));
     let channel = LocalParseChannel::new();
     let mut agent = AcpJsonRpcAgent::new();
 
