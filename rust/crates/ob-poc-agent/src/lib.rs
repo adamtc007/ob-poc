@@ -69,6 +69,12 @@
 /// `sem_os_mcp` exists.
 pub mod index;
 
+/// Motivated Sage goal frame — typed goal state the agent tracks
+/// across a session. Phase 3.1 (C-01 / C-02 / C-03) — see
+/// `goal_frame.rs` for the lifecycle FSM. The `GoalFrameStore`
+/// (Phase 3.1b) keys frames by session id.
+pub mod goal_frame;
+
 /// Sage planning loop — Phase 2.6. Takes a raw utterance + a
 /// `SessionIndex` and returns a constrained-composition draft (verb
 /// FQN bounded to the pack allowlist). LLM call site is optional so

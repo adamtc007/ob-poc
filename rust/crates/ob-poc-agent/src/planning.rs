@@ -29,74 +29,12 @@
 use std::sync::Arc;
 
 use anyhow::{anyhow, Result};
-use chrono::{DateTime, Utc};
 use ob_agentic::llm_client::{LlmClient, ToolDefinition};
 use serde::{Deserialize, Serialize};
 
+use crate::goal_frame::GoalFrame;
 use crate::index::SessionIndex;
 use crate::knowledge::{active_verbs_query_for_index, KnowledgeResponse, SemOsKnowledgeClient};
-
-/// Hard-coded spike shape of the Motivated Sage `GoalFrame`. Phase
-/// 3.1 (C-01 / C-02 / C-03) extends this with the full planning
-/// surface — frontier state, blocker reports, motivation prompt
-/// scratch, GoalProposalTrace emission. For Phase 2 the frame is
-/// just enough to draft + validate one runbook end-to-end and to
-/// carry the audit-relevant correlation ids.
-///
-/// The seed-only fields below are stable across the spike → Phase
-/// 3.1 transition. Phase 3.1 adds fields; it does not rename or
-/// remove. The `seed_*` constructor (`GoalFrame::seed_for_spike`) is
-/// the single call site Phase 3 will replace with the full
-/// Motivated Sage builder.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct GoalFrame {
-    /// Stable id the audit record correlates against (`gf-<uuid>`).
-    pub id: String,
-    /// Raw utterance the user typed in the editor.
-    pub utterance: String,
-    /// Pack the session is anchored to.
-    pub pack_id: String,
-    /// Pack manifest hash (SHA-256 of raw YAML) — captured for
-    /// replay-grade audit.
-    pub pack_hash: String,
-    /// Workspace the session targets (seed: copied from
-    /// [`SessionIndex::workspace`]).
-    pub workspace: String,
-    /// Optional intent summary the planning loop or the LLM
-    /// recorded for the round-trip. Phase 2 leaves this `None`;
-    /// Phase 3.4 (motivation prompt template) fills it.
-    pub intent_summary: Option<String>,
-    /// When the frame was constructed.
-    pub created_at: DateTime<Utc>,
-}
-
-impl GoalFrame {
-    /// Seed constructor used by the Phase 2 spike. Captures the
-    /// utterance + anchors against the session index. Phase 3.1
-    /// will introduce richer constructors that thread the
-    /// constellation hydration + frontier state in.
-    pub fn seed_for_spike(utterance: &str, index: &SessionIndex) -> Self {
-        Self {
-            id: format!("gf-{}", uuid::Uuid::new_v4()),
-            utterance: utterance.to_string(),
-            pack_id: index.pack.id.clone(),
-            pack_hash: index.pack_hash.clone(),
-            workspace: workspace_tag(&index.workspace),
-            intent_summary: None,
-            created_at: Utc::now(),
-        }
-    }
-}
-
-/// Stable workspace tag — picks the serde rename when present (e.g.
-/// `OnBoarding -> "onboarding_request"`) so the audit-shape value
-/// matches everything else in the system.
-fn workspace_tag(workspace: &ob_poc_types::session::kinds::WorkspaceKind) -> String {
-    serde_json::to_value(workspace)
-        .ok()
-        .and_then(|v| v.as_str().map(String::from))
-        .unwrap_or_else(|| format!("{workspace:?}"))
-}
 
 /// Output of one planning round-trip.
 ///
@@ -310,6 +248,7 @@ impl PlanningLoop {
 mod tests {
     use super::*;
     use crate::index::SessionIndex;
+    use chrono::Utc;
     use ob_agentic::llm_client::ToolCallResult;
     use ob_poc_journey::pack::load_pack_from_bytes;
     use ob_poc_types::session::kinds::WorkspaceKind;

@@ -234,12 +234,13 @@ pub enum AuditPath {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::planning::GoalFrame;
+    use crate::goal_frame::{GoalFrame, GoalFrameStatus};
     use crate::repl_channel::DraftDiagnostic;
     use chrono::Utc;
     use tempfile::TempDir;
 
     fn sample_outcome() -> PlanningOutcome {
+        let now = Utc::now();
         PlanningOutcome {
             goal_frame: GoalFrame {
                 id: "gf-test-123".to_string(),
@@ -248,7 +249,9 @@ mod tests {
                 pack_hash: "deadbeef".to_string(),
                 workspace: "cbu".to_string(),
                 intent_summary: None,
-                created_at: Utc::now(),
+                created_at: now,
+                updated_at: now,
+                status: GoalFrameStatus::Proposed,
             },
             verb_fqn: "cbu.create".to_string(),
             source: DraftSource::DeterministicFallback,
