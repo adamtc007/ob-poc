@@ -35,6 +35,7 @@ use ob_poc_agent::audit::{default_audit_path, AuditPath, AuditSink, JsonlAuditSi
 use ob_poc_agent::constellation::{ConstellationHydrator, StubConstellationHydrator};
 use ob_poc_agent::goal_frame::GoalFrameStore;
 use ob_poc_agent::goal_frame_handler::try_handle_goal_frame;
+use ob_poc_agent::goal_proposal_trace::{GoalProposalTraceSink, LoggingTraceSink};
 use ob_poc_agent::index::{DiskPackIndexLoader, IndexLoadRequest, IndexLoader};
 use ob_poc_agent::knowledge::{SemOsKnowledgeClient, StubKnowledgeClient};
 use ob_poc_agent::planning::PlanningLoop;
@@ -115,6 +116,13 @@ async fn main() -> anyhow::Result<()> {
 
     let frames = GoalFrameStore::new();
 
+    let traces: Arc<dyn GoalProposalTraceSink> =
+        Arc::new(LoggingTraceSink::with_label("phase-3-spike"));
+    eprintln!(
+        "[sage-acp] GoalProposalTrace sink wired (provider: {})",
+        traces.provider_label()
+    );
+
     let audit: Arc<dyn AuditSink> = match default_audit_path() {
         AuditPath::Disabled => {
             eprintln!("[sage-acp] Audit sink disabled (OBPOC_SAGE_AUDIT=none)");
@@ -142,8 +150,15 @@ async fn main() -> anyhow::Result<()> {
                 // Dispatch order: prompt handler (planning loop) →
                 // goal-frame lifecycle handlers → boundary fall-through
                 // (discovery / projection / KYC dry-run surface).
-                if let Some(messages) =
-                    try_handle_prompt(&request, &planning, &channel, audit.as_ref(), &frames).await
+                if let Some(messages) = try_handle_prompt(
+                    &request,
+                    &planning,
+                    &channel,
+                    audit.as_ref(),
+                    &frames,
+                    traces.as_ref(),
+                )
+                .await
                 {
                     messages
                 } else if let Some(messages) = try_handle_goal_frame(&request, &frames).await {

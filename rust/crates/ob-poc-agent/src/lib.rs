@@ -111,6 +111,12 @@ pub mod motivation;
 /// for the next planning round to avoid.
 pub mod approval;
 
+/// Typed `GoalProposalTrace` + sink for emission — Phase 3.7. The
+/// replay-grade artefact V&S §13 references. Spike ships a logging
+/// stub; Phase 4 wires the SemOS Semantic Traceability Kernel
+/// transport via `sem_os_client`.
+pub mod goal_proposal_trace;
+
 /// Sage planning loop — Phase 2.6. Takes a raw utterance + a
 /// `SessionIndex` and returns a constrained-composition draft (verb
 /// FQN bounded to the pack allowlist). LLM call site is optional so

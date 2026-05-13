@@ -21,6 +21,7 @@ use uuid::Uuid;
 
 use crate::audit::{AuditRecord, AuditSink};
 use crate::goal_frame::GoalFrameStore;
+use crate::goal_proposal_trace::{GoalProposalTrace, GoalProposalTraceSink};
 use crate::planning::{DraftSource, PlanningLoop, PlanningOutcome};
 use crate::repl_channel::{minimal_source_for_verb, ReplChannelClient, ValidationOutcome};
 
@@ -47,6 +48,7 @@ pub async fn try_handle_prompt(
     channel: &dyn ReplChannelClient,
     audit: &dyn AuditSink,
     frames: &GoalFrameStore,
+    traces: &dyn GoalProposalTraceSink,
 ) -> Option<Vec<JsonRpcOutgoing>> {
     if request.method != "session/prompt" {
         return None;
@@ -105,6 +107,20 @@ pub async fn try_handle_prompt(
             let record =
                 AuditRecord::from_outcome(&outcome, &validation, planning.knowledge_label());
             audit.emit(record).await;
+
+            // Phase 3.7: emit a typed GoalProposalTrace to the
+            // pluggable sink. Spike sink is a tracing::info!; Phase
+            // 4 wires the SemOS Semantic Traceability Kernel.
+            let trace = GoalProposalTrace::from_parts(
+                outcome.goal_frame.clone(),
+                outcome.verb_fqn.clone(),
+                outcome.source,
+                &validation,
+                planning.knowledge_label(),
+                planning.hydrator_label(),
+            );
+            traces.emit(trace).await;
+
             Some(success_messages(
                 id,
                 &parsed.session_id,
@@ -266,6 +282,7 @@ fn error_response(
 mod tests {
     use super::*;
     use crate::audit::NullAuditSink;
+    use crate::goal_proposal_trace::NullTraceSink;
     use crate::index::SessionIndex;
     use crate::repl_channel::LocalParseChannel;
     use chrono::Utc;
@@ -318,7 +335,8 @@ progress_signals: []
         let channel = LocalParseChannel::new();
         let audit = NullAuditSink;
         let frames = GoalFrameStore::new();
-        let outcome = try_handle_prompt(&request, &make_planning_loop(), &channel, &audit, &frames).await;
+        let traces = NullTraceSink;
+        let outcome = try_handle_prompt(&request, &make_planning_loop(), &channel, &audit, &frames, &traces).await;
         assert!(outcome.is_none());
     }
 
@@ -336,7 +354,8 @@ progress_signals: []
         let channel = LocalParseChannel::new();
         let audit = NullAuditSink;
         let frames = GoalFrameStore::new();
-        let outcome = try_handle_prompt(&request, &make_planning_loop(), &channel, &audit, &frames)
+        let traces = NullTraceSink;
+        let outcome = try_handle_prompt(&request, &make_planning_loop(), &channel, &audit, &frames, &traces)
             .await
             .expect("session/prompt must be handled");
         assert_eq!(outcome.len(), 3, "plan update + diagnostics + response");
@@ -383,7 +402,8 @@ progress_signals: []
         let channel = LocalParseChannel::new();
         let audit = NullAuditSink;
         let frames = GoalFrameStore::new();
-        let outcome = try_handle_prompt(&request, &make_planning_loop(), &channel, &audit, &frames)
+        let traces = NullTraceSink;
+        let outcome = try_handle_prompt(&request, &make_planning_loop(), &channel, &audit, &frames, &traces)
             .await
             .expect("handled");
         assert_eq!(outcome.len(), 1);
@@ -426,7 +446,8 @@ progress_signals: []
         let channel = LocalParseChannel::new();
         let audit = NullAuditSink;
         let frames = GoalFrameStore::new();
-        let outcome = try_handle_prompt(&request, &make_planning_loop(), &channel, &audit, &frames)
+        let traces = NullTraceSink;
+        let outcome = try_handle_prompt(&request, &make_planning_loop(), &channel, &audit, &frames, &traces)
             .await
             .expect("handled");
         assert_eq!(outcome.len(), 1);
@@ -450,12 +471,19 @@ progress_signals: []
         let channel = LocalParseChannel::new();
         let audit = NullAuditSink;
         let frames = GoalFrameStore::new();
+        let traces = NullTraceSink;
         let planning = make_planning_loop();
 
-        let first =
-            try_handle_prompt(&prompt_request(sid, "set up a book", 1), &planning, &channel, &audit, &frames)
-                .await
-                .expect("first prompt handled");
+        let first = try_handle_prompt(
+            &prompt_request(sid, "set up a book", 1),
+            &planning,
+            &channel,
+            &audit,
+            &frames,
+            &traces,
+        )
+        .await
+        .expect("first prompt handled");
         let (first_id, first_refined) = extract_goal_frame_id(&first);
         assert!(!first_refined, "first prompt must seed, not refine");
 
@@ -465,6 +493,7 @@ progress_signals: []
             &channel,
             &audit,
             &frames,
+            &traces,
         )
         .await
         .expect("second prompt handled");
@@ -480,6 +509,7 @@ progress_signals: []
             &channel,
             &audit,
             &frames,
+            &traces,
         )
         .await
         .expect("third prompt handled");
