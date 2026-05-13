@@ -26,6 +26,7 @@ ob-poc-boundary = { path = "crates/ob-poc-boundary" }
 # Empty skeletons populated by Phases 2–5.
 ob-poc-sage = { path = "crates/ob-poc-sage" }       # Sage intent understanding (Phase 2 dest)
 ob-poc-journey = { path = "crates/ob-poc-journey" } # Pack-guided workflows (Phase 3 dest)
+ob-poc-domain = { path = "crates/ob-poc-domain" }   # Business-domain DTOs (Phase 4 dest)
 ob-poc-macros = { path = "crates/ob-poc-macros" }
 sem_os_core = { path = "crates/sem_os_core" }
 sem_os_client = { path = "crates/sem_os_client" }
@@ -254,6 +255,7 @@ members = [
     "crates/ob-poc-boundary",
     "crates/ob-poc-sage",
     "crates/ob-poc-journey",
+    "crates/ob-poc-domain",
     "crates/entity-gateway",
     "crates/ob-semantic-matcher",
 

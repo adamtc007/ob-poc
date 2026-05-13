@@ -1,0 +1,43 @@
+[package]
+name = "ob-poc-domain"
+version = "0.1.0"
+edition = "2021"
+description = "Domain DTOs — pure reference-data shapes for the business domains (booking principal, BODS/LEI, deal, trading profile, taxonomies, ontology, derived attributes). No execution logic. Pairs each DTO cluster with its small DB-loading helper where one exists."
+
+# Capability discipline (see docs/todo/capability-crate-restructure-v1.md §2.2):
+#   IN-SCOPE: pure DTOs for the business domains + their small sqlx
+#             helpers where the helper has no internal-crate deps
+#             (advisory_lock pairs with derived_attributes,
+#             view_config_service pairs with taxonomy).
+#   OUT-OF-SCOPE: domain SERVICES (sqlx repositories with business
+#                 logic, materialization, governance). Those stay in
+#                 ob-poc::database::* and ob-poc::services::*.
+#
+# Re-evaluate after Phase 4: if this crate ends up >2k LOC of types
+# across 10 unrelated domains, the bed-in review (plan §9) should
+# consider per-domain crates.
+
+[dependencies]
+ob-poc-types = { path = "../ob-poc-types" }
+anyhow = "1.0"
+chrono = { version = "0.4", features = ["serde"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+serde_yaml = "0.9"
+sha2 = "0.10"
+thiserror = "1"
+unicode-normalization = "0.1"
+uuid = { version = "1", features = ["v4", "serde"] }
+# DB-feature gated — taxonomy/derived_attributes/view_config_service all
+# carry sqlx::PgPool helpers; bods_types + deal_types use the rust_decimal
+# and bigdecimal types in column shapes.
+sqlx = { version = "0.8", features = ["runtime-tokio-rustls", "postgres", "uuid", "chrono", "json", "bigdecimal"], optional = true }
+bigdecimal = { version = "0.4", features = ["serde"], optional = true }
+rust_decimal = { version = "1", features = ["serde", "db-postgres"], optional = true }
+
+[features]
+default = []
+database = ["dep:sqlx", "dep:bigdecimal", "dep:rust_decimal"]
+
+[lints.rust]
+unreachable_pub = "deny"
