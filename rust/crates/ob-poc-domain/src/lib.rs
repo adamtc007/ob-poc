@@ -70,9 +70,9 @@
 // re-exports in ob-poc, now retargeted from ob_poc_boundary::* to
 // ob_poc_domain::*. Boundary no longer hosts these modules.
 
-pub mod booking_principal_types;
 #[cfg(feature = "database")]
 pub mod bods_types;
+pub mod booking_principal_types;
 #[cfg(feature = "database")]
 pub mod deal_types;
 
@@ -121,6 +121,6 @@ pub mod derived_attributes;
 //   - entity_linking (~7 files) — mention extraction + resolver +
 //     snapshot + normalize + compiler + stub.
 #[cfg(feature = "database")]
-pub mod trading_profile;
-#[cfg(feature = "database")]
 pub mod entity_linking;
+#[cfg(feature = "database")]
+pub mod trading_profile;

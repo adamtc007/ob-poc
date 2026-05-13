@@ -1,15 +1,15 @@
 //! Coder engine — deterministic OutcomeIntent -> verb + DSL resolution.
 //!
-//! Phase 3 slice 2aa (2026-05-13): the result DTOs (`CoderResolution`,
-//! `CoderFailureKind`, `CoderDiagnostics`, `CoderFilterDiagnostics`,
-//! `CoderResult`) moved to `ob_poc_boundary::sage::coder_result`. The
-//! `CoderEngine` itself stays here because it depends on dsl_core verb
+//! Phase 3 slice 2aa (2026-05-13): the result DTOs (`DraftResolution`,
+//! `DraftFailureKind`, `DraftDiagnostics`, `DraftFilterDiagnostics`,
+//! `DraftResult`) moved to `ob_poc_boundary::sage::drafter_result`. The
+//! `DrafterEngine` itself stays here because it depends on dsl_core verb
 //! config and mcp::intent_pipeline.
 //!
 //! Slice 2bb (2026-05-13) followed up: `FilterDiagnostics` itself moved
-//! to envelope, so the `From<FilterDiagnostics> for CoderFilterDiagnostics`
+//! to envelope, so the `From<FilterDiagnostics> for DraftFilterDiagnostics`
 //! impl moved alongside it (orphan rule). The `pub use` re-export below
-//! preserves `sage::coder::{CoderResolution, CoderResult, ...}` paths
+//! preserves `sage::drafter::{DraftResolution, DraftResult, ...}` paths
 //! used by agent::orchestrator and others.
 
 use anyhow::{anyhow, Result};
@@ -23,30 +23,30 @@ use super::outcome::{OutcomeIntent, OutcomeStep};
 use super::verb_index::VerbMetadataIndex;
 use super::verb_resolve::{FilterDiagnostics, ScoredVerbCandidate, StructuredVerbScorer};
 
-// Back-compat re-export — `sage::coder::CoderResolution`, `sage::coder::CoderResult`,
+// Back-compat re-export — `sage::drafter::DraftResolution`, `sage::drafter::DraftResult`,
 // etc. are reached this way by agent::orchestrator and other callers.
-pub use super::coder_result::{
-    CoderDiagnostics, CoderFailureKind, CoderFilterDiagnostics, CoderResolution, CoderResult,
+pub use super::drafter_result::{
+    DraftDiagnostics, DraftFailureKind, DraftFilterDiagnostics, DraftResolution, DraftResult,
 };
 
 /// Deterministic Coder engine over verb metadata and config.
 #[derive(Debug, Clone)]
-pub struct CoderEngine {
+pub struct DrafterEngine {
     verb_index: VerbMetadataIndex,
     scorer: StructuredVerbScorer,
     config: VerbsConfig,
 }
 
-impl CoderEngine {
+impl DrafterEngine {
     /// Build a coder engine from loaded verb config.
     ///
     /// # Examples
     /// ```ignore
     /// use dsl_core::config::loader::ConfigLoader;
-    /// use ob_poc::sage::coder::CoderEngine;
+    /// use ob_poc::sage::drafter::DrafterEngine;
     ///
     /// let config = ConfigLoader::from_env().load_verbs()?;
-    /// let engine = CoderEngine::from_config(config);
+    /// let engine = DrafterEngine::from_config(config);
     /// assert!(engine.verb_index().len() > 0);
     /// # Ok::<(), anyhow::Error>(())
     /// ```
@@ -64,9 +64,9 @@ impl CoderEngine {
     ///
     /// # Examples
     /// ```ignore
-    /// use ob_poc::sage::coder::CoderEngine;
+    /// use ob_poc::sage::drafter::DrafterEngine;
     ///
-    /// let engine = CoderEngine::load()?;
+    /// let engine = DrafterEngine::load()?;
     /// assert!(engine.verb_index().len() > 0);
     /// # Ok::<(), anyhow::Error>(())
     /// ```
@@ -80,9 +80,9 @@ impl CoderEngine {
     /// # Examples
     /// ```ignore
     /// use ob_poc::sage::{IntentPolarity, ObservationPlane, OutcomeAction, OutcomeIntent, SageConfidence};
-    /// use ob_poc::sage::coder::CoderEngine;
+    /// use ob_poc::sage::drafter::DrafterEngine;
     ///
-    /// let engine = CoderEngine::load()?;
+    /// let engine = DrafterEngine::load()?;
     /// let outcome = OutcomeIntent {
     ///     summary: "List CBUs".to_string(),
     ///     plane: ObservationPlane::Instance,
@@ -98,7 +98,7 @@ impl CoderEngine {
     /// assert!(!result.verb_fqn.is_empty());
     /// # Ok::<(), anyhow::Error>(())
     /// ```
-    pub fn resolve(&self, outcome: &OutcomeIntent) -> Result<CoderResult> {
+    pub fn resolve(&self, outcome: &OutcomeIntent) -> Result<DraftResult> {
         if let Some(result) = self.try_structure_read_describe(outcome)? {
             return Ok(result);
         }
@@ -136,7 +136,7 @@ impl CoderEngine {
                 Some(&top),
                 threshold,
                 filter_diagnostics,
-                Some(CoderFailureKind::BelowThreshold),
+                Some(DraftFailureKind::BelowThreshold),
             ));
         }
 
@@ -146,13 +146,13 @@ impl CoderEngine {
                 Some(&top),
                 threshold,
                 filter_diagnostics,
-                Some(CoderFailureKind::PolicyConflict),
+                Some(DraftFailureKind::PolicyConflict),
             ));
         }
         self.resolve_candidate(
             outcome,
             &top,
-            Some(CoderDiagnostics {
+            Some(DraftDiagnostics {
                 failure_kind: None,
                 filter_diagnostics: filter_diagnostics.into(),
                 top_candidate: Some(top.fqn.clone()),
@@ -166,9 +166,9 @@ impl CoderEngine {
     ///
     /// # Examples
     /// ```ignore
-    /// use ob_poc::sage::coder::CoderEngine;
+    /// use ob_poc::sage::drafter::DrafterEngine;
     ///
-    /// let engine = CoderEngine::load()?;
+    /// let engine = DrafterEngine::load()?;
     /// assert!(engine.verb_index().len() > 0);
     /// # Ok::<(), anyhow::Error>(())
     /// ```
@@ -176,7 +176,7 @@ impl CoderEngine {
         &self.verb_index
     }
 
-    fn try_structure_read_describe(&self, outcome: &OutcomeIntent) -> Result<Option<CoderResult>> {
+    fn try_structure_read_describe(&self, outcome: &OutcomeIntent) -> Result<Option<DraftResult>> {
         if outcome.plane != super::ObservationPlane::Structure
             || outcome.polarity != super::IntentPolarity::Read
             || outcome.domain_concept.is_empty()
@@ -201,8 +201,8 @@ impl CoderEngine {
         &self,
         outcome: &OutcomeIntent,
         candidate: &ScoredVerbCandidate,
-        diagnostics: Option<CoderDiagnostics>,
-    ) -> Result<CoderResult> {
+        diagnostics: Option<DraftDiagnostics>,
+    ) -> Result<DraftResult> {
         let step = primary_step(outcome);
         let config = self.verb_config(&candidate.fqn)?;
         let structured = structured_intent_from_step(&candidate.fqn, &step, config)?;
@@ -237,14 +237,14 @@ impl CoderEngine {
 
         let resolution =
             if candidate.score >= 0.75 && missing_args.is_empty() && unresolved_refs.is_empty() {
-                CoderResolution::Confident
+                DraftResolution::Confident
             } else if !candidate.fqn.is_empty() {
-                CoderResolution::Proposed
+                DraftResolution::Proposed
             } else {
-                CoderResolution::NeedsInput
+                DraftResolution::NeedsInput
             };
 
-        Ok(CoderResult {
+        Ok(DraftResult {
             verb_fqn: candidate.fqn.clone(),
             dsl,
             resolution,
@@ -283,11 +283,11 @@ impl CoderEngine {
         top: Option<&ScoredVerbCandidate>,
         threshold: f32,
         filter_diagnostics: FilterDiagnostics,
-        override_kind: Option<CoderFailureKind>,
+        override_kind: Option<DraftFailureKind>,
     ) -> anyhow::Error {
         let failure_kind = override_kind
             .unwrap_or_else(|| classify_failure_kind(filter_diagnostics, top, threshold));
-        let diagnostics = CoderDiagnostics {
+        let diagnostics = DraftDiagnostics {
             failure_kind: Some(failure_kind),
             filter_diagnostics: filter_diagnostics.into(),
             top_candidate: top.map(|candidate| candidate.fqn.clone()),
@@ -316,32 +316,32 @@ fn classify_failure_kind(
     filter_diagnostics: FilterDiagnostics,
     top: Option<&ScoredVerbCandidate>,
     threshold: f32,
-) -> CoderFailureKind {
+) -> DraftFailureKind {
     if filter_diagnostics.base_candidates == 0 || filter_diagnostics.final_candidates == 0 {
         if filter_diagnostics.domain_candidates == 0 && filter_diagnostics.base_candidates > 0 {
-            return CoderFailureKind::DomainConflict;
+            return DraftFailureKind::DomainConflict;
         }
         if filter_diagnostics.phase_candidates == 0 && filter_diagnostics.domain_candidates > 0 {
-            return CoderFailureKind::PhaseConflict;
+            return DraftFailureKind::PhaseConflict;
         }
         if filter_diagnostics.subject_kind_candidates == 0
             && filter_diagnostics.phase_candidates > 0
         {
-            return CoderFailureKind::SubjectKindConflict;
+            return DraftFailureKind::SubjectKindConflict;
         }
-        return CoderFailureKind::NoCandidateAfterFilters;
+        return DraftFailureKind::NoCandidateAfterFilters;
     }
 
     if let Some(top) = top {
         if top.score < threshold {
             if top.action_score < 0.5 {
-                return CoderFailureKind::ActionConflict;
+                return DraftFailureKind::ActionConflict;
             }
-            return CoderFailureKind::BelowThreshold;
+            return DraftFailureKind::BelowThreshold;
         }
     }
 
-    CoderFailureKind::NoCandidateAfterFilters
+    DraftFailureKind::NoCandidateAfterFilters
 }
 
 fn primary_step(outcome: &OutcomeIntent) -> OutcomeStep {
@@ -379,8 +379,8 @@ mod tests {
 
     use super::*;
     use crate::sage::{
-        CoderHandoff, IntentPolarity, ObservationPlane, OutcomeAction, SageConfidence, SageExplain,
-        UtteranceHints,
+        DrafterHandoff, IntentPolarity, ObservationPlane, OutcomeAction, SageConfidence,
+        SageExplain, UtteranceHints,
     };
 
     fn sample_config() -> VerbsConfig {
@@ -457,7 +457,7 @@ mod tests {
             pending_clarifications: vec![],
             hints: UtteranceHints::default(),
             explain: SageExplain::default(),
-            coder_handoff: CoderHandoff::default(),
+            drafter_handoff: DrafterHandoff::default(),
         }
     }
 
@@ -514,7 +514,7 @@ mod tests {
 
     #[test]
     fn structure_read_prefers_schema_entity_describe() {
-        let engine = CoderEngine::load().unwrap();
+        let engine = DrafterEngine::load().unwrap();
         let outcome = OutcomeIntent {
             summary: "Describe entity schema for document with fields relationships and verbs"
                 .to_string(),
@@ -533,7 +533,7 @@ mod tests {
             pending_clarifications: vec![],
             hints: UtteranceHints::default(),
             explain: SageExplain::default(),
-            coder_handoff: CoderHandoff::default(),
+            drafter_handoff: DrafterHandoff::default(),
         };
 
         let result = engine.resolve(&outcome).unwrap();
@@ -546,10 +546,10 @@ mod tests {
 
     #[test]
     fn coder_resolves_confident_result() {
-        let engine = CoderEngine::from_config(sample_config());
+        let engine = DrafterEngine::from_config(sample_config());
         let result = engine.resolve(&sample_outcome()).unwrap();
         assert_eq!(result.verb_fqn, "deal.create");
-        assert_eq!(result.resolution, CoderResolution::Confident);
+        assert_eq!(result.resolution, DraftResolution::Confident);
         assert_eq!(result.dsl, "(deal.create :name \"Apex Deal\")");
     }
 
@@ -557,15 +557,15 @@ mod tests {
     fn coder_marks_missing_args_as_proposed() {
         let mut outcome = sample_outcome();
         outcome.steps[0].params.clear();
-        let engine = CoderEngine::from_config(sample_config());
+        let engine = DrafterEngine::from_config(sample_config());
         let result = engine.resolve(&outcome).unwrap();
-        assert_eq!(result.resolution, CoderResolution::Proposed);
+        assert_eq!(result.resolution, DraftResolution::Proposed);
         assert_eq!(result.missing_args, vec!["name".to_string()]);
     }
 
     #[test]
     fn coder_reports_phase_conflict_when_candidates_are_filtered_by_stage() {
-        let engine = CoderEngine::from_config(sample_read_config_with_metadata(VerbMetadata {
+        let engine = DrafterEngine::from_config(sample_read_config_with_metadata(VerbMetadata {
             side_effects: Some("facts_only".to_string()),
             harm_class: Some(HarmClass::ReadOnly),
             action_class: Some(ActionClass::List),
@@ -587,7 +587,7 @@ mod tests {
                 ..UtteranceHints::default()
             },
             explain: SageExplain::default(),
-            coder_handoff: CoderHandoff::default(),
+            drafter_handoff: DrafterHandoff::default(),
         };
 
         let error = engine.resolve(&outcome).unwrap_err().to_string();
@@ -596,7 +596,7 @@ mod tests {
 
     #[test]
     fn coder_reports_subject_kind_conflict_when_candidates_are_filtered_by_kind() {
-        let engine = CoderEngine::from_config(sample_read_config_with_metadata(VerbMetadata {
+        let engine = DrafterEngine::from_config(sample_read_config_with_metadata(VerbMetadata {
             side_effects: Some("facts_only".to_string()),
             harm_class: Some(HarmClass::ReadOnly),
             action_class: Some(ActionClass::List),
@@ -619,7 +619,7 @@ mod tests {
             pending_clarifications: vec![],
             hints: UtteranceHints::default(),
             explain: SageExplain::default(),
-            coder_handoff: CoderHandoff::default(),
+            drafter_handoff: DrafterHandoff::default(),
         };
 
         let error = engine.resolve(&outcome).unwrap_err().to_string();
@@ -628,7 +628,7 @@ mod tests {
 
     #[test]
     fn coder_reports_action_conflict_when_top_candidate_is_below_threshold() {
-        let engine = CoderEngine::from_config(sample_read_config_named(
+        let engine = DrafterEngine::from_config(sample_read_config_named(
             "status",
             "Read current status",
             VerbMetadata {
@@ -655,7 +655,7 @@ mod tests {
             pending_clarifications: vec![],
             hints: UtteranceHints::default(),
             explain: SageExplain::default(),
-            coder_handoff: CoderHandoff::default(),
+            drafter_handoff: DrafterHandoff::default(),
         };
 
         let error = engine.resolve(&outcome).unwrap_err().to_string();

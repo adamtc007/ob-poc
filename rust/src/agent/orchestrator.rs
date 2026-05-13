@@ -42,7 +42,7 @@ use crate::mcp::verb_search::{
 };
 use crate::policy::{gate::PolicySnapshot, PolicyGate};
 use crate::sage::{
-    coder::CoderResolution, CoderResult, ObservationPlane, OutcomeStep, PendingMutation,
+    drafter::DraftResolution, DraftResult, ObservationPlane, OutcomeStep, PendingMutation,
     SageConfidence, SageEngine, UtteranceDisposition,
 };
 use crate::sem_reg::abac::ActorContext;
@@ -155,8 +155,8 @@ struct SageStageOutcome {
     intent: Option<crate::sage::OutcomeIntent>,
 }
 
-struct CoderStageOutcome {
-    result: Option<CoderResult>,
+struct DraftStageOutcome {
+    result: Option<DraftResult>,
     elapsed_ms: Option<u128>,
     error: Option<String>,
 }
@@ -215,7 +215,7 @@ pub(crate) fn is_confirmation(utterance: &str) -> bool {
 
 fn build_mutation_confirmation(
     intent: &crate::sage::OutcomeIntent,
-    coder_result: &CoderResult,
+    drafter_result: &DraftResult,
     lookup: Option<&crate::lookup::LookupResult>,
 ) -> PendingMutation {
     let action_word = match intent.action {
@@ -239,24 +239,24 @@ fn build_mutation_confirmation(
         })
         .unwrap_or("this");
 
-    let mut change_summary = vec![format!("Resolved action: {}", coder_result.verb_fqn)];
-    if !coder_result.missing_args.is_empty() {
+    let mut change_summary = vec![format!("Resolved action: {}", drafter_result.verb_fqn)];
+    if !drafter_result.missing_args.is_empty() {
         change_summary.push(format!(
             "Still missing: {}",
-            coder_result.missing_args.join(", ")
+            drafter_result.missing_args.join(", ")
         ));
     }
-    if !coder_result.unresolved_refs.is_empty() {
+    if !drafter_result.unresolved_refs.is_empty() {
         change_summary.push(format!(
             "Needs entity resolution: {}",
-            coder_result.unresolved_refs.join(", ")
+            drafter_result.unresolved_refs.join(", ")
         ));
     }
 
     PendingMutation {
         confirmation_text: format!("So you want to {action_word} {subject_name}?"),
         change_summary,
-        coder_result: coder_result.clone(),
+        drafter_result: drafter_result.clone(),
         intent: intent.clone(),
     }
 }
@@ -264,7 +264,7 @@ fn build_mutation_confirmation(
 fn can_use_sage_structure_fast_path(
     ctx: &OrchestratorContext,
     intent: &crate::sage::OutcomeIntent,
-    coder_result: &CoderResult,
+    drafter_result: &DraftResult,
     prepared: &PreparedTurnContext,
 ) -> bool {
     if !matches!(
@@ -281,7 +281,7 @@ fn can_use_sage_structure_fast_path(
             SageConfidence::High | SageConfidence::Medium
         )
         || !intent.pending_clarifications.is_empty()
-        || !coder_result.missing_args.is_empty()
+        || !drafter_result.missing_args.is_empty()
     {
         return false;
     }
@@ -289,13 +289,13 @@ fn can_use_sage_structure_fast_path(
     if allow_data_management_structure_fast_path(
         ctx.stage_focus.as_deref(),
         intent,
-        &coder_result.verb_fqn,
+        &drafter_result.verb_fqn,
     ) {
         return true;
     }
 
     Some(&prepared.surface)
-        .map(|surface| surface.allowed_fqns().contains(&coder_result.verb_fqn))
+        .map(|surface| surface.allowed_fqns().contains(&drafter_result.verb_fqn))
         .unwrap_or(false)
 }
 
@@ -303,7 +303,7 @@ pub(crate) fn can_auto_execute_serve_result(verb_fqn: &str) -> bool {
     !can_skip_fast_path_parse_validation(verb_fqn)
 }
 
-fn read_only_list_fallback(intent: &crate::sage::OutcomeIntent) -> Option<CoderResult> {
+fn read_only_list_fallback(intent: &crate::sage::OutcomeIntent) -> Option<DraftResult> {
     if intent.polarity != crate::sage::IntentPolarity::Read || intent.domain_concept.is_empty() {
         return None;
     }
@@ -324,10 +324,10 @@ fn read_only_list_fallback(intent: &crate::sage::OutcomeIntent) -> Option<CoderR
         || summary.starts_with("list "))
         && registry().get_by_name(&list_verb).is_some()
     {
-        return Some(CoderResult {
+        return Some(DraftResult {
             verb_fqn: list_verb.clone(),
             dsl: format!("({list_verb})"),
-            resolution: crate::sage::coder::CoderResolution::Confident,
+            resolution: crate::sage::drafter::DraftResolution::Confident,
             missing_args: vec![],
             unresolved_refs: vec![],
             diagnostics: None,
@@ -458,21 +458,21 @@ async fn prepare_turn_context(
 fn can_use_coder_for_serve(
     ctx: &OrchestratorContext,
     intent: &crate::sage::OutcomeIntent,
-    coder_result: &CoderResult,
+    drafter_result: &DraftResult,
     prepared: &PreparedTurnContext,
 ) -> bool {
-    if !coder_result.missing_args.is_empty() || !coder_result.unresolved_refs.is_empty() {
+    if !drafter_result.missing_args.is_empty() || !drafter_result.unresolved_refs.is_empty() {
         return false;
     }
 
-    if can_use_sage_structure_fast_path(ctx, intent, coder_result, prepared) {
+    if can_use_sage_structure_fast_path(ctx, intent, drafter_result, prepared) {
         return true;
     }
 
     // Use the pre-computed surface — no need to re-evaluate Phase2.
     let allowed = prepared.surface.allowed_fqns();
     if !allowed.is_empty() {
-        return allowed.contains(&coder_result.verb_fqn);
+        return allowed.contains(&drafter_result.verb_fqn);
     }
 
     false
@@ -483,21 +483,21 @@ async fn build_sage_serve_outcome(
     ctx: &OrchestratorContext,
     utterance: &str,
     intent: &crate::sage::OutcomeIntent,
-    coder_result: &CoderResult,
+    drafter_result: &DraftResult,
     prepared: PreparedTurnContext,
     selection_source: &str,
 ) -> anyhow::Result<OrchestratorOutcome> {
     let pipeline_result =
-        build_sage_fast_path_result(utterance, ctx.scope.clone(), intent, coder_result)?;
+        build_sage_fast_path_result(utterance, ctx.scope.clone(), intent, drafter_result)?;
     let candidates = vec![(
-        coder_result.verb_fqn.clone(),
+        drafter_result.verb_fqn.clone(),
         pipeline_result
             .verb_candidates
             .first()
             .map(|candidate| candidate.score)
             .unwrap_or_default(),
     )];
-    let chosen = Some(coder_result.verb_fqn.clone());
+    let chosen = Some(drafter_result.verb_fqn.clone());
     let semreg_unavail = prepared.envelope.is_unavailable();
     let mut trace = build_trace(
         utterance,
@@ -531,7 +531,7 @@ async fn build_sage_serve_outcome(
         trace,
         journey_decision: None,
         pending_mutation: None,
-        auto_execute: can_auto_execute_serve_result(&coder_result.verb_fqn),
+        auto_execute: can_auto_execute_serve_result(&drafter_result.verb_fqn),
         sage_intent: Some(intent.clone()),
         trace_id: None,
     };
@@ -783,9 +783,9 @@ async fn run_sage_stage(
 fn run_coder_stage(
     ctx: &OrchestratorContext,
     intent: Option<&crate::sage::OutcomeIntent>,
-) -> CoderStageOutcome {
+) -> DraftStageOutcome {
     let Some(intent) = intent else {
-        return CoderStageOutcome {
+        return DraftStageOutcome {
             result: None,
             elapsed_ms: None,
             error: None,
@@ -804,12 +804,12 @@ fn run_coder_stage(
         if supports_cbu_compiler_slice(&compiler_input) {
             return match compiler.compile(compiler_input) {
                 Ok(output) => match output.selection {
-                    Some(selection) => CoderStageOutcome {
+                    Some(selection) => DraftStageOutcome {
                         result: Some(coder_result_from_compiler_selection(selection)),
                         elapsed_ms: Some(started_at.elapsed().as_millis()),
                         error: None,
                     },
-                    None => CoderStageOutcome {
+                    None => DraftStageOutcome {
                         result: None,
                         elapsed_ms: Some(started_at.elapsed().as_millis()),
                         error: Some(
@@ -823,7 +823,7 @@ fn run_coder_stage(
                         ),
                     },
                 },
-                Err(error) => CoderStageOutcome {
+                Err(error) => DraftStageOutcome {
                     result: None,
                     elapsed_ms: Some(started_at.elapsed().as_millis()),
                     error: Some(error.to_string()),
@@ -832,13 +832,13 @@ fn run_coder_stage(
         }
     }
 
-    match crate::sage::CoderEngine::load().and_then(|engine| engine.resolve(intent)) {
-        Ok(coder_result) => CoderStageOutcome {
-            result: Some(coder_result),
+    match crate::sage::DrafterEngine::load().and_then(|engine| engine.resolve(intent)) {
+        Ok(drafter_result) => DraftStageOutcome {
+            result: Some(drafter_result),
             elapsed_ms: Some(started_at.elapsed().as_millis()),
             error: None,
         },
-        Err(error) => CoderStageOutcome {
+        Err(error) => DraftStageOutcome {
             result: None,
             elapsed_ms: Some(started_at.elapsed().as_millis()),
             error: Some(error.to_string()),
@@ -846,12 +846,12 @@ fn run_coder_stage(
     }
 }
 
-fn coder_result_from_compiler_selection(selection: CompilerSelection) -> CoderResult {
+fn coder_result_from_compiler_selection(selection: CompilerSelection) -> DraftResult {
     let dsl = render_selection_dsl(&selection);
-    CoderResult {
+    DraftResult {
         verb_fqn: selection.verb_id,
         dsl,
-        resolution: CoderResolution::Confident,
+        resolution: DraftResolution::Confident,
         missing_args: vec![],
         unresolved_refs: vec![],
         diagnostics: None,
@@ -1130,18 +1130,18 @@ pub async fn handle_utterance(
                 .clone()
                 .or_else(|| read_only_list_fallback(&intent));
 
-            if let Some(coder_result) = serve_candidate.as_ref() {
+            if let Some(drafter_result) = serve_candidate.as_ref() {
                 let selection_source = if intent.plane == ObservationPlane::Structure {
                     "sage_serve_fast_path"
                 } else {
                     "sage_serve_coder"
                 };
-                if can_use_coder_for_serve(ctx, &intent, coder_result, &prepared) {
+                if can_use_coder_for_serve(ctx, &intent, drafter_result, &prepared) {
                     let outcome = build_sage_serve_outcome(
                         ctx,
                         utterance,
                         &intent,
-                        coder_result,
+                        drafter_result,
                         prepared,
                         selection_source,
                     )
@@ -1235,13 +1235,13 @@ pub async fn handle_utterance(
             }
 
             let coder_stage = run_coder_stage(ctx, Some(&delegate.outcome));
-            let coder_result = coder_stage.result.as_ref();
-            let coder_complete = coder_result
+            let drafter_result = coder_stage.result.as_ref();
+            let coder_complete = drafter_result
                 .map(|result| result.missing_args.is_empty() && result.unresolved_refs.is_empty())
                 .unwrap_or(false);
 
             let confirmation = if coder_complete {
-                coder_result.map(|result| {
+                drafter_result.map(|result| {
                     build_mutation_confirmation(&intent, result, outcome.lookup_result.as_ref())
                 })
             } else {
@@ -1267,7 +1267,7 @@ pub async fn handle_utterance(
                 return finalize_orchestrator_trace(ctx, trace_scaffold, outcome).await;
             }
 
-            if let Some(coder_result) = coder_result {
+            if let Some(drafter_result) = drafter_result {
                 outcome.pipeline_result = PipelineResult {
                     intent: StructuredIntent::empty(),
                     verb_candidates: vec![],
@@ -1279,7 +1279,7 @@ pub async fn handle_utterance(
                             .to_string(),
                     ),
                     unresolved_refs: vec![],
-                    missing_required: coder_result.missing_args.clone(),
+                    missing_required: drafter_result.missing_args.clone(),
                     outcome: PipelineOutcome::NeedsUserInput,
                     scope_resolution: None,
                     scope_context: ctx.scope.clone(),
@@ -1655,23 +1655,25 @@ pub async fn legacy_handle_utterance(
     let searcher = (*ctx.verb_searcher).clone();
 
     if sage_fast_path_enabled {
-        if let (Some(si), Some(coder_result)) = (sage_intent.as_ref(), sage_coder_result.as_ref()) {
+        if let (Some(si), Some(drafter_result)) = (sage_intent.as_ref(), sage_coder_result.as_ref())
+        {
             let sage_only = si.plane == ObservationPlane::Structure
                 && si.polarity == crate::sage::IntentPolarity::Read
                 && si.pending_clarifications.is_empty();
             let confidence_ok =
                 matches!(si.confidence, SageConfidence::High | SageConfidence::Medium);
-            let verb_allowed = surface_allowed.contains(&coder_result.verb_fqn);
+            let verb_allowed = surface_allowed.contains(&drafter_result.verb_fqn);
 
-            if sage_only && confidence_ok && coder_result.missing_args.is_empty() && verb_allowed {
+            if sage_only && confidence_ok && drafter_result.missing_args.is_empty() && verb_allowed
+            {
                 let fast_path_result =
-                    build_sage_fast_path_result(utterance, ctx.scope.clone(), si, coder_result)?;
+                    build_sage_fast_path_result(utterance, ctx.scope.clone(), si, drafter_result)?;
                 let fast_path_candidates = fast_path_result
                     .verb_candidates
                     .iter()
                     .map(|candidate| (candidate.verb.clone(), candidate.score))
                     .collect::<Vec<_>>();
-                let chosen_verb = Some(coder_result.verb_fqn.clone());
+                let chosen_verb = Some(drafter_result.verb_fqn.clone());
                 let mut trace = build_trace(
                     utterance,
                     ctx,
@@ -1704,10 +1706,10 @@ pub async fn legacy_handle_utterance(
                 };
 
                 tracing::info!(
-                    verb = %coder_result.verb_fqn,
-                    dsl = %coder_result.dsl,
+                    verb = %drafter_result.verb_fqn,
+                    dsl = %drafter_result.dsl,
                     sage_confidence = %si.confidence.as_str(),
-                    sage_coder_resolution = ?coder_result.resolution,
+                    sage_coder_resolution = ?drafter_result.resolution,
                     unresolved_refs = fast_path_result.unresolved_refs.len(),
                     "Sage-only fast path: Read+Structure — bypassing pipeline"
                 );
@@ -2195,19 +2197,19 @@ pub async fn legacy_handle_utterance(
         };
     }
 
-    if let Some(ref coder_result) = sage_coder_result {
+    if let Some(ref drafter_result) = sage_coder_result {
         let existing_verb = trace.final_verb.clone();
         let existing_dsl = trace.dsl_generated.clone().unwrap_or_default();
-        let dsl_similarity = dsl_similarity(&coder_result.dsl, &existing_dsl);
+        let dsl_similarity = dsl_similarity(&drafter_result.dsl, &existing_dsl);
         tracing::info!(
-            sage_coder_verb = %coder_result.verb_fqn,
+            sage_coder_verb = %drafter_result.verb_fqn,
             existing_verb = ?existing_verb,
-            sage_coder_dsl = %coder_result.dsl,
+            sage_coder_dsl = %drafter_result.dsl,
             existing_dsl = %existing_dsl,
-            sage_coder_resolution = ?coder_result.resolution,
-            sage_coder_missing_args = ?coder_result.missing_args,
-            sage_coder_unresolved_refs = ?coder_result.unresolved_refs,
-            verb_agreement = (existing_verb.as_deref() == Some(coder_result.verb_fqn.as_str())),
+            sage_coder_resolution = ?drafter_result.resolution,
+            sage_coder_missing_args = ?drafter_result.missing_args,
+            sage_coder_unresolved_refs = ?drafter_result.unresolved_refs,
+            verb_agreement = (existing_verb.as_deref() == Some(drafter_result.verb_fqn.as_str())),
             dsl_similarity,
             sage_coder_ms = sage_coder_elapsed_ms.unwrap_or_default(),
             "Stage 2.4: Sage->Coder shadow comparison"
@@ -2281,19 +2283,22 @@ fn build_sage_fast_path_result(
     utterance: &str,
     scope: Option<ScopeContext>,
     outcome: &crate::sage::OutcomeIntent,
-    coder_result: &CoderResult,
+    drafter_result: &DraftResult,
 ) -> anyhow::Result<PipelineResult> {
     let config = dsl_core::config::loader::ConfigLoader::from_env().load_verbs()?;
-    let (domain, verb_name) = coder_result
+    let (domain, verb_name) = drafter_result
         .verb_fqn
         .split_once('.')
-        .ok_or_else(|| anyhow::anyhow!("invalid coder verb '{}'", coder_result.verb_fqn))?;
+        .ok_or_else(|| anyhow::anyhow!("invalid coder verb '{}'", drafter_result.verb_fqn))?;
     let verb_cfg = config
         .domains
         .get(domain)
         .and_then(|domain_cfg| domain_cfg.verbs.get(verb_name))
         .ok_or_else(|| {
-            anyhow::anyhow!("missing config for coder verb '{}'", coder_result.verb_fqn)
+            anyhow::anyhow!(
+                "missing config for coder verb '{}'",
+                drafter_result.verb_fqn
+            )
         })?;
     let step = outcome
         .steps
@@ -2306,13 +2311,13 @@ fn build_sage_fast_path_result(
             notes: None,
         });
     let intent = crate::sage::arg_assembly::structured_intent_from_step(
-        &coder_result.verb_fqn,
+        &drafter_result.verb_fqn,
         &step,
         verb_cfg,
     )?;
 
-    let parsed = parse_program(&coder_result.dsl);
-    let skip_parse_validation = can_skip_fast_path_parse_validation(&coder_result.verb_fqn);
+    let parsed = parse_program(&drafter_result.dsl);
+    let skip_parse_validation = can_skip_fast_path_parse_validation(&drafter_result.verb_fqn);
     let (unresolved_refs, parse_error) = match parsed.as_ref() {
         Ok(ast) => {
             let registry = runtime_registry_arc();
@@ -2358,20 +2363,20 @@ fn build_sage_fast_path_result(
     Ok(PipelineResult {
         intent,
         verb_candidates: vec![VerbSearchResult {
-            verb: coder_result.verb_fqn.clone(),
+            verb: drafter_result.verb_fqn.clone(),
             score,
             source: VerbSearchSource::PatternEmbedding,
             matched_phrase: utterance.to_string(),
             description: Some("sage_fast_path".to_string()),
             journey: None,
         }],
-        dsl: coder_result.dsl.clone(),
-        dsl_hash: Some(compute_dsl_hash(&coder_result.dsl)),
+        dsl: drafter_result.dsl.clone(),
+        dsl_hash: Some(compute_dsl_hash(&drafter_result.dsl)),
         valid,
         validation_error,
         unresolved_refs: unresolved_refs.clone(),
-        missing_required: coder_result.missing_args.clone(),
-        outcome: if coder_result.missing_args.is_empty() && unresolved_refs.is_empty() && valid {
+        missing_required: drafter_result.missing_args.clone(),
+        outcome: if drafter_result.missing_args.is_empty() && unresolved_refs.is_empty() && valid {
             PipelineOutcome::Ready
         } else {
             PipelineOutcome::NeedsUserInput
@@ -3532,7 +3537,7 @@ mod tests {
             pending_clarifications: vec![],
             hints: crate::sage::UtteranceHints::default(),
             explain: crate::sage::SageExplain::default(),
-            coder_handoff: crate::sage::CoderHandoff::default(),
+            drafter_handoff: crate::sage::DrafterHandoff::default(),
         };
         assert!(matches!(
             route(&read_intent),
@@ -3555,7 +3560,7 @@ mod tests {
             pending_clarifications: vec![],
             hints: crate::sage::UtteranceHints::default(),
             explain: crate::sage::SageExplain::default(),
-            coder_handoff: crate::sage::CoderHandoff::default(),
+            drafter_handoff: crate::sage::DrafterHandoff::default(),
         };
         assert!(matches!(
             route(&write_intent),
@@ -3589,18 +3594,18 @@ mod tests {
             pending_clarifications: vec![],
             hints: crate::sage::UtteranceHints::default(),
             explain: crate::sage::SageExplain::default(),
-            coder_handoff: crate::sage::CoderHandoff::default(),
+            drafter_handoff: crate::sage::DrafterHandoff::default(),
         };
-        let coder_result = CoderResult {
+        let drafter_result = DraftResult {
             verb_fqn: "deal.create".into(),
             dsl: "(deal.create :name \"Allianz UK Deal\")".into(),
-            resolution: crate::sage::coder::CoderResolution::Confident,
+            resolution: crate::sage::drafter::DraftResolution::Confident,
             missing_args: vec![],
             unresolved_refs: vec![],
             diagnostics: None,
         };
 
-        let pending = build_mutation_confirmation(&intent, &coder_result, None);
+        let pending = build_mutation_confirmation(&intent, &drafter_result, None);
         assert!(pending.confirmation_text.contains("create Allianz UK Deal"));
         assert!(!pending.confirmation_text.contains("deal.create"));
         assert_eq!(pending.change_summary[0], "Resolved action: deal.create");
@@ -3620,7 +3625,7 @@ mod tests {
             pending_clarifications: vec![],
             hints: crate::sage::UtteranceHints::default(),
             explain: crate::sage::SageExplain::default(),
-            coder_handoff: crate::sage::CoderHandoff::default(),
+            drafter_handoff: crate::sage::DrafterHandoff::default(),
         };
 
         let result = read_only_list_fallback(&intent).expect("expected safe list fallback");
@@ -3628,7 +3633,7 @@ mod tests {
         assert_eq!(result.dsl, "(deal.list)");
         assert!(matches!(
             result.resolution,
-            crate::sage::coder::CoderResolution::Confident
+            crate::sage::drafter::DraftResolution::Confident
         ));
     }
 
@@ -3973,7 +3978,7 @@ mod tests {
             pending_clarifications: vec![],
             hints: crate::sage::UtteranceHints::default(),
             explain: crate::sage::SageExplain::default(),
-            coder_handoff: crate::sage::CoderHandoff::default(),
+            drafter_handoff: crate::sage::DrafterHandoff::default(),
         }
     }
 
@@ -4003,7 +4008,7 @@ mod tests {
             pending_clarifications: vec![],
             hints: crate::sage::UtteranceHints::default(),
             explain: crate::sage::SageExplain::default(),
-            coder_handoff: crate::sage::CoderHandoff::default(),
+            drafter_handoff: crate::sage::DrafterHandoff::default(),
         }
     }
 
@@ -4343,16 +4348,16 @@ mod tests {
             last_intents: vec![],
         };
         let outcome = sage.classify("show me documents", &ctx).await.unwrap();
-        let coder = crate::sage::CoderEngine::load().unwrap();
-        let coder_result = coder.resolve(&outcome).unwrap();
+        let coder = crate::sage::DrafterEngine::load().unwrap();
+        let drafter_result = coder.resolve(&outcome).unwrap();
 
         assert_eq!(outcome.plane, crate::sage::ObservationPlane::Structure);
         assert_eq!(outcome.polarity, crate::sage::IntentPolarity::Read);
         assert_eq!(outcome.confidence, crate::sage::SageConfidence::High);
-        assert_eq!(coder_result.verb_fqn, "schema.entity.describe");
-        assert!(coder_result.missing_args.is_empty());
+        assert_eq!(drafter_result.verb_fqn, "schema.entity.describe");
+        assert!(drafter_result.missing_args.is_empty());
         assert_eq!(
-            coder_result.dsl,
+            drafter_result.dsl,
             "(schema.entity.describe :entity-type \"document\")"
         );
     }
@@ -4458,7 +4463,7 @@ mod tests {
             pending_clarifications: vec![],
             hints: crate::sage::UtteranceHints::default(),
             explain: crate::sage::SageExplain::default(),
-            coder_handoff: crate::sage::CoderHandoff::default(),
+            drafter_handoff: crate::sage::DrafterHandoff::default(),
         };
 
         assert!(should_use_generic_task_subject_for_sage(
@@ -4486,7 +4491,7 @@ mod tests {
             pending_clarifications: vec![],
             hints: crate::sage::UtteranceHints::default(),
             explain: crate::sage::SageExplain::default(),
-            coder_handoff: crate::sage::CoderHandoff::default(),
+            drafter_handoff: crate::sage::DrafterHandoff::default(),
         };
 
         assert!(allow_data_management_structure_fast_path(
@@ -4528,19 +4533,20 @@ mod tests {
             pending_clarifications: vec![],
             hints: crate::sage::UtteranceHints::default(),
             explain: crate::sage::SageExplain::default(),
-            coder_handoff: crate::sage::CoderHandoff::default(),
+            drafter_handoff: crate::sage::DrafterHandoff::default(),
         };
-        let coder_result = CoderResult {
+        let drafter_result = DraftResult {
             verb_fqn: "cbu.list".to_string(),
             dsl: "(cbu.list)".to_string(),
-            resolution: crate::sage::coder::CoderResolution::Confident,
+            resolution: crate::sage::drafter::DraftResolution::Confident,
             missing_args: vec![],
             unresolved_refs: vec![],
             diagnostics: None,
         };
 
-        let result = build_sage_fast_path_result("show me the cbus", None, &outcome, &coder_result)
-            .expect("cbu list fast path should assemble");
+        let result =
+            build_sage_fast_path_result("show me the cbus", None, &outcome, &drafter_result)
+                .expect("cbu list fast path should assemble");
         assert!(result.valid);
         assert_eq!(result.intent.verb, "cbu.list");
         assert_eq!(result.dsl, "(cbu.list)");

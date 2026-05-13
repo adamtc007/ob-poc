@@ -190,9 +190,7 @@ pub(crate) fn ensure_test_provider_registered() {
 }
 
 #[cfg(test)]
-fn load_test_pack_manifests(
-    config_root: &Path,
-) -> Result<Vec<(PackManifest, String)>, String> {
+fn load_test_pack_manifests(config_root: &Path) -> Result<Vec<(PackManifest, String)>, String> {
     use ob_poc_journey::pack::load_packs_from_dir;
     let packs_dir = config_root.join("packs");
     load_packs_from_dir(&packs_dir).map_err(|error| error.to_string())

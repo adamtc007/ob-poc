@@ -44,7 +44,7 @@ struct ChatPayload {
     #[serde(default)]
     message: Option<String>,
     #[serde(default)]
-    coder_proposal: Option<CoderProposal>,
+    drafter_proposal: Option<DraftProposal>,
     #[serde(default)]
     discovery_bootstrap: Option<DiscoveryBootstrap>,
     #[serde(default)]
@@ -52,7 +52,7 @@ struct ChatPayload {
 }
 
 #[derive(Debug, Deserialize, Default, Clone)]
-struct CoderProposal {
+struct DraftProposal {
     #[serde(default)]
     verb_fqn: Option<String>,
     #[serde(default)]
@@ -307,7 +307,7 @@ async fn post_utterance(
 }
 
 fn build_row(case: FixtureCase, payload: ChatPayload) -> Row {
-    let coder = payload.coder_proposal.clone().unwrap_or_default();
+    let coder = payload.drafter_proposal.clone().unwrap_or_default();
     let discovery = payload.discovery_bootstrap.clone().unwrap_or_default();
     let predicted_verb = coder.verb_fqn.clone();
     let pass = predicted_verb.as_deref().is_some_and(|verb| {
@@ -386,7 +386,7 @@ fn build_row(case: FixtureCase, payload: ChatPayload) -> Row {
 fn classify_root_cause(
     expected_verb: &str,
     predicted_verb: Option<&str>,
-    coder: &CoderProposal,
+    coder: &DraftProposal,
     discovery: &DiscoveryBootstrap,
     message: Option<&str>,
 ) -> String {

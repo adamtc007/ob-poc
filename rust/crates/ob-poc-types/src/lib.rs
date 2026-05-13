@@ -114,21 +114,22 @@ use uuid::Uuid;
 // reviewable at a glance and follow-on dead-surface audits can prune the list.
 pub use chat::{
     BindingSummary, ChatDebugInfo, ChatMessage, ChatMessageRole, ChatPayload, ChatRequest,
-    ChatResponse, ChatResponseV2, ChatStreamEvent, CoderProposalPayload, DiscoveryBootstrapPayload,
+    ChatResponse, ChatResponseV2, ChatStreamEvent, DiscoveryBootstrapPayload,
     DiscoveryConstellationOption, DiscoveryDomainOption, DiscoveryFamilyOption,
-    DiscoveryInputPrompt, DiscoveryQuestionPrompt, DiscoveryUniverseOption, DslDisplaySegment,
-    EnrichedDsl, EntityCandidateDebug, EntityMentionDebug, EntityResolutionDebug, ParkedEntryPayload,
-    SageExplainPayload, SessionStateEnum, VerbArgProfile, VerbCandidateDebug, VerbEvidenceDebug,
-    VerbMatchDebug, VerbMatchSource, VerbProfile, VerbSelectionPolicyDebug, VerbSurfaceEntry,
-    VerbSurfaceExcludedEntry, VerbSurfaceFilterSummary, VerbSurfacePruneReason, VerbSurfaceResponse,
+    DiscoveryInputPrompt, DiscoveryQuestionPrompt, DiscoveryUniverseOption, DraftProposalPayload,
+    DslDisplaySegment, EnrichedDsl, EntityCandidateDebug, EntityMentionDebug,
+    EntityResolutionDebug, ParkedEntryPayload, SageExplainPayload, SessionStateEnum,
+    VerbArgProfile, VerbCandidateDebug, VerbEvidenceDebug, VerbMatchDebug, VerbMatchSource,
+    VerbProfile, VerbSelectionPolicyDebug, VerbSurfaceEntry, VerbSurfaceExcludedEntry,
+    VerbSurfaceFilterSummary, VerbSurfacePruneReason, VerbSurfaceResponse,
 };
 pub use commands::{AgentCommand, PanDirection};
 pub use decision::{
     AffectedEntityPreview, ClarificationPayload, DealClarificationPayload, DealOption,
     DecisionKind, DecisionPacket, DecisionReplyRequest, DecisionReplyResponse, DecisionTrace,
-    EffectMode, EffectsPreview, EntityChoice, EntityClarificationPayload, GroupClarificationPayload,
-    GroupOption, PlanPreview, ProposalPayload, RefusePayload, ScopeOption, ScopePayload,
-    ScopeSample, SessionStateView, UserChoice, UserReply, VerbPayload,
+    EffectMode, EffectsPreview, EntityChoice, EntityClarificationPayload,
+    GroupClarificationPayload, GroupOption, PlanPreview, ProposalPayload, RefusePayload,
+    ScopeOption, ScopePayload, ScopeSample, SessionStateView, UserChoice, UserReply, VerbPayload,
 };
 pub use disambiguation::{
     ClientGroupCandidate, DisambiguationItem, DisambiguationRequest, DisambiguationResponse,
@@ -141,14 +142,15 @@ pub use onboarding_state::{
     OnboardingStateView, SuggestedVerb, UnreachableVerb, VerbDirection,
 };
 pub use resolution::{
-    CancelResolutionResponse, CommitResolutionResponse, ConfirmAllRequest, ConfirmResolutionRequest,
-    DiscriminatorField, DiscriminatorFieldType, EntityMatchResponse, EntityStatus, EnumValue,
-    RefContext, ResolutionContextInfo, ResolutionMethod, ResolutionModeHint,
-    ResolutionRequiredPayload, ResolutionSearchRequest, ResolutionSearchResponse,
-    ResolutionSessionResponse, ResolutionStateResponse, ResolutionSummary, ResolutionWarning,
-    ResolvedRefResponse, ReviewRequirement, SearchKeyField, SearchKeyFieldType, SearchSuggestions,
-    SelectResolutionRequest, SelectResolutionResponse, StartResolutionRequest, SuggestedAction,
-    SuggestedActionType, UnresolvedRefResponse, WarningSeverity,
+    CancelResolutionResponse, CommitResolutionResponse, ConfirmAllRequest,
+    ConfirmResolutionRequest, DiscriminatorField, DiscriminatorFieldType, EntityMatchResponse,
+    EntityStatus, EnumValue, RefContext, ResolutionContextInfo, ResolutionMethod,
+    ResolutionModeHint, ResolutionRequiredPayload, ResolutionSearchRequest,
+    ResolutionSearchResponse, ResolutionSessionResponse, ResolutionStateResponse,
+    ResolutionSummary, ResolutionWarning, ResolvedRefResponse, ReviewRequirement, SearchKeyField,
+    SearchKeyFieldType, SearchSuggestions, SelectResolutionRequest, SelectResolutionResponse,
+    StartResolutionRequest, SuggestedAction, SuggestedActionType, UnresolvedRefResponse,
+    WarningSeverity,
 };
 pub use session_input::{
     DiscoverySelection, DiscoverySelectionKind, SessionInputRequest, SessionInputResponse,

@@ -6,7 +6,7 @@ description = "Sage intent understanding — turns raw utterances into structure
 
 # Capability discipline (see docs/todo/capability-crate-restructure-v1.md §2.2):
 #   IN-SCOPE  : plane / polarity / outcome / context / pre_classify /
-#               coder_result / disposition / verb_resolve_types / session_context.
+#               drafter_result / disposition / verb_resolve_types / session_context.
 #               Later: the small pure engines (clash_matrix, arg_assembly,
 #               coder, verb_resolve, verb_index) once their mcp::intent_pipeline
 #               dep is decoupled.

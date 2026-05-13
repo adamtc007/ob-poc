@@ -10,11 +10,11 @@
 //! `StructuredVerbScorer` that produces them stays in ob-poc because it
 //! needs `VerbMetadataIndex` (dsl_core verb config).
 //!
-//! The `From<FilterDiagnostics> for CoderFilterDiagnostics` impl moved
+//! The `From<FilterDiagnostics> for DraftFilterDiagnostics` impl moved
 //! here alongside the type — once both sides of the conversion live in
 //! envelope, the orphan rule requires the impl to live with them too.
 
-use super::coder_result::CoderFilterDiagnostics;
+use super::drafter_result::DraftFilterDiagnostics;
 
 /// Ranked candidate returned by the structured scorer.
 #[derive(Debug, Clone)]
@@ -35,7 +35,7 @@ pub struct FilterDiagnostics {
     pub final_candidates: usize,
 }
 
-impl From<FilterDiagnostics> for CoderFilterDiagnostics {
+impl From<FilterDiagnostics> for DraftFilterDiagnostics {
     fn from(value: FilterDiagnostics) -> Self {
         Self {
             base_candidates: value.base_candidates,

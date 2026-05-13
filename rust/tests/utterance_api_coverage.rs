@@ -29,7 +29,7 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use ob_poc::sage::{
-    CoderEngine, DeterministicSage, LlmSage, ObservationPlane, SageContext, SageEngine,
+    DeterministicSage, DrafterEngine, LlmSage, ObservationPlane, SageContext, SageEngine,
 };
 use serde::{Deserialize, Serialize};
 use serde_json::json;
@@ -268,7 +268,7 @@ mod tests {
 
         let client = reqwest::Client::new();
         let sage_engine = build_sage_engine();
-        let coder_engine = CoderEngine::load()?;
+        let drafter_engine = DrafterEngine::load()?;
         let mut rows = Vec::with_capacity(tests.len());
         let mut by_category: HashMap<String, (usize, usize)> = HashMap::new();
         let mut by_difficulty: HashMap<String, (usize, usize)> = HashMap::new();
@@ -364,7 +364,7 @@ mod tests {
                 .ok();
             let sage_coder = sage_outcome
                 .as_ref()
-                .and_then(|outcome| coder_engine.resolve(outcome).ok());
+                .and_then(|outcome| drafter_engine.resolve(outcome).ok());
             let sage_verb = sage_coder.as_ref().map(|r| r.verb_fqn.clone());
             let sage_dsl = sage_coder.as_ref().map(|r| r.dsl.clone());
             let sage_match = sage_verb

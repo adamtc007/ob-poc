@@ -23,11 +23,11 @@
 //! - `context` — `SageContext`, `RecentIntent`.
 //! - `outcome` — `OutcomeIntent`, `OutcomeAction`, `OutcomeStep`,
 //!   `EntityRef`, `Clarification`, `SageConfidence`, `UtteranceHints`,
-//!   `SageExplain`, `CoderHandoff`.
-//! - `coder_result` — `CoderResolution`, `CoderFailureKind`,
-//!   `CoderDiagnostics`, `CoderFilterDiagnostics`, `CoderResult`.
+//!   `SageExplain`, `DrafterHandoff`.
+//! - `drafter_result` — `DraftResolution`, `DraftFailureKind`,
+//!   `DraftDiagnostics`, `DraftFilterDiagnostics`, `DraftResult`.
 //! - `verb_resolve_types` — `ScoredVerbCandidate`, `FilterDiagnostics`
-//!   + `From<FilterDiagnostics> for CoderFilterDiagnostics`.
+//!   + `From<FilterDiagnostics> for DraftFilterDiagnostics`.
 //! - `disposition` — `UtteranceDisposition`, `ServeIntent`,
 //!   `DelegateIntent`, `PendingMutation`.
 //! - `pre_classify` — `pre_classify()` + `SagePreClassification`.
@@ -44,9 +44,9 @@
 //! NOT depend on `dsl-core`, `dsl-runtime`, `sem_os_*`,
 //! `ob-poc-boundary`, or any execution-tier surface in ob-poc.
 
-pub mod coder_result;
 pub mod context;
 pub mod disposition;
+pub mod drafter_result;
 pub mod outcome;
 pub mod plane;
 pub mod polarity;

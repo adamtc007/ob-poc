@@ -1196,10 +1196,8 @@ async fn get_acp_projection_value_for_state(
     })?;
 
     if let Some(repl_session) = state.orchestrator.get_session(session_id).await {
-        let session = facade.open_session_with_persona(
-            session_id,
-            crate::acp::AcpPersonaMode::SagePlanning,
-        );
+        let session =
+            facade.open_session_with_persona(session_id, crate::acp::AcpPersonaMode::SagePlanning);
         if let Some(projection) =
             build_live_acp_projection(&session, facade.manifest(), &repl_session, parsed_kind)?
         {
@@ -1891,13 +1889,9 @@ pub(crate) fn compute_session_aware_runtime_trace_typed(
 /// envelope wire shape unchanged while making typed code the canonical
 /// source of truth.
 fn attach_session_runtime_trace_to_result(result: &mut serde_json::Value, session: &ReplSessionV2) {
-    let Some(resolution) = result
-        .get("dag_semantic")
-        .and_then(|v| {
-            serde_json::from_value::<crate::acp_dag_semantic::AcpDagSemanticResolution>(v.clone())
-                .ok()
-        })
-    else {
+    let Some(resolution) = result.get("dag_semantic").and_then(|v| {
+        serde_json::from_value::<crate::acp_dag_semantic::AcpDagSemanticResolution>(v.clone()).ok()
+    }) else {
         return;
     };
     let Some(typed_trace) = compute_session_aware_runtime_trace_typed(&resolution, session) else {

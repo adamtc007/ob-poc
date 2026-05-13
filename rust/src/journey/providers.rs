@@ -55,9 +55,7 @@ fn provide_pack_projections() -> Result<Vec<PackProjection>, String> {
 
 /// Provider entry-point invoked by
 /// `acp_registry_projection::build_slice1_acp_registry_projection`.
-fn provide_pack_manifests(
-    config_root: &Path,
-) -> Result<Vec<(PackManifest, String)>, String> {
+fn provide_pack_manifests(config_root: &Path) -> Result<Vec<(PackManifest, String)>, String> {
     load_packs_from_dir(&config_root.join("packs")).map_err(|error| error.to_string())
 }
 

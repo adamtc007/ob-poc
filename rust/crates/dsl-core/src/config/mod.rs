@@ -69,9 +69,8 @@ pub use types::{
     ReturnTypeConfig, ReturnsConfig, RuleCondition, RuleRequirement, RuleSeverity, SearchKeyConfig,
     SlotType, SourceOfTruth, StateEffect, ThreeAxisDeclaration, TransitionArgs, TransitionEdge,
     VerbBehavior, VerbConfig, VerbConsumes, VerbFlavour, VerbLifecycle, VerbMetadata,
-    VerbOutputConfig,
-    VerbProduces, VerbRoleGuard, VerbScope, VerbSentences, VerbStatus, VerbTier, VerbTransitions,
-    VerbsConfig, WarningRule,
+    VerbOutputConfig, VerbProduces, VerbRoleGuard, VerbScope, VerbSentences, VerbStatus, VerbTier,
+    VerbTransitions, VerbsConfig, WarningRule,
 };
 pub use validator::{
     collect_declared_fqns, validate_pack_fqns, validate_verb, validate_verbs_config, Location,

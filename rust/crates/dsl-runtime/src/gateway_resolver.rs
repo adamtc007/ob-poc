@@ -10,9 +10,7 @@
 //! - No reconciliation risk between different search implementations
 
 use crate::ref_resolver::{RefResolver, ResolveResult, SuggestedMatch};
-use crate::validation::{
-    Diagnostic, DiagnosticCode, RefType, Severity, SourceSpan, Suggestion,
-};
+use crate::validation::{Diagnostic, DiagnosticCode, RefType, Severity, SourceSpan, Suggestion};
 use async_trait::async_trait;
 use entity_gateway::proto::ob::gateway::v1::{
     entity_gateway_client::EntityGatewayClient, GetEntityConfigRequest, GetEntityConfigResponse,

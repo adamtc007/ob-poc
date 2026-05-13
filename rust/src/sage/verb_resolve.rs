@@ -16,7 +16,7 @@ use super::verb_index::{VerbMeta, VerbMetadataIndex};
 
 // Phase 3 slice 2bb (2026-05-13): result DTOs (`ScoredVerbCandidate`,
 // `FilterDiagnostics`) moved to `ob_poc_boundary::sage::verb_resolve_types`
-// alongside the `From<FilterDiagnostics> for CoderFilterDiagnostics` impl.
+// alongside the `From<FilterDiagnostics> for DraftFilterDiagnostics` impl.
 // Back-compat re-export keeps `sage::verb_resolve::{ScoredVerbCandidate,
 // FilterDiagnostics}` and `crate::sage::ScoredVerbCandidate` (via mod.rs
 // pub-use chain) reachable for the engine and external callers.
@@ -306,7 +306,7 @@ fn active_phase_tags(intent: &OutcomeIntent) -> HashSet<String> {
     }
 
     for goal in intent
-        .coder_handoff
+        .drafter_handoff
         .constraints
         .iter()
         .chain(intent.hints.explicit_domain_terms.iter())
@@ -568,7 +568,7 @@ mod tests {
 
     use crate::sage::verb_index::VerbMeta;
     use crate::sage::{
-        Clarification, CoderHandoff, EntityRef, IntentPolarity, ObservationPlane, OutcomeAction,
+        Clarification, DrafterHandoff, EntityRef, IntentPolarity, ObservationPlane, OutcomeAction,
         OutcomeStep, SageConfidence, SageExplain, UtteranceHints,
     };
 
@@ -649,7 +649,7 @@ mod tests {
             pending_clarifications: Vec::<Clarification>::new(),
             hints: UtteranceHints::default(),
             explain: SageExplain::default(),
-            coder_handoff: CoderHandoff::default(),
+            drafter_handoff: DrafterHandoff::default(),
         }
     }
 
@@ -712,7 +712,7 @@ mod tests {
             pending_clarifications: vec![],
             hints: UtteranceHints::default(),
             explain: SageExplain::default(),
-            coder_handoff: CoderHandoff::default(),
+            drafter_handoff: DrafterHandoff::default(),
         };
 
         let candidates = scorer.score(&intent, 5);
@@ -755,7 +755,7 @@ mod tests {
             pending_clarifications: vec![],
             hints: UtteranceHints::default(),
             explain: SageExplain::default(),
-            coder_handoff: CoderHandoff::default(),
+            drafter_handoff: DrafterHandoff::default(),
         };
 
         let candidates = scorer.score(&intent, 5);
@@ -801,7 +801,7 @@ mod tests {
                 ..UtteranceHints::default()
             },
             explain: SageExplain::default(),
-            coder_handoff: CoderHandoff::default(),
+            drafter_handoff: DrafterHandoff::default(),
         };
 
         let candidates = scorer.score(&intent, 5);
@@ -873,7 +873,7 @@ mod tests {
             pending_clarifications: vec![],
             hints: UtteranceHints::default(),
             explain: SageExplain::default(),
-            coder_handoff: CoderHandoff::default(),
+            drafter_handoff: DrafterHandoff::default(),
         };
 
         let candidates = scorer.score(&intent, 5);
@@ -894,7 +894,7 @@ mod tests {
             pending_clarifications: vec![],
             hints: UtteranceHints::default(),
             explain: SageExplain::default(),
-            coder_handoff: CoderHandoff::default(),
+            drafter_handoff: DrafterHandoff::default(),
         };
         let scorer = StructuredVerbScorer::new(index_with(vec![sample_meta(
             "deal.read-timeline",

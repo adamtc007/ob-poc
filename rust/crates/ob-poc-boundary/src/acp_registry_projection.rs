@@ -831,7 +831,9 @@ fn build_slice1_known_collision_policy() -> Vec<AcpKnownCollisionProjection> {
             phrase: "resource dictionary".to_string(),
             winner_pack_id: "product-service-taxonomy".to_string(),
             loser_pack_ids: vec!["onboarding-request".to_string()],
-            rationale: "Bare 'resource dictionary' is a browse query, not a compile/freeze request.".to_string(),
+            rationale:
+                "Bare 'resource dictionary' is a browse query, not a compile/freeze request."
+                    .to_string(),
         },
         AcpKnownCollisionProjection {
             phrase: "compile resource dictionary".to_string(),
@@ -843,19 +845,22 @@ fn build_slice1_known_collision_policy() -> Vec<AcpKnownCollisionProjection> {
             phrase: "attach service to product".to_string(),
             winner_pack_id: "product-service-taxonomy".to_string(),
             loser_pack_ids: vec!["cbu-maintenance".to_string()],
-            rationale: "Service-to-product binding lives in the taxonomy, not CBU maintenance.".to_string(),
+            rationale: "Service-to-product binding lives in the taxonomy, not CBU maintenance."
+                .to_string(),
         },
         AcpKnownCollisionProjection {
             phrase: "attach product to cbu".to_string(),
             winner_pack_id: "cbu-maintenance".to_string(),
             loser_pack_ids: vec!["product-service-taxonomy".to_string()],
-            rationale: "Attaching a product to a live CBU mutates CBU state, not taxonomy.".to_string(),
+            rationale: "Attaching a product to a live CBU mutates CBU state, not taxonomy."
+                .to_string(),
         },
         AcpKnownCollisionProjection {
             phrase: "set up onboarding".to_string(),
             winner_pack_id: "onboarding-request".to_string(),
             loser_pack_ids: vec!["cbu-maintenance".to_string()],
-            rationale: "'Set up onboarding' = data-request workflow, not CBU structure setup.".to_string(),
+            rationale: "'Set up onboarding' = data-request workflow, not CBU structure setup."
+                .to_string(),
         },
     ]
 }
@@ -887,7 +892,8 @@ fn build_slice1_example_utterances() -> Result<Vec<AcpExampleUtteranceProjection
             required_bindings: vec!["name", "management_company", "depositary"],
             expected_status: "pending_question",
             pending_question: Some("Which management company should sponsor the SICAV?"),
-            rationale: "Canonical structure macro happy path with pending question for required slot.",
+            rationale:
+                "Canonical structure macro happy path with pending question for required slot.",
         },
         ExampleSeed {
             example_id: "ex-positive-add-product-suite",
@@ -998,7 +1004,8 @@ fn build_slice1_example_utterances() -> Result<Vec<AcpExampleUtteranceProjection
             required_bindings: vec![],
             expected_status: "refusal",
             pending_question: None,
-            rationale: "'Apex' is a CBU name, not a product — must not bind to the product-suite macro.",
+            rationale:
+                "'Apex' is a CBU name, not a product — must not bind to the product-suite macro.",
         },
     ];
 
@@ -1286,7 +1293,8 @@ fn build_dsl_atoms(
             continue;
         }
         let source = macro_sources.get(&tier.macro_id);
-        let (required_args, optional_args) = (tier.required_args.clone(), tier.optional_args.clone());
+        let (required_args, optional_args) =
+            (tier.required_args.clone(), tier.optional_args.clone());
 
         // Build expansion summary from macro_tier counts plus optional
         // YAML source for distinct entity kinds.
@@ -1299,9 +1307,16 @@ fn build_dsl_atoms(
         };
 
         // Extract R1.3-5 parity fields from the macro YAML body
-        let (plan_kind, lifecycle_state, state_effect, side_effects,
-             requires_states, precondition_checks, transition_args, description) =
-            extract_macro_parity_fields(source);
+        let (
+            plan_kind,
+            lifecycle_state,
+            state_effect,
+            side_effects,
+            requires_states,
+            precondition_checks,
+            transition_args,
+            description,
+        ) = extract_macro_parity_fields(source);
 
         let atom = AcpDslAtomProjection {
             dispatch_type: AcpDslAtomKind::Macro,

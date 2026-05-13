@@ -80,7 +80,9 @@ pub(crate) fn is_viewport_verb(verb_call: &VerbCall) -> bool {
 /// Returns `Ok(None)` if the verb is not in the viewport domain.
 /// Returns `Ok(Some(ViewportVerb))` if parsing succeeds.
 /// Returns `Err(ViewportParseError)` if the verb is viewport but malformed.
-pub(crate) fn parse_viewport_verb(verb_call: &VerbCall) -> ViewportParseResult<Option<ViewportVerb>> {
+pub(crate) fn parse_viewport_verb(
+    verb_call: &VerbCall,
+) -> ViewportParseResult<Option<ViewportVerb>> {
     if !is_viewport_verb(verb_call) {
         return Ok(None);
     }

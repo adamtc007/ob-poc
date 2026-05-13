@@ -25,7 +25,6 @@ use crate::repl::session_v2::ReplSessionV2;
 use crate::repl::types_v2::ReplStateV2;
 use crate::runbook::plan_types::{PlanStepStatus, RunbookPlanStatus};
 
-
 // ---------------------------------------------------------------------------
 // Session-derived source collection (formerly `acp_runtime_context_sources`).
 // Transport-adjacent: reads already scoped session state and produces an

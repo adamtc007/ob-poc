@@ -70,9 +70,7 @@ pub trait RefResolver: Send + Sync {
     fn clear_cache(&mut self) {}
 
     /// Downcast to GatewayRefResolver for fuzzy search (returns None for non-Gateway resolvers)
-    fn as_gateway_resolver(
-        &mut self,
-    ) -> Option<&mut crate::gateway_resolver::GatewayRefResolver> {
+    fn as_gateway_resolver(&mut self) -> Option<&mut crate::gateway_resolver::GatewayRefResolver> {
         None
     }
 }

@@ -19,7 +19,6 @@ use uuid::Uuid;
 use crate::acp_facade::load_ob_poc_kyc_domain_pack;
 use crate::api::repl_routes_v2::{handle_repl_acp_request, ReplV2RouteState};
 
-
 pub(crate) async fn acp_prompt_state_anchor_provider_outcome(
     state: &ReplV2RouteState,
     session_id: Uuid,
@@ -737,7 +736,6 @@ fn acp_prompt_text(prompt: &[crate::acp_protocol::AcpContentBlock]) -> String {
         .collect::<Vec<_>>()
         .join("\n")
 }
-
 
 const DEAL_STATES: &[&str] = &[
     "PROSPECT",

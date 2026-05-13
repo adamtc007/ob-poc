@@ -1580,9 +1580,7 @@ fn envelope_sections(
     let example_utterances: Vec<_> = projection
         .example_utterances
         .iter()
-        .filter(|ex| {
-            ex.pack_id == pack_id || ex.expected_pack_id.as_deref() == Some(pack_id)
-        })
+        .filter(|ex| ex.pack_id == pack_id || ex.expected_pack_id.as_deref() == Some(pack_id))
         .cloned()
         .collect();
 

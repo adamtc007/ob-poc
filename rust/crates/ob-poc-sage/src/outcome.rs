@@ -208,7 +208,7 @@ pub struct SageExplain {
 
 /// Structured Sage -> Coder handoff contract.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
-pub struct CoderHandoff {
+pub struct DrafterHandoff {
     /// Outcome goal Sage wants the Coder to realize.
     pub goal: String,
     /// Compact restatement of the intent.
@@ -299,7 +299,7 @@ pub struct OutcomeIntent {
 
     /// Structured Sage -> Coder handoff contract.
     #[serde(default)]
-    pub coder_handoff: CoderHandoff,
+    pub drafter_handoff: DrafterHandoff,
 }
 
 impl OutcomeIntent {
@@ -330,7 +330,7 @@ impl OutcomeIntent {
                 confidence: SageConfidence::Low.as_str().to_string(),
                 clarifications: vec![],
             },
-            coder_handoff: CoderHandoff {
+            drafter_handoff: DrafterHandoff {
                 goal: "clarify_intent".to_string(),
                 intent_summary: utterance.trim()[..utterance.trim().len().min(60)].to_string(),
                 required_outcome: "determine intended outcome safely".to_string(),

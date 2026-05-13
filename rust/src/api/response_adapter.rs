@@ -4,7 +4,7 @@
 //! orchestrator produces `ReplResponseV2`. This adapter bridges the two so the
 //! frontend works unchanged as we migrate to the REPL V2 session model.
 
-use ob_poc_types::chat::{ChatResponse, CoderProposalPayload, SessionStateEnum};
+use ob_poc_types::chat::{ChatResponse, DraftProposalPayload, SessionStateEnum};
 use ob_poc_types::decision::{
     ClarificationPayload, DecisionKind, DecisionPacket, DecisionTrace, GroupClarificationPayload,
     SessionStateView, UserChoice,
@@ -38,7 +38,7 @@ pub fn repl_to_chat_response(resp: ReplResponseV2, session_id: Uuid) -> ChatResp
         available_verbs: None,
         surface_fingerprint: None,
         sage_explain: None,
-        coder_proposal: None,
+        drafter_proposal: None,
         discovery_bootstrap: None,
         parked_entries: None,
         onboarding_state: None,
@@ -49,9 +49,10 @@ pub fn repl_to_chat_response(resp: ReplResponseV2, session_id: Uuid) -> ChatResp
         // semantic resolution into `acp_trace`. Replaces Phase A's
         // pre-built `ChatResponse` carrier. The typed summary mirrors
         // the ~30-key flat shape the chat UI's `AcpTraceCard` consumes.
-        acp_trace: resp.acp_dag_semantic.as_ref().map(
-            crate::acp_dag_semantic::acp_chat_trace_summary_typed,
-        ),
+        acp_trace: resp
+            .acp_dag_semantic
+            .as_ref()
+            .map(crate::acp_dag_semantic::acp_chat_trace_summary_typed),
         // Phase A.2 (F5 follow-on): forward the turn-level correlation id.
         trace_id: resp.trace_id,
     };
@@ -139,7 +140,7 @@ pub fn repl_to_chat_response(resp: ReplResponseV2, session_id: Uuid) -> ChatResp
             ref verb,
             ..
         } => {
-            chat.coder_proposal = Some(CoderProposalPayload {
+            chat.drafter_proposal = Some(DraftProposalPayload {
                 verb_fqn: Some(verb.clone()),
                 dsl: Some(sentence.clone()),
                 change_summary: vec![resp.message.clone()],
@@ -184,7 +185,7 @@ pub fn repl_to_chat_response(resp: ReplResponseV2, session_id: Uuid) -> ChatResp
 
         ReplResponseKindV2::StepProposals { ref proposals, .. } => {
             if let Some(top) = proposals.first() {
-                chat.coder_proposal = Some(CoderProposalPayload {
+                chat.drafter_proposal = Some(DraftProposalPayload {
                     verb_fqn: Some(top.verb.clone()),
                     dsl: Some(top.sentence.clone()),
                     change_summary: vec![top.sentence.clone()],
@@ -431,8 +432,8 @@ mod tests {
             acp_dag_semantic: None,
         };
         let chat = repl_to_chat_response(resp, Uuid::nil());
-        assert!(chat.coder_proposal.is_some());
-        let cp = chat.coder_proposal.unwrap();
+        assert!(chat.drafter_proposal.is_some());
+        let cp = chat.drafter_proposal.unwrap();
         assert_eq!(cp.verb_fqn.unwrap(), "cbu.create");
         assert!(cp.requires_confirmation);
     }

@@ -211,7 +211,7 @@ pub struct AgentChatResponse {
     pub sage_explain: Option<ob_poc_types::chat::SageExplainPayload>,
     /// Typed Coder/REPL proposal payload for UI rendering.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub coder_proposal: Option<ob_poc_types::chat::CoderProposalPayload>,
+    pub drafter_proposal: Option<ob_poc_types::chat::DraftProposalPayload>,
     /// Typed Sem OS discovery/bootstrap payload for onboarding-stage sessions.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub discovery_bootstrap: Option<ob_poc_types::chat::DiscoveryBootstrapPayload>,
@@ -249,7 +249,6 @@ impl Default for AgentServiceConfig {
         }
     }
 }
-
 
 // ============================================================================
 // Client Scope (for client portal)
@@ -339,8 +338,6 @@ pub struct AgentService {
 }
 
 impl AgentService {
-
-
     /// Map Semantic OS stage focus to Sem OS phase-tag goals.
     ///
     /// `semos-data-management` is intentionally expanded to include:
@@ -465,7 +462,6 @@ impl AgentService {
         self.service_registry = Some(services);
         self
     }
-
 
     /// Build the verb searcher with all search indices.
     ///
@@ -610,7 +606,6 @@ impl AgentService {
             })
     }
 
-
     /// Get or build the LookupService for unified verb + entity discovery
     ///
     /// Returns None if entity_linker is not configured (graceful degradation).
@@ -656,6 +651,4 @@ impl AgentService {
         .await;
         Ok(envelope)
     }
-
-
 }

@@ -10,7 +10,7 @@ use super::context::SageContext;
 use std::collections::HashMap;
 
 use super::outcome::{
-    CoderHandoff, OutcomeAction, OutcomeIntent, OutcomeStep, SageConfidence, SageExplain,
+    DrafterHandoff, OutcomeAction, OutcomeIntent, OutcomeStep, SageConfidence, SageExplain,
     UtteranceHints,
 };
 use super::pre_classify::pre_classify;
@@ -71,7 +71,7 @@ impl SageEngine for DeterministicSage {
             confidence,
             pending_clarifications: Vec::new(),
             explain: build_explain(context, utterance, confidence, pre.polarity, &hints),
-            coder_handoff: build_coder_handoff(utterance, pre.polarity, &hints),
+            drafter_handoff: build_coder_handoff(utterance, pre.polarity, &hints),
             hints,
         })
     }
@@ -150,7 +150,7 @@ fn build_coder_handoff(
     utterance: &str,
     polarity: super::IntentPolarity,
     hints: &UtteranceHints,
-) -> CoderHandoff {
+) -> DrafterHandoff {
     let required_outcome = if matches!(polarity, super::IntentPolarity::Write) {
         "prepare a deterministic mutation proposal".to_string()
     } else {
@@ -161,7 +161,7 @@ fn build_coder_handoff(
     if let Some(subject) = hints.subject_phrase.as_ref() {
         hint_terms.push(subject.clone());
     }
-    CoderHandoff {
+    DrafterHandoff {
         goal: required_outcome.clone(),
         intent_summary: utterance.trim()[..utterance.trim().len().min(80)].to_string(),
         required_outcome,
@@ -352,7 +352,7 @@ fn confidence_for(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::sage::{CoderEngine, IntentPolarity, ObservationPlane, SageConfidence};
+    use crate::sage::{DrafterEngine, IntentPolarity, ObservationPlane, SageConfidence};
 
     fn ctx_with_focus(stage_focus: &str) -> SageContext {
         SageContext {
@@ -451,7 +451,7 @@ mod tests {
         let sage = DeterministicSage;
         let ctx = ctx_with_focus("semos-data-management");
         let outcome = sage.classify("show me documents", &ctx).await.unwrap();
-        let coder = CoderEngine::load().unwrap();
+        let coder = DrafterEngine::load().unwrap();
         let result = coder.resolve(&outcome).unwrap();
 
         assert_eq!(result.verb_fqn, "schema.entity.describe");
@@ -470,7 +470,7 @@ mod tests {
             .classify("what deals does Allianz have?", &ctx)
             .await
             .unwrap();
-        let coder = CoderEngine::load().unwrap();
+        let coder = DrafterEngine::load().unwrap();
         let result = coder.resolve(&outcome).unwrap();
 
         assert_eq!(outcome.summary, "what deals does Allianz have?");
@@ -485,7 +485,7 @@ mod tests {
             .classify("create a new CBU for Allianz UK Fund", &ctx)
             .await
             .unwrap();
-        let coder = CoderEngine::load().unwrap();
+        let coder = DrafterEngine::load().unwrap();
         let result = coder.resolve(&outcome).unwrap();
 
         assert_eq!(

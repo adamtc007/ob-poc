@@ -45,7 +45,7 @@ pub struct SagePreClassification {
     pub runner_up_domain_score: i32,
 
     /// True if this utterance is a noun-only Structure exploration with no instance targeting.
-    /// When true + polarity == Read → CoderEngine can be skipped (fast path eligible).
+    /// When true + polarity == Read → DrafterEngine can be skipped (fast path eligible).
     pub sage_only: bool,
 }
 

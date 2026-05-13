@@ -41,7 +41,7 @@ pub struct ChatMessage {
 
     /// Coder proposal payload for this message, when present.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub coder_proposal: Option<CoderProposalPayload>,
+    pub drafter_proposal: Option<DraftProposalPayload>,
 
     /// Runbook parked-state payload for this message, when present.
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -343,7 +343,7 @@ pub struct ChatResponse {
 
     /// Typed Coder/REPL proposal for UI rendering.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub coder_proposal: Option<CoderProposalPayload>,
+    pub drafter_proposal: Option<DraftProposalPayload>,
     /// Typed Sem OS discovery/bootstrap payload for onboarding-stage sessions.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub discovery_bootstrap: Option<DiscoveryBootstrapPayload>,
@@ -404,7 +404,7 @@ pub struct SageExplainPayload {
 
 /// Typed Coder proposal payload for UI rendering.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct CoderProposalPayload {
+pub struct DraftProposalPayload {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub verb_fqn: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]

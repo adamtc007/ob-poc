@@ -221,7 +221,6 @@ impl OperatorMacroDef {
             .get(name)
             .or_else(|| self.args.optional.get(name))
     }
-
 }
 
 /// Summary of a macro for API responses

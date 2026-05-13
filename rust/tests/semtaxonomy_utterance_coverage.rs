@@ -340,22 +340,22 @@ mod tests {
                 .ok_or_else(|| anyhow::anyhow!("Missing chat response payload"))?;
 
             let predicted_verb = response
-                .get("coder_proposal")
+                .get("drafter_proposal")
                 .and_then(|value| value.get("verb_fqn"))
                 .and_then(serde_json::Value::as_str)
                 .map(str::to_string);
             let predicted_dsl = response
-                .get("coder_proposal")
+                .get("drafter_proposal")
                 .and_then(|value| value.get("dsl"))
                 .and_then(serde_json::Value::as_str)
                 .map(str::to_string);
             let requires_confirmation = response
-                .get("coder_proposal")
+                .get("drafter_proposal")
                 .and_then(|value| value.get("requires_confirmation"))
                 .and_then(serde_json::Value::as_bool)
                 .unwrap_or(false);
             let ready_to_execute = response
-                .get("coder_proposal")
+                .get("drafter_proposal")
                 .and_then(|value| value.get("ready_to_execute"))
                 .and_then(serde_json::Value::as_bool)
                 .unwrap_or(false);

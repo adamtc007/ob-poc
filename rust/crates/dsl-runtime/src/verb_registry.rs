@@ -18,8 +18,8 @@
 use std::collections::HashMap;
 use std::sync::OnceLock;
 
-use dsl_core::config::types::{LookupConfig, VerbConsumes, VerbProduces};
 use crate::runtime_registry::{runtime_registry, RuntimeBehavior};
+use dsl_core::config::types::{LookupConfig, VerbConsumes, VerbProduces};
 
 // =============================================================================
 // TYPES

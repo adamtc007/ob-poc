@@ -321,12 +321,12 @@ pub fn validate_restricted_mutation_audit_chain(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::llm_trace::{
-        record_llm_inference_trace, workbook_llm_trace_ref, LlmInferenceTraceInput,
-    };
     use crate::approval_token::{ApprovalTokenId, RestrictedMutationApprovalCheck};
     use crate::dsl_coder::{
         DslCoderDryRunResult, DslCoderValidationStep, DslCoderValidationStepStatus,
+    };
+    use crate::llm_trace::{
+        record_llm_inference_trace, workbook_llm_trace_ref, LlmInferenceTraceInput,
     };
     use crate::mutation_preflight::{
         MutationExecutor, MutationSemanticDiff, RestrictedMutationPreflight,

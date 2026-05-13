@@ -476,9 +476,7 @@ structure.setup:
     /// `cbu-maintenance` pack (18 `struct.*` + 3 `structure.*`).
     #[test]
     fn test_slice1_macros_declare_plan_kind_and_lifecycle_state() {
-        use super::super::schema::{
-            MacroLifecycleState, MacroPlanKind, MacroSideEffect,
-        };
+        use super::super::schema::{MacroLifecycleState, MacroPlanKind, MacroSideEffect};
         use dsl_core::config::StateEffect;
 
         let slice1_fqns: &[&str] = &[
@@ -560,12 +558,12 @@ structure.setup:
             // transition_args; creating macros produce a new entity and
             // legitimately leave transition_args = None.
             if modifying_fqns.contains(fqn) {
-                let ta = schema
-                    .transition_args
-                    .as_ref()
-                    .unwrap_or_else(|| panic!(
-                        "Modifying Slice 1 macro {} must declare `transition-args`", fqn
-                    ));
+                let ta = schema.transition_args.as_ref().unwrap_or_else(|| {
+                    panic!(
+                        "Modifying Slice 1 macro {} must declare `transition-args`",
+                        fqn
+                    )
+                });
                 assert!(
                     !ta.entity_id_arg.is_empty(),
                     "Modifying Slice 1 macro {} must declare `transition-args.entity_id_arg`",

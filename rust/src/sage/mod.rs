@@ -40,12 +40,12 @@ pub mod constrained_match;
 // `ob-poc-sage::*` at the top level. Sibling Sage engines in this crate
 // (deterministic, llm_sage, coder, verb_resolve, verb_index,
 // arg_assembly, clash_matrix, valid_verb_set) continue to reach them via
-// `super::{outcome, plane, polarity, context, coder_result,
+// `super::{outcome, plane, polarity, context, drafter_result,
 // verb_resolve_types, disposition, pre_classify}` through these
 // re-exports. See docs/todo/capability-crate-restructure-v1.md §2.2.
-pub use ob_poc_sage::coder_result;
 pub use ob_poc_sage::context;
 pub use ob_poc_sage::disposition;
+pub use ob_poc_sage::drafter_result;
 pub use ob_poc_sage::outcome;
 pub use ob_poc_sage::plane;
 pub use ob_poc_sage::polarity;
@@ -60,8 +60,8 @@ pub mod valid_verb_set;
 // Phase 1.4
 pub mod arg_assembly;
 pub mod clash_matrix;
-pub mod coder;
 pub mod deterministic;
+pub mod drafter;
 pub mod llm_sage;
 pub mod verb_index;
 pub mod verb_resolve;
@@ -69,13 +69,13 @@ pub mod verb_resolve;
 // Re-export core types for convenience
 pub use arg_assembly::assemble_args_from_step;
 pub use clash_matrix::{build_clash_matrix, render_clash_reports, ClashRow};
-pub use coder::{CoderEngine, CoderResolution, CoderResult};
+pub use drafter::{DraftResolution, DraftResult, DrafterEngine};
 pub use context::{RecentIntent, SageContext};
 pub use deterministic::DeterministicSage;
 pub use disposition::{DelegateIntent, PendingMutation, ServeIntent, UtteranceDisposition};
 pub use llm_sage::LlmSage;
 pub use outcome::{
-    Clarification, CoderHandoff, EntityRef, OutcomeAction, OutcomeIntent, OutcomeStep,
+    Clarification, DrafterHandoff, EntityRef, OutcomeAction, OutcomeIntent, OutcomeStep,
     SageConfidence, SageExplain, UtteranceHints,
 };
 pub use plane::ObservationPlane;

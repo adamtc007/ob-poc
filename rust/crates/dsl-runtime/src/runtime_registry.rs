@@ -17,9 +17,9 @@ use tracing::{info, warn};
 
 use sqlx::PgPool;
 
+use crate::entity_kind::canonicalize as canonicalize_entity_kind;
 use dsl_core::config::types::*;
 use ob_templates::{TemplateDefinition, TemplateRegistry};
-use crate::entity_kind::canonicalize as canonicalize_entity_kind;
 
 // =============================================================================
 // RUNTIME VERB DEFINITION

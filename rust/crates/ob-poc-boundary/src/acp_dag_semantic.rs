@@ -214,10 +214,7 @@ pub fn acp_chat_trace_summary_typed(resolution: &AcpDagSemanticResolution) -> se
     let route_metadata = resolution.route_metadata.as_ref();
 
     let refusal_code = if resolution.status == AcpDagSemanticStatus::Refused {
-        resolution
-            .diagnostics
-            .first()
-            .map(|d| d.error_code.clone())
+        resolution.diagnostics.first().map(|d| d.error_code.clone())
     } else {
         None
     };
@@ -226,10 +223,7 @@ pub fn acp_chat_trace_summary_typed(resolution: &AcpDagSemanticResolution) -> se
         || (resolution.status == AcpDagSemanticStatus::Matched
             && resolution.first_pass_valid_draft_dsl().is_none())
     {
-        resolution
-            .diagnostics
-            .first()
-            .map(|d| d.error_code.clone())
+        resolution.diagnostics.first().map(|d| d.error_code.clone())
     } else {
         None
     };
@@ -293,9 +287,7 @@ pub fn acp_chat_trace_summary_typed(resolution: &AcpDagSemanticResolution) -> se
 
     let selected_macro_id = resolution.selected_verb.as_ref().and_then(|selected| {
         resolution.top_candidates.iter().find_map(|c| {
-            if &c.fqn == selected
-                && c.side_effects.as_deref() == Some("macro_projection_only")
-            {
+            if &c.fqn == selected && c.side_effects.as_deref() == Some("macro_projection_only") {
                 Some(c.fqn.clone())
             } else {
                 None
@@ -317,12 +309,9 @@ pub fn acp_chat_trace_summary_typed(resolution: &AcpDagSemanticResolution) -> se
     let mut put = |key: &str, value: Value| {
         summary.insert(key.to_string(), value);
     };
-    let opt_str = |v: Option<String>| -> Value {
-        v.map(Value::String).unwrap_or(Value::Null)
-    };
-    let opt_u64 = |v: Option<u64>| -> Value {
-        v.map(|n| Value::Number(n.into())).unwrap_or(Value::Null)
-    };
+    let opt_str = |v: Option<String>| -> Value { v.map(Value::String).unwrap_or(Value::Null) };
+    let opt_u64 =
+        |v: Option<u64>| -> Value { v.map(|n| Value::Number(n.into())).unwrap_or(Value::Null) };
     let opt_bool = |v: Option<bool>| -> Value { v.map(Value::Bool).unwrap_or(Value::Null) };
 
     put("status", Value::String(status_str.clone()));
@@ -361,12 +350,7 @@ pub fn acp_chat_trace_summary_typed(resolution: &AcpDagSemanticResolution) -> se
                 .observability
                 .as_ref()
                 .and_then(|o| o.transition_ref.clone())
-                .or_else(|| {
-                    resolution
-                        .workflow_plan
-                        .as_ref()
-                        .map(|p| p.plan_id.clone())
-                })
+                .or_else(|| resolution.workflow_plan.as_ref().map(|p| p.plan_id.clone()))
                 .or_else(|| {
                     resolution
                         .selected_template
@@ -414,7 +398,12 @@ pub fn acp_chat_trace_summary_typed(resolution: &AcpDagSemanticResolution) -> se
     put("pack_ref", opt_str(pack_ref));
     put(
         "pack_allowed_verb_count",
-        opt_u64(resolution.pack.as_ref().map(|p| p.allowed_verb_count as u64)),
+        opt_u64(
+            resolution
+                .pack
+                .as_ref()
+                .map(|p| p.allowed_verb_count as u64),
+        ),
     );
     put("candidate_verbs", candidate_verbs_value);
     put(
@@ -432,9 +421,7 @@ pub fn acp_chat_trace_summary_typed(resolution: &AcpDagSemanticResolution) -> se
     put(
         "workflow_plan_needed_from_user",
         workflow_plan_needed_from_user
-            .map(|v| {
-                Value::Array(v.into_iter().map(Value::String).collect())
-            })
+            .map(|v| Value::Array(v.into_iter().map(Value::String).collect()))
             .unwrap_or(Value::Null),
     );
     put(
@@ -470,7 +457,12 @@ pub fn acp_chat_trace_summary_typed(resolution: &AcpDagSemanticResolution) -> se
     );
     put(
         "revision_count",
-        opt_u64(resolution.observability.as_ref().and_then(|o| o.revision_count)),
+        opt_u64(
+            resolution
+                .observability
+                .as_ref()
+                .and_then(|o| o.revision_count),
+        ),
     );
     put(
         "prose_only_failure",
@@ -593,12 +585,7 @@ pub fn acp_chat_trace_summary_typed(resolution: &AcpDagSemanticResolution) -> se
     );
     put(
         "runtime_pack_id",
-        opt_str(
-            resolution
-                .runtime_trace
-                .as_ref()
-                .map(|t| t.pack_id.clone()),
-        ),
+        opt_str(resolution.runtime_trace.as_ref().map(|t| t.pack_id.clone())),
     );
     put(
         "runtime_snapshot_id",
@@ -1096,22 +1083,18 @@ pub fn resolve_acp_dag_semantic_prompt(
     // R3: look up the winner's confidence + matched_phrase from the
     // scored candidate set (the resolver returns a bare row from the
     // (dis)ambiguation step; the scored entry carries score/phrase).
-    let selected_dispatch =
-        selected
-            .as_ref()
-            .map(|row| {
-                let winner_candidate =
-                    candidates.iter().find(|c| c.fqn == row.fqn);
-                let score = winner_candidate.map(|c| c.score).unwrap_or(1.0);
-                AcpDagSemanticSelectedDispatch {
-                    dispatch_kind: AcpDagSemanticDispatchKind::Verb,
-                    fqn: row.fqn.clone(),
-                    confidence: score,
-                    confidence_band: AcpDagSemanticConfidenceBand::from_score(score),
-                    matched_phrase: winner_candidate.and_then(|c| c.matched_phrase.clone()),
-                    description: Some(row.description.clone()),
-                }
-            });
+    let selected_dispatch = selected.as_ref().map(|row| {
+        let winner_candidate = candidates.iter().find(|c| c.fqn == row.fqn);
+        let score = winner_candidate.map(|c| c.score).unwrap_or(1.0);
+        AcpDagSemanticSelectedDispatch {
+            dispatch_kind: AcpDagSemanticDispatchKind::Verb,
+            fqn: row.fqn.clone(),
+            confidence: score,
+            confidence_band: AcpDagSemanticConfidenceBand::from_score(score),
+            matched_phrase: winner_candidate.and_then(|c| c.matched_phrase.clone()),
+            description: Some(row.description.clone()),
+        }
+    });
     // R3: split the scored list into winner-retained `top_candidates` and
     // structured `rejected_candidates` so HITL reviewers can answer
     // "why X over Y" from the trace alone.
@@ -1171,10 +1154,7 @@ fn build_rejected_candidates(
             } else {
                 (
                     "lost_to_higher_scorer".to_string(),
-                    format!(
-                        "scored {:.2}; outranked by the winning candidate",
-                        c.score
-                    ),
+                    format!("scored {:.2}; outranked by the winning candidate", c.score),
                 )
             };
             AcpDagSemanticRejectedCandidate {
@@ -1424,14 +1404,16 @@ fn refused_resolution(
     actual: Option<String>,
 ) -> AcpDagSemanticResolution {
     let selected_verb = actual.clone();
-    let selected_dispatch = selected_verb.as_ref().map(|fqn| AcpDagSemanticSelectedDispatch {
-        dispatch_kind: AcpDagSemanticDispatchKind::Verb,
-        fqn: fqn.clone(),
-        confidence: 1.0,
-        confidence_band: AcpDagSemanticConfidenceBand::High,
-        matched_phrase: None,
-        description: row.as_ref().map(|row| row.description.clone()),
-    });
+    let selected_dispatch = selected_verb
+        .as_ref()
+        .map(|fqn| AcpDagSemanticSelectedDispatch {
+            dispatch_kind: AcpDagSemanticDispatchKind::Verb,
+            fqn: fqn.clone(),
+            confidence: 1.0,
+            confidence_band: AcpDagSemanticConfidenceBand::High,
+            matched_phrase: None,
+            description: row.as_ref().map(|row| row.description.clone()),
+        });
     AcpDagSemanticResolution {
         status: AcpDagSemanticStatus::Refused,
         utterance: utterance.to_string(),
@@ -1820,16 +1802,13 @@ fn select_pack(index: &AcpDagSemanticIndex, utterance: &str) -> Option<ScoredPac
         .filter(|pack| pack.score >= PACK_MATCH_THRESHOLD)
         .collect::<Vec<_>>();
     scored.sort_by(|left, right| {
-        right
-            .score
-            .total_cmp(&left.score)
-            .then_with(|| {
-                left.row
-                    .projection
-                    .indexing
-                    .id
-                    .cmp(&right.row.projection.indexing.id)
-            })
+        right.score.total_cmp(&left.score).then_with(|| {
+            left.row
+                .projection
+                .indexing
+                .id
+                .cmp(&right.row.projection.indexing.id)
+        })
     });
     let top = scored.first()?.clone();
     let clear_pack = scored
@@ -1895,16 +1874,13 @@ fn infer_slice_pack_for_selected_verb(
     }
 
     candidates.sort_by(|left, right| {
-        right
-            .score
-            .total_cmp(&left.score)
-            .then_with(|| {
-                left.row
-                    .projection
-                    .indexing
-                    .id
-                    .cmp(&right.row.projection.indexing.id)
-            })
+        right.score.total_cmp(&left.score).then_with(|| {
+            left.row
+                .projection
+                .indexing
+                .id
+                .cmp(&right.row.projection.indexing.id)
+        })
     });
     let top = candidates.first()?.clone();
     let clear_pack = candidates
@@ -2802,14 +2778,16 @@ mod tests {
         assert!(!dispatch.fqn.is_empty());
         assert!(dispatch.confidence > 0.0);
         // legacy alias still populated for migration window
-        assert_eq!(resolved.selected_verb.as_deref(), Some(dispatch.fqn.as_str()));
+        assert_eq!(
+            resolved.selected_verb.as_deref(),
+            Some(dispatch.fqn.as_str())
+        );
 
         // every candidate carries kind + confidence band
         for candidate in &resolved.top_candidates {
             assert_eq!(candidate.dispatch_kind, AcpDagSemanticDispatchKind::Verb);
             // band derives from score
-            let derived =
-                AcpDagSemanticConfidenceBand::from_score(candidate.score);
+            let derived = AcpDagSemanticConfidenceBand::from_score(candidate.score);
             assert_eq!(candidate.confidence_band, derived);
         }
 
@@ -2854,7 +2832,6 @@ mod tests {
             AcpDagSemanticConfidenceBand::BelowThreshold
         );
     }
-
 
     #[test]
     fn resolves_cbu_assign_role_prompt() {
@@ -2992,8 +2969,10 @@ mod tests {
         assert_eq!(obj["outcome_layer"], "language_loop");
         assert_eq!(obj["selected_verb"], "cbu.assign-role");
         assert_eq!(obj["selected_dispatch_fqn"], "cbu.assign-role");
-        assert!(obj["human_summary"].is_string(),
-            "human_summary must be populated typed");
+        assert!(
+            obj["human_summary"].is_string(),
+            "human_summary must be populated typed"
+        );
         assert!(obj["candidate_verbs"].is_array() || obj["candidate_verbs"].is_null());
         assert!(obj["pack_id"].is_string(), "pack_id should be populated");
 

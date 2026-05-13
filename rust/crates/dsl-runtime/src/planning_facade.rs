@@ -9,6 +9,7 @@
 
 use std::sync::Arc;
 
+use crate::runtime_registry::RuntimeVerbRegistry;
 use dsl_core::ast::Program;
 use dsl_core::binding_context::BindingContext;
 use dsl_core::compiler::compile_to_ops;
@@ -16,7 +17,6 @@ use dsl_core::dag::{build_execution_plan as build_dag_plan, describe_plan, Cycle
 use dsl_core::diagnostics::{Diagnostic, DiagnosticCode, SourceSpan};
 use dsl_core::ops::Op;
 use dsl_core::parser::parse_program;
-use crate::runtime_registry::RuntimeVerbRegistry;
 
 /// Context for implicit create behavior
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Default)]
@@ -287,8 +287,8 @@ pub fn quick_validate(source: &str, registry: Arc<RuntimeVerbRegistry>) -> Vec<D
 
 #[cfg(test)]
 mod tests {
-    use dsl_core::config::loader::ConfigLoader;
     use super::*;
+    use dsl_core::config::loader::ConfigLoader;
 
     fn test_registry() -> Arc<RuntimeVerbRegistry> {
         let loader = ConfigLoader::from_env();

@@ -2,7 +2,7 @@
 
 use serde::{Deserialize, Serialize};
 
-use super::coder_result::CoderResult;
+use super::drafter_result::DraftResult;
 use super::outcome::{EntityRef, OutcomeAction, OutcomeIntent};
 
 /// The single routing decision after Sage classification.
@@ -35,6 +35,6 @@ pub struct DelegateIntent {
 pub struct PendingMutation {
     pub confirmation_text: String,
     pub change_summary: Vec<String>,
-    pub coder_result: CoderResult,
+    pub drafter_result: DraftResult,
     pub intent: OutcomeIntent,
 }

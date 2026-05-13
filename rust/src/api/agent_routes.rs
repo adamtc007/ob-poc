@@ -640,7 +640,6 @@ fn acp_agent_message_text(envelope: &serde_json::Value) -> Option<String> {
         })
 }
 
-
 fn acp_valid_dag_semantic_draft_dsl(envelope: &serde_json::Value) -> Option<DslState> {
     let result = envelope.get("result")?;
     let first_pass_valid = result
@@ -660,7 +659,6 @@ fn acp_valid_dag_semantic_draft_dsl(envelope: &serde_json::Value) -> Option<DslS
         })
 }
 
-
 fn dag_semantic_candidate_verbs(result: &serde_json::Value) -> Option<Vec<String>> {
     let candidates = result
         .pointer("/dag_semantic/top_candidates")?
@@ -674,7 +672,6 @@ fn dag_semantic_candidate_verbs(result: &serde_json::Value) -> Option<Vec<String
         .collect::<Vec<_>>();
     (!candidates.is_empty()).then_some(candidates)
 }
-
 
 fn value_at_path<'a>(value: &'a serde_json::Value, path: &[&str]) -> Option<&'a serde_json::Value> {
     path.iter()
@@ -694,7 +691,6 @@ fn value_bool(value: &serde_json::Value, path: &[&str]) -> Option<bool> {
 fn value_u64(value: &serde_json::Value, path: &[&str]) -> Option<u64> {
     value_at_path(value, path).and_then(serde_json::Value::as_u64)
 }
-
 
 async fn dispatch_to_v2_repl(
     req: &SessionInputRequest,
@@ -1443,7 +1439,7 @@ fn v2_message_to_wire(
         intents: None,
         dsl: None,
         sage_explain: None,
-        coder_proposal: None,
+        drafter_proposal: None,
         discovery_bootstrap: None,
         parked_entries: None,
     }

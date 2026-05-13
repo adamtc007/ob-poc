@@ -8,7 +8,6 @@ use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, BTreeSet};
 
-
 /// Schema version for Slice 2 ACP runtime context projections.
 pub const ACP_RUNTIME_CONTEXT_SCHEMA_VERSION: &str = "acp_runtime_context_v1";
 

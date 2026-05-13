@@ -1,7 +1,7 @@
-use dsl_core::ast::Program;
-use dsl_core::binding_context::BindingContext;
 use crate::runtime_registry::RuntimeVerbRegistry;
 use crate::verb_registry::registry;
+use dsl_core::ast::Program;
+use dsl_core::binding_context::BindingContext;
 
 /// A suggested next step (verb)
 #[derive(Debug, Clone)]
@@ -112,8 +112,8 @@ pub fn predict_next_steps(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use dsl_core::binding_context::BindingInfo;
     use crate::runtime_registry::runtime_registry;
+    use dsl_core::binding_context::BindingInfo;
     use uuid::Uuid;
 
     #[test]
