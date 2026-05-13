@@ -61,24 +61,38 @@ impl MotivationPromptBuilder {
     /// intent_summary}` object. Both fields required so the LLM
     /// cannot return one without the other.
     pub fn tool_definition(index: &SessionIndex) -> ToolDefinition {
+        Self::tool_definition_with_allowlist(index.allowed_verbs())
+    }
+
+    /// Tool definition constrained to a precomputed effective
+    /// allowlist (Phase 4.6). The planning loop intersects the pack
+    /// allowlist with the substrate's active-verb-surface and the
+    /// user's refused-draft set before calling this, so the JSON
+    /// Schema enum the LLM sees is the *exact* sanctioned set for
+    /// this round. Falls back to the pack allowlist via
+    /// [`tool_definition`] when callers don't have an effective
+    /// allowlist.
+    pub fn tool_definition_with_allowlist(allowlist: &[String]) -> ToolDefinition {
+        let enum_values: Vec<serde_json::Value> = allowlist
+            .iter()
+            .map(|fqn| serde_json::Value::String(fqn.clone()))
+            .collect();
         ToolDefinition {
             name: "propose_verb".to_string(),
             description:
                 "Select the verb FQN that best advances the frontier given the blockers, \
                  plus a one-sentence intent summary explaining the choice. The verb_fqn \
-                 MUST appear in the allowed-verbs list and MUST NOT appear in the \
-                 forbidden-verbs list; the drafter rejects any FQN outside the sanctioned \
-                 set."
+                 MUST be drawn from the enum below — the drafter rejects any FQN outside \
+                 it."
                     .to_string(),
             parameters: serde_json::json!({
                 "type": "object",
                 "properties": {
                     "verb_fqn": {
                         "type": "string",
-                        "description": format!(
-                            "Fully-qualified verb from the pack '{}' allowlist.",
-                            index.pack.id
-                        )
+                        "enum": enum_values,
+                        "description":
+                            "Fully-qualified verb. Must be one of the listed enum values."
                     },
                     "intent_summary": {
                         "type": "string",

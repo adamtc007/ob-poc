@@ -157,16 +157,35 @@ impl SemOsKnowledgeClient for StubKnowledgeClient {
 }
 
 /// Helper for the planning loop: build the standard
-/// "verbs-at-current-state" query from a session index. Returns
-/// `None` when the index has no state-node anchor yet — the spike
-/// is anchored only at workspace + pack granularity.
+/// "verbs-at-current-state" query from a session index. Phase 4.6 —
+/// the spike has no real constellation_id (Phase 3.2 hydrator
+/// returns `Empty`), so the query carries a synthetic `session_root`
+/// state node so the substrate can still answer at workspace + pack
+/// granularity. Returns the query unconditionally; the planning loop
+/// uses an empty `KnowledgeResponse::Verbs` to mean "substrate has
+/// nothing to say, fall back to pack allowlist".
 pub fn active_verbs_query_for_index(index: &SessionIndex) -> Option<KnowledgeQuery> {
-    // Phase 2 indices have no current state node — Phase 3.4 / 4
-    // hydrate the constellation and produce one. Returning `None`
-    // here documents the gap; consumers fall back to the pack
-    // allowlist as the coarse approximation.
-    let _ = index;
-    None
+    Some(KnowledgeQuery::ActiveVerbsAtState {
+        workspace: workspace_label(&index.workspace),
+        constellation_id: "session_root".to_string(),
+        state_node: "session_root".to_string(),
+    })
+}
+
+fn workspace_label(workspace: &ob_poc_types::session::kinds::WorkspaceKind) -> String {
+    use ob_poc_types::session::kinds::WorkspaceKind;
+    match workspace {
+        WorkspaceKind::Cbu => "cbu".to_string(),
+        WorkspaceKind::Kyc => "kyc".to_string(),
+        WorkspaceKind::Deal => "deal".to_string(),
+        WorkspaceKind::InstrumentMatrix => "instrument-matrix".to_string(),
+        WorkspaceKind::BookingPrincipal => "booking-principal".to_string(),
+        WorkspaceKind::LifecycleResources => "lifecycle-resources".to_string(),
+        WorkspaceKind::ProductMaintenance => "product-maintenance".to_string(),
+        WorkspaceKind::SemOsMaintenance => "sem-os-maintenance".to_string(),
+        WorkspaceKind::OnBoarding => "onboarding".to_string(),
+        WorkspaceKind::Catalogue => "catalogue".to_string(),
+    }
 }
 
 #[cfg(test)]

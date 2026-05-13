@@ -185,6 +185,7 @@ mod tests {
             blockers: None,
             approval: None,
             refused_drafts: Vec::new(),
+            active_verb_surface: None,
         }
     }
 

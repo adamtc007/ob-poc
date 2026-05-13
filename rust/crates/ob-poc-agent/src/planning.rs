@@ -176,16 +176,31 @@ impl PlanningLoop {
         let frontier = FrontierEngine::compute(&self.index, &snapshot_ref);
         goal_frame.attach_frontier(frontier);
 
-        // Phase 2.8 — exercise the knowledge surface so the seam is
-        // demonstrably wired end-to-end. The spike client returns
-        // Empty for every query; Phase 3.4 / 4 swap for the real
-        // sem_os_mcp transport and hydrate constellation context
-        // before the LLM call.
+        // Phase 4.6 — query the substrate's active-verb-surface at
+        // the session's anchor state and record the result on the
+        // goal frame. The constrained-composition guard below
+        // intersects this with the pack allowlist before the LLM /
+        // deterministic fallback picks a verb. The stub knowledge
+        // client returns `Empty`, which the loop treats as "substrate
+        // had nothing to say, fall back to the pack allowlist
+        // unchanged". A `Verbs { fqns: [] }` response is the
+        // substrate explicitly reporting an empty surface — the
+        // loop refuses with a constrained-composition error so a
+        // policy gap doesn't silently degrade into a pack-allowlist
+        // pick.
         if let (Some(client), Some(query)) = (
             self.knowledge.as_ref(),
             active_verbs_query_for_index(&self.index),
         ) {
             match client.query(query).await {
+                Ok(KnowledgeResponse::Verbs { fqns }) => {
+                    tracing::debug!(
+                        target: "sage-acp",
+                        substrate_surface_size = fqns.len(),
+                        "substrate active-verb-surface attached"
+                    );
+                    goal_frame.attach_active_verb_surface(fqns);
+                }
                 Ok(KnowledgeResponse::Empty) => {
                     tracing::debug!(
                         target: "sage-acp",
@@ -196,7 +211,7 @@ impl PlanningLoop {
                     tracing::debug!(
                         target: "sage-acp",
                         ?response,
-                        "knowledge client hydrated context"
+                        "knowledge client returned non-verbs response — ignoring"
                     );
                 }
                 Err(error) => {
@@ -207,6 +222,24 @@ impl PlanningLoop {
                     );
                 }
             }
+        }
+
+        // Phase 4.6 — compute the effective verb allowlist by
+        // intersecting the pack allowlist with the substrate's
+        // active-verb-surface (when known) and excluding the user's
+        // refused drafts. When the intersection is empty the loop
+        // refuses with a structured constrained-composition error
+        // before either the LLM or the deterministic fallback is
+        // invoked.
+        let effective_allowlist =
+            self.compute_effective_allowlist(goal_frame.active_verb_surface.as_deref(), &goal_frame.refused_drafts);
+        if effective_allowlist.is_empty() {
+            return Err(anyhow!(
+                "constrained-composition refusal: pack '{}' allowlist intersected with substrate \
+                 active-verb-surface and refused-draft exclusion is empty — no sanctioned verb \
+                 can satisfy this prompt",
+                self.index.pack.id
+            ));
         }
 
         // Phase 3.5 — build the pre-LLM blocker view so the
@@ -230,7 +263,16 @@ impl PlanningLoop {
                     goal_frame.frontier.as_ref().expect("attached above"),
                     Some(&pre_blockers),
                 );
-                let result = self.invoke_motivated_llm(client.as_ref(), &prompt).await?;
+                let result = self
+                    .invoke_motivated_llm(client.as_ref(), &prompt, &effective_allowlist)
+                    .await?;
+                // Two-layer guard: the LLM might propose a verb that
+                // is on the pack allowlist but pruned by the
+                // substrate-supplied surface or refused by the user.
+                // The pack-only check stays the canonical
+                // constrained-composition invariant; the effective
+                // allowlist check then rejects substrate-pruned /
+                // refused picks with the same error class.
                 if !self.index.is_verb_sanctioned(&result.verb_fqn) {
                     return Err(anyhow!(
                         "constrained-composition violation: LLM proposed '{}' which is not in \
@@ -239,19 +281,23 @@ impl PlanningLoop {
                         self.index.pack.id
                     ));
                 }
+                if !effective_allowlist.contains(&result.verb_fqn) {
+                    return Err(anyhow!(
+                        "constrained-composition violation: LLM proposed '{}' which the substrate \
+                         active-verb-surface or refused-draft set excludes (pack '{}' allowed it)",
+                        result.verb_fqn,
+                        self.index.pack.id
+                    ));
+                }
                 (result.verb_fqn, Some(result.intent_summary), DraftSource::LlmTool)
             }
             None => {
-                let fallback = self
-                    .deterministic_fallback(&goal_frame.refused_drafts)
-                    .ok_or_else(|| {
-                        anyhow!(
-                            "no LLM client wired and pack '{}' has no sanctioned verbs (after \
-                             excluding {} refused) to fall back on",
-                            self.index.pack.id,
-                            goal_frame.refused_drafts.len()
-                        )
-                    })?;
+                let fallback = effective_allowlist.first().cloned().ok_or_else(|| {
+                    anyhow!(
+                        "no LLM client wired and effective allowlist is empty for pack '{}'",
+                        self.index.pack.id
+                    )
+                })?;
                 (fallback, None, DraftSource::DeterministicFallback)
             }
         };
@@ -291,20 +337,38 @@ impl PlanningLoop {
         })
     }
 
-    fn deterministic_fallback(&self, refused: &[String]) -> Option<String> {
+    /// Intersect the pack's sanctioned-verb list with the substrate's
+    /// active-verb-surface (when present) and exclude refused
+    /// drafts. Ordering is preserved from the pack manifest so the
+    /// deterministic fallback's "first allowed verb" stays
+    /// reproducible. When `surface` is `None`, the substrate had
+    /// nothing to say and the pack allowlist passes through
+    /// unchanged.
+    fn compute_effective_allowlist(
+        &self,
+        surface: Option<&[String]>,
+        refused: &[String],
+    ) -> Vec<String> {
         self.index
             .allowed_verbs()
             .iter()
-            .find(|v| !self.index.forbidden_verbs().contains(v) && !refused.contains(v))
+            .filter(|fqn| !self.index.forbidden_verbs().contains(fqn))
+            .filter(|fqn| !refused.contains(fqn))
+            .filter(|fqn| match surface {
+                Some(allowed) => allowed.iter().any(|allowed_fqn| allowed_fqn == *fqn),
+                None => true,
+            })
             .cloned()
+            .collect()
     }
 
     async fn invoke_motivated_llm(
         &self,
         client: &dyn LlmClient,
         prompt: &crate::motivation::MotivationPrompt,
+        effective_allowlist: &[String],
     ) -> Result<LlmDraftResult> {
-        let tool = MotivationPromptBuilder::tool_definition(&self.index);
+        let tool = MotivationPromptBuilder::tool_definition_with_allowlist(effective_allowlist);
         let result = client
             .chat_with_tool(&prompt.system, &prompt.user, &tool)
             .await?;
@@ -478,6 +542,132 @@ progress_signals: []
         assert!(
             err.to_string().contains("constrained-composition violation"),
             "{err}"
+        );
+    }
+
+    /// Phase 4.6 — knowledge client returning a controlled active-
+    /// verb-surface lets us assert that the planning loop intersects
+    /// the substrate surface with the pack allowlist.
+    struct SurfaceKnowledge {
+        fqns: Vec<String>,
+    }
+
+    #[async_trait::async_trait]
+    impl crate::knowledge::SemOsKnowledgeClient for SurfaceKnowledge {
+        async fn query(
+            &self,
+            _query: crate::knowledge::KnowledgeQuery,
+        ) -> std::result::Result<
+            crate::knowledge::KnowledgeResponse,
+            crate::knowledge::KnowledgeError,
+        > {
+            Ok(crate::knowledge::KnowledgeResponse::Verbs {
+                fqns: self.fqns.clone(),
+            })
+        }
+
+        fn provider_label(&self) -> &str {
+            "surface-stub"
+        }
+    }
+
+    #[tokio::test]
+    async fn substrate_surface_records_on_goal_frame() {
+        let knowledge: Arc<dyn crate::knowledge::SemOsKnowledgeClient> = Arc::new(SurfaceKnowledge {
+            fqns: vec!["cbu.create".to_string(), "cbu.attach-product".to_string()],
+        });
+        let loop_ = PlanningLoop::new(make_index(), None, Some(knowledge), None);
+        let outcome = loop_.propose_draft("set up a book", None).await.unwrap();
+        assert_eq!(
+            outcome.goal_frame.active_verb_surface,
+            Some(vec![
+                "cbu.create".to_string(),
+                "cbu.attach-product".to_string()
+            ])
+        );
+        assert_eq!(outcome.verb_fqn, "cbu.create");
+    }
+
+    #[tokio::test]
+    async fn substrate_surface_prunes_deterministic_pick() {
+        // Pack allows {cbu.create, cbu.attach-product}; substrate
+        // surface excludes cbu.create. Deterministic fallback must
+        // skip past it and land on cbu.attach-product.
+        let knowledge: Arc<dyn crate::knowledge::SemOsKnowledgeClient> = Arc::new(SurfaceKnowledge {
+            fqns: vec!["cbu.attach-product".to_string()],
+        });
+        let loop_ = PlanningLoop::new(make_index(), None, Some(knowledge), None);
+        let outcome = loop_.propose_draft("set up a book", None).await.unwrap();
+        assert_eq!(outcome.verb_fqn, "cbu.attach-product");
+        assert_eq!(outcome.source, DraftSource::DeterministicFallback);
+    }
+
+    #[tokio::test]
+    async fn empty_substrate_surface_refuses_with_constrained_composition_error() {
+        // Pack allows two verbs but substrate explicitly reports an
+        // empty active-verb-surface — the loop must refuse rather
+        // than silently degrade to a pack-allowlist pick.
+        let knowledge: Arc<dyn crate::knowledge::SemOsKnowledgeClient> = Arc::new(SurfaceKnowledge {
+            fqns: Vec::new(),
+        });
+        let loop_ = PlanningLoop::new(make_index(), None, Some(knowledge), None);
+        let err = loop_
+            .propose_draft("set up a book", None)
+            .await
+            .expect_err("empty intersection must refuse");
+        assert!(
+            err.to_string().contains("constrained-composition refusal"),
+            "{err}"
+        );
+    }
+
+    #[tokio::test]
+    async fn llm_proposal_outside_substrate_surface_is_rejected() {
+        // Pack allows cbu.attach-product but substrate surface only
+        // includes cbu.create. LLM proposes the pack-allowed but
+        // substrate-pruned verb — must reject with constrained-
+        // composition error mentioning the substrate exclusion.
+        let llm: Arc<dyn LlmClient> = Arc::new(StubLlm {
+            verb_fqn: "cbu.attach-product".to_string(),
+        });
+        let knowledge: Arc<dyn crate::knowledge::SemOsKnowledgeClient> = Arc::new(SurfaceKnowledge {
+            fqns: vec!["cbu.create".to_string()],
+        });
+        let loop_ = PlanningLoop::new(make_index(), Some(llm), Some(knowledge), None);
+        let err = loop_
+            .propose_draft("attach the product", None)
+            .await
+            .expect_err("substrate exclusion must reject");
+        let msg = err.to_string();
+        assert!(
+            msg.contains("constrained-composition violation"),
+            "{msg}"
+        );
+        assert!(msg.contains("substrate"), "expected substrate mention: {msg}");
+    }
+
+    #[test]
+    fn effective_allowlist_intersects_surface_and_excludes_refused() {
+        let loop_ = PlanningLoop::new(make_index(), None, None, None);
+        let surface = vec![
+            "cbu.create".to_string(),
+            "cbu.attach-product".to_string(),
+            "cbu.delete".to_string(),
+        ];
+        // refused includes cbu.create; surface includes cbu.delete
+        // but pack forbids it; final must be just cbu.attach-product.
+        let refused = vec!["cbu.create".to_string()];
+        let effective = loop_.compute_effective_allowlist(Some(&surface), &refused);
+        assert_eq!(effective, vec!["cbu.attach-product".to_string()]);
+    }
+
+    #[test]
+    fn effective_allowlist_none_surface_passes_pack_through() {
+        let loop_ = PlanningLoop::new(make_index(), None, None, None);
+        let effective = loop_.compute_effective_allowlist(None, &[]);
+        assert_eq!(
+            effective,
+            vec!["cbu.create".to_string(), "cbu.attach-product".to_string()]
         );
     }
 }

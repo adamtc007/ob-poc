@@ -143,6 +143,13 @@ pub struct GoalFrame {
     /// avoid these on the next round. Empty by default.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub refused_drafts: Vec<String>,
+    /// Substrate-supplied active-verb-surface FQNs from the most
+    /// recent draft round (Phase 4.6). `None` when no substrate
+    /// query has run (spike + offline modes). When present, the
+    /// constrained-composition guard intersects this with the pack
+    /// allowlist; an empty intersection forces refusal.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub active_verb_surface: Option<Vec<String>>,
 }
 
 impl GoalFrame {
@@ -185,6 +192,7 @@ impl GoalFrame {
             blockers: None,
             approval: None,
             refused_drafts: Vec::new(),
+            active_verb_surface: None,
         }
     }
 
@@ -217,6 +225,16 @@ impl GoalFrame {
     /// evaluation (Phase 3.6 — C-12).
     pub fn attach_approval(&mut self, decision: ApprovalDecision) {
         self.approval = Some(decision);
+        self.updated_at = Utc::now();
+    }
+
+    /// Attach (or replace) the substrate-supplied active-verb-surface
+    /// FQNs, bumping `updated_at`. Used by the planning loop after
+    /// each substrate query (Phase 4.6). Pass `Vec::new()` to record
+    /// that the substrate returned an empty surface — `None` instead
+    /// signals "no substrate query happened" (offline / stub mode).
+    pub fn attach_active_verb_surface(&mut self, surface: Vec<String>) {
+        self.active_verb_surface = Some(surface);
         self.updated_at = Utc::now();
     }
 
