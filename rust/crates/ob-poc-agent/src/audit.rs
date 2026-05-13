@@ -1,11 +1,13 @@
 //! Audit emission for the Sage ACP runtime.
 //!
-//! Phase 2.9 of the Sage ACP capability plan. Every prompt that
-//! traverses the planning loop produces one [`AuditRecord`] that
-//! captures the inputs, the draft, the validation outcome, and
-//! the goal-frame metadata. The spike emits records as JSON lines
-//! (`.jsonl`) to a local file; Phase 5.3 wires the OTLP exporter
-//! alongside the local sink per V&S §6.9 / §13.
+//! Phase 2.9 of the Sage ACP capability plan introduced the
+//! [`AuditRecord`] + [`JsonlAuditSink`]; Phase 5.3 (this module)
+//! adds the OTLP HTTP+JSON exporter and the [`MultiAuditSink`] fan-
+//! out so a single planning round-trip writes once and is observed
+//! both locally (JSONL) and centrally (OTLP collector → backend of
+//! choice). Every prompt that traverses the planning loop produces
+//! one [`AuditRecord`] that captures the inputs, the draft, the
+//! validation outcome, and the goal-frame metadata.
 //!
 //! ## Replay-grade audit
 //!
@@ -195,6 +197,260 @@ impl AuditSink for NullAuditSink {
     }
 }
 
+/// Fan-out sink. Emits a record into every inner sink, awaiting
+/// each in sequence. The spike has at most one prompt in flight so
+/// sequential emission is the simplest correct shape. Phase 6+ can
+/// fan out concurrently via `futures::join_all` once latency
+/// becomes a measured concern.
+///
+/// Per-sink failures are isolated by each implementation
+/// (`JsonlAuditSink` and `OtlpAuditSink` both `tracing::warn` and
+/// continue); `MultiAuditSink` never short-circuits.
+pub struct MultiAuditSink {
+    sinks: Vec<Box<dyn AuditSink>>,
+    label: String,
+}
+
+impl MultiAuditSink {
+    pub fn new(sinks: Vec<Box<dyn AuditSink>>) -> Self {
+        let label = sinks
+            .iter()
+            .map(|_| "sink")
+            .collect::<Vec<_>>()
+            .join(",");
+        Self { sinks, label }
+    }
+
+    /// Builder convenience — overrides the diagnostic label
+    /// (`"jsonl+otlp"`, etc.). The binary integrator threads this
+    /// into the startup log so operators see which sinks are wired.
+    pub fn with_label(mut self, label: impl Into<String>) -> Self {
+        self.label = label.into();
+        self
+    }
+
+    pub fn label(&self) -> &str {
+        &self.label
+    }
+
+    pub fn sink_count(&self) -> usize {
+        self.sinks.len()
+    }
+}
+
+#[async_trait]
+impl AuditSink for MultiAuditSink {
+    async fn emit(&self, record: AuditRecord) {
+        for sink in &self.sinks {
+            sink.emit(record.clone()).await;
+        }
+    }
+}
+
+/// OTLP HTTP+JSON exporter — Phase 5.3.
+///
+/// Each [`AuditRecord`] is wrapped in a minimal OTLP `LogsData`
+/// envelope (`ResourceLogs[ScopeLogs[LogRecord]]`) and POSTed as
+/// `application/json` to the configured endpoint. The endpoint
+/// should point at an OTLP collector's `/v1/logs` route (or the
+/// equivalent on a backend that accepts OTLP/HTTP+JSON directly).
+///
+/// ## Best-effort semantics
+///
+/// Emission is non-blocking from the agent's perspective: failures
+/// are logged at `warn` and dropped. The planning loop never waits
+/// on a slow collector — V&S §6.9 lists OTLP push as a durability
+/// companion to the local JSONL sink, not as a gate.
+///
+/// ## Wire format
+///
+/// The exporter follows the OTLP/HTTP+JSON wire format
+/// (opentelemetry-proto v1.0.0). Each record produces one
+/// `LogRecord` with severity `INFO` (9). The `AuditRecord` fields
+/// project to OTLP attributes one-for-one so a collector can route
+/// or filter without parsing the body.
+pub struct OtlpAuditSink {
+    endpoint: String,
+    service_name: String,
+    client: reqwest::Client,
+}
+
+impl OtlpAuditSink {
+    /// Construct an OTLP sink pointing at `endpoint`. `service_name`
+    /// is stamped as the `service.name` resource attribute so a
+    /// shared collector can multiplex traffic from multiple Sage
+    /// agents.
+    ///
+    /// Builds a long-lived `reqwest::Client` with a 5-second total
+    /// request timeout so a misconfigured collector cannot stall
+    /// the planning loop.
+    pub fn new(endpoint: impl Into<String>, service_name: impl Into<String>) -> Self {
+        let client = reqwest::Client::builder()
+            .timeout(std::time::Duration::from_secs(5))
+            .build()
+            .expect("reqwest client builder with default config is infallible");
+        Self {
+            endpoint: endpoint.into(),
+            service_name: service_name.into(),
+            client,
+        }
+    }
+
+    /// The endpoint URL the sink POSTs to. Used by the binary
+    /// integrator's startup log.
+    pub fn endpoint(&self) -> &str {
+        &self.endpoint
+    }
+
+    /// Build the OTLP/HTTP+JSON envelope for a record. Pure function
+    /// — separated from `emit` so tests can assert the wire shape
+    /// without spinning up an HTTP server.
+    pub fn build_payload(&self, record: &AuditRecord) -> serde_json::Value {
+        // Per OTLP/HTTP+JSON: timeUnixNano is a string-encoded i64
+        // (the JSON spec restricts numbers, so 64-bit ints travel
+        // as strings). chrono's `timestamp_nanos_opt` returns
+        // `Option<i64>` — None only when the timestamp is out of
+        // i64 range (year ~2262), which we never produce; default
+        // to 0 in that impossible case.
+        let time_unix_nano = record
+            .emitted_at
+            .timestamp_nanos_opt()
+            .unwrap_or_default()
+            .to_string();
+        let attributes = vec![
+            string_attribute("goal_frame_id", &record.goal_frame_id),
+            string_attribute("pack_id", &record.pack_id),
+            string_attribute("pack_hash", &record.pack_hash),
+            string_attribute("workspace", &record.workspace),
+            string_attribute("verb_fqn", &record.verb_fqn),
+            string_attribute("draft_source", &record.draft_source),
+            string_attribute("knowledge_provider", &record.knowledge_provider),
+            bool_attribute("validation_passed", record.validation_passed),
+            int_attribute(
+                "validation_diagnostic_count",
+                record.validation_diagnostic_count as i64,
+            ),
+        ];
+        serde_json::json!({
+            "resourceLogs": [{
+                "resource": {
+                    "attributes": [
+                        string_attribute("service.name", &self.service_name),
+                    ]
+                },
+                "scopeLogs": [{
+                    "scope": {
+                        "name": "ob-poc-agent.audit",
+                        "version": env!("CARGO_PKG_VERSION"),
+                    },
+                    "logRecords": [{
+                        "timeUnixNano": time_unix_nano,
+                        "severityNumber": 9,
+                        "severityText": "INFO",
+                        "body": {"stringValue": format!(
+                            "sage planning round-trip — {} ({})",
+                            record.verb_fqn, record.draft_source
+                        )},
+                        "attributes": attributes,
+                    }]
+                }]
+            }]
+        })
+    }
+}
+
+fn string_attribute(key: &str, value: &str) -> serde_json::Value {
+    serde_json::json!({
+        "key": key,
+        "value": {"stringValue": value}
+    })
+}
+
+fn bool_attribute(key: &str, value: bool) -> serde_json::Value {
+    serde_json::json!({
+        "key": key,
+        "value": {"boolValue": value}
+    })
+}
+
+fn int_attribute(key: &str, value: i64) -> serde_json::Value {
+    serde_json::json!({
+        "key": key,
+        "value": {"intValue": value.to_string()}
+    })
+}
+
+#[async_trait]
+impl AuditSink for OtlpAuditSink {
+    async fn emit(&self, record: AuditRecord) {
+        let payload = self.build_payload(&record);
+        match self
+            .client
+            .post(&self.endpoint)
+            .json(&payload)
+            .send()
+            .await
+        {
+            Ok(response) => {
+                let status = response.status();
+                if !status.is_success() {
+                    let body = response.text().await.unwrap_or_default();
+                    tracing::warn!(
+                        target: "sage-acp",
+                        endpoint = %self.endpoint,
+                        %status,
+                        body = %truncate(&body, 256),
+                        "OTLP collector returned non-success status — record dropped"
+                    );
+                }
+            }
+            Err(error) => {
+                tracing::warn!(
+                    target: "sage-acp",
+                    endpoint = %self.endpoint,
+                    %error,
+                    "OTLP push failed — record dropped"
+                );
+            }
+        }
+    }
+}
+
+/// Truncate a string to at most `max` bytes, appending `…` if cut.
+/// Used for log lines that quote a collector response body so a
+/// chatty collector cannot blow up log volume.
+fn truncate(s: &str, max: usize) -> String {
+    if s.len() <= max {
+        return s.to_string();
+    }
+    // Walk back to a UTF-8 char boundary.
+    let mut cut = max;
+    while !s.is_char_boundary(cut) && cut > 0 {
+        cut -= 1;
+    }
+    format!("{}…", &s[..cut])
+}
+
+/// Resolution outcome for the OTLP endpoint env var.
+/// `Disabled` when `OBPOC_SAGE_OTLP_ENDPOINT` is unset / empty;
+/// `Endpoint(url)` otherwise. The binary integrator constructs the
+/// sink only on `Endpoint`.
+#[derive(Debug, Clone)]
+pub enum OtlpEndpoint {
+    Endpoint(String),
+    Disabled,
+}
+
+/// Read `OBPOC_SAGE_OTLP_ENDPOINT`. Empty values are treated
+/// identically to unset (matches the binary's `ANTHROPIC_API_KEY`
+/// handling — an empty env var is no env var).
+pub fn default_otlp_endpoint() -> OtlpEndpoint {
+    match std::env::var("OBPOC_SAGE_OTLP_ENDPOINT") {
+        Ok(value) if !value.trim().is_empty() => OtlpEndpoint::Endpoint(value),
+        _ => OtlpEndpoint::Disabled,
+    }
+}
+
 /// Default audit-file path discovery for the binary integrator.
 /// Resolution order:
 /// 1. `OBPOC_SAGE_AUDIT` env (explicit path or the literal `none` to
@@ -342,6 +598,144 @@ mod tests {
             None,
         ))
         .await;
+    }
+
+    #[test]
+    fn otlp_payload_carries_canonical_attributes() {
+        let outcome = sample_outcome();
+        let validation = empty_validation();
+        let record = AuditRecord::from_outcome(&outcome, &validation, Some("phase-2-spike"));
+        let sink = OtlpAuditSink::new("http://localhost:4318/v1/logs", "sage-acp");
+        let payload = sink.build_payload(&record);
+
+        // Walk to the single LogRecord and check shape.
+        let resource_logs = payload["resourceLogs"].as_array().expect("resourceLogs");
+        assert_eq!(resource_logs.len(), 1);
+        let scope_logs = resource_logs[0]["scopeLogs"].as_array().expect("scopeLogs");
+        assert_eq!(scope_logs.len(), 1);
+        let log_records = scope_logs[0]["logRecords"]
+            .as_array()
+            .expect("logRecords");
+        assert_eq!(log_records.len(), 1);
+        let log = &log_records[0];
+
+        assert_eq!(log["severityNumber"], 9);
+        assert_eq!(log["severityText"], "INFO");
+
+        // Resource attribute carries service.name.
+        let resource_attrs = resource_logs[0]["resource"]["attributes"]
+            .as_array()
+            .expect("resource attrs");
+        let service_name = resource_attrs
+            .iter()
+            .find(|a| a["key"] == "service.name")
+            .expect("service.name present");
+        assert_eq!(service_name["value"]["stringValue"], "sage-acp");
+
+        // Record fields all project onto LogRecord attributes.
+        let attrs = log["attributes"].as_array().expect("attrs");
+        let keys: Vec<&str> = attrs
+            .iter()
+            .filter_map(|a| a["key"].as_str())
+            .collect();
+        for expected in [
+            "goal_frame_id",
+            "pack_id",
+            "pack_hash",
+            "workspace",
+            "verb_fqn",
+            "draft_source",
+            "knowledge_provider",
+            "validation_passed",
+            "validation_diagnostic_count",
+        ] {
+            assert!(
+                keys.contains(&expected),
+                "missing OTLP attribute '{expected}' in {keys:?}"
+            );
+        }
+
+        // bool + int attrs use the typed variants, not string.
+        let validation_passed = attrs
+            .iter()
+            .find(|a| a["key"] == "validation_passed")
+            .unwrap();
+        assert_eq!(validation_passed["value"]["boolValue"], true);
+        let diag_count = attrs
+            .iter()
+            .find(|a| a["key"] == "validation_diagnostic_count")
+            .unwrap();
+        // OTLP/HTTP+JSON encodes int64 as string per the proto3-JSON
+        // mapping rules.
+        assert_eq!(diag_count["value"]["intValue"], "0");
+    }
+
+    #[test]
+    fn otlp_payload_time_unix_nano_is_string() {
+        let outcome = sample_outcome();
+        let validation = empty_validation();
+        let record = AuditRecord::from_outcome(&outcome, &validation, None);
+        let sink = OtlpAuditSink::new("http://localhost:4318/v1/logs", "sage-acp");
+        let payload = sink.build_payload(&record);
+        let log = &payload["resourceLogs"][0]["scopeLogs"][0]["logRecords"][0];
+        let time = &log["timeUnixNano"];
+        let s = time.as_str().expect("timeUnixNano must be string per OTLP JSON");
+        // Must parse as i64 and be in the right ballpark (post-2020 nanos).
+        let parsed: i64 = s.parse().expect("string must parse to i64");
+        assert!(parsed > 1_577_836_800_000_000_000, "got {parsed}");
+    }
+
+    #[tokio::test]
+    async fn multi_sink_fans_out_to_every_inner_sink() {
+        let dir = TempDir::new().unwrap();
+        let path_a = dir.path().join("a.jsonl");
+        let path_b = dir.path().join("b.jsonl");
+        let multi = MultiAuditSink::new(vec![
+            Box::new(JsonlAuditSink::new(&path_a)),
+            Box::new(JsonlAuditSink::new(&path_b)),
+        ])
+        .with_label("jsonl+jsonl");
+        assert_eq!(multi.sink_count(), 2);
+        assert_eq!(multi.label(), "jsonl+jsonl");
+
+        let validation = empty_validation();
+        multi
+            .emit(AuditRecord::from_outcome(
+                &sample_outcome(),
+                &validation,
+                None,
+            ))
+            .await;
+
+        for path in [&path_a, &path_b] {
+            let contents = tokio::fs::read_to_string(path).await.unwrap();
+            assert_eq!(contents.lines().count(), 1, "{} did not get record", path.display());
+        }
+    }
+
+    #[test]
+    fn default_otlp_endpoint_disabled_when_unset_or_empty() {
+        let original = std::env::var("OBPOC_SAGE_OTLP_ENDPOINT").ok();
+
+        std::env::remove_var("OBPOC_SAGE_OTLP_ENDPOINT");
+        assert!(matches!(default_otlp_endpoint(), OtlpEndpoint::Disabled));
+
+        std::env::set_var("OBPOC_SAGE_OTLP_ENDPOINT", "");
+        assert!(matches!(default_otlp_endpoint(), OtlpEndpoint::Disabled));
+
+        std::env::set_var("OBPOC_SAGE_OTLP_ENDPOINT", "   ");
+        assert!(matches!(default_otlp_endpoint(), OtlpEndpoint::Disabled));
+
+        std::env::set_var("OBPOC_SAGE_OTLP_ENDPOINT", "http://localhost:4318/v1/logs");
+        match default_otlp_endpoint() {
+            OtlpEndpoint::Endpoint(url) => assert_eq!(url, "http://localhost:4318/v1/logs"),
+            OtlpEndpoint::Disabled => panic!("expected Endpoint"),
+        }
+
+        match original {
+            Some(value) => std::env::set_var("OBPOC_SAGE_OTLP_ENDPOINT", value),
+            None => std::env::remove_var("OBPOC_SAGE_OTLP_ENDPOINT"),
+        }
     }
 
     // Both env-var branches exercised in a single test so cargo's

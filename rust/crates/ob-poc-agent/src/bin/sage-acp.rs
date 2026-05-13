@@ -31,7 +31,10 @@ use std::sync::Arc;
 
 use ob_agentic::anthropic_client::AnthropicClient;
 use ob_agentic::llm_client::LlmClient;
-use ob_poc_agent::audit::{default_audit_path, AuditPath, AuditSink, JsonlAuditSink, NullAuditSink};
+use ob_poc_agent::audit::{
+    default_audit_path, default_otlp_endpoint, AuditPath, AuditSink, JsonlAuditSink,
+    MultiAuditSink, NullAuditSink, OtlpAuditSink, OtlpEndpoint,
+};
 use ob_poc_agent::constellation::ConstellationHydrator;
 use ob_poc_agent::goal_frame::GoalFrameStore;
 use ob_poc_agent::goal_frame_handler::try_handle_goal_frame;
@@ -147,15 +150,42 @@ async fn main() -> anyhow::Result<()> {
         traces.provider_label()
     );
 
-    let audit: Arc<dyn AuditSink> = match default_audit_path() {
+    // Phase 5.3 — JSONL local sink + optional OTLP fan-out.
+    // Operator switches:
+    //   `OBPOC_SAGE_AUDIT=none`       — disable local JSONL sink
+    //   `OBPOC_SAGE_AUDIT=<path>`     — override JSONL path
+    //   `OBPOC_SAGE_OTLP_ENDPOINT=…`  — push to an OTLP collector
+    let mut sinks: Vec<Box<dyn AuditSink>> = Vec::new();
+    let mut labels: Vec<&'static str> = Vec::new();
+    match default_audit_path() {
         AuditPath::Disabled => {
-            eprintln!("[sage-acp] Audit sink disabled (OBPOC_SAGE_AUDIT=none)");
-            Arc::new(NullAuditSink)
+            eprintln!("[sage-acp] Local JSONL audit sink disabled (OBPOC_SAGE_AUDIT=none)");
         }
         AuditPath::File(path) => {
-            eprintln!("[sage-acp] Audit sink: {}", path.display());
-            Arc::new(JsonlAuditSink::new(path))
+            eprintln!("[sage-acp] Local JSONL audit sink: {}", path.display());
+            sinks.push(Box::new(JsonlAuditSink::new(path)));
+            labels.push("jsonl");
         }
+    }
+    match default_otlp_endpoint() {
+        OtlpEndpoint::Disabled => {
+            eprintln!(
+                "[sage-acp] OTLP audit exporter disabled (OBPOC_SAGE_OTLP_ENDPOINT unset)"
+            );
+        }
+        OtlpEndpoint::Endpoint(url) => {
+            eprintln!("[sage-acp] OTLP audit exporter: {url}");
+            sinks.push(Box::new(OtlpAuditSink::new(url, "sage-acp")));
+            labels.push("otlp");
+        }
+    }
+    let audit: Arc<dyn AuditSink> = if sinks.is_empty() {
+        eprintln!("[sage-acp] No audit sinks wired — audit records will be dropped");
+        Arc::new(NullAuditSink)
+    } else {
+        let label = labels.join("+");
+        eprintln!("[sage-acp] Audit fan-out: {label} ({} sinks)", sinks.len());
+        Arc::new(MultiAuditSink::new(sinks).with_label(label))
     };
 
     let mut agent = AcpJsonRpcAgent::new();

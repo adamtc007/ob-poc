@@ -73,6 +73,12 @@ thiserror = "1"
 tracing = "0.1"
 uuid = { version = "1", features = ["v4", "serde"] }
 chrono = { version = "0.4", features = ["serde"] }
+# Phase 5.3 OTLP exporter — HTTP+JSON push to an OTLP-compatible
+# collector endpoint. Best-effort; failure logs at warn level and
+# does not block planning. reqwest is already a transitive dep
+# through ob-agentic + sem_os_client; promoting to a direct dep
+# documents the use.
+reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
 
 [dev-dependencies]
 tempfile = "3"
