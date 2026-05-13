@@ -13,7 +13,10 @@
 #
 # (1) Legitimate distinct types sharing a name — unrelated UI graph,
 #     DSL stategraph, dag config, taxonomy nodes, workflow defs,
-#     capital graph. Low remediation priority.
+#     capital graph, plus one verb-extract helper whose `VerbOutput`
+#     describes the entity-kind a verb creates (vs sem_os_core's
+#     `VerbOutput` for output-field declarations). Low remediation
+#     priority — these mirrors don't shadow the canonical type.
 #       crates/dsl-core/src/config/dag.rs               — DSL DAG config
 #       crates/dsl-runtime/src/state_reducer/*          — DSL FSM
 #       crates/dsl-runtime/src/stategraph/mod.rs        — DSL stategraph
@@ -23,16 +26,15 @@
 #       crates/ob-workflow/src/definition.rs            — workflow defs
 #       src/api/capital_routes.rs                       — capital graph
 #       src/graph/types.rs                              — UI graph types
+#       src/sem_reg/onboarding/verb_extract.rs          — verb-extract
+#                                                         produced-type
+#                                                         marker DTO
 #
-# (2) Verb-output extract helper in `src/sem_reg/onboarding/`:
-#       src/sem_reg/onboarding/verb_extract.rs          — verb extract DTO
-#
-# (3) HIGH-priority near-duplicates of sem_os_core schema authority:
+# (2) HIGH-priority near-duplicates of sem_os_core schema authority:
 #     EMPTY — Phase 4.7 follow-up collapsed all three flagged files
 #     (`entity_type_def`, `relationship_type_def`, `verb_contract`)
-#     to `sem_os_core::*` re-exports. Remaining 22 entries above are
-#     bucket 1 (legitimate distinct types sharing a name) + bucket 2
-#     (verb-output helper).
+#     to `sem_os_core::*` re-exports. All 22 remaining entries above
+#     are bucket-1 namesake collisions.
 
 crates/dsl-core/src/config/dag.rs:497:TransitionDef
 crates/dsl-runtime/src/state_reducer/state_machine.rs:23:TransitionDef
