@@ -141,6 +141,14 @@ pub mod prompt_handler;
 /// validated through this channel before they reach the editor.
 pub mod repl_channel;
 
+/// Out-of-process LSP-shaped runbook channel — spawns the
+/// `dsl-lsp` binary and speaks proper LSP traffic (Content-Length
+/// framing, initialize handshake, didOpen/didChange/didClose,
+/// publishDiagnostics correlation). Sibling to `LocalRunbookChannel`
+/// post §9 item 8 (dsl-lsp dep inversion); the binary integrator
+/// picks one of the two impls at startup via env var.
+pub mod lsp_subprocess;
+
 /// ACP method handlers for the LSP-shaped runbook lifecycle —
 /// Phase 4.4. `runbook/{didOpen,didChange,didClose,validateOnly,
 /// validateAndExecute}` routed through the agent's REPL channel.

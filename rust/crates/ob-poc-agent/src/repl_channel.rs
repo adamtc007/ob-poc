@@ -83,6 +83,12 @@ pub enum RunbookChannelError {
     Transport(String),
 }
 
+impl From<serde_json::Error> for RunbookChannelError {
+    fn from(error: serde_json::Error) -> Self {
+        Self::Transport(format!("serde_json: {error}"))
+    }
+}
+
 /// Why `validate_and_execute` refused.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]

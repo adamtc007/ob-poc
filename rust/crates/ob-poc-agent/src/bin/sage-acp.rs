@@ -48,7 +48,8 @@ use ob_poc_agent::mcp_client::{
 };
 use ob_poc_agent::planning::PlanningLoop;
 use ob_poc_agent::prompt_handler::try_handle_prompt;
-use ob_poc_agent::repl_channel::LocalRunbookChannel;
+use ob_poc_agent::lsp_subprocess::SubprocessLspChannel;
+use ob_poc_agent::repl_channel::{LocalRunbookChannel, ReplChannelClient};
 use ob_poc_agent::runbook_handler::try_handle_runbook;
 use ob_poc_boundary::acp_protocol::{AcpJsonRpcAgent, JsonRpcOutgoing, JsonRpcRequest};
 use ob_poc_types::session::kinds::WorkspaceKind;
@@ -145,9 +146,13 @@ async fn main() -> anyhow::Result<()> {
     );
 
     let planning = PlanningLoop::new(index, llm_client, Some(knowledge), Some(hydrator));
-    // Phase 4.4 — full LSP-shaped runbook lifecycle channel (per-URI
-    // state, open/change/close/validateOnly/validateAndExecute).
-    let channel = LocalRunbookChannel::new();
+    // §9 item 8 follow-up — pick the runbook channel transport.
+    // `in_process` (default) is the Phase 4.4 spike's
+    // `LocalRunbookChannel` (parse-only via dsl_core::parser).
+    // `subprocess` spawns the `dsl-lsp` binary and speaks proper
+    // LSP traffic so the full analyser runs.
+    let channel: Arc<dyn ReplChannelClient> = pick_runbook_channel().await?;
+    eprintln!("[sage-acp] Runbook channel wired");
 
     let frames = GoalFrameStore::new();
 
@@ -215,7 +220,7 @@ async fn main() -> anyhow::Result<()> {
                 if let Some(messages) = try_handle_prompt(
                     &request,
                     &planning,
-                    &channel,
+                    channel.as_ref(),
                     audit.as_ref(),
                     &frames,
                     traces.as_ref(),
@@ -225,7 +230,7 @@ async fn main() -> anyhow::Result<()> {
                     messages
                 } else if let Some(messages) = try_handle_goal_frame(&request, &frames).await {
                     messages
-                } else if let Some(messages) = try_handle_runbook(&request, &channel).await {
+                } else if let Some(messages) = try_handle_runbook(&request, channel.as_ref()).await {
                     messages
                 } else {
                     agent.handle_request(request)
@@ -386,6 +391,76 @@ async fn pick_mcp_transport(
             )))
         }
     }
+}
+
+/// Resolve which runbook channel transport to wire.
+///
+/// `OBPOC_SAGE_RUNBOOK_CHANNEL` selector:
+///   in_process (default) | subprocess
+///
+/// When `subprocess`, `OBPOC_SAGE_LSP_BIN` overrides the dsl-lsp
+/// binary path; the default is `dsl-lsp` alongside `sage-acp` in
+/// the same target dir.
+///
+/// Empty / unset env values fall back to defaults; unknown values
+/// log a warning and fall back to in_process.
+async fn pick_runbook_channel() -> anyhow::Result<Arc<dyn ReplChannelClient>> {
+    let mode = std::env::var("OBPOC_SAGE_RUNBOOK_CHANNEL")
+        .ok()
+        .map(|v| v.trim().to_ascii_lowercase())
+        .filter(|v| !v.is_empty())
+        .unwrap_or_else(|| "in_process".to_string());
+
+    match mode.as_str() {
+        "in_process" | "inprocess" | "in-process" => {
+            eprintln!("[sage-acp] Runbook channel: in-process LocalRunbookChannel");
+            Ok(Arc::new(LocalRunbookChannel::new()))
+        }
+        "subprocess" => {
+            let bin_path = locate_dsl_lsp_bin()?;
+            eprintln!("[sage-acp] Spawning dsl-lsp subprocess: {}", bin_path.display());
+            let channel = SubprocessLspChannel::spawn(&bin_path, &[])
+                .await
+                .map_err(|error| {
+                    anyhow::anyhow!(
+                        "failed to spawn dsl-lsp subprocess from {}: {error}",
+                        bin_path.display()
+                    )
+                })?;
+            eprintln!("[sage-acp] Runbook channel: {}", channel.label());
+            Ok(Arc::new(channel))
+        }
+        other => {
+            eprintln!(
+                "[sage-acp] OBPOC_SAGE_RUNBOOK_CHANNEL='{other}' is not a known value; \
+                 expected `in_process` or `subprocess`. Falling back to in_process."
+            );
+            Ok(Arc::new(LocalRunbookChannel::new()))
+        }
+    }
+}
+
+/// Resolve the `dsl-lsp` binary path. `OBPOC_SAGE_LSP_BIN` wins
+/// when set; otherwise look sibling to the running `sage-acp`
+/// binary (same target dir).
+fn locate_dsl_lsp_bin() -> anyhow::Result<PathBuf> {
+    if let Some(path) = nonempty_env("OBPOC_SAGE_LSP_BIN") {
+        return Ok(PathBuf::from(path));
+    }
+    let current = std::env::current_exe()
+        .map_err(|error| anyhow::anyhow!("current_exe lookup failed: {error}"))?;
+    let dir = current
+        .parent()
+        .ok_or_else(|| anyhow::anyhow!("current executable has no parent directory"))?;
+    let candidate = dir.join("dsl-lsp");
+    if !candidate.exists() {
+        return Err(anyhow::anyhow!(
+            "default dsl-lsp binary not found at {}; set OBPOC_SAGE_LSP_BIN or build with \
+             `cargo build -p dsl-lsp`",
+            candidate.display()
+        ));
+    }
+    Ok(candidate)
 }
 
 /// Resolve the `sem_os_mcp` binary path. `OBPOC_SAGE_MCP_BIN` wins
