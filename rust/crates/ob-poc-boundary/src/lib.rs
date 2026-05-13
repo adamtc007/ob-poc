@@ -73,7 +73,9 @@ pub mod llm_trace;
 pub mod mutation_preflight;
 pub mod ontology;
 pub mod policy;
-pub mod sage;
+// Phase 2 of capability-crate restructure (2026-05-13) — sage subtree
+// fully relocated to ob-poc-sage. The `sage::` submodule no longer
+// exists in ob-poc-boundary.
 pub mod semtaxonomy;
 pub mod session;
 pub mod session_trace;

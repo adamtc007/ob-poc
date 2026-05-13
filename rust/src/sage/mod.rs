@@ -50,10 +50,11 @@ pub use ob_poc_sage::outcome;
 pub use ob_poc_sage::plane;
 pub use ob_poc_sage::polarity;
 pub use ob_poc_sage::pre_classify;
+// Phase 2B (2026-05-13) — session_context with its sqlx::PgPool loaders
+// joined the other eight sage modules in ob-poc-sage. The
+// ob-poc-boundary::sage submodule is gone.
+pub use ob_poc_sage::session_context;
 pub use ob_poc_sage::verb_resolve_types;
-// Phase 2B still pending — session_context's sqlx-backed loaders are
-// staying in ob-poc-boundary one more slice.
-pub use ob_poc_boundary::sage::session_context;
 pub mod valid_verb_set;
 
 // Phase 1.4

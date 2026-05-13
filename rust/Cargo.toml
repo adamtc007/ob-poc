@@ -219,7 +219,7 @@ path = "src/bin/sem_os_footprint_audit.rs"
 [features]
 default = ["server"]  # Enable for sqlx prepare; use --no-default-features to disable
 
-database = ["dep:sqlx", "dep:bigdecimal", "dep:entity-gateway", "dep:pgvector", "ob-poc-diagnostics/database", "ob-poc-boundary/database"]  # Only enable database functionality when needed
+database = ["dep:sqlx", "dep:bigdecimal", "dep:entity-gateway", "dep:pgvector", "ob-poc-diagnostics/database", "ob-poc-boundary/database", "ob-poc-sage/database"]  # Only enable database functionality when needed
 server = ["database", "mcp", "dep:axum", "dep:tower", "dep:tower-http"]  # REST API server with intent pipeline
 cli = ["dep:clap", "dep:colored", "dep:atty", "dep:rustyline"]  # CLI tool for DSL testing
 mcp = ["database"]  # MCP/intent pipeline for semantic verb search

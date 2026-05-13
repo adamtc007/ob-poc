@@ -51,4 +51,6 @@ pub mod outcome;
 pub mod plane;
 pub mod polarity;
 pub mod pre_classify;
+#[cfg(feature = "database")]
+pub mod session_context;
 pub mod verb_resolve_types;
