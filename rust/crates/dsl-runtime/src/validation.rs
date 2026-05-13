@@ -597,6 +597,13 @@ impl DiagnosticBuilder {
         unsafe { &mut *(last as *mut Diagnostic as *mut DiagnosticEntry) }
     }
 
+    pub(crate) fn push(&mut self, diagnostic: Diagnostic) -> &mut DiagnosticEntry {
+        self.diagnostics.push(diagnostic);
+        let last = self.diagnostics.last_mut().expect("just pushed");
+        // Safe transmute due to #[repr(transparent)]
+        unsafe { &mut *(last as *mut Diagnostic as *mut DiagnosticEntry) }
+    }
+
     pub fn build(self) -> Vec<Diagnostic> {
         self.diagnostics
     }

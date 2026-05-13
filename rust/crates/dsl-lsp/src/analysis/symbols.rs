@@ -37,11 +37,7 @@ impl SymbolTable {
     /// Merge symbols from a document into the table.
     pub(crate) fn merge_from_document(&mut self, uri: &Url, doc: &DocumentState) {
         // Clear existing symbols from this document
-        if let Some(old_symbols) = self.by_document.remove(uri) {
-            for name in old_symbols {
-                self.symbols.remove(&name);
-            }
-        }
+        self.remove_document(uri);
 
         // Add new symbol definitions
         let mut doc_symbols = Vec::new();
@@ -70,6 +66,15 @@ impl SymbolTable {
         }
 
         self.by_document.insert(uri.clone(), doc_symbols);
+    }
+
+    /// Remove all symbols owned by a document.
+    pub(crate) fn remove_document(&mut self, uri: &Url) {
+        if let Some(old_symbols) = self.by_document.remove(uri) {
+            for name in old_symbols {
+                self.symbols.remove(&name);
+            }
+        }
     }
 
     /// Get symbol info by name.
@@ -127,4 +132,43 @@ fn ranges_overlap(a: &Range, b: &Range) -> bool {
         || (a.end.line == b.start.line && a.end.character < b.start.character)
         || b.end.line < a.start.line
         || (b.end.line == a.start.line && b.end.character < a.start.character))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::analysis::document::SymbolDef;
+    use tower_lsp::lsp_types::Position;
+
+    fn range(start: u32, end: u32) -> Range {
+        Range {
+            start: Position {
+                line: 0,
+                character: start,
+            },
+            end: Position {
+                line: 0,
+                character: end,
+            },
+        }
+    }
+
+    #[test]
+    fn remove_document_removes_owned_symbols() {
+        let uri = Url::parse("file:///a.dsl").unwrap();
+        let mut doc = DocumentState::new(String::new());
+        doc.symbol_defs.push(SymbolDef {
+            name: "fund".to_string(),
+            range: range(0, 5),
+            defined_by: "cbu.create".to_string(),
+            id_type: "cbu".to_string(),
+        });
+
+        let mut table = SymbolTable::new();
+        table.merge_from_document(&uri, &doc);
+        assert!(table.get("fund").is_some());
+
+        table.remove_document(&uri);
+        assert!(table.get("fund").is_none());
+    }
 }

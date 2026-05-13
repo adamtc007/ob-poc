@@ -24,6 +24,7 @@ pub(crate) struct EntityMatch {
 }
 
 /// Client for entity lookups via the EntityGateway service.
+#[derive(Clone)]
 pub(crate) struct EntityLookupClient {
     client: EntityGatewayClient<Channel>,
 }

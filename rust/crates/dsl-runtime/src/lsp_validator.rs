@@ -15,15 +15,15 @@
 //! - Returns LSP-compatible diagnostics
 //! - Builds resolved AST with primary_keys populated
 
-use dsl_core::ast::{Argument, AstNode, Literal, Program, Span, Statement, VerbCall};
 use crate::gateway_resolver::{gateway_addr, GatewayRefResolver};
-use dsl_core::parser::parse_program;
 use crate::ref_resolver::{arg_to_ref_type, ResolveResult};
 use crate::validation::{
     Diagnostic, DiagnosticBuilder, DiagnosticCode, RefType, Severity, SourceSpan, ValidatedProgram,
     ValidatedStatement, ValidationContext,
 };
 use crate::verb_registry::registry;
+use dsl_core::ast::{Argument, AstNode, Literal, Program, Span, Statement, VerbCall};
+use dsl_core::parser::parse_program;
 use std::collections::HashMap;
 use uuid::Uuid;
 
@@ -344,7 +344,7 @@ impl LspValidator {
                                     src_span,
                                     &ResolveResult::NotFound { suggestions },
                                 );
-                                diagnostics.error(diag.code, diag.span, &diag.message);
+                                diagnostics.push(diag);
                                 None
                             }
                             Err(e) => {
@@ -450,21 +450,13 @@ impl LspValidator {
                                 })
                             }
                             Ok(ResolveResult::NotFound { suggestions }) => {
-                                let suggestion_text = if suggestions.is_empty() {
-                                    String::new()
-                                } else {
-                                    let names: Vec<_> =
-                                        suggestions.iter().map(|s| s.display.as_str()).collect();
-                                    format!(". Did you mean: {}?", names.join(", "))
-                                };
-                                diagnostics.error(
-                                    DiagnosticCode::InvalidValue,
+                                let diag = self.resolver.diagnostic_for_failure(
+                                    ref_type,
+                                    search_value,
                                     src_span,
-                                    format!(
-                                        "'{}' not found for type '{}'{}",
-                                        search_value, entity_type, suggestion_text
-                                    ),
+                                    &ResolveResult::NotFound { suggestions },
                                 );
+                                diagnostics.push(diag);
                                 None
                             }
                             Err(e) => {

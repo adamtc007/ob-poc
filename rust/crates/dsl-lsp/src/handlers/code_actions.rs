@@ -7,10 +7,10 @@
 
 use tower_lsp::lsp_types::*;
 
+use crate::encoding::{span_to_range, PositionEncoding};
+use dsl_core::ast::Statement;
 use dsl_core::diagnostics::{DiagnosticCode, SuggestedFix};
-use dsl_runtime::planning_facade::{
-    PlanningOutput, SyntheticStep as PlanningSyntheticStep,
-};
+use dsl_runtime::planning_facade::{PlanningOutput, SyntheticStep as PlanningSyntheticStep};
 use dsl_runtime::validation::{Diagnostic as SemanticDiagnostic, Suggestion};
 
 /// Generate code actions from planning output and semantic diagnostics
@@ -120,51 +120,44 @@ fn create_reorder_action(
     // Get the planned execution order
     let plan = planning_output.plan.as_ref()?;
 
-    // Build reordered source from ops
-    let mut reordered_lines: Vec<String> = Vec::new();
-    let source_lines: Vec<&str> = source.lines().collect();
+    // Reordering must operate on parser spans, not line numbers. Comments do
+    // not have spans in the current AST, so avoid emitting edits that might
+    // detach comments from the statement they describe.
+    if planning_output
+        .program
+        .statements
+        .iter()
+        .any(|stmt| matches!(stmt, Statement::Comment(_)))
+    {
+        return None;
+    }
 
-    // Track which source statements we've already added
+    // Build reordered source from verb-call byte spans.
+    let mut reordered_lines: Vec<String> = Vec::new();
     let mut seen_stmts = std::collections::HashSet::new();
 
     for op in &plan.ops {
         let stmt_idx = op.source_stmt();
         if !seen_stmts.contains(&stmt_idx) {
             seen_stmts.insert(stmt_idx);
-            // Find the corresponding source line
-            // This is a simplification - in practice we'd need to track statement spans
-            if stmt_idx < source_lines.len() {
-                reordered_lines.push(source_lines[stmt_idx].to_string());
-            }
+            let stmt = planning_output.program.statements.get(stmt_idx)?;
+            let Statement::VerbCall(verb_call) = stmt else {
+                return None;
+            };
+            let stmt_source = source.get(verb_call.span.start..verb_call.span.end)?;
+            reordered_lines.push(stmt_source.to_string());
         }
     }
 
-    // Add any lines that weren't part of ops (comments, etc.)
-    for (idx, line) in source_lines.iter().enumerate() {
-        if !seen_stmts.contains(&idx) {
-            // Insert at appropriate position (for now, append)
-            if !line.trim().is_empty() && !line.trim().starts_with(';') {
-                // Skip - this should have been in ops
-            } else {
-                reordered_lines.push(line.to_string());
-            }
-        }
+    if seen_stmts.len() != planning_output.program.statements.len() {
+        return None;
     }
 
     let new_source = reordered_lines.join("\n");
 
     // Replace entire document
     let edit = TextEdit {
-        range: Range {
-            start: Position {
-                line: 0,
-                character: 0,
-            },
-            end: Position {
-                line: source_lines.len() as u32,
-                character: 0,
-            },
-        },
+        range: span_to_range(0, source.len(), source, PositionEncoding::Utf16),
         new_text: new_source,
     };
 
@@ -194,16 +187,9 @@ fn create_fix_action(
     uri: &Url,
     _source: &str,
 ) -> Option<CodeAction> {
-    let range = Range {
-        start: Position {
-            line: fix.span.start_line.saturating_sub(1),
-            character: fix.span.start_col.saturating_sub(1),
-        },
-        end: Position {
-            line: fix.span.end_line.saturating_sub(1),
-            character: fix.span.end_col.saturating_sub(1),
-        },
-    };
+    let start = line_col_to_offset(_source, fix.span.start_line, fix.span.start_col)?;
+    let end = line_col_to_offset(_source, fix.span.end_line, fix.span.end_col)?;
+    let range = span_to_range(start, end, _source, PositionEncoding::Utf16);
 
     let edit = TextEdit {
         range,
@@ -248,25 +234,9 @@ fn create_suggestion_action(
     // Use the suggestion's span if provided, otherwise use the diagnostic span
     let span = suggestion.replace_span.or(Some(diag.span))?;
 
-    // Convert to LSP range (0-indexed)
-    // SourceSpan has: line (1-based), column (0-based), offset, length
-    let start_line = span.line.saturating_sub(1); // Convert to 0-based
-    let start_char = span.column;
-
-    // For end position, we need to calculate based on length
-    // This is simplified - assumes the replacement is on a single line
-    let end_char = start_char + span.length;
-
-    let range = Range {
-        start: Position {
-            line: start_line,
-            character: start_char,
-        },
-        end: Position {
-            line: start_line, // Same line (simplified)
-            character: end_char,
-        },
-    };
+    let start = span.offset as usize;
+    let end = start.saturating_add(span.length as usize);
+    let range = span_to_range(start, end, _source, PositionEncoding::Utf16);
 
     // For entity references, we need to replace the quoted string value
     // The replacement should be the entity name/value
@@ -302,4 +272,85 @@ fn create_suggestion_action(
         disabled: None,
         data: None,
     })
+}
+
+fn line_col_to_offset(source: &str, line: u32, col: u32) -> Option<usize> {
+    let target_line = line.saturating_sub(1) as usize;
+    let target_col = col.saturating_sub(1) as usize;
+    let mut current_line = 0usize;
+    let mut line_start = 0usize;
+
+    for (offset, ch) in source.char_indices() {
+        if current_line == target_line {
+            let line_end = source[offset..]
+                .find('\n')
+                .map(|pos| offset + pos)
+                .unwrap_or(source.len());
+            let line_text = &source[line_start..line_end];
+            let byte_col = line_text
+                .char_indices()
+                .nth(target_col)
+                .map(|(idx, _)| idx)
+                .unwrap_or(line_text.len());
+            return Some(line_start + byte_col);
+        }
+
+        if ch == '\n' {
+            current_line += 1;
+            line_start = offset + 1;
+        }
+    }
+
+    if current_line == target_line {
+        let line_text = &source[line_start..];
+        let byte_col = line_text
+            .char_indices()
+            .nth(target_col)
+            .map(|(idx, _)| idx)
+            .unwrap_or(line_text.len());
+        Some(line_start + byte_col)
+    } else {
+        None
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use dsl_runtime::validation::{
+        Diagnostic as SemanticDiagnostic, DiagnosticCode as SemanticDiagnosticCode, Severity,
+        SourceSpan, Suggestion,
+    };
+
+    #[test]
+    fn suggestion_action_uses_utf16_range_from_byte_span() {
+        let source = "(test.verb :name \"🎉 Allianz\")";
+        let start = source.find("Allianz").unwrap();
+        let diag = SemanticDiagnostic {
+            severity: Severity::Error,
+            span: SourceSpan {
+                line: 1,
+                column: 0,
+                offset: start as u32,
+                length: "Allianz".len() as u32,
+            },
+            code: SemanticDiagnosticCode::InvalidValue,
+            message: "unknown entity".to_string(),
+            suggestions: vec![],
+        };
+        let suggestion = Suggestion::new("did you mean", "Allianz SE", 0.95);
+        let uri = Url::parse("file:///test.dsl").unwrap();
+
+        let action = create_suggestion_action(&diag, &suggestion, &uri, source).unwrap();
+        let edit = action.edit.unwrap().changes.unwrap().remove(&uri).unwrap();
+
+        assert_eq!(
+            edit[0].range.start.character,
+            source[..start].encode_utf16().count() as u32
+        );
+        assert_eq!(
+            edit[0].range.end.character,
+            source[..start + "Allianz".len()].encode_utf16().count() as u32
+        );
+    }
 }

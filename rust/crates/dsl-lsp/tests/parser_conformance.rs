@@ -8,7 +8,8 @@
 //! - Symbol references (`@name`) are `SymbolRef`
 //! - Entity references are NOT identified yet (that's the enrichment pass)
 
-use ob_poc::dsl_v2::syntax::{parse_program, AstNode, Literal, Statement};
+use dsl_core::ast::{AstNode, Literal, Statement};
+use dsl_core::parser::parse_program;
 use rust_decimal::Decimal;
 
 const VALID_INPUTS: &[&str] = &[
