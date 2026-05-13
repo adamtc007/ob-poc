@@ -21,7 +21,16 @@ lsp-types = "0.95"
 # Async runtime
 tokio = { version = "1", features = ["full", "sync"] }
 
-# Main library (for parser, schema, vocabulary) - with database feature for full schema support
+# Analyser primitives — ast, parser, binding_context, config, diagnostics.
+# §9 item 8 (capability-crate restructure v1) — first surgical step:
+# move dsl-lsp's leaf imports off the application crate. Remaining
+# ob_poc imports (planning, execution, tooling, suggestions, macros)
+# need the §9 item 9 analyser consolidation before they can move.
+dsl-core = { path = "../dsl-core" }
+
+# Main library (for planning, execution, tooling, suggestions, macros).
+# This is the inverted edge — to be removed by §9 item 9 (consolidate
+# analyser surface into dsl-runtime).
 ob-poc = { path = "../..", features = ["database"] }
 
 # Playbook support

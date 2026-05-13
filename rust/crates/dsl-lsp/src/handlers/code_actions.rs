@@ -7,7 +7,7 @@
 
 use tower_lsp::lsp_types::*;
 
-use ob_poc::dsl_v2::diagnostics::{DiagnosticCode, SuggestedFix};
+use dsl_core::diagnostics::{DiagnosticCode, SuggestedFix};
 use ob_poc::dsl_v2::tooling::{
     PlanningOutput, PlanningSyntheticStep, SemanticDiagnostic, Suggestion,
 };
@@ -188,7 +188,7 @@ fn create_reorder_action(
 
 /// Create a code action from a diagnostic's suggested fix
 fn create_fix_action(
-    diag: &ob_poc::dsl_v2::diagnostics::Diagnostic,
+    diag: &dsl_core::diagnostics::Diagnostic,
     fix: &SuggestedFix,
     uri: &Url,
     _source: &str,

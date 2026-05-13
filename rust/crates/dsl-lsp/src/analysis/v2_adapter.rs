@@ -28,10 +28,8 @@
 //! | `Map` | `Map` |
 //! | `Nested` | `Call` |
 
-use ob_poc::dsl_v2::ast::{
-    Argument, AstNode, Literal, Program, Span as V2Span, Statement, VerbCall,
-};
-use ob_poc::dsl_v2::syntax::parse_program;
+use dsl_core::ast::{Argument, AstNode, Literal, Program, Span as V2Span, Statement, VerbCall};
+use dsl_core::parser::parse_program;
 use tower_lsp::lsp_types::{Diagnostic, DiagnosticSeverity, NumberOrString, Range};
 
 use super::document::{DocumentState, ExprKind, ParsedArg, ParsedExpr, SymbolDef, SymbolRef};
@@ -301,7 +299,7 @@ fn extract_symbols_from_expr(
 ///
 /// This aligns with the REPL's BindingContext and uses the same source of truth.
 fn infer_id_type(verb_name: &str) -> String {
-    use ob_poc::dsl_v2::config::ConfigLoader;
+    use dsl_core::config::ConfigLoader;
     use ob_poc::dsl_v2::execution::RuntimeVerbRegistry;
 
     // Try to load from registry (cached after first load)

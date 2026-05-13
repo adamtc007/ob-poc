@@ -14,7 +14,7 @@ use crate::analysis::document::DocumentState;
 use crate::analysis::parse_with_v2;
 use crate::encoding::{span_to_range as encoding_span_to_range, PositionEncoding};
 
-use ob_poc::dsl_v2::config::ConfigLoader;
+use dsl_core::config::ConfigLoader;
 use ob_poc::dsl_v2::tooling::{
     analyse_and_plan, LspValidator, PlanningInput, PlanningOutput, RuntimeVerbRegistry,
     SemanticDiagnostic, Severity, SourceSpan, ValidationContext,
@@ -189,10 +189,10 @@ fn convert_diagnostic(diag: &SemanticDiagnostic, source: &str) -> Diagnostic {
 
 /// Convert planning facade Diagnostic to LSP Diagnostic format
 fn convert_planning_diagnostic(
-    diag: &ob_poc::dsl_v2::diagnostics::Diagnostic,
+    diag: &dsl_core::diagnostics::Diagnostic,
     _source: &str,
 ) -> Diagnostic {
-    use ob_poc::dsl_v2::diagnostics::Severity as PlanningSeverity;
+    use dsl_core::diagnostics::Severity as PlanningSeverity;
 
     // Convert span to LSP Range
     let range = if let Some(ref span) = diag.span {

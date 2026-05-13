@@ -7,8 +7,9 @@ use tower_lsp::lsp_types::*;
 use crate::analysis::{detect_completion_context, CompletionContext, DocumentState, SymbolTable};
 use crate::entity_client::EntityLookupClient;
 
+use dsl_core::binding_context::{BindingContext, BindingInfo};
+use dsl_core::parser::parse_program;
 use ob_poc::dsl_v2::suggestions::predict_next_steps;
-use ob_poc::dsl_v2::syntax::{parse_program, BindingContext, BindingInfo};
 use ob_poc::dsl_v2::tooling::{find_unified_verb, registry};
 use ob_poc::dsl_v2::{execution::runtime_registry, load_macro_registry};
 
