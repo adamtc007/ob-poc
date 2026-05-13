@@ -76,7 +76,9 @@ pub mod kyc_dry_run;
 pub mod language_pack;
 pub mod llm_trace;
 pub mod mutation_preflight;
-pub mod ontology;
+// Phase 4.2a (2026-05-13): ontology relocated to ob-poc-domain (entity
+// taxonomy + lifecycle config, self-contained outside of ob_poc_types).
+// Compat re-export in ob-poc::lib.rs.
 // Phase 3 of capability-crate restructure (2026-05-13) — pack projection
 // is boundary's typed view of the pack catalogue. The catalogue's
 // authoritative source is SemOS; today the ob-poc integrator registers
@@ -86,7 +88,9 @@ pub mod policy;
 // Phase 2 of capability-crate restructure (2026-05-13) — sage subtree
 // fully relocated to ob-poc-sage. The `sage::` submodule no longer
 // exists in ob-poc-boundary.
-pub mod semtaxonomy;
+// Phase 4.2a (2026-05-13): semtaxonomy relocated to ob-poc-domain (514 LOC
+// entity-extraction layer, zero internal-crate deps). Compat re-export
+// in ob-poc::lib.rs.
 pub mod session;
 pub mod session_trace;
 pub mod taxonomy;

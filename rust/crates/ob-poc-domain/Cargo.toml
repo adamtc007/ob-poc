@@ -19,6 +19,8 @@ description = "Domain DTOs — pure reference-data shapes for the business domai
 
 [dependencies]
 ob-poc-types = { path = "../ob-poc-types" }
+# Primitive — ontology re-exports `VerbLifecycle` from dsl_core::config::types.
+dsl-core = { path = "../dsl-core" }
 anyhow = "1.0"
 chrono = { version = "0.4", features = ["serde"] }
 serde = { version = "1.0", features = ["derive"] }

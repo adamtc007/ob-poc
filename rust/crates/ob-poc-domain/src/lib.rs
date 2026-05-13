@@ -75,3 +75,13 @@ pub mod booking_principal_types;
 pub mod bods_types;
 #[cfg(feature = "database")]
 pub mod deal_types;
+
+// Phase 4.2a (2026-05-13): independent self-contained domain modules.
+//   - ontology (6 files, ~45 KB) — entity taxonomy + lifecycle (loads YAML),
+//     only external dep is ob_poc_types::semantic_stage
+//   - semtaxonomy (514 LOC) — entity-extraction layer, zero crate refs
+// Both moved from ob-poc-boundary; compat re-exports in ob-poc::lib.rs
+// retargeted from ob_poc_boundary::* to ob_poc_domain::*.
+pub mod ontology;
+#[cfg(feature = "database")]
+pub mod semtaxonomy;
