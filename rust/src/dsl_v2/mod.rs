@@ -88,8 +88,8 @@ pub(crate) mod execution_plan;
 pub mod execution_result;
 pub(crate) mod executor;
 pub(crate) mod expansion;
-#[cfg(feature = "database")]
-pub(crate) mod gateway_resolver;
+// §9 item 9 slice 6 (2026-05-13): gateway_resolver relocated to dsl-runtime.
+pub(crate) use dsl_runtime::gateway_resolver;
 #[cfg(feature = "database")]
 pub(crate) mod generic_executor;
 #[cfg(feature = "database")]
@@ -98,14 +98,14 @@ pub mod graph_executor;
 pub mod idempotency;
 pub mod intent;
 pub mod intent_tiers;
-#[cfg(feature = "database")]
-pub(crate) mod lsp_validator;
+// §9 item 9 slice 6 (2026-05-13): lsp_validator relocated to dsl-runtime.
+pub(crate) use dsl_runtime::lsp_validator;
 pub(crate) mod macros;
 pub mod operator_types;
 // §9 item 9 slice 5 (2026-05-13): planning_facade relocated to dsl-runtime.
 pub(crate) use dsl_runtime::planning_facade;
-#[cfg(feature = "database")]
-pub mod ref_resolver;
+// §9 item 9 slice 6 (2026-05-13): ref_resolver relocated to dsl-runtime.
+pub use dsl_runtime::ref_resolver;
 pub mod repl_session;
 // §9 item 9 slice 1 (2026-05-13): runtime_registry relocated to
 // dsl-runtime. Compat re-export keeps `super::runtime_registry::*`

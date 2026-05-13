@@ -15,12 +15,12 @@ use crate::analysis::parse_with_v2;
 use crate::encoding::{span_to_range as encoding_span_to_range, PositionEncoding};
 
 use dsl_core::config::ConfigLoader;
+use dsl_runtime::lsp_validator::LspValidator;
 use dsl_runtime::planning_facade::{analyse_and_plan, PlanningInput, PlanningOutput};
 use dsl_runtime::runtime_registry::RuntimeVerbRegistry;
 use dsl_runtime::validation::{
     Diagnostic as SemanticDiagnostic, Severity, SourceSpan, ValidationContext,
 };
-use ob_poc::dsl_v2::tooling::LspValidator;
 
 /// Create a planning registry from config
 /// This is cached after first call via lazy_static pattern

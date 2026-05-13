@@ -82,6 +82,15 @@ pub mod validation;
 // diagnostics + executable plan. analyse_and_plan, PlanningInput,
 // PlanningOutput, SyntheticStep, quick_validate, ImplicitCreateMode.
 pub mod planning_facade;
+// §9 item 9 slice 6 (2026-05-13): ref_resolver + gateway_resolver +
+// lsp_validator paired move from rust/src/dsl_v2/. Tight cluster:
+// lsp_validator depends on gateway_resolver depends on ref_resolver,
+// and all three reach validation + dsl_core types now in this crate
+// and dsl-core. lsp_validator owns the EntityGateway-resolved
+// semantic validator the LSP/REPL/SemanticValidator share.
+pub mod ref_resolver;
+pub mod gateway_resolver;
+pub mod lsp_validator;
 pub mod service_traits;
 pub mod services;
 pub mod state_reducer;

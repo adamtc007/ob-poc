@@ -12,7 +12,7 @@
 //! The `GatewayRefResolver` in `gateway_resolver.rs` implements the `RefResolver` trait
 //! using the EntityGateway gRPC service for all lookups.
 
-use crate::dsl_v2::validation::{Diagnostic, RefType, SourceSpan, Suggestion};
+use crate::validation::{Diagnostic, RefType, SourceSpan, Suggestion};
 use async_trait::async_trait;
 use uuid::Uuid;
 
@@ -72,7 +72,7 @@ pub trait RefResolver: Send + Sync {
     /// Downcast to GatewayRefResolver for fuzzy search (returns None for non-Gateway resolvers)
     fn as_gateway_resolver(
         &mut self,
-    ) -> Option<&mut crate::dsl_v2::gateway_resolver::GatewayRefResolver> {
+    ) -> Option<&mut crate::gateway_resolver::GatewayRefResolver> {
         None
     }
 }

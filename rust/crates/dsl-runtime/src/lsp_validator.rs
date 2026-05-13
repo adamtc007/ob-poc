@@ -15,15 +15,15 @@
 //! - Returns LSP-compatible diagnostics
 //! - Builds resolved AST with primary_keys populated
 
-use crate::dsl_v2::ast::{Argument, AstNode, Literal, Program, Span, Statement, VerbCall};
-use crate::dsl_v2::gateway_resolver::{gateway_addr, GatewayRefResolver};
-use crate::dsl_v2::parser::parse_program;
-use crate::dsl_v2::ref_resolver::{arg_to_ref_type, ResolveResult};
-use crate::dsl_v2::validation::{
+use dsl_core::ast::{Argument, AstNode, Literal, Program, Span, Statement, VerbCall};
+use crate::gateway_resolver::{gateway_addr, GatewayRefResolver};
+use dsl_core::parser::parse_program;
+use crate::ref_resolver::{arg_to_ref_type, ResolveResult};
+use crate::validation::{
     Diagnostic, DiagnosticBuilder, DiagnosticCode, RefType, Severity, SourceSpan, ValidatedProgram,
     ValidatedStatement, ValidationContext,
 };
-use crate::dsl_v2::verb_registry::registry;
+use crate::verb_registry::registry;
 use std::collections::HashMap;
 use uuid::Uuid;
 
@@ -130,7 +130,7 @@ impl LspValidator {
                     .map(|(name, info)| {
                         (
                             name.clone(),
-                            crate::dsl_v2::validation::BindingInfo {
+                            crate::validation::BindingInfo {
                                 name,
                                 ref_type: info.ref_type,
                                 defined_at: info.defined_at,
@@ -299,8 +299,8 @@ impl LspValidator {
         diagnostics: &mut DiagnosticBuilder,
         stmt_idx: usize,
         resolved_keys: &mut HashMap<(usize, String), String>,
-    ) -> Option<crate::dsl_v2::validation::ResolvedArg> {
-        use crate::dsl_v2::validation::ResolvedArg;
+    ) -> Option<crate::validation::ResolvedArg> {
+        use crate::validation::ResolvedArg;
 
         let src_span = span_to_source_span(value_span, source);
 

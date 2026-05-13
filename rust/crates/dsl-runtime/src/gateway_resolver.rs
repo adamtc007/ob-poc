@@ -9,8 +9,8 @@
 //! - Consistent fuzzy matching behavior between LSP and validator
 //! - No reconciliation risk between different search implementations
 
-use crate::dsl_v2::ref_resolver::{RefResolver, ResolveResult, SuggestedMatch};
-use crate::dsl_v2::validation::{
+use crate::ref_resolver::{RefResolver, ResolveResult, SuggestedMatch};
+use crate::validation::{
     Diagnostic, DiagnosticCode, RefType, Severity, SourceSpan, Suggestion,
 };
 use async_trait::async_trait;
