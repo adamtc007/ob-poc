@@ -31,6 +31,11 @@ ob-poc-sage = { path = "../ob-poc-sage" }
 # projection, and pack manifest providers. The agent binary constructs
 # the dispatcher with injected runtime deps.
 ob-poc-boundary = { path = "../ob-poc-boundary" }
+# Journey owns the pack manifest YAML loader + canonical hash. The agent
+# uses it to populate its in-memory pack catalogue for the spike (Phase
+# 2.5). The Phase 4 cutover swaps the disk loader for a sem_os_mcp-backed
+# loader without changing the index surface.
+ob-poc-journey = { path = "../ob-poc-journey" }
 # Analyser surface — runbook validate / plan / diagnostics consumed by
 # the LSP-shaped channel and the planning loop.
 dsl-runtime = { path = "../dsl-runtime" }

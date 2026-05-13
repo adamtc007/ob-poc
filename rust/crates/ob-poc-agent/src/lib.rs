@@ -63,4 +63,8 @@
 //!   - 2.9: audit emission (JSONL)
 //!   - 2.10: hard-coded GoalFrame for the spike
 
-// Empty — Phase 2.1 fills this in incrementally.
+/// In-memory SemOS knowledge snapshot for a session. Phase 2.5 — see
+/// `index.rs` for the planning loop's read view + the spike disk
+/// loader. The substrate-backed loader lands in Phase 4 once
+/// `sem_os_mcp` exists.
+pub mod index;
