@@ -27,6 +27,7 @@ tokio = { version = "1", features = ["full", "sync"] }
 # ob_poc imports (planning, execution, tooling, suggestions, macros)
 # need the §9 item 9 analyser consolidation before they can move.
 dsl-core = { path = "../dsl-core" }
+dsl-runtime = { path = "../dsl-runtime" }
 
 # Main library (for planning, execution, tooling, suggestions, macros).
 # This is the inverted edge — to be removed by §9 item 9 (consolidate

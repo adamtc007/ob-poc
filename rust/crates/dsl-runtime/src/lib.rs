@@ -59,6 +59,11 @@ pub mod entity_kind;
 pub mod execution;
 pub mod placeholder;
 pub mod port;
+// §9 item 9 slice 1 (2026-05-13): runtime_registry relocated from
+// rust/src/dsl_v2/. Pulls in the YAML-driven verb registry that fronts
+// dsl-lsp completion / hover / signature; reaches dsl_core for verb
+// config types and ob-templates for template definitions.
+pub mod runtime_registry;
 pub mod service_traits;
 pub mod services;
 pub mod state_reducer;

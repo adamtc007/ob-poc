@@ -6,19 +6,20 @@
 //! Also loads templates from config/verbs/templates/ as first-class
 //! language constructs (macros that expand to DSL statements).
 
-#[cfg(feature = "database")]
+// §9 item 9 slice 1 (2026-05-13): cfg(feature = "database") gates
+// dropped on relocation — dsl-runtime has sqlx as an unconditional
+// dependency (unlike ob-poc, where this module previously lived).
 use anyhow::{anyhow, Result};
 use std::collections::HashMap;
 use std::path::Path;
 use std::sync::{Arc, OnceLock};
 use tracing::{info, warn};
 
-#[cfg(feature = "database")]
 use sqlx::PgPool;
 
-use super::config::types::*;
-use crate::templates::{TemplateDefinition, TemplateRegistry};
-use dsl_runtime::entity_kind::canonicalize as canonicalize_entity_kind;
+use dsl_core::config::types::*;
+use ob_templates::{TemplateDefinition, TemplateRegistry};
+use crate::entity_kind::canonicalize as canonicalize_entity_kind;
 
 // =============================================================================
 // RUNTIME VERB DEFINITION
@@ -188,7 +189,7 @@ pub struct RuntimeDurableConfig {
     pub escalation: Option<String>,
 }
 
-use super::config::types::{DurableRuntime, GraphQueryOperation};
+use dsl_core::config::types::{DurableRuntime, GraphQueryOperation};
 
 #[derive(Debug, Clone)]
 pub struct RuntimeArg {
@@ -291,7 +292,6 @@ impl RuntimeVerbRegistry {
     }
 
     /// Build registry with dynamic verbs from database
-    #[cfg(feature = "database")]
     pub async fn from_config_with_db(config: &VerbsConfig, pool: &PgPool) -> Result<Self> {
         let mut registry = Self::from_config(config);
 
@@ -307,7 +307,6 @@ impl RuntimeVerbRegistry {
         Ok(registry)
     }
 
-    #[cfg(feature = "database")]
     async fn expand_dynamic_verbs(
         &mut self,
         domain: &str,
@@ -414,7 +413,6 @@ impl RuntimeVerbRegistry {
         Ok(())
     }
 
-    #[cfg(any(feature = "database", test))]
     fn transform_name(name: &str, transform: Option<&str>) -> String {
         match transform {
             Some("kebab_case") => name.to_lowercase().replace('_', "-"),
@@ -1009,7 +1007,7 @@ static RUNTIME_REGISTRY: OnceLock<RuntimeVerbRegistry> = OnceLock::new();
 /// Returns an empty registry if loading fails (with warning logged).
 pub fn runtime_registry() -> &'static RuntimeVerbRegistry {
     RUNTIME_REGISTRY.get_or_init(|| {
-        use super::config::ConfigLoader;
+        use dsl_core::config::ConfigLoader;
 
         let loader = ConfigLoader::from_env();
         match loader.load_verbs() {
@@ -1049,7 +1047,7 @@ static RUNTIME_REGISTRY_ARC: OnceLock<Arc<RuntimeVerbRegistry>> = OnceLock::new(
 pub fn runtime_registry_arc() -> Arc<RuntimeVerbRegistry> {
     RUNTIME_REGISTRY_ARC
         .get_or_init(|| {
-            use super::config::ConfigLoader;
+            use dsl_core::config::ConfigLoader;
 
             let loader = ConfigLoader::from_env();
             match loader.load_verbs() {

@@ -106,7 +106,11 @@ pub(crate) mod planning_facade;
 #[cfg(feature = "database")]
 pub mod ref_resolver;
 pub mod repl_session;
-pub(crate) mod runtime_registry;
+// §9 item 9 slice 1 (2026-05-13): runtime_registry relocated to
+// dsl-runtime. Compat re-export keeps `super::runtime_registry::*`
+// paths (used by the tooling + execution submodules below) and
+// existing `crate::dsl_v2::runtime_registry::*` callers working.
+pub(crate) use dsl_runtime::runtime_registry;
 #[cfg(feature = "database")]
 pub(crate) mod semantic_validator;
 #[cfg(feature = "database")]
