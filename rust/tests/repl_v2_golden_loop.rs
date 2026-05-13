@@ -12,7 +12,9 @@ use std::sync::Arc;
 
 use uuid::Uuid;
 
-use ob_poc::journey::pack::{load_pack_from_bytes, load_pack_from_file, PackManifest};
+use ob_poc::journey::pack::{
+    load_pack_from_bytes, load_pack_from_file, manifest_hash, PackManifest,
+};
 use ob_poc::journey::router::PackRouter;
 use ob_poc::journey::template::instantiate_template;
 use ob_poc::repl::response_v2::ReplResponseKindV2;
@@ -401,14 +403,14 @@ fn test_pack_hash_stability() {
     let yaml = include_bytes!("../config/packs/onboarding-request.yaml");
 
     // Same bytes → same hash.
-    let hash1 = PackManifest::manifest_hash(yaml);
-    let hash2 = PackManifest::manifest_hash(yaml);
+    let hash1 = manifest_hash(yaml);
+    let hash2 = manifest_hash(yaml);
     assert_eq!(hash1, hash2, "Same bytes must produce same hash");
 
     // Different bytes → different hash.
     let mut modified = yaml.to_vec();
     modified.push(b' ');
-    let hash3 = PackManifest::manifest_hash(&modified);
+    let hash3 = manifest_hash(&modified);
     assert_ne!(hash1, hash3, "Different bytes must produce different hash");
 }
 

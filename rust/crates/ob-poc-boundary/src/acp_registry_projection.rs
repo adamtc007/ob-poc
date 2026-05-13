@@ -16,11 +16,15 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
 use std::path::Path;
 
-use crate::journey::pack::{
-    load_packs_from_dir, AnswerKind, PackManifest, PackQuestion, PackTemplate, RiskPolicy,
-    TemplateStep,
+// Phase 3C-prep of capability-crate restructure (2026-05-13): pack DTOs
+// hoisted to ob-poc-types per plan §6.5. The YAML loader stays in the
+// catalogue-owning crate (currently `crate::journey::pack` during the
+// transition; will move to ob-poc-journey in Phase 3C proper).
+use crate::journey::pack::load_packs_from_dir;
+use ob_poc_types::journey::pack_types::{
+    AnswerKind, PackManifest, PackQuestion, PackTemplate, RiskPolicy, TemplateStep,
 };
-use crate::session::WorkspaceKind;
+use ob_poc_types::session::kinds::WorkspaceKind;
 
 /// Schema version for the Slice 1 ACP registry projection.
 pub const ACP_REGISTRY_PROJECTION_SCHEMA_VERSION: &str = "acp_registry_projection_v1";

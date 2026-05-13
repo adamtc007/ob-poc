@@ -1,8 +1,15 @@
-//! Pack Manifest Types and YAML Loader
+//! Pack Manifest YAML loader.
 //!
-//! A Journey Pack is the product-level interface between the user and the
-//! platform. It defines structured, versioned workflows with question policy,
-//! allowed verbs, templates, and definition-of-done.
+//! The pack manifest data shapes (`PackManifest`, `RiskPolicy`,
+//! `PackQuestion`, `AnswerKind`, `PackTemplate`, `TemplateStep`,
+//! `SectionLayout`, `ProgressSignal`) live in
+//! `ob_poc_types::journey::pack_types` — hoisted there in Phase 3C-prep so
+//! the boundary `acp_registry_projection` builder can consume them
+//! without depending on `ob-poc-journey` (plan §6 decision 2).
+//!
+//! This module owns the disk-loading + canonical-hashing IO; it stays
+//! with the catalogue source during the Phase 3 transition and moves to
+//! `ob-poc-journey` in Phase 3C proper.
 //!
 //! # Canonical Hashing
 //!
@@ -18,236 +25,28 @@
 
 use std::path::Path;
 
-use ob_poc_types::session::kinds::WorkspaceKind;
-use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
-// ---------------------------------------------------------------------------
-// PackManifest (top-level)
-// ---------------------------------------------------------------------------
-
-/// A Journey Pack manifest loaded from YAML.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct PackManifest {
-    pub id: String,
-    pub name: String,
-    pub version: String,
-    pub description: String,
-
-    /// Phrases that trigger routing to this pack.
-    #[serde(default)]
-    pub invocation_phrases: Vec<String>,
-
-    /// Context fields that MUST be set before the pack can start.
-    #[serde(default)]
-    pub required_context: Vec<String>,
-
-    /// Context fields that are useful but not blocking.
-    #[serde(default)]
-    pub optional_context: Vec<String>,
-
-    /// Workspaces in which this pack is valid.
-    #[serde(default)]
-    pub workspaces: Vec<WorkspaceKind>,
-
-    /// Verbs this pack is allowed to use.
-    #[serde(default)]
-    pub allowed_verbs: Vec<String>,
-
-    /// Verbs this pack must never use.
-    #[serde(default)]
-    pub forbidden_verbs: Vec<String>,
-
-    /// Risk policy for execution confirmation.
-    #[serde(default)]
-    pub risk_policy: RiskPolicy,
-
-    /// Questions the pack asks the user (required).
-    #[serde(default)]
-    pub required_questions: Vec<PackQuestion>,
-
-    /// Questions the pack may ask (optional, depending on context).
-    #[serde(default)]
-    pub optional_questions: Vec<PackQuestion>,
-
-    /// Conditions that signal the pack's work is done.
-    #[serde(default)]
-    pub stop_rules: Vec<String>,
-
-    /// Parameterised step templates.
-    #[serde(default)]
-    pub templates: Vec<PackTemplate>,
-
-    /// Handlebars-style summary template for runbook playback.
-    pub pack_summary_template: Option<String>,
-
-    /// UI section layout for runbook display.
-    #[serde(default)]
-    pub section_layout: Vec<SectionLayout>,
-
-    /// Acceptance criteria for the pack.
-    #[serde(default)]
-    pub definition_of_done: Vec<String>,
-
-    /// Observable signals for progress tracking.
-    #[serde(default)]
-    pub progress_signals: Vec<ProgressSignal>,
-
-    /// If set, auto-handoff to this pack after successful execution.
-    #[serde(default)]
-    pub handoff_target: Option<String>,
-}
-
-// ---------------------------------------------------------------------------
-// Risk Policy
-// ---------------------------------------------------------------------------
-
-/// Controls when and how the user must confirm before execution.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct RiskPolicy {
-    /// If true, always ask before executing the runbook.
-    #[serde(default = "default_true")]
-    pub require_confirm_before_execute: bool,
-
-    /// Maximum steps allowed without an intermediate confirmation.
-    #[serde(default = "default_max_steps")]
-    pub max_steps_without_confirm: u32,
-}
-
-impl Default for RiskPolicy {
-    fn default() -> Self {
-        Self {
-            require_confirm_before_execute: true,
-            max_steps_without_confirm: 10,
-        }
-    }
-}
-
-fn default_true() -> bool {
-    true
-}
-
-fn default_max_steps() -> u32 {
-    10
-}
-
-// ---------------------------------------------------------------------------
-// PackQuestion
-// ---------------------------------------------------------------------------
-
-/// A question the pack asks the user during the InPack Q/A phase.
-///
-/// `options_source` is **suggestions vocabulary only** — the orchestrator
-/// MUST NOT gate correctness on picker/dropdown selection. All answers are
-/// accepted as free-text and validated after the fact.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct PackQuestion {
-    /// Slot key this answer populates (e.g. "products", "trading_matrix").
-    pub field: String,
-
-    /// Human-readable question text.
-    pub prompt: String,
-
-    /// Expected answer shape.
-    #[serde(default)]
-    pub answer_kind: AnswerKind,
-
-    /// Suggestions vocabulary — for UI autocomplete / chips only.
-    /// Never gates correctness.
-    pub options_source: Option<String>,
-
-    /// Default value if the user skips this question.
-    pub default: Option<serde_json::Value>,
-
-    /// Condition expression — only ask when this evaluates to true.
-    pub ask_when: Option<String>,
-}
-
-/// The shape of an expected answer.
-#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-pub enum AnswerKind {
-    #[default]
-    String,
-    Boolean,
-    List,
-    EntityRef,
-    Enum,
-}
-
-// ---------------------------------------------------------------------------
-// PackTemplate
-// ---------------------------------------------------------------------------
-
-/// A parameterised step template within a pack.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct PackTemplate {
-    pub template_id: String,
-
-    /// Human description of when to use this template.
-    pub when_to_use: String,
-
-    /// Ordered steps in the template.
-    pub steps: Vec<TemplateStep>,
-}
-
-/// A single step in a pack template.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct TemplateStep {
-    /// Fully-qualified verb name (e.g. "cbu.create").
-    pub verb: String,
-
-    /// Static or slot-referenced arguments.
-    #[serde(default)]
-    pub args: std::collections::HashMap<String, serde_json::Value>,
-
-    /// If set, repeat this step for each item in the named list slot.
-    pub repeat_for: Option<String>,
-
-    /// Condition — only include this step when this expression is true.
-    pub when: Option<String>,
-
-    /// How to execute this step (overrides pack default).
-    pub execution_mode: Option<String>,
-}
-
-// ---------------------------------------------------------------------------
-// Section Layout
-// ---------------------------------------------------------------------------
-
-/// Controls how runbook entries are grouped for display.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct SectionLayout {
-    pub title: String,
-    #[serde(default)]
-    pub verb_prefixes: Vec<String>,
-}
-
-// ---------------------------------------------------------------------------
-// Progress Signal
-// ---------------------------------------------------------------------------
-
-/// An observable signal the pack emits to indicate progress.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ProgressSignal {
-    pub signal: String,
-    pub description: String,
-}
+// Re-export the hoisted types so existing
+// `crate::journey::pack::{PackManifest, ...}` import sites continue to work
+// during the Phase 3 transition.
+pub use ob_poc_types::journey::pack_types::{
+    AnswerKind, PackManifest, PackQuestion, PackTemplate, ProgressSignal, RiskPolicy,
+    SectionLayout, TemplateStep,
+};
 
 // ---------------------------------------------------------------------------
 // Canonical Hashing
 // ---------------------------------------------------------------------------
 
-impl PackManifest {
-    /// Deterministic hash of the raw YAML file bytes.
-    ///
-    /// We hash the **original file bytes**, NOT a serde re-serialization.
-    /// This guarantees: same file bytes ⇒ same hash, always, regardless
-    /// of serde_yaml version or map key ordering.
-    pub fn manifest_hash(raw_yaml_bytes: &[u8]) -> String {
-        let hash = Sha256::digest(raw_yaml_bytes);
-        format!("{:x}", hash)
-    }
+/// Deterministic hash of the raw YAML file bytes.
+///
+/// We hash the **original file bytes**, NOT a serde re-serialization.
+/// This guarantees: same file bytes ⇒ same hash, always, regardless
+/// of serde_yaml version or map key ordering.
+pub fn manifest_hash(raw_yaml_bytes: &[u8]) -> String {
+    let hash = Sha256::digest(raw_yaml_bytes);
+    format!("{:x}", hash)
 }
 
 // ---------------------------------------------------------------------------
@@ -266,7 +65,7 @@ pub fn load_pack_from_file(path: &Path) -> Result<(PackManifest, String), PackLo
         path: path.display().to_string(),
         source: e,
     })?;
-    let hash = PackManifest::manifest_hash(&raw_bytes);
+    let hash = manifest_hash(&raw_bytes);
     let manifest: PackManifest =
         serde_yaml::from_slice(&raw_bytes).map_err(|e| PackLoadError::Parse {
             path: path.display().to_string(),
@@ -277,7 +76,7 @@ pub fn load_pack_from_file(path: &Path) -> Result<(PackManifest, String), PackLo
 
 /// Load a pack manifest from raw YAML bytes (useful for testing).
 pub fn load_pack_from_bytes(raw_bytes: &[u8]) -> Result<(PackManifest, String), PackLoadError> {
-    let hash = PackManifest::manifest_hash(raw_bytes);
+    let hash = manifest_hash(raw_bytes);
     let manifest: PackManifest =
         serde_yaml::from_slice(raw_bytes).map_err(|e| PackLoadError::Parse {
             path: "<bytes>".to_string(),
@@ -439,8 +238,8 @@ definition_of_done:
         let yaml = minimal_pack_yaml();
         let bytes = yaml.as_bytes();
 
-        let hash1 = PackManifest::manifest_hash(bytes);
-        let hash2 = PackManifest::manifest_hash(bytes);
+        let hash1 = manifest_hash(bytes);
+        let hash2 = manifest_hash(bytes);
 
         assert_eq!(hash1, hash2);
         assert_eq!(hash1.len(), 64); // SHA-256 hex = 64 chars
@@ -449,10 +248,10 @@ definition_of_done:
     #[test]
     fn test_hash_changes_on_modification() {
         let yaml = minimal_pack_yaml();
-        let hash_original = PackManifest::manifest_hash(yaml.as_bytes());
+        let hash_original = manifest_hash(yaml.as_bytes());
 
         let modified = yaml.replace("test-pack", "test-pack-modified");
-        let hash_modified = PackManifest::manifest_hash(modified.as_bytes());
+        let hash_modified = manifest_hash(modified.as_bytes());
 
         assert_ne!(hash_original, hash_modified);
     }
@@ -463,8 +262,8 @@ definition_of_done:
         let yaml_a = b"id: x\nname: X\nversion: '1'\ndescription: test\n";
         let yaml_b = b"id:  x\nname:  X\nversion:  '1'\ndescription:  test\n";
 
-        let hash_a = PackManifest::manifest_hash(yaml_a);
-        let hash_b = PackManifest::manifest_hash(yaml_b);
+        let hash_a = manifest_hash(yaml_a);
+        let hash_b = manifest_hash(yaml_b);
 
         // Raw-byte hashing: different bytes → different hashes,
         // even though serde would produce the same struct.

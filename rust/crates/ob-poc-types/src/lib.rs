@@ -28,6 +28,12 @@ pub mod galaxy;
 pub mod gated_envelope;
 pub mod graph_scene;
 pub mod investor_register;
+// Phase 3C-prep of capability-crate restructure (2026-05-13). Pack
+// manifest DTOs hoisted from ob-poc-boundary::journey::pack per plan §6.5.
+// Boundary's acp_registry_projection consumes these field-by-field but
+// must not depend on ob-poc-journey (plan §6 decision 2), so the pure
+// types live here and the YAML loader stays with ob-poc-journey.
+pub mod journey;
 pub mod manco_group;
 pub mod narration;
 pub mod onboarding_state;
