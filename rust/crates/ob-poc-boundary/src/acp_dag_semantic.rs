@@ -21,7 +21,7 @@ use crate::acp_registry_projection::{
     build_slice1_acp_registry_projection, AcpRegistryProjection, SLICE_1_ACP_PACK_IDS,
 };
 use crate::acp_runtime_context::{build_acp_runtime_context_projection, AcpRuntimeContextSource};
-use crate::journey::pack::{load_packs_from_dir, PackManifest};
+use crate::pack_projection::{get_pack_projection_provider, PackProjection};
 
 const MATCH_THRESHOLD: f32 = 0.42;
 const AMBIGUITY_MARGIN: f32 = 0.08;
@@ -1000,10 +1000,11 @@ struct AcpDagSemanticIndex {
 
 #[derive(Debug, Clone)]
 struct AcpDagPackRow {
-    manifest: PackManifest,
-    hash: String,
-    phrases: Vec<String>,
-    allowed_verbs: BTreeSet<String>,
+    /// Boundary-owned projection of one pack from the catalogue. The
+    /// integrator's projection function (ob-poc) is the only place that
+    /// knows how to derive this from the upstream `PackManifest`; this
+    /// crate only reads.
+    projection: PackProjection,
 }
 
 #[derive(Debug, Clone)]
@@ -1241,7 +1242,7 @@ fn disambiguated_candidate(
     utterance: &str,
 ) -> Option<ScoredRow> {
     if pack
-        .map(|pack| pack.row.manifest.id.as_str() != "cbu-maintenance")
+        .map(|pack| pack.row.projection.indexing.id.as_str() != "cbu-maintenance")
         .unwrap_or(false)
     {
         return None;
@@ -1625,7 +1626,7 @@ fn pack_context_by_id(
     index
         .packs
         .iter()
-        .find(|pack| pack.manifest.id == pack_id)
+        .find(|pack| pack.projection.indexing.id == pack_id)
         .map(|row| {
             pack_context_from_scored(&ScoredPack {
                 row: row.clone(),
@@ -1640,6 +1641,9 @@ fn row_by_fqn(index: &AcpDagSemanticIndex, fqn: &str) -> Option<AcpDagVerbRow> {
 }
 
 fn semantic_index() -> Result<&'static AcpDagSemanticIndex, String> {
+    #[cfg(test)]
+    crate::pack_projection::ensure_test_provider_registered();
+
     static INDEX: OnceLock<Result<AcpDagSemanticIndex, String>> = OnceLock::new();
     INDEX
         .get_or_init(|| {
@@ -1653,36 +1657,21 @@ fn semantic_index() -> Result<&'static AcpDagSemanticIndex, String> {
                 }
             }
             rows.extend(slice_macro_rows());
-            // CARGO_MANIFEST_DIR resolves to repo/rust/crates/ob-poc-boundary; the
-            // shared config tree lives at repo/rust/config (two levels up).
-            let packs_dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../config/packs");
-            let packs = load_packs_from_dir(&packs_dir)
-                .map_err(|error| error.to_string())?
-                .into_iter()
-                .map(row_from_pack)
-                .collect();
+            // The pack catalogue is fetched from the boundary-owned
+            // provider (registered by the ob-poc integrator at startup
+            // — see pack_projection.rs). Boundary no longer reaches
+            // into ob-poc-journey for PackManifest or for the disk
+            // loader. The catalogue's eventual home is SemOS-via-MCP.
+            let provider = get_pack_projection_provider().map_err(str::to_string)?;
+            let packs = provider()?.into_iter().map(row_from_projection).collect();
             Ok(AcpDagSemanticIndex { rows, packs })
         })
         .as_ref()
         .map_err(Clone::clone)
 }
 
-fn row_from_pack((manifest, hash): (PackManifest, String)) -> AcpDagPackRow {
-    let mut phrases = BTreeSet::new();
-    phrases.insert(manifest.id.clone());
-    phrases.insert(manifest.name.clone());
-    for phrase in &manifest.invocation_phrases {
-        phrases.insert(phrase.clone());
-    }
-    for workspace in &manifest.workspaces {
-        phrases.insert(workspace_context_name(workspace).replace('_', " "));
-    }
-    AcpDagPackRow {
-        allowed_verbs: manifest.allowed_verbs.iter().cloned().collect(),
-        manifest,
-        hash,
-        phrases: phrases.into_iter().collect(),
-    }
+fn row_from_projection(projection: PackProjection) -> AcpDagPackRow {
+    AcpDagPackRow { projection }
 }
 
 fn score_rows(
@@ -1690,7 +1679,7 @@ fn score_rows(
     utterance: &str,
     pack: Option<&ScoredPack>,
 ) -> Vec<ScoredRow> {
-    let pack_allowed_verbs = pack.map(|pack| &pack.row.allowed_verbs);
+    let pack_allowed_verbs = pack.map(|pack| &pack.row.projection.indexing.allowed_verbs);
     let mut scored = index
         .rows
         .iter()
@@ -1834,7 +1823,13 @@ fn select_pack(index: &AcpDagSemanticIndex, utterance: &str) -> Option<ScoredPac
         right
             .score
             .total_cmp(&left.score)
-            .then_with(|| left.row.manifest.id.cmp(&right.row.manifest.id))
+            .then_with(|| {
+                left.row
+                    .projection
+                    .indexing
+                    .id
+                    .cmp(&right.row.projection.indexing.id)
+            })
     });
     let top = scored.first()?.clone();
     let clear_pack = scored
@@ -1859,15 +1854,24 @@ fn infer_slice_pack_for_selected_verb(
     let mut candidates = index
         .packs
         .iter()
-        .filter(|pack| target_pack_ids.contains(&pack.manifest.id.as_str()))
-        .filter(|pack| pack.allowed_verbs.contains(&selected.fqn))
+        .filter(|pack| target_pack_ids.contains(&pack.projection.indexing.id.as_str()))
+        .filter(|pack| {
+            pack.projection
+                .indexing
+                .allowed_verbs
+                .contains(&selected.fqn)
+        })
         .filter_map(|pack| {
-            slice_pack_signal_score(&pack.manifest.id, &normalized_utterance, &utterance_tokens)
-                .map(|score| ScoredPack {
-                    row: pack.clone(),
-                    score,
-                    matched_phrase: Some(format!("selected verb {}", selected.fqn)),
-                })
+            slice_pack_signal_score(
+                &pack.projection.indexing.id,
+                &normalized_utterance,
+                &utterance_tokens,
+            )
+            .map(|score| ScoredPack {
+                row: pack.clone(),
+                score,
+                matched_phrase: Some(format!("selected verb {}", selected.fqn)),
+            })
         })
         .collect::<Vec<_>>();
 
@@ -1875,8 +1879,13 @@ fn infer_slice_pack_for_selected_verb(
         candidates = index
             .packs
             .iter()
-            .filter(|pack| target_pack_ids.contains(&pack.manifest.id.as_str()))
-            .filter(|pack| pack.allowed_verbs.contains(&selected.fqn))
+            .filter(|pack| target_pack_ids.contains(&pack.projection.indexing.id.as_str()))
+            .filter(|pack| {
+                pack.projection
+                    .indexing
+                    .allowed_verbs
+                    .contains(&selected.fqn)
+            })
             .map(|pack| ScoredPack {
                 row: pack.clone(),
                 score: 0.6,
@@ -1889,7 +1898,13 @@ fn infer_slice_pack_for_selected_verb(
         right
             .score
             .total_cmp(&left.score)
-            .then_with(|| left.row.manifest.id.cmp(&right.row.manifest.id))
+            .then_with(|| {
+                left.row
+                    .projection
+                    .indexing
+                    .id
+                    .cmp(&right.row.projection.indexing.id)
+            })
     });
     let top = candidates.first()?.clone();
     let clear_pack = candidates
@@ -1983,7 +1998,7 @@ fn score_pack(
 ) -> Option<ScoredPack> {
     let mut best_score = 0.0_f32;
     let mut matched_phrase = None;
-    for phrase in &row.phrases {
+    for phrase in &row.projection.indexing.phrases {
         let normalized_phrase = normalize_text(phrase);
         let phrase_tokens = tokens(&normalized_phrase);
         if phrase_tokens.is_empty() {
@@ -2003,9 +2018,11 @@ fn score_pack(
             matched_phrase = Some(phrase.clone());
         }
     }
-    if let Some(slice_score) =
-        slice_pack_signal_score(&row.manifest.id, normalized_utterance, utterance_tokens)
-    {
+    if let Some(slice_score) = slice_pack_signal_score(
+        &row.projection.indexing.id,
+        normalized_utterance,
+        utterance_tokens,
+    ) {
         if slice_score > best_score {
             best_score = slice_score;
             matched_phrase = Some("slice pack signal".to_string());
@@ -2076,84 +2093,13 @@ fn score_row(
 }
 
 fn pack_context_from_scored(scored: &ScoredPack) -> AcpDagSemanticPackContext {
-    let manifest = &scored.row.manifest;
-    AcpDagSemanticPackContext {
-        pack_id: manifest.id.clone(),
-        pack_name: manifest.name.clone(),
-        pack_version: manifest.version.clone(),
-        pack_hash: scored.row.hash.clone(),
-        score: scored.score,
-        matched_phrase: scored.matched_phrase.clone(),
-        description: manifest.description.clone(),
-        invocation_phrases: manifest.invocation_phrases.clone(),
-        workspaces: manifest
-            .workspaces
-            .iter()
-            .map(workspace_context_name)
-            .collect(),
-        required_context: manifest.required_context.clone(),
-        optional_context: manifest.optional_context.clone(),
-        allowed_verbs: manifest.allowed_verbs.clone(),
-        allowed_verb_count: manifest.allowed_verbs.len(),
-        forbidden_verbs: manifest.forbidden_verbs.clone(),
-        risk_policy: AcpDagSemanticPackRiskPolicy {
-            require_confirm_before_execute: manifest.risk_policy.require_confirm_before_execute,
-            max_steps_without_confirm: manifest.risk_policy.max_steps_without_confirm,
-        },
-        required_questions: manifest
-            .required_questions
-            .iter()
-            .map(pack_question_context)
-            .collect(),
-        optional_questions: manifest
-            .optional_questions
-            .iter()
-            .map(pack_question_context)
-            .collect(),
-        stop_rules: manifest.stop_rules.clone(),
-        templates: manifest
-            .templates
-            .iter()
-            .map(|template| AcpDagSemanticPackTemplate {
-                template_id: template.template_id.clone(),
-                when_to_use: template.when_to_use.clone(),
-                steps: template
-                    .steps
-                    .iter()
-                    .map(|step| AcpDagSemanticPackTemplateStep {
-                        verb: step.verb.clone(),
-                        args: step
-                            .args
-                            .iter()
-                            .map(|(key, value)| (key.clone(), value.clone()))
-                            .collect(),
-                        repeat_for: step.repeat_for.clone(),
-                        when: step.when.clone(),
-                        execution_mode: step.execution_mode.clone(),
-                    })
-                    .collect(),
-            })
-            .collect(),
-        pack_summary_template: manifest.pack_summary_template.clone(),
-        section_layout: manifest
-            .section_layout
-            .iter()
-            .map(|section| AcpDagSemanticPackSection {
-                title: section.title.clone(),
-                verb_prefixes: section.verb_prefixes.clone(),
-            })
-            .collect(),
-        definition_of_done: manifest.definition_of_done.clone(),
-        progress_signals: manifest
-            .progress_signals
-            .iter()
-            .map(|signal| AcpDagSemanticPackProgressSignal {
-                signal: signal.signal.clone(),
-                description: signal.description.clone(),
-            })
-            .collect(),
-        handoff_target: manifest.handoff_target.clone(),
-    }
+    // The context is pre-projected by the ob-poc integrator at startup
+    // (see crate::pack_projection). We just clone it and patch in the
+    // per-utterance score + matched phrase.
+    let mut context = scored.row.projection.context.clone();
+    context.score = scored.score;
+    context.matched_phrase = scored.matched_phrase.clone();
+    context
 }
 
 fn template_context_for_selected_verb(
@@ -2162,49 +2108,23 @@ fn template_context_for_selected_verb(
 ) -> Option<AcpDagSemanticPackTemplate> {
     scored
         .row
-        .manifest
+        .projection
+        .context
         .templates
         .iter()
         .find(|template| template.steps.iter().any(|step| step.verb == selected.fqn))
-        .map(|template| AcpDagSemanticPackTemplate {
-            template_id: template.template_id.clone(),
-            when_to_use: template.when_to_use.clone(),
-            steps: template
-                .steps
-                .iter()
-                .map(|step| AcpDagSemanticPackTemplateStep {
-                    verb: step.verb.clone(),
-                    args: step
-                        .args
-                        .iter()
-                        .map(|(key, value)| (key.clone(), value.clone()))
-                        .collect(),
-                    repeat_for: step.repeat_for.clone(),
-                    when: step.when.clone(),
-                    execution_mode: step.execution_mode.clone(),
-                })
-                .collect(),
-        })
+        .cloned()
 }
 
-fn workspace_context_name(workspace: &crate::session::WorkspaceKind) -> String {
+/// Project a `crate::session::WorkspaceKind` to its boundary-canonical
+/// string form. Exposed `pub` so the ob-poc integrator's pack-projection
+/// function can render workspace names in the same shape boundary stores
+/// in `AcpDagSemanticPackContext::workspaces`.
+pub fn workspace_context_name(workspace: &crate::session::WorkspaceKind) -> String {
     serde_json::to_value(workspace)
         .ok()
         .and_then(|value| value.as_str().map(str::to_string))
         .unwrap_or_else(|| format!("{workspace:?}").to_ascii_lowercase())
-}
-
-fn pack_question_context(
-    question: &crate::journey::pack::PackQuestion,
-) -> AcpDagSemanticPackQuestion {
-    AcpDagSemanticPackQuestion {
-        field: question.field.clone(),
-        prompt: question.prompt.clone(),
-        answer_kind: format!("{:?}", question.answer_kind),
-        options_source: question.options_source.clone(),
-        default: question.default.clone(),
-        ask_when: question.ask_when.clone(),
-    }
 }
 
 fn token_overlap_score(utterance_tokens: &[String], phrase_tokens: &[String]) -> f32 {

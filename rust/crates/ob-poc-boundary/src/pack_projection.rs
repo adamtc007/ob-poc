@@ -120,3 +120,164 @@ pub fn get_pack_projection_provider() -> Result<PackProjectionProvider, &'static
         .copied()
         .ok_or("pack-projection provider not registered (ob-poc app startup must call set_pack_projection_provider)")
 }
+
+// ---------------------------------------------------------------------------
+// Test-only fixture provider
+// ---------------------------------------------------------------------------
+//
+// Phase 3 of the capability-crate restructure splits pack-catalogue
+// loading (ob-poc-journey owns it) from pack-projection (ob-poc-boundary
+// owns it). The production projection function lives in the ob-poc
+// integrator (Phase 3D). Boundary's tests still need to exercise the
+// semantic-pack-selection algorithm against real pack data, so this
+// `#[cfg(test)]` block carries a parallel projection function that
+// mirrors what ob-poc will do at startup. Duplication is intentional:
+// it keeps boundary's tests standalone and provides a concrete spec for
+// what the ob-poc projection must produce. If the production projection
+// diverges from this fixture, the tests will catch the drift.
+
+#[cfg(test)]
+pub(crate) fn ensure_test_provider_registered() {
+    // Idempotent — `set_pack_projection_provider` is a no-op after first
+    // success, matching `OnceLock::set` semantics. Multiple tests
+    // calling this concurrently is safe.
+    let _ = set_pack_projection_provider(load_test_pack_projections);
+}
+
+#[cfg(test)]
+fn load_test_pack_projections() -> Result<Vec<PackProjection>, String> {
+    use crate::journey::pack::load_packs_from_dir;
+    use std::path::Path;
+    // CARGO_MANIFEST_DIR resolves to repo/rust/crates/ob-poc-boundary; the
+    // shared config tree lives at repo/rust/config (two levels up).
+    let packs_dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../config/packs");
+    let packs = load_packs_from_dir(&packs_dir).map_err(|error| error.to_string())?;
+    Ok(packs.into_iter().map(test_project_pack).collect())
+}
+
+#[cfg(test)]
+fn test_project_pack(
+    (manifest, hash): (crate::journey::pack::PackManifest, String),
+) -> PackProjection {
+    use crate::acp_dag_semantic::workspace_context_name;
+    use crate::acp_dag_semantic::{
+        AcpDagSemanticPackContext, AcpDagSemanticPackProgressSignal, AcpDagSemanticPackQuestion,
+        AcpDagSemanticPackRiskPolicy, AcpDagSemanticPackSection, AcpDagSemanticPackTemplate,
+        AcpDagSemanticPackTemplateStep,
+    };
+
+    // Build indexing — id/name/hash + phrase set + allowed-verb set.
+    let mut phrases = std::collections::BTreeSet::new();
+    phrases.insert(manifest.id.clone());
+    phrases.insert(manifest.name.clone());
+    for phrase in &manifest.invocation_phrases {
+        phrases.insert(phrase.clone());
+    }
+    for workspace in &manifest.workspaces {
+        phrases.insert(workspace_context_name(workspace).replace('_', " "));
+    }
+    let indexing = PackIndexing {
+        id: manifest.id.clone(),
+        name: manifest.name.clone(),
+        hash: hash.clone(),
+        phrases: phrases.into_iter().collect(),
+        allowed_verbs: manifest.allowed_verbs.iter().cloned().collect(),
+    };
+
+    // Build context — the full ACP discovery payload. Score and
+    // matched_phrase are placeholders; `pack_context_from_scored` patches
+    // them in per-utterance.
+    let context = AcpDagSemanticPackContext {
+        pack_id: manifest.id.clone(),
+        pack_name: manifest.name.clone(),
+        pack_version: manifest.version.clone(),
+        pack_hash: hash,
+        score: 0.0,
+        matched_phrase: None,
+        description: manifest.description.clone(),
+        invocation_phrases: manifest.invocation_phrases.clone(),
+        workspaces: manifest
+            .workspaces
+            .iter()
+            .map(workspace_context_name)
+            .collect(),
+        required_context: manifest.required_context.clone(),
+        optional_context: manifest.optional_context.clone(),
+        allowed_verbs: manifest.allowed_verbs.clone(),
+        allowed_verb_count: manifest.allowed_verbs.len(),
+        forbidden_verbs: manifest.forbidden_verbs.clone(),
+        risk_policy: AcpDagSemanticPackRiskPolicy {
+            require_confirm_before_execute: manifest.risk_policy.require_confirm_before_execute,
+            max_steps_without_confirm: manifest.risk_policy.max_steps_without_confirm,
+        },
+        required_questions: manifest
+            .required_questions
+            .iter()
+            .map(|question| AcpDagSemanticPackQuestion {
+                field: question.field.clone(),
+                prompt: question.prompt.clone(),
+                answer_kind: format!("{:?}", question.answer_kind),
+                options_source: question.options_source.clone(),
+                default: question.default.clone(),
+                ask_when: question.ask_when.clone(),
+            })
+            .collect(),
+        optional_questions: manifest
+            .optional_questions
+            .iter()
+            .map(|question| AcpDagSemanticPackQuestion {
+                field: question.field.clone(),
+                prompt: question.prompt.clone(),
+                answer_kind: format!("{:?}", question.answer_kind),
+                options_source: question.options_source.clone(),
+                default: question.default.clone(),
+                ask_when: question.ask_when.clone(),
+            })
+            .collect(),
+        stop_rules: manifest.stop_rules.clone(),
+        templates: manifest
+            .templates
+            .iter()
+            .map(|template| AcpDagSemanticPackTemplate {
+                template_id: template.template_id.clone(),
+                when_to_use: template.when_to_use.clone(),
+                steps: template
+                    .steps
+                    .iter()
+                    .map(|step| AcpDagSemanticPackTemplateStep {
+                        verb: step.verb.clone(),
+                        args: step
+                            .args
+                            .iter()
+                            .map(|(key, value)| (key.clone(), value.clone()))
+                            .collect(),
+                        repeat_for: step.repeat_for.clone(),
+                        when: step.when.clone(),
+                        execution_mode: step.execution_mode.clone(),
+                    })
+                    .collect(),
+            })
+            .collect(),
+        pack_summary_template: manifest.pack_summary_template.clone(),
+        section_layout: manifest
+            .section_layout
+            .iter()
+            .map(|section| AcpDagSemanticPackSection {
+                title: section.title.clone(),
+                verb_prefixes: section.verb_prefixes.clone(),
+            })
+            .collect(),
+        definition_of_done: manifest.definition_of_done.clone(),
+        progress_signals: manifest
+            .progress_signals
+            .iter()
+            .map(|signal| AcpDagSemanticPackProgressSignal {
+                signal: signal.signal.clone(),
+                description: signal.description.clone(),
+            })
+            .collect(),
+        handoff_target: manifest.handoff_target.clone(),
+    };
+
+    PackProjection { indexing, context }
+}
