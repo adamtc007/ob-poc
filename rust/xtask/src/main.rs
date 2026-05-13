@@ -14,6 +14,7 @@ mod allianz_harness;
 mod audit;
 mod aviva_deal_harness;
 mod bpmn_lite;
+mod byok_conformance;
 mod calibration;
 mod catalogue;
 mod dag_test;
@@ -138,6 +139,18 @@ enum Command {
         /// Refresh the baseline after reviewing intentional changes.
         #[arg(long)]
         bless: bool,
+    },
+
+    /// Phase 5.4 — BYOK conformance check. Runs the corpus at
+    /// `tools/sage-conformance-corpus.yaml` through the planning
+    /// loop against the chosen provider. `stub` is CI-safe;
+    /// `anthropic` calls the real model (requires
+    /// `ANTHROPIC_API_KEY`); `openai` errors until the OpenAI
+    /// client lands in `ob-agentic`.
+    ByokConformanceCheck {
+        /// LLM provider to validate. One of: stub|anthropic|openai.
+        #[arg(long, default_value = "stub")]
+        provider: String,
     },
 
     /// R6 — rebuild Slice 1 ACP pack context envelopes and assert
@@ -1388,6 +1401,7 @@ fn main() -> Result<()> {
         Command::RunbookEnvelopeDeterminismCheck { bless } => {
             runbook_envelope_determinism::run(bless)
         }
+        Command::ByokConformanceCheck { provider } => byok_conformance::run(&provider),
         Command::AcpEnvelopeByteEqualityCheck { bless } => acp_envelope_byte_equality::run(bless),
         Command::Deploy {
             release,
