@@ -5,13 +5,15 @@
 # reviewing whether the mirror is still justified.
 # Run `cargo run -p xtask -- audit` to fail on new mirrors.
 #
-# Baseline buckets — current state (16 entries, down from 32).
+# Baseline buckets — current state (13 entries, down from 32).
 # Phase 4.7 follow-up collapsed the three high-priority near-
 # duplicates under `src/sem_reg/` (`entity_type_def`,
 # `relationship_type_def`, `verb_contract`) to `sem_os_core::*`
-# re-exports. The walk-by audit landed the same kind of fix for
-# `dsl-runtime::stategraph` after finding its 6 leaf names were
-# byte-identical to `sem_os_core::state_graph_def`.
+# re-exports. The walk-by audit then landed the same kind of fix
+# for `dsl-runtime::stategraph` (6 names) and
+# `dsl-runtime::state_reducer::state_machine` (3 names) after
+# finding their leaf types were byte-identical to
+# `sem_os_core::state_graph_def` / `state_machine_def`.
 #
 # (1) Legitimate distinct types sharing a name — unrelated UI graph,
 #     DSL stategraph, dag config, taxonomy nodes, workflow defs,
@@ -20,7 +22,6 @@
 #     `VerbOutput` for output-field declarations). Low remediation
 #     priority — these mirrors don't shadow the canonical type.
 #       crates/dsl-core/src/config/dag.rs               — DSL DAG config
-#       crates/dsl-runtime/src/state_reducer/*          — DSL FSM
 #       crates/ob-poc-domain/src/taxonomy/{rules,types} — taxonomy nodes
 #       crates/ob-poc-types/src/galaxy.rs               — galaxy viz
 #       crates/ob-poc-types/src/lib.rs                  — graph DTOs
@@ -38,9 +39,6 @@
 #     are bucket-1 namesake collisions.
 
 crates/dsl-core/src/config/dag.rs:497:TransitionDef
-crates/dsl-runtime/src/state_reducer/state_machine.rs:23:TransitionDef
-crates/dsl-runtime/src/state_reducer/state_machine.rs:31:ReducerDef
-crates/dsl-runtime/src/state_reducer/state_machine.rs:48:ConditionDef
 crates/ob-poc-domain/src/taxonomy/rules.rs:523:EdgeType
 crates/ob-poc-domain/src/taxonomy/types.rs:109:NodeType
 crates/ob-poc-types/src/galaxy.rs:1417:NodeType

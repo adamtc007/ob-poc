@@ -1,3 +1,27 @@
+//! State machine definition + leaf type re-exports.
+//!
+//! ## Schema-authority alignment (walk-by audit, 2026-05-13)
+//!
+//! The 6 leaf types `TransitionDef`, `ReducerDef`,
+//! `OverlaySourceDef`, `ConditionDef`, `RuleDef`,
+//! `ConsistencyCheckDef` are re-exported from
+//! `sem_os_core::state_machine_def` — they had byte-identical
+//! shapes and derives in the dsl-runtime-local definitions
+//! before, surfaced as `xtask audit` bucket-1 entries that the
+//! walk-by check identified as bucket-3-class drift.
+//!
+//! `StateMachineDefinition` (this file) stays local because it
+//! genuinely differs from `sem_os_core::state_machine_def::
+//! StateMachineDefBody` — the body type carries `fqn: String`
+//! and an `Option<ReducerDef>` (registry-snapshot shape), while
+//! the runtime engine here loads YAML where `reducer` is always
+//! present and there is no fqn (the YAML filename is the
+//! identifier).
+//!
+//! `ValidatedStateMachine` (further down) stays local — it is
+//! the post-validation runtime artefact, not a schema-authority
+//! type.
+
 use std::collections::HashMap;
 
 use serde::{Deserialize, Serialize};
@@ -6,6 +30,10 @@ use sha2::{Digest, Sha256};
 use super::ast::ConditionBody;
 use super::error::ReducerResult;
 use super::validate::validate_state_machine;
+
+pub use sem_os_core::state_machine_def::{
+    ConditionDef, ConsistencyCheckDef, OverlaySourceDef, ReducerDef, RuleDef, TransitionDef,
+};
 
 /// State machine definition loaded from YAML.
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -16,58 +44,6 @@ pub struct StateMachineDefinition {
     pub initial: String,
     pub transitions: Vec<TransitionDef>,
     pub reducer: ReducerDef,
-}
-
-/// Transition definition.
-#[derive(Debug, Clone, Deserialize, Serialize)]
-pub struct TransitionDef {
-    pub from: String,
-    pub to: String,
-    pub verbs: Vec<String>,
-}
-
-/// Reducer section of the state machine.
-#[derive(Debug, Clone, Deserialize, Serialize)]
-pub struct ReducerDef {
-    pub overlay_sources: HashMap<String, OverlaySourceDef>,
-    pub conditions: HashMap<String, ConditionDef>,
-    pub rules: Vec<RuleDef>,
-}
-
-/// Overlay source definition used for validation.
-#[derive(Debug, Clone, Deserialize, Serialize)]
-pub struct OverlaySourceDef {
-    pub table: String,
-    pub join: String,
-    pub provides: Vec<String>,
-    pub cardinality: Option<String>,
-}
-
-/// Condition definition.
-#[derive(Debug, Clone, Deserialize, Serialize)]
-pub struct ConditionDef {
-    pub expr: String,
-    pub description: Option<String>,
-    #[serde(default)]
-    pub parameterized: bool,
-}
-
-/// Reducer rule definition.
-#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
-pub struct RuleDef {
-    pub state: String,
-    #[serde(default)]
-    pub requires: Vec<String>,
-    #[serde(default)]
-    pub excludes: Vec<String>,
-    pub consistency_check: Option<ConsistencyCheckDef>,
-}
-
-/// Consistency warning definition.
-#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
-pub struct ConsistencyCheckDef {
-    pub warn_unless: String,
-    pub warning: String,
 }
 
 /// State machine after parse + validation.
