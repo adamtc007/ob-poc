@@ -31,6 +31,7 @@ pub mod lint;
 pub mod macros;
 pub mod approval_token;
 pub mod audit_chain;
+pub mod booking_principal_types;
 pub mod dsl_coder;
 pub mod envelope_builder;
 pub mod kyc_dry_run;

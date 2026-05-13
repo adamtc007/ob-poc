@@ -6,7 +6,11 @@
 #[cfg(feature = "server")]
 pub mod attribute_routes;
 
-pub mod booking_principal_types;
+// Phase 3 slice 2w (2026-05-13): pure-DTO module relocated to ob-poc-envelope.
+// Callers continue to use `crate::api::booking_principal_types::*` via this
+// compat re-export; the DTOs themselves moved to a sibling crate with no
+// internal-crate dependencies (chrono/serde/uuid/serde_json::Value only).
+pub use ob_poc_envelope::booking_principal_types;
 
 #[cfg(feature = "server")]
 pub mod agent_types;
