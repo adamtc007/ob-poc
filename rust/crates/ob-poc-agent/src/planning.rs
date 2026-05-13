@@ -32,6 +32,7 @@ use anyhow::{anyhow, Result};
 use ob_agentic::llm_client::{LlmClient, ToolDefinition};
 use serde::{Deserialize, Serialize};
 
+use crate::constellation::{ConstellationHydrator, HydrationScope};
 use crate::goal_frame::GoalFrame;
 use crate::index::SessionIndex;
 use crate::knowledge::{active_verbs_query_for_index, KnowledgeResponse, SemOsKnowledgeClient};
@@ -70,21 +71,24 @@ pub struct PlanningLoop {
     index: SessionIndex,
     llm_client: Option<Arc<dyn LlmClient>>,
     knowledge: Option<Arc<dyn SemOsKnowledgeClient>>,
+    hydrator: Option<Arc<dyn ConstellationHydrator>>,
 }
 
 impl PlanningLoop {
-    /// Construct a planning loop. `llm_client` and `knowledge` are
-    /// optional so the spike runs hermetically (no API key, no MCP
-    /// transport).
+    /// Construct a planning loop. `llm_client`, `knowledge`, and
+    /// `hydrator` are optional so the spike runs hermetically (no
+    /// API key, no MCP transport).
     pub fn new(
         index: SessionIndex,
         llm_client: Option<Arc<dyn LlmClient>>,
         knowledge: Option<Arc<dyn SemOsKnowledgeClient>>,
+        hydrator: Option<Arc<dyn ConstellationHydrator>>,
     ) -> Self {
         Self {
             index,
             llm_client,
             knowledge,
+            hydrator,
         }
     }
 
@@ -96,6 +100,11 @@ impl PlanningLoop {
     /// Optional knowledge client label for audit / diagnostics.
     pub fn knowledge_label(&self) -> Option<&str> {
         self.knowledge.as_ref().map(|k| k.provider_label())
+    }
+
+    /// Optional constellation hydrator label for audit / diagnostics.
+    pub fn hydrator_label(&self) -> Option<&str> {
+        self.hydrator.as_ref().map(|h| h.provider_label())
     }
 
     /// One round-trip — utterance → verb FQN.
@@ -120,7 +129,7 @@ impl PlanningLoop {
         utterance: &str,
         existing: Option<GoalFrame>,
     ) -> Result<PlanningOutcome> {
-        let goal_frame = match existing {
+        let mut goal_frame = match existing {
             Some(mut frame) if frame.status.is_mutable() => {
                 frame
                     .refine_with_utterance(utterance)
@@ -129,6 +138,26 @@ impl PlanningLoop {
             }
             _ => GoalFrame::seed_for_spike(utterance, &self.index),
         };
+
+        // Phase 3.2 — hydrate the constellation snapshot before the
+        // LLM call. Stub hydrator returns empty; Phase 4 swaps for
+        // the real MCP transport. Failures are non-fatal — fall
+        // back to the pack allowlist.
+        if let Some(hydrator) = self.hydrator.as_ref() {
+            let scope = HydrationScope {
+                workspace: &goal_frame.workspace,
+                pack_id: &goal_frame.pack_id,
+                constellation_id: None,
+            };
+            match hydrator.hydrate(scope).await {
+                Ok(snapshot) => goal_frame.attach_constellation(snapshot),
+                Err(error) => tracing::warn!(
+                    target: "sage-acp",
+                    %error,
+                    "constellation hydrator failed — continuing without snapshot"
+                ),
+            }
+        }
 
         // Phase 2.8 — exercise the knowledge surface so the seam is
         // demonstrably wired end-to-end. The spike client returns
@@ -339,7 +368,7 @@ progress_signals: []
 
     #[tokio::test]
     async fn deterministic_fallback_picks_first_allowed_verb() {
-        let loop_ = PlanningLoop::new(make_index(), None, None);
+        let loop_ = PlanningLoop::new(make_index(), None, None, None);
         let outcome = loop_.propose_draft("set up a book", None).await.unwrap();
         assert_eq!(outcome.verb_fqn, "cbu.create");
         assert_eq!(outcome.source, DraftSource::DeterministicFallback);
@@ -366,7 +395,7 @@ progress_signals: []
         let llm: Arc<dyn LlmClient> = Arc::new(StubLlm {
             verb_fqn: "cbu.attach-product".to_string(),
         });
-        let loop_ = PlanningLoop::new(make_index(), Some(llm), None);
+        let loop_ = PlanningLoop::new(make_index(), Some(llm), None, None);
         let outcome = loop_.propose_draft("attach the new product", None).await.unwrap();
         assert_eq!(outcome.verb_fqn, "cbu.attach-product");
         assert_eq!(outcome.source, DraftSource::LlmTool);
@@ -377,7 +406,7 @@ progress_signals: []
         let llm: Arc<dyn LlmClient> = Arc::new(StubLlm {
             verb_fqn: "cbu.delete".to_string(),
         });
-        let loop_ = PlanningLoop::new(make_index(), Some(llm), None);
+        let loop_ = PlanningLoop::new(make_index(), Some(llm), None, None);
         let err = loop_
             .propose_draft("wipe the book", None)
             .await
@@ -393,7 +422,7 @@ progress_signals: []
         let llm: Arc<dyn LlmClient> = Arc::new(StubLlm {
             verb_fqn: "cbu.invent-this".to_string(),
         });
-        let loop_ = PlanningLoop::new(make_index(), Some(llm), None);
+        let loop_ = PlanningLoop::new(make_index(), Some(llm), None, None);
         let err = loop_
             .propose_draft("do something new", None)
             .await

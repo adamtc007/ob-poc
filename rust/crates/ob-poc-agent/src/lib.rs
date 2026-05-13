@@ -80,6 +80,12 @@ pub mod goal_frame;
 /// complete}`.
 pub mod goal_frame_handler;
 
+/// Constellation hydration — Phase 3.2 (C-04). The hydrator trait
+/// + DTOs the planning loop reads to ground its proposals against
+/// the substrate. Spike ships a stub returning the empty snapshot;
+/// Phase 4 swaps for the `sem_os_mcp`-backed transport.
+pub mod constellation;
+
 /// Sage planning loop — Phase 2.6. Takes a raw utterance + a
 /// `SessionIndex` and returns a constrained-composition draft (verb
 /// FQN bounded to the pack allowlist). LLM call site is optional so

@@ -48,6 +48,7 @@ use serde::{Deserialize, Serialize};
 use tokio::sync::Mutex;
 use uuid::Uuid;
 
+use crate::constellation::ConstellationSnapshot;
 use crate::index::SessionIndex;
 
 /// Lifecycle status of a [`GoalFrame`].
@@ -112,6 +113,12 @@ pub struct GoalFrame {
     pub updated_at: DateTime<Utc>,
     /// Current lifecycle status.
     pub status: GoalFrameStatus,
+    /// Constellation snapshot hydrated at draft time (Phase 3.2 —
+    /// C-04). `None` when no hydrator is wired or the hydrator
+    /// reports an error; consumers must treat the absence as
+    /// "fall back to the pack allowlist".
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub constellation: Option<ConstellationSnapshot>,
 }
 
 impl GoalFrame {
@@ -149,7 +156,16 @@ impl GoalFrame {
             created_at: now,
             updated_at: now,
             status: GoalFrameStatus::Proposed,
+            constellation: None,
         }
+    }
+
+    /// Attach (or replace) a constellation snapshot, bumping
+    /// `updated_at`. Used by the planning loop after each hydration
+    /// (Phase 3.2 — C-04).
+    pub fn attach_constellation(&mut self, snapshot: ConstellationSnapshot) {
+        self.constellation = Some(snapshot);
+        self.updated_at = Utc::now();
     }
 
     /// Mark the frame as refused. Idempotent: refusing an already-

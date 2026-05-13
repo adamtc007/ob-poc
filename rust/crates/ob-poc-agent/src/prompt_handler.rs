@@ -304,7 +304,7 @@ progress_signals: []
             workspace: WorkspaceKind::Cbu,
             loaded_at: Utc::now(),
         };
-        PlanningLoop::new(index, None, None)
+        PlanningLoop::new(index, None, None, None)
     }
 
     #[tokio::test]

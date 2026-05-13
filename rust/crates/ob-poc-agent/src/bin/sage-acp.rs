@@ -32,6 +32,7 @@ use std::sync::Arc;
 use ob_agentic::anthropic_client::AnthropicClient;
 use ob_agentic::llm_client::LlmClient;
 use ob_poc_agent::audit::{default_audit_path, AuditPath, AuditSink, JsonlAuditSink, NullAuditSink};
+use ob_poc_agent::constellation::{ConstellationHydrator, StubConstellationHydrator};
 use ob_poc_agent::goal_frame::GoalFrameStore;
 use ob_poc_agent::goal_frame_handler::try_handle_goal_frame;
 use ob_poc_agent::index::{DiskPackIndexLoader, IndexLoadRequest, IndexLoader};
@@ -102,7 +103,14 @@ async fn main() -> anyhow::Result<()> {
         knowledge.provider_label()
     );
 
-    let planning = PlanningLoop::new(index, llm_client, Some(knowledge));
+    let hydrator: Arc<dyn ConstellationHydrator> =
+        Arc::new(StubConstellationHydrator::with_label("phase-3-spike"));
+    eprintln!(
+        "[sage-acp] Constellation hydrator wired (provider: {})",
+        hydrator.provider_label()
+    );
+
+    let planning = PlanningLoop::new(index, llm_client, Some(knowledge), Some(hydrator));
     let channel = LocalParseChannel::new();
 
     let frames = GoalFrameStore::new();
