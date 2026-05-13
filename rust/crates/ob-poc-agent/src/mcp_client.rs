@@ -100,6 +100,176 @@ impl McpTransport for InProcessTransport {
     }
 }
 
+/// Subprocess MCP transport — spawns the `sem_os_mcp` binary and
+/// speaks newline-delimited JSON-RPC over its stdin/stdout pipes.
+/// Stderr is inherited so server diagnostics surface in the
+/// hosting binary's logs.
+///
+/// ## Concurrency
+///
+/// The spike's planning loop processes one prompt at a time, so a
+/// single `tokio::sync::Mutex` around the stdio pair is the
+/// simplest correct shape — concurrent `invoke` calls serialise
+/// at the mutex. Production deployments that need real concurrency
+/// should replace the mutex with a request-id correlation map +
+/// MPSC channel; the public surface (`McpTransport::invoke`) is
+/// unchanged.
+///
+/// ## Error semantics
+///
+/// Spawn / transport / parse failures surface as
+/// `JsonRpcResponse::error` with the canonical
+/// [`sem_os_mcp::protocol::INTERNAL_ERROR`] code so callers see
+/// the same error shape as in-process transport faults. A dead
+/// subprocess is detected on the next `invoke` (read returns EOF /
+/// write fails); the transport does not auto-restart.
+pub struct SubprocessTransport {
+    inner: tokio::sync::Mutex<SubprocessInner>,
+    label: String,
+}
+
+struct SubprocessInner {
+    /// Child handle kept so the subprocess dies when the transport
+    /// drops (tokio's `Child` defaults to killing on drop unless
+    /// `set_kill_on_drop(false)` is called — we leave the default
+    /// on).
+    #[allow(dead_code)]
+    child: tokio::process::Child,
+    stdin: tokio::io::BufWriter<tokio::process::ChildStdin>,
+    stdout: tokio::io::Lines<tokio::io::BufReader<tokio::process::ChildStdout>>,
+}
+
+impl SubprocessTransport {
+    /// Spawn the named binary (typically `sem_os_mcp`) and wire
+    /// its stdio for JSON-RPC. The returned transport owns the
+    /// child handle.
+    pub async fn spawn(
+        command: impl AsRef<std::ffi::OsStr>,
+        args: &[&str],
+    ) -> std::io::Result<Self> {
+        use std::process::Stdio;
+        use tokio::io::{AsyncBufReadExt, BufReader, BufWriter};
+        use tokio::process::Command;
+
+        let mut child = Command::new(command.as_ref())
+            .args(args)
+            .stdin(Stdio::piped())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::inherit())
+            .kill_on_drop(true)
+            .spawn()?;
+
+        let stdin = child.stdin.take().ok_or_else(|| {
+            std::io::Error::new(std::io::ErrorKind::Other, "child stdin missing after spawn")
+        })?;
+        let stdout = child.stdout.take().ok_or_else(|| {
+            std::io::Error::new(std::io::ErrorKind::Other, "child stdout missing after spawn")
+        })?;
+        let pid = child.id().unwrap_or(0);
+        let command_lossy = command
+            .as_ref()
+            .to_string_lossy()
+            .into_owned();
+
+        Ok(Self {
+            inner: tokio::sync::Mutex::new(SubprocessInner {
+                child,
+                stdin: BufWriter::new(stdin),
+                stdout: BufReader::new(stdout).lines(),
+            }),
+            label: format!("subprocess:{command_lossy} pid={pid}"),
+        })
+    }
+}
+
+#[async_trait]
+impl McpTransport for SubprocessTransport {
+    async fn invoke(&self, request: JsonRpcRequest) -> JsonRpcResponse {
+        use sem_os_mcp::protocol::INTERNAL_ERROR;
+        use tokio::io::AsyncWriteExt;
+
+        let request_id = request.id.clone();
+        let line = match serde_json::to_string(&request) {
+            Ok(s) => s,
+            Err(error) => {
+                return JsonRpcResponse::error(
+                    request_id,
+                    INTERNAL_ERROR,
+                    format!("subprocess transport: serialising request failed: {error}"),
+                );
+            }
+        };
+
+        let mut inner = self.inner.lock().await;
+        if let Err(error) = inner.stdin.write_all(line.as_bytes()).await {
+            return JsonRpcResponse::error(
+                request_id,
+                INTERNAL_ERROR,
+                format!("subprocess transport: stdin write failed: {error}"),
+            );
+        }
+        if let Err(error) = inner.stdin.write_all(b"\n").await {
+            return JsonRpcResponse::error(
+                request_id,
+                INTERNAL_ERROR,
+                format!("subprocess transport: stdin newline write failed: {error}"),
+            );
+        }
+        if let Err(error) = inner.stdin.flush().await {
+            return JsonRpcResponse::error(
+                request_id,
+                INTERNAL_ERROR,
+                format!("subprocess transport: stdin flush failed: {error}"),
+            );
+        }
+
+        let response_line = match inner.stdout.next_line().await {
+            Ok(Some(line)) => line,
+            Ok(None) => {
+                return JsonRpcResponse::error(
+                    request_id,
+                    INTERNAL_ERROR,
+                    "subprocess transport: child closed stdout (EOF) before responding",
+                );
+            }
+            Err(error) => {
+                return JsonRpcResponse::error(
+                    request_id,
+                    INTERNAL_ERROR,
+                    format!("subprocess transport: stdout read failed: {error}"),
+                );
+            }
+        };
+
+        match serde_json::from_str::<JsonRpcResponse>(&response_line) {
+            Ok(response) => response,
+            Err(error) => JsonRpcResponse::error(
+                request_id,
+                INTERNAL_ERROR,
+                format!(
+                    "subprocess transport: response decode failed: {error}; raw: {}",
+                    truncate_for_log(&response_line, 256)
+                ),
+            ),
+        }
+    }
+
+    fn provider_label(&self) -> &str {
+        &self.label
+    }
+}
+
+fn truncate_for_log(s: &str, max: usize) -> String {
+    if s.len() <= max {
+        return s.to_string();
+    }
+    let mut cut = max;
+    while !s.is_char_boundary(cut) && cut > 0 {
+        cut -= 1;
+    }
+    format!("{}…", &s[..cut])
+}
+
 /// Wraps an `McpTransport` and dispatches knowledge queries
 /// through it. Constructed once at startup; cheap to share via
 /// `Arc`. The transport is injectable so the in-process and
@@ -415,5 +585,71 @@ mod tests {
             .await
             .unwrap();
         assert!(snapshot.is_empty());
+    }
+
+    /// Integration smoke test for `SubprocessTransport`. Requires
+    /// the `sem_os_mcp` binary to be built first via
+    /// `cargo build -p sem_os_mcp --bin sem_os_mcp`. Marked
+    /// `#[ignore]` so the default `cargo test` run stays hermetic;
+    /// run on demand with
+    /// `cargo test -p ob-poc-agent --lib subprocess -- --ignored`.
+    #[tokio::test]
+    #[ignore = "requires `cargo build -p sem_os_mcp` first; opt-in via --ignored"]
+    async fn subprocess_transport_round_trips_through_real_binary() {
+        // Locate the bin relative to the current test executable.
+        // `current_exe` is `<target>/debug/deps/ob_poc_agent-<hash>`;
+        // we walk up to `<target>/debug` and pick up `sem_os_mcp`.
+        let test_exe = std::env::current_exe().expect("current_exe");
+        let bin_dir = test_exe
+            .parent()
+            .and_then(|p| p.parent())
+            .expect("target debug dir");
+        let bin_path = bin_dir.join("sem_os_mcp");
+        assert!(
+            bin_path.exists(),
+            "sem_os_mcp binary not at {} — run `cargo build -p sem_os_mcp` first",
+            bin_path.display()
+        );
+
+        let transport = SubprocessTransport::spawn(&bin_path, &[])
+            .await
+            .expect("spawn sem_os_mcp");
+        assert!(transport.provider_label().starts_with("subprocess:"));
+
+        // Drive one tools/invoke round-trip — the stub bridge
+        // returns no matches, so the response should report a
+        // structured zero-entry result.
+        let request = JsonRpcRequest {
+            jsonrpc: "2.0".to_string(),
+            id: Some(json!(1)),
+            method: "tools/invoke".to_string(),
+            params: json!({
+                "name": "entity_resolve",
+                "arguments": {"text": "Allianz", "entity_kind": "cbu"}
+            }),
+        };
+        let response = transport.invoke(request).await;
+        assert!(response.error.is_none(), "got error: {:?}", response.error);
+        let matches = response
+            .result
+            .as_ref()
+            .and_then(|v| v["result"]["matches"].as_array())
+            .expect("matches array in response");
+        assert!(matches.is_empty(), "stub bridge returns no matches");
+
+        // Pipe a second request through the same transport to
+        // prove the mutex / pipe state survives more than one
+        // round-trip.
+        let request = JsonRpcRequest {
+            jsonrpc: "2.0".to_string(),
+            id: Some(json!(2)),
+            method: "tools/invoke".to_string(),
+            params: json!({
+                "name": "pack_catalogue",
+                "arguments": {"workspace": "cbu"}
+            }),
+        };
+        let response = transport.invoke(request).await;
+        assert!(response.error.is_none(), "got error: {:?}", response.error);
     }
 }
