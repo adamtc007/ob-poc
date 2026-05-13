@@ -17,8 +17,10 @@ use ob_poc_boundary::acp_protocol::{
     JsonRpcResponse,
 };
 use serde_json::{json, Value};
+use uuid::Uuid;
 
 use crate::audit::{AuditRecord, AuditSink};
+use crate::goal_frame::GoalFrameStore;
 use crate::planning::{DraftSource, PlanningLoop, PlanningOutcome};
 use crate::repl_channel::{minimal_source_for_verb, ReplChannelClient, ValidationOutcome};
 
@@ -44,6 +46,7 @@ pub async fn try_handle_prompt(
     planning: &PlanningLoop,
     channel: &dyn ReplChannelClient,
     audit: &dyn AuditSink,
+    frames: &GoalFrameStore,
 ) -> Option<Vec<JsonRpcOutgoing>> {
     if request.method != "session/prompt" {
         return None;
@@ -62,10 +65,34 @@ pub async fn try_handle_prompt(
         }
     };
 
+    let session_uuid = match Uuid::parse_str(&parsed.session_id) {
+        Ok(uuid) => uuid,
+        Err(error) => {
+            return Some(vec![JsonRpcOutgoing::Response(error_response(
+                id,
+                INVALID_PARAMS,
+                format!("sessionId must be a UUID: {error}"),
+                None,
+            ))]);
+        }
+    };
+
     let utterance = collect_utterance(&parsed.prompt);
 
-    match planning.propose_draft(&utterance).await {
+    // Phase 3.1c — session binding. If the session already has a
+    // goal frame and it is still mutable, refine it in place;
+    // otherwise the planning loop seeds a fresh one.
+    let existing = frames.get(session_uuid).await;
+    let was_refined = matches!(&existing, Some(frame) if frame.status.is_mutable());
+
+    match planning.propose_draft(&utterance, existing).await {
         Ok(outcome) => {
+            // Persist the (possibly-refined) frame back to the store
+            // so the next prompt sees it.
+            frames
+                .put(session_uuid, outcome.goal_frame.clone())
+                .await;
+
             // Phase 2.7: round-trip the draft through the LSP-shaped
             // channel before the response leaves the agent. The spike
             // channel is parse-only; Phase 4 swaps for a real LSP
@@ -84,6 +111,7 @@ pub async fn try_handle_prompt(
                 outcome,
                 &utterance,
                 validation,
+                was_refined,
             ))
         }
         Err(error) => Some(vec![JsonRpcOutgoing::Response(error_response(
@@ -121,6 +149,7 @@ fn success_messages(
     outcome: PlanningOutcome,
     utterance: &str,
     validation: ValidationOutcome,
+    was_refined: bool,
 ) -> Vec<JsonRpcOutgoing> {
     let source = match outcome.source {
         DraftSource::LlmTool => "llm_tool",
@@ -145,6 +174,9 @@ fn success_messages(
                     "workspace": outcome.goal_frame.workspace,
                     "intentSummary": outcome.goal_frame.intent_summary,
                     "createdAt": outcome.goal_frame.created_at.to_rfc3339(),
+                    "updatedAt": outcome.goal_frame.updated_at.to_rfc3339(),
+                    "status": outcome.goal_frame.status,
+                    "wasRefined": was_refined,
                     "verbFqn": outcome.verb_fqn,
                     "draftSource": source,
                     "utteranceLength": utterance.len(),
@@ -285,7 +317,8 @@ progress_signals: []
         };
         let channel = LocalParseChannel::new();
         let audit = NullAuditSink;
-        let outcome = try_handle_prompt(&request, &make_planning_loop(), &channel, &audit).await;
+        let frames = GoalFrameStore::new();
+        let outcome = try_handle_prompt(&request, &make_planning_loop(), &channel, &audit, &frames).await;
         assert!(outcome.is_none());
     }
 
@@ -302,7 +335,8 @@ progress_signals: []
         };
         let channel = LocalParseChannel::new();
         let audit = NullAuditSink;
-        let outcome = try_handle_prompt(&request, &make_planning_loop(), &channel, &audit)
+        let frames = GoalFrameStore::new();
+        let outcome = try_handle_prompt(&request, &make_planning_loop(), &channel, &audit, &frames)
             .await
             .expect("session/prompt must be handled");
         assert_eq!(outcome.len(), 3, "plan update + diagnostics + response");
@@ -348,7 +382,8 @@ progress_signals: []
         };
         let channel = LocalParseChannel::new();
         let audit = NullAuditSink;
-        let outcome = try_handle_prompt(&request, &make_planning_loop(), &channel, &audit)
+        let frames = GoalFrameStore::new();
+        let outcome = try_handle_prompt(&request, &make_planning_loop(), &channel, &audit, &frames)
             .await
             .expect("handled");
         assert_eq!(outcome.len(), 1);
@@ -359,5 +394,102 @@ progress_signals: []
             }
             JsonRpcOutgoing::Notification(_) => panic!("expected response"),
         }
+    }
+
+    fn prompt_request(session_id: &str, text: &str, request_id: i64) -> JsonRpcRequest {
+        JsonRpcRequest {
+            jsonrpc: "2.0".to_string(),
+            id: Some(json!(request_id)),
+            method: "session/prompt".to_string(),
+            params: json!({
+                "sessionId": session_id,
+                "prompt": [{"type": "text", "text": text}]
+            }),
+        }
+    }
+
+    fn extract_goal_frame_id(outgoing: &[JsonRpcOutgoing]) -> (String, bool) {
+        match &outgoing[0] {
+            JsonRpcOutgoing::Notification(note) => {
+                let trace = &note.params["update"]["goalProposalTrace"];
+                let id = trace["goalFrameId"].as_str().unwrap().to_string();
+                let refined = trace["wasRefined"].as_bool().unwrap();
+                (id, refined)
+            }
+            JsonRpcOutgoing::Response(_) => panic!("expected plan-update notification"),
+        }
+    }
+
+    #[tokio::test]
+    async fn malformed_session_id_returns_invalid_params() {
+        let request = prompt_request("not-a-uuid", "anything", 42);
+        let channel = LocalParseChannel::new();
+        let audit = NullAuditSink;
+        let frames = GoalFrameStore::new();
+        let outcome = try_handle_prompt(&request, &make_planning_loop(), &channel, &audit, &frames)
+            .await
+            .expect("handled");
+        assert_eq!(outcome.len(), 1);
+        match &outcome[0] {
+            JsonRpcOutgoing::Response(resp) => {
+                let err = resp.error.as_ref().expect("error response");
+                assert_eq!(err.code, INVALID_PARAMS);
+                assert!(
+                    err.message.contains("UUID"),
+                    "message must say UUID: {}",
+                    err.message
+                );
+            }
+            JsonRpcOutgoing::Notification(_) => panic!("expected response"),
+        }
+    }
+
+    #[tokio::test]
+    async fn second_prompt_in_session_refines_existing_frame() {
+        let sid = "00000000-0000-0000-0000-000000000001";
+        let channel = LocalParseChannel::new();
+        let audit = NullAuditSink;
+        let frames = GoalFrameStore::new();
+        let planning = make_planning_loop();
+
+        let first =
+            try_handle_prompt(&prompt_request(sid, "set up a book", 1), &planning, &channel, &audit, &frames)
+                .await
+                .expect("first prompt handled");
+        let (first_id, first_refined) = extract_goal_frame_id(&first);
+        assert!(!first_refined, "first prompt must seed, not refine");
+
+        let second = try_handle_prompt(
+            &prompt_request(sid, "actually attach a product", 2),
+            &planning,
+            &channel,
+            &audit,
+            &frames,
+        )
+        .await
+        .expect("second prompt handled");
+        let (second_id, second_refined) = extract_goal_frame_id(&second);
+        assert!(second_refined, "second prompt must refine");
+        assert_eq!(second_id, first_id, "frame id must persist across prompts");
+
+        // Different session id seeds its own fresh frame.
+        let sid2 = "00000000-0000-0000-0000-000000000002";
+        let other = try_handle_prompt(
+            &prompt_request(sid2, "different session", 3),
+            &planning,
+            &channel,
+            &audit,
+            &frames,
+        )
+        .await
+        .expect("third prompt handled");
+        let (other_id, other_refined) = extract_goal_frame_id(&other);
+        assert!(!other_refined);
+        assert_ne!(
+            other_id, first_id,
+            "different sessions must hold independent frames"
+        );
+
+        assert_eq!(frames.len().await, 2, "two distinct sessions retained");
     }
 }

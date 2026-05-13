@@ -110,8 +110,25 @@ impl PlanningLoop {
     /// If no LLM is wired, the loop picks the first sanctioned verb
     /// as a deterministic fallback so the spike can run end-to-end
     /// in CI / offline.
-    pub async fn propose_draft(&self, utterance: &str) -> Result<PlanningOutcome> {
-        let goal_frame = GoalFrame::seed_for_spike(utterance, &self.index);
+    ///
+    /// `existing` is the frame bound to this session (Phase 3.1c).
+    /// When `Some` and still mutable, the existing frame is reused
+    /// (id + created_at + pack anchor preserved) and refined with
+    /// the new utterance. Otherwise a fresh frame is seeded.
+    pub async fn propose_draft(
+        &self,
+        utterance: &str,
+        existing: Option<GoalFrame>,
+    ) -> Result<PlanningOutcome> {
+        let goal_frame = match existing {
+            Some(mut frame) if frame.status.is_mutable() => {
+                frame
+                    .refine_with_utterance(utterance)
+                    .expect("mutable status guarded above");
+                frame
+            }
+            _ => GoalFrame::seed_for_spike(utterance, &self.index),
+        };
 
         // Phase 2.8 — exercise the knowledge surface so the seam is
         // demonstrably wired end-to-end. The spike client returns
@@ -323,7 +340,7 @@ progress_signals: []
     #[tokio::test]
     async fn deterministic_fallback_picks_first_allowed_verb() {
         let loop_ = PlanningLoop::new(make_index(), None, None);
-        let outcome = loop_.propose_draft("set up a book").await.unwrap();
+        let outcome = loop_.propose_draft("set up a book", None).await.unwrap();
         assert_eq!(outcome.verb_fqn, "cbu.create");
         assert_eq!(outcome.source, DraftSource::DeterministicFallback);
         assert_eq!(outcome.goal_frame.pack_id, "book-setup");
@@ -350,7 +367,7 @@ progress_signals: []
             verb_fqn: "cbu.attach-product".to_string(),
         });
         let loop_ = PlanningLoop::new(make_index(), Some(llm), None);
-        let outcome = loop_.propose_draft("attach the new product").await.unwrap();
+        let outcome = loop_.propose_draft("attach the new product", None).await.unwrap();
         assert_eq!(outcome.verb_fqn, "cbu.attach-product");
         assert_eq!(outcome.source, DraftSource::LlmTool);
     }
@@ -362,7 +379,7 @@ progress_signals: []
         });
         let loop_ = PlanningLoop::new(make_index(), Some(llm), None);
         let err = loop_
-            .propose_draft("wipe the book")
+            .propose_draft("wipe the book", None)
             .await
             .expect_err("denylist hit must reject");
         assert!(
@@ -378,7 +395,7 @@ progress_signals: []
         });
         let loop_ = PlanningLoop::new(make_index(), Some(llm), None);
         let err = loop_
-            .propose_draft("do something new")
+            .propose_draft("do something new", None)
             .await
             .expect_err("unlisted verb must reject");
         assert!(

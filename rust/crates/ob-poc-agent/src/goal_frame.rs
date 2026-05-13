@@ -115,6 +115,24 @@ pub struct GoalFrame {
 }
 
 impl GoalFrame {
+    /// Refine an existing frame with a new utterance. Used by Phase
+    /// 3.1c when a follow-up prompt arrives on a session whose
+    /// frame is still mutable (`Proposed`). The id, `created_at`,
+    /// and pack anchor stay; the utterance and `updated_at` move.
+    /// Returns `Err` when the frame is no longer mutable (Confirmed
+    /// / InProgress / Completed / Refused).
+    pub fn refine_with_utterance(
+        &mut self,
+        utterance: &str,
+    ) -> Result<(), GoalFrameTransitionError> {
+        if !self.status.is_mutable() {
+            return Err(GoalFrameTransitionError::InvalidFrom(self.status));
+        }
+        self.utterance = utterance.to_string();
+        self.updated_at = Utc::now();
+        Ok(())
+    }
+
     /// Seed constructor — captures the utterance + anchors against
     /// the session index. Phase 3.2+ will introduce richer
     /// constructors that thread constellation hydration + frontier
