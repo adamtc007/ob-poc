@@ -4,11 +4,13 @@
 //! `CoderFailureKind`, `CoderDiagnostics`, `CoderFilterDiagnostics`,
 //! `CoderResult`) moved to `ob_poc_envelope::sage::coder_result`. The
 //! `CoderEngine` itself stays here because it depends on dsl_core verb
-//! config and mcp::intent_pipeline. The `From<FilterDiagnostics>` impl
-//! also stays — the orphan rule allows it since `FilterDiagnostics` is
-//! local to this crate. The `pub use` re-export below preserves
-//! `sage::coder::{CoderResolution, CoderResult, ...}` paths used by
-//! agent::orchestrator and others.
+//! config and mcp::intent_pipeline.
+//!
+//! Slice 2bb (2026-05-13) followed up: `FilterDiagnostics` itself moved
+//! to envelope, so the `From<FilterDiagnostics> for CoderFilterDiagnostics`
+//! impl moved alongside it (orphan rule). The `pub use` re-export below
+//! preserves `sage::coder::{CoderResolution, CoderResult, ...}` paths
+//! used by agent::orchestrator and others.
 
 use anyhow::{anyhow, Result};
 use dsl_core::config::loader::ConfigLoader;
@@ -26,18 +28,6 @@ use super::verb_resolve::{FilterDiagnostics, ScoredVerbCandidate, StructuredVerb
 pub use super::coder_result::{
     CoderDiagnostics, CoderFailureKind, CoderFilterDiagnostics, CoderResolution, CoderResult,
 };
-
-impl From<FilterDiagnostics> for CoderFilterDiagnostics {
-    fn from(value: FilterDiagnostics) -> Self {
-        Self {
-            base_candidates: value.base_candidates,
-            domain_candidates: value.domain_candidates,
-            phase_candidates: value.phase_candidates,
-            subject_kind_candidates: value.subject_kind_candidates,
-            final_candidates: value.final_candidates,
-        }
-    }
-}
 
 /// Deterministic Coder engine over verb metadata and config.
 #[derive(Debug, Clone)]

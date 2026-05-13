@@ -28,3 +28,8 @@ pub mod disposition;
 pub mod outcome;
 pub mod plane;
 pub mod polarity;
+// Phase 3 slice 2bb (2026-05-13): ScoredVerbCandidate + FilterDiagnostics +
+// the From<FilterDiagnostics> for CoderFilterDiagnostics impl relocated
+// here. Once both sides of the conversion are in envelope the orphan rule
+// requires the impl to follow.
+pub mod verb_resolve_types;

@@ -7,9 +7,10 @@
 //! `ob_poc::sage::coder` because it pulls execution-tier deps (dsl_core
 //! verb config, mcp::intent_pipeline, scorer state).
 //!
-//! `impl From<FilterDiagnostics> for CoderFilterDiagnostics` stays at the
-//! engine site (orphan rule allows the impl in either crate; keeping it there
-//! avoids dragging `FilterDiagnostics` into the boundary tier).
+//! Slice 2bb (2026-05-13) update: `FilterDiagnostics` itself moved to the
+//! boundary tier (see `verb_resolve_types`), so the
+//! `From<FilterDiagnostics> for CoderFilterDiagnostics` impl that used to
+//! live at the engine site now lives alongside the types.
 
 use serde::{Deserialize, Serialize};
 

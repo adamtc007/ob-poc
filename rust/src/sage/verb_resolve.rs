@@ -14,24 +14,13 @@ use super::outcome::OutcomeIntent;
 use super::polarity::IntentPolarity;
 use super::verb_index::{VerbMeta, VerbMetadataIndex};
 
-/// Ranked candidate returned by the structured scorer.
-#[derive(Debug, Clone)]
-pub struct ScoredVerbCandidate {
-    pub fqn: String,
-    pub score: f32,
-    pub action_score: f32,
-    pub param_overlap_score: f32,
-}
-
-/// Candidate counts after each deterministic filter stage.
-#[derive(Debug, Clone, Copy, Default)]
-pub struct FilterDiagnostics {
-    pub base_candidates: usize,
-    pub domain_candidates: usize,
-    pub phase_candidates: usize,
-    pub subject_kind_candidates: usize,
-    pub final_candidates: usize,
-}
+// Phase 3 slice 2bb (2026-05-13): result DTOs (`ScoredVerbCandidate`,
+// `FilterDiagnostics`) moved to `ob_poc_envelope::sage::verb_resolve_types`
+// alongside the `From<FilterDiagnostics> for CoderFilterDiagnostics` impl.
+// Back-compat re-export keeps `sage::verb_resolve::{ScoredVerbCandidate,
+// FilterDiagnostics}` and `crate::sage::ScoredVerbCandidate` (via mod.rs
+// pub-use chain) reachable for the engine and external callers.
+pub use super::verb_resolve_types::{FilterDiagnostics, ScoredVerbCandidate};
 
 /// Deterministic metadata-based verb scorer.
 #[derive(Debug, Clone)]
