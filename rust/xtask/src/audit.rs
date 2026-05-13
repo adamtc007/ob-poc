@@ -64,6 +64,9 @@ const CANONICAL_NAMES: &[&str] = &[
     "TransitionDef",
     "ReducerDef",
     "ConditionDef",
+    "OverlaySourceDef",
+    "RuleDef",
+    "ConsistencyCheckDef",
     // Verb contract — sem_os_core/verb_contract.rs.
     "VerbContractBody",
     "VerbCrudMapping",
@@ -78,6 +81,26 @@ const CANONICAL_NAMES: &[&str] = &[
     "LifecycleTransition",
     // Relationship type — sem_os_core/relationship_type_def.rs.
     "RelationshipTypeDefBody",
+    // Attribute / typed-attribute schema — sem_os_core/attribute_def.rs.
+    "AttributeDefBody",
+    // Constellation surface — sem_os_core/constellation_*.
+    "ConstellationMapDefBody",
+    // Document + evidence + observation + obligation + profile —
+    // sem_os_core/*_def.rs.
+    "DocumentTypeDefBody",
+    "EvidenceStrategyDefBody",
+    "ObservationDefBody",
+    "ProofObligationDefBody",
+    "RequirementProfileDefBody",
+    // Service-resource discovery & provisioning — sem_os_core/
+    // service_resource_def.rs.
+    "ServiceResourceDefBody",
+    // Taxonomy / universe / view surface — sem_os_core/*_def.rs.
+    "TaxonomyDefBody",
+    "UniverseDefBody",
+    "ViewDefBody",
+    // Policy rule — sem_os_core/policy_rule.rs.
+    "PolicyRuleBody",
 ];
 
 /// Directories the audit walks. Workspace-relative; the audit runs
