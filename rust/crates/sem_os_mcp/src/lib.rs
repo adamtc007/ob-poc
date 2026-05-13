@@ -71,3 +71,11 @@ pub mod tools;
 /// Server dispatcher — `initialize` / `tools/list` /
 /// `tools/invoke`. Phase 4.2a.
 pub mod server;
+
+/// SemOS substrate bridge trait — narrow surface the knowledge
+/// tools delegate through. Spike ships `StubBridge`; Phase 4.3
+/// adapts `sem_os_client::SemOsClient` to this surface.
+pub mod bridge;
+
+/// Concrete `KnowledgeTool` implementations — Phase 4.2b onwards.
+pub mod tool_impls;
