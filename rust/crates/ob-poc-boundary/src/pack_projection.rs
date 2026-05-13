@@ -193,14 +193,14 @@ pub(crate) fn ensure_test_provider_registered() {
 fn load_test_pack_manifests(
     config_root: &Path,
 ) -> Result<Vec<(PackManifest, String)>, String> {
-    use crate::journey::pack::load_packs_from_dir;
+    use ob_poc_journey::pack::load_packs_from_dir;
     let packs_dir = config_root.join("packs");
     load_packs_from_dir(&packs_dir).map_err(|error| error.to_string())
 }
 
 #[cfg(test)]
 fn load_test_pack_projections() -> Result<Vec<PackProjection>, String> {
-    use crate::journey::pack::load_packs_from_dir;
+    use ob_poc_journey::pack::load_packs_from_dir;
     use std::path::Path;
     // CARGO_MANIFEST_DIR resolves to repo/rust/crates/ob-poc-boundary; the
     // shared config tree lives at repo/rust/config (two levels up).
@@ -211,7 +211,7 @@ fn load_test_pack_projections() -> Result<Vec<PackProjection>, String> {
 
 #[cfg(test)]
 fn test_project_pack(
-    (manifest, hash): (crate::journey::pack::PackManifest, String),
+    (manifest, hash): (ob_poc_types::journey::pack_types::PackManifest, String),
 ) -> PackProjection {
     use crate::acp_dag_semantic::workspace_context_name;
     use crate::acp_dag_semantic::{

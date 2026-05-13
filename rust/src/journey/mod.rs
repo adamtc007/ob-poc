@@ -12,13 +12,15 @@
 //! - **Pack Playback** (`playback.rs`): Pack-level summary and chapter view generation.
 //! - **Pack Handoff** (`handoff.rs`): Context forwarding between packs.
 
-// Phase 3 slice 2u (2026-05-13): handoff DTO relocated to ob-poc-boundary.
-pub use ob_poc_boundary::journey::handoff;
-// Phase 3 slice 2d.2 (2026-05-12): pack manifest types relocated to ob-poc-boundary.
-pub use ob_poc_boundary::journey::pack;
+// Phase 3C of capability-crate restructure (2026-05-13): the three
+// journey leaves (pack manifest types/loader, lifecycle FSM, handoff
+// DTO) live in `ob-poc-journey`. The compat re-exports below preserve
+// the `ob_poc::journey::{handoff,pack,pack_state}` paths used across
+// the application crate.
+pub use ob_poc_journey::handoff;
+pub use ob_poc_journey::pack;
 pub mod pack_manager;
-// Phase 3 slice 2u (2026-05-13): pack lifecycle FSM relocated to ob-poc-boundary.
-pub use ob_poc_boundary::journey::pack_state;
+pub use ob_poc_journey::pack_state;
 pub mod playback;
 pub mod router;
 pub mod template;

@@ -53,7 +53,11 @@ pub mod derived_attributes;
 pub mod entity_linking;
 #[cfg(feature = "database")]
 pub mod feedback;
-pub mod journey;
+// Phase 3C of capability-crate restructure (2026-05-13): journey/{pack,
+// handoff,pack_state} relocated to `ob-poc-journey` per plan §6 decision 2.
+// Boundary's pack-related surface is now `pack_projection` (typed
+// projection + provider hook); the raw manifest types live in
+// `ob_poc_types::journey::pack_types`.
 pub mod lexicon;
 pub mod lint;
 pub mod macros;

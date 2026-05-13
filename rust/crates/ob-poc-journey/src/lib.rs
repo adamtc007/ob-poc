@@ -40,18 +40,21 @@
 //!
 //! ## Migration status (2026-05-13)
 //!
-//! This crate is the destination for Phase 3 of the capability-crate
-//! restructure (`docs/todo/capability-crate-restructure-v1.md`). Phase 3
-//! moves three journey modules out of `ob-poc-boundary::journey::*` into
-//! this crate. The later helpers (pack_manager, router, playback,
-//! template) live in `ob-poc/src/journey/` today and stay there unless
-//! Phase 3 successor work decouples their REPL deps.
+//! Phase 3C of the capability-crate restructure
+//! (`docs/todo/capability-crate-restructure-v1.md`) relocated the three
+//! journey modules from `ob-poc-boundary::journey::*` to this crate.
+//! The later helpers (pack_manager, router, playback, template) live in
+//! `ob-poc/src/journey/` today and stay there unless Phase 3 successor
+//! work decouples their REPL deps.
 //!
 //! Note on the boundary edge: per plan §6 decision 2, `ob-poc-boundary`
-//! does NOT depend on this crate. The ACP discovery projection owns its
-//! own `PackProjection` DTO; the projection function (`fn from(&PackManifest)
-//! -> PackProjection`) lives in `ob-poc` (the application layer).
+//! does NOT depend on this crate at runtime. The ACP discovery projection
+//! owns its own `PackProjection` DTO; the projection function
+//! (`fn from(&PackManifest) -> PackProjection`) lives in `ob-poc` (the
+//! application layer). Boundary may depend on this crate as a
+//! `dev-dependency` only — used by `#[cfg(test)]` fixtures that exercise
+//! the projection pipeline against real on-disk packs.
 
-// Empty — Phase 3C is paused on acp_registry_projection refactor blocker.
-// See `docs/todo/capability-crate-restructure-v1.md` §6 and the journey
-// mod.rs in ob-poc-boundary for the current status.
+pub mod handoff;
+pub mod pack;
+pub mod pack_state;
