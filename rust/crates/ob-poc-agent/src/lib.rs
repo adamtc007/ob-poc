@@ -105,6 +105,12 @@ pub mod blockers;
 /// system prompt with a frontier- and blocker-aware template.
 pub mod motivation;
 
+/// Approval policy + refused-draft tracking — Phase 3.6
+/// (C-12 / C-13). Pure read of pack `risk_policy` into a typed
+/// approval decision; refused drafts are tracked on the goal frame
+/// for the next planning round to avoid.
+pub mod approval;
+
 /// Sage planning loop — Phase 2.6. Takes a raw utterance + a
 /// `SessionIndex` and returns a constrained-composition draft (verb
 /// FQN bounded to the pack allowlist). LLM call site is optional so

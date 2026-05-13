@@ -48,6 +48,7 @@ use serde::{Deserialize, Serialize};
 use tokio::sync::Mutex;
 use uuid::Uuid;
 
+use crate::approval::ApprovalDecision;
 use crate::blockers::BlockerReport;
 use crate::constellation::ConstellationSnapshot;
 use crate::frontier::Frontier;
@@ -132,6 +133,16 @@ pub struct GoalFrame {
     /// records may omit.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub blockers: Option<BlockerReport>,
+    /// Approval decision computed at draft time (Phase 3.6 — C-12).
+    /// `None` until the planning loop has produced at least one
+    /// outcome.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub approval: Option<ApprovalDecision>,
+    /// Verb FQNs the user has refused for this goal frame (Phase
+    /// 3.6 — C-13). The motivation prompt + deterministic fallback
+    /// avoid these on the next round. Empty by default.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub refused_drafts: Vec<String>,
 }
 
 impl GoalFrame {
@@ -172,6 +183,8 @@ impl GoalFrame {
             constellation: None,
             frontier: None,
             blockers: None,
+            approval: None,
+            refused_drafts: Vec::new(),
         }
     }
 
@@ -197,6 +210,26 @@ impl GoalFrame {
     pub fn attach_blockers(&mut self, blockers: BlockerReport) {
         self.blockers = Some(blockers);
         self.updated_at = Utc::now();
+    }
+
+    /// Attach (or replace) an approval decision, bumping
+    /// `updated_at`. Used by the planning loop after each approval
+    /// evaluation (Phase 3.6 — C-12).
+    pub fn attach_approval(&mut self, decision: ApprovalDecision) {
+        self.approval = Some(decision);
+        self.updated_at = Utc::now();
+    }
+
+    /// Record that the user refused the named verb FQN as a draft.
+    /// Idempotent — duplicates collapse. Does not change the
+    /// frame's status (use `refuse()` to terminate the whole
+    /// frame instead). Bumps `updated_at`.
+    pub fn record_refused_draft(&mut self, verb_fqn: impl Into<String>) {
+        let fqn = verb_fqn.into();
+        if !self.refused_drafts.contains(&fqn) {
+            self.refused_drafts.push(fqn);
+            self.updated_at = Utc::now();
+        }
     }
 
     /// Mark the frame as refused. Idempotent: refusing an already-

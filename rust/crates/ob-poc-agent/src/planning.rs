@@ -32,6 +32,7 @@ use anyhow::{anyhow, Result};
 use ob_agentic::llm_client::LlmClient;
 use serde::{Deserialize, Serialize};
 
+use crate::approval::ApprovalEvaluator;
 use crate::blockers::BlockerDetector;
 use crate::constellation::{ConstellationHydrator, ConstellationSnapshot, HydrationScope};
 use crate::frontier::FrontierEngine;
@@ -241,13 +242,16 @@ impl PlanningLoop {
                 (result.verb_fqn, Some(result.intent_summary), DraftSource::LlmTool)
             }
             None => {
-                let fallback = self.deterministic_fallback().ok_or_else(|| {
-                    anyhow!(
-                        "no LLM client wired and pack '{}' has no sanctioned verbs to fall \
-                         back on",
-                        self.index.pack.id
-                    )
-                })?;
+                let fallback = self
+                    .deterministic_fallback(&goal_frame.refused_drafts)
+                    .ok_or_else(|| {
+                        anyhow!(
+                            "no LLM client wired and pack '{}' has no sanctioned verbs (after \
+                             excluding {} refused) to fall back on",
+                            self.index.pack.id,
+                            goal_frame.refused_drafts.len()
+                        )
+                    })?;
                 (fallback, None, DraftSource::DeterministicFallback)
             }
         };
@@ -269,6 +273,17 @@ impl PlanningLoop {
         );
         goal_frame.attach_blockers(blocker_report);
 
+        // Phase 3.6 — evaluate the approval decision from the pack
+        // `risk_policy`. Attached even when not required so audit
+        // shape is stable.
+        let approval = ApprovalEvaluator::evaluate(
+            &self.index,
+            &goal_frame,
+            goal_frame.frontier.as_ref().expect("attached above"),
+            goal_frame.blockers.as_ref().expect("attached above"),
+        );
+        goal_frame.attach_approval(approval);
+
         Ok(PlanningOutcome {
             goal_frame,
             verb_fqn,
@@ -276,11 +291,11 @@ impl PlanningLoop {
         })
     }
 
-    fn deterministic_fallback(&self) -> Option<String> {
+    fn deterministic_fallback(&self, refused: &[String]) -> Option<String> {
         self.index
             .allowed_verbs()
             .iter()
-            .find(|v| !self.index.forbidden_verbs().contains(v))
+            .find(|v| !self.index.forbidden_verbs().contains(v) && !refused.contains(v))
             .cloned()
     }
 

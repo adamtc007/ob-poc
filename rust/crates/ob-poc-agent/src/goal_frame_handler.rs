@@ -38,6 +38,7 @@ pub fn is_goal_frame_method(method: &str) -> bool {
         "obpoc/goal_frame/get"
             | "obpoc/goal_frame/confirm"
             | "obpoc/goal_frame/refuse"
+            | "obpoc/goal_frame/refuse_draft"
             | "obpoc/goal_frame/start_execution"
             | "obpoc/goal_frame/complete"
     )
@@ -55,7 +56,10 @@ pub async fn try_handle_goal_frame(
     }
 
     let id = request.id.clone();
-    let params: SessionIdParams = match serde_json::from_value(request.params.clone()) {
+    // The refuse_draft method needs an extra `verbFqn` field; the
+    // other methods only need sessionId. Parse the broader shape
+    // here and unpack per method below.
+    let params: RefuseDraftParams = match serde_json::from_value(request.params.clone()) {
         Ok(parsed) => parsed,
         Err(error) => {
             return Some(vec![JsonRpcOutgoing::Response(error_response(
@@ -90,6 +94,23 @@ pub async fn try_handle_goal_frame(
             .update(session_uuid, GoalFrame::refuse)
             .await
             .map(Ok),
+        "obpoc/goal_frame/refuse_draft" => {
+            let verb_fqn = match params.verb_fqn.as_deref() {
+                Some(v) if !v.is_empty() => v.to_string(),
+                _ => {
+                    return Some(vec![JsonRpcOutgoing::Response(error_response(
+                        id,
+                        INVALID_PARAMS,
+                        "refuse_draft requires non-empty verbFqn".to_string(),
+                        None,
+                    ))]);
+                }
+            };
+            frames
+                .update(session_uuid, |frame| frame.record_refused_draft(&verb_fqn))
+                .await
+                .map(Ok)
+        }
         "obpoc/goal_frame/start_execution" => frames
             .update(session_uuid, |frame| {
                 let _ = frame.start_execution();
@@ -154,8 +175,10 @@ where
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
-struct SessionIdParams {
+struct RefuseDraftParams {
     session_id: String,
+    #[serde(default)]
+    verb_fqn: Option<String>,
 }
 
 fn success_response(id: Option<Value>, result: Value) -> JsonRpcResponse {
@@ -327,6 +350,48 @@ progress_signals: []
             .unwrap();
         let stored = store.get(sid).await.unwrap();
         assert_eq!(stored.status, GoalFrameStatus::Completed);
+    }
+
+    #[tokio::test]
+    async fn refuse_draft_appends_to_refused_drafts_without_changing_status() {
+        let store = GoalFrameStore::new();
+        let sid = Uuid::new_v4();
+        populate(&store, sid).await;
+        let request = JsonRpcRequest {
+            jsonrpc: "2.0".to_string(),
+            id: Some(json!(1)),
+            method: "obpoc/goal_frame/refuse_draft".to_string(),
+            params: json!({"sessionId": sid.to_string(), "verbFqn": "cbu.create"}),
+        };
+        let outcome = try_handle_goal_frame(&request, &store).await.unwrap();
+        match &outcome[0] {
+            JsonRpcOutgoing::Response(resp) => {
+                let frame = &resp.result.as_ref().unwrap()["frame"];
+                assert_eq!(frame["refused_drafts"][0], "cbu.create");
+                assert_eq!(frame["status"], "proposed");
+            }
+            JsonRpcOutgoing::Notification(_) => panic!(),
+        }
+    }
+
+    #[tokio::test]
+    async fn refuse_draft_without_verb_fqn_returns_invalid_params() {
+        let store = GoalFrameStore::new();
+        let sid = Uuid::new_v4();
+        populate(&store, sid).await;
+        let request = JsonRpcRequest {
+            jsonrpc: "2.0".to_string(),
+            id: Some(json!(1)),
+            method: "obpoc/goal_frame/refuse_draft".to_string(),
+            params: json!({"sessionId": sid.to_string()}),
+        };
+        let outcome = try_handle_goal_frame(&request, &store).await.unwrap();
+        match &outcome[0] {
+            JsonRpcOutgoing::Response(resp) => {
+                assert_eq!(resp.error.as_ref().unwrap().code, INVALID_PARAMS);
+            }
+            JsonRpcOutgoing::Notification(_) => panic!(),
+        }
     }
 
     #[tokio::test]

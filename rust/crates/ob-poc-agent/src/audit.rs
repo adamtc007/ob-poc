@@ -255,6 +255,8 @@ mod tests {
                 constellation: None,
                 frontier: None,
                 blockers: None,
+                approval: None,
+                refused_drafts: Vec::new(),
             },
             verb_fqn: "cbu.create".to_string(),
             source: DraftSource::DeterministicFallback,
