@@ -29,7 +29,7 @@
 use std::sync::Arc;
 
 use anyhow::{anyhow, Result};
-use ob_agentic::llm_client::{LlmClient, ToolDefinition};
+use ob_agentic::llm_client::LlmClient;
 use serde::{Deserialize, Serialize};
 
 use crate::blockers::BlockerDetector;
@@ -38,6 +38,7 @@ use crate::frontier::FrontierEngine;
 use crate::goal_frame::GoalFrame;
 use crate::index::SessionIndex;
 use crate::knowledge::{active_verbs_query_for_index, KnowledgeResponse, SemOsKnowledgeClient};
+use crate::motivation::MotivationPromptBuilder;
 
 /// Output of one planning round-trip.
 ///
@@ -207,17 +208,37 @@ impl PlanningLoop {
             }
         }
 
-        let (verb_fqn, source) = match self.llm_client.as_ref() {
+        // Phase 3.5 — build the pre-LLM blocker view so the
+        // motivation prompt can surface blockers the LLM should
+        // consider before picking a verb. The post-LLM detect call
+        // below re-runs with the verb FQN to catch
+        // UnsanctionedDraft, which can't be known before the LLM
+        // returns.
+        let pre_blockers = BlockerDetector::detect(
+            &self.index,
+            goal_frame.frontier.as_ref().expect("attached above"),
+            &snapshot_ref,
+            None,
+        );
+
+        let (verb_fqn, intent_summary, source) = match self.llm_client.as_ref() {
             Some(client) => {
-                let proposed = self.invoke_llm(client.as_ref(), utterance).await?;
-                if !self.index.is_verb_sanctioned(&proposed) {
+                let prompt = MotivationPromptBuilder::build(
+                    &self.index,
+                    utterance,
+                    goal_frame.frontier.as_ref().expect("attached above"),
+                    Some(&pre_blockers),
+                );
+                let result = self.invoke_motivated_llm(client.as_ref(), &prompt).await?;
+                if !self.index.is_verb_sanctioned(&result.verb_fqn) {
                     return Err(anyhow!(
-                        "constrained-composition violation: LLM proposed '{proposed}' which is \
-                         not in pack '{}' allowlist (or is on the denylist)",
+                        "constrained-composition violation: LLM proposed '{}' which is not in \
+                         pack '{}' allowlist (or is on the denylist)",
+                        result.verb_fqn,
                         self.index.pack.id
                     ));
                 }
-                (proposed, DraftSource::LlmTool)
+                (result.verb_fqn, Some(result.intent_summary), DraftSource::LlmTool)
             }
             None => {
                 let fallback = self.deterministic_fallback().ok_or_else(|| {
@@ -227,13 +248,19 @@ impl PlanningLoop {
                         self.index.pack.id
                     )
                 })?;
-                (fallback, DraftSource::DeterministicFallback)
+                (fallback, None, DraftSource::DeterministicFallback)
             }
         };
 
-        // Phase 3.4 — detect blockers once the verb is chosen. Runs
-        // unconditionally; the report is attached to the goal frame
-        // even when empty so audit shape is stable.
+        if let Some(summary) = intent_summary {
+            goal_frame.intent_summary = Some(summary);
+            goal_frame.updated_at = chrono::Utc::now();
+        }
+
+        // Phase 3.4 — re-detect blockers with the verb FQN so the
+        // UnsanctionedDraft kind can fire. Runs unconditionally;
+        // the report is attached to the goal frame even when empty
+        // so audit shape is stable.
         let blocker_report = BlockerDetector::detect(
             &self.index,
             goal_frame.frontier.as_ref().expect("attached above"),
@@ -257,16 +284,15 @@ impl PlanningLoop {
             .cloned()
     }
 
-    async fn invoke_llm(&self, client: &dyn LlmClient, utterance: &str) -> Result<String> {
-        let tool = self.draft_tool_definition();
-        let system_prompt = self.system_prompt();
-        let user_prompt = format!(
-            "Editor utterance: {utterance}\n\
-             Pack: {pack_id}\n\
-             Select the single most-applicable verb FQN from the allowlist.",
-            pack_id = self.index.pack.id,
-        );
-        let result = client.chat_with_tool(&system_prompt, &user_prompt, &tool).await?;
+    async fn invoke_motivated_llm(
+        &self,
+        client: &dyn LlmClient,
+        prompt: &crate::motivation::MotivationPrompt,
+    ) -> Result<LlmDraftResult> {
+        let tool = MotivationPromptBuilder::tool_definition(&self.index);
+        let result = client
+            .chat_with_tool(&prompt.system, &prompt.user, &tool)
+            .await?;
         let verb_fqn = result
             .arguments
             .get("verb_fqn")
@@ -278,42 +304,23 @@ impl PlanningLoop {
                 )
             })?
             .to_string();
-        Ok(verb_fqn)
+        let intent_summary = result
+            .arguments
+            .get("intent_summary")
+            .and_then(|v| v.as_str())
+            .unwrap_or("")
+            .to_string();
+        Ok(LlmDraftResult {
+            verb_fqn,
+            intent_summary,
+        })
     }
+}
 
-    fn system_prompt(&self) -> String {
-        format!(
-            "You are Sage, the constrained-composition drafter for a governed runbook \
-             system. You may only select verbs from the pack's allowlist. Free-text DSL is \
-             forbidden. Return exactly one verb FQN via the propose_verb tool.\n\
-             \n\
-             Allowed verbs: {allowed}\n\
-             Forbidden verbs: {forbidden}",
-            allowed = self.index.allowed_verbs().join(", "),
-            forbidden = self.index.forbidden_verbs().join(", "),
-        )
-    }
-
-    fn draft_tool_definition(&self) -> ToolDefinition {
-        ToolDefinition {
-            name: "propose_verb".to_string(),
-            description:
-                "Select the verb FQN that best matches the editor utterance. The FQN MUST \
-                 appear in the allowed-verbs list and MUST NOT appear in the forbidden-verbs \
-                 list. The drafter will reject any FQN outside the sanctioned set."
-                    .to_string(),
-            parameters: serde_json::json!({
-                "type": "object",
-                "properties": {
-                    "verb_fqn": {
-                        "type": "string",
-                        "description": "Fully-qualified verb name from the allowlist."
-                    }
-                },
-                "required": ["verb_fqn"]
-            }),
-        }
-    }
+#[derive(Debug, Clone)]
+struct LlmDraftResult {
+    verb_fqn: String,
+    intent_summary: String,
 }
 
 #[cfg(test)]
@@ -321,7 +328,7 @@ mod tests {
     use super::*;
     use crate::index::SessionIndex;
     use chrono::Utc;
-    use ob_agentic::llm_client::ToolCallResult;
+    use ob_agentic::llm_client::{ToolCallResult, ToolDefinition};
     use ob_poc_journey::pack::load_pack_from_bytes;
     use ob_poc_types::session::kinds::WorkspaceKind;
 

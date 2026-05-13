@@ -99,6 +99,12 @@ pub mod frontier;
 /// variants ship without detectors; Phase 4 wires them.
 pub mod blockers;
 
+/// Motivation prompt template — Phase 3.5 (C-10). Builds the
+/// system + user prompts and the structured tool schema the
+/// planning loop sends to the LLM. Replaces the Phase 2 hard-coded
+/// system prompt with a frontier- and blocker-aware template.
+pub mod motivation;
+
 /// Sage planning loop — Phase 2.6. Takes a raw utterance + a
 /// `SessionIndex` and returns a constrained-composition draft (verb
 /// FQN bounded to the pack allowlist). LLM call site is optional so
