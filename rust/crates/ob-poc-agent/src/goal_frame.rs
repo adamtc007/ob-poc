@@ -192,6 +192,22 @@ impl GoalFrame {
         self.updated_at = Utc::now();
         Ok(())
     }
+
+    /// Post-transition status predicates used by the ACP method
+    /// handlers (Phase 3.1d). The handler swallows the transition
+    /// error inside a `FnOnce`, then re-checks the post-mutation
+    /// status here to surface failures upstream.
+    pub fn confirm_check(&self) -> bool {
+        self.status == GoalFrameStatus::Confirmed
+    }
+
+    pub fn start_execution_check(&self) -> bool {
+        self.status == GoalFrameStatus::InProgress
+    }
+
+    pub fn complete_check(&self) -> bool {
+        self.status == GoalFrameStatus::Completed
+    }
 }
 
 /// Errors produced by [`GoalFrame`] state transitions.

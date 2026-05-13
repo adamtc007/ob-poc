@@ -33,6 +33,7 @@ use ob_agentic::anthropic_client::AnthropicClient;
 use ob_agentic::llm_client::LlmClient;
 use ob_poc_agent::audit::{default_audit_path, AuditPath, AuditSink, JsonlAuditSink, NullAuditSink};
 use ob_poc_agent::goal_frame::GoalFrameStore;
+use ob_poc_agent::goal_frame_handler::try_handle_goal_frame;
 use ob_poc_agent::index::{DiskPackIndexLoader, IndexLoadRequest, IndexLoader};
 use ob_poc_agent::knowledge::{SemOsKnowledgeClient, StubKnowledgeClient};
 use ob_poc_agent::planning::PlanningLoop;
@@ -129,10 +130,20 @@ async fn main() -> anyhow::Result<()> {
             continue;
         }
         let outgoing = match serde_json::from_str::<JsonRpcRequest>(&line) {
-            Ok(request) => match try_handle_prompt(&request, &planning, &channel, audit.as_ref(), &frames).await {
-                Some(messages) => messages,
-                None => agent.handle_request(request),
-            },
+            Ok(request) => {
+                // Dispatch order: prompt handler (planning loop) →
+                // goal-frame lifecycle handlers → boundary fall-through
+                // (discovery / projection / KYC dry-run surface).
+                if let Some(messages) =
+                    try_handle_prompt(&request, &planning, &channel, audit.as_ref(), &frames).await
+                {
+                    messages
+                } else if let Some(messages) = try_handle_goal_frame(&request, &frames).await {
+                    messages
+                } else {
+                    agent.handle_request(request)
+                }
+            }
             // Parse failures bubble through the boundary's
             // `handle_line` which emits a standard ParseError.
             Err(_) => agent.handle_line(&line),

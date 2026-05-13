@@ -75,6 +75,11 @@ pub mod index;
 /// (Phase 3.1b) keys frames by session id.
 pub mod goal_frame;
 
+/// ACP method handlers for goal-frame lifecycle transitions —
+/// Phase 3.1d. `obpoc/goal_frame/{get,confirm,refuse,start_execution,
+/// complete}`.
+pub mod goal_frame_handler;
+
 /// Sage planning loop — Phase 2.6. Takes a raw utterance + a
 /// `SessionIndex` and returns a constrained-composition draft (verb
 /// FQN bounded to the pack allowlist). LLM call site is optional so
