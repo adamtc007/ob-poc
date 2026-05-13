@@ -3,6 +3,18 @@
 //! The StateGraph engine loads authored graph YAML, validates it against the
 //! live verb registry, and walks a grounded entity's current state to produce
 //! frontier actions.
+//!
+//! ## Schema-authority alignment (Phase 4.7 walk-by audit, 2026-05-13)
+//!
+//! The 6 leaf primitives `GraphNode`, `NodeType`, `GraphEdge`, `EdgeType`,
+//! `GraphGate`, `SignalCondition` are re-exported from
+//! `sem_os_core::state_graph_def` — they were byte-identical local
+//! duplicates before, surfaced by `xtask audit` as bucket-1
+//! namesakes-that-turned-out-to-be-drift. The wrapping `StateGraph`
+//! type here stays local because it deliberately differs from
+//! `sem_os_core::state_graph_def::StateGraphDefBody` (the body
+//! body that lives in a registry snapshot vs the authored YAML
+//! shape this engine loads).
 
 use anyhow::{anyhow, Context, Result};
 use dsl_core::config::loader::ConfigLoader;
@@ -11,6 +23,10 @@ use serde_json::Value;
 use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
 use std::path::{Path, PathBuf};
+
+pub use sem_os_core::state_graph_def::{
+    EdgeType, GraphEdge, GraphGate, GraphNode, NodeType, SignalCondition,
+};
 
 /// Authored StateGraph definition.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -24,62 +40,6 @@ pub struct StateGraph {
     pub edges: Vec<GraphEdge>,
     #[serde(default)]
     pub gates: Vec<GraphGate>,
-}
-
-/// A graph node.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-pub struct GraphNode {
-    pub node_id: String,
-    pub name: String,
-    pub node_type: NodeType,
-    pub lane: String,
-    #[serde(default)]
-    pub satisfied_when: Vec<SignalCondition>,
-}
-
-/// Node type in the graph.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-#[serde(rename_all = "snake_case")]
-pub enum NodeType {
-    Entry,
-    Milestone,
-    Gate,
-    Terminal,
-}
-
-/// A directed graph edge.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-pub struct GraphEdge {
-    pub edge_id: String,
-    pub from_node: String,
-    pub to_node: String,
-    pub verb_ids: Vec<String>,
-    pub edge_type: EdgeType,
-    #[serde(default)]
-    pub condition: Vec<SignalCondition>,
-}
-
-/// Edge behavior.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-#[serde(rename_all = "snake_case")]
-pub enum EdgeType {
-    Advance,
-    Revert,
-    Conditional,
-}
-
-/// Gate dependency definition.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-pub struct GraphGate {
-    pub gate_node: String,
-    pub required_nodes: Vec<String>,
-}
-
-/// Signal condition used for node or edge evaluation.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-pub struct SignalCondition {
-    pub signal: String,
-    pub description: String,
 }
 
 /// Result of walking a graph for a grounded entity.

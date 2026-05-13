@@ -5,11 +5,13 @@
 # reviewing whether the mirror is still justified.
 # Run `cargo run -p xtask -- audit` to fail on new mirrors.
 #
-# Baseline buckets — current state (22 entries, down from 32 after
-# Phase 4.7 follow-up collapsed all three high-priority near-
-# duplicates (`entity_type_def`, `relationship_type_def`, and
-# `verb_contract` under `src/sem_reg/`) to `sem_os_core::*`
-# re-exports):
+# Baseline buckets — current state (16 entries, down from 32).
+# Phase 4.7 follow-up collapsed the three high-priority near-
+# duplicates under `src/sem_reg/` (`entity_type_def`,
+# `relationship_type_def`, `verb_contract`) to `sem_os_core::*`
+# re-exports. The walk-by audit landed the same kind of fix for
+# `dsl-runtime::stategraph` after finding its 6 leaf names were
+# byte-identical to `sem_os_core::state_graph_def`.
 #
 # (1) Legitimate distinct types sharing a name — unrelated UI graph,
 #     DSL stategraph, dag config, taxonomy nodes, workflow defs,
@@ -19,7 +21,6 @@
 #     priority — these mirrors don't shadow the canonical type.
 #       crates/dsl-core/src/config/dag.rs               — DSL DAG config
 #       crates/dsl-runtime/src/state_reducer/*          — DSL FSM
-#       crates/dsl-runtime/src/stategraph/mod.rs        — DSL stategraph
 #       crates/ob-poc-domain/src/taxonomy/{rules,types} — taxonomy nodes
 #       crates/ob-poc-types/src/galaxy.rs               — galaxy viz
 #       crates/ob-poc-types/src/lib.rs                  — graph DTOs
@@ -40,12 +41,6 @@ crates/dsl-core/src/config/dag.rs:497:TransitionDef
 crates/dsl-runtime/src/state_reducer/state_machine.rs:23:TransitionDef
 crates/dsl-runtime/src/state_reducer/state_machine.rs:31:ReducerDef
 crates/dsl-runtime/src/state_reducer/state_machine.rs:48:ConditionDef
-crates/dsl-runtime/src/stategraph/mod.rs:31:GraphNode
-crates/dsl-runtime/src/stategraph/mod.rs:43:NodeType
-crates/dsl-runtime/src/stategraph/mod.rs:52:GraphEdge
-crates/dsl-runtime/src/stategraph/mod.rs:65:EdgeType
-crates/dsl-runtime/src/stategraph/mod.rs:73:GraphGate
-crates/dsl-runtime/src/stategraph/mod.rs:80:SignalCondition
 crates/ob-poc-domain/src/taxonomy/rules.rs:523:EdgeType
 crates/ob-poc-domain/src/taxonomy/types.rs:109:NodeType
 crates/ob-poc-types/src/galaxy.rs:1417:NodeType
