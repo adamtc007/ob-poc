@@ -36,11 +36,21 @@ use serde::{Deserialize, Serialize};
 use crate::index::SessionIndex;
 use crate::knowledge::{active_verbs_query_for_index, KnowledgeResponse, SemOsKnowledgeClient};
 
-/// Placeholder for the Phase 3.1 [`GoalFrame`] shape. The spike fills
-/// just the fields the audit emission slice (Phase 2.9) needs.
+/// Hard-coded spike shape of the Motivated Sage `GoalFrame`. Phase
+/// 3.1 (C-01 / C-02 / C-03) extends this with the full planning
+/// surface — frontier state, blocker reports, motivation prompt
+/// scratch, GoalProposalTrace emission. For Phase 2 the frame is
+/// just enough to draft + validate one runbook end-to-end and to
+/// carry the audit-relevant correlation ids.
+///
+/// The seed-only fields below are stable across the spike → Phase
+/// 3.1 transition. Phase 3.1 adds fields; it does not rename or
+/// remove. The `seed_*` constructor (`GoalFrame::seed_for_spike`) is
+/// the single call site Phase 3 will replace with the full
+/// Motivated Sage builder.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct GoalFrame {
-    /// Stable id the audit record correlates against.
+    /// Stable id the audit record correlates against (`gf-<uuid>`).
     pub id: String,
     /// Raw utterance the user typed in the editor.
     pub utterance: String,
@@ -49,8 +59,43 @@ pub struct GoalFrame {
     /// Pack manifest hash (SHA-256 of raw YAML) — captured for
     /// replay-grade audit.
     pub pack_hash: String,
+    /// Workspace the session targets (seed: copied from
+    /// [`SessionIndex::workspace`]).
+    pub workspace: String,
+    /// Optional intent summary the planning loop or the LLM
+    /// recorded for the round-trip. Phase 2 leaves this `None`;
+    /// Phase 3.4 (motivation prompt template) fills it.
+    pub intent_summary: Option<String>,
     /// When the frame was constructed.
     pub created_at: DateTime<Utc>,
+}
+
+impl GoalFrame {
+    /// Seed constructor used by the Phase 2 spike. Captures the
+    /// utterance + anchors against the session index. Phase 3.1
+    /// will introduce richer constructors that thread the
+    /// constellation hydration + frontier state in.
+    pub fn seed_for_spike(utterance: &str, index: &SessionIndex) -> Self {
+        Self {
+            id: format!("gf-{}", uuid::Uuid::new_v4()),
+            utterance: utterance.to_string(),
+            pack_id: index.pack.id.clone(),
+            pack_hash: index.pack_hash.clone(),
+            workspace: workspace_tag(&index.workspace),
+            intent_summary: None,
+            created_at: Utc::now(),
+        }
+    }
+}
+
+/// Stable workspace tag — picks the serde rename when present (e.g.
+/// `OnBoarding -> "onboarding_request"`) so the audit-shape value
+/// matches everything else in the system.
+fn workspace_tag(workspace: &ob_poc_types::session::kinds::WorkspaceKind) -> String {
+    serde_json::to_value(workspace)
+        .ok()
+        .and_then(|v| v.as_str().map(String::from))
+        .unwrap_or_else(|| format!("{workspace:?}"))
 }
 
 /// Output of one planning round-trip.
@@ -128,13 +173,7 @@ impl PlanningLoop {
     /// as a deterministic fallback so the spike can run end-to-end
     /// in CI / offline.
     pub async fn propose_draft(&self, utterance: &str) -> Result<PlanningOutcome> {
-        let goal_frame = GoalFrame {
-            id: format!("gf-{}", uuid::Uuid::new_v4()),
-            utterance: utterance.to_string(),
-            pack_id: self.index.pack.id.clone(),
-            pack_hash: self.index.pack_hash.clone(),
-            created_at: Utc::now(),
-        };
+        let goal_frame = GoalFrame::seed_for_spike(utterance, &self.index);
 
         // Phase 2.8 — exercise the knowledge surface so the seam is
         // demonstrably wired end-to-end. The spike client returns
@@ -349,6 +388,21 @@ progress_signals: []
         assert_eq!(outcome.verb_fqn, "cbu.create");
         assert_eq!(outcome.source, DraftSource::DeterministicFallback);
         assert_eq!(outcome.goal_frame.pack_id, "book-setup");
+        assert_eq!(outcome.goal_frame.workspace, "cbu");
+        assert!(outcome.goal_frame.intent_summary.is_none());
+        assert!(outcome.goal_frame.id.starts_with("gf-"));
+    }
+
+    #[test]
+    fn seed_goal_frame_captures_session_anchor() {
+        let index = make_index();
+        let frame = GoalFrame::seed_for_spike("attach a product to the new book", &index);
+        assert_eq!(frame.utterance, "attach a product to the new book");
+        assert_eq!(frame.pack_id, "book-setup");
+        assert_eq!(frame.pack_hash, index.pack_hash);
+        assert_eq!(frame.workspace, "cbu");
+        assert!(frame.intent_summary.is_none(), "Phase 3.4 fills this");
+        assert!(frame.id.starts_with("gf-"));
     }
 
     #[tokio::test]

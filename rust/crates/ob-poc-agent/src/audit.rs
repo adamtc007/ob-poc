@@ -60,6 +60,13 @@ pub struct AuditRecord {
     pub pack_id: String,
     /// SHA-256 of pack manifest YAML (replay invariant).
     pub pack_hash: String,
+    /// Workspace tag (matches the serde-rename used elsewhere in
+    /// the system — e.g. `cbu`, `onboarding_request`).
+    pub workspace: String,
+    /// Optional intent summary from the goal frame. `None` in Phase
+    /// 2; Phase 3.4 fills it once the motivation prompt template
+    /// lands.
+    pub intent_summary: Option<String>,
     /// Verb FQN the planning loop drafted.
     pub verb_fqn: String,
     /// Identifier for which call site produced the draft.
@@ -92,6 +99,8 @@ impl AuditRecord {
             utterance: outcome.goal_frame.utterance.clone(),
             pack_id: outcome.goal_frame.pack_id.clone(),
             pack_hash: outcome.goal_frame.pack_hash.clone(),
+            workspace: outcome.goal_frame.workspace.clone(),
+            intent_summary: outcome.goal_frame.intent_summary.clone(),
             verb_fqn: outcome.verb_fqn.clone(),
             draft_source,
             validation_passed: validation.passed(),
@@ -237,6 +246,8 @@ mod tests {
                 utterance: "set up a book".to_string(),
                 pack_id: "book-setup".to_string(),
                 pack_hash: "deadbeef".to_string(),
+                workspace: "cbu".to_string(),
+                intent_summary: None,
                 created_at: Utc::now(),
             },
             verb_fqn: "cbu.create".to_string(),

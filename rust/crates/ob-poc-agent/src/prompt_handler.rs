@@ -142,6 +142,8 @@ fn success_messages(
                     "goalFrameId": outcome.goal_frame.id,
                     "packId": outcome.goal_frame.pack_id,
                     "packHash": outcome.goal_frame.pack_hash,
+                    "workspace": outcome.goal_frame.workspace,
+                    "intentSummary": outcome.goal_frame.intent_summary,
                     "createdAt": outcome.goal_frame.created_at.to_rfc3339(),
                     "verbFqn": outcome.verb_fqn,
                     "draftSource": source,
