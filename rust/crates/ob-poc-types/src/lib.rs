@@ -34,6 +34,13 @@ pub mod onboarding_state;
 pub mod orientation;
 pub mod resolution;
 pub mod semantic_stage;
+// Phase 3C-prep of capability-crate restructure (2026-05-13). Session enums
+// (WorkspaceKind, SubjectKind, AgentMode, WorkspaceRegistryEntry) hoisted
+// from ob-poc-boundary::session per plan §6.5 — they cross capability
+// boundaries (boundary acp_dag_semantic + audit_chain, ob-poc-journey
+// pack manifest, ob-poc app session/repl machinery). Pure types, no
+// crate-internal deps.
+pub mod session;
 pub mod session_input;
 pub mod session_stack;
 pub mod state_token_resolver;
