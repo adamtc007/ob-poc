@@ -4,7 +4,7 @@ use tower_lsp::lsp_types::*;
 
 use crate::analysis::DocumentState;
 
-use ob_poc::dsl_v2::tooling::find_unified_verb;
+use dsl_runtime::verb_registry::find_unified_verb;
 
 /// Get signature help at position.
 pub(crate) fn get_signature_help(doc: &DocumentState, position: Position) -> Option<SignatureHelp> {

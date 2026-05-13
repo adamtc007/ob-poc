@@ -5,7 +5,7 @@ use tower_lsp::lsp_types::*;
 use crate::analysis::document::{ExprKind, ParsedArg};
 use crate::analysis::DocumentState;
 
-use ob_poc::dsl_v2::tooling::{find_unified_verb, registry, ArgDef, UnifiedVerbDef};
+use dsl_runtime::verb_registry::{find_unified_verb, registry, ArgDef, UnifiedVerbDef};
 
 /// Get hover information at position.
 pub(crate) fn get_hover(doc: &DocumentState, position: Position) -> Option<Hover> {

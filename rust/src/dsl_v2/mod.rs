@@ -119,7 +119,10 @@ pub mod submission;
 pub mod suggestions;
 pub mod topo_sort;
 pub(crate) mod validation;
-pub mod verb_registry;
+// §9 item 9 slice 2 (2026-05-13): verb_registry relocated to dsl-runtime.
+// Compat re-export preserves `super::verb_registry::*` (used by the
+// tooling submodule) and `crate::dsl_v2::verb_registry::*` callers.
+pub use dsl_runtime::verb_registry;
 pub mod verb_taxonomy;
 
 // Re-export local module types

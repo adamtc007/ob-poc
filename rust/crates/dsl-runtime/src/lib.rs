@@ -64,6 +64,9 @@ pub mod port;
 // dsl-lsp completion / hover / signature; reaches dsl_core for verb
 // config types and ob-templates for template definitions.
 pub mod runtime_registry;
+// §9 item 9 slice 2 (2026-05-13): verb_registry relocated from
+// rust/src/dsl_v2/. UnifiedVerbDef + find_unified_verb + registry().
+pub mod verb_registry;
 pub mod service_traits;
 pub mod services;
 pub mod state_reducer;

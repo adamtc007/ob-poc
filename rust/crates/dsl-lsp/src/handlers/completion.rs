@@ -10,7 +10,7 @@ use crate::entity_client::EntityLookupClient;
 use dsl_core::binding_context::{BindingContext, BindingInfo};
 use dsl_core::parser::parse_program;
 use ob_poc::dsl_v2::suggestions::predict_next_steps;
-use ob_poc::dsl_v2::tooling::{find_unified_verb, registry};
+use dsl_runtime::verb_registry::{find_unified_verb, registry};
 use dsl_runtime::runtime_registry::runtime_registry;
 use ob_poc::dsl_v2::load_macro_registry;
 
