@@ -118,6 +118,10 @@ mod invariants {
                 produces_focus: false,
                 metadata: None,
                 crud_mapping: None,
+                reads_from: Vec::new(),
+                writes_to: Vec::new(),
+                outputs: Vec::new(),
+                produces_shared_facts: Vec::new(),
             };
             let sid =
                 RegistryService::publish_verb_contract(&self.pool, &meta, &body, None).await?;

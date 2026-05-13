@@ -5,9 +5,10 @@
 # reviewing whether the mirror is still justified.
 # Run `cargo run -p xtask -- audit` to fail on new mirrors.
 #
-# Baseline buckets — current state (28 entries, down from 32 after
-# Phase 4.7 follow-up collapsed `src/sem_reg/entity_type_def.rs` and
-# `src/sem_reg/relationship_type_def.rs` to `sem_os_core::*`
+# Baseline buckets — current state (22 entries, down from 32 after
+# Phase 4.7 follow-up collapsed all three high-priority near-
+# duplicates (`entity_type_def`, `relationship_type_def`, and
+# `verb_contract` under `src/sem_reg/`) to `sem_os_core::*`
 # re-exports):
 #
 # (1) Legitimate distinct types sharing a name — unrelated UI graph,
@@ -26,11 +27,12 @@
 # (2) Verb-output extract helper in `src/sem_reg/onboarding/`:
 #       src/sem_reg/onboarding/verb_extract.rs          — verb extract DTO
 #
-# (3) HIGH-priority near-duplicates of sem_os_core schema authority —
-#     one file left after Phase 4.7 follow-up landed
-#     `entity_type_def` + `relationship_type_def`. These 6 names
-#     should migrate next:
-#       src/sem_reg/verb_contract.rs         (6 names)
+# (3) HIGH-priority near-duplicates of sem_os_core schema authority:
+#     EMPTY — Phase 4.7 follow-up collapsed all three flagged files
+#     (`entity_type_def`, `relationship_type_def`, `verb_contract`)
+#     to `sem_os_core::*` re-exports. Remaining 22 entries above are
+#     bucket 1 (legitimate distinct types sharing a name) + bucket 2
+#     (verb-output helper).
 
 crates/dsl-core/src/config/dag.rs:497:TransitionDef
 crates/dsl-runtime/src/state_reducer/state_machine.rs:23:TransitionDef
@@ -54,9 +56,3 @@ src/graph/types.rs:1998:NodeType
 src/graph/types.rs:2062:EdgeType
 src/graph/types.rs:686:GraphNode
 src/sem_reg/onboarding/verb_extract.rs:63:VerbOutput
-src/sem_reg/verb_contract.rs:110:VerbCrudMapping
-src/sem_reg/verb_contract.rs:122:VerbArgDef
-src/sem_reg/verb_contract.rs:14:VerbContractBody
-src/sem_reg/verb_contract.rs:164:VerbReturnSpec
-src/sem_reg/verb_contract.rs:175:VerbPrecondition
-src/sem_reg/verb_contract.rs:187:VerbProducesSpec

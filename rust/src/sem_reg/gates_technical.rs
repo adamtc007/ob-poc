@@ -368,6 +368,7 @@ mod tests {
                 lookup: None,
                 valid_values: None,
                 default: None,
+                maps_to: None,
             }],
             returns: None,
             preconditions: vec![],
@@ -384,6 +385,10 @@ mod tests {
             produces_focus: false,
             metadata: None,
             crud_mapping: None,
+            reads_from: Vec::new(),
+            writes_to: Vec::new(),
+            outputs: Vec::new(),
+            produces_shared_facts: Vec::new(),
         }
     }
 
