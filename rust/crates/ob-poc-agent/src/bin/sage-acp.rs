@@ -31,6 +31,7 @@ use std::sync::Arc;
 
 use ob_agentic::anthropic_client::AnthropicClient;
 use ob_agentic::llm_client::LlmClient;
+use ob_agentic::openai_client::OpenAiClient;
 use ob_poc_agent::audit::{
     default_audit_path, default_otlp_endpoint, AuditPath, AuditSink, JsonlAuditSink,
     MultiAuditSink, NullAuditSink, OtlpAuditSink, OtlpEndpoint,
@@ -82,28 +83,14 @@ async fn main() -> anyhow::Result<()> {
         index.pack_hash,
     );
 
-    // Treat a missing-or-empty ANTHROPIC_API_KEY identically — an
-    // empty env var is no API key. `AnthropicClient::from_env` only
-    // checks for unset, so we filter empty values here so the planning
-    // loop's deterministic fallback runs instead of 401-failing on
-    // every prompt.
-    let llm_client: Option<Arc<dyn LlmClient>> = match std::env::var("ANTHROPIC_API_KEY") {
-        Ok(key) if !key.trim().is_empty() => {
-            let client = AnthropicClient::new(key);
-            eprintln!(
-                "[sage-acp] Anthropic client wired (model: {})",
-                client.model_name()
-            );
-            Some(Arc::new(client))
-        }
-        _ => {
-            eprintln!(
-                "[sage-acp] ANTHROPIC_API_KEY not set or empty — planning loop will use \
-                 deterministic fallback"
-            );
-            None
-        }
-    };
+    // BYOK provider selection — Phase 5.4 closure. Both Anthropic
+    // and OpenAI are LlmClient impls in ob-agentic; the binary picks
+    // whichever key is set. Anthropic wins when both are present
+    // (matches the precedence the conformance harness uses).
+    // `OBPOC_SAGE_LLM_PROVIDER` (`anthropic` | `openai`) overrides
+    // the auto-pick so operators can force a provider when both
+    // keys are exported. Empty values are treated as unset.
+    let llm_client: Option<Arc<dyn LlmClient>> = pick_llm_client();
 
     // Phase 4.3 — knowledge + hydration now ride the sem_os_mcp
     // protocol surface. The MCP server is constructed in-process
@@ -242,4 +229,89 @@ async fn main() -> anyhow::Result<()> {
 
     eprintln!("[sage-acp] Server stopped");
     Ok(())
+}
+
+/// Resolve which BYOK LLM client (if any) to wire into the
+/// planning loop. Inspects three env vars:
+///
+/// - `OBPOC_SAGE_LLM_PROVIDER` (optional, `anthropic` | `openai`):
+///   force a provider. The corresponding key MUST be set.
+/// - `ANTHROPIC_API_KEY` / `OPENAI_API_KEY`: the keys themselves.
+///   Empty values are treated as unset (matches sage-acp's existing
+///   OTLP env-var discipline).
+///
+/// When `OBPOC_SAGE_LLM_PROVIDER` is unset, the picker prefers
+/// Anthropic over OpenAI when both keys are set; returns `None`
+/// (deterministic-fallback mode) when neither is set.
+fn pick_llm_client() -> Option<Arc<dyn LlmClient>> {
+    let forced = std::env::var("OBPOC_SAGE_LLM_PROVIDER")
+        .ok()
+        .map(|v| v.trim().to_ascii_lowercase())
+        .filter(|v| !v.is_empty());
+
+    let anthropic_key = nonempty_env("ANTHROPIC_API_KEY");
+    let openai_key = nonempty_env("OPENAI_API_KEY");
+
+    match forced.as_deref() {
+        Some("anthropic") => match anthropic_key {
+            Some(key) => Some(wire_anthropic(key)),
+            None => {
+                eprintln!(
+                    "[sage-acp] OBPOC_SAGE_LLM_PROVIDER=anthropic but ANTHROPIC_API_KEY is not \
+                     set or empty — falling back to deterministic mode"
+                );
+                None
+            }
+        },
+        Some("openai") => match openai_key {
+            Some(key) => Some(wire_openai(key)),
+            None => {
+                eprintln!(
+                    "[sage-acp] OBPOC_SAGE_LLM_PROVIDER=openai but OPENAI_API_KEY is not set or \
+                     empty — falling back to deterministic mode"
+                );
+                None
+            }
+        },
+        Some(other) => {
+            eprintln!(
+                "[sage-acp] OBPOC_SAGE_LLM_PROVIDER='{other}' is not a known provider; falling \
+                 back to deterministic mode"
+            );
+            None
+        }
+        None => match (anthropic_key, openai_key) {
+            (Some(key), _) => Some(wire_anthropic(key)),
+            (None, Some(key)) => Some(wire_openai(key)),
+            (None, None) => {
+                eprintln!(
+                    "[sage-acp] Neither ANTHROPIC_API_KEY nor OPENAI_API_KEY set — planning loop \
+                     will use deterministic fallback"
+                );
+                None
+            }
+        },
+    }
+}
+
+fn nonempty_env(key: &str) -> Option<String> {
+    std::env::var(key).ok().filter(|v| !v.trim().is_empty())
+}
+
+fn wire_anthropic(key: String) -> Arc<dyn LlmClient> {
+    let client = AnthropicClient::new(key);
+    eprintln!(
+        "[sage-acp] Anthropic client wired (model: {})",
+        client.model_name()
+    );
+    Arc::new(client)
+}
+
+fn wire_openai(key: String) -> Arc<dyn LlmClient> {
+    let client = OpenAiClient::new(key);
+    eprintln!(
+        "[sage-acp] OpenAI client wired (model: {})",
+        client.model_name()
+    );
+    Arc::new(client)
 }

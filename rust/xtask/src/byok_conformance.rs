@@ -207,10 +207,18 @@ fn build_llm(provider: Provider, fixture: &Fixture) -> Result<Arc<dyn LlmClient>
                 })?;
             Ok(Arc::new(ob_agentic::anthropic_client::AnthropicClient::new(key)))
         }
-        Provider::OpenAi => bail!(
-            "OpenAI provider not yet implemented in ob-agentic; rerun with --provider stub \
-             or wait for the OpenAI client landing"
-        ),
+        Provider::OpenAi => {
+            let key = std::env::var("OPENAI_API_KEY")
+                .ok()
+                .filter(|k| !k.trim().is_empty())
+                .ok_or_else(|| {
+                    anyhow!(
+                        "OpenAI conformance run requires OPENAI_API_KEY (set or non-empty); \
+                         set it or rerun with --provider stub"
+                    )
+                })?;
+            Ok(Arc::new(ob_agentic::openai_client::OpenAiClient::new(key)))
+        }
     }
 }
 

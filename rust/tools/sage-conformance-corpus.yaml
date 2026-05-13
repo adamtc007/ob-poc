@@ -11,17 +11,22 @@
 #     # provider defaults to `stub` — deterministic, no API key,
 #     # exercises the planning loop with a canned LLM response.
 #   cargo run -p xtask -- byok-conformance-check --provider anthropic
-#     # gated behind ANTHROPIC_API_KEY; calls the real model.
+#     # gated behind ANTHROPIC_API_KEY; calls the real Anthropic model.
+#   cargo run -p xtask -- byok-conformance-check --provider openai
+#     # gated behind OPENAI_API_KEY; calls the real OpenAI model.
 #
 # Conformance claim:
 #   - stub run         — sanity check: planning loop wiring + pack
 #                        resolution + constrained-composition guard
 #                        all behave correctly given a known LLM
 #                        response. CI-safe.
-#   - anthropic run    — Anthropic conforms today.
-#   - openai run       — pending the OpenAI provider in ob-agentic.
-#                        Cross-provider conformance asserted when
-#                        both runs pass against the same corpus.
+#   - anthropic run    — Anthropic conforms when this passes against
+#                        the live Anthropic API.
+#   - openai run       — OpenAI conforms when this passes against
+#                        the live OpenAI API. Cross-provider
+#                        conformance asserted when both real-API runs
+#                        produce identical verb FQNs against this
+#                        corpus (V&S R7).
 #
 # When adding fixtures: prefer utterances that exercise distinct
 # planning-loop paths (deterministic fallback, LLM tool, refusal,
