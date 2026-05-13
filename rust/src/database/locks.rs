@@ -30,99 +30,27 @@
 //! The `acquire_locks` function enforces this, but callers should pre-sort
 //! for efficiency.
 
-use std::collections::hash_map::DefaultHasher;
-use std::hash::{Hash, Hasher};
-
 use sqlx::{Postgres, Transaction};
 use thiserror::Error;
 
-// Re-use the LockKey type from expansion module
+// Lock type definitions (LockKey, LockMode, LockAccess) live in the
+// expansion tier — they're tied to verb policy expansion. The typeless
+// SQL primitives (lock_key, advisory_xact_lock, try_advisory_xact_lock)
+// were lifted to ob-poc-envelope in Phase 3 slice 2p so the boundary
+// tier can call them directly without re-entering src/.
 #[allow(unused_imports)]
 pub use crate::dsl_v2::expansion::{LockAccess, LockKey, LockMode};
+pub use ob_poc_envelope::advisory_lock::{
+    advisory_xact_lock, lock_key, try_advisory_xact_lock,
+};
 
 // =============================================================================
-// LOCK KEY DERIVATION
+// LOCK KEY DERIVATION (struct overload)
 // =============================================================================
-
-/// Derive stable i64 lock key from entity type + UUID
-///
-/// Uses deterministic hashing - same input always produces same key.
-/// The hash is truncated to i64 for PostgreSQL advisory lock compatibility.
-///
-/// # Example
-/// ```ignore
-/// let key = lock_key("person", "550e8400-e29b-41d4-a716-446655440000");
-/// // key is a stable i64 value
-/// ```
-pub fn lock_key(entity_type: &str, entity_id: &str) -> i64 {
-    let mut hasher = DefaultHasher::new();
-    entity_type.hash(&mut hasher);
-    entity_id.hash(&mut hasher);
-    hasher.finish() as i64
-}
 
 /// Derive lock key from a LockKey struct
 pub fn lock_key_from_struct(lock: &LockKey) -> i64 {
     lock_key(&lock.entity_type, &lock.entity_id)
-}
-
-// =============================================================================
-// LOCK ACQUISITION
-// =============================================================================
-
-/// Acquire advisory lock (blocks until available)
-///
-/// The lock is automatically released when the transaction ends (commit or rollback).
-/// This is a transaction-level lock, NOT a session-level lock.
-///
-/// # Arguments
-/// * `tx` - Active transaction
-/// * `key` - Lock key derived from `lock_key()`
-///
-/// # Example
-/// ```ignore
-/// let key = lock_key("person", &person_id);
-/// advisory_xact_lock(&mut tx, key).await?;
-/// // Lock is held until tx.commit() or tx.rollback()
-/// ```
-pub async fn advisory_xact_lock(
-    tx: &mut Transaction<'_, Postgres>,
-    key: i64,
-) -> Result<(), sqlx::Error> {
-    sqlx::query("SELECT pg_advisory_xact_lock($1)")
-        .bind(key)
-        .execute(&mut **tx)
-        .await?;
-    Ok(())
-}
-
-/// Try to acquire advisory lock (non-blocking)
-///
-/// Returns `true` if lock was acquired, `false` if already held by another session.
-/// Does NOT block - returns immediately.
-///
-/// # Arguments
-/// * `tx` - Active transaction
-/// * `key` - Lock key derived from `lock_key()`
-///
-/// # Example
-/// ```ignore
-/// let key = lock_key("person", &person_id);
-/// if try_advisory_xact_lock(&mut tx, key).await? {
-///     // Lock acquired - proceed
-/// } else {
-///     // Lock held by another session - handle contention
-/// }
-/// ```
-pub async fn try_advisory_xact_lock(
-    tx: &mut Transaction<'_, Postgres>,
-    key: i64,
-) -> Result<bool, sqlx::Error> {
-    let result: (bool,) = sqlx::query_as("SELECT pg_try_advisory_xact_lock($1)")
-        .bind(key)
-        .fetch_one(&mut **tx)
-        .await?;
-    Ok(result.0)
 }
 
 // =============================================================================
@@ -313,30 +241,9 @@ pub async fn acquire_locks(
 mod tests {
     use super::*;
 
-    #[test]
-    fn test_lock_key_deterministic() {
-        let key1 = lock_key("person", "550e8400-e29b-41d4-a716-446655440000");
-        let key2 = lock_key("person", "550e8400-e29b-41d4-a716-446655440000");
-
-        assert_eq!(key1, key2, "Same input should produce same key");
-    }
-
-    #[test]
-    fn test_lock_key_different_for_different_entities() {
-        let key1 = lock_key("person", "550e8400-e29b-41d4-a716-446655440000");
-        let key2 = lock_key("person", "660e8400-e29b-41d4-a716-446655440001");
-
-        assert_ne!(key1, key2, "Different entities should have different keys");
-    }
-
-    #[test]
-    fn test_lock_key_different_for_different_types() {
-        let key1 = lock_key("person", "550e8400-e29b-41d4-a716-446655440000");
-        let key2 = lock_key("entity", "550e8400-e29b-41d4-a716-446655440000");
-
-        assert_ne!(key1, key2, "Different types should have different keys");
-    }
-
+    // lock_key determinism + collision tests live in
+    // ob-poc-envelope::advisory_lock — this test covers the LockKey
+    // struct overload that stays in src/ because LockKey lives in dsl_v2.
     #[test]
     fn test_lock_key_from_struct() {
         let lock = LockKey::write("person", "550e8400-e29b-41d4-a716-446655440000");
