@@ -39,7 +39,7 @@ pub struct ChatMessage {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub sage_explain: Option<SageExplainPayload>,
 
-    /// Coder proposal payload for this message, when present.
+    /// Drafter proposal payload for this message, when present.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub drafter_proposal: Option<DraftProposalPayload>,
 
@@ -341,7 +341,7 @@ pub struct ChatResponse {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub sage_explain: Option<SageExplainPayload>,
 
-    /// Typed Coder/REPL proposal for UI rendering.
+    /// Typed Drafter/REPL proposal for UI rendering.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub drafter_proposal: Option<DraftProposalPayload>,
     /// Typed Sem OS discovery/bootstrap payload for onboarding-stage sessions.
@@ -402,7 +402,7 @@ pub struct SageExplainPayload {
     pub clarifications: Vec<String>,
 }
 
-/// Typed Coder proposal payload for UI rendering.
+/// Typed Drafter proposal payload for UI rendering.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DraftProposalPayload {
     #[serde(default, skip_serializing_if = "Option::is_none")]

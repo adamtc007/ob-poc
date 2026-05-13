@@ -10,7 +10,7 @@ use super::outcome::{EntityRef, OutcomeAction, OutcomeIntent};
 pub enum UtteranceDisposition {
     /// Sage serves directly with a facts-only path.
     Serve(ServeIntent),
-    /// Coder resolves a mutation candidate that requires confirmation.
+    /// Drafter resolves a mutation candidate that requires confirmation.
     Delegate(Box<DelegateIntent>),
 }
 
@@ -23,7 +23,7 @@ pub struct ServeIntent {
     pub subject: Option<EntityRef>,
 }
 
-/// Mutation intent delegated to the Coder for confirmation-first execution.
+/// Mutation intent delegated to the Drafter for confirmation-first execution.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DelegateIntent {
     pub summary: String,

@@ -1,7 +1,7 @@
 //! Audit-chain reconstruction for the configuration-native workflow.
 //!
 //! This module validates the in-memory relationship between session trace
-//! entries, an Execution Workbook, the DSL Coder dry-run result, and optional
+//! entries, an Execution Workbook, the DSL Drafter dry-run result, and optional
 //! LLM inference metadata. It intentionally stores hashes and references only;
 //! raw prompts, model responses, and evidence payloads stay outside the chain.
 

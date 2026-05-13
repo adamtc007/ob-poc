@@ -1,7 +1,7 @@
 //! SemTaxonomy replacement contracts.
 //!
 //! These types define the replacement path for utterance grounding, discovery,
-//! and runbook composition without depending on the legacy Sage/Coder structs.
+//! and runbook composition without depending on the legacy Sage/Drafter structs.
 
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};

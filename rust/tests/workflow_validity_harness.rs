@@ -86,7 +86,7 @@ fn workflow_validity_harness_reports_valid_repl_workbook_dsl_pack_rates() {
     assert_eq!(
         count(&rows, |r| r.dsl_drafter_valid),
         total,
-        "DSL Coder workbook validation rate regressed"
+        "DSL Drafter workbook validation rate regressed"
     );
     assert_eq!(
         count(&rows, |r| r.compiled_runbook_valid),
@@ -138,7 +138,7 @@ fn run_workflow_validity_case(
     if let Err(error) =
         validate_workbook_for_dry_run(&output.workbook, DslDrafterExecutionMode::DryRun)
     {
-        row.failure = Some(format!("DSL Coder validation failed: {error:?}"));
+        row.failure = Some(format!("DSL Drafter validation failed: {error:?}"));
         return row;
     }
     row.dsl_drafter_valid = true;
@@ -256,7 +256,7 @@ fn print_report(rows: &[WorkflowValidityRow]) {
         pct(count(rows, |r| r.workbook_integrity_valid), total)
     );
     println!(
-        "  DSL Coder valid:             {}/{} ({:.1}%)",
+        "  DSL Drafter valid:             {}/{} ({:.1}%)",
         count(rows, |r| r.dsl_drafter_valid),
         total,
         pct(count(rows, |r| r.dsl_drafter_valid), total)

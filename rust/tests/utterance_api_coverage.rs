@@ -473,16 +473,16 @@ mod tests {
             "- Pass (top1 == expected or in alt_verbs): {passed}\n"
         ));
         md.push_str(&format!(
-            "- Sage+Coder pass (top1 == expected or in alt_verbs): {sage_passed}\n"
+            "- Sage+Drafter pass (top1 == expected or in alt_verbs): {sage_passed}\n"
         ));
         md.push_str(&format!("- Fail: {}\n", total.saturating_sub(passed)));
         md.push_str(&format!(
-            "- Sage+Coder fail: {}\n",
+            "- Sage+Drafter fail: {}\n",
             total.saturating_sub(sage_passed)
         ));
         md.push_str(&format!("- Accuracy: {:.2}%\n\n", accuracy * 100.0));
         md.push_str(&format!(
-            "- Sage+Coder accuracy: {:.2}%\n\n",
+            "- Sage+Drafter accuracy: {:.2}%\n\n",
             sage_accuracy * 100.0
         ));
 
@@ -547,7 +547,7 @@ mod tests {
         println!("Verb XRef:   {}", csv_path.display());
         println!("Coverage: {:.2}% ({}/{})", accuracy * 100.0, passed, total);
         println!(
-            "Sage+Coder Coverage: {:.2}% ({}/{})",
+            "Sage+Drafter Coverage: {:.2}% ({}/{})",
             sage_accuracy * 100.0,
             sage_passed,
             total

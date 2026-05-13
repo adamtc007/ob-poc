@@ -1,6 +1,6 @@
 //! Task-shaped SemOS language packs for update-status workbook drafting.
 //!
-//! This stays deliberately bounded: it teaches Sage/Coder one active
+//! This stays deliberately bounded: it teaches Sage/Drafter one active
 //! dry-run-only transition surface from a Domain Pack, rather than dumping the
 //! whole SemOS substrate into prompt context.
 

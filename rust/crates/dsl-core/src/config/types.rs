@@ -674,7 +674,7 @@ pub struct VerbMetadata {
     #[serde(default)]
     pub side_effects: Option<String>,
 
-    /// Safety tier for Coder routing and confirmation policy.
+    /// Safety tier for Drafter routing and confirmation policy.
     #[serde(default)]
     pub harm_class: Option<HarmClass>,
 

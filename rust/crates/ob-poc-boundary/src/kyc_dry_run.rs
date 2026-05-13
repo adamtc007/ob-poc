@@ -3,7 +3,7 @@
 //! This is the first narrow integration path for the configuration-native
 //! toolkit: load the ob-poc KYC Domain Pack, simulate the approved transition,
 //! bind the result into an Execution Workbook, and pass it through the DSL
-//! Coder dry-run validator. It performs no storage and no mutation.
+//! Drafter dry-run validator. It performs no storage and no mutation.
 
 use sem_os_core::domain_pack::{DomainPackDiagnostic, DomainPackManifest};
 use sem_os_core::state_simulation::{

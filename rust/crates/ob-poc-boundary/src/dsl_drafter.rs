@@ -1,4 +1,4 @@
-//! DSL Coder validation boundary.
+//! DSL Drafter validation boundary.
 //!
 //! This module is intentionally dry-run-only for the MVP slice. It validates an
 //! Execution Workbook and returns the already-bound SemOS simulation result

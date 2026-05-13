@@ -3,7 +3,7 @@
 //! This module is transport-neutral: it models the lifecycle and safety
 //! boundary an ACP server/client binding needs, without depending on a Zed ACP
 //! crate or granting mutation capability. The adapter may authorize discovery,
-//! assemble redacted Sage context, and request DSL Coder dry-runs only.
+//! assemble redacted Sage context, and request DSL Drafter dry-runs only.
 
 use chrono::{DateTime, Utc};
 use sem_os_core::acp_projection::{

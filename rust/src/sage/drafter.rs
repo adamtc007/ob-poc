@@ -1,4 +1,4 @@
-//! Coder engine — deterministic OutcomeIntent -> verb + DSL resolution.
+//! Drafter engine — deterministic OutcomeIntent -> verb + DSL resolution.
 //!
 //! Phase 3 slice 2aa (2026-05-13): the result DTOs (`DraftResolution`,
 //! `DraftFailureKind`, `DraftDiagnostics`, `DraftFilterDiagnostics`,
@@ -29,7 +29,7 @@ pub use super::drafter_result::{
     DraftDiagnostics, DraftFailureKind, DraftFilterDiagnostics, DraftResolution, DraftResult,
 };
 
-/// Deterministic Coder engine over verb metadata and config.
+/// Deterministic Drafter engine over verb metadata and config.
 #[derive(Debug, Clone)]
 pub struct DrafterEngine {
     verb_index: VerbMetadataIndex,
@@ -127,7 +127,7 @@ impl DrafterEngine {
             param_overlap_score = top.param_overlap_score,
             step_param_count = step.params.len(),
             verb_required_count = verb_required,
-            "Coder resolve"
+            "Drafter resolve"
         );
 
         if top.score < threshold {

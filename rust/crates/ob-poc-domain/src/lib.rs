@@ -19,7 +19,7 @@
 //!   the reference-data shapes those services produce and consume.
 //! - NOT cross-capability shared DTOs. Anything referenced by two or more
 //!   capability crates belongs in `ob-poc-types` (per plan §6 decision 5).
-//! - NOT Sage / Coder / boundary types. Those are intent + contract, not
+//! - NOT Sage / Drafter / boundary types. Those are intent + contract, not
 //!   business domain data.
 //!
 //! ## Public surface contract (post Phase 4)

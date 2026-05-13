@@ -1,4 +1,4 @@
-//! Structured workbook diagnostics for bounded Sage/Coder revision.
+//! Structured workbook diagnostics for bounded Sage/Drafter revision.
 //!
 //! Diagnostics are deliberately machine-usable. Invalid private DSL drafts
 //! must not collapse into prose-only failures.

@@ -1298,7 +1298,7 @@ pub async fn handle_utterance(
                 validation_error: Some(
                     coder_stage
                         .error
-                        .unwrap_or_else(|| "Coder could not resolve this mutation.".to_string()),
+                        .unwrap_or_else(|| "Drafter could not resolve this mutation.".to_string()),
                 ),
                 unresolved_refs: vec![],
                 missing_required: vec![],
@@ -2212,13 +2212,13 @@ pub async fn legacy_handle_utterance(
             verb_agreement = (existing_verb.as_deref() == Some(drafter_result.verb_fqn.as_str())),
             dsl_similarity,
             sage_coder_ms = sage_coder_elapsed_ms.unwrap_or_default(),
-            "Stage 2.4: Sage->Coder shadow comparison"
+            "Stage 2.4: Sage->Drafter shadow comparison"
         );
     } else if let Some(error) = sage_coder_error {
         tracing::warn!(
             error = %error,
             sage_coder_ms = sage_coder_elapsed_ms.unwrap_or_default(),
-            "Stage 2.4: Sage->Coder shadow comparison failed (non-fatal)"
+            "Stage 2.4: Sage->Drafter shadow comparison failed (non-fatal)"
         );
     }
 

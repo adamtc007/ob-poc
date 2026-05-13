@@ -1,6 +1,6 @@
-//! Coder result DTOs — relocated from `src/sage/drafter.rs` for Phase 3 slice 2aa.
+//! Drafter result DTOs — relocated from `src/sage/drafter.rs` for Phase 3 slice 2aa.
 //!
-//! These five types form the Coder's output surface: the resolution verdict,
+//! These five types form the Drafter's output surface: the resolution verdict,
 //! failure taxonomy, scorer-filter counts, and end-to-end result envelope.
 //! They are referenced by `sage::disposition::PendingMutation` and consumed by
 //! the agent orchestrator + dispatcher. The `DrafterEngine` itself stays in
@@ -14,7 +14,7 @@
 
 use serde::{Deserialize, Serialize};
 
-/// Resolution state for the Coder output.
+/// Resolution state for the Drafter output.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum DraftResolution {
     Confident,
@@ -22,7 +22,7 @@ pub enum DraftResolution {
     NeedsInput,
 }
 
-/// Explicit failure reason when deterministic Coder resolution cannot proceed.
+/// Explicit failure reason when deterministic Drafter resolution cannot proceed.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum DraftFailureKind {
     NoCandidateAfterFilters,
@@ -34,7 +34,7 @@ pub enum DraftFailureKind {
     PolicyConflict,
 }
 
-/// Diagnostics explaining how Coder resolution succeeded or failed.
+/// Diagnostics explaining how Drafter resolution succeeded or failed.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DraftDiagnostics {
     pub failure_kind: Option<DraftFailureKind>,
@@ -54,7 +54,7 @@ pub struct DraftFilterDiagnostics {
     pub final_candidates: usize,
 }
 
-/// End-to-end Coder output.
+/// End-to-end Drafter output.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DraftResult {
     pub verb_fqn: String,

@@ -1,6 +1,6 @@
 //! OutcomeIntent — structured intent understood by the Sage.
 //!
-//! This is the Sage's output type. It carries enough information for the Coder
+//! This is the Sage's output type. It carries enough information for the Drafter
 //! to resolve to a specific verb and assemble arguments — without ever exposing
 //! verb FQNs to the Sage itself.
 
@@ -206,16 +206,16 @@ pub struct SageExplain {
     pub clarifications: Vec<String>,
 }
 
-/// Structured Sage -> Coder handoff contract.
+/// Structured Sage -> Drafter handoff contract.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct DrafterHandoff {
-    /// Outcome goal Sage wants the Coder to realize.
+    /// Outcome goal Sage wants the Drafter to realize.
     pub goal: String,
     /// Compact restatement of the intent.
     pub intent_summary: String,
     /// Required business outcome.
     pub required_outcome: String,
-    /// Hard constraints for the Coder.
+    /// Hard constraints for the Drafter.
     #[serde(default)]
     pub constraints: Vec<String>,
     /// Hint terms lifted from the utterance and context.
@@ -253,7 +253,7 @@ pub struct OutcomeStep {
 /// The structured intent understood by the Sage.
 ///
 /// The Sage produces this from the raw utterance + session context.
-/// The Coder consumes this to resolve a specific verb and assemble args.
+/// The Drafter consumes this to resolve a specific verb and assemble args.
 ///
 /// ## Invariants
 /// - `plane` is always deterministic from session context (never guessed)
@@ -289,7 +289,7 @@ pub struct OutcomeIntent {
     /// Questions the Sage needs answered (empty = confident)
     pub pending_clarifications: Vec<Clarification>,
 
-    /// Compact utterance hint ledger preserved for Coder and traceability.
+    /// Compact utterance hint ledger preserved for Drafter and traceability.
     #[serde(default)]
     pub hints: UtteranceHints,
 
@@ -297,7 +297,7 @@ pub struct OutcomeIntent {
     #[serde(default)]
     pub explain: SageExplain,
 
-    /// Structured Sage -> Coder handoff contract.
+    /// Structured Sage -> Drafter handoff contract.
     #[serde(default)]
     pub drafter_handoff: DrafterHandoff,
 }

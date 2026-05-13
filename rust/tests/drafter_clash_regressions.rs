@@ -1,4 +1,4 @@
-//! Regression checks for known high-value clash pairs in the Coder clash matrix.
+//! Regression checks for known high-value clash pairs in the Drafter clash matrix.
 
 use std::fs;
 use std::path::Path;
@@ -20,7 +20,7 @@ struct Case {
 }
 
 fn fixture_path() -> std::path::PathBuf {
-    Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/coder_clash_regressions.toml")
+    Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/drafter_clash_regressions.toml")
 }
 
 #[test]

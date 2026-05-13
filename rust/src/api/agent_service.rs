@@ -209,7 +209,7 @@ pub struct AgentChatResponse {
     /// Typed Sage explanation payload for UI rendering.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub sage_explain: Option<ob_poc_types::chat::SageExplainPayload>,
-    /// Typed Coder/REPL proposal payload for UI rendering.
+    /// Typed Drafter/REPL proposal payload for UI rendering.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub drafter_proposal: Option<ob_poc_types::chat::DraftProposalPayload>,
     /// Typed Sem OS discovery/bootstrap payload for onboarding-stage sessions.

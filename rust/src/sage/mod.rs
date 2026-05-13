@@ -1,7 +1,7 @@
 //! Sage — intent understanding layer for the utterance→DSL pipeline.
 //!
 //! The Sage understands WHAT the user wants (intent) without ever resolving
-//! HOW to do it (verb FQNs, DSL assembly). That is the Coder's job.
+//! HOW to do it (verb FQNs, DSL assembly). That is the Drafter's job.
 //!
 //! ## Architecture
 //!
@@ -29,7 +29,7 @@
 //! |----|-----------|
 //! | E-SAGE-1 | Sage fires BEFORE entity linking (raw utterance, no UUID resolution) |
 //! | E-SAGE-2 | Sage never sees verb FQNs (SageContext has no verb/fqn fields) |
-//! | E-SAGE-3 | Coder never interprets NL (takes OutcomeIntent, not &str) |
+//! | E-SAGE-3 | Drafter never interprets NL (takes OutcomeIntent, not &str) |
 //! | E-SAGE-4 | Shadow mode has zero production impact |
 //! | E-SAGE-5 | `cargo check -p ob-poc` passes after every sub-phase |
 //! | E-SAGE-6 | data_management_rewrite() unchanged until Sage accuracy exceeds it |

@@ -1,6 +1,6 @@
 //! Execution Workbook contract.
 //!
-//! A workbook is the immutable handoff between Sage/discovery and the DSL Coder
+//! A workbook is the immutable handoff between Sage/discovery and the DSL Drafter
 //! gate. It binds a declared Domain Pack transition to configuration/state
 //! anchors, evidence references, execution mode, and a SemOS simulation result.
 

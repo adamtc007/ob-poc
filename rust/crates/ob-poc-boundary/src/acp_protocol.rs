@@ -701,7 +701,7 @@ impl AcpJsonRpcAgent {
                         "entries": [
                             {"id": "discover", "status": "completed", "label": "Read SemOS projection surface"},
                             {"id": "plan", "status": "in_progress", "label": "Assemble workbook-safe plan"},
-                            {"id": "execute", "status": "blocked", "label": "Await DSL Coder and HITL gate"}
+                            {"id": "execute", "status": "blocked", "label": "Await DSL Drafter and HITL gate"}
                         ]
                     }
                 }),

@@ -1,4 +1,4 @@
-//! Structured verb scoring for the Coder layer.
+//! Structured verb scoring for the Drafter layer.
 //!
 //! This scorer never reads natural-language utterances directly. It consumes
 //! `OutcomeIntent` plus precomputed `VerbMetadataIndex` rows and ranks verbs

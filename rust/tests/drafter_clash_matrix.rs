@@ -1,7 +1,7 @@
-//! Export the deterministic Coder clash matrix.
+//! Export the deterministic Drafter clash matrix.
 //!
 //! Usage:
-//!   RUSTC_WRAPPER= cargo test -p ob-poc --test coder_clash_matrix -- --ignored --nocapture
+//!   RUSTC_WRAPPER= cargo test -p ob-poc --test drafter_clash_matrix -- --ignored --nocapture
 
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -14,7 +14,7 @@ fn output_dir() -> PathBuf {
 
 #[test]
 #[ignore]
-fn export_coder_clash_matrix() -> anyhow::Result<()> {
+fn export_drafter_clash_matrix() -> anyhow::Result<()> {
     let index = VerbMetadataIndex::load()?;
     let rows = build_clash_matrix(&index);
     let (csv, markdown) = render_clash_reports(&rows)?;

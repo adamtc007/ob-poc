@@ -5,7 +5,7 @@
 //! Turns raw user utterances into structured intent: (`plane`, `polarity`,
 //! `action`, `domain_concept`, `subject`). The Sage decides WHAT the user
 //! wants without ever resolving HOW to do it (verb FQNs, DSL assembly,
-//! database state) — that's the Coder's and sequencer's job.
+//! database state) — that's the Drafter's and sequencer's job.
 //!
 //! ## Anti-charter
 //!
