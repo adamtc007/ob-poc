@@ -12,11 +12,13 @@
 //! - **Pack Playback** (`playback.rs`): Pack-level summary and chapter view generation.
 //! - **Pack Handoff** (`handoff.rs`): Context forwarding between packs.
 
-pub mod handoff;
+// Phase 3 slice 2u (2026-05-13): handoff DTO relocated to ob-poc-envelope.
+pub use ob_poc_envelope::journey::handoff;
 // Phase 3 slice 2d.2 (2026-05-12): pack manifest types relocated to ob-poc-envelope.
 pub use ob_poc_envelope::journey::pack;
 pub mod pack_manager;
-pub mod pack_state;
+// Phase 3 slice 2u (2026-05-13): pack lifecycle FSM relocated to ob-poc-envelope.
+pub use ob_poc_envelope::journey::pack_state;
 pub mod playback;
 pub mod router;
 pub mod template;
