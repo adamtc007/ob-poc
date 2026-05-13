@@ -5,7 +5,7 @@
 # reviewing whether the mirror is still justified.
 # Run `cargo run -p xtask -- audit` to fail on new mirrors.
 #
-# Baseline buckets — current state (13 entries, down from 32).
+# Baseline buckets — current state (16 entries).
 # Phase 4.7 follow-up collapsed the three high-priority near-
 # duplicates under `src/sem_reg/` (`entity_type_def`,
 # `relationship_type_def`, `verb_contract`) to `sem_os_core::*`
@@ -13,7 +13,12 @@
 # for `dsl-runtime::stategraph` (6 names) and
 # `dsl-runtime::state_reducer::state_machine` (3 names) after
 # finding their leaf types were byte-identical to
-# `sem_os_core::state_graph_def` / `state_machine_def`.
+# `sem_os_core::state_graph_def` / `state_machine_def`. A second
+# round of canonical-name expansion collapsed five more
+# byte-identical mirrors (`document_type_def`, `observation_def`,
+# `policy_rule`, `taxonomy_def`, `view_def`) and surfaced three
+# remaining structurally-equivalent-but-docstring-rich mirrors
+# (bucket 3 below) for later docstring migration.
 #
 # (1) Legitimate distinct types sharing a name — unrelated UI graph,
 #     DSL stategraph, dag config, taxonomy nodes, workflow defs,
@@ -33,32 +38,32 @@
 #                                                         marker DTO
 #
 # (2) HIGH-priority near-duplicates of sem_os_core schema authority:
-#     EMPTY — Phase 4.7 follow-up + walk-by audit together cleared
-#     all near-duplicates (3 src/sem_reg/* files + dsl-runtime
-#     stategraph + state_reducer leaf types collapsed to re-exports).
-#     All 13 remaining entries are bucket-1 namesake collisions
-#     verified by the walk-by audit:
+#     EMPTY — Phase 4.7 follow-up + walk-by audit + canonical-name
+#     expansion together cleared all byte-identical near-duplicates
+#     (3 src/sem_reg/* files + dsl-runtime stategraph + state_reducer
+#     leaf types + 5 src/sem_reg/* registry-body files collapsed to
+#     re-exports).
 #
-#     dsl-core::config::dag::TransitionDef
-#         from: YamlValue (string|list), via: Option<YamlValue>,
-#         precondition: Option<String>, args: Option<YamlValue>
-#         — YAML parser shape for compound/parametric transitions
-#         vs sem_os_core's `{from: String, to: String, verbs:
-#         Vec<String>}` registry-snapshot shape.
-#     ob-workflow::definition::TransitionDef
-#         guard / auto / manual flags — workflow-engine shape.
-#     ob-poc-domain::taxonomy::NodeType / EdgeType
-#         Root/Client/Cluster/Cbu/Entity/… nodes and
-#         Ownership/Control/BoardMember/… edges — UBO ownership
-#         graph, not state-graph workflow nodes.
-#     ob-poc-types::galaxy / ob-poc-types::lib / src/api/
-#         capital_routes / src/graph/types
-#         UI visualization DTOs — frontend rendering, not
-#         schema-authority types.
-#     src/sem_reg/onboarding/verb_extract::VerbOutput
-#         {produced_type, initial_state} — verb-extract metadata
-#         vs sem_os_core's {field_name, output_type, entity_kind,
-#         description} output-field declaration.
+# (3) Structurally-equivalent mirrors with richer docstrings —
+#     functionally a no-op divergence (same field names, same serde
+#     shape, same enum variants) but the `src/sem_reg/*` version has
+#     per-field rustdoc that the canonical version doesn't carry.
+#     Collapsing now would lose those comments; the right sequence is
+#     to migrate the docstrings into `sem_os_core/*` first and only
+#     then collapse to a re-export. Tracked here so the audit fails
+#     on any *new* mirror of these names.
+#       src/sem_reg/derivation_spec.rs:15:DerivationSpecBody
+#           — rich per-field docstrings on body + Input + Expression
+#             + NullSemantics + SecurityInheritanceMode + FreshnessRule
+#             + TestCase. Same shape as sem_os_core/derivation_spec.
+#       src/sem_reg/evidence.rs:15:EvidenceRequirementBody
+#           — rich docstrings + 3 distinct default-fn names
+#             (`default_true_doc`, `default_true_obs`, `default_one`)
+#             where canonical uses one `default_true`. Same JSON
+#             shape; no behavioural difference.
+#       src/sem_reg/membership.rs:45:MembershipRuleBody
+#           — rich docstrings on body + MembershipKind variants +
+#             ConditionExpression. Same shape as canonical.
 
 crates/dsl-core/src/config/dag.rs:497:TransitionDef
 crates/ob-poc-domain/src/taxonomy/rules.rs:523:EdgeType
@@ -72,4 +77,7 @@ src/api/capital_routes.rs:263:GraphEdge
 src/graph/types.rs:1998:NodeType
 src/graph/types.rs:2062:EdgeType
 src/graph/types.rs:686:GraphNode
+src/sem_reg/derivation_spec.rs:15:DerivationSpecBody
+src/sem_reg/evidence.rs:15:EvidenceRequirementBody
+src/sem_reg/membership.rs:45:MembershipRuleBody
 src/sem_reg/onboarding/verb_extract.rs:63:VerbOutput

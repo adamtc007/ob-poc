@@ -97,10 +97,17 @@ const CANONICAL_NAMES: &[&str] = &[
     "ServiceResourceDefBody",
     // Taxonomy / universe / view surface — sem_os_core/*_def.rs.
     "TaxonomyDefBody",
+    "TaxonomyNodeBody",
     "UniverseDefBody",
     "ViewDefBody",
     // Policy rule — sem_os_core/policy_rule.rs.
     "PolicyRuleBody",
+    // Derivation spec — sem_os_core/derivation_spec.rs.
+    "DerivationSpecBody",
+    // Evidence requirement — sem_os_core/evidence.rs.
+    "EvidenceRequirementBody",
+    // Membership rule — sem_os_core/membership.rs.
+    "MembershipRuleBody",
 ];
 
 /// Directories the audit walks. Workspace-relative; the audit runs
