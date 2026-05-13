@@ -34,6 +34,8 @@ pub mod audit_chain;
 #[cfg(feature = "database")]
 pub mod bods_types;
 pub mod booking_principal_types;
+#[cfg(feature = "database")]
+pub mod deal_types;
 pub mod dsl_coder;
 pub mod envelope_builder;
 pub mod kyc_dry_run;

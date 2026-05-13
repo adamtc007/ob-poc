@@ -87,8 +87,11 @@ pub mod display_nouns;
 #[cfg(feature = "server")]
 pub mod projection_routes;
 
+// Phase 3 slice 2y (2026-05-13): pure-DTO module relocated to ob-poc-envelope.
+// Gated behind `server` to keep the existing visibility profile (envelope
+// gates it behind `database`; ob-poc's `server` feature activates `database`).
 #[cfg(feature = "server")]
-pub mod deal_types;
+pub use ob_poc_envelope::deal_types;
 
 #[cfg(feature = "server")]
 pub mod deal_routes;
