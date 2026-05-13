@@ -1,4 +1,11 @@
-//! Derivation spec body types — pure value types, no DB dependency.
+//! Derivation specification body type.
+//!
+//! A `DerivationSpecBody` describes a recipe for computing a derived attribute
+//! from one or more input attributes. Stored as JSONB in `sem_reg.snapshots`
+//! with `object_type = 'derivation_spec'`.
+//!
+//! MVP: Only `FunctionRef` expressions — Rust function dispatch via the
+//! `DerivationFunctionRegistry`. AST-based expressions can be added later.
 
 use serde::{Deserialize, Serialize};
 
@@ -8,51 +15,76 @@ fn default_true() -> bool {
     true
 }
 
-/// Body of a `derivation_spec` registry snapshot.
+/// Body type for `ObjectType::DerivationSpec`.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DerivationSpecBody {
+    /// Fully qualified name, e.g. `"risk.composite_score"`.
     pub fqn: String,
+    /// Human-readable name.
     pub name: String,
+    /// Description of the derivation.
     pub description: String,
+    /// FQN of the output attribute produced by this derivation.
     pub output_attribute_fqn: String,
+    /// Input attributes consumed by this derivation.
     pub inputs: Vec<DerivationInput>,
+    /// The expression that computes the output from inputs.
     pub expression: DerivationExpression,
+    /// How null inputs are handled.
     #[serde(default)]
     pub null_semantics: NullSemantics,
+    /// Optional freshness constraint on input data.
     #[serde(default)]
     pub freshness_rule: Option<FreshnessRule>,
+    /// How security labels are inherited from inputs.
     #[serde(default)]
     pub security_inheritance: SecurityInheritanceMode,
+    /// Whether this derivation may be used as regulatory evidence.
     #[serde(default)]
     pub evidence_grade: EvidenceGrade,
+    /// Inline test cases for validation.
     #[serde(default)]
     pub tests: Vec<DerivationTestCase>,
 }
 
-/// An input attribute for a derivation.
+/// A single input to a derivation.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DerivationInput {
+    /// FQN of the input attribute.
     pub attribute_fqn: String,
+    /// Role of this input (e.g., `"primary"`, `"secondary"`, `"weight"`).
     pub role: String,
+    /// Whether this input is required (affects null semantics).
     #[serde(default = "default_true")]
     pub required: bool,
 }
 
-/// The expression used to compute the derivation.
+/// The computation expression.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum DerivationExpression {
-    FunctionRef { ref_name: String },
+    /// MVP: dispatch to a named Rust function via `DerivationFunctionRegistry`.
+    FunctionRef {
+        /// Name of the registered function, e.g. `"weighted_average"`.
+        ref_name: String,
+    },
+    // Future variants:
+    // ExpressionAst { ast: serde_json::Value },
+    // QueryPlan { sql: String },
 }
 
 /// How null inputs are handled.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum NullSemantics {
+    /// Null propagates: if any required input is null, output is null.
     #[default]
     Propagate,
+    /// Use a default value when inputs are null.
     Default(serde_json::Value),
+    /// Skip derivation entirely when inputs are null.
     Skip,
+    /// Error when required inputs are null.
     Error,
 }
 
@@ -60,21 +92,26 @@ pub enum NullSemantics {
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum SecurityInheritanceMode {
+    /// Default: compute inherited label using `compute_inherited_label()`.
     #[default]
     Strict,
+    /// Allow declared override with steward approval.
     DeclaredOverride,
 }
 
 /// Freshness constraint on input data.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FreshnessRule {
+    /// Maximum age of input data in seconds.
     pub max_age_seconds: u64,
 }
 
-/// A test case for verifying derivation logic.
+/// Inline test case for derivation validation.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DerivationTestCase {
+    /// Input values keyed by attribute FQN or role.
     pub inputs: serde_json::Value,
+    /// Expected output value.
     pub expected: serde_json::Value,
 }
 

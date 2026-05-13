@@ -1,4 +1,12 @@
-//! Evidence requirement body types — pure value types, no DB dependency.
+//! Evidence requirement types for the semantic registry.
+//!
+//! An evidence requirement specifies what documents and observations
+//! must be collected to substantiate a registry claim. This is the
+//! bridge between the Proof Rule (governance) and the document/observation
+//! collection pipeline.
+//!
+//! Key invariant: if an evidence requirement references a `TrustClass::Proof`
+//! attribute, the evidence requirement itself must be governed-tier.
 
 use serde::{Deserialize, Serialize};
 
@@ -10,45 +18,62 @@ fn default_one() -> u32 {
     1
 }
 
-/// Body of an `evidence_requirement` registry snapshot.
+/// Body for an evidence requirement snapshot.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct EvidenceRequirementBody {
+    /// Fully qualified name, e.g. `"kyc.identity-evidence"`
     pub fqn: String,
+    /// Human-readable name
     pub name: String,
+    /// Description
     pub description: String,
+    /// Entity type this requirement applies to
     pub target_entity_type: String,
+    /// Context that triggers this requirement (e.g., `onboarding`, `periodic_review`)
     #[serde(default)]
     pub trigger_context: Option<String>,
+    /// Required documents
     #[serde(default)]
     pub required_documents: Vec<RequiredDocument>,
+    /// Required observations (data points from external sources)
     #[serde(default)]
     pub required_observations: Vec<RequiredObservation>,
+    /// Whether ALL items are required (true) or ANY (false)
     #[serde(default = "default_true")]
     pub all_required: bool,
 }
 
-/// A document type required by an evidence requirement.
+/// A document required as evidence.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RequiredDocument {
+    /// FQN of the document type definition
     pub document_type_fqn: String,
+    /// How many copies/instances are needed
     #[serde(default = "default_one")]
     pub min_count: u32,
+    /// Maximum age in days (None = no expiry check)
     #[serde(default)]
     pub max_age_days: Option<u32>,
+    /// Acceptable alternatives (any one suffices)
     #[serde(default)]
     pub alternatives: Vec<String>,
+    /// Whether this specific document is mandatory
     #[serde(default = "default_true")]
     pub mandatory: bool,
 }
 
-/// An observation type required by an evidence requirement.
+/// An observation (data point) required as evidence.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RequiredObservation {
+    /// FQN of the observation definition
     pub observation_def_fqn: String,
+    /// Minimum confidence score required (0.0 to 1.0)
     #[serde(default)]
     pub min_confidence: Option<f64>,
+    /// Maximum age in days
     #[serde(default)]
     pub max_age_days: Option<u32>,
+    /// Whether this observation is mandatory
     #[serde(default = "default_true")]
     pub mandatory: bool,
 }
