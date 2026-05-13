@@ -22,5 +22,10 @@ pub use ob_poc_journey::pack;
 pub mod pack_manager;
 pub use ob_poc_journey::pack_state;
 pub mod playback;
+// Phase 3D of capability-crate restructure (2026-05-13): registration
+// helpers for the boundary-side pack provider hooks. `ob-poc-web::main`
+// (and other binaries that exercise the projection pipeline) must call
+// `journey::providers::register_pack_providers()` once during startup.
+pub mod providers;
 pub mod router;
 pub mod template;

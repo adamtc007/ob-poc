@@ -162,6 +162,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     tracing::info!("Starting OB-POC Hybrid Web Server");
 
+    // Phase 3D of capability-crate restructure (2026-05-13): register
+    // the boundary-side pack provider hooks so `acp_dag_semantic` and
+    // `acp_registry_projection` can resolve pack manifests without
+    // depending on `ob-poc-journey` at the crate level. Idempotent —
+    // OnceLock-backed; subsequent calls in the same process are no-ops.
+    ob_poc::journey::providers::register_pack_providers();
+    tracing::info!("Pack-projection + pack-manifest providers registered");
+
     // =========================================================================
     // P.1.g — DB-free catalogue-load gate (v1.1 P3 / DoD item 7)
     //
