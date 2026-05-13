@@ -20,6 +20,8 @@ pub mod advisory_lock;
 pub mod clarify;
 pub mod data_dictionary;
 #[cfg(feature = "database")]
+pub mod derived_attributes;
+#[cfg(feature = "database")]
 pub mod entity_linking;
 #[cfg(feature = "database")]
 pub mod feedback;

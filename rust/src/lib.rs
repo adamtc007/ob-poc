@@ -136,8 +136,9 @@ pub mod traceability;
 pub mod sem_os_runtime;
 
 // Canonical persistence plane for derived attributes
+// Phase 3 slice 2t (2026-05-13): relocated to ob-poc-envelope; compat re-export.
 #[cfg(feature = "database")]
-pub mod derived_attributes;
+pub use ob_poc_envelope::derived_attributes;
 
 // Phase 5a composite #2 — `cross_workspace` relocated to
 // `dsl-runtime::cross_workspace`. External callers reach it via

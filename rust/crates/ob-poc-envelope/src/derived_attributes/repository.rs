@@ -6,7 +6,7 @@ use sha2::{Digest, Sha256};
 use sqlx::{Executor, FromRow, PgPool, Postgres, Transaction};
 use uuid::Uuid;
 
-use crate::database::locks::{advisory_xact_lock, lock_key};
+use crate::advisory_lock::{advisory_xact_lock, lock_key};
 
 /// Persisted canonical row for a derived attribute value.
 #[derive(Debug, Clone, FromRow)]
@@ -621,14 +621,14 @@ pub async fn acquire_derivation_lock(
     Ok(())
 }
 
-pub(crate) async fn insert_derived_value_tx(
+pub async fn insert_derived_value_tx(
     tx: &mut Transaction<'_, Postgres>,
     row: &DerivedValueRowInput,
 ) -> Result<DerivedValueRow> {
     insert_derived_value_inner(&mut **tx, row).await
 }
 
-pub(crate) async fn insert_dependencies_tx(
+pub async fn insert_dependencies_tx(
     tx: &mut Transaction<'_, Postgres>,
     derived_value_id: Uuid,
     deps: &[DependencyRowInput],
@@ -665,7 +665,7 @@ pub(crate) async fn insert_dependencies_tx(
     Ok(rows)
 }
 
-pub(crate) async fn supersede_current_tx(
+pub async fn supersede_current_tx(
     tx: &mut Transaction<'_, Postgres>,
     entity_type: &str,
     entity_id: Uuid,
@@ -675,7 +675,7 @@ pub(crate) async fn supersede_current_tx(
     supersede_current_inner(&mut **tx, entity_type, entity_id, attr_id, new_id).await
 }
 
-pub(crate) async fn get_current_tx(
+pub async fn get_current_tx(
     tx: &mut Transaction<'_, Postgres>,
     entity_type: &str,
     entity_id: Uuid,
