@@ -47,10 +47,20 @@
 pub mod context;
 pub mod disposition;
 pub mod drafter_result;
+// Phase 2.2 (2026-05-13): engine traits — SageEngine (moved here from
+// ob-poc), ValidVerbSetEngine (new). The traits live here so
+// ob-poc-agent can reach engines that live in ob-poc without depending
+// on ob-poc. Locked decision 6.
+pub mod engine;
 pub mod outcome;
 pub mod plane;
 pub mod polarity;
 pub mod pre_classify;
 #[cfg(feature = "database")]
 pub mod session_context;
+// Phase 2.2 (2026-05-13): pure-DTO types for the valid verb set
+// (relocated from ob-poc::sage::valid_verb_set). The computation
+// reaches sem_os_core constellation_runtime and stays in ob-poc as
+// the ValidVerbSetEngine impl.
+pub mod valid_verb_set;
 pub mod verb_resolve_types;

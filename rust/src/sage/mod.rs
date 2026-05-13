@@ -84,16 +84,7 @@ pub use pre_classify::SagePreClassification;
 pub use verb_index::{runtime_registry_parity, VerbMeta, VerbMetadataIndex};
 pub use verb_resolve::{ScoredVerbCandidate, StructuredVerbScorer};
 
-// SageEngine trait
-use anyhow::Result;
-
-/// The Sage classifies user intent from raw utterance + session context.
-///
-/// ## Contract
-/// - Never receives verb FQNs (E-SAGE-2)
-/// - Always receives raw utterance text (not entity-resolved text) (E-SAGE-1)
-/// - Always returns a valid OutcomeIntent (degrades to Low confidence stub on failure)
-#[async_trait::async_trait]
-pub trait SageEngine: Send + Sync {
-    async fn classify(&self, utterance: &str, context: &SageContext) -> Result<OutcomeIntent>;
-}
+// Phase 2.2 (2026-05-13): SageEngine trait relocated to
+// `ob_poc_sage::engine`. Compat re-export keeps existing `crate::sage::
+// SageEngine` callers (orchestrator, deterministic, llm_sage) working.
+pub use ob_poc_sage::engine::SageEngine;

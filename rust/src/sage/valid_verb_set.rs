@@ -11,7 +11,7 @@ use std::{
 };
 
 use anyhow::{anyhow, Result};
-use chrono::{DateTime, Utc};
+use chrono::Utc;
 use dsl_core::resolver::{resolve_template, ResolverInputs};
 use sem_os_core::{
     constellation_map_def::{
@@ -33,64 +33,15 @@ use crate::sem_os_runtime::constellation_runtime::{
 use super::session_context::EntityState;
 
 // ---------------------------------------------------------------------------
-// Types
+// Types — Phase 2.2 (2026-05-13): the DTOs (ValidVerbSet, VerbCandidate,
+// VerbSource) live in `ob_poc_sage::valid_verb_set` so the trait surface
+// in `ob_poc_sage::engine::ValidVerbSetEngine` and consumers in
+// `ob-poc-agent` can reference them without depending on ob-poc. The
+// compute functions below stay here because they reach
+// `sem_os_runtime::constellation_runtime` and other execution-tier deps.
 // ---------------------------------------------------------------------------
 
-/// A verb that is legal in the current session context.
-#[derive(Debug, Clone)]
-pub struct VerbCandidate {
-    pub verb_fqn: String,
-    pub entity_id: Option<Uuid>,
-    pub entity_type: String,
-    pub source: VerbSource,
-    pub priority: u32,
-    pub keywords: Vec<String>,
-}
-
-/// How this verb became part of the valid set.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum VerbSource {
-    /// Outgoing FSM transition from current entity state.
-    FsmTransition,
-    /// Creation verb for an entity that doesn't exist yet.
-    CreationVerb,
-    /// Always available (observation verbs: read, list, show).
-    AlwaysAvailable,
-}
-
-/// The computed set of valid verbs for a session context.
-#[derive(Debug, Clone)]
-pub struct ValidVerbSet {
-    pub verbs: Vec<VerbCandidate>,
-    pub client_group_id: Uuid,
-    pub constellation_id: String,
-    pub computed_at: DateTime<Utc>,
-}
-
-impl ValidVerbSet {
-    /// Get all verb FQNs in the set.
-    pub fn verb_fqns(&self) -> Vec<&str> {
-        self.verbs.iter().map(|v| v.verb_fqn.as_str()).collect()
-    }
-
-    pub fn is_empty(&self) -> bool {
-        self.verbs.is_empty()
-    }
-
-    pub fn len(&self) -> usize {
-        self.verbs.len()
-    }
-
-    /// Check if a specific verb FQN is in the valid set.
-    pub fn contains_verb(&self, fqn: &str) -> bool {
-        self.verbs.iter().any(|v| v.verb_fqn == fqn)
-    }
-
-    /// Convert to a HashSet for passing to the constrained embedding search.
-    pub fn to_allowed_set(&self) -> HashSet<String> {
-        self.verbs.iter().map(|v| v.verb_fqn.clone()).collect()
-    }
-}
+pub use ob_poc_sage::valid_verb_set::{ValidVerbSet, VerbCandidate, VerbSource};
 
 static VERB_KEYWORDS: OnceLock<HashMap<String, Vec<String>>> = OnceLock::new();
 static RESOLVER_INPUTS: OnceLock<Result<ResolverInputs, String>> = OnceLock::new();
