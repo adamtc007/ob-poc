@@ -153,7 +153,8 @@ pub mod calibration;
 // `dsl-runtime::verification`; consumer `verify_ops` moved alongside it.
 
 // Taxonomy module - generic taxonomy pattern for Product/Instrument domains
-pub mod taxonomy;
+// Phase 3 slice 2r (2026-05-13): relocated to ob-poc-envelope; compat re-export.
+pub use ob_poc_envelope::taxonomy;
 
 // Lint module - schema validation for macro and verb definitions
 // Phase 3 slice 2g (2026-05-12): relocated to ob-poc-envelope; compat re-export.

@@ -39,6 +39,7 @@ pub mod ontology;
 pub mod policy;
 pub mod session;
 pub mod session_trace;
+pub mod taxonomy;
 pub mod toctou_recheck;
 pub mod traceability;
 pub mod trading_profile;

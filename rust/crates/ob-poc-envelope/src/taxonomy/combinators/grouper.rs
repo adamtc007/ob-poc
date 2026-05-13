@@ -147,7 +147,7 @@ impl Grouper for EntityTypeGrouper {
 /// No grouping - items become direct children
 #[allow(dead_code)]
 #[derive(Debug, Clone, Default)]
-pub struct NoGrouper;
+pub(crate) struct NoGrouper;
 
 impl Grouper for NoGrouper {
     fn group(&self, items: Vec<SourceItem>) -> Vec<GroupResult> {
@@ -172,7 +172,7 @@ impl Grouper for NoGrouper {
 /// Composite grouper - applies multiple groupers in sequence
 #[allow(dead_code)]
 #[derive(Debug)]
-pub struct CompositeGrouper {
+pub(crate) struct CompositeGrouper {
     groupers: Vec<Box<dyn Grouper>>,
 }
 
@@ -186,14 +186,14 @@ impl Clone for CompositeGrouper {
 
 impl CompositeGrouper {
     #[allow(dead_code)]
-    pub fn new() -> Self {
+    pub(crate) fn new() -> Self {
         Self {
             groupers: Vec::new(),
         }
     }
 
     #[allow(dead_code)]
-    pub fn then(mut self, grouper: impl Grouper + 'static) -> Self {
+    pub(crate) fn then(mut self, grouper: impl Grouper + 'static) -> Self {
         self.groupers.push(Box::new(grouper));
         self
     }

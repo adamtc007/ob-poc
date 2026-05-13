@@ -120,13 +120,13 @@ impl DataSource for EmptySource {
 /// In-memory data source from a vector
 #[allow(dead_code)]
 #[derive(Debug, Clone)]
-pub struct VecSource {
+pub(crate) struct VecSource {
     items: Vec<SourceItem>,
 }
 
 impl VecSource {
     #[allow(dead_code)]
-    pub fn new(items: Vec<SourceItem>) -> Self {
+    pub(crate) fn new(items: Vec<SourceItem>) -> Self {
         Self { items }
     }
 }

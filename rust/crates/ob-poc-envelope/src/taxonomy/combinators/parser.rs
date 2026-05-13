@@ -361,7 +361,7 @@ impl TaxonomyParserBuilder {
 
 /// Create a new parser combinator
 #[allow(dead_code)]
-pub fn parser(name: impl Into<String>) -> ParserCombinator {
+pub(crate) fn parser(name: impl Into<String>) -> ParserCombinator {
     ParserCombinator::new(name)
 }
 

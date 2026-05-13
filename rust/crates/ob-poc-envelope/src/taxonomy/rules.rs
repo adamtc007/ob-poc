@@ -18,7 +18,7 @@ use uuid::Uuid;
 use super::types::Filter;
 
 #[cfg(feature = "database")]
-use crate::database::view_config_service::ViewConfigService;
+use crate::view_config_service::ViewConfigService;
 #[cfg(feature = "database")]
 use anyhow::Result;
 #[cfg(feature = "database")]
