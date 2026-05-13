@@ -106,6 +106,10 @@ pub mod toctou_recheck;
 pub mod traceability;
 // Phase 4.2d (2026-05-13): trading_profile relocated to ob-poc-domain;
 // compat re-export in ob-poc::lib.rs.
+// Phase 4.5 (Sage ACP, 2026-05-13): runbook_envelope — JSON envelope
+// for state context per locked decision D2=c. Hashable audit
+// artefact paired with stateless DSL source.
+pub mod runbook_envelope;
 pub mod workbook;
 pub mod workbook_diagnostics;
 pub mod workbook_revision;
