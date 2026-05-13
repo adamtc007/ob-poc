@@ -822,6 +822,35 @@ fn to_core_slot(slot: RuntimeSlotDef) -> CoreSlotDef {
 }
 
 // ---------------------------------------------------------------------------
+// Engine impl — Phase 2.3 (2026-05-13)
+// ---------------------------------------------------------------------------
+
+/// Default `ValidVerbSetEngine` impl: loads the constellation stack via
+/// `load_constellation_stack_for_workspace` and computes the verb set
+/// via `compute_valid_verb_set_for_constellations`. Lives in ob-poc
+/// because the underlying functions reach `dsl_core::resolver` +
+/// `sem_os_core::constellation_map_def` + the constellation runtime.
+/// The agent integrator wires this impl into the Sage ACP runtime at
+/// startup.
+pub struct DefaultValidVerbSetEngine;
+
+#[async_trait::async_trait]
+impl ob_poc_sage::engine::ValidVerbSetEngine for DefaultValidVerbSetEngine {
+    async fn compute(
+        &self,
+        scope: ob_poc_sage::engine::ValidVerbSetScope<'_>,
+    ) -> Result<ValidVerbSet> {
+        let stack =
+            load_constellation_stack_for_workspace(scope.constellation_id, scope.workspace)?;
+        Ok(compute_valid_verb_set_for_constellations(
+            scope.entity_states,
+            &stack,
+            scope.client_group_id,
+        ))
+    }
+}
+
+// ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
 
