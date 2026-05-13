@@ -117,6 +117,12 @@ pub mod approval;
 /// transport via `sem_os_client`.
 pub mod goal_proposal_trace;
 
+/// MCP-backed knowledge client + constellation hydrator — Phase 4.3.
+/// Drives the `sem_os_mcp` server via the standard `tools/invoke`
+/// protocol. In-process today; subprocess transport later without
+/// changing the trait surface this module exposes.
+pub mod mcp_client;
+
 /// Sage planning loop — Phase 2.6. Takes a raw utterance + a
 /// `SessionIndex` and returns a constrained-composition draft (verb
 /// FQN bounded to the pack allowlist). LLM call site is optional so

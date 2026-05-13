@@ -55,6 +55,11 @@ ob-agentic = { path = "../ob-agentic" }
 sem_os_client = { path = "../sem_os_client" }
 # Cross-capability primitives.
 sem_os_core = { path = "../sem_os_core" }
+# SemOS MCP server — Phase 4.3 wires the agent's knowledge surface
+# + constellation hydrator through this crate's protocol + tool
+# registry. In-process today; future subprocess transport keeps
+# the same protocol shape.
+sem_os_mcp = { path = "../sem_os_mcp" }
 
 # Async runtime.
 tokio = { version = "1", features = ["full"] }

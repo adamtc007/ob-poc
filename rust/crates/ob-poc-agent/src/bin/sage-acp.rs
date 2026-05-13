@@ -32,17 +32,21 @@ use std::sync::Arc;
 use ob_agentic::anthropic_client::AnthropicClient;
 use ob_agentic::llm_client::LlmClient;
 use ob_poc_agent::audit::{default_audit_path, AuditPath, AuditSink, JsonlAuditSink, NullAuditSink};
-use ob_poc_agent::constellation::{ConstellationHydrator, StubConstellationHydrator};
+use ob_poc_agent::constellation::ConstellationHydrator;
 use ob_poc_agent::goal_frame::GoalFrameStore;
 use ob_poc_agent::goal_frame_handler::try_handle_goal_frame;
 use ob_poc_agent::goal_proposal_trace::{GoalProposalTraceSink, LoggingTraceSink};
 use ob_poc_agent::index::{DiskPackIndexLoader, IndexLoadRequest, IndexLoader};
-use ob_poc_agent::knowledge::{SemOsKnowledgeClient, StubKnowledgeClient};
+use ob_poc_agent::knowledge::SemOsKnowledgeClient;
+use ob_poc_agent::mcp_client::{McpConstellationHydrator, McpKnowledgeClient};
 use ob_poc_agent::planning::PlanningLoop;
 use ob_poc_agent::prompt_handler::try_handle_prompt;
 use ob_poc_agent::repl_channel::LocalParseChannel;
 use ob_poc_boundary::acp_protocol::{AcpJsonRpcAgent, JsonRpcOutgoing, JsonRpcRequest};
 use ob_poc_types::session::kinds::WorkspaceKind;
+use sem_os_mcp::bridge::StubBridge;
+use sem_os_mcp::server::McpServer;
+use sem_os_mcp::tool_impls::build_registry;
 
 const DEFAULT_PACKS_DIR: &str = "rust/config/packs";
 const DEFAULT_PACK_ID: &str = "book-setup";
@@ -97,15 +101,32 @@ async fn main() -> anyhow::Result<()> {
         }
     };
 
-    let knowledge: Arc<dyn SemOsKnowledgeClient> =
-        Arc::new(StubKnowledgeClient::with_label("phase-2-spike"));
+    // Phase 4.3 — knowledge + hydration now ride the sem_os_mcp
+    // protocol surface. The MCP server is constructed in-process
+    // with the StubBridge for the spike; production deployments
+    // swap the bridge for a sem_os_client-backed impl without
+    // touching this binary.
+    let mcp_bridge = Arc::new(StubBridge::with_label("phase-4-spike"));
+    let mcp_server = Arc::new(McpServer::new(build_registry(mcp_bridge.clone())));
+    eprintln!(
+        "[sage-acp] SemOS MCP server constructed (bridge: {}, {} tools)",
+        sem_os_mcp::bridge::SemOsBridge::provider_label(mcp_bridge.as_ref()),
+        mcp_server.registry().len(),
+    );
+
+    let knowledge: Arc<dyn SemOsKnowledgeClient> = Arc::new(McpKnowledgeClient::new(
+        mcp_server.clone(),
+        "sem_os_mcp@in-process",
+    ));
     eprintln!(
         "[sage-acp] SemOS knowledge client wired (provider: {})",
         knowledge.provider_label()
     );
 
-    let hydrator: Arc<dyn ConstellationHydrator> =
-        Arc::new(StubConstellationHydrator::with_label("phase-3-spike"));
+    let hydrator: Arc<dyn ConstellationHydrator> = Arc::new(McpConstellationHydrator::new(
+        mcp_server.clone(),
+        "sem_os_mcp@in-process",
+    ));
     eprintln!(
         "[sage-acp] Constellation hydrator wired (provider: {})",
         hydrator.provider_label()
