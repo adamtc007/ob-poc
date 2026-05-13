@@ -44,6 +44,7 @@ use ob_poc_agent::index::{DiskPackIndexLoader, IndexLoadRequest, IndexLoader};
 use ob_poc_agent::knowledge::SemOsKnowledgeClient;
 use ob_poc_agent::mcp_client::{
     InProcessTransport, McpConstellationHydrator, McpKnowledgeClient, McpTransport,
+    SubprocessTransport,
 };
 use ob_poc_agent::planning::PlanningLoop;
 use ob_poc_agent::prompt_handler::try_handle_prompt;
@@ -107,13 +108,19 @@ async fn main() -> anyhow::Result<()> {
         mcp_server.registry().len(),
     );
 
-    // §9 item 8 follow-up slice A — the in-process transport is the
-    // CI-safe default; slice B introduces a subprocess transport
-    // that swaps in here under env-var control.
-    let transport: Arc<dyn McpTransport> = Arc::new(InProcessTransport::new(
-        mcp_server.clone(),
-        "sem_os_mcp@in-process",
-    ));
+    // §9 item 8 follow-up slice C — pick the MCP transport at
+    // startup. Two options:
+    //   in-process  (default)  — `Arc<McpServer>` in this address
+    //                            space; CI-safe; zero spawn cost.
+    //   subprocess             — spawn the `sem_os_mcp` binary and
+    //                            speak newline-delimited JSON-RPC
+    //                            over its stdio.
+    // Operator switch: `OBPOC_SAGE_MCP_TRANSPORT=subprocess` flips
+    // to subprocess. `OBPOC_SAGE_MCP_BIN=<path>` overrides the
+    // default `sem_os_mcp` binary location (default: same
+    // directory as the running `sage-acp` binary, so a sibling
+    // `target/debug/sem_os_mcp` is picked up automatically).
+    let transport: Arc<dyn McpTransport> = pick_mcp_transport(mcp_server.clone()).await?;
     eprintln!(
         "[sage-acp] MCP transport wired (provider: {})",
         transport.provider_label()
@@ -328,4 +335,78 @@ fn wire_openai(key: String) -> Arc<dyn LlmClient> {
         client.model_name()
     );
     Arc::new(client)
+}
+
+/// Resolve which MCP transport to wire.
+///
+/// `OBPOC_SAGE_MCP_TRANSPORT` is the selector:
+///   in_process (default) | subprocess
+///
+/// When `subprocess`, `OBPOC_SAGE_MCP_BIN` overrides the binary
+/// path; the default is `sem_os_mcp` alongside the running
+/// `sage-acp` binary (so a sibling debug build is picked up
+/// automatically).
+///
+/// Empty / unset env values fall back to defaults.
+async fn pick_mcp_transport(
+    mcp_server: Arc<McpServer>,
+) -> anyhow::Result<Arc<dyn McpTransport>> {
+    let mode = std::env::var("OBPOC_SAGE_MCP_TRANSPORT")
+        .ok()
+        .map(|v| v.trim().to_ascii_lowercase())
+        .filter(|v| !v.is_empty())
+        .unwrap_or_else(|| "in_process".to_string());
+
+    match mode.as_str() {
+        "in_process" | "inprocess" | "in-process" => Ok(Arc::new(InProcessTransport::new(
+            mcp_server,
+            "sem_os_mcp@in-process",
+        ))),
+        "subprocess" => {
+            let bin_path = locate_sem_os_mcp_bin()?;
+            eprintln!("[sage-acp] Spawning MCP subprocess: {}", bin_path.display());
+            let transport = SubprocessTransport::spawn(&bin_path, &[])
+                .await
+                .map_err(|error| {
+                    anyhow::anyhow!(
+                        "failed to spawn MCP subprocess from {}: {error}",
+                        bin_path.display()
+                    )
+                })?;
+            Ok(Arc::new(transport))
+        }
+        other => {
+            eprintln!(
+                "[sage-acp] OBPOC_SAGE_MCP_TRANSPORT='{other}' is not a known value; \
+                 expected `in_process` or `subprocess`. Falling back to in_process."
+            );
+            Ok(Arc::new(InProcessTransport::new(
+                mcp_server,
+                "sem_os_mcp@in-process",
+            )))
+        }
+    }
+}
+
+/// Resolve the `sem_os_mcp` binary path. `OBPOC_SAGE_MCP_BIN` wins
+/// when set; otherwise look for `sem_os_mcp` next to the current
+/// executable (`sage-acp`'s sibling in the same target dir).
+fn locate_sem_os_mcp_bin() -> anyhow::Result<PathBuf> {
+    if let Some(path) = nonempty_env("OBPOC_SAGE_MCP_BIN") {
+        return Ok(PathBuf::from(path));
+    }
+    let current = std::env::current_exe()
+        .map_err(|error| anyhow::anyhow!("current_exe lookup failed: {error}"))?;
+    let dir = current
+        .parent()
+        .ok_or_else(|| anyhow::anyhow!("current executable has no parent directory"))?;
+    let candidate = dir.join("sem_os_mcp");
+    if !candidate.exists() {
+        return Err(anyhow::anyhow!(
+            "default MCP binary not found at {}; set OBPOC_SAGE_MCP_BIN or build with \
+             `cargo build -p sem_os_mcp`",
+            candidate.display()
+        ));
+    }
+    Ok(candidate)
 }
