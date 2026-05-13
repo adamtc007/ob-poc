@@ -251,11 +251,49 @@ seam where SemOS-via-MCP will plug in later is unchanged from the
 - 4.3 — `view_config_service`, `derived_attributes` (DB-coupled)
 - 4.4 — `trading_profile`, `entity_linking`
 
+### Phase 4 status (COMPLETE 2026-05-13)
+
+All 10 target modules live in `ob-poc-domain` and the compat re-exports in `ob_poc::*` are wired:
+
+| Module | Re-export | Notes |
+|---|---|---|
+| `booking_principal_types` | `ob_poc::api::booking_principal_types` (api/mod.rs:13) | |
+| `bods_types` | `ob_poc::database::bods_types` (database/mod.rs:20) | |
+| `deal_types` | `ob_poc::api::deal_types` (api/mod.rs:99) | |
+| `trading_profile` | `ob_poc::trading_profile` (src/lib.rs:126) | |
+| `taxonomy` | `ob_poc::taxonomy` (src/lib.rs:159) | |
+| `semtaxonomy` | `ob_poc::semtaxonomy` (src/lib.rs:289) | |
+| `ontology` | `ob_poc::ontology` (src/lib.rs:75) | |
+| `derived_attributes` | `ob_poc::derived_attributes` (src/lib.rs:141) | |
+| `view_config_service` | `ob_poc::database::view_config_service` (database/mod.rs:51) | |
+| `entity_linking` | `ob_poc::entity_linking` (src/lib.rs:176) | |
+| (`advisory_lock`) | `ob_poc::database::locks::*` (database/locks.rs:43) | paired-moved per §6 decision 3 |
+
+The relocations originally landed under the slice-2u … 2dd boundary-tier extraction work (memory file `feedback_extraction_pattern.md`); Phase 4 became a retro acknowledgement once the rename from `ob-poc-envelope` → `ob-poc-boundary` finished and the §6 charter clarification landed.
+
 ### Phase 5: Move authoring modules out of envelope into ob-poc-authoring
 8 modules. Sub-slices:
 - 5.1 — `clarify`, `data_dictionary`, `display_nouns`
 - 5.2 — `lexicon`, `macros`, `lint`
 - 5.3 — `language_pack`, `feedback`
+
+### Phase 5 status (COMPLETE 2026-05-13)
+
+7 of 8 target modules live in `ob-poc-authoring`. `language_pack` stayed in `ob-poc-boundary` per a locked decision documented in `ob-poc-boundary/src/lib.rs:76–81`:
+
+> language_pack STAYS in boundary (Phase 5.3 evaluated and rejected the move): the module uses `sem_os_core::domain_pack` types, which the authoring crate's charter forbids; additionally five intra-boundary modules (acp / acp_facade / acp_protocol / workbook_diagnostics / workbook_revision) import `crate::language_pack`, so moving it would cascade. boundary charter permits `sem_os_core` deps, so it belongs here.
+
+Modules now in `ob-poc-authoring`:
+
+| Module | Phase 5 slice |
+|---|---|
+| `clarify` | 5.1 |
+| `data_dictionary` | 5.1 |
+| `display_nouns` | 5.1 |
+| `lexicon` | 5.2 |
+| `macros` | 5.2 |
+| `lint` | 5.2 |
+| `feedback` | 5.3 |
 
 ### Phase 6: Tighten public surfaces
 For each capability crate, audit `pub`:
@@ -265,8 +303,46 @@ For each capability crate, audit `pub`:
 
 Add `#![deny(unreachable_pub)]` to each crate's `lib.rs`.
 
+### Phase 6 status (COMPLETE 2026-05-13)
+
+`unreachable_pub = "deny"` is enforced via `[lints.rust]` in every capability crate's `Cargo.toml` — functionally equivalent to `#![deny(unreachable_pub)]` on `lib.rs` and slightly cleaner (centralised in one place rather than each module file). Audit:
+
+```
+ob-poc-types        ✅  Cargo.toml line 21
+ob-poc-diagnostics  ✅  Cargo.toml line 34
+ob-poc-sage         ✅  Cargo.toml line 37
+ob-poc-boundary     ✅  Cargo.toml line 65
+ob-poc-journey      ✅  Cargo.toml line 31
+ob-poc-domain       ✅  Cargo.toml line 58
+ob-poc-authoring    ✅  Cargo.toml line 61
+ob-poc-agent        ✅  Cargo.toml line 91
+```
+
+Pub-discipline §7.7–§7.10 audit (`sem_os_postgres`, `ob-poc-types` wildcards → explicit re-exports, `sem_os_core` internal modules, `dsl-runtime` `deny(unreachable_pub)`) landed across commits `b1101756`, `807bf68e`, `ecc8d27f`, `0e570512` (memory file `MEMORY.md` lines 21–22).
+
 ### Phase 7: Audit cyclic deps + dead deps
 Run `cargo tree` per crate; verify no capability crate imports another except the documented edges (envelope → journey, possibly envelope → sage). Remove any leftover dev/dead deps.
+
+### Phase 7 status (COMPLETE 2026-05-13)
+
+`cargo tree --depth 1` walked across all 8 capability crates. Edges match the §3 target graph exactly:
+
+```
+ob-poc-types        — primitives only
+ob-poc-diagnostics  — primitives only
+ob-poc-sage         — ob-poc-types
+ob-poc-journey      — ob-poc-types
+ob-poc-domain       — dsl-core + ob-poc-types
+ob-poc-authoring    — ob-poc-diagnostics + ob-poc-macros + ob-poc-types
+ob-poc-boundary     — dsl-core + ob-poc-diagnostics + ob-poc-macros + ob-poc-types + sem_os_core
+ob-poc-agent        — dsl-core + dsl-runtime + ob-agentic +
+                      ob-poc-boundary + ob-poc-diagnostics + ob-poc-journey +
+                      ob-poc-sage + ob-poc-types +
+                      sem_os_client + sem_os_core + sem_os_mcp
+                      (no ob-poc edge — capability ships standalone per V&S §3 R5)
+```
+
+No cycles. The §6 decision-2 break of the boundary→journey edge holds: boundary now reaches the pack catalogue via the `PackProjectionProvider` + `PackManifestProvider` hooks the integrator wires at startup (commits `7520bb99`, `b37cfb3d`, `0097895e`).
 
 ---
 
