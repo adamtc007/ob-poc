@@ -58,4 +58,14 @@
 //! restructure (`docs/todo/capability-crate-restructure-v1.md`). Phase 5
 //! moves eight modules out of `ob-poc-boundary::*` into this crate.
 
-// Empty — Phase 5 fills this in.
+// Phase 5.1 (2026-05-13): three independent authoring modules
+// relocated from ob-poc-boundary. Charter-aligned: each module is an
+// author-facing tool, not execution logic.
+//   - clarify (2 files) — DecisionPacket + confirmation UX.
+//   - data_dictionary (2 files) — AttributeId typed identifier
+//     (uses #[derive(IdType)] from ob-poc-macros).
+//   - display_nouns (1 file) — internal-vocab → operator-vocab
+//     translation table.
+pub mod clarify;
+pub mod data_dictionary;
+pub mod display_nouns;

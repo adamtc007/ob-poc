@@ -86,7 +86,7 @@ pub mod workflow_routes;
 // The pub-use `translate_json` / `translate_string` / `DisplayNounTranslator`
 // re-export below keeps the same external API surface.
 #[cfg(feature = "server")]
-pub use ob_poc_boundary::display_nouns;
+pub use ob_poc_authoring::display_nouns;
 
 #[cfg(feature = "server")]
 pub mod projection_routes;

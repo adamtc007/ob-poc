@@ -43,8 +43,9 @@ pub mod acp_registry_projection;
 pub mod acp_runtime_context;
 pub mod acp_session_input_draft_mode;
 pub mod acp_state_anchor;
-pub mod clarify;
-pub mod data_dictionary;
+// Phase 5.1 (2026-05-13): clarify + data_dictionary + display_nouns
+// relocated to ob-poc-authoring (authoring tooling, not boundary
+// concern). Compat re-exports in rust/src/lib.rs and rust/src/api/mod.rs.
 // Phase 4.2c (2026-05-13): advisory_lock + derived_attributes paired-moved
 // to ob-poc-domain per plan §6 decision 3 (advisory_lock follows primary
 // consumer). Compat re-exports in rust/src/database/locks.rs and
@@ -69,7 +70,7 @@ pub mod audit_chain;
 // were misplaced in slices 2w / 2x / 2y. Callers reach them via the
 // existing `crate::api::*` / `crate::database::*` compat shims in ob-poc,
 // which now point at `ob_poc_domain::*`.
-pub mod display_nouns;
+// display_nouns moved to ob-poc-authoring (Phase 5.1).
 pub mod dsl_coder;
 pub mod envelope_builder;
 pub mod kyc_dry_run;

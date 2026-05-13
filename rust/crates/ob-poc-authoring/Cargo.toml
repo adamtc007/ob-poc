@@ -26,6 +26,10 @@ ob-poc-macros = { path = "../ob-poc-macros" }
 # inspector. Primitive tier.
 ob-poc-diagnostics = { path = "../ob-poc-diagnostics" }
 anyhow = "1.0"
+# clarify::confirm signs confirmation tokens with base64(random_bytes || ts).
+base64 = "0.22"
+# data_dictionary defines an #[async_trait]'d AttributeRepository surface.
+async-trait = "0.1"
 bincode = "1"
 chrono = { version = "0.4", features = ["serde"] }
 hex = "0.4"
@@ -44,6 +48,10 @@ sqlx = { version = "0.8", features = ["runtime-tokio-rustls", "postgres", "uuid"
 [features]
 default = []
 database = ["dep:sqlx", "ob-poc-diagnostics/database"]
+
+[dev-dependencies]
+# clarify::confirm tests generate random tokens.
+rand = "0.8"
 
 [lints.rust]
 unreachable_pub = "deny"

@@ -50,7 +50,7 @@ pub use ob_poc_boundary::audit_chain;
 
 // Data dictionary
 // Phase 3 slice 2e (2026-05-12): relocated to ob-poc-boundary; compat re-export.
-pub use ob_poc_boundary::data_dictionary;
+pub use ob_poc_authoring::data_dictionary;
 
 // Domain handlers for business logic
 pub mod domains;
@@ -266,7 +266,7 @@ pub mod plan_builder;
 
 // Clarify module - Unified DecisionPacket-based clarification UX
 // Phase 3 slice 2f (2026-05-12): relocated to ob-poc-boundary; compat re-export.
-pub use ob_poc_boundary::clarify;
+pub use ob_poc_authoring::clarify;
 
 // Policy module — server-side enforcement for single-pipeline invariants.
 // Phase 3 slice 2o (2026-05-13): relocated to ob-poc-boundary; HTTP-binding
