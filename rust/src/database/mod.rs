@@ -38,7 +38,10 @@ pub mod service_resource_service;
 pub mod service_service;
 pub mod session_repository;
 pub mod verb_service;
-pub mod view_config_service;
+// Phase 3 slice 2q (2026-05-13): relocated to ob-poc-envelope. The DB-shaped
+// helpers in ViewConfigService are pure sqlx::PgPool queries with no
+// execution-tier coupling, so they live at the boundary tier now.
+pub use ob_poc_envelope::view_config_service;
 pub mod view_state_audit;
 pub mod viewport_service;
 pub mod visualization_repository;
