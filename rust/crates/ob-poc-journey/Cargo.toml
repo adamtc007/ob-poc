@@ -1,0 +1,31 @@
+[package]
+name = "ob-poc-journey"
+version = "0.1.0"
+edition = "2021"
+description = "Pack-guided workflow definitions — pack manifests (YAML schema + content hash), pack lifecycle FSM (Dormant → Active → Suspended → Completed), and pack handoff context. The 'what the user is doing' layer above atomic DSL verbs."
+
+# Capability discipline (see docs/todo/capability-crate-restructure-v1.md §2.2):
+#   IN-SCOPE: pack manifest types, pack-state FSM, pack handoff.
+#   Later: pack_manager (loads/lists packs), router (selection),
+#          playback (chapter view), template (slot expansion). Those
+#          require ob-poc-types::repl + sentence_gen and currently live
+#          in ob-poc; whether they move is a judgement call for Phase 3.
+#   OUT-OF-SCOPE: anything that touches the runbook execution engine
+#                 or REPL session state. Packs describe intent shape,
+#                 they don't execute.
+
+[dependencies]
+ob-poc-types = { path = "../ob-poc-types" }
+chrono = { version = "0.4", features = ["serde"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_yaml = "0.9"
+sha2 = "0.10"
+hex = "0.4"
+thiserror = "1"
+uuid = { version = "1", features = ["v4", "serde"] }
+
+[dev-dependencies]
+serde_json = "1.0"
+
+[lints.rust]
+unreachable_pub = "deny"
