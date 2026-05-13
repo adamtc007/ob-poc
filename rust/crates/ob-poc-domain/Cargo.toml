@@ -22,6 +22,8 @@ ob-poc-types = { path = "../ob-poc-types" }
 # Primitive — ontology re-exports `VerbLifecycle` from dsl_core::config::types.
 dsl-core = { path = "../dsl-core" }
 anyhow = "1.0"
+# taxonomy::combinators uses #[async_trait] on TaxonomyParser / DataSource.
+async-trait = "0.1"
 chrono = { version = "0.4", features = ["serde"] }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
@@ -40,6 +42,10 @@ rust_decimal = { version = "1", features = ["serde", "db-postgres"], optional = 
 [features]
 default = []
 database = ["dep:sqlx", "dep:bigdecimal", "dep:rust_decimal"]
+
+[dev-dependencies]
+# taxonomy::combinators inline #[tokio::test] modules.
+tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
 
 [lints.rust]
 unreachable_pub = "deny"

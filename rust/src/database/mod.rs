@@ -44,10 +44,11 @@ pub mod service_resource_service;
 pub mod service_service;
 pub mod session_repository;
 pub mod verb_service;
-// Phase 3 slice 2q (2026-05-13): relocated to ob-poc-boundary. The DB-shaped
-// helpers in ViewConfigService are pure sqlx::PgPool queries with no
-// execution-tier coupling, so they live at the boundary tier now.
-pub use ob_poc_boundary::view_config_service;
+// Phase 4.2b (2026-05-13): now lives in ob-poc-domain (slice 2q → 4.2b).
+// The DB-shaped helpers in ViewConfigService are pure sqlx::PgPool queries
+// with no execution-tier coupling, and they pair with the taxonomy module's
+// rules engine (taxonomy/rules.rs imports ViewConfigService).
+pub use ob_poc_domain::view_config_service;
 pub mod view_state_audit;
 pub mod viewport_service;
 pub mod visualization_repository;

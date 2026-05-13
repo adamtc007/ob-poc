@@ -154,8 +154,9 @@ pub mod calibration;
 // `dsl-runtime::verification`; consumer `verify_ops` moved alongside it.
 
 // Taxonomy module - generic taxonomy pattern for Product/Instrument domains
-// Phase 3 slice 2r (2026-05-13): relocated to ob-poc-boundary; compat re-export.
-pub use ob_poc_boundary::taxonomy;
+// Phase 4.2b (2026-05-13): now lives in ob-poc-domain (slice 2r → 4.2b).
+#[cfg(feature = "database")]
+pub use ob_poc_domain::taxonomy;
 
 // Lint module - schema validation for macro and verb definitions
 // Phase 3 slice 2g (2026-05-12): relocated to ob-poc-boundary; compat re-export.

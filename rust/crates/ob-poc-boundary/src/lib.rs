@@ -93,12 +93,12 @@ pub mod policy;
 // in ob-poc::lib.rs.
 pub mod session;
 pub mod session_trace;
-pub mod taxonomy;
+// Phase 4.2b (2026-05-13): taxonomy + view_config_service relocated to
+// ob-poc-domain (taxonomy/rules.rs depends on view_config_service;
+// paired move keeps the edge intra-crate). Compat re-exports in ob-poc.
 pub mod toctou_recheck;
 pub mod traceability;
 pub mod trading_profile;
-#[cfg(feature = "database")]
-pub mod view_config_service;
 pub mod workbook;
 pub mod workbook_diagnostics;
 pub mod workbook_revision;

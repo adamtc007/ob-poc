@@ -85,3 +85,17 @@ pub mod deal_types;
 pub mod ontology;
 #[cfg(feature = "database")]
 pub mod semtaxonomy;
+
+// Phase 4.2b (2026-05-13): paired move — taxonomy depends on
+// view_config_service (single `use crate::view_config_service::*`
+// in taxonomy/rules.rs). Both gated `database` because they carry
+// sqlx::PgPool helpers.
+//   - taxonomy (5,438 LOC, 11 active files + combinators submodule) —
+//     generic taxonomy combinators (Product/Instrument), builder, stack,
+//     rules engine. Materialization helpers gated `database`.
+//   - view_config_service (1,032 LOC) — view-mode / node-type / layout
+//     config loader. Pure sqlx::PgPool helpers.
+#[cfg(feature = "database")]
+pub mod taxonomy;
+#[cfg(feature = "database")]
+pub mod view_config_service;
