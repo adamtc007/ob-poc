@@ -71,11 +71,14 @@ pub mod verb_registry;
 // relocated from rust/src/dsl_v2/. Frontier-derived "what verb makes
 // sense next" recommender; pure-Rust over the verb registry.
 pub mod suggestions;
-// §9 item 9 slice 4 (2026-05-13): validation relocated from
-// rust/src/dsl_v2/. Pure-type module (920 LOC, zero internal crate
-// refs) — Diagnostic, Severity, SourceSpan, ValidationContext,
-// ValidationResult, Suggestion, ValidatedProgram, ValidatedStatement.
-pub mod validation;
+// dsl-runtime-split v1 Phase 2 (2026-05-14): validation relocated to
+// `dsl-analysis`. Pure-types module (Diagnostic, Severity, SourceSpan,
+// ValidationContext, ValidationResult, Suggestion, ValidatedProgram,
+// ValidatedStatement). Compat re-export keeps `dsl_runtime::validation::*`
+// resolving for external consumers (ob-poc, dsl-lsp) and intra-crate
+// `crate::validation::*` paths in gateway_resolver/ref_resolver/lsp_validator.
+// Removed in Phase 11.
+pub use dsl_analysis::validation;
 // §9 item 9 slice 5 (2026-05-13): planning_facade relocated from
 // rust/src/dsl_v2/. The analyse-and-plan orchestrator that parses
 // DSL text, compiles to ops, runs DAG planning, and returns both

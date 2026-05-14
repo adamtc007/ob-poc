@@ -82,9 +82,6 @@ pub mod api;
 #[cfg(feature = "mcp")]
 pub mod mcp;
 
-// Agentic DSL generation module
-pub mod agentic;
-
 // Phase A (F5): shadow envelope construction.
 // Builds a `GatedVerbEnvelope` alongside the existing dispatch path as a
 // determinism-harness observable. Does not gate execution yet — Phase B
@@ -116,10 +113,6 @@ pub mod navigation;
 // Session module - unified session context for REPL + Graph + Viewport
 #[cfg(feature = "database")]
 pub mod session;
-
-// Workflow orchestration module
-#[cfg(feature = "database")]
-pub mod workflow;
 
 // Trading profile document types and materialization
 // Phase 3 slice 2k (2026-05-12): relocated to ob-poc-boundary; compat re-export.

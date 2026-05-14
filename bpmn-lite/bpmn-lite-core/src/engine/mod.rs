@@ -156,7 +156,7 @@ impl BpmnLiteEngine {
 
     /// Compile a WorkflowGraphDto → verified IR → bytecode, store the program.
     /// Same post-parse pipeline as `compile()`.
-    pub async fn compile_from_dto(
+    pub(crate) async fn compile_from_dto(
         &self,
         dto: &authoring::dto::WorkflowGraphDto,
     ) -> Result<CompileResult> {
@@ -203,7 +203,7 @@ impl BpmnLiteEngine {
     }
 
     /// Parse YAML → DTO → compile via `compile_from_dto()`.
-    pub async fn compile_from_yaml(&self, yaml_str: &str) -> Result<CompileResult> {
+    pub(crate) async fn compile_from_yaml(&self, yaml_str: &str) -> Result<CompileResult> {
         let dto = authoring::yaml::parse_workflow_yaml(yaml_str)?;
         self.compile_from_dto(&dto).await
     }
@@ -215,7 +215,7 @@ impl BpmnLiteEngine {
     ///
     /// If (b) fails, no Draft row is left behind — the template was never written.
     /// Program writes are idempotent (keyed by bytecode hash), so retry is safe.
-    pub async fn compile_and_publish(
+    pub(crate) async fn compile_and_publish(
         &self,
         yaml_str: &str,
         options: authoring::publish::PublishOptions,

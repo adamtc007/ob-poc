@@ -13,7 +13,7 @@ impl ToolHandlers {
     // =========================================================================
 
     pub(crate) async fn workflow_status(&self, args: Value) -> Result<Value> {
-        use crate::workflow::{WorkflowEngine, WorkflowLoader};
+        use ob_workflow::{WorkflowEngine, WorkflowLoader};
         use std::path::Path;
 
         let subject_type = args["subject_type"]
@@ -50,7 +50,7 @@ impl ToolHandlers {
 
     /// Try to advance workflow automatically
     pub(crate) async fn workflow_advance(&self, args: Value) -> Result<Value> {
-        use crate::workflow::{WorkflowEngine, WorkflowLoader};
+        use ob_workflow::{WorkflowEngine, WorkflowLoader};
         use std::path::Path;
 
         let subject_type = args["subject_type"]
@@ -98,7 +98,7 @@ impl ToolHandlers {
 
     /// Manually transition to a specific state
     pub(crate) async fn workflow_transition(&self, args: Value) -> Result<Value> {
-        use crate::workflow::{WorkflowEngine, WorkflowLoader};
+        use ob_workflow::{WorkflowEngine, WorkflowLoader};
         use std::path::Path;
 
         let subject_type = args["subject_type"]
@@ -157,7 +157,7 @@ impl ToolHandlers {
 
     /// Start a new workflow
     pub(crate) async fn workflow_start(&self, args: Value) -> Result<Value> {
-        use crate::workflow::{WorkflowEngine, WorkflowLoader};
+        use ob_workflow::{WorkflowEngine, WorkflowLoader};
         use std::path::Path;
 
         let workflow_id = args["workflow_id"]

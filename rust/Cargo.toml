@@ -17,7 +17,6 @@ ob-agentic = { path = "crates/ob-agentic", features = ["gateway"] }
 ob-semantic-matcher = { path = "crates/ob-semantic-matcher" }
 ob-templates = { path = "crates/ob-templates" }
 ob-workflow = { path = "crates/ob-workflow", features = ["database"] }
-dsl_types = { path = "crates/dsl_types" }
 entity-gateway = { path = "crates/entity-gateway", optional = true }
 ob-poc-types = { path = "crates/ob-poc-types" }
 ob-poc-diagnostics = { path = "crates/ob-poc-diagnostics" }
@@ -279,6 +278,9 @@ members = [
 
     # Three-plane refactor — dsl-runtime (Phase 1 onwards)
     "crates/dsl-runtime",
+
+    # dsl-runtime split v1 (docs/todo/dsl-runtime-split-v1.md) — analyser plane
+    "crates/dsl-analysis",
 
     # Three-plane refactor harnesses (Phase 0e skeleton)
     "crates/determinism-harness",

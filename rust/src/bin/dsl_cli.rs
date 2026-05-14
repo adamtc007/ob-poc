@@ -1356,7 +1356,7 @@ async fn cmd_generate(
     // Build system prompt
     let system_prompt = build_generation_system_prompt(&vocab);
 
-    let client = ob_poc::agentic::create_llm_client()
+    let client = ob_agentic::create_llm_client()
         .map_err(|e| format!("Failed to create LLM client: {e}"))?;
     let generated = client
         .chat(&system_prompt, &prompt)
