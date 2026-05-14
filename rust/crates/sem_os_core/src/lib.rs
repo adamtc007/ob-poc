@@ -1,8 +1,6 @@
 pub mod authoring;
-pub mod enforce;
 pub mod error;
 pub mod execution;
-pub(crate) mod gates;
 pub mod ids;
 pub mod observatory;
 pub mod ports;
@@ -10,7 +8,6 @@ pub mod principal;
 pub mod proto;
 pub mod seeds;
 pub mod service;
-pub mod state_simulation;
 pub mod stewardship;
 pub mod types;
 
@@ -29,8 +26,11 @@ pub use sem_os_policy::context_resolution;
 pub use sem_os_policy::derivation;
 pub use sem_os_policy::diagram;
 pub use sem_os_policy::domain_pack;
+pub use sem_os_policy::enforce;
+pub use sem_os_policy::gates;
 pub use sem_os_policy::grounding;
 pub use sem_os_policy::security;
+pub use sem_os_policy::state_simulation;
 
 // sem_os_core-split v1 Phases 2–3 (2026-05-14): ontology modules
 // relocated to `sem_os_ontology`. Compat re-exports keep

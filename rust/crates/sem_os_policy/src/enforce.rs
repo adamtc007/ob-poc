@@ -8,8 +8,8 @@ use serde_json::json;
 use crate::abac::{
     evaluate_abac, evaluate_abac_with_evidence_grade, AccessDecision, AccessPurpose, ActorContext,
 };
-use crate::attribute_def::AttributeDefBody;
-use crate::types::{ObjectType, SecurityLabel, SnapshotRow};
+use sem_os_ontology::attribute_def::AttributeDefBody;
+use sem_os_types::{ObjectType, SecurityLabel, SnapshotRow};
 
 /// Result of an enforcement check on a single snapshot.
 pub enum EnforceResult {
@@ -207,7 +207,7 @@ pub fn filter_by_abac<'a>(
 mod tests {
     use super::*;
     use crate::abac::ActorContext;
-    use crate::types::*;
+    use sem_os_types::*;
     use uuid::Uuid;
 
     fn make_row(

@@ -6,9 +6,9 @@
 //! 3. Evidence grade policy — governed derivations with AllowedWithConstraints
 //!    need passing tests + policy link
 
-use crate::derivation_spec::DerivationSpecBody;
-use crate::types::EvidenceGrade;
-use crate::types::{GovernanceTier, SnapshotRow};
+use sem_os_ontology::derivation_spec::DerivationSpecBody;
+use sem_os_types::EvidenceGrade;
+use sem_os_types::{GovernanceTier, SnapshotRow};
 
 use super::{GateFailure, GateSeverity};
 
@@ -18,7 +18,7 @@ use super::{GateFailure, GateSeverity};
 ///
 /// - Governed tier with zero memberships → Error
 /// - Operational tier with zero memberships → Warning (informational)
-pub(crate) fn check_taxonomy_membership(
+pub fn check_taxonomy_membership(
     object_fqn: &str,
     tier: GovernanceTier,
     memberships: &[String],
@@ -64,7 +64,7 @@ pub(crate) fn check_taxonomy_membership(
 ///
 /// - Governed tier with empty/placeholder steward → Error
 /// - Operational tier → pass (no steward requirement)
-pub(crate) fn check_stewardship(snapshot: &SnapshotRow, tier: GovernanceTier) -> Vec<GateFailure> {
+pub fn check_stewardship(snapshot: &SnapshotRow, tier: GovernanceTier) -> Vec<GateFailure> {
     match tier {
         GovernanceTier::Operational => vec![],
         GovernanceTier::Governed => {
@@ -97,7 +97,7 @@ pub(crate) fn check_stewardship(snapshot: &SnapshotRow, tier: GovernanceTier) ->
 /// - `EvidenceGrade::None` / `EvidenceGrade::Prohibited` → always passes
 /// - constrained or regulatory evidence grades on governed tier → need tests + policy
 /// - Operational tier → pass (no evidence policy enforcement)
-pub(crate) fn check_evidence_grade_policy(
+pub fn check_evidence_grade_policy(
     derivation: &DerivationSpecBody,
     tier: GovernanceTier,
     has_passing_tests: bool,
@@ -162,7 +162,7 @@ pub(crate) fn check_evidence_grade_policy(
 /// If a governed snapshot's definition contains `regulatory_references` or
 /// `regulation_ids`, those references should be non-empty and well-formed.
 /// Operational-tier snapshots skip this check.
-pub(crate) fn check_regulatory_linkage(
+pub fn check_regulatory_linkage(
     snapshot: &SnapshotRow,
     tier: GovernanceTier,
 ) -> Vec<GateFailure> {
@@ -216,7 +216,7 @@ pub(crate) fn check_regulatory_linkage(
 ///
 /// If a snapshot has an `effective_until` date, it must not be in the past.
 /// Governed snapshots without `effective_until` get a Warning suggesting one be set.
-pub(crate) fn check_review_cycle_compliance(
+pub fn check_review_cycle_compliance(
     snapshot: &SnapshotRow,
     tier: GovernanceTier,
     now: chrono::DateTime<chrono::Utc>,
@@ -272,7 +272,7 @@ pub(crate) fn check_review_cycle_compliance(
 /// When a predecessor exists, the new snapshot's version must be strictly greater.
 /// This is a stricter version of the simple `version_monotonicity` gate — it
 /// also checks that the version tuple strictly increases (not just >=).
-pub(crate) fn check_version_consistency(
+pub fn check_version_consistency(
     snapshot: &SnapshotRow,
     predecessor: Option<&SnapshotRow>,
 ) -> Vec<GateFailure> {
@@ -308,8 +308,8 @@ pub(crate) fn check_version_consistency(
 ///
 /// When `change_type` is `Breaking`, `change_rationale` must be non-empty and
 /// describe the migration path for consumers of the previous version.
-pub(crate) fn check_continuation_completeness(snapshot: &SnapshotRow) -> Vec<GateFailure> {
-    if snapshot.change_type == crate::types::ChangeType::Breaking {
+pub fn check_continuation_completeness(snapshot: &SnapshotRow) -> Vec<GateFailure> {
+    if snapshot.change_type == sem_os_types::ChangeType::Breaking {
         let rationale = snapshot.change_rationale.as_deref().unwrap_or("").trim();
         if rationale.is_empty() {
             vec![GateFailure::error(
@@ -340,7 +340,7 @@ pub(crate) fn check_continuation_completeness(snapshot: &SnapshotRow) -> Vec<Gat
 /// If a verb contract has `behavior: template` and its definition contains
 /// an `expands_to` field, each referenced verb FQN must exist in the
 /// known verb set.
-pub(crate) fn check_macro_expansion_integrity(
+pub fn check_macro_expansion_integrity(
     verb_definition: &serde_json::Value,
     verb_fqn: &str,
     known_verb_fqns: &std::collections::HashSet<String>,
@@ -397,8 +397,8 @@ pub(crate) fn check_macro_expansion_integrity(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::derivation_spec::*;
-    use crate::types::*;
+    use sem_os_ontology::derivation_spec::*;
+    use sem_os_types::*;
     use uuid::Uuid;
 
     fn mock_snapshot(tier: GovernanceTier, created_by: &str) -> SnapshotRow {

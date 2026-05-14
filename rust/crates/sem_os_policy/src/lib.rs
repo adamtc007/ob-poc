@@ -48,5 +48,8 @@ pub mod context_resolution;
 pub mod derivation;
 pub mod diagram;
 pub mod domain_pack;
+pub mod enforce;
+pub mod gates;
 pub mod grounding;
 pub mod security;
+pub mod state_simulation;
