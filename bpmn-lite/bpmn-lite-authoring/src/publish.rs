@@ -1,31 +1,31 @@
-use crate::authoring::contracts::ContractRegistry;
-use crate::authoring::dto::WorkflowGraphDto;
-use crate::authoring::export_bpmn::dto_to_bpmn_xml;
-use crate::authoring::lints::{lint_contracts, LintDiagnostic, LintLevel};
-use crate::authoring::registry::{SourceFormat, TemplateState, WorkflowTemplate};
-use crate::authoring::{dto_to_ir, validate, yaml};
-use crate::compiler::{lowering, verifier};
+use crate::contracts::ContractRegistry;
+use crate::dto::WorkflowGraphDto;
+use crate::export_bpmn::dto_to_bpmn_xml;
+use crate::lints::{lint_contracts, LintDiagnostic, LintLevel};
+use crate::registry::{SourceFormat, TemplateState, WorkflowTemplate};
+use crate::{dto_to_ir, validate, yaml};
+use bpmn_lite_compiler::{lowering, verifier};
 use anyhow::{anyhow, Result};
 use sha2::{Digest, Sha256};
 use std::fmt::Write;
 
 /// Options for the publish pipeline.
-pub(crate) struct PublishOptions {
-    pub(crate) template_key: String,
-    pub(crate) template_version: u32,
-    pub(crate) process_key: String,
-    pub(crate) source_format: SourceFormat,
-    pub(crate) contract_registry: Option<ContractRegistry>,
-    pub(crate) generate_bpmn: bool,
-    pub(crate) verb_registry_hash: Option<String>,
+pub struct PublishOptions {
+    pub template_key: String,
+    pub template_version: u32,
+    pub process_key: String,
+    pub source_format: SourceFormat,
+    pub contract_registry: Option<ContractRegistry>,
+    pub generate_bpmn: bool,
+    pub verb_registry_hash: Option<String>,
 }
 
 /// Result of a successful publish pipeline run.
 #[derive(Debug)]
-pub(crate) struct PublishResult {
-    pub(crate) template: WorkflowTemplate,
-    pub(crate) program: crate::types::CompiledProgram,
-    pub(crate) lint_diagnostics: Vec<LintDiagnostic>,
+pub struct PublishResult {
+    pub template: WorkflowTemplate,
+    pub program: bpmn_lite_types::CompiledProgram,
+    pub lint_diagnostics: Vec<LintDiagnostic>,
 }
 
 /// Encode bytes as lowercase hex string.
@@ -52,7 +52,7 @@ fn hex_encode(bytes: &[u8]) -> String {
 ///
 /// Steps 1-10 are pure/sync (no persistence). The caller (`compile_and_publish`)
 /// persists: (a) program to ProcessStore, (b) template to TemplateStore.
-pub(crate) fn publish_workflow(yaml_str: &str, options: PublishOptions) -> Result<PublishResult> {
+pub fn publish_workflow(yaml_str: &str, options: PublishOptions) -> Result<PublishResult> {
     // 1. Parse YAML → DTO
     let dto = yaml::parse_workflow_yaml(yaml_str)?;
 
@@ -150,7 +150,7 @@ pub(crate) fn publish_workflow(yaml_str: &str, options: PublishOptions) -> Resul
 
 /// Compute a deterministic hex SHA-256 hash of the program bytecode.
 /// Excludes debug_map and task_manifest from the hash for stability.
-fn compute_bytecode_hash(program: &crate::types::CompiledProgram) -> String {
+fn compute_bytecode_hash(program: &bpmn_lite_types::CompiledProgram) -> String {
     let mut hasher = Sha256::new();
     // Hash each instruction's debug representation for determinism.
     // This avoids needing bincode — we serialize the program Vec<Instr> via debug format.
@@ -162,7 +162,7 @@ fn compute_bytecode_hash(program: &crate::types::CompiledProgram) -> String {
 
 /// Helper: shorthand for compile_and_publish without the DTO.
 /// Returns the DTO for callers that need it.
-pub(crate) fn parse_and_validate_yaml(yaml_str: &str) -> Result<WorkflowGraphDto> {
+pub fn parse_and_validate_yaml(yaml_str: &str) -> Result<WorkflowGraphDto> {
     let dto = yaml::parse_workflow_yaml(yaml_str)?;
     let errors = validate::validate_dto(&dto);
     if !errors.is_empty() {
@@ -185,7 +185,7 @@ fn now_ms() -> i64 {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::authoring::contracts::{ContractRegistry, VerbContract};
+    use crate::contracts::{ContractRegistry, VerbContract};
     use std::collections::HashSet;
 
     const MINIMAL_YAML: &str = r#"

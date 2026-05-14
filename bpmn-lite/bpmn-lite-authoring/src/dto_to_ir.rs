@@ -1,6 +1,6 @@
 use super::dto::*;
 use super::validate::validate_dto;
-use crate::compiler::ir::*;
+use bpmn_lite_compiler::ir::*;
 use anyhow::{anyhow, Result};
 use std::collections::HashMap;
 
@@ -10,7 +10,7 @@ use std::collections::HashMap;
 /// RaceWait is not supported in Phase A — returns an error if encountered.
 /// Error edge retries are deferred; on_error edges create BoundaryError IR nodes
 /// which provide routing without retry counters.
-pub(crate) fn dto_to_ir(dto: &WorkflowGraphDto) -> Result<IRGraph> {
+pub fn dto_to_ir(dto: &WorkflowGraphDto) -> Result<IRGraph> {
     // 1. Validate
     let errors = validate_dto(dto);
     if !errors.is_empty() {
@@ -305,7 +305,7 @@ mod tests {
         assert_eq!(ir.edge_count(), 2);
 
         // Verify passes
-        let errors = crate::compiler::verifier::verify(&ir);
+        let errors = bpmn_lite_compiler::verifier::verify(&ir);
         assert!(errors.is_empty(), "Verifier errors: {:?}", errors);
     }
 
@@ -430,7 +430,7 @@ mod tests {
         assert!(has_boundary_error, "Expected synthetic BoundaryError node");
 
         // Verifier should pass
-        let errors = crate::compiler::verifier::verify(&ir);
+        let errors = bpmn_lite_compiler::verifier::verify(&ir);
         assert!(errors.is_empty(), "Verifier errors: {:?}", errors);
     }
 }

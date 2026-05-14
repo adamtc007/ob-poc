@@ -2,9 +2,9 @@ use super::dto::*;
 use std::collections::HashMap;
 
 #[derive(Debug, Clone)]
-pub(crate) struct ValidationError {
-    pub(crate) rule: String,
-    pub(crate) message: String,
+pub struct ValidationError {
+    pub rule: String,
+    pub message: String,
 }
 
 impl std::fmt::Display for ValidationError {
@@ -14,7 +14,7 @@ impl std::fmt::Display for ValidationError {
 }
 
 /// Validate a WorkflowGraphDto before IR conversion. Returns all errors found.
-pub(crate) fn validate_dto(dto: &WorkflowGraphDto) -> Vec<ValidationError> {
+pub fn validate_dto(dto: &WorkflowGraphDto) -> Vec<ValidationError> {
     let mut errors = Vec::new();
 
     // Build lookup maps
@@ -113,7 +113,7 @@ pub(crate) fn validate_dto(dto: &WorkflowGraphDto) -> Vec<ValidationError> {
     for node in &dto.nodes {
         if let NodeDto::ParallelGateway {
             id,
-            direction: crate::compiler::ir::GatewayDirection::Diverging,
+            direction: bpmn_lite_compiler::ir::GatewayDirection::Diverging,
             join: Some(join_id),
         } = node
         {
@@ -121,7 +121,7 @@ pub(crate) fn validate_dto(dto: &WorkflowGraphDto) -> Vec<ValidationError> {
                 matches!(
                     n,
                     NodeDto::ParallelGateway {
-                        direction: crate::compiler::ir::GatewayDirection::Converging,
+                        direction: bpmn_lite_compiler::ir::GatewayDirection::Converging,
                         ..
                     }
                 )
@@ -142,7 +142,7 @@ pub(crate) fn validate_dto(dto: &WorkflowGraphDto) -> Vec<ValidationError> {
     for node in &dto.nodes {
         if let NodeDto::InclusiveGateway {
             id,
-            direction: crate::compiler::ir::GatewayDirection::Diverging,
+            direction: bpmn_lite_compiler::ir::GatewayDirection::Diverging,
             join: Some(join_id),
         } = node
         {
@@ -150,7 +150,7 @@ pub(crate) fn validate_dto(dto: &WorkflowGraphDto) -> Vec<ValidationError> {
                 matches!(
                     n,
                     NodeDto::InclusiveGateway {
-                        direction: crate::compiler::ir::GatewayDirection::Converging,
+                        direction: bpmn_lite_compiler::ir::GatewayDirection::Converging,
                         ..
                     }
                 )
@@ -175,7 +175,7 @@ pub(crate) fn validate_dto(dto: &WorkflowGraphDto) -> Vec<ValidationError> {
             matches!(
                 n,
                 NodeDto::InclusiveGateway {
-                    direction: crate::compiler::ir::GatewayDirection::Diverging,
+                    direction: bpmn_lite_compiler::ir::GatewayDirection::Diverging,
                     ..
                 }
             )
@@ -188,7 +188,7 @@ pub(crate) fn validate_dto(dto: &WorkflowGraphDto) -> Vec<ValidationError> {
             matches!(
                 n,
                 NodeDto::InclusiveGateway {
-                    direction: crate::compiler::ir::GatewayDirection::Converging,
+                    direction: bpmn_lite_compiler::ir::GatewayDirection::Converging,
                     ..
                 }
             )

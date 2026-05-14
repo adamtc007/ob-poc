@@ -28,6 +28,10 @@ description = "BPMN-Lite authoring — YAML/DTO → IR pipeline, lint rules (L1�
 # a separate slice (add gRPC RPCs + wire `compile_and_publish` to
 # persist into TemplateStore).
 
+[features]
+default = []
+postgres = ["dep:sqlx", "dep:chrono"]
+
 [dependencies]
 bpmn-lite-types = { path = "../bpmn-lite-types" }
 bpmn-lite-compiler = { path = "../bpmn-lite-compiler" }
@@ -37,6 +41,11 @@ serde_json = { workspace = true }
 serde_yaml = "0.9"
 sha2 = { workspace = true }
 async-trait = { workspace = true }
+uuid = { workspace = true }
+petgraph = { workspace = true }
+sqlx = { workspace = true, optional = true }
+chrono = { workspace = true, optional = true }
+tokio = { workspace = true }
 
 [lints]
 workspace = true

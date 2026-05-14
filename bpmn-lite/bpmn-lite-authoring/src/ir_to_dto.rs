@@ -1,5 +1,5 @@
 use super::dto::*;
-use crate::compiler::ir::*;
+use bpmn_lite_compiler::ir::*;
 use anyhow::{anyhow, Result};
 use petgraph::visit::EdgeRef;
 use petgraph::Direction;
@@ -17,7 +17,7 @@ use std::collections::HashMap;
 ///   edges (not collapsed back to `on_error` EdgeDto fields) for simplicity.
 /// - Gateway join pairing: parallel/inclusive converging gateways get `join: None`
 ///   (pairing is a higher-level concern handled by the verifier).
-pub(crate) fn ir_to_dto(graph: &IRGraph, workflow_id: &str) -> Result<WorkflowGraphDto> {
+pub fn ir_to_dto(graph: &IRGraph, workflow_id: &str) -> Result<WorkflowGraphDto> {
     let mut nodes = Vec::new();
     let mut node_id_map: HashMap<petgraph::graph::NodeIndex, String> = HashMap::new();
 
@@ -228,7 +228,7 @@ fn timer_spec_to_fields(spec: &TimerSpec) -> (Option<u64>, Option<u64>, Option<u
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::authoring::dto_to_ir::dto_to_ir;
+    use crate::dto_to_ir::dto_to_ir;
 
     /// T-EXP-8: Linear IR round-trips through ir_to_dto.
     #[test]

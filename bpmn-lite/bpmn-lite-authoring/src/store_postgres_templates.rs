@@ -1,16 +1,16 @@
-use crate::authoring::registry::{SourceFormat, TemplateState, TemplateStore, WorkflowTemplate};
+use crate::registry::{SourceFormat, TemplateState, TemplateStore, WorkflowTemplate};
 use anyhow::{anyhow, Result};
 use async_trait::async_trait;
 
 /// PostgreSQL-backed TemplateStore.
 ///
 /// Relies on migration 013_create_workflow_templates.sql for schema + immutability triggers.
-pub(crate) struct PostgresTemplateStore {
+pub struct PostgresTemplateStore {
     pool: sqlx::PgPool,
 }
 
 impl PostgresTemplateStore {
-    pub(crate) fn new(pool: sqlx::PgPool) -> Self {
+    pub fn new(pool: sqlx::PgPool) -> Self {
         Self { pool }
     }
 }
@@ -249,7 +249,7 @@ mod tests {
     #[tokio::test]
     async fn t_pub_10_postgres_round_trip() {
         use super::*;
-        use crate::authoring::dto::{EdgeDto, NodeDto, WorkflowGraphDto};
+        use crate::dto::{EdgeDto, NodeDto, WorkflowGraphDto};
 
         let db_url = std::env::var("DATABASE_URL")
             .unwrap_or_else(|_| "postgresql:///bpmn_lite_test".to_string());

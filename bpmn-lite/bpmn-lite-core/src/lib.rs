@@ -18,7 +18,6 @@
 //   can start working on their internals. The remaining modules stay
 //   `pub` because the server or its integration tests reach into
 //   them; tightening those is a later slice.
-pub(crate) mod authoring;
 pub mod engine;
 
 // Cleanup Phase 2.x compat re-exports.
@@ -30,11 +29,15 @@ pub mod engine;
 // Phase 2.4 — `store_postgres` + `migrations/` moved to
 //             `bpmn-lite-store-postgres`.
 // Phase 2.5 — `vm` moved to `bpmn-lite-vm`.
-// In-crate consumers (engine, authoring/*) reach the moved modules
-// through `crate::*` — these re-exports preserve those paths until
-// `bpmn-lite-core` itself goes away at the end of Phase 2.
-// `store_postgres` is feature-gated because the downstream
-// `bpmn-lite-core` feature `postgres` was the activation switch.
+// Phase 2.6 — `authoring/*` (11 sub-modules) moved to
+//             `bpmn-lite-authoring`.
+// The remaining in-crate consumer (engine + its tests) reaches the
+// moved modules through `crate::*` — these re-exports preserve
+// those paths until `bpmn-lite-core` itself goes away at the end of
+// Phase 2. `store_postgres` is feature-gated because the
+// downstream `bpmn-lite-core` feature `postgres` was the
+// activation switch.
+pub use bpmn_lite_authoring as authoring;
 pub use bpmn_lite_compiler as compiler;
 pub use bpmn_lite_store::{store, store_memory};
 #[cfg(feature = "postgres")]

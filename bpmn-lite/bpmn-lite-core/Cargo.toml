@@ -29,6 +29,7 @@ bpmn-lite-compiler = { path = "../bpmn-lite-compiler" }
 bpmn-lite-store = { path = "../bpmn-lite-store" }
 bpmn-lite-store-postgres = { path = "../bpmn-lite-store-postgres", optional = true }
 bpmn-lite-vm = { path = "../bpmn-lite-vm" }
+bpmn-lite-authoring = { path = "../bpmn-lite-authoring" }
 
 [dev-dependencies]
 tokio = { workspace = true, features = ["test-util"] }

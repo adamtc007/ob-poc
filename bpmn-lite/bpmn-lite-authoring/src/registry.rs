@@ -1,4 +1,4 @@
-use crate::authoring::dto::WorkflowGraphDto;
+use crate::dto::WorkflowGraphDto;
 use anyhow::{anyhow, Result};
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
@@ -11,7 +11,7 @@ use std::sync::RwLock;
 
 /// State of a workflow template.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub(crate) enum TemplateState {
+pub enum TemplateState {
     Draft,
     Published,
     Retired,
@@ -19,7 +19,7 @@ pub(crate) enum TemplateState {
 
 /// How the template was authored.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub(crate) enum SourceFormat {
+pub enum SourceFormat {
     Yaml,
     BpmnImport,
     Agent,
@@ -27,25 +27,25 @@ pub(crate) enum SourceFormat {
 
 /// A versioned workflow template — the publish artifact.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct WorkflowTemplate {
-    pub(crate) template_key: String,
-    pub(crate) template_version: u32,
-    pub(crate) process_key: String,
-    pub(crate) bytecode_version: String,
-    pub(crate) state: TemplateState,
-    pub(crate) source_format: SourceFormat,
-    pub(crate) dto_snapshot: WorkflowGraphDto,
-    pub(crate) task_manifest: Vec<String>,
-    pub(crate) bpmn_xml: Option<String>,
-    pub(crate) summary_md: Option<String>,
-    pub(crate) verb_registry_hash: Option<String>,
-    pub(crate) created_at: i64,
-    pub(crate) published_at: Option<i64>,
+pub struct WorkflowTemplate {
+    pub template_key: String,
+    pub template_version: u32,
+    pub process_key: String,
+    pub bytecode_version: String,
+    pub state: TemplateState,
+    pub source_format: SourceFormat,
+    pub dto_snapshot: WorkflowGraphDto,
+    pub task_manifest: Vec<String>,
+    pub bpmn_xml: Option<String>,
+    pub summary_md: Option<String>,
+    pub verb_registry_hash: Option<String>,
+    pub created_at: i64,
+    pub published_at: Option<i64>,
 }
 
 /// Persistence trait for workflow templates.
 #[async_trait]
-pub(crate) trait TemplateStore: Send + Sync {
+pub trait TemplateStore: Send + Sync {
     async fn save(&self, tpl: &WorkflowTemplate) -> Result<()>;
     async fn load(&self, key: &str, version: u32) -> Result<Option<WorkflowTemplate>>;
     async fn list(
@@ -67,12 +67,12 @@ type StoreKey = (String, u32);
 /// - Published content cannot be modified (only state → Retired)
 /// - Retired cannot transition back to Draft or Published
 /// - Valid transitions: Draft→Published, Published→Retired
-pub(crate) struct MemoryTemplateStore {
+pub struct MemoryTemplateStore {
     inner: RwLock<HashMap<StoreKey, WorkflowTemplate>>,
 }
 
 impl MemoryTemplateStore {
-    pub(crate) fn new() -> Self {
+    pub fn new() -> Self {
         Self {
             inner: RwLock::new(HashMap::new()),
         }
@@ -201,7 +201,7 @@ fn now_ms() -> i64 {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::authoring::dto::{EdgeDto, NodeDto, WorkflowGraphDto};
+    use crate::dto::{EdgeDto, NodeDto, WorkflowGraphDto};
 
     fn sample_dto() -> WorkflowGraphDto {
         WorkflowGraphDto {

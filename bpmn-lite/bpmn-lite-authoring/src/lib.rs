@@ -9,15 +9,30 @@
 //! lower to bytecode → hash → extract task manifest → optional
 //! BPMN-XML export → assemble `WorkflowTemplate`.
 //!
-//! **Status (Phase 1 skeleton):** the entire authoring pipeline
-//! exists in `bpmn-lite-core/src/authoring/*` but has no external
-//! caller — neither the gRPC service nor any CLI exposes it. The
-//! Phase 0 audit flagged this as a real gap: making authoring a
-//! shippable user-facing capability requires a `PublishWorkflow`
-//! gRPC RPC (and matching `GetTemplate` retrieval) plus wiring
-//! `compile_and_publish` to persist into the TemplateStore. Those
-//! changes are out-of-scope for the restructure itself and tracked
-//! as a follow-on slice.
+//! **Audit status (carried over from Phase 0 findings):** the
+//! entire authoring pipeline below is architecturally complete but
+//! has no external caller — the gRPC service exposes only
+//! `Compile(bpmn_xml: string)`. There is no `PublishWorkflow` /
+//! `CompileYaml` / `Validate` / `Lint` / `Template*` RPC, no xtask
+//! CLI surface, and `compile_and_publish` is not wired to persist
+//! into the TemplateStore. The Phase 2.6 migration relocates the
+//! code as-is; making this crate user-facing is a separate
+//! downstream slice.
 //!
-//! Empty at Phase 1 skeleton — code moves in via the Phase 2
-//! migration slice (`authoring/* → bpmn-lite-authoring`).
+//! Phase 2.6 (2026-05-14) migrated all eleven sub-modules
+//! (contracts, dto, dto_to_ir, export_bpmn, ir_to_dto, lints,
+//! publish, registry, store_postgres_templates (feature-gated),
+//! validate, yaml) from `bpmn-lite-core/src/authoring/`.
+
+pub mod contracts;
+pub mod dto;
+pub mod dto_to_ir;
+pub mod export_bpmn;
+pub mod ir_to_dto;
+pub mod lints;
+pub mod publish;
+pub mod registry;
+#[cfg(feature = "postgres")]
+pub mod store_postgres_templates;
+pub mod validate;
+pub mod yaml;

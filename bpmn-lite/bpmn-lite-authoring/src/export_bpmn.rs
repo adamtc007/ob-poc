@@ -27,7 +27,7 @@ fn hex_encode(bytes: &[u8]) -> String {
 /// Exported as `<bpmn:eventBasedGateway>` + catch events per arm.
 /// The existing `parser.rs` does NOT handle eventBasedGateway import, so
 /// RaceWait round-trip (export → re-import) is deferred until parser support is added.
-pub(crate) fn dto_to_bpmn_xml(dto: &WorkflowGraphDto) -> Result<String> {
+pub fn dto_to_bpmn_xml(dto: &WorkflowGraphDto) -> Result<String> {
     let process_id = sanitize_ncname(&dto.id);
     let bpmn_ids = compute_bpmn_ids(dto);
 
@@ -337,7 +337,7 @@ pub(crate) fn dto_to_bpmn_xml(dto: &WorkflowGraphDto) -> Result<String> {
 /// Convert a `FlagCondition` to a FEEL expression string.
 ///
 /// Format: `= {flag} {op} {value}`
-pub(crate) fn flag_condition_to_feel(cond: &FlagCondition) -> String {
+pub fn flag_condition_to_feel(cond: &FlagCondition) -> String {
     let op_str = match cond.op {
         FlagOp::Eq => "==",
         FlagOp::Neq => "!=",
@@ -354,7 +354,7 @@ pub(crate) fn flag_condition_to_feel(cond: &FlagCondition) -> String {
 /// Convert milliseconds to ISO 8601 duration.
 ///
 /// Examples: 5000 → "PT5S", 90000 → "PT1M30S", 86400000 → "P1D"
-pub(crate) fn ms_to_iso_duration(ms: u64) -> String {
+pub fn ms_to_iso_duration(ms: u64) -> String {
     if ms == 0 {
         return "PT0S".to_string();
     }
@@ -447,10 +447,10 @@ fn xml_escape(s: &str) -> String {
         .replace('"', "&quot;")
 }
 
-fn gateway_dir_attr(dir: &crate::compiler::ir::GatewayDirection) -> &'static str {
+fn gateway_dir_attr(dir: &bpmn_lite_compiler::ir::GatewayDirection) -> &'static str {
     match dir {
-        crate::compiler::ir::GatewayDirection::Diverging => r#"gatewayDirection="Diverging""#,
-        crate::compiler::ir::GatewayDirection::Converging => r#"gatewayDirection="Converging""#,
+        bpmn_lite_compiler::ir::GatewayDirection::Diverging => r#"gatewayDirection="Diverging""#,
+        bpmn_lite_compiler::ir::GatewayDirection::Converging => r#"gatewayDirection="Converging""#,
     }
 }
 
@@ -827,9 +827,9 @@ mod tests {
         let xml = dto_to_bpmn_xml(&dto).unwrap();
 
         // Parse back to IR
-        let ir = crate::compiler::parser::parse_bpmn(&xml).unwrap();
+        let ir = bpmn_lite_compiler::parser::parse_bpmn(&xml).unwrap();
         // Verify IR is valid
-        let errors = crate::compiler::verifier::verify(&ir);
+        let errors = bpmn_lite_compiler::verifier::verify(&ir);
         assert!(
             errors.is_empty(),
             "Round-trip IR should verify: {:?}",

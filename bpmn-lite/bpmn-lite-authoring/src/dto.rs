@@ -1,4 +1,4 @@
-use crate::compiler::ir::GatewayDirection;
+use bpmn_lite_compiler::ir::GatewayDirection;
 use serde::{Deserialize, Serialize};
 
 // ── Helper defaults for serde ──
@@ -18,46 +18,46 @@ fn is_false(v: &bool) -> bool {
 // ── Top-level DTO ──
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct WorkflowGraphDto {
-    pub(crate) id: String,
+pub struct WorkflowGraphDto {
+    pub id: String,
     #[serde(default)]
-    pub(crate) meta: Option<TemplateMeta>,
-    pub(crate) nodes: Vec<NodeDto>,
-    pub(crate) edges: Vec<EdgeDto>,
+    pub meta: Option<TemplateMeta>,
+    pub nodes: Vec<NodeDto>,
+    pub edges: Vec<EdgeDto>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct TemplateMeta {
-    pub(crate) name: String,
+pub struct TemplateMeta {
+    pub name: String,
     #[serde(default)]
-    pub(crate) version: Option<String>,
+    pub version: Option<String>,
     #[serde(default)]
-    pub(crate) description: Option<String>,
+    pub description: Option<String>,
 }
 
 // ── Edge ──
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct EdgeDto {
-    pub(crate) from: String,
-    pub(crate) to: String,
+pub struct EdgeDto {
+    pub from: String,
+    pub to: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub(crate) condition: Option<FlagCondition>,
+    pub condition: Option<FlagCondition>,
     #[serde(default, skip_serializing_if = "is_false")]
-    pub(crate) is_default: bool,
+    pub is_default: bool,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub(crate) on_error: Option<ErrorEdge>,
+    pub on_error: Option<ErrorEdge>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct FlagCondition {
-    pub(crate) flag: String,
-    pub(crate) op: FlagOp,
-    pub(crate) value: FlagValue,
+pub struct FlagCondition {
+    pub flag: String,
+    pub op: FlagOp,
+    pub value: FlagValue,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) enum FlagOp {
+pub enum FlagOp {
     #[serde(rename = "==")]
     Eq,
     #[serde(rename = "!=")]
@@ -70,23 +70,23 @@ pub(crate) enum FlagOp {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(untagged)]
-pub(crate) enum FlagValue {
+pub enum FlagValue {
     Bool(bool),
     I64(i64),
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct ErrorEdge {
-    pub(crate) error_code: String,
+pub struct ErrorEdge {
+    pub error_code: String,
     #[serde(default)]
-    pub(crate) retries: u32,
+    pub retries: u32,
 }
 
 // ── Node (tagged enum) ──
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "kind")]
-pub(crate) enum NodeDto {
+pub enum NodeDto {
     Start {
         id: String,
     },
@@ -168,14 +168,14 @@ pub(crate) enum NodeDto {
 // ── RaceArm ──
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct RaceArm {
-    pub(crate) arm_id: String,
-    pub(crate) kind: RaceArmKind,
+pub struct RaceArm {
+    pub arm_id: String,
+    pub kind: RaceArmKind,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "type")]
-pub(crate) enum RaceArmKind {
+pub enum RaceArmKind {
     Timer {
         duration_ms: u64,
         #[serde(default = "default_true")]
@@ -192,7 +192,7 @@ pub(crate) enum RaceArmKind {
 
 impl NodeDto {
     /// Returns the id regardless of variant.
-    pub(crate) fn id(&self) -> &str {
+    pub fn id(&self) -> &str {
         match self {
             NodeDto::Start { id } => id,
             NodeDto::End { id, .. } => id,
@@ -212,7 +212,7 @@ impl NodeDto {
 
 impl WorkflowGraphDto {
     /// Deterministic JSON: clone, sort nodes by id, sort edges by (from, to), serialize to pretty JSON.
-    pub(crate) fn deterministic_json(&self) -> String {
+    pub fn deterministic_json(&self) -> String {
         let mut dto = self.clone();
         dto.nodes.sort_by(|a, b| a.id().cmp(b.id()));
         dto.edges
