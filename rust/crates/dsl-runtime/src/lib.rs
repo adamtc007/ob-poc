@@ -65,31 +65,19 @@ pub use dsl_analysis::catalogue_loader;
 pub use dsl_analysis::entity_kind;
 pub use dsl_analysis::runtime_registry;
 pub use dsl_analysis::verb_registry;
-// §9 item 9 slice 3 (2026-05-13): suggestions::predict_next_steps
-// relocated from rust/src/dsl_v2/. Frontier-derived "what verb makes
-// sense next" recommender; pure-Rust over the verb registry.
-pub mod suggestions;
 // dsl-runtime-split v1 Phase 2 (2026-05-14): validation relocated to
-// `dsl-analysis`. Pure-types module (Diagnostic, Severity, SourceSpan,
-// ValidationContext, ValidationResult, Suggestion, ValidatedProgram,
-// ValidatedStatement). Compat re-export keeps `dsl_runtime::validation::*`
-// resolving for external consumers (ob-poc, dsl-lsp) and intra-crate
-// `crate::validation::*` paths in gateway_resolver/ref_resolver/lsp_validator.
-// Removed in Phase 11.
+// `dsl-analysis` (pure-types module). Compat re-export keeps
+// `dsl_runtime::validation::*` resolving. Removed in Phase 11.
 pub use dsl_analysis::validation;
-// §9 item 9 slice 5 (2026-05-13): planning_facade relocated from
-// rust/src/dsl_v2/. The analyse-and-plan orchestrator that parses
-// DSL text, compiles to ops, runs DAG planning, and returns both
-// diagnostics + executable plan. analyse_and_plan, PlanningInput,
-// PlanningOutput, SyntheticStep, quick_validate, ImplicitCreateMode.
-pub mod planning_facade;
-// dsl-runtime-split v1 Phases 5–6 (2026-05-14): resolver cluster +
-// lsp_validator relocated to `dsl-analysis`. Compat re-exports preserve
-// `dsl_runtime::{gateway_resolver, ref_resolver, lsp_validator}` for
-// dsl-lsp and ob-poc::dsl_v2 consumers. Removed in Phase 11.
+// dsl-runtime-split v1 Phases 5–7 (2026-05-14): resolver cluster +
+// lsp_validator + suggestions + planning_facade relocated to
+// `dsl-analysis`. Compat re-exports preserve all `dsl_runtime::*`
+// paths for dsl-lsp and ob-poc::dsl_v2. Removed in Phase 11.
 pub use dsl_analysis::gateway_resolver;
 pub use dsl_analysis::lsp_validator;
+pub use dsl_analysis::planning_facade;
 pub use dsl_analysis::ref_resolver;
+pub use dsl_analysis::suggestions;
 // dsl-runtime-split v1 Phase 4 (2026-05-14): macros registry subset
 // (schema + registry + conditions + variable + scope) relocated to
 // `dsl-analysis`. Expander remains in `ob-poc`. Compat re-export

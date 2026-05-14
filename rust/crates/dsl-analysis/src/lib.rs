@@ -44,9 +44,12 @@
 //!   variable, scope). 2,585 LOC. Expander stays in `ob-poc`.
 //! - Phase 5: `ref_resolver` + `gateway_resolver` paired-move (835 LOC,
 //!   async-trait + entity-gateway + tonic).
-//! - Phase 6 (current): `lsp_validator` (713 LOC). Now-co-resident with
-//!   its deps — gateway_resolver, ref_resolver, validation, verb_registry.
-//!   No new deps required.
+//! - Phase 6: `lsp_validator` (713 LOC).
+//! - Phase 7 (current): `suggestions` + `planning_facade` (571 LOC).
+//!   `suggestions::predict_next_steps` ranks verbs; `planning_facade`
+//!   is the analyse-and-plan orchestrator (parses DSL, compiles to ops,
+//!   runs DAG planning, returns diagnostics + executable plan). Both
+//!   reach runtime_registry + verb_registry + dsl_core; all co-resident.
 //!
 //! Compat re-exported from `dsl-runtime` until Phase 11 cleanup.
 
@@ -55,7 +58,9 @@ pub mod entity_kind;
 pub mod gateway_resolver;
 pub mod lsp_validator;
 pub mod macros;
+pub mod planning_facade;
 pub mod ref_resolver;
 pub mod runtime_registry;
+pub mod suggestions;
 pub mod validation;
 pub mod verb_registry;
