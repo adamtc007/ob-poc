@@ -390,7 +390,7 @@ This v1 plan draws capability boundaries based on the best information we have *
 
 **What to look for:**
 1. **Too-small crates** — any crate whose lib.rs is <300 LOC of real content. Candidate for fold-back into a sibling capability or `ob-poc`.
-2. **Too-large crates** — any crate whose surface is incoherent or whose changes routinely touch the whole crate. Candidate for split (esp. `ob-poc-domain` per §6 item 4).
+2. **Too-large crates** — any crate whose surface is incoherent or whose changes routinely touch the whole crate. Candidate for split (esp. `ob-poc-domain` per §6 item 4). **Actioned 2026-05-14:** `ob-poc-domain` (17,341 LOC) split into 9 per-business-capability crates per `docs/todo/ob-poc-domain-split-v1.md` (Option A approved). The original crate was deleted; consumers continue reaching its types via compat re-exports inside `ob-poc`.
 3. **Friction at the boundary → journey break** (§6 item 2). If projecting `PackManifest → PackProjection` in the app turns into a maintenance burden vs. the leak it prevents.
 4. **Friction at the boundary → sage opaqueness** (§6 item 1). If ACP consumers are constantly asking for Sage-shape data and the app has to keep adding projection surfaces.
 5. **Engines that didn't move to `ob-poc-sage`** (§6 item 6). If `valid_verb_set` / `llm_sage` / `deterministic` end up being reused outside ob-poc — promote.

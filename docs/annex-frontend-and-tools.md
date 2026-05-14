@@ -465,8 +465,7 @@ This ensures LSP diagnostics match server behavior 100%.
 
 Files matching `*.playbook.yaml` / `*.playbook.yml` get specialized handling:
 
-- Parse with `playbook-core`
-- Lower with `playbook-lower`
+- Parse and lower with `playbook-core` (single crate since the Tier 3 #9 cleanup folded `playbook-lower` in).
 - Report missing required slots as warnings
 - Validate verb references
 
