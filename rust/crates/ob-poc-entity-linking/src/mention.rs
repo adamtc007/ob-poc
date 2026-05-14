@@ -224,7 +224,7 @@ impl MentionExtractor {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::entity_linking::snapshot::{EntityRow, EntitySnapshot, SNAPSHOT_VERSION};
+    use crate::snapshot::{EntityRow, EntitySnapshot, SNAPSHOT_VERSION};
     use smallvec::smallvec;
 
     fn make_test_snapshot() -> EntitySnapshot {

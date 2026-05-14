@@ -100,7 +100,7 @@ pub fn validate_document(doc: &TradingProfileDocument) -> Vec<ValidationError> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::trading_profile::types::{
+    use crate::types::{
         BookingMatch, BookingRule, CsaConfig, EntityRef, EntityRefType, IsdaAgreementConfig,
         StandingInstruction, Universe,
     };

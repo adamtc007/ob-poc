@@ -25,11 +25,9 @@ ob-poc-boundary = { path = "crates/ob-poc-boundary" }
 # Empty skeletons populated by Phases 2–5.
 ob-poc-sage = { path = "crates/ob-poc-sage" }           # Sage intent understanding (Phase 2 dest)
 ob-poc-journey = { path = "crates/ob-poc-journey" }     # Pack-guided workflows (Phase 3 dest)
-ob-poc-domain = { path = "crates/ob-poc-domain" }       # Business-domain DTOs (Phase 4 dest)
 # ob-poc-domain split v1 (docs/todo/ob-poc-domain-split-v1.md) — 9
-# per-business-capability crates carved out of ob-poc-domain. Pre-flight
-# wires them all in as empty skeletons; each subsequent slice relocates
-# one module and removes the corresponding `pub mod` from ob-poc-domain.
+# per-business-capability crates carved out of ob-poc-domain. The
+# original ob-poc-domain crate was deleted in Slice D (2026-05-14).
 ob-poc-bods = { path = "crates/ob-poc-bods" }
 ob-poc-deal = { path = "crates/ob-poc-deal" }
 ob-poc-booking-principal = { path = "crates/ob-poc-booking-principal" }
@@ -243,7 +241,7 @@ path = "src/bin/sem_os_footprint_audit.rs"
 [features]
 default = ["server"]  # Enable for sqlx prepare; use --no-default-features to disable
 
-database = ["dep:sqlx", "dep:bigdecimal", "dep:entity-gateway", "dep:pgvector", "ob-poc-diagnostics/database", "ob-poc-boundary/database", "ob-poc-sage/database", "ob-poc-domain/database", "ob-poc-authoring/database", "ob-poc-bods/database", "ob-poc-semtaxonomy/database", "ob-poc-entity-linking/database", "ob-poc-trading-profile/database", "ob-poc-derived-attributes/database", "ob-poc-taxonomy/database"]  # Only enable database functionality when needed
+database = ["dep:sqlx", "dep:bigdecimal", "dep:entity-gateway", "dep:pgvector", "ob-poc-diagnostics/database", "ob-poc-boundary/database", "ob-poc-sage/database", "ob-poc-authoring/database", "ob-poc-bods/database", "ob-poc-semtaxonomy/database", "ob-poc-entity-linking/database", "ob-poc-trading-profile/database", "ob-poc-derived-attributes/database", "ob-poc-taxonomy/database"]  # Only enable database functionality when needed
 server = ["database", "mcp", "dep:axum", "dep:tower", "dep:tower-http"]  # REST API server with intent pipeline
 cli = ["dep:clap", "dep:colored", "dep:atty", "dep:rustyline"]  # CLI tool for DSL testing
 mcp = ["database"]  # MCP/intent pipeline for semantic verb search
@@ -280,8 +278,8 @@ members = [
     "crates/ob-poc-boundary",
     "crates/ob-poc-sage",
     "crates/ob-poc-journey",
-    "crates/ob-poc-domain",
-    # ob-poc-domain split v1 — 9 per-business-capability crates
+    # ob-poc-domain split v1 — 9 per-business-capability crates carved out of
+    # the original ob-poc-domain crate (which was deleted 2026-05-14).
     "crates/ob-poc-bods",
     "crates/ob-poc-deal",
     "crates/ob-poc-booking-principal",

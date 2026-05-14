@@ -733,7 +733,7 @@ mod tests {
 
     #[test]
     fn test_deserialize_seed_file() {
-        let yaml = include_str!("../../../../config/seed/trading_profiles/allianzgi_complete.yaml");
+        let yaml = include_str!("../../../config/seed/trading_profiles/allianzgi_complete.yaml");
         let result: Result<TradingProfileImport, _> = serde_yaml::from_str(yaml);
         assert!(
             result.is_ok(),
@@ -750,7 +750,7 @@ mod tests {
 
     #[test]
     fn test_convert_to_document() {
-        let yaml = include_str!("../../../../config/seed/trading_profiles/allianzgi_complete.yaml");
+        let yaml = include_str!("../../../config/seed/trading_profiles/allianzgi_complete.yaml");
         let import: TradingProfileImport = serde_yaml::from_str(yaml).unwrap();
         let doc = import.into_document();
 
