@@ -1,0 +1,22 @@
+[package]
+name = "sem_os_policy"
+version = "0.1.0"
+edition = "2021"
+description = "Semantic OS governance + projection plane. Owns ABAC primitives, gate logic, policy enforcement, ACP discovery projection, affinity graph, observatory orientation/projection, stewardship + authoring lifecycle, state simulation, context policy/resolution, diagram emission. Decides *what may happen* and projects *what is shown*."
+
+# Capability discipline (see docs/todo/sem-os-core-split-v1.md §2.3):
+#   IN-SCOPE: ABAC, gates, enforcement, projection, observatory, affinity,
+#             authoring lifecycle, stewardship, state simulation, context
+#             policy/resolution, diagram emission, grounding, security labels.
+#   OUT-OF-SCOPE: defining new ontology shapes (that's sem_os_ontology),
+#                 engine primitives (that's sem_os_core), database
+#                 persistence (that's sem_os_postgres).
+#
+# Hard invariant: sem_os_policy MUST be the most-downstream of the three;
+# sem_os_ontology and sem_os_core never depend on it.
+
+[dependencies]
+# Skeleton dependencies — populated as modules land in Phases 5–10.
+
+[lints.rust]
+unreachable_pub = "deny"

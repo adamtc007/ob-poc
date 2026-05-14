@@ -273,6 +273,11 @@ members = [
 
     # Semantic OS crates (Stage 1.1)
     "crates/sem_os_core",
+
+    # sem_os_core split v1 (docs/todo/sem-os-core-split-v1.md) —
+    # ontology + policy planes
+    "crates/sem_os_ontology",
+    "crates/sem_os_policy",
     "crates/sem_os_postgres",
     "crates/sem_os_server",
     "crates/sem_os_client",
