@@ -105,10 +105,8 @@ pub mod view_config_service;
 //     snapshots + lineage; sqlx::PgPool repository.
 //   - advisory_lock (~90 LOC) — typeless pg advisory-lock helpers
 //     (advisory_xact_lock, try_advisory_xact_lock, lock_key).
-#[cfg(feature = "database")]
-pub mod advisory_lock;
-#[cfg(feature = "database")]
-pub mod derived_attributes;
+// advisory_lock + derived_attributes relocated to `ob-poc-derived-attributes`
+// by split v1 Slice C1 (2026-05-14). They paired per v1 plan §6 decision 3.
 
 // Phase 4.2d (2026-05-13): final Phase 4 modules out of boundary into
 // ob-poc-domain. Both are pure DTO trees with only `ob_poc_types::*`

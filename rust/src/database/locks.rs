@@ -40,7 +40,9 @@ use thiserror::Error;
 // tier can call them directly without re-entering src/.
 #[allow(unused_imports)]
 pub use crate::dsl_v2::expansion::{LockAccess, LockKey, LockMode};
-pub use ob_poc_domain::advisory_lock::{advisory_xact_lock, lock_key, try_advisory_xact_lock};
+pub use ob_poc_derived_attributes::advisory_lock::{
+    advisory_xact_lock, lock_key, try_advisory_xact_lock,
+};
 
 // =============================================================================
 // LOCK KEY DERIVATION (struct overload)
