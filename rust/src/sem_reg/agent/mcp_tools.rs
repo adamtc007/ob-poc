@@ -29,10 +29,10 @@ use crate::sem_reg::abac::ActorContext;
 use crate::sem_reg::enforce::{enforce_read, enforce_read_label, redacted_stub, EnforceResult};
 use crate::sem_reg::store::SnapshotStore;
 use crate::sem_reg::types::ObjectType;
-use sem_os_core::context_resolution::{
+use sem_os_policy::context_resolution::{
     ContextResolutionRequest, DiscoveryContext, EvidenceMode, SubjectRef,
 };
-use sem_os_core::service::{CoreService, CoreServiceImpl};
+use sem_os_policy::service::{CoreService, CoreServiceImpl};
 use sem_os_postgres::PgStores;
 
 // ── Grounding Context ─────────────────────────────────────────
@@ -136,7 +136,7 @@ pub fn build_sem_os_service(pool: &PgPool) -> Arc<dyn CoreService> {
     )
 }
 
-fn to_sem_os_actor(actor: &ActorContext) -> sem_os_core::abac::ActorContext {
+fn to_sem_os_actor(actor: &ActorContext) -> sem_os_policy::abac::ActorContext {
     let json = serde_json::to_value(actor).expect("ActorContext serializes");
     serde_json::from_value(json).expect("ActorContext round-trips")
 }
@@ -144,7 +144,7 @@ fn to_sem_os_actor(actor: &ActorContext) -> sem_os_core::abac::ActorContext {
 async fn resolve_context_via_sem_os(
     ctx: &SemRegToolContext<'_>,
     request: ContextResolutionRequest,
-) -> sem_os_core::service::Result<sem_os_core::context_resolution::ContextResolutionResponse> {
+) -> sem_os_policy::service::Result<sem_os_policy::context_resolution::ContextResolutionResponse> {
     let principal =
         sem_os_core::principal::Principal::in_process(&ctx.actor.actor_id, ctx.actor.roles.clone());
     let owned;

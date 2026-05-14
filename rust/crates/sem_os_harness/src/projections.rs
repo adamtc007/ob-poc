@@ -6,7 +6,7 @@
 
 use sem_os_client::SemOsClient;
 use sem_os_core::principal::Principal;
-use sem_os_core::proof_obligation_def::ProofStrength;
+use sem_os_ontology::proof_obligation_def::ProofStrength;
 use sem_os_core::seeds::*;
 use sqlx::PgPool;
 use uuid::Uuid;

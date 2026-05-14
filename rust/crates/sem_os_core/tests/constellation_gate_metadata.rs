@@ -1,11 +1,11 @@
-use sem_os_core::constellation_map_def::{
+use sem_os_ontology::constellation_map_def::{
     Cardinality, ClosureType, ConstellationMapDefBody, EligibilityConstraint,
 };
 use std::{collections::BTreeMap, fs, path::PathBuf};
 
 #[derive(serde::Deserialize)]
 struct SeedConstellationMap {
-    slots: BTreeMap<String, sem_os_core::constellation_map_def::SlotDef>,
+    slots: BTreeMap<String, sem_os_ontology::constellation_map_def::SlotDef>,
 }
 
 fn constellation_dir() -> PathBuf {

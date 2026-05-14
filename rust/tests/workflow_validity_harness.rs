@@ -14,7 +14,7 @@ use ob_poc::runbook::{
     record_restricted_mutation_execution_receipt, validate_workbook_for_dry_run,
     DslDrafterExecutionMode, KycUpdateStatusDryRunInput, ObservedMutationAnchors,
 };
-use sem_os_core::domain_pack::DomainPackManifest;
+use sem_os_policy::domain_pack::DomainPackManifest;
 use uuid::{uuid, Uuid};
 
 const SESSION_ID: Uuid = uuid!("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa");

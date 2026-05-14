@@ -540,7 +540,7 @@ pub(crate) async fn ctx_resolve(
     json_output: bool,
 ) -> Result<()> {
     use ob_poc::sem_reg::abac::ActorContext;
-    use sem_os_core::context_resolution::{
+    use sem_os_policy::context_resolution::{
         ContextResolutionRequest, DiscoveryContext, EvidenceMode, SubjectRef,
     };
 
@@ -616,7 +616,7 @@ pub(crate) async fn ctx_resolve(
     };
 
     // Convert ob_poc ActorContext → sem_os_core ActorContext via JSON round-trip
-    let sem_os_actor: sem_os_core::abac::ActorContext = {
+    let sem_os_actor: sem_os_policy::abac::ActorContext = {
         let json = serde_json::to_value(&actor).expect("ActorContext serializes");
         serde_json::from_value(json).expect("ActorContext round-trips")
     };
@@ -1201,7 +1201,7 @@ pub(crate) async fn authoring_list(status: Option<&str>, limit: i64) -> Result<(
 
     let status_filter = match status {
         Some(s) => {
-            let parsed: sem_os_core::authoring::types::ChangeSetStatus =
+            let parsed: sem_os_policy::authoring::types::ChangeSetStatus =
                 s.parse().map_err(|_| {
                     anyhow::anyhow!(
                         "Invalid status '{}'. Valid: draft, validated, rejected, \
@@ -1214,7 +1214,7 @@ pub(crate) async fn authoring_list(status: Option<&str>, limit: i64) -> Result<(
         None => None,
     };
 
-    use sem_os_core::authoring::ports::AuthoringStore;
+    use sem_os_policy::authoring::ports::AuthoringStore;
     let changesets = store
         .list_change_sets(status_filter, limit)
         .await
@@ -1248,7 +1248,7 @@ pub(crate) async fn authoring_get(id: &str) -> Result<()> {
     let store = sem_os_postgres::PgAuthoringStore::new(pool);
     let cs_id = uuid::Uuid::parse_str(id).context("Invalid UUID")?;
 
-    use sem_os_core::authoring::ports::AuthoringStore;
+    use sem_os_policy::authoring::ports::AuthoringStore;
     let cs = store
         .get_change_set(cs_id)
         .await
@@ -1318,7 +1318,7 @@ pub(crate) async fn authoring_validate(id: &str) -> Result<()> {
     let cs_id = uuid::Uuid::parse_str(id).context("Invalid UUID")?;
 
     let service =
-        sem_os_core::authoring::governance_verbs::GovernanceVerbService::new(&store, &scratch);
+        sem_os_policy::authoring::governance_verbs::GovernanceVerbService::new(&store, &scratch);
     let report = service
         .validate(cs_id)
         .await
@@ -1349,7 +1349,7 @@ pub(crate) async fn authoring_dry_run(id: &str) -> Result<()> {
     let cs_id = uuid::Uuid::parse_str(id).context("Invalid UUID")?;
 
     let service =
-        sem_os_core::authoring::governance_verbs::GovernanceVerbService::new(&store, &scratch);
+        sem_os_policy::authoring::governance_verbs::GovernanceVerbService::new(&store, &scratch);
     let report = service
         .dry_run(cs_id)
         .await
@@ -1386,7 +1386,7 @@ pub(crate) async fn authoring_plan(id: &str) -> Result<()> {
     let cs_id = uuid::Uuid::parse_str(id).context("Invalid UUID")?;
 
     let service =
-        sem_os_core::authoring::governance_verbs::GovernanceVerbService::new(&store, &scratch);
+        sem_os_policy::authoring::governance_verbs::GovernanceVerbService::new(&store, &scratch);
     let diff = service
         .plan_publish(cs_id)
         .await
@@ -1408,7 +1408,7 @@ pub(crate) async fn authoring_publish(id: &str, publisher: &str) -> Result<()> {
     let cs_id = uuid::Uuid::parse_str(id).context("Invalid UUID")?;
 
     let service =
-        sem_os_core::authoring::governance_verbs::GovernanceVerbService::new(&store, &scratch);
+        sem_os_policy::authoring::governance_verbs::GovernanceVerbService::new(&store, &scratch);
     let batch = service
         .publish(cs_id, publisher)
         .await
@@ -1434,7 +1434,7 @@ pub(crate) async fn authoring_publish_batch(ids: &[String], publisher: &str) -> 
         .collect::<Result<Vec<_>>>()?;
 
     let service =
-        sem_os_core::authoring::governance_verbs::GovernanceVerbService::new(&store, &scratch);
+        sem_os_policy::authoring::governance_verbs::GovernanceVerbService::new(&store, &scratch);
     let batch = service
         .publish_batch(&cs_ids, publisher)
         .await
@@ -1464,7 +1464,7 @@ pub(crate) async fn authoring_diff(base_id: &str, target_id: &str) -> Result<()>
     let target = uuid::Uuid::parse_str(target_id).context("Invalid target UUID")?;
 
     let service =
-        sem_os_core::authoring::governance_verbs::GovernanceVerbService::new(&store, &scratch);
+        sem_os_policy::authoring::governance_verbs::GovernanceVerbService::new(&store, &scratch);
     let diff = service
         .diff(base, target)
         .await
@@ -1480,7 +1480,7 @@ pub(crate) async fn authoring_health() -> Result<()> {
     let pool = connect().await?;
     let store = sem_os_postgres::PgAuthoringStore::new(pool);
 
-    use sem_os_core::authoring::ports::AuthoringStore;
+    use sem_os_policy::authoring::ports::AuthoringStore;
 
     // Pending changeset counts by status
     let status_counts = store
@@ -1524,7 +1524,7 @@ pub(crate) async fn authoring_health() -> Result<()> {
 
 /// Propose a ChangeSet from a bundle directory or inline YAML.
 pub(crate) async fn authoring_propose(bundle_path: &str) -> Result<()> {
-    use sem_os_core::authoring::bundle::{build_bundle, parse_manifest};
+    use sem_os_policy::authoring::bundle::{build_bundle, parse_manifest};
     use sem_os_core::principal::Principal;
 
     let pool = connect().await?;
@@ -1553,7 +1553,7 @@ pub(crate) async fn authoring_propose(bundle_path: &str) -> Result<()> {
     };
 
     let service =
-        sem_os_core::authoring::governance_verbs::GovernanceVerbService::new(&store, &scratch);
+        sem_os_policy::authoring::governance_verbs::GovernanceVerbService::new(&store, &scratch);
     let cs = service
         .propose(&bundle, &principal)
         .await
@@ -1574,7 +1574,7 @@ pub(crate) async fn authoring_cleanup(
 ) -> Result<()> {
     let pool = connect().await?;
 
-    let policy = sem_os_core::authoring::cleanup::CleanupPolicy {
+    let policy = sem_os_policy::authoring::cleanup::CleanupPolicy {
         terminal_retention_days: terminal_days.unwrap_or(90),
         orphan_retention_days: orphan_days.unwrap_or(30),
     };
@@ -1590,7 +1590,7 @@ pub(crate) async fn authoring_cleanup(
     );
 
     let cleanup_store = sem_os_postgres::PgCleanupStore::new(pool);
-    let report = sem_os_core::authoring::cleanup::run_cleanup(&cleanup_store, &policy)
+    let report = sem_os_policy::authoring::cleanup::run_cleanup(&cleanup_store, &policy)
         .await
         .map_err(|e| anyhow::anyhow!("{e}"))?;
 
@@ -1600,7 +1600,7 @@ pub(crate) async fn authoring_cleanup(
     Ok(())
 }
 
-fn print_diff_summary(diff: &sem_os_core::authoring::types::DiffSummary) {
+fn print_diff_summary(diff: &sem_os_policy::authoring::types::DiffSummary) {
     if diff.added.is_empty()
         && diff.modified.is_empty()
         && diff.removed.is_empty()

@@ -13,15 +13,15 @@ use std::{
 use anyhow::{anyhow, Result};
 use chrono::Utc;
 use dsl_core::resolver::{resolve_template, ResolverInputs};
-use sem_os_core::{
+use sem_os_ontology::{
     constellation_map_def::{
         Cardinality, ConstellationMapDefBody, DependencyEntry as CoreDependencyEntry,
         JoinDef as CoreJoinDef, SlotDef as CoreSlotDef, SlotType as CoreSlotType,
         VerbAvailability as CoreVerbAvailability, VerbPaletteEntry as CoreVerbPaletteEntry,
     },
-    grounding::{compute_slot_action_surface, ConstellationModel},
     state_machine_def::{ReducerDef, StateMachineDefBody, TransitionDef},
 };
+use sem_os_policy::grounding::{compute_slot_action_surface, ConstellationModel};
 use uuid::Uuid;
 
 use crate::sem_os_runtime::constellation_runtime::{
@@ -377,7 +377,7 @@ fn entity_type_for_slot(slot_name: &str, model: &ConstellationModel) -> String {
 
 fn normalize_slot_state(
     current_state: &str,
-    slot: &sem_os_core::grounding::ResolvedSlot,
+    slot: &sem_os_policy::grounding::ResolvedSlot,
 ) -> String {
     let normalized = current_state.to_lowercase();
     if slot.def.state_machine.is_none() {

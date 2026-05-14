@@ -2,13 +2,13 @@
 //!
 //! Bridges the plane-crossing trait to
 //! `crate::sem_reg::agent::mcp_tools::build_sem_os_service`, which
-//! returns an `Arc<dyn sem_os_core::service::CoreService>` whose
+//! returns an `Arc<dyn sem_os_policy::service::CoreService>` whose
 //! concrete impl lives in the in-process registry. We then call
 //! `.resolve_context(...)` on that service.
 
 use anyhow::Result;
 use async_trait::async_trait;
-use sem_os_core::context_resolution::{ContextResolutionRequest, ContextResolutionResponse};
+use sem_os_policy::context_resolution::{ContextResolutionRequest, ContextResolutionResponse};
 use sem_os_core::principal::Principal;
 use sqlx::PgPool;
 

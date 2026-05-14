@@ -8,7 +8,7 @@ use ob_poc::runbook::{
     validate_kyc_update_status_draft_without_revision, KycLanguagePackRequest,
     KycUpdateStatusWorkbookDraft, WorkbookRevisionOutcome,
 };
-use sem_os_core::domain_pack::DomainPackManifest;
+use sem_os_policy::domain_pack::DomainPackManifest;
 use serde::Deserialize;
 use uuid::{uuid, Uuid};
 

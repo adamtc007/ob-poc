@@ -57,7 +57,7 @@ use crate::traceability::{
 };
 
 use sem_os_client::SemOsClient;
-use sem_os_core::authoring::agent_mode::AgentMode;
+use sem_os_types::agent_mode::AgentMode;
 
 /// Context needed to run the unified orchestrator.
 pub struct OrchestratorContext {
@@ -3227,7 +3227,7 @@ async fn resolve_via_client(
     entity_kind: Option<&str>,
     use_generic_task_subject: bool,
 ) -> SemOsContextEnvelope {
-    use sem_os_core::context_resolution::{EvidenceMode, SubjectRef};
+    use sem_os_policy::context_resolution::{EvidenceMode, SubjectRef};
 
     let subject = if use_generic_task_subject {
         SubjectRef::TaskId(ctx.session_id.unwrap_or_else(Uuid::new_v4))
@@ -3243,7 +3243,7 @@ async fn resolve_via_client(
     };
     // Convert ob-poc ActorContext → sem_os_core ActorContext via serde round-trip
     // (structurally identical types in separate crates)
-    let core_actor: sem_os_core::abac::ActorContext = {
+    let core_actor: sem_os_policy::abac::ActorContext = {
         let json = serde_json::to_value(&ctx.actor).expect("ActorContext serializes");
         serde_json::from_value(json).expect("ActorContext round-trips")
     };
@@ -3257,7 +3257,7 @@ async fn resolve_via_client(
     } else {
         EvidenceMode::default()
     };
-    let request = sem_os_core::context_resolution::ContextResolutionRequest {
+    let request = sem_os_policy::context_resolution::ContextResolutionRequest {
         subject,
         intent_summary: sage_intent.map(|intent| intent.summary.clone()),
         raw_utterance: Some(utterance.to_string()),
@@ -3268,7 +3268,7 @@ async fn resolve_via_client(
         point_in_time: None,
         entity_kind: entity_kind.map(|s| s.to_string()),
         entity_confidence: ctx.pre_sage_entity_confidence,
-        discovery: sem_os_core::context_resolution::DiscoveryContext {
+        discovery: sem_os_policy::context_resolution::DiscoveryContext {
             selected_domain_id: ctx.discovery_selected_domain.clone(),
             selected_family_id: ctx.discovery_selected_family.clone(),
             selected_constellation_id: ctx.discovery_selected_constellation.clone(),
@@ -3306,17 +3306,17 @@ pub async fn resolve_allowed_verbs(
     actor: &ActorContext,
     session_id: Option<Uuid>,
 ) -> SemOsContextEnvelope {
-    use sem_os_core::context_resolution::{EvidenceMode, SubjectRef};
+    use sem_os_policy::context_resolution::{EvidenceMode, SubjectRef};
 
     // Resolve against a neutral task subject for generic sessions. This avoids
     // coupling resolve_context to KYC case tables in environments that do not
     // run case workflows.
     let subject = SubjectRef::TaskId(session_id.unwrap_or_else(Uuid::new_v4));
-    let core_actor: sem_os_core::abac::ActorContext = {
+    let core_actor: sem_os_policy::abac::ActorContext = {
         let json = serde_json::to_value(actor).expect("ActorContext serializes");
         serde_json::from_value(json).expect("ActorContext round-trips")
     };
-    let request = sem_os_core::context_resolution::ContextResolutionRequest {
+    let request = sem_os_policy::context_resolution::ContextResolutionRequest {
         subject,
         intent_summary: None,
         raw_utterance: None,
@@ -3360,8 +3360,8 @@ mod tests {
     use async_trait::async_trait;
     use chrono::Utc;
     use sem_os_client::SemOsClient;
-    use sem_os_core::abac::AccessDecision;
-    use sem_os_core::context_resolution::{
+    use sem_os_policy::abac::AccessDecision;
+    use sem_os_policy::context_resolution::{
         ContextResolutionResponse, DiscoverySurface, GroundingReadiness, ResolutionStage,
     };
     use sem_os_core::error::SemOsError;
@@ -3370,10 +3370,14 @@ mod tests {
         BootstrapSeedBundleResponse, ChangesetDiffResponse, ChangesetImpactResponse,
         ChangesetPublishResponse, ExportSnapshotSetResponse, GatePreviewResponse,
         GetManifestResponse, ListChangesetsQuery, ListChangesetsResponse, ListToolSpecsResponse,
-        ResolveContextRequest, ResolveContextResponse, ToolCallRequest, ToolCallResponse,
+        ToolCallRequest, ToolCallResponse,
     };
-    use sem_os_core::types::Changeset;
-    use sem_os_core::universe_def::{EntryQuestion, GroundingInput};
+    use sem_os_policy::context_resolution::{
+        ContextResolutionRequest as ResolveContextRequest,
+        ContextResolutionResponse as ResolveContextResponse,
+    };
+    use sem_os_types::Changeset;
+    use sem_os_ontology::universe_def::{EntryQuestion, GroundingInput};
     use uuid::Uuid;
 
     /// Helper to build a default IntentTrace for tests.
@@ -3771,7 +3775,7 @@ mod tests {
             policy_gate: std::sync::Arc::new(crate::policy::PolicyGate::strict()),
             source: UtteranceSource::Chat,
             sem_os_client: None,
-            agent_mode: sem_os_core::authoring::agent_mode::AgentMode::default(),
+            agent_mode: sem_os_types::agent_mode::AgentMode::default(),
             goals: vec![],
             stage_focus: None,
             sage_engine: None,
@@ -3893,7 +3897,7 @@ mod tests {
 
         async fn get_affinity_graph(
             &self,
-        ) -> sem_os_client::Result<Arc<sem_os_core::affinity::AffinityGraph>> {
+        ) -> sem_os_client::Result<Arc<sem_os_policy::affinity::AffinityGraph>> {
             Err(Self::unsupported())
         }
 

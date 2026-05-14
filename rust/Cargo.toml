@@ -29,6 +29,9 @@ ob-poc-domain = { path = "crates/ob-poc-domain" }       # Business-domain DTOs (
 ob-poc-authoring = { path = "crates/ob-poc-authoring" } # Editor toolkit (Phase 5 dest)
 ob-poc-macros = { path = "crates/ob-poc-macros" }
 sem_os_core = { path = "crates/sem_os_core" }
+sem_os_types = { path = "crates/sem_os_types" }
+sem_os_ontology = { path = "crates/sem_os_ontology" }
+sem_os_policy = { path = "crates/sem_os_policy" }
 sem_os_client = { path = "crates/sem_os_client" }
 sem_os_obpoc_adapter = { path = "crates/sem_os_obpoc_adapter" }
 sem_os_postgres = { path = "crates/sem_os_postgres" }
@@ -141,6 +144,8 @@ bpmn-lite-engine = { path = "../bpmn-lite/bpmn-lite-engine" }
 bpmn-lite-store = { path = "../bpmn-lite/bpmn-lite-store" }
 bpmn-lite-server = { path = "../bpmn-lite/bpmn-lite-server" }
 sem_os_core = { path = "crates/sem_os_core" }
+sem_os_ontology = { path = "crates/sem_os_ontology" }
+sem_os_policy = { path = "crates/sem_os_policy" }
 tokio-stream = "0.1"
 proptest = "1.4"
 toml = "0.8"

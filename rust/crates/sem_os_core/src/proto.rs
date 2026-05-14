@@ -8,15 +8,11 @@ use serde::{Deserialize, Serialize};
 
 use crate::types::ObjectType;
 
-// ── Re-exports from context_resolution ────────────────────────
-// These are the canonical request/response types for resolve_context().
-// Re-exported here so that `SemOsClient` and `CoreService` both import
-// from `sem_os_core::proto::*` without knowing the internal module path.
-
-pub use crate::context_resolution::{
-    ContextResolutionRequest as ResolveContextRequest,
-    ContextResolutionResponse as ResolveContextResponse,
-};
+// Note (sem_os_core-split v1 Phase 9): the historical re-exports of
+// `crate::context_resolution::ContextResolution{Request,Response}`
+// were removed when context_resolution moved to sem_os_policy. They
+// were never referenced under their proto aliases (`ResolveContextRequest`
+// / `ResolveContextResponse`) anywhere in the workspace.
 
 // ── Manifest ──────────────────────────────────────────────────
 

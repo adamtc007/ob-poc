@@ -7,4 +7,4 @@
 //! `sem_os_core` as the single schema authority per V&S §O7 /
 //! ADN §7.3 without losing the prose contract.
 
-pub use sem_os_core::membership::*;
+pub use sem_os_ontology::membership::*;

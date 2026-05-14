@@ -23,7 +23,7 @@ pub struct McpServer {
     handlers: ToolHandlers,
     pool: PgPool,
     sem_os_client: Option<Arc<dyn SemOsClient>>,
-    sem_os_service: Option<Arc<dyn sem_os_core::service::CoreService>>,
+    sem_os_service: Option<Arc<dyn sem_os_policy::service::CoreService>>,
 }
 
 impl McpServer {
@@ -49,7 +49,7 @@ impl McpServer {
     /// Set the pre-built CoreService shared across all MCP tool calls.
     pub fn with_sem_os_service(
         mut self,
-        service: Arc<dyn sem_os_core::service::CoreService>,
+        service: Arc<dyn sem_os_policy::service::CoreService>,
     ) -> Self {
         self.sem_os_service = Some(service.clone());
         self.handlers = self.handlers.with_sem_os_service(service);

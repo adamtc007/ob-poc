@@ -338,7 +338,7 @@ mod tests {
         WorkbookExecutionMode, WorkbookSubject,
     };
     use chrono::Utc;
-    use sem_os_core::state_simulation::{
+    use sem_os_policy::state_simulation::{
         SemanticStateDiff, SimulatedStateAdvance, StateSimulationResult,
     };
     use uuid::uuid;

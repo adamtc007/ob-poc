@@ -13,7 +13,11 @@
 //! - **governance_verbs**: 7 governance verb orchestration
 //! - **bundle**: Bundle ingestion (changeset.yaml manifest + directory layout)
 
-pub mod agent_mode;
+// agent_mode relocated to sem_os_types in Phase 9 — needed by sem_os_core::
+// principal.rs, which can't reach up into the policy plane. Back-compat
+// re-export so `sem_os_policy::authoring::agent_mode::AgentMode` still
+// resolves.
+pub use sem_os_types::agent_mode;
 pub mod canonical_hash;
 pub mod diff;
 pub mod errors;

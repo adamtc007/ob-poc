@@ -39,8 +39,8 @@
 
 use uuid::Uuid;
 
-use sem_os_core::acp_projection::AcpProjectionEnvelope;
-use sem_os_core::domain_pack::{
+use sem_os_policy::acp_projection::AcpProjectionEnvelope;
+use sem_os_policy::domain_pack::{
     DiscoveryRequest, DiscoveryResponse, DomainPackManifest, ProjectionCatalogEntry,
 };
 

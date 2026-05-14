@@ -522,7 +522,7 @@ impl AgentService {
             policy_gate: self.policy_gate.clone(),
             source,
             sem_os_client: self.sem_os_client.clone(),
-            agent_mode: sem_os_core::authoring::agent_mode::AgentMode::default(),
+            agent_mode: sem_os_types::agent_mode::AgentMode::default(),
             goals,
             stage_focus: session.context.stage_focus.clone(),
             sage_engine: self.sage_engine.clone(),

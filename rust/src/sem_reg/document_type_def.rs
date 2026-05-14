@@ -7,4 +7,4 @@
 //! authority drift baseline and keeps `sem_os_core` as the
 //! single schema authority per V&S §O7 / ADN §7.3.
 
-pub use sem_os_core::document_type_def::*;
+pub use sem_os_ontology::document_type_def::*;

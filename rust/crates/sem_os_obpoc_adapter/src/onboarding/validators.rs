@@ -5,7 +5,7 @@
 
 use anyhow::{bail, Result};
 
-use sem_os_core::{
+use sem_os_ontology::{
     attribute_def::AttributeDefBody, entity_type_def::EntityTypeDefBody,
     evidence::EvidenceRequirementBody, verb_contract::VerbContractBody,
 };
@@ -131,7 +131,7 @@ fn validate_evidence_requirements(request: &OnboardingRequest) -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use sem_os_core::attribute_def::AttributeDataType;
+    use sem_os_ontology::attribute_def::AttributeDataType;
 
     fn minimal_entity_type() -> EntityTypeDefBody {
         EntityTypeDefBody {

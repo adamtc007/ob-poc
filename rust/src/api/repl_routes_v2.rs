@@ -18,10 +18,10 @@ use axum::{
     routing::{get, post},
     Json, Router,
 };
-use sem_os_core::acp_projection::{
+use sem_os_policy::acp_projection::{
     AcpProjectionEnvelope, AcpProjectionEnvelopeInput, AcpProjectionKind,
 };
-use sem_os_core::domain_pack::DomainPackManifest;
+use sem_os_policy::domain_pack::DomainPackManifest;
 use serde::{Deserialize, Serialize};
 use std::sync::{Arc, LazyLock};
 use std::time::Instant;
@@ -337,9 +337,9 @@ pub struct AcpContextAssemblyRequest {
     #[serde(default)]
     pub context: std::collections::BTreeMap<String, serde_json::Value>,
     #[serde(default)]
-    pub observations: Vec<sem_os_core::domain_pack::DiscoveryObservation>,
+    pub observations: Vec<sem_os_policy::domain_pack::DiscoveryObservation>,
     #[serde(default)]
-    pub provenance: Vec<sem_os_core::domain_pack::DiscoveryProvenance>,
+    pub provenance: Vec<sem_os_policy::domain_pack::DiscoveryProvenance>,
     #[serde(default)]
     pub first_class_state_mutated: bool,
 }
@@ -499,11 +499,11 @@ fn output_field_name_for(produced_type: &str) -> String {
 }
 
 fn load_plan_verb_outputs(
-) -> anyhow::Result<std::collections::BTreeMap<String, Vec<sem_os_core::verb_contract::VerbOutput>>>
+) -> anyhow::Result<std::collections::BTreeMap<String, Vec<sem_os_ontology::verb_contract::VerbOutput>>>
 {
     let verbs_config = dsl_core::config::loader::ConfigLoader::from_env().load_verbs()?;
     let mut outputs =
-        std::collections::BTreeMap::<String, Vec<sem_os_core::verb_contract::VerbOutput>>::new();
+        std::collections::BTreeMap::<String, Vec<sem_os_ontology::verb_contract::VerbOutput>>::new();
     for verb in crate::sem_reg::onboarding::verb_extract::extract_verbs(&verbs_config) {
         let Some(output) = verb.output else {
             continue;
@@ -511,7 +511,7 @@ fn load_plan_verb_outputs(
         outputs
             .entry(verb.fqn)
             .or_default()
-            .push(sem_os_core::verb_contract::VerbOutput {
+            .push(sem_os_ontology::verb_contract::VerbOutput {
                 field_name: output_field_name_for(&output.produced_type),
                 output_type: "uuid".into(),
                 entity_kind: Some(normalize_output_entity_kind(&output.produced_type)),
@@ -1217,7 +1217,7 @@ fn get_acp_projection_value(
 ) -> Result<serde_json::Value, crate::acp::AcpAdapterError> {
     let facade = crate::acp_facade::AcpFacade::for_default_pack(crate::acp::AcpAdapterKind::Zed)?;
     let kind = kind
-        .parse::<sem_os_core::acp_projection::AcpProjectionKind>()
+        .parse::<sem_os_policy::acp_projection::AcpProjectionKind>()
         .map_err(|_| crate::acp::AcpAdapterError::ProjectionUnknown {
             projection_kind: kind.to_string(),
         })?;
@@ -1573,18 +1573,18 @@ fn assemble_acp_context_value(
     req: AcpContextAssemblyRequest,
 ) -> Result<serde_json::Value, crate::acp::AcpAdapterError> {
     let facade = crate::acp_facade::AcpFacade::for_default_pack(req.adapter)?;
-    let subject = sem_os_core::domain_pack::DiscoverySubject {
+    let subject = sem_os_policy::domain_pack::DiscoverySubject {
         subject_kind: req.subject_kind,
         subject_id: req.subject_id,
     };
     let probe_id = req.probe_id;
-    let discovery_request = sem_os_core::domain_pack::DiscoveryRequest {
+    let discovery_request = sem_os_policy::domain_pack::DiscoveryRequest {
         pack_id: facade.manifest().pack_id.clone(),
         probe_id: probe_id.clone(),
         subject: subject.clone(),
         context: req.context,
     };
-    let discovery_response = sem_os_core::domain_pack::DiscoveryResponse {
+    let discovery_response = sem_os_policy::domain_pack::DiscoveryResponse {
         probe_id,
         subject,
         observations: req.observations,
@@ -3316,7 +3316,7 @@ fn prepare_kyc_restricted_mutation_preflight_value(
 fn prepare_kyc_restricted_mutation_preflight_value_with_manifest(
     session_id: Uuid,
     req: KycRestrictedMutationPreflightRequest,
-    manifest: &sem_os_core::domain_pack::DomainPackManifest,
+    manifest: &sem_os_policy::domain_pack::DomainPackManifest,
 ) -> Result<serde_json::Value, crate::runbook::RestrictedMutationPreflightError> {
     if req.workbook.core.session_id != session_id {
         return Err(
@@ -3581,7 +3581,7 @@ fn compilation_json_error(
 }
 
 pub(crate) fn load_ob_poc_kyc_domain_pack(
-) -> Result<sem_os_core::domain_pack::DomainPackManifest, crate::acp::AcpAdapterError> {
+) -> Result<sem_os_policy::domain_pack::DomainPackManifest, crate::acp::AcpAdapterError> {
     crate::acp_facade::load_ob_poc_kyc_domain_pack()
 }
 
@@ -5787,10 +5787,10 @@ mod tests {
         (value * 100.0).round() / 100.0
     }
 
-    fn reference_mutation_manifest() -> sem_os_core::domain_pack::DomainPackManifest {
+    fn reference_mutation_manifest() -> sem_os_policy::domain_pack::DomainPackManifest {
         let mut manifest = load_ob_poc_kyc_domain_pack().expect("pack");
         manifest.compatibility_tier =
-            sem_os_core::domain_pack::PackCompatibilityTier::ReferenceMutation;
+            sem_os_policy::domain_pack::PackCompatibilityTier::ReferenceMutation;
         for transition in &mut manifest.allowed_transitions {
             if transition.transition_ref == "kyc-case.discovery-to-assessment" {
                 transition.mutation_enabled = true;

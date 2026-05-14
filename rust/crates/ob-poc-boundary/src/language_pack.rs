@@ -4,7 +4,7 @@
 //! dry-run-only transition surface from a Domain Pack, rather than dumping the
 //! whole SemOS substrate into prompt context.
 
-use sem_os_core::domain_pack::{DomainPackManifest, DomainTransition};
+use sem_os_policy::domain_pack::{DomainPackManifest, DomainTransition};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 

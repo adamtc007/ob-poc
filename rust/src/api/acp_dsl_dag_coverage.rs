@@ -5,7 +5,7 @@
 //! registry so migration progress is visible as a structured ledger.
 
 use anyhow::{Context, Result};
-use sem_os_core::domain_pack::DomainPackManifest;
+use sem_os_policy::domain_pack::DomainPackManifest;
 use serde::Serialize;
 use serde_yaml::{Mapping, Value};
 use std::collections::{BTreeMap, BTreeSet};

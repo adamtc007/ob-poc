@@ -5,8 +5,8 @@
 //! bind the result into an Execution Workbook, and pass it through the DSL
 //! Drafter dry-run validator. It performs no storage and no mutation.
 
-use sem_os_core::domain_pack::{DomainPackDiagnostic, DomainPackManifest};
-use sem_os_core::state_simulation::{
+use sem_os_policy::domain_pack::{DomainPackDiagnostic, DomainPackManifest};
+use sem_os_policy::state_simulation::{
     simulate_transition_from_pack, StateSimulationError, StateSimulationRequest,
 };
 use serde::{Deserialize, Serialize};

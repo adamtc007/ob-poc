@@ -5,7 +5,7 @@
 
 use std::collections::BTreeMap;
 
-use sem_os_core::taxonomy_def::{TaxonomyDefBody, TaxonomyNodeBody};
+use sem_os_ontology::taxonomy_def::{TaxonomyDefBody, TaxonomyNodeBody};
 
 /// Core taxonomy definitions to bootstrap.
 /// Returns 9 taxonomies: 5 domain + 4 KYC-canonical.

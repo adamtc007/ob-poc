@@ -673,10 +673,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // =========================================================================
     // Shared CoreService — built once at startup, reused by MCP tool handlers.
     // Only available in inprocess mode.
-    let sem_os_core_service: Option<Arc<dyn sem_os_core::service::CoreService>> = {
+    let sem_os_core_service: Option<Arc<dyn sem_os_policy::service::CoreService>> = {
         let mode = std::env::var("SEM_OS_MODE").unwrap_or_else(|_| "inprocess".to_string());
         if mode == "inprocess" {
-            use sem_os_core::service::CoreServiceImpl;
+            use sem_os_policy::service::CoreServiceImpl;
             use sem_os_postgres::PgStores;
 
             let stores = PgStores::new(pool.clone());
@@ -692,7 +692,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             .with_authoring(Arc::new(stores.authoring))
             .with_scratch_runner(Arc::new(stores.scratch_runner))
             .with_cleanup(Arc::new(stores.cleanup));
-            Some(Arc::new(core_service) as Arc<dyn sem_os_core::service::CoreService>)
+            Some(Arc::new(core_service) as Arc<dyn sem_os_policy::service::CoreService>)
         } else {
             None
         }

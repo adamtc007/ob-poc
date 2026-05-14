@@ -11,12 +11,12 @@ pub use types::*;
 
 use uuid::Uuid;
 
-use crate::{
-    error::{GateSeverity, GateViolation, SemOsError},
+use sem_os_core::{
+    error::{GateViolation, SemOsError},
     ports::SnapshotStore,
     principal::Principal,
-    types::{ChangeKind, ChangesetEntry, Fqn, GovernanceTier, TrustClass},
 };
+use sem_os_types::{ChangeKind, ChangesetEntry, Fqn, GateSeverity, GovernanceTier, TrustClass};
 
 // ── Role constraints ──────────────────────────────────────────
 
@@ -227,7 +227,7 @@ mod tests {
             entry_id: Uuid::new_v4(),
             changeset_id: Uuid::new_v4(),
             object_fqn: fqn.to_string(),
-            object_type: crate::types::ObjectType::AttributeDef,
+            object_type: sem_os_types::ObjectType::AttributeDef,
             change_kind: kind,
             draft_payload: json!({}),
             base_snapshot_id: None,

@@ -3,7 +3,7 @@
 //! All functions are **pure** (no DB, no I/O). The DB-publishing orchestrator
 //! remains in `ob-poc/src/sem_reg/seeds/policy_seeds.rs`.
 
-use sem_os_core::policy_rule::{PolicyAction, PolicyPredicate, PolicyRuleBody};
+use sem_os_ontology::policy_rule::{PolicyAction, PolicyPredicate, PolicyRuleBody};
 
 /// Core policy rules to bootstrap.
 pub fn core_policies() -> Vec<PolicyRuleBody> {

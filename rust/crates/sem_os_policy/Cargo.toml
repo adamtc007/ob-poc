@@ -16,12 +16,26 @@ description = "Semantic OS governance + projection plane. Owns ABAC primitives, 
 # sem_os_ontology and sem_os_core never depend on it.
 
 [dependencies]
-# Phase 5 (policy leaves: abac, security, derivation). None of the
-# three need sem_os_core today — that dep is added when context_policy
-# + grounding move in Phase 6 (paired with domain_pack + context_resolution
-# to avoid the Cargo cycle between policy and core's compat re-exports).
+# Phase 9 (2026-05-14): authoring/, stewardship/, observatory/, and
+# service.rs joined sem_os_policy. They reach `sem_os_core::{error,
+# principal, ports}` — the policy → core direction the ADR §2.4 graph
+# explicitly allows. The cycle that blocked this dep being added
+# earlier is gone: sem_os_core no longer has compat re-exports of any
+# sem_os_policy modules (eager consumer rewrite done in the same slice).
+sem_os_core = { path = "../sem_os_core" }
 sem_os_ontology = { path = "../sem_os_ontology" }
 sem_os_types = { path = "../sem_os_types" }
+
+# Phase 9 third-party deps inherited from the moved modules:
+# authoring/* uses ob-poc-types + sqlparser + tokio; service.rs uses
+# tokio + tracing; observatory uses tracing; authoring + stewardship
+# both use async_trait for store traits.
+ob-poc-types = { path = "../ob-poc-types" }
+async-trait = "0.1"
+serde_yaml = "0.9"
+sqlparser = "0.53"
+tokio = { version = "1", features = ["sync"] }
+tracing = "0.1"
 
 # Third-party — sha2 for context_policy fingerprinting; standard
 # primitives elsewhere.

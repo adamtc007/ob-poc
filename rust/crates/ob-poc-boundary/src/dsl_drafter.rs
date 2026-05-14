@@ -4,7 +4,7 @@
 //! Execution Workbook and returns the already-bound SemOS simulation result
 //! without invoking the runbook executor or mutating state.
 
-use sem_os_core::state_simulation::StateSimulationResult;
+use sem_os_policy::state_simulation::StateSimulationResult;
 use serde::{Deserialize, Serialize};
 
 use super::workbook::{
@@ -180,7 +180,7 @@ mod tests {
         EvidenceRef, ExecutionWorkbook, ExecutionWorkbookCore, ExecutionWorkbookId, LlmTraceRef,
         StaleWorkbookPolicy, WorkbookActor, WorkbookExecutionMode, WorkbookSubject,
     };
-    use sem_os_core::state_simulation::{
+    use sem_os_policy::state_simulation::{
         SemanticStateDiff, SimulatedStateAdvance, StateSimulationResult,
     };
     use std::collections::BTreeMap;

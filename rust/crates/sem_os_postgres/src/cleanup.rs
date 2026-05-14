@@ -2,8 +2,8 @@
 
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
-use sem_os_core::authoring::cleanup::CleanupStore;
-use sem_os_core::authoring::ports::Result;
+use sem_os_policy::authoring::cleanup::CleanupStore;
+use sem_os_policy::authoring::ports::Result;
 use sqlx::PgPool;
 
 /// PostgreSQL-backed cleanup store for archiving old ChangeSets.

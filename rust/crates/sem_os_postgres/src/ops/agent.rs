@@ -583,7 +583,7 @@ impl SemOsVerbOp for SetAuthoringMode {
         let confirm = json_extract_bool_opt(args, "confirm").unwrap_or(false);
 
         let mode =
-            sem_os_core::authoring::agent_mode::AgentMode::parse(&mode_str).ok_or_else(|| {
+            sem_os_types::agent_mode::AgentMode::parse(&mode_str).ok_or_else(|| {
                 anyhow!(
                     "Invalid authoring mode '{}'. Valid: research, governed",
                     mode_str
@@ -919,7 +919,7 @@ impl SemOsVerbOp for ReadMode {
             .and_then(|v| v.as_str().map(String::from))
             .unwrap_or_else(|| "governed".to_string());
         let parsed =
-            sem_os_core::authoring::agent_mode::AgentMode::parse(&mode).unwrap_or_default();
+            sem_os_types::agent_mode::AgentMode::parse(&mode).unwrap_or_default();
         Ok(VerbExecutionOutcome::Record(json!({
             "mode": parsed.to_string(),
             "allows_authoring": parsed.allows_authoring(),

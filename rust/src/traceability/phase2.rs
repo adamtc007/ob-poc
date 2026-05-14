@@ -917,7 +917,7 @@ mod tests {
     use crate::agent::sem_os_context_envelope::SemOsContextEnvelope;
     use crate::entity_linking::{EntityCandidate, EntityResolution};
     use crate::lookup::LookupResult;
-    use sem_os_core::context_resolution::{
+    use sem_os_policy::context_resolution::{
         BlockedActionOption, GroundedActionSurface, GroundedConstraintSignal, SubjectRef,
     };
     use uuid::Uuid;

@@ -12,8 +12,8 @@ use sha2::{Digest, Sha256};
 use std::collections::HashSet;
 use uuid::Uuid;
 
-use sem_os_core::abac::AccessDecision;
-use sem_os_core::context_resolution::{
+use sem_os_policy::abac::AccessDecision;
+use sem_os_policy::context_resolution::{
     ContextResolutionResponse, DiscoverySurface, GroundedActionSurface, ResolutionStage,
 };
 
@@ -210,8 +210,8 @@ impl SemOsContextEnvelope {
             .filter(|s| {
                 matches!(
                     s.kind,
-                    sem_os_core::context_resolution::GovernanceSignalKind::StaleEvidence
-                        | sem_os_core::context_resolution::GovernanceSignalKind::CoverageGap
+                    sem_os_policy::context_resolution::GovernanceSignalKind::StaleEvidence
+                        | sem_os_policy::context_resolution::GovernanceSignalKind::CoverageGap
                 )
             })
             .map(|s| s.message.clone())
@@ -392,7 +392,7 @@ impl SemOsContextEnvelope {
 }
 
 /// Derive a structured prune reason from a denied VerbCandidate.
-fn prune_reason_from_candidate(vc: &sem_os_core::context_resolution::VerbCandidate) -> PruneReason {
+fn prune_reason_from_candidate(vc: &sem_os_policy::context_resolution::VerbCandidate) -> PruneReason {
     match &vc.access_decision {
         AccessDecision::Deny { reason } => PruneReason::AbacDenied {
             actor_role: String::new(),
@@ -539,7 +539,7 @@ mod tests {
 
     #[test]
     fn test_from_resolution_preserves_entity_kind_pruned_verbs() {
-        let response = sem_os_core::context_resolution::ContextResolutionResponse {
+        let response = sem_os_policy::context_resolution::ContextResolutionResponse {
             as_of_time: Utc::now(),
             resolved_at: Utc::now(),
             applicable_views: vec![],
@@ -551,7 +551,7 @@ mod tests {
             policy_verdicts: vec![],
             security_handling: AccessDecision::Allow,
             governance_signals: vec![],
-            entity_kind_pruned_verbs: vec![sem_os_core::context_resolution::EntityKindPrunedVerb {
+            entity_kind_pruned_verbs: vec![sem_os_policy::context_resolution::EntityKindPrunedVerb {
                 fqn: "deal.create".into(),
                 verb_kinds: vec!["deal".into()],
                 subject_kind: "company".into(),
@@ -578,7 +578,7 @@ mod tests {
 
     #[test]
     fn test_from_resolution_preserves_grounded_action_surface() {
-        let response = sem_os_core::context_resolution::ContextResolutionResponse {
+        let response = sem_os_policy::context_resolution::ContextResolutionResponse {
             as_of_time: Utc::now(),
             resolved_at: Utc::now(),
             applicable_views: vec![],
@@ -592,8 +592,8 @@ mod tests {
             governance_signals: vec![],
             entity_kind_pruned_verbs: vec![],
             confidence: 0.9,
-            grounded_action_surface: Some(sem_os_core::context_resolution::GroundedActionSurface {
-                resolved_subject: sem_os_core::context_resolution::SubjectRef::TaskId(Uuid::nil()),
+            grounded_action_surface: Some(sem_os_policy::context_resolution::GroundedActionSurface {
+                resolved_subject: sem_os_policy::context_resolution::SubjectRef::TaskId(Uuid::nil()),
                 resolved_constellation: Some("constellation.kyc".into()),
                 resolved_slot_path: Some("case".into()),
                 resolved_node_id: Some("node-1".into()),

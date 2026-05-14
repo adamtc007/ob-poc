@@ -74,7 +74,7 @@ pub mod dsl_drafter;
 pub mod envelope_builder;
 pub mod kyc_dry_run;
 // language_pack STAYS in boundary (Phase 5.3 evaluated and rejected the
-// move): the module uses sem_os_core::domain_pack types, which the
+// move): the module uses sem_os_policy::domain_pack types, which the
 // authoring crate's charter forbids; additionally five intra-boundary
 // modules (acp / acp_facade / acp_protocol / workbook_diagnostics /
 // workbook_revision) import `crate::language_pack`, so moving it would

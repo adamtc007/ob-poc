@@ -6,9 +6,9 @@
 
 use anyhow::Result;
 use chrono::{DateTime, Utc};
-use sem_os_core::constellation_map_def as core_map;
-use sem_os_core::grounding::{compute_slot_action_surface, ConstellationModel};
-use sem_os_core::state_machine_def as core_sm;
+use sem_os_ontology::constellation_map_def as core_map;
+use sem_os_ontology::state_machine_def as core_sm;
+use sem_os_policy::grounding::{compute_slot_action_surface, ConstellationModel};
 
 use crate::sem_os_runtime::reducer_runtime::load_runtime_state_machine;
 use serde::{Deserialize, Serialize};

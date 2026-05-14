@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use crate::authoring::agent_mode::AgentMode;
+use sem_os_types::agent_mode::AgentMode;
 use crate::error::SemOsError;
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]

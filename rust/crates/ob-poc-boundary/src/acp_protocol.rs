@@ -235,9 +235,9 @@ pub struct AcpContextExtensionRequest {
     #[serde(default)]
     pub context: BTreeMap<String, Value>,
     #[serde(default)]
-    pub observations: Vec<sem_os_core::domain_pack::DiscoveryObservation>,
+    pub observations: Vec<sem_os_policy::domain_pack::DiscoveryObservation>,
     #[serde(default)]
-    pub provenance: Vec<sem_os_core::domain_pack::DiscoveryProvenance>,
+    pub provenance: Vec<sem_os_policy::domain_pack::DiscoveryProvenance>,
     #[serde(default)]
     pub first_class_state_mutated: bool,
 }
@@ -245,11 +245,11 @@ pub struct AcpContextExtensionRequest {
 #[derive(Debug, Clone, Deserialize)]
 pub struct AcpProjectionGetRequest {
     pub session_id: String,
-    pub kind: sem_os_core::acp_projection::AcpProjectionKind,
+    pub kind: sem_os_policy::acp_projection::AcpProjectionKind,
     #[serde(default = "default_adapter")]
     pub adapter: AcpAdapterKind,
     #[serde(default)]
-    pub subject: Option<sem_os_core::acp_projection::AcpProjectionSubject>,
+    pub subject: Option<sem_os_policy::acp_projection::AcpProjectionSubject>,
     #[serde(default)]
     pub current_state: Option<String>,
     #[serde(default)]
@@ -273,9 +273,9 @@ pub struct AcpKycCaseStateDiscoverRequest {
     pub adapter: AcpAdapterKind,
     pub subject_id: Uuid,
     #[serde(default)]
-    pub observations: Vec<sem_os_core::domain_pack::DiscoveryObservation>,
+    pub observations: Vec<sem_os_policy::domain_pack::DiscoveryObservation>,
     #[serde(default)]
-    pub provenance: Vec<sem_os_core::domain_pack::DiscoveryProvenance>,
+    pub provenance: Vec<sem_os_policy::domain_pack::DiscoveryProvenance>,
     #[serde(default)]
     pub first_class_state_mutated: bool,
 }
@@ -1095,17 +1095,17 @@ impl AcpJsonRpcAgent {
             .entry(session_id)
             .or_insert_with(|| acp::open_acp_session(session_id, request.adapter))
             .clone();
-        let subject = sem_os_core::domain_pack::DiscoverySubject {
+        let subject = sem_os_policy::domain_pack::DiscoverySubject {
             subject_kind: request.subject_kind,
             subject_id: request.subject_id,
         };
-        let discovery_request = sem_os_core::domain_pack::DiscoveryRequest {
+        let discovery_request = sem_os_policy::domain_pack::DiscoveryRequest {
             pack_id: facade.manifest().pack_id.clone(),
             probe_id: request.probe_id.clone(),
             subject: subject.clone(),
             context: request.context,
         };
-        let discovery_response = sem_os_core::domain_pack::DiscoveryResponse {
+        let discovery_response = sem_os_policy::domain_pack::DiscoveryResponse {
             probe_id: request.probe_id,
             subject,
             observations: request.observations,
@@ -1198,7 +1198,7 @@ impl AcpJsonRpcAgent {
             .or_insert_with(|| acp::open_acp_session(session_id, request.adapter))
             .clone();
         let language_pack_request = if request.kind
-            == sem_os_core::acp_projection::AcpProjectionKind::LanguagePack
+            == sem_os_policy::acp_projection::AcpProjectionKind::LanguagePack
         {
             let subject = match request.subject.as_ref() {
                 Some(subject) => subject,
@@ -1322,9 +1322,9 @@ impl AcpJsonRpcAgent {
             .entry(session_id)
             .or_insert_with(|| acp::open_acp_session(session_id, request.adapter))
             .clone();
-        let response = sem_os_core::domain_pack::DiscoveryResponse {
+        let response = sem_os_policy::domain_pack::DiscoveryResponse {
             probe_id: "kyc-case.read-state".to_string(),
-            subject: sem_os_core::domain_pack::DiscoverySubject {
+            subject: sem_os_policy::domain_pack::DiscoverySubject {
                 subject_kind: "kyc_case".to_string(),
                 subject_id: request.subject_id.to_string(),
             },
@@ -2458,7 +2458,7 @@ fn parse_semos_resource_uri(uri: &str) -> Option<ParsedSemosResource> {
     })
 }
 
-fn obpoc_capability_summary(manifest: &sem_os_core::domain_pack::DomainPackManifest) -> Value {
+fn obpoc_capability_summary(manifest: &sem_os_policy::domain_pack::DomainPackManifest) -> Value {
     let session = acp::open_acp_session(Uuid::nil(), AcpAdapterKind::Zed);
     let policy = acp::acp_policy_capabilities(&session, manifest)
         .expect("bundled ob-poc KYC Domain Pack validates");
@@ -3187,7 +3187,7 @@ where
 }
 
 fn load_ob_poc_kyc_domain_pack(
-) -> Result<sem_os_core::domain_pack::DomainPackManifest, acp::AcpAdapterError> {
+) -> Result<sem_os_policy::domain_pack::DomainPackManifest, acp::AcpAdapterError> {
     crate::acp_facade::load_ob_poc_kyc_domain_pack()
 }
 

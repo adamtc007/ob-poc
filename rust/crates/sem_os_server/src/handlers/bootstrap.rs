@@ -11,8 +11,8 @@ use std::sync::Arc;
 use axum::{extract::Extension, http::StatusCode, Json};
 use sem_os_core::{
     principal::Principal, proto::BootstrapSeedBundleResponse, seeds::SeedBundle,
-    service::CoreService,
 };
+use sem_os_policy::service::CoreService;
 use serde::Serialize;
 
 use crate::error::AppError;

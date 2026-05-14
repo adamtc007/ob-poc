@@ -7,7 +7,7 @@
 
 use uuid::Uuid;
 
-use crate::error::SemOsError;
+use sem_os_core::error::SemOsError;
 
 use super::ports::Result;
 

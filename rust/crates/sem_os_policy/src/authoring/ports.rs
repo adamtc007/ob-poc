@@ -4,8 +4,8 @@
 use async_trait::async_trait;
 use uuid::Uuid;
 
-use crate::error::SemOsError;
-use crate::principal::Principal;
+use sem_os_core::error::SemOsError;
+use sem_os_core::principal::Principal;
 
 use super::types::*;
 

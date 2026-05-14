@@ -8753,8 +8753,8 @@ definition_of_done:
     fn test_phase5_recheck_failure_surfaces_constellation_block() {
         let mut envelope = crate::agent::sem_os_context_envelope::SemOsContextEnvelope::deny_all();
         envelope.grounded_action_surface =
-            Some(sem_os_core::context_resolution::GroundedActionSurface {
-                resolved_subject: sem_os_core::context_resolution::SubjectRef::TaskId(Uuid::nil()),
+            Some(sem_os_policy::context_resolution::GroundedActionSurface {
+                resolved_subject: sem_os_policy::context_resolution::SubjectRef::TaskId(Uuid::nil()),
                 resolved_constellation: Some("constellation.kyc".to_string()),
                 resolved_slot_path: Some("case".to_string()),
                 resolved_node_id: Some("node-1".to_string()),
@@ -8762,7 +8762,7 @@ definition_of_done:
                 current_state: Some("intake".to_string()),
                 traversed_edges: vec![],
                 constraint_signals: vec![
-                    sem_os_core::context_resolution::GroundedConstraintSignal {
+                    sem_os_policy::context_resolution::GroundedConstraintSignal {
                         kind: "dependency_block".to_string(),
                         slot_path: "case".to_string(),
                         related_slot: Some("cbu".to_string()),
@@ -8773,7 +8773,7 @@ definition_of_done:
                     },
                 ],
                 valid_actions: vec![],
-                blocked_actions: vec![sem_os_core::context_resolution::BlockedActionOption {
+                blocked_actions: vec![sem_os_policy::context_resolution::BlockedActionOption {
                     action_id: "case.open".to_string(),
                     action_kind: "primitive".to_string(),
                     description: "Blocked action for slot 'case'".to_string(),
@@ -9636,8 +9636,8 @@ definition_of_done:
         let mut session = ReplSessionV2::new();
         let mut envelope = crate::agent::sem_os_context_envelope::SemOsContextEnvelope::deny_all();
         envelope.grounded_action_surface =
-            Some(sem_os_core::context_resolution::GroundedActionSurface {
-                resolved_subject: sem_os_core::context_resolution::SubjectRef::TaskId(Uuid::nil()),
+            Some(sem_os_policy::context_resolution::GroundedActionSurface {
+                resolved_subject: sem_os_policy::context_resolution::SubjectRef::TaskId(Uuid::nil()),
                 resolved_constellation: Some("constellation.kyc".to_string()),
                 resolved_slot_path: Some("case".to_string()),
                 resolved_node_id: Some("node-1".to_string()),
@@ -9645,7 +9645,7 @@ definition_of_done:
                 current_state: Some("intake".to_string()),
                 traversed_edges: vec![],
                 constraint_signals: vec![
-                    sem_os_core::context_resolution::GroundedConstraintSignal {
+                    sem_os_policy::context_resolution::GroundedConstraintSignal {
                         kind: "dependency_block".to_string(),
                         slot_path: "case".to_string(),
                         related_slot: Some("cbu".to_string()),
@@ -9656,7 +9656,7 @@ definition_of_done:
                     },
                 ],
                 valid_actions: vec![],
-                blocked_actions: vec![sem_os_core::context_resolution::BlockedActionOption {
+                blocked_actions: vec![sem_os_policy::context_resolution::BlockedActionOption {
                     action_id: "case.open".to_string(),
                     action_kind: "primitive".to_string(),
                     description: "Blocked action for slot 'case'".to_string(),

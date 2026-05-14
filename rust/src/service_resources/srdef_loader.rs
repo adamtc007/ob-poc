@@ -4,7 +4,7 @@
 //! and syncs them to the database.
 
 use anyhow::{Context, Result};
-use sem_os_core::service_resource_def::{
+use sem_os_ontology::service_resource_def::{
     ServiceResourceAttributeRequirement, ServiceResourceDefBody, ServiceResourceDimensions,
 };
 use serde::{Deserialize, Serialize};

@@ -6,7 +6,7 @@
 //! gate has a valid, non-replayed approval.
 
 use chrono::{DateTime, Utc};
-use sem_os_core::domain_pack::DomainPackManifest;
+use sem_os_policy::domain_pack::DomainPackManifest;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::collections::BTreeSet;
@@ -396,11 +396,11 @@ mod tests {
         WorkbookExecutionMode, WorkbookSubject,
     };
     use chrono::TimeZone;
-    use sem_os_core::domain_pack::{
+    use sem_os_policy::domain_pack::{
         ClassificationLimit, ContextClassificationPolicy, DomainPackManifest, DomainTransition,
         PackCompatibilityTier, PackImplementationMode,
     };
-    use sem_os_core::state_simulation::{
+    use sem_os_policy::state_simulation::{
         SemanticStateDiff, SimulatedStateAdvance, StateSimulationResult,
     };
     use uuid::{uuid, Uuid};

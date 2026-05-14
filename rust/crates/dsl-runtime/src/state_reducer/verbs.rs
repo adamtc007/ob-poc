@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use anyhow::{anyhow, Result};
 use chrono::{DateTime, Utc};
-use sem_os_core::constellation_map_def::{ConstellationMapDefBody, SlotDef, SlotType};
+use sem_os_ontology::constellation_map_def::{ConstellationMapDefBody, SlotDef, SlotType};
 use sqlx::{PgPool, Postgres, Transaction};
 use uuid::Uuid;
 
@@ -877,7 +877,7 @@ fn infer_entity_type(state_machine: &ValidatedStateMachine, slot_path: &str) -> 
 #[cfg(test)]
 mod tests {
     use super::{checked_ident, collect_sem_os_slots};
-    use sem_os_core::constellation_map_def::ConstellationMapDefBody;
+    use sem_os_ontology::constellation_map_def::ConstellationMapDefBody;
 
     #[test]
     fn sem_os_slot_collection_finds_nested_state_machine_slots() {

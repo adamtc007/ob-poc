@@ -493,6 +493,35 @@ impl ChangeSetStatus {
 /// the same canonical enum.
 pub use ChangeSetStatus as ChangesetStatus;
 
+// ── Agent mode (relocated in Phase 9, was sem_os_core::authoring::agent_mode)
+
+pub mod agent_mode;
+pub use agent_mode::AgentMode;
+
+// ── Gate severity ─────────────────────────────────────────────
+
+/// Severity of a gate failure. Originally lived in
+/// `sem_os_core::gates::GateSeverity`; relocated to sem_os_types in
+/// sem_os_core-split v1 Phase 9 because `sem_os_core::error::SemOsError`
+/// embeds a `GateViolation` that carries this severity, and the engine
+/// crate cannot reach up into the policy plane where the gates module
+/// now lives.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum GateSeverity {
+    Error,
+    Warning,
+}
+
+impl std::fmt::Display for GateSeverity {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Error => write!(f, "error"),
+            Self::Warning => write!(f, "warning"),
+        }
+    }
+}
+
 /// Kind of change in a changeset entry.
 #[derive(
     Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, Display, EnumString, AsRefStr,

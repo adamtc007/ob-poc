@@ -1,6 +1,6 @@
 //! Observatory orientation types — WASM-safe version for frontend consumption.
 //!
-//! These types mirror `sem_os_core::observatory::orientation` but replace
+//! These types mirror `sem_os_policy::observatory::orientation` but replace
 //! `AgentMode` with `String` to avoid pulling sem_os_core into the WASM
 //! build. Projection from internal types happens in sem_os_core's
 //! observatory module.

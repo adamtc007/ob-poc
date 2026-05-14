@@ -2,8 +2,8 @@
 
 use anyhow::{anyhow, Result};
 use sem_os_client::{inprocess::InProcessClient, SemOsClient};
-use sem_os_core::authoring::agent_mode::AgentMode;
-use sem_os_core::context_resolution::{
+use sem_os_types::agent_mode::AgentMode;
+use sem_os_policy::context_resolution::{
     ContextResolutionRequest, DiscoveryContext, EvidenceMode, SubjectRef,
 };
 use sqlx::PgPool;
@@ -179,7 +179,7 @@ async fn compute_live_legal_verb_set(
     let actor = calibration_actor();
     let principal =
         sem_os_core::principal::Principal::in_process(&actor.actor_id, actor.roles.clone());
-    let core_actor: sem_os_core::abac::ActorContext = {
+    let core_actor: sem_os_policy::abac::ActorContext = {
         let json = serde_json::to_value(&actor).expect("ActorContext serializes");
         serde_json::from_value(json).expect("ActorContext round-trips")
     };

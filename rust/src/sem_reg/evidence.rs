@@ -10,4 +10,4 @@
 //! schema authority per V&S §O7 / ADN §7.3 without losing the
 //! prose contract.
 
-pub use sem_os_core::evidence::*;
+pub use sem_os_ontology::evidence::*;

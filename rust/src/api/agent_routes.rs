@@ -1096,7 +1096,7 @@ async fn get_semos_context(
         .collect();
 
     // 3. Agent mode — default is Governed
-    let agent_mode = sem_os_core::authoring::agent_mode::AgentMode::default().to_string();
+    let agent_mode = sem_os_types::agent_mode::AgentMode::default().to_string();
 
     Ok(Json(SemOsContextResponse {
         registry_stats,
@@ -3289,7 +3289,7 @@ async fn get_session_verb_surface(
             .cloned()
             .ok_or(StatusCode::NOT_FOUND)?
     };
-    let agent_mode = sem_os_core::authoring::agent_mode::AgentMode::default();
+    let agent_mode = sem_os_types::agent_mode::AgentMode::default();
 
     // Resolve real Sem OS verb set via the same path as the chat pipeline.
     // On failure, fall back to unavailable envelope with FailOpen (this is a

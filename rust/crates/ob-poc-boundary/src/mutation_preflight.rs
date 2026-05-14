@@ -6,8 +6,8 @@
 //! mutation remains the responsibility of the existing runbook execution gate.
 
 use chrono::{DateTime, Utc};
-use sem_os_core::domain_pack::DomainPackManifest;
-use sem_os_core::state_simulation::StateSimulationResult;
+use sem_os_policy::domain_pack::DomainPackManifest;
+use sem_os_policy::state_simulation::StateSimulationResult;
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -141,11 +141,11 @@ mod tests {
         WorkbookExecutionMode, WorkbookSubject,
     };
     use chrono::TimeZone;
-    use sem_os_core::domain_pack::{
+    use sem_os_policy::domain_pack::{
         ClassificationLimit, ContextClassificationPolicy, DomainPackManifest, DomainTransition,
         PackCompatibilityTier, PackImplementationMode,
     };
-    use sem_os_core::state_simulation::{
+    use sem_os_policy::state_simulation::{
         SemanticStateDiff, SimulatedStateAdvance, StateSimulationResult,
     };
     use uuid::{uuid, Uuid};

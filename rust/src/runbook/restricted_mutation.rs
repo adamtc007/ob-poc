@@ -31,7 +31,7 @@ pub struct RestrictedMutationExecutionReceipt {
     pub approval_token_id: super::approval_token::ApprovalTokenId,
     pub transition_ref: String,
     pub intended_diff: MutationSemanticDiff,
-    pub predicted_diff: sem_os_core::state_simulation::StateSimulationResult,
+    pub predicted_diff: sem_os_policy::state_simulation::StateSimulationResult,
     pub actual_diff: MutationSemanticDiff,
     pub executed_at: chrono::DateTime<chrono::Utc>,
 }
@@ -277,7 +277,7 @@ mod tests {
     use crate::runbook::{
         ApprovalTokenId, ExecutionWorkbookId, MutationSemanticDiff, RestrictedMutationApprovalCheck,
     };
-    use sem_os_core::state_simulation::{
+    use sem_os_policy::state_simulation::{
         SemanticStateDiff, SimulatedStateAdvance, StateSimulationResult,
     };
     use uuid::uuid;

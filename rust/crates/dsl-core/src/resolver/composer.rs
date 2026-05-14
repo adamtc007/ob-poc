@@ -10,7 +10,7 @@ use crate::resolver::shape_rule::{
     load_shape_rules_from_dir, LoadedShapeRule, SlotGateMetadataRefinement, StructuralFacts,
 };
 use anyhow::{Context, Result};
-use sem_os_core::constellation_map_def as core_map;
+use sem_os_ontology::constellation_map_def as core_map;
 use serde::{Deserialize, Serialize};
 use serde_yaml::Value as YamlValue;
 use std::{

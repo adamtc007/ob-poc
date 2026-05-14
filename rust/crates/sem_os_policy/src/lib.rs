@@ -43,6 +43,7 @@
 pub mod abac;
 pub mod acp_projection;
 pub mod affinity;
+pub mod authoring;
 pub mod context_policy;
 pub mod context_resolution;
 pub mod derivation;
@@ -51,5 +52,8 @@ pub mod domain_pack;
 pub mod enforce;
 pub mod gates;
 pub mod grounding;
+pub mod observatory;
 pub mod security;
+pub mod service;
 pub mod state_simulation;
+pub mod stewardship;

@@ -6,17 +6,17 @@
 //!
 //! All functions are **pure** (no DB, no I/O).
 
-use sem_os_core::{
+use sem_os_ontology::{
     attribute_def::{AttributeConstraints, AttributeDataType, AttributeDefBody},
     entity_type_def::EntityTypeDefBody,
     membership::{MembershipKind, MembershipRuleBody},
-    types::EvidenceGrade,
     verb_contract::{
         VerbArgDef, VerbContractBody, VerbContractMetadata, VerbPrecondition, VerbProducesSpec,
         VerbReturnSpec,
     },
     view_def::ViewColumn,
 };
+use sem_os_types::EvidenceGrade;
 
 // -- Step 2: Default attributes -----------------------------------------------
 

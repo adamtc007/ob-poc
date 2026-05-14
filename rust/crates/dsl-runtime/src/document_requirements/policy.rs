@@ -3,7 +3,7 @@
 //! Runtime reader for published SemOS document-policy objects.
 
 use anyhow::{Context, Result};
-use sem_os_core::{
+use sem_os_ontology::{
     evidence_strategy_def::EvidenceStrategyDefBody, proof_obligation_def::ProofObligationDefBody,
     requirement_profile_def::RequirementProfileDefBody,
 };

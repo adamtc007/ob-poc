@@ -20,7 +20,7 @@ use uuid::Uuid;
 
 use crate::{CrudExecutionPort, VerbExecutionContext, VerbExecutionOutcome};
 use sem_os_core::error::SemOsError;
-use sem_os_core::verb_contract::{VerbArgDef, VerbContractBody, VerbCrudMapping};
+use sem_os_ontology::verb_contract::{VerbArgDef, VerbContractBody, VerbCrudMapping};
 
 /// SemOS-native CRUD executor backed by PostgreSQL.
 pub struct PgCrudExecutor {
@@ -124,7 +124,7 @@ impl PgCrudExecutor {
         table: &str,
         arg_defs: &[VerbArgDef],
         args: &serde_json::Value,
-        returns: &Option<sem_os_core::verb_contract::VerbReturnSpec>,
+        returns: &Option<sem_os_ontology::verb_contract::VerbReturnSpec>,
     ) -> crate::Result<VerbExecutionOutcome> {
         let args_map = args.as_object().cloned().unwrap_or_default();
         let mut conditions = Vec::new();
@@ -1469,7 +1469,7 @@ fn row_to_json(row: &PgRow) -> crate::Result<serde_json::Value> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use sem_os_core::verb_contract::{VerbArgDef, VerbCrudMapping, VerbReturnSpec};
+    use sem_os_ontology::verb_contract::{VerbArgDef, VerbCrudMapping, VerbReturnSpec};
 
     fn make_select_contract(
         fqn: &str,

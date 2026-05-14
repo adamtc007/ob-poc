@@ -3,7 +3,7 @@
 //! All functions are **pure** (no DB, no I/O). The DB-publishing orchestrator
 //! remains in `ob-poc/src/sem_reg/seeds/derivation_seeds.rs`.
 
-use sem_os_core::derivation_spec::{
+use sem_os_ontology::derivation_spec::{
     DerivationExpression, DerivationInput, DerivationSpecBody, DerivationTestCase, FreshnessRule,
     NullSemantics, SecurityInheritanceMode,
 };

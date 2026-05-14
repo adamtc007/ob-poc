@@ -18,8 +18,8 @@ use sem_os_core::{
         ChangesetDiffResponse, ChangesetImpactResponse, ChangesetPublishResponse,
         GatePreviewResponse, ListChangesetsQuery, ListChangesetsResponse,
     },
-    service::CoreService,
 };
+use sem_os_policy::service::CoreService;
 
 use crate::error::AppError;
 

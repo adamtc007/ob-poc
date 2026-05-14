@@ -6,11 +6,11 @@
 //! assemble redacted Sage context, and request DSL Drafter dry-runs only.
 
 use chrono::{DateTime, Utc};
-use sem_os_core::acp_projection::{
+use sem_os_policy::acp_projection::{
     AcpProjectionEnvelope, AcpProjectionEnvelopeInput, AcpProjectionKind, AcpProjectionSubject,
 };
-use sem_os_core::context_policy::{assemble_prompt_context, PromptContextAssembly};
-use sem_os_core::domain_pack::{
+use sem_os_policy::context_policy::{assemble_prompt_context, PromptContextAssembly};
+use sem_os_policy::domain_pack::{
     authorize_discovery_probe, AcpPersonaDeclaration, ClassificationLimit,
     DiscoveryAuthorizationError, DiscoveryRequest, DiscoveryResponse, DomainPackManifest,
     ExternalMcpTransport, MentionNamespace, PackCompatibilityTier, ProjectionCatalogEntry,
@@ -481,7 +481,7 @@ pub fn acp_discover_kyc_case_state(
     let request = DiscoveryRequest {
         pack_id: manifest.pack_id.clone(),
         probe_id: "kyc-case.read-state".to_string(),
-        subject: sem_os_core::domain_pack::DiscoverySubject {
+        subject: sem_os_policy::domain_pack::DiscoverySubject {
             subject_kind: "kyc_case".to_string(),
             subject_id: subject_id.to_string(),
         },
@@ -830,7 +830,7 @@ fn observation_string(response: &DiscoveryResponse, keys: &[&str]) -> Option<Str
 #[cfg(test)]
 mod tests {
     use super::*;
-    use sem_os_core::domain_pack::{
+    use sem_os_policy::domain_pack::{
         ClassificationLimit, DiscoveryObservation, DiscoveryProvenance, DiscoverySubject,
         PackCompatibilityTier,
     };

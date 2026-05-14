@@ -12,7 +12,7 @@
 //! duplicates before, surfaced by `xtask audit` as bucket-1
 //! namesakes-that-turned-out-to-be-drift. The wrapping `StateGraph`
 //! type here stays local because it deliberately differs from
-//! `sem_os_core::state_graph_def::StateGraphDefBody` (the body
+//! `sem_os_ontology::state_graph_def::StateGraphDefBody` (the body
 //! body that lives in a registry snapshot vs the authored YAML
 //! shape this engine loads).
 
@@ -24,7 +24,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
 use std::path::{Path, PathBuf};
 
-pub use sem_os_core::state_graph_def::{
+pub use sem_os_ontology::state_graph_def::{
     EdgeType, GraphEdge, GraphGate, GraphNode, NodeType, SignalCondition,
 };
 

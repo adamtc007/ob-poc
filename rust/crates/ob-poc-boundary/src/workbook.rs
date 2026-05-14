@@ -5,7 +5,7 @@
 //! anchors, evidence references, execution mode, and a SemOS simulation result.
 
 use chrono::{DateTime, Utc};
-use sem_os_core::state_simulation::StateSimulationResult;
+use sem_os_policy::state_simulation::StateSimulationResult;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::collections::BTreeMap;
@@ -242,7 +242,7 @@ fn require_non_empty(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use sem_os_core::state_simulation::{
+    use sem_os_policy::state_simulation::{
         SemanticStateDiff, SimulatedStateAdvance, StateSimulationResult,
     };
     use uuid::uuid;

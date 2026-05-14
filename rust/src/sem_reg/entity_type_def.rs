@@ -3,7 +3,7 @@
 //!
 //! Phase 4.7 audit follow-up (2026-05-13): the local parallel
 //! definition that lived here was a strict subset of
-//! `sem_os_core::entity_type_def::EntityTypeDefBody` (missing 5
+//! `sem_os_ontology::entity_type_def::EntityTypeDefBody` (missing 5
 //! governance / visibility fields). Collapsing to a re-export
 //! removes 3 entries from the schema-authority drift allowlist
 //! (`EntityTypeDefBody`, `LifecycleStateDef`, `LifecycleTransition`)
@@ -18,4 +18,4 @@
 //! `read_by_verbs`, `written_by_verbs`) with `None` / `Vec::new()`
 //! defaults.
 
-pub use sem_os_core::entity_type_def::*;
+pub use sem_os_ontology::entity_type_def::*;

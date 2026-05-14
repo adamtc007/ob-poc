@@ -11,7 +11,7 @@
 //! walk-by check identified as bucket-3-class drift.
 //!
 //! `StateMachineDefinition` (this file) stays local because it
-//! genuinely differs from `sem_os_core::state_machine_def::
+//! genuinely differs from `sem_os_ontology::state_machine_def::
 //! StateMachineDefBody` — the body type carries `fqn: String`
 //! and an `Option<ReducerDef>` (registry-snapshot shape), while
 //! the runtime engine here loads YAML where `reducer` is always
@@ -31,7 +31,7 @@ use super::ast::ConditionBody;
 use super::error::ReducerResult;
 use super::validate::validate_state_machine;
 
-pub use sem_os_core::state_machine_def::{
+pub use sem_os_ontology::state_machine_def::{
     ConditionDef, ConsistencyCheckDef, OverlaySourceDef, ReducerDef, RuleDef, TransitionDef,
 };
 

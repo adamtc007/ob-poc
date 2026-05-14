@@ -44,6 +44,8 @@ dsl-core = { path = "../dsl-core" }
 # and the VerbContractBody consumed by CrudExecutionPort. Kept deliberately
 # until a later slice resolves the cycle cleanly.
 sem_os_core = { path = "../sem_os_core" }
+sem_os_policy = { path = "../sem_os_policy" }
+sem_os_ontology = { path = "../sem_os_ontology" }
 async-trait = "0.1"
 anyhow = "1.0"
 serde = { version = "1", features = ["derive"] }

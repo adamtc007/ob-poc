@@ -3,7 +3,8 @@
 use std::sync::Arc;
 
 use axum::{extract::Path, Extension, Json};
-use sem_os_core::{proto::GetManifestResponse, service::CoreService};
+use sem_os_core::proto::GetManifestResponse;
+use sem_os_policy::service::CoreService;
 
 use crate::error::AppError;
 

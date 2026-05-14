@@ -355,22 +355,9 @@ pub enum GateMode {
     ReportOnly,
 }
 
-/// Severity of a gate failure.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-pub enum GateSeverity {
-    Error,
-    Warning,
-}
-
-impl std::fmt::Display for GateSeverity {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::Error => write!(f, "error"),
-            Self::Warning => write!(f, "warning"),
-        }
-    }
-}
+// `GateSeverity` lives in `sem_os_types::GateSeverity`; re-exported here for
+// backwards compatibility with existing call sites under `gates::GateSeverity`.
+pub use sem_os_types::GateSeverity;
 
 /// Structured gate failure with metadata for audit and remediation.
 #[derive(Debug, Clone, Serialize, Deserialize)]

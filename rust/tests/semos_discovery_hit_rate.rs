@@ -11,8 +11,8 @@ use std::sync::Arc;
 use async_trait::async_trait;
 use chrono::Utc;
 use dsl_core::config::loader::ConfigLoader;
-use sem_os_core::abac::ActorContext;
-use sem_os_core::context_resolution::{
+use sem_os_policy::abac::ActorContext;
+use sem_os_policy::context_resolution::{
     ContextResolutionRequest, DiscoveryContext, DiscoverySurface, EvidenceMode,
     ResolutionConstraints, ResolutionStage, SubjectRef,
 };
@@ -23,7 +23,7 @@ use sem_os_core::ports::{
     OutboxStore, ProjectionWriter, SnapshotStore,
 };
 use sem_os_core::principal::Principal;
-use sem_os_core::service::{CoreService, CoreServiceImpl};
+use sem_os_policy::service::{CoreService, CoreServiceImpl};
 use sem_os_core::types::{
     AuditEntry, ChangeType, Changeset, ChangesetEntry, ChangesetReview, ChangesetStatus,
     CreateChangesetInput, DependentSnapshot, EventId, EvidenceInstance, Fqn, GovernanceTier,

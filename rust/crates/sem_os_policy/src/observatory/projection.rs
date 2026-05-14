@@ -5,7 +5,7 @@
 
 use chrono::Utc;
 
-use crate::authoring::agent_mode::AgentMode;
+use sem_os_types::agent_mode::AgentMode;
 use crate::context_resolution::{
     ContextResolutionResponse, GroundedActionOption, GroundedActionSurface, VerbCandidate,
 };

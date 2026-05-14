@@ -20,12 +20,10 @@ use crate::{
         governance_verbs::GovernanceVerbService,
         ports::{AuthoringStore, ScratchSchemaRunner},
         types::{
-            ChangeSetFull, ChangeSetStatus, DiffSummary, DryRunReport, PublishBatch, PublishPlan,
+            ChangeSetFull, DiffSummary, DryRunReport, PublishBatch, PublishPlan,
             ValidationReport,
         },
     },
-    constellation_family_def::{ConstellationFamilyDefBody, ConstellationRef},
-    constellation_map_def::ConstellationMapDefBody,
     context_resolution::{
         compute_composite_access, compute_confidence, evaluate_policies,
         evaluate_verb_preconditions, filter_and_rank_attributes, filter_and_rank_verbs,
@@ -36,8 +34,10 @@ use crate::{
         RankedUniverseDomain, RankedView, ResolutionStage, ResolvedSubject, SubjectMemberships,
         SubjectRelationships,
     },
-    error::SemOsError,
     grounding::{compute_slot_action_surface, ConstellationModel},
+};
+use sem_os_core::{
+    error::SemOsError,
     ports::{
         AuditStore, BootstrapAuditStore, ChangesetStore, EvidenceInstanceStore, ObjectStore,
         OutboxStore, ProjectionWriter, SnapshotStore,
@@ -45,11 +45,15 @@ use crate::{
     principal::Principal,
     proto::*,
     seeds::SeedBundle,
+};
+use sem_os_ontology::{
+    constellation_family_def::{ConstellationFamilyDefBody, ConstellationRef},
+    constellation_map_def::ConstellationMapDefBody,
     state_machine_def::StateMachineDefBody,
-    types::*,
     universe_def::{GroundingInput, UniverseDefBody, UniverseDomain},
     view_def::ViewDefBody,
 };
+use sem_os_types::{ChangeSetStatus, *};
 
 pub type Result<T> = std::result::Result<T, SemOsError>;
 
@@ -86,11 +90,11 @@ pub trait CoreService: Send + Sync {
     async fn dispatch_tool(
         &self,
         principal: &Principal,
-        req: crate::proto::ToolCallRequest,
-    ) -> Result<crate::proto::ToolCallResponse>;
+        req: sem_os_core::proto::ToolCallRequest,
+    ) -> Result<sem_os_core::proto::ToolCallResponse>;
 
     /// List all available tool specifications.
-    async fn list_tool_specs(&self) -> Result<crate::proto::ListToolSpecsResponse>;
+    async fn list_tool_specs(&self) -> Result<sem_os_core::proto::ListToolSpecsResponse>;
 
     /// Promote an approved changeset — publish all entries as new snapshots.
     /// Returns the number of snapshots created.
@@ -99,26 +103,26 @@ pub trait CoreService: Send + Sync {
     /// List changesets with optional filters.
     async fn list_changesets(
         &self,
-        query: crate::proto::ListChangesetsQuery,
-    ) -> Result<crate::proto::ListChangesetsResponse>;
+        query: sem_os_core::proto::ListChangesetsQuery,
+    ) -> Result<sem_os_core::proto::ListChangesetsResponse>;
 
     /// Diff a changeset's entries against current active snapshots.
     async fn changeset_diff(
         &self,
         changeset_id: &str,
-    ) -> Result<crate::proto::ChangesetDiffResponse>;
+    ) -> Result<sem_os_core::proto::ChangesetDiffResponse>;
 
     /// Impact analysis — find downstream dependents for each modified FQN.
     async fn changeset_impact(
         &self,
         changeset_id: &str,
-    ) -> Result<crate::proto::ChangesetImpactResponse>;
+    ) -> Result<sem_os_core::proto::ChangesetImpactResponse>;
 
     /// Gate preview — run publish gates against draft entries without persisting.
     async fn changeset_gate_preview(
         &self,
         changeset_id: &str,
-    ) -> Result<crate::proto::GatePreviewResponse>;
+    ) -> Result<sem_os_core::proto::GatePreviewResponse>;
 
     // ── Authoring pipeline (governance verbs) ──────────────────
 
@@ -1205,7 +1209,7 @@ impl CoreService for CoreServiceImpl {
                     skipped += 1;
                 }
                 Err(SemOsError::NotFound(_)) => {
-                    let object_id = crate::ids::object_id_for(*object_type, fqn);
+                    let object_id = sem_os_core::ids::object_id_for(*object_type, fqn);
                     let meta =
                         SnapshotMeta::new_operational(*object_type, object_id, &principal.actor_id);
                     to_publish.push((meta, (*payload).clone()));
@@ -1274,8 +1278,8 @@ impl CoreService for CoreServiceImpl {
     async fn dispatch_tool(
         &self,
         _principal: &Principal,
-        _req: crate::proto::ToolCallRequest,
-    ) -> Result<crate::proto::ToolCallResponse> {
+        _req: sem_os_core::proto::ToolCallRequest,
+    ) -> Result<sem_os_core::proto::ToolCallResponse> {
         // Tool dispatch requires the ob-poc host's sem_reg::agent::mcp_tools.
         // InProcessClient overrides this; HttpClient calls the server endpoint.
         Err(SemOsError::MigrationPending(
@@ -1283,7 +1287,7 @@ impl CoreService for CoreServiceImpl {
         ))
     }
 
-    async fn list_tool_specs(&self) -> Result<crate::proto::ListToolSpecsResponse> {
+    async fn list_tool_specs(&self) -> Result<sem_os_core::proto::ListToolSpecsResponse> {
         // Tool specs are provided by ob-poc's all_tool_specs().
         // InProcessClient overrides this; HttpClient calls the server endpoint.
         Err(SemOsError::MigrationPending(
@@ -1368,7 +1372,7 @@ impl CoreService for CoreServiceImpl {
         for entry in &entries {
             let object_type = entry.object_type;
 
-            let object_id = crate::ids::object_id_for(object_type, &entry.object_fqn);
+            let object_id = sem_os_core::ids::object_id_for(object_type, &entry.object_fqn);
 
             let change_type = match entry.change_kind {
                 ChangeKind::Add => ChangeType::Created,
@@ -1448,8 +1452,8 @@ impl CoreService for CoreServiceImpl {
 
     async fn list_changesets(
         &self,
-        query: crate::proto::ListChangesetsQuery,
-    ) -> Result<crate::proto::ListChangesetsResponse> {
+        query: sem_os_core::proto::ListChangesetsQuery,
+    ) -> Result<sem_os_core::proto::ListChangesetsResponse> {
         let changesets = self
             .changesets
             .list_changesets(
@@ -1458,13 +1462,13 @@ impl CoreService for CoreServiceImpl {
                 query.scope.as_deref(),
             )
             .await?;
-        Ok(crate::proto::ListChangesetsResponse { changesets })
+        Ok(sem_os_core::proto::ListChangesetsResponse { changesets })
     }
 
     async fn changeset_diff(
         &self,
         changeset_id: &str,
-    ) -> Result<crate::proto::ChangesetDiffResponse> {
+    ) -> Result<sem_os_core::proto::ChangesetDiffResponse> {
         let cs_id = parse_uuid(changeset_id, "changeset_id")?;
         let changeset = self.changesets.get_changeset(cs_id).await?;
         let entries = self.changesets.list_entries(cs_id).await?;
@@ -1489,7 +1493,7 @@ impl CoreService for CoreServiceImpl {
                 stale_count += 1;
             }
 
-            diff_entries.push(crate::proto::DiffEntry {
+            diff_entries.push(sem_os_core::proto::DiffEntry {
                 entry_id: entry.entry_id.to_string(),
                 object_fqn: entry.object_fqn.clone(),
                 object_type: entry.object_type,
@@ -1502,7 +1506,7 @@ impl CoreService for CoreServiceImpl {
             });
         }
 
-        Ok(crate::proto::ChangesetDiffResponse {
+        Ok(sem_os_core::proto::ChangesetDiffResponse {
             changeset_id: cs_id.to_string(),
             status: changeset.status.to_string(),
             entries: diff_entries,
@@ -1513,7 +1517,7 @@ impl CoreService for CoreServiceImpl {
     async fn changeset_impact(
         &self,
         changeset_id: &str,
-    ) -> Result<crate::proto::ChangesetImpactResponse> {
+    ) -> Result<sem_os_core::proto::ChangesetImpactResponse> {
         let cs_id = parse_uuid(changeset_id, "changeset_id")?;
         let _changeset = self.changesets.get_changeset(cs_id).await?;
         let entries = self.changesets.list_entries(cs_id).await?;
@@ -1542,7 +1546,7 @@ impl CoreService for CoreServiceImpl {
                     _ => "depends_on",
                 };
 
-                impacts.push(crate::proto::ImpactEntry {
+                impacts.push(sem_os_core::proto::ImpactEntry {
                     source_fqn: source_fqn.clone(),
                     source_object_type: *source_type,
                     dependent_fqn: dep.fqn,
@@ -1552,7 +1556,7 @@ impl CoreService for CoreServiceImpl {
             }
         }
 
-        Ok(crate::proto::ChangesetImpactResponse {
+        Ok(sem_os_core::proto::ChangesetImpactResponse {
             changeset_id: cs_id.to_string(),
             impacts,
         })
@@ -1561,7 +1565,7 @@ impl CoreService for CoreServiceImpl {
     async fn changeset_gate_preview(
         &self,
         changeset_id: &str,
-    ) -> Result<crate::proto::GatePreviewResponse> {
+    ) -> Result<sem_os_core::proto::GatePreviewResponse> {
         let cs_id = parse_uuid(changeset_id, "changeset_id")?;
         let _changeset = self.changesets.get_changeset(cs_id).await?;
         let entries = self.changesets.list_entries(cs_id).await?;
@@ -1575,7 +1579,7 @@ impl CoreService for CoreServiceImpl {
             crate::stewardship::check_proof_chain_compatibility(&entries, self.snapshots.as_ref())
                 .await
         {
-            gate_results.push(crate::proto::GatePreviewEntry {
+            gate_results.push(sem_os_core::proto::GatePreviewEntry {
                 entry_id: String::new(),
                 object_fqn: String::new(),
                 gate_name: "proof_chain_compatibility".into(),
@@ -1591,7 +1595,7 @@ impl CoreService for CoreServiceImpl {
             crate::stewardship::detect_stale_drafts(&entries, self.snapshots.as_ref()).await
         {
             for conflict in &stale {
-                gate_results.push(crate::proto::GatePreviewEntry {
+                gate_results.push(sem_os_core::proto::GatePreviewEntry {
                     entry_id: conflict.entry_id.to_string(),
                     object_fqn: conflict.object_fqn.clone(),
                     gate_name: "stale_draft_detection".into(),
@@ -1609,7 +1613,7 @@ impl CoreService for CoreServiceImpl {
         for entry in &entries {
             let object_type = entry.object_type;
 
-            let object_id = crate::ids::object_id_for(object_type, &entry.object_fqn);
+            let object_id = sem_os_core::ids::object_id_for(object_type, &entry.object_fqn);
 
             // Build SnapshotMeta from the draft entry
             let meta = SnapshotMeta {
@@ -1650,7 +1654,7 @@ impl CoreService for CoreServiceImpl {
                 if !gr.passed {
                     total_errors += 1;
                 }
-                gate_results.push(crate::proto::GatePreviewEntry {
+                gate_results.push(sem_os_core::proto::GatePreviewEntry {
                     entry_id: entry.entry_id.to_string(),
                     object_fqn: entry.object_fqn.clone(),
                     gate_name: gr.gate_name.to_string(),
@@ -1665,7 +1669,7 @@ impl CoreService for CoreServiceImpl {
             }
         }
 
-        Ok(crate::proto::GatePreviewResponse {
+        Ok(sem_os_core::proto::GatePreviewResponse {
             changeset_id: cs_id.to_string(),
             would_block: total_errors > 0,
             error_count: total_errors,
@@ -1898,7 +1902,7 @@ fn parse_uuid(s: &str, field_name: &str) -> Result<Uuid> {
 mod tests {
     use super::*;
     use crate::abac::ActorContext;
-    use crate::constellation_map_def::ConstellationMapDefBody;
+    use sem_os_ontology::constellation_map_def::ConstellationMapDefBody;
     use crate::context_resolution::{
         DiscoveryContext, EvidenceMode, ResolutionConstraints, SubjectRef,
     };
@@ -1975,7 +1979,7 @@ slots:
             snapshot_id: Uuid::new_v4(),
             snapshot_set_id: None,
             object_type,
-            object_id: crate::ids::object_id_for(object_type, fqn),
+            object_id: sem_os_core::ids::object_id_for(object_type, fqn),
             version_major: 1,
             version_minor: 0,
             status: SnapshotStatus::Active,

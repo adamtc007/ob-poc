@@ -8,7 +8,7 @@
 
 pub use ob_poc_boundary::acp_state_anchor::*;
 
-use sem_os_core::state_simulation::{
+use sem_os_policy::state_simulation::{
     SemanticStateDiff, SimulatedStateAdvance, StateSimulationResult,
 };
 use serde_json::{json, Value};

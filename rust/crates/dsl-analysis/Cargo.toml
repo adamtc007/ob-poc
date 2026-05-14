@@ -55,6 +55,10 @@ tonic = "0.12"
 # dsl-runtime carries — to be inverted in a later slice.
 chrono = { version = "0.4", features = ["serde"] }
 sem_os_core = { path = "../sem_os_core" }
+sem_os_ontology = { path = "../sem_os_ontology" }
+
+[dev-dependencies]
+tokio = { version = "1", features = ["macros", "rt"] }
 
 [lints.rust]
 unreachable_pub = "deny"

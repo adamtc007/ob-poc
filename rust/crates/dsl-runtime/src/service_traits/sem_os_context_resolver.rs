@@ -4,7 +4,7 @@
 //! `resolve_context` is the entry point used by `affinity_ops` (and a
 //! handful of other governance-aware ops) to evaluate ABAC, security
 //! labels, and verb prune reasons against a principal. The full
-//! [`sem_os_core::service::CoreService`] trait is much larger (~12
+//! [`sem_os_policy::service::CoreService`] trait is much larger (~12
 //! methods covering manifest, export, validate, publish, etc.) and
 //! its concrete impl lives deep in `crate::sem_reg::agent::mcp_tools`
 //! plus `sem_os_postgres`.
@@ -23,11 +23,11 @@
 
 use anyhow::Result;
 use async_trait::async_trait;
-use sem_os_core::context_resolution::{ContextResolutionRequest, ContextResolutionResponse};
+use sem_os_policy::context_resolution::{ContextResolutionRequest, ContextResolutionResponse};
 use sem_os_core::principal::Principal;
 
 /// Single-method trait for SemOS context resolution. Returns
-/// `anyhow::Result` to keep `sem_os_core::service::SemOsError` out
+/// `anyhow::Result` to keep `sem_os_policy::service::SemOsError` out
 /// of the boundary; the bridge converts internally.
 #[async_trait]
 pub trait SemOsContextResolver: Send + Sync {

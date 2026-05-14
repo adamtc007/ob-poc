@@ -32,7 +32,7 @@ async fn build_test_app() -> Router {
     // Build SemOsClient (in-process mode, same as production default)
     let sem_os_client: Option<Arc<dyn sem_os_client::SemOsClient>> = {
         use sem_os_client::inprocess::InProcessClient;
-        use sem_os_core::service::CoreServiceImpl;
+        use sem_os_policy::service::CoreServiceImpl;
         use sem_os_postgres::PgStores;
 
         let stores = PgStores::new(pool.clone());

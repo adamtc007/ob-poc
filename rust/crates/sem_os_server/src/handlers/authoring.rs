@@ -16,17 +16,18 @@ use axum::{
     extract::{Path, Query},
     Extension, Json,
 };
-use sem_os_core::{
+use sem_os_core::principal::Principal;
+use sem_os_policy::{
     authoring::{
         bundle::{build_bundle_from_map, parse_manifest},
         types::{
-            ChangeSetFull, ChangeSetStatus, DiffSummary, DryRunReport, PublishBatch, PublishPlan,
+            ChangeSetFull, DiffSummary, DryRunReport, PublishBatch, PublishPlan,
             ValidationReport,
         },
     },
-    principal::Principal,
     service::CoreService,
 };
+use sem_os_types::ChangeSetStatus;
 use serde::Deserialize;
 use uuid::Uuid;
 
@@ -196,7 +197,7 @@ fn require_publish_permission(principal: &Principal) -> Result<(), AppError> {
     let mode = principal.agent_mode();
     if !matches!(
         mode,
-        sem_os_core::authoring::agent_mode::AgentMode::Governed
+        sem_os_types::agent_mode::AgentMode::Governed
     ) {
         return Err(AppError::from(
             sem_os_core::error::SemOsError::Unauthorized(format!(

@@ -25,10 +25,10 @@
 mod integration {
     use anyhow::Result;
     use chrono::Utc;
-    use sem_os_core::context_resolution::{
+    use sem_os_policy::context_resolution::{
         ContextResolutionRequest, DiscoveryContext, EvidenceMode, SubjectRef,
     };
-    use sem_os_core::service::{CoreService, CoreServiceImpl};
+    use sem_os_policy::service::{CoreService, CoreServiceImpl};
     use sem_os_core::types::EvidenceGrade;
     use sem_os_postgres::PgStores;
     use serde_json::json;
@@ -215,8 +215,8 @@ mod integration {
         )
     }
 
-    fn to_sem_os_actor(actor: &ActorContext) -> sem_os_core::abac::ActorContext {
-        sem_os_core::abac::ActorContext {
+    fn to_sem_os_actor(actor: &ActorContext) -> sem_os_policy::abac::ActorContext {
+        sem_os_policy::abac::ActorContext {
             actor_id: actor.actor_id.clone(),
             roles: actor.roles.clone(),
             department: actor.department.clone(),
@@ -229,7 +229,7 @@ mod integration {
         pool: &PgPool,
         actor: &ActorContext,
         request: ContextResolutionRequest,
-    ) -> sem_os_core::service::Result<sem_os_core::context_resolution::ContextResolutionResponse>
+    ) -> sem_os_policy::service::Result<sem_os_policy::context_resolution::ContextResolutionResponse>
     {
         let service = build_sem_os_service(pool);
         let principal =

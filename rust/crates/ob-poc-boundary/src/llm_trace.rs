@@ -5,7 +5,7 @@
 //! sensitive prompt context can be retained under a separate policy.
 
 use chrono::{DateTime, Utc};
-use sem_os_core::context_policy::PromptContextAssembly;
+use sem_os_policy::context_policy::PromptContextAssembly;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::collections::BTreeSet;
@@ -209,8 +209,8 @@ fn sha256_digest(bytes: &[u8]) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use sem_os_core::context_policy::assemble_prompt_context;
-    use sem_os_core::domain_pack::{
+    use sem_os_policy::context_policy::assemble_prompt_context;
+    use sem_os_policy::domain_pack::{
         ClassificationLimit, ContextClassificationPolicy, DiscoveryObservation, DiscoveryResponse,
         DiscoverySubject,
     };

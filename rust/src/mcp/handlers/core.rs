@@ -226,9 +226,9 @@ pub struct ToolHandlers {
     pub(super) sem_os_client: Option<Arc<dyn SemOsClient>>,
     /// Pre-built CoreService from startup — shared across all MCP tool calls.
     /// Avoids per-request reconstruction of CoreServiceImpl + 8 PgStores.
-    pub(super) sem_os_service: Option<Arc<dyn sem_os_core::service::CoreService>>,
+    pub(super) sem_os_service: Option<Arc<dyn sem_os_policy::service::CoreService>>,
     /// Authoring pipeline mode (Research vs Governed) — controls db_introspect surface.
-    pub(super) agent_mode: sem_os_core::authoring::agent_mode::AgentMode,
+    pub(super) agent_mode: sem_os_types::agent_mode::AgentMode,
     /// Canonical SemOS plugin op registry threaded into every inner
     /// `DslExecutor` constructed by these handlers. Required for plugin
     /// dispatch post-Phase-5c-migrate slice #80 — without it, plugin verbs
@@ -258,13 +258,13 @@ impl ToolHandlers {
             scenario_index: None,
             sem_os_client: None,
             sem_os_service: None,
-            agent_mode: sem_os_core::authoring::agent_mode::AgentMode::default(),
+            agent_mode: sem_os_types::agent_mode::AgentMode::default(),
             sem_os_ops: None,
         }
     }
 
     /// Set the authoring pipeline mode (Research vs Governed).
-    pub fn with_agent_mode(mut self, mode: sem_os_core::authoring::agent_mode::AgentMode) -> Self {
+    pub fn with_agent_mode(mut self, mode: sem_os_types::agent_mode::AgentMode) -> Self {
         self.agent_mode = mode;
         self
     }
@@ -302,7 +302,7 @@ impl ToolHandlers {
     /// Set the pre-built CoreService shared across all MCP tool calls.
     pub fn with_sem_os_service(
         mut self,
-        service: Arc<dyn sem_os_core::service::CoreService>,
+        service: Arc<dyn sem_os_policy::service::CoreService>,
     ) -> Self {
         self.sem_os_service = Some(service);
         self

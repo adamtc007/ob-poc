@@ -1,1 +1,1 @@
-pub use sem_os_core::requirement_profile_def::*;
+pub use sem_os_ontology::requirement_profile_def::*;

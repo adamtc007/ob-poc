@@ -13,7 +13,7 @@ use serde::Serialize;
 use sha2::{Digest, Sha256};
 use std::collections::{HashMap, HashSet};
 
-use sem_os_core::authoring::agent_mode::AgentMode;
+use sem_os_types::agent_mode::AgentMode;
 
 use crate::agent::composite_state::GroupCompositeState;
 use crate::agent::sem_os_context_envelope::{

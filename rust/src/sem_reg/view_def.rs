@@ -7,4 +7,4 @@
 //! `sem_os_core` as the single schema authority per V&S §O7 /
 //! ADN §7.3.
 
-pub use sem_os_core::view_def::*;
+pub use sem_os_ontology::view_def::*;

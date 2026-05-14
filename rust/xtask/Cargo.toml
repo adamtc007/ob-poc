@@ -26,6 +26,9 @@ ob-poc-agent = { path = "../crates/ob-poc-agent" }
 ob-poc-types = { path = "../crates/ob-poc-types" }
 ob-agentic = { path = "../crates/ob-agentic", features = ["gateway"] }
 sem_os_core = { path = "../crates/sem_os_core" }
+sem_os_types = { path = "../crates/sem_os_types" }
+sem_os_ontology = { path = "../crates/sem_os_ontology" }
+sem_os_policy = { path = "../crates/sem_os_policy" }
 sem_os_client = { path = "../crates/sem_os_client" }
 sem_os_postgres = { path = "../crates/sem_os_postgres" }
 dsl-core = { path = "../crates/dsl-core" }

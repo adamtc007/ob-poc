@@ -7,7 +7,7 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
-use crate::authoring::agent_mode::AgentMode;
+use sem_os_types::agent_mode::AgentMode;
 
 // ── OrientationContract ──────────────────────────────────────
 

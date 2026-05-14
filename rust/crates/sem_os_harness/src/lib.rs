@@ -22,7 +22,7 @@ mod projections;
 #[cfg(test)]
 use sem_os_client::SemOsClient;
 #[cfg(test)]
-use sem_os_core::context_resolution::{EvidenceMode, ResolutionConstraints, SubjectRef};
+use sem_os_policy::context_resolution::{EvidenceMode, ResolutionConstraints, SubjectRef};
 #[cfg(test)]
 use sem_os_core::error::SemOsError;
 #[cfg(test)]
@@ -333,11 +333,11 @@ async fn test_context_resolution_determinism(client: &dyn SemOsClient) {
         .expect("bootstrap for context resolution");
 
     let subject_id = Uuid::new_v4();
-    let request = || sem_os_core::proto::ResolveContextRequest {
+    let request = || sem_os_policy::context_resolution::ContextResolutionRequest {
         subject: SubjectRef::EntityId(subject_id),
         intent_summary: Some("discover UBO structure".into()),
         raw_utterance: Some("discover UBO structure".into()),
-        actor: sem_os_core::abac::ActorContext {
+        actor: sem_os_policy::abac::ActorContext {
             actor_id: "harness-agent".into(),
             roles: vec!["analyst".into()],
             department: Some("compliance".into()),
@@ -350,7 +350,7 @@ async fn test_context_resolution_determinism(client: &dyn SemOsClient) {
         point_in_time: None,
         entity_kind: None,
         entity_confidence: None,
-        discovery: sem_os_core::context_resolution::DiscoveryContext::default(),
+        discovery: sem_os_policy::context_resolution::DiscoveryContext::default(),
     };
 
     // Run resolution twice with identical input.
@@ -628,7 +628,7 @@ mod tests {
     use super::*;
     use crate::db::{drop_db, isolated_db};
     use sem_os_client::inprocess::InProcessClient;
-    use sem_os_core::service::CoreServiceImpl;
+    use sem_os_policy::service::CoreServiceImpl;
     use sem_os_postgres::{
         PgAuditStore, PgChangesetStore, PgEvidenceStore, PgObjectStore, PgOutboxStore,
         PgProjectionWriter, PgSnapshotStore,

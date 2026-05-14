@@ -9,7 +9,7 @@ use std::time::Instant;
 
 use anyhow::Context;
 use ob_agentic::llm_client::{LlmClient, ToolDefinition};
-use sem_os_core::domain_pack::DomainPackManifest;
+use sem_os_policy::domain_pack::DomainPackManifest;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 

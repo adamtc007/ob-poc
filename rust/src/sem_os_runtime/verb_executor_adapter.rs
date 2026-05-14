@@ -286,9 +286,9 @@ impl VerbExecutionPort for ObPocVerbExecutor {
 /// Only populates the fields needed by CrudExecutionPort.
 fn runtime_verb_to_contract(
     rv: &crate::dsl_v2::runtime_registry::RuntimeVerb,
-) -> sem_os_core::verb_contract::VerbContractBody {
+) -> sem_os_ontology::verb_contract::VerbContractBody {
     use crate::dsl_v2::runtime_registry::RuntimeBehavior;
-    use sem_os_core::verb_contract::{
+    use sem_os_ontology::verb_contract::{
         VerbArgDef, VerbContractBody, VerbCrudMapping, VerbReturnSpec,
     };
 
@@ -354,16 +354,16 @@ fn runtime_verb_to_contract(
         phase_tags: vec![],
         harm_class: rv.harm_class.map(|h| match h {
             dsl_core::config::types::HarmClass::ReadOnly => {
-                sem_os_core::verb_contract::HarmClass::ReadOnly
+                sem_os_ontology::verb_contract::HarmClass::ReadOnly
             }
             dsl_core::config::types::HarmClass::Reversible => {
-                sem_os_core::verb_contract::HarmClass::Reversible
+                sem_os_ontology::verb_contract::HarmClass::Reversible
             }
             dsl_core::config::types::HarmClass::Irreversible => {
-                sem_os_core::verb_contract::HarmClass::Irreversible
+                sem_os_ontology::verb_contract::HarmClass::Irreversible
             }
             dsl_core::config::types::HarmClass::Destructive => {
-                sem_os_core::verb_contract::HarmClass::Destructive
+                sem_os_ontology::verb_contract::HarmClass::Destructive
             }
         }),
         action_class: None,

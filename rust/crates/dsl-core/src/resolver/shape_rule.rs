@@ -1,6 +1,6 @@
 use crate::config::dag::{ClosureType, EligibilityConstraint, PredicateBinding, RoleGuard};
 use anyhow::{Context, Result};
-use sem_os_core::constellation_map_def::{AuditClass, CompletenessAssertionConfig};
+use sem_os_ontology::constellation_map_def::{AuditClass, CompletenessAssertionConfig};
 use serde::{Deserialize, Serialize};
 use serde_yaml::Value as YamlValue;
 use std::{

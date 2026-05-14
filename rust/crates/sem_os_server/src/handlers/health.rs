@@ -7,7 +7,7 @@
 use std::sync::Arc;
 
 use axum::{Extension, Json};
-use sem_os_core::service::CoreService;
+use sem_os_policy::service::CoreService;
 use serde_json::{json, Value};
 
 use crate::error::AppError;

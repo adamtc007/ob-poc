@@ -3,7 +3,7 @@
 //! Diagnostics are deliberately machine-usable. Invalid private DSL drafts
 //! must not collapse into prose-only failures.
 
-use sem_os_core::state_simulation::StateSimulationError;
+use sem_os_policy::state_simulation::StateSimulationError;
 use serde::{Deserialize, Serialize};
 
 use crate::dsl_drafter::DslDrafterValidationError;

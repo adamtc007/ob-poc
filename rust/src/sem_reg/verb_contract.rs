@@ -3,7 +3,7 @@
 //!
 //! Phase 4.7 audit follow-up (2026-05-13): the local parallel
 //! definition that lived here was a strict subset of
-//! `sem_os_core::verb_contract::*` (missing 4 footprint fields on
+//! `sem_os_ontology::verb_contract::*` (missing 4 footprint fields on
 //! `VerbContractBody`, 13 SQL helper fields on `VerbCrudMapping`,
 //! `maps_to` on `VerbArgDef`, plus the `VerbOutput` struct
 //! entirely). Collapsing to a re-export removes 6 entries from
@@ -20,4 +20,4 @@
 //! to `None` / `Vec::new()` so behaviour matches the pre-collapse
 //! state).
 
-pub use sem_os_core::verb_contract::*;
+pub use sem_os_ontology::verb_contract::*;

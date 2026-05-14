@@ -17,6 +17,8 @@ ob-poc-macros = { path = "../ob-poc-macros" }
 # control-plane (canonical domain types) and acceptable here. Not the
 # execution tier — see the boundary-tier discipline in lib.rs.
 sem_os_core = { path = "../sem_os_core" }
+sem_os_ontology = { path = "../sem_os_ontology" }
+sem_os_policy = { path = "../sem_os_policy" }
 # dsl-core supplies VerbConfig metadata for ACP registry/pack projection
 # (slice 2d.3). Pure-data crate — no execution-tier dependency.
 dsl-core = { path = "../dsl-core" }

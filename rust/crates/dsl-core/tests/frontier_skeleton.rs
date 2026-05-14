@@ -8,7 +8,7 @@ use dsl_core::{
         SlotProvenance, VersionHash,
     },
 };
-use sem_os_core::constellation_map_def::CompletenessAssertionConfig;
+use sem_os_ontology::constellation_map_def::CompletenessAssertionConfig;
 
 fn template() -> ResolvedTemplate {
     ResolvedTemplate {

@@ -6,8 +6,11 @@
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use sem_os_core::{
-    affinity::AffinityGraph, error::SemOsError, principal::Principal, proto::*, seeds::SeedBundle,
+use sem_os_core::{error::SemOsError, principal::Principal, proto::*, seeds::SeedBundle};
+use sem_os_policy::affinity::AffinityGraph;
+use sem_os_policy::context_resolution::{
+    ContextResolutionRequest as ResolveContextRequest,
+    ContextResolutionResponse as ResolveContextResponse,
 };
 
 use crate::{Result, SemOsClient};

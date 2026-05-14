@@ -1,7 +1,7 @@
 use thiserror::Error;
 
-// Re-export GateSeverity from gates module — single canonical definition.
-pub(crate) use crate::gates::GateSeverity;
+// GateSeverity now lives in sem_os_types (sem_os_core-split v1 Phase 9).
+pub(crate) use sem_os_types::GateSeverity;
 
 #[derive(Debug, Error)]
 pub enum SemOsError {

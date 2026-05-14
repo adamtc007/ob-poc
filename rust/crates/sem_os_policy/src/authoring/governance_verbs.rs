@@ -15,10 +15,10 @@
 use chrono::Utc;
 use uuid::Uuid;
 
-use crate::error::SemOsError;
+use sem_os_core::error::SemOsError;
 
 use super::ports::Result;
-use crate::principal::Principal;
+use sem_os_core::principal::Principal;
 
 use super::bundle::BundleContents;
 use super::canonical_hash::{compute_content_hash, HASH_VERSION};

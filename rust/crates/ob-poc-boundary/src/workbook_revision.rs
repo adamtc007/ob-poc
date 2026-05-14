@@ -4,7 +4,7 @@
 //! may draft, but validation decides. The loop terminates after at most two
 //! revisions with either a valid dry-run or a structured refusal.
 
-use sem_os_core::domain_pack::DomainPackManifest;
+use sem_os_policy::domain_pack::DomainPackManifest;
 use serde::{Deserialize, Serialize};
 use std::time::Instant;
 use uuid::Uuid;

@@ -49,6 +49,9 @@ ob-semantic-matcher = { path = "../ob-semantic-matcher" }
 
 # Semantic OS client + core + postgres stores
 sem_os_core = { path = "../sem_os_core" }
+sem_os_types = { path = "../sem_os_types" }
+sem_os_ontology = { path = "../sem_os_ontology" }
+sem_os_policy = { path = "../sem_os_policy" }
 sem_os_client = { path = "../sem_os_client" }
 sem_os_postgres = { path = "../sem_os_postgres" }
 

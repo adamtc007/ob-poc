@@ -6,7 +6,7 @@
 //! - assigning the KYC verb slice into the same taxonomy
 
 use anyhow::Result;
-use sem_os_core::verb_contract::VerbContractBody;
+use sem_os_ontology::verb_contract::VerbContractBody;
 use sqlx::PgPool;
 use uuid::Uuid;
 

@@ -5,7 +5,7 @@
 //! axum/HTTP types. The transport-specific lift from headers happens
 //! here, then the canonical `ActorContext` is handed to the gate.
 
-use sem_os_core::abac::ActorContext;
+use sem_os_policy::abac::ActorContext;
 use sem_os_core::types::Classification;
 
 /// Build an `ActorContext` from request headers using the
