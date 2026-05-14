@@ -14,7 +14,12 @@ description = "Semantic OS ontology vocabulary — the *_def family. Definition 
 #                 (core knows nothing about ontology).
 
 [dependencies]
-# Skeleton dependencies — populated as modules land in Phases 2–4.
+# Phase 2 (pure-type leaves): policy_rule, observation_def, verb_contract,
+# view_def, taxonomy_def, universe_def, requirement_profile_def,
+# relationship_type_def, state_machine_def. serde + serde_json::Value
+# in inline field types (caught at slice time, not by `^use ` grep).
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
 
 [lints.rust]
 unreachable_pub = "deny"

@@ -29,6 +29,22 @@
 //!
 //! ## Migration status (2026-05-14)
 //!
-//! Phase 1 skeleton of `docs/todo/sem-os-core-split-v1.md`. Modules
-//! land in Phases 2–4 via `git mv` from `sem_os_core/src/`. Until then
-//! the crate is empty.
+//! Phase 2 of `docs/todo/sem-os-core-split-v1.md`. Modules land in
+//! Phases 2–4 via `git mv` from `sem_os_core/src/`.
+//!
+//! - Phase 2 (current): 9 pure-type leaves (policy_rule, observation_def,
+//!   verb_contract, view_def, taxonomy_def, universe_def,
+//!   requirement_profile_def, relationship_type_def, state_machine_def).
+//!   Every module has zero crate-internal imports — serde-only.
+//!
+//! Compat re-exported from `sem_os_core` until Phase 12 cleanup.
+
+pub mod observation_def;
+pub mod policy_rule;
+pub mod relationship_type_def;
+pub mod requirement_profile_def;
+pub mod state_machine_def;
+pub mod taxonomy_def;
+pub mod universe_def;
+pub mod verb_contract;
+pub mod view_def;

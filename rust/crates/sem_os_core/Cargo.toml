@@ -6,6 +6,13 @@ description = "Semantic OS core — pure domain types, port traits, gate logic. 
 
 [dependencies]
 ob-poc-types = { path = "../ob-poc-types" }
+# sem_os_core-split v1 Phase 2 (transitional, 2026-05-14): pure-type
+# ontology leaves relocated to sem_os_ontology. Compat re-exports in
+# lib.rs keep `sem_os_core::<def>::*` paths resolving for every
+# downstream consumer (sem_os_postgres, sem_os_server, sem_os_client,
+# ob-poc-boundary, ob-poc, dsl-runtime, dsl-analysis, etc). Removed
+# in Phase 12.
+sem_os_ontology = { path = "../sem_os_ontology" }
 async-trait = "0.1"
 tokio = { version = "1", features = ["sync"] }
 thiserror = "1.0"
