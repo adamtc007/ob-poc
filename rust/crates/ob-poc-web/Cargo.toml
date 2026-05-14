@@ -37,9 +37,6 @@ ob-poc-types = { path = "../ob-poc-types" }
 # Database
 sqlx = { version = "0.8", features = ["runtime-tokio", "postgres", "uuid", "chrono", "json"] }
 
-# Entity resolution (same as LSP uses)
-dsl-lsp = { path = "../dsl-lsp" }
-
 # EntityGateway for embedded gRPC service
 entity-gateway = { path = "../entity-gateway" }
 tonic = "0.12"
