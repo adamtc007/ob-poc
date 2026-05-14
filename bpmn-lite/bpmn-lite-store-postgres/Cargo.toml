@@ -24,6 +24,13 @@ serde = { workspace = true }
 serde_json = { workspace = true }
 sqlx = { workspace = true }
 chrono = { workspace = true }
+ob-poc-types = { path = "../../rust/crates/ob-poc-types" }
+tracing = { workspace = true }
+
+[dev-dependencies]
+bpmn-lite-core = { path = "../bpmn-lite-core" }
+tokio = { workspace = true, features = ["test-util"] }
+sha2 = { workspace = true }
 
 [lints]
 workspace = true

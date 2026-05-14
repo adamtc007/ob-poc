@@ -20,8 +20,6 @@
 //   them; tightening those is a later slice.
 pub(crate) mod authoring;
 pub mod engine;
-#[cfg(feature = "postgres")]
-pub mod store_postgres;
 pub mod vm;
 
 // Cleanup Phase 2.x compat re-exports.
@@ -30,13 +28,18 @@ pub mod vm;
 // Phase 2.2 — `compiler` (ir + parser + lowering + verifier) moved
 //             to `bpmn-lite-compiler`.
 // Phase 2.3 — `store` + `store_memory` moved to `bpmn-lite-store`.
-// The in-crate consumers (engine, vm, authoring/*, store_postgres)
-// reach the moved modules through `crate::compiler::*`,
-// `crate::types::*`, `crate::events::*`, `crate::store::*`,
-// `crate::store_memory::*` — these re-exports preserve those paths
-// until `bpmn-lite-core` itself goes away at the end of Phase 2.
+// Phase 2.4 — `store_postgres` + `migrations/` moved to
+//             `bpmn-lite-store-postgres`.
+// In-crate consumers (engine, vm, authoring/*) reach the moved
+// modules through `crate::*` — these re-exports preserve those
+// paths until `bpmn-lite-core` itself goes away at the end of
+// Phase 2. `store_postgres` is feature-gated here because the
+// downstream `bpmn-lite-core` feature `postgres` was the activation
+// switch for the postgres impl; we keep that switch intact.
 pub use bpmn_lite_compiler as compiler;
 pub use bpmn_lite_store::{store, store_memory};
+#[cfg(feature = "postgres")]
+pub use bpmn_lite_store_postgres as store_postgres;
 pub use bpmn_lite_types::{events, types};
 
 #[cfg(test)]

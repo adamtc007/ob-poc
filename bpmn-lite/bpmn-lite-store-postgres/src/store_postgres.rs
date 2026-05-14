@@ -1,6 +1,6 @@
-use crate::events::RuntimeEvent;
-use crate::store::ProcessStore;
-use crate::types::*;
+use bpmn_lite_types::events::RuntimeEvent;
+use bpmn_lite_store::store::ProcessStore;
+use bpmn_lite_types::*;
 use anyhow::{anyhow, Context, Result};
 use async_trait::async_trait;
 use std::collections::BTreeMap;
@@ -1163,10 +1163,15 @@ impl ProcessStore for PostgresProcessStore {
     }
 }
 
-#[cfg(all(test, feature = "postgres"))]
+// The whole crate is postgres-only — no need for the inner cfg-gate
+// that store_postgres used when it lived inside bpmn-lite-core
+// behind `cfg(feature = "postgres")`. Tests still need a real
+// database (BPMN_LITE_TEST_DATABASE_URL); the `--ignored` runner
+// guards them at the test level.
+#[cfg(test)]
 mod tests {
     use super::*;
-    use crate::engine::BpmnLiteEngine;
+    use bpmn_lite_core::engine::BpmnLiteEngine;
     use sqlx::PgPool;
     use std::collections::BTreeMap;
     use std::sync::Arc;
@@ -1767,7 +1772,7 @@ mod tests {
 
         // Start process
         let payload = r#"{"case_id":"test-123"}"#;
-        let hash = crate::vm::compute_hash(payload);
+        let hash = bpmn_lite_core::vm::compute_hash(payload);
         let instance_id = engine
             .start("smoke_proc", version, payload, hash, "test-corr-1")
             .await
@@ -1791,7 +1796,7 @@ mod tests {
 
         // Complete job
         let completion_payload = r#"{"result":"ok"}"#;
-        let completion_hash = crate::vm::compute_hash(completion_payload);
+        let completion_hash = bpmn_lite_core::vm::compute_hash(completion_payload);
         engine
             .complete_job(
                 &job.job_key,

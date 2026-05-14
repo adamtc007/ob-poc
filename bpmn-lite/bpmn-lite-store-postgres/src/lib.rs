@@ -6,7 +6,13 @@
 //! tests, smoke harnesses) doesn't link sqlx + the full Postgres
 //! client.
 //!
-//! Empty at Phase 1 skeleton — the PostgreSQL impl lives in
-//! `bpmn-lite-core/src/store_postgres.rs` and migrations under
-//! `bpmn-lite-core/migrations/` until the Phase 2 migration slice
-//! (`store_postgres + migrations → bpmn-lite-store-postgres`).
+//! Phase 2.4 (2026-05-14) migrated `store_postgres.rs` and the
+//! `migrations/` set here from `bpmn-lite-core/`. The
+//! `sqlx::migrate!("./migrations")` invocation path is unchanged
+//! — `./migrations` resolves to this crate's `migrations/` dir at
+//! macro-expansion time, the same way it resolved to
+//! `bpmn-lite-core/migrations/` before the move.
+
+pub mod store_postgres;
+
+pub use store_postgres::*;

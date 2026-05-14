@@ -6,7 +6,7 @@ edition = "2021"
 [features]
 default = []
 database = ["postgres"]
-postgres = ["dep:sqlx", "dep:chrono"]
+postgres = ["dep:sqlx", "dep:chrono", "dep:bpmn-lite-store-postgres"]
 
 [dependencies]
 uuid = { workspace = true }
@@ -27,6 +27,7 @@ ob-poc-types = { path = "../../rust/crates/ob-poc-types" }
 bpmn-lite-types = { path = "../bpmn-lite-types" }
 bpmn-lite-compiler = { path = "../bpmn-lite-compiler" }
 bpmn-lite-store = { path = "../bpmn-lite-store" }
+bpmn-lite-store-postgres = { path = "../bpmn-lite-store-postgres", optional = true }
 
 [dev-dependencies]
 tokio = { workspace = true, features = ["test-util"] }
