@@ -11,13 +11,11 @@ use std::time::Duration;
 
 pub mod attribute_values_service;
 pub mod bods_service;
-// Phase 4.1 (2026-05-13): pure-DTO module now lives in ob-poc-domain
-// (relocated from ob-poc-boundary; slice 2x → 4.1 sequence). Callers
-// (bods_service.rs via `super::bods_types::*`, this module's pub-use
-// alias) keep their existing paths through the compat re-export. The DTOs
-// derive sqlx::FromRow and serde — both available in domain under the
-// `database` feature.
-pub use ob_poc_domain::bods_types;
+// ob-poc-domain split v1 Slice A1 (2026-05-14): bods_types now lives in
+// `ob-poc-bods`. The compat re-export below keeps `super::bods_types::*`
+// (bods_service) and `crate::database::bods_types::*` (downstream
+// consumers) working unchanged.
+pub use ob_poc_bods as bods_types;
 pub mod cbu_entity_roles_service;
 pub mod cbu_service;
 pub mod context_discovery_service;

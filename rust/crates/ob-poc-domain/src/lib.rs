@@ -70,8 +70,7 @@
 // re-exports in ob-poc, now retargeted from ob_poc_boundary::* to
 // ob_poc_domain::*. Boundary no longer hosts these modules.
 
-#[cfg(feature = "database")]
-pub mod bods_types;
+// bods_types relocated to `ob-poc-bods` by split v1 Slice A1 (2026-05-14).
 pub mod booking_principal_types;
 #[cfg(feature = "database")]
 pub mod deal_types;
