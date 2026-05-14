@@ -54,6 +54,7 @@ message StartRequest {
     string correlation_id = 7;
     string entry_id = 8;
     string runbook_id = 9;
+    string tenant_id = 10;
 }
 
 message StartResponse {
@@ -68,6 +69,7 @@ message SignalRequest {
     ProtoValue correlation_key = 3;
     bytes payload = 4;
     string msg_id = 5;
+    string tenant_id = 6;
 }
 
 message SignalResponse {}
@@ -77,6 +79,7 @@ message SignalResponse {}
 message CancelRequest {
     string process_instance_id = 1;
     string reason = 2;
+    string tenant_id = 3;
 }
 
 message CancelResponse {}
@@ -85,6 +88,7 @@ message CancelResponse {}
 
 message InspectRequest {
     string process_instance_id = 1;
+    string tenant_id = 2;
 }
 
 message InspectResponse {
@@ -93,6 +97,7 @@ message InspectResponse {
     repeated WaitInfo waits = 3;
     bytes bytecode_version = 4;
     string domain_payload_hash = 5;
+    string tenant_id = 6;
 }
 
 message FiberInfo {
@@ -114,6 +119,7 @@ message ActivateJobsRequest {
     int32 max_jobs = 2;
     int64 timeout_ms = 3;
     string worker_id = 4;
+    string tenant_id = 5;
 }
 
 message JobActivationMsg {
@@ -128,6 +134,9 @@ message JobActivationMsg {
     int32 retries_remaining = 9;
     string entry_id = 10;
     string runbook_id = 11;
+    string worker_id = 12;
+    string claim_token = 13;
+    string tenant_id = 14;
 }
 
 message CompleteJobRequest {
@@ -135,6 +144,9 @@ message CompleteJobRequest {
     string domain_payload = 2;
     bytes domain_payload_hash = 3;
     map<string, ProtoValue> orch_flags = 4;
+    string worker_id = 5;
+    string claim_token = 6;
+    string tenant_id = 7;
 }
 
 message CompleteJobResponse {}
@@ -144,6 +156,9 @@ message FailJobRequest {
     string error_class = 2;
     string message = 3;
     int64 retry_hint_ms = 4;
+    string worker_id = 5;
+    string claim_token = 6;
+    string tenant_id = 7;
 }
 
 message FailJobResponse {}
@@ -152,6 +167,7 @@ message FailJobResponse {}
 
 message SubscribeRequest {
     string process_instance_id = 1;
+    string tenant_id = 2;
 }
 
 message LifecycleEvent {

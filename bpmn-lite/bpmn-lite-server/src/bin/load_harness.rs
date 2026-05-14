@@ -591,6 +591,7 @@ async fn subscription_watcher(
     let mut stream = client
         .subscribe_events(SubscribeRequest {
             process_instance_id: process_instance_id.clone(),
+            tenant_id: String::new(),
         })
         .await
         .with_context(|| {
@@ -714,6 +715,7 @@ async fn start_instances(
                 correlation_id: format!("{}-{}", fixture.fixture.key, idx),
                 entry_id: uuid::Uuid::nil().to_string(),
                 runbook_id: uuid::Uuid::nil().to_string(),
+                tenant_id: String::new(),
             })
             .await
             .with_context(|| format!("StartProcess failed for fixture '{}'", fixture.fixture.key))?
@@ -759,6 +761,7 @@ async fn worker_loop(config: WorkerLoopConfig) -> Result<()> {
                 max_jobs,
                 timeout_ms: 100,
                 worker_id: format!("worker-{}", worker_idx),
+                tenant_id: String::new(),
             })
             .await?
             .into_inner();
@@ -802,6 +805,9 @@ async fn process_job(
                 error_class: "TRANSIENT".to_string(),
                 message: "synthetic load-harness transient failure".to_string(),
                 retry_hint_ms: 250,
+                worker_id: job.worker_id,
+                claim_token: job.claim_token,
+                tenant_id: job.tenant_id.clone(),
             })
             .await?;
         if cancel_after_fail {
@@ -809,6 +815,7 @@ async fn process_job(
                 .cancel(CancelRequest {
                     process_instance_id,
                     reason: "synthetic load-harness cancellation after fail_job".to_string(),
+                    tenant_id: String::new(),
                 })
                 .await?;
         }
@@ -824,6 +831,9 @@ async fn process_job(
             domain_payload: payload_json,
             domain_payload_hash: job.domain_payload_hash,
             orch_flags,
+            worker_id: job.worker_id,
+            claim_token: job.claim_token,
+            tenant_id: job.tenant_id,
         })
         .await?;
     metrics.job_completions.fetch_add(1, Ordering::Relaxed);
@@ -920,6 +930,7 @@ async fn signal_loop(
                     correlation_key: None,
                     payload: payload.into_bytes(),
                     msg_id: format!("{}-{}", signal_name, turn),
+                    tenant_id: String::new(),
                 })
                 .await?;
 
@@ -979,6 +990,7 @@ async fn monitor_until_terminal(
                 let inspect = client
                     .inspect(InspectRequest {
                         process_instance_id,
+                        tenant_id: String::new(),
                     })
                     .await?
                     .into_inner();

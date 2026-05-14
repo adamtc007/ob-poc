@@ -1,11 +1,11 @@
-use bpmn_lite_types::events::RuntimeEvent;
 use crate::store::ProcessStore;
-use bpmn_lite_types::*;
 use anyhow::{anyhow, Result};
 use async_trait::async_trait;
-use std::collections::{BTreeMap, HashMap, VecDeque};
+use bpmn_lite_types::events::RuntimeEvent;
+use bpmn_lite_types::*;
+use std::collections::{BTreeMap, HashMap, HashSet, VecDeque};
 use std::sync::Arc;
-use std::time::Instant;
+use std::time::{Duration, Instant};
 use tokio::sync::RwLock;
 use uuid::Uuid;
 
@@ -14,6 +14,7 @@ struct Inner {
     fibers: HashMap<(Uuid, Uuid), Fiber>,
     join_counters: HashMap<(Uuid, JoinId), u16>,
     dedupe: HashMap<String, (JobCompletion, Instant)>,
+    message_dedupe: HashSet<(String, Uuid, String)>,
     job_queue: VecDeque<JobActivation>,
     /// Jobs that have been dequeued but not yet acked.
     inflight_jobs: HashMap<String, (JobActivation, Instant)>,
@@ -23,6 +24,7 @@ struct Inner {
     event_seq: HashMap<Uuid, u64>,
     payload_history: HashMap<(Uuid, [u8; 32]), String>,
     incidents: HashMap<Uuid, Vec<Incident>>,
+    transition_leases: HashMap<Uuid, (String, Instant)>,
 }
 
 /// In-memory implementation of `ProcessStore` for POC/testing.
@@ -38,6 +40,7 @@ impl MemoryStore {
                 fibers: HashMap::new(),
                 join_counters: HashMap::new(),
                 dedupe: HashMap::new(),
+                message_dedupe: HashSet::new(),
                 job_queue: VecDeque::new(),
                 inflight_jobs: HashMap::new(),
                 programs: HashMap::new(),
@@ -46,6 +49,7 @@ impl MemoryStore {
                 event_seq: HashMap::new(),
                 payload_history: HashMap::new(),
                 incidents: HashMap::new(),
+                transition_leases: HashMap::new(),
             }),
         }
     }
@@ -192,6 +196,17 @@ impl ProcessStore for MemoryStore {
         Ok(())
     }
 
+    async fn record_message_delivery(
+        &self,
+        tenant_id: &str,
+        instance_id: Uuid,
+        msg_id: &str,
+    ) -> Result<bool> {
+        let mut w = self.inner.write().await;
+        Ok(w.message_dedupe
+            .insert((tenant_id.to_string(), instance_id, msg_id.to_string())))
+    }
+
     // ── Job queue ──
 
     async fn enqueue_job(&self, activation: &JobActivation) -> Result<()> {
@@ -212,18 +227,27 @@ impl ProcessStore for MemoryStore {
         task_types: &[String],
         max: usize,
         tenant_id: &str,
+        worker_id: &str,
     ) -> Result<Vec<JobActivation>> {
         let mut w = self.inner.write().await;
         let mut result = Vec::new();
         let mut remaining = VecDeque::new();
 
-        while let Some(job) = w.job_queue.pop_front() {
-            let same_tenant = w
+        while let Some(mut job) = w.job_queue.pop_front() {
+            let job_tenant = w
                 .instances
                 .get(&job.process_instance_id)
-                .map(|instance| instance.tenant_id == tenant_id)
+                .map(|instance| instance.tenant_id.clone());
+            let same_tenant = job_tenant
+                .as_ref()
+                .map(|instance_tenant| instance_tenant == tenant_id)
                 .unwrap_or(false);
             if result.len() < max && same_tenant && task_types.contains(&job.task_type) {
+                if let Some(job_tenant) = job_tenant {
+                    job.tenant_id = job_tenant;
+                }
+                job.worker_id = worker_id.to_string();
+                job.claim_token = Uuid::now_v7().to_string();
                 w.inflight_jobs
                     .insert(job.job_key.clone(), (job.clone(), Instant::now()));
                 result.push(job);
@@ -239,6 +263,19 @@ impl ProcessStore for MemoryStore {
         let mut w = self.inner.write().await;
         w.inflight_jobs.remove(job_key);
         Ok(())
+    }
+
+    async fn validate_job_claim(
+        &self,
+        job_key: &str,
+        worker_id: &str,
+        claim_token: &str,
+    ) -> Result<bool> {
+        let w = self.inner.read().await;
+        Ok(w.inflight_jobs
+            .get(job_key)
+            .map(|(job, _)| job.worker_id == worker_id && job.claim_token == claim_token)
+            .unwrap_or(false))
     }
 
     async fn cancel_jobs_for_instance(&self, instance_id: Uuid) -> Result<Vec<String>> {
@@ -422,6 +459,7 @@ impl ProcessStore for MemoryStore {
         &self,
         instance: &ProcessInstance,
         completion: &JobCompletion,
+        events: &[RuntimeEvent],
     ) -> Result<()> {
         let mut w = self.inner.write().await;
         // save instance (upsert)
@@ -436,6 +474,17 @@ impl ProcessStore for MemoryStore {
             (instance.instance_id, instance.domain_payload_hash),
             instance.domain_payload.to_string(),
         );
+        for event in events {
+            let seq = w.event_seq.entry(instance.instance_id).or_insert(0);
+            *seq += 1;
+            let current_seq = *seq;
+            w.events
+                .entry(instance.instance_id)
+                .or_default()
+                .push((current_seq, event.clone()));
+        }
+        w.inflight_jobs.remove(&completion.job_key);
+        w.job_queue.retain(|job| job.job_key != completion.job_key);
         Ok(())
     }
 
@@ -491,6 +540,58 @@ impl ProcessStore for MemoryStore {
     ) -> Result<Vec<Uuid>> {
         let ids = self.list_running_instances(tenant_id).await?;
         Ok(ids.into_iter().take(limit).collect())
+    }
+
+    async fn claim_instance_for_transition(
+        &self,
+        tenant_id: &str,
+        instance_id: Uuid,
+        owner: &str,
+        lease_ms: u64,
+    ) -> Result<bool> {
+        let mut w = self.inner.write().await;
+        let Some(instance) = w.instances.get(&instance_id) else {
+            return Ok(false);
+        };
+        if instance.tenant_id != tenant_id {
+            return Ok(false);
+        }
+
+        let now = Instant::now();
+        let lease_until = now + Duration::from_millis(lease_ms);
+        match w.transition_leases.get(&instance_id) {
+            Some((current_owner, expires_at)) if current_owner != owner && *expires_at > now => {
+                Ok(false)
+            }
+            _ => {
+                w.transition_leases
+                    .insert(instance_id, (owner.to_string(), lease_until));
+                Ok(true)
+            }
+        }
+    }
+
+    async fn release_instance_transition(
+        &self,
+        tenant_id: &str,
+        instance_id: Uuid,
+        owner: &str,
+    ) -> Result<()> {
+        let mut w = self.inner.write().await;
+        let same_tenant = w
+            .instances
+            .get(&instance_id)
+            .map(|instance| instance.tenant_id == tenant_id)
+            .unwrap_or(false);
+        if same_tenant
+            && matches!(
+                w.transition_leases.get(&instance_id),
+                Some((current_owner, _)) if current_owner == owner
+            )
+        {
+            w.transition_leases.remove(&instance_id);
+        }
+        Ok(())
     }
 
     async fn health_check(&self) -> Result<()> {
@@ -680,6 +781,7 @@ mod tests {
             store
                 .enqueue_job(&JobActivation {
                     job_key: format!("job-{i}"),
+                    tenant_id: "default".to_string(),
                     process_instance_id: instance_id,
                     task_type: task_type.clone(),
                     service_task_id: format!("task-{i}"),
@@ -693,6 +795,8 @@ mod tests {
                     retries_remaining: 3,
                     entry_id: Uuid::new_v4(),
                     runbook_id: Uuid::new_v4(),
+                    worker_id: String::new(),
+                    claim_token: String::new(),
                 })
                 .await
                 .unwrap();
@@ -700,12 +804,22 @@ mod tests {
 
         // Dequeue 2
         let batch1 = store
-            .dequeue_jobs(std::slice::from_ref(&task_type), 2, "default")
+            .dequeue_jobs(std::slice::from_ref(&task_type), 2, "default", "test-worker")
             .await
             .unwrap();
         assert_eq!(batch1.len(), 2);
         assert_eq!(batch1[0].job_key, "job-0");
         assert_eq!(batch1[1].job_key, "job-1");
+        assert_eq!(batch1[0].worker_id, "test-worker");
+        assert!(!batch1[0].claim_token.is_empty());
+        assert!(store
+            .validate_job_claim("job-0", "test-worker", &batch1[0].claim_token)
+            .await
+            .unwrap());
+        assert!(!store
+            .validate_job_claim("job-0", "other-worker", &batch1[0].claim_token)
+            .await
+            .unwrap());
         assert!(batch1
             .iter()
             .all(|job| job.session_stack.session_id == session_id));
@@ -715,7 +829,7 @@ mod tests {
 
         // Dequeue remaining
         let batch2 = store
-            .dequeue_jobs(std::slice::from_ref(&task_type), 10, "default")
+            .dequeue_jobs(std::slice::from_ref(&task_type), 10, "default", "test-worker")
             .await
             .unwrap();
         assert_eq!(batch2.len(), 1);
@@ -739,6 +853,7 @@ mod tests {
 
         let mut activation = JobActivation {
             job_key: "job-copy-test".to_string(),
+            tenant_id: "default".to_string(),
             process_instance_id: instance_id,
             task_type: task_type.clone(),
             service_task_id: "task-copy-test".to_string(),
@@ -754,6 +869,8 @@ mod tests {
             retries_remaining: 3,
             entry_id: Uuid::new_v4(),
             runbook_id: Uuid::new_v4(),
+            worker_id: String::new(),
+            claim_token: String::new(),
         };
 
         store.enqueue_job(&activation).await.unwrap();
@@ -764,7 +881,7 @@ mod tests {
         activation.session_stack.trace_sequence = 42;
 
         let batch = store
-            .dequeue_jobs(std::slice::from_ref(&task_type), 1, "default")
+            .dequeue_jobs(std::slice::from_ref(&task_type), 1, "default", "test-worker")
             .await
             .unwrap();
         assert_eq!(batch.len(), 1);
@@ -839,5 +956,43 @@ mod tests {
             .await
             .unwrap()
             .is_none());
+    }
+
+    #[tokio::test]
+    async fn test_transition_lease_excludes_other_owner_until_release() {
+        let store = MemoryStore::new();
+        let iid = Uuid::now_v7();
+        store.save_instance(&make_instance(iid)).await.unwrap();
+
+        assert!(store
+            .claim_instance_for_transition("default", iid, "owner-a", 5_000)
+            .await
+            .unwrap());
+        assert!(!store
+            .claim_instance_for_transition("default", iid, "owner-b", 5_000)
+            .await
+            .unwrap());
+        assert!(store
+            .claim_instance_for_transition("default", iid, "owner-a", 5_000)
+            .await
+            .unwrap());
+
+        store
+            .release_instance_transition("default", iid, "owner-b")
+            .await
+            .unwrap();
+        assert!(!store
+            .claim_instance_for_transition("default", iid, "owner-b", 5_000)
+            .await
+            .unwrap());
+
+        store
+            .release_instance_transition("default", iid, "owner-a")
+            .await
+            .unwrap();
+        assert!(store
+            .claim_instance_for_transition("default", iid, "owner-b", 5_000)
+            .await
+            .unwrap());
     }
 }

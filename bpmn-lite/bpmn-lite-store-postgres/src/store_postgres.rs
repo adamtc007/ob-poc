@@ -1,8 +1,8 @@
-use bpmn_lite_types::events::RuntimeEvent;
-use bpmn_lite_store::store::ProcessStore;
-use bpmn_lite_types::*;
 use anyhow::{anyhow, Context, Result};
 use async_trait::async_trait;
+use bpmn_lite_store::store::ProcessStore;
+use bpmn_lite_types::events::RuntimeEvent;
+use bpmn_lite_types::*;
 use std::collections::BTreeMap;
 use std::sync::Arc;
 use uuid::Uuid;
@@ -434,6 +434,27 @@ impl ProcessStore for PostgresProcessStore {
         Ok(())
     }
 
+    async fn record_message_delivery(
+        &self,
+        tenant_id: &str,
+        instance_id: Uuid,
+        msg_id: &str,
+    ) -> Result<bool> {
+        let result = sqlx::query(
+            r#"
+            INSERT INTO message_dedupe (tenant_id, instance_id, msg_id)
+            VALUES ($1, $2, $3)
+            ON CONFLICT (tenant_id, instance_id, msg_id) DO NOTHING
+            "#,
+        )
+        .bind(tenant_id)
+        .bind(instance_id)
+        .bind(msg_id)
+        .execute(&self.pool)
+        .await?;
+        Ok(result.rows_affected() == 1)
+    }
+
     // ── Job queue ──
 
     async fn enqueue_job(&self, activation: &JobActivation) -> Result<()> {
@@ -472,6 +493,7 @@ impl ProcessStore for PostgresProcessStore {
         task_types: &[String],
         max: usize,
         tenant_id: &str,
+        worker_id: &str,
     ) -> Result<Vec<JobActivation>> {
         let rows = sqlx::query(
             r#"
@@ -488,10 +510,14 @@ impl ProcessStore for PostgresProcessStore {
             UPDATE job_queue
             SET status = 'claimed',
                 claimed_at = now(),
+                worker_id = $4,
+                claim_token = md5(random()::text || clock_timestamp()::text),
+                claim_expires_at = now() + make_interval(secs => 300),
                 attempt_count = attempt_count + 1
             FROM claimed
             WHERE job_queue.job_key = claimed.job_key
             RETURNING job_queue.job_key,
+                      job_queue.tenant_id,
                       job_queue.process_instance_id,
                       job_queue.task_type,
                       job_queue.service_task_id,
@@ -501,12 +527,15 @@ impl ProcessStore for PostgresProcessStore {
                       job_queue.orch_flags,
                       job_queue.retries_remaining,
                       job_queue.entry_id,
-                      job_queue.runbook_id
+                      job_queue.runbook_id,
+                      job_queue.worker_id,
+                      job_queue.claim_token
             "#,
         )
         .bind(task_types)
         .bind(max as i64)
         .bind(tenant_id)
+        .bind(worker_id)
         .fetch_all(&self.pool)
         .await?;
 
@@ -520,6 +549,7 @@ impl ProcessStore for PostgresProcessStore {
 
             result.push(JobActivation {
                 job_key: row.get("job_key"),
+                tenant_id: row.get("tenant_id"),
                 process_instance_id: row.get("process_instance_id"),
                 task_type: row.get("task_type"),
                 service_task_id: row.get("service_task_id"),
@@ -530,6 +560,8 @@ impl ProcessStore for PostgresProcessStore {
                 retries_remaining: retries as u32,
                 entry_id: row.get("entry_id"),
                 runbook_id: row.get("runbook_id"),
+                worker_id: row.get("worker_id"),
+                claim_token: row.get("claim_token"),
             });
         }
         Ok(result)
@@ -541,6 +573,31 @@ impl ProcessStore for PostgresProcessStore {
             .execute(&self.pool)
             .await?;
         Ok(())
+    }
+
+    async fn validate_job_claim(
+        &self,
+        job_key: &str,
+        worker_id: &str,
+        claim_token: &str,
+    ) -> Result<bool> {
+        let row = sqlx::query(
+            r#"
+            SELECT 1
+            FROM job_queue
+            WHERE job_key = $1
+              AND status = 'claimed'
+              AND worker_id = $2
+              AND claim_token = $3
+              AND (claim_expires_at IS NULL OR claim_expires_at > now())
+            "#,
+        )
+        .bind(job_key)
+        .bind(worker_id)
+        .bind(claim_token)
+        .fetch_optional(&self.pool)
+        .await?;
+        Ok(row.is_some())
     }
 
     async fn cancel_jobs_for_instance(&self, instance_id: Uuid) -> Result<Vec<String>> {
@@ -954,6 +1011,7 @@ impl ProcessStore for PostgresProcessStore {
         &self,
         instance: &ProcessInstance,
         completion: &JobCompletion,
+        events: &[RuntimeEvent],
     ) -> Result<()> {
         let mut tx = self.pool.begin().await?;
 
@@ -1034,6 +1092,39 @@ impl ProcessStore for PostgresProcessStore {
         .execute(&mut *tx)
         .await?;
 
+        // 4. Append completion events in the same transaction.
+        for event in events {
+            let event_json = serde_json::to_value(event)?;
+            sqlx::query(
+                r#"
+                WITH seq AS (
+                    INSERT INTO event_sequences (instance_id, next_seq)
+                    VALUES ($1, 1)
+                    ON CONFLICT (instance_id) DO UPDATE
+                        SET next_seq = event_sequences.next_seq + 1
+                    RETURNING next_seq
+                )
+                INSERT INTO event_log (instance_id, seq, event)
+                SELECT $1, seq.next_seq, $2
+                FROM seq
+                "#,
+            )
+            .bind(instance.instance_id)
+            .bind(&event_json)
+            .execute(&mut *tx)
+            .await?;
+        }
+
+        // 5. ACK job in the same transaction as completion state.
+        sqlx::query("DELETE FROM job_queue WHERE job_key = $1")
+            .bind(&completion.job_key)
+            .execute(&mut *tx)
+            .await?;
+
+        if !events.is_empty() {
+            notify_event_tx(&mut tx, instance.instance_id).await?;
+        }
+
         tx.commit().await?;
         Ok(())
     }
@@ -1054,6 +1145,9 @@ impl ProcessStore for PostgresProcessStore {
                 UPDATE job_queue
                 SET status = 'dead_lettered',
                     claimed_at = NULL,
+                    worker_id = NULL,
+                    claim_token = NULL,
+                    claim_expires_at = NULL,
                     dead_lettered_at = now(),
                     last_failed_at = now(),
                     last_error = 'stale claimed job exhausted retry budget'
@@ -1066,6 +1160,9 @@ impl ProcessStore for PostgresProcessStore {
                 UPDATE job_queue
                 SET status = 'pending',
                     claimed_at = NULL,
+                    worker_id = NULL,
+                    claim_token = NULL,
+                    claim_expires_at = NULL,
                     retries_remaining = job_queue.retries_remaining - 1,
                     last_failed_at = now(),
                     last_error = 'stale claimed job reclaimed'
@@ -1157,6 +1254,59 @@ impl ProcessStore for PostgresProcessStore {
         Ok(rows.iter().map(|r| r.get("instance_id")).collect())
     }
 
+    async fn claim_instance_for_transition(
+        &self,
+        tenant_id: &str,
+        instance_id: Uuid,
+        owner: &str,
+        lease_ms: u64,
+    ) -> Result<bool> {
+        let result = sqlx::query(
+            r#"
+            UPDATE process_instances
+            SET lease_owner = $3,
+                lease_until = now() + make_interval(secs => $4::float / 1000.0),
+                last_tick_at = now()
+            WHERE tenant_id = $1
+              AND instance_id = $2
+              AND (lease_until IS NULL OR lease_until < now() OR lease_owner = $3)
+            "#,
+        )
+        .bind(tenant_id)
+        .bind(instance_id)
+        .bind(owner)
+        .bind(lease_ms as f64)
+        .execute(&self.pool)
+        .await?;
+
+        Ok(result.rows_affected() == 1)
+    }
+
+    async fn release_instance_transition(
+        &self,
+        tenant_id: &str,
+        instance_id: Uuid,
+        owner: &str,
+    ) -> Result<()> {
+        sqlx::query(
+            r#"
+            UPDATE process_instances
+            SET lease_owner = NULL,
+                lease_until = NULL
+            WHERE tenant_id = $1
+              AND instance_id = $2
+              AND lease_owner = $3
+            "#,
+        )
+        .bind(tenant_id)
+        .bind(instance_id)
+        .bind(owner)
+        .execute(&self.pool)
+        .await?;
+
+        Ok(())
+    }
+
     async fn health_check(&self) -> Result<()> {
         sqlx::query("SELECT 1").execute(&self.pool).await?;
         Ok(())
@@ -1204,6 +1354,10 @@ mod tests {
             .await
             .unwrap();
         sqlx::query("TRUNCATE dedupe_cache")
+            .execute(&pool)
+            .await
+            .unwrap();
+        sqlx::query("TRUNCATE message_dedupe")
             .execute(&pool)
             .await
             .unwrap();
@@ -1428,6 +1582,7 @@ mod tests {
             store
                 .enqueue_job(&JobActivation {
                     job_key: format!("job-{i}"),
+                    tenant_id: "default".to_string(),
                     process_instance_id: iid,
                     task_type: task_type.clone(),
                     service_task_id: format!("task-{i}"),
@@ -1438,6 +1593,8 @@ mod tests {
                     retries_remaining: 3,
                     entry_id: Uuid::nil(),
                     runbook_id: Uuid::nil(),
+                    worker_id: String::new(),
+                    claim_token: String::new(),
                 })
                 .await
                 .unwrap();
@@ -1445,7 +1602,7 @@ mod tests {
 
         // Dequeue 2
         let batch1 = store
-            .dequeue_jobs(std::slice::from_ref(&task_type), 2, "default")
+            .dequeue_jobs(std::slice::from_ref(&task_type), 2, "default", "test-worker")
             .await
             .unwrap();
         assert_eq!(batch1.len(), 2);
@@ -1455,7 +1612,7 @@ mod tests {
 
         // Dequeue remaining
         let batch2 = store
-            .dequeue_jobs(std::slice::from_ref(&task_type), 10, "default")
+            .dequeue_jobs(std::slice::from_ref(&task_type), 10, "default", "test-worker")
             .await
             .unwrap();
         assert_eq!(batch2.len(), 1);
@@ -1707,6 +1864,7 @@ mod tests {
             store
                 .enqueue_job(&JobActivation {
                     job_key: format!("conc-job-{i}"),
+                    tenant_id: "default".to_string(),
                     process_instance_id: iid,
                     task_type: task_type.clone(),
                     service_task_id: format!("task-{i}"),
@@ -1717,6 +1875,8 @@ mod tests {
                     retries_remaining: 3,
                     entry_id: Uuid::nil(),
                     runbook_id: Uuid::nil(),
+                    worker_id: String::new(),
+                    claim_token: String::new(),
                 })
                 .await
                 .unwrap();
@@ -1728,7 +1888,7 @@ mod tests {
             let s = store.clone();
             let tt = task_type.clone();
             handles.push(tokio::spawn(async move {
-                s.dequeue_jobs(&[tt], 1, "default").await.unwrap()
+                s.dequeue_jobs(&[tt], 1, "default", "test-worker").await.unwrap()
             }));
         }
 
@@ -1789,7 +1949,7 @@ mod tests {
         );
 
         // Dequeue job
-        let jobs = store.dequeue_jobs(&task_types, 1, "default").await.unwrap();
+        let jobs = store.dequeue_jobs(&task_types, 1, "default", "test-worker").await.unwrap();
         assert_eq!(jobs.len(), 1, "should have 1 job");
 
         let job = &jobs[0];
@@ -1855,6 +2015,7 @@ mod tests {
             store
                 .enqueue_job(&JobActivation {
                     job_key: format!("cancel-a-{i}"),
+                    tenant_id: "default".to_string(),
                     process_instance_id: iid_a,
                     task_type: task_type.clone(),
                     service_task_id: format!("task-a-{i}"),
@@ -1865,6 +2026,8 @@ mod tests {
                     retries_remaining: 3,
                     entry_id: Uuid::nil(),
                     runbook_id: Uuid::nil(),
+                    worker_id: String::new(),
+                    claim_token: String::new(),
                 })
                 .await
                 .unwrap();
@@ -1872,6 +2035,7 @@ mod tests {
         store
             .enqueue_job(&JobActivation {
                 job_key: "cancel-b-0".to_string(),
+                tenant_id: "default".to_string(),
                 process_instance_id: iid_b,
                 task_type: task_type.clone(),
                 service_task_id: "task-b-0".to_string(),
@@ -1882,6 +2046,8 @@ mod tests {
                 retries_remaining: 3,
                 entry_id: Uuid::nil(),
                 runbook_id: Uuid::nil(),
+                worker_id: String::new(),
+                claim_token: String::new(),
             })
             .await
             .unwrap();
@@ -1892,7 +2058,7 @@ mod tests {
 
         // Dequeue remaining — should only get B's job
         let remaining = store
-            .dequeue_jobs(&[task_type], 10, "default")
+            .dequeue_jobs(&[task_type], 10, "default", "test-worker")
             .await
             .unwrap();
         assert_eq!(remaining.len(), 1);

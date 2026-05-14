@@ -663,23 +663,25 @@ fn name_to_snake(name: &str) -> String {
 }
 
 /// Parse condition expression text.
-/// Format: `= flag_name == true` or `flag_name > 5`
+/// Format: `= flag_name == true`
 /// Strips leading `=`, parses `flag_name OP literal`.
 fn parse_condition(text: &str) -> Result<ConditionExpr> {
     let text = text.trim();
     let text = text.strip_prefix('=').unwrap_or(text).trim();
 
-    // Try to split by operators: ==, !=, <, >
+    if text.contains('<') || text.contains('>') {
+        return Err(anyhow!(
+            "numeric comparisons are not supported in BPMN-Lite conditions; use an external decision worker and route on boolean flags"
+        ));
+    }
+
+    // Switch conditions only support boolean equality/inequality.
     let (flag, op, literal) = if let Some((lhs, rhs)) = text.split_once("==") {
         (lhs.trim(), ConditionOp::Eq, rhs.trim())
     } else if let Some((lhs, rhs)) = text.split_once("!=") {
         (lhs.trim(), ConditionOp::Neq, rhs.trim())
-    } else if let Some((lhs, rhs)) = text.split_once('>') {
-        (lhs.trim(), ConditionOp::Gt, rhs.trim())
-    } else if let Some((lhs, rhs)) = text.split_once('<') {
-        (lhs.trim(), ConditionOp::Lt, rhs.trim())
     } else {
-        return Err(anyhow!("missing supported operator (==, !=, >, <)"));
+        return Err(anyhow!("missing supported operator (==, !=)"));
     };
     if flag.is_empty() {
         return Err(anyhow!("condition flag name is empty"));
@@ -688,13 +690,7 @@ fn parse_condition(text: &str) -> Result<ConditionExpr> {
     let literal = match literal {
         "true" => ConditionLiteral::Bool(true),
         "false" => ConditionLiteral::Bool(false),
-        other => {
-            if let Ok(n) = other.parse::<i64>() {
-                ConditionLiteral::I64(n)
-            } else {
-                return Err(anyhow!("unsupported condition literal '{}'", other));
-            }
-        }
+        other => return Err(anyhow!("unsupported condition literal '{}'", other)),
     };
 
     Ok(ConditionExpr {
@@ -1140,11 +1136,14 @@ mod tests {
         assert_eq!(c.op, ConditionOp::Eq);
         assert_eq!(c.literal, ConditionLiteral::Bool(true));
 
-        let c = parse_condition("count > 5").unwrap();
-        assert_eq!(c.flag_name, "count");
-        assert_eq!(c.op, ConditionOp::Gt);
-        assert_eq!(c.literal, ConditionLiteral::I64(5));
+        let c = parse_condition("approved != false").unwrap();
+        assert_eq!(c.flag_name, "approved");
+        assert_eq!(c.op, ConditionOp::Neq);
+        assert_eq!(c.literal, ConditionLiteral::Bool(false));
 
+        assert!(parse_condition("count > 5").is_err());
+        assert!(parse_condition("count < 5").is_err());
+        assert!(parse_condition("count == 5").is_err());
         assert!(parse_condition("garbage").is_err());
     }
 
@@ -1254,7 +1253,10 @@ mod tests {
             "Expected 2 arms (Internal + Timer)"
         );
         assert!(
-            matches!(race_entry.arms[0], bpmn_lite_types::WaitArm::Internal { .. }),
+            matches!(
+                race_entry.arms[0],
+                bpmn_lite_types::WaitArm::Internal { .. }
+            ),
             "Arm 0 = Internal"
         );
 
@@ -1274,7 +1276,8 @@ mod tests {
                 assert!(
                     matches!(
                         instr,
-                        bpmn_lite_types::Instr::ExecNative { .. } | bpmn_lite_types::Instr::Jump { .. }
+                        bpmn_lite_types::Instr::ExecNative { .. }
+                            | bpmn_lite_types::Instr::Jump { .. }
                     ),
                     "Timer resume_at should point to escalation code, got {:?}",
                     instr

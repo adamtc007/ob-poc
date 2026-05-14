@@ -520,6 +520,157 @@
         );
     }
 
+    #[tokio::test]
+    async fn test_signal_matches_message_name_and_correlation_key() {
+        let store: Arc<dyn ProcessStore> = Arc::new(MemoryStore::new());
+        let engine = BpmnLiteEngine::new(store.clone());
+
+        let program = CompiledProgram {
+            bytecode_version: [90u8; 32],
+            program: vec![
+                Instr::WaitMsg {
+                    wait_id: 0,
+                    name: 1,
+                    corr_reg: 0,
+                },
+                Instr::End,
+            ],
+            debug_map: BTreeMap::new(),
+            join_plan: BTreeMap::new(),
+            wait_plan: BTreeMap::new(),
+            race_plan: BTreeMap::new(),
+            boundary_map: BTreeMap::new(),
+            write_set: BTreeMap::new(),
+            task_manifest: vec![],
+            error_route_map: BTreeMap::new(),
+        };
+        store
+            .store_program(program.bytecode_version, &program)
+            .await
+            .unwrap();
+
+        let payload = r#"{"case":"signal"}"#;
+        let hash = compute_hash(payload);
+        let iid = engine
+            .start(
+                "signal_proc",
+                program.bytecode_version,
+                payload,
+                hash,
+                "corr",
+            )
+            .await
+            .unwrap();
+        engine.tick_instance(iid).await.unwrap();
+
+        let fibers = store.load_fibers(iid).await.unwrap();
+        assert!(matches!(fibers[0].wait, WaitState::Msg { .. }));
+
+        engine
+            .signal_with_value(iid, "1", Value::Bool(true), None, None, Some("wrong"))
+            .await
+            .unwrap();
+        let fibers = store.load_fibers(iid).await.unwrap();
+        assert!(matches!(fibers[0].wait, WaitState::Msg { .. }));
+
+        engine
+            .signal_with_value(iid, "1", Value::Bool(false), None, None, Some("right"))
+            .await
+            .unwrap();
+        let fibers = store.load_fibers(iid).await.unwrap();
+        assert_eq!(fibers[0].wait, WaitState::Running);
+        assert_eq!(fibers[0].pc, 1);
+
+        let events_after_first_delivery = store.read_events(iid, 0).await.unwrap().len();
+        engine
+            .signal_with_value(iid, "1", Value::Bool(false), None, None, Some("right"))
+            .await
+            .unwrap();
+        let events_after_duplicate = store.read_events(iid, 0).await.unwrap().len();
+        assert_eq!(events_after_duplicate, events_after_first_delivery);
+    }
+
+    #[tokio::test]
+    async fn test_tenant_scoped_engine_rejects_cross_tenant_instance_access() {
+        let store: Arc<dyn ProcessStore> = Arc::new(MemoryStore::new());
+        let tenant_a = BpmnLiteEngine::new_with_tenant(store.clone(), "tenant-a");
+        let tenant_b = BpmnLiteEngine::new_with_tenant(store.clone(), "tenant-b");
+
+        let compile_result = tenant_a.compile(SINGLE_TASK_BPMN).await.unwrap();
+        let payload = r#"{"case":"tenant-a"}"#;
+        let hash = compute_hash(payload);
+        let iid = tenant_a
+            .start(
+                "cancel_proc",
+                compile_result.bytecode_version,
+                payload,
+                hash,
+                "tenant-corr",
+            )
+            .await
+            .unwrap();
+        tenant_a.tick_instance(iid).await.unwrap();
+
+        let inspection = tenant_a.inspect(iid).await.unwrap();
+        assert_eq!(inspection.tenant_id, "tenant-a");
+
+        assert!(tenant_b.inspect(iid).await.is_err());
+        assert!(tenant_b.read_events(iid, 0).await.is_err());
+
+        let tenant_b_jobs = tenant_b
+            .activate_jobs_for_worker(&["do_work".to_string()], 10, "worker-b")
+            .await
+            .unwrap();
+        assert!(tenant_b_jobs.is_empty());
+
+        let tenant_a_jobs = tenant_a
+            .activate_jobs_for_worker(&["do_work".to_string()], 10, "worker-a")
+            .await
+            .unwrap();
+        assert_eq!(tenant_a_jobs.len(), 1);
+        assert_eq!(tenant_a_jobs[0].tenant_id, "tenant-a");
+    }
+
+    #[tokio::test]
+    async fn test_recovery_scanner_reports_running_instance_inconsistencies_by_tenant() {
+        let store: Arc<dyn ProcessStore> = Arc::new(MemoryStore::new());
+        let tenant_a = BpmnLiteEngine::new_with_tenant(store.clone(), "tenant-a");
+        let tenant_b = BpmnLiteEngine::new_with_tenant(store.clone(), "tenant-b");
+
+        let instance_id = Uuid::now_v7();
+        let payload = "{}";
+        let instance = ProcessInstance {
+            instance_id,
+            tenant_id: "tenant-a".to_string(),
+            process_key: "orphaned".to_string(),
+            bytecode_version: [17u8; 32],
+            domain_payload: payload.into(),
+            domain_payload_hash: compute_hash(payload),
+            session_stack: SessionStackState::default(),
+            flags: BTreeMap::new(),
+            counters: BTreeMap::new(),
+            join_expected: BTreeMap::new(),
+            state: ProcessState::Running,
+            correlation_id: "recover-me".to_string(),
+            entry_id: Uuid::nil(),
+            runbook_id: Uuid::nil(),
+            created_at: 1,
+        };
+        store.save_instance(&instance).await.unwrap();
+
+        let issues = tenant_a.scan_recoverable_inconsistencies().await.unwrap();
+        let kinds = issues
+            .iter()
+            .map(|issue| issue.kind.as_str())
+            .collect::<Vec<_>>();
+        assert!(kinds.contains(&"missing_program"));
+        assert!(kinds.contains(&"missing_fibers"));
+        assert!(kinds.contains(&"missing_start_event"));
+
+        let tenant_b_issues = tenant_b.scan_recoverable_inconsistencies().await.unwrap();
+        assert!(tenant_b_issues.is_empty());
+    }
+
     // ═══════════════════════════════════════════════════════════
     //  Phase 2A: Non-Interrupting Boundary Timer Tests (T-NI)
     // ═══════════════════════════════════════════════════════════
@@ -1053,7 +1204,7 @@
 
         // Assert: no jobs for this instance remain
         let jobs = store
-            .dequeue_jobs(&["slow_task".to_string()], 100, "default")
+            .dequeue_jobs(&["slow_task".to_string()], 100, "default", "test-worker")
             .await
             .unwrap();
         let instance_jobs: Vec<_> = jobs
@@ -1303,7 +1454,7 @@
 
         // Should now have a job for enhanced_review
         let new_jobs = store
-            .dequeue_jobs(&["enhanced_review".to_string()], 10, "default")
+            .dequeue_jobs(&["enhanced_review".to_string()], 10, "default", "test-worker")
             .await
             .unwrap();
         assert!(

@@ -1,7 +1,7 @@
-use bpmn_lite_types::events::RuntimeEvent;
-use bpmn_lite_types::*;
 use anyhow::Result;
 use async_trait::async_trait;
+use bpmn_lite_types::events::RuntimeEvent;
+use bpmn_lite_types::*;
 use std::collections::BTreeMap;
 use uuid::Uuid;
 
@@ -41,6 +41,12 @@ pub trait ProcessStore: Send + Sync {
 
     async fn dedupe_get(&self, key: &str) -> Result<Option<JobCompletion>>;
     async fn dedupe_put(&self, key: &str, completion: &JobCompletion) -> Result<()>;
+    async fn record_message_delivery(
+        &self,
+        tenant_id: &str,
+        instance_id: Uuid,
+        msg_id: &str,
+    ) -> Result<bool>;
 
     // ── Job queue ──
 
@@ -50,8 +56,15 @@ pub trait ProcessStore: Send + Sync {
         task_types: &[String],
         max: usize,
         tenant_id: &str,
+        worker_id: &str,
     ) -> Result<Vec<JobActivation>>;
     async fn ack_job(&self, job_key: &str) -> Result<()>;
+    async fn validate_job_claim(
+        &self,
+        job_key: &str,
+        worker_id: &str,
+        claim_token: &str,
+    ) -> Result<bool>;
 
     /// Cancel all pending and inflight jobs for an instance.
     /// Returns the list of cancelled job_keys.
@@ -120,12 +133,12 @@ pub trait ProcessStore: Send + Sync {
         event: &RuntimeEvent,
     ) -> Result<u64>;
 
-    /// Atomically complete a job: save instance + dedupe + payload version.
-    /// `ack_job` is NOT included because on the race path, ack happens separately.
+    /// Atomically complete a job: save instance + dedupe + payload version + events + ack job.
     async fn atomic_complete(
         &self,
         instance: &ProcessInstance,
         completion: &JobCompletion,
+        events: &[RuntimeEvent],
     ) -> Result<()>;
 
     // ── Durability maintenance ──
@@ -147,6 +160,26 @@ pub trait ProcessStore: Send + Sync {
         limit: usize,
         lease_ms: u64,
     ) -> Result<Vec<Uuid>>;
+
+    /// Claim the mutation right for one process instance.
+    ///
+    /// This is a transition guard, not a scheduler batch primitive. Every
+    /// mutating engine path should claim this before changing instance state.
+    async fn claim_instance_for_transition(
+        &self,
+        tenant_id: &str,
+        instance_id: Uuid,
+        owner: &str,
+        lease_ms: u64,
+    ) -> Result<bool>;
+
+    /// Release a previously claimed transition guard if this owner still holds it.
+    async fn release_instance_transition(
+        &self,
+        tenant_id: &str,
+        instance_id: Uuid,
+        owner: &str,
+    ) -> Result<()>;
 
     /// Lightweight readiness probe for the backing store.
     async fn health_check(&self) -> Result<()>;

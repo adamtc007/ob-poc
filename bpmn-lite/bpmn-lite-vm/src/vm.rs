@@ -1,7 +1,7 @@
-use bpmn_lite_types::events::RuntimeEvent;
-use bpmn_lite_store::store::ProcessStore;
-use bpmn_lite_types::*;
 use anyhow::{anyhow, Result};
+use bpmn_lite_store::store::ProcessStore;
+use bpmn_lite_types::events::RuntimeEvent;
+use bpmn_lite_types::*;
 use sha2::{Digest, Sha256};
 use std::collections::BTreeMap;
 use std::sync::Arc;
@@ -184,6 +184,7 @@ impl Vm {
 
                 let activation = JobActivation {
                     job_key: job_key.clone(),
+                    tenant_id: instance.tenant_id.clone(),
                     process_instance_id: instance.instance_id,
                     task_type: task_type_str.clone(),
                     service_task_id: service_task_id.clone(),
@@ -194,6 +195,8 @@ impl Vm {
                     retries_remaining: 3,
                     entry_id: instance.entry_id,
                     runbook_id: instance.runbook_id,
+                    worker_id: String::new(),
+                    claim_token: String::new(),
                 };
 
                 // Emit event
@@ -289,8 +292,8 @@ impl Vm {
                     fiber_id: fiber.fiber_id,
                     deadline_ms: deadline,
                 });
-                self.store.save_fiber(instance.instance_id, fiber).await?;
                 fiber.pc += 1; // advance past wait so resume continues
+                self.store.save_fiber(instance.instance_id, fiber).await?;
                 Ok(TickOutcome::Parked(WaitState::Timer {
                     deadline_ms: deadline,
                 }))
@@ -304,8 +307,8 @@ impl Vm {
                     fiber_id: fiber.fiber_id,
                     deadline_ms: *deadline_ms,
                 });
-                self.store.save_fiber(instance.instance_id, fiber).await?;
                 fiber.pc += 1;
+                self.store.save_fiber(instance.instance_id, fiber).await?;
                 Ok(TickOutcome::Parked(WaitState::Timer {
                     deadline_ms: *deadline_ms,
                 }))
@@ -333,8 +336,8 @@ impl Vm {
                     name: *name,
                     corr_key,
                 });
-                self.store.save_fiber(instance.instance_id, fiber).await?;
                 fiber.pc += 1;
+                self.store.save_fiber(instance.instance_id, fiber).await?;
                 Ok(TickOutcome::Parked(fiber.wait.clone()))
             }
 
@@ -637,8 +640,8 @@ impl Vm {
     }
 
     /// Resume a fiber parked on a job. Fiber-resume ONLY — no mutation of
-    /// instance flags/payload, no dedupe, no save_instance. The engine owns
-    /// all completion mutation.
+    /// instance flags/payload, no dedupe, no save_instance, no job ack. The
+    /// engine owns all completion mutation.
     ///
     /// Returns `Some(fiber_id)` if a matching fiber was found and resumed,
     /// `None` if no fiber is parked on this job_key (ghost signal).
@@ -671,21 +674,7 @@ impl Vm {
             fiber.pc += 1;
             fiber.wait = WaitState::Running;
 
-            self.store
-                .append_event(
-                    instance.instance_id,
-                    &RuntimeEvent::JobCompleted {
-                        job_key: completion.job_key.clone(),
-                        payload_hash_before: instance.domain_payload_hash,
-                        payload_hash_after: compute_hash(&completion.domain_payload),
-                        orch_flags_out: completion.orch_flags.clone(),
-                        pc_next: fiber.pc,
-                    },
-                )
-                .await?;
-
             self.store.save_fiber(instance.instance_id, &fiber).await?;
-            self.store.ack_job(&completion.job_key).await?;
 
             Ok(Some(fiber.fiber_id))
         } else {
@@ -924,7 +913,7 @@ mod tests {
 
         // Dequeue job
         let jobs = store
-            .dequeue_jobs(&["create_case".to_string()], 10, "default")
+            .dequeue_jobs(&["create_case".to_string()], 10, "default", "test-worker")
             .await
             .unwrap();
         assert_eq!(jobs.len(), 1);
@@ -965,7 +954,7 @@ mod tests {
 
         // Dequeue second job
         let jobs = store
-            .dequeue_jobs(&["request_docs".to_string()], 10, "default")
+            .dequeue_jobs(&["request_docs".to_string()], 10, "default", "test-worker")
             .await
             .unwrap();
         assert_eq!(jobs.len(), 1);
@@ -1033,7 +1022,7 @@ mod tests {
 
         // Complete job — set flag_0 = true via orch_flags
         let jobs = store
-            .dequeue_jobs(&["create_case".to_string()], 1, "default")
+            .dequeue_jobs(&["create_case".to_string()], 1, "default", "test-worker")
             .await
             .unwrap();
         let payload = r#"{"done":true}"#;
@@ -1119,7 +1108,7 @@ mod tests {
             .await
             .unwrap();
         let jobs = store
-            .dequeue_jobs(&["create_case".to_string()], 1, "default")
+            .dequeue_jobs(&["create_case".to_string()], 1, "default", "test-worker")
             .await
             .unwrap();
 
@@ -1155,7 +1144,7 @@ mod tests {
 
         // No new jobs enqueued
         let queue = store
-            .dequeue_jobs(&["create_case".to_string()], 10, "default")
+            .dequeue_jobs(&["create_case".to_string()], 10, "default", "test-worker")
             .await
             .unwrap();
         assert!(queue.is_empty());
@@ -1190,7 +1179,7 @@ mod tests {
             .unwrap();
 
         let jobs = store
-            .dequeue_jobs(&["create_case".to_string()], 1, "default")
+            .dequeue_jobs(&["create_case".to_string()], 1, "default", "test-worker")
             .await
             .unwrap();
 
@@ -1235,6 +1224,86 @@ mod tests {
         ));
     }
 
+    #[tokio::test]
+    async fn test_wait_for_persists_resume_pc() {
+        let store = Arc::new(MemoryStore::new());
+        let vm = Vm::new(store.clone());
+
+        let program = make_program(vec![Instr::WaitFor { ms: 1000 }, Instr::End]);
+        let mut instance = make_instance();
+        let mut fiber = Fiber::new(Uuid::now_v7(), 0);
+
+        vm.tick_fiber(&mut fiber, &mut instance, &program)
+            .await
+            .unwrap();
+
+        let persisted = store
+            .load_fiber(instance.instance_id, fiber.fiber_id)
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(persisted.pc, 1);
+        assert!(matches!(persisted.wait, WaitState::Timer { .. }));
+    }
+
+    #[tokio::test]
+    async fn test_wait_until_persists_resume_pc() {
+        let store = Arc::new(MemoryStore::new());
+        let vm = Vm::new(store.clone());
+
+        let program = make_program(vec![Instr::WaitUntil { deadline_ms: 42 }, Instr::End]);
+        let mut instance = make_instance();
+        let mut fiber = Fiber::new(Uuid::now_v7(), 0);
+
+        vm.tick_fiber(&mut fiber, &mut instance, &program)
+            .await
+            .unwrap();
+
+        let persisted = store
+            .load_fiber(instance.instance_id, fiber.fiber_id)
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(persisted.pc, 1);
+        assert_eq!(persisted.wait, WaitState::Timer { deadline_ms: 42 });
+    }
+
+    #[tokio::test]
+    async fn test_wait_msg_persists_resume_pc() {
+        let store = Arc::new(MemoryStore::new());
+        let vm = Vm::new(store.clone());
+
+        let program = make_program(vec![
+            Instr::WaitMsg {
+                wait_id: 7,
+                name: 1,
+                corr_reg: 0,
+            },
+            Instr::End,
+        ]);
+        let mut instance = make_instance();
+        let mut fiber = Fiber::new(Uuid::now_v7(), 0);
+
+        vm.tick_fiber(&mut fiber, &mut instance, &program)
+            .await
+            .unwrap();
+
+        let persisted = store
+            .load_fiber(instance.instance_id, fiber.fiber_id)
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(persisted.pc, 1);
+        assert!(matches!(
+            persisted.wait,
+            WaitState::Msg {
+                wait_id: 7,
+                name: 1,
+                ..
+            }
+        ));
+    }
+
     /// A3.T6: Event log completeness for linear flow
     #[tokio::test]
     async fn test_event_log_completeness() {
@@ -1266,7 +1335,7 @@ mod tests {
 
         // Complete
         let jobs = store
-            .dequeue_jobs(&["create_case".to_string()], 1, "default")
+            .dequeue_jobs(&["create_case".to_string()], 1, "default", "test-worker")
             .await
             .unwrap();
         let payload = r#"{"done":true}"#;
@@ -1281,6 +1350,27 @@ mod tests {
             .await
             .unwrap();
         assert!(resumed.is_some());
+        let payload_hash_before = instance.domain_payload_hash;
+        let resumed_fiber = store
+            .load_fiber(instance.instance_id, resumed.unwrap())
+            .await
+            .unwrap()
+            .unwrap();
+        apply_completion(&mut instance, &completion);
+        store
+            .atomic_complete(
+                &instance,
+                &completion,
+                &[RuntimeEvent::JobCompleted {
+                    job_key: completion.job_key.clone(),
+                    payload_hash_before,
+                    payload_hash_after: instance.domain_payload_hash,
+                    orch_flags_out: completion.orch_flags.clone(),
+                    pc_next: resumed_fiber.pc,
+                }],
+            )
+            .await
+            .unwrap();
 
         // Check events
         let events = store.read_events(instance.instance_id, 1).await.unwrap();

@@ -350,6 +350,7 @@ async fn test_grpc_smoke() {
             correlation_id: "smoke-corr-1".to_string(),
             entry_id: uuid::Uuid::new_v4().to_string(),
             runbook_id: uuid::Uuid::new_v4().to_string(),
+            tenant_id: String::new(),
         })
         .await
         .expect("StartProcess RPC failed")
@@ -363,6 +364,7 @@ async fn test_grpc_smoke() {
     let inspect_resp = client
         .inspect(InspectRequest {
             process_instance_id: instance_id.clone(),
+            tenant_id: String::new(),
         })
         .await
         .expect("Inspect RPC failed")
@@ -383,6 +385,7 @@ async fn test_grpc_smoke() {
             max_jobs: 10,
             timeout_ms: 1000,
             worker_id: "smoke-worker".to_string(),
+            tenant_id: String::new(),
         })
         .await
         .expect("ActivateJobs RPC failed")
@@ -415,6 +418,9 @@ async fn test_grpc_smoke() {
             domain_payload: result_payload.to_string(),
             domain_payload_hash: hash.to_vec(),
             orch_flags: Default::default(),
+            worker_id: job.worker_id.clone(),
+            claim_token: job.claim_token.clone(),
+            tenant_id: job.tenant_id.clone(),
         })
         .await
         .expect("CompleteJob RPC failed");
@@ -424,6 +430,7 @@ async fn test_grpc_smoke() {
     let final_inspect = client
         .inspect(InspectRequest {
             process_instance_id: instance_id.clone(),
+            tenant_id: String::new(),
         })
         .await
         .expect("Final Inspect failed")
@@ -440,6 +447,7 @@ async fn test_grpc_smoke() {
     let mut events_stream = client
         .subscribe_events(SubscribeRequest {
             process_instance_id: instance_id,
+            tenant_id: String::new(),
         })
         .await
         .expect("SubscribeEvents RPC failed")

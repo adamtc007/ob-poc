@@ -326,6 +326,7 @@ pub struct ProcessInstance {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct JobActivation {
     pub job_key: String,
+    pub tenant_id: String,
     pub process_instance_id: Uuid,
     pub task_type: String,
     pub service_task_id: String,
@@ -336,6 +337,8 @@ pub struct JobActivation {
     pub retries_remaining: u32,
     pub entry_id: Uuid,
     pub runbook_id: Uuid,
+    pub worker_id: String,
+    pub claim_token: String,
 }
 
 /// Returned by ob-poc worker after verb execution.
