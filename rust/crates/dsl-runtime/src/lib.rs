@@ -83,15 +83,13 @@ pub use dsl_analysis::validation;
 // diagnostics + executable plan. analyse_and_plan, PlanningInput,
 // PlanningOutput, SyntheticStep, quick_validate, ImplicitCreateMode.
 pub mod planning_facade;
-// §9 item 9 slice 6 (2026-05-13): ref_resolver + gateway_resolver +
-// lsp_validator paired move from rust/src/dsl_v2/. Tight cluster:
-// lsp_validator depends on gateway_resolver depends on ref_resolver,
-// and all three reach validation + dsl_core types now in this crate
-// and dsl-core. lsp_validator owns the EntityGateway-resolved
-// semantic validator the LSP/REPL/SemanticValidator share.
-pub mod gateway_resolver;
+// dsl-runtime-split v1 Phase 5 (2026-05-14): ref_resolver +
+// gateway_resolver relocated to `dsl-analysis`. lsp_validator stays
+// here for Phase 6; reaches the resolver pair via the compat re-exports
+// below. Removed in Phase 11.
+pub use dsl_analysis::gateway_resolver;
+pub use dsl_analysis::ref_resolver;
 pub mod lsp_validator;
-pub mod ref_resolver;
 // dsl-runtime-split v1 Phase 4 (2026-05-14): macros registry subset
 // (schema + registry + conditions + variable + scope) relocated to
 // `dsl-analysis`. Expander remains in `ob-poc`. Compat re-export

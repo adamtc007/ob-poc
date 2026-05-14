@@ -40,15 +40,20 @@
 //! - Phase 3: `verb_registry` + `runtime_registry` + `catalogue_loader`
 //!   + `entity_kind`. Registry cluster ~2,084 LOC. `entity_kind` joined
 //!   from Phase 9 (paired-move dep of `runtime_registry`).
-//! - Phase 4 (current): `macros` (registry subset — schema, registry,
-//!   conditions, variable, scope). 2,585 LOC. The macro EXPANDER stays
-//!   in `ob-poc` because it reaches `UnifiedSession` + `sem_os_obpoc_adapter`.
+//! - Phase 4: `macros` (registry subset — schema, registry, conditions,
+//!   variable, scope). 2,585 LOC. Expander stays in `ob-poc`.
+//! - Phase 5 (current): `ref_resolver` + `gateway_resolver`. 835 LOC.
+//!   Paired-move (gateway_resolver depends on ref_resolver and
+//!   ref_resolver's `as_gateway_resolver` downcast depends on
+//!   gateway_resolver). Picks up async-trait + entity-gateway + tonic.
 //!
 //! Compat re-exported from `dsl-runtime` until Phase 11 cleanup.
 
 pub mod catalogue_loader;
 pub mod entity_kind;
+pub mod gateway_resolver;
 pub mod macros;
+pub mod ref_resolver;
 pub mod runtime_registry;
 pub mod validation;
 pub mod verb_registry;

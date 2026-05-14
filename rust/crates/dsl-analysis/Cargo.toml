@@ -41,5 +41,12 @@ serde_yaml = "0.9"
 regex = "1"
 thiserror = "1"
 
+# Phase 5 (resolver cluster): ref_resolver + gateway_resolver.
+# RefResolver trait uses async_trait; GatewayRefResolver hits the
+# entity_gateway gRPC service via tonic channel.
+async-trait = "0.1"
+entity-gateway = { path = "../entity-gateway" }
+tonic = "0.12"
+
 [lints.rust]
 unreachable_pub = "deny"
