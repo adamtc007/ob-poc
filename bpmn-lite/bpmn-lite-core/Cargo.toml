@@ -25,6 +25,7 @@ sqlx = { workspace = true, optional = true }
 chrono = { workspace = true, optional = true }
 ob-poc-types = { path = "../../rust/crates/ob-poc-types" }
 bpmn-lite-types = { path = "../bpmn-lite-types" }
+bpmn-lite-compiler = { path = "../bpmn-lite-compiler" }
 
 [dev-dependencies]
 tokio = { workspace = true, features = ["test-util"] }

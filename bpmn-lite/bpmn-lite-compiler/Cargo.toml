@@ -17,6 +17,9 @@ bpmn-lite-types = { path = "../bpmn-lite-types" }
 anyhow = { workspace = true }
 petgraph = { workspace = true }
 quick-xml = "0.36"
+serde = { workspace = true }
+serde_json = { workspace = true }
+sha2 = { workspace = true }
 
 [lints]
 workspace = true

@@ -1,4 +1,4 @@
-use super::ir::*;
+use crate::ir::*;
 use anyhow::{anyhow, Context, Result};
 use petgraph::graph::NodeIndex;
 use quick_xml::events::{BytesStart, Event};
@@ -12,7 +12,7 @@ const MAX_TIMER_CYCLE_FIRES: u32 = 1_000;
 ///
 /// Accepts both prefixed (`bpmn:startEvent`) and default-namespace (`startEvent`) forms.
 /// Only elements in the canonical mapping table are accepted; all others produce a compile error.
-pub(crate) fn parse_bpmn(xml: &str) -> Result<IRGraph> {
+pub fn parse_bpmn(xml: &str) -> Result<IRGraph> {
     let mut reader = Reader::from_str(xml);
 
     let mut graph = IRGraph::new();
@@ -855,7 +855,7 @@ fn parse_iso_cycle(s: &str) -> Result<(u64, u32)> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::compiler::{lowering, verifier};
+    use crate::{lowering, verifier};
 
     /// A5.T1: Minimal process (Start → ServiceTask → End) parses correctly
     #[test]
@@ -1077,7 +1077,7 @@ mod tests {
         let exec_native_count = program
             .program
             .iter()
-            .filter(|i| matches!(i, crate::types::Instr::ExecNative { .. }))
+            .filter(|i| matches!(i, bpmn_lite_types::Instr::ExecNative { .. }))
             .count();
         assert_eq!(exec_native_count, 3);
 
@@ -1085,7 +1085,7 @@ mod tests {
         let wait_msg_count = program
             .program
             .iter()
-            .filter(|i| matches!(i, crate::types::Instr::WaitMsg { .. }))
+            .filter(|i| matches!(i, bpmn_lite_types::Instr::WaitMsg { .. }))
             .count();
         assert_eq!(wait_msg_count, 2);
 
@@ -1254,12 +1254,12 @@ mod tests {
             "Expected 2 arms (Internal + Timer)"
         );
         assert!(
-            matches!(race_entry.arms[0], crate::types::WaitArm::Internal { .. }),
+            matches!(race_entry.arms[0], bpmn_lite_types::WaitArm::Internal { .. }),
             "Arm 0 = Internal"
         );
 
         match &race_entry.arms[1] {
-            crate::types::WaitArm::Timer {
+            bpmn_lite_types::WaitArm::Timer {
                 duration_ms,
                 resume_at,
                 interrupting,
@@ -1274,7 +1274,7 @@ mod tests {
                 assert!(
                     matches!(
                         instr,
-                        crate::types::Instr::ExecNative { .. } | crate::types::Instr::Jump { .. }
+                        bpmn_lite_types::Instr::ExecNative { .. } | bpmn_lite_types::Instr::Jump { .. }
                     ),
                     "Timer resume_at should point to escalation code, got {:?}",
                     instr

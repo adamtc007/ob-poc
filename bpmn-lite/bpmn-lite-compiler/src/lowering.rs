@@ -1,5 +1,5 @@
-use super::ir::*;
-use crate::types::*;
+use crate::ir::*;
+use bpmn_lite_types::*;
 use anyhow::{anyhow, Result};
 use petgraph::graph::NodeIndex;
 use petgraph::visit::EdgeRef;
@@ -7,7 +7,7 @@ use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, HashMap, HashSet};
 
 /// Lower a verified IR graph to bytecode.
-pub(crate) fn lower(graph: &IRGraph) -> Result<CompiledProgram> {
+pub fn lower(graph: &IRGraph) -> Result<CompiledProgram> {
     let start_idx = find_start(graph).ok_or_else(|| anyhow!("No Start node in IR graph"))?;
 
     // Topological traversal to assign bytecode addresses.
@@ -600,7 +600,7 @@ fn parse_corr_reg(source: &str) -> u8 {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::compiler::verifier;
+    use crate::verifier;
 
     fn make_linear_graph() -> IRGraph {
         let mut graph = IRGraph::new();

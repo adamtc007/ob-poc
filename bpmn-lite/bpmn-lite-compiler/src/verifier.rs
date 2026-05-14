@@ -1,14 +1,14 @@
-use super::ir::*;
-use crate::types::{Addr, CompiledProgram, Instr};
+use crate::ir::*;
+use bpmn_lite_types::{Addr, CompiledProgram, Instr};
 use anyhow::{anyhow, Result};
 use petgraph::visit::Dfs;
 use std::collections::HashMap;
 
 /// Verification errors.
 #[derive(Debug, Clone)]
-pub(crate) struct VerifyError {
-    pub(crate) message: String,
-    pub(crate) element_id: Option<String>,
+pub struct VerifyError {
+    pub message: String,
+    pub element_id: Option<String>,
 }
 
 impl std::fmt::Display for VerifyError {
@@ -24,7 +24,7 @@ impl std::fmt::Display for VerifyError {
 /// Verify structural invariants of the IR graph.
 ///
 /// Returns a list of errors. Empty list means the graph is valid.
-pub(crate) fn verify(graph: &IRGraph) -> Vec<VerifyError> {
+pub fn verify(graph: &IRGraph) -> Vec<VerifyError> {
     let mut errors = Vec::new();
 
     // 1. Exactly one StartEvent
@@ -406,7 +406,7 @@ pub(crate) fn verify(graph: &IRGraph) -> Vec<VerifyError> {
 ///
 /// Rejects backward `Jump`/`BrIf`/`BrIfNot` (infinite loop risk).
 /// Allows backward `BrCounterLt` (bounded by counter limit).
-pub(crate) fn verify_bytecode(program: &CompiledProgram) -> Vec<VerifyError> {
+pub fn verify_bytecode(program: &CompiledProgram) -> Vec<VerifyError> {
     let mut errors = Vec::new();
     let program_len = program.program.len() as Addr;
     for (addr, instr) in program.program.iter().enumerate() {
@@ -478,7 +478,7 @@ fn check_target(
 }
 
 /// Verify and return Result — convenience wrapper.
-pub(crate) fn verify_or_err(graph: &IRGraph) -> Result<()> {
+pub fn verify_or_err(graph: &IRGraph) -> Result<()> {
     let errors = verify(graph);
     if errors.is_empty() {
         Ok(())

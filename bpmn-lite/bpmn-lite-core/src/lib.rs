@@ -19,7 +19,6 @@
 //   `pub` because the server or its integration tests reach into
 //   them; tightening those is a later slice.
 pub(crate) mod authoring;
-pub(crate) mod compiler;
 pub mod engine;
 pub mod store;
 pub mod store_memory;
@@ -27,13 +26,17 @@ pub mod store_memory;
 pub mod store_postgres;
 pub mod vm;
 
-// Cleanup Phase 2.1 (2026-05-14) — `types` + `events` relocated to
-// the new `bpmn-lite-types` leaf crate. Compat re-exports keep the
-// `bpmn_lite_core::types::Foo` and `bpmn_lite_core::events::Bar`
-// paths working for downstream consumers (bpmn-lite-server,
-// integration tests, future bin targets). These re-exports will be
-// retired in the final Phase 2 slice when `bpmn-lite-core` itself
-// is deleted.
+// Cleanup Phase 2.x compat re-exports.
+//
+// Phase 2.1 — `types` + `events` moved to `bpmn-lite-types`.
+// Phase 2.2 — `compiler` (ir + parser + lowering + verifier) moved
+//             to `bpmn-lite-compiler`. The in-crate consumers
+//             (engine, vm, authoring/*) reach the moved modules
+//             through `crate::compiler::*` and `crate::types::*` —
+//             these re-exports preserve those paths until
+//             `bpmn-lite-core` itself goes away at the end of
+//             Phase 2.
+pub use bpmn_lite_compiler as compiler;
 pub use bpmn_lite_types::{events, types};
 
 #[cfg(test)]
