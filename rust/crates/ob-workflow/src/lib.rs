@@ -45,21 +45,14 @@
 //! let instance = engine.try_advance(instance.instance_id).await?;
 //! ```
 
+mod cargo_ref;
 mod definition;
 mod state;
-
-// Task queue and document modules
-mod blob_store;
-mod cargo_ref;
-mod document;
-mod task_queue;
 
 #[cfg(feature = "database")]
 mod engine;
 #[cfg(feature = "database")]
 mod guards;
-#[cfg(feature = "database")]
-mod listener;
 #[cfg(feature = "database")]
 mod repository;
 #[cfg(feature = "database")]
@@ -67,10 +60,10 @@ mod requirements;
 
 // External contract (verified by workspace grep, Phase 2 audit 2026-05-12):
 // every symbol below has at least one `use ob_workflow::...` consumer in
-// rust/src/. The blob_store, document, task_queue, and listener modules
-// re-exported a further ~190 symbols whose sole consumer was the crate
-// itself — those are demoted to pub(crate) in this slice and dropped from
-// the public surface.
+// `rust/src/`. The original `blob_store`, `document`, `task_queue`, and
+// `listener` modules (~1,523 LOC) were deleted 2026-05-14 after the
+// dead-code sweep — they had been demoted to `pub(crate)` in the 2026-05-12
+// audit and turned out to have no consumers at all, internal or external.
 pub use cargo_ref::{CargoRef, CargoRefParseError};
 pub use definition::{
     ActionDef, RequirementDef, StateDef, TransitionDef, TriggerDef, WorkflowDefinition,
