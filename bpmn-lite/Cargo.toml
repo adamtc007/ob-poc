@@ -1,11 +1,14 @@
 [workspace]
 members = [
+    "bpmn-lite-authoring",
     "bpmn-lite-compiler",
     "bpmn-lite-core",
+    "bpmn-lite-engine",
     "bpmn-lite-server",
     "bpmn-lite-store",
     "bpmn-lite-store-postgres",
     "bpmn-lite-types",
+    "bpmn-lite-vm",
     "xtask",
 ]
 resolver = "2"
