@@ -26,4 +26,7 @@ pub use lifecycle::{is_terminal_state, is_valid_state, is_valid_transition, vali
 pub use semantic_stage::SemanticStageRegistry;
 pub use service::{ontology, OntologyService};
 pub use taxonomy::EntityTaxonomy;
-pub use types::*;
+// `types::SearchKeyDef` is the only `types::*` item consumed externally
+// (see `crate::ontology::SearchKeyDef` in `services/schema_introspection_impl`).
+// Everything else in types.rs is reached as `crate::types::*` inside the crate.
+pub use types::SearchKeyDef;

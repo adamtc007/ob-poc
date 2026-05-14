@@ -7,7 +7,7 @@ use std::collections::HashMap;
 
 /// Root configuration structure for entity taxonomy.
 #[derive(Debug, Clone, Deserialize, Serialize)]
-pub struct EntityTaxonomyConfig {
+pub(crate) struct EntityTaxonomyConfig {
     /// Configuration version
     pub version: String,
 
@@ -213,11 +213,11 @@ pub struct ReferenceTableDef {
 // This avoids duplication while keeping the ontology module self-contained for docs.
 
 // Re-export VerbLifecycle from dsl-core (lives one tier down from envelope).
-pub use dsl_core::config::types::VerbLifecycle;
+pub(crate) use dsl_core::config::types::VerbLifecycle;
 
 /// Extended VerbProduces with lifecycle info.
 #[derive(Debug, Clone, Default, Deserialize, Serialize)]
-pub struct VerbProducesExt {
+pub(crate) struct VerbProducesExt {
     /// Entity type produced (e.g., "cbu", "entity")
     #[serde(rename = "type")]
     pub produced_type: String,

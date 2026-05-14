@@ -30,7 +30,15 @@ pub mod validate;
 pub use ast_builder::{apply_op, AstBuildError, AstBuildResult};
 #[cfg(feature = "database")]
 pub use ast_db::{apply_and_save, load_document, ApplyError, AstDbError};
-pub use document_ops::*;
 pub use resolve::{resolve_entity_ref, ResolveError};
-pub use types::*;
+// Allowlist re-export of types consumed externally (mostly through
+// `crate::trading_profile::*` paths in `src/domain_ops/trading_profile.rs`).
+// Other types are still reachable as `crate::trading_profile::types::*`.
+pub use types::{
+    BookingRule, EntityRefType, InvestmentManagerMandate, IsdaAgreementConfig,
+    MaterializationResult, StandingInstruction, TradingProfileDocument, TradingProfileImport,
+    Universe,
+};
 pub use validate::{validate_csa_ssi_refs, validate_document, ValidationError};
+// `document_ops::*` glob removed — consumers reach helpers via the
+// `crate::trading_profile::document_ops::*` path directly.
