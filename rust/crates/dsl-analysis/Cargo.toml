@@ -36,5 +36,10 @@ tracing = "0.1"
 serde_json = "1"
 serde_yaml = "0.9"
 
+# Phase 4 (macros registry subset): variable.rs uses regex for ${var}
+# substitution + thiserror for VariableError. schema.rs uses dsl_core::config.
+regex = "1"
+thiserror = "1"
+
 [lints.rust]
 unreachable_pub = "deny"

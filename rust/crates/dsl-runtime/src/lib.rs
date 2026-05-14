@@ -92,12 +92,12 @@ pub mod planning_facade;
 pub mod gateway_resolver;
 pub mod lsp_validator;
 pub mod ref_resolver;
-// §9 item 9 slice 7 (2026-05-13): macros-registry subset (schema +
-// loader + conditions + variable + scope) relocated from
-// rust/src/dsl_v2/macros/. The expansion engine (expander.rs +
-// attribute_seed.rs) stays in ob-poc — it reaches UnifiedSession +
-// sem_os_obpoc_adapter, which are not analyser-tier concerns.
-pub mod macros;
+// dsl-runtime-split v1 Phase 4 (2026-05-14): macros registry subset
+// (schema + registry + conditions + variable + scope) relocated to
+// `dsl-analysis`. Expander remains in `ob-poc`. Compat re-export
+// preserves `dsl_runtime::macros::*` for dsl-lsp + ob-poc::dsl_v2::macros.
+// Removed in Phase 11.
+pub use dsl_analysis::macros;
 pub mod service_traits;
 pub mod services;
 pub mod state_reducer;

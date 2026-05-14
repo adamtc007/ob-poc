@@ -37,16 +37,18 @@
 //! - Phase 2: `validation` — pure-types module (Diagnostic, Severity,
 //!   SourceSpan, ValidationContext, ValidationResult, Suggestion,
 //!   ValidatedProgram, ValidatedStatement). 927 LOC.
-//! - Phase 3 (current): `verb_registry` + `runtime_registry` +
-//!   `catalogue_loader` + `entity_kind`. Registry cluster ~2,084 LOC.
-//!   `entity_kind` joined from Phase 9 (`runtime_registry` calls
-//!   `entity_kind::canonicalize`; pair-move avoids a forbidden
-//!   `dsl-analysis → dsl-runtime` back-edge).
+//! - Phase 3: `verb_registry` + `runtime_registry` + `catalogue_loader`
+//!   + `entity_kind`. Registry cluster ~2,084 LOC. `entity_kind` joined
+//!   from Phase 9 (paired-move dep of `runtime_registry`).
+//! - Phase 4 (current): `macros` (registry subset — schema, registry,
+//!   conditions, variable, scope). 2,585 LOC. The macro EXPANDER stays
+//!   in `ob-poc` because it reaches `UnifiedSession` + `sem_os_obpoc_adapter`.
 //!
 //! Compat re-exported from `dsl-runtime` until Phase 11 cleanup.
 
 pub mod catalogue_loader;
 pub mod entity_kind;
+pub mod macros;
 pub mod runtime_registry;
 pub mod validation;
 pub mod verb_registry;
