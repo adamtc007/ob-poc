@@ -18,8 +18,6 @@
 //   can start working on their internals. The remaining modules stay
 //   `pub` because the server or its integration tests reach into
 //   them; tightening those is a later slice.
-pub mod engine;
-
 // Cleanup Phase 2.x compat re-exports.
 //
 // Phase 2.1 — `types` + `events` moved to `bpmn-lite-types`.
@@ -39,6 +37,7 @@ pub mod engine;
 // activation switch.
 pub use bpmn_lite_authoring as authoring;
 pub use bpmn_lite_compiler as compiler;
+pub use bpmn_lite_engine as engine;
 pub use bpmn_lite_store::{store, store_memory};
 #[cfg(feature = "postgres")]
 pub use bpmn_lite_store_postgres as store_postgres;

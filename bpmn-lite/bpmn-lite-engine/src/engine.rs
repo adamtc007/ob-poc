@@ -1,9 +1,9 @@
-use crate::authoring;
-use crate::compiler::{lowering, parser, verifier};
-use crate::events::RuntimeEvent;
-use crate::store::ProcessStore;
-use crate::types::*;
-use crate::vm::{apply_completion, compute_hash, TickOutcome, Vm};
+// authoring dep removed in Phase 2.7 — see lib.rs
+use bpmn_lite_compiler::{lowering, parser, verifier};
+use bpmn_lite_types::events::RuntimeEvent;
+use bpmn_lite_store::store::ProcessStore;
+use bpmn_lite_types::*;
+use bpmn_lite_vm::{apply_completion, compute_hash, TickOutcome, Vm};
 use anyhow::{anyhow, Result};
 use ob_poc_types::session_stack::SessionStackState;
 use std::collections::BTreeMap;
@@ -65,7 +65,7 @@ pub struct FiberInspection {
     pub stack_depth: usize,
 }
 
-fn enforce_ir_limits(ir: &crate::compiler::ir::IRGraph) -> Result<()> {
+fn enforce_ir_limits(ir: &bpmn_lite_compiler::ir::IRGraph) -> Result<()> {
     if ir.node_count() > MAX_IR_NODES {
         return Err(anyhow!(
             "BPMN graph has too many nodes: {} > {}",
@@ -154,31 +154,23 @@ impl BpmnLiteEngine {
         })
     }
 
-    /// Compile a WorkflowGraphDto → verified IR → bytecode, store the program.
-    /// Same post-parse pipeline as `compile()`.
-    pub(crate) async fn compile_from_dto(
+    /// Persist an already-compiled program through this engine's
+    /// `ProcessStore` and surface the same `CompileResult` shape the
+    /// retired `compile_from_dto` / `compile_from_yaml` produced.
+    /// Used by the `bpmn-lite-authoring` free-function pipeline
+    /// (`authoring::compile_from_dto` / `compile_from_yaml`) after
+    /// it has lowered IR → bytecode.
+    ///
+    /// Phase 2.7 (2026-05-14) edge inversion landed here: the
+    /// engine no longer parses YAML or DTOs. It accepts an
+    /// already-lowered `CompiledProgram`, applies the same engine-
+    /// level limit checks, and persists. Callers that need
+    /// authoring-side compilation pull in `bpmn-lite-authoring`
+    /// directly.
+    pub async fn store_compiled_program(
         &self,
-        dto: &authoring::dto::WorkflowGraphDto,
+        program: CompiledProgram,
     ) -> Result<CompileResult> {
-        let errors = authoring::validate::validate_dto(dto);
-        if !errors.is_empty() {
-            let msgs: Vec<String> = errors
-                .iter()
-                .map(|e| format!("[{}] {}", e.rule, e.message))
-                .collect();
-            return Err(anyhow!("DTO validation failed: {}", msgs.join("; ")));
-        }
-
-        let ir = authoring::dto_to_ir::dto_to_ir(dto)?;
-        enforce_ir_limits(&ir)?;
-
-        let verify_errors = verifier::verify(&ir);
-        if !verify_errors.is_empty() {
-            let msgs: Vec<String> = verify_errors.iter().map(|e| e.message.clone()).collect();
-            return Err(anyhow!("Verification failed:\n{}", msgs.join("\n")));
-        }
-
-        let program = lowering::lower(&ir)?;
         enforce_program_limits(&program)?;
 
         let bytecode_errors = verifier::verify_bytecode(&program);
@@ -200,38 +192,6 @@ impl BpmnLiteEngine {
             task_types,
             diagnostics: vec![],
         })
-    }
-
-    /// Parse YAML → DTO → compile via `compile_from_dto()`.
-    pub(crate) async fn compile_from_yaml(&self, yaml_str: &str) -> Result<CompileResult> {
-        let dto = authoring::yaml::parse_workflow_yaml(yaml_str)?;
-        self.compile_from_dto(&dto).await
-    }
-
-    /// Compile and publish a workflow from YAML in a single atomic step.
-    ///
-    /// Runs the full publish pipeline (parse → validate → lint → compile → hash),
-    /// then persists: (a) compiled program to ProcessStore, (b) template to TemplateStore.
-    ///
-    /// If (b) fails, no Draft row is left behind — the template was never written.
-    /// Program writes are idempotent (keyed by bytecode hash), so retry is safe.
-    pub(crate) async fn compile_and_publish(
-        &self,
-        yaml_str: &str,
-        options: authoring::publish::PublishOptions,
-        template_store: &dyn authoring::registry::TemplateStore,
-    ) -> Result<authoring::publish::PublishResult> {
-        let result = authoring::publish::publish_workflow(yaml_str, options)?;
-
-        // Persist compiled program (idempotent — keyed by bytecode hash)
-        self.store
-            .store_program(result.program.bytecode_version, &result.program)
-            .await?;
-
-        // Persist template (Published state — no intermediate Draft)
-        template_store.save(&result.template).await?;
-
-        Ok(result)
     }
 
     /// Start a new process instance.
@@ -490,7 +450,7 @@ impl BpmnLiteEngine {
                         self.store.save_fiber(instance_id, &promoted).await?;
 
                         // Emit RaceRegistered event
-                        let arm_descs: Vec<crate::events::WaitArmDesc> =
+                        let arm_descs: Vec<bpmn_lite_types::events::WaitArmDesc> =
                             race_entry.arms.iter().map(|a| a.into()).collect();
                         self.store
                             .append_event(
@@ -1264,7 +1224,3 @@ fn now_ms() -> i64 {
         .unwrap_or_default()
         .as_millis() as i64
 }
-
-
-#[cfg(test)]
-mod tests;

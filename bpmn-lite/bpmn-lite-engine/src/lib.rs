@@ -7,13 +7,24 @@
 //! `complete_job`, `fail_job`) and the background scheduler
 //! (`tick_*`).
 //!
-//! Empty at Phase 1 skeleton — `BpmnLiteEngine` and its `impl`
-//! block live in `bpmn-lite-core/src/engine/{mod,tests}.rs`
-//! until the Phase 2 migration slice. That slice also inverts
-//! the engine→authoring edge: the YAML/DTO/publish methods
-//! (`compile_from_dto`, `compile_from_yaml`, `compile_and_publish`)
-//! leave the engine entirely and become free functions in
-//! `bpmn-lite-authoring`, which calls into `bpmn-lite-compiler`
-//! directly. The engine keeps only `compile(bpmn_xml)` plus a new
-//! `compile_program(&CompiledProgram)` entry point for callers
-//! that already hold an artefact.
+//! Phase 2.7 (2026-05-14) migrated the engine here from
+//! `bpmn-lite-core/src/engine/`. The locked decision from the
+//! cleanup plan landed in this slice: **the engine→authoring edge
+//! inverts**. `BpmnLiteEngine` no longer exposes `compile_from_dto`
+//! / `compile_from_yaml` / `compile_and_publish` — those moved out
+//! to `bpmn-lite-authoring::compile_from_dto` /
+//! `compile_from_yaml` / `compile_and_publish` (free functions
+//! that take a `ProcessStore` handle so they can still persist the
+//! compiled program after lowering). The engine keeps only:
+//!
+//!   - `compile(bpmn_xml: &str)` — BPMN-XML path; depends only on
+//!     `bpmn-lite-compiler`.
+//!
+//! …and the runtime API plus scheduler.
+
+pub mod engine;
+
+pub use engine::*;
+
+#[cfg(test)]
+mod tests;

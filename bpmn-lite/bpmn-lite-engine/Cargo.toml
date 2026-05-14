@@ -35,6 +35,10 @@ serde_json = { workspace = true }
 uuid = { workspace = true }
 tokio = { workspace = true }
 tracing = { workspace = true }
+ob-poc-types = { path = "../../rust/crates/ob-poc-types" }
+
+[dev-dependencies]
+bpmn-lite-authoring = { path = "../bpmn-lite-authoring" }
 
 [lints]
 workspace = true

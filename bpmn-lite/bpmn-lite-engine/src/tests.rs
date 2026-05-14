@@ -1,6 +1,12 @@
     use super::*;
-    use crate::store_memory::MemoryStore;
-    use crate::vm::compute_hash;
+    use bpmn_lite_store::store::ProcessStore;
+    use bpmn_lite_store::store_memory::MemoryStore;
+    use bpmn_lite_types::*;
+    use bpmn_lite_vm::{compute_hash, TickOutcome, Vm};
+    use ob_poc_types::session_stack::SessionStackState;
+    use std::collections::BTreeMap;
+    use std::sync::Arc;
+    use uuid::Uuid;
 
     /// Integration test: compile → start → run → activate jobs → complete → verify completion
     #[tokio::test]
@@ -1913,7 +1919,7 @@
             error_route_map: BTreeMap::new(),
         };
 
-        let errors = crate::compiler::verifier::verify_bytecode(&program);
+        let errors = bpmn_lite_compiler::verifier::verify_bytecode(&program);
         assert!(!errors.is_empty(), "Should reject backward Jump");
         assert!(
             errors[0].message.contains("Backward jump"),
@@ -1951,7 +1957,7 @@
             error_route_map: BTreeMap::new(),
         };
 
-        let errors = crate::compiler::verifier::verify_bytecode(&program);
+        let errors = bpmn_lite_compiler::verifier::verify_bytecode(&program);
         assert!(
             errors.is_empty(),
             "BrCounterLt backward should be allowed, got errors: {:?}",
@@ -2066,7 +2072,7 @@
         // Complete all 3 jobs
         for job in &jobs {
             let payload = "{}";
-            let hash = crate::vm::compute_hash(payload);
+            let hash = bpmn_lite_vm::compute_hash(payload);
             engine
                 .complete_job(&job.job_key, payload, hash, BTreeMap::new())
                 .await
@@ -2179,7 +2185,7 @@
 
         // Complete job → JoinDynamic expects 1, 1 arrives → immediate release
         let payload = "{}";
-        let hash = crate::vm::compute_hash(payload);
+        let hash = bpmn_lite_vm::compute_hash(payload);
         engine
             .complete_job(&jobs[0].job_key, payload, hash, BTreeMap::new())
             .await
@@ -2340,7 +2346,7 @@
 
         // Complete and finish
         let payload = "{}";
-        let hash = crate::vm::compute_hash(payload);
+        let hash = bpmn_lite_vm::compute_hash(payload);
         engine
             .complete_job(&jobs[0].job_key, payload, hash, BTreeMap::new())
             .await
@@ -2458,7 +2464,7 @@
 
         // Complete first job → join has 1/2, should NOT release yet
         let payload = "{}";
-        let hash = crate::vm::compute_hash(payload);
+        let hash = bpmn_lite_vm::compute_hash(payload);
         engine
             .complete_job(&jobs[0].job_key, payload, hash, BTreeMap::new())
             .await
@@ -2589,7 +2595,8 @@ edges:
         let engine = BpmnLiteEngine::new(store.clone());
 
         // Compile from YAML
-        let cr = engine.compile_from_yaml(yaml).await.unwrap();
+        let program = bpmn_lite_authoring::publish::compile_program_from_yaml(yaml).unwrap();
+        let cr = engine.store_compiled_program(program).await.unwrap();
         assert!(cr.task_types.contains(&"do_a".to_string()));
         assert!(cr.task_types.contains(&"do_b".to_string()));
 
@@ -2662,8 +2669,8 @@ edges:
     /// Unconditional + 2 conditional branches, set 1 flag true → 2 branches taken.
     #[tokio::test]
     async fn t_auth_2_inclusive_gateway_yaml() {
-        use crate::authoring::dto::*;
-        use crate::compiler::ir::GatewayDirection;
+        use bpmn_lite_authoring::dto::*;
+        use bpmn_lite_compiler::ir::GatewayDirection;
 
         let dto = WorkflowGraphDto {
             id: "inclusive-test".to_string(),
@@ -2776,7 +2783,8 @@ edges:
         let store: Arc<dyn ProcessStore> = Arc::new(MemoryStore::new());
         let engine = BpmnLiteEngine::new(store.clone());
 
-        let cr = engine.compile_from_dto(&dto).await.unwrap();
+        let program = bpmn_lite_authoring::publish::compile_program_from_dto(&dto).unwrap();
+        let cr = engine.store_compiled_program(program).await.unwrap();
 
         // Start with flag_a=true, flag_b=false
         let payload = r#"{"test":"ig"}"#;
@@ -2857,7 +2865,8 @@ edges:
         let store: Arc<dyn ProcessStore> = Arc::new(MemoryStore::new());
         let engine = BpmnLiteEngine::new(store.clone());
 
-        let cr = engine.compile_from_yaml(yaml).await.unwrap();
+        let program = bpmn_lite_authoring::publish::compile_program_from_yaml(yaml).unwrap();
+        let cr = engine.store_compiled_program(program).await.unwrap();
 
         let payload = r#"{"test":"err"}"#;
         let hash = compute_hash(payload);
@@ -2958,7 +2967,8 @@ edges:
         let store: Arc<dyn ProcessStore> = Arc::new(MemoryStore::new());
         let engine = BpmnLiteEngine::new(store.clone());
 
-        let cr = engine.compile_from_yaml(yaml).await.unwrap();
+        let program = bpmn_lite_authoring::publish::compile_program_from_yaml(yaml).unwrap();
+        let cr = engine.store_compiled_program(program).await.unwrap();
 
         let payload = r#"{"test":"xor"}"#;
         let hash = compute_hash(payload);

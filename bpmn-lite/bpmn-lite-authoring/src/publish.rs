@@ -2,12 +2,90 @@ use crate::contracts::ContractRegistry;
 use crate::dto::WorkflowGraphDto;
 use crate::export_bpmn::dto_to_bpmn_xml;
 use crate::lints::{lint_contracts, LintDiagnostic, LintLevel};
-use crate::registry::{SourceFormat, TemplateState, WorkflowTemplate};
+use crate::registry::{SourceFormat, TemplateState, TemplateStore, WorkflowTemplate};
 use crate::{dto_to_ir, validate, yaml};
-use bpmn_lite_compiler::{lowering, verifier};
 use anyhow::{anyhow, Result};
+use bpmn_lite_compiler::{lowering, verifier};
+use bpmn_lite_store::store::ProcessStore;
+use bpmn_lite_types::CompiledProgram;
 use sha2::{Digest, Sha256};
 use std::fmt::Write;
+
+/// Phase 2.7 inversion entrypoint: pure DTO → CompiledProgram.
+///
+/// Runs the same validate → dto_to_ir → verify → lower → verify_bytecode
+/// pipeline the retired `BpmnLiteEngine::compile_from_dto` used, but
+/// returns the program **without** persisting. Caller (engine
+/// test, future gRPC RPC) hands the result to
+/// `engine.store_compiled_program(program)` to land it in
+/// `ProcessStore`.
+pub fn compile_program_from_dto(dto: &WorkflowGraphDto) -> Result<CompiledProgram> {
+    let errors = validate::validate_dto(dto);
+    if !errors.is_empty() {
+        let msgs: Vec<String> = errors
+            .iter()
+            .map(|e| format!("[{}] {}", e.rule, e.message))
+            .collect();
+        return Err(anyhow!("DTO validation failed: {}", msgs.join("; ")));
+    }
+
+    let ir = dto_to_ir::dto_to_ir(dto)?;
+
+    let verify_errors = verifier::verify(&ir);
+    if !verify_errors.is_empty() {
+        let msgs: Vec<String> = verify_errors.iter().map(|e| e.message.clone()).collect();
+        return Err(anyhow!("Verification failed:\n{}", msgs.join("\n")));
+    }
+
+    let program = lowering::lower(&ir)?;
+
+    let bytecode_errors = verifier::verify_bytecode(&program);
+    if !bytecode_errors.is_empty() {
+        let msgs: Vec<String> = bytecode_errors.iter().map(|e| e.message.clone()).collect();
+        return Err(anyhow!(
+            "Bytecode verification failed:\n{}",
+            msgs.join("\n")
+        ));
+    }
+
+    Ok(program)
+}
+
+/// Phase 2.7 inversion entrypoint: YAML → CompiledProgram.
+///
+/// Parses YAML to DTO, then runs `compile_program_from_dto`.
+pub fn compile_program_from_yaml(yaml_str: &str) -> Result<CompiledProgram> {
+    let dto = yaml::parse_workflow_yaml(yaml_str)?;
+    compile_program_from_dto(&dto)
+}
+
+/// Phase 2.7 inversion entrypoint: YAML → publish (atomic).
+///
+/// Runs the full publish pipeline (parse → validate → lint →
+/// compile → hash), then persists the compiled program to
+/// `ProcessStore` and the template to `TemplateStore`. The two
+/// writes are sequential — if the template write fails, no Draft
+/// row is left behind. Program writes are idempotent (keyed by
+/// bytecode hash) so retries are safe.
+///
+/// Replaces the retired `BpmnLiteEngine::compile_and_publish`
+/// method. Now lives here so the engine has no authoring edge.
+pub async fn compile_and_publish(
+    yaml_str: &str,
+    options: PublishOptions,
+    template_store: &dyn TemplateStore,
+    process_store: &dyn ProcessStore,
+) -> Result<PublishResult> {
+    let result = publish_workflow(yaml_str, options)?;
+
+    process_store
+        .store_program(result.program.bytecode_version, &result.program)
+        .await?;
+
+    template_store.save(&result.template).await?;
+
+    Ok(result)
+}
 
 /// Options for the publish pipeline.
 pub struct PublishOptions {
