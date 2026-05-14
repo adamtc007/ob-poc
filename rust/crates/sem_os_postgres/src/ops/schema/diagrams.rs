@@ -19,13 +19,13 @@ use anyhow::{anyhow, Result};
 use async_trait::async_trait;
 use serde_json::{json, Value};
 
+use sem_os_ontology::verb_contract::VerbContractBody;
 use sem_os_policy::affinity::{match_intent, AffinityGraph, DataRef};
 use sem_os_policy::diagram::{
     enrichment::build_diagram_model,
     mermaid,
     model::{ColumnInput, ForeignKeyInput, RenderOptions, TableInput},
 };
-use sem_os_ontology::verb_contract::VerbContractBody;
 
 use dsl_runtime::domain_ops::affinity_graph_cache::load_affinity_graph_cached;
 use dsl_runtime::domain_ops::helpers::{

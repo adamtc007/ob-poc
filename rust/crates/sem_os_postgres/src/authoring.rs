@@ -4,12 +4,12 @@ use async_trait::async_trait;
 use sqlx::PgPool;
 use uuid::Uuid;
 
+use sem_os_core::error::SemOsError;
+use sem_os_core::principal::Principal;
 use sem_os_policy::authoring::ports::{
     AuthoringStore, Result, ScratchRunResult, ScratchSchemaRunner,
 };
 use sem_os_policy::authoring::types::*;
-use sem_os_core::error::SemOsError;
-use sem_os_core::principal::Principal;
 
 // ── PgAuthoringStore ───────────────────────────────────────────
 

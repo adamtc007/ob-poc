@@ -3,7 +3,9 @@
 //! All functions are **pure** (no DB, no I/O). The DB-publishing orchestrator
 //! remains in `ob-poc/src/sem_reg/seeds/view_seeds.rs`.
 
-use sem_os_ontology::view_def::{SortDirection, ViewColumn, ViewDefBody, ViewFilter, ViewSortField};
+use sem_os_ontology::view_def::{
+    SortDirection, ViewColumn, ViewDefBody, ViewFilter, ViewSortField,
+};
 
 /// Core view definitions to bootstrap.
 pub fn core_views() -> Vec<ViewDefBody> {

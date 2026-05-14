@@ -11,14 +11,14 @@ use async_trait::async_trait;
 use serde_json::{json, Value};
 use uuid::Uuid;
 
-use dsl_runtime::domain_ops::helpers::{
-    json_extract_string, json_extract_string_opt, json_extract_uuid, json_extract_uuid_opt,
-};
-use dsl_runtime::tx::TransactionScope;
 use dsl_analysis::verification::{
     ConfidenceCalculator, EvasionDetector, Evidence, EvidenceSource, InconsistencySeverity,
     PatternDetector, PatternSeverity, RegistryVerifier,
 };
+use dsl_runtime::domain_ops::helpers::{
+    json_extract_string, json_extract_string_opt, json_extract_uuid, json_extract_uuid_opt,
+};
+use dsl_runtime::tx::TransactionScope;
 use dsl_runtime::{VerbExecutionContext, VerbExecutionOutcome};
 
 use super::SemOsVerbOp;

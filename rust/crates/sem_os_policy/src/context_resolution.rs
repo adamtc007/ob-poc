@@ -35,9 +35,9 @@ use sem_os_ontology::membership::MembershipKind;
 use sem_os_ontology::membership::{MembershipCondition, MembershipRuleBody};
 use sem_os_ontology::policy_rule::PolicyRuleBody;
 use sem_os_ontology::relationship_type_def::RelationshipTypeDefBody;
-use sem_os_types::{GovernanceTier, SnapshotRow, TrustClass};
 use sem_os_ontology::universe_def::{EntryQuestion, GroundingInput};
 use sem_os_ontology::view_def::ViewDefBody;
+use sem_os_types::{GovernanceTier, SnapshotRow, TrustClass};
 
 // ── Evidence Mode ─────────────────────────────────────────────
 
@@ -1924,9 +1924,12 @@ mod tests {
                 domain: "ownership".into(),
                 source_entity_type_fqn: "entity.fund".into(),
                 target_entity_type_fqn: "entity.legal_entity".into(),
-                cardinality: sem_os_ontology::relationship_type_def::RelationshipCardinality::OneToMany,
+                cardinality:
+                    sem_os_ontology::relationship_type_def::RelationshipCardinality::OneToMany,
                 edge_class: Some("ownership".into()),
-                directionality: Some(sem_os_ontology::relationship_type_def::Directionality::Forward),
+                directionality: Some(
+                    sem_os_ontology::relationship_type_def::Directionality::Forward,
+                ),
                 inverse_fqn: None,
                 constraints: vec![],
             }],
@@ -1937,7 +1940,8 @@ mod tests {
                 domain: "custody".into(),
                 source_entity_type_fqn: "entity.custodian".into(),
                 target_entity_type_fqn: "entity.fund".into(),
-                cardinality: sem_os_ontology::relationship_type_def::RelationshipCardinality::OneToMany,
+                cardinality:
+                    sem_os_ontology::relationship_type_def::RelationshipCardinality::OneToMany,
                 edge_class: Some("service".into()),
                 directionality: None,
                 inverse_fqn: None,
@@ -1961,7 +1965,8 @@ mod tests {
                 domain: "ownership".into(),
                 source_entity_type_fqn: "entity.fund".into(),
                 target_entity_type_fqn: "entity.legal_entity".into(),
-                cardinality: sem_os_ontology::relationship_type_def::RelationshipCardinality::OneToMany,
+                cardinality:
+                    sem_os_ontology::relationship_type_def::RelationshipCardinality::OneToMany,
                 edge_class: None,
                 directionality: None,
                 inverse_fqn: None,

@@ -7,8 +7,8 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
-use sem_os_ontology::derivation_spec::{DerivationExpression, DerivationSpecBody, NullSemantics};
 use crate::security::compute_inherited_label;
+use sem_os_ontology::derivation_spec::{DerivationExpression, DerivationSpecBody, NullSemantics};
 use sem_os_types::SecurityLabel;
 
 // ── Derivation function trait ─────────────────────────────────

@@ -3,11 +3,11 @@
 //! All functions are **pure** (no DB, no I/O). The DB-publishing orchestrator
 //! remains in `ob-poc/src/sem_reg/seeds/derivation_seeds.rs`.
 
+use sem_os_core::types::EvidenceGrade;
 use sem_os_ontology::derivation_spec::{
     DerivationExpression, DerivationInput, DerivationSpecBody, DerivationTestCase, FreshnessRule,
     NullSemantics, SecurityInheritanceMode,
 };
-use sem_os_core::types::EvidenceGrade;
 
 /// Core derivation specs to bootstrap.
 pub fn core_derivation_specs() -> Vec<DerivationSpecBody> {

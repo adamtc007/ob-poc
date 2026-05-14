@@ -144,9 +144,7 @@ pub(crate) fn run(bless: bool) -> Result<()> {
     }
 
     if !added.is_empty() {
-        eprintln!(
-            "New schema-authority parallel definitions detected (not in {ALLOWLIST_PATH}):"
-        );
+        eprintln!("New schema-authority parallel definitions detected (not in {ALLOWLIST_PATH}):");
         for entry in &added {
             eprintln!("  + {entry}");
         }
@@ -243,10 +241,8 @@ fn scan_file(path: &Path, matcher: &Regex, entries: &mut BTreeSet<String>) -> Re
 /// when scanning for `GraphNode`.
 fn build_matcher() -> Regex {
     let alternation = CANONICAL_NAMES.join("|");
-    Regex::new(&format!(
-        r"^pub\s+(?:struct|enum)\s+({alternation})\b"
-    ))
-    .expect("regex over hand-curated names should compile")
+    Regex::new(&format!(r"^pub\s+(?:struct|enum)\s+({alternation})\b"))
+        .expect("regex over hand-curated names should compile")
 }
 
 fn read_allowlist(path: &Path) -> Result<BTreeSet<String>> {
@@ -271,15 +267,9 @@ fn write_allowlist(path: &Path, items: &BTreeSet<String>) -> Result<()> {
     }
     let mut buf = String::new();
     buf.push_str("# Schema-authority drift allowlist (Phase 4.7).\n");
-    buf.push_str(
-        "# Each line is `<path>:<line>:<TypeName>` for a parallel\n",
-    );
-    buf.push_str(
-        "# definition of a name V&S §O7 / ADN §7.3 locks to sem_os_core.\n",
-    );
-    buf.push_str(
-        "# Regenerate with `cargo run -p xtask -- audit --bless` after\n",
-    );
+    buf.push_str("# Each line is `<path>:<line>:<TypeName>` for a parallel\n");
+    buf.push_str("# definition of a name V&S §O7 / ADN §7.3 locks to sem_os_core.\n");
+    buf.push_str("# Regenerate with `cargo run -p xtask -- audit --bless` after\n");
     buf.push_str("# reviewing whether the mirror is still justified.\n");
     buf.push_str("# Run `cargo run -p xtask -- audit` to fail on new mirrors.\n");
     buf.push('\n');

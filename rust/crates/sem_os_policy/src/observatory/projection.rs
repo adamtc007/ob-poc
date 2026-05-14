@@ -5,11 +5,11 @@
 
 use chrono::Utc;
 
-use sem_os_types::agent_mode::AgentMode;
 use crate::context_resolution::{
     ContextResolutionResponse, GroundedActionOption, GroundedActionSurface, VerbCandidate,
 };
 use crate::stewardship::types::{FocusState, OverlayMode};
+use sem_os_types::agent_mode::AgentMode;
 
 use super::orientation::*;
 

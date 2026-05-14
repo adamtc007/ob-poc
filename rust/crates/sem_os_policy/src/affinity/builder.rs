@@ -14,8 +14,8 @@ use sem_os_ontology::attribute_def::AttributeDefBody;
 use sem_os_ontology::derivation_spec::DerivationSpecBody;
 use sem_os_ontology::entity_type_def::EntityTypeDefBody;
 use sem_os_ontology::relationship_type_def::RelationshipTypeDefBody;
-use sem_os_types::{ObjectType, SnapshotRow};
 use sem_os_ontology::verb_contract::VerbContractBody;
+use sem_os_types::{ObjectType, SnapshotRow};
 
 impl AffinityGraph {
     /// Build an AffinityGraph from a flat list of active registry snapshots.

@@ -97,9 +97,8 @@ pub(crate) fn run(bless: bool) -> Result<()> {
         };
         let serialized = serde_json::to_string_pretty(&new_baseline)
             .context("serialising refreshed runbook envelope baseline")?;
-        std::fs::write(baseline_path, serialized).with_context(|| {
-            format!("writing baseline to {}", baseline_path.display())
-        })?;
+        std::fs::write(baseline_path, serialized)
+            .with_context(|| format!("writing baseline to {}", baseline_path.display()))?;
         println!(
             "Runbook envelope determinism baseline refreshed at {} ({} fixtures)",
             baseline_path.display(),
@@ -151,11 +150,7 @@ fn fixtures() -> Vec<(&'static str, RunbookEnvelope)> {
         );
         out.push((
             "single_state_entry",
-            RunbookEnvelope::with_state_context(
-                "rb-single",
-                "(cbu.attach-product :cbu @cbu)",
-                ctx,
-            ),
+            RunbookEnvelope::with_state_context("rb-single", "(cbu.attach-product :cbu @cbu)", ctx),
         ));
     }
 
@@ -168,11 +163,7 @@ fn fixtures() -> Vec<(&'static str, RunbookEnvelope)> {
         ctx.insert("mike".to_string(), Value::String("m-val".to_string()));
         out.push((
             "multi_state_ordering",
-            RunbookEnvelope::with_state_context(
-                "rb-multi",
-                "(view.universe)",
-                ctx,
-            ),
+            RunbookEnvelope::with_state_context("rb-multi", "(view.universe)", ctx),
         ));
     }
 
@@ -201,18 +192,11 @@ fn fixtures() -> Vec<(&'static str, RunbookEnvelope)> {
         ctx.insert("text".to_string(), json!("plain"));
         ctx.insert("count".to_string(), json!(42));
         ctx.insert("flag".to_string(), json!(true));
-        ctx.insert(
-            "nested".to_string(),
-            json!({"a": 1, "b": [1, 2, 3]}),
-        );
+        ctx.insert("nested".to_string(), json!({"a": 1, "b": [1, 2, 3]}));
         ctx.insert("array".to_string(), json!(["x", "y", "z"]));
         out.push((
             "mixed_value_types",
-            RunbookEnvelope::with_state_context(
-                "rb-mixed",
-                "(deal.assemble)",
-                ctx,
-            ),
+            RunbookEnvelope::with_state_context("rb-mixed", "(deal.assemble)", ctx),
         ));
     }
 
@@ -222,8 +206,7 @@ fn fixtures() -> Vec<(&'static str, RunbookEnvelope)> {
 fn read_baseline(path: &Path) -> Result<Baseline> {
     let source = std::fs::read_to_string(path)
         .with_context(|| format!("reading runbook envelope baseline {}", path.display()))?;
-    serde_json::from_str(&source)
-        .with_context(|| format!("parsing baseline at {}", path.display()))
+    serde_json::from_str(&source).with_context(|| format!("parsing baseline at {}", path.display()))
 }
 
 fn compare(expected: &[BaselineEntry], observed: &[BaselineEntry]) -> Result<()> {
@@ -299,7 +282,10 @@ fn compare(expected: &[BaselineEntry], observed: &[BaselineEntry]) -> Result<()>
 }
 
 fn today_iso() -> String {
-    chrono::Utc::now().date_naive().format("%Y-%m-%d").to_string()
+    chrono::Utc::now()
+        .date_naive()
+        .format("%Y-%m-%d")
+        .to_string()
 }
 
 #[cfg(test)]

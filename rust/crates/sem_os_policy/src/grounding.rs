@@ -10,11 +10,11 @@ use std::collections::{HashMap, HashSet};
 
 use serde::{Deserialize, Serialize};
 
-use sem_os_ontology::constellation_map_def::{
-    ConstellationMapDefBody, DependencyEntry, SlotDef, VerbPaletteEntry,
-};
 use crate::context_resolution::{
     BlockedActionOption, GroundedActionOption, GroundedConstraintSignal,
+};
+use sem_os_ontology::constellation_map_def::{
+    ConstellationMapDefBody, DependencyEntry, SlotDef, VerbPaletteEntry,
 };
 use sem_os_ontology::state_machine_def::StateMachineDefBody;
 

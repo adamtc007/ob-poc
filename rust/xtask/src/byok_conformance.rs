@@ -83,7 +83,9 @@ impl Provider {
             "stub" => Ok(Self::Stub),
             "anthropic" => Ok(Self::Anthropic),
             "openai" => Ok(Self::OpenAi),
-            other => Err(anyhow!("unknown --provider '{other}' (expected stub|anthropic|openai)")),
+            other => Err(anyhow!(
+                "unknown --provider '{other}' (expected stub|anthropic|openai)"
+            )),
         }
     }
 
@@ -109,13 +111,15 @@ async fn run_async(provider: Provider) -> Result<()> {
 
     let mut passed = 0usize;
     for fixture in &corpus.fixtures {
-        check_fixture(&loader, fixture, provider).await.with_context(|| {
-            format!(
-                "conformance failure: fixture '{}' ({provider})",
-                fixture.id,
-                provider = provider.label()
-            )
-        })?;
+        check_fixture(&loader, fixture, provider)
+            .await
+            .with_context(|| {
+                format!(
+                    "conformance failure: fixture '{}' ({provider})",
+                    fixture.id,
+                    provider = provider.label()
+                )
+            })?;
         passed += 1;
     }
     println!(
@@ -151,10 +155,8 @@ async fn check_fixture(
 
     // Seed an explicit GoalFrame so we can preload refused drafts
     // for fixtures that exercise the refused-drafts code path.
-    let mut frame = ob_poc_agent::goal_frame::GoalFrame::seed_for_spike(
-        &fixture.utterance,
-        planning.index(),
-    );
+    let mut frame =
+        ob_poc_agent::goal_frame::GoalFrame::seed_for_spike(&fixture.utterance, planning.index());
     for refused in &fixture.refused_drafts {
         frame.record_refused_draft(refused.clone());
     }
@@ -205,7 +207,9 @@ fn build_llm(provider: Provider, fixture: &Fixture) -> Result<Arc<dyn LlmClient>
                          set it or rerun with --provider stub"
                     )
                 })?;
-            Ok(Arc::new(ob_agentic::anthropic_client::AnthropicClient::new(key)))
+            Ok(Arc::new(
+                ob_agentic::anthropic_client::AnthropicClient::new(key),
+            ))
         }
         Provider::OpenAi => {
             let key = std::env::var("OPENAI_API_KEY")
@@ -293,12 +297,18 @@ mod tests {
 
     #[test]
     fn provider_parses_canonical_names() {
-        assert!(matches!(Provider::from_str("stub").unwrap(), Provider::Stub));
+        assert!(matches!(
+            Provider::from_str("stub").unwrap(),
+            Provider::Stub
+        ));
         assert!(matches!(
             Provider::from_str("Anthropic").unwrap(),
             Provider::Anthropic
         ));
-        assert!(matches!(Provider::from_str("OPENAI").unwrap(), Provider::OpenAi));
+        assert!(matches!(
+            Provider::from_str("OPENAI").unwrap(),
+            Provider::OpenAi
+        ));
         assert!(Provider::from_str("gemini").is_err());
     }
 
@@ -316,7 +326,8 @@ mod tests {
             "onboarding",
             "catalogue",
         ] {
-            parse_workspace(label).unwrap_or_else(|_| panic!("workspace label '{label}' should parse"));
+            parse_workspace(label)
+                .unwrap_or_else(|_| panic!("workspace label '{label}' should parse"));
         }
     }
 

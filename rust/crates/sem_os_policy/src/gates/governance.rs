@@ -162,10 +162,7 @@ pub fn check_evidence_grade_policy(
 /// If a governed snapshot's definition contains `regulatory_references` or
 /// `regulation_ids`, those references should be non-empty and well-formed.
 /// Operational-tier snapshots skip this check.
-pub fn check_regulatory_linkage(
-    snapshot: &SnapshotRow,
-    tier: GovernanceTier,
-) -> Vec<GateFailure> {
+pub fn check_regulatory_linkage(snapshot: &SnapshotRow, tier: GovernanceTier) -> Vec<GateFailure> {
     match tier {
         GovernanceTier::Operational => vec![],
         GovernanceTier::Governed => {

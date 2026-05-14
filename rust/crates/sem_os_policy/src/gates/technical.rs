@@ -10,8 +10,8 @@
 
 use std::collections::HashSet;
 
-use sem_os_types::{GovernanceTier, SnapshotRow};
 use sem_os_ontology::verb_contract::VerbContractBody;
+use sem_os_types::{GovernanceTier, SnapshotRow};
 
 use super::{GateFailure, GateSeverity};
 
@@ -338,8 +338,8 @@ pub fn check_orphan_attributes(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use sem_os_types::*;
     use sem_os_ontology::verb_contract::*;
+    use sem_os_types::*;
     use uuid::Uuid;
 
     fn sample_verb() -> VerbContractBody {

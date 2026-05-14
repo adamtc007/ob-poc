@@ -1,0 +1,169 @@
+{
+  "url": "http://localhost:3000",
+  "results": [
+    {
+      "id": "scope-gate-initial-prompt",
+      "description": "Initial session prompt",
+      "ok": true,
+      "missing": [],
+      "screenshot": "/Users/adamtc007/Developer/ob-poc/artifacts/acp-ui-pack-20260511/scope-gate-initial-prompt.png",
+      "textSample": "Which client would you like to work with today?\n\n19:35\nPress Enter to send, Shift+Enter for new line\nScope\nNo client group selected. Start by choosing a client group to work with.\nCONSTELLATION\nLoad or select a CBU from session scope to inspect the operating constellation.\nCompile Plan\nCommands\n142\nShowing 1310 of 1324 verbs\naccess-review\n17\nadmin.regulators\n5\nadmin.regulatory-tiers\n2\nadmin.role-types\n5\nagent\n20\nallegation\n6\napplication\n3\napplication-instance\n7\nattribute\n19\nattributes\n4\naudit\n8\nbatch\n7\nbilling\n17\nboard\n9\nbods\n9\nbook\n4\nbooking-location\n3\nbooking-principal\n9\nbooking-principal-clearance\n9\nbpmn\n5\ncapability-binding\n6\ncapital\n29\ncase-event\n2\ncash-sweep\n9\ncatalogue\n4\ncbu\n54\ncbu-ca\n5\ncbu-custody\n8\ncbu-group\n1\ncbu-role\n1\nclient-group\n29\nclient-principal-relationship\n4\ncollateral-management\n5\nconstellation\n2\ncontract\n14\ncontract-pack\n3\ncontrol\n14\ncorporate-action\n9\ncorporate-action-event\n2\ncoverage\n1\ndeal\n60\ndelegation\n4\ndelivery\n5\nderivation\n1\ndiscovery\n12\ndiscrepancy\n4\ndocs-bundle\n3\ndocument\n21\neconomic-exposure\n2\nedge\n1\nentity\n16\nentity-relationship\n1\nentity-settlement\n3\nentity-workstream\n9\nevidence\n5\nfocus\n6\nfund\n22\ngleif\n9\ngovernance\n9\ngraph\n10\nholding\n14\nidentifier\n11"
+    },
+    {
+      "id": "scope-gate-allianz-resolve",
+      "description": "Allianz resolves and workspace options render",
+      "ok": false,
+      "missing": [
+        "Scope set to Allianz Global Investors"
+      ],
+      "screenshot": "/Users/adamtc007/Developer/ob-poc/artifacts/acp-ui-pack-20260511/scope-gate-allianz-resolve.png",
+      "textSample": "Which client would you like to work with today?\n\n19:35\n\nAllianz\n\n19:35\n\nI resolved this to session.load-cluster and drafted a non-executing DSL proposal. No mutation has run; execution remains behind the workbook, HITL, and runbook gates.\n\nACP TRACE\ndag_semantic_proposal\nI resolved this to `session.load-cluster` and drafted a non-executing DSL proposal. No mutation has run; execution remains behind the workbook, HITL, and runbook gates.\nroute: session_input\ndraft: deterministic\nlayer: language_loop\nrevisions: null\ntotal: 543ms\nSTATE ANCHOR PROVIDER\nprovider: not_applicable\nlanguage pack: no\nprovider dry-run: not valid\nmutation: no authority\nsupported: kyc-case.update-status, deal.update-status\ndry-run: valid\nprose-only failure: no\n19:35\nPress Enter to send, Shift+Enter for new line\nScope\nNo client group selected. Start by choosing a client group to work with.\nUNIVERSE\nSelect a workspace or client group\nProduct Maintenance\nproduct_service_taxonomy\nCatalogue\nregistry_governance\nDeal\ncommercial\nCBU\noperating\nKYC\nownership\nInstrument Matrix\ntrading_streetside\nOnBoarding\nhandoff\nSemOS Maintenance\nregistry_governance\nLifecycle Resources\nplatform\nBooking Principal\ndeal_governance\nAVAILABL"
+    },
+    {
+      "id": "workspace-cbu-click",
+      "description": "CBU workspace transitions to structure DAG picker",
+      "ok": false,
+      "missing": [
+        "Choose a specific CBU structure DAG",
+        "Luxembourg UCITS SICAV",
+        "Ireland UCITS ICAV",
+        "UK Authorised OEIC"
+      ],
+      "screenshot": "/Users/adamtc007/Developer/ob-poc/artifacts/acp-ui-pack-20260511/workspace-cbu-click.png",
+      "textSample": "Which client would you like to work with today?\n\n19:35\n\nAllianz\n\n19:35\n\nI resolved this to session.load-cluster and drafted a non-executing DSL proposal. No mutation has run; execution remains behind the workbook, HITL, and runbook gates.\n\nACP TRACE\ndag_semantic_proposal\nI resolved this to `session.load-cluster` and drafted a non-executing DSL proposal. No mutation has run; execution remains behind the workbook, HITL, and runbook gates.\nroute: session_input\ndraft: deterministic\nlayer: language_loop\nrevisions: null\ntotal: 543ms\nSTATE ANCHOR PROVIDER\nprovider: not_applicable\nlanguage pack: no\nprovider dry-run: not valid\nmutation: no authority\nsupported: kyc-case.update-status, deal.update-status\ndry-run: valid\nprose-only failure: no\n19:35\n\nCBU\n\n19:35\n\nI resolved this to view.cbu, but the workbook draft is blocked until these required bindings are supplied: cbu-id. No mutation has run.\n\nACP TRACE\npending_question\nI resolved this to `view.cbu`, but the workbook draft is blocked until these required bindings are supplied: `cbu-id`. No mutation has run.\nroute: session_input\ndraft: deterministic\nlayer: language_loop\npending: dag_semantic_missing_required_args\nrevisions: null\ntotal: 377ms\n"
+    },
+    {
+      "id": "structure-dag-lux-sicav-click-action",
+      "ok": false,
+      "missing": [
+        "Luxembourg UCITS SICAV button"
+      ],
+      "clicked": {
+        "ok": false,
+        "available": [
+          "19:35",
+          "19:35",
+          "ACP TRACE",
+          "dag_semantic_proposal",
+          "I resolved this to `session.load-cluster` and drafted a non-executing DSL proposal. No mutation has run; execution remains behind the workbook, HITL, and runbook gates.",
+          "route: session_input",
+          "draft: deterministic",
+          "layer: language_loop",
+          "revisions: null",
+          "total: 543ms",
+          "STATE ANCHOR PROVIDER",
+          "provider: not_applicable",
+          "language pack: no",
+          "provider dry-run: not valid",
+          "mutation: no authority",
+          "supported: kyc-case.update-status, deal.update-status",
+          "dry-run: valid",
+          "prose-only failure: no",
+          "19:35",
+          "19:35",
+          "ACP TRACE",
+          "pending_question",
+          "I resolved this to `view.cbu`, but the workbook draft is blocked until these required bindings are supplied: `cbu-id`. No mutation has run.",
+          "route: session_input",
+          "draft: deterministic",
+          "layer: language_loop",
+          "pending: dag_semantic_missing_required_args",
+          "revisions: null",
+          "total: 377ms",
+          "STATE ANCHOR PROVIDER"
+        ]
+      }
+    },
+    {
+      "id": "structure-dag-lux-sicav-click",
+      "description": "Lux SICAV opens journey selection",
+      "ok": false,
+      "missing": [
+        "Luxembourg UCITS SICAV DAG selected",
+        "Which journey",
+        "Book Setup",
+        "CBU Maintenance"
+      ],
+      "screenshot": "/Users/adamtc007/Developer/ob-poc/artifacts/acp-ui-pack-20260511/structure-dag-lux-sicav-click.png",
+      "textSample": "Which client would you like to work with today?\n\n19:35\n\nAllianz\n\n19:35\n\nI resolved this to session.load-cluster and drafted a non-executing DSL proposal. No mutation has run; execution remains behind the workbook, HITL, and runbook gates.\n\nACP TRACE\ndag_semantic_proposal\nI resolved this to `session.load-cluster` and drafted a non-executing DSL proposal. No mutation has run; execution remains behind the workbook, HITL, and runbook gates.\nroute: session_input\ndraft: deterministic\nlayer: language_loop\nrevisions: null\ntotal: 543ms\nSTATE ANCHOR PROVIDER\nprovider: not_applicable\nlanguage pack: no\nprovider dry-run: not valid\nmutation: no authority\nsupported: kyc-case.update-status, deal.update-status\ndry-run: valid\nprose-only failure: no\n19:35\n\nCBU\n\n19:35\n\nI resolved this to view.cbu, but the workbook draft is blocked until these required bindings are supplied: cbu-id. No mutation has run.\n\nACP TRACE\npending_question\nI resolved this to `view.cbu`, but the workbook draft is blocked until these required bindings are supplied: `cbu-id`. No mutation has run.\nroute: session_input\ndraft: deterministic\nlayer: language_loop\npending: dag_semantic_missing_required_args\nrevisions: null\ntotal: 377ms\n"
+    },
+    {
+      "id": "journey-book-setup-click-action",
+      "ok": false,
+      "missing": [
+        "Book Setup button"
+      ],
+      "clicked": {
+        "ok": false,
+        "available": [
+          "19:35",
+          "19:35",
+          "ACP TRACE",
+          "dag_semantic_proposal",
+          "I resolved this to `session.load-cluster` and drafted a non-executing DSL proposal. No mutation has run; execution remains behind the workbook, HITL, and runbook gates.",
+          "route: session_input",
+          "draft: deterministic",
+          "layer: language_loop",
+          "revisions: null",
+          "total: 543ms",
+          "STATE ANCHOR PROVIDER",
+          "provider: not_applicable",
+          "language pack: no",
+          "provider dry-run: not valid",
+          "mutation: no authority",
+          "supported: kyc-case.update-status, deal.update-status",
+          "dry-run: valid",
+          "prose-only failure: no",
+          "19:35",
+          "19:35",
+          "ACP TRACE",
+          "pending_question",
+          "I resolved this to `view.cbu`, but the workbook draft is blocked until these required bindings are supplied: `cbu-id`. No mutation has run.",
+          "route: session_input",
+          "draft: deterministic",
+          "layer: language_loop",
+          "pending: dag_semantic_missing_required_args",
+          "revisions: null",
+          "total: 377ms",
+          "STATE ANCHOR PROVIDER"
+        ]
+      }
+    },
+    {
+      "id": "journey-book-setup-click",
+      "description": "Book Setup activates pack first question",
+      "ok": false,
+      "missing": [
+        "name of the client book"
+      ],
+      "screenshot": "/Users/adamtc007/Developer/ob-poc/artifacts/acp-ui-pack-20260511/journey-book-setup-click.png",
+      "textSample": "Which client would you like to work with today?\n\n19:35\n\nAllianz\n\n19:35\n\nI resolved this to session.load-cluster and drafted a non-executing DSL proposal. No mutation has run; execution remains behind the workbook, HITL, and runbook gates.\n\nACP TRACE\ndag_semantic_proposal\nI resolved this to `session.load-cluster` and drafted a non-executing DSL proposal. No mutation has run; execution remains behind the workbook, HITL, and runbook gates.\nroute: session_input\ndraft: deterministic\nlayer: language_loop\nrevisions: null\ntotal: 543ms\nSTATE ANCHOR PROVIDER\nprovider: not_applicable\nlanguage pack: no\nprovider dry-run: not valid\nmutation: no authority\nsupported: kyc-case.update-status, deal.update-status\ndry-run: valid\nprose-only failure: no\n19:35\n\nCBU\n\n19:35\n\nI resolved this to view.cbu, but the workbook draft is blocked until these required bindings are supplied: cbu-id. No mutation has run.\n\nACP TRACE\npending_question\nI resolved this to `view.cbu`, but the workbook draft is blocked until these required bindings are supplied: `cbu-id`. No mutation has run.\nroute: session_input\ndraft: deterministic\nlayer: language_loop\npending: dag_semantic_missing_required_args\nrevisions: null\ntotal: 377ms\n"
+    },
+    {
+      "id": "in-pack-answer-question",
+      "description": "Answering first pack question advances",
+      "ok": false,
+      "missing": [
+        "jurisdiction"
+      ],
+      "screenshot": "/Users/adamtc007/Developer/ob-poc/artifacts/acp-ui-pack-20260511/in-pack-answer-question.png",
+      "textSample": "Which client would you like to work with today?\n\n19:35\n\nAllianz\n\n19:35\n\nI resolved this to session.load-cluster and drafted a non-executing DSL proposal. No mutation has run; execution remains behind the workbook, HITL, and runbook gates.\n\nACP TRACE\ndag_semantic_proposal\nI resolved this to `session.load-cluster` and drafted a non-executing DSL proposal. No mutation has run; execution remains behind the workbook, HITL, and runbook gates.\nroute: session_input\ndraft: deterministic\nlayer: language_loop\nrevisions: null\ntotal: 543ms\nSTATE ANCHOR PROVIDER\nprovider: not_applicable\nlanguage pack: no\nprovider dry-run: not valid\nmutation: no authority\nsupported: kyc-case.update-status, deal.update-status\ndry-run: valid\nprose-only failure: no\n19:35\n\nCBU\n\n19:35\n\nI resolved this to view.cbu, but the workbook draft is blocked until these required bindings are supplied: cbu-id. No mutation has run.\n\nACP TRACE\npending_question\nI resolved this to `view.cbu`, but the workbook draft is blocked until these required bindings are supplied: `cbu-id`. No mutation has run.\nroute: session_input\ndraft: deterministic\nlayer: language_loop\npending: dag_semantic_missing_required_args\nrevisions: null\ntotal: 377ms\n"
+    },
+    {
+      "id": "narration-whats-missing",
+      "description": "Narration query returns gap analysis",
+      "ok": false,
+      "missing": [
+        "Required"
+      ],
+      "screenshot": "/Users/adamtc007/Developer/ob-poc/artifacts/acp-ui-pack-20260511/narration-whats-missing.png",
+      "textSample": "Which client would you like to work with today?\n\n19:35\n\nAllianz\n\n19:35\n\nI resolved this to session.load-cluster and drafted a non-executing DSL proposal. No mutation has run; execution remains behind the workbook, HITL, and runbook gates.\n\nACP TRACE\ndag_semantic_proposal\nI resolved this to `session.load-cluster` and drafted a non-executing DSL proposal. No mutation has run; execution remains behind the workbook, HITL, and runbook gates.\nroute: session_input\ndraft: deterministic\nlayer: language_loop\nrevisions: null\ntotal: 543ms\nSTATE ANCHOR PROVIDER\nprovider: not_applicable\nlanguage pack: no\nprovider dry-run: not valid\nmutation: no authority\nsupported: kyc-case.update-status, deal.update-status\ndry-run: valid\nprose-only failure: no\n19:35\n\nCBU\n\n19:35\n\nI resolved this to view.cbu, but the workbook draft is blocked until these required bindings are supplied: cbu-id. No mutation has run.\n\nACP TRACE\npending_question\nI resolved this to `view.cbu`, but the workbook draft is blocked until these required bindings are supplied: `cbu-id`. No mutation has run.\nroute: session_input\ndraft: deterministic\nlayer: language_loop\npending: dag_semantic_missing_required_args\nrevisions: null\ntotal: 377ms\n"
+    }
+  ],
+  "consoleErrors": [
+    "Failed to init observatory WASM: Failed to start: JsValue(\"WebGL isn't supported\")"
+  ],
+  "failedRequests": [],
+  "pass": 1,
+  "fail": 8
+}
