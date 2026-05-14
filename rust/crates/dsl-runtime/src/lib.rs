@@ -83,13 +83,13 @@ pub use dsl_analysis::validation;
 // diagnostics + executable plan. analyse_and_plan, PlanningInput,
 // PlanningOutput, SyntheticStep, quick_validate, ImplicitCreateMode.
 pub mod planning_facade;
-// dsl-runtime-split v1 Phase 5 (2026-05-14): ref_resolver +
-// gateway_resolver relocated to `dsl-analysis`. lsp_validator stays
-// here for Phase 6; reaches the resolver pair via the compat re-exports
-// below. Removed in Phase 11.
+// dsl-runtime-split v1 Phases 5–6 (2026-05-14): resolver cluster +
+// lsp_validator relocated to `dsl-analysis`. Compat re-exports preserve
+// `dsl_runtime::{gateway_resolver, ref_resolver, lsp_validator}` for
+// dsl-lsp and ob-poc::dsl_v2 consumers. Removed in Phase 11.
 pub use dsl_analysis::gateway_resolver;
+pub use dsl_analysis::lsp_validator;
 pub use dsl_analysis::ref_resolver;
-pub mod lsp_validator;
 // dsl-runtime-split v1 Phase 4 (2026-05-14): macros registry subset
 // (schema + registry + conditions + variable + scope) relocated to
 // `dsl-analysis`. Expander remains in `ob-poc`. Compat re-export

@@ -42,16 +42,18 @@
 //!   from Phase 9 (paired-move dep of `runtime_registry`).
 //! - Phase 4: `macros` (registry subset — schema, registry, conditions,
 //!   variable, scope). 2,585 LOC. Expander stays in `ob-poc`.
-//! - Phase 5 (current): `ref_resolver` + `gateway_resolver`. 835 LOC.
-//!   Paired-move (gateway_resolver depends on ref_resolver and
-//!   ref_resolver's `as_gateway_resolver` downcast depends on
-//!   gateway_resolver). Picks up async-trait + entity-gateway + tonic.
+//! - Phase 5: `ref_resolver` + `gateway_resolver` paired-move (835 LOC,
+//!   async-trait + entity-gateway + tonic).
+//! - Phase 6 (current): `lsp_validator` (713 LOC). Now-co-resident with
+//!   its deps — gateway_resolver, ref_resolver, validation, verb_registry.
+//!   No new deps required.
 //!
 //! Compat re-exported from `dsl-runtime` until Phase 11 cleanup.
 
 pub mod catalogue_loader;
 pub mod entity_kind;
 pub mod gateway_resolver;
+pub mod lsp_validator;
 pub mod macros;
 pub mod ref_resolver;
 pub mod runtime_registry;
