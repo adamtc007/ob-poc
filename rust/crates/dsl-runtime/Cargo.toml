@@ -35,10 +35,7 @@ dsl-core = { path = "../dsl-core" }
 #   - ob-templates   (runtime_registry, Phase 3)
 #   - entity-gateway (gateway_resolver, Phase 5)
 #   - tonic          (gateway_resolver, Phase 5)
-#   - governed_query_proc (no `#[governed_query]` annotation exists in
-#                          remaining dsl-runtime src; the macro is
-#                          prepared infrastructure not yet applied —
-#                          tracked in the audit Tier 4 finding).
+#   - governed_query_proc (crate deleted 2026-05-14 — zero adopters)
 #
 # Remaining transitional dep — sem_os_core provides Principal, SemOsError,
 # and the VerbContractBody consumed by CrudExecutionPort. Kept deliberately

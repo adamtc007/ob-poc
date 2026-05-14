@@ -3,7 +3,7 @@
 > **Last reviewed:** 2026-04-26
 > **Frontend:** React/TypeScript (`ob-poc-ui-react/`) — Chat UI with scope panel, Inspector, Semantic OS Tab
 > **Backend:** Rust/Axum (`rust/crates/ob-poc-web/`) — Serves React + REST API
-> **Crates:** 37 workspace crates (incl. `ob-poc` application root) — 10 ob-poc-* library (web, types, diagnostics, boundary, sage, journey, domain, authoring, agent, macros) · 10 sem_os_* (core, types, ontology, policy, postgres, server, client, obpoc_adapter, harness, mcp) · 4 dsl-* (dsl-core, dsl-lsp, dsl-runtime, dsl-analysis) · 4 ob-* (ob-agentic, ob-templates, ob-workflow, ob-semantic-matcher) · 8 misc (entity-gateway, governed_query_proc, xtask, playbook-core, playbook-lower, inspector-projection, determinism-harness, round-trip-harness)
+> **Crates:** 36 workspace crates (incl. `ob-poc` application root) — 10 ob-poc-* library (web, types, diagnostics, boundary, sage, journey, domain, authoring, agent, macros) · 10 sem_os_* (core, types, ontology, policy, postgres, server, client, obpoc_adapter, harness, mcp) · 4 dsl-* (dsl-core, dsl-lsp, dsl-runtime, dsl-analysis) · 4 ob-* (ob-agentic, ob-templates, ob-workflow, ob-semantic-matcher) · 7 misc (entity-gateway, xtask, playbook-core, playbook-lower, inspector-projection, determinism-harness, round-trip-harness)
 > **Verbs:** 1,282 canonical verbs across 134 domains (795 declared with three-axis = 62.0%); 24,587 intent patterns (DB-sourced)
 > **Macros:** 103 operator macros (22 YAML files, 18 domains, 3 composite), Tier -2B in intent pipeline
 > **MCP Tools:** ~102 tools (DSL, verbs, learning, session, batch, research, taxonomy, sem_reg, stewardship, db_introspect, session_verb_surface)

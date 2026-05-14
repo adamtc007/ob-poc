@@ -289,15 +289,6 @@ need_stdout = false
 command = ["cargo", "test", "-p", "sem_os_core", "-p", "sem_os_server", "--color", "always"]
 need_stdout = true
 
-# governed_query_proc (proc-macro)
-[jobs.check-governed-query]
-command = ["cargo", "check", "-p", "governed_query_proc", "--color", "always"]
-need_stdout = false
-
-[jobs.clippy-governed-query]
-command = ["cargo", "clippy", "-p", "governed_query_proc", "--color", "always"]
-need_stdout = false
-
 # =============================================================================
 # XTASK
 # =============================================================================
