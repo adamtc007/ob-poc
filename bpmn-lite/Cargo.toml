@@ -1,5 +1,10 @@
 [workspace]
-members = ["bpmn-lite-core", "bpmn-lite-server", "xtask"]
+members = [
+    "bpmn-lite-core",
+    "bpmn-lite-server",
+    "bpmn-lite-types",
+    "xtask",
+]
 resolver = "2"
 
 # Pub-discipline ratchet (bpmn-lite cleanup Phase 0.1).
