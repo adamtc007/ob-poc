@@ -65,6 +65,46 @@ version: "1.0"
 workspace: semos_maintenance
 dag_id: semos_maintenance_dag
 
+dsl_verb_reconciliation:
+  attribute_surface:
+    - attribute.bridge-to-semos
+    - attribute.classify
+    - attribute.define-derived
+    - attribute.inspect
+    - attribute.list
+    - attribute.read
+    - attribute.seed-derived
+    - attribute.seed-domain
+    - attribute.set-evidence-grade
+  changeset_surface:
+    - changeset.add-item
+    - changeset.apply-template
+    - changeset.attach-basis
+    - changeset.diff
+    - changeset.get
+    - changeset.impact-analysis
+    - changeset.list
+    - changeset.refine-item
+    - changeset.remove-item
+    - changeset.resolve-conflict
+    - changeset.suggest
+  governance_surface:
+    - governance.dry-run
+    - governance.gate-precheck
+    - governance.plan-publish
+    - governance.publish-batch
+    - governance.record-review
+    - governance.submit-for-review
+    - governance.validate
+  phrase_surface:
+    - phrase.approve
+    - phrase.batch-propose
+    - phrase.check-collisions
+    - phrase.coverage-report
+    - phrase.observe-misses
+    - phrase.reject
+    - phrase.review-proposals
+
 # =============================================================================
 # 1. OVERALL REGISTRY-STEWARDSHIP LIFECYCLE (per governance-item, derived)
 # =============================================================================

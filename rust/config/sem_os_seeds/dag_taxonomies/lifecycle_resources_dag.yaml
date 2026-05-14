@@ -68,6 +68,11 @@ version: "1.0"
 workspace: lifecycle_resources
 dag_id: lifecycle_resources_dag
 
+dsl_verb_reconciliation:
+  application_catalogue_surface:
+    - application.register
+    - application.update
+
 # =============================================================================
 # 1. OVERALL LIFECYCLE — derived per (application_instance, capability_binding)
 # =============================================================================

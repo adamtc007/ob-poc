@@ -36,11 +36,15 @@ allowed_verbs:
   - cbu.assign-role
   - cbu.parties
   - kyc-case.create
+  - kyc-case.list-by-cbu
+  - kyc-case.update-status
   - ubo.discover
   - ownership.compute
   - document.solicit
   - document.solicit-batch
   - screening.run
+  - screening.bulk-refresh
+  - screening.review-hit
   - screening.sanctions
   - screening.pep
   - screening.adverse-media

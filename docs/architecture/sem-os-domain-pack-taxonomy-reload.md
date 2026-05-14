@@ -39,6 +39,21 @@ This lets Sem OS answer: "which domain pack is authoritative for this DAG, DSL p
 
 The `business_crates` field is an informational link to code that may consume or implement behavior for the domain. It is not ownership of taxonomy shape.
 
+## Loader Discipline
+
+Runtime loaders must not discover Sem OS taxonomy shape by independently walking legacy directories.
+
+The production rule is:
+
+- Domain Pack manifests are discovered first.
+- `owned_dags`, `owned_state_machines`, `owned_constellation_maps`, `owned_constellation_families`, and `owned_universes` determine the Sem OS taxonomy surfaces visible to seed bootstrap and compiler DAG registry loading.
+- `owned_packs[].allowed_verbs` determines the Sem OS `MacroDef` surface: a macro is seed-visible only when a Domain Pack-owned DSL pack exposes that macro FQN.
+- Direct `dag_taxonomies/`, `state_machines/`, and related directory walkers are low-level parser/test/tooling utilities only.
+- Direct macro directory walks are likewise index/parser utilities only; they are filtered through Domain Pack-owned pack allowlists before entering Sem OS seed bundles or reload hashes.
+- A new domain is enabled by adding YAML plus a Domain Pack manifest that declares ownership; no Rust hard-coded pack load should be required.
+
+This makes the domain universe soft/configuration-owned while keeping the compiler and Sem OS reload code shared.
+
 ## Reload Model
 
 Reload uses a build-engine pattern:
@@ -109,13 +124,19 @@ The command checks all domain packs by default. It can persist refreshed index r
 
 Startup should not perform full YAML reconciliation unconditionally. A future startup hook may run the cheap fingerprint check, but full reload and publication should remain explicit or environment-gated.
 
-## CBU Reconciliation Rule
+## Reconciliation Rule
 
-CBU is the reference case for this architecture.
+All domain packs follow the same reconciliation rule.
 
-The CBU domain pack owns the CBU DAG taxonomy, the CBU DSL pack, related CBU state machines/constellations/universes, CBU verb prefixes, and CBU entity kinds. Tests cross-reference CBU macros, DSL verbs, and DAG taxonomy entries to ensure macro expansion does not refer to verbs or states that are absent from the Sem OS-owned taxonomy.
+Each Domain Pack declares owned DSL packs, owned verb prefixes, and owned DAGs. The reconciliation harness cross-references:
 
-This is the pattern for future domains: add or update YAML, declare ownership in a Domain Pack, run the reload check, then publish through the Sem OS seed bootstrap path when the canonical content hash changes.
+- pack `allowed_verbs`
+- macro definitions and recursive `expands-to` atomics from `config/verb_schemas/macros`
+- `allowed_transitions[].verb` from the Domain Pack manifest
+- explicit `dsl_verb_reconciliation` entries in each owned DAG
+- registry verbs from `config/verbs`
+
+This prevents a pack from exposing a DSL verb or macro primitive that has no Sem OS-owned DAG backing. It also prevents a macro from hiding owned primitive verbs that the pack did not explicitly allow. A macro is treated as a Sem OS-owned DSL sequence: `macro FQN -> expands-to[] -> atomic DSL verbs`.
 
 ## Implementation Map
 
@@ -126,5 +147,5 @@ This is the pattern for future domains: add or update YAML, declare ownership in
 - Manual trigger: `rust/xtask/src/sem_reg.rs`
 - Domain pack object migration: `rust/migrations/20260514_sem_os_domain_pack_object.sql`
 - Reload index migration: `rust/migrations/20260514_domain_pack_reload_index.sql`
-- CBU reconciliation harness: `rust/crates/dsl-core/tests/cbu_dsl_reconciliation.rs`
+- Domain-pack reconciliation harness: `rust/crates/dsl-core/tests/domain_pack_dsl_reconciliation.rs`
 - DB reload-index harness: `rust/crates/sem_os_harness/src/lib.rs`

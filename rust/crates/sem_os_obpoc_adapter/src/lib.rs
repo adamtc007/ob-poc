@@ -48,14 +48,9 @@ pub fn build_seed_bundle_with_metadata(
     let mut verb_contract_bodies = scanner::scan_verb_contracts(verbs_config);
     let mut entity_type_bodies = scanner::infer_entity_types_from_verbs(verbs_config);
     let attribute_bodies = scanner::infer_attributes_from_verbs(verbs_config, &entity_type_bodies);
-    let macro_defs = pipeline_seeds::scan_macro_defs().unwrap_or_default();
-    let universes = pipeline_seeds::scan_universes().unwrap_or_default();
-    let constellation_families = pipeline_seeds::scan_constellation_families().unwrap_or_default();
-    let constellation_maps = pipeline_seeds::scan_constellation_maps().unwrap_or_default();
-    let state_machines = pipeline_seeds::scan_state_machines().unwrap_or_default();
     let state_graphs = pipeline_seeds::scan_state_graphs().unwrap_or_default();
-    let dag_taxonomies = pipeline_seeds::scan_dag_taxonomies().unwrap_or_default();
-    let domain_packs = pipeline_seeds::scan_domain_packs().unwrap_or_default();
+    let domain_pack_taxonomies = pipeline_seeds::scan_domain_pack_taxonomy_seeds()
+        .expect("SemOS domain-pack taxonomy seeds must load from manifest-owned YAML");
 
     // 2. Enrich with DomainMetadata if available
     if let Some(meta) = domain_metadata {
@@ -130,14 +125,14 @@ pub fn build_seed_bundle_with_metadata(
     let mut bundle = SeedBundle {
         bundle_hash: String::new(),
         verb_contracts,
-        macro_defs,
-        universes,
-        constellation_families,
-        constellation_maps,
-        state_machines,
+        macro_defs: domain_pack_taxonomies.macro_defs,
+        universes: domain_pack_taxonomies.universes,
+        constellation_families: domain_pack_taxonomies.constellation_families,
+        constellation_maps: domain_pack_taxonomies.constellation_maps,
+        state_machines: domain_pack_taxonomies.state_machines,
         state_graphs,
-        dag_taxonomies,
-        domain_packs,
+        dag_taxonomies: domain_pack_taxonomies.dag_taxonomies,
+        domain_packs: domain_pack_taxonomies.domain_packs,
         attributes,
         entity_types,
         taxonomies,

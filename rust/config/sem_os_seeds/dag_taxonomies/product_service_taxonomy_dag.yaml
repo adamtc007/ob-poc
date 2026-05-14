@@ -48,6 +48,20 @@ version: "1.0"
 workspace: product_maintenance
 dag_id: product_service_taxonomy_dag
 
+dsl_verb_reconciliation:
+  service_option_surface:
+    - service-option.list-by-service
+    - service-option.read
+  service_version_surface:
+    - service-version.compare
+    - service-version.draft
+    - service-version.update
+  service_catalogue_surface:
+    - service.bind-option-source
+    - service.constrain-option-values
+    - service.list-versions
+    - service.show
+
 # =============================================================================
 # 1. OVERALL LIFECYCLE — catalog-exploration journey
 # =============================================================================

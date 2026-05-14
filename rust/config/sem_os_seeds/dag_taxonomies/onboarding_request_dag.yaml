@@ -41,6 +41,15 @@ version: "1.0"
 workspace: onboarding_request
 dag_id: onboarding_request_dag
 
+dsl_verb_reconciliation:
+  onboarding_read_model:
+    - onboarding.get-data-request
+    - onboarding.get-slice
+    - onboarding.get-slice-attrs
+    - onboarding.list-data-requests
+    - onboarding.list-slices
+    - service-resource.get-provisioning-status
+
 # =============================================================================
 # 1. OVERALL LIFECYCLE — handoff-request journey
 # =============================================================================

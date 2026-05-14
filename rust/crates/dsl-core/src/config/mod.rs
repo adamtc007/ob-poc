@@ -34,7 +34,7 @@ pub mod tier_gate;
 pub mod types;
 pub mod validator;
 
-pub use dag::{load_dags_from_dir, Dag, LoadedDag};
+pub use dag::{load_dags_from_dir, load_domain_pack_owned_dags, Dag, LoadedDag};
 pub use dag_registry::{DagRegistry, SlotKey, TransitionKey};
 pub use dag_validator::{
     entity_kinds_from_taxonomy_yaml, validate_constellation_map_dir_schema_coordination,

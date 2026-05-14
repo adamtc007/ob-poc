@@ -199,6 +199,14 @@ pub fn reload_domain_pack_taxonomy_from_yaml(
     for pack_id in &manifest.owned_packs {
         let (path, yaml) = find_yaml_by_field(&config_root.join("packs"), &["id"], pack_id)?;
         insert_surface(&mut surfaces, format!("pack:{pack_id}"), path, &yaml)?;
+
+        for macro_fqn in owned_pack_macro_fqns(config_root, pack_id)? {
+            let (path, yaml) = find_macro_yaml_by_fqn(
+                &config_root.join("verb_schemas/macros"),
+                &macro_fqn,
+            )?;
+            insert_surface(&mut surfaces, format!("macro:{macro_fqn}"), path, &yaml)?;
+        }
     }
 
     for state_machine in &manifest.owned_state_machines {
@@ -1110,6 +1118,47 @@ fn find_yaml_by_field(
         fields,
         expected
     )
+}
+
+fn owned_pack_macro_fqns(config_root: &Path, pack_id: &str) -> Result<Vec<String>> {
+    let (_, pack_yaml) = find_yaml_by_field(&config_root.join("packs"), &["id"], pack_id)?;
+    let macro_defs = macro_definition_index(&config_root.join("verb_schemas/macros"))?;
+    Ok(yaml_field(&pack_yaml, "allowed_verbs")
+        .and_then(serde_yaml::Value::as_sequence)
+        .into_iter()
+        .flatten()
+        .filter_map(serde_yaml::Value::as_str)
+        .filter(|allowed| macro_defs.contains_key(*allowed))
+        .map(ToString::to_string)
+        .collect())
+}
+
+fn find_macro_yaml_by_fqn(dir: &Path, expected: &str) -> Result<(PathBuf, serde_yaml::Value)> {
+    macro_definition_index(dir)?
+        .remove(expected)
+        .with_context(|| format!("failed to find macro definition {expected} in {}", dir.display()))
+}
+
+fn macro_definition_index(dir: &Path) -> Result<BTreeMap<String, (PathBuf, serde_yaml::Value)>> {
+    let mut out = BTreeMap::new();
+    for path in yaml_files(dir)? {
+        let yaml = parse_yaml_file(&path)?;
+        let Some(mapping) = yaml.as_mapping() else {
+            continue;
+        };
+        for (key, body) in mapping {
+            let Some(fqn) = key.as_str() else {
+                continue;
+            };
+            if out
+                .insert(fqn.to_string(), (path.clone(), body.clone()))
+                .is_some()
+            {
+                bail!("duplicate macro definition {fqn}");
+            }
+        }
+    }
+    Ok(out)
 }
 
 fn insert_surface(

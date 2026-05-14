@@ -59,6 +59,10 @@ version: "1.0"
 workspace: booking_principal
 dag_id: booking_principal_dag
 
+dsl_verb_reconciliation:
+  clearance_pack_surface:
+    - booking-principal-clearance.create
+
 # =============================================================================
 # 1. OVERALL LIFECYCLE — clearance pipeline
 # =============================================================================

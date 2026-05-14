@@ -71,6 +71,12 @@ version: "1.0"
 workspace: deal
 dag_id: deal_dag
 
+dsl_verb_reconciliation:
+  deal_pack_surface:
+    - contract.create
+    - deal.list-contracts
+    - deal.read
+
 # =============================================================================
 # 1. OVERALL DEAL LIFECYCLE (per deal, derived)
 # =============================================================================
