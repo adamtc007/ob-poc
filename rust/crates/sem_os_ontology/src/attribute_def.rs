@@ -2,7 +2,7 @@
 
 use serde::{Deserialize, Serialize};
 
-use crate::types::{AttributeVisibility, EvidenceGrade};
+use sem_os_types::{AttributeVisibility, EvidenceGrade};
 
 fn default_attribute_evidence_grade() -> EvidenceGrade {
     EvidenceGrade::None

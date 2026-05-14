@@ -9,7 +9,7 @@
 
 use serde::{Deserialize, Serialize};
 
-use crate::types::EvidenceGrade;
+use sem_os_types::EvidenceGrade;
 
 fn default_true() -> bool {
     true
