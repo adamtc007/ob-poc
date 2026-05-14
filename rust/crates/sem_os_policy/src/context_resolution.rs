@@ -29,15 +29,15 @@ use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 use crate::abac::{evaluate_abac, AccessDecision, AccessPurpose, ActorContext};
-use crate::constellation_family_def::GroundingThreshold;
+use sem_os_ontology::constellation_family_def::GroundingThreshold;
 #[cfg(test)]
-use crate::membership::MembershipKind;
-use crate::membership::{MembershipCondition, MembershipRuleBody};
-use crate::policy_rule::PolicyRuleBody;
-use crate::relationship_type_def::RelationshipTypeDefBody;
-use crate::types::{GovernanceTier, SnapshotRow, TrustClass};
-use crate::universe_def::{EntryQuestion, GroundingInput};
-use crate::view_def::ViewDefBody;
+use sem_os_ontology::membership::MembershipKind;
+use sem_os_ontology::membership::{MembershipCondition, MembershipRuleBody};
+use sem_os_ontology::policy_rule::PolicyRuleBody;
+use sem_os_ontology::relationship_type_def::RelationshipTypeDefBody;
+use sem_os_types::{GovernanceTier, SnapshotRow, TrustClass};
+use sem_os_ontology::universe_def::{EntryQuestion, GroundingInput};
+use sem_os_ontology::view_def::ViewDefBody;
 
 // ── Evidence Mode ─────────────────────────────────────────────
 
@@ -727,7 +727,7 @@ impl SubjectRelationships {
 }
 
 /// Inputs used to filter and rank candidate verbs during context resolution.
-pub(crate) struct VerbFilterContext<'a> {
+pub struct VerbFilterContext<'a> {
     /// Actor context used for ABAC evaluation.
     pub actor: &'a ActorContext,
     /// Evidence mode for the current resolution.
@@ -747,7 +747,7 @@ pub(crate) struct VerbFilterContext<'a> {
 // ── Pure Scoring / Filtering Functions ────────────────────────
 
 /// Step 3: Rank views by taxonomy overlap with the subject.
-pub(crate) fn rank_views_by_overlap(
+pub fn rank_views_by_overlap(
     views: &[(SnapshotRow, ViewDefBody)],
     subject: &ResolvedSubject,
     memberships: &SubjectMemberships,
@@ -770,7 +770,7 @@ pub(crate) fn rank_views_by_overlap(
 }
 
 /// Compute overlap score between a view and a resolved subject.
-pub(crate) fn compute_view_overlap(
+pub fn compute_view_overlap(
     view: &ViewDefBody,
     subject: &ResolvedSubject,
     memberships: &SubjectMemberships,
@@ -817,7 +817,7 @@ pub(crate) fn compute_view_overlap(
 }
 
 /// Step 5: Filter and rank verbs by taxonomy + ABAC + tier + relationship edge_class.
-pub(crate) fn filter_and_rank_verbs(
+pub fn filter_and_rank_verbs(
     verb_rows: &[SnapshotRow],
     ctx: VerbFilterContext<'_>,
 ) -> (Vec<VerbCandidate>, Vec<EntityKindPrunedVerb>) {
@@ -1489,7 +1489,7 @@ pub fn build_subject_memberships(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::types::Classification;
+    use sem_os_types::Classification;
 
     fn test_actor() -> ActorContext {
         ActorContext {
@@ -1924,9 +1924,9 @@ mod tests {
                 domain: "ownership".into(),
                 source_entity_type_fqn: "entity.fund".into(),
                 target_entity_type_fqn: "entity.legal_entity".into(),
-                cardinality: crate::relationship_type_def::RelationshipCardinality::OneToMany,
+                cardinality: sem_os_ontology::relationship_type_def::RelationshipCardinality::OneToMany,
                 edge_class: Some("ownership".into()),
-                directionality: Some(crate::relationship_type_def::Directionality::Forward),
+                directionality: Some(sem_os_ontology::relationship_type_def::Directionality::Forward),
                 inverse_fqn: None,
                 constraints: vec![],
             }],
@@ -1937,7 +1937,7 @@ mod tests {
                 domain: "custody".into(),
                 source_entity_type_fqn: "entity.custodian".into(),
                 target_entity_type_fqn: "entity.fund".into(),
-                cardinality: crate::relationship_type_def::RelationshipCardinality::OneToMany,
+                cardinality: sem_os_ontology::relationship_type_def::RelationshipCardinality::OneToMany,
                 edge_class: Some("service".into()),
                 directionality: None,
                 inverse_fqn: None,
@@ -1961,7 +1961,7 @@ mod tests {
                 domain: "ownership".into(),
                 source_entity_type_fqn: "entity.fund".into(),
                 target_entity_type_fqn: "entity.legal_entity".into(),
-                cardinality: crate::relationship_type_def::RelationshipCardinality::OneToMany,
+                cardinality: sem_os_ontology::relationship_type_def::RelationshipCardinality::OneToMany,
                 edge_class: None,
                 directionality: None,
                 inverse_fqn: None,

@@ -41,5 +41,10 @@
 //! from `sem_os_core` until Phase 12 cleanup.
 
 pub mod abac;
+pub mod acp_projection;
+pub mod context_policy;
+pub mod context_resolution;
 pub mod derivation;
+pub mod domain_pack;
+pub mod grounding;
 pub mod security;

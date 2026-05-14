@@ -10,13 +10,13 @@ use std::collections::{HashMap, HashSet};
 
 use serde::{Deserialize, Serialize};
 
-use crate::constellation_map_def::{
+use sem_os_ontology::constellation_map_def::{
     ConstellationMapDefBody, DependencyEntry, SlotDef, VerbPaletteEntry,
 };
 use crate::context_resolution::{
     BlockedActionOption, GroundedActionOption, GroundedConstraintSignal,
 };
-use crate::state_machine_def::StateMachineDefBody;
+use sem_os_ontology::state_machine_def::StateMachineDefBody;
 
 /// Fully flattened constellation model used for grounding.
 #[derive(Debug, Clone)]
@@ -337,8 +337,8 @@ fn action_kind_for(entry: &VerbPaletteEntry) -> &'static str {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::constellation_map_def::ConstellationMapDefBody;
-    use crate::state_machine_def::StateMachineDefBody;
+    use sem_os_ontology::constellation_map_def::ConstellationMapDefBody;
+    use sem_os_ontology::state_machine_def::StateMachineDefBody;
 
     #[test]
     fn computes_valid_action_for_slot_with_satisfied_dependencies() {

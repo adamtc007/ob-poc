@@ -1,19 +1,10 @@
-pub mod acp_projection;
 pub mod affinity;
 pub mod authoring;
-// context_policy and grounding still live here. They depend on
-// domain_pack (context_policy) and context_resolution (grounding),
-// which are still here. When those move in Phase 6, context_policy
-// and grounding can follow as intra-policy refs.
-pub mod context_policy;
-pub mod context_resolution;
 pub mod diagram;
-pub mod domain_pack;
 pub mod enforce;
 pub mod error;
 pub mod execution;
 pub(crate) mod gates;
-pub mod grounding;
 pub mod ids;
 pub mod observatory;
 pub mod ports;
@@ -25,16 +16,20 @@ pub mod state_simulation;
 pub mod stewardship;
 pub mod types;
 
-// sem_os_core-split v1 Phase 5 (2026-05-14): policy-tier leaves + derivation
-// relocated to `sem_os_policy`. Compat re-exports preserve
-// `sem_os_core::{abac, security, derivation}::*` for downstream consumers.
-// security promoted from pub(crate) → pub by this move (ADR §5 decision 1).
-// context_policy + grounding deferred to Phase 6 — they reach
-// domain_pack/context_resolution which are sem_os_core internals; moving
-// them now would create a Cargo cycle.
-// Removed in Phase 12.
+// sem_os_core-split v1 Phases 5–6 (2026-05-14): policy-tier modules
+// relocated to `sem_os_policy`. The 5 Phase 6 modules paired-moved as
+// a tight cluster (domain_pack ↔ acp_projection ↔ context_resolution
+// ↔ context_policy ↔ grounding) — they cross-reference each other,
+// so they all had to land in the same crate to avoid the Cargo cycle
+// pattern Phase 5 first hit. Compat re-exports preserve all
+// `sem_os_core::*` paths for downstream consumers. Removed in Phase 12.
 pub use sem_os_policy::abac;
+pub use sem_os_policy::acp_projection;
+pub use sem_os_policy::context_policy;
+pub use sem_os_policy::context_resolution;
 pub use sem_os_policy::derivation;
+pub use sem_os_policy::domain_pack;
+pub use sem_os_policy::grounding;
 pub use sem_os_policy::security;
 
 // sem_os_core-split v1 Phases 2–3 (2026-05-14): ontology modules
