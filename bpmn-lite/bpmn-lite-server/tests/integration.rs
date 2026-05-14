@@ -9,10 +9,10 @@
 use std::collections::BTreeMap;
 use std::sync::Arc;
 
-use bpmn_lite_core::engine::BpmnLiteEngine;
-use bpmn_lite_core::store_memory::MemoryStore;
-use bpmn_lite_core::types::{ErrorClass, ProcessState};
-use bpmn_lite_core::vm::compute_hash;
+use bpmn_lite_engine::BpmnLiteEngine;
+use bpmn_lite_store::store_memory::MemoryStore;
+use bpmn_lite_types::{ErrorClass, ProcessState};
+use bpmn_lite_vm::compute_hash;
 
 /// Minimal BPMN with one service task.
 const MINIMAL_BPMN: &str = r#"<?xml version="1.0" encoding="UTF-8"?>

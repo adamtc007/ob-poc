@@ -2,7 +2,6 @@
 members = [
     "bpmn-lite-authoring",
     "bpmn-lite-compiler",
-    "bpmn-lite-core",
     "bpmn-lite-engine",
     "bpmn-lite-server",
     "bpmn-lite-store",

@@ -6,8 +6,8 @@ use tokio::sync::Semaphore;
 use tonic::{Request, Response, Status};
 use uuid::Uuid;
 
-use bpmn_lite_core::engine::BpmnLiteEngine;
-use bpmn_lite_core::types::{ErrorClass, Value};
+use bpmn_lite_engine::BpmnLiteEngine;
+use bpmn_lite_types::{ErrorClass, Value};
 
 use crate::event_fanout::EventFanout;
 
@@ -324,7 +324,7 @@ impl BpmnLite for BpmnLiteService {
         self.limits.check_orch_flags(&req.orch_flags)?;
         let bytecode_version = parse_bytecode_version(&req.bytecode_version)?;
         let hash = parse_hash(&req.domain_payload_hash)?;
-        let actual_hash = bpmn_lite_core::vm::compute_hash(&req.domain_payload);
+        let actual_hash = bpmn_lite_vm::compute_hash(&req.domain_payload);
         if actual_hash != hash {
             return Err(Status::invalid_argument(
                 "domain_payload_hash does not match domain_payload",
@@ -339,7 +339,7 @@ impl BpmnLite for BpmnLiteService {
 
         let instance_id = self
             .engine
-            .start_with_params(bpmn_lite_core::engine::StartParams {
+            .start_with_params(bpmn_lite_engine::StartParams {
                 process_key: req.process_key.clone(),
                 bytecode_version,
                 domain_payload: req.domain_payload.clone(),
@@ -387,7 +387,7 @@ impl BpmnLite for BpmnLiteService {
         let hash = if req.payload.is_empty() {
             None
         } else {
-            Some(bpmn_lite_core::vm::compute_hash(
+            Some(bpmn_lite_vm::compute_hash(
                 payload.unwrap_or_default(),
             ))
         };
@@ -449,11 +449,11 @@ impl BpmnLite for BpmnLiteService {
         let inspection = self.engine.inspect(instance_id).await.map_err(engine_err)?;
 
         let state_str = match &inspection.state {
-            bpmn_lite_core::types::ProcessState::Running => "RUNNING",
-            bpmn_lite_core::types::ProcessState::Completed { .. } => "COMPLETED",
-            bpmn_lite_core::types::ProcessState::Cancelled { .. } => "CANCELLED",
-            bpmn_lite_core::types::ProcessState::Failed { .. } => "FAILED",
-            bpmn_lite_core::types::ProcessState::Terminated { .. } => "TERMINATED",
+            bpmn_lite_types::ProcessState::Running => "RUNNING",
+            bpmn_lite_types::ProcessState::Completed { .. } => "COMPLETED",
+            bpmn_lite_types::ProcessState::Cancelled { .. } => "CANCELLED",
+            bpmn_lite_types::ProcessState::Failed { .. } => "FAILED",
+            bpmn_lite_types::ProcessState::Terminated { .. } => "TERMINATED",
         };
 
         let fibers: Vec<FiberInfo> = inspection
@@ -472,28 +472,28 @@ impl BpmnLite for BpmnLiteService {
         let waits: Vec<WaitInfo> = inspection
             .fibers
             .iter()
-            .filter(|f| !matches!(f.wait_state, bpmn_lite_core::types::WaitState::Running))
+            .filter(|f| !matches!(f.wait_state, bpmn_lite_types::WaitState::Running))
             .map(|f| {
                 let (wt, detail) = match &f.wait_state {
-                    bpmn_lite_core::types::WaitState::Timer { .. } => {
+                    bpmn_lite_types::WaitState::Timer { .. } => {
                         ("TIMER".to_string(), String::new())
                     }
-                    bpmn_lite_core::types::WaitState::Msg { .. } => {
+                    bpmn_lite_types::WaitState::Msg { .. } => {
                         ("MESSAGE".to_string(), String::new())
                     }
-                    bpmn_lite_core::types::WaitState::Job { job_key } => {
+                    bpmn_lite_types::WaitState::Job { job_key } => {
                         ("JOB".to_string(), job_key.clone())
                     }
-                    bpmn_lite_core::types::WaitState::Join { .. } => {
+                    bpmn_lite_types::WaitState::Join { .. } => {
                         ("JOIN".to_string(), String::new())
                     }
-                    bpmn_lite_core::types::WaitState::Incident { incident_id } => {
+                    bpmn_lite_types::WaitState::Incident { incident_id } => {
                         ("INCIDENT".to_string(), incident_id.to_string())
                     }
-                    bpmn_lite_core::types::WaitState::Race { race_id, .. } => {
+                    bpmn_lite_types::WaitState::Race { race_id, .. } => {
                         ("RACE".to_string(), format!("race_{}", race_id))
                     }
-                    bpmn_lite_core::types::WaitState::Running => unreachable!(),
+                    bpmn_lite_types::WaitState::Running => unreachable!(),
                 };
                 WaitInfo {
                     fiber_id: f.fiber_id.to_string(),

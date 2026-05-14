@@ -1,9 +1,9 @@
 use std::sync::Arc;
 use uuid::Uuid;
 
-use bpmn_lite_core::engine::BpmnLiteEngine;
-use bpmn_lite_core::store::ProcessStore;
-use bpmn_lite_core::store_memory::MemoryStore;
+use bpmn_lite_engine::BpmnLiteEngine;
+use bpmn_lite_store::store::ProcessStore;
+use bpmn_lite_store::store_memory::MemoryStore;
 use bpmn_lite_server::event_fanout::EventFanout;
 use bpmn_lite_server::grpc::proto::bpmn_lite_server::BpmnLiteServer;
 use bpmn_lite_server::grpc::{BpmnLiteService, RequestLimits, ServerMetrics};
@@ -31,7 +31,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         Some(url) => {
             tracing::info!("Connecting to PostgreSQL...");
             let pool = sqlx::PgPool::connect(&url).await?;
-            let pg = bpmn_lite_core::store_postgres::PostgresProcessStore::new(pool);
+            let pg = bpmn_lite_store_postgres::PostgresProcessStore::new(pool);
             pg.migrate().await?;
             tracing::info!("Using PostgresProcessStore (migrations applied)");
             Arc::new(pg)

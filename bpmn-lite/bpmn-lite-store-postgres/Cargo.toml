@@ -28,7 +28,9 @@ ob-poc-types = { path = "../../rust/crates/ob-poc-types" }
 tracing = { workspace = true }
 
 [dev-dependencies]
-bpmn-lite-core = { path = "../bpmn-lite-core" }
+bpmn-lite-engine = { path = "../bpmn-lite-engine" }
+bpmn-lite-vm = { path = "../bpmn-lite-vm" }
+bpmn-lite-authoring = { path = "../bpmn-lite-authoring" }
 tokio = { workspace = true, features = ["test-util"] }
 sha2 = { workspace = true }
 

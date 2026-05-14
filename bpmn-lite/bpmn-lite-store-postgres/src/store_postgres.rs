@@ -1171,7 +1171,7 @@ impl ProcessStore for PostgresProcessStore {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use bpmn_lite_core::engine::BpmnLiteEngine;
+    use bpmn_lite_engine::BpmnLiteEngine;
     use sqlx::PgPool;
     use std::collections::BTreeMap;
     use std::sync::Arc;
@@ -1772,7 +1772,7 @@ mod tests {
 
         // Start process
         let payload = r#"{"case_id":"test-123"}"#;
-        let hash = bpmn_lite_core::vm::compute_hash(payload);
+        let hash = bpmn_lite_vm::compute_hash(payload);
         let instance_id = engine
             .start("smoke_proc", version, payload, hash, "test-corr-1")
             .await
@@ -1796,7 +1796,7 @@ mod tests {
 
         // Complete job
         let completion_payload = r#"{"result":"ok"}"#;
-        let completion_hash = bpmn_lite_core::vm::compute_hash(completion_payload);
+        let completion_hash = bpmn_lite_vm::compute_hash(completion_payload);
         engine
             .complete_job(
                 &job.job_key,
