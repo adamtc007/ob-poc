@@ -3,7 +3,7 @@
 //! Loads entity definitions from `config/ontology/entity_taxonomy.yaml` and provides
 //! lookup methods for entity types, FK relationships, and implicit creation config.
 
-use crate::ontology::types::{EntityDef, EntityTaxonomyConfig, FkRelationship};
+use crate::types::{EntityDef, EntityTaxonomyConfig, FkRelationship};
 use std::collections::HashMap;
 use std::path::Path;
 
@@ -20,7 +20,7 @@ pub struct EntityTaxonomy {
     fk_index: HashMap<(String, String), String>,
 
     /// Reference tables
-    reference_tables: HashMap<String, crate::ontology::types::ReferenceTableDef>,
+    reference_tables: HashMap<String, crate::types::ReferenceTableDef>,
 }
 
 impl EntityTaxonomy {
@@ -144,7 +144,7 @@ impl EntityTaxonomy {
     pub fn get_lifecycle(
         &self,
         entity_type: &str,
-    ) -> Option<&crate::ontology::types::EntityLifecycle> {
+    ) -> Option<&crate::types::EntityLifecycle> {
         // Handle aliases
         let resolved_type = self
             .entities
@@ -179,7 +179,7 @@ impl EntityTaxonomy {
     pub fn get_reference_table(
         &self,
         name: &str,
-    ) -> Option<&crate::ontology::types::ReferenceTableDef> {
+    ) -> Option<&crate::types::ReferenceTableDef> {
         self.reference_tables.get(name)
     }
 
@@ -187,7 +187,7 @@ impl EntityTaxonomy {
     pub fn get_db_config(
         &self,
         entity_type: &str,
-    ) -> Option<&crate::ontology::types::EntityDbConfig> {
+    ) -> Option<&crate::types::EntityDbConfig> {
         self.entities.get(entity_type).map(|e| &e.db)
     }
 

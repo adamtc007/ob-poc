@@ -13,7 +13,7 @@
 //! - `is_terminal_state` - Check if state has no outbound transitions
 //! - `terminal_states` - Get all terminal states for a lifecycle
 
-use crate::ontology::types::EntityLifecycle;
+use crate::types::EntityLifecycle;
 
 /// Check if a transition from `from_state` to `to_state` is valid.
 pub fn is_valid_transition(lifecycle: &EntityLifecycle, from_state: &str, to_state: &str) -> bool {
@@ -150,7 +150,7 @@ pub(crate) fn terminal_states(lifecycle: &EntityLifecycle) -> Vec<&str> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::ontology::types::StateTransition;
+    use crate::types::StateTransition;
 
     fn test_lifecycle() -> EntityLifecycle {
         EntityLifecycle {

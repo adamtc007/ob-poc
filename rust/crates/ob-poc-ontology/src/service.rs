@@ -3,8 +3,8 @@
 //! Provides a thread-safe, lazily-loaded global accessor for the entity taxonomy
 //! and verb lifecycle information.
 
-use crate::ontology::taxonomy::EntityTaxonomy;
-use crate::ontology::types::{EntityDef, EntityLifecycle};
+use crate::taxonomy::EntityTaxonomy;
+use crate::types::{EntityDef, EntityLifecycle};
 use std::path::PathBuf;
 use std::sync::{Arc, OnceLock};
 

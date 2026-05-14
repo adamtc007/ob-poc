@@ -5,6 +5,7 @@ edition = "2021"
 description = "Ontology lifecycle and semantic-stage reference data. Lifecycle stage / semantic stage definitions, entity taxonomy YAML loader, service-level lookups. No DB coupling — pure config + types."
 
 [dependencies]
+dsl-core = { path = "../dsl-core" }
 ob-poc-types = { path = "../ob-poc-types" }
 chrono = { version = "0.4", features = ["serde"] }
 serde = { version = "1", features = ["derive"] }

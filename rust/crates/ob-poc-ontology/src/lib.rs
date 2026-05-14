@@ -1,13 +1,29 @@
-//! ob-poc-ontology — Ontology lifecycle and semantic-stage reference data.
+//! ob-poc-ontology — Ontology lifecycle and entity-taxonomy reference data.
 //!
-//! ## Capability claim
+//! Relocated from `ob_poc_domain::ontology` by ob-poc-domain split v1
+//! Slice B2 (2026-05-14).
 //!
-//! Owns the ontology lifecycle vocabulary: lifecycle-stage definitions,
-//! semantic-stage definitions, the entity taxonomy YAML loader, and the
-//! ontology service-level lookup helpers. Pure config + types — no
-//! database coupling.
+//! Loads and manages the entity taxonomy configuration from YAML,
+//! providing:
+//! - Entity type definitions with DB mappings
+//! - Lifecycle state machines for entities
+//! - FK relationship inference for the DSL planner
+//! - Implicit entity creation configuration
+//! - Semantic stage map for onboarding journey tracking
 //!
-//! ## Anti-charter
-//!
-//! - NOT taxonomy combinators (those live in `ob-poc-taxonomy`).
-//! - NOT entity extraction (that's `ob-poc-semtaxonomy`).
+//! Config sources:
+//! 1. `entity_taxonomy.yaml` - Entity definitions
+//! 2. `semantic_stage_map.yaml` - Onboarding stage definitions
+//! 3. Verb YAML files - Verb lifecycle semantics (via runtime_registry)
+
+mod lifecycle;
+mod semantic_stage;
+mod service;
+mod taxonomy;
+mod types;
+
+pub use lifecycle::{is_terminal_state, is_valid_state, is_valid_transition, valid_next_states};
+pub use semantic_stage::SemanticStageRegistry;
+pub use service::{ontology, OntologyService};
+pub use taxonomy::EntityTaxonomy;
+pub use types::*;
