@@ -117,7 +117,6 @@ pub mod derived_attributes;
 //     + validator.
 //   - entity_linking (~7 files) — mention extraction + resolver +
 //     snapshot + normalize + compiler + stub.
-#[cfg(feature = "database")]
-pub mod entity_linking;
+// entity_linking relocated to `ob-poc-entity-linking` by split v1 Slice B3 (2026-05-14).
 #[cfg(feature = "database")]
 pub mod trading_profile;

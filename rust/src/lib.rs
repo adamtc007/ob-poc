@@ -165,9 +165,10 @@ pub use ob_poc_authoring::macros;
 pub use ob_poc_authoring::lexicon;
 
 // Entity Linking module - In-memory entity resolution from utterances
-// Phase 3 slice 2m (2026-05-12): relocated to ob-poc-boundary; compat re-export.
+// ob-poc-domain split v1 Slice B3 (2026-05-14): entity_linking now lives in
+// `ob-poc-entity-linking`.
 #[cfg(feature = "database")]
-pub use ob_poc_domain::entity_linking;
+pub use ob_poc_entity_linking as entity_linking;
 
 // Lookup module - Unified verb search + entity linking with verb-first ordering
 #[cfg(feature = "database")]

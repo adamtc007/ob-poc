@@ -1,13 +1,63 @@
-//! ob-poc-entity-linking — Entity-linking reference data and resolver shapes.
+//! ob-poc-entity-linking — Entity Linking Service.
 //!
-//! ## Capability claim
+//! Relocated from `ob_poc_domain::entity_linking` by ob-poc-domain split
+//! v1 Slice B3 (2026-05-14).
 //!
-//! Owns the entity-linking data plane: mention extraction, candidate
-//! resolution, lexicon snapshot, normalization, compiler — the shapes for
-//! linking free-form mentions in utterances to canonical entities in the
-//! registry.
+//! Provides fast, in-memory entity resolution from natural language utterances.
+//! Extracts entity mention spans and resolves them to canonical entity IDs
+//! with disambiguation support via kind constraints and concept overlap.
 //!
-//! ## Anti-charter
+//! ## Architecture
 //!
-//! - NOT the LexiconService runtime singleton (that's in ob-poc itself).
-//! - NOT the Drafter mention pipeline.
+//! ```text
+//! Build time:  DB tables → compiler → entity.snapshot.bin
+//! Runtime:     load_binary() → Arc<EntitySnapshot> → EntityLinkingServiceImpl
+//! ```
+//!
+//! ## Hot Path Performance
+//!
+//! All resolution is in-memory (no DB access):
+//! - Alias index lookup: O(1)
+//! - Token overlap matching: O(n * m) where n=query tokens, m=avg entities per token
+//! - Target: p95 < 5ms
+//!
+//! ## Usage
+//!
+//! ```rust,ignore
+//! use ob_poc::entity_linking::{EntityLinkingServiceImpl, EntityLinkingService, EntitySnapshot};
+//! use std::path::Path;
+//! use std::sync::Arc;
+//!
+//! let snapshot = EntitySnapshot::load(Path::new("rust/assets/entity.snapshot.bin"))?;
+//! let service = EntityLinkingServiceImpl::new(Arc::new(snapshot));
+//! let resolutions = service.resolve_mentions(
+//!     "Set up Goldman Sachs for OTC trading",
+//!     Some(&["company".to_string()]),
+//!     None,
+//!     5,
+//! );
+//!
+//! for r in resolutions {
+//!     println!("Found '{}' at {}..{}", r.mention_text, r.mention_span.0, r.mention_span.1);
+//!     if let Some(id) = r.selected {
+//!         println!("  Resolved to: {}", id);
+//!     }
+//! }
+//! ```
+
+pub mod compiler;
+pub mod mention;
+pub mod normalize;
+pub mod resolver;
+pub mod snapshot;
+pub mod stub;
+
+// Re-exports
+pub use compiler::{compile_entity_snapshot, lint_entity_data, LintSeverity, LintWarning};
+pub use mention::{MentionExtractor, MentionSpan};
+pub use normalize::{normalize_entity_text, tokenize};
+pub use resolver::{
+    EntityCandidate, EntityLinkingService, EntityLinkingServiceImpl, EntityResolution, Evidence,
+};
+pub use snapshot::{EntityId, EntityRow, EntitySnapshot, SnapshotStats, SNAPSHOT_VERSION};
+pub use stub::StubEntityLinkingService;
