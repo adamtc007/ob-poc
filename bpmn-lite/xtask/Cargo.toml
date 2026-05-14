@@ -9,3 +9,6 @@ database = []
 
 [dependencies]
 anyhow = { workspace = true }
+
+[lints]
+workspace = true

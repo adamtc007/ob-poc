@@ -27,3 +27,6 @@ ob-poc-types = { path = "../../rust/crates/ob-poc-types" }
 
 [dev-dependencies]
 tokio = { workspace = true, features = ["test-util"] }
+
+[lints]
+workspace = true
