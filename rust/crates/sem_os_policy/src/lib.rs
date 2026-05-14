@@ -42,9 +42,11 @@
 
 pub mod abac;
 pub mod acp_projection;
+pub mod affinity;
 pub mod context_policy;
 pub mod context_resolution;
 pub mod derivation;
+pub mod diagram;
 pub mod domain_pack;
 pub mod grounding;
 pub mod security;

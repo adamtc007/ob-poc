@@ -1,6 +1,4 @@
-pub mod affinity;
 pub mod authoring;
-pub mod diagram;
 pub mod enforce;
 pub mod error;
 pub mod execution;
@@ -25,9 +23,11 @@ pub mod types;
 // `sem_os_core::*` paths for downstream consumers. Removed in Phase 12.
 pub use sem_os_policy::abac;
 pub use sem_os_policy::acp_projection;
+pub use sem_os_policy::affinity;
 pub use sem_os_policy::context_policy;
 pub use sem_os_policy::context_resolution;
 pub use sem_os_policy::derivation;
+pub use sem_os_policy::diagram;
 pub use sem_os_policy::domain_pack;
 pub use sem_os_policy::grounding;
 pub use sem_os_policy::security;

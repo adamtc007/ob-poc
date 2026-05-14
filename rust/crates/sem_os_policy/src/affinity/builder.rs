@@ -10,12 +10,12 @@ use crate::affinity::{
     AffinityEdge, AffinityGraph, AffinityKind, AffinityProvenance, ColumnRef, DataRef,
     DerivationEdge, EntityRelationship, TableRef,
 };
-use crate::attribute_def::AttributeDefBody;
-use crate::derivation_spec::DerivationSpecBody;
-use crate::entity_type_def::EntityTypeDefBody;
-use crate::relationship_type_def::RelationshipTypeDefBody;
-use crate::types::{ObjectType, SnapshotRow};
-use crate::verb_contract::VerbContractBody;
+use sem_os_ontology::attribute_def::AttributeDefBody;
+use sem_os_ontology::derivation_spec::DerivationSpecBody;
+use sem_os_ontology::entity_type_def::EntityTypeDefBody;
+use sem_os_ontology::relationship_type_def::RelationshipTypeDefBody;
+use sem_os_types::{ObjectType, SnapshotRow};
+use sem_os_ontology::verb_contract::VerbContractBody;
 
 impl AffinityGraph {
     /// Build an AffinityGraph from a flat list of active registry snapshots.
@@ -306,8 +306,8 @@ mod tests {
     use chrono::Utc;
     use uuid::Uuid;
 
-    use crate::derivation_spec::DerivationInput;
-    use crate::types::{ChangeType, GovernanceTier, SnapshotStatus, TrustClass};
+    use sem_os_ontology::derivation_spec::DerivationInput;
+    use sem_os_types::{ChangeType, GovernanceTier, SnapshotStatus, TrustClass};
 
     /// Helper: create a minimal SnapshotRow for testing.
     fn snap(object_type: ObjectType, definition: serde_json::Value) -> SnapshotRow {
@@ -357,7 +357,7 @@ mod tests {
             returns: None,
             preconditions: vec![],
             postconditions: vec![],
-            produces: Some(crate::verb_contract::VerbProducesSpec {
+            produces: Some(sem_os_ontology::verb_contract::VerbProducesSpec {
                 entity_type: "cbu".into(),
                 resolved: true,
             }),
@@ -416,7 +416,7 @@ mod tests {
             requires_subject: false,
             produces_focus: false,
             metadata: None,
-            crud_mapping: Some(crate::verb_contract::VerbCrudMapping {
+            crud_mapping: Some(sem_os_ontology::verb_contract::VerbCrudMapping {
                 operation: "select".into(),
                 table: Some("cbus".into()),
                 schema: Some("ob-poc".into()),
@@ -451,12 +451,12 @@ mod tests {
             action: "create".into(),
             description: "Create ISDA".into(),
             behavior: "plugin".into(),
-            args: vec![crate::verb_contract::VerbArgDef {
+            args: vec![sem_os_ontology::verb_contract::VerbArgDef {
                 name: "counterparty".into(),
                 arg_type: "uuid".into(),
                 required: true,
                 description: None,
-                lookup: Some(crate::verb_contract::VerbArgLookup {
+                lookup: Some(sem_os_ontology::verb_contract::VerbArgLookup {
                     table: "entities".into(),
                     entity_type: "entity".into(),
                     schema: Some("ob-poc".into()),
@@ -557,7 +557,7 @@ mod tests {
             name: "Client Business Unit".into(),
             description: "Atomic trading unit".into(),
             domain: "cbu".into(),
-            db_table: Some(crate::entity_type_def::DbTableMapping {
+            db_table: Some(sem_os_ontology::entity_type_def::DbTableMapping {
                 schema: "ob-poc".into(),
                 table: "cbus".into(),
                 primary_key: "cbu_id".into(),
@@ -591,9 +591,9 @@ mod tests {
             name: "jurisdiction_code".into(),
             description: "ISO jurisdiction".into(),
             domain: "cbu".into(),
-            data_type: crate::attribute_def::AttributeDataType::String,
-            evidence_grade: crate::types::EvidenceGrade::None,
-            source: Some(crate::attribute_def::AttributeSource {
+            data_type: sem_os_ontology::attribute_def::AttributeDataType::String,
+            evidence_grade: sem_os_types::EvidenceGrade::None,
+            source: Some(sem_os_ontology::attribute_def::AttributeSource {
                 producing_verb: Some("cbu.create".into()),
                 schema: Some("ob-poc".into()),
                 table: Some("cbus".into()),
@@ -601,7 +601,7 @@ mod tests {
                 derived: false,
             }),
             constraints: None,
-            sinks: vec![crate::attribute_def::AttributeSink {
+            sinks: vec![sem_os_ontology::attribute_def::AttributeSink {
                 consuming_verb: "session.load-jurisdiction".into(),
                 arg_name: "code".into(),
             }],
@@ -666,7 +666,7 @@ mod tests {
                     required: true,
                 },
             ],
-            expression: crate::derivation_spec::DerivationExpression::FunctionRef {
+            expression: sem_os_ontology::derivation_spec::DerivationExpression::FunctionRef {
                 ref_name: "sum_holdings".into(),
             },
             null_semantics: Default::default(),
@@ -694,9 +694,9 @@ mod tests {
             domain: "entity".into(),
             source_entity_type_fqn: "entity.organization".into(),
             target_entity_type_fqn: "entity.organization".into(),
-            cardinality: crate::relationship_type_def::RelationshipCardinality::OneToMany,
+            cardinality: sem_os_ontology::relationship_type_def::RelationshipCardinality::OneToMany,
             edge_class: Some("ownership".into()),
-            directionality: Some(crate::relationship_type_def::Directionality::Forward),
+            directionality: Some(sem_os_ontology::relationship_type_def::Directionality::Forward),
             inverse_fqn: None,
             constraints: vec![],
         })
@@ -736,7 +736,7 @@ mod tests {
             requires_subject: true,
             produces_focus: false,
             metadata: None,
-            crud_mapping: Some(crate::verb_contract::VerbCrudMapping {
+            crud_mapping: Some(sem_os_ontology::verb_contract::VerbCrudMapping {
                 operation: "insert".into(),
                 table: Some("cbus".into()),
                 schema: Some("ob-poc".into()),
@@ -771,7 +771,7 @@ mod tests {
             requires_subject: false,
             produces_focus: false,
             metadata: None,
-            crud_mapping: Some(crate::verb_contract::VerbCrudMapping {
+            crud_mapping: Some(sem_os_ontology::verb_contract::VerbCrudMapping {
                 operation: "select".into(),
                 table: Some("cbus".into()),
                 schema: Some("ob-poc".into()),
@@ -827,7 +827,7 @@ mod tests {
             returns: None,
             preconditions: vec![],
             postconditions: vec![],
-            produces: Some(crate::verb_contract::VerbProducesSpec {
+            produces: Some(sem_os_ontology::verb_contract::VerbProducesSpec {
                 entity_type: "cbu".into(),
                 resolved: true,
             }),
@@ -841,7 +841,7 @@ mod tests {
             requires_subject: true,
             produces_focus: false,
             metadata: None,
-            crud_mapping: Some(crate::verb_contract::VerbCrudMapping {
+            crud_mapping: Some(sem_os_ontology::verb_contract::VerbCrudMapping {
                 operation: "insert".into(),
                 table: Some("cbus".into()),
                 schema: Some("ob-poc".into()),
@@ -860,7 +860,7 @@ mod tests {
             name: "CBU".into(),
             description: "CBU".into(),
             domain: "cbu".into(),
-            db_table: Some(crate::entity_type_def::DbTableMapping {
+            db_table: Some(sem_os_ontology::entity_type_def::DbTableMapping {
                 schema: "ob-poc".into(),
                 table: "cbus".into(),
                 primary_key: "cbu_id".into(),
@@ -883,9 +883,9 @@ mod tests {
             name: "name".into(),
             description: "CBU name".into(),
             domain: "cbu".into(),
-            data_type: crate::attribute_def::AttributeDataType::String,
-            evidence_grade: crate::types::EvidenceGrade::None,
-            source: Some(crate::attribute_def::AttributeSource {
+            data_type: sem_os_ontology::attribute_def::AttributeDataType::String,
+            evidence_grade: sem_os_types::EvidenceGrade::None,
+            source: Some(sem_os_ontology::attribute_def::AttributeSource {
                 producing_verb: Some("cbu.create".into()),
                 schema: Some("ob-poc".into()),
                 table: Some("cbus".into()),
@@ -916,7 +916,7 @@ mod tests {
                 role: "addend".into(),
                 required: true,
             }],
-            expression: crate::derivation_spec::DerivationExpression::FunctionRef {
+            expression: sem_os_ontology::derivation_spec::DerivationExpression::FunctionRef {
                 ref_name: "sum".into(),
             },
             null_semantics: Default::default(),
@@ -934,7 +934,7 @@ mod tests {
             domain: "entity".into(),
             source_entity_type_fqn: "entity.org".into(),
             target_entity_type_fqn: "entity.org".into(),
-            cardinality: crate::relationship_type_def::RelationshipCardinality::OneToMany,
+            cardinality: sem_os_ontology::relationship_type_def::RelationshipCardinality::OneToMany,
             edge_class: None,
             directionality: None,
             inverse_fqn: None,

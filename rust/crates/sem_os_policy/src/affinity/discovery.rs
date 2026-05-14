@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 use crate::affinity::{AffinityGraph, AffinityKind, DataRef};
-use crate::verb_contract::VerbContractBody;
+use sem_os_ontology::verb_contract::VerbContractBody;
 
 /// Full discovery payload for `registry.discover-dsl`.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -619,12 +619,12 @@ mod tests {
     fn generate_disambiguation_for_required_args_and_subject() {
         let mut verb = sample_verb("cbu-role.assign", "set up depositary");
         verb.requires_subject = true;
-        verb.args.push(crate::verb_contract::VerbArgDef {
+        verb.args.push(sem_os_ontology::verb_contract::VerbArgDef {
             name: "entity-id".to_owned(),
             arg_type: "uuid".to_owned(),
             required: true,
             description: None,
-            lookup: Some(crate::verb_contract::VerbArgLookup {
+            lookup: Some(sem_os_ontology::verb_contract::VerbArgLookup {
                 table: "entities".to_owned(),
                 entity_type: "entity".to_owned(),
                 schema: Some("ob-poc".to_owned()),
