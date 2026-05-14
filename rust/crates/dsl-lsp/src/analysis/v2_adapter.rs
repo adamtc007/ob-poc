@@ -300,7 +300,7 @@ fn extract_symbols_from_expr(
 /// This aligns with the REPL's BindingContext and uses the same source of truth.
 fn infer_id_type(verb_name: &str) -> String {
     use dsl_core::config::ConfigLoader;
-    use dsl_runtime::runtime_registry::RuntimeVerbRegistry;
+    use dsl_analysis::runtime_registry::RuntimeVerbRegistry;
 
     // Try to load from registry (cached after first load)
     static REGISTRY: std::sync::OnceLock<Option<RuntimeVerbRegistry>> = std::sync::OnceLock::new();

@@ -48,6 +48,11 @@
 //! surface is added here deliberately so the plane boundary is reviewable
 //! at a glance.
 
+// dsl-runtime is now the data plane only. The 13 analyser-tier modules
+// (validation, verb_registry, runtime_registry, catalogue_loader,
+// entity_kind, macros, ref_resolver, gateway_resolver, lsp_validator,
+// suggestions, planning_facade, stategraph, verification) live in
+// `dsl-analysis`. See docs/todo/dsl-runtime-split-v1.md.
 pub mod bods;
 pub mod cross_workspace;
 pub mod crud_executor;
@@ -57,43 +62,10 @@ pub mod domain_ops;
 pub mod execution;
 pub mod placeholder;
 pub mod port;
-// dsl-runtime-split v1 Phase 3 (2026-05-14): registry cluster relocated
-// to `dsl-analysis` — verb_registry, runtime_registry, catalogue_loader,
-// entity_kind. Compat re-exports keep external + intra-crate
-// `crate::*` / `dsl_runtime::*` paths resolving. Removed in Phase 11.
-pub use dsl_analysis::catalogue_loader;
-pub use dsl_analysis::entity_kind;
-pub use dsl_analysis::runtime_registry;
-pub use dsl_analysis::verb_registry;
-// dsl-runtime-split v1 Phase 2 (2026-05-14): validation relocated to
-// `dsl-analysis` (pure-types module). Compat re-export keeps
-// `dsl_runtime::validation::*` resolving. Removed in Phase 11.
-pub use dsl_analysis::validation;
-// dsl-runtime-split v1 Phases 5–7 (2026-05-14): resolver cluster +
-// lsp_validator + suggestions + planning_facade relocated to
-// `dsl-analysis`. Compat re-exports preserve all `dsl_runtime::*`
-// paths for dsl-lsp and ob-poc::dsl_v2. Removed in Phase 11.
-pub use dsl_analysis::gateway_resolver;
-pub use dsl_analysis::lsp_validator;
-pub use dsl_analysis::planning_facade;
-pub use dsl_analysis::ref_resolver;
-pub use dsl_analysis::suggestions;
-// dsl-runtime-split v1 Phase 4 (2026-05-14): macros registry subset
-// (schema + registry + conditions + variable + scope) relocated to
-// `dsl-analysis`. Expander remains in `ob-poc`. Compat re-export
-// preserves `dsl_runtime::macros::*` for dsl-lsp + ob-poc::dsl_v2::macros.
-// Removed in Phase 11.
-pub use dsl_analysis::macros;
 pub mod service_traits;
 pub mod services;
 pub mod state_reducer;
 pub mod tx;
-// dsl-runtime-split v1 Phase 8 (2026-05-14): stategraph + verification
-// relocated to `dsl-analysis`. Compat re-exports preserve
-// `dsl_runtime::{stategraph, verification}` for sem_os_postgres::ops::
-// {discovery, verify}. Removed in Phase 11.
-pub use dsl_analysis::stategraph;
-pub use dsl_analysis::verification;
 
 // Explicit re-exports — do NOT add `pub use module::*`.
 pub use crud_executor::PgCrudExecutor;

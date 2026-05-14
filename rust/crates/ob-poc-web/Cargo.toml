@@ -56,6 +56,10 @@ sem_os_postgres = { path = "../sem_os_postgres" }
 # Phase 3 relocation of PgCrudExecutor from sem_os_postgres to dsl-runtime
 # means the startup wiring now imports it from this crate.
 dsl-runtime = { path = "../dsl-runtime" }
+# dsl-runtime-split v1 Phase 11 (2026-05-14): main.rs reaches
+# `dsl_analysis::catalogue_loader` directly for the boot-time YAML→DB
+# seed pipeline.
+dsl-analysis = { path = "../dsl-analysis" }
 
 [features]
 default = []

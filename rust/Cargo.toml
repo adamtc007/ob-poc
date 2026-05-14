@@ -34,6 +34,10 @@ sem_os_obpoc_adapter = { path = "crates/sem_os_obpoc_adapter" }
 sem_os_postgres = { path = "crates/sem_os_postgres" }
 governed_query_proc = { path = "crates/governed_query_proc" }
 dsl-runtime = { path = "crates/dsl-runtime" }
+# dsl-runtime-split v1 Phase 11 (2026-05-14): ob-poc reaches the
+# analyser-tier directly through dsl_v2 re-exports + entity_kind callers
+# in mcp/verb_search, sage/verb_resolve, service_resources/discovery.
+dsl-analysis = { path = "crates/dsl-analysis" }
 
 # Core libraries
 anyhow = "1.0"

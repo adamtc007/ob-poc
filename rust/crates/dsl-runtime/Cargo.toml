@@ -20,12 +20,11 @@ description = "DSL verb execution runtime — the data plane of the three-plane 
 # `dsl-runtime-macros` path dep were removed in the same slice.
 [dependencies]
 ob-poc-types = { path = "../ob-poc-types" }
-# dsl-runtime-split v1 Phase 2 (transitional, 2026-05-14): validation
-# module relocated to dsl-analysis. Three intra-crate consumers
-# (gateway_resolver, ref_resolver, lsp_validator) still live here and
-# reach validation types via the compat re-export in lib.rs. Removed
-# in Phase 11 after those modules also relocate.
-dsl-analysis = { path = "../dsl-analysis" }
+# dsl-runtime-split v1 Phase 11 cleanup (2026-05-14): the transitional
+# `dsl-analysis = { path = "../dsl-analysis" }` dep is gone — all 13
+# analyser-tier modules + their compat re-exports moved out, and every
+# consumer reaches `dsl_analysis::*` directly. Hard invariant restored:
+# no edge between dsl-runtime and dsl-analysis in either direction.
 # Phase 5a composite-blocker #23 — domain_ops still uses dsl_core::config
 # loader/types for verb metadata loading.
 dsl-core = { path = "../dsl-core" }

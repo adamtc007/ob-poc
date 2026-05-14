@@ -93,7 +93,7 @@ mod stub_op;
 // `dsl-runtime::domain_ops::discovery_ops` along with its two helper
 // modules: `entity_kind` (81 LOC, zero deps) and `stategraph/`
 // (514 LOC, dsl_core only). 4 ob-poc consumers updated from
-// `crate::entity_kind` → `dsl_runtime::entity_kind`.
+// `crate::entity_kind` → `dsl_analysis::entity_kind`.
 // Inside discovery_ops: `dispatch_tool` calls routed via
 // `StewardshipDispatch` (slice #7 cascade trick); `gateway_addr()`
 // inlined to direct `std::env::var` lookup; legacy `sem_reg_tool`

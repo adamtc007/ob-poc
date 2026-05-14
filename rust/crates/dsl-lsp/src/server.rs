@@ -13,8 +13,8 @@ use crate::analysis::{DocumentState, SymbolTable};
 use crate::encoding::{position_to_offset, PositionEncoding};
 use crate::entity_client::{gateway_addr, EntityLookupClient};
 use crate::handlers;
-use dsl_runtime::planning_facade::PlanningOutput;
-use dsl_runtime::validation::Diagnostic as SemanticDiagnostic;
+use dsl_analysis::planning_facade::PlanningOutput;
+use dsl_analysis::validation::Diagnostic as SemanticDiagnostic;
 
 /// File type detection for dispatch
 enum FileType {

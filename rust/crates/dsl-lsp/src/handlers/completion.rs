@@ -10,10 +10,10 @@ use crate::entity_client::EntityLookupClient;
 
 use dsl_core::binding_context::{BindingContext, BindingInfo};
 use dsl_core::parser::parse_program;
-use dsl_runtime::macros::load_macro_registry;
-use dsl_runtime::runtime_registry::runtime_registry;
-use dsl_runtime::suggestions::predict_next_steps;
-use dsl_runtime::verb_registry::{find_unified_verb, registry};
+use dsl_analysis::macros::load_macro_registry;
+use dsl_analysis::runtime_registry::runtime_registry;
+use dsl_analysis::suggestions::predict_next_steps;
+use dsl_analysis::verb_registry::{find_unified_verb, registry};
 
 /// Generate completions based on cursor position.
 pub(crate) async fn get_completions(

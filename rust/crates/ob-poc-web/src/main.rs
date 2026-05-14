@@ -403,13 +403,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Currently we LOG the resolved source + opportunistically seed the
     // DB table; full Stage 4 swap-out (replace all `load_verbs()` with
     // DB load) is a separate refactor.
-    let catalogue_source = dsl_runtime::catalogue_loader::CatalogueSource::from_env();
+    let catalogue_source = dsl_analysis::catalogue_loader::CatalogueSource::from_env();
     tracing::info!(
         "Catalogue source: {:?} (Tranche 3 Phase 3.F Stage {})",
         catalogue_source,
         match catalogue_source {
-            dsl_runtime::catalogue_loader::CatalogueSource::Yaml => "1/2 (YAML primary)",
-            dsl_runtime::catalogue_loader::CatalogueSource::Db => "3/4 (DB primary)",
+            dsl_analysis::catalogue_loader::CatalogueSource::Yaml => "1/2 (YAML primary)",
+            dsl_analysis::catalogue_loader::CatalogueSource::Db => "3/4 (DB primary)",
         }
     );
 
@@ -421,12 +421,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             // YAML removed).
             if matches!(
                 catalogue_source,
-                dsl_runtime::catalogue_loader::CatalogueSource::Db
+                dsl_analysis::catalogue_loader::CatalogueSource::Db
             ) {
                 let seed_pool = pool.clone();
                 let seed_cfg = verbs_config.clone();
                 tokio::spawn(async move {
-                    match dsl_runtime::catalogue_loader::seed_committed_verbs_from_yaml(
+                    match dsl_analysis::catalogue_loader::seed_committed_verbs_from_yaml(
                         &seed_pool, &seed_cfg,
                     )
                     .await

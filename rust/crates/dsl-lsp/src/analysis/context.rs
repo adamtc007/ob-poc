@@ -338,7 +338,7 @@ fn extract_value_prefix(prefix: &str) -> String {
 /// This replaces the hardcoded `is_entity_keyword()` function with dynamic lookup.
 /// A keyword is an entity keyword if the verb's arg definition has a `lookup` config.
 fn is_entity_keyword_for_verb(verb_name: &str, keyword: &str) -> bool {
-    use dsl_runtime::verb_registry::find_unified_verb;
+    use dsl_analysis::verb_registry::find_unified_verb;
 
     let parts: Vec<&str> = verb_name.split('.').collect();
     if parts.len() != 2 {

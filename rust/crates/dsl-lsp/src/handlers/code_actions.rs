@@ -10,8 +10,8 @@ use tower_lsp::lsp_types::*;
 use crate::encoding::{span_to_range, PositionEncoding};
 use dsl_core::ast::Statement;
 use dsl_core::diagnostics::{DiagnosticCode, SuggestedFix};
-use dsl_runtime::planning_facade::{PlanningOutput, SyntheticStep as PlanningSyntheticStep};
-use dsl_runtime::validation::{Diagnostic as SemanticDiagnostic, Suggestion};
+use dsl_analysis::planning_facade::{PlanningOutput, SyntheticStep as PlanningSyntheticStep};
+use dsl_analysis::validation::{Diagnostic as SemanticDiagnostic, Suggestion};
 
 /// Generate code actions from planning output and semantic diagnostics
 ///
@@ -317,7 +317,7 @@ fn line_col_to_offset(source: &str, line: u32, col: u32) -> Option<usize> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use dsl_runtime::validation::{
+    use dsl_analysis::validation::{
         Diagnostic as SemanticDiagnostic, DiagnosticCode as SemanticDiagnosticCode, Severity,
         SourceSpan, Suggestion,
     };

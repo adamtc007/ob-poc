@@ -89,7 +89,7 @@ pub mod execution_result;
 pub(crate) mod executor;
 pub(crate) mod expansion;
 // §9 item 9 slice 6 (2026-05-13): gateway_resolver relocated to dsl-runtime.
-pub(crate) use dsl_runtime::gateway_resolver;
+pub(crate) use dsl_analysis::gateway_resolver;
 #[cfg(feature = "database")]
 pub(crate) mod generic_executor;
 #[cfg(feature = "database")]
@@ -99,33 +99,33 @@ pub mod idempotency;
 pub mod intent;
 pub mod intent_tiers;
 // §9 item 9 slice 6 (2026-05-13): lsp_validator relocated to dsl-runtime.
-pub(crate) use dsl_runtime::lsp_validator;
+pub(crate) use dsl_analysis::lsp_validator;
 pub(crate) mod macros;
 pub mod operator_types;
 // §9 item 9 slice 5 (2026-05-13): planning_facade relocated to dsl-runtime.
-pub(crate) use dsl_runtime::planning_facade;
+pub(crate) use dsl_analysis::planning_facade;
 // §9 item 9 slice 6 (2026-05-13): ref_resolver relocated to dsl-runtime.
-pub use dsl_runtime::ref_resolver;
+pub use dsl_analysis::ref_resolver;
 pub mod repl_session;
 // §9 item 9 slice 1 (2026-05-13): runtime_registry relocated to
 // dsl-runtime. Compat re-export keeps `super::runtime_registry::*`
 // paths (used by the tooling + execution submodules below) and
 // existing `crate::dsl_v2::runtime_registry::*` callers working.
-pub(crate) use dsl_runtime::runtime_registry;
+pub(crate) use dsl_analysis::runtime_registry;
 #[cfg(feature = "database")]
 pub(crate) mod semantic_validator;
 #[cfg(feature = "database")]
 pub mod sheet_executor;
 pub mod submission;
 // §9 item 9 slice 3 (2026-05-13): suggestions relocated to dsl-runtime.
-pub use dsl_runtime::suggestions;
+pub use dsl_analysis::suggestions;
 pub mod topo_sort;
 // §9 item 9 slice 4 (2026-05-13): validation relocated to dsl-runtime.
-pub(crate) use dsl_runtime::validation;
+pub(crate) use dsl_analysis::validation;
 // §9 item 9 slice 2 (2026-05-13): verb_registry relocated to dsl-runtime.
 // Compat re-export preserves `super::verb_registry::*` (used by the
 // tooling submodule) and `crate::dsl_v2::verb_registry::*` callers.
-pub use dsl_runtime::verb_registry;
+pub use dsl_analysis::verb_registry;
 pub mod verb_taxonomy;
 
 // Re-export local module types

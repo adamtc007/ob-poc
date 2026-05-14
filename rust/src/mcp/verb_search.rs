@@ -53,7 +53,7 @@ use crate::lexicon::LexiconService;
 use crate::mcp::compound_intent::extract_compound_signals;
 use crate::mcp::macro_index::{MacroIndex, MacroResolveOutcome};
 use crate::mcp::scenario_index::{ResolvedRoute, ScenarioIndex, ScenarioResolveOutcome};
-use dsl_runtime::entity_kind::canonicalize as canonicalize_entity_kind;
+use dsl_analysis::entity_kind::canonicalize as canonicalize_entity_kind;
 
 /// Shared lexicon service type alias
 pub type SharedLexicon = Arc<dyn LexiconService>;

@@ -15,10 +15,10 @@ use crate::analysis::parse_with_v2;
 use crate::encoding::{span_to_range as encoding_span_to_range, PositionEncoding};
 
 use dsl_core::config::ConfigLoader;
-use dsl_runtime::lsp_validator::LspValidator;
-use dsl_runtime::planning_facade::{analyse_and_plan, PlanningInput, PlanningOutput};
-use dsl_runtime::runtime_registry::RuntimeVerbRegistry;
-use dsl_runtime::validation::{
+use dsl_analysis::lsp_validator::LspValidator;
+use dsl_analysis::planning_facade::{analyse_and_plan, PlanningInput, PlanningOutput};
+use dsl_analysis::runtime_registry::RuntimeVerbRegistry;
+use dsl_analysis::validation::{
     Diagnostic as SemanticDiagnostic, Severity, SourceSpan, ValidationContext,
 };
 

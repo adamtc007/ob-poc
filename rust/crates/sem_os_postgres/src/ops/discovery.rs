@@ -44,9 +44,9 @@ use dsl_runtime::domain_ops::helpers::{
     json_extract_bool_opt, json_extract_int_opt, json_extract_string, json_extract_string_list_opt,
     json_extract_string_opt, json_extract_uuid,
 };
-use dsl_runtime::entity_kind::matches as entity_kind_matches;
+use dsl_analysis::entity_kind::matches as entity_kind_matches;
 use dsl_runtime::service_traits::StewardshipDispatch;
-use dsl_runtime::stategraph::{load_state_graphs, validate_graphs, walk_graph};
+use dsl_analysis::stategraph::{load_state_graphs, validate_graphs, walk_graph};
 use dsl_runtime::tx::TransactionScope;
 use dsl_runtime::{VerbExecutionContext, VerbExecutionOutcome};
 

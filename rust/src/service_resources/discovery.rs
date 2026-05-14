@@ -23,7 +23,7 @@ use crate::derived_attributes::repository::{
 use crate::sem_reg::{DerivationFunctionRegistry, DerivationSpecBody};
 use crate::services::attribute_identity_service::AttributeIdentityService;
 use crate::services::attribute_registry_enrichment::ensure_semos_registry_bridge;
-use dsl_runtime::entity_kind;
+use dsl_analysis::entity_kind;
 
 // =============================================================================
 // DISCOVERY ENGINE

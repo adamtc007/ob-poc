@@ -28,6 +28,10 @@ tokio = { version = "1", features = ["full", "sync"] }
 # is gone; dsl-lsp is now an analyser-tier consumer only.
 dsl-core = { path = "../dsl-core" }
 dsl-runtime = { path = "../dsl-runtime" }
+# dsl-runtime-split v1 Phase 11 (2026-05-14): dsl-lsp now reaches the
+# analyser-tier modules (validation, verb_registry, runtime_registry,
+# macros, suggestions, planning_facade, lsp_validator) directly.
+dsl-analysis = { path = "../dsl-analysis" }
 
 # Playbook support
 playbook-core = { path = "../playbook-core" }
