@@ -43,10 +43,9 @@ pub mod service_service;
 pub mod session_repository;
 pub mod verb_service;
 // Phase 4.2b (2026-05-13): now lives in ob-poc-domain (slice 2q → 4.2b).
-// The DB-shaped helpers in ViewConfigService are pure sqlx::PgPool queries
-// with no execution-tier coupling, and they pair with the taxonomy module's
-// rules engine (taxonomy/rules.rs imports ViewConfigService).
-pub use ob_poc_domain::view_config_service;
+// ob-poc-domain split v1 Slice C2 (2026-05-14): view_config_service now
+// lives in `ob-poc-taxonomy` (paired with taxonomy::rules which imports it).
+pub use ob_poc_taxonomy::view_config_service;
 pub mod view_state_audit;
 pub mod viewport_service;
 pub mod visualization_repository;

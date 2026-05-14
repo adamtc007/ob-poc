@@ -92,10 +92,9 @@
 //     rules engine. Materialization helpers gated `database`.
 //   - view_config_service (1,032 LOC) — view-mode / node-type / layout
 //     config loader. Pure sqlx::PgPool helpers.
-#[cfg(feature = "database")]
-pub mod taxonomy;
-#[cfg(feature = "database")]
-pub mod view_config_service;
+// taxonomy + view_config_service relocated to `ob-poc-taxonomy` by
+// split v1 Slice C2 (2026-05-14). They paired because taxonomy::rules
+// imports view_config_service.
 
 // Phase 4.2c (2026-05-13): derived_attributes + advisory_lock paired
 // move per plan §6 decision 3 ("Helpers like advisory_lock go with
