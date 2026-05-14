@@ -207,34 +207,6 @@ pub struct ReferenceTableDef {
 }
 
 // =============================================================================
-// Verb Lifecycle Extension Types
-// =============================================================================
-// Note: VerbLifecycle is defined in dsl_v2::config::types and re-exported here.
-// This avoids duplication while keeping the ontology module self-contained for docs.
-
-// Re-export VerbLifecycle from dsl-core (lives one tier down from envelope).
-pub(crate) use dsl_core::config::types::VerbLifecycle;
-
-/// Extended VerbProduces with lifecycle info.
-#[derive(Debug, Clone, Default, Deserialize, Serialize)]
-pub(crate) struct VerbProducesExt {
-    /// Entity type produced (e.g., "cbu", "entity")
-    #[serde(rename = "type")]
-    pub produced_type: String,
-
-    /// Subtype if applicable (e.g., "proper_person")
-    #[serde(default)]
-    pub subtype: Option<String>,
-
-    /// Whether this verb can resolve existing entities
-    #[serde(default)]
-    pub resolved: bool,
-
-    /// Initial state when creating new entity
-    #[serde(default)]
-    pub initial_state: Option<String>,
-}
-
 impl EntityLifecycle {
     /// Check if a transition from `from_state` to `to_state` is valid.
     pub fn is_valid_transition(&self, from_state: &str, to_state: &str) -> bool {

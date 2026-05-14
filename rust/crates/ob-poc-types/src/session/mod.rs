@@ -4,7 +4,7 @@
 //! agent-mode enums plus the workspace registry entry — hoisted from
 //! `ob-poc-boundary::session` in Phase 3C-prep (2026-05-13) per plan
 //! §6.5. They cross capability boundaries (boundary's `acp_dag_semantic`
-//! + `audit_chain`, ob-poc-journey's pack manifest, ob-poc app session
+//! and `audit_chain`, ob-poc-journey's pack manifest, ob-poc app session
 //! machinery) so they belong with the cross-crate primitives.
 //!
 //! Historical note: the file `session/mod.rs` at HEAD before this slice
