@@ -15,6 +15,9 @@ struct Inner {
     join_counters: HashMap<(Uuid, JoinId), u16>,
     dedupe: HashMap<String, (JobCompletion, Instant)>,
     message_dedupe: HashSet<(String, Uuid, String)>,
+    message_buffer: HashMap<(String, String, String, String), BufferedMessage>,
+    message_buffer_claims: HashMap<(String, String, String, String), (String, i64)>,
+    message_buffer_consumed: HashSet<(String, String, String, String)>,
     job_queue: VecDeque<JobActivation>,
     /// Jobs that have been dequeued but not yet acked.
     inflight_jobs: HashMap<String, (JobActivation, Instant)>,
@@ -41,6 +44,9 @@ impl MemoryStore {
                 join_counters: HashMap::new(),
                 dedupe: HashMap::new(),
                 message_dedupe: HashSet::new(),
+                message_buffer: HashMap::new(),
+                message_buffer_claims: HashMap::new(),
+                message_buffer_consumed: HashSet::new(),
                 job_queue: VecDeque::new(),
                 inflight_jobs: HashMap::new(),
                 programs: HashMap::new(),
@@ -69,6 +75,13 @@ fn value_key(v: &Value) -> String {
         Value::Str(s) => format!("s:{s}"),
         Value::Ref(r) => format!("r:{r}"),
     }
+}
+
+fn now_ms() -> i64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_millis() as i64
 }
 
 #[async_trait]
@@ -228,10 +241,13 @@ impl ProcessStore for MemoryStore {
         max: usize,
         tenant_id: &str,
         worker_id: &str,
+        lease_ms: u64,
     ) -> Result<Vec<JobActivation>> {
         let mut w = self.inner.write().await;
         let mut result = Vec::new();
         let mut remaining = VecDeque::new();
+        let now = now_ms();
+        let claim_expires_at = now + lease_ms as i64;
 
         while let Some(mut job) = w.job_queue.pop_front() {
             let job_tenant = w
@@ -242,12 +258,18 @@ impl ProcessStore for MemoryStore {
                 .as_ref()
                 .map(|instance_tenant| instance_tenant == tenant_id)
                 .unwrap_or(false);
-            if result.len() < max && same_tenant && task_types.contains(&job.task_type) {
+            let due = job
+                .not_before
+                .map(|not_before| not_before <= now)
+                .unwrap_or(true);
+            if result.len() < max && same_tenant && due && task_types.contains(&job.task_type) {
                 if let Some(job_tenant) = job_tenant {
                     job.tenant_id = job_tenant;
                 }
                 job.worker_id = worker_id.to_string();
                 job.claim_token = Uuid::now_v7().to_string();
+                job.claim_expires_at = Some(claim_expires_at);
+                job.attempt_count += 1;
                 w.inflight_jobs
                     .insert(job.job_key.clone(), (job.clone(), Instant::now()));
                 result.push(job);
@@ -274,8 +296,74 @@ impl ProcessStore for MemoryStore {
         let w = self.inner.read().await;
         Ok(w.inflight_jobs
             .get(job_key)
-            .map(|(job, _)| job.worker_id == worker_id && job.claim_token == claim_token)
+            .map(|(job, _)| {
+                job.worker_id == worker_id
+                    && job.claim_token == claim_token
+                    && job
+                        .claim_expires_at
+                        .map(|expires_at| expires_at > now_ms())
+                        .unwrap_or(false)
+            })
             .unwrap_or(false))
+    }
+
+    async fn retry_claimed_job(
+        &self,
+        job_key: &str,
+        worker_id: &str,
+        claim_token: &str,
+        error_class: &str,
+        error_message: &str,
+        not_before_ms: i64,
+    ) -> Result<bool> {
+        let mut w = self.inner.write().await;
+        let Some((mut job, _)) = w.inflight_jobs.remove(job_key) else {
+            return Ok(false);
+        };
+        if job.worker_id != worker_id || job.claim_token != claim_token {
+            w.inflight_jobs
+                .insert(job.job_key.clone(), (job, Instant::now()));
+            return Ok(false);
+        }
+        if job.retries_remaining <= 1 {
+            w.inflight_jobs
+                .insert(job.job_key.clone(), (job, Instant::now()));
+            return Ok(false);
+        }
+        job.worker_id.clear();
+        job.claim_token.clear();
+        job.claim_expires_at = None;
+        job.not_before = Some(not_before_ms);
+        job.failure_count += 1;
+        job.retries_remaining = job.retries_remaining.saturating_sub(1);
+        job.orch_flags.insert(
+            "last_error_class".to_string(),
+            Value::Str(error_class.len() as u32),
+        );
+        let _ = error_message;
+        w.job_queue.push_back(job);
+        Ok(true)
+    }
+
+    async fn dead_letter_claimed_job(
+        &self,
+        job_key: &str,
+        worker_id: &str,
+        claim_token: &str,
+        _error_class: &str,
+        _error_message: &str,
+        _incident_id: Uuid,
+    ) -> Result<bool> {
+        let mut w = self.inner.write().await;
+        let Some((job, _)) = w.inflight_jobs.remove(job_key) else {
+            return Ok(false);
+        };
+        if job.worker_id != worker_id || job.claim_token != claim_token {
+            w.inflight_jobs
+                .insert(job.job_key.clone(), (job, Instant::now()));
+            return Ok(false);
+        }
+        Ok(true)
     }
 
     async fn cancel_jobs_for_instance(&self, instance_id: Uuid) -> Result<Vec<String>> {
@@ -340,6 +428,201 @@ impl ProcessStore for MemoryStore {
         let mut w = self.inner.write().await;
         let key = (name, value_key(corr_key));
         Ok(w.dead_letter.remove(&key).map(|(data, _)| data))
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    async fn buffer_message(
+        &self,
+        tenant_id: &str,
+        message_name: &str,
+        correlation_key: &str,
+        msg_id: &str,
+        payload: &[u8],
+        payload_hash: Option<[u8; 32]>,
+        ttl_ms: u64,
+        process_instance_id: Option<Uuid>,
+    ) -> Result<BufferMessageResult> {
+        let mut w = self.inner.write().await;
+        let key = (
+            tenant_id.to_string(),
+            message_name.to_string(),
+            correlation_key.to_string(),
+            msg_id.to_string(),
+        );
+        if w.message_buffer.contains_key(&key) || w.message_buffer_consumed.contains(&key) {
+            return Ok(BufferMessageResult::Duplicate);
+        }
+        let received_at = now_ms();
+        w.message_buffer.insert(
+            key,
+            BufferedMessage {
+                tenant_id: tenant_id.to_string(),
+                message_name: message_name.to_string(),
+                correlation_key: correlation_key.to_string(),
+                msg_id: msg_id.to_string(),
+                payload: payload.to_vec(),
+                payload_hash,
+                process_instance_id,
+                received_at,
+                expires_at: received_at + ttl_ms as i64,
+            },
+        );
+        Ok(BufferMessageResult::Inserted)
+    }
+
+    async fn claim_buffered_message(
+        &self,
+        tenant_id: &str,
+        message_name: &str,
+        correlation_key: &str,
+        claim_ms: u64,
+    ) -> Result<Option<ClaimedBufferedMessage>> {
+        let mut w = self.inner.write().await;
+        let now = now_ms();
+        let key = w
+            .message_buffer
+            .iter()
+            .filter(|((tenant, name, corr, _), msg)| {
+                tenant == tenant_id
+                    && name == message_name
+                    && corr == correlation_key
+                    && msg.expires_at > now
+            })
+            .filter(|(key, _)| {
+                w.message_buffer_claims
+                    .get(*key)
+                    .map(|(_, claim_until)| *claim_until <= now)
+                    .unwrap_or(true)
+            })
+            .min_by_key(|(_, msg)| msg.received_at)
+            .map(|(key, msg)| (key.clone(), msg.clone()));
+
+        let Some((key, message)) = key else {
+            return Ok(None);
+        };
+        let claim_token = Uuid::now_v7().to_string();
+        let claim_until = now + claim_ms as i64;
+        w.message_buffer_claims
+            .insert(key, (claim_token.clone(), claim_until));
+        Ok(Some(ClaimedBufferedMessage {
+            message,
+            claim_token,
+            claim_until,
+        }))
+    }
+
+    async fn atomic_consume_buffered_message(
+        &self,
+        instance: &ProcessInstance,
+        fiber: &Fiber,
+        message: &ClaimedBufferedMessage,
+        payload_update: Option<&PayloadUpdate>,
+        events: &[RuntimeEvent],
+    ) -> Result<bool> {
+        let mut w = self.inner.write().await;
+        let key = (
+            message.message.tenant_id.clone(),
+            message.message.message_name.clone(),
+            message.message.correlation_key.clone(),
+            message.message.msg_id.clone(),
+        );
+        let Some((claim_token, claim_until)) = w.message_buffer_claims.get(&key) else {
+            return Ok(false);
+        };
+        if claim_token != &message.claim_token || *claim_until != message.claim_until {
+            return Ok(false);
+        }
+        if *claim_until <= now_ms() {
+            w.message_buffer_claims.remove(&key);
+            return Ok(false);
+        }
+
+        let mut instance = instance.clone();
+        if let Some(payload_update) = payload_update {
+            instance.domain_payload = Arc::from(payload_update.payload.as_str());
+            instance.domain_payload_hash = payload_update.payload_hash;
+            w.payload_history.insert(
+                (instance.instance_id, payload_update.payload_hash),
+                payload_update.payload.clone(),
+            );
+        }
+        w.instances.insert(instance.instance_id, instance.clone());
+        w.fibers
+            .insert((instance.instance_id, fiber.fiber_id), fiber.clone());
+        for event in events {
+            let seq = w.event_seq.entry(instance.instance_id).or_insert(0);
+            *seq += 1;
+            let current_seq = *seq;
+            w.events
+                .entry(instance.instance_id)
+                .or_default()
+                .push((current_seq, event.clone()));
+        }
+        w.message_buffer_claims.remove(&key);
+        w.message_buffer.remove(&key);
+        w.message_buffer_consumed.insert(key);
+        Ok(true)
+    }
+
+    async fn release_buffered_message_claim(
+        &self,
+        message: &ClaimedBufferedMessage,
+    ) -> Result<bool> {
+        let mut w = self.inner.write().await;
+        let key = (
+            message.message.tenant_id.clone(),
+            message.message.message_name.clone(),
+            message.message.correlation_key.clone(),
+            message.message.msg_id.clone(),
+        );
+        let Some((claim_token, _)) = w.message_buffer_claims.get(&key) else {
+            return Ok(false);
+        };
+        if claim_token != &message.claim_token {
+            return Ok(false);
+        }
+        w.message_buffer_claims.remove(&key);
+        Ok(true)
+    }
+
+    async fn reclaim_stale_buffered_message_claims(&self) -> Result<u32> {
+        let mut w = self.inner.write().await;
+        let now = now_ms();
+        let before = w.message_buffer_claims.len();
+        w.message_buffer_claims
+            .retain(|_, (_, claim_until)| *claim_until > now);
+        Ok((before - w.message_buffer_claims.len()) as u32)
+    }
+
+    async fn prune_expired_messages(&self) -> Result<u32> {
+        let mut w = self.inner.write().await;
+        let now = now_ms();
+        let before = w.message_buffer.len();
+        let expired: Vec<_> = w
+            .message_buffer
+            .iter()
+            .filter(|(_, msg)| msg.expires_at <= now)
+            .map(|(key, _)| key.clone())
+            .collect();
+        for key in expired {
+            if let Some(msg) = w.message_buffer.remove(&key) {
+                if let Some(instance_id) = msg.process_instance_id {
+                    let seq = w.event_seq.entry(instance_id).or_insert(0);
+                    *seq += 1;
+                    let current_seq = *seq;
+                    w.events.entry(instance_id).or_default().push((
+                        current_seq,
+                        RuntimeEvent::BufferedMessageExpired {
+                            message_name: msg.message_name,
+                            correlation_key: msg.correlation_key,
+                            msg_id: msg.msg_id,
+                        },
+                    ));
+                }
+            }
+            w.message_buffer_claims.remove(&key);
+        }
+        Ok((before - w.message_buffer.len()) as u32)
     }
 
     // ── Event log ──
@@ -490,23 +773,42 @@ impl ProcessStore for MemoryStore {
 
     // ── Durability maintenance ──
 
-    async fn reclaim_stale_jobs(&self, timeout_ms: u64) -> Result<u32> {
+    async fn reclaim_stale_jobs(&self, _timeout_ms: u64) -> Result<u32> {
         let mut w = self.inner.write().await;
-        let timeout = std::time::Duration::from_millis(timeout_ms);
-        let now = Instant::now();
+        let now = now_ms();
         let stale_keys: Vec<String> = w
             .inflight_jobs
             .iter()
-            .filter(|(_, (_, claimed_at))| now.duration_since(*claimed_at) > timeout)
+            .filter(|(_, (job, _))| {
+                job.claim_expires_at
+                    .map(|expires_at| expires_at < now)
+                    .unwrap_or(false)
+            })
             .map(|(key, _)| key.clone())
             .collect();
         let count = stale_keys.len() as u32;
         for key in stale_keys {
             if let Some((mut job, _)) = w.inflight_jobs.remove(&key) {
+                let previous_worker_id = (!job.worker_id.is_empty()).then(|| job.worker_id.clone());
+                let process_instance_id = job.process_instance_id;
                 if job.retries_remaining > 1 {
                     job.retries_remaining -= 1;
+                    job.failure_count += 1;
+                    job.worker_id.clear();
+                    job.claim_token.clear();
+                    job.claim_expires_at = None;
                     w.job_queue.push_back(job);
                 }
+                let seq = w.event_seq.entry(process_instance_id).or_insert(0);
+                *seq += 1;
+                let current_seq = *seq;
+                w.events.entry(process_instance_id).or_default().push((
+                    current_seq,
+                    RuntimeEvent::JobReclaimed {
+                        job_key: key,
+                        previous_worker_id,
+                    },
+                ));
             }
         }
         Ok(count)
@@ -797,6 +1099,10 @@ mod tests {
                     runbook_id: Uuid::new_v4(),
                     worker_id: String::new(),
                     claim_token: String::new(),
+                    claim_expires_at: None,
+                    attempt_count: 0,
+                    failure_count: 0,
+                    not_before: None,
                 })
                 .await
                 .unwrap();
@@ -804,7 +1110,13 @@ mod tests {
 
         // Dequeue 2
         let batch1 = store
-            .dequeue_jobs(std::slice::from_ref(&task_type), 2, "default", "test-worker")
+            .dequeue_jobs(
+                std::slice::from_ref(&task_type),
+                2,
+                "default",
+                "test-worker",
+                300_000,
+            )
             .await
             .unwrap();
         assert_eq!(batch1.len(), 2);
@@ -829,12 +1141,255 @@ mod tests {
 
         // Dequeue remaining
         let batch2 = store
-            .dequeue_jobs(std::slice::from_ref(&task_type), 10, "default", "test-worker")
+            .dequeue_jobs(
+                std::slice::from_ref(&task_type),
+                10,
+                "default",
+                "test-worker",
+                300_000,
+            )
             .await
             .unwrap();
         assert_eq!(batch2.len(), 1);
         assert_eq!(batch2[0].job_key, "job-2");
         assert_eq!(batch2[0].session_stack.session_id, session_id);
+    }
+
+    #[tokio::test]
+    async fn test_job_claim_lease_not_before_and_reclaim() {
+        let store = MemoryStore::new();
+        let task_type = "create_case".to_string();
+        let instance_id = Uuid::now_v7();
+        store
+            .save_instance(&make_instance(instance_id))
+            .await
+            .unwrap();
+
+        store
+            .enqueue_job(&JobActivation {
+                job_key: "lease-job".to_string(),
+                tenant_id: "default".to_string(),
+                process_instance_id: instance_id,
+                task_type: task_type.clone(),
+                service_task_id: "task-lease".to_string(),
+                domain_payload: "{}".to_string(),
+                domain_payload_hash: [0u8; 32],
+                session_stack: ob_poc_types::session_stack::SessionStackState::default(),
+                orch_flags: BTreeMap::new(),
+                retries_remaining: 3,
+                entry_id: Uuid::new_v4(),
+                runbook_id: Uuid::new_v4(),
+                worker_id: String::new(),
+                claim_token: String::new(),
+                claim_expires_at: None,
+                attempt_count: 0,
+                failure_count: 0,
+                not_before: Some(now_ms() + 60_000),
+            })
+            .await
+            .unwrap();
+
+        let not_due = store
+            .dequeue_jobs(
+                std::slice::from_ref(&task_type),
+                1,
+                "default",
+                "worker-a",
+                1,
+            )
+            .await
+            .unwrap();
+        assert!(not_due.is_empty());
+
+        let mut queued = store.inner.write().await;
+        queued.job_queue[0].not_before = None;
+        drop(queued);
+
+        let claimed = store
+            .dequeue_jobs(
+                std::slice::from_ref(&task_type),
+                1,
+                "default",
+                "worker-a",
+                1,
+            )
+            .await
+            .unwrap();
+        assert_eq!(claimed.len(), 1);
+        assert_eq!(claimed[0].attempt_count, 1);
+        assert!(claimed[0].claim_expires_at.is_some());
+        assert!(store
+            .validate_job_claim("lease-job", "worker-a", &claimed[0].claim_token)
+            .await
+            .unwrap());
+
+        tokio::time::sleep(std::time::Duration::from_millis(2)).await;
+        assert!(!store
+            .validate_job_claim("lease-job", "worker-a", &claimed[0].claim_token)
+            .await
+            .unwrap());
+        assert_eq!(store.reclaim_stale_jobs(0).await.unwrap(), 1);
+
+        let reclaimed = store
+            .dequeue_jobs(
+                std::slice::from_ref(&task_type),
+                1,
+                "default",
+                "worker-b",
+                300_000,
+            )
+            .await
+            .unwrap();
+        assert_eq!(reclaimed.len(), 1);
+        assert_eq!(reclaimed[0].worker_id, "worker-b");
+        assert_eq!(reclaimed[0].attempt_count, 2);
+        assert_eq!(reclaimed[0].failure_count, 1);
+    }
+
+    #[tokio::test]
+    async fn test_message_buffer_idempotent_claim_release_and_prune() {
+        let store = MemoryStore::new();
+        assert_eq!(
+            store
+                .buffer_message("default", "1", "b:false", "msg-1", b"{}", None, 60_000, None)
+                .await
+                .unwrap(),
+            BufferMessageResult::Inserted
+        );
+        assert_eq!(
+            store
+                .buffer_message("default", "1", "b:false", "msg-1", b"{}", None, 60_000, None)
+                .await
+                .unwrap(),
+            BufferMessageResult::Duplicate
+        );
+
+        let claimed = store
+            .claim_buffered_message("default", "1", "b:false", 60_000)
+            .await
+            .unwrap()
+            .expect("buffered message");
+        assert_eq!(claimed.message.msg_id, "msg-1");
+        assert!(store
+            .claim_buffered_message("default", "1", "b:false", 60_000)
+            .await
+            .unwrap()
+            .is_none());
+        assert!(store
+            .release_buffered_message_claim(&claimed)
+            .await
+            .unwrap());
+        assert!(store
+            .claim_buffered_message("default", "1", "b:false", 60_000)
+            .await
+            .unwrap()
+            .is_some());
+
+        store
+            .buffer_message("default", "1", "b:false", "expired", b"{}", None, 0, None)
+            .await
+            .unwrap();
+        assert_eq!(store.prune_expired_messages().await.unwrap(), 1);
+    }
+
+    #[tokio::test]
+    async fn test_claimed_buffered_message_is_idempotent_until_atomic_consume() {
+        let store = MemoryStore::new();
+        let instance_id = Uuid::now_v7();
+        let mut instance = make_instance(instance_id);
+        let mut fiber = Fiber::new(Uuid::now_v7(), 0);
+        fiber.wait = WaitState::Msg {
+            wait_id: 1,
+            name: 1,
+            corr_key: Value::Bool(false),
+        };
+        store.save_instance(&instance).await.unwrap();
+        store.save_fiber(instance_id, &fiber).await.unwrap();
+
+        assert_eq!(
+            store
+                .buffer_message(
+                    "default",
+                    "1",
+                    "b:false",
+                    "msg-atomic",
+                    br#"{"ok":true}"#,
+                    Some([7u8; 32]),
+                    60_000,
+                    Some(instance_id),
+                )
+                .await
+                .unwrap(),
+            BufferMessageResult::Inserted
+        );
+        assert_eq!(
+            store
+                .buffer_message(
+                    "default",
+                    "1",
+                    "b:false",
+                    "msg-atomic",
+                    br#"{"ok":true}"#,
+                    Some([7u8; 32]),
+                    60_000,
+                    Some(instance_id),
+                )
+                .await
+                .unwrap(),
+            BufferMessageResult::Duplicate
+        );
+
+        let claimed = store
+            .claim_buffered_message("default", "1", "b:false", 60_000)
+            .await
+            .unwrap()
+            .expect("claimed message");
+        assert!(store
+            .claim_buffered_message("default", "1", "b:false", 60_000)
+            .await
+            .unwrap()
+            .is_none());
+
+        fiber.wait = WaitState::Running;
+        fiber.pc = 1;
+        let payload_update = PayloadUpdate {
+            payload: r#"{"ok":true}"#.to_string(),
+            payload_hash: [7u8; 32],
+        };
+        let events = vec![RuntimeEvent::BufferedMessageConsumed {
+            message_name: "1".to_string(),
+            correlation_key: "b:false".to_string(),
+            msg_id: "msg-atomic".to_string(),
+            fiber_id: fiber.fiber_id,
+        }];
+        assert!(store
+            .atomic_consume_buffered_message(
+                &instance,
+                &fiber,
+                &claimed,
+                Some(&payload_update),
+                &events,
+            )
+            .await
+            .unwrap());
+        instance = store.load_instance(instance_id).await.unwrap().unwrap();
+        assert_eq!(instance.domain_payload.as_ref(), r#"{"ok":true}"#);
+        assert_eq!(
+            store
+                .buffer_message(
+                    "default",
+                    "1",
+                    "b:false",
+                    "msg-atomic",
+                    br#"{"ok":true}"#,
+                    Some([7u8; 32]),
+                    60_000,
+                    Some(instance_id),
+                )
+                .await
+                .unwrap(),
+            BufferMessageResult::Duplicate
+        );
     }
 
     /// A2.T5b: Enqueueing a job copies session_stack by value.
@@ -871,6 +1426,10 @@ mod tests {
             runbook_id: Uuid::new_v4(),
             worker_id: String::new(),
             claim_token: String::new(),
+            claim_expires_at: None,
+            attempt_count: 0,
+            failure_count: 0,
+            not_before: None,
         };
 
         store.enqueue_job(&activation).await.unwrap();
@@ -881,7 +1440,13 @@ mod tests {
         activation.session_stack.trace_sequence = 42;
 
         let batch = store
-            .dequeue_jobs(std::slice::from_ref(&task_type), 1, "default", "test-worker")
+            .dequeue_jobs(
+                std::slice::from_ref(&task_type),
+                1,
+                "default",
+                "test-worker",
+                300_000,
+            )
             .await
             .unwrap();
         assert_eq!(batch.len(), 1);

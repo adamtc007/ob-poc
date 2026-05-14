@@ -1,6 +1,6 @@
 use crate::ir::*;
-use bpmn_lite_types::{Addr, CompiledProgram, Instr};
 use anyhow::{anyhow, Result};
+use bpmn_lite_types::{Addr, CompiledProgram, Instr};
 use petgraph::visit::Dfs;
 use std::collections::HashMap;
 

@@ -7,6 +7,8 @@ use std::collections::BTreeMap;
 use std::sync::Arc;
 use uuid::Uuid;
 
+const MESSAGE_CLAIM_MS: u64 = 30_000;
+
 /// Result of a single VM tick on a fiber.
 #[derive(Debug)]
 pub enum TickOutcome {
@@ -197,6 +199,10 @@ impl Vm {
                     runbook_id: instance.runbook_id,
                     worker_id: String::new(),
                     claim_token: String::new(),
+                    claim_expires_at: None,
+                    attempt_count: 0,
+                    failure_count: 0,
+                    not_before: None,
                 };
 
                 // Emit event
@@ -324,6 +330,66 @@ impl Vm {
                 } else {
                     Value::Bool(false)
                 };
+                let message_name = message_name_key(program, *name);
+                let correlation_key = value_key(&corr_key);
+                if let Some(buffered) = self
+                    .store
+                    .claim_buffered_message(
+                        &instance.tenant_id,
+                        &message_name,
+                        &correlation_key,
+                        MESSAGE_CLAIM_MS,
+                    )
+                    .await?
+                {
+                    let payload_update = buffered
+                        .message
+                        .payload_hash
+                        .map(|hash| {
+                            let payload =
+                                std::str::from_utf8(&buffered.message.payload).map_err(|err| {
+                                    anyhow!("buffered message payload is not utf-8: {err}")
+                                })?;
+                            Ok::<_, anyhow::Error>(PayloadUpdate {
+                                payload: payload.to_string(),
+                                payload_hash: hash,
+                            })
+                        })
+                        .transpose()?;
+                    let events = vec![
+                        RuntimeEvent::BufferedMessageConsumed {
+                            message_name,
+                            correlation_key,
+                            msg_id: buffered.message.msg_id.clone(),
+                            fiber_id: fiber.fiber_id,
+                        },
+                        RuntimeEvent::MsgReceived {
+                            name: *name,
+                            corr_key: corr_key.clone(),
+                            msg_ref: None,
+                        },
+                    ];
+                    fiber.pc += 1;
+                    fiber.wait = WaitState::Running;
+                    if self
+                        .store
+                        .atomic_consume_buffered_message(
+                            instance,
+                            fiber,
+                            &buffered,
+                            payload_update.as_ref(),
+                            &events,
+                        )
+                        .await?
+                    {
+                        if let Some(payload_update) = payload_update {
+                            instance.domain_payload = Arc::from(payload_update.payload.as_str());
+                            instance.domain_payload_hash = payload_update.payload_hash;
+                        }
+                        return Ok(TickOutcome::Continue);
+                    }
+                    let _ = self.store.release_buffered_message_claim(&buffered).await?;
+                }
 
                 fiber.wait = WaitState::Msg {
                     wait_id: *wait_id,
@@ -352,6 +418,93 @@ impl Vm {
                     fiber_id: fiber.fiber_id,
                     arms: arm_descs,
                 });
+
+                for (i, arm) in arms.iter().enumerate() {
+                    if let WaitArm::Msg { name, corr_reg, .. } = arm {
+                        let corr_key = if (*corr_reg as usize) < fiber.regs.len() {
+                            fiber.regs[*corr_reg as usize].clone()
+                        } else {
+                            Value::Bool(false)
+                        };
+                        let message_name = message_name_key(program, *name);
+                        let correlation_key = value_key(&corr_key);
+                        if let Some(buffered) = self
+                            .store
+                            .claim_buffered_message(
+                                &instance.tenant_id,
+                                &message_name,
+                                &correlation_key,
+                                MESSAGE_CLAIM_MS,
+                            )
+                            .await?
+                        {
+                            let payload_update = buffered
+                                .message
+                                .payload_hash
+                                .map(|hash| {
+                                    let payload = std::str::from_utf8(&buffered.message.payload)
+                                        .map_err(|err| {
+                                            anyhow!("buffered message payload is not utf-8: {err}")
+                                        })?;
+                                    Ok::<_, anyhow::Error>(PayloadUpdate {
+                                        payload: payload.to_string(),
+                                        payload_hash: hash,
+                                    })
+                                })
+                                .transpose()?;
+                            let resume_at = arm.resume_at();
+                            let mut events = vec![
+                                RuntimeEvent::BufferedMessageConsumed {
+                                    message_name,
+                                    correlation_key,
+                                    msg_id: buffered.message.msg_id.clone(),
+                                    fiber_id: fiber.fiber_id,
+                                },
+                                RuntimeEvent::MsgReceived {
+                                    name: *name,
+                                    corr_key,
+                                    msg_ref: None,
+                                },
+                                RuntimeEvent::RaceWon {
+                                    race_id: *race_id,
+                                    fiber_id: fiber.fiber_id,
+                                    winner_index: i,
+                                    resume_at,
+                                },
+                            ];
+                            let cancelled_indices: Vec<usize> =
+                                (0..arms.len()).filter(|idx| *idx != i).collect();
+                            if !cancelled_indices.is_empty() {
+                                events.push(RuntimeEvent::RaceCancelled {
+                                    race_id: *race_id,
+                                    cancelled_indices,
+                                });
+                            }
+                            fiber.pc = resume_at;
+                            fiber.wait = WaitState::Running;
+                            if self
+                                .store
+                                .atomic_consume_buffered_message(
+                                    instance,
+                                    fiber,
+                                    &buffered,
+                                    payload_update.as_ref(),
+                                    &events,
+                                )
+                                .await?
+                            {
+                                if let Some(payload_update) = payload_update {
+                                    instance.domain_payload =
+                                        Arc::from(payload_update.payload.as_str());
+                                    instance.domain_payload_hash = payload_update.payload_hash;
+                                }
+                                pending_events.clear();
+                                return Ok(TickOutcome::Continue);
+                            }
+                            let _ = self.store.release_buffered_message_claim(&buffered).await?;
+                        }
+                    }
+                }
 
                 // Emit WaitMsgSubscribed for each Msg arm (so signal() can find them)
                 for arm in arms.iter() {
@@ -802,6 +955,23 @@ fn is_truthy(val: &Value) -> bool {
     }
 }
 
+fn value_key(value: &Value) -> String {
+    match value {
+        Value::Bool(b) => format!("b:{b}"),
+        Value::I64(n) => format!("i:{n}"),
+        Value::Str(s) => format!("s:{s}"),
+        Value::Ref(r) => format!("r:{r}"),
+    }
+}
+
+fn message_name_key(program: &CompiledProgram, name: u32) -> String {
+    program
+        .message_name_map
+        .get(&name)
+        .cloned()
+        .unwrap_or_else(|| name.to_string())
+}
+
 pub fn apply_completion(instance: &mut ProcessInstance, completion: &JobCompletion) {
     instance.domain_payload = Arc::<str>::from(completion.domain_payload.as_str());
     instance.domain_payload_hash = compute_hash(&completion.domain_payload);
@@ -842,6 +1012,7 @@ mod tests {
             debug_map: BTreeMap::new(),
             join_plan: BTreeMap::new(),
             wait_plan: BTreeMap::new(),
+            message_name_map: BTreeMap::new(),
             race_plan: BTreeMap::new(),
             boundary_map: BTreeMap::new(),
             write_set: BTreeMap::new(),
@@ -913,7 +1084,13 @@ mod tests {
 
         // Dequeue job
         let jobs = store
-            .dequeue_jobs(&["create_case".to_string()], 10, "default", "test-worker")
+            .dequeue_jobs(
+                &["create_case".to_string()],
+                10,
+                "default",
+                "test-worker",
+                300_000,
+            )
             .await
             .unwrap();
         assert_eq!(jobs.len(), 1);
@@ -954,7 +1131,13 @@ mod tests {
 
         // Dequeue second job
         let jobs = store
-            .dequeue_jobs(&["request_docs".to_string()], 10, "default", "test-worker")
+            .dequeue_jobs(
+                &["request_docs".to_string()],
+                10,
+                "default",
+                "test-worker",
+                300_000,
+            )
             .await
             .unwrap();
         assert_eq!(jobs.len(), 1);
@@ -1022,7 +1205,13 @@ mod tests {
 
         // Complete job — set flag_0 = true via orch_flags
         let jobs = store
-            .dequeue_jobs(&["create_case".to_string()], 1, "default", "test-worker")
+            .dequeue_jobs(
+                &["create_case".to_string()],
+                1,
+                "default",
+                "test-worker",
+                300_000,
+            )
             .await
             .unwrap();
         let payload = r#"{"done":true}"#;
@@ -1108,7 +1297,13 @@ mod tests {
             .await
             .unwrap();
         let jobs = store
-            .dequeue_jobs(&["create_case".to_string()], 1, "default", "test-worker")
+            .dequeue_jobs(
+                &["create_case".to_string()],
+                1,
+                "default",
+                "test-worker",
+                300_000,
+            )
             .await
             .unwrap();
 
@@ -1144,7 +1339,13 @@ mod tests {
 
         // No new jobs enqueued
         let queue = store
-            .dequeue_jobs(&["create_case".to_string()], 10, "default", "test-worker")
+            .dequeue_jobs(
+                &["create_case".to_string()],
+                10,
+                "default",
+                "test-worker",
+                300_000,
+            )
             .await
             .unwrap();
         assert!(queue.is_empty());
@@ -1179,7 +1380,13 @@ mod tests {
             .unwrap();
 
         let jobs = store
-            .dequeue_jobs(&["create_case".to_string()], 1, "default", "test-worker")
+            .dequeue_jobs(
+                &["create_case".to_string()],
+                1,
+                "default",
+                "test-worker",
+                300_000,
+            )
             .await
             .unwrap();
 
@@ -1335,7 +1542,13 @@ mod tests {
 
         // Complete
         let jobs = store
-            .dequeue_jobs(&["create_case".to_string()], 1, "default", "test-worker")
+            .dequeue_jobs(
+                &["create_case".to_string()],
+                1,
+                "default",
+                "test-worker",
+                300_000,
+            )
             .await
             .unwrap();
         let payload = r#"{"done":true}"#;
@@ -1426,6 +1639,7 @@ mod tests {
             debug_map: BTreeMap::new(),
             join_plan: BTreeMap::new(),
             wait_plan: BTreeMap::new(),
+            message_name_map: BTreeMap::new(),
             race_plan: BTreeMap::from([(
                 0,
                 RacePlanEntry {
@@ -1549,6 +1763,7 @@ mod tests {
             debug_map: BTreeMap::new(),
             join_plan: BTreeMap::new(),
             wait_plan: BTreeMap::new(),
+            message_name_map: BTreeMap::new(),
             race_plan: BTreeMap::from([(
                 0,
                 RacePlanEntry {
@@ -1643,6 +1858,7 @@ mod tests {
             debug_map: BTreeMap::new(),
             join_plan: BTreeMap::new(),
             wait_plan: BTreeMap::new(),
+            message_name_map: BTreeMap::new(),
             race_plan: BTreeMap::from([(
                 0,
                 RacePlanEntry {
@@ -1734,6 +1950,7 @@ mod tests {
             debug_map: BTreeMap::new(),
             join_plan: BTreeMap::new(),
             wait_plan: BTreeMap::new(),
+            message_name_map: BTreeMap::new(),
             race_plan: BTreeMap::from([(
                 0,
                 RacePlanEntry {
@@ -1810,6 +2027,7 @@ mod tests {
             debug_map: BTreeMap::from([(0, "verify_docs".to_string())]),
             join_plan: BTreeMap::new(),
             wait_plan: BTreeMap::new(),
+            message_name_map: BTreeMap::new(),
             race_plan: BTreeMap::from([(
                 race_id,
                 RacePlanEntry {
@@ -1927,6 +2145,7 @@ mod tests {
             debug_map: BTreeMap::from([(0, "verify_docs".to_string())]),
             join_plan: BTreeMap::new(),
             wait_plan: BTreeMap::new(),
+            message_name_map: BTreeMap::new(),
             race_plan: BTreeMap::from([(
                 race_id,
                 RacePlanEntry {

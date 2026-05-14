@@ -390,7 +390,10 @@ impl BpmnLite for BpmnLiteService {
             .map_err(engine_err)?;
 
         // Tick the instance to kick off any initial work (jobs stay in queue for ActivateJobs)
-        engine.tick_instance(instance_id).await.map_err(engine_err)?;
+        engine
+            .tick_instance(instance_id)
+            .await
+            .map_err(engine_err)?;
 
         Ok(Response::new(StartResponse {
             process_instance_id: instance_id.to_string(),
@@ -408,6 +411,9 @@ impl BpmnLite for BpmnLiteService {
         self.limits.check_string("msg_id", &req.msg_id)?;
         self.limits
             .check_bytes("payload", req.payload.len(), self.limits.max_payload_bytes)?;
+        if req.msg_id.is_empty() {
+            return Err(Status::invalid_argument("msg_id is required"));
+        }
         let tenant_id = request_tenant_id(&self.limits, &req.tenant_id)?;
         let corr_key = proto_to_correlation_value(&req.correlation_key)?;
         let instance_id = parse_uuid(&req.process_instance_id)?;
@@ -423,9 +429,7 @@ impl BpmnLite for BpmnLiteService {
         let hash = if req.payload.is_empty() {
             None
         } else {
-            Some(bpmn_lite_vm::compute_hash(
-                payload.unwrap_or_default(),
-            ))
+            Some(bpmn_lite_vm::compute_hash(payload.unwrap_or_default()))
         };
 
         let engine = self.engine.for_tenant(tenant_id);
@@ -436,17 +440,16 @@ impl BpmnLite for BpmnLiteService {
                 corr_key,
                 payload,
                 hash,
-                if req.msg_id.is_empty() {
-                    None
-                } else {
-                    Some(req.msg_id.as_str())
-                },
+                Some(req.msg_id.as_str()),
             )
             .await
             .map_err(engine_err)?;
 
         // Tick instance to advance past the signal (jobs stay in queue)
-        engine.tick_instance(instance_id).await.map_err(engine_err)?;
+        engine
+            .tick_instance(instance_id)
+            .await
+            .map_err(engine_err)?;
 
         Ok(Response::new(SignalResponse {}))
     }
@@ -526,9 +529,7 @@ impl BpmnLite for BpmnLiteService {
                     bpmn_lite_types::WaitState::Job { job_key } => {
                         ("JOB".to_string(), job_key.clone())
                     }
-                    bpmn_lite_types::WaitState::Join { .. } => {
-                        ("JOIN".to_string(), String::new())
-                    }
+                    bpmn_lite_types::WaitState::Join { .. } => ("JOIN".to_string(), String::new()),
                     bpmn_lite_types::WaitState::Incident { incident_id } => {
                         ("INCIDENT".to_string(), incident_id.to_string())
                     }
@@ -584,11 +585,21 @@ impl BpmnLite for BpmnLiteService {
         let tenant_id = request_tenant_id(&self.limits, &req.tenant_id)?;
         let requested = req.max_jobs.max(1) as usize;
         let max_jobs = requested.min(self.limits.max_activate_jobs);
+        let lease_ms = if req.timeout_ms > 0 {
+            req.timeout_ms as u64
+        } else {
+            300_000
+        };
 
         let jobs = self
             .engine
             .for_tenant(tenant_id)
-            .activate_jobs_for_worker(&req.task_types, max_jobs, &req.worker_id)
+            .activate_jobs_for_worker_with_lease(
+                &req.task_types,
+                max_jobs,
+                &req.worker_id,
+                lease_ms,
+            )
             .await
             .map_err(engine_err)?;
 
@@ -672,7 +683,10 @@ impl BpmnLite for BpmnLiteService {
             .fetch_add(1, Ordering::Relaxed);
 
         // Tick the instance so the resumed fiber advances (may hit End or next ExecNative)
-        engine.tick_instance(instance_id).await.map_err(engine_err)?;
+        engine
+            .tick_instance(instance_id)
+            .await
+            .map_err(engine_err)?;
 
         Ok(Response::new(CompleteJobResponse {}))
     }

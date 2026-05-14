@@ -51,12 +51,30 @@ pub enum RuntimeEvent {
         service_task_id: String,
         pc: Addr,
     },
+    JobClaimed {
+        job_key: String,
+        worker_id: String,
+        claim_expires_at: i64,
+    },
     JobCompleted {
         job_key: String,
         payload_hash_before: [u8; 32],
         payload_hash_after: [u8; 32],
         orch_flags_out: BTreeMap<String, Value>,
         pc_next: Addr,
+    },
+    JobReclaimed {
+        job_key: String,
+        previous_worker_id: Option<String>,
+    },
+    JobRetryScheduled {
+        job_key: String,
+        retry_at: i64,
+        retries_remaining: u32,
+    },
+    JobDeadLettered {
+        job_key: String,
+        incident_id: Uuid,
     },
     GatewayTaken {
         gateway_id: String,
@@ -94,6 +112,23 @@ pub enum RuntimeEvent {
         name: u32,
         corr_key: Value,
         msg_ref: Option<Uuid>,
+    },
+    MessageBuffered {
+        message_name: String,
+        correlation_key: String,
+        msg_id: String,
+        expires_at: i64,
+    },
+    BufferedMessageConsumed {
+        message_name: String,
+        correlation_key: String,
+        msg_id: String,
+        fiber_id: Uuid,
+    },
+    BufferedMessageExpired {
+        message_name: String,
+        correlation_key: String,
+        msg_id: String,
     },
     IncidentCreated {
         incident_id: Uuid,

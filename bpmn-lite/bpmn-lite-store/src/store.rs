@@ -57,6 +57,7 @@ pub trait ProcessStore: Send + Sync {
         max: usize,
         tenant_id: &str,
         worker_id: &str,
+        lease_ms: u64,
     ) -> Result<Vec<JobActivation>>;
     async fn ack_job(&self, job_key: &str) -> Result<()>;
     async fn validate_job_claim(
@@ -64,6 +65,24 @@ pub trait ProcessStore: Send + Sync {
         job_key: &str,
         worker_id: &str,
         claim_token: &str,
+    ) -> Result<bool>;
+    async fn retry_claimed_job(
+        &self,
+        job_key: &str,
+        worker_id: &str,
+        claim_token: &str,
+        error_class: &str,
+        error_message: &str,
+        not_before_ms: i64,
+    ) -> Result<bool>;
+    async fn dead_letter_claimed_job(
+        &self,
+        job_key: &str,
+        worker_id: &str,
+        claim_token: &str,
+        error_class: &str,
+        error_message: &str,
+        incident_id: Uuid,
     ) -> Result<bool>;
 
     /// Cancel all pending and inflight jobs for an instance.
@@ -85,6 +104,40 @@ pub trait ProcessStore: Send + Sync {
         ttl_ms: u64,
     ) -> Result<()>;
     async fn dead_letter_take(&self, name: u32, corr_key: &Value) -> Result<Option<Vec<u8>>>;
+
+    #[allow(clippy::too_many_arguments)]
+    async fn buffer_message(
+        &self,
+        tenant_id: &str,
+        message_name: &str,
+        correlation_key: &str,
+        msg_id: &str,
+        payload: &[u8],
+        payload_hash: Option<[u8; 32]>,
+        ttl_ms: u64,
+        process_instance_id: Option<Uuid>,
+    ) -> Result<BufferMessageResult>;
+    async fn claim_buffered_message(
+        &self,
+        tenant_id: &str,
+        message_name: &str,
+        correlation_key: &str,
+        claim_ms: u64,
+    ) -> Result<Option<ClaimedBufferedMessage>>;
+    async fn atomic_consume_buffered_message(
+        &self,
+        instance: &ProcessInstance,
+        fiber: &Fiber,
+        message: &ClaimedBufferedMessage,
+        payload_update: Option<&PayloadUpdate>,
+        events: &[RuntimeEvent],
+    ) -> Result<bool>;
+    async fn release_buffered_message_claim(
+        &self,
+        message: &ClaimedBufferedMessage,
+    ) -> Result<bool>;
+    async fn reclaim_stale_buffered_message_claims(&self) -> Result<u32>;
+    async fn prune_expired_messages(&self) -> Result<u32>;
 
     // ── Event log (append-only) ──
 

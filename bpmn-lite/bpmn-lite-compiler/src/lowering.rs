@@ -1,6 +1,6 @@
 use crate::ir::*;
-use bpmn_lite_types::*;
 use anyhow::{anyhow, Result};
+use bpmn_lite_types::*;
 use petgraph::graph::NodeIndex;
 use petgraph::visit::EdgeRef;
 use sha2::{Digest, Sha256};
@@ -27,6 +27,7 @@ pub fn lower(graph: &IRGraph) -> Result<CompiledProgram> {
     let mut debug_map: BTreeMap<Addr, String> = BTreeMap::new();
     let mut join_plan: BTreeMap<JoinId, JoinPlanEntry> = BTreeMap::new();
     let mut wait_plan: BTreeMap<WaitId, WaitPlanEntry> = BTreeMap::new();
+    let mut message_name_map: BTreeMap<u32, String> = BTreeMap::new();
     let mut race_plan: BTreeMap<RaceId, RacePlanEntry> = BTreeMap::new();
     let mut write_set: BTreeMap<String, HashSet<FlagKey>> = BTreeMap::new();
 
@@ -386,6 +387,7 @@ pub fn lower(graph: &IRGraph) -> Result<CompiledProgram> {
                 let wait_id = wait_id_counter;
                 wait_id_counter += 1;
                 let name_id = intern_flag(&mut flag_intern, msg_name);
+                message_name_map.insert(name_id, msg_name.clone());
                 let corr_reg = parse_corr_reg(corr_key_source);
 
                 wait_plan.insert(
@@ -418,6 +420,7 @@ pub fn lower(graph: &IRGraph) -> Result<CompiledProgram> {
                 let wait_id = wait_id_counter;
                 wait_id_counter += 1;
                 let name_id = intern_flag(&mut flag_intern, msg_name);
+                message_name_map.insert(name_id, msg_name.clone());
                 let corr_reg = parse_corr_reg(corr_key_source);
 
                 wait_plan.insert(
@@ -505,6 +508,7 @@ pub fn lower(graph: &IRGraph) -> Result<CompiledProgram> {
         debug_map,
         join_plan,
         wait_plan,
+        message_name_map,
         race_plan,
         boundary_map,
         write_set,
@@ -893,6 +897,10 @@ mod tests {
             .program
             .iter()
             .any(|i| matches!(i, Instr::WaitMsg { .. })));
+        assert!(program
+            .message_name_map
+            .values()
+            .any(|name| name == "docs_received"));
     }
 
     /// A4.T7: End-to-end IR → verify → lower → bytecode valid

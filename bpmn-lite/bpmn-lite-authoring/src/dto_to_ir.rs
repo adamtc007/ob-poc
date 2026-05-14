@@ -1,7 +1,7 @@
 use super::dto::*;
 use super::validate::validate_dto;
-use bpmn_lite_compiler::ir::*;
 use anyhow::{anyhow, Result};
+use bpmn_lite_compiler::ir::*;
 use std::collections::HashMap;
 
 /// Convert a validated WorkflowGraphDto to an IRGraph suitable for the existing

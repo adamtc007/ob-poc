@@ -55,6 +55,10 @@ fn epoch_ms_to_datetime(epoch_ms: i64) -> chrono::DateTime<chrono::Utc> {
         .unwrap_or_else(chrono::Utc::now)
 }
 
+fn datetime_to_epoch_ms(dt: chrono::DateTime<chrono::Utc>) -> i64 {
+    dt.timestamp_millis()
+}
+
 /// PostgreSQL-backed implementation of `ProcessStore`.
 pub struct PostgresProcessStore {
     pool: sqlx::PgPool,
@@ -494,6 +498,7 @@ impl ProcessStore for PostgresProcessStore {
         max: usize,
         tenant_id: &str,
         worker_id: &str,
+        lease_ms: u64,
     ) -> Result<Vec<JobActivation>> {
         let rows = sqlx::query(
             r#"
@@ -503,6 +508,7 @@ impl ProcessStore for PostgresProcessStore {
                 WHERE status = 'pending'
                   AND tenant_id = $3
                   AND task_type = ANY($1)
+                  AND (not_before IS NULL OR not_before <= now())
                 ORDER BY created_at
                 LIMIT $2
                 FOR UPDATE SKIP LOCKED
@@ -512,7 +518,7 @@ impl ProcessStore for PostgresProcessStore {
                 claimed_at = now(),
                 worker_id = $4,
                 claim_token = md5(random()::text || clock_timestamp()::text),
-                claim_expires_at = now() + make_interval(secs => 300),
+                claim_expires_at = now() + make_interval(secs => $5::float / 1000.0),
                 attempt_count = attempt_count + 1
             FROM claimed
             WHERE job_queue.job_key = claimed.job_key
@@ -529,13 +535,18 @@ impl ProcessStore for PostgresProcessStore {
                       job_queue.entry_id,
                       job_queue.runbook_id,
                       job_queue.worker_id,
-                      job_queue.claim_token
+                      job_queue.claim_token,
+                      job_queue.claim_expires_at,
+                      job_queue.attempt_count,
+                      job_queue.failure_count,
+                      job_queue.not_before
             "#,
         )
         .bind(task_types)
         .bind(max as i64)
         .bind(tenant_id)
         .bind(worker_id)
+        .bind(lease_ms as f64)
         .fetch_all(&self.pool)
         .await?;
 
@@ -546,6 +557,11 @@ impl ProcessStore for PostgresProcessStore {
             let session_stack_json: serde_json::Value = row.get("session_stack");
             let orch_flags_json: serde_json::Value = row.get("orch_flags");
             let retries: i32 = row.get("retries_remaining");
+            let claim_expires_at: Option<chrono::DateTime<chrono::Utc>> =
+                row.get("claim_expires_at");
+            let not_before: Option<chrono::DateTime<chrono::Utc>> = row.get("not_before");
+            let attempt_count: i32 = row.get("attempt_count");
+            let failure_count: i32 = row.get("failure_count");
 
             result.push(JobActivation {
                 job_key: row.get("job_key"),
@@ -562,6 +578,10 @@ impl ProcessStore for PostgresProcessStore {
                 runbook_id: row.get("runbook_id"),
                 worker_id: row.get("worker_id"),
                 claim_token: row.get("claim_token"),
+                claim_expires_at: claim_expires_at.map(datetime_to_epoch_ms),
+                attempt_count: attempt_count as u32,
+                failure_count: failure_count as u32,
+                not_before: not_before.map(datetime_to_epoch_ms),
             });
         }
         Ok(result)
@@ -589,7 +609,8 @@ impl ProcessStore for PostgresProcessStore {
               AND status = 'claimed'
               AND worker_id = $2
               AND claim_token = $3
-              AND (claim_expires_at IS NULL OR claim_expires_at > now())
+              AND claim_expires_at > now()
+              AND retries_remaining > 1
             "#,
         )
         .bind(job_key)
@@ -598,6 +619,90 @@ impl ProcessStore for PostgresProcessStore {
         .fetch_optional(&self.pool)
         .await?;
         Ok(row.is_some())
+    }
+
+    async fn retry_claimed_job(
+        &self,
+        job_key: &str,
+        worker_id: &str,
+        claim_token: &str,
+        error_class: &str,
+        error_message: &str,
+        not_before_ms: i64,
+    ) -> Result<bool> {
+        let result = sqlx::query(
+            r#"
+            UPDATE job_queue
+            SET status = 'pending',
+                claimed_at = NULL,
+                worker_id = NULL,
+                claim_token = NULL,
+                claim_expires_at = NULL,
+                not_before = $4,
+                retries_remaining = GREATEST(retries_remaining - 1, 0),
+                failure_count = failure_count + 1,
+                last_failed_at = now(),
+                last_error_class = $5,
+                last_error_message = $6,
+                last_error = $6
+            WHERE job_key = $1
+              AND status = 'claimed'
+              AND worker_id = $2
+              AND claim_token = $3
+              AND claim_expires_at > now()
+            "#,
+        )
+        .bind(job_key)
+        .bind(worker_id)
+        .bind(claim_token)
+        .bind(epoch_ms_to_datetime(not_before_ms))
+        .bind(error_class)
+        .bind(error_message)
+        .execute(&self.pool)
+        .await?;
+        Ok(result.rows_affected() == 1)
+    }
+
+    async fn dead_letter_claimed_job(
+        &self,
+        job_key: &str,
+        worker_id: &str,
+        claim_token: &str,
+        error_class: &str,
+        error_message: &str,
+        incident_id: Uuid,
+    ) -> Result<bool> {
+        let result = sqlx::query(
+            r#"
+            UPDATE job_queue
+            SET status = 'dead_lettered',
+                claimed_at = NULL,
+                worker_id = NULL,
+                claim_token = NULL,
+                claim_expires_at = NULL,
+                failure_count = failure_count + 1,
+                last_failed_at = now(),
+                dead_lettered_at = now(),
+                last_error_class = $4,
+                last_error_message = $5,
+                last_error = $5,
+                incident_id = $6
+            WHERE job_key = $1
+              AND status = 'claimed'
+              AND worker_id = $2
+              AND claim_token = $3
+              AND claim_expires_at > now()
+            "#,
+        )
+        .bind(job_key)
+        .bind(worker_id)
+        .bind(claim_token)
+        .bind(error_class)
+        .bind(error_message)
+        .bind(incident_id)
+        .execute(&self.pool)
+        .await?;
+        Ok(result.rows_affected() == 1)
     }
 
     async fn cancel_jobs_for_instance(&self, instance_id: Uuid) -> Result<Vec<String>> {
@@ -694,6 +799,344 @@ impl ProcessStore for PostgresProcessStore {
                 Ok(Some(row.get("payload")))
             }
         }
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    async fn buffer_message(
+        &self,
+        tenant_id: &str,
+        message_name: &str,
+        correlation_key: &str,
+        msg_id: &str,
+        payload: &[u8],
+        payload_hash: Option<[u8; 32]>,
+        ttl_ms: u64,
+        process_instance_id: Option<Uuid>,
+    ) -> Result<BufferMessageResult> {
+        let expires_at = chrono::Utc::now() + chrono::Duration::milliseconds(ttl_ms as i64);
+        let result = sqlx::query(
+            r#"
+            INSERT INTO message_buffer (
+                tenant_id, message_name, correlation_key, msg_id, payload,
+                payload_hash, expires_at, process_instance_id
+            )
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+            ON CONFLICT (tenant_id, message_name, correlation_key, msg_id) DO NOTHING
+            "#,
+        )
+        .bind(tenant_id)
+        .bind(message_name)
+        .bind(correlation_key)
+        .bind(msg_id)
+        .bind(payload)
+        .bind(payload_hash.map(|hash| hash.to_vec()))
+        .bind(expires_at)
+        .bind(process_instance_id)
+        .execute(&self.pool)
+        .await?;
+        if result.rows_affected() == 1 {
+            Ok(BufferMessageResult::Inserted)
+        } else {
+            Ok(BufferMessageResult::Duplicate)
+        }
+    }
+
+    async fn claim_buffered_message(
+        &self,
+        tenant_id: &str,
+        message_name: &str,
+        correlation_key: &str,
+        claim_ms: u64,
+    ) -> Result<Option<ClaimedBufferedMessage>> {
+        let claim_until = chrono::Utc::now() + chrono::Duration::milliseconds(claim_ms as i64);
+        let claim_token = Uuid::now_v7().to_string();
+        let row = sqlx::query(
+            r#"
+            WITH picked AS (
+                SELECT tenant_id, message_name, correlation_key, msg_id
+                FROM message_buffer
+                WHERE tenant_id = $1
+                  AND message_name = $2
+                  AND correlation_key = $3
+                  AND consumed_at IS NULL
+                  AND expires_at > now()
+                  AND (claim_token IS NULL OR claim_until <= now())
+                ORDER BY received_at
+                LIMIT 1
+                FOR UPDATE SKIP LOCKED
+            )
+            UPDATE message_buffer
+            SET claim_token = $4,
+                claimed_at = now(),
+                claim_until = $5,
+                status = 'claimed'
+            FROM picked
+            WHERE message_buffer.tenant_id = picked.tenant_id
+              AND message_buffer.message_name = picked.message_name
+              AND message_buffer.correlation_key = picked.correlation_key
+              AND message_buffer.msg_id = picked.msg_id
+            RETURNING message_buffer.tenant_id,
+                      message_buffer.message_name,
+                      message_buffer.correlation_key,
+                      message_buffer.msg_id,
+                      message_buffer.payload,
+                      message_buffer.payload_hash,
+                      message_buffer.process_instance_id,
+                      message_buffer.received_at,
+                      message_buffer.expires_at
+            "#,
+        )
+        .bind(tenant_id)
+        .bind(message_name)
+        .bind(correlation_key)
+        .bind(&claim_token)
+        .bind(claim_until)
+        .fetch_optional(&self.pool)
+        .await?;
+
+        let Some(row) = row else {
+            return Ok(None);
+        };
+        use sqlx::Row;
+        let payload_hash: Option<Vec<u8>> = row.get("payload_hash");
+        let received_at: chrono::DateTime<chrono::Utc> = row.get("received_at");
+        let expires_at: chrono::DateTime<chrono::Utc> = row.get("expires_at");
+        Ok(Some(ClaimedBufferedMessage {
+            message: BufferedMessage {
+                tenant_id: row.get("tenant_id"),
+                message_name: row.get("message_name"),
+                correlation_key: row.get("correlation_key"),
+                msg_id: row.get("msg_id"),
+                payload: row.get("payload"),
+                payload_hash: payload_hash.map(bytes_to_hash).transpose()?,
+                process_instance_id: row.get("process_instance_id"),
+                received_at: datetime_to_epoch_ms(received_at),
+                expires_at: datetime_to_epoch_ms(expires_at),
+            },
+            claim_token,
+            claim_until: datetime_to_epoch_ms(claim_until),
+        }))
+    }
+
+    async fn atomic_consume_buffered_message(
+        &self,
+        instance: &ProcessInstance,
+        fiber: &Fiber,
+        message: &ClaimedBufferedMessage,
+        payload_update: Option<&PayloadUpdate>,
+        events: &[RuntimeEvent],
+    ) -> Result<bool> {
+        let mut tx = self.pool.begin().await?;
+
+        let result = sqlx::query(
+            r#"
+            UPDATE message_buffer
+            SET consumed_at = now(),
+                consumed_by_instance_id = $5,
+                consumed_by_fiber_id = $6,
+                status = 'consumed'
+            WHERE tenant_id = $1
+              AND message_name = $2
+              AND correlation_key = $3
+              AND msg_id = $4
+              AND claim_token = $7
+              AND claim_until = $8
+              AND consumed_at IS NULL
+            "#,
+        )
+        .bind(&message.message.tenant_id)
+        .bind(&message.message.message_name)
+        .bind(&message.message.correlation_key)
+        .bind(&message.message.msg_id)
+        .bind(instance.instance_id)
+        .bind(fiber.fiber_id)
+        .bind(&message.claim_token)
+        .bind(epoch_ms_to_datetime(message.claim_until))
+        .execute(&mut *tx)
+        .await?;
+
+        if result.rows_affected() != 1 {
+            tx.rollback().await?;
+            return Ok(false);
+        }
+
+        let payload = payload_update
+            .map(|payload_update| payload_update.payload.as_str())
+            .unwrap_or(instance.domain_payload.as_ref());
+        let payload_hash = payload_update
+            .map(|payload_update| payload_update.payload_hash)
+            .unwrap_or(instance.domain_payload_hash);
+
+        let flags = serde_json::to_value(&instance.flags)?;
+        let counters = serde_json::to_value(&instance.counters)?;
+        let join_expected = serde_json::to_value(&instance.join_expected)?;
+        let state = serde_json::to_value(&instance.state)?;
+
+        sqlx::query(
+            r#"
+            UPDATE process_instances
+            SET domain_payload = $2,
+                domain_payload_hash = $3,
+                flags = $4,
+                counters = $5,
+                join_expected = $6,
+                state = $7
+            WHERE instance_id = $1
+            "#,
+        )
+        .bind(instance.instance_id)
+        .bind(payload)
+        .bind(&payload_hash[..])
+        .bind(&flags)
+        .bind(&counters)
+        .bind(&join_expected)
+        .bind(&state)
+        .execute(&mut *tx)
+        .await?;
+
+        if let Some(payload_update) = payload_update {
+            sqlx::query(
+                r#"
+                INSERT INTO payload_history (instance_id, payload_hash, domain_payload)
+                VALUES ($1, $2, $3)
+                ON CONFLICT (instance_id, payload_hash) DO NOTHING
+                "#,
+            )
+            .bind(instance.instance_id)
+            .bind(&payload_update.payload_hash[..])
+            .bind(&payload_update.payload)
+            .execute(&mut *tx)
+            .await?;
+        }
+
+        let stack = serde_json::to_value(&fiber.stack)?;
+        let regs = serde_json::to_value(&fiber.regs)?;
+        let wait_state = serde_json::to_value(&fiber.wait)?;
+        sqlx::query(
+            r#"
+            INSERT INTO fibers (instance_id, fiber_id, pc, stack, regs, wait_state, loop_epoch)
+            VALUES ($1, $2, $3, $4, $5, $6, $7)
+            ON CONFLICT (instance_id, fiber_id) DO UPDATE SET
+                pc = EXCLUDED.pc,
+                stack = EXCLUDED.stack,
+                regs = EXCLUDED.regs,
+                wait_state = EXCLUDED.wait_state,
+                loop_epoch = EXCLUDED.loop_epoch
+            "#,
+        )
+        .bind(instance.instance_id)
+        .bind(fiber.fiber_id)
+        .bind(fiber.pc as i32)
+        .bind(&stack)
+        .bind(&regs)
+        .bind(&wait_state)
+        .bind(fiber.loop_epoch as i32)
+        .execute(&mut *tx)
+        .await?;
+
+        for event in events {
+            let event_json = serde_json::to_value(event)?;
+            sqlx::query(
+                r#"
+                WITH seq AS (
+                    INSERT INTO event_sequences (instance_id, next_seq)
+                    VALUES ($1, 1)
+                    ON CONFLICT (instance_id) DO UPDATE
+                        SET next_seq = event_sequences.next_seq + 1
+                    RETURNING next_seq
+                )
+                INSERT INTO event_log (instance_id, seq, event)
+                SELECT $1, seq.next_seq, $2
+                FROM seq
+                "#,
+            )
+            .bind(instance.instance_id)
+            .bind(&event_json)
+            .execute(&mut *tx)
+            .await?;
+        }
+
+        if !events.is_empty() {
+            notify_event_tx(&mut tx, instance.instance_id).await?;
+        }
+        tx.commit().await?;
+        Ok(true)
+    }
+
+    async fn release_buffered_message_claim(
+        &self,
+        message: &ClaimedBufferedMessage,
+    ) -> Result<bool> {
+        let result = sqlx::query(
+            r#"
+            UPDATE message_buffer
+            SET claim_token = NULL,
+                claimed_at = NULL,
+                claim_until = NULL,
+                status = 'buffered'
+            WHERE tenant_id = $1
+              AND message_name = $2
+              AND correlation_key = $3
+              AND msg_id = $4
+              AND claim_token = $5
+              AND consumed_at IS NULL
+            "#,
+        )
+        .bind(&message.message.tenant_id)
+        .bind(&message.message.message_name)
+        .bind(&message.message.correlation_key)
+        .bind(&message.message.msg_id)
+        .bind(&message.claim_token)
+        .execute(&self.pool)
+        .await?;
+        Ok(result.rows_affected() == 1)
+    }
+
+    async fn reclaim_stale_buffered_message_claims(&self) -> Result<u32> {
+        let result = sqlx::query(
+            r#"
+            UPDATE message_buffer
+            SET claim_token = NULL,
+                claimed_at = NULL,
+                claim_until = NULL,
+                status = 'buffered'
+            WHERE consumed_at IS NULL
+              AND claim_token IS NOT NULL
+              AND claim_until <= now()
+            "#,
+        )
+        .execute(&self.pool)
+        .await?;
+        Ok(result.rows_affected() as u32)
+    }
+
+    async fn prune_expired_messages(&self) -> Result<u32> {
+        let rows = sqlx::query(
+            r#"
+            DELETE FROM message_buffer
+            WHERE consumed_at IS NULL
+              AND expires_at <= now()
+            RETURNING process_instance_id, message_name, correlation_key, msg_id
+            "#,
+        )
+        .fetch_all(&self.pool)
+        .await?;
+        use sqlx::Row;
+        for row in &rows {
+            let instance_id: Option<Uuid> = row.get("process_instance_id");
+            if let Some(instance_id) = instance_id {
+                self.append_event(
+                    instance_id,
+                    &RuntimeEvent::BufferedMessageExpired {
+                        message_name: row.get("message_name"),
+                        correlation_key: row.get("correlation_key"),
+                        msg_id: row.get("msg_id"),
+                    },
+                )
+                .await?;
+            }
+        }
+        Ok(rows.len() as u32)
     }
 
     // ── Event log ──
@@ -1132,10 +1575,10 @@ impl ProcessStore for PostgresProcessStore {
     // ── Durability maintenance ──
 
     async fn reclaim_stale_jobs(&self, timeout_ms: u64) -> Result<u32> {
-        let row = sqlx::query(
+        let rows = sqlx::query(
             r#"
             WITH stale AS (
-                SELECT job_key, retries_remaining
+                SELECT job_key, process_instance_id, worker_id AS previous_worker_id, retries_remaining
                 FROM job_queue
                 WHERE status = 'claimed'
                   AND claimed_at < now() - make_interval(secs => $1::float / 1000.0)
@@ -1154,7 +1597,7 @@ impl ProcessStore for PostgresProcessStore {
                 FROM stale
                 WHERE job_queue.job_key = stale.job_key
                   AND stale.retries_remaining <= 1
-                RETURNING job_queue.job_key
+                RETURNING job_queue.job_key, job_queue.process_instance_id, stale.previous_worker_id
             ),
             reclaimed AS (
                 UPDATE job_queue
@@ -1169,18 +1612,31 @@ impl ProcessStore for PostgresProcessStore {
                 FROM stale
                 WHERE job_queue.job_key = stale.job_key
                   AND stale.retries_remaining > 1
-                RETURNING job_queue.job_key
+                RETURNING job_queue.job_key, job_queue.process_instance_id, stale.previous_worker_id
             )
-            SELECT (SELECT count(*) FROM reclaimed) + (SELECT count(*) FROM dead_lettered) AS cnt
+            SELECT job_key, process_instance_id, previous_worker_id FROM reclaimed
+            UNION ALL
+            SELECT job_key, process_instance_id, previous_worker_id FROM dead_lettered
             "#,
         )
         .bind(timeout_ms as f64)
-        .fetch_one(&self.pool)
+        .fetch_all(&self.pool)
         .await?;
 
         use sqlx::Row;
-        let cnt: i64 = row.get("cnt");
-        Ok(cnt as u32)
+        for row in &rows {
+            let instance_id: Uuid = row.get("process_instance_id");
+            let previous_worker_id: Option<String> = row.get("previous_worker_id");
+            self.append_event(
+                instance_id,
+                &RuntimeEvent::JobReclaimed {
+                    job_key: row.get("job_key"),
+                    previous_worker_id,
+                },
+            )
+            .await?;
+        }
+        Ok(rows.len() as u32)
     }
 
     async fn prune_dedupe_cache(&self, older_than_ms: u64) -> Result<u32> {
@@ -1326,7 +1782,7 @@ mod tests {
     use std::collections::BTreeMap;
     use std::sync::Arc;
 
-    const DEFAULT_TEST_DATABASE_URL: &str = "postgresql:///bpmn_lite_test";
+    const DEFAULT_TEST_DATABASE_URL: &str = "postgresql://localhost/bpmn_lite_test";
 
     async fn setup() -> (PgPool, PostgresProcessStore) {
         let url = std::env::var("BPMN_LITE_TEST_DATABASE_URL")
@@ -1595,6 +2051,10 @@ mod tests {
                     runbook_id: Uuid::nil(),
                     worker_id: String::new(),
                     claim_token: String::new(),
+                    claim_expires_at: None,
+                    attempt_count: 0,
+                    failure_count: 0,
+                    not_before: None,
                 })
                 .await
                 .unwrap();
@@ -1602,7 +2062,13 @@ mod tests {
 
         // Dequeue 2
         let batch1 = store
-            .dequeue_jobs(std::slice::from_ref(&task_type), 2, "default", "test-worker")
+            .dequeue_jobs(
+                std::slice::from_ref(&task_type),
+                2,
+                "default",
+                "test-worker",
+                300_000,
+            )
             .await
             .unwrap();
         assert_eq!(batch1.len(), 2);
@@ -1612,7 +2078,13 @@ mod tests {
 
         // Dequeue remaining
         let batch2 = store
-            .dequeue_jobs(std::slice::from_ref(&task_type), 10, "default", "test-worker")
+            .dequeue_jobs(
+                std::slice::from_ref(&task_type),
+                10,
+                "default",
+                "test-worker",
+                300_000,
+            )
             .await
             .unwrap();
         assert_eq!(batch2.len(), 1);
@@ -1698,6 +2170,7 @@ mod tests {
             debug_map: BTreeMap::new(),
             join_plan: BTreeMap::new(),
             wait_plan: BTreeMap::new(),
+            message_name_map: BTreeMap::new(),
             race_plan: BTreeMap::new(),
             boundary_map: BTreeMap::new(),
             write_set: BTreeMap::new(),
@@ -1877,6 +2350,10 @@ mod tests {
                     runbook_id: Uuid::nil(),
                     worker_id: String::new(),
                     claim_token: String::new(),
+                    claim_expires_at: None,
+                    attempt_count: 0,
+                    failure_count: 0,
+                    not_before: None,
                 })
                 .await
                 .unwrap();
@@ -1888,7 +2365,9 @@ mod tests {
             let s = store.clone();
             let tt = task_type.clone();
             handles.push(tokio::spawn(async move {
-                s.dequeue_jobs(&[tt], 1, "default", "test-worker").await.unwrap()
+                s.dequeue_jobs(&[tt], 1, "default", "test-worker", 300_000)
+                    .await
+                    .unwrap()
             }));
         }
 
@@ -1949,19 +2428,21 @@ mod tests {
         );
 
         // Dequeue job
-        let jobs = store.dequeue_jobs(&task_types, 1, "default", "test-worker").await.unwrap();
+        let jobs = store
+            .dequeue_jobs(&task_types, 1, "default", "test-worker", 300_000)
+            .await
+            .unwrap();
         assert_eq!(jobs.len(), 1, "should have 1 job");
 
         let job = &jobs[0];
 
         // Complete job
         let completion_payload = r#"{"result":"ok"}"#;
-        let completion_hash = bpmn_lite_vm::compute_hash(completion_payload);
         engine
             .complete_job(
                 &job.job_key,
                 completion_payload,
-                completion_hash,
+                job.domain_payload_hash,
                 BTreeMap::new(),
             )
             .await
@@ -2028,6 +2509,10 @@ mod tests {
                     runbook_id: Uuid::nil(),
                     worker_id: String::new(),
                     claim_token: String::new(),
+                    claim_expires_at: None,
+                    attempt_count: 0,
+                    failure_count: 0,
+                    not_before: None,
                 })
                 .await
                 .unwrap();
@@ -2048,6 +2533,10 @@ mod tests {
                 runbook_id: Uuid::nil(),
                 worker_id: String::new(),
                 claim_token: String::new(),
+                claim_expires_at: None,
+                attempt_count: 0,
+                failure_count: 0,
+                not_before: None,
             })
             .await
             .unwrap();
@@ -2058,7 +2547,7 @@ mod tests {
 
         // Dequeue remaining — should only get B's job
         let remaining = store
-            .dequeue_jobs(&[task_type], 10, "default", "test-worker")
+            .dequeue_jobs(&[task_type], 10, "default", "test-worker", 300_000)
             .await
             .unwrap();
         assert_eq!(remaining.len(), 1);

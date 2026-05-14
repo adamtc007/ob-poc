@@ -339,6 +339,10 @@ pub struct JobActivation {
     pub runbook_id: Uuid,
     pub worker_id: String,
     pub claim_token: String,
+    pub claim_expires_at: Option<Timestamp>,
+    pub attempt_count: u32,
+    pub failure_count: u32,
+    pub not_before: Option<Timestamp>,
 }
 
 /// Returned by ob-poc worker after verb execution.
@@ -369,6 +373,38 @@ pub enum ErrorClass {
     BusinessRejection { rejection_code: String },
 }
 
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+pub enum BufferMessageResult {
+    Inserted,
+    Duplicate,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct BufferedMessage {
+    pub tenant_id: String,
+    pub message_name: String,
+    pub correlation_key: String,
+    pub msg_id: String,
+    pub payload: Vec<u8>,
+    pub payload_hash: Option<[u8; 32]>,
+    pub process_instance_id: Option<Uuid>,
+    pub received_at: Timestamp,
+    pub expires_at: Timestamp,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct ClaimedBufferedMessage {
+    pub message: BufferedMessage,
+    pub claim_token: String,
+    pub claim_until: Timestamp,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct PayloadUpdate {
+    pub payload: String,
+    pub payload_hash: [u8; 32],
+}
+
 // ─── Compiler artifacts ───────────────────────────────────────
 
 /// The output of the compiler pipeline.
@@ -381,6 +417,7 @@ pub struct CompiledProgram {
     pub debug_map: BTreeMap<Addr, String>,
     pub join_plan: BTreeMap<JoinId, JoinPlanEntry>,
     pub wait_plan: BTreeMap<WaitId, WaitPlanEntry>,
+    pub message_name_map: BTreeMap<u32, String>,
     pub race_plan: BTreeMap<RaceId, RacePlanEntry>,
     /// ExecNative bytecode addr → RaceId for tasks with boundary timers.
     pub boundary_map: BTreeMap<Addr, RaceId>,
