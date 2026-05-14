@@ -26,26 +26,25 @@ ob-poc-types = { path = "../ob-poc-types" }
 # reach validation types via the compat re-export in lib.rs. Removed
 # in Phase 11 after those modules also relocate.
 dsl-analysis = { path = "../dsl-analysis" }
-# Phase 5a composite-blocker #23 — discovery_ops + stategraph use
-# `dsl_core::config::loader::ConfigLoader` and `dsl_core::config::types::*`
-# for verb metadata loading; entity-gateway proto + client for
-# search-entities op.
+# Phase 5a composite-blocker #23 — domain_ops still uses dsl_core::config
+# loader/types for verb metadata loading.
 dsl-core = { path = "../dsl-core" }
-# §9 item 9 (analyser consolidation) slice 1 — runtime_registry pulled
-# in from rust/src/dsl_v2/ also pulls in template-loader integration.
-ob-templates = { path = "../ob-templates" }
-# §9 item 9 slice 7 — macros::variable uses regex for ${var} substitution.
-regex = "1"
-entity-gateway = { path = "../entity-gateway" }
-tonic = "0.12"
+# dsl-runtime-split v1 Phase 10 (2026-05-14): the following deps were
+# removed after the analyser-tier modules consuming them moved to
+# `dsl-analysis`:
+#   - regex          (macros::variable, Phase 4)
+#   - ob-templates   (runtime_registry, Phase 3)
+#   - entity-gateway (gateway_resolver, Phase 5)
+#   - tonic          (gateway_resolver, Phase 5)
+#   - governed_query_proc (no `#[governed_query]` annotation exists in
+#                          remaining dsl-runtime src; the macro is
+#                          prepared infrastructure not yet applied —
+#                          tracked in the audit Tier 4 finding).
+#
 # Remaining transitional dep — sem_os_core provides Principal, SemOsError,
 # and the VerbContractBody consumed by CrudExecutionPort. Kept deliberately
 # until a later slice resolves the cycle cleanly.
 sem_os_core = { path = "../sem_os_core" }
-# Composite-blocker #1 (agent_ops) uses `#[governed_query]` on a live
-# execute_json method; keeping the attribute requires the proc-macro
-# crate in dsl-runtime's graph. Zero transitive ob-poc pull.
-governed_query_proc = { path = "../governed_query_proc" }
 async-trait = "0.1"
 anyhow = "1.0"
 serde = { version = "1", features = ["derive"] }
