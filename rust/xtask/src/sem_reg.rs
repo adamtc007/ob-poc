@@ -3,12 +3,18 @@
 //! Usage: `cargo x sem-reg <subcommand>`
 
 use anyhow::{Context, Result};
+use chrono::Utc;
+use serde_json::json;
 use sqlx::PgPool;
+use std::path::{Path, PathBuf};
 
 use ob_poc::sem_reg::types::{
     pg_rows_to_snapshot_rows, ChangeType, PgSnapshotRow, SnapshotMeta, SnapshotRow,
 };
 use ob_poc::sem_reg::{ObjectType, RegistryService, SnapshotStore};
+use sem_os_policy::domain_pack::{
+    refresh_domain_pack_taxonomy_with_index, DomainPackRefreshAction,
+};
 
 /// Show registry statistics (counts by object type).
 pub(crate) async fn stats() -> Result<()> {
@@ -299,6 +305,120 @@ pub(crate) async fn scan(dry_run: bool, verbose: bool) -> Result<()> {
     let report = ob_poc::sem_reg::scanner::run_onboarding_scan(&pool, dry_run, verbose).await?;
     println!("\n{}", report);
     Ok(())
+}
+
+/// Check Sem OS domain-pack YAML against the persisted reload index.
+pub(crate) async fn domain_pack_check(
+    pack_id: Option<&str>,
+    config_root: &Path,
+    force_check: bool,
+    update_index: bool,
+    json_output: bool,
+) -> Result<()> {
+    let pool = connect().await?;
+    let store = sem_os_postgres::PgDomainPackReloadIndexStore::new(pool);
+    let pack_ids = match pack_id {
+        Some(pack_id) => vec![pack_id.to_string()],
+        None => domain_pack_ids(config_root)?,
+    };
+
+    let mut rows = Vec::new();
+    for pack_id in pack_ids {
+        let previous = store.load(&pack_id).await.with_context(|| {
+            format!("failed to load domain-pack reload index for {pack_id}; run migrations first")
+        })?;
+        let plan = refresh_domain_pack_taxonomy_with_index(
+            config_root,
+            &pack_id,
+            previous.as_ref(),
+            force_check,
+            Utc::now(),
+        )
+        .with_context(|| format!("failed to check domain pack {pack_id}"))?;
+
+        if update_index {
+            store
+                .upsert(&plan.index_entry)
+                .await
+                .with_context(|| format!("failed to update reload index for {pack_id}"))?;
+        }
+
+        rows.push(json!({
+            "pack_id": plan.pack_id,
+            "action": plan.action,
+            "reason": plan.reason,
+            "surface_hash": plan.index_entry.surface_hash,
+            "source_count": plan.index_entry.source_fingerprints.len(),
+            "status": plan.index_entry.status,
+            "index_updated": update_index,
+        }));
+    }
+
+    if json_output {
+        println!("{}", serde_json::to_string_pretty(&rows)?);
+    } else {
+        println!("Domain Pack Reload Check");
+        println!("========================");
+        for row in &rows {
+            println!(
+                "  {:<38} {:<16} {}",
+                row["pack_id"].as_str().unwrap_or("?"),
+                row["action"].as_str().unwrap_or("?"),
+                row["reason"].as_str().unwrap_or("")
+            );
+            println!(
+                "    hash={} sources={}{}",
+                row["surface_hash"].as_str().unwrap_or("?"),
+                row["source_count"].as_u64().unwrap_or(0),
+                if update_index { " index=updated" } else { "" }
+            );
+        }
+
+        let publish_required = rows
+            .iter()
+            .filter(|row| {
+                row["action"].as_str()
+                    == Some(action_name(DomainPackRefreshAction::PublishRequired))
+            })
+            .count();
+        if publish_required > 0 {
+            println!(
+                "\n{} pack(s) require Sem OS seed bootstrap publication.",
+                publish_required
+            );
+        }
+    }
+
+    Ok(())
+}
+
+fn domain_pack_ids(config_root: &Path) -> Result<Vec<String>> {
+    let dir = config_root.join("sem_os_seeds/domain_packs");
+    let mut ids = Vec::new();
+    for entry in std::fs::read_dir(&dir).with_context(|| format!("failed to read {:?}", dir))? {
+        let path: PathBuf = entry?.path();
+        if path.extension().and_then(|ext| ext.to_str()) != Some("yaml") {
+            continue;
+        }
+        let contents = std::fs::read_to_string(&path)
+            .with_context(|| format!("failed to read {}", path.display()))?;
+        let yaml: serde_yaml::Value = serde_yaml::from_str(&contents)
+            .with_context(|| format!("failed to parse {}", path.display()))?;
+        let Some(pack_id) = yaml.get("pack_id").and_then(serde_yaml::Value::as_str) else {
+            anyhow::bail!("domain pack {} does not declare pack_id", path.display());
+        };
+        ids.push(pack_id.to_string());
+    }
+    ids.sort();
+    Ok(ids)
+}
+
+fn action_name(action: DomainPackRefreshAction) -> &'static str {
+    match action {
+        DomainPackRefreshAction::Skip => "skip",
+        DomainPackRefreshAction::IndexOnly => "index_only",
+        DomainPackRefreshAction::PublishRequired => "publish_required",
+    }
 }
 
 /// Describe a derivation spec by FQN.
@@ -1524,8 +1644,8 @@ pub(crate) async fn authoring_health() -> Result<()> {
 
 /// Propose a ChangeSet from a bundle directory or inline YAML.
 pub(crate) async fn authoring_propose(bundle_path: &str) -> Result<()> {
-    use sem_os_policy::authoring::bundle::{build_bundle, parse_manifest};
     use sem_os_core::principal::Principal;
+    use sem_os_policy::authoring::bundle::{build_bundle, parse_manifest};
 
     let pool = connect().await?;
     let store = sem_os_postgres::PgAuthoringStore::new(pool.clone());

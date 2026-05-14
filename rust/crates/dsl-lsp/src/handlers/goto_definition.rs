@@ -20,7 +20,7 @@ pub(crate) fn get_definition(
     let word = find_word_at_position(line, col)?;
 
     // Check if it's a symbol reference
-    if let Some(symbol_name) = word.strip_prefix('@') {
+    if let Some(symbol_name) = strip_symbol_marker(&word) {
         // Look up in symbol table (cross-document)
         if let Some(info) = symbols.get(symbol_name) {
             return Some(GotoDefinitionResponse::Scalar(info.definition.clone()));
@@ -53,7 +53,7 @@ pub(crate) fn get_definition_with_uri(
     let word = find_word_at_position(line, col)?;
 
     // Check if it's a symbol reference
-    if let Some(symbol_name) = word.strip_prefix('@') {
+    if let Some(symbol_name) = strip_symbol_marker(&word) {
         // Look up in symbol table (cross-document)
         if let Some(info) = symbols.get(symbol_name) {
             return Some(GotoDefinitionResponse::Scalar(info.definition.clone()));
@@ -84,7 +84,7 @@ pub(crate) fn get_references(
     let word = find_word_at_position(line, col)?;
 
     // Check if it's a symbol reference or definition
-    let symbol_name = word.strip_prefix('@')?;
+    let symbol_name = strip_symbol_marker(&word)?;
 
     // Look up in symbol table (cross-document)
     if let Some(info) = symbols.get(symbol_name) {
@@ -110,7 +110,7 @@ pub(crate) fn get_references_with_uri(
     let word = find_word_at_position(line, col)?;
 
     // Check if it's a symbol reference or definition
-    let symbol_name = word.strip_prefix('@')?;
+    let symbol_name = strip_symbol_marker(&word)?;
 
     // Look up in symbol table (cross-document)
     if let Some(info) = symbols.get(symbol_name) {
@@ -182,6 +182,10 @@ fn find_word_at_position(line: &str, col: usize) -> Option<String> {
 }
 
 /// Check if a character is part of a word.
+fn strip_symbol_marker(word: &str) -> Option<&str> {
+    word.strip_prefix('@').or_else(|| word.strip_prefix('$'))
+}
+
 fn is_word_char(c: char) -> bool {
-    c.is_alphanumeric() || c == '-' || c == '_' || c == '.' || c == ':' || c == '@'
+    c.is_alphanumeric() || c == '-' || c == '_' || c == '.' || c == ':' || c == '@' || c == '$'
 }

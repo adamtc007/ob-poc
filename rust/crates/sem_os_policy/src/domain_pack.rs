@@ -4,8 +4,15 @@
 //! state-machine surface an adapter may discover, dry-run, and eventually mutate.
 
 use crate::acp_projection::AcpProjectionKind;
+use anyhow::{bail, Context, Result};
+use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
+use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, HashSet};
+use std::fs;
+use std::path::{Path, PathBuf};
+use std::time::UNIX_EPOCH;
+use uuid::Uuid;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct DomainPackManifest {
@@ -14,6 +21,24 @@ pub struct DomainPackManifest {
     pub version: String,
     pub implementation_mode: PackImplementationMode,
     pub compatibility_tier: PackCompatibilityTier,
+    #[serde(default)]
+    pub owned_dags: Vec<String>,
+    #[serde(default)]
+    pub owned_packs: Vec<String>,
+    #[serde(default)]
+    pub owned_state_machines: Vec<String>,
+    #[serde(default)]
+    pub owned_constellation_maps: Vec<String>,
+    #[serde(default)]
+    pub owned_constellation_families: Vec<String>,
+    #[serde(default)]
+    pub owned_universes: Vec<String>,
+    #[serde(default)]
+    pub owned_verb_prefixes: Vec<String>,
+    #[serde(default)]
+    pub owned_entity_kinds: Vec<String>,
+    #[serde(default)]
+    pub business_crates: Vec<String>,
     #[serde(default)]
     pub owned_constellations: Vec<String>,
     #[serde(default)]
@@ -43,6 +68,379 @@ impl DomainPackManifest {
     pub fn validate(&self) -> DomainPackValidationReport {
         validate_domain_pack(self)
     }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DomainPackTaxonomyReload {
+    pub manifest: DomainPackManifest,
+    pub surface_hash: String,
+    pub surfaces: BTreeMap<String, DomainPackTaxonomySurface>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DomainPackTaxonomySurface {
+    pub path: PathBuf,
+    pub canonical_payload: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct DomainPackReloadIndexEntry {
+    pub pack_id: String,
+    pub source_fingerprints: Vec<DomainPackSourceFingerprint>,
+    pub surface_hash: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub snapshot_set_id: Option<Uuid>,
+    pub last_checked_at: DateTime<Utc>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub last_loaded_at: Option<DateTime<Utc>>,
+    pub status: DomainPackReloadStatus,
+    #[serde(default)]
+    pub diagnostics: Vec<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct DomainPackSourceFingerprint {
+    pub surface: String,
+    pub path: String,
+    pub size_bytes: u64,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub modified_unix_millis: Option<i64>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum DomainPackReloadStatus {
+    Clean,
+    Loaded,
+    IndexOnly,
+    PublishRequired,
+}
+
+impl DomainPackReloadStatus {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Clean => "clean",
+            Self::Loaded => "loaded",
+            Self::IndexOnly => "index_only",
+            Self::PublishRequired => "publish_required",
+        }
+    }
+}
+
+impl std::str::FromStr for DomainPackReloadStatus {
+    type Err = anyhow::Error;
+
+    fn from_str(value: &str) -> Result<Self> {
+        match value {
+            "clean" => Ok(Self::Clean),
+            "loaded" => Ok(Self::Loaded),
+            "index_only" => Ok(Self::IndexOnly),
+            "publish_required" => Ok(Self::PublishRequired),
+            other => bail!("unknown domain pack reload status {other}"),
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DomainPackRefreshPlan {
+    pub pack_id: String,
+    pub action: DomainPackRefreshAction,
+    pub reason: String,
+    pub reload: Option<DomainPackTaxonomyReload>,
+    pub index_entry: DomainPackReloadIndexEntry,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum DomainPackRefreshAction {
+    Skip,
+    IndexOnly,
+    PublishRequired,
+}
+
+pub fn reload_domain_pack_taxonomy_from_yaml(
+    config_root: impl AsRef<Path>,
+    pack_id: &str,
+) -> Result<DomainPackTaxonomyReload> {
+    let config_root = config_root.as_ref();
+    let (domain_pack_path, domain_pack_yaml) = find_yaml_by_field(
+        &config_root.join("sem_os_seeds/domain_packs"),
+        &["pack_id"],
+        pack_id,
+    )?;
+    let manifest: DomainPackManifest = serde_yaml::from_value(domain_pack_yaml.clone())
+        .with_context(|| format!("failed to parse domain pack manifest {pack_id}"))?;
+
+    let report = manifest.validate();
+    if !report.valid {
+        bail!(
+            "domain pack {pack_id} failed validation: {:?}",
+            report.diagnostics
+        );
+    }
+
+    let mut surfaces = BTreeMap::new();
+    insert_surface(
+        &mut surfaces,
+        format!("domain_pack:{pack_id}"),
+        domain_pack_path,
+        &domain_pack_yaml,
+    )?;
+
+    for dag_id in &manifest.owned_dags {
+        let (path, yaml) = find_yaml_by_field(
+            &config_root.join("sem_os_seeds/dag_taxonomies"),
+            &["dag_id", "workspace"],
+            dag_id,
+        )?;
+        insert_surface(&mut surfaces, format!("dag:{dag_id}"), path, &yaml)?;
+    }
+
+    for pack_id in &manifest.owned_packs {
+        let (path, yaml) = find_yaml_by_field(&config_root.join("packs"), &["id"], pack_id)?;
+        insert_surface(&mut surfaces, format!("pack:{pack_id}"), path, &yaml)?;
+    }
+
+    for state_machine in &manifest.owned_state_machines {
+        let (path, yaml) = find_yaml_by_field(
+            &config_root.join("sem_os_seeds/state_machines"),
+            &["state_machine"],
+            state_machine,
+        )?;
+        insert_surface(
+            &mut surfaces,
+            format!("state_machine:{state_machine}"),
+            path,
+            &yaml,
+        )?;
+    }
+
+    for constellation in &manifest.owned_constellation_maps {
+        let (path, yaml) = find_yaml_by_field(
+            &config_root.join("sem_os_seeds/constellation_maps"),
+            &["constellation"],
+            constellation,
+        )?;
+        insert_surface(
+            &mut surfaces,
+            format!("constellation_map:{constellation}"),
+            path,
+            &yaml,
+        )?;
+    }
+
+    for family in &manifest.owned_constellation_families {
+        let (path, yaml) = find_yaml_by_field(
+            &config_root.join("sem_os_seeds/constellation_families"),
+            &["family_id", "fqn"],
+            family,
+        )?;
+        insert_surface(
+            &mut surfaces,
+            format!("constellation_family:{family}"),
+            path,
+            &yaml,
+        )?;
+    }
+
+    for universe in &manifest.owned_universes {
+        let (path, yaml) = find_yaml_by_field(
+            &config_root.join("sem_os_seeds/universes"),
+            &["fqn", "universe_id"],
+            universe,
+        )?;
+        insert_surface(&mut surfaces, format!("universe:{universe}"), path, &yaml)?;
+    }
+
+    let entity_taxonomy_path = config_root.join("ontology/entity_taxonomy.yaml");
+    let entity_taxonomy = parse_yaml_file(&entity_taxonomy_path)?;
+    validate_owned_entity_kinds(&entity_taxonomy, &manifest.owned_entity_kinds)?;
+    insert_surface(
+        &mut surfaces,
+        "ontology:entity_taxonomy".to_string(),
+        entity_taxonomy_path,
+        &entity_taxonomy,
+    )?;
+
+    let surface_hash = hash_surfaces(&surfaces);
+    Ok(DomainPackTaxonomyReload {
+        manifest,
+        surface_hash,
+        surfaces,
+    })
+}
+
+pub fn reload_all_domain_pack_taxonomies_from_yaml(
+    config_root: impl AsRef<Path>,
+) -> Result<BTreeMap<String, DomainPackTaxonomyReload>> {
+    let config_root = config_root.as_ref();
+    let mut out = BTreeMap::new();
+    for path in yaml_files(&config_root.join("sem_os_seeds/domain_packs"))? {
+        let yaml = parse_yaml_file(&path)?;
+        let Some(pack_id) = yaml_field(&yaml, "pack_id").and_then(serde_yaml::Value::as_str) else {
+            bail!("domain pack {} does not declare pack_id", path.display());
+        };
+        let reload = reload_domain_pack_taxonomy_from_yaml(config_root, pack_id)?;
+        if out.insert(pack_id.to_string(), reload).is_some() {
+            bail!("duplicate domain pack id {pack_id}");
+        }
+    }
+    Ok(out)
+}
+
+pub fn refresh_domain_pack_taxonomy_with_index(
+    config_root: impl AsRef<Path>,
+    pack_id: &str,
+    previous: Option<&DomainPackReloadIndexEntry>,
+    force_check: bool,
+    now: DateTime<Utc>,
+) -> Result<DomainPackRefreshPlan> {
+    let config_root = config_root.as_ref();
+
+    if !force_check {
+        if let Some(previous) = previous {
+            let probe = probe_domain_pack_sources(config_root, &previous.source_fingerprints)?;
+            if probe.clean {
+                let mut index_entry = previous.clone();
+                index_entry.last_checked_at = now;
+                index_entry.status = DomainPackReloadStatus::Clean;
+                index_entry.diagnostics.clear();
+                return Ok(DomainPackRefreshPlan {
+                    pack_id: pack_id.to_string(),
+                    action: DomainPackRefreshAction::Skip,
+                    reason: "source fingerprints unchanged".to_string(),
+                    reload: None,
+                    index_entry,
+                });
+            }
+        }
+    }
+
+    let reload = reload_domain_pack_taxonomy_from_yaml(config_root, pack_id)?;
+    let hash_changed = previous
+        .map(|entry| entry.surface_hash != reload.surface_hash)
+        .unwrap_or(true);
+    let action = if hash_changed {
+        DomainPackRefreshAction::PublishRequired
+    } else {
+        DomainPackRefreshAction::IndexOnly
+    };
+    let status = if hash_changed {
+        DomainPackReloadStatus::PublishRequired
+    } else {
+        DomainPackReloadStatus::IndexOnly
+    };
+    let reason = match (previous.is_some(), force_check, hash_changed) {
+        (false, _, _) => "no prior reload index".to_string(),
+        (true, true, true) => "forced check found content hash change".to_string(),
+        (true, true, false) => "forced check found unchanged content hash".to_string(),
+        (true, false, true) => "source fingerprint changed and content hash changed".to_string(),
+        (true, false, false) => {
+            "source fingerprint changed but content hash is unchanged".to_string()
+        }
+    };
+    let mut index_entry = reload_index_entry_from_reload(config_root, &reload, now, status)?;
+    index_entry.last_loaded_at = previous.and_then(|entry| entry.last_loaded_at);
+
+    Ok(DomainPackRefreshPlan {
+        pack_id: pack_id.to_string(),
+        action,
+        reason,
+        reload: Some(reload),
+        index_entry,
+    })
+}
+
+pub fn reload_index_entry_from_reload(
+    config_root: impl AsRef<Path>,
+    reload: &DomainPackTaxonomyReload,
+    now: DateTime<Utc>,
+    status: DomainPackReloadStatus,
+) -> Result<DomainPackReloadIndexEntry> {
+    Ok(DomainPackReloadIndexEntry {
+        pack_id: reload.manifest.pack_id.clone(),
+        source_fingerprints: source_fingerprints(config_root.as_ref(), &reload.surfaces)?,
+        surface_hash: reload.surface_hash.clone(),
+        snapshot_set_id: None,
+        last_checked_at: now,
+        last_loaded_at: (status == DomainPackReloadStatus::Loaded).then_some(now),
+        status,
+        diagnostics: Vec::new(),
+    })
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct SourceProbe {
+    clean: bool,
+}
+
+fn probe_domain_pack_sources(
+    config_root: &Path,
+    previous: &[DomainPackSourceFingerprint],
+) -> Result<SourceProbe> {
+    if previous.is_empty() {
+        return Ok(SourceProbe { clean: false });
+    }
+
+    for old in previous {
+        let path = source_path(config_root, &old.path);
+        let current = source_fingerprint_for_path(config_root, &old.surface, &path)?;
+        if current.size_bytes != old.size_bytes
+            || current.modified_unix_millis != old.modified_unix_millis
+        {
+            return Ok(SourceProbe { clean: false });
+        }
+    }
+
+    Ok(SourceProbe { clean: true })
+}
+
+fn source_fingerprints(
+    config_root: &Path,
+    surfaces: &BTreeMap<String, DomainPackTaxonomySurface>,
+) -> Result<Vec<DomainPackSourceFingerprint>> {
+    surfaces
+        .iter()
+        .map(|(surface, value)| source_fingerprint_for_path(config_root, surface, &value.path))
+        .collect()
+}
+
+fn source_fingerprint_for_path(
+    config_root: &Path,
+    surface: &str,
+    path: &Path,
+) -> Result<DomainPackSourceFingerprint> {
+    let metadata =
+        fs::metadata(path).with_context(|| format!("failed to stat {}", path.display()))?;
+    let modified_unix_millis = metadata
+        .modified()
+        .ok()
+        .and_then(|modified| modified.duration_since(UNIX_EPOCH).ok())
+        .map(|duration| duration.as_millis() as i64);
+    Ok(DomainPackSourceFingerprint {
+        surface: surface.to_string(),
+        path: stable_source_path(config_root, path),
+        size_bytes: metadata.len(),
+        modified_unix_millis,
+    })
+}
+
+fn source_path(config_root: &Path, stored: &str) -> PathBuf {
+    let path = PathBuf::from(stored);
+    if path.is_absolute() {
+        path
+    } else {
+        config_root.join(path)
+    }
+}
+
+fn stable_source_path(config_root: &Path, path: &Path) -> String {
+    let root = fs::canonicalize(config_root).unwrap_or_else(|_| config_root.to_path_buf());
+    let path = fs::canonicalize(path).unwrap_or_else(|_| path.to_path_buf());
+    path.strip_prefix(&root)
+        .unwrap_or(&path)
+        .to_string_lossy()
+        .replace('\\', "/")
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -252,6 +650,49 @@ pub fn validate_domain_pack(manifest: &DomainPackManifest) -> DomainPackValidati
     require_non_empty(&mut diagnostics, "pack_id", &manifest.pack_id);
     require_non_empty(&mut diagnostics, "name", &manifest.name);
     require_non_empty(&mut diagnostics, "version", &manifest.version);
+
+    validate_owned_values("owned_dags", &manifest.owned_dags, &mut diagnostics);
+    validate_owned_values("owned_packs", &manifest.owned_packs, &mut diagnostics);
+    validate_owned_values(
+        "owned_state_machines",
+        &manifest.owned_state_machines,
+        &mut diagnostics,
+    );
+    validate_owned_values(
+        "owned_constellation_maps",
+        &manifest.owned_constellation_maps,
+        &mut diagnostics,
+    );
+    validate_owned_values(
+        "owned_constellation_families",
+        &manifest.owned_constellation_families,
+        &mut diagnostics,
+    );
+    validate_owned_values(
+        "owned_universes",
+        &manifest.owned_universes,
+        &mut diagnostics,
+    );
+    validate_owned_values(
+        "owned_verb_prefixes",
+        &manifest.owned_verb_prefixes,
+        &mut diagnostics,
+    );
+    validate_owned_values(
+        "owned_entity_kinds",
+        &manifest.owned_entity_kinds,
+        &mut diagnostics,
+    );
+    validate_owned_values(
+        "business_crates",
+        &manifest.business_crates,
+        &mut diagnostics,
+    );
+    validate_owned_values(
+        "owned_constellations",
+        &manifest.owned_constellations,
+        &mut diagnostics,
+    );
 
     if manifest.owned_constellations.is_empty() {
         diagnostics.push(diagnostic(
@@ -623,6 +1064,144 @@ fn validate_external_mcp_transport(
     }
 }
 
+fn yaml_files(dir: &Path) -> Result<Vec<PathBuf>> {
+    let mut files = Vec::new();
+    for entry in fs::read_dir(dir).with_context(|| format!("failed to read {}", dir.display()))? {
+        let entry = entry?;
+        let path = entry.path();
+        if path.extension().and_then(|ext| ext.to_str()) == Some("yaml") {
+            files.push(path);
+        }
+    }
+    files.sort();
+    Ok(files)
+}
+
+fn parse_yaml_file(path: &Path) -> Result<serde_yaml::Value> {
+    let source = fs::read_to_string(path)
+        .with_context(|| format!("failed to read yaml {}", path.display()))?;
+    serde_yaml::from_str(&source)
+        .with_context(|| format!("failed to parse yaml {}", path.display()))
+}
+
+fn yaml_field<'a>(value: &'a serde_yaml::Value, key: &str) -> Option<&'a serde_yaml::Value> {
+    value
+        .as_mapping()?
+        .get(serde_yaml::Value::String(key.to_string()))
+}
+
+fn find_yaml_by_field(
+    dir: &Path,
+    fields: &[&str],
+    expected: &str,
+) -> Result<(PathBuf, serde_yaml::Value)> {
+    for path in yaml_files(dir)? {
+        let yaml = parse_yaml_file(&path)?;
+        if fields.iter().any(|field| {
+            yaml_field(&yaml, field).and_then(serde_yaml::Value::as_str) == Some(expected)
+        }) {
+            return Ok((path, yaml));
+        }
+    }
+
+    bail!(
+        "failed to find yaml in {} with any of {:?} = {}",
+        dir.display(),
+        fields,
+        expected
+    )
+}
+
+fn insert_surface(
+    surfaces: &mut BTreeMap<String, DomainPackTaxonomySurface>,
+    key: String,
+    path: PathBuf,
+    yaml: &serde_yaml::Value,
+) -> Result<()> {
+    let canonical_payload = canonical_yaml_json(yaml)?;
+    surfaces.insert(
+        key,
+        DomainPackTaxonomySurface {
+            path,
+            canonical_payload,
+        },
+    );
+    Ok(())
+}
+
+fn canonical_yaml_json(value: &serde_yaml::Value) -> Result<String> {
+    fn sort_json(value: serde_json::Value) -> serde_json::Value {
+        match value {
+            serde_json::Value::Array(values) => {
+                serde_json::Value::Array(values.into_iter().map(sort_json).collect())
+            }
+            serde_json::Value::Object(map) => {
+                let mut sorted = serde_json::Map::new();
+                let mut entries = map.into_iter().collect::<Vec<_>>();
+                entries.sort_by(|left, right| left.0.cmp(&right.0));
+                for (key, value) in entries {
+                    sorted.insert(key, sort_json(value));
+                }
+                serde_json::Value::Object(sorted)
+            }
+            scalar => scalar,
+        }
+    }
+
+    let json = serde_json::to_value(value).context("failed to convert yaml to json")?;
+    serde_json::to_string(&sort_json(json)).context("failed to serialize canonical json")
+}
+
+fn validate_owned_entity_kinds(
+    entity_taxonomy: &serde_yaml::Value,
+    owned_entity_kinds: &[String],
+) -> Result<()> {
+    let Some(entity_defs) = yaml_field(entity_taxonomy, "entities").and_then(|v| v.as_mapping())
+    else {
+        bail!("entity taxonomy does not declare entities");
+    };
+
+    for entity_kind in owned_entity_kinds {
+        if !entity_defs.contains_key(serde_yaml::Value::String(entity_kind.clone())) {
+            bail!("domain pack owns unknown entity kind {entity_kind}");
+        }
+    }
+
+    Ok(())
+}
+
+fn hash_surfaces(surfaces: &BTreeMap<String, DomainPackTaxonomySurface>) -> String {
+    let mut hasher = Sha256::new();
+    for (surface, payload) in surfaces {
+        hasher.update(surface.as_bytes());
+        hasher.update(b"\n");
+        hasher.update(payload.canonical_payload.as_bytes());
+        hasher.update(b"\n");
+    }
+    hex::encode(hasher.finalize())
+}
+
+fn validate_owned_values(
+    field: &'static str,
+    values: &[String],
+    diagnostics: &mut Vec<DomainPackDiagnostic>,
+) {
+    let mut seen = HashSet::new();
+    for value in values {
+        if value.trim().is_empty() {
+            diagnostics.push(diagnostic(
+                "domain_pack.owned_field_empty",
+                format!("{field} contains an empty value"),
+            ));
+        } else if !seen.insert(value.as_str()) {
+            diagnostics.push(diagnostic(
+                "domain_pack.duplicate_owned_value",
+                format!("{field} contains duplicate value {value}"),
+            ));
+        }
+    }
+}
+
 fn require_non_empty(
     diagnostics: &mut Vec<DomainPackDiagnostic>,
     field: &'static str,
@@ -656,6 +1235,15 @@ mod tests {
             version: "0.1.0".to_string(),
             implementation_mode: PackImplementationMode::NativeCompiled,
             compatibility_tier: PackCompatibilityTier::DryRunOnly,
+            owned_dags: vec!["kyc_dag".to_string()],
+            owned_packs: vec!["kyc-case".to_string()],
+            owned_state_machines: vec!["kyc_case_lifecycle".to_string()],
+            owned_constellation_maps: vec!["kyc.onboarding".to_string()],
+            owned_constellation_families: vec!["kyc_lifecycle".to_string()],
+            owned_universes: vec!["universe.kyc_operations".to_string()],
+            owned_verb_prefixes: vec!["kyc-case.".to_string()],
+            owned_entity_kinds: vec!["kyc_case".to_string()],
+            business_crates: vec![],
             owned_constellations: vec!["kyc.onboarding".to_string()],
             allowed_transitions: vec![DomainTransition {
                 transition_ref: "kyc-case.intake-to-discovery".to_string(),
@@ -809,6 +1397,20 @@ mod tests {
     }
 
     #[test]
+    fn duplicate_owned_values_are_rejected() {
+        let mut manifest = valid_manifest();
+        manifest.owned_packs.push("kyc-case".to_string());
+
+        let report = manifest.validate();
+
+        assert!(!report.valid);
+        assert!(report
+            .diagnostics
+            .iter()
+            .any(|d| d.code == "domain_pack.duplicate_owned_value"));
+    }
+
+    #[test]
     fn discovery_probe_authorization_allows_declared_safe_probe() {
         let manifest = valid_manifest();
         let request = DiscoveryRequest {
@@ -865,5 +1467,188 @@ mod tests {
             .allowed_transitions
             .iter()
             .any(|t| t.verb == "kyc-case.update-status"));
+    }
+
+    #[test]
+    fn ob_poc_cbu_seed_pack_parses_and_validates() {
+        let path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("../../config/sem_os_seeds/domain_packs/ob_poc_cbu.yaml");
+        let contents = fs::read_to_string(&path).expect("domain pack readable");
+        let manifest: DomainPackManifest =
+            serde_yaml::from_str(&contents).expect("domain pack parses");
+
+        let report = manifest.validate();
+
+        assert!(report.valid, "{:?}", report.diagnostics);
+        assert_eq!(manifest.pack_id, "ob-poc.cbu");
+        assert!(manifest.owned_dags.iter().any(|dag| dag == "cbu_dag"));
+        assert!(manifest
+            .owned_verb_prefixes
+            .iter()
+            .any(|prefix| prefix == "cbu."));
+    }
+
+    #[test]
+    fn cbu_taxonomy_reload_from_yaml_is_idempotent() {
+        let config_root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../config");
+
+        let first =
+            reload_domain_pack_taxonomy_from_yaml(&config_root, "ob-poc.cbu").expect("first load");
+        let second =
+            reload_domain_pack_taxonomy_from_yaml(&config_root, "ob-poc.cbu").expect("second load");
+
+        assert_eq!(first, second);
+        assert_eq!(first.manifest.pack_id, "ob-poc.cbu");
+        assert!(first.manifest.owned_dags.iter().any(|dag| dag == "cbu_dag"));
+        assert!(first.surfaces.contains_key("dag:cbu_dag"));
+        assert!(first.surfaces.contains_key("pack:cbu-maintenance"));
+        assert!(!first.surface_hash.is_empty());
+    }
+
+    #[test]
+    fn reload_index_skips_when_source_fingerprints_match() {
+        let config_root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../config");
+        let now = Utc::now();
+        let reload =
+            reload_domain_pack_taxonomy_from_yaml(&config_root, "ob-poc.cbu").expect("load");
+        let index = reload_index_entry_from_reload(
+            &config_root,
+            &reload,
+            now,
+            DomainPackReloadStatus::Loaded,
+        )
+        .expect("index");
+
+        let plan = refresh_domain_pack_taxonomy_with_index(
+            &config_root,
+            "ob-poc.cbu",
+            Some(&index),
+            false,
+            now,
+        )
+        .expect("plan");
+
+        assert_eq!(plan.action, DomainPackRefreshAction::Skip);
+        assert_eq!(plan.index_entry.surface_hash, reload.surface_hash);
+        assert!(plan.reload.is_none());
+    }
+
+    #[test]
+    fn reload_index_updates_only_when_fingerprint_changed_but_hash_matches() {
+        let config_root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../config");
+        let now = Utc::now();
+        let reload =
+            reload_domain_pack_taxonomy_from_yaml(&config_root, "ob-poc.cbu").expect("load");
+        let mut index = reload_index_entry_from_reload(
+            &config_root,
+            &reload,
+            now,
+            DomainPackReloadStatus::Loaded,
+        )
+        .expect("index");
+        index.source_fingerprints[0].size_bytes += 1;
+
+        let plan = refresh_domain_pack_taxonomy_with_index(
+            &config_root,
+            "ob-poc.cbu",
+            Some(&index),
+            false,
+            now,
+        )
+        .expect("plan");
+
+        assert_eq!(plan.action, DomainPackRefreshAction::IndexOnly);
+        assert_eq!(plan.index_entry.surface_hash, reload.surface_hash);
+        assert!(plan.reload.is_some());
+    }
+
+    #[test]
+    fn reload_index_requires_publish_without_prior_index() {
+        let config_root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../config");
+
+        let plan = refresh_domain_pack_taxonomy_with_index(
+            &config_root,
+            "ob-poc.cbu",
+            None,
+            false,
+            Utc::now(),
+        )
+        .expect("plan");
+
+        assert_eq!(plan.action, DomainPackRefreshAction::PublishRequired);
+        assert_eq!(
+            plan.index_entry.status,
+            DomainPackReloadStatus::PublishRequired
+        );
+        assert!(plan.reload.is_some());
+    }
+
+    #[test]
+    fn all_domain_packs_reload_idempotently_and_cover_dsl_surfaces() {
+        let config_root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../config");
+
+        let mut owned_packs = HashSet::new();
+        let mut owned_dags = HashSet::new();
+        let mut loaded_pack_ids = Vec::new();
+
+        let all_reloads = reload_all_domain_pack_taxonomies_from_yaml(&config_root)
+            .expect("all domain packs reload");
+
+        for (pack_id, first) in &all_reloads {
+            let second = reload_domain_pack_taxonomy_from_yaml(&config_root, pack_id)
+                .expect("domain pack reload succeeds again");
+
+            assert_eq!(*first, second, "reload was not idempotent for {pack_id}");
+            loaded_pack_ids.push(pack_id.to_string());
+            owned_packs.extend(first.manifest.owned_packs.iter().cloned());
+            owned_dags.extend(first.manifest.owned_dags.iter().cloned());
+        }
+
+        assert!(
+            !loaded_pack_ids.is_empty(),
+            "expected at least one SemOS domain pack"
+        );
+
+        let actual_packs = yaml_files(&config_root.join("packs"))
+            .expect("pack directory readable")
+            .into_iter()
+            .map(|path| {
+                let yaml = parse_yaml_file(&path).expect("pack yaml parses");
+                yaml_field(&yaml, "id")
+                    .and_then(serde_yaml::Value::as_str)
+                    .unwrap_or_else(|| panic!("pack {} declares id", path.display()))
+                    .to_string()
+            })
+            .collect::<HashSet<_>>();
+
+        let actual_dags = yaml_files(&config_root.join("sem_os_seeds/dag_taxonomies"))
+            .expect("DAG directory readable")
+            .into_iter()
+            .map(|path| {
+                let yaml = parse_yaml_file(&path).expect("DAG yaml parses");
+                yaml_field(&yaml, "dag_id")
+                    .and_then(serde_yaml::Value::as_str)
+                    .unwrap_or_else(|| panic!("DAG {} declares dag_id", path.display()))
+                    .to_string()
+            })
+            .collect::<HashSet<_>>();
+
+        let missing_packs = actual_packs
+            .difference(&owned_packs)
+            .cloned()
+            .collect::<Vec<_>>();
+        let missing_dags = actual_dags
+            .difference(&owned_dags)
+            .cloned()
+            .collect::<Vec<_>>();
+
+        assert!(
+            missing_packs.is_empty(),
+            "DSL journey packs not owned by any SemOS domain pack: {missing_packs:#?}"
+        );
+        assert!(
+            missing_dags.is_empty(),
+            "DAG taxonomies not owned by any SemOS domain pack: {missing_dags:#?}"
+        );
     }
 }

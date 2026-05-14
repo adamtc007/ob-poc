@@ -21,7 +21,7 @@
 use crate::ast::{AstNode, Literal, Program, Statement, VerbCall};
 use crate::ops::{DocKey, EntityKey, Op};
 use rust_decimal::Decimal;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::str::FromStr;
 
 /// Result of compiling a DSL program
@@ -87,6 +87,188 @@ pub fn compile_to_ops(program: &Program) -> CompiledProgram {
         ops,
         symbols,
         errors,
+    }
+}
+
+/// Compile a runbook-finalisation surface with scoped authoring bindings.
+///
+/// This is intentionally stricter than the legacy `compile_to_ops` path:
+/// bindings are accepted only on supported create-style verbs, uses are checked
+/// in source order, and emitted executable ops have authoring binding metadata
+/// stripped. The returned symbol table is retained as compiler metadata for
+/// diagnostics/audit; it is not encoded into the executable ops.
+pub fn compile_scoped_runbook_bindings(program: &Program) -> CompiledProgram {
+    let validation_errors = validate_scoped_runbook_bindings(program);
+    if !validation_errors.is_empty() {
+        return CompiledProgram {
+            ops: Vec::new(),
+            symbols: HashMap::new(),
+            errors: validation_errors,
+        };
+    }
+
+    let mut compiled = compile_to_ops(program);
+    if compiled.is_ok() {
+        for op in &mut compiled.ops {
+            strip_authoring_binding(op);
+        }
+    }
+    compiled
+}
+
+#[derive(Debug, Clone)]
+struct ScopedBindingInfo {
+    entity_type: &'static str,
+}
+
+fn validate_scoped_runbook_bindings(program: &Program) -> Vec<CompileError> {
+    let mut bindings: HashMap<String, ScopedBindingInfo> = HashMap::new();
+    let declared_names = collect_scoped_binding_names(program);
+    let mut errors = Vec::new();
+
+    for (stmt_idx, stmt) in program.statements.iter().enumerate() {
+        let Statement::VerbCall(vc) = stmt else {
+            continue;
+        };
+
+        validate_scoped_binding_uses(vc, stmt_idx, &bindings, &declared_names, &mut errors);
+
+        if let Some(binding) = &vc.binding {
+            match scoped_create_output_type(vc) {
+                Some(entity_type) => {
+                    if bindings.contains_key(binding) {
+                        errors.push(CompileError {
+                            stmt_idx,
+                            message: format!(
+                                "Duplicate binding '@{binding}'. Bindings are immutable and may be assigned only once."
+                            ),
+                        });
+                    } else {
+                        bindings.insert(binding.clone(), ScopedBindingInfo { entity_type });
+                    }
+                }
+                None => errors.push(CompileError {
+                    stmt_idx,
+                    message: format!(
+                        "Verb '{}.{}' does not declare an entity output. Only create-style verbs may declare :as @alias.",
+                        vc.domain, vc.verb
+                    ),
+                }),
+            }
+        }
+    }
+
+    errors
+}
+
+fn collect_scoped_binding_names(program: &Program) -> HashSet<String> {
+    program
+        .statements
+        .iter()
+        .filter_map(|statement| match statement {
+            Statement::VerbCall(vc) => vc.binding.clone(),
+            Statement::Comment(_) => None,
+        })
+        .collect()
+}
+
+fn validate_scoped_binding_uses(
+    vc: &VerbCall,
+    stmt_idx: usize,
+    bindings: &HashMap<String, ScopedBindingInfo>,
+    declared_names: &HashSet<String>,
+    errors: &mut Vec<CompileError>,
+) {
+    for arg in &vc.arguments {
+        let mut refs = Vec::new();
+        collect_symbol_refs(&arg.value, &mut refs);
+
+        for symbol in refs {
+            let Some(info) = bindings.get(symbol) else {
+                let message = if declared_names.contains(symbol) {
+                    format!(
+                        "Binding '@{symbol}' is used before it is declared. Bindings must be produced by an earlier statement in the same runbook."
+                    )
+                } else {
+                    format!(
+                        "Undefined binding '@{symbol}'. No earlier create statement declares :as @{symbol} in this runbook."
+                    )
+                };
+                errors.push(CompileError { stmt_idx, message });
+                continue;
+            };
+
+            if let Some(expected_type) = expected_scoped_arg_type(vc, &arg.key) {
+                if !scoped_type_matches(info.entity_type, expected_type) {
+                    errors.push(CompileError {
+                        stmt_idx,
+                        message: format!(
+                            "Type mismatch for argument '{}' of '{}.{}'. Expected '{}'; found '@{} : {}'.",
+                            arg.key, vc.domain, vc.verb, expected_type, symbol, info.entity_type
+                        ),
+                    });
+                }
+            }
+        }
+    }
+}
+
+fn scoped_create_output_type(vc: &VerbCall) -> Option<&'static str> {
+    match (vc.domain.as_str(), vc.verb.as_str()) {
+        ("cbu", "create") => Some("cbu"),
+        _ => None,
+    }
+}
+
+fn expected_scoped_arg_type(vc: &VerbCall, arg_key: &str) -> Option<&'static str> {
+    match (vc.domain.as_str(), vc.verb.as_str(), arg_key) {
+        ("cbu", "assign-role", "cbu-id") | ("cbu", "remove-role", "cbu-id") => Some("cbu"),
+        ("cbu", "assign-role", "entity-id") | ("cbu", "remove-role", "entity-id") => Some("entity"),
+        ("kyc-case", "create", "cbu-id") => Some("cbu"),
+        ("cbu-custody", "add-universe", "cbu-id")
+        | ("cbu-custody", "create-ssi", "cbu-id")
+        | ("cbu-custody", "add-booking-rule", "cbu-id")
+        | ("trading-profile", "import", "cbu-id")
+        | ("document", "catalog", "cbu-id")
+        | ("cbu", "attach-evidence", "cbu-id") => Some("cbu"),
+        _ => None,
+    }
+}
+
+fn scoped_type_matches(actual: &str, expected: &str) -> bool {
+    actual == expected || expected == "entity" && actual != "cbu"
+}
+
+fn collect_symbol_refs<'a>(node: &'a AstNode, refs: &mut Vec<&'a str>) {
+    match node {
+        AstNode::SymbolRef { name, .. } => refs.push(name),
+        AstNode::List { items, .. } => {
+            for item in items {
+                collect_symbol_refs(item, refs);
+            }
+        }
+        AstNode::Map { entries, .. } => {
+            for (_key, value) in entries {
+                collect_symbol_refs(value, refs);
+            }
+        }
+        AstNode::Nested(call) => {
+            for arg in &call.arguments {
+                collect_symbol_refs(&arg.value, refs);
+            }
+        }
+        _ => {}
+    }
+}
+
+fn strip_authoring_binding(op: &mut Op) {
+    match op {
+        Op::EnsureEntity { binding, .. }
+        | Op::CreateCase { binding, .. }
+        | Op::CreateWorkstream { binding, .. }
+        | Op::CreateSSI { binding, .. }
+        | Op::GenericCrud { binding, .. } => *binding = None,
+        _ => {}
     }
 }
 

@@ -29,7 +29,7 @@ use sha2::{Digest, Sha256};
 use uuid::Uuid;
 
 #[cfg(test)]
-use super::envelope::MacroExpansionAudit;
+use super::envelope::{BindingResolutionAudit, MacroExpansionAudit};
 use super::envelope::{EnvelopeCore, ReplayEnvelope};
 use super::types::{CompiledRunbookId, CompiledStep};
 
@@ -155,6 +155,7 @@ mod tests {
                 macro_audit_digests: vec![],
                 snapshot_manifest: BTreeMap::new(),
             },
+            binding_resolution_audits: vec![],
             external_lookups: vec![],
             macro_audits: vec![],
             sealed_at: chrono::DateTime::UNIX_EPOCH,
@@ -545,6 +546,27 @@ mod proptests {
             )
     }
 
+    fn arb_binding_resolution_audit() -> impl Strategy<Value = BindingResolutionAudit> {
+        (
+            "[a-z_]{1,16}",
+            "[a-z_]{1,16}",
+            any::<usize>(),
+            arb_uuid(),
+            "[a-z0-9_-]{1,32}",
+        )
+            .prop_map(
+                |(symbol_name, entity_type, producer_statement, assigned_uuid, source)| {
+                    BindingResolutionAudit {
+                        symbol: format!("@{symbol_name}"),
+                        entity_type,
+                        producer_statement,
+                        assigned_uuid,
+                        source,
+                    }
+                },
+            )
+    }
+
     fn arb_envelope_core() -> impl Strategy<Value = crate::runbook::envelope::EnvelopeCore> {
         (
             any::<u64>(),
@@ -573,16 +595,20 @@ mod proptests {
     fn arb_replay_envelope() -> impl Strategy<Value = ReplayEnvelope> {
         (
             arb_envelope_core(),
+            prop::collection::vec(arb_binding_resolution_audit(), 0..3),
             prop::collection::vec(arb_external_lookup(), 0..3),
             prop::collection::vec(arb_macro_audit(), 0..3),
             arb_datetime(),
         )
             .prop_map(
-                |(core, external_lookups, macro_audits, sealed_at)| ReplayEnvelope {
-                    core,
-                    external_lookups,
-                    macro_audits,
-                    sealed_at,
+                |(core, binding_resolution_audits, external_lookups, macro_audits, sealed_at)| {
+                    ReplayEnvelope {
+                        core,
+                        binding_resolution_audits,
+                        external_lookups,
+                        macro_audits,
+                        sealed_at,
+                    }
                 },
             )
     }
@@ -648,6 +674,13 @@ mod proptests {
                 macro_audit_digests: vec!["def456".into()],
                 snapshot_manifest: BTreeMap::new(),
             },
+            binding_resolution_audits: vec![BindingResolutionAudit {
+                symbol: "@cbu".into(),
+                entity_type: "cbu".into(),
+                producer_statement: 0,
+                assigned_uuid: Uuid::new_v4(),
+                source: "compile-time-uuid-v7".into(),
+            }],
             external_lookups: vec![ExternalLookup {
                 source: "gleif".into(),
                 query: "allianz".into(),

@@ -53,6 +53,12 @@ pub struct Dag {
     #[serde(default)]
     pub evidence_types: Vec<EvidenceType>,
 
+    /// Canonical DSL verbs owned by this DAG but not necessarily represented
+    /// as lifecycle transitions. Used by reconciliation harnesses to keep
+    /// verb registry, packs, macros, and DAG taxonomy aligned.
+    #[serde(default)]
+    pub dsl_verb_reconciliation: BTreeMap<String, Vec<String>>,
+
     // --- existing sections ---
     #[serde(default)]
     pub product_module_gates: Option<ProductModuleGates>,

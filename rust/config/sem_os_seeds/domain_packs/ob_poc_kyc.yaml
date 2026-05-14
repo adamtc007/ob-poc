@@ -3,6 +3,32 @@ name: ob-poc KYC Domain Pack
 version: 0.1.0
 implementation_mode: native_compiled
 compatibility_tier: dry_run_only
+owned_dags:
+  - kyc_dag
+owned_packs:
+  - kyc-case
+owned_state_machines:
+  - kyc_case_lifecycle
+  - entity_kyc_lifecycle
+  - screening_lifecycle
+  - document_request_lifecycle
+owned_constellation_maps:
+  - kyc.onboarding
+  - kyc.workspace
+  - kyc.extended
+owned_constellation_families:
+  - kyc_lifecycle
+  - kyc_workspace
+  - kyc_extended
+owned_universes:
+  - universe.kyc_operations
+owned_verb_prefixes:
+  - kyc-case.
+  - kyc.
+  - screening.
+owned_entity_kinds:
+  - kyc_case
+business_crates: []
 owned_constellations:
   - kyc.onboarding
 allowed_transitions:

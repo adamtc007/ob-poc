@@ -1,0 +1,63 @@
+pack_id: ob-poc.product-service-taxonomy
+name: ob-poc Product Service Taxonomy Domain Pack
+version: 0.1.0
+implementation_mode: native_compiled
+compatibility_tier: dry_run_only
+owned_dags: [product_service_taxonomy_dag]
+owned_packs: [product-service-taxonomy]
+owned_state_machines:
+  - service_resource_def_lifecycle
+  - service_resource_def_governance_lifecycle
+  - resource_owner_principal_lifecycle
+owned_constellation_maps:
+  - product.service.taxonomy
+  - product.workspace
+owned_constellation_families:
+  - product_service_taxonomy
+  - product_workspace
+owned_universes:
+  - universe.client_lifecycle
+owned_verb_prefixes:
+  - product.
+  - service.
+  - service-option.
+  - service-version.
+owned_entity_kinds:
+  - product
+  - service
+  - resource_type
+  - service_resource_def
+  - resource_owner_principal
+business_crates: []
+owned_constellations:
+  - product.service.taxonomy
+  - product.workspace
+allowed_transitions:
+  - transition_ref: product-service-taxonomy.option-declared
+    entity_type: service
+    state_machine: service_resource_def_lifecycle
+    verb: service.declare-option
+    from_state: draft
+    to_state: declared
+    dry_run_enabled: true
+    mutation_enabled: false
+    hitl_required: true
+discovery_probes:
+  - probe_id: product-service-taxonomy.read-state
+    operation: read_state
+    target: semos.product_service_taxonomy
+    idempotent: true
+    modeled: true
+    first_class_state_mutation: false
+projection_catalog: []
+mention_namespaces: []
+declared_modes: []
+workflow_phases: []
+acp_personas: []
+resource_uri_schemes: []
+external_mcp_transports: []
+typed_extension_points: []
+classification_policy:
+  max_prompt_classification: internal
+  allow_external_llm: false
+  required_redactions: []

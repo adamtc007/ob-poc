@@ -30,20 +30,22 @@ pub(crate) enum CompletionContext {
         prefix: String,
         in_string: bool,
     },
-    /// Completing a symbol reference (after @) - for existing symbols
+    /// Completing a symbol reference (after @ or $) - for existing symbols
     /// Includes optional verb/keyword context for type-aware ranking
     SymbolRef {
         prefix: String,
+        marker: char,
         /// The verb being called (if inside an s-expression)
         verb_name: Option<String>,
         /// The keyword this symbol is a value for (e.g., "cbu-id", "entity-id")
         keyword: Option<String>,
     },
-    /// Completing an entity lookup that will be inserted as @symbol (after keyword + @)
+    /// Completing an entity lookup that will be inserted as a symbol (after keyword + marker)
     EntityAsSymbol {
         verb_name: String,
         keyword: String,
         prefix: String,
+        marker: char,
     },
     /// No specific completion context
     None,
@@ -92,21 +94,21 @@ pub(crate) fn detect_completion_context(
         return CompletionContext::None;
     }
 
-    // Check for @ symbol - could be existing symbol ref OR entity lookup for keyword
-    // But first verify the @ is not inside a comment
-    if let Some(at_pos) = find_at_outside_comment(&prefix) {
-        let after_at = &prefix[at_pos + 1..];
-        if after_at
+    // Check for @/$ symbol - could be existing symbol ref OR entity lookup for keyword.
+    if let Some((marker_pos, marker)) = find_symbol_marker_outside_comment(&prefix) {
+        let after_marker = &prefix[marker_pos + 1..];
+        if after_marker
             .chars()
             .all(|c| c.is_alphanumeric() || c == '-' || c == '_')
         {
             // Check if we're after a keyword that expects an entity lookup
-            let before_at = &prefix[..at_pos];
-            let (verb_name, keyword) = parse_sexp_context(before_at);
+            let before_marker = &prefix[..marker_pos];
+            let (verb_name, keyword) = parse_sexp_context(before_marker);
 
             tracing::debug!(
-                "@ context: before_at='{}', verb={:?}, keyword={:?}",
-                before_at,
+                "symbol context: before_marker='{}', marker={}, verb={:?}, keyword={:?}",
+                before_marker,
+                marker,
                 verb_name,
                 keyword
             );
@@ -117,14 +119,16 @@ pub(crate) fn detect_completion_context(
                     return CompletionContext::EntityAsSymbol {
                         verb_name: verb.clone(),
                         keyword: kw.clone(),
-                        prefix: after_at.to_string(),
+                        prefix: after_marker.to_string(),
+                        marker,
                     };
                 }
             }
 
             // Otherwise, it's a regular symbol reference with optional context
             return CompletionContext::SymbolRef {
-                prefix: after_at.to_string(),
+                prefix: after_marker.to_string(),
+                marker,
                 verb_name,
                 keyword,
             };
@@ -401,11 +405,11 @@ fn is_in_comment(prefix: &str) -> bool {
     in_comment
 }
 
-/// Find the last @ that is not inside a string or comment.
-fn find_at_outside_comment(prefix: &str) -> Option<usize> {
+/// Find the last symbol marker (@ or $) that is not inside a string or comment.
+fn find_symbol_marker_outside_comment(prefix: &str) -> Option<(usize, char)> {
     let mut in_string = false;
     let mut in_comment = false;
-    let mut last_at: Option<usize> = None;
+    let mut last_marker: Option<(usize, char)> = None;
     let chars: Vec<char> = prefix.chars().collect();
     let mut byte_offset = 0usize;
 
@@ -431,15 +435,15 @@ fn find_at_outside_comment(prefix: &str) -> Option<usize> {
             ';' if i + 1 < chars.len() && chars[i + 1] == ';' => {
                 in_comment = true;
             }
-            '@' => {
-                last_at = Some(byte_offset);
+            '@' | '$' => {
+                last_marker = Some((byte_offset, c));
             }
             _ => {}
         }
         byte_offset += c.len_utf8();
     }
 
-    last_at
+    last_marker
 }
 
 #[cfg(test)]
@@ -497,7 +501,29 @@ mod tests {
             },
         );
         match ctx {
-            CompletionContext::SymbolRef { prefix, .. } => assert_eq!(prefix, "fu"),
+            CompletionContext::SymbolRef { prefix, marker, .. } => {
+                assert_eq!(prefix, "fu");
+                assert_eq!(marker, '@');
+            }
+            other => panic!("Expected SymbolRef context, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn test_dollar_symbol_ref_completion() {
+        let doc = make_doc("(cbu.ensure :name \"Test\" :as $fu");
+        let ctx = detect_completion_context(
+            &doc,
+            Position {
+                line: 0,
+                character: 32,
+            },
+        );
+        match ctx {
+            CompletionContext::SymbolRef { prefix, marker, .. } => {
+                assert_eq!(prefix, "fu");
+                assert_eq!(marker, '$');
+            }
             other => panic!("Expected SymbolRef context, got {:?}", other),
         }
     }
@@ -688,18 +714,22 @@ mod tests {
     }
 
     #[test]
-    fn test_find_at_outside_comment() {
+    fn test_find_symbol_marker_outside_comment() {
         // @ in code
-        assert!(find_at_outside_comment("(cbu.create :as @fund)").is_some());
+        assert!(find_symbol_marker_outside_comment("(cbu.create :as @fund)").is_some());
+        // $ in code
+        assert!(find_symbol_marker_outside_comment("(cbu.create :as $fund)").is_some());
         // @ in comment - should return None
-        assert!(find_at_outside_comment(";; @fund").is_none());
+        assert!(find_symbol_marker_outside_comment(";; @fund").is_none());
+        // $ in comment - should return None
+        assert!(find_symbol_marker_outside_comment(";; $fund").is_none());
         // @ in string - also returns None (we filter both strings and comments)
-        assert!(find_at_outside_comment("\"email@domain.com\"").is_none());
+        assert!(find_symbol_marker_outside_comment("\"email@domain.com\"").is_none());
         // @ after comment ends
-        let result = find_at_outside_comment(";; comment\n@fund");
+        let result = find_symbol_marker_outside_comment(";; comment\n@fund");
         assert!(result.is_some());
         // @ in code after string with @
-        let result = find_at_outside_comment("\"email@domain.com\" :as @fund");
+        let result = find_symbol_marker_outside_comment("\"email@domain.com\" :as @fund");
         assert!(result.is_some());
     }
 }

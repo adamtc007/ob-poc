@@ -1,15 +1,15 @@
 # CLAUDE.md
 
-> **Last reviewed:** 2026-04-26
+> **Last reviewed:** 2026-05-14
 > **Frontend:** React/TypeScript (`ob-poc-ui-react/`) — Chat UI with scope panel, Inspector, Semantic OS Tab
 > **Backend:** Rust/Axum (`rust/crates/ob-poc-web/`) — Serves React + REST API
 > **Crates:** 41 workspace crates (incl. `ob-poc` application root) — 18 ob-poc-* library (web, types, diagnostics, boundary, sage, journey, authoring, agent, macros · split-v1: bods, deal, booking-principal, semtaxonomy, ontology, entity-linking, trading-profile, derived-attributes, taxonomy) · 10 sem_os_* (core, types, ontology, policy, postgres, server, client, obpoc_adapter, harness, mcp) · 4 dsl-* (dsl-core, dsl-lsp, dsl-runtime, dsl-analysis) · 4 ob-* (ob-agentic, ob-templates, ob-workflow, ob-semantic-matcher) · 4 misc (entity-gateway, xtask, playbook-core, inspector-projection)
 > **Verbs:** 1,282 canonical verbs across 134 domains (795 declared with three-axis = 62.0%); 24,587 intent patterns (DB-sourced)
 > **Macros:** 103 operator macros (22 YAML files, 18 domains, 3 composite), Tier -2B in intent pipeline
 > **MCP Tools:** ~102 tools (DSL, verbs, learning, session, batch, research, taxonomy, sem_reg, stewardship, db_introspect, session_verb_surface)
-> **DAG Taxonomies:** 11 (CBU + KYC + Deal + InstrumentMatrix + BookingPrincipal + LifecycleResources + ProductMaintenance + SemOsMaintenance + SessionBootstrap + OnboardingRequest + BookSetup) — see `rust/config/sem_os_seeds/dag_taxonomies/`
-> **Latest schema additions:** `rust/migrations/20260424_tranche_2_3_dag_alignment.sql`, `rust/migrations/20260425_manco_regulatory_status.sql`, `rust/migrations/20260427_lifecycle_resources_workspace.sql`, `rust/migrations/20260428_service_lifecycle.sql`, `rust/migrations/20260429_booking_principal_clearance.sql`
-> **Workspaces:** 11 (7 domain: CBU, KYC, Deal, InstrumentMatrix, BookingPrincipal, LifecycleResources, ProductMaintenance) + (4 infrastructure: SemOsMaintenance, SessionBootstrap, OnboardingRequest, BookSetup)
+> **DAG Taxonomies:** 12 (CBU + KYC + Deal + Catalogue + InstrumentMatrix + BookingPrincipal + LifecycleResources + ProductServiceTaxonomy + SemOsMaintenance + SessionBootstrap + OnboardingRequest + BookSetup) — see `rust/config/sem_os_seeds/dag_taxonomies/`
+> **Latest schema additions:** `rust/migrations/20260503_sem_os_dag_taxonomy_object.sql`, `rust/migrations/20260514_sem_os_domain_pack_object.sql`, `rust/migrations/20260514_domain_pack_reload_index.sql`
+> **Workspaces:** 12 (8 domain: CBU, KYC, Deal, Catalogue, InstrumentMatrix, BookingPrincipal, LifecycleResources, ProductServiceTaxonomy) + (4 infrastructure: SemOsMaintenance, SessionBootstrap, OnboardingRequest, BookSetup)
 > **Catalogue spec:** `docs/todo/catalogue-platform-refinement-v1_2.md` (consolidated authoritative spec, 2026-04-26 — supersedes v1.0/v1.1/v1.3). Tranche 1 implementation complete: validator (transition_args + EXISTS predicate), Sage/REPL policies, P-G provisional designation, GatePipeline default-on, CI gate. Tranche 2 (estate reconciliation: 487 verbs to declare, 153 preserving-with-transition_args migration warnings to fix) follows.
 > **Schema Overview:** `migrations/OB_POC_SCHEMA_ENTITY_OVERVIEW.md`
 > **Embeddings:** Candle local (384-dim, BGE-small-en-v1.5) — 24,587 patterns vectorized
@@ -78,6 +78,10 @@ DATABASE_URL="postgresql:///data_designer" \
 
 # Semantic OS standalone server
 SEM_OS_DATABASE_URL="postgresql:///data_designer" SEM_OS_JWT_SECRET=dev-secret cargo run -p sem_os_server
+
+# Sem OS domain-pack reload check (build-engine style index; no snapshot publication)
+cargo run --manifest-path xtask/Cargo.toml -- sem-reg domain-pack-check
+cargo run --manifest-path xtask/Cargo.toml -- sem-reg domain-pack-check --pack-id ob-poc.cbu --force-check --update-index
 ```
 
 Current schema export target: `migrations/master-schema.sql` (canonical), `schema_export.sql` (convenience copy)
@@ -135,6 +139,15 @@ SemOS Maintenance workspace (2026-03-28):
 - Macro audit (2026-03-29): fixed `expands_to` → `expands-to` YAML key in `attribute.seed-*` macros (serde kebab-case deserialization bug); removed 8 KYC-domain macros from `book-setup` pack (screening, case, kyc-workflow macros leaked into CBU/InstrumentMatrix workspaces); added search overrides for `screening-ops.*` workstream-level macros; two screening families coexist: `screening.*` (party-level ad-hoc) and `screening-ops.*` (workstream-level KYC)
 - PACK001 lint rule: workspace-macro bleed detection — checks every macro in a pack's `allowed_verbs` has mode-tags compatible with all pack workspaces; prevents KYC/screening macros from leaking into CBU/InstrumentMatrix contexts; workspace-to-mode-tag compatibility table in `docs/annex-macros.md`
 - `cargo clippy` clean across entire codebase
+
+SemOS domain-pack taxonomy reload (2026-05-14):
+- Sem OS domain packs are the configuration-native ownership boundary for domain-specific YAML shape. Business crates are clients/implementation homes; they do not own Sem OS taxonomy shape.
+- Domain Pack manifests live in `rust/config/sem_os_seeds/domain_packs/*.yaml` and declare owned DAGs, DSL packs, state machines, constellation maps/families, universes, verb prefixes, entity kinds, and informational business-crate links.
+- `DomainPack` is a SemReg object type. Domain packs are scanned into `SeedBundle.domain_packs` by `sem_os_obpoc_adapter` and published through the existing Sem OS seed bootstrap path.
+- Reload uses a build-engine index in `sem_reg.domain_pack_reload_index`: path + mtime + size are the cheap "maybe dirty" check; canonical surface hash is the correctness check.
+- Reload checking does not publish snapshots directly. It reports `clean`, `index_only`, or `publish_required`; actual Sem OS mutation remains behind `bootstrap_seed_bundle()`, where identical payloads skip and changed payloads publish non-breaking successor snapshots.
+- Manual trigger: `cargo run --manifest-path xtask/Cargo.toml -- sem-reg domain-pack-check [--pack-id ob-poc.cbu] [--force-check] [--update-index] [--json]`.
+- Architecture note: `docs/architecture/sem-os-domain-pack-taxonomy-reload.md`.
 
 ---
 
@@ -670,7 +683,8 @@ Automated browser testing via Chrome DevTools MCP. Claude Code can navigate, typ
 | When working on... | Read this annex |
 |--------------------|-----------------|
 | DSL pipeline, verb search, embeddings, intent resolution, disambiguation, teaching, promotion, scenarios, AffinityGraph, discovery | `docs/annex-dsl-and-intent.md` |
-| Semantic OS, SemReg, context resolution, ABAC, stewardship, governed authoring, CCIR, verb surface, scanner, **v1.3 cross-workspace runtime stack** (DagRegistry, GateChecker, DerivedStateEvaluator, CascadePlanner, GatePipeline) | `docs/annex-sem-os.md` |
+| Semantic OS, SemReg, context resolution, ABAC, stewardship, governed authoring, CCIR, verb surface, scanner, domain-pack reload, **v1.3 cross-workspace runtime stack** (DagRegistry, GateChecker, DerivedStateEvaluator, CascadePlanner, GatePipeline) | `docs/annex-sem-os.md` |
+| Sem OS domain-pack YAML ownership, reload index, timestamp/hash refresh, publication boundary | `docs/architecture/sem-os-domain-pack-taxonomy-reload.md` |
 | BPMN-Lite service, fiber VM, race semantics, gRPC, orchestration, bpmn_integration | `docs/annex-bpmn-lite.md` |
 | V2 REPL, packs, scoring, preconditions, context stack, golden corpus, replay tuner | `docs/annex-repl-v2.md` |
 | Macros: operator vocabulary, expansion engine, MacroIndex, lint, composite macros, state DAG, pack mapping | `docs/annex-macros.md` |
@@ -745,6 +759,7 @@ When you see these in a task, read the corresponding annex first:
 | "DerivedStateEvaluator", "DerivedStateProjector", "CascadePlanner", "SqlPredicateResolver", "SlotStateProvider", "PostgresChildEntityResolver" | `docs/annex-sem-os.md` |
 | "DAG taxonomy", "dag_taxonomies", "overall_lifecycle", "dual_lifecycle", "category_gated", "periodic_review_cadence" | `docs/annex-sem-os.md` |
 | "scanner", "drift detection", "bootstrap", "seed bundle" | `docs/annex-sem-os.md` |
+| "domain pack", "domain-pack reload", "reload index", "taxonomy reload", "publish_required", "domain_pack_reload_index" | `docs/architecture/sem-os-domain-pack-taxonomy-reload.md` + `docs/annex-sem-os.md` |
 | "shared atom", "cross-workspace", "staleness propagation", "constellation replay", "remediation event" | `docs/annex-cross-workspace-state-consistency.md` |
 | "RebuildContext", "shared fact version", "workspace fact ref", "produces_shared_facts" | `rust/src/cross_workspace/` |
 | "BPMN", "bpmn-lite", "fiber VM", "orchestration", "durable workflow" | `docs/annex-bpmn-lite.md` |

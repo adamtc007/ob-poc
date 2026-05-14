@@ -39,8 +39,8 @@ pub(crate) fn rename_symbol(
     // Find the symbol name at position
     let symbol_name = find_symbol_at_position(doc, position)?;
 
-    // Clean up new name (remove @ prefix if user added it)
-    let new_name = new_name.strip_prefix('@').unwrap_or(new_name);
+    // Clean up new name (remove symbol prefix if user added it)
+    let new_name = strip_symbol_marker(new_name).unwrap_or(new_name);
 
     // Collect all edits
     let mut edits = Vec::new();
@@ -50,7 +50,7 @@ pub(crate) fn rename_symbol(
         if def.name == symbol_name {
             edits.push(TextEdit {
                 range: def.range,
-                new_text: format!("@{}", new_name),
+                new_text: format!("{}{}", marker_for_range(doc, def.range), new_name),
             });
         }
     }
@@ -60,7 +60,7 @@ pub(crate) fn rename_symbol(
         if sym_ref.name == symbol_name {
             edits.push(TextEdit {
                 range: sym_ref.range,
-                new_text: format!("@{}", new_name),
+                new_text: format!("{}{}", marker_for_range(doc, sym_ref.range), new_name),
             });
         }
     }
@@ -96,6 +96,17 @@ fn find_symbol_at_position(doc: &DocumentState, position: Position) -> Option<St
     }
 
     None
+}
+
+fn strip_symbol_marker(name: &str) -> Option<&str> {
+    name.strip_prefix('@').or_else(|| name.strip_prefix('$'))
+}
+
+fn marker_for_range(doc: &DocumentState, range: Range) -> char {
+    doc.get_line(range.start.line)
+        .and_then(|line| line.chars().nth(range.start.character as usize))
+        .filter(|marker| *marker == '@' || *marker == '$')
+        .unwrap_or('@')
 }
 
 /// Check if position is within range.

@@ -20,8 +20,7 @@ use crate::{
         governance_verbs::GovernanceVerbService,
         ports::{AuthoringStore, ScratchSchemaRunner},
         types::{
-            ChangeSetFull, DiffSummary, DryRunReport, PublishBatch, PublishPlan,
-            ValidationReport,
+            ChangeSetFull, DiffSummary, DryRunReport, PublishBatch, PublishPlan, ValidationReport,
         },
     },
     context_resolution::{
@@ -869,6 +868,62 @@ fn build_discovery_surface(
     })
 }
 
+#[derive(Debug)]
+enum SeedBootstrapPlan {
+    Skip,
+    Publish(SnapshotMeta, serde_json::Value),
+}
+
+fn plan_seed_bootstrap_item(
+    principal: &Principal,
+    bundle_hash: &str,
+    object_type: ObjectType,
+    fqn: &str,
+    payload: &serde_json::Value,
+    current: Option<&SnapshotRow>,
+) -> Result<SeedBootstrapPlan> {
+    match current {
+        Some(current) => {
+            if current.object_type != object_type {
+                return Err(SemOsError::Conflict(format!(
+                    "FQN {} is already active as {:?}, cannot bootstrap as {:?}",
+                    fqn, current.object_type, object_type
+                )));
+            }
+
+            if current.definition == *payload {
+                return Ok(SeedBootstrapPlan::Skip);
+            }
+
+            Ok(SeedBootstrapPlan::Publish(
+                SnapshotMeta {
+                    object_type,
+                    object_id: current.object_id,
+                    version_major: current.version_major,
+                    version_minor: current.version_minor + 1,
+                    status: SnapshotStatus::Active,
+                    governance_tier: GovernanceTier::Operational,
+                    trust_class: TrustClass::Convenience,
+                    security_label: SecurityLabel::default(),
+                    change_type: ChangeType::NonBreaking,
+                    change_rationale: Some(format!("Refreshed from seed bundle {}", bundle_hash)),
+                    created_by: principal.actor_id.clone(),
+                    approved_by: Some(principal.actor_id.clone()),
+                    predecessor_id: Some(current.snapshot_id),
+                },
+                payload.clone(),
+            ))
+        }
+        None => {
+            let object_id = sem_os_core::ids::object_id_for(object_type, fqn);
+            Ok(SeedBootstrapPlan::Publish(
+                SnapshotMeta::new_operational(object_type, object_id, &principal.actor_id),
+                payload.clone(),
+            ))
+        }
+    }
+}
+
 #[async_trait]
 impl CoreService for CoreServiceImpl {
     async fn resolve_context(
@@ -1147,6 +1202,12 @@ impl CoreService for CoreServiceImpl {
             )
             .chain(
                 bundle
+                    .domain_packs
+                    .iter()
+                    .map(|s| (ObjectType::DomainPack, s.fqn.as_str(), &s.payload)),
+            )
+            .chain(
+                bundle
                     .attributes
                     .iter()
                     .map(|s| (ObjectType::AttributeDef, s.fqn.as_str(), &s.payload)),
@@ -1204,17 +1265,22 @@ impl CoreService for CoreServiceImpl {
 
         for (object_type, fqn, payload) in &all_seeds {
             let fqn_obj = Fqn::new(*fqn);
-            match self.snapshots.resolve(&fqn_obj, None).await {
-                Ok(_) => {
-                    skipped += 1;
-                }
-                Err(SemOsError::NotFound(_)) => {
-                    let object_id = sem_os_core::ids::object_id_for(*object_type, fqn);
-                    let meta =
-                        SnapshotMeta::new_operational(*object_type, object_id, &principal.actor_id);
-                    to_publish.push((meta, (*payload).clone()));
-                }
+            let current = match self.snapshots.resolve(&fqn_obj, None).await {
+                Ok(current) => Some(current),
+                Err(SemOsError::NotFound(_)) => None,
                 Err(e) => return Err(e),
+            };
+
+            match plan_seed_bootstrap_item(
+                principal,
+                &bundle.bundle_hash,
+                *object_type,
+                fqn,
+                payload,
+                current.as_ref(),
+            )? {
+                SeedBootstrapPlan::Skip => skipped += 1,
+                SeedBootstrapPlan::Publish(meta, payload) => to_publish.push((meta, payload)),
             }
         }
 
@@ -1902,12 +1968,12 @@ fn parse_uuid(s: &str, field_name: &str) -> Result<Uuid> {
 mod tests {
     use super::*;
     use crate::abac::ActorContext;
-    use sem_os_ontology::constellation_map_def::ConstellationMapDefBody;
     use crate::context_resolution::{
         DiscoveryContext, EvidenceMode, ResolutionConstraints, SubjectRef,
     };
     use crate::grounding::ConstellationModel;
     use chrono::Utc;
+    use sem_os_ontology::constellation_map_def::ConstellationMapDefBody;
     use serde_json::json;
     use std::collections::HashMap;
 
@@ -1996,6 +2062,80 @@ slots:
             definition,
             created_at: Utc::now(),
         }
+    }
+
+    #[test]
+    fn seed_bootstrap_plan_skips_identical_payload() {
+        let principal = Principal::system();
+        let payload = json!({"pack_id": "ob-poc.cbu", "version": "1"});
+        let current = snapshot_row(ObjectType::DomainPack, payload.clone(), "ob-poc.cbu");
+
+        let plan = plan_seed_bootstrap_item(
+            &principal,
+            "v1:test",
+            ObjectType::DomainPack,
+            "ob-poc.cbu",
+            &payload,
+            Some(&current),
+        )
+        .expect("plan");
+
+        assert!(matches!(plan, SeedBootstrapPlan::Skip));
+    }
+
+    #[test]
+    fn seed_bootstrap_plan_versions_changed_payload() {
+        let principal = Principal::explicit("seed-runner", vec!["admin".into()]);
+        let current = snapshot_row(
+            ObjectType::DomainPack,
+            json!({"pack_id": "ob-poc.cbu", "version": "1"}),
+            "ob-poc.cbu",
+        );
+        let payload = json!({"pack_id": "ob-poc.cbu", "version": "2"});
+
+        let plan = plan_seed_bootstrap_item(
+            &principal,
+            "v1:test",
+            ObjectType::DomainPack,
+            "ob-poc.cbu",
+            &payload,
+            Some(&current),
+        )
+        .expect("plan");
+
+        let SeedBootstrapPlan::Publish(meta, planned_payload) = plan else {
+            panic!("expected publish plan");
+        };
+        assert_eq!(meta.object_type, ObjectType::DomainPack);
+        assert_eq!(meta.object_id, current.object_id);
+        assert_eq!(meta.version_major, current.version_major);
+        assert_eq!(meta.version_minor, current.version_minor + 1);
+        assert_eq!(meta.change_type, ChangeType::NonBreaking);
+        assert_eq!(meta.predecessor_id, Some(current.snapshot_id));
+        assert_eq!(meta.created_by, "seed-runner");
+        assert_eq!(planned_payload, payload);
+    }
+
+    #[test]
+    fn seed_bootstrap_plan_rejects_type_conflict() {
+        let principal = Principal::system();
+        let current = snapshot_row(
+            ObjectType::DagTaxonomy,
+            json!({"fqn": "ob-poc.cbu"}),
+            "ob-poc.cbu",
+        );
+
+        let err = plan_seed_bootstrap_item(
+            &principal,
+            "v1:test",
+            ObjectType::DomainPack,
+            "ob-poc.cbu",
+            &json!({"pack_id": "ob-poc.cbu"}),
+            Some(&current),
+        )
+        .expect_err("type conflict");
+
+        assert!(matches!(err, SemOsError::Conflict(_)));
     }
 
     #[test]

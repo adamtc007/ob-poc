@@ -2838,7 +2838,7 @@ mod tests {
     fn slice1_projection_includes_entity_grain_effects() {
         let projection = build_slice1_acp_registry_projection(repo_config_root()).unwrap();
 
-        assert_eq!(projection.verb_effect_count, 78);
+        assert_eq!(projection.verb_effect_count, 81);
 
         let cbu_pack = find_pack(&projection, "cbu-maintenance");
         let create = find_effect(cbu_pack, "cbu.create", "allowed");

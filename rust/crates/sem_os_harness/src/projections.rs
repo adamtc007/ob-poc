@@ -6,8 +6,8 @@
 
 use sem_os_client::SemOsClient;
 use sem_os_core::principal::Principal;
-use sem_os_ontology::proof_obligation_def::ProofStrength;
 use sem_os_core::seeds::*;
+use sem_os_ontology::proof_obligation_def::ProofStrength;
 use sqlx::PgPool;
 use uuid::Uuid;
 
@@ -174,6 +174,7 @@ async fn test_projection_watermark_advances(client: &dyn SemOsClient, pool: &PgP
         state_machines: vec![],
         state_graphs: vec![],
         dag_taxonomies: vec![],
+        domain_packs: vec![],
         attributes: vec![],
         entity_types,
         taxonomies,

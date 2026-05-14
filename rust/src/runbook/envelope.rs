@@ -76,6 +76,13 @@ pub struct ReplayEnvelope {
     /// Deterministic core — feeds into content-addressed ID hash.
     pub core: EnvelopeCore,
 
+    /// Scoped binding resolutions finalised during compilation.
+    ///
+    /// These records explain how authoring aliases such as `@cbu` were
+    /// converted into immutable UUID arguments in the frozen runbook DSL.
+    #[serde(default)]
+    pub binding_resolution_audits: Vec<BindingResolutionAudit>,
+
     /// External lookups performed during compilation (e.g., GLEIF, screening).
     /// Full records with timestamps for audit trail.
     pub external_lookups: Vec<ExternalLookup>,
@@ -99,6 +106,7 @@ impl ReplayEnvelope {
                 macro_audit_digests: Vec::new(),
                 snapshot_manifest: BTreeMap::new(),
             },
+            binding_resolution_audits: Vec::new(),
             external_lookups: Vec::new(),
             macro_audits: Vec::new(),
             sealed_at: Utc::now(),
@@ -115,6 +123,7 @@ impl ReplayEnvelope {
                 macro_audit_digests: Vec::new(),
                 snapshot_manifest: BTreeMap::new(),
             },
+            binding_resolution_audits: Vec::new(),
             external_lookups: Vec::new(),
             macro_audits: Vec::new(),
             sealed_at: Utc::now(),
@@ -130,6 +139,29 @@ impl ReplayEnvelope {
     pub fn entity_bindings(&self) -> &BTreeMap<String, Uuid> {
         &self.core.entity_bindings
     }
+}
+
+// ---------------------------------------------------------------------------
+// BindingResolutionAudit
+// ---------------------------------------------------------------------------
+
+/// Audit record for a scoped runbook binding finalised at compile time.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct BindingResolutionAudit {
+    /// Authoring symbol, including the `@` prefix.
+    pub symbol: String,
+
+    /// Entity type produced by the binding declaration.
+    pub entity_type: String,
+
+    /// Zero-based source statement index that produced this binding.
+    pub producer_statement: usize,
+
+    /// UUID assigned to the produced entity and inserted into frozen DSL.
+    pub assigned_uuid: Uuid,
+
+    /// Allocation mechanism used for audit/replay diagnostics.
+    pub source: String,
 }
 
 // ---------------------------------------------------------------------------
@@ -214,6 +246,7 @@ mod tests {
         let back: ReplayEnvelope = serde_json::from_str(&json).unwrap();
         assert_eq!(back.core.session_cursor, 0);
         assert!(back.core.entity_bindings.is_empty());
+        assert!(back.binding_resolution_audits.is_empty());
         assert!(back.macro_audits.is_empty());
     }
 

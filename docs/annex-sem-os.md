@@ -23,6 +23,54 @@ Two practical consequences follow.
   constellation or slot path, but they are still surfaced only through the
   currently grounded SEM-OS context.
 
+### Domain Pack Taxonomy Ownership
+
+Domain-specific Sem OS shape is configuration-owned. The source of truth is
+the YAML corpus under `rust/config/sem_os_seeds/`, `rust/config/packs/`, and
+`rust/config/ontology/`, not business-crate code.
+
+Domain Pack manifests in `rust/config/sem_os_seeds/domain_packs/*.yaml`
+declare the YAML surfaces a domain owns:
+
+- DAG taxonomies
+- DSL packs
+- state machines
+- constellation maps and families
+- universes
+- verb prefixes
+- entity kinds
+- informational business-crate links
+
+Business crates are consumers or execution homes. They may implement behavior
+for a domain, but they do not own the Sem OS taxonomy shape. Adding a new
+domain should be possible by adding/configuring Sem OS YAML and publishing
+the resulting seed bundle, with code required only for genuinely new
+execution mechanics.
+
+Reload is build-engine style:
+
+- source path + mtime + size are the cheap dirty check
+- canonical surface hash is the correctness check
+- unchanged fingerprints skip parse/hash work
+- changed fingerprints trigger YAML reload and canonical hashing
+- unchanged canonical hash updates only the reload index
+- changed canonical hash reports `publish_required`
+
+The reload checker never publishes snapshots directly. Publication remains
+behind `bootstrap_seed_bundle()`, where identical payloads skip and changed
+payloads publish non-breaking successor snapshots with predecessor links.
+
+Manual trigger:
+
+```bash
+cd rust
+cargo run --manifest-path xtask/Cargo.toml -- sem-reg domain-pack-check
+cargo run --manifest-path xtask/Cargo.toml -- sem-reg domain-pack-check --pack-id ob-poc.cbu --force-check --update-index
+```
+
+See `docs/architecture/sem-os-domain-pack-taxonomy-reload.md` for the
+full architecture note.
+
 ### ACP Projection Surface
 
 ACP is the rich agent-editor projection surface over SemOS, not a separate
@@ -81,7 +129,7 @@ evidence, and state-snapshot metadata.
 | `sem_os_server` | Standalone REST API + JWT auth |
 | `sem_os_client` | Trait: in-process or HTTP access |
 | `sem_os_harness` | Integration test framework (102 scenarios) |
-| `sem_os_obpoc_adapter` | Verb YAML → seed bundle conversion |
+| `sem_os_obpoc_adapter` | Verb/domain YAML → seed bundle conversion |
 
 ---
 
@@ -171,7 +219,7 @@ sem_reg.snapshots (
 - Operational snapshots auto-approve (no manual gate)
 - Full point-in-time resolution via `snapshot_set_id`
 
-### Object Types (24 total)
+### Object Types (selected registry types)
 
 | Type | Purpose |
 |------|---------|
@@ -188,6 +236,8 @@ sem_reg.snapshots (
 | `ConstellationMap` | Concrete constellation: slots, state machines, verbs per slot |
 | `StateMachine` | State transition rules for a slot/node |
 | `StateGraph` | DAG of state constraints (cross-domain workflows) |
+| `DagTaxonomy` | YAML-authored DAG taxonomy surface used by Sem OS and DSL ordering checks |
+| `DomainPack` | Domain ownership manifest for DAGs, packs, state machines, constellations, universes, verb prefixes, and entity kinds |
 | `UniverseDef` | Discovery universe: domains, entry questions, grounding thresholds |
 | `MacroDef` | Compound intent (e.g., "lux sicav setup" → sequence of verbs) |
 
@@ -647,7 +697,7 @@ All Observatory endpoints project from the session's `tos.hydrated_state` — th
 
 ## Scanner & Seed Bundles
 
-**File:** `rust/crates/sem_os_obpoc_adapter/src/scanner.rs`
+**Files:** `rust/crates/sem_os_obpoc_adapter/src/scanner.rs`, `rust/crates/sem_os_obpoc_adapter/src/pipeline_seeds.rs`
 
 ### Scanner Pipeline (verb-first bootstrap)
 
@@ -659,10 +709,10 @@ All Observatory endpoints project from the session's `tos.hydrated_state` — th
 5. Suggest security labels (domain + tags)
 6. Load domain metadata (reads/writes/workspace affinity)
 7. Enrich verb contracts + entity types
-8. Collect taxonomy/policy/view/derivation seeds
+8. Collect taxonomy/policy/view/derivation/domain-pack seeds
 9. Serialize into SeedBundle (versioned DTO)
 10. Compute deterministic SHA-256 bundle hash
-11. Publish via SnapshotStore (idempotent)
+11. Publish via SnapshotStore (idempotent, with successor snapshots for changed payloads)
 ```
 
 ### Pure Conversion Functions
@@ -677,6 +727,29 @@ pub fn enrich_entity_types(bodies: &mut [EntityTypeDefBody], meta: &DomainMetada
 ```
 
 Entry point: `rust/crates/sem_os_obpoc_adapter/src/lib.rs` — `build_seed_bundle_with_metadata()`
+
+### Domain Pack Reload Index
+
+Domain Pack reload is intentionally split from publication:
+
+1. `sem_os_policy::domain_pack::refresh_domain_pack_taxonomy_with_index()`
+   checks source fingerprints and canonical surface hashes.
+2. `sem_os_postgres::PgDomainPackReloadIndexStore` persists the build-engine
+   index in `sem_reg.domain_pack_reload_index`.
+3. `xtask sem-reg domain-pack-check` reports `clean`, `index_only`, or
+   `publish_required`.
+4. Sem OS seed bootstrap performs actual snapshot publication.
+
+The index is an optimization and diagnostic surface, not the source of truth.
+The active Sem OS snapshot graph remains canonical.
+
+Relevant files:
+
+- `rust/crates/sem_os_policy/src/domain_pack.rs`
+- `rust/crates/sem_os_postgres/src/store.rs`
+- `rust/xtask/src/sem_reg.rs`
+- `rust/migrations/20260514_domain_pack_reload_index.sql`
+- `docs/architecture/sem-os-domain-pack-taxonomy-reload.md`
 
 ### Verb Output Declarations
 
@@ -1059,7 +1132,7 @@ Three modes:
   parent transition propagates to child slots (e.g. parent CBU SUSPENDED →
   all child CBUs SUSPENDED).
 
-### DAG inventory (9 workspaces)
+### DAG inventory (active taxonomy files)
 
 | Workspace | DAG file | Slots | Notes |
 |---|---|---|---|
@@ -1069,6 +1142,9 @@ Three modes:
 | CBU | `cbu_dag.yaml` | 24 | R-3: re-centred on money-making apparatus; tollgate hosted here |
 | SemOS Maintenance | `semos_maintenance_dag.yaml` | 14 | Governance — 5 stateful + 9 stateless slots |
 | Book-Setup | `book_setup_dag.yaml` | 11 | Journey workspace — book-setup lifecycle (8 phases) |
+| Booking Principal | `booking_principal_dag.yaml` | configured | Booking-principal clearance lifecycle and deal-contracting gate source |
+| Catalogue | `catalogue_dag.yaml` | configured | Governed catalogue authorship proposals |
+| Lifecycle Resources | `lifecycle_resources_dag.yaml` | configured | Application instance + capability binding lifecycle |
 | Session-Bootstrap | `session_bootstrap_dag.yaml` | 3 | Smallest DAG; transitional scope-resolution pack |
 | Onboarding-Request | `onboarding_request_dag.yaml` | 5 | Deal→Ops handoff journey |
 | Product-Service-Taxonomy | `product_service_taxonomy_dag.yaml` | 5 | Read-only catalog browsing |

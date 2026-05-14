@@ -10,8 +10,8 @@ use std::path::{Path, PathBuf};
 
 use anyhow::{Context, Result};
 use sem_os_core::seeds::{
-    ConstellationFamilySeed, ConstellationMapSeed, DagTaxonomySeed, MacroDefSeed, StateGraphSeed,
-    StateMachineSeed, UniverseSeed,
+    ConstellationFamilySeed, ConstellationMapSeed, DagTaxonomySeed, DomainPackSeed, MacroDefSeed,
+    StateGraphSeed, StateMachineSeed, UniverseSeed,
 };
 
 fn repo_rust_root() -> PathBuf {
@@ -204,6 +204,25 @@ pub(crate) fn scan_dag_taxonomies() -> Result<Vec<DagTaxonomySeed>> {
     Ok(seeds)
 }
 
+/// Scan domain-pack YAML into Sem OS `DomainPackSeed` objects.
+pub(crate) fn scan_domain_packs() -> Result<Vec<DomainPackSeed>> {
+    let dir = repo_rust_root().join("config/sem_os_seeds/domain_packs");
+    let mut seeds = Vec::new();
+    for (_path, value) in read_yaml_files(&dir)? {
+        let Some(fqn) = value
+            .get("pack_id")
+            .and_then(serde_yaml::Value::as_str)
+            .map(str::to_string)
+        else {
+            continue;
+        };
+        let payload = with_fqn(yaml_to_json(value)?, &fqn);
+        seeds.push(DomainPackSeed { fqn, payload });
+    }
+    seeds.sort_by(|left, right| left.fqn.cmp(&right.fqn));
+    Ok(seeds)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -285,5 +304,16 @@ mod tests {
         let seeds = scan_dag_taxonomies().unwrap();
         assert!(!seeds.is_empty());
         assert!(seeds.iter().any(|seed| seed.fqn == "cbu_dag"));
+    }
+
+    #[test]
+    fn scans_domain_packs_with_fqns() {
+        let seeds = scan_domain_packs().unwrap();
+        assert!(!seeds.is_empty());
+        assert!(seeds.iter().any(|seed| seed.fqn == "ob-poc.cbu"));
+        assert!(seeds.iter().all(
+            |seed| seed.payload.get("fqn").and_then(|value| value.as_str())
+                == Some(seed.fqn.as_str())
+        ));
     }
 }

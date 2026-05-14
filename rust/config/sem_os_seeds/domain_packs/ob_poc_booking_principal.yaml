@@ -1,0 +1,50 @@
+pack_id: ob-poc.booking-principal
+name: ob-poc Booking Principal Domain Pack
+version: 0.1.0
+implementation_mode: native_compiled
+compatibility_tier: dry_run_only
+owned_dags: [booking_principal_dag]
+owned_packs: [booking-principal]
+owned_state_machines: []
+owned_constellation_maps:
+  - deal.workspace
+owned_constellation_families:
+  - deal_workspace
+owned_universes:
+  - universe.deal_execution
+owned_verb_prefixes:
+  - booking-principal-clearance.
+owned_entity_kinds: []
+business_crates:
+  - ob-poc-booking-principal
+owned_constellations:
+  - deal.workspace
+allowed_transitions:
+  - transition_ref: booking-principal.clearance-started
+    entity_type: booking_principal_clearance
+    state_machine: booking_principal_clearance_lifecycle
+    verb: booking-principal-clearance.start-screening
+    from_state: pending
+    to_state: screening
+    dry_run_enabled: true
+    mutation_enabled: false
+    hitl_required: true
+discovery_probes:
+  - probe_id: booking-principal.read-state
+    operation: read_state
+    target: semos.booking_principal_clearance
+    idempotent: true
+    modeled: true
+    first_class_state_mutation: false
+projection_catalog: []
+mention_namespaces: []
+declared_modes: []
+workflow_phases: []
+acp_personas: []
+resource_uri_schemes: []
+external_mcp_transports: []
+typed_extension_points: []
+classification_policy:
+  max_prompt_classification: internal
+  allow_external_llm: false
+  required_redactions: [pii]

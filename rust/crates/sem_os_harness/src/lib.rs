@@ -22,13 +22,13 @@ mod projections;
 #[cfg(test)]
 use sem_os_client::SemOsClient;
 #[cfg(test)]
-use sem_os_policy::context_resolution::{EvidenceMode, ResolutionConstraints, SubjectRef};
-#[cfg(test)]
 use sem_os_core::error::SemOsError;
 #[cfg(test)]
 use sem_os_core::principal::Principal;
 #[cfg(test)]
 use sem_os_core::seeds::*;
+#[cfg(test)]
+use sem_os_policy::context_resolution::{EvidenceMode, ResolutionConstraints, SubjectRef};
 #[cfg(test)]
 use uuid::Uuid;
 
@@ -184,6 +184,7 @@ fn build_test_seed_bundle() -> SeedBundle {
         state_machines: vec![],
         state_graphs: vec![],
         dag_taxonomies: vec![],
+        domain_packs: vec![],
         attributes,
         entity_types,
         taxonomies,
@@ -422,6 +423,7 @@ async fn test_manifest_stability(client: &dyn SemOsClient) {
         state_machines: vec![],
         state_graphs: vec![],
         dag_taxonomies: vec![],
+        domain_packs: vec![],
         attributes: vec![],
         entity_types: vec![],
         taxonomies: vec![],
@@ -465,6 +467,7 @@ async fn test_manifest_stability(client: &dyn SemOsClient) {
         state_machines: vec![],
         state_graphs: vec![],
         dag_taxonomies: vec![],
+        domain_packs: vec![],
         attributes: vec![],
         entity_types: vec![],
         taxonomies: vec![],
@@ -713,6 +716,58 @@ mod tests {
         let result = std::panic::AssertUnwindSafe(
             crate::permissions::run_permission_scenario_suite(&pool, &url, &iso.dbname),
         );
+        let outcome = futures::FutureExt::catch_unwind(result).await;
+
+        drop_db(iso).await;
+
+        if let Err(e) = outcome {
+            std::panic::resume_unwind(e);
+        }
+    }
+
+    #[tokio::test]
+    #[ignore] // Requires a running Postgres instance
+    async fn test_domain_pack_reload_index_round_trip() {
+        use chrono::Utc;
+        use sem_os_policy::domain_pack::{
+            refresh_domain_pack_taxonomy_with_index, reload_domain_pack_taxonomy_from_yaml,
+            reload_index_entry_from_reload, DomainPackRefreshAction, DomainPackReloadStatus,
+        };
+
+        let iso = isolated_db(&admin_url()).await;
+        let pool = iso.pool.clone();
+        let result = std::panic::AssertUnwindSafe(async move {
+            let config_root =
+                std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../config");
+            let reload =
+                reload_domain_pack_taxonomy_from_yaml(&config_root, "ob-poc.cbu").expect("reload");
+            let entry = reload_index_entry_from_reload(
+                &config_root,
+                &reload,
+                Utc::now(),
+                DomainPackReloadStatus::Loaded,
+            )
+            .expect("index entry");
+            let store = sem_os_postgres::PgDomainPackReloadIndexStore::new(pool);
+
+            store.upsert(&entry).await.expect("index upsert");
+            let loaded = store
+                .load("ob-poc.cbu")
+                .await
+                .expect("index load")
+                .expect("index row");
+
+            assert_eq!(loaded.surface_hash, reload.surface_hash);
+            let plan = refresh_domain_pack_taxonomy_with_index(
+                &config_root,
+                "ob-poc.cbu",
+                Some(&loaded),
+                false,
+                Utc::now(),
+            )
+            .expect("refresh plan");
+            assert_eq!(plan.action, DomainPackRefreshAction::Skip);
+        });
         let outcome = futures::FutureExt::catch_unwind(result).await;
 
         drop_db(iso).await;

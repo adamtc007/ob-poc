@@ -98,13 +98,18 @@ fn convert_verb_call(vc: &VerbCall, text: &str) -> ParsedExpr {
     // Add :as binding as a special argument if present
     if let Some(ref binding) = vc.binding {
         // Approximate the :as span from the verb call text
-        let binding_text = format!(":as @{}", binding);
+        let at_binding_text = format!(":as @{}", binding);
+        let dollar_binding_text = format!(":as ${}", binding);
         let span_end = vc.span.end.min(text.len());
         let span_start = vc.span.start.min(span_end);
-        if let Some(pos) = text
-            .get(span_start..span_end)
-            .and_then(|s| s.rfind(&binding_text))
-        {
+        if let Some((pos, binding_text)) = text.get(span_start..span_end).and_then(|s| {
+            s.rfind(&at_binding_text)
+                .map(|pos| (pos, at_binding_text.as_str()))
+                .or_else(|| {
+                    s.rfind(&dollar_binding_text)
+                        .map(|pos| (pos, dollar_binding_text.as_str()))
+                })
+        }) {
             let as_start = span_start + pos;
             let as_end = (as_start + binding_text.len()).min(text.len());
             let as_range = span_to_range(&V2Span::new(as_start, as_end), text);
@@ -299,8 +304,8 @@ fn extract_symbols_from_expr(
 ///
 /// This aligns with the REPL's BindingContext and uses the same source of truth.
 fn infer_id_type(verb_name: &str) -> String {
-    use dsl_core::config::ConfigLoader;
     use dsl_analysis::runtime_registry::RuntimeVerbRegistry;
+    use dsl_core::config::ConfigLoader;
 
     // Try to load from registry (cached after first load)
     static REGISTRY: std::sync::OnceLock<Option<RuntimeVerbRegistry>> = std::sync::OnceLock::new();
@@ -379,6 +384,17 @@ mod tests {
     #[test]
     fn test_symbol_binding() {
         let input = r#"(cbu.create :name "Test" :as @mycbu)"#;
+        let (state, diags) = parse_with_v2(input);
+
+        assert!(diags.is_empty());
+        assert_eq!(state.symbol_defs.len(), 1);
+        assert_eq!(state.symbol_defs[0].name, "mycbu");
+        assert_eq!(state.symbol_defs[0].defined_by, "cbu.create");
+    }
+
+    #[test]
+    fn test_dollar_symbol_binding() {
+        let input = r#"(cbu.create :name "Test" :as $mycbu)"#;
         let (state, diags) = parse_with_v2(input);
 
         assert!(diags.is_empty());

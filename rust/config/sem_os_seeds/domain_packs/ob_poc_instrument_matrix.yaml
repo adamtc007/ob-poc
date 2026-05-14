@@ -1,0 +1,61 @@
+pack_id: ob-poc.instrument-matrix
+name: ob-poc Instrument Matrix Domain Pack
+version: 0.1.0
+implementation_mode: native_compiled
+compatibility_tier: dry_run_only
+owned_dags: [instrument_matrix_dag]
+owned_packs: [instrument-matrix]
+owned_state_machines:
+  - trading_profile_lifecycle
+owned_constellation_maps:
+  - instrument.workspace
+  - instrument.template
+  - trading.streetside
+owned_constellation_families:
+  - instrument_workspace
+  - instrument_template
+  - trading_streetside
+  - trading_mandate
+owned_universes:
+  - universe.trading_operations
+owned_verb_prefixes:
+  - instrument.
+  - trading-profile.
+  - settlement-chain.
+  - trade-gateway.
+owned_entity_kinds:
+  - cbu
+business_crates:
+  - ob-poc-trading-profile
+owned_constellations:
+  - instrument.workspace
+  - instrument.template
+allowed_transitions:
+  - transition_ref: instrument-matrix.profile-created
+    entity_type: cbu
+    state_machine: trading_profile_lifecycle
+    verb: trading-profile.create
+    from_state: absent
+    to_state: draft
+    dry_run_enabled: true
+    mutation_enabled: false
+    hitl_required: true
+discovery_probes:
+  - probe_id: instrument-matrix.read-state
+    operation: read_state
+    target: semos.instrument_matrix
+    idempotent: true
+    modeled: true
+    first_class_state_mutation: false
+projection_catalog: []
+mention_namespaces: []
+declared_modes: []
+workflow_phases: []
+acp_personas: []
+resource_uri_schemes: []
+external_mcp_transports: []
+typed_extension_points: []
+classification_policy:
+  max_prompt_classification: internal
+  allow_external_llm: false
+  required_redactions: [pii]

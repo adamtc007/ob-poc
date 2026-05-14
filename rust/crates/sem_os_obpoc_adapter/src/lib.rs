@@ -55,6 +55,7 @@ pub fn build_seed_bundle_with_metadata(
     let state_machines = pipeline_seeds::scan_state_machines().unwrap_or_default();
     let state_graphs = pipeline_seeds::scan_state_graphs().unwrap_or_default();
     let dag_taxonomies = pipeline_seeds::scan_dag_taxonomies().unwrap_or_default();
+    let domain_packs = pipeline_seeds::scan_domain_packs().unwrap_or_default();
 
     // 2. Enrich with DomainMetadata if available
     if let Some(meta) = domain_metadata {
@@ -136,6 +137,7 @@ pub fn build_seed_bundle_with_metadata(
         state_machines,
         state_graphs,
         dag_taxonomies,
+        domain_packs,
         attributes,
         entity_types,
         taxonomies,

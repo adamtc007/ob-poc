@@ -31,6 +31,10 @@ workspaces:
   - onboarding_request
 
 allowed_verbs:
+  - cbu.create
+  - cbu.list
+  - cbu.assign-role
+  - cbu.parties
   - kyc-case.create
   - ubo.discover
   - ownership.compute

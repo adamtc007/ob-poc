@@ -254,6 +254,7 @@ impl LanguageServer for DslLanguageServer {
                     trigger_characters: Some(vec![
                         ":".to_string(), // Keywords
                         "@".to_string(), // Symbols/entity refs
+                        "$".to_string(), // Runbook placeholder aliases
                         "(".to_string(), // S-expressions (verbs)
                         " ".to_string(), // After keyword (for values)
                     ]),

@@ -154,6 +154,7 @@ pub fn compile_restricted_mutation_preflight(
             macro_audit_digests: vec![],
             snapshot_manifest,
         },
+        binding_resolution_audits: vec![],
         external_lookups: vec![],
         macro_audits: vec![],
         sealed_at: chrono::Utc::now(),

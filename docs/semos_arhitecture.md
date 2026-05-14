@@ -2,7 +2,7 @@
 
 > **Version:** 3.1
 > **Date:** 2026-03-28
-> **Status:** Living document — consolidation of 9 prior specs, updated for the 2026-03-08 runtime schema consolidation, the 2026-03-12 document-governance bootstrap, the 2026-03-13 NLCI/CBU surface reconciliation, the 2026-03-15 reducer/constellation runtime cutover, the 2026-03-16 DB harness/runtime verification pass, the 2026-03-16 CODEX data-integrity/parser/serialization remediation, the 2026-03-17 discovery-universe + single-pipeline cutover, the 2026-03-21 SemOS reconciliation remediation verification pass, the 2026-03-24 attribute identity + derivation reconciliation pass, the 2026-03-24 taxonomy/evidence unification pass, the 2026-03-24 attribute DSL + Phase 4 schema cleanup pass, the 2026-03-27 derived attribute canonical persistence (D0-D12), the 2026-03-28 SemOS-first hub implementation (Phases 1-7), and the 2026-04-16 capability-boundary and dead-code cleanup pass
+> **Status:** Living document — consolidation of 9 prior specs, updated for the 2026-03-08 runtime schema consolidation, the 2026-03-12 document-governance bootstrap, the 2026-03-13 NLCI/CBU surface reconciliation, the 2026-03-15 reducer/constellation runtime cutover, the 2026-03-16 DB harness/runtime verification pass, the 2026-03-16 CODEX data-integrity/parser/serialization remediation, the 2026-03-17 discovery-universe + single-pipeline cutover, the 2026-03-21 SemOS reconciliation remediation verification pass, the 2026-03-24 attribute identity + derivation reconciliation pass, the 2026-03-24 taxonomy/evidence unification pass, the 2026-03-24 attribute DSL + Phase 4 schema cleanup pass, the 2026-03-27 derived attribute canonical persistence (D0-D12), the 2026-03-28 SemOS-first hub implementation (Phases 1-7), the 2026-04-16 capability-boundary and dead-code cleanup pass, and the 2026-05-14 domain-pack taxonomy reload/index implementation
 > **Audience:** Engineering, governance, architecture review
 
 ---
@@ -37,6 +37,42 @@ The Sem OS crate split now more closely matches the intended capability boundary
 - dormant server tool endpoints have been removed rather than preserved as commented placeholder capability
 
 What remains intentionally unresolved is adapter leakage from `sem_os_obpoc_adapter` into `ob-poc`. That is a bridge-facade problem, not a reason to widen the standalone Sem OS service surface.
+
+### Domain-Pack Taxonomy Reload State (2026-05-14)
+
+SemOS domain-specific shape is now explicitly configuration-owned. Domain
+packs under `rust/config/sem_os_seeds/domain_packs/*.yaml` declare ownership
+over DAG taxonomies, DSL packs, state machines, constellation maps/families,
+universes, verb prefixes, and entity kinds. Business crates are clients and
+execution/mechanics homes; they do not own SemOS taxonomy shape.
+
+Reload uses a build-engine index:
+
+- source path, mtime, and byte length are the cheap "maybe dirty" check
+- canonical surface hash is the correctness check
+- unchanged fingerprints skip YAML parsing
+- changed fingerprints reload YAML and recompute the canonical hash
+- unchanged hash updates only the reload index
+- changed hash reports `publish_required`
+
+The persisted index lives in `sem_reg.domain_pack_reload_index`. It is an
+optimization and diagnostic surface, not canonical truth. Canonical truth is
+still the immutable SemOS snapshot graph.
+
+`DomainPack` is a SemReg object type and is scanned into
+`SeedBundle.domain_packs`. Publication stays behind
+`CoreService::bootstrap_seed_bundle()`: identical payloads skip; changed
+payloads publish non-breaking successor snapshots.
+
+Manual trigger:
+
+```bash
+cd rust
+cargo run --manifest-path xtask/Cargo.toml -- sem-reg domain-pack-check
+cargo run --manifest-path xtask/Cargo.toml -- sem-reg domain-pack-check --pack-id ob-poc.cbu --force-check --update-index
+```
+
+Architecture note: `docs/architecture/sem-os-domain-pack-taxonomy-reload.md`.
 
 ### Current Discovery/Bootstrap State (2026-03-17)
 
@@ -738,9 +774,9 @@ This reduces hallucination surface and lets ACP project expert recipes
 without leaking implementation detail (the full ordered expansion stays
 SemOS-internal; only a redacted summary is projected).
 
-### 13 Object Types
+### Core Object Types
 
-All 13 types share a single table (`sem_reg.snapshots`) with type-specific bodies stored as JSONB:
+SemOS registry objects share a single table (`sem_reg.snapshots`) with type-specific bodies stored as JSONB:
 
 | Object Type | Body Struct | Domain |
 |-------------|-------------|--------|
@@ -757,6 +793,8 @@ All 13 types share a single table (`sem_reg.snapshots`) with type-specific bodie
 | `document_type_def` | `DocumentTypeDefBody` | Document type classification |
 | `observation_def` | `ObservationDefBody` | Observation recording templates |
 | `derivation_spec` | `DerivationSpecBody` | Derived/composite attribute computation specs |
+| `dag_taxonomy` | YAML taxonomy body | Workspace DAG ordering, state constraints, DSL reconciliation |
+| `domain_pack` | `DomainPackManifest` | Domain ownership manifest for DAGs, DSL packs, state machines, constellations, universes, verb prefixes, and entity kinds |
 
 ### Snapshot Structure
 
@@ -765,7 +803,7 @@ All 13 types share a single table (`sem_reg.snapshots`) with type-specific bodie
 │  sem_reg.snapshots                                          │
 │                                                             │
 │  snapshot_id       UUID (PK)                                │
-│  object_type       ENUM (13 variants)                       │
+│  object_type       ENUM (SemOS registry object variant)     │
 │  object_id         UUID (deterministic v5 from type:fqn)    │
 │  fqn               TEXT (fully qualified name)              │
 │  version           INTEGER (monotonically increasing)       │

@@ -1,0 +1,48 @@
+pack_id: ob-poc.catalogue
+name: ob-poc Catalogue Domain Pack
+version: 0.1.0
+implementation_mode: native_compiled
+compatibility_tier: dry_run_only
+owned_dags: [catalogue_dag]
+owned_packs: [catalogue]
+owned_state_machines: []
+owned_constellation_maps:
+  - registry.stewardship
+owned_constellation_families:
+  - registry_governance
+owned_universes: []
+owned_verb_prefixes:
+  - catalogue.
+owned_entity_kinds: []
+business_crates: []
+owned_constellations:
+  - registry.stewardship
+allowed_transitions:
+  - transition_ref: catalogue.proposal-committed
+    entity_type: verb_declaration
+    state_machine: catalogue_proposal_lifecycle
+    verb: catalogue.commit-verb-declaration
+    from_state: staged
+    to_state: committed
+    dry_run_enabled: true
+    mutation_enabled: false
+    hitl_required: true
+discovery_probes:
+  - probe_id: catalogue.read-proposals
+    operation: read_proposals
+    target: semos.catalogue
+    idempotent: true
+    modeled: true
+    first_class_state_mutation: false
+projection_catalog: []
+mention_namespaces: []
+declared_modes: []
+workflow_phases: []
+acp_personas: []
+resource_uri_schemes: []
+external_mcp_transports: []
+typed_extension_points: []
+classification_policy:
+  max_prompt_classification: internal
+  allow_external_llm: false
+  required_redactions: []

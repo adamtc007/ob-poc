@@ -1084,6 +1084,25 @@ enum SemRegAction {
         verbose: bool,
     },
 
+    /// Check Sem OS domain-pack YAML reload state against the persisted reload index
+    DomainPackCheck {
+        /// Restrict check to one pack id, e.g. ob-poc.cbu
+        #[arg(long)]
+        pack_id: Option<String>,
+        /// Config root directory
+        #[arg(long, default_value = "config")]
+        config_root: std::path::PathBuf,
+        /// Bypass the mtime/size short-circuit and recompute content hashes
+        #[arg(long)]
+        force_check: bool,
+        /// Persist the refreshed reload-index rows
+        #[arg(long)]
+        update_index: bool,
+        /// Output JSON
+        #[arg(long)]
+        json: bool,
+    },
+
     /// Describe a derivation spec by FQN
     DerivationDescribe {
         /// Derivation FQN (e.g., "kyc.risk_score_derived")
@@ -1565,6 +1584,19 @@ fn main() -> Result<()> {
                 SemRegAction::Scan { dry_run, verbose } => {
                     rt.block_on(sem_reg::scan(dry_run, verbose))
                 }
+                SemRegAction::DomainPackCheck {
+                    pack_id,
+                    config_root,
+                    force_check,
+                    update_index,
+                    json,
+                } => rt.block_on(sem_reg::domain_pack_check(
+                    pack_id.as_deref(),
+                    &config_root,
+                    force_check,
+                    update_index,
+                    json,
+                )),
                 SemRegAction::DerivationDescribe { fqn } => {
                     rt.block_on(sem_reg::derivation_describe(&fqn))
                 }

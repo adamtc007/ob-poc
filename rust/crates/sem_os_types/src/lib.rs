@@ -102,6 +102,7 @@ pub enum ObjectType {
     StateMachine,
     StateGraph,
     DagTaxonomy,
+    DomainPack,
     TaxonomyDef,
     TaxonomyNode,
     MembershipRule,

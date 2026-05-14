@@ -6,12 +6,12 @@ use crate::analysis::{detect_completion_context, CompletionContext, DocumentStat
 use crate::encoding::{position_to_offset, span_to_range, PositionEncoding};
 use crate::entity_client::EntityLookupClient;
 
-use dsl_core::binding_context::{BindingContext, BindingInfo};
-use dsl_core::parser::parse_program;
 use dsl_analysis::macros::load_macro_registry;
 use dsl_analysis::runtime_registry::runtime_registry;
 use dsl_analysis::suggestions::predict_next_steps;
 use dsl_analysis::verb_registry::{find_unified_verb, registry};
+use dsl_core::binding_context::{BindingContext, BindingInfo};
+use dsl_core::parser::parse_program;
 
 /// Generate completions based on cursor position.
 pub(crate) async fn get_completions(
@@ -50,18 +50,27 @@ pub(crate) async fn get_completions(
         }
         CompletionContext::SymbolRef {
             prefix,
+            marker,
             verb_name,
             keyword,
-        } => complete_symbols(&prefix, symbols, verb_name.as_deref(), keyword.as_deref()),
+        } => complete_symbols(
+            &prefix,
+            marker,
+            symbols,
+            verb_name.as_deref(),
+            keyword.as_deref(),
+        ),
         CompletionContext::EntityAsSymbol {
             verb_name,
             keyword,
             prefix,
+            marker,
         } => {
             complete_entity_as_symbol(
                 &verb_name,
                 &keyword,
                 &prefix,
+                marker,
                 position,
                 &doc.text,
                 entity_client,
@@ -310,6 +319,7 @@ async fn complete_entity_as_symbol(
     verb_name: &str,
     keyword: &str,
     prefix: &str,
+    marker: char,
     position: Position,
     source: &str,
     entity_client: Option<EntityLookupClient>,
@@ -342,10 +352,10 @@ async fn complete_entity_as_symbol(
                             .map(|(i, m)| {
                                 // Insert @KEY as bare token - parser/linter resolves to UUID
                                 // m.id is the key (e.g., search_name, display_name) from return_key config
-                                let new_text = format!("@{}", m.id);
+                                let new_text = format!("{}{}", marker, m.id);
 
-                                // filterText includes @ so user can filter by typing @Apex
-                                let filter = format!("@{}", m.display);
+                                // filterText includes the marker so user can filter by typing @Apex/$Apex.
+                                let filter = format!("{}{}", marker, m.display);
 
                                 CompletionItem {
                                     label: m.display.clone(),
@@ -434,6 +444,7 @@ fn get_lookup_entity_type(verb_name: &str, keyword: &str) -> Option<String> {
 /// falling back to keyword pattern matching for backwards compatibility.
 fn complete_symbols(
     prefix: &str,
+    marker: char,
     symbols: &SymbolTable,
     verb_name: Option<&str>,
     keyword: Option<&str>,
@@ -470,7 +481,7 @@ fn complete_symbols(
             };
 
             CompletionItem {
-                label: format!("@{}", name),
+                label: format!("{}{}", marker, name),
                 kind: Some(CompletionItemKind::VARIABLE),
                 detail: Some(detail),
                 documentation: Some(Documentation::String(format!(
@@ -482,7 +493,7 @@ fn complete_symbols(
                         String::new()
                     }
                 ))),
-                insert_text: Some(format!("@{}", name)),
+                insert_text: Some(format!("{}{}", marker, name)),
                 insert_text_format: Some(InsertTextFormat::PLAIN_TEXT),
                 sort_text: Some(format!("{}-{}", sort_priority, name)),
                 ..Default::default()

@@ -21,6 +21,8 @@ The distinguishing architectural feature is the **Semantic OS (SemOS)** layer: a
 
 This loop is enforced at every entry point with no bypass paths. Direct DSL execution validates every verb FQN against the SemOS context envelope. Pending mutation confirmations perform TOCTOU (time-of-check-to-time-of-use) rechecks against a fresh envelope before executing stale DSL. Discovery selections are validated against the SemOS discovery surface before mutating session state. The grounded action surface extracts `current_state` from the SemOS envelope and feeds it to the lifecycle filter in the verb surface computation pipeline.
 
+As of 2026-05-14, SemOS also treats **Domain Packs** as the configuration-native ownership boundary for domain shape. A Domain Pack manifest declares the DAG taxonomies, DSL packs, state machines, constellation maps/families, universes, verb prefixes, and entity kinds it owns. Business crates are clients and execution-mechanics homes; they do not own SemOS taxonomy shape. Reload is build-engine style: source path + mtime + size are a cheap dirty check, canonical surface hash is the correctness check, and immutable SemOS snapshots remain the durable published truth. The reload checker reports `clean`, `index_only`, or `publish_required`; actual publication stays behind SemOS seed bootstrap.
+
 A standalone **BPMN-Lite** durable orchestration service (23-opcode fiber VM, gRPC API, 123+ tests) handles long-running workflows spanning days or weeks (document solicitation, human approvals, timer-based escalations). It compiles BPMN XML into bytecode executed by user-space fibers that can be serialized, persisted, and resumed deterministically.
 
 **Key architectural principles:**
@@ -30,6 +32,7 @@ A standalone **BPMN-Lite** durable orchestration service (23-opcode fiber VM, gR
 - The agent is a router (maps utterance to valid verb), not a reasoner
 - LLM is used only for argument extraction, never for verb selection
 - Undo is composite-level (state transitions), not factual (entity attributes are facts, not states)
+- Domain shape is configuration-owned: SemOS Domain Packs own taxonomies and DAG surfaces; business crates consume them
 
 ---
 
