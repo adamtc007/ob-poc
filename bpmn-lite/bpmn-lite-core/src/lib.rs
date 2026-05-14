@@ -21,13 +21,20 @@
 pub(crate) mod authoring;
 pub(crate) mod compiler;
 pub mod engine;
-pub mod events;
 pub mod store;
 pub mod store_memory;
 #[cfg(feature = "postgres")]
 pub mod store_postgres;
-pub mod types;
 pub mod vm;
+
+// Cleanup Phase 2.1 (2026-05-14) — `types` + `events` relocated to
+// the new `bpmn-lite-types` leaf crate. Compat re-exports keep the
+// `bpmn_lite_core::types::Foo` and `bpmn_lite_core::events::Bar`
+// paths working for downstream consumers (bpmn-lite-server,
+// integration tests, future bin targets). These re-exports will be
+// retired in the final Phase 2 slice when `bpmn-lite-core` itself
+// is deleted.
+pub use bpmn_lite_types::{events, types};
 
 #[cfg(test)]
 mod tests {

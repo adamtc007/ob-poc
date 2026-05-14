@@ -24,6 +24,7 @@ serde_yaml = "0.9"
 sqlx = { workspace = true, optional = true }
 chrono = { workspace = true, optional = true }
 ob-poc-types = { path = "../../rust/crates/ob-poc-types" }
+bpmn-lite-types = { path = "../bpmn-lite-types" }
 
 [dev-dependencies]
 tokio = { workspace = true, features = ["test-util"] }
