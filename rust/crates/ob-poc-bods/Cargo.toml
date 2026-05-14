@@ -1,0 +1,25 @@
+[package]
+name = "ob-poc-bods"
+version = "0.1.0"
+edition = "2021"
+description = "BODS 0.4 / LEI spine reference data. EntityIdentifier, GLEIF hierarchy, UboInterest, PersonPepStatus — the shapes the platform speaks for ownership-graph imports and beneficial-ownership disclosure."
+
+# Capability discipline (see docs/todo/ob-poc-domain-split-v1.md):
+#   IN-SCOPE  : BODS 0.4 schema DTOs, sqlx::FromRow projections for the
+#               bods table family.
+#   OUT-OF-SCOPE: GLEIF API client, ownership-graph pipeline, governance.
+
+[dependencies]
+chrono = { version = "0.4", features = ["serde"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+uuid = { version = "1", features = ["v4", "serde"] }
+rust_decimal = { version = "1", features = ["db-postgres", "serde"], optional = true }
+sqlx = { version = "0.8", features = ["runtime-tokio-rustls", "postgres", "uuid", "chrono", "json", "rust_decimal"], optional = true }
+
+[features]
+default = []
+database = ["dep:sqlx", "dep:rust_decimal"]
+
+[lints.rust]
+unreachable_pub = "deny"

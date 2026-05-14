@@ -1,0 +1,28 @@
+[package]
+name = "ob-poc-derived-attributes"
+version = "0.1.0"
+edition = "2021"
+description = "Derived-attribute snapshots and the pg advisory-lock helpers they rely on. Canonical derived-value plane plus the typeless advisory_xact_lock / try_advisory_xact_lock / lock_key helpers (paired per v1 plan §6 decision 3)."
+
+# Capability discipline (see docs/todo/ob-poc-domain-split-v1.md):
+#   IN-SCOPE  : derived_attribute_values / dependencies repository,
+#               advisory_lock helpers used by that repository.
+#   OUT-OF-SCOPE: derivation spec materialization (stays in sem_os_postgres),
+#                 CBU derived value views, runtime evaluation.
+
+[dependencies]
+ob-poc-types = { path = "../ob-poc-types" }
+anyhow = "1"
+chrono = { version = "0.4", features = ["serde"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+thiserror = "1"
+uuid = { version = "1", features = ["v4", "serde"] }
+sqlx = { version = "0.8", features = ["runtime-tokio-rustls", "postgres", "uuid", "chrono", "json"], optional = true }
+
+[features]
+default = []
+database = ["dep:sqlx"]
+
+[lints.rust]
+unreachable_pub = "deny"

@@ -26,6 +26,19 @@ ob-poc-boundary = { path = "crates/ob-poc-boundary" }
 ob-poc-sage = { path = "crates/ob-poc-sage" }           # Sage intent understanding (Phase 2 dest)
 ob-poc-journey = { path = "crates/ob-poc-journey" }     # Pack-guided workflows (Phase 3 dest)
 ob-poc-domain = { path = "crates/ob-poc-domain" }       # Business-domain DTOs (Phase 4 dest)
+# ob-poc-domain split v1 (docs/todo/ob-poc-domain-split-v1.md) — 9
+# per-business-capability crates carved out of ob-poc-domain. Pre-flight
+# wires them all in as empty skeletons; each subsequent slice relocates
+# one module and removes the corresponding `pub mod` from ob-poc-domain.
+ob-poc-bods = { path = "crates/ob-poc-bods" }
+ob-poc-deal = { path = "crates/ob-poc-deal" }
+ob-poc-booking-principal = { path = "crates/ob-poc-booking-principal" }
+ob-poc-semtaxonomy = { path = "crates/ob-poc-semtaxonomy" }
+ob-poc-ontology = { path = "crates/ob-poc-ontology" }
+ob-poc-entity-linking = { path = "crates/ob-poc-entity-linking" }
+ob-poc-trading-profile = { path = "crates/ob-poc-trading-profile" }
+ob-poc-derived-attributes = { path = "crates/ob-poc-derived-attributes" }
+ob-poc-taxonomy = { path = "crates/ob-poc-taxonomy" }
 ob-poc-authoring = { path = "crates/ob-poc-authoring" } # Editor toolkit (Phase 5 dest)
 ob-poc-macros = { path = "crates/ob-poc-macros" }
 sem_os_core = { path = "crates/sem_os_core" }
@@ -230,7 +243,7 @@ path = "src/bin/sem_os_footprint_audit.rs"
 [features]
 default = ["server"]  # Enable for sqlx prepare; use --no-default-features to disable
 
-database = ["dep:sqlx", "dep:bigdecimal", "dep:entity-gateway", "dep:pgvector", "ob-poc-diagnostics/database", "ob-poc-boundary/database", "ob-poc-sage/database", "ob-poc-domain/database", "ob-poc-authoring/database"]  # Only enable database functionality when needed
+database = ["dep:sqlx", "dep:bigdecimal", "dep:entity-gateway", "dep:pgvector", "ob-poc-diagnostics/database", "ob-poc-boundary/database", "ob-poc-sage/database", "ob-poc-domain/database", "ob-poc-authoring/database", "ob-poc-bods/database", "ob-poc-semtaxonomy/database", "ob-poc-entity-linking/database", "ob-poc-trading-profile/database", "ob-poc-derived-attributes/database", "ob-poc-taxonomy/database"]  # Only enable database functionality when needed
 server = ["database", "mcp", "dep:axum", "dep:tower", "dep:tower-http"]  # REST API server with intent pipeline
 cli = ["dep:clap", "dep:colored", "dep:atty", "dep:rustyline"]  # CLI tool for DSL testing
 mcp = ["database"]  # MCP/intent pipeline for semantic verb search
@@ -268,6 +281,16 @@ members = [
     "crates/ob-poc-sage",
     "crates/ob-poc-journey",
     "crates/ob-poc-domain",
+    # ob-poc-domain split v1 — 9 per-business-capability crates
+    "crates/ob-poc-bods",
+    "crates/ob-poc-deal",
+    "crates/ob-poc-booking-principal",
+    "crates/ob-poc-semtaxonomy",
+    "crates/ob-poc-ontology",
+    "crates/ob-poc-entity-linking",
+    "crates/ob-poc-trading-profile",
+    "crates/ob-poc-derived-attributes",
+    "crates/ob-poc-taxonomy",
     "crates/ob-poc-authoring",
     "crates/ob-poc-agent",
     "crates/entity-gateway",
