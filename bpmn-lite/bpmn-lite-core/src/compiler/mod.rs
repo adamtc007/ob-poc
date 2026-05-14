@@ -1,4 +1,4 @@
-pub mod ir;
-pub mod lowering;
-pub mod parser;
-pub mod verifier;
+pub(crate) mod ir;
+pub(crate) mod lowering;
+pub(crate) mod parser;
+pub(crate) mod verifier;

@@ -4,7 +4,7 @@ use std::collections::{HashMap, HashSet, VecDeque};
 
 /// Severity level for a lint diagnostic.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum LintLevel {
+pub(crate) enum LintLevel {
     Error,
     Warning,
     Info,
@@ -12,13 +12,13 @@ pub enum LintLevel {
 
 /// A single lint diagnostic emitted by the contract linter.
 #[derive(Debug, Clone)]
-pub struct LintDiagnostic {
+pub(crate) struct LintDiagnostic {
     /// Rule identifier: "L1", "L2", etc.
-    pub rule: String,
-    pub level: LintLevel,
-    pub message: String,
+    pub(crate) rule: String,
+    pub(crate) level: LintLevel,
+    pub(crate) message: String,
     /// Node id where the issue was detected (if applicable).
-    pub node_id: Option<String>,
+    pub(crate) node_id: Option<String>,
 }
 
 impl std::fmt::Display for LintDiagnostic {
@@ -62,7 +62,7 @@ impl std::fmt::Display for LintDiagnostic {
 ///
 /// - **L5 (Unused writes):** Verb declares `writes_flags` but no edge condition in
 ///   the entire workflow references that flag. Warning.
-pub fn lint_contracts(dto: &WorkflowGraphDto, registry: &ContractRegistry) -> Vec<LintDiagnostic> {
+pub(crate) fn lint_contracts(dto: &WorkflowGraphDto, registry: &ContractRegistry) -> Vec<LintDiagnostic> {
     let mut diags = Vec::new();
 
     // Build index structures

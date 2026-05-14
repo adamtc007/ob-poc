@@ -7,7 +7,7 @@ use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, HashMap, HashSet};
 
 /// Lower a verified IR graph to bytecode.
-pub fn lower(graph: &IRGraph) -> Result<CompiledProgram> {
+pub(crate) fn lower(graph: &IRGraph) -> Result<CompiledProgram> {
     let start_idx = find_start(graph).ok_or_else(|| anyhow!("No Start node in IR graph"))?;
 
     // Topological traversal to assign bytecode addresses.

@@ -3,14 +3,14 @@ use serde::{Deserialize, Serialize};
 
 /// Gateway direction for parallel/exclusive gateways.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-pub enum GatewayDirection {
+pub(crate) enum GatewayDirection {
     Diverging,
     Converging,
 }
 
 /// Timer specification.
 #[derive(Clone, Debug, Serialize, Deserialize)]
-pub enum TimerSpec {
+pub(crate) enum TimerSpec {
     Duration { ms: u64 },
     Date { deadline_ms: u64 },
     Cycle { interval_ms: u64, max_fires: u32 },
@@ -18,14 +18,14 @@ pub enum TimerSpec {
 
 /// Condition expression for XOR gateway edges.
 #[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct ConditionExpr {
-    pub flag_name: String,
-    pub op: ConditionOp,
-    pub literal: ConditionLiteral,
+pub(crate) struct ConditionExpr {
+    pub(crate) flag_name: String,
+    pub(crate) op: ConditionOp,
+    pub(crate) literal: ConditionLiteral,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
-pub enum ConditionOp {
+pub(crate) enum ConditionOp {
     Eq,
     Neq,
     Lt,
@@ -33,14 +33,14 @@ pub enum ConditionOp {
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
-pub enum ConditionLiteral {
+pub(crate) enum ConditionLiteral {
     Bool(bool),
     I64(i64),
 }
 
 /// IR node — one per BPMN element.
 #[derive(Clone, Debug, Serialize, Deserialize)]
-pub enum IRNode {
+pub(crate) enum IRNode {
     Start {
         id: String,
     },
@@ -96,7 +96,7 @@ pub enum IRNode {
 }
 
 impl IRNode {
-    pub fn id(&self) -> &str {
+    pub(crate) fn id(&self) -> &str {
         match self {
             IRNode::Start { id } => id,
             IRNode::End { id, .. } => id,
@@ -115,23 +115,23 @@ impl IRNode {
 
 /// IR edge — one per sequence flow.
 #[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct IREdge {
-    pub id: String,
-    pub condition: Option<ConditionExpr>,
+pub(crate) struct IREdge {
+    pub(crate) id: String,
+    pub(crate) condition: Option<ConditionExpr>,
 }
 
 /// The intermediate representation — a directed graph of BPMN elements.
-pub type IRGraph = DiGraph<IRNode, IREdge>;
+pub(crate) type IRGraph = DiGraph<IRNode, IREdge>;
 
 /// Helper to find a node by its BPMN element id.
-pub fn find_node_by_id(graph: &IRGraph, element_id: &str) -> Option<NodeIndex> {
+pub(crate) fn find_node_by_id(graph: &IRGraph, element_id: &str) -> Option<NodeIndex> {
     graph
         .node_indices()
         .find(|&idx| graph[idx].id() == element_id)
 }
 
 /// Helper to find the start node.
-pub fn find_start(graph: &IRGraph) -> Option<NodeIndex> {
+pub(crate) fn find_start(graph: &IRGraph) -> Option<NodeIndex> {
     graph
         .node_indices()
         .find(|&idx| matches!(&graph[idx], IRNode::Start { .. }))

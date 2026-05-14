@@ -6,7 +6,7 @@ use anyhow::Result;
 /// Validation is NOT performed here — call `validate_dto()` or use
 /// `compile_from_dto()` / `compile_from_yaml()` on the engine which
 /// validates before IR conversion.
-pub fn parse_workflow_yaml(yaml_str: &str) -> Result<WorkflowGraphDto> {
+pub(crate) fn parse_workflow_yaml(yaml_str: &str) -> Result<WorkflowGraphDto> {
     let dto: WorkflowGraphDto = serde_yaml::from_str(yaml_str)?;
     Ok(dto)
 }

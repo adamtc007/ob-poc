@@ -3,21 +3,21 @@ use std::collections::{HashMap, HashSet};
 
 /// Contract describing what a verb (service task) reads, writes, and may raise.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct VerbContract {
-    pub task_type: String,
-    pub reads_flags: HashSet<String>,
-    pub writes_flags: HashSet<String>,
+pub(crate) struct VerbContract {
+    pub(crate) task_type: String,
+    pub(crate) reads_flags: HashSet<String>,
+    pub(crate) writes_flags: HashSet<String>,
     /// Error codes the verb may raise. `"*"` = catch-all (satisfies any error code check).
-    pub may_raise_errors: HashSet<String>,
-    pub produces_correlation: Vec<CorrelationContract>,
+    pub(crate) may_raise_errors: HashSet<String>,
+    pub(crate) produces_correlation: Vec<CorrelationContract>,
 }
 
 /// Declares a correlation key that a verb produces.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct CorrelationContract {
-    pub key_source: String,
+pub(crate) struct CorrelationContract {
+    pub(crate) key_source: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub description: Option<String>,
+    pub(crate) description: Option<String>,
 }
 
 /// Registry of verb contracts + known workflow inputs.
@@ -26,7 +26,7 @@ pub struct CorrelationContract {
 /// inputs (e.g., flags set by the caller before the workflow starts). When L1 (flag
 /// provenance) encounters a flag in this set, it emits a Warning instead of an Error.
 #[derive(Debug, Clone, Default)]
-pub struct ContractRegistry {
+pub(crate) struct ContractRegistry {
     contracts: HashMap<String, VerbContract>,
     known_workflow_inputs: HashSet<String>,
 }
@@ -62,37 +62,37 @@ struct CorrelationContractYaml {
 }
 
 impl ContractRegistry {
-    pub fn new() -> Self {
+    pub(crate) fn new() -> Self {
         Self::default()
     }
 
     /// Register a contract for a task type. Replaces any existing contract.
-    pub fn register(&mut self, contract: VerbContract) {
+    pub(crate) fn register(&mut self, contract: VerbContract) {
         self.contracts.insert(contract.task_type.clone(), contract);
     }
 
     /// Get the contract for a task type.
-    pub fn get(&self, task_type: &str) -> Option<&VerbContract> {
+    pub(crate) fn get(&self, task_type: &str) -> Option<&VerbContract> {
         self.contracts.get(task_type)
     }
 
     /// Check if a contract exists for the given task type.
-    pub fn has(&self, task_type: &str) -> bool {
+    pub(crate) fn has(&self, task_type: &str) -> bool {
         self.contracts.contains_key(task_type)
     }
 
     /// Check if a flag is in the known workflow inputs allow-list.
-    pub fn is_known_input(&self, flag: &str) -> bool {
+    pub(crate) fn is_known_input(&self, flag: &str) -> bool {
         self.known_workflow_inputs.contains(flag)
     }
 
     /// Add a flag to the known workflow inputs allow-list.
-    pub fn add_known_input(&mut self, flag: impl Into<String>) {
+    pub(crate) fn add_known_input(&mut self, flag: impl Into<String>) {
         self.known_workflow_inputs.insert(flag.into());
     }
 
     /// Builder: set all known workflow inputs at once.
-    pub fn with_known_inputs(
+    pub(crate) fn with_known_inputs(
         mut self,
         inputs: impl IntoIterator<Item = impl Into<String>>,
     ) -> Self {
@@ -112,7 +112,7 @@ impl ContractRegistry {
     ///     produces_correlation:
     ///       - key_source: document_request_id
     /// ```
-    pub fn from_yaml_str(yaml: &str) -> Result<Self, serde_yaml::Error> {
+    pub(crate) fn from_yaml_str(yaml: &str) -> Result<Self, serde_yaml::Error> {
         let raw: ContractRegistryYaml = serde_yaml::from_str(yaml)?;
         let mut registry = ContractRegistry {
             known_workflow_inputs: raw.known_workflow_inputs.into_iter().collect(),
@@ -139,7 +139,7 @@ impl ContractRegistry {
     }
 
     /// Iterate over all registered contracts.
-    pub fn iter(&self) -> impl Iterator<Item = (&String, &VerbContract)> {
+    pub(crate) fn iter(&self) -> impl Iterator<Item = (&String, &VerbContract)> {
         self.contracts.iter()
     }
 }

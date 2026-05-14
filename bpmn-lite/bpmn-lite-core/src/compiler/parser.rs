@@ -12,7 +12,7 @@ const MAX_TIMER_CYCLE_FIRES: u32 = 1_000;
 ///
 /// Accepts both prefixed (`bpmn:startEvent`) and default-namespace (`startEvent`) forms.
 /// Only elements in the canonical mapping table are accepted; all others produce a compile error.
-pub fn parse_bpmn(xml: &str) -> Result<IRGraph> {
+pub(crate) fn parse_bpmn(xml: &str) -> Result<IRGraph> {
     let mut reader = Reader::from_str(xml);
 
     let mut graph = IRGraph::new();

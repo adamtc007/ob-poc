@@ -2,9 +2,9 @@ use super::dto::*;
 use std::collections::HashMap;
 
 #[derive(Debug, Clone)]
-pub struct ValidationError {
-    pub rule: String,
-    pub message: String,
+pub(crate) struct ValidationError {
+    pub(crate) rule: String,
+    pub(crate) message: String,
 }
 
 impl std::fmt::Display for ValidationError {
@@ -14,7 +14,7 @@ impl std::fmt::Display for ValidationError {
 }
 
 /// Validate a WorkflowGraphDto before IR conversion. Returns all errors found.
-pub fn validate_dto(dto: &WorkflowGraphDto) -> Vec<ValidationError> {
+pub(crate) fn validate_dto(dto: &WorkflowGraphDto) -> Vec<ValidationError> {
     let mut errors = Vec::new();
 
     // Build lookup maps

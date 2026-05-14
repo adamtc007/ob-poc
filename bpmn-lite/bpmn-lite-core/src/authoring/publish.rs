@@ -10,22 +10,22 @@ use sha2::{Digest, Sha256};
 use std::fmt::Write;
 
 /// Options for the publish pipeline.
-pub struct PublishOptions {
-    pub template_key: String,
-    pub template_version: u32,
-    pub process_key: String,
-    pub source_format: SourceFormat,
-    pub contract_registry: Option<ContractRegistry>,
-    pub generate_bpmn: bool,
-    pub verb_registry_hash: Option<String>,
+pub(crate) struct PublishOptions {
+    pub(crate) template_key: String,
+    pub(crate) template_version: u32,
+    pub(crate) process_key: String,
+    pub(crate) source_format: SourceFormat,
+    pub(crate) contract_registry: Option<ContractRegistry>,
+    pub(crate) generate_bpmn: bool,
+    pub(crate) verb_registry_hash: Option<String>,
 }
 
 /// Result of a successful publish pipeline run.
 #[derive(Debug)]
-pub struct PublishResult {
-    pub template: WorkflowTemplate,
-    pub program: crate::types::CompiledProgram,
-    pub lint_diagnostics: Vec<LintDiagnostic>,
+pub(crate) struct PublishResult {
+    pub(crate) template: WorkflowTemplate,
+    pub(crate) program: crate::types::CompiledProgram,
+    pub(crate) lint_diagnostics: Vec<LintDiagnostic>,
 }
 
 /// Encode bytes as lowercase hex string.
@@ -52,7 +52,7 @@ fn hex_encode(bytes: &[u8]) -> String {
 ///
 /// Steps 1-10 are pure/sync (no persistence). The caller (`compile_and_publish`)
 /// persists: (a) program to ProcessStore, (b) template to TemplateStore.
-pub fn publish_workflow(yaml_str: &str, options: PublishOptions) -> Result<PublishResult> {
+pub(crate) fn publish_workflow(yaml_str: &str, options: PublishOptions) -> Result<PublishResult> {
     // 1. Parse YAML → DTO
     let dto = yaml::parse_workflow_yaml(yaml_str)?;
 
@@ -162,7 +162,7 @@ fn compute_bytecode_hash(program: &crate::types::CompiledProgram) -> String {
 
 /// Helper: shorthand for compile_and_publish without the DTO.
 /// Returns the DTO for callers that need it.
-pub fn parse_and_validate_yaml(yaml_str: &str) -> Result<WorkflowGraphDto> {
+pub(crate) fn parse_and_validate_yaml(yaml_str: &str) -> Result<WorkflowGraphDto> {
     let dto = yaml::parse_workflow_yaml(yaml_str)?;
     let errors = validate::validate_dto(&dto);
     if !errors.is_empty() {
