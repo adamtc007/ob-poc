@@ -1,5 +1,6 @@
 [workspace]
 members = [
+    "bpmn-lite-compiler",
     "bpmn-lite-core",
     "bpmn-lite-server",
     "bpmn-lite-store",
