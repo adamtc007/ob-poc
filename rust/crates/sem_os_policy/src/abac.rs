@@ -7,7 +7,7 @@
 
 use serde::{Deserialize, Serialize};
 
-use crate::types::{Classification, EvidenceGrade, SecurityLabel};
+use sem_os_types::{Classification, EvidenceGrade, SecurityLabel};
 
 /// Context about the actor requesting access.
 #[derive(Debug, Clone, Serialize, Deserialize)]

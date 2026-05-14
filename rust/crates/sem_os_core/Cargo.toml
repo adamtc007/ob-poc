@@ -18,6 +18,11 @@ sem_os_types = { path = "../sem_os_types" }
 # ob-poc-boundary, ob-poc, dsl-runtime, dsl-analysis, etc). Removed
 # in Phase 12.
 sem_os_ontology = { path = "../sem_os_ontology" }
+# sem_os_core-split v1 Phase 5 (transitional, 2026-05-14): policy-tier
+# leaves (abac, context_policy, grounding, security, derivation) relocated
+# to sem_os_policy. Compat re-exports in lib.rs keep `sem_os_core::*`
+# paths resolving for downstream consumers. Removed in Phase 12.
+sem_os_policy = { path = "../sem_os_policy" }
 async-trait = "0.1"
 tokio = { version = "1", features = ["sync"] }
 thiserror = "1.0"

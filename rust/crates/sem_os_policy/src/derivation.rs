@@ -7,9 +7,9 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
-use crate::derivation_spec::{DerivationExpression, DerivationSpecBody, NullSemantics};
+use sem_os_ontology::derivation_spec::{DerivationExpression, DerivationSpecBody, NullSemantics};
 use crate::security::compute_inherited_label;
-use crate::types::SecurityLabel;
+use sem_os_types::SecurityLabel;
 
 // ── Derivation function trait ─────────────────────────────────
 
@@ -181,10 +181,10 @@ impl Default for DerivationFunctionRegistry {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::derivation_spec::{
+    use sem_os_ontology::derivation_spec::{
         DerivationExpression, DerivationInput, DerivationSpecBody, NullSemantics,
     };
-    use crate::types::Classification;
+    use sem_os_types::Classification;
 
     fn make_spec(fn_name: &str, null_sem: NullSemantics) -> DerivationSpecBody {
         DerivationSpecBody {

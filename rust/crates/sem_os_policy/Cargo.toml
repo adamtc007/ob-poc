@@ -16,7 +16,24 @@ description = "Semantic OS governance + projection plane. Owns ABAC primitives, 
 # sem_os_ontology and sem_os_core never depend on it.
 
 [dependencies]
-# Skeleton dependencies — populated as modules land in Phases 5–10.
+# Phase 5 (policy leaves: abac, security, derivation). None of the
+# three need sem_os_core today — that dep is added when context_policy
+# + grounding move in Phase 6 (paired with domain_pack + context_resolution
+# to avoid the Cargo cycle between policy and core's compat re-exports).
+sem_os_ontology = { path = "../sem_os_ontology" }
+sem_os_types = { path = "../sem_os_types" }
+
+# Third-party — sha2 for context_policy fingerprinting; standard
+# primitives elsewhere.
+anyhow = "1.0"
+chrono = { version = "0.4", features = ["serde"] }
+hex = "0.4"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+sha2 = "0.10"
+strum = { version = "0.26", features = ["derive"] }
+thiserror = "1.0"
+uuid = { version = "1", features = ["v4", "v5", "serde"] }
 
 [lints.rust]
 unreachable_pub = "deny"

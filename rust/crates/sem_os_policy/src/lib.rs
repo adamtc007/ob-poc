@@ -28,6 +28,18 @@
 //!
 //! ## Migration status (2026-05-14)
 //!
-//! Phase 1 skeleton of `docs/todo/sem-os-core-split-v1.md`. Modules land
-//! in Phases 5–10 via `git mv` from `sem_os_core/src/`. Until then the
-//! crate is empty.
+//! Phase 5 of `docs/todo/sem-os-core-split-v1.md`.
+//!
+//! - Phase 5 (current): abac, context_policy, grounding, security,
+//!   derivation. derivation joined this slice (was deferred Phase 3)
+//!   because it reaches `crate::security::compute_inherited_label` —
+//!   intra-policy after both move together. ADR §2 categorisation
+//!   refined: derivation_spec stays vocabulary (sem_os_ontology),
+//!   derivation moves to policy as runtime evaluation logic.
+//!
+//! Modules land via `git mv` from `sem_os_core/src/`. Compat re-exports
+//! from `sem_os_core` until Phase 12 cleanup.
+
+pub mod abac;
+pub mod derivation;
+pub mod security;

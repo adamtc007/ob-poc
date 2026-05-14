@@ -13,7 +13,7 @@
 
 use serde::{Deserialize, Serialize};
 
-use crate::types::{Classification, HandlingControl, SecurityLabel};
+use sem_os_types::{Classification, HandlingControl, SecurityLabel};
 
 // ── Supporting types ──────────────────────────────────────────
 
