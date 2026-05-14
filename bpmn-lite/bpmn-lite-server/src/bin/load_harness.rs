@@ -10,12 +10,17 @@ use tokio::sync::{Mutex, Semaphore};
 use tokio::time::sleep;
 use tonic::transport::Channel;
 
-use crate::grpc::proto::bpmn_lite_client::BpmnLiteClient;
-use crate::grpc::proto::{
+use bpmn_lite_server::grpc::proto::bpmn_lite_client::BpmnLiteClient;
+use bpmn_lite_server::grpc::proto::{
     ActivateJobsRequest, CancelRequest, CompileRequest, CompleteJobRequest, FailJobRequest,
     HealthRequest, InspectRequest, JobActivationMsg, MetricsRequest, ProtoValue, SignalRequest,
     StartRequest, SubscribeRequest,
 };
+
+#[tokio::main]
+async fn main() -> Result<()> {
+    run_from_args(std::env::args().skip(1)).await
+}
 
 const SINGLE_TASK_BPMN: &str = r#"<?xml version="1.0" encoding="UTF-8"?>
 <bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL">
@@ -259,7 +264,7 @@ struct WorkerLoopConfig {
     max_jobs: i32,
 }
 
-pub async fn run_from_args<I>(args: I) -> Result<()>
+async fn run_from_args<I>(args: I) -> Result<()>
 where
     I: IntoIterator,
     I::Item: Into<String>,
@@ -852,7 +857,7 @@ fn next_orch_flags(job: &JobActivationMsg, turn: usize) -> HashMap<String, Proto
         flags.insert(
             "approved".to_string(),
             ProtoValue {
-                kind: Some(crate::grpc::proto::proto_value::Kind::BoolValue(
+                kind: Some(bpmn_lite_server::grpc::proto::proto_value::Kind::BoolValue(
                     (turn & 1) == 0,
                 )),
             },
