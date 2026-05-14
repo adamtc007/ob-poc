@@ -1,4 +1,11 @@
 //! LSP Server implementation for the Onboarding DSL.
+//!
+//! Consumed only by the `dsl-lsp` binary (`main.rs`). The library target
+//! (`lib.rs`) exposes `pub mod server` for source discoverability but
+//! has no reachable consumer of `DslLanguageServer`, hence the
+//! `#[allow(dead_code)]` blanket on this file.
+
+#![allow(dead_code)]
 
 use std::collections::HashMap;
 use std::sync::Arc;

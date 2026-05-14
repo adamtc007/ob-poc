@@ -2,8 +2,6 @@
 //!
 //! Supports renaming symbols (@name) across a document.
 
-#![allow(dead_code)] // Public API - functions used by LSP server
-
 use std::collections::HashMap;
 use tower_lsp::lsp_types::*;
 

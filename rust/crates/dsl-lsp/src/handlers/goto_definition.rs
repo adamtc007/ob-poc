@@ -1,7 +1,5 @@
 //! Go-to-definition and find-references handler.
 
-#![allow(dead_code)] // Public API - functions may be used by LSP server
-
 use tower_lsp::lsp_types::*;
 
 use crate::analysis::{DocumentState, SymbolTable};

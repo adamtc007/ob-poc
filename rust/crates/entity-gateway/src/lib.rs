@@ -58,22 +58,14 @@ mod config;
 mod index;
 pub mod proto;
 mod refresh;
-mod search_engine;
-mod search_expr;
 mod server;
 
-// Re-export the external API surface only. Workspace-grep (Phase 2 audit,
-// 2026-05-12) confirmed:
-//   - GatewayConfig, EntityConfig, RefreshConfig, StartupMode — consumed
-//     by ob-poc-web's main.rs (Clone, field traversal, struct iteration).
-//   - IndexRegistry, TantivyIndex, run_refresh_loop, RefreshPipeline,
-//     EntityGatewayService — same caller.
-//   - The rest (SearchEngine/SearchResult/RankedMatch; SearchExpr +
-//     SearchExprQuery/SearchSchema/search_expr::ParseError; IndexError,
-//     IndexRecord, MatchMode, SearchIndex, SearchMatch, SearchQuery) had
-//     zero external imports. Removed from the public surface so
-//     unreachable_pub can flag the now-orphaned items for demotion to
-//     pub(crate).
+// External API surface confirmed by workspace-grep (Phase 2 audit
+// 2026-05-12). The dead `search_engine` and `search_expr` modules
+// (SearchEngine + SearchResult + RankedMatch + SearchExpr s-expression
+// parser + SearchQuery/SearchSchema/DiscriminatorDef + DateMatchMode)
+// were deleted 2026-05-14 — see git history — once dead-code sweep
+// confirmed zero consumers inside or outside the crate.
 pub use config::{EntityConfig, GatewayConfig, RefreshConfig, StartupMode};
 pub use index::{IndexRegistry, TantivyIndex};
 pub use refresh::{run_refresh_loop, RefreshPipeline};
