@@ -6,11 +6,12 @@
 #[cfg(feature = "server")]
 pub mod attribute_routes;
 
-// Phase 4.1 (2026-05-13): pure-DTO module now lives in ob-poc-domain
-// (relocated from ob-poc-boundary; slice 2w → 4.1 sequence). Callers continue
-// to use `crate::api::booking_principal_types::*` via this compat re-export.
-// The DTOs depend only on chrono/serde/uuid/serde_json::Value.
-pub use ob_poc_domain::booking_principal_types;
+// ob-poc-domain split v1 Slice A3 (2026-05-14): booking_principal_types now
+// lives in `ob-poc-booking-principal`. Compat re-export keeps
+// `crate::api::booking_principal_types::*` working for the 4 ob-poc
+// consumers (booking_principal_repository, rule_evaluator,
+// booking_principal_ops, plus this module).
+pub use ob_poc_booking_principal as booking_principal_types;
 
 #[cfg(feature = "server")]
 pub mod agent_types;

@@ -71,7 +71,7 @@
 // ob_poc_domain::*. Boundary no longer hosts these modules.
 
 // bods_types relocated to `ob-poc-bods` by split v1 Slice A1 (2026-05-14).
-pub mod booking_principal_types;
+// booking_principal_types relocated to `ob-poc-booking-principal` by Slice A3.
 // deal_types relocated to `ob-poc-deal` by split v1 Slice A2 (2026-05-14).
 
 // Phase 4.2a (2026-05-13): independent self-contained domain modules.
