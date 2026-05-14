@@ -87,9 +87,13 @@ pub use dsl_analysis::macros;
 pub mod service_traits;
 pub mod services;
 pub mod state_reducer;
-pub mod stategraph;
 pub mod tx;
-pub mod verification;
+// dsl-runtime-split v1 Phase 8 (2026-05-14): stategraph + verification
+// relocated to `dsl-analysis`. Compat re-exports preserve
+// `dsl_runtime::{stategraph, verification}` for sem_os_postgres::ops::
+// {discovery, verify}. Removed in Phase 11.
+pub use dsl_analysis::stategraph;
+pub use dsl_analysis::verification;
 
 // Explicit re-exports — do NOT add `pub use module::*`.
 pub use crud_executor::PgCrudExecutor;

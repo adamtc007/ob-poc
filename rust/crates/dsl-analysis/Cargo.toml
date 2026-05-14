@@ -48,5 +48,13 @@ async-trait = "0.1"
 entity-gateway = { path = "../entity-gateway" }
 tonic = "0.12"
 
+# Phase 8 (stategraph + verification): verification::{patterns,evasion,
+# confidence,registry,types} uses chrono for DateTime<Utc>. stategraph
+# re-exports several types from sem_os_core::state_graph_def (control-plane
+# graph node/edge primitives). Same transitional sem_os_core dep that
+# dsl-runtime carries — to be inverted in a later slice.
+chrono = { version = "0.4", features = ["serde"] }
+sem_os_core = { path = "../sem_os_core" }
+
 [lints.rust]
 unreachable_pub = "deny"

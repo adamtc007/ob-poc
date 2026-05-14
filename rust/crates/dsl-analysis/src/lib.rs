@@ -45,12 +45,15 @@
 //! - Phase 5: `ref_resolver` + `gateway_resolver` paired-move (835 LOC,
 //!   async-trait + entity-gateway + tonic).
 //! - Phase 6: `lsp_validator` (713 LOC).
-//! - Phase 7 (current): `suggestions` + `planning_facade` (571 LOC).
-//!   `suggestions::predict_next_steps` ranks verbs; `planning_facade`
-//!   is the analyse-and-plan orchestrator (parses DSL, compiles to ops,
-//!   runs DAG planning, returns diagnostics + executable plan). Both
-//!   reach runtime_registry + verb_registry + dsl_core; all co-resident.
+//! - Phase 7: `suggestions` + `planning_facade` (571 LOC). The
+//!   analyse-and-plan orchestrator + frontier-derived verb suggestions.
+//! - Phase 8 (current): `stategraph` + `verification` (4,053 LOC).
+//!   stategraph (480 LOC) loads + walks state-graph YAMLs.
+//!   verification (3,573 LOC across types/registry/patterns/confidence/
+//!   evasion) is the pattern-detection + confidence-scoring system.
+//!   Adds `chrono` dep.
 //!
+//! All 13 analyser-tier modules from the ADR are now relocated.
 //! Compat re-exported from `dsl-runtime` until Phase 11 cleanup.
 
 pub mod catalogue_loader;
@@ -61,6 +64,8 @@ pub mod macros;
 pub mod planning_facade;
 pub mod ref_resolver;
 pub mod runtime_registry;
+pub mod stategraph;
 pub mod suggestions;
 pub mod validation;
 pub mod verb_registry;
+pub mod verification;
