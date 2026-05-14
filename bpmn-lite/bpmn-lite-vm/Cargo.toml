@@ -25,6 +25,11 @@ sha2 = { workspace = true }
 serde_json = { workspace = true }
 uuid = { workspace = true }
 tracing = { workspace = true }
+ob-poc-types = { path = "../../rust/crates/ob-poc-types" }
+
+[dev-dependencies]
+bpmn-lite-compiler = { path = "../bpmn-lite-compiler" }
+tokio = { workspace = true, features = ["test-util"] }
 
 [lints]
 workspace = true

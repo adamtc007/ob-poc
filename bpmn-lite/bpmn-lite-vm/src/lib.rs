@@ -5,6 +5,9 @@
 //! `bpmn-lite-engine` (the orchestrator) so the interpreter's
 //! surface area stays locked once the instruction set is stable.
 //!
-//! Empty at Phase 1 skeleton — the interpreter lives in
-//! `bpmn-lite-core/src/vm.rs` until the Phase 2 migration slice
-//! (`vm.rs → bpmn-lite-vm`).
+//! Phase 2.5 (2026-05-14) migrated `vm.rs` (2,010 LOC) here from
+//! `bpmn-lite-core/src/`.
+
+pub mod vm;
+
+pub use vm::*;

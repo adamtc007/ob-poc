@@ -1,6 +1,6 @@
-use crate::events::RuntimeEvent;
-use crate::store::ProcessStore;
-use crate::types::*;
+use bpmn_lite_types::events::RuntimeEvent;
+use bpmn_lite_store::store::ProcessStore;
+use bpmn_lite_types::*;
 use anyhow::{anyhow, Result};
 use sha2::{Digest, Sha256};
 use std::collections::BTreeMap;
@@ -340,7 +340,7 @@ impl Vm {
 
             Instr::WaitAny { race_id, arms } => {
                 // Build arm descriptions for event log
-                let arm_descs: Vec<crate::events::WaitArmDesc> =
+                let arm_descs: Vec<bpmn_lite_types::events::WaitArmDesc> =
                     arms.iter().map(|a| a.into()).collect();
 
                 // Emit RaceRegistered event
@@ -813,7 +813,7 @@ fn is_truthy(val: &Value) -> bool {
     }
 }
 
-pub(crate) fn apply_completion(instance: &mut ProcessInstance, completion: &JobCompletion) {
+pub fn apply_completion(instance: &mut ProcessInstance, completion: &JobCompletion) {
     instance.domain_payload = Arc::<str>::from(completion.domain_payload.as_str());
     instance.domain_payload_hash = compute_hash(&completion.domain_payload);
     // Merge orch_flags: completion flags update instance flags
@@ -843,7 +843,7 @@ fn now_ms() -> Timestamp {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::store_memory::MemoryStore;
+    use bpmn_lite_store::store_memory::MemoryStore;
     use std::collections::BTreeMap;
 
     fn make_program(instrs: Vec<Instr>) -> CompiledProgram {
@@ -1938,8 +1938,8 @@ mod tests {
     /// T-BTIMER-5: Verifier rejects non-interrupting + multiple timers per task.
     #[test]
     fn t_btimer_5_verifier_rejects_invalid() {
-        use crate::compiler::parser::parse_bpmn;
-        use crate::compiler::verifier;
+        use bpmn_lite_compiler::parser::parse_bpmn;
+        use bpmn_lite_compiler::verifier;
 
         // 5a: non-interrupting boundary timer is valid (Phase 2A)
         let xml_ni = r#"<?xml version="1.0" encoding="UTF-8"?>
