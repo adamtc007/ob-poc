@@ -277,9 +277,10 @@ pub mod sem_reg;
 // Constellation graph + resolver was removed/relocated alongside this.
 
 // SemTaxonomy — replacement discovery/composition contract for utterance handling
+// ob-poc-domain split v1 Slice B1 (2026-05-14): semtaxonomy now lives in
+// `ob-poc-semtaxonomy`.
 #[cfg(feature = "database")]
-// Phase 4.2a (2026-05-13): now lives in ob-poc-domain (slice 2s → 4.2a).
-pub use ob_poc_domain::semtaxonomy;
+pub use ob_poc_semtaxonomy as semtaxonomy;
 
 // SemTaxonomy v2 — three-step rip-and-replace pipeline
 #[cfg(feature = "database")]

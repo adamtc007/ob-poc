@@ -81,8 +81,7 @@
 // Both moved from ob-poc-boundary; compat re-exports in ob-poc::lib.rs
 // retargeted from ob_poc_boundary::* to ob_poc_domain::*.
 pub mod ontology;
-#[cfg(feature = "database")]
-pub mod semtaxonomy;
+// semtaxonomy relocated to `ob-poc-semtaxonomy` by split v1 Slice B1 (2026-05-14).
 
 // Phase 4.2b (2026-05-13): paired move — taxonomy depends on
 // view_config_service (single `use crate::view_config_service::*`
