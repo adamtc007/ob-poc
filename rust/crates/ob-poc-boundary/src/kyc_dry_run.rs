@@ -4,6 +4,13 @@
 //! toolkit: load the ob-poc KYC Domain Pack, simulate the approved transition,
 //! bind the result into an Execution Workbook, and pass it through the DSL
 //! Drafter dry-run validator. It performs no storage and no mutation.
+//!
+//! **Bed-in v2 review note (2026-05-14):** this module is KYC-domain-specific
+//! orchestration and is the one off-charter outlier in ob-poc-boundary per
+//! the v2 audit. Its natural home is a per-domain KYC subtree of
+//! `ob-poc-domain`, which doesn't yet exist (ob-poc-domain is currently
+//! flat-DTOs only). Move when ob-poc-domain gains a per-domain split
+//! (audit Tier 3, deferred pending co-evolution measurement).
 
 use sem_os_policy::domain_pack::{DomainPackDiagnostic, DomainPackManifest};
 use sem_os_policy::state_simulation::{
