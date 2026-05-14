@@ -5,6 +5,13 @@
 //! PostgreSQL backend is a separate crate (`bpmn-lite-store-postgres`)
 //! so binaries that don't need Postgres don't link sqlx.
 //!
-//! Empty at Phase 1 skeleton — the trait and memory impl live in
-//! `bpmn-lite-core/src/{store.rs, store_memory.rs}` until the Phase 2
-//! migration slice (`store + store_memory → bpmn-lite-store`).
+//! Phase 2.3 (2026-05-14) migrated `store.rs` and `store_memory.rs`
+//! here from `bpmn-lite-core/src/`. Submodules are `pub mod` for
+//! module-qualified access; the prelude re-exports the user-facing
+//! types flat.
+
+pub mod store;
+pub mod store_memory;
+
+pub use store::*;
+pub use store_memory::*;

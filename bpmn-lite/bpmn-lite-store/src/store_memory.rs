@@ -1,6 +1,6 @@
-use crate::events::RuntimeEvent;
+use bpmn_lite_types::events::RuntimeEvent;
 use crate::store::ProcessStore;
-use crate::types::*;
+use bpmn_lite_types::*;
 use anyhow::{anyhow, Result};
 use async_trait::async_trait;
 use std::collections::{BTreeMap, HashMap, VecDeque};
