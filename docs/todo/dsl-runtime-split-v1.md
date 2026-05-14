@@ -59,9 +59,9 @@ Module list (13):
 
 ### 2.2 `dsl-analysis` (new) — the analyser plane
 
-> **Charter:** Reads DSL text + verb metadata and produces diagnostics, suggestions, and executable plans. Hosts the verb registry, the macro registry, ref/gateway resolvers, the LSP-facing semantic validator, and the analyse-and-plan orchestrator. Zero `sqlx`. Zero execution-port deps.
+> **Charter:** Reads DSL text + verb metadata and produces diagnostics, suggestions, and executable plans. Hosts the verb registry, the macro registry, ref/gateway resolvers, the LSP-facing semantic validator, and the analyse-and-plan orchestrator. May use `sqlx` for read-only catalogue/registry loading at boot. Zero execution-port deps.
 >
-> **Anti-charter:** Does not execute. Does not hold a `PgPool`. Does not implement `VerbExecutionPort`. Does not own runtime services or Pattern A ops.
+> **Anti-charter:** Does not execute user verbs. Does not implement `VerbExecutionPort` or `CrudExecutionPort`. Does not own runtime services, `TransactionScope`, or Pattern A ops. The hard line is "no verb-execution path", not "no sqlx" — the analyser legitimately loads its own verb catalogue from the DB at boot, which is fundamentally different from executing user verbs against the DB.
 
 Module list (13):
 
@@ -128,8 +128,8 @@ Empty crate with charter / anti-charter doc, `unreachable_pub = "deny"`, `[depen
 ### Phase 2 — Move `validation` (pure types, 920 LOC, zero refs)
 Easiest first — confirms the seam works. `git mv src/validation.rs → ../dsl-analysis/src/validation.rs`. Compat re-export `pub use dsl_analysis::validation;` in `dsl-runtime/src/lib.rs` for one phase.
 
-### Phase 3 — Move the registry cluster
-`verb_registry` + `runtime_registry` + `catalogue_loader`. These three are the analyser-registry surface that LSP consumes. Move as a paired set; they likely cross-reference.
+### Phase 3 — Move the registry cluster (revised scope)
+`verb_registry` + `runtime_registry` + `catalogue_loader` + `entity_kind`. **`entity_kind` joins this slice** (originally Phase 9 — `runtime_registry::20` reaches `crate::entity_kind::canonicalize`, so they must move together to avoid a forbidden `dsl-analysis → dsl-runtime` back-edge). Also picks up the sqlx/anyhow/tracing/serde_yaml/ob-templates deps that `runtime_registry` and `catalogue_loader` need for boot-time catalogue loading (see anti-charter clarification in §2.2).
 
 ### Phase 4 — Move `macros` (registry subset)
 Schema + loader + conditions + variable + scope. The expander stays in `ob-poc` per the existing `lib.rs` note.
@@ -146,8 +146,8 @@ The analyser orchestrator. `planning_facade` consumes `runtime_registry`; sugges
 ### Phase 8 — Move `stategraph/` + `verification/`
 DAG state graph and plan verification. Both are leaf-level analyser concerns.
 
-### Phase 9 — Move/decide `entity_kind`
-Slice-time confirm it has zero data-plane callers, then move. If it has a data-plane caller, leave it in dsl-runtime and add a re-export to dsl-analysis.
+### Phase 9 — (Now absorbed into Phase 3)
+`entity_kind` moved in Phase 3 as a paired dep of `runtime_registry`. Skip; renumber later phases if desired.
 
 ### Phase 10 — Tighten dsl-runtime
 Remove now-unused deps from `Cargo.toml` (likely candidates: `regex`, `nom`, `serde_yaml` if no remaining consumer; `governed_query_proc` if no live `#[governed_query]` annotation). Tighten `pub` → `pub(crate)` on items that lost their cross-module consumers.
@@ -187,6 +187,8 @@ Same discipline as v1 §9: after 2–4 weeks, audit whether anything drifted acr
 | 2026-05-14 | Draft authored. Two-way split (`dsl-runtime` / `dsl-analysis`) over three-way (registry separate). | §1.5 — registry has only analyser-plane consumers; a 3-way carve adds a seam without a second use case yet. |
 | 2026-05-14 | Plan type → `ob-poc-types`. | v1 §6.5 rule (≥2 consumers across capability crates). |
 | 2026-05-14 | Macro expander stays in `ob-poc`. | Reaches `UnifiedSession` + `sem_os_obpoc_adapter`. |
+| 2026-05-14 | Anti-charter relaxed mid-Phase 3 — sqlx allowed for catalogue/registry loading, forbidden for verb execution. | `runtime_registry::from_config_with_db` and `catalogue_loader::{seed_committed_verbs_from_yaml,load_from_db}` need `sqlx::PgPool` for read-only metadata loading at boot. That's not the verb-execution path. Hard invariant is "no `TransactionScope` / `CrudExecutionPort` / `PgCrudExecutor`", not "no sqlx". |
+| 2026-05-14 | `entity_kind` absorbed into Phase 3 (was Phase 9). | `runtime_registry::20` calls `crate::entity_kind::canonicalize`; must paired-move to avoid a forbidden `dsl-analysis → dsl-runtime` back-edge. |
 
 ---
 

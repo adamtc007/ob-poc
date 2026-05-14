@@ -49,24 +49,22 @@
 //! at a glance.
 
 pub mod bods;
-pub mod catalogue_loader;
 pub mod cross_workspace;
 pub mod crud_executor;
 pub mod document_bundles;
 pub mod document_requirements;
 pub mod domain_ops;
-pub mod entity_kind;
 pub mod execution;
 pub mod placeholder;
 pub mod port;
-// §9 item 9 slice 1 (2026-05-13): runtime_registry relocated from
-// rust/src/dsl_v2/. Pulls in the YAML-driven verb registry that fronts
-// dsl-lsp completion / hover / signature; reaches dsl_core for verb
-// config types and ob-templates for template definitions.
-pub mod runtime_registry;
-// §9 item 9 slice 2 (2026-05-13): verb_registry relocated from
-// rust/src/dsl_v2/. UnifiedVerbDef + find_unified_verb + registry().
-pub mod verb_registry;
+// dsl-runtime-split v1 Phase 3 (2026-05-14): registry cluster relocated
+// to `dsl-analysis` — verb_registry, runtime_registry, catalogue_loader,
+// entity_kind. Compat re-exports keep external + intra-crate
+// `crate::*` / `dsl_runtime::*` paths resolving. Removed in Phase 11.
+pub use dsl_analysis::catalogue_loader;
+pub use dsl_analysis::entity_kind;
+pub use dsl_analysis::runtime_registry;
+pub use dsl_analysis::verb_registry;
 // §9 item 9 slice 3 (2026-05-13): suggestions::predict_next_steps
 // relocated from rust/src/dsl_v2/. Frontier-derived "what verb makes
 // sense next" recommender; pure-Rust over the verb registry.

@@ -25,5 +25,16 @@ dsl-core = { path = "../dsl-core" }
 serde = { version = "1", features = ["derive"] }
 uuid = { version = "1", features = ["v4", "serde"] }
 
+# Phase 3 (registry cluster): verb_registry + runtime_registry +
+# catalogue_loader + entity_kind. sqlx is for read-only boot-time
+# catalogue loading (see ADR §2.2 anti-charter clarification —
+# verb-execution path is the forbidden line, not sqlx itself).
+ob-templates = { path = "../ob-templates" }
+sqlx = { version = "0.8", features = ["runtime-tokio-rustls", "postgres", "uuid", "chrono", "json"] }
+anyhow = "1.0"
+tracing = "0.1"
+serde_json = "1"
+serde_yaml = "0.9"
+
 [lints.rust]
 unreachable_pub = "deny"

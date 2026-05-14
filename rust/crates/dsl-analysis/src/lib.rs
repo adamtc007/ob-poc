@@ -11,7 +11,11 @@
 //! ## Anti-charter
 //!
 //! - Does NOT execute verbs. The execution plane is `dsl-runtime`.
-//! - Does NOT hold a `PgPool`, a `TransactionScope`, or any sqlx surface.
+//! - Does NOT execute user verbs against the DB. The hard line is no
+//!   `TransactionScope`, no `CrudExecutionPort`, no `PgCrudExecutor`,
+//!   no Pattern A domain ops. sqlx for read-only catalogue/registry
+//!   loading at boot IS allowed — that's the analyser loading its own
+//!   metadata, not verb execution (see ADR §2.2 clarification).
 //! - Does NOT implement `VerbExecutionPort` or `CrudExecutionPort`.
 //! - Does NOT host runtime services or Pattern A domain ops.
 //! - Does NOT host the macro EXPANDER — only the macro REGISTRY.
@@ -30,10 +34,19 @@
 //! Phase 2 of the split described in `docs/todo/dsl-runtime-split-v1.md`.
 //! Modules land in Phases 2–9 via `git mv` from `dsl-runtime/src/`.
 //!
-//! - Phase 2 (current): `validation` — pure-types module (Diagnostic,
-//!   Severity, SourceSpan, ValidationContext, ValidationResult,
-//!   Suggestion, ValidatedProgram, ValidatedStatement). 927 LOC, zero
-//!   internal crate refs at the source. Compat re-exported from
-//!   `dsl-runtime` until Phase 11 cleanup.
+//! - Phase 2: `validation` — pure-types module (Diagnostic, Severity,
+//!   SourceSpan, ValidationContext, ValidationResult, Suggestion,
+//!   ValidatedProgram, ValidatedStatement). 927 LOC.
+//! - Phase 3 (current): `verb_registry` + `runtime_registry` +
+//!   `catalogue_loader` + `entity_kind`. Registry cluster ~2,084 LOC.
+//!   `entity_kind` joined from Phase 9 (`runtime_registry` calls
+//!   `entity_kind::canonicalize`; pair-move avoids a forbidden
+//!   `dsl-analysis → dsl-runtime` back-edge).
+//!
+//! Compat re-exported from `dsl-runtime` until Phase 11 cleanup.
 
+pub mod catalogue_loader;
+pub mod entity_kind;
+pub mod runtime_registry;
 pub mod validation;
+pub mod verb_registry;
