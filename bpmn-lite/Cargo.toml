@@ -2,6 +2,7 @@
 members = [
     "bpmn-lite-core",
     "bpmn-lite-server",
+    "bpmn-lite-store",
     "bpmn-lite-types",
     "xtask",
 ]
