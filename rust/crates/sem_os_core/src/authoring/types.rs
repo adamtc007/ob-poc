@@ -7,51 +7,15 @@ use serde::{Deserialize, Serialize};
 use strum::{AsRefStr, Display, EnumString};
 use uuid::Uuid;
 
-// ── ChangeSet status (7-state, superset of stewardship statuses) ──
+// ── ChangeSet status (canonical 9-state, lives in sem_os_types) ───
 
-/// ChangeSet lifecycle status for the authoring pipeline.
-///
-/// Transitions:
-///   Draft → Validated → DryRunPassed → Published
-///   Draft → Rejected (validation failure)
-///   Validated → Rejected (dry-run not attempted)
-///   Validated → DryRunFailed
-///   Published → Superseded (when successor declares supersedes_change_set_id)
-#[derive(
-    Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, Display, EnumString, AsRefStr,
-)]
-#[serde(rename_all = "snake_case")]
-#[strum(serialize_all = "snake_case")]
-pub enum ChangeSetStatus {
-    Draft,
-    #[strum(serialize = "under_review", serialize = "in_review")]
-    UnderReview,
-    Approved,
-    Validated,
-    Rejected,
-    DryRunPassed,
-    DryRunFailed,
-    Published,
-    Superseded,
-}
-
-impl ChangeSetStatus {
-    /// Whether this status is terminal (no further transitions).
-    pub fn is_terminal(&self) -> bool {
-        matches!(
-            self,
-            Self::Published | Self::Rejected | Self::DryRunFailed | Self::Superseded
-        )
-    }
-
-    /// Whether this status is a non-terminal intermediate state.
-    pub fn is_intermediate(&self) -> bool {
-        matches!(
-            self,
-            Self::Draft | Self::UnderReview | Self::Approved | Self::Validated | Self::DryRunPassed
-        )
-    }
-}
+// sem_os_core-split v1 Phase 2.5 (2026-05-14): ChangeSetStatus enum +
+// impl relocated to `sem_os_types`. The enum is foundational vocabulary
+// (lifecycle states, derive macros only) — having it here forced the
+// `Changeset` struct in `sem_os_types` to reach up into the policy
+// tier. Re-exported here to preserve `sem_os_core::authoring::types::
+// ChangeSetStatus` paths for existing consumers.
+pub use sem_os_types::ChangeSetStatus;
 
 // ── Artifact type ──────────────────────────────────────────────
 

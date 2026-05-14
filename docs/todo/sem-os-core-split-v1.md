@@ -37,25 +37,39 @@ Three crates land cleanly. The dep graph stays acyclic and matches consumer need
 
 ## 2. Target capability map
 
+### 2.0 `sem_os_types` (new bottom tier, added 2026-05-14)
+
+> **Charter:** The shared vocabulary every SemOS-touching crate needs to *talk about* the registry. Classifications, evidence grades, security labels, object types, snapshot row shape, attribute visibility, governance tier. Zero workspace deps; depends only on `chrono`, `serde`, `strum`, `uuid`.
+>
+> **Anti-charter:** No traits beyond derive macros. No business logic. No async. If a future addition needs any other workspace crate, it belongs in `sem_os_core` (engine) or `sem_os_ontology` (vocabulary), not here.
+>
+> **Why this tier exists** — the original ADR placed `types` in core, but Phase 3 surfaced a real cycle: ontology `*_def` bodies legitimately need types (`AttributeVisibility`, `EvidenceGrade`, `Classification`), forcing `sem_os_ontology → sem_os_core` (Cargo); meanwhile the migration-time compat re-exports in `sem_os_core` already force `sem_os_core → sem_os_ontology`. Cargo rejects the cycle. Extracting `types` to a tiny bottom crate that everything depends on resolves it cleanly: types is *foundation under everything*, not engine-specific. (See §8 decision record.)
+
+Module list (1, ~652 LOC):
+
+| Module | What it provides |
+|---|---|
+| `lib.rs` (was `sem_os_core::types`) | `GovernanceTier`, `AttributeVisibility`, `Classification`, `EvidenceGrade`, `SecurityLabel`, `ObjectType`, `SnapshotRow`, plus any sibling pure-vocabulary enums in that file. |
+
 ### 2.1 `sem-os-core` (after) — engine + foundation
 
 > **Charter:** Foundation types, type-safe IDs, error type, principal/role primitives, port traits for store backends, the execution-context placeholder, seed-data DTOs, and the protobuf-generated wire types. Every other `sem-os-*` crate (and the `ob-poc-*` crates that touch SemOS) depends on this.
 >
 > **Anti-charter:** No business-logic helpers. No registry mutation. No projection. No policy enforcement. No YAML loading beyond seed data. No async machinery beyond the bare port trait shapes. If a module's job is to *define* something the world contains, it's ontology, not core. If a module's job is to *decide* something, it's policy, not core.
 
-Module list (9):
+Module list (8 after `types` moves to §2.0):
 
 | Module | Why it stays |
 |---|---|
 | `error` | `SemOsError` — every crate needs to import this |
 | `ids` | type-safe ID newtypes (`AttributeId`, `EntityId`, …) |
 | `principal` | `Principal` (actor + role) |
-| `types` | shared DTOs (`Classification`, `EvidenceGrade`, `SecurityLabel`, `ObjectType`, `SnapshotRow`, `AttributeVisibility`) — zero crate-internal imports |
 | `service` | service trait surface (2,212 LOC — needs review at slice time to confirm it doesn't reach into policy/projection; if it does, that part splits to policy) |
 | `ports` | port traits for store implementations |
 | `execution` | execution-context placeholder (per dsl-runtime-split history, this is mostly a stub now) |
 | `seeds` | seed-data DTOs |
 | `proto` | prost-generated types + `build.rs` |
+| `types` (compat shim) | `pub use sem_os_types::*;` — preserves `sem_os_core::types::*` paths for the duration of migration; can drop in Phase 12 if no consumer reaches `sem_os_core::types::*` directly anymore. |
 
 ### 2.2 `sem-os-ontology` (new) — the `*_def` vocabulary
 
@@ -123,13 +137,15 @@ Module list (~15):
 ob-poc (composition)
 sem_os_server, sem_os_postgres, sem_os_client, sem_os_obpoc_adapter,
 sem_os_harness, sem_os_mcp, ob-poc-boundary, ob-poc-domain (already)
-  ├─→ sem-os-policy
+  ├─→ sem_os_policy
   │     ↓
-  │   sem-os-ontology
+  │   sem_os_ontology
   │     ↓
-  └─→ sem-os-core
+  ├─→ sem_os_core
+  │     ↓
+  └─→ sem_os_types
         ↓
-      ob-poc-types, primitives (serde, chrono, uuid, prost, …)
+      primitives only (serde, chrono, uuid, strum)
 
 dsl-runtime → sem-os-core (transitional, existing — Principal/SemOsError/VerbContractBody)
               + sem-os-ontology (transitional — VerbContractBody is verb_contract)
@@ -137,10 +153,10 @@ dsl-analysis → sem-os-core + sem-os-ontology (state_graph_def already, verb_co
 ```
 
 **Critical invariants:**
-- No `sem-os-core → sem-os-ontology` edge. Core knows nothing about ontology.
+- No `sem-os-types → anything` edge. Types is the absolute bottom.
+- No `sem-os-core → sem-os-ontology` edge in the END STATE. Core knows nothing about ontology. (Transitional `sem_os_core → sem_os_ontology` edge exists during migration via compat re-exports; removed in Phase 12.)
 - No `sem-os-core → sem-os-policy` edge. Core knows nothing about policy.
 - No `sem-os-ontology → sem-os-policy` edge. Ontology defines *what exists*; policy decides *what may happen*.
-- Cross-edges may briefly exist during the migration via the same compat re-export pattern from dsl-runtime-split (`pub use sem_os_ontology::*;` in core during Phases 2–N, removed in Phase 11).
 
 ---
 
@@ -170,6 +186,9 @@ The blast radius is wider than dsl-runtime-split because there are ~10 external 
 
 ### Phase 1 — Skeleton crates
 Create empty `sem-os-ontology` and `sem-os-policy` with charter doc-comments, `unreachable_pub = "deny"`, minimal deps. Add to workspace members. Mirrors v1 Phase 1 × 2.
+
+### Phase 2.5 — Extract `sem_os_types` (added 2026-05-14)
+Move `sem_os_core/src/types.rs` (~652 LOC) into a new `sem_os_types/src/lib.rs`. Replace `sem_os_core/src/types.rs` with a one-line `pub use sem_os_types::*;` compat shim. Add `sem_os_types = { path = "../sem_os_types" }` as a dep of `sem_os_core` and `sem_os_ontology`. Unblocks Phase 3.
 
 ### Phase 2 — Pure-type ontology leaves
 Move the `*_def` modules with zero or `types`-only crate-internal imports first. Likely batch: `policy_rule`, `observation_def`, `verb_contract`, `view_def`, `taxonomy_def`, `universe_def`, `requirement_profile_def`, `relationship_type_def`, `state_machine_def`. ~9 modules, all leaf-level.
@@ -251,6 +270,7 @@ Same 2-4 week discipline as dsl-runtime-split's Phase 12.
 | 2026-05-14 | `prost` proto + build.rs stay in core. | Generated types are foundation; moving them adds build-graph complexity for no charter benefit. |
 | 2026-05-14 | `service.rs` placement deferred to Phase 10 slice-time read. | 2,212 LOC could plausibly belong to any tier; cheaper to inspect than to forecast. |
 | 2026-05-14 | The 4 `pub(crate)` modules promote to `pub` at split time. | Cross-crate use is the whole point; promotion is part of the slice not a separate concern. |
+| 2026-05-14 (mid-migration) | Extracted a 4th tier `sem_os_types` (Phase 2.5). | Phase 3 surfaced a Cargo cycle: ontology `*_def` bodies need `types::*`, forcing `sem_os_ontology → sem_os_core`; existing compat re-exports already force `sem_os_core → sem_os_ontology`. Extracting types to a bottom crate resolves the cycle. Original ADR's "types in core" miscategorised the file — types is foundation under everything, not engine-specific. |
 
 ---
 

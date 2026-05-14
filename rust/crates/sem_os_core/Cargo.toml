@@ -6,6 +6,11 @@ description = "Semantic OS core — pure domain types, port traits, gate logic. 
 
 [dependencies]
 ob-poc-types = { path = "../ob-poc-types" }
+# sem_os_core-split v1 Phase 2.5 (2026-05-14): types.rs extracted to
+# sem_os_types crate. sem_os_core/src/types.rs is now a compat shim
+# (`pub use sem_os_types::*;`). This dep stays after migration —
+# sem_os_types is the bottom tier every SemOS-touching crate needs.
+sem_os_types = { path = "../sem_os_types" }
 # sem_os_core-split v1 Phase 2 (transitional, 2026-05-14): pure-type
 # ontology leaves relocated to sem_os_ontology. Compat re-exports in
 # lib.rs keep `sem_os_core::<def>::*` paths resolving for every

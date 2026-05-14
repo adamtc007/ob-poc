@@ -134,7 +134,11 @@ smallvec = { version = "1.11", features = ["serde"] }
 
 # Testing
 [dev-dependencies]
-bpmn-lite-core = { path = "../bpmn-lite/bpmn-lite-core" }
+# bpmn-lite-core retired in bpmn-lite Phase 2.8 (3344bb57) — split into
+# bpmn-lite-{types, compiler, store, store-postgres, vm, authoring, engine}.
+# Only the ob-poc bpmn integration test needs the engine + memory store.
+bpmn-lite-engine = { path = "../bpmn-lite/bpmn-lite-engine" }
+bpmn-lite-store = { path = "../bpmn-lite/bpmn-lite-store" }
 bpmn-lite-server = { path = "../bpmn-lite/bpmn-lite-server" }
 sem_os_core = { path = "crates/sem_os_core" }
 tokio-stream = "0.1"
@@ -275,7 +279,8 @@ members = [
     "crates/sem_os_core",
 
     # sem_os_core split v1 (docs/todo/sem-os-core-split-v1.md) —
-    # ontology + policy planes
+    # types (bottom tier) + ontology + policy planes
+    "crates/sem_os_types",
     "crates/sem_os_ontology",
     "crates/sem_os_policy",
     "crates/sem_os_postgres",
