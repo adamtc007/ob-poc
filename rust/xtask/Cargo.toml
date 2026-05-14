@@ -33,7 +33,6 @@ sem_os_client = { path = "../crates/sem_os_client" }
 sem_os_postgres = { path = "../crates/sem_os_postgres" }
 dsl-core = { path = "../crates/dsl-core" }
 playbook-core = { path = "../crates/playbook-core" }
-playbook-lower = { path = "../crates/playbook-lower" }
 csv = "1.3"
 serde_yaml = "0.9"
 sha2 = "0.10"

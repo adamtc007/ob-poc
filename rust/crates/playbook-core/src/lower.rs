@@ -1,5 +1,5 @@
 use crate::slots::{SlotState, SlotValue};
-use playbook_core::{PlaybookSpec, StepSpec};
+use crate::{PlaybookSpec, StepSpec};
 use std::collections::HashMap;
 
 pub struct LowerResult {

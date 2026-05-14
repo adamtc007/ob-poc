@@ -3494,8 +3494,7 @@ async fn run_aviva_deal_harness(verbose: bool, dry_run: bool) -> Result<()> {
 // ============================================================================
 
 fn playbook_check(files: Vec<std::path::PathBuf>, format: &str, verbose: bool) -> Result<()> {
-    use playbook_core::parse_playbook;
-    use playbook_lower::{lower_playbook, SlotState};
+    use playbook_core::{lower_playbook, parse_playbook, SlotState};
 
     let _ = format; // unused for now
 

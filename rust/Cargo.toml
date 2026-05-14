@@ -275,7 +275,7 @@ members = [
 
     "crates/ob-poc-macros",
 
-    "xtask", "crates/playbook-core", "crates/playbook-lower",
+    "xtask", "crates/playbook-core",
     "crates/inspector-projection",
 
     # Semantic OS crates (Stage 1.1)
@@ -298,8 +298,4 @@ members = [
 
     # dsl-runtime split v1 (docs/todo/dsl-runtime-split-v1.md) — analyser plane
     "crates/dsl-analysis",
-
-    # Three-plane refactor harnesses (Phase 0e skeleton)
-    "crates/determinism-harness",
-    "crates/round-trip-harness",
 ]

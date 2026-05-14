@@ -35,7 +35,6 @@ dsl-analysis = { path = "../dsl-analysis" }
 
 # Playbook support
 playbook-core = { path = "../playbook-core" }
-playbook-lower = { path = "../playbook-lower" }
 
 # Entity Gateway client (gRPC)
 entity-gateway = { path = "../entity-gateway" }

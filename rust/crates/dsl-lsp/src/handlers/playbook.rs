@@ -1,7 +1,6 @@
 //! Playbook file analysis and diagnostics
 
-use playbook_core::parse_playbook;
-use playbook_lower::{lower_playbook, SlotState};
+use playbook_core::{lower_playbook, parse_playbook, SlotState};
 use tower_lsp::lsp_types::*;
 
 /// Analyze a playbook YAML file and return diagnostics
