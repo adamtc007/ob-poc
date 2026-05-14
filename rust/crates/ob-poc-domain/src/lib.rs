@@ -72,8 +72,7 @@
 
 // bods_types relocated to `ob-poc-bods` by split v1 Slice A1 (2026-05-14).
 pub mod booking_principal_types;
-#[cfg(feature = "database")]
-pub mod deal_types;
+// deal_types relocated to `ob-poc-deal` by split v1 Slice A2 (2026-05-14).
 
 // Phase 4.2a (2026-05-13): independent self-contained domain modules.
 //   - ontology (6 files, ~45 KB) — entity taxonomy + lifecycle (loads YAML),

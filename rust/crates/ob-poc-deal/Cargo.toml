@@ -9,9 +9,11 @@ description = "Deal taxonomy reference data. Deal, Product, ProductLine, RateCar
 #   OUT-OF-SCOPE: Deal repository / negotiation workflow / billing run logic.
 
 [dependencies]
+anyhow = "1"
 chrono = { version = "0.4", features = ["serde"] }
 rust_decimal = { version = "1", features = ["serde"] }
 serde = { version = "1", features = ["derive"] }
+serde_json = "1"
 uuid = { version = "1", features = ["v4", "serde"] }
 
 [lints.rust]

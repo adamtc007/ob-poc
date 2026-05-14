@@ -91,12 +91,11 @@ pub use ob_poc_authoring::display_nouns;
 #[cfg(feature = "server")]
 pub mod projection_routes;
 
-// Phase 4.1 (2026-05-13): pure-DTO module now lives in ob-poc-domain
-// (relocated from ob-poc-boundary; slice 2y → 4.1 sequence). Gated behind
-// `server` to keep the existing visibility profile (domain gates it behind
-// `database`; ob-poc's `server` feature activates `database`).
+// ob-poc-domain split v1 Slice A2 (2026-05-14): deal_types now lives in
+// `ob-poc-deal`. Compat re-export keeps `crate::api::deal_types::*` paths
+// in `deal_routes`, `deal_repository`, and `deal_graph_builder` working.
 #[cfg(feature = "server")]
-pub use ob_poc_domain::deal_types;
+pub use ob_poc_deal as deal_types;
 
 #[cfg(feature = "server")]
 pub mod deal_routes;
