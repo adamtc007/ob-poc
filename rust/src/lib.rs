@@ -116,8 +116,9 @@ pub mod navigation;
 pub mod session;
 
 // Trading profile document types and materialization
-// Phase 3 slice 2k (2026-05-12): relocated to ob-poc-boundary; compat re-export.
-pub use ob_poc_domain::trading_profile;
+// ob-poc-domain split v1 Slice B4 (2026-05-14): trading_profile now lives in
+// `ob-poc-trading-profile`.
+pub use ob_poc_trading_profile as trading_profile;
 
 // Template system for DSL generation
 pub mod templates;
