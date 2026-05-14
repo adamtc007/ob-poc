@@ -3,6 +3,7 @@ members = [
     "bpmn-lite-core",
     "bpmn-lite-server",
     "bpmn-lite-store",
+    "bpmn-lite-store-postgres",
     "bpmn-lite-types",
     "xtask",
 ]
