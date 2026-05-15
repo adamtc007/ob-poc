@@ -6,21 +6,14 @@
 //! via [`AcpSessionInputDraftMode::from_env`]. Per-request env reads were
 //! removed in R8 (single-path unification).
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub enum AcpSessionInputDraftMode {
+    #[default]
     Deterministic,
     LiveLlm,
 }
 
 impl AcpSessionInputDraftMode {
-    pub fn from_str(value: &str) -> Option<Self> {
-        match value.trim().to_ascii_lowercase().as_str() {
-            "" | "deterministic" | "deterministic_draft" => Some(Self::Deterministic),
-            "llm" | "llm_tool_call" | "live_llm" => Some(Self::LiveLlm),
-            _ => None,
-        }
-    }
-
     pub fn as_str(self) -> &'static str {
         match self {
             Self::Deterministic => "deterministic",
@@ -42,13 +35,19 @@ impl AcpSessionInputDraftMode {
         std::env::var("OB_ACP_SESSION_INPUT_DRAFT_SOURCE")
             .ok()
             .or_else(|| std::env::var("OB_ACP_SESSION_INPUT_DRAFT_MODE").ok())
-            .and_then(|value| Self::from_str(&value))
+            .and_then(|value| value.parse().ok())
             .unwrap_or(Self::Deterministic)
     }
 }
 
-impl Default for AcpSessionInputDraftMode {
-    fn default() -> Self {
-        Self::Deterministic
+impl std::str::FromStr for AcpSessionInputDraftMode {
+    type Err = ();
+
+    fn from_str(value: &str) -> Result<Self, Self::Err> {
+        match value.trim().to_ascii_lowercase().as_str() {
+            "" | "deterministic" | "deterministic_draft" => Ok(Self::Deterministic),
+            "llm" | "llm_tool_call" | "live_llm" => Ok(Self::LiveLlm),
+            _ => Err(()),
+        }
     }
 }

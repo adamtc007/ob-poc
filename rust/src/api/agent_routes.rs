@@ -3521,14 +3521,14 @@ mod tests {
     #[test]
     fn test_acp_session_input_draft_mode_parsing() {
         assert_eq!(
-            AcpSessionInputDraftMode::from_str("deterministic"),
-            Some(AcpSessionInputDraftMode::Deterministic)
+            "deterministic".parse::<AcpSessionInputDraftMode>(),
+            Ok(AcpSessionInputDraftMode::Deterministic)
         );
         assert_eq!(
-            AcpSessionInputDraftMode::from_str("live_llm"),
-            Some(AcpSessionInputDraftMode::LiveLlm)
+            "live_llm".parse::<AcpSessionInputDraftMode>(),
+            Ok(AcpSessionInputDraftMode::LiveLlm)
         );
-        assert_eq!(AcpSessionInputDraftMode::from_str("random"), None);
+        assert!("random".parse::<AcpSessionInputDraftMode>().is_err());
     }
 
     #[test]

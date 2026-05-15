@@ -95,6 +95,18 @@ pub type PackProjectionProvider = fn() -> Result<Vec<PackProjection>, String>;
 
 static PROVIDER: OnceLock<PackProjectionProvider> = OnceLock::new();
 
+/// Provider registration failed because another provider was already set.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ProviderAlreadyRegistered;
+
+impl std::fmt::Display for ProviderAlreadyRegistered {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("provider already registered")
+    }
+}
+
+impl std::error::Error for ProviderAlreadyRegistered {}
+
 /// Register the pack-projection provider. Idempotent — calling more than
 /// once after the first set has no effect (the first registration wins,
 /// matching `OnceLock` semantics).
@@ -103,10 +115,14 @@ static PROVIDER: OnceLock<PackProjectionProvider> = OnceLock::new();
 /// closure is invoked lazily by [`get_pack_projection_provider`] the
 /// first time `acp_dag_semantic`'s `semantic_index()` is queried.
 ///
-/// Returns `Ok(())` if the registration took, `Err(())` if a provider
-/// was already registered (caller can decide whether to log/panic).
-pub fn set_pack_projection_provider(provider: PackProjectionProvider) -> Result<(), ()> {
-    PROVIDER.set(provider).map_err(|_| ())
+/// Returns `Ok(())` if the registration took, `Err` if a provider was
+/// already registered (caller can decide whether to log/panic).
+pub fn set_pack_projection_provider(
+    provider: PackProjectionProvider,
+) -> Result<(), ProviderAlreadyRegistered> {
+    PROVIDER
+        .set(provider)
+        .map_err(|_| ProviderAlreadyRegistered)
 }
 
 /// Fetch the registered pack-projection provider.
@@ -149,8 +165,12 @@ static MANIFEST_PROVIDER: OnceLock<PackManifestProvider> = OnceLock::new();
 
 /// Register the pack-manifest provider. Idempotent — `OnceLock::set`
 /// semantics; the first registration wins.
-pub fn set_pack_manifest_provider(provider: PackManifestProvider) -> Result<(), ()> {
-    MANIFEST_PROVIDER.set(provider).map_err(|_| ())
+pub fn set_pack_manifest_provider(
+    provider: PackManifestProvider,
+) -> Result<(), ProviderAlreadyRegistered> {
+    MANIFEST_PROVIDER
+        .set(provider)
+        .map_err(|_| ProviderAlreadyRegistered)
 }
 
 /// Fetch the registered pack-manifest provider.

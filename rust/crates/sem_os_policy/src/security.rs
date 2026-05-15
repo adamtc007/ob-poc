@@ -11,6 +11,8 @@
 //! - Purpose limitation: intersection (empty = no restriction)
 //! - Handling controls: union
 
+#![allow(dead_code)]
+
 use serde::{Deserialize, Serialize};
 
 use sem_os_types::{Classification, HandlingControl, SecurityLabel};

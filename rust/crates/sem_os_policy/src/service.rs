@@ -871,7 +871,7 @@ fn build_discovery_surface(
 #[derive(Debug)]
 enum SeedBootstrapPlan {
     Skip,
-    Publish(SnapshotMeta, serde_json::Value),
+    Publish(Box<SnapshotMeta>, serde_json::Value),
 }
 
 fn plan_seed_bootstrap_item(
@@ -896,7 +896,7 @@ fn plan_seed_bootstrap_item(
             }
 
             Ok(SeedBootstrapPlan::Publish(
-                SnapshotMeta {
+                Box::new(SnapshotMeta {
                     object_type,
                     object_id: current.object_id,
                     version_major: current.version_major,
@@ -910,14 +910,18 @@ fn plan_seed_bootstrap_item(
                     created_by: principal.actor_id.clone(),
                     approved_by: Some(principal.actor_id.clone()),
                     predecessor_id: Some(current.snapshot_id),
-                },
+                }),
                 payload.clone(),
             ))
         }
         None => {
             let object_id = sem_os_core::ids::object_id_for(object_type, fqn);
             Ok(SeedBootstrapPlan::Publish(
-                SnapshotMeta::new_operational(object_type, object_id, &principal.actor_id),
+                Box::new(SnapshotMeta::new_operational(
+                    object_type,
+                    object_id,
+                    &principal.actor_id,
+                )),
                 payload.clone(),
             ))
         }
@@ -1280,7 +1284,7 @@ impl CoreService for CoreServiceImpl {
                 current.as_ref(),
             )? {
                 SeedBootstrapPlan::Skip => skipped += 1,
-                SeedBootstrapPlan::Publish(meta, payload) => to_publish.push((meta, payload)),
+                SeedBootstrapPlan::Publish(meta, payload) => to_publish.push((*meta, payload)),
             }
         }
 

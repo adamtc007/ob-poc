@@ -39,7 +39,7 @@
 //!   ValidatedProgram, ValidatedStatement). 927 LOC.
 //! - Phase 3: `verb_registry` + `runtime_registry` + `catalogue_loader`
 //!   + `entity_kind`. Registry cluster ~2,084 LOC. `entity_kind` joined
-//!   from Phase 9 (paired-move dep of `runtime_registry`).
+//!     from Phase 9 (paired-move dep of `runtime_registry`).
 //! - Phase 4: `macros` (registry subset — schema, registry, conditions,
 //!   variable, scope). 2,585 LOC. Expander stays in `ob-poc`.
 //! - Phase 5: `ref_resolver` + `gateway_resolver` paired-move (835 LOC,
