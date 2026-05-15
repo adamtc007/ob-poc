@@ -5,8 +5,8 @@
 //! approve, reject, complete) require a successful checkpoint.
 
 use anyhow::{Context, Result};
+use sqlx::PgPool;
 use sqlx::Row;
-use sqlx::{PgPool, Postgres, Transaction};
 use uuid::Uuid;
 
 use super::runbook::InvocationRecord;
@@ -17,25 +17,15 @@ pub struct SessionRepositoryV2 {
     pool: PgPool,
 }
 
-/// Transaction-scoped lock for one durable REPL session record.
-pub struct SessionRecordLock {
-    tx: Option<Transaction<'static, Postgres>>,
-}
+/// Compatibility handle for older call sites.
+///
+/// REPL workbook snapshots are append-only, so normal session persistence no
+/// longer takes a database advisory lock. `release()` is intentionally a no-op.
+pub struct SessionRecordLock {}
 
 impl SessionRecordLock {
-    /// Release the session record lock.
-    ///
-    /// # Examples
-    /// ```rust,ignore
-    /// let lock = repo.acquire_session_record_lock(session_id).await?;
-    /// lock.release().await?;
-    /// ```
-    pub async fn release(mut self) -> Result<()> {
-        if let Some(tx) = self.tx.take() {
-            tx.commit()
-                .await
-                .context("Failed to release session record lock")?;
-        }
+    /// Compatibility no-op.
+    pub async fn release(self) -> Result<()> {
         Ok(())
     }
 }
@@ -45,67 +35,35 @@ impl SessionRepositoryV2 {
         Self { pool }
     }
 
-    /// Acquire the durable record lock for a REPL session.
-    ///
-    /// # Examples
-    /// ```rust,ignore
-    /// let lock = repo.acquire_session_record_lock(session_id).await?;
-    /// // Mutate and checkpoint the session while the lock is held.
-    /// lock.release().await?;
-    /// ```
+    /// Compatibility no-op. Session workbook writes are append-only snapshots.
     pub async fn acquire_session_record_lock(&self, session_id: Uuid) -> Result<SessionRecordLock> {
-        let lock_key = crate::database::locks::lock_key("repl_session_v2", &session_id.to_string());
-        loop {
-            let mut tx = self
-                .pool
-                .begin()
-                .await
-                .context("Failed to begin session lock transaction")?;
-            if crate::database::locks::try_advisory_xact_lock(&mut tx, lock_key)
-                .await
-                .context("Failed to acquire session record lock")?
-            {
-                return Ok(SessionRecordLock { tx: Some(tx) });
-            }
-            drop(tx);
-            tokio::time::sleep(std::time::Duration::from_millis(25)).await;
-        }
+        let _ = session_id;
+        Ok(SessionRecordLock {})
     }
 
-    /// Save or update a session with optimistic concurrency.
+    /// Save the current session header and append an immutable workbook snapshot.
     ///
-    /// `version` is the last known version — if a concurrent writer has
-    /// incremented it, this call will fail (returns 0 rows affected).
-    /// Returns the new version on success.
+    /// The `version` argument is retained for call-site compatibility; the save
+    /// path no longer reads/increments a caller-side version and does not take a
+    /// session advisory lock.
     #[allow(deprecated)] // Reads deprecated fields for DB persistence (migration compat)
     pub async fn save_session(&self, session: &ReplSessionV2, version: i64) -> Result<i64> {
-        self.save_session_inner(session, version, true).await
+        let _ = version;
+        self.save_session_inner(session).await
     }
 
-    /// Save a session while the caller already holds the session record lock.
-    ///
-    /// # Examples
-    /// ```rust,ignore
-    /// let lock = repo.acquire_session_record_lock(session.id).await?;
-    /// let version = repo.save_session_with_record_lock(&session, version).await?;
-    /// lock.release().await?;
-    /// ```
+    /// Compatibility wrapper for older held-lock call sites.
     #[allow(deprecated)] // Reads deprecated fields for DB persistence (migration compat)
     pub async fn save_session_with_record_lock(
         &self,
         session: &ReplSessionV2,
         version: i64,
     ) -> Result<i64> {
-        self.save_session_inner(session, version, false).await
+        self.save_session(session, version).await
     }
 
     #[allow(deprecated)] // Reads deprecated fields for DB persistence (migration compat)
-    async fn save_session_inner(
-        &self,
-        session: &ReplSessionV2,
-        version: i64,
-        acquire_lock: bool,
-    ) -> Result<i64> {
+    async fn save_session_inner(&self, session: &ReplSessionV2) -> Result<i64> {
         let state =
             serde_json::to_value(&session.state).context("Failed to serialize session state")?;
         let client_context = session
@@ -141,27 +99,31 @@ impl SessionRepositoryV2 {
             "name": session.name,
             "last_entity_resolution": session.last_entity_resolution,
         });
+        let snapshot_id = Uuid::now_v7();
+        let workbook_snapshot = serde_json::json!({
+            "session_id": session.id,
+            "state": state.clone(),
+            "client_context": client_context.clone(),
+            "journey_context": journey_context.clone(),
+            "runbook": runbook.clone(),
+            "messages": messages.clone(),
+            "extended_state": extended_state.clone(),
+            "created_at": session.created_at,
+            "last_active_at": session.last_active_at,
+        });
 
-        let new_version = version + 1;
         let mut tx = self
             .pool
             .begin()
             .await
             .context("Failed to begin session save transaction")?;
-        if acquire_lock {
-            let lock_key =
-                crate::database::locks::lock_key("repl_session_v2", &session.id.to_string());
-            crate::database::locks::advisory_xact_lock(&mut tx, lock_key)
-                .await
-                .context("Failed to acquire session record lock")?;
-        }
 
-        let rows = sqlx::query(
+        let new_version: i64 = sqlx::query_scalar(
             r#"
             INSERT INTO "ob-poc".repl_sessions_v2
                 (session_id, state, client_context, journey_context, runbook, messages,
-                 extended_state, created_at, last_active_at, version)
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+                 extended_state, created_at, last_active_at, version, current_snapshot_id)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 1, $10)
             ON CONFLICT (session_id) DO UPDATE
                 SET state = $2,
                     client_context = $3,
@@ -170,33 +132,49 @@ impl SessionRepositoryV2 {
                     messages = $6,
                     extended_state = $7,
                     last_active_at = $9,
-                    version = $10
-                WHERE "ob-poc".repl_sessions_v2.version = $11
+                    version = "ob-poc".repl_sessions_v2.version + 1,
+                    current_snapshot_id = $10
+            RETURNING version
             "#,
         )
         .bind(session.id)
-        .bind(state)
-        .bind(client_context)
-        .bind(journey_context)
-        .bind(runbook)
-        .bind(messages)
-        .bind(extended_state)
+        .bind(&state)
+        .bind(&client_context)
+        .bind(&journey_context)
+        .bind(&runbook)
+        .bind(&messages)
+        .bind(&extended_state)
         .bind(session.created_at)
         .bind(session.last_active_at)
+        .bind(snapshot_id)
+        .fetch_one(&mut *tx)
+        .await
+        .context("Failed to save session")?;
+
+        sqlx::query(
+            r#"
+            INSERT INTO "ob-poc".repl_session_workbook_snapshots
+                (session_id, snapshot_id, session_version, state, client_context,
+                 journey_context, runbook, messages, extended_state, workbook,
+                 created_at, session_created_at, session_last_active_at)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, now(), $11, $12)
+            "#,
+        )
+        .bind(session.id)
+        .bind(snapshot_id)
         .bind(new_version)
-        .bind(version)
+        .bind(&state)
+        .bind(&client_context)
+        .bind(&journey_context)
+        .bind(&runbook)
+        .bind(&messages)
+        .bind(&extended_state)
+        .bind(&workbook_snapshot)
+        .bind(session.created_at)
+        .bind(session.last_active_at)
         .execute(&mut *tx)
         .await
-        .context("Failed to save session")?
-        .rows_affected();
-
-        if rows == 0 {
-            anyhow::bail!(
-                "Optimistic concurrency conflict: session {} version {} stale",
-                session.id,
-                version
-            );
-        }
+        .context("Failed to append session workbook snapshot")?;
 
         if let Some(plan) = &session.runbook_plan {
             let status = runbook_plan_status_name(&plan.status);
@@ -238,20 +216,6 @@ impl SessionRepositoryV2 {
         tx.commit()
             .await
             .context("Failed to commit session save transaction")?;
-
-        #[cfg(feature = "database")]
-        if let Err(error) = crate::repl::trace_repository::SessionTraceRepository::append_batch(
-            &self.pool,
-            &session.trace,
-        )
-        .await
-        {
-            tracing::warn!(
-                session_id = %session.id,
-                error = %error,
-                "Failed to persist session trace batch after session checkpoint"
-            );
-        }
 
         Ok(new_version)
     }

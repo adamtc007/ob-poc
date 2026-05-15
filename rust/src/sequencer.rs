@@ -263,6 +263,10 @@ pub struct ReplOrchestratorV2 {
     /// rather than read per request. Used by the orchestrator's internal
     /// ACP resolution step (R8 §13.5).
     acp_session_input_draft_mode: crate::acp_session_input_draft_mode::AcpSessionInputDraftMode,
+    /// Maximum time a single runbook step may spend inside the execution
+    /// bridge before the REPL marks it failed and returns control to the
+    /// caller. This protects `/run` from indefinitely-held HTTP requests.
+    runbook_step_timeout: std::time::Duration,
 }
 
 impl ReplOrchestratorV2 {
@@ -295,6 +299,7 @@ impl ReplOrchestratorV2 {
             gate_pipeline: None,
             acp_session_input_draft_mode:
                 crate::acp_session_input_draft_mode::AcpSessionInputDraftMode::Deterministic,
+            runbook_step_timeout: std::time::Duration::from_secs(5),
         }
     }
 
@@ -379,6 +384,12 @@ impl ReplOrchestratorV2 {
     /// Attach an extended executor that can signal parking.
     pub fn with_executor_v2(mut self, executor: Arc<dyn DslExecutorV2>) -> Self {
         self.executor_v2 = Some(executor);
+        self
+    }
+
+    /// Override the per-step execution timeout used by `/run`.
+    pub fn with_runbook_step_timeout(mut self, timeout: std::time::Duration) -> Self {
+        self.runbook_step_timeout = timeout;
         self
     }
 
@@ -662,13 +673,9 @@ impl ReplOrchestratorV2 {
         session: &ReplSessionV2,
         record_lock_held: bool,
     ) -> anyhow::Result<i64> {
+        let _ = record_lock_held;
+        let new_version = repo.save_session(session, 0).await?;
         let mut versions = self.persistence_versions.write().await;
-        let version = versions.get(&session.id).copied().unwrap_or(0);
-        let new_version = if record_lock_held {
-            repo.save_session_with_record_lock(session, version).await?
-        } else {
-            repo.save_session(session, version).await?
-        };
         versions.insert(session.id, new_version);
         Ok(new_version)
     }
@@ -681,12 +688,11 @@ impl ReplOrchestratorV2 {
         let Some(repo) = self.session_repository.as_ref() else {
             return Ok(None);
         };
-        let record_lock = repo.acquire_session_record_lock(session_id).await?;
         if let Some((mut session, version)) = repo.load_session(session_id).await? {
             session.rehydrate(&self.pack_router);
             self.restore_session_with_version(session, version).await;
         }
-        Ok(Some(record_lock))
+        Ok(None)
     }
 
     /// Record a Sage/ACP-owned chat exchange against the shared REPL session record.
@@ -706,9 +712,6 @@ impl ReplOrchestratorV2 {
         user_message: String,
         assistant_message: String,
     ) -> anyhow::Result<()> {
-        #[cfg(feature = "database")]
-        let turn_lock = self.acquire_session_turn_record_lock(session_id).await?;
-
         let lookup_result = if let Some(lookup_service) = &self.lookup_service {
             Some(lookup_service.analyze(&user_message, 5).await)
         } else {
@@ -717,21 +720,20 @@ impl ReplOrchestratorV2 {
 
         {
             let mut sessions = self.sessions.write().await;
-            let session = sessions
-                .get_mut(&session_id)
-                .ok_or(OrchestratorError::SessionNotFound(session_id))?;
+            let Some(session) = sessions.get_mut(&session_id) else {
+                drop(sessions);
+                return Err(anyhow::anyhow!(
+                    "{}",
+                    OrchestratorError::SessionNotFound(session_id)
+                ));
+            };
             if let Some(result) = lookup_result.as_ref() {
                 session.apply_lookup_result(result);
             }
             session.push_message(MessageRole::User, user_message);
             session.push_message(MessageRole::Assistant, assistant_message);
         }
-        self.persist_session_checkpoint_with_record_lock(session_id)
-            .await?;
-        #[cfg(feature = "database")]
-        if let Some(lock) = turn_lock {
-            lock.release().await?;
-        }
+        self.persist_session_checkpoint(session_id).await?;
         Ok(())
     }
 
@@ -911,9 +913,6 @@ impl ReplOrchestratorV2 {
             other => anyhow::bail!("Invalid signal status: {}", other),
         };
 
-        #[cfg(feature = "database")]
-        let turn_lock = self.acquire_session_turn_record_lock(session_id).await?;
-
         // 3. Resume the parked entry in the runbook.
         let mut failed_response = None;
         {
@@ -965,11 +964,6 @@ impl ReplOrchestratorV2 {
 
         self.persist_session_checkpoint_with_record_lock(session_id)
             .await?;
-
-        #[cfg(feature = "database")]
-        if let Some(lock) = turn_lock {
-            lock.release().await?;
-        }
 
         if let Some(response) = failed_response {
             return Ok(Some(response));
@@ -1089,21 +1083,63 @@ impl ReplOrchestratorV2 {
         session_id: Uuid,
         input: UserInputV2,
     ) -> Result<ReplResponseV2, OrchestratorError> {
-        #[cfg(feature = "database")]
-        let turn_lock = self
-            .acquire_session_turn_record_lock(session_id)
-            .await
-            .map_err(|error| OrchestratorError::PersistenceFailed(error.to_string()))?;
+        let input_kind = repl_input_kind(&input);
+        let is_run_command = matches!(
+            &input,
+            UserInputV2::Command {
+                command: ReplCommandV2::Run
+            }
+        );
+        tracing::info!(
+            session_id = %session_id,
+            input_kind,
+            "REPL process starting"
+        );
 
+        #[cfg(feature = "database")]
+        if let Some(ref repo) = self.session_repository {
+            if let Some((mut persisted, version)) = repo
+                .load_session(session_id)
+                .await
+                .map_err(|error| OrchestratorError::PersistenceFailed(error.to_string()))?
+            {
+                persisted.rehydrate(&self.pack_router);
+                self.restore_session_with_version(persisted, version).await;
+            }
+        }
+
+        tracing::info!(
+            session_id = %session_id,
+            input_kind,
+            "REPL process acquiring in-memory session write lock"
+        );
         let mut sessions = self.sessions.write().await;
-        let session = sessions
-            .get_mut(&session_id)
-            .ok_or(OrchestratorError::SessionNotFound(session_id))?;
+        tracing::info!(
+            session_id = %session_id,
+            input_kind,
+            "REPL process acquired in-memory session write lock"
+        );
+        let Some(session) = sessions.get_mut(&session_id) else {
+            drop(sessions);
+            return Err(OrchestratorError::SessionNotFound(session_id));
+        };
 
         session.pending_sem_os_envelope = None;
         session.pending_lookup_result = None;
 
+        tracing::info!(
+            session_id = %session_id,
+            input_kind,
+            state = ?session.state,
+            "REPL process persisting trace scaffold"
+        );
         let trace_scaffold = self.persist_trace_scaffold(session, &input).await;
+        tracing::info!(
+            session_id = %session_id,
+            input_kind,
+            has_trace_scaffold = trace_scaffold.is_some(),
+            "REPL process persisted trace scaffold"
+        );
 
         // Stage 1 — utterance receipt (Phase 5b-deep typed contract).
         // Computes the trace anchor / envelope-version / utterance hash
@@ -1147,36 +1183,111 @@ impl ReplOrchestratorV2 {
         if let UserInputV2::Message { ref content } = input {
             if crate::agent::narration_engine::is_contextual_query(content) {
                 if let Some(narration_resp) = self.handle_contextual_query(session, content) {
+                    drop(sessions);
                     return Ok(narration_resp);
                 }
             }
         }
 
         // Dispatch based on current state.
-        let mut response = match session.state.clone() {
-            ReplStateV2::ScopeGate { .. } => self.handle_scope_gate(session, input).await,
-            ReplStateV2::WorkspaceSelection { .. } => {
-                self.handle_workspace_selection(session, input).await
-            }
-            ReplStateV2::ConstellationMapSelection { options } => {
-                self.handle_constellation_map_selection(session, input, options)
-                    .await
-            }
-            ReplStateV2::JourneySelection { .. } => {
-                self.handle_journey_selection(session, input).await
-            }
-            ReplStateV2::InPack { .. } => self.handle_in_pack(session, input).await,
-            ReplStateV2::Clarifying { .. } => self.handle_clarifying(session, input),
-            ReplStateV2::SentencePlayback { .. } => self.handle_sentence_playback(session, input),
-            ReplStateV2::RunbookEditing => self.handle_runbook_editing(session, input).await,
-            ReplStateV2::Executing {
-                runbook_id,
-                progress,
-            } => {
-                self.handle_executing(session, input, runbook_id, progress)
-                    .await
+        tracing::info!(
+            session_id = %session_id,
+            input_kind,
+            state = ?session.state,
+            "REPL process dispatching state"
+        );
+        let dispatch = async {
+            match session.state.clone() {
+                ReplStateV2::ScopeGate { .. } => self.handle_scope_gate(session, input).await,
+                ReplStateV2::WorkspaceSelection { .. } => {
+                    self.handle_workspace_selection(session, input).await
+                }
+                ReplStateV2::ConstellationMapSelection { options } => {
+                    self.handle_constellation_map_selection(session, input, options)
+                        .await
+                }
+                ReplStateV2::JourneySelection { .. } => {
+                    self.handle_journey_selection(session, input).await
+                }
+                ReplStateV2::InPack { .. } => self.handle_in_pack(session, input).await,
+                ReplStateV2::Clarifying { .. } => self.handle_clarifying(session, input),
+                ReplStateV2::SentencePlayback { .. } => {
+                    self.handle_sentence_playback(session, input)
+                }
+                ReplStateV2::RunbookEditing => self.handle_runbook_editing(session, input).await,
+                ReplStateV2::Executing {
+                    runbook_id,
+                    progress,
+                } => {
+                    self.handle_executing(session, input, runbook_id, progress)
+                        .await
+                }
             }
         };
+        let mut response = if is_run_command {
+            match tokio::time::timeout(self.runbook_step_timeout, dispatch).await {
+                Ok(response) => response,
+                Err(_) => {
+                    tracing::error!(
+                        session_id = %session_id,
+                        timeout_ms = self.runbook_step_timeout.as_millis(),
+                        "REPL /run timed out during orchestrator dispatch"
+                    );
+                    session.runbook.set_status(RunbookStatus::Ready);
+                    session.set_state(ReplStateV2::RunbookEditing);
+                    let message = format!(
+                        "Run timed out before execution completed after {} ms",
+                        self.runbook_step_timeout.as_millis()
+                    );
+                    if let Some(entry) = session.runbook.entries.first_mut() {
+                        entry.status = EntryStatus::Failed;
+                        ReplResponseV2 {
+                            state: session.state.clone(),
+                            kind: ReplResponseKindV2::Executed {
+                                results: vec![StepResult {
+                                    entry_id: entry.id,
+                                    sequence: entry.sequence,
+                                    sentence: entry.sentence.clone(),
+                                    success: false,
+                                    message: Some(message.clone()),
+                                    result: None,
+                                }],
+                            },
+                            message,
+                            runbook_summary: Some(self.runbook_summary(session)),
+                            step_count: session.runbook.entries.len(),
+                            session_feedback: Some(session.build_session_feedback(false)),
+                            narration: None,
+                            trace_id: None,
+                            acp_dag_semantic: None,
+                        }
+                    } else {
+                        ReplResponseV2 {
+                            state: session.state.clone(),
+                            kind: ReplResponseKindV2::Error {
+                                error: message.clone(),
+                                recoverable: true,
+                            },
+                            message,
+                            runbook_summary: None,
+                            step_count: 0,
+                            session_feedback: Some(session.build_session_feedback(false)),
+                            narration: None,
+                            trace_id: None,
+                            acp_dag_semantic: None,
+                        }
+                    }
+                }
+            }
+        } else {
+            dispatch.await
+        };
+        tracing::info!(
+            session_id = %session_id,
+            input_kind,
+            response_kind = ?std::mem::discriminant(&response.kind),
+            "REPL process state dispatch complete"
+        );
 
         // Re-hydrate constellation on TOS if writes occurred during this turn.
         // This ensures the response's session_feedback carries the post-execution
@@ -1409,17 +1520,6 @@ impl ReplOrchestratorV2 {
             .await
         {
             tracing::warn!(session_id = %session_id, error = %e, "Session checkpoint after process() failed");
-        }
-
-        #[cfg(feature = "database")]
-        if let Some(lock) = turn_lock {
-            if let Err(error) = lock.release().await {
-                tracing::warn!(
-                    session_id = %session_id,
-                    error = %error,
-                    "Session turn record lock release failed"
-                );
-            }
         }
 
         Ok(response)
@@ -3008,7 +3108,7 @@ impl ReplOrchestratorV2 {
         }
 
         // Persist after approval (required — state changed from Parked).
-        if let Err(e) = self.persist_session_required(session).await {
+        if let Err(e) = self.persist_session_required(session, true).await {
             tracing::error!(session_id = %session.id, error = %e, "Failed to persist after gate approval");
         }
 
@@ -3076,7 +3176,7 @@ impl ReplOrchestratorV2 {
         session.set_state(ReplStateV2::RunbookEditing);
 
         // Persist after rejection (required — state changed from Parked).
-        if let Err(e) = self.persist_session_required(session).await {
+        if let Err(e) = self.persist_session_required(session, true).await {
             tracing::error!(session_id = %session.id, error = %e, "Failed to persist after gate rejection");
         }
 
@@ -3111,7 +3211,7 @@ impl ReplOrchestratorV2 {
         session.set_state(ReplStateV2::RunbookEditing);
 
         // Persist after cancel (required — parked state cleared).
-        if let Err(e) = self.persist_session_required(session).await {
+        if let Err(e) = self.persist_session_required(session, true).await {
             tracing::error!(session_id = %session.id, error = %e, "Failed to persist after cancel");
         }
 
@@ -4893,7 +4993,11 @@ impl ReplOrchestratorV2 {
                     };
                     (parsed, HashMap::new(), None)
                 };
-                let dsl = generated_dsl.unwrap_or_else(|| rebuild_dsl(&verb, &args));
+                let dsl = if args.is_empty() {
+                    generated_dsl.unwrap_or_else(|| rebuild_dsl(&verb, &args))
+                } else {
+                    rebuild_dsl(&verb, &args)
+                };
 
                 // Phase G: Emit DecisionLog for this matched verb.
                 {
@@ -6083,9 +6187,45 @@ impl ReplOrchestratorV2 {
         #[cfg(feature = "database")]
         let mut outer_scope: Option<crate::sequencer_tx::PgTransactionScope> =
             if let Some(pool) = self.pool.as_ref() {
-                match crate::sequencer_tx::PgTransactionScope::begin(pool).await {
-                    Ok(s) => Some(s),
-                    Err(e) => {
+                match tokio::time::timeout(
+                    self.runbook_step_timeout,
+                    crate::sequencer_tx::PgTransactionScope::begin(pool),
+                )
+                .await
+                {
+                    Err(_) => {
+                        session.runbook.set_status(RunbookStatus::Ready);
+                        session.set_state(ReplStateV2::RunbookEditing);
+                        let summary = self.runbook_summary(session);
+                        return ReplResponseV2 {
+                            state: session.state.clone(),
+                            kind: ReplResponseKindV2::Executed {
+                                results: vec![StepResult {
+                                    entry_id: session.runbook.entries[start_index].id,
+                                    sequence: session.runbook.entries[start_index].sequence,
+                                    sentence: session.runbook.entries[start_index].sentence.clone(),
+                                    success: false,
+                                    message: Some(format!(
+                                        "Runbook transaction setup timed out after {} ms",
+                                        self.runbook_step_timeout.as_millis()
+                                    )),
+                                    result: None,
+                                }],
+                            },
+                            message: format!(
+                                "Runbook transaction setup timed out after {} ms",
+                                self.runbook_step_timeout.as_millis()
+                            ),
+                            runbook_summary: Some(summary),
+                            step_count: session.runbook.entries.len(),
+                            session_feedback: Some(session.build_session_feedback(false)),
+                            narration: None,
+                            trace_id: None,
+                            acp_dag_semantic: None,
+                        };
+                    }
+                    Ok(Ok(s)) => Some(s),
+                    Ok(Err(e)) => {
                         tracing::error!(
                             session_id = %session.id,
                             runbook_id = %runbook_id,
@@ -6121,26 +6261,66 @@ impl ReplOrchestratorV2 {
                 let store: &dyn crate::runbook::RunbookStoreBackend =
                     self.runbook_store.as_deref().unwrap_or(&fallback_store);
 
-                if let Err(e) = crate::runbook::acquire_advisory_locks_on_scope(
-                    scope,
-                    &aggregate_write_set,
-                    store,
+                let lock_result = tokio::time::timeout(
+                    self.runbook_step_timeout,
+                    crate::runbook::acquire_advisory_locks_on_scope(
+                        scope,
+                        &aggregate_write_set,
+                        store,
+                    ),
                 )
-                .await
-                {
-                    tracing::error!(
-                        session_id = %session.id,
-                        runbook_id = %runbook_id,
-                        error = %e,
-                        "B.2b-ζ: advisory lock acquisition failed on outer scope"
-                    );
-                    // Rollback the scope (clears the lock attempt) and
-                    // fall back to None so downstream dispatch uses the
-                    // per-entry path. Alternative: return an error
-                    // response here. For now, we degrade rather than
-                    // block the runbook.
-                    if let Some(s) = outer_scope.take() {
-                        let _ = s.rollback().await;
+                .await;
+                match lock_result {
+                    Ok(Ok(_)) => {}
+                    Ok(Err(e)) => {
+                        tracing::error!(
+                            session_id = %session.id,
+                            runbook_id = %runbook_id,
+                            error = %e,
+                            "B.2b-ζ: advisory lock acquisition failed on outer scope"
+                        );
+                        // Rollback the scope (clears the lock attempt) and
+                        // fall back to None so downstream dispatch uses the
+                        // per-entry path. Alternative: return an error
+                        // response here. For now, we degrade rather than
+                        // block the runbook.
+                        if let Some(s) = outer_scope.take() {
+                            let _ = s.rollback().await;
+                        }
+                    }
+                    Err(_) => {
+                        if let Some(s) = outer_scope.take() {
+                            let _ = s.rollback().await;
+                        }
+                        session.runbook.set_status(RunbookStatus::Ready);
+                        session.set_state(ReplStateV2::RunbookEditing);
+                        let summary = self.runbook_summary(session);
+                        return ReplResponseV2 {
+                            state: session.state.clone(),
+                            kind: ReplResponseKindV2::Executed {
+                                results: vec![StepResult {
+                                    entry_id: session.runbook.entries[start_index].id,
+                                    sequence: session.runbook.entries[start_index].sequence,
+                                    sentence: session.runbook.entries[start_index].sentence.clone(),
+                                    success: false,
+                                    message: Some(format!(
+                                        "Runbook advisory lock acquisition timed out after {} ms",
+                                        self.runbook_step_timeout.as_millis()
+                                    )),
+                                    result: None,
+                                }],
+                            },
+                            message: format!(
+                                "Runbook advisory lock acquisition timed out after {} ms",
+                                self.runbook_step_timeout.as_millis()
+                            ),
+                            runbook_summary: Some(summary),
+                            step_count: session.runbook.entries.len(),
+                            session_feedback: Some(session.build_session_feedback(false)),
+                            narration: None,
+                            trace_id: None,
+                            acp_dag_semantic: None,
+                        };
                     }
                 }
             }
@@ -6162,6 +6342,19 @@ impl ReplOrchestratorV2 {
             let entry_sentence = entry.sentence.clone();
             let entry_status = entry.status;
             let execution_mode = entry.execution_mode;
+            let entry_verb = entry.verb.clone();
+
+            tracing::info!(
+                session_id = %session.id,
+                runbook_id = %runbook_id,
+                entry_id = %entry_id,
+                sequence = entry_sequence,
+                verb = %entry_verb,
+                dsl = %entry_dsl,
+                execution_mode = ?execution_mode,
+                timeout_ms = self.runbook_step_timeout.as_millis(),
+                "Runbook step execution starting"
+            );
 
             // Skip disabled entries.
             if entry_status == EntryStatus::Disabled {
@@ -6181,10 +6374,22 @@ impl ReplOrchestratorV2 {
                 continue;
             }
 
-            if let Some(outcome) = self
-                .phase5_runtime_recheck(session, idx, entry_id, &entry_sentence, &entry_dsl)
-                .await
-            {
+            let runtime_recheck = tokio::time::timeout(
+                self.runbook_step_timeout,
+                self.phase5_runtime_recheck(session, idx, entry_id, &entry_sentence, &entry_dsl),
+            )
+            .await;
+            let runtime_recheck = match runtime_recheck {
+                Ok(outcome) => outcome,
+                Err(_) => Some(StepOutcome::Failed {
+                    error: format!(
+                        "Runbook step runtime re-check timed out after {} ms",
+                        self.runbook_step_timeout.as_millis()
+                    ),
+                }),
+            };
+
+            if let Some(outcome) = runtime_recheck {
                 tracing::warn!(
                     session_id = %session.id,
                     entry_id = %entry_id,
@@ -6253,8 +6458,9 @@ impl ReplOrchestratorV2 {
                     let scope_for_entry = outer_scope
                         .as_mut()
                         .map(|s| s as &mut dyn dsl_runtime::tx::TransactionScope);
-                    let gate_outcome = self
-                        .execute_entry_via_gate_impl(
+                    let gate_outcome = match tokio::time::timeout(
+                        self.runbook_step_timeout,
+                        self.execute_entry_via_gate_impl(
                             &entry_snapshot,
                             session.id,
                             true, // is_durable
@@ -6262,8 +6468,30 @@ impl ReplOrchestratorV2 {
                             fallback_version,
                             Some(session.session_stack.clone()),
                             scope_for_entry,
-                        )
-                        .await;
+                        ),
+                    )
+                    .await
+                    {
+                        Ok(outcome) => outcome,
+                        Err(_) => {
+                            tracing::error!(
+                                session_id = %session.id,
+                                runbook_id = %runbook_id,
+                                entry_id = %entry_id,
+                                sequence = entry_sequence,
+                                verb = %entry_verb,
+                                dsl = %entry_dsl,
+                                timeout_ms = self.runbook_step_timeout.as_millis(),
+                                "Durable runbook step timed out"
+                            );
+                            StepOutcome::Failed {
+                                error: format!(
+                                    "Runbook step timed out after {} ms",
+                                    self.runbook_step_timeout.as_millis()
+                                ),
+                            }
+                        }
+                    };
 
                     match gate_outcome {
                         StepOutcome::Completed { result } => {
@@ -6394,8 +6622,9 @@ impl ReplOrchestratorV2 {
                     let scope_for_entry = outer_scope
                         .as_mut()
                         .map(|s| s as &mut dyn dsl_runtime::tx::TransactionScope);
-                    let gate_outcome = self
-                        .execute_entry_via_gate_impl(
+                    let gate_outcome = match tokio::time::timeout(
+                        self.runbook_step_timeout,
+                        self.execute_entry_via_gate_impl(
                             &entry_snapshot,
                             session.id,
                             false, // not durable
@@ -6403,8 +6632,30 @@ impl ReplOrchestratorV2 {
                             fallback_version,
                             Some(session.session_stack.clone()),
                             scope_for_entry,
-                        )
-                        .await;
+                        ),
+                    )
+                    .await
+                    {
+                        Ok(outcome) => outcome,
+                        Err(_) => {
+                            tracing::error!(
+                                session_id = %session.id,
+                                runbook_id = %runbook_id,
+                                entry_id = %entry_id,
+                                sequence = entry_sequence,
+                                verb = %entry_verb,
+                                dsl = %entry_dsl,
+                                timeout_ms = self.runbook_step_timeout.as_millis(),
+                                "Sync runbook step timed out"
+                            );
+                            StepOutcome::Failed {
+                                error: format!(
+                                    "Runbook step timed out after {} ms",
+                                    self.runbook_step_timeout.as_millis()
+                                ),
+                            }
+                        }
+                    };
 
                     // Phase A.3 (F5 follow-on, 2026-04-22): per-step stage-8
                     // shadow event carrying the turn's trace_id. Complements
@@ -6607,7 +6858,10 @@ impl ReplOrchestratorV2 {
             });
 
             // Persist session on park (required — durable execution guarantee).
-            if let Err(e) = self.persist_session_required(session).await {
+            // `process()` owns the session record lock for the turn, so save
+            // through the held-lock path instead of re-entering the same
+            // advisory lock on another connection.
+            if let Err(e) = self.persist_session_required(session, true).await {
                 tracing::error!(session_id = %session.id, error = %e, "Failed to persist parked session");
             }
 
@@ -6645,8 +6899,9 @@ impl ReplOrchestratorV2 {
 
             session.set_state(ReplStateV2::RunbookEditing);
 
-            // Best-effort persist on completion (non-critical).
-            self.maybe_persist_session(session).await;
+            // Best-effort persist on completion (non-critical). `process()`
+            // already holds the session record lock for this turn.
+            self.maybe_persist_session(session, true).await;
 
             let summary = self.runbook_summary(session);
             let succeeded = results.iter().filter(|r| r.success).count();
@@ -7094,11 +7349,14 @@ impl ReplOrchestratorV2 {
     ///
     /// Used for non-critical checkpoints (e.g., execution completes normally).
     #[allow(unused_variables)]
-    async fn maybe_persist_session(&self, session: &ReplSessionV2) {
+    async fn maybe_persist_session(&self, session: &ReplSessionV2, record_lock_held: bool) {
         #[cfg(feature = "database")]
         {
             if let Some(ref repo) = self.session_repository {
-                match self.save_session_snapshot(repo, session, false).await {
+                match self
+                    .save_session_snapshot(repo, session, record_lock_held)
+                    .await
+                {
                     Ok(_) => {}
                     Err(e) => {
                         tracing::warn!(
@@ -7120,11 +7378,15 @@ impl ReplOrchestratorV2 {
     async fn persist_session_required(
         &self,
         session: &ReplSessionV2,
+        record_lock_held: bool,
     ) -> Result<(), OrchestratorError> {
         #[cfg(feature = "database")]
         {
             if let Some(ref repo) = self.session_repository {
-                match self.save_session_snapshot(repo, session, false).await {
+                match self
+                    .save_session_snapshot(repo, session, record_lock_held)
+                    .await
+                {
                     Ok(_) => {}
                     Err(error) => {
                         return Err(OrchestratorError::PersistenceFailed(error.to_string()));
@@ -7652,6 +7914,28 @@ fn input_trace_text(input: &UserInputV2) -> Option<String> {
     }
 }
 
+fn repl_input_kind(input: &UserInputV2) -> &'static str {
+    match input {
+        UserInputV2::Message { .. } => "message",
+        UserInputV2::Command {
+            command: ReplCommandV2::Run,
+        } => "command.run",
+        UserInputV2::Command { .. } => "command",
+        UserInputV2::SelectPack { .. } => "select_pack",
+        UserInputV2::SelectVerb { .. } => "select_verb",
+        UserInputV2::SelectProposal { .. } => "select_proposal",
+        UserInputV2::SelectEntity { .. } => "select_entity",
+        UserInputV2::SelectScope { .. } => "select_scope",
+        UserInputV2::SelectWorkspace { .. } => "select_workspace",
+        UserInputV2::SelectConstellationMap { .. } => "select_constellation_map",
+        UserInputV2::Approve { .. } => "approve",
+        UserInputV2::RejectGate { .. } => "reject_gate",
+        UserInputV2::Confirm => "confirm",
+        UserInputV2::Reject => "reject",
+        UserInputV2::Edit { .. } => "edit",
+    }
+}
+
 fn repl_trace_kind(session: &ReplSessionV2, input: &UserInputV2) -> TraceKind {
     match input {
         UserInputV2::Command {
@@ -7737,9 +8021,13 @@ fn repl_response_needs_follow_up(response: &ReplResponseV2) -> bool {
 }
 
 fn classify_repl_trace_outcome(response: &ReplResponseV2) -> crate::traceability::TraceOutcome {
-    match response.kind {
-        ReplResponseKindV2::Executed { .. } => {
-            crate::traceability::TraceOutcome::ExecutedSuccessfully
+    match &response.kind {
+        ReplResponseKindV2::Executed { results } => {
+            if results.iter().any(|result| !result.success) {
+                crate::traceability::TraceOutcome::HaltedAtPhase
+            } else {
+                crate::traceability::TraceOutcome::ExecutedSuccessfully
+            }
         }
         ReplResponseKindV2::Error { .. } => crate::traceability::TraceOutcome::HaltedAtPhase,
         ReplResponseKindV2::JourneyOptions { .. } => crate::traceability::TraceOutcome::NoMatch,
@@ -7769,7 +8057,12 @@ fn repl_halt_reason_code(session: &ReplSessionV2, response: &ReplResponseV2) -> 
         }
     }
 
-    match response.kind {
+    match &response.kind {
+        ReplResponseKindV2::Executed { results }
+            if results.iter().any(|result| !result.success) =>
+        {
+            Some("repl_execution_failed".to_string())
+        }
         ReplResponseKindV2::Error { .. } => Some("repl_error".to_string()),
         ReplResponseKindV2::JourneyOptions { .. } => Some("journey_selection_required".to_string()),
         _ => None,
@@ -7785,7 +8078,12 @@ fn repl_halt_phase(session: &ReplSessionV2, response: &ReplResponseV2) -> Option
         }
     }
 
-    match response.kind {
+    match &response.kind {
+        ReplResponseKindV2::Executed { results }
+            if results.iter().any(|result| !result.success) =>
+        {
+            Some(5)
+        }
         ReplResponseKindV2::Error { .. } | ReplResponseKindV2::JourneyOptions { .. } => Some(4),
         _ => None,
     }
@@ -8752,8 +9050,8 @@ definition_of_done:
     #[test]
     fn test_phase5_recheck_failure_surfaces_constellation_block() {
         let mut envelope = crate::agent::sem_os_context_envelope::SemOsContextEnvelope::deny_all();
-        envelope.grounded_action_surface =
-            Some(sem_os_policy::context_resolution::GroundedActionSurface {
+        envelope.grounded_action_surface = Some(
+            sem_os_policy::context_resolution::GroundedActionSurface {
                 resolved_subject: sem_os_policy::context_resolution::SubjectRef::TaskId(Uuid::nil()),
                 resolved_constellation: Some("constellation.kyc".to_string()),
                 resolved_slot_path: Some("case".to_string()),
@@ -8782,7 +9080,8 @@ definition_of_done:
                     ],
                 }],
                 dsl_candidates: vec![],
-            });
+            },
+        );
 
         let outcome = phase5_recheck_failure("case.open", &envelope).expect("blocked");
         let StepOutcome::Failed { error } = outcome else {
@@ -9635,8 +9934,8 @@ definition_of_done:
         let orch = ReplOrchestratorV2::new(PackRouter::new(vec![]), Arc::new(StubExecutor));
         let mut session = ReplSessionV2::new();
         let mut envelope = crate::agent::sem_os_context_envelope::SemOsContextEnvelope::deny_all();
-        envelope.grounded_action_surface =
-            Some(sem_os_policy::context_resolution::GroundedActionSurface {
+        envelope.grounded_action_surface = Some(
+            sem_os_policy::context_resolution::GroundedActionSurface {
                 resolved_subject: sem_os_policy::context_resolution::SubjectRef::TaskId(Uuid::nil()),
                 resolved_constellation: Some("constellation.kyc".to_string()),
                 resolved_slot_path: Some("case".to_string()),
@@ -9665,7 +9964,8 @@ definition_of_done:
                     ],
                 }],
                 dsl_candidates: vec![],
-            });
+            },
+        );
         session.pending_sem_os_envelope = Some(envelope);
 
         let response = orch.phase2_gate_response(&session).expect("phase 2 gate");

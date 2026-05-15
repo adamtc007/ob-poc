@@ -498,12 +498,13 @@ fn output_field_name_for(produced_type: &str) -> String {
     }
 }
 
-fn load_plan_verb_outputs(
-) -> anyhow::Result<std::collections::BTreeMap<String, Vec<sem_os_ontology::verb_contract::VerbOutput>>>
-{
+fn load_plan_verb_outputs() -> anyhow::Result<
+    std::collections::BTreeMap<String, Vec<sem_os_ontology::verb_contract::VerbOutput>>,
+> {
     let verbs_config = dsl_core::config::loader::ConfigLoader::from_env().load_verbs()?;
     let mut outputs =
-        std::collections::BTreeMap::<String, Vec<sem_os_ontology::verb_contract::VerbOutput>>::new();
+        std::collections::BTreeMap::<String, Vec<sem_os_ontology::verb_contract::VerbOutput>>::new(
+        );
     for verb in crate::sem_reg::onboarding::verb_extract::extract_verbs(&verbs_config) {
         let Some(output) = verb.output else {
             continue;
@@ -3633,6 +3634,17 @@ async fn append_session_trace_if_present(
     let sessions = state.orchestrator.sessions_for_test();
     let mut sessions_write = sessions.write().await;
     let Some(session) = sessions_write.get_mut(&session_id) else {
+        drop(sessions_write);
+        #[cfg(feature = "database")]
+        if let Some(lock) = turn_lock {
+            if let Err(error) = lock.release().await {
+                tracing::warn!(
+                    session_id = %session_id,
+                    error = %error,
+                    "Failed to release session record lock after missing ACP/workbook session"
+                );
+            }
+        }
         return;
     };
     session.append_trace(op);
