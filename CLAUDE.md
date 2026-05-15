@@ -1,6 +1,6 @@
 # CLAUDE.md
 
-> **Last reviewed:** 2026-05-14
+> **Last reviewed:** 2026-05-15
 > **Frontend:** React/TypeScript (`ob-poc-ui-react/`) — Chat UI with scope panel, Inspector, Semantic OS Tab
 > **Backend:** Rust/Axum (`rust/crates/ob-poc-web/`) — Serves React + REST API
 > **Crates:** 41 workspace crates (incl. `ob-poc` application root) — 18 ob-poc-* library (web, types, diagnostics, boundary, sage, journey, authoring, agent, macros · split-v1: bods, deal, booking-principal, semtaxonomy, ontology, entity-linking, trading-profile, derived-attributes, taxonomy) · 10 sem_os_* (core, types, ontology, policy, postgres, server, client, obpoc_adapter, harness, mcp) · 4 dsl-* (dsl-core, dsl-lsp, dsl-runtime, dsl-analysis) · 4 ob-* (ob-agentic, ob-templates, ob-workflow, ob-semantic-matcher) · 4 misc (entity-gateway, xtask, playbook-core, inspector-projection)
@@ -186,9 +186,19 @@ versioned, governed object, which Sage chooses as an atomic option. This
 reduces hallucination surface and encodes expert domain knowledge into
 the dispatch surface itself.
 
-See `todo/acp-pack-context-parity-gate-a/r1-schema-parity-adr.md` for the
-two invariants and the projection redaction principle that protect this
-discipline under LLM pressure.
+See `docs/annex-macros.md` and
+`docs/architecture/sem-os-domain-pack-taxonomy-reload.md` for the durable
+macro and domain-pack architecture notes that protect this discipline under
+LLM pressure.
+
+## Repository Hygiene
+
+- Root `todo/` is transient planning scratch space and is ignored by git.
+  Do not use it as an architecture source of truth.
+- Durable project guidance belongs in `CLAUDE.md`, `AGENTS.md`, and
+  persistent docs under `docs/`, especially `docs/architecture/`.
+- Generated screenshots and local UI smoke artifacts are local evidence only
+  unless a task explicitly promotes them into a reviewed artifact.
 
 ## Non-Negotiable Implementation Rules
 
