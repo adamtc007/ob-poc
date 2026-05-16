@@ -12,10 +12,20 @@
 //! - **Pack Playback** (`playback.rs`): Pack-level summary and chapter view generation.
 //! - **Pack Handoff** (`handoff.rs`): Context forwarding between packs.
 
-pub mod handoff;
-pub mod pack;
+// Phase 3C of capability-crate restructure (2026-05-13): the three
+// journey leaves (pack manifest types/loader, lifecycle FSM, handoff
+// DTO) live in `ob-poc-journey`. The compat re-exports below preserve
+// the `ob_poc::journey::{handoff,pack,pack_state}` paths used across
+// the application crate.
+pub use ob_poc_journey::handoff;
+pub use ob_poc_journey::pack;
 pub mod pack_manager;
-pub mod pack_state;
+pub use ob_poc_journey::pack_state;
 pub mod playback;
+// Phase 3D of capability-crate restructure (2026-05-13): registration
+// helpers for the boundary-side pack provider hooks. `ob-poc-web::main`
+// (and other binaries that exercise the projection pipeline) must call
+// `journey::providers::register_pack_providers()` once during startup.
+pub mod providers;
 pub mod router;
 pub mod template;

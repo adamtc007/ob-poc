@@ -1,4 +1,11 @@
 //! LSP Server implementation for the Onboarding DSL.
+//!
+//! Consumed only by the `dsl-lsp` binary (`main.rs`). The library target
+//! (`lib.rs`) exposes `pub mod server` for source discoverability but
+//! has no reachable consumer of `DslLanguageServer`, hence the
+//! `#[allow(dead_code)]` blanket on this file.
+
+#![allow(dead_code)]
 
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -10,9 +17,11 @@ use tower_lsp::lsp_types::*;
 use tower_lsp::{Client, LanguageServer};
 
 use crate::analysis::{DocumentState, SymbolTable};
+use crate::encoding::{position_to_offset, PositionEncoding};
 use crate::entity_client::{gateway_addr, EntityLookupClient};
 use crate::handlers;
-use ob_poc::dsl_v2::tooling::{PlanningOutput, SemanticDiagnostic};
+use dsl_analysis::planning_facade::PlanningOutput;
+use dsl_analysis::validation::Diagnostic as SemanticDiagnostic;
 
 /// File type detection for dispatch
 enum FileType {
@@ -33,7 +42,7 @@ fn file_type(uri: &Url) -> FileType {
 }
 
 /// DSL Language Server state.
-pub struct DslLanguageServer {
+pub(crate) struct DslLanguageServer {
     /// LSP client for sending notifications
     client: Client,
     /// Open documents and their state
@@ -52,7 +61,7 @@ pub struct DslLanguageServer {
 
 impl DslLanguageServer {
     /// Create a new language server instance.
-    pub fn new(client: Client) -> Self {
+    pub(crate) fn new(client: Client) -> Self {
         Self {
             client,
             documents: Arc::new(RwLock::new(HashMap::new())),
@@ -84,14 +93,19 @@ impl DslLanguageServer {
     }
 
     /// Get the entity client (if connected)
-    pub async fn get_entity_client(&self) -> Option<EntityLookupClient> {
-        // Clone the client for use - we need to reconnect each time since gRPC clients are !Clone
+    pub(crate) async fn get_entity_client(&self) -> Option<EntityLookupClient> {
+        if let Some(client) = self.entity_client.read().await.clone() {
+            return Some(client);
+        }
+
         let addr = gateway_addr();
-        (EntityLookupClient::connect(&addr).await).ok()
+        let client = EntityLookupClient::connect(&addr).await.ok()?;
+        *self.entity_client.write().await = Some(client.clone());
+        Some(client)
     }
 
     /// Get a document by URL.
-    pub async fn get_document(&self, uri: &Url) -> Option<DocumentState> {
+    pub(crate) async fn get_document(&self, uri: &Url) -> Option<DocumentState> {
         self.documents.read().await.get(uri).cloned()
     }
 
@@ -152,12 +166,12 @@ impl DslLanguageServer {
     }
 
     /// Get planning output for a document (for code actions)
-    pub async fn get_planning_output(&self, uri: &Url) -> Option<PlanningOutput> {
+    pub(crate) async fn get_planning_output(&self, uri: &Url) -> Option<PlanningOutput> {
         self.planning_outputs.read().await.get(uri).cloned()
     }
 
     /// Get semantic diagnostics for a document (for entity suggestion code actions)
-    pub async fn get_semantic_diagnostics(&self, uri: &Url) -> Vec<SemanticDiagnostic> {
+    pub(crate) async fn get_semantic_diagnostics(&self, uri: &Url) -> Vec<SemanticDiagnostic> {
         self.semantic_diagnostics
             .read()
             .await
@@ -172,8 +186,23 @@ impl DslLanguageServer {
         documents: &Arc<RwLock<HashMap<Url, DocumentState>>>,
         planning_outputs: &Arc<RwLock<HashMap<Url, PlanningOutput>>>,
         semantic_diagnostics: &Arc<RwLock<HashMap<Url, Vec<SemanticDiagnostic>>>>,
+        symbols: &Arc<RwLock<SymbolTable>>,
         client: &Client,
     ) {
+        match file_type(uri) {
+            FileType::Playbook => {
+                let diagnostics = handlers::playbook::analyze_playbook(text).await;
+                client
+                    .publish_diagnostics(uri.clone(), diagnostics, None)
+                    .await;
+                return;
+            }
+            FileType::Unknown => {
+                return;
+            }
+            FileType::Dsl => {}
+        }
+
         let result = handlers::diagnostics::analyze_document_full(text).await;
 
         // Store document state
@@ -192,6 +221,12 @@ impl DslLanguageServer {
         {
             let mut sem_diag = semantic_diagnostics.write().await;
             sem_diag.insert(uri.clone(), result.semantic_diagnostics);
+        }
+
+        // Update symbol table from this document
+        {
+            let mut symbols = symbols.write().await;
+            symbols.merge_from_document(uri, &result.state);
         }
 
         // Publish diagnostics
@@ -219,6 +254,7 @@ impl LanguageServer for DslLanguageServer {
                     trigger_characters: Some(vec![
                         ":".to_string(), // Keywords
                         "@".to_string(), // Symbols/entity refs
+                        "$".to_string(), // Runbook placeholder aliases
                         "(".to_string(), // S-expressions (verbs)
                         " ".to_string(), // After keyword (for values)
                     ]),
@@ -328,6 +364,7 @@ impl LanguageServer for DslLanguageServer {
         let client = self.client.clone();
         let planning_outputs = self.planning_outputs.clone();
         let semantic_diagnostics = self.semantic_diagnostics.clone();
+        let symbols = self.symbols.clone();
         let uri2 = uri.clone();
         let text2 = text.clone();
 
@@ -344,6 +381,7 @@ impl LanguageServer for DslLanguageServer {
                     &docs,
                     &planning_outputs,
                     &semantic_diagnostics,
+                    &symbols,
                     &client,
                 )
                 .await;
@@ -364,6 +402,21 @@ impl LanguageServer for DslLanguageServer {
         {
             let mut planning = self.planning_outputs.write().await;
             planning.remove(&params.text_document.uri);
+        }
+
+        {
+            let mut sem_diags = self.semantic_diagnostics.write().await;
+            sem_diags.remove(&params.text_document.uri);
+        }
+
+        {
+            let mut pending = self.pending_changes.write().await;
+            pending.remove(&params.text_document.uri);
+        }
+
+        {
+            let mut symbols = self.symbols.write().await;
+            symbols.remove_document(&params.text_document.uri);
         }
 
         // Clear diagnostics
@@ -457,7 +510,7 @@ impl LanguageServer for DslLanguageServer {
         let uri = &params.text_document.uri;
 
         if let Some(doc) = self.get_document(uri).await {
-            let symbols = handlers::symbols::get_document_symbols(&doc);
+            let symbols = handlers::symbols::get_document_symbols(&doc, uri);
             return Ok(Some(DocumentSymbolResponse::Flat(symbols)));
         }
 
@@ -531,19 +584,5 @@ impl LanguageServer for DslLanguageServer {
 
 /// Convert LSP position to byte offset in text.
 fn offset_from_position(text: &str, position: Position) -> usize {
-    let mut offset = 0;
-    for (line_num, line) in text.lines().enumerate() {
-        if line_num == position.line as usize {
-            // Add character offset within line
-            offset += line
-                .chars()
-                .take(position.character as usize)
-                .map(|c| c.len_utf8())
-                .sum::<usize>();
-            break;
-        }
-        // Add line length plus newline
-        offset += line.len() + 1;
-    }
-    offset
+    position_to_offset(text, position, PositionEncoding::Utf16).unwrap_or(text.len())
 }

@@ -1,8 +1,8 @@
-//! Verb metadata index for Phase 2 Coder resolution.
+//! Verb metadata index for Phase 2 Drafter resolution.
 //!
 //! This is a read-only projection over verb YAML and runtime registry data.
 //! It precomputes plane, polarity, action tags, and argument names so the
-//! Coder can rank verbs without embedding search.
+//! Drafter can rank verbs without embedding search.
 
 use std::collections::HashMap;
 

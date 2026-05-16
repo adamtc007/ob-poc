@@ -208,6 +208,14 @@ Plus: `ubo.trace-chains`
 
 ## Pack → Macro Mapping
 
+Pack membership is now cross-checked against Sem OS Domain Pack ownership.
+`rust/config/packs/*.yaml` still gates which macros/verbs are available to a
+workspace, but each pack should be owned by exactly one Sem OS Domain Pack
+manifest under `rust/config/sem_os_seeds/domain_packs/`. The Domain Pack is
+the architecture-level owner for the related DAG taxonomy, DSL pack, state
+machines, constellation maps/families, universes, verb prefixes, and entity
+kinds. Business crates may implement behavior but do not own this shape.
+
 | Pack | Workspaces | Macro Families |
 |------|-----------|----------------|
 | **book-setup** | cbu, instrument_matrix, on_boarding | struct.*, structure.*, mandate.*, party.*, product-suite-* |
@@ -222,6 +230,17 @@ Plus: `ubo.trace-chains`
 **Workspace isolation rule:** A macro appears in a pack only if its mode-tags are compatible
 with that pack's workspace. KYC macros are not in `book-setup` or `cbu-maintenance`. Governance
 macros are only in `semos-maintenance`.
+
+**Reload rule:** after adding or moving macros in a pack, run the Domain Pack
+reload check for the owning pack. The reload index uses source fingerprints
+as the cheap dirty check and canonical surface hashes as the correctness
+gate. If the checker reports `publish_required`, publish through Sem OS seed
+bootstrap; do not mutate Sem OS snapshots directly from the macro tooling.
+
+```bash
+cd rust
+cargo run --manifest-path xtask/Cargo.toml -- sem-reg domain-pack-check --pack-id ob-poc.cbu
+```
 
 ---
 
@@ -450,6 +469,11 @@ at multiple layers. PACK001 enforces this — if any step is skipped, the lint f
 
 3. **Create or update a pack** in `rust/config/packs/`
    - Add the new workspace to the pack's `workspaces` list
+4. **Create or update the owning Sem OS Domain Pack** in
+   `rust/config/sem_os_seeds/domain_packs/`
+   - declare the owned DSL pack, DAG taxonomy, state machine(s),
+     constellation map/family, universe, verb prefixes, and entity kinds
+   - run `cargo run --manifest-path xtask/Cargo.toml -- sem-reg domain-pack-check --pack-id <pack-id>`
    - Add macros to `allowed_verbs` — only macros whose mode-tags include a tag
      accepted by the new workspace
    - Run `cargo x verbs lint-macros` to verify zero PACK001 errors

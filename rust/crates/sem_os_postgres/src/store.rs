@@ -6,7 +6,10 @@
 use anyhow::anyhow;
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
-use sqlx::PgPool;
+use sem_os_policy::domain_pack::{
+    DomainPackReloadIndexEntry, DomainPackReloadStatus, DomainPackSourceFingerprint,
+};
+use sqlx::{PgPool, Row};
 use uuid::Uuid;
 
 use sem_os_core::error::SemOsError;
@@ -18,6 +21,112 @@ use sem_os_core::principal::Principal;
 use sem_os_core::types::*;
 
 use crate::sqlx_types::PgSnapshotRow;
+
+// ── PgDomainPackReloadIndexStore ─────────────────────────────
+
+/// Build-engine style reload index for Sem OS domain-pack YAML surfaces.
+pub struct PgDomainPackReloadIndexStore {
+    pool: PgPool,
+}
+
+impl PgDomainPackReloadIndexStore {
+    pub fn new(pool: PgPool) -> Self {
+        Self { pool }
+    }
+
+    pub async fn load(&self, pack_id: &str) -> anyhow::Result<Option<DomainPackReloadIndexEntry>> {
+        let row = sqlx::query(
+            r#"
+            SELECT pack_id, source_fingerprints, surface_hash, snapshot_set_id,
+                   last_checked_at, last_loaded_at, status, diagnostics
+            FROM sem_reg.domain_pack_reload_index
+            WHERE pack_id = $1
+            "#,
+        )
+        .bind(pack_id)
+        .fetch_optional(&self.pool)
+        .await?;
+
+        row.map(row_to_domain_pack_reload_index).transpose()
+    }
+
+    pub async fn list(&self) -> anyhow::Result<Vec<DomainPackReloadIndexEntry>> {
+        let rows = sqlx::query(
+            r#"
+            SELECT pack_id, source_fingerprints, surface_hash, snapshot_set_id,
+                   last_checked_at, last_loaded_at, status, diagnostics
+            FROM sem_reg.domain_pack_reload_index
+            ORDER BY pack_id
+            "#,
+        )
+        .fetch_all(&self.pool)
+        .await?;
+
+        rows.into_iter()
+            .map(row_to_domain_pack_reload_index)
+            .collect()
+    }
+
+    pub async fn upsert(&self, entry: &DomainPackReloadIndexEntry) -> anyhow::Result<()> {
+        sqlx::query(
+            r#"
+            INSERT INTO sem_reg.domain_pack_reload_index (
+                pack_id,
+                source_fingerprints,
+                surface_hash,
+                snapshot_set_id,
+                last_checked_at,
+                last_loaded_at,
+                status,
+                diagnostics
+            )
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+            ON CONFLICT (pack_id) DO UPDATE SET
+                source_fingerprints = EXCLUDED.source_fingerprints,
+                surface_hash = EXCLUDED.surface_hash,
+                snapshot_set_id = EXCLUDED.snapshot_set_id,
+                last_checked_at = EXCLUDED.last_checked_at,
+                last_loaded_at = EXCLUDED.last_loaded_at,
+                status = EXCLUDED.status,
+                diagnostics = EXCLUDED.diagnostics,
+                updated_at = now()
+            "#,
+        )
+        .bind(&entry.pack_id)
+        .bind(serde_json::to_value(&entry.source_fingerprints)?)
+        .bind(&entry.surface_hash)
+        .bind(entry.snapshot_set_id)
+        .bind(entry.last_checked_at)
+        .bind(entry.last_loaded_at)
+        .bind(entry.status.as_str())
+        .bind(serde_json::to_value(&entry.diagnostics)?)
+        .execute(&self.pool)
+        .await?;
+
+        Ok(())
+    }
+}
+
+fn row_to_domain_pack_reload_index(
+    row: sqlx::postgres::PgRow,
+) -> anyhow::Result<DomainPackReloadIndexEntry> {
+    let source_fingerprints: serde_json::Value = row.try_get("source_fingerprints")?;
+    let diagnostics: serde_json::Value = row.try_get("diagnostics")?;
+    let status: String = row.try_get("status")?;
+
+    Ok(DomainPackReloadIndexEntry {
+        pack_id: row.try_get("pack_id")?,
+        source_fingerprints: serde_json::from_value::<Vec<DomainPackSourceFingerprint>>(
+            source_fingerprints,
+        )?,
+        surface_hash: row.try_get("surface_hash")?,
+        snapshot_set_id: row.try_get("snapshot_set_id")?,
+        last_checked_at: row.try_get("last_checked_at")?,
+        last_loaded_at: row.try_get("last_loaded_at")?,
+        status: status.parse::<DomainPackReloadStatus>()?,
+        diagnostics: serde_json::from_value::<Vec<String>>(diagnostics)?,
+    })
+}
 
 // ── PgSnapshotStore ───────────────────────────────────────────
 
@@ -304,9 +413,13 @@ impl SnapshotStore for PgSnapshotStore {
             ObjectType::RelationshipTypeDef,
             ObjectType::VerbContract,
             ObjectType::MacroDef,
+            ObjectType::UniverseDef,
+            ObjectType::ConstellationFamilyDef,
             ObjectType::ConstellationMap,
             ObjectType::StateMachine,
             ObjectType::StateGraph,
+            ObjectType::DagTaxonomy,
+            ObjectType::DomainPack,
             ObjectType::TaxonomyDef,
             ObjectType::TaxonomyNode,
             ObjectType::MembershipRule,

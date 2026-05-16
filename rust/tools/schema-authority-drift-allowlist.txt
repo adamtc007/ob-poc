@@ -1,0 +1,64 @@
+# Schema-authority drift allowlist (Phase 4.7).
+# Each line is `<path>:<line>:<TypeName>` for a parallel
+# definition of a name V&S §O7 / ADN §7.3 locks to sem_os_core.
+# Regenerate with `cargo run -p xtask -- audit --bless` after
+# reviewing whether the mirror is still justified.
+# Run `cargo run -p xtask -- audit` to fail on new mirrors.
+#
+# Baseline buckets — current state (13 entries, down from 32).
+# Phase 4.7 follow-up collapsed the three high-priority near-
+# duplicates under `src/sem_reg/` (`entity_type_def`,
+# `relationship_type_def`, `verb_contract`) to `sem_os_core::*`
+# re-exports. The walk-by audit then landed the same kind of fix
+# for `dsl-runtime::stategraph` (6 names) and
+# `dsl-runtime::state_reducer::state_machine` (3 names) after
+# finding their leaf types were byte-identical to
+# `sem_os_core::state_graph_def` / `state_machine_def`. A second
+# round of canonical-name expansion collapsed five more
+# byte-identical mirrors (`document_type_def`, `observation_def`,
+# `policy_rule`, `taxonomy_def`, `view_def`). A third
+# wave migrated rich per-field docstrings from
+# `src/sem_reg/{derivation_spec, evidence, membership}.rs` into
+# `sem_os_core/*` and then collapsed those three mirrors as well,
+# leaving the schema-authority drift allowlist at 13 entries with
+# bucket 2 + bucket 3 both empty.
+#
+# (1) Legitimate distinct types sharing a name — unrelated UI graph,
+#     DSL stategraph, dag config, taxonomy nodes, workflow defs,
+#     capital graph, plus one verb-extract helper whose `VerbOutput`
+#     describes the entity-kind a verb creates (vs sem_os_core's
+#     `VerbOutput` for output-field declarations). Low remediation
+#     priority — these mirrors don't shadow the canonical type.
+#       crates/dsl-core/src/config/dag.rs               — DSL DAG config
+#       crates/ob-poc-domain/src/taxonomy/{rules,types} — taxonomy nodes
+#       crates/ob-poc-types/src/galaxy.rs               — galaxy viz
+#       crates/ob-poc-types/src/lib.rs                  — graph DTOs
+#       crates/ob-workflow/src/definition.rs            — workflow defs
+#       src/api/capital_routes.rs                       — capital graph
+#       src/graph/types.rs                              — UI graph types
+#       src/sem_reg/onboarding/verb_extract.rs          — verb-extract
+#                                                         produced-type
+#                                                         marker DTO
+#
+# (2) HIGH-priority near-duplicates of sem_os_core schema authority:
+#     EMPTY — Phase 4.7 follow-up + walk-by audit + canonical-name
+#     expansion together cleared all byte-identical near-duplicates.
+#
+# (3) Structurally-equivalent mirrors with richer docstrings:
+#     EMPTY — the third migration wave lifted per-field docstrings
+#     into `sem_os_core/{derivation_spec, evidence, membership}.rs`
+#     and collapsed the three `src/sem_reg/*` mirrors to re-exports.
+
+crates/dsl-core/src/config/dag.rs:497:TransitionDef
+crates/ob-poc-domain/src/taxonomy/rules.rs:523:EdgeType
+crates/ob-poc-domain/src/taxonomy/types.rs:109:NodeType
+crates/ob-poc-types/src/galaxy.rs:1417:NodeType
+crates/ob-poc-types/src/lib.rs:784:GraphNode
+crates/ob-poc-types/src/lib.rs:888:GraphEdge
+crates/ob-workflow/src/definition.rs:160:TransitionDef
+src/api/capital_routes.rs:255:GraphNode
+src/api/capital_routes.rs:263:GraphEdge
+src/graph/types.rs:1998:NodeType
+src/graph/types.rs:2062:EdgeType
+src/graph/types.rs:686:GraphNode
+src/sem_reg/onboarding/verb_extract.rs:63:VerbOutput

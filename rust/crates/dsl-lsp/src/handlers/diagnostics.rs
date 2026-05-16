@@ -14,10 +14,12 @@ use crate::analysis::document::DocumentState;
 use crate::analysis::parse_with_v2;
 use crate::encoding::{span_to_range as encoding_span_to_range, PositionEncoding};
 
-use ob_poc::dsl_v2::config::ConfigLoader;
-use ob_poc::dsl_v2::tooling::{
-    analyse_and_plan, LspValidator, PlanningInput, PlanningOutput, RuntimeVerbRegistry,
-    SemanticDiagnostic, Severity, SourceSpan, ValidationContext,
+use dsl_core::config::ConfigLoader;
+use dsl_analysis::lsp_validator::LspValidator;
+use dsl_analysis::planning_facade::{analyse_and_plan, PlanningInput, PlanningOutput};
+use dsl_analysis::runtime_registry::RuntimeVerbRegistry;
+use dsl_analysis::validation::{
+    Diagnostic as SemanticDiagnostic, Severity, SourceSpan, ValidationContext,
 };
 
 /// Create a planning registry from config
@@ -50,25 +52,25 @@ fn create_planning_registry() -> Option<Arc<RuntimeVerbRegistry>> {
 }
 
 /// Result of document analysis including planning info for code actions
-pub struct AnalysisResult {
-    pub state: DocumentState,
-    pub diagnostics: Vec<Diagnostic>,
-    pub planning_output: PlanningOutput,
+pub(crate) struct AnalysisResult {
+    pub(crate) state: DocumentState,
+    pub(crate) diagnostics: Vec<Diagnostic>,
+    pub(crate) planning_output: PlanningOutput,
     /// Semantic diagnostics with entity suggestions (for code actions)
-    pub semantic_diagnostics: Vec<SemanticDiagnostic>,
+    pub(crate) semantic_diagnostics: Vec<SemanticDiagnostic>,
 }
 
 /// Analyze a document with full semantic validation via EntityGateway.
 ///
 /// This is the primary validation path - uses the same validator as the server,
 /// plus the planning facade for DAG-based dependency analysis.
-pub async fn analyze_document_async(text: &str) -> (DocumentState, Vec<Diagnostic>) {
+pub(crate) async fn analyze_document_async(text: &str) -> (DocumentState, Vec<Diagnostic>) {
     let result = analyze_document_full(text).await;
     (result.state, result.diagnostics)
 }
 
 /// Full analysis returning planning output for code actions
-pub async fn analyze_document_full(text: &str) -> AnalysisResult {
+pub(crate) async fn analyze_document_full(text: &str) -> AnalysisResult {
     // Step 1: Parse to get DocumentState (for LSP features like symbols, completions)
     let (state, mut diagnostics) = parse_with_v2(text);
 
@@ -159,7 +161,13 @@ fn convert_diagnostic(diag: &SemanticDiagnostic, source: &str) -> Diagnostic {
         let suggestions: Vec<String> = diag
             .suggestions
             .iter()
-            .map(|s| format!("'{}' ({:.0}%)", s.replacement, (s.confidence * 100.0).min(100.0)))
+            .map(|s| {
+                format!(
+                    "'{}' ({:.0}%)",
+                    s.replacement,
+                    (s.confidence * 100.0).min(100.0)
+                )
+            })
             .collect();
         format!(
             "{}. Did you mean: {}?",
@@ -183,10 +191,10 @@ fn convert_diagnostic(diag: &SemanticDiagnostic, source: &str) -> Diagnostic {
 
 /// Convert planning facade Diagnostic to LSP Diagnostic format
 fn convert_planning_diagnostic(
-    diag: &ob_poc::dsl_v2::diagnostics::Diagnostic,
+    diag: &dsl_core::diagnostics::Diagnostic,
     _source: &str,
 ) -> Diagnostic {
-    use ob_poc::dsl_v2::diagnostics::Severity as PlanningSeverity;
+    use dsl_core::diagnostics::Severity as PlanningSeverity;
 
     // Convert span to LSP Range
     let range = if let Some(ref span) = diag.span {

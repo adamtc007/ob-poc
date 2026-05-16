@@ -3,15 +3,21 @@
 //! Usage: `cargo x sem-reg <subcommand>`
 
 use anyhow::{Context, Result};
+use chrono::Utc;
+use serde_json::json;
 use sqlx::PgPool;
+use std::path::{Path, PathBuf};
 
 use ob_poc::sem_reg::types::{
     pg_rows_to_snapshot_rows, ChangeType, PgSnapshotRow, SnapshotMeta, SnapshotRow,
 };
 use ob_poc::sem_reg::{ObjectType, RegistryService, SnapshotStore};
+use sem_os_policy::domain_pack::{
+    refresh_domain_pack_taxonomy_with_index, DomainPackRefreshAction,
+};
 
 /// Show registry statistics (counts by object type).
-pub async fn stats() -> Result<()> {
+pub(crate) async fn stats() -> Result<()> {
     let pool = connect().await?;
     let counts = RegistryService::stats(&pool).await?;
 
@@ -34,7 +40,7 @@ pub async fn stats() -> Result<()> {
 }
 
 /// Describe an attribute definition by FQN.
-pub async fn attr_describe(fqn: &str) -> Result<()> {
+pub(crate) async fn attr_describe(fqn: &str) -> Result<()> {
     let pool = connect().await?;
     match RegistryService::resolve_attribute_def_by_fqn(&pool, fqn).await? {
         Some((row, body)) => {
@@ -68,7 +74,7 @@ pub async fn attr_describe(fqn: &str) -> Result<()> {
 }
 
 /// List active attribute definitions.
-pub async fn attr_list(limit: i64) -> Result<()> {
+pub(crate) async fn attr_list(limit: i64) -> Result<()> {
     let pool = connect().await?;
     let rows = SnapshotStore::list_active(&pool, ObjectType::AttributeDef, limit, 0).await?;
     if rows.is_empty() {
@@ -104,7 +110,7 @@ pub async fn attr_list(limit: i64) -> Result<()> {
 }
 
 /// Describe an entity type definition by FQN.
-pub async fn entity_type_describe(fqn: &str) -> Result<()> {
+pub(crate) async fn entity_type_describe(fqn: &str) -> Result<()> {
     let pool = connect().await?;
     match RegistryService::resolve_entity_type_def_by_fqn(&pool, fqn).await? {
         Some((row, body)) => {
@@ -145,7 +151,7 @@ pub async fn entity_type_describe(fqn: &str) -> Result<()> {
 }
 
 /// Describe a verb contract by FQN.
-pub async fn verb_describe(fqn: &str) -> Result<()> {
+pub(crate) async fn verb_describe(fqn: &str) -> Result<()> {
     let pool = connect().await?;
     match RegistryService::resolve_verb_contract_by_fqn(&pool, fqn).await? {
         Some((row, body)) => {
@@ -212,7 +218,7 @@ pub async fn verb_describe(fqn: &str) -> Result<()> {
 }
 
 /// List active verb contracts.
-pub async fn verb_list(limit: i64) -> Result<()> {
+pub(crate) async fn verb_list(limit: i64) -> Result<()> {
     let pool = connect().await?;
     let rows = SnapshotStore::list_active(&pool, ObjectType::VerbContract, limit, 0).await?;
     if rows.is_empty() {
@@ -255,7 +261,7 @@ pub async fn verb_list(limit: i64) -> Result<()> {
 }
 
 /// Show snapshot history for an object.
-pub async fn history(object_type_str: &str, fqn: &str) -> Result<()> {
+pub(crate) async fn history(object_type_str: &str, fqn: &str) -> Result<()> {
     let pool = connect().await?;
 
     let object_type = parse_object_type(object_type_str)?;
@@ -293,7 +299,7 @@ pub async fn history(object_type_str: &str, fqn: &str) -> Result<()> {
 }
 
 /// Run the onboarding scan (bootstrap registry from verb YAML).
-pub async fn scan(dry_run: bool, verbose: bool) -> Result<()> {
+pub(crate) async fn scan(dry_run: bool, verbose: bool) -> Result<()> {
     let pool = connect().await?;
     println!("Scanning verb YAML definitions...\n");
     let report = ob_poc::sem_reg::scanner::run_onboarding_scan(&pool, dry_run, verbose).await?;
@@ -301,8 +307,122 @@ pub async fn scan(dry_run: bool, verbose: bool) -> Result<()> {
     Ok(())
 }
 
+/// Check Sem OS domain-pack YAML against the persisted reload index.
+pub(crate) async fn domain_pack_check(
+    pack_id: Option<&str>,
+    config_root: &Path,
+    force_check: bool,
+    update_index: bool,
+    json_output: bool,
+) -> Result<()> {
+    let pool = connect().await?;
+    let store = sem_os_postgres::PgDomainPackReloadIndexStore::new(pool);
+    let pack_ids = match pack_id {
+        Some(pack_id) => vec![pack_id.to_string()],
+        None => domain_pack_ids(config_root)?,
+    };
+
+    let mut rows = Vec::new();
+    for pack_id in pack_ids {
+        let previous = store.load(&pack_id).await.with_context(|| {
+            format!("failed to load domain-pack reload index for {pack_id}; run migrations first")
+        })?;
+        let plan = refresh_domain_pack_taxonomy_with_index(
+            config_root,
+            &pack_id,
+            previous.as_ref(),
+            force_check,
+            Utc::now(),
+        )
+        .with_context(|| format!("failed to check domain pack {pack_id}"))?;
+
+        if update_index {
+            store
+                .upsert(&plan.index_entry)
+                .await
+                .with_context(|| format!("failed to update reload index for {pack_id}"))?;
+        }
+
+        rows.push(json!({
+            "pack_id": plan.pack_id,
+            "action": plan.action,
+            "reason": plan.reason,
+            "surface_hash": plan.index_entry.surface_hash,
+            "source_count": plan.index_entry.source_fingerprints.len(),
+            "status": plan.index_entry.status,
+            "index_updated": update_index,
+        }));
+    }
+
+    if json_output {
+        println!("{}", serde_json::to_string_pretty(&rows)?);
+    } else {
+        println!("Domain Pack Reload Check");
+        println!("========================");
+        for row in &rows {
+            println!(
+                "  {:<38} {:<16} {}",
+                row["pack_id"].as_str().unwrap_or("?"),
+                row["action"].as_str().unwrap_or("?"),
+                row["reason"].as_str().unwrap_or("")
+            );
+            println!(
+                "    hash={} sources={}{}",
+                row["surface_hash"].as_str().unwrap_or("?"),
+                row["source_count"].as_u64().unwrap_or(0),
+                if update_index { " index=updated" } else { "" }
+            );
+        }
+
+        let publish_required = rows
+            .iter()
+            .filter(|row| {
+                row["action"].as_str()
+                    == Some(action_name(DomainPackRefreshAction::PublishRequired))
+            })
+            .count();
+        if publish_required > 0 {
+            println!(
+                "\n{} pack(s) require Sem OS seed bootstrap publication.",
+                publish_required
+            );
+        }
+    }
+
+    Ok(())
+}
+
+fn domain_pack_ids(config_root: &Path) -> Result<Vec<String>> {
+    let dir = config_root.join("sem_os_seeds/domain_packs");
+    let mut ids = Vec::new();
+    for entry in std::fs::read_dir(&dir).with_context(|| format!("failed to read {:?}", dir))? {
+        let path: PathBuf = entry?.path();
+        if path.extension().and_then(|ext| ext.to_str()) != Some("yaml") {
+            continue;
+        }
+        let contents = std::fs::read_to_string(&path)
+            .with_context(|| format!("failed to read {}", path.display()))?;
+        let yaml: serde_yaml::Value = serde_yaml::from_str(&contents)
+            .with_context(|| format!("failed to parse {}", path.display()))?;
+        let Some(pack_id) = yaml.get("pack_id").and_then(serde_yaml::Value::as_str) else {
+            anyhow::bail!("domain pack {} does not declare pack_id", path.display());
+        };
+        ids.push(pack_id.to_string());
+    }
+    ids.sort();
+    Ok(ids)
+}
+
+fn action_name(action: DomainPackRefreshAction) -> &'static str {
+    match action {
+        DomainPackRefreshAction::Skip => "skip",
+        DomainPackRefreshAction::IndexOnly => "index_only",
+        DomainPackRefreshAction::PublishRequired => "publish_required",
+    }
+}
+
 /// Describe a derivation spec by FQN.
-pub async fn derivation_describe(fqn: &str) -> Result<()> {
+pub(crate) async fn derivation_describe(fqn: &str) -> Result<()> {
     let pool = connect().await?;
     match RegistryService::resolve_derivation_spec_by_fqn(&pool, fqn).await? {
         Some((row, body)) => {
@@ -346,7 +466,7 @@ pub async fn derivation_describe(fqn: &str) -> Result<()> {
 }
 
 /// Backfill security labels on existing snapshots using heuristics.
-pub async fn backfill_labels(dry_run: bool) -> Result<()> {
+pub(crate) async fn backfill_labels(dry_run: bool) -> Result<()> {
     let pool = connect().await?;
 
     // Query snapshots with default/empty security labels
@@ -441,7 +561,7 @@ pub async fn backfill_labels(dry_run: bool) -> Result<()> {
 }
 
 /// Run all publish gates against active snapshots and report results.
-pub async fn validate(enforce: bool) -> Result<()> {
+pub(crate) async fn validate(enforce: bool) -> Result<()> {
     use ob_poc::sem_reg::gates::{evaluate_publish_gates, GateMode};
     use ob_poc::sem_reg::gates_technical::check_security_label_presence;
 
@@ -531,7 +651,7 @@ pub async fn validate(enforce: bool) -> Result<()> {
 }
 
 /// Resolve context for a subject using the 12-step pipeline.
-pub async fn ctx_resolve(
+pub(crate) async fn ctx_resolve(
     subject_str: &str,
     subject_type: &str,
     actor_type: &str,
@@ -540,7 +660,7 @@ pub async fn ctx_resolve(
     json_output: bool,
 ) -> Result<()> {
     use ob_poc::sem_reg::abac::ActorContext;
-    use sem_os_core::context_resolution::{
+    use sem_os_policy::context_resolution::{
         ContextResolutionRequest, DiscoveryContext, EvidenceMode, SubjectRef,
     };
 
@@ -616,7 +736,7 @@ pub async fn ctx_resolve(
     };
 
     // Convert ob_poc ActorContext → sem_os_core ActorContext via JSON round-trip
-    let sem_os_actor: sem_os_core::abac::ActorContext = {
+    let sem_os_actor: sem_os_policy::abac::ActorContext = {
         let json = serde_json::to_value(&actor).expect("ActorContext serializes");
         serde_json::from_value(json).expect("ActorContext round-trips")
     };
@@ -746,7 +866,7 @@ pub async fn ctx_resolve(
 }
 
 /// List available Semantic Registry MCP tools.
-pub async fn agent_tools() -> Result<()> {
+pub(crate) async fn agent_tools() -> Result<()> {
     let specs = ob_poc::sem_reg::all_tool_specs();
 
     println!("Semantic Registry MCP Tools ({} tools)", specs.len());
@@ -795,7 +915,7 @@ pub async fn agent_tools() -> Result<()> {
 }
 
 /// Show governance coverage report.
-pub async fn coverage(tier_str: &str, json_output: bool) -> Result<()> {
+pub(crate) async fn coverage(tier_str: &str, json_output: bool) -> Result<()> {
     let pool = connect().await?;
 
     let tier_filter = match tier_str {
@@ -874,7 +994,7 @@ pub async fn coverage(tier_str: &str, json_output: bool) -> Result<()> {
 const DEFAULT_MANIFEST_PATH: &str = "data/onboarding-manifest.json";
 
 /// Run the 5-step extraction pipeline and write an onboarding manifest.
-pub async fn onboard_scan(verbose: bool) -> Result<()> {
+pub(crate) async fn onboard_scan(verbose: bool) -> Result<()> {
     use ob_poc::sem_reg::onboarding::{entity_infer, manifest, schema_extract, verb_extract, xref};
 
     println!("Registry Onboarding Scan");
@@ -1030,7 +1150,7 @@ pub async fn onboard_scan(verbose: bool) -> Result<()> {
 }
 
 /// Display a summary report from an onboarding manifest file.
-pub async fn onboard_report(manifest_path: Option<&str>) -> Result<()> {
+pub(crate) async fn onboard_report(manifest_path: Option<&str>) -> Result<()> {
     use ob_poc::sem_reg::onboarding::manifest;
 
     let path_str = manifest_path.unwrap_or(DEFAULT_MANIFEST_PATH);
@@ -1127,7 +1247,7 @@ pub async fn onboard_report(manifest_path: Option<&str>) -> Result<()> {
 }
 
 /// Apply bootstrap seed from manifest to sem_reg.snapshots.
-pub async fn onboard_apply(manifest_path: Option<&str>) -> Result<()> {
+pub(crate) async fn onboard_apply(manifest_path: Option<&str>) -> Result<()> {
     use ob_poc::sem_reg::onboarding::{manifest, seed};
 
     let path_str = manifest_path.unwrap_or(DEFAULT_MANIFEST_PATH);
@@ -1195,13 +1315,13 @@ pub async fn onboard_apply(manifest_path: Option<&str>) -> Result<()> {
 // ── Authoring Pipeline CLI ────────────────────────────────────
 
 /// List authoring pipeline ChangeSets with optional status filter.
-pub async fn authoring_list(status: Option<&str>, limit: i64) -> Result<()> {
+pub(crate) async fn authoring_list(status: Option<&str>, limit: i64) -> Result<()> {
     let pool = connect().await?;
     let store = sem_os_postgres::PgAuthoringStore::new(pool);
 
     let status_filter = match status {
         Some(s) => {
-            let parsed: sem_os_core::authoring::types::ChangeSetStatus =
+            let parsed: sem_os_policy::authoring::types::ChangeSetStatus =
                 s.parse().map_err(|_| {
                     anyhow::anyhow!(
                         "Invalid status '{}'. Valid: draft, validated, rejected, \
@@ -1214,7 +1334,7 @@ pub async fn authoring_list(status: Option<&str>, limit: i64) -> Result<()> {
         None => None,
     };
 
-    use sem_os_core::authoring::ports::AuthoringStore;
+    use sem_os_policy::authoring::ports::AuthoringStore;
     let changesets = store
         .list_change_sets(status_filter, limit)
         .await
@@ -1243,12 +1363,12 @@ pub async fn authoring_list(status: Option<&str>, limit: i64) -> Result<()> {
 }
 
 /// Get details for a single ChangeSet.
-pub async fn authoring_get(id: &str) -> Result<()> {
+pub(crate) async fn authoring_get(id: &str) -> Result<()> {
     let pool = connect().await?;
     let store = sem_os_postgres::PgAuthoringStore::new(pool);
     let cs_id = uuid::Uuid::parse_str(id).context("Invalid UUID")?;
 
-    use sem_os_core::authoring::ports::AuthoringStore;
+    use sem_os_policy::authoring::ports::AuthoringStore;
     let cs = store
         .get_change_set(cs_id)
         .await
@@ -1311,14 +1431,14 @@ pub async fn authoring_get(id: &str) -> Result<()> {
 }
 
 /// Validate a ChangeSet (Stage 1 — Draft → Validated/Rejected).
-pub async fn authoring_validate(id: &str) -> Result<()> {
+pub(crate) async fn authoring_validate(id: &str) -> Result<()> {
     let pool = connect().await?;
     let store = sem_os_postgres::PgAuthoringStore::new(pool.clone());
     let scratch = sem_os_postgres::PgScratchSchemaRunner::new(pool);
     let cs_id = uuid::Uuid::parse_str(id).context("Invalid UUID")?;
 
     let service =
-        sem_os_core::authoring::governance_verbs::GovernanceVerbService::new(&store, &scratch);
+        sem_os_policy::authoring::governance_verbs::GovernanceVerbService::new(&store, &scratch);
     let report = service
         .validate(cs_id)
         .await
@@ -1342,14 +1462,14 @@ pub async fn authoring_validate(id: &str) -> Result<()> {
 }
 
 /// Dry-run a ChangeSet (Stage 2 — Validated → DryRunPassed/DryRunFailed).
-pub async fn authoring_dry_run(id: &str) -> Result<()> {
+pub(crate) async fn authoring_dry_run(id: &str) -> Result<()> {
     let pool = connect().await?;
     let store = sem_os_postgres::PgAuthoringStore::new(pool.clone());
     let scratch = sem_os_postgres::PgScratchSchemaRunner::new(pool);
     let cs_id = uuid::Uuid::parse_str(id).context("Invalid UUID")?;
 
     let service =
-        sem_os_core::authoring::governance_verbs::GovernanceVerbService::new(&store, &scratch);
+        sem_os_policy::authoring::governance_verbs::GovernanceVerbService::new(&store, &scratch);
     let report = service
         .dry_run(cs_id)
         .await
@@ -1379,14 +1499,14 @@ pub async fn authoring_dry_run(id: &str) -> Result<()> {
 }
 
 /// Generate a publish plan (diff) for a ChangeSet. Read-only.
-pub async fn authoring_plan(id: &str) -> Result<()> {
+pub(crate) async fn authoring_plan(id: &str) -> Result<()> {
     let pool = connect().await?;
     let store = sem_os_postgres::PgAuthoringStore::new(pool.clone());
     let scratch = sem_os_postgres::PgScratchSchemaRunner::new(pool);
     let cs_id = uuid::Uuid::parse_str(id).context("Invalid UUID")?;
 
     let service =
-        sem_os_core::authoring::governance_verbs::GovernanceVerbService::new(&store, &scratch);
+        sem_os_policy::authoring::governance_verbs::GovernanceVerbService::new(&store, &scratch);
     let diff = service
         .plan_publish(cs_id)
         .await
@@ -1401,14 +1521,14 @@ pub async fn authoring_plan(id: &str) -> Result<()> {
 }
 
 /// Publish a ChangeSet (DryRunPassed → Published).
-pub async fn authoring_publish(id: &str, publisher: &str) -> Result<()> {
+pub(crate) async fn authoring_publish(id: &str, publisher: &str) -> Result<()> {
     let pool = connect().await?;
     let store = sem_os_postgres::PgAuthoringStore::new(pool.clone());
     let scratch = sem_os_postgres::PgScratchSchemaRunner::new(pool);
     let cs_id = uuid::Uuid::parse_str(id).context("Invalid UUID")?;
 
     let service =
-        sem_os_core::authoring::governance_verbs::GovernanceVerbService::new(&store, &scratch);
+        sem_os_policy::authoring::governance_verbs::GovernanceVerbService::new(&store, &scratch);
     let batch = service
         .publish(cs_id, publisher)
         .await
@@ -1423,7 +1543,7 @@ pub async fn authoring_publish(id: &str, publisher: &str) -> Result<()> {
 }
 
 /// Publish multiple ChangeSets atomically in topological order.
-pub async fn authoring_publish_batch(ids: &[String], publisher: &str) -> Result<()> {
+pub(crate) async fn authoring_publish_batch(ids: &[String], publisher: &str) -> Result<()> {
     let pool = connect().await?;
     let store = sem_os_postgres::PgAuthoringStore::new(pool.clone());
     let scratch = sem_os_postgres::PgScratchSchemaRunner::new(pool);
@@ -1434,7 +1554,7 @@ pub async fn authoring_publish_batch(ids: &[String], publisher: &str) -> Result<
         .collect::<Result<Vec<_>>>()?;
 
     let service =
-        sem_os_core::authoring::governance_verbs::GovernanceVerbService::new(&store, &scratch);
+        sem_os_policy::authoring::governance_verbs::GovernanceVerbService::new(&store, &scratch);
     let batch = service
         .publish_batch(&cs_ids, publisher)
         .await
@@ -1455,7 +1575,7 @@ pub async fn authoring_publish_batch(ids: &[String], publisher: &str) -> Result<
 }
 
 /// Compute structural diff between two ChangeSets.
-pub async fn authoring_diff(base_id: &str, target_id: &str) -> Result<()> {
+pub(crate) async fn authoring_diff(base_id: &str, target_id: &str) -> Result<()> {
     let pool = connect().await?;
     let store = sem_os_postgres::PgAuthoringStore::new(pool.clone());
     let scratch = sem_os_postgres::PgScratchSchemaRunner::new(pool);
@@ -1464,7 +1584,7 @@ pub async fn authoring_diff(base_id: &str, target_id: &str) -> Result<()> {
     let target = uuid::Uuid::parse_str(target_id).context("Invalid target UUID")?;
 
     let service =
-        sem_os_core::authoring::governance_verbs::GovernanceVerbService::new(&store, &scratch);
+        sem_os_policy::authoring::governance_verbs::GovernanceVerbService::new(&store, &scratch);
     let diff = service
         .diff(base, target)
         .await
@@ -1476,11 +1596,11 @@ pub async fn authoring_diff(base_id: &str, target_id: &str) -> Result<()> {
 }
 
 /// Show authoring pipeline health (pending changesets, stale dry-runs).
-pub async fn authoring_health() -> Result<()> {
+pub(crate) async fn authoring_health() -> Result<()> {
     let pool = connect().await?;
     let store = sem_os_postgres::PgAuthoringStore::new(pool);
 
-    use sem_os_core::authoring::ports::AuthoringStore;
+    use sem_os_policy::authoring::ports::AuthoringStore;
 
     // Pending changeset counts by status
     let status_counts = store
@@ -1523,9 +1643,9 @@ pub async fn authoring_health() -> Result<()> {
 }
 
 /// Propose a ChangeSet from a bundle directory or inline YAML.
-pub async fn authoring_propose(bundle_path: &str) -> Result<()> {
-    use sem_os_core::authoring::bundle::{build_bundle, parse_manifest};
+pub(crate) async fn authoring_propose(bundle_path: &str) -> Result<()> {
     use sem_os_core::principal::Principal;
+    use sem_os_policy::authoring::bundle::{build_bundle, parse_manifest};
 
     let pool = connect().await?;
     let store = sem_os_postgres::PgAuthoringStore::new(pool.clone());
@@ -1553,7 +1673,7 @@ pub async fn authoring_propose(bundle_path: &str) -> Result<()> {
     };
 
     let service =
-        sem_os_core::authoring::governance_verbs::GovernanceVerbService::new(&store, &scratch);
+        sem_os_policy::authoring::governance_verbs::GovernanceVerbService::new(&store, &scratch);
     let cs = service
         .propose(&bundle, &principal)
         .await
@@ -1568,10 +1688,13 @@ pub async fn authoring_propose(bundle_path: &str) -> Result<()> {
 }
 
 /// Run cleanup to archive old terminal/orphan ChangeSets.
-pub async fn authoring_cleanup(terminal_days: Option<u32>, orphan_days: Option<u32>) -> Result<()> {
+pub(crate) async fn authoring_cleanup(
+    terminal_days: Option<u32>,
+    orphan_days: Option<u32>,
+) -> Result<()> {
     let pool = connect().await?;
 
-    let policy = sem_os_core::authoring::cleanup::CleanupPolicy {
+    let policy = sem_os_policy::authoring::cleanup::CleanupPolicy {
         terminal_retention_days: terminal_days.unwrap_or(90),
         orphan_retention_days: orphan_days.unwrap_or(30),
     };
@@ -1587,7 +1710,7 @@ pub async fn authoring_cleanup(terminal_days: Option<u32>, orphan_days: Option<u
     );
 
     let cleanup_store = sem_os_postgres::PgCleanupStore::new(pool);
-    let report = sem_os_core::authoring::cleanup::run_cleanup(&cleanup_store, &policy)
+    let report = sem_os_policy::authoring::cleanup::run_cleanup(&cleanup_store, &policy)
         .await
         .map_err(|e| anyhow::anyhow!("{e}"))?;
 
@@ -1597,7 +1720,7 @@ pub async fn authoring_cleanup(terminal_days: Option<u32>, orphan_days: Option<u
     Ok(())
 }
 
-fn print_diff_summary(diff: &sem_os_core::authoring::types::DiffSummary) {
+fn print_diff_summary(diff: &sem_os_policy::authoring::types::DiffSummary) {
     if diff.added.is_empty()
         && diff.modified.is_empty()
         && diff.removed.is_empty()

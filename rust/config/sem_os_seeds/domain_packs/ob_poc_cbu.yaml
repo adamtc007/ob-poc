@@ -1,0 +1,162 @@
+pack_id: ob-poc.cbu
+name: ob-poc CBU Domain Pack
+version: 0.1.0
+implementation_mode: native_compiled
+compatibility_tier: dry_run_only
+owned_dags:
+  - cbu_dag
+owned_packs:
+  - cbu-maintenance
+  - book-setup
+  - kyc-case
+owned_state_machines:
+  - cbu_evidence_lifecycle
+  - cbu_resource_instance_lifecycle
+owned_constellation_maps:
+  - cbu.workspace
+owned_constellation_families:
+  - cbu_workspace
+owned_universes:
+  - universe.client_lifecycle
+  - universe.group_onboarding
+owned_verb_prefixes:
+  - cbu.
+  - cbu-custody.
+owned_entity_kinds:
+  - cbu
+  - cbu_resource_instance
+business_crates: []
+owned_constellations:
+  - cbu.workspace
+allowed_transitions:
+  - transition_ref: cbu.discovered-to-structured
+    entity_type: cbu
+    state_machine: cbu_overall_lifecycle
+    verb: cbu.link-structure
+    from_state: discovered
+    to_state: structured
+    dry_run_enabled: true
+    mutation_enabled: false
+    hitl_required: true
+    evidence_refs_required:
+      - cbu_id
+  - transition_ref: cbu.structured-to-evidenced
+    entity_type: cbu
+    state_machine: cbu_overall_lifecycle
+    verb: cbu.attach-evidence
+    from_state: structured
+    to_state: evidenced
+    dry_run_enabled: true
+    mutation_enabled: false
+    hitl_required: true
+    evidence_refs_required:
+      - cbu_id
+  - transition_ref: cbu.validated-to-configuring
+    entity_type: cbu
+    state_machine: cbu_overall_lifecycle
+    verb: cbu.add-product
+    from_state: validated
+    to_state: configuring
+    dry_run_enabled: true
+    mutation_enabled: false
+    hitl_required: true
+    evidence_refs_required:
+      - cbu_id
+discovery_probes:
+  - probe_id: cbu.read-state
+    operation: read_state
+    target: '"ob-poc".cbus.status'
+    idempotent: true
+    modeled: true
+    first_class_state_mutation: false
+  - probe_id: cbu.read-party-summary
+    operation: read_party_summary
+    target: '"ob-poc".cbu_entity_roles'
+    idempotent: true
+    modeled: true
+    first_class_state_mutation: false
+projection_catalog:
+  - kind: pack_manifest
+    source: domain_pack.manifest
+    default_classification: internal
+    acp_visible_by_default: true
+  - kind: transition_surface
+    source: domain_pack.allowed_transitions
+    default_classification: internal
+    allowed_subject_kinds:
+      - cbu
+    acp_visible_by_default: true
+  - kind: dag
+    source: semos.tos.hydrated_state
+    default_classification: internal
+    allowed_subject_kinds:
+      - cbu
+    max_depth: 4
+    acp_visible_by_default: true
+  - kind: discovery_surface
+    source: semos.context_resolution.discovery_surface
+    default_classification: internal
+    allowed_subject_kinds:
+      - cbu
+    max_depth: 3
+    acp_visible_by_default: true
+mention_namespaces:
+  - namespace: entity
+    target_kind: semos.entity
+    description: Entity references resolvable by Sage and the editor.
+  - namespace: verb
+    target_kind: semos.verb
+    description: CBU verb and transition references exposed through the scoped verb surface.
+  - namespace: pack
+    target_kind: domain_pack
+    description: Domain Pack manifest and compatibility references.
+declared_modes:
+  - mode_id: sage:planning
+    label: Sage Planning
+    description: Discovery, projection, planning, explanation, and workbook drafting.
+  - mode_id: sage:execution
+    label: Sage Execution
+    description: Workbook validation, dry-run, HITL approval routing, and approved REPL DSL execution.
+workflow_phases:
+  - phase_id: discovery
+    label: Discovery
+    description: Read-only SemOS discovery and projection assembly.
+  - phase_id: planning
+    label: Planning
+    description: Workbook and runbook plan construction without mutation.
+  - phase_id: attestation
+    label: Attestation
+    description: Approval-token and audit review before any restricted mutation path.
+acp_personas:
+  - persona_id: sage:planning
+    label: Sage Planning
+    description: Discovery, projection, planning, explanation, and workbook drafting.
+    mutation_authority: false
+  - persona_id: sage:execution
+    label: Sage Execution
+    description: Workbook validation, dry-run, and approved execution.
+    mutation_authority: true
+resource_uri_schemes:
+  - scheme: semos://pack-manifest/{pack_id}
+    resource_kind: pack_manifest
+    description: Domain Pack manifest reference.
+  - scheme: semos://entity/{id}
+    resource_kind: entity
+    description: SemOS entity reference.
+  - scheme: semos://verb/{id}
+    resource_kind: verb
+    description: SemOS verb reference.
+  - scheme: semos://transition/{id}
+    resource_kind: transition
+    description: Domain transition reference.
+external_mcp_transports: []
+typed_extension_points:
+  - extension_id: semos.lineage_projection
+    extension_kind: lineage_projection
+    implementation_ref: native::repl::session_trace
+classification_policy:
+  max_prompt_classification: internal
+  allow_external_llm: false
+  required_redactions:
+    - pii
+    - confidential_evidence

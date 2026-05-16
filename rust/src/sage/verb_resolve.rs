@@ -1,4 +1,4 @@
-//! Structured verb scoring for the Coder layer.
+//! Structured verb scoring for the Drafter layer.
 //!
 //! This scorer never reads natural-language utterances directly. It consumes
 //! `OutcomeIntent` plus precomputed `VerbMetadataIndex` rows and ranks verbs
@@ -8,30 +8,19 @@ use std::collections::HashSet;
 
 use dsl_core::config::types::ActionClass;
 
-use dsl_runtime::entity_kind::matches as entity_kind_matches;
+use dsl_analysis::entity_kind::matches as entity_kind_matches;
 
 use super::outcome::OutcomeIntent;
 use super::polarity::IntentPolarity;
 use super::verb_index::{VerbMeta, VerbMetadataIndex};
 
-/// Ranked candidate returned by the structured scorer.
-#[derive(Debug, Clone)]
-pub struct ScoredVerbCandidate {
-    pub fqn: String,
-    pub score: f32,
-    pub action_score: f32,
-    pub param_overlap_score: f32,
-}
-
-/// Candidate counts after each deterministic filter stage.
-#[derive(Debug, Clone, Copy, Default)]
-pub struct FilterDiagnostics {
-    pub base_candidates: usize,
-    pub domain_candidates: usize,
-    pub phase_candidates: usize,
-    pub subject_kind_candidates: usize,
-    pub final_candidates: usize,
-}
+// Phase 3 slice 2bb (2026-05-13): result DTOs (`ScoredVerbCandidate`,
+// `FilterDiagnostics`) moved to `ob_poc_boundary::sage::verb_resolve_types`
+// alongside the `From<FilterDiagnostics> for DraftFilterDiagnostics` impl.
+// Back-compat re-export keeps `sage::verb_resolve::{ScoredVerbCandidate,
+// FilterDiagnostics}` and `crate::sage::ScoredVerbCandidate` (via mod.rs
+// pub-use chain) reachable for the engine and external callers.
+pub use super::verb_resolve_types::{FilterDiagnostics, ScoredVerbCandidate};
 
 /// Deterministic metadata-based verb scorer.
 #[derive(Debug, Clone)]
@@ -317,7 +306,7 @@ fn active_phase_tags(intent: &OutcomeIntent) -> HashSet<String> {
     }
 
     for goal in intent
-        .coder_handoff
+        .drafter_handoff
         .constraints
         .iter()
         .chain(intent.hints.explicit_domain_terms.iter())
@@ -579,7 +568,7 @@ mod tests {
 
     use crate::sage::verb_index::VerbMeta;
     use crate::sage::{
-        Clarification, CoderHandoff, EntityRef, IntentPolarity, ObservationPlane, OutcomeAction,
+        Clarification, DrafterHandoff, EntityRef, IntentPolarity, ObservationPlane, OutcomeAction,
         OutcomeStep, SageConfidence, SageExplain, UtteranceHints,
     };
 
@@ -660,7 +649,7 @@ mod tests {
             pending_clarifications: Vec::<Clarification>::new(),
             hints: UtteranceHints::default(),
             explain: SageExplain::default(),
-            coder_handoff: CoderHandoff::default(),
+            drafter_handoff: DrafterHandoff::default(),
         }
     }
 
@@ -723,7 +712,7 @@ mod tests {
             pending_clarifications: vec![],
             hints: UtteranceHints::default(),
             explain: SageExplain::default(),
-            coder_handoff: CoderHandoff::default(),
+            drafter_handoff: DrafterHandoff::default(),
         };
 
         let candidates = scorer.score(&intent, 5);
@@ -766,7 +755,7 @@ mod tests {
             pending_clarifications: vec![],
             hints: UtteranceHints::default(),
             explain: SageExplain::default(),
-            coder_handoff: CoderHandoff::default(),
+            drafter_handoff: DrafterHandoff::default(),
         };
 
         let candidates = scorer.score(&intent, 5);
@@ -812,7 +801,7 @@ mod tests {
                 ..UtteranceHints::default()
             },
             explain: SageExplain::default(),
-            coder_handoff: CoderHandoff::default(),
+            drafter_handoff: DrafterHandoff::default(),
         };
 
         let candidates = scorer.score(&intent, 5);
@@ -884,7 +873,7 @@ mod tests {
             pending_clarifications: vec![],
             hints: UtteranceHints::default(),
             explain: SageExplain::default(),
-            coder_handoff: CoderHandoff::default(),
+            drafter_handoff: DrafterHandoff::default(),
         };
 
         let candidates = scorer.score(&intent, 5);
@@ -905,7 +894,7 @@ mod tests {
             pending_clarifications: vec![],
             hints: UtteranceHints::default(),
             explain: SageExplain::default(),
-            coder_handoff: CoderHandoff::default(),
+            drafter_handoff: DrafterHandoff::default(),
         };
         let scorer = StructuredVerbScorer::new(index_with(vec![sample_meta(
             "deal.read-timeline",

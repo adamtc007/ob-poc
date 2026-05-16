@@ -1,8 +1,8 @@
 //! Session Repository V2 — Database persistence for REPL v2 sessions.
 //!
-//! Sessions are persisted on parking/resumption events (checkpoint-based).
-//! Normal in-memory mutations (adding entries, editing) are NOT persisted —
-//! only critical state changes (park, resume, complete) trigger writes.
+//! Sessions are persisted through orchestrator checkpoints. A normal REPL/Sage
+//! turn checkpoints after `process()`, and critical gates (park, resume,
+//! approve, reject, complete) require a successful checkpoint.
 
 use anyhow::{Context, Result};
 use sqlx::PgPool;
@@ -17,18 +17,53 @@ pub struct SessionRepositoryV2 {
     pool: PgPool,
 }
 
+/// Compatibility handle for older call sites.
+///
+/// REPL workbook snapshots are append-only, so normal session persistence no
+/// longer takes a database advisory lock. `release()` is intentionally a no-op.
+pub struct SessionRecordLock {}
+
+impl SessionRecordLock {
+    /// Compatibility no-op.
+    pub async fn release(self) -> Result<()> {
+        Ok(())
+    }
+}
+
 impl SessionRepositoryV2 {
     pub fn new(pool: PgPool) -> Self {
         Self { pool }
     }
 
-    /// Save or update a session with optimistic concurrency.
+    /// Compatibility no-op. Session workbook writes are append-only snapshots.
+    pub async fn acquire_session_record_lock(&self, session_id: Uuid) -> Result<SessionRecordLock> {
+        let _ = session_id;
+        Ok(SessionRecordLock {})
+    }
+
+    /// Save the current session header and append an immutable workbook snapshot.
     ///
-    /// `version` is the last known version — if a concurrent writer has
-    /// incremented it, this call will fail (returns 0 rows affected).
-    /// Returns the new version on success.
+    /// The `version` argument is retained for call-site compatibility; the save
+    /// path no longer reads/increments a caller-side version and does not take a
+    /// session advisory lock.
     #[allow(deprecated)] // Reads deprecated fields for DB persistence (migration compat)
     pub async fn save_session(&self, session: &ReplSessionV2, version: i64) -> Result<i64> {
+        let _ = version;
+        self.save_session_inner(session).await
+    }
+
+    /// Compatibility wrapper for older held-lock call sites.
+    #[allow(deprecated)] // Reads deprecated fields for DB persistence (migration compat)
+    pub async fn save_session_with_record_lock(
+        &self,
+        session: &ReplSessionV2,
+        version: i64,
+    ) -> Result<i64> {
+        self.save_session(session, version).await
+    }
+
+    #[allow(deprecated)] // Reads deprecated fields for DB persistence (migration compat)
+    async fn save_session_inner(&self, session: &ReplSessionV2) -> Result<i64> {
         let state =
             serde_json::to_value(&session.state).context("Failed to serialize session state")?;
         let client_context = session
@@ -62,16 +97,33 @@ impl SessionRepositoryV2 {
             "bindings": session.bindings,
             "cbu_ids": session.cbu_ids,
             "name": session.name,
+            "last_entity_resolution": session.last_entity_resolution,
+        });
+        let snapshot_id = Uuid::now_v7();
+        let workbook_snapshot = serde_json::json!({
+            "session_id": session.id,
+            "state": state.clone(),
+            "client_context": client_context.clone(),
+            "journey_context": journey_context.clone(),
+            "runbook": runbook.clone(),
+            "messages": messages.clone(),
+            "extended_state": extended_state.clone(),
+            "created_at": session.created_at,
+            "last_active_at": session.last_active_at,
         });
 
-        let new_version = version + 1;
+        let mut tx = self
+            .pool
+            .begin()
+            .await
+            .context("Failed to begin session save transaction")?;
 
-        let rows = sqlx::query(
+        let new_version: i64 = sqlx::query_scalar(
             r#"
             INSERT INTO "ob-poc".repl_sessions_v2
                 (session_id, state, client_context, journey_context, runbook, messages,
-                 extended_state, created_at, last_active_at, version)
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+                 extended_state, created_at, last_active_at, version, current_snapshot_id)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 1, $10)
             ON CONFLICT (session_id) DO UPDATE
                 SET state = $2,
                     client_context = $3,
@@ -80,41 +132,49 @@ impl SessionRepositoryV2 {
                     messages = $6,
                     extended_state = $7,
                     last_active_at = $9,
-                    version = $10
-                WHERE "ob-poc".repl_sessions_v2.version = $11
+                    version = "ob-poc".repl_sessions_v2.version + 1,
+                    current_snapshot_id = $10
+            RETURNING version
             "#,
         )
         .bind(session.id)
-        .bind(state)
-        .bind(client_context)
-        .bind(journey_context)
-        .bind(runbook)
-        .bind(messages)
-        .bind(extended_state)
+        .bind(&state)
+        .bind(&client_context)
+        .bind(&journey_context)
+        .bind(&runbook)
+        .bind(&messages)
+        .bind(&extended_state)
         .bind(session.created_at)
         .bind(session.last_active_at)
-        .bind(new_version)
-        .bind(version)
-        .execute(&self.pool)
+        .bind(snapshot_id)
+        .fetch_one(&mut *tx)
         .await
-        .context("Failed to save session")?
-        .rows_affected();
+        .context("Failed to save session")?;
 
-        if rows == 0 {
-            anyhow::bail!(
-                "Optimistic concurrency conflict: session {} version {} stale",
-                session.id,
-                version
-            );
-        }
-
-        #[cfg(feature = "database")]
-        crate::repl::trace_repository::SessionTraceRepository::append_batch(
-            &self.pool,
-            &session.trace,
+        sqlx::query(
+            r#"
+            INSERT INTO "ob-poc".repl_session_workbook_snapshots
+                (session_id, snapshot_id, session_version, state, client_context,
+                 journey_context, runbook, messages, extended_state, workbook,
+                 created_at, session_created_at, session_last_active_at)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, now(), $11, $12)
+            "#,
         )
+        .bind(session.id)
+        .bind(snapshot_id)
+        .bind(new_version)
+        .bind(&state)
+        .bind(&client_context)
+        .bind(&journey_context)
+        .bind(&runbook)
+        .bind(&messages)
+        .bind(&extended_state)
+        .bind(&workbook_snapshot)
+        .bind(session.created_at)
+        .bind(session.last_active_at)
+        .execute(&mut *tx)
         .await
-        .context("Failed to persist session trace")?;
+        .context("Failed to append session workbook snapshot")?;
 
         if let Some(plan) = &session.runbook_plan {
             let status = runbook_plan_status_name(&plan.status);
@@ -148,10 +208,14 @@ impl SessionRepositoryV2 {
             .bind(bindings)
             .bind(approval)
             .bind(plan.compiled_at)
-            .execute(&self.pool)
+            .execute(&mut *tx)
             .await
             .context("Failed to persist runbook plan")?;
         }
+
+        tx.commit()
+            .await
+            .context("Failed to commit session save transaction")?;
 
         Ok(new_version)
     }
@@ -222,6 +286,13 @@ impl SessionRepositoryV2 {
                     pending_trace_id: None,
                     pending_sem_os_envelope: None,
                     pending_lookup_result: None,
+                    last_entity_resolution: serde_json::from_value(
+                        extended_state
+                            .get("last_entity_resolution")
+                            .cloned()
+                            .unwrap_or(serde_json::Value::Null),
+                    )
+                    .context("Failed to deserialize last_entity_resolution")?,
                     pending_execution_rechecks: Vec::new(),
                     active_workspace: serde_json::from_value(
                         extended_state
@@ -348,14 +419,24 @@ impl SessionRepositoryV2 {
 
                 #[cfg(feature = "database")]
                 {
-                    session.trace =
-                        crate::repl::trace_repository::SessionTraceRepository::load_trace(
-                            &self.pool, session.id,
-                        )
-                        .await
-                        .context("Failed to load session trace")?;
-                    if let Some(last) = session.trace.last() {
-                        session.trace_sequence = session.trace_sequence.max(last.sequence);
+                    match crate::repl::trace_repository::SessionTraceRepository::load_trace(
+                        &self.pool, session.id,
+                    )
+                    .await
+                    {
+                        Ok(trace) => {
+                            session.trace = trace;
+                            if let Some(last) = session.trace.last() {
+                                session.trace_sequence = session.trace_sequence.max(last.sequence);
+                            }
+                        }
+                        Err(error) => {
+                            tracing::warn!(
+                                session_id = %session.id,
+                                error = %error,
+                                "Failed to load session trace batch with session checkpoint"
+                            );
+                        }
                     }
                 }
 
@@ -552,5 +633,83 @@ mod tests {
             Some(ob_poc_types::session_stack::SessionWorkspaceKind::Cbu)
         );
         assert_eq!(loaded.session_stack.trace_sequence, 12);
+    }
+
+    #[sqlx::test(migrations = "./test-migrations/session_repository")]
+    async fn test_save_load_preserves_entity_resolution_session_state(pool: PgPool) {
+        let repo = SessionRepositoryV2::new(pool);
+        let entity_id = Uuid::new_v4();
+        let lookup = crate::lookup::LookupResult {
+            entity_snapshot: crate::lookup::EntitySnapshotMetadata {
+                hash: "snapshot-hash".to_string(),
+                version: 1,
+                entity_count: 7,
+            },
+            verbs: Vec::new(),
+            entities: vec![crate::entity_linking::EntityResolution {
+                mention_span: (0, 7),
+                mention_text: "Allianz".to_string(),
+                candidates: vec![crate::entity_linking::EntityCandidate {
+                    entity_id,
+                    entity_kind: "cbu".to_string(),
+                    canonical_name: "Allianz Fund".to_string(),
+                    score: 0.92,
+                    evidence: Vec::new(),
+                }],
+                selected: Some(entity_id),
+                confidence: 0.92,
+                evidence: Vec::new(),
+            }],
+            dominant_entity: Some(crate::lookup::service::DominantEntity {
+                entity_id,
+                canonical_name: "Allianz Fund".to_string(),
+                entity_kind: "cbu".to_string(),
+                confidence: 0.92,
+                mention_span: (0, 7),
+            }),
+            expected_kinds: vec!["cbu".to_string()],
+            concepts: Vec::new(),
+            verb_matched: false,
+            entities_resolved: true,
+        };
+
+        let mut session = ReplSessionV2::new();
+        session.set_client_scope(Uuid::new_v4());
+        session.set_workspace_root(crate::repl::types_v2::WorkspaceKind::Cbu);
+        assert!(session.apply_lookup_result(&lookup));
+
+        let version = repo.save_session(&session, 0).await.unwrap();
+        assert_eq!(version, 1);
+
+        let (loaded, loaded_version) = repo.load_session(session.id).await.unwrap().unwrap();
+        assert_eq!(loaded_version, 1);
+        assert_eq!(loaded.cbu_ids, vec![entity_id]);
+        assert_eq!(
+            loaded
+                .last_entity_resolution
+                .as_ref()
+                .and_then(|resolution| resolution.dominant_entity.as_ref())
+                .map(|entity| entity.entity_id),
+            Some(entity_id)
+        );
+        assert_eq!(
+            loaded
+                .bindings
+                .get("last_entity_id")
+                .and_then(|value| value.as_str())
+                .map(ToOwned::to_owned),
+            Some(entity_id.to_string())
+        );
+        assert_eq!(
+            loaded
+                .workspace_stack
+                .last()
+                .and_then(|frame| frame.subject_id),
+            Some(entity_id)
+        );
+        assert_eq!(
+            loaded.session_stack.workspace_stack[0].subject_id,
+            Some(entity_id)
+        );
     }
 }

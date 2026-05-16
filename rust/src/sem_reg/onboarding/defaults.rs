@@ -156,6 +156,7 @@ fn crud_contract(
             lookup: None,
             valid_values: None,
             default: None,
+            maps_to: None,
         });
     }
     if action == "create" || action == "update" {
@@ -173,6 +174,7 @@ fn crud_contract(
                 lookup: None,
                 valid_values: None,
                 default: None,
+                maps_to: None,
             });
         }
     }
@@ -246,6 +248,10 @@ fn crud_contract(
             phase_tags: vec![],
         }),
         crud_mapping: None,
+        reads_from: Vec::new(),
+        writes_to: Vec::new(),
+        outputs: Vec::new(),
+        produces_shared_facts: Vec::new(),
     }
 }
 
@@ -378,6 +384,11 @@ mod tests {
             ],
             optional_attributes: vec!["entity.widget-description".to_string()],
             parent_type: None,
+            governance_tier: None,
+            security_classification: None,
+            pii: None,
+            read_by_verbs: Vec::new(),
+            written_by_verbs: Vec::new(),
         }
     }
 

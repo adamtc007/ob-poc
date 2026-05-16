@@ -19,10 +19,10 @@ use crate::sem_reg::{
     store::SnapshotStore,
     types::{ObjectType, SnapshotRow},
 };
-use sem_os_core::context_resolution::{
+use sem_os_policy::context_resolution::{
     ContextResolutionRequest, DiscoveryContext, EvidenceMode, ResolutionConstraints, SubjectRef,
 };
-use sem_os_core::service::{CoreService, CoreServiceImpl};
+use sem_os_policy::service::{CoreService, CoreServiceImpl};
 use sem_os_postgres::PgStores;
 
 // ── Resource listing ──────────────────────────────────────────
@@ -272,7 +272,7 @@ async fn read_context(
     }
 }
 
-fn to_sem_os_actor(actor: &ActorContext) -> sem_os_core::abac::ActorContext {
+fn to_sem_os_actor(actor: &ActorContext) -> sem_os_policy::abac::ActorContext {
     let json = serde_json::to_value(actor).expect("ActorContext serializes");
     serde_json::from_value(json).expect("ActorContext round-trips")
 }
@@ -300,7 +300,7 @@ async fn resolve_context_via_sem_os(
     pool: &PgPool,
     actor: &ActorContext,
     request: ContextResolutionRequest,
-) -> sem_os_core::service::Result<sem_os_core::context_resolution::ContextResolutionResponse> {
+) -> sem_os_policy::service::Result<sem_os_policy::context_resolution::ContextResolutionResponse> {
     let principal =
         sem_os_core::principal::Principal::in_process(&actor.actor_id, actor.roles.clone());
     let service = build_core_service(pool);

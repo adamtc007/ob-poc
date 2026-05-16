@@ -16,7 +16,7 @@ use ob_poc::session::verb_sync::VerbSyncService;
 use ob_poc::session::verb_tiering_linter;
 
 /// Compile all verbs from YAML and sync to database
-pub async fn verbs_compile(verbose: bool) -> Result<()> {
+pub(crate) async fn verbs_compile(verbose: bool) -> Result<()> {
     println!("===========================================");
     println!("  Verb Contract Compilation");
     println!("===========================================\n");
@@ -84,7 +84,7 @@ pub async fn verbs_compile(verbose: bool) -> Result<()> {
 }
 
 /// Show compiled contract for a specific verb
-pub async fn verbs_show(verb_name: &str) -> Result<()> {
+pub(crate) async fn verbs_show(verb_name: &str) -> Result<()> {
     let database_url =
         std::env::var("DATABASE_URL").unwrap_or_else(|_| "postgresql:///data_designer".to_string());
     let pool = PgPool::connect(&database_url)
@@ -211,7 +211,7 @@ pub async fn verbs_show(verb_name: &str) -> Result<()> {
 ///
 /// Compares YAML config hashes to database compiled hashes.
 /// Exits with code 1 if any verbs need recompilation.
-pub async fn verbs_check(verbose: bool) -> Result<()> {
+pub(crate) async fn verbs_check(verbose: bool) -> Result<()> {
     println!("===========================================");
     println!("  Verb Contract Hash Check (CI)");
     println!("===========================================\n");
@@ -360,7 +360,7 @@ pub async fn verbs_check(verbose: bool) -> Result<()> {
 /// - Intent verbs cannot write to operational tables
 /// - Diagnostics verbs must be read-only
 /// - etc.
-pub async fn verbs_lint(errors_only: bool, verbose: bool, tier: &str) -> Result<()> {
+pub(crate) async fn verbs_lint(errors_only: bool, verbose: bool, tier: &str) -> Result<()> {
     // Parse lint tier
     let lint_tier: verb_tiering_linter::LintTier =
         tier.parse().map_err(|e| anyhow::anyhow!("{}", e))?;
@@ -634,7 +634,7 @@ pub async fn verbs_lint(errors_only: bool, verbose: bool, tier: &str) -> Result<
 }
 
 /// Show all verbs with diagnostics (errors or warnings)
-pub async fn verbs_diagnostics(errors_only: bool) -> Result<()> {
+pub(crate) async fn verbs_diagnostics(errors_only: bool) -> Result<()> {
     let database_url =
         std::env::var("DATABASE_URL").unwrap_or_else(|_| "postgresql:///data_designer".to_string());
     let pool = PgPool::connect(&database_url)
@@ -732,7 +732,7 @@ pub async fn verbs_diagnostics(errors_only: bool) -> Result<()> {
 /// Generate verb inventory report
 ///
 /// Creates a comprehensive markdown report of all verbs grouped by domain, tier, and noun.
-pub fn verbs_inventory(
+pub(crate) fn verbs_inventory(
     output: Option<PathBuf>,
     update_claude_md: bool,
     show_untagged: bool,
@@ -1173,7 +1173,11 @@ fn load_verb_concepts(config_dir: &std::path::Path) -> Result<HashSet<String>> {
 const CONTROL_PREFIXES: &[&str] = &["session.", "runbook.", "agent.", "view.", "nav."];
 
 /// Generate the verb atlas.
-pub fn verbs_atlas(output_dir: Option<PathBuf>, lint_only: bool, verbose: bool) -> Result<()> {
+pub(crate) fn verbs_atlas(
+    output_dir: Option<PathBuf>,
+    lint_only: bool,
+    verbose: bool,
+) -> Result<()> {
     println!("===========================================");
     println!("  Verb Atlas Generator");
     println!("===========================================\n");
@@ -1984,7 +1988,7 @@ impl std::fmt::Display for DurableSeverity {
 }
 
 /// Lint all verbs with `behavior: durable` for correct configuration.
-pub fn verbs_lint_durable(errors_only: bool, verbose: bool) -> Result<()> {
+pub(crate) fn verbs_lint_durable(errors_only: bool, verbose: bool) -> Result<()> {
     println!("===========================================");
     println!("  Durable Verb Lint");
     println!("===========================================\n");

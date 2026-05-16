@@ -1,0 +1,22 @@
+{
+  "name": "wrong entity type refuses in DISCOVERY",
+  "language_current_state": "DISCOVERY",
+  "draft": {
+    "session_id": "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+    "actor_id": "analyst@example.com",
+    "actor_roles": ["analyst"],
+    "verb": "kyc-case.update-status",
+    "transition_ref": "kyc-case.discovery-to-assessment",
+    "subject_kind": "screening_case",
+    "case_id": "11111111-1111-1111-1111-111111111111",
+    "current_state": "DISCOVERY",
+    "requested_state": "ASSESSMENT",
+    "configuration_version": "config-1",
+    "state_snapshot_id": "snapshot-1",
+    "evidence_digest": "sha256:case"
+  },
+  "expected": {
+    "outcome": "refused",
+    "refusal_code": "wrong_subject_kind"
+  }
+}

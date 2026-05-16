@@ -25,8 +25,10 @@ import type {
   VerbProfile,
   VerbDisambiguationRequest,
   OnboardingStateView,
+  AcpTraceSummary,
 } from "../types/chat";
 import type { SessionFeedback } from "./replV2";
+import type { InputRequestV2 } from "./replV2";
 
 /**
  * Backend session response structure
@@ -397,6 +399,50 @@ export const chatApi = {
     };
   },
 
+  async sendReplInput(
+    sessionId: string,
+    input: InputRequestV2,
+  ): Promise<SendMessageResponse> {
+    let envelope: ChatInputEnvelope;
+    try {
+      envelope = await api.post<ChatInputEnvelope>(
+        `/session/${sessionId}/input`,
+        {
+          kind: "repl_v2",
+          input,
+        },
+      );
+    } catch (error) {
+      if (isSessionMissingError(error)) {
+        pruneSessionIdFromStorage(sessionId);
+      }
+      throw error;
+    }
+
+    const response = envelope.response;
+    const assistantMessage = buildAssistantMessage(sessionId, response);
+
+    let session: ChatSession | undefined;
+    try {
+      session = await chatApi.getSession(sessionId);
+    } catch (e) {
+      console.warn("[chat] Failed to re-fetch session after REPL input:", e);
+    }
+
+    return {
+      message: assistantMessage,
+      session: session || {
+        id: sessionId,
+        title: "",
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+        messages: [],
+      },
+      available_verbs: response.available_verbs,
+      surface_fingerprint: response.surface_fingerprint,
+    };
+  },
+
   async sendDiscoverySelection(
     sessionId: string,
     selection: DiscoverySelection,
@@ -638,6 +684,7 @@ interface ChatInputEnvelope {
     discovery_bootstrap?: DiscoveryBootstrap;
     session_feedback?: SessionFeedback;
     narration?: import("../types/chat").NarrationPayload;
+    acp_trace?: AcpTraceSummary;
     available_verbs?: VerbProfile[];
     surface_fingerprint?: string;
     decision?: {
@@ -689,6 +736,7 @@ function buildAssistantMessage(
     onboarding_state: response.onboarding_state,
     session_feedback: response.session_feedback,
     narration: response.narration,
+    acp_trace: response.acp_trace,
   };
 
   if (response.verb_disambiguation) {

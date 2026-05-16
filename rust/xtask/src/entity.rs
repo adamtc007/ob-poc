@@ -14,7 +14,7 @@ fn get_database_url() -> Result<String> {
 }
 
 /// Compile entity snapshot from database
-pub async fn compile(output: Option<&Path>, verbose: bool) -> Result<()> {
+pub(crate) async fn compile(output: Option<&Path>, verbose: bool) -> Result<()> {
     println!("===========================================");
     println!("  Entity Snapshot Compiler");
     println!("===========================================\n");
@@ -55,7 +55,7 @@ pub async fn compile(output: Option<&Path>, verbose: bool) -> Result<()> {
 }
 
 /// Lint entity data for quality issues
-pub async fn lint(errors_only: bool) -> Result<()> {
+pub(crate) async fn lint(errors_only: bool) -> Result<()> {
     println!("===========================================");
     println!("  Entity Data Lint");
     println!("===========================================\n");
@@ -106,7 +106,7 @@ pub async fn lint(errors_only: bool) -> Result<()> {
 }
 
 /// Show entity snapshot statistics
-pub fn stats(snapshot_path: Option<&Path>) -> Result<()> {
+pub(crate) fn stats(snapshot_path: Option<&Path>) -> Result<()> {
     println!("===========================================");
     println!("  Entity Snapshot Statistics");
     println!("===========================================\n");

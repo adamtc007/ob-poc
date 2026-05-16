@@ -1,0 +1,61 @@
+pack_id: ob-poc.onboarding-request
+name: ob-poc Onboarding Request Domain Pack
+version: 0.1.0
+implementation_mode: native_compiled
+compatibility_tier: dry_run_only
+owned_dags: [onboarding_request_dag]
+owned_packs: [onboarding-request]
+owned_state_machines:
+  - onboarding_data_request_lifecycle
+  - onboarding_data_request_slice_lifecycle
+  - onboarding_data_request_attr_lifecycle
+  - provisioning_request_lifecycle
+owned_constellation_maps:
+  - onboarding.workspace
+owned_constellation_families:
+  - onboarding_workspace
+owned_universes:
+  - universe.client_lifecycle
+  - universe.deal_execution
+owned_verb_prefixes:
+  - onboarding.
+  - readiness.
+  - service-resource.
+owned_entity_kinds:
+  - onboarding_data_request
+  - onboarding_data_request_slice
+  - onboarding_data_request_attr
+  - onboarding_data_request_discovery
+  - provisioning_request
+business_crates: []
+owned_constellations:
+  - onboarding.workspace
+allowed_transitions:
+  - transition_ref: onboarding-request.compiled
+    entity_type: onboarding_data_request
+    state_machine: onboarding_data_request_lifecycle
+    verb: onboarding.compile-data-request
+    from_state: draft
+    to_state: compiled
+    dry_run_enabled: true
+    mutation_enabled: false
+    hitl_required: true
+discovery_probes:
+  - probe_id: onboarding-request.read-state
+    operation: read_state
+    target: semos.onboarding_request
+    idempotent: true
+    modeled: true
+    first_class_state_mutation: false
+projection_catalog: []
+mention_namespaces: []
+declared_modes: []
+workflow_phases: []
+acp_personas: []
+resource_uri_schemes: []
+external_mcp_transports: []
+typed_extension_points: []
+classification_policy:
+  max_prompt_classification: internal
+  allow_external_llm: false
+  required_redactions: [pii]

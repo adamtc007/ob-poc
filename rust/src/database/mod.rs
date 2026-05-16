@@ -11,7 +11,11 @@ use std::time::Duration;
 
 pub mod attribute_values_service;
 pub mod bods_service;
-pub mod bods_types;
+// ob-poc-domain split v1 Slice A1 (2026-05-14): bods_types now lives in
+// `ob-poc-bods`. The compat re-export below keeps `super::bods_types::*`
+// (bods_service) and `crate::database::bods_types::*` (downstream
+// consumers) working unchanged.
+pub use ob_poc_bods as bods_types;
 pub mod cbu_entity_roles_service;
 pub mod cbu_service;
 pub mod context_discovery_service;
@@ -38,7 +42,10 @@ pub mod service_resource_service;
 pub mod service_service;
 pub mod session_repository;
 pub mod verb_service;
-pub mod view_config_service;
+// Phase 4.2b (2026-05-13): now lives in ob-poc-domain (slice 2q → 4.2b).
+// ob-poc-domain split v1 Slice C2 (2026-05-14): view_config_service now
+// lives in `ob-poc-taxonomy` (paired with taxonomy::rules which imports it).
+pub use ob_poc_taxonomy::view_config_service;
 pub mod view_state_audit;
 pub mod viewport_service;
 pub mod visualization_repository;

@@ -28,7 +28,7 @@ import { DealPanel } from "../deal/components";
 import { ConstellationCanvas } from "../observatory/components/ConstellationCanvas";
 import type { ObservatoryAction } from "../../types/observatory";
 import type { DecisionReply, DiscoverySelection } from "../../types/chat";
-import type { SessionFeedback } from "../../api/replV2";
+import type { SessionFeedback, WorkspaceKind } from "../../api/replV2";
 
 export function ChatPage() {
   const { sessionId } = useParams<{ sessionId?: string }>();
@@ -322,9 +322,6 @@ export function ChatPage() {
         );
       }
       queryClient.invalidateQueries({
-        queryKey: queryKeys.chat.session(activeSessionId),
-      });
-      queryClient.invalidateQueries({
         queryKey: queryKeys.scope(activeSessionId),
       });
       queryClient.invalidateQueries({
@@ -362,9 +359,6 @@ export function ChatPage() {
         );
       }
       if (sessionId) {
-        queryClient.invalidateQueries({
-          queryKey: queryKeys.chat.session(sessionId),
-        });
         queryClient.invalidateQueries({ queryKey: queryKeys.scope(sessionId) });
         queryClient.invalidateQueries({
           queryKey: queryKeys.constellation.all,
@@ -374,6 +368,62 @@ export function ChatPage() {
     },
     onError: (err) => {
       console.error("[ChatPage] sendDiscoverySelection failed:", err);
+      setStreaming(false);
+    },
+  });
+
+  const workspaceSelectionMutation = useMutation({
+    mutationFn: ({
+      workspace,
+    }: {
+      workspace: WorkspaceKind;
+      label: string;
+    }) => {
+      if (!sessionId) throw new Error("No session selected");
+      return chatApi.sendReplInput(sessionId, {
+        type: "select_workspace",
+        workspace,
+      });
+    },
+    onMutate: ({ label }) => {
+      addMessage({
+        id: `temp-workspace-${Date.now()}`,
+        role: "user",
+        content: label,
+        timestamp: new Date().toISOString(),
+      });
+      setStreaming(true);
+    },
+    onSuccess: (response) => {
+      addMessage(response.message);
+      if (response.available_verbs?.length) {
+        setAvailableVerbs(
+          response.available_verbs,
+          response.surface_fingerprint
+            ? {
+                fingerprint: response.surface_fingerprint,
+                totalRegistry: 0,
+                finalCount: response.available_verbs.length,
+              }
+            : undefined,
+        );
+      }
+      if (sessionId) {
+        queryClient.invalidateQueries({
+          queryKey: queryKeys.chat.session(sessionId),
+        });
+        queryClient.invalidateQueries({ queryKey: queryKeys.scope(sessionId) });
+        queryClient.invalidateQueries({
+          queryKey: queryKeys.constellation.all,
+        });
+        queryClient.invalidateQueries({
+          queryKey: queryKeys.observatory.all(sessionId),
+        });
+      }
+      setStreaming(false);
+    },
+    onError: (err) => {
+      console.error("[ChatPage] selectWorkspace failed:", err);
       setStreaming(false);
     },
   });
@@ -541,6 +591,9 @@ export function ChatPage() {
               sessionFeedback={latestSessionFeedback}
               className="min-h-0"
               onPromptAgent={handleSend}
+              onSelectWorkspace={(workspace, label) =>
+                workspaceSelectionMutation.mutate({ workspace, label })
+              }
             />
 
             {latestNarration && (

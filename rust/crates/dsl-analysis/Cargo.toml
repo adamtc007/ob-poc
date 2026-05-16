@@ -1,0 +1,64 @@
+[package]
+name = "dsl-analysis"
+version = "0.1.0"
+edition = "2021"
+description = "DSL analyser plane — reads DSL text + verb metadata and produces diagnostics, suggestions, and executable plans. Hosts the verb registry, macro registry, ref/gateway resolvers, the LSP-facing semantic validator, and the analyse-and-plan orchestrator. Zero sqlx; never executes against a database."
+
+# Capability discipline (see docs/todo/dsl-runtime-split-v1.md §2.2):
+#   IN-SCOPE: analyser-tier DSL validation, verb/macro registries,
+#             ref/gateway resolution, LSP semantic validator, plan
+#             compilation.
+#   OUT-OF-SCOPE: VerbExecutionPort, CrudExecutionPort, sqlx, TransactionScope,
+#                 Pattern A domain ops, service registry, runtime services.
+#                 If a module reaches sqlx or a PgPool, it belongs in
+#                 dsl-runtime (the execution plane), not here.
+#
+# Hard invariant: dsl-analysis MUST NOT depend on dsl-runtime. The
+# orchestrator in ob-poc produces a plan via dsl-analysis and hands it
+# to dsl-runtime for execution; the plan type lives in ob-poc-types
+# (cross-capability DTO, v1 §6.5 rule).
+
+[dependencies]
+# Phase 2 (validation): types module — references dsl_core::ast::Program
+# in ValidatedProgram.resolved_ast field.
+dsl-core = { path = "../dsl-core" }
+serde = { version = "1", features = ["derive"] }
+uuid = { version = "1", features = ["v4", "serde"] }
+
+# Phase 3 (registry cluster): verb_registry + runtime_registry +
+# catalogue_loader + entity_kind. sqlx is for read-only boot-time
+# catalogue loading (see ADR §2.2 anti-charter clarification —
+# verb-execution path is the forbidden line, not sqlx itself).
+ob-templates = { path = "../ob-templates" }
+sqlx = { version = "0.8", features = ["runtime-tokio-rustls", "postgres", "uuid", "chrono", "json"] }
+anyhow = "1.0"
+tracing = "0.1"
+serde_json = "1"
+serde_yaml = "0.9"
+
+# Phase 4 (macros registry subset): variable.rs uses regex for ${var}
+# substitution + thiserror for VariableError. schema.rs uses dsl_core::config.
+regex = "1"
+thiserror = "1"
+
+# Phase 5 (resolver cluster): ref_resolver + gateway_resolver.
+# RefResolver trait uses async_trait; GatewayRefResolver hits the
+# entity_gateway gRPC service via tonic channel.
+async-trait = "0.1"
+entity-gateway = { path = "../entity-gateway" }
+tonic = "0.12"
+
+# Phase 8 (stategraph + verification): verification::{patterns,evasion,
+# confidence,registry,types} uses chrono for DateTime<Utc>. stategraph
+# re-exports several types from sem_os_core::state_graph_def (control-plane
+# graph node/edge primitives). Same transitional sem_os_core dep that
+# dsl-runtime carries — to be inverted in a later slice.
+chrono = { version = "0.4", features = ["serde"] }
+sem_os_core = { path = "../sem_os_core" }
+sem_os_ontology = { path = "../sem_os_ontology" }
+
+[dev-dependencies]
+tokio = { version = "1", features = ["macros", "rt"] }
+
+[lints.rust]
+unreachable_pub = "deny"

@@ -1,1 +1,1 @@
-pub use sem_os_core::evidence_strategy_def::*;
+pub use sem_os_ontology::evidence_strategy_def::*;

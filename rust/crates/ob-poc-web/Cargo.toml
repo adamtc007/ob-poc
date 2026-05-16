@@ -37,9 +37,6 @@ ob-poc-types = { path = "../ob-poc-types" }
 # Database
 sqlx = { version = "0.8", features = ["runtime-tokio", "postgres", "uuid", "chrono", "json"] }
 
-# Entity resolution (same as LSP uses)
-dsl-lsp = { path = "../dsl-lsp" }
-
 # EntityGateway for embedded gRPC service
 entity-gateway = { path = "../entity-gateway" }
 tonic = "0.12"
@@ -49,6 +46,9 @@ ob-semantic-matcher = { path = "../ob-semantic-matcher" }
 
 # Semantic OS client + core + postgres stores
 sem_os_core = { path = "../sem_os_core" }
+sem_os_types = { path = "../sem_os_types" }
+sem_os_ontology = { path = "../sem_os_ontology" }
+sem_os_policy = { path = "../sem_os_policy" }
 sem_os_client = { path = "../sem_os_client" }
 sem_os_postgres = { path = "../sem_os_postgres" }
 
@@ -56,6 +56,13 @@ sem_os_postgres = { path = "../sem_os_postgres" }
 # Phase 3 relocation of PgCrudExecutor from sem_os_postgres to dsl-runtime
 # means the startup wiring now imports it from this crate.
 dsl-runtime = { path = "../dsl-runtime" }
+# dsl-runtime-split v1 Phase 11 (2026-05-14): main.rs reaches
+# `dsl_analysis::catalogue_loader` directly for the boot-time YAML→DB
+# seed pipeline.
+dsl-analysis = { path = "../dsl-analysis" }
 
 [features]
 default = []
+
+[lints.rust]
+unreachable_pub = "deny"

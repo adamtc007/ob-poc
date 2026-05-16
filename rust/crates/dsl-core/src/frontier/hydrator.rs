@@ -11,7 +11,7 @@ use crate::{
     parser::parse_single_verb,
     resolver::{ResolvedSlot, ResolvedTemplate},
 };
-use sem_os_core::constellation_map_def::Cardinality;
+use sem_os_ontology::constellation_map_def::Cardinality;
 
 use super::{
     CompletenessAssertionStatus, DiscretionaryReason, EntityRef, GreenWhenStatus, InstanceFrontier,

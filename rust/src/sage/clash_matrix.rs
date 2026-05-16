@@ -1,4 +1,4 @@
-//! Export deterministic Coder clash diagnostics from the verb metadata index.
+//! Export deterministic Drafter clash diagnostics from the verb metadata index.
 
 use std::fmt::Write;
 
@@ -7,7 +7,7 @@ use dsl_core::config::types::HarmClass;
 
 use super::verb_index::{VerbMeta, VerbMetadataIndex};
 
-/// One candidate clash pair in the Coder surface.
+/// One candidate clash pair in the Drafter surface.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ClashRow {
     pub verb_a: String,
@@ -100,14 +100,14 @@ pub fn build_clash_matrix(index: &VerbMetadataIndex) -> Vec<ClashRow> {
 /// let index = VerbMetadataIndex::load()?;
 /// let rows = build_clash_matrix(&index);
 /// let (_csv, markdown) = render_clash_reports(&rows)?;
-/// assert!(markdown.starts_with("# Coder Clash Matrix"));
+/// assert!(markdown.starts_with("# Drafter Clash Matrix"));
 /// # Ok::<(), anyhow::Error>(())
 /// ```
 pub fn render_clash_reports(rows: &[ClashRow]) -> Result<(String, String)> {
     let mut csv = String::from(
         "verb_a,verb_b,domain,planes,required_param_signature,action_overlap,clash_kind,harm_a,harm_b,side_effects_a,side_effects_b\n",
     );
-    let mut markdown = String::from("# Coder Clash Matrix\n\n");
+    let mut markdown = String::from("# Drafter Clash Matrix\n\n");
     writeln!(&mut markdown, "- clash pairs: {}", rows.len())?;
     let mut by_kind = std::collections::BTreeMap::<String, usize>::new();
     for row in rows {

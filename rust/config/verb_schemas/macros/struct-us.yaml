@@ -14,6 +14,12 @@
 # =============================================================================
 struct.us.40act.open-end:
   kind: macro
+  plan-kind: composite_sequence
+  lifecycle-state: active
+  requires-states: []
+  precondition-checks: ["requires_scope:client"]
+  state-effect: transition
+  side-effects: state_write
 
   ui:
     label: "US 40 Act Open-End Fund"
@@ -256,6 +262,12 @@ struct.us.40act.open-end:
 # =============================================================================
 struct.us.40act.closed-end:
   kind: macro
+  plan-kind: composite_sequence
+  lifecycle-state: active
+  requires-states: []
+  precondition-checks: ["requires_scope:client"]
+  state-effect: transition
+  side-effects: state_write
 
   ui:
     label: "US 40 Act Closed-End Fund"
@@ -487,6 +499,12 @@ struct.us.40act.closed-end:
 # =============================================================================
 struct.us.etf.40act:
   kind: macro
+  plan-kind: composite_sequence
+  lifecycle-state: active
+  requires-states: []
+  precondition-checks: ["requires_scope:client"]
+  state-effect: transition
+  side-effects: state_write
 
   ui:
     label: "US 40 Act ETF"
@@ -779,6 +797,12 @@ struct.us.etf.40act:
 # =============================================================================
 struct.us.private-fund.delaware-lp:
   kind: macro
+  plan-kind: composite_sequence
+  lifecycle-state: active
+  requires-states: []
+  precondition-checks: ["requires_scope:client"]
+  state-effect: transition
+  side-effects: state_write
 
   ui:
     label: "US Private Fund Delaware LP"

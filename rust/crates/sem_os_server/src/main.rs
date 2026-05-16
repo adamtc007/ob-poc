@@ -39,7 +39,7 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use sem_os_core::ports::BootstrapAuditStore;
-use sem_os_core::service::CoreServiceImpl;
+use sem_os_policy::service::CoreServiceImpl;
 use sem_os_postgres::PgStores;
 use sem_os_server::{build_router, JwtConfig, OutboxDispatcher};
 use sqlx::postgres::PgPoolOptions;
@@ -77,7 +77,7 @@ async fn main() {
     let projections: Arc<dyn sem_os_core::ports::ProjectionWriter> = Arc::new(stores.projections);
 
     // Build core service
-    let service: Arc<dyn sem_os_core::service::CoreService> = Arc::new(
+    let service: Arc<dyn sem_os_policy::service::CoreService> = Arc::new(
         CoreServiceImpl::new(
             Arc::new(stores.snapshots),
             Arc::new(stores.objects),

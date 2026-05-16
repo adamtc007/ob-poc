@@ -14,7 +14,7 @@ use super::plan_types::{
     BindingTable, EntityBinding, PlanStepStatus, RunbookPlan, RunbookPlanStep,
 };
 use crate::repl::types_v2::{SubjectKind, VerbRef, WorkspaceKind};
-use sem_os_core::verb_contract::VerbOutput;
+use sem_os_ontology::verb_contract::VerbOutput;
 
 // ---------------------------------------------------------------------------
 // Compiler input

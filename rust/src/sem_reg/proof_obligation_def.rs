@@ -1,1 +1,1 @@
-pub use sem_os_core::proof_obligation_def::*;
+pub use sem_os_ontology::proof_obligation_def::*;

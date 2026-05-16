@@ -52,6 +52,41 @@ version: "1.0"
 workspace: book_setup
 dag_id: book_setup_dag
 
+dsl_verb_reconciliation:
+  book_setup_macro_surface:
+    - mandate.details
+    - mandate.list
+    - mandate.select
+    - party.add
+    - party.details
+    - party.list
+    - party.search
+    - party.set-address
+    - party.update
+    - struct.hedge.cross-border
+    - struct.ie.aif.icav
+    - struct.ie.hedge.icav
+    - struct.ie.ucits.icav
+    - struct.lux.aif.raif
+    - struct.lux.pe.scsp
+    - struct.pe.cross-border
+    - struct.uk.authorised.acs
+    - struct.uk.authorised.aut
+    - struct.uk.authorised.ltaf
+    - struct.uk.manager.llp
+    - struct.uk.private-equity.lp
+    - struct.us.40act.closed-end
+    - struct.us.40act.open-end
+    - struct.us.etf.40act
+    - struct.us.private-fund.delaware-lp
+    - structure.list
+    - structure.product-suite-custody-fa-ta
+    - structure.product-suite-full
+    - structure.remove-all-products
+    - structure.roles
+    - structure.select
+    - structure.setup
+
 # =============================================================================
 # 1. OVERALL BOOK-SETUP LIFECYCLE (per book, derived)
 # =============================================================================

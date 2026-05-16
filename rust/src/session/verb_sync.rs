@@ -186,15 +186,16 @@ impl VerbSyncService {
         let removed = orphans.len() as i32;
 
         if removed > 0 {
-            warn!("Deleting {} orphaned verbs from DB (not in YAML registry)", removed);
+            warn!(
+                "Deleting {} orphaned verbs from DB (not in YAML registry)",
+                removed
+            );
             let orphan_names: Vec<String> = orphans.into_iter().cloned().collect();
-            sqlx::query(
-                r#"DELETE FROM "ob-poc".dsl_verbs WHERE full_name = ANY($1)"#,
-            )
-            .bind(&orphan_names)
-            .execute(&self.pool)
-            .await
-            .map_err(VerbSyncError::from)?;
+            sqlx::query(r#"DELETE FROM "ob-poc".dsl_verbs WHERE full_name = ANY($1)"#)
+                .bind(&orphan_names)
+                .execute(&self.pool)
+                .await
+                .map_err(VerbSyncError::from)?;
         }
 
         let duration_ms = start.elapsed().as_millis() as i64;
@@ -583,10 +584,7 @@ impl VerbSyncService {
                 // ops use `primary_table`. Accept any of these.
                 let has_table = !crud.table.is_empty()
                     || crud.junction.as_deref().is_some_and(|s| !s.is_empty())
-                    || crud
-                        .primary_table
-                        .as_deref()
-                        .is_some_and(|s| !s.is_empty())
+                    || crud.primary_table.as_deref().is_some_and(|s| !s.is_empty())
                     || crud.base_table.as_deref().is_some_and(|s| !s.is_empty());
                 if !has_table {
                     diagnostics.add_error_with_path(

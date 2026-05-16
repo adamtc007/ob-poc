@@ -53,6 +53,12 @@ pub struct Dag {
     #[serde(default)]
     pub evidence_types: Vec<EvidenceType>,
 
+    /// Canonical DSL verbs owned by this DAG but not necessarily represented
+    /// as lifecycle transitions. Used by reconciliation harnesses to keep
+    /// verb registry, packs, macros, and DAG taxonomy aligned.
+    #[serde(default)]
+    pub dsl_verb_reconciliation: BTreeMap<String, Vec<String>>,
+
     // --- existing sections ---
     #[serde(default)]
     pub product_module_gates: Option<ProductModuleGates>,
@@ -788,7 +794,7 @@ pub struct LoadedDag {
 /// we're stricter than pack_loader because DAG YAML is authoritative
 /// architectural input.
 pub fn load_dags_from_dir(dags_dir: &Path) -> Result<BTreeMap<String, LoadedDag>> {
-    let mut out = BTreeMap::new();
+    let mut out: BTreeMap<String, LoadedDag> = BTreeMap::new();
     let entries = fs::read_dir(dags_dir)
         .with_context(|| format!("cannot read DAG taxonomies dir {dags_dir:?}"))?;
     for entry in entries {
@@ -810,6 +816,92 @@ pub fn load_dags_from_dir(dags_dir: &Path) -> Result<BTreeMap<String, LoadedDag>
         );
     }
     Ok(out)
+}
+
+/// Load DAG taxonomies through Sem OS Domain Pack ownership.
+///
+/// Runtime callers should prefer this over walking `dag_taxonomies/`
+/// directly. A DAG is visible to the compiler/runtime only when a domain-pack
+/// manifest declares it in `owned_dags`.
+pub fn load_domain_pack_owned_dags(config_root: &Path) -> Result<BTreeMap<String, LoadedDag>> {
+    let domain_pack_dir = config_root.join("sem_os_seeds/domain_packs");
+    let dag_dir = config_root.join("sem_os_seeds/dag_taxonomies");
+    let mut out: BTreeMap<String, LoadedDag> = BTreeMap::new();
+
+    for manifest_path in yaml_files(&domain_pack_dir)? {
+        let raw = fs::read_to_string(&manifest_path)
+            .with_context(|| format!("cannot read domain pack manifest {manifest_path:?}"))?;
+        let manifest: serde_yaml::Value = serde_yaml::from_str(&raw)
+            .with_context(|| format!("failed to parse domain pack manifest {manifest_path:?}"))?;
+        let pack_id = manifest
+            .get("pack_id")
+            .and_then(serde_yaml::Value::as_str)
+            .unwrap_or("<unknown>");
+
+        let owned_dags = manifest
+            .get("owned_dags")
+            .and_then(serde_yaml::Value::as_sequence)
+            .into_iter()
+            .flatten()
+            .filter_map(serde_yaml::Value::as_str);
+
+        for dag_id in owned_dags {
+            let path = find_dag_yaml_by_id(&dag_dir, dag_id)
+                .with_context(|| format!("domain pack {pack_id} declares missing DAG {dag_id}"))?;
+            let raw = fs::read_to_string(&path)
+                .with_context(|| format!("cannot read DAG taxonomy {path:?}"))?;
+            let dag: Dag = serde_yaml::from_str(&raw)
+                .with_context(|| format!("failed to parse DAG taxonomy {path:?}"))?;
+            let loaded = LoadedDag {
+                source_path: path,
+                dag,
+            };
+            if let Some(existing) = out.get(&loaded.dag.workspace) {
+                if existing.dag.dag_id != loaded.dag.dag_id {
+                    anyhow::bail!(
+                        "domain pack DAG ownership conflict for workspace {}: {} vs {}",
+                        loaded.dag.workspace,
+                        existing.dag.dag_id,
+                        loaded.dag.dag_id
+                    );
+                }
+            } else {
+                out.insert(loaded.dag.workspace.clone(), loaded);
+            }
+        }
+    }
+
+    Ok(out)
+}
+
+fn yaml_files(dir: &Path) -> Result<Vec<PathBuf>> {
+    let mut files = Vec::new();
+    for entry in fs::read_dir(dir).with_context(|| format!("cannot read YAML dir {dir:?}"))? {
+        let entry = entry?;
+        let path = entry.path();
+        if path.extension().and_then(|e| e.to_str()) == Some("yaml") {
+            files.push(path);
+        }
+    }
+    files.sort();
+    Ok(files)
+}
+
+fn find_dag_yaml_by_id(dag_dir: &Path, expected: &str) -> Result<PathBuf> {
+    for path in yaml_files(dag_dir)? {
+        let raw = fs::read_to_string(&path)
+            .with_context(|| format!("cannot read DAG taxonomy {path:?}"))?;
+        let yaml: serde_yaml::Value = serde_yaml::from_str(&raw)
+            .with_context(|| format!("failed to parse DAG taxonomy {path:?}"))?;
+        let matches = ["dag_id", "workspace"]
+            .iter()
+            .any(|field| yaml.get(*field).and_then(serde_yaml::Value::as_str) == Some(expected));
+        if matches {
+            return Ok(path);
+        }
+    }
+
+    anyhow::bail!("failed to find DAG taxonomy {expected} in {dag_dir:?}")
 }
 
 // =============================================================================

@@ -114,6 +114,7 @@ domains:
         - "show legal entities"
         - "all BNY entities"
         - "get legal entities"
+        args: []
         returns:
           type: record_set
           name: legal_entities

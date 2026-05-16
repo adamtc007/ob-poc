@@ -11,6 +11,7 @@ description: >
 
 invocation_phrases:
   - "instrument matrix"
+  - "trading matrix"
   - "trading profile"
   - "configure trading"
   - "settlement setup"

@@ -137,6 +137,13 @@ export interface FrameRef {
   stale: boolean;
 }
 
+export interface TraceValidationStep {
+  step_number: number;
+  step_id: string;
+  status: "passed" | "failed" | "skipped" | string;
+  message: string;
+}
+
 export type TraceOp =
   | { op: "stack_push"; workspace: WorkspaceKind }
   | { op: "stack_pop"; workspace: WorkspaceKind }
@@ -179,6 +186,8 @@ export type TraceOp =
       op: "workbook_dry_run_validated";
       workbook_id: string;
       transition_ref: string;
+      semantic_diff_uri?: string;
+      validation_trace?: TraceValidationStep[];
     }
   | {
       op: "approval_token_issued";
@@ -296,6 +305,15 @@ export interface WorkbookEvidenceRef {
   kind: string;
   ref_id: string;
   digest: string;
+  source_system?: string;
+  field_path?: string;
+  classification?: string;
+}
+
+export interface WorkbookCheck {
+  check_id: string;
+  status: "passed" | "failed" | "not_evaluated";
+  message: string;
 }
 
 export interface WorkbookSubject {
@@ -340,13 +358,21 @@ export interface ExecutionWorkbookCore {
   schema_version: number;
   pack_id: string;
   transition_ref: string;
+  execution_mode: "dry_run" | "execute_after_approval" | "execute";
   session_id: string;
   subject: WorkbookSubject;
   actor: WorkbookActor;
   configuration_version: string;
   state_snapshot_id: string;
+  objective: string;
+  user_prompt_ref?: string;
+  editor_context_refs?: string[];
   evidence_refs: WorkbookEvidenceRef[];
   llm_trace_ref?: unknown;
+  expected_preconditions?: string[];
+  expected_postconditions?: string[];
+  invariant_checks?: WorkbookCheck[];
+  governance_checks?: WorkbookCheck[];
   simulation: StateSimulationResult;
   stale_policy: "reject" | "revalidate" | "rebind_if_equivalent";
   previous_workbook_id?: string;
@@ -364,6 +390,8 @@ export interface DslCoderDryRunResult {
   workbook_id: string;
   transition_ref: string;
   semantic_diff: StateSimulationResult;
+  semantic_diff_uri: string;
+  validation_trace: TraceValidationStep[];
 }
 
 export interface KycUpdateStatusDryRunResult {

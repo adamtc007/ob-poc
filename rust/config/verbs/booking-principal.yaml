@@ -308,6 +308,7 @@ domains:
         - "show me the booking coverage by jurisdiction"
         - "which principal services this region"
         - "booking coverage by country"
+        args: []
         returns:
           type: record_set
           name: coverage_entries
@@ -333,6 +334,7 @@ domains:
         - "coverage gaps"
         - "what gaps exist"
         - "show booking gaps"
+        args: []
         returns:
           type: record_set
           name: gaps

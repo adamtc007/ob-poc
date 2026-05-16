@@ -45,26 +45,26 @@
 //! let instance = engine.try_advance(instance.instance_id).await?;
 //! ```
 
+mod cargo_ref;
 mod definition;
 mod state;
-
-// Task queue and document modules
-mod blob_store;
-mod cargo_ref;
-mod document;
-mod task_queue;
 
 #[cfg(feature = "database")]
 mod engine;
 #[cfg(feature = "database")]
 mod guards;
 #[cfg(feature = "database")]
-mod listener;
-#[cfg(feature = "database")]
 mod repository;
 #[cfg(feature = "database")]
 mod requirements;
 
+// External contract (verified by workspace grep, Phase 2 audit 2026-05-12):
+// every symbol below has at least one `use ob_workflow::...` consumer in
+// `rust/src/`. The original `blob_store`, `document`, `task_queue`, and
+// `listener` modules (~1,523 LOC) were deleted 2026-05-14 after the
+// dead-code sweep — they had been demoted to `pub(crate)` in the 2026-05-12
+// audit and turned out to have no consumers at all, internal or external.
+pub use cargo_ref::{CargoRef, CargoRefParseError};
 pub use definition::{
     ActionDef, RequirementDef, StateDef, TransitionDef, TriggerDef, WorkflowDefinition,
     WorkflowLoader,
@@ -74,27 +74,12 @@ pub use state::{Blocker, BlockerType, StateTransition, WorkflowInstance};
 #[cfg(feature = "database")]
 pub use requirements::RequirementEvaluator;
 
-// Re-export key types from new modules
-pub use blob_store::{BlobStore, BlobStoreError, LocalBlobStore};
-pub use cargo_ref::{CargoRef, CargoRefParseError};
-pub use document::{
-    Document, DocumentEvent, DocumentEventType, DocumentRequirement, DocumentVersion,
-    DocumentWithStatus, RejectionCode, RequirementState, RequirementStateError,
-    UnsatisfiedRequirement, VerificationStatus,
-};
-pub use task_queue::{
-    BundleItem, PendingTask, PendingTaskStatus, TaskCompleteRequest, TaskEvent, TaskEventType,
-    TaskResult, TaskResultRow, TaskStatus,
-};
-
 #[cfg(feature = "database")]
 pub use engine::{
     AvailableAction, AvailableTransition, GuardStatus, WorkflowEngine, WorkflowStatus,
 };
 #[cfg(feature = "database")]
 pub use guards::{GuardEvaluator, GuardResult};
-#[cfg(feature = "database")]
-pub use listener::{ListenerError, TaskQueueListener};
 #[cfg(feature = "database")]
 pub use repository::WorkflowRepository;
 

@@ -1,0 +1,62 @@
+pack_id: ob-poc.semos-maintenance
+name: ob-poc SemOS Maintenance Domain Pack
+version: 0.1.0
+implementation_mode: native_compiled
+compatibility_tier: dry_run_only
+owned_dags: [semos_maintenance_dag]
+owned_packs: [semos-maintenance]
+owned_state_machines:
+  - changeset_lifecycle
+  - attribute_def_lifecycle
+  - derivation_spec_lifecycle
+  - phrase_authoring_lifecycle
+  - shared_atom_lifecycle
+owned_constellation_maps:
+  - semos.workspace
+  - registry.stewardship
+  - governance.compliance
+owned_constellation_families:
+  - semos_workspace
+  - registry_governance
+  - governance_sla
+owned_universes: []
+owned_verb_prefixes:
+  - changeset.
+  - governance.
+  - attribute.
+  - derivation.
+  - phrase.
+owned_entity_kinds: []
+business_crates: []
+owned_constellations:
+  - semos.workspace
+  - registry.stewardship
+allowed_transitions:
+  - transition_ref: semos-maintenance.changeset-submitted
+    entity_type: changeset
+    state_machine: changeset_lifecycle
+    verb: governance.submit-for-review
+    from_state: draft
+    to_state: submitted
+    dry_run_enabled: true
+    mutation_enabled: false
+    hitl_required: true
+discovery_probes:
+  - probe_id: semos-maintenance.read-state
+    operation: read_state
+    target: semos.registry
+    idempotent: true
+    modeled: true
+    first_class_state_mutation: false
+projection_catalog: []
+mention_namespaces: []
+declared_modes: []
+workflow_phases: []
+acp_personas: []
+resource_uri_schemes: []
+external_mcp_transports: []
+typed_extension_points: []
+classification_policy:
+  max_prompt_classification: internal
+  allow_external_llm: false
+  required_redactions: []

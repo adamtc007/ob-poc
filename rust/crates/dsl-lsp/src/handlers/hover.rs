@@ -5,10 +5,10 @@ use tower_lsp::lsp_types::*;
 use crate::analysis::document::{ExprKind, ParsedArg};
 use crate::analysis::DocumentState;
 
-use ob_poc::dsl_v2::tooling::{find_unified_verb, registry, ArgDef, UnifiedVerbDef};
+use dsl_analysis::verb_registry::{find_unified_verb, registry, ArgDef, UnifiedVerbDef};
 
 /// Get hover information at position.
-pub fn get_hover(doc: &DocumentState, position: Position) -> Option<Hover> {
+pub(crate) fn get_hover(doc: &DocumentState, position: Position) -> Option<Hover> {
     // Check if we're hovering over a verb or keyword argument
     for expr in &doc.expressions {
         if let ExprKind::Call {

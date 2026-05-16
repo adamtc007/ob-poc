@@ -28,6 +28,7 @@ domains:
           side_effects: facts_only
         behavior: plugin
         handler: SourceListOp
+        args: []
         returns:
           type: record_set
 

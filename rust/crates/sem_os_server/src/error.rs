@@ -10,7 +10,7 @@ use sem_os_core::error::SemOsError;
 use serde_json::json;
 
 /// Wrapper to convert `SemOsError` into an axum response.
-pub struct AppError(SemOsError);
+pub(crate) struct AppError(SemOsError);
 
 impl From<SemOsError> for AppError {
     fn from(e: SemOsError) -> Self {

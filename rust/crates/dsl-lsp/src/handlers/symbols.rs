@@ -7,7 +7,7 @@ use crate::analysis::DocumentState;
 
 /// Get document symbols (outline).
 #[allow(deprecated)]
-pub fn get_document_symbols(doc: &DocumentState) -> Vec<SymbolInformation> {
+pub(crate) fn get_document_symbols(doc: &DocumentState, uri: &Url) -> Vec<SymbolInformation> {
     let mut symbols = Vec::new();
 
     for expr in &doc.expressions {
@@ -53,7 +53,7 @@ pub fn get_document_symbols(doc: &DocumentState) -> Vec<SymbolInformation> {
                 tags: None,
                 deprecated: None,
                 location: Location {
-                    uri: Url::parse("file:///").unwrap(), // Will be set by caller
+                    uri: uri.clone(),
                     range: expr.range,
                 },
                 container_name: Some(verb_name.split('.').next().unwrap_or("dsl").to_string()),
@@ -69,7 +69,7 @@ pub fn get_document_symbols(doc: &DocumentState) -> Vec<SymbolInformation> {
             tags: None,
             deprecated: None,
             location: Location {
-                uri: Url::parse("file:///").unwrap(),
+                uri: uri.clone(),
                 range: def.range,
             },
             container_name: Some(def.defined_by.clone()),

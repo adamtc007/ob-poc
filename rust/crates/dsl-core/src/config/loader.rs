@@ -9,8 +9,8 @@ use tracing::info;
 use super::phrase_gen::generate_phrases;
 use super::types::{ArgType, CsgRulesConfig, VerbBehavior, VerbsConfig};
 use super::{
-    dag::load_dags_from_dir, dag_validator::entity_kinds_from_taxonomy_yaml,
-    validate_dags_with_context, DagValidationContext,
+    dag_validator::entity_kinds_from_taxonomy_yaml, validate_dags_with_context,
+    DagValidationContext,
 };
 
 pub struct ConfigLoader {
@@ -259,30 +259,29 @@ impl ConfigLoader {
     }
 
     /// Load CSG rules configuration
-    /// Load the DAG taxonomy registry from `{config_dir}/sem_os_seeds/dag_taxonomies/`.
+    /// Load the DAG taxonomy registry through Sem OS Domain Pack manifests.
     ///
     /// Returns a `DagRegistry` with all DAGs pre-indexed for V1.3
     /// runtime lookups (cross_workspace_constraints,
     /// derived_cross_workspace_state, parent_slot). Intended to be
     /// called once at runtime startup and shared via `Arc`.
     ///
-    /// Returns an empty registry (logged warning) if the
-    /// dag_taxonomies directory is missing — keeps startup tolerant
-    /// for environments where DAGs aren't yet authored.
+    /// Returns an empty registry (logged warning) if the domain-pack manifest
+    /// directory is missing — keeps startup tolerant for environments where
+    /// DAGs aren't yet authored.
     pub fn load_dag_registry(&self) -> Result<super::dag_registry::DagRegistry> {
-        let path = std::path::Path::new(&self.config_dir)
-            .join("sem_os_seeds")
-            .join("dag_taxonomies");
+        let config_root = std::path::Path::new(&self.config_dir);
+        let path = config_root.join("sem_os_seeds").join("domain_packs");
         if !path.exists() {
             tracing::warn!(
-                "DAG taxonomies directory not found at {:?} — \
+                "Domain-pack manifest directory not found at {:?} — \
                  runtime cross-workspace lookups will return empty",
                 path
             );
             return Ok(super::dag_registry::DagRegistry::default());
         }
-        let loaded = load_dags_from_dir(&path)
-            .with_context(|| format!("loading DAG taxonomies from {path:?}"))?;
+        let loaded = super::dag::load_domain_pack_owned_dags(config_root)
+            .with_context(|| format!("loading domain-pack-owned DAG taxonomies from {path:?}"))?;
         let context = self.load_dag_validation_context()?;
         let report = validate_dags_with_context(&loaded, &context);
         if !report.errors.is_empty() {

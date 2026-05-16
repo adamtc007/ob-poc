@@ -30,7 +30,7 @@
 // `ObPocSemOsContextResolver` in ob-poc bridges to
 // `crate::sem_reg::agent::mcp_tools::build_sem_os_service(pool).resolve_context(...)`.
 // Internal `ActorContext`/`Classification` references switched from
-// `crate::sem_reg::*` to `sem_os_core::abac::*` (already JSON-compatible
+// `crate::sem_reg::*` to `sem_os_policy::abac::*` (already JSON-compatible
 // per the original `to_sem_os_actor` round-trip helper, now eliminated).
 // affinity_graph_cache also relocated alongside (slice #24 step B).
 // Phase 5a — agent_ops relocated to `dsl-runtime::domain_ops::agent_ops`
@@ -93,7 +93,7 @@ mod stub_op;
 // `dsl-runtime::domain_ops::discovery_ops` along with its two helper
 // modules: `entity_kind` (81 LOC, zero deps) and `stategraph/`
 // (514 LOC, dsl_core only). 4 ob-poc consumers updated from
-// `crate::entity_kind` → `dsl_runtime::entity_kind`.
+// `crate::entity_kind` → `dsl_analysis::entity_kind`.
 // Inside discovery_ops: `dispatch_tool` calls routed via
 // `StewardshipDispatch` (slice #7 cascade trick); `gateway_addr()`
 // inlined to direct `std::env::var` lookup; legacy `sem_reg_tool`
@@ -232,7 +232,7 @@ pub mod rule_evaluator;
 // verb_registry + sem_reg snapshots); 5 introspect/extract verbs
 // route via existing `StewardshipDispatch` cascade to the
 // `db_introspect` MCP tool (slice #7 trick); 3 diagram verbs use
-// direct sqlx + sem_os_core::diagram + relocated affinity_graph_cache.
+// direct sqlx + sem_os_policy::diagram + relocated affinity_graph_cache.
 // Phase 5a — semantic_ops relocated to `dsl-runtime::domain_ops::semantic_ops`,
 // consuming `dyn SemanticStateService` via the ServiceRegistry.
 // Phase 5a composite-blocker #28 — service_pipeline_ops relocated to

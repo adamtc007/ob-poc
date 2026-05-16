@@ -1068,6 +1068,7 @@ struct DiscoveryRow {
 struct AttrRequirementRow {
     attr_id: Uuid,
     #[allow(dead_code)]
+    // sqlx FromRow column; column is selected for completeness even though it isn't read in Rust
     requirement_strength: String,
     required_by_srdefs: JsonValue,
 }

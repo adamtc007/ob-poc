@@ -27,10 +27,10 @@ use tokio::time::sleep;
 // =============================================================================
 
 /// Allianz SE (Head Office) - Large corporate with many children
-pub const ALLIANZ_SE_LEI: &str = "529900K9B0N5BT694847";
+pub(crate) const ALLIANZ_SE_LEI: &str = "529900K9B0N5BT694847";
 
 /// Allianz Global Investors GmbH (ManCo) - Fund manager with managed funds
-pub const ALLIANZ_GI_LEI: &str = "529900FAHFDMSXCPII15";
+pub(crate) const ALLIANZ_GI_LEI: &str = "529900FAHFDMSXCPII15";
 
 // =============================================================================
 // Configuration
@@ -45,12 +45,12 @@ const OUTPUT_DIR: &str = "data/gleif_test_output";
 // =============================================================================
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct TestConfig {
-    pub output_dir: PathBuf,
-    pub save_responses: bool,
-    pub verbose: bool,
-    pub max_managed_funds: usize,
-    pub max_children: usize,
+pub(crate) struct TestConfig {
+    pub(crate) output_dir: PathBuf,
+    pub(crate) save_responses: bool,
+    pub(crate) verbose: bool,
+    pub(crate) max_managed_funds: usize,
+    pub(crate) max_children: usize,
 }
 
 impl Default for TestConfig {
@@ -66,61 +66,61 @@ impl Default for TestConfig {
 }
 
 #[derive(Debug, Default, Serialize)]
-pub struct TestReport {
-    pub endpoints_tested: Vec<EndpointResult>,
-    pub relationship_types: HashSet<String>,
-    pub entity_categories: HashSet<String>,
-    pub entity_statuses: HashSet<String>,
-    pub legal_forms: HashSet<String>,
-    pub edge_cases: Vec<EdgeCaseResult>,
-    pub rate_limit_stats: RateLimitStats,
-    pub errors: Vec<String>,
-    pub summary: TestSummary,
+pub(crate) struct TestReport {
+    pub(crate) endpoints_tested: Vec<EndpointResult>,
+    pub(crate) relationship_types: HashSet<String>,
+    pub(crate) entity_categories: HashSet<String>,
+    pub(crate) entity_statuses: HashSet<String>,
+    pub(crate) legal_forms: HashSet<String>,
+    pub(crate) edge_cases: Vec<EdgeCaseResult>,
+    pub(crate) rate_limit_stats: RateLimitStats,
+    pub(crate) errors: Vec<String>,
+    pub(crate) summary: TestSummary,
 }
 
 #[derive(Debug, Clone, Serialize)]
-pub struct EndpointResult {
-    pub endpoint: String,
-    pub method: String,
-    pub status_code: u16,
-    pub response_time_ms: u64,
-    pub sample_lei: String,
-    pub response_file: Option<String>,
-    pub notes: Vec<String>,
+pub(crate) struct EndpointResult {
+    pub(crate) endpoint: String,
+    pub(crate) method: String,
+    pub(crate) status_code: u16,
+    pub(crate) response_time_ms: u64,
+    pub(crate) sample_lei: String,
+    pub(crate) response_file: Option<String>,
+    pub(crate) notes: Vec<String>,
 }
 
 #[derive(Debug, Clone, Serialize)]
-pub struct EdgeCaseResult {
-    pub case_type: String,
-    pub lei: String,
-    pub description: String,
-    pub observed_behavior: String,
-    pub response_file: Option<String>,
+pub(crate) struct EdgeCaseResult {
+    pub(crate) case_type: String,
+    pub(crate) lei: String,
+    pub(crate) description: String,
+    pub(crate) observed_behavior: String,
+    pub(crate) response_file: Option<String>,
 }
 
 #[derive(Debug, Default, Clone, Serialize)]
-pub struct RateLimitStats {
-    pub total_requests: usize,
-    pub total_time_ms: u64,
-    pub avg_delay_ms: u64,
-    pub rate_limit_hits: usize,
+pub(crate) struct RateLimitStats {
+    pub(crate) total_requests: usize,
+    pub(crate) total_time_ms: u64,
+    pub(crate) avg_delay_ms: u64,
+    pub(crate) rate_limit_hits: usize,
 }
 
 #[derive(Debug, Default, Clone, Serialize)]
-pub struct TestSummary {
-    pub total_endpoints: usize,
-    pub successful_endpoints: usize,
-    pub failed_endpoints: usize,
-    pub unique_relationship_types: usize,
-    pub unique_entity_categories: usize,
-    pub edge_cases_tested: usize,
+pub(crate) struct TestSummary {
+    pub(crate) total_endpoints: usize,
+    pub(crate) successful_endpoints: usize,
+    pub(crate) failed_endpoints: usize,
+    pub(crate) unique_relationship_types: usize,
+    pub(crate) unique_entity_categories: usize,
+    pub(crate) edge_cases_tested: usize,
 }
 
 // =============================================================================
 // GLEIF API Test Client
 // =============================================================================
 
-pub struct GleifTestClient {
+pub(crate) struct GleifTestClient {
     client: Client,
     last_request: Mutex<Instant>,
     request_count: AtomicUsize,
@@ -128,7 +128,7 @@ pub struct GleifTestClient {
 }
 
 impl GleifTestClient {
-    pub fn new(config: TestConfig) -> Result<Self> {
+    pub(crate) fn new(config: TestConfig) -> Result<Self> {
         let client = Client::builder()
             .timeout(Duration::from_secs(30))
             .build()
@@ -164,7 +164,7 @@ impl GleifTestClient {
     }
 
     /// Make a raw GET request and return the response with metadata
-    pub async fn get_raw(&self, url: &str) -> Result<(u16, String, u64)> {
+    pub(crate) async fn get_raw(&self, url: &str) -> Result<(u16, String, u64)> {
         self.rate_limit().await;
         let start = Instant::now();
 
@@ -212,14 +212,14 @@ impl GleifTestClient {
 // Test Harness (Original)
 // =============================================================================
 
-pub struct GleifTestHarness {
+pub(crate) struct GleifTestHarness {
     client: GleifTestClient,
     report: TestReport,
     start_time: Instant,
 }
 
 impl GleifTestHarness {
-    pub async fn new(config: TestConfig) -> Result<Self> {
+    pub(crate) async fn new(config: TestConfig) -> Result<Self> {
         Ok(Self {
             client: GleifTestClient::new(config)?,
             report: TestReport::default(),
@@ -228,7 +228,7 @@ impl GleifTestHarness {
     }
 
     /// Run all tests and generate report
-    pub async fn run_all_tests(&mut self) -> Result<()> {
+    pub(crate) async fn run_all_tests(&mut self) -> Result<()> {
         println!("\n{}", "=".repeat(70));
         println!("  GLEIF API TEST HARNESS");
         println!("  Testing API endpoints, response structures, and edge cases");
@@ -1238,7 +1238,7 @@ impl GleifTestHarness {
 // =============================================================================
 
 /// Run the GLEIF API test harness (original mode)
-pub async fn run_gleif_tests(verbose: bool) -> Result<()> {
+pub(crate) async fn run_gleif_tests(verbose: bool) -> Result<()> {
     let config = TestConfig {
         verbose,
         save_responses: true,

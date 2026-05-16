@@ -19,7 +19,7 @@ use ob_poc::agent::harness::runner::{dump_failures, print_suite_report, run_suit
 use ob_poc::agent::harness::{load_all_suites, load_suite, ScenarioSuite};
 
 /// List all suites and their scenario counts.
-pub fn list(scenarios_dir: &Path) -> Result<()> {
+pub(crate) fn list(scenarios_dir: &Path) -> Result<()> {
     let suites = load_all_suites(scenarios_dir).context("Failed to load scenario suites")?;
 
     if suites.is_empty() {
@@ -46,7 +46,7 @@ pub fn list(scenarios_dir: &Path) -> Result<()> {
 }
 
 /// Run scenarios with a database pool.
-pub async fn run(
+pub(crate) async fn run(
     pool: &sqlx::PgPool,
     scenarios_dir: &Path,
     suite_path: Option<&Path>,
@@ -118,7 +118,7 @@ pub async fn run(
 }
 
 /// Dump full artifacts for a specific scenario.
-pub async fn dump(
+pub(crate) async fn dump(
     pool: &sqlx::PgPool,
     scenarios_dir: &Path,
     scenario_name: &str,

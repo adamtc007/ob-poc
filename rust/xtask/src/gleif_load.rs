@@ -11,129 +11,129 @@ use std::path::Path;
 
 /// Entity data from GLEIF Level 2
 #[derive(Debug, Deserialize)]
-pub struct GleifEntity {
-    pub name: String,
-    pub lei: String,
-    pub jurisdiction: String,
+pub(crate) struct GleifEntity {
+    pub(crate) name: String,
+    pub(crate) lei: String,
+    pub(crate) jurisdiction: String,
     #[serde(default)]
-    pub category: Option<String>,
+    pub(crate) category: Option<String>,
     #[serde(default)]
-    pub legal_form: Option<String>,
+    pub(crate) legal_form: Option<String>,
     #[serde(default)]
-    pub status: Option<String>,
+    pub(crate) status: Option<String>,
     #[serde(default)]
-    pub registration_number: Option<String>,
+    pub(crate) registration_number: Option<String>,
     #[serde(default)]
-    pub validation_level: Option<String>,
+    pub(crate) validation_level: Option<String>,
     #[serde(default)]
-    pub next_renewal: Option<String>,
+    pub(crate) next_renewal: Option<String>,
     #[serde(default)]
-    pub parent_exception: Option<String>,
+    pub(crate) parent_exception: Option<String>,
     #[serde(default)]
-    pub address: Option<GleifAddress>,
+    pub(crate) address: Option<GleifAddress>,
     #[serde(default)]
-    pub direct_parent: Option<ParentRelationship>,
+    pub(crate) direct_parent: Option<ParentRelationship>,
     #[serde(default)]
-    pub ultimate_parent: Option<ParentRelationship>,
+    pub(crate) ultimate_parent: Option<ParentRelationship>,
 }
 
 #[derive(Debug, Deserialize)]
-pub struct GleifAddress {
+pub(crate) struct GleifAddress {
     #[serde(default)]
-    pub city: Option<String>,
+    pub(crate) city: Option<String>,
     #[serde(default)]
-    pub country: Option<String>,
+    pub(crate) country: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
-pub struct ParentRelationship {
-    pub parent_lei: String,
+pub(crate) struct ParentRelationship {
+    pub(crate) parent_lei: String,
     #[serde(default)]
-    pub relationship_type: Option<String>,
+    pub(crate) relationship_type: Option<String>,
     #[serde(default)]
-    pub corroboration: Option<String>,
+    pub(crate) corroboration: Option<String>,
 }
 
 /// Level 2 data file structure
 #[derive(Debug, Deserialize)]
-pub struct Level2Data {
-    pub entities: HashMap<String, GleifEntity>,
+pub(crate) struct Level2Data {
+    pub(crate) entities: HashMap<String, GleifEntity>,
 }
 
 /// Ownership chain file structure
 #[derive(Debug, Deserialize)]
-pub struct OwnershipChain {
-    pub ownership_chain: Vec<OwnershipChainEntity>,
-    pub relationships: Vec<Relationship>,
-    pub subsidiaries: Vec<Subsidiary>,
+pub(crate) struct OwnershipChain {
+    pub(crate) ownership_chain: Vec<OwnershipChainEntity>,
+    pub(crate) relationships: Vec<Relationship>,
+    pub(crate) subsidiaries: Vec<Subsidiary>,
     #[serde(default)]
-    pub managed_funds_count: usize,
+    pub(crate) managed_funds_count: usize,
     #[serde(default)]
-    pub managed_funds_sample: Vec<ManagedFund>,
+    pub(crate) managed_funds_sample: Vec<ManagedFund>,
 }
 
 #[derive(Debug, Deserialize)]
-pub struct OwnershipChainEntity {
-    pub lei: String,
-    pub legal_name: String,
-    pub jurisdiction: String,
+pub(crate) struct OwnershipChainEntity {
+    pub(crate) lei: String,
+    pub(crate) legal_name: String,
+    pub(crate) jurisdiction: String,
     #[serde(default)]
-    pub category: Option<String>,
+    pub(crate) category: Option<String>,
     #[serde(default)]
-    pub legal_form_code: Option<String>,
+    pub(crate) legal_form_code: Option<String>,
     #[serde(default)]
-    pub status: Option<String>,
+    pub(crate) status: Option<String>,
     #[serde(default)]
-    pub registration_number: Option<String>,
+    pub(crate) registration_number: Option<String>,
     #[serde(default)]
-    pub city: Option<String>,
+    pub(crate) city: Option<String>,
     #[serde(default)]
-    pub address: Option<String>,
+    pub(crate) address: Option<String>,
     #[serde(default)]
-    pub ubo_terminus: Option<bool>,
+    pub(crate) ubo_terminus: Option<bool>,
     #[serde(default)]
-    pub terminus_reason: Option<String>,
+    pub(crate) terminus_reason: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
-pub struct Relationship {
-    pub child_lei: String,
-    pub parent_lei: String,
+pub(crate) struct Relationship {
+    pub(crate) child_lei: String,
+    pub(crate) parent_lei: String,
     #[serde(rename = "type")]
-    pub relationship_type: String,
+    pub(crate) relationship_type: String,
     #[serde(default)]
-    pub status: Option<String>,
+    pub(crate) status: Option<String>,
     #[serde(default)]
-    pub corroboration: Option<String>,
+    pub(crate) corroboration: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
-pub struct Subsidiary {
-    pub lei: String,
-    pub legal_name: String,
-    pub jurisdiction: String,
+pub(crate) struct Subsidiary {
+    pub(crate) lei: String,
+    pub(crate) legal_name: String,
+    pub(crate) jurisdiction: String,
     #[serde(default)]
-    pub category: Option<String>,
+    pub(crate) category: Option<String>,
     #[serde(default)]
-    pub legal_form_code: Option<String>,
+    pub(crate) legal_form_code: Option<String>,
     #[serde(default)]
-    pub status: Option<String>,
+    pub(crate) status: Option<String>,
     #[serde(default)]
-    pub registration_number: Option<String>,
+    pub(crate) registration_number: Option<String>,
     #[serde(default)]
-    pub city: Option<String>,
+    pub(crate) city: Option<String>,
     #[serde(default)]
-    pub address: Option<String>,
+    pub(crate) address: Option<String>,
     #[serde(default)]
-    pub parent_lei: Option<String>,
+    pub(crate) parent_lei: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
-pub struct ManagedFund {
-    pub manco_lei: String,
-    pub fund_lei: String,
-    pub fund_name: String,
-    pub fund_jurisdiction: String,
+pub(crate) struct ManagedFund {
+    pub(crate) manco_lei: String,
+    pub(crate) fund_lei: String,
+    pub(crate) fund_name: String,
+    pub(crate) fund_jurisdiction: String,
 }
 
 // ============================================================================
@@ -142,80 +142,80 @@ pub struct ManagedFund {
 
 /// Complete funds file structure with umbrella relationships
 #[derive(Debug, Deserialize)]
-pub struct FundsComplete {
-    pub investment_manager: EntityRef,
-    pub ultimate_client: EntityRef,
-    pub total_funds: usize,
-    pub umbrella_count: usize,
+pub(crate) struct FundsComplete {
+    pub(crate) investment_manager: EntityRef,
+    pub(crate) ultimate_client: EntityRef,
+    pub(crate) total_funds: usize,
+    pub(crate) umbrella_count: usize,
     #[serde(default)]
-    pub unique_umbrella_leis: Vec<String>,
+    pub(crate) unique_umbrella_leis: Vec<String>,
     #[serde(default)]
-    pub by_jurisdiction: HashMap<String, usize>,
-    pub funds: Vec<CompleteFund>,
+    pub(crate) by_jurisdiction: HashMap<String, usize>,
+    pub(crate) funds: Vec<CompleteFund>,
 }
 
 /// Reference to a key entity (IM, Ultimate Client)
 #[derive(Debug, Deserialize)]
-pub struct EntityRef {
-    pub lei: String,
-    pub name: String,
+pub(crate) struct EntityRef {
+    pub(crate) lei: String,
+    pub(crate) name: String,
 }
 
 /// Fund with umbrella relationship info
 #[derive(Debug, Deserialize)]
-pub struct CompleteFund {
-    pub lei: String,
-    pub name: String,
-    pub jurisdiction: String,
+pub(crate) struct CompleteFund {
+    pub(crate) lei: String,
+    pub(crate) name: String,
+    pub(crate) jurisdiction: String,
     #[serde(default)]
-    pub category: Option<String>,
+    pub(crate) category: Option<String>,
     #[serde(default)]
-    pub status: Option<String>,
+    pub(crate) status: Option<String>,
     #[serde(default)]
-    pub legal_form: Option<String>,
+    pub(crate) legal_form: Option<String>,
     #[serde(default)]
-    pub city: Option<String>,
+    pub(crate) city: Option<String>,
     #[serde(default)]
-    pub country: Option<String>,
+    pub(crate) country: Option<String>,
     #[serde(default)]
-    pub umbrella_lei: Option<String>,
+    pub(crate) umbrella_lei: Option<String>,
     #[serde(default)]
-    pub umbrella_name: Option<String>,
+    pub(crate) umbrella_name: Option<String>,
     #[serde(default)]
-    pub is_umbrella: bool,
+    pub(crate) is_umbrella: bool,
 }
 
 /// Corporate tree file structure
 #[derive(Debug, Deserialize)]
-pub struct CorporateTree {
-    pub parent: CorporateTreeParent,
-    pub direct_children_count: usize,
-    pub by_jurisdiction: HashMap<String, usize>,
-    pub direct_children: Vec<CorporateTreeChild>,
+pub(crate) struct CorporateTree {
+    pub(crate) parent: CorporateTreeParent,
+    pub(crate) direct_children_count: usize,
+    pub(crate) by_jurisdiction: HashMap<String, usize>,
+    pub(crate) direct_children: Vec<CorporateTreeChild>,
 }
 
 #[derive(Debug, Deserialize)]
-pub struct CorporateTreeParent {
-    pub lei: String,
-    pub name: String,
-    pub jurisdiction: String,
+pub(crate) struct CorporateTreeParent {
+    pub(crate) lei: String,
+    pub(crate) name: String,
+    pub(crate) jurisdiction: String,
 }
 
 #[derive(Debug, Deserialize)]
-pub struct CorporateTreeChild {
-    pub lei: String,
-    pub name: String,
-    pub jurisdiction: String,
+pub(crate) struct CorporateTreeChild {
+    pub(crate) lei: String,
+    pub(crate) name: String,
+    pub(crate) jurisdiction: String,
     #[serde(default)]
-    pub category: Option<String>,
+    pub(crate) category: Option<String>,
     #[serde(default)]
-    pub legal_form: Option<String>,
+    pub(crate) legal_form: Option<String>,
     #[serde(default)]
-    pub status: Option<String>,
+    pub(crate) status: Option<String>,
     #[serde(default)]
-    pub city: Option<String>,
+    pub(crate) city: Option<String>,
     #[serde(default)]
-    pub address: Option<String>,
+    pub(crate) address: Option<String>,
 }
 
 /// Convert LEI to a safe DSL binding alias
@@ -489,7 +489,7 @@ fn generate_fund_cbu_dsl(
 }
 
 /// Generate full DSL from the complete funds file (allianzgi_funds_complete.json)
-pub fn generate_complete_funds_dsl(
+pub(crate) fn generate_complete_funds_dsl(
     funds_path: &Path,
     level2_path: &Path,
     fund_limit: Option<usize>,
@@ -801,7 +801,7 @@ fn generate_ownership_dsl(rel: &Relationship) -> String {
 }
 
 /// Generate full DSL file from all sources
-pub fn generate_full_dsl(
+pub(crate) fn generate_full_dsl(
     level2_path: &Path,
     ownership_path: &Path,
     corp_tree_path: &Path,
@@ -954,7 +954,7 @@ pub fn generate_full_dsl(
 }
 
 /// Main entry point for the gleif-load command
-pub async fn gleif_load(
+pub(crate) async fn gleif_load(
     output_file: Option<std::path::PathBuf>,
     fund_limit: Option<usize>,
     _corp_limit: Option<usize>, // Kept for backward compatibility

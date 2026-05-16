@@ -1,19 +1,20 @@
 //! Completion handler for the DSL Language Server.
 
-#![allow(dead_code)] // Public API - functions may be used by LSP server
-
 use tower_lsp::lsp_types::*;
 
 use crate::analysis::{detect_completion_context, CompletionContext, DocumentState, SymbolTable};
+use crate::encoding::{position_to_offset, span_to_range, PositionEncoding};
 use crate::entity_client::EntityLookupClient;
 
-use ob_poc::dsl_v2::suggestions::predict_next_steps;
-use ob_poc::dsl_v2::syntax::{parse_program, BindingContext, BindingInfo};
-use ob_poc::dsl_v2::tooling::{find_unified_verb, registry};
-use ob_poc::dsl_v2::{execution::runtime_registry, load_macro_registry};
+use dsl_analysis::macros::load_macro_registry;
+use dsl_analysis::runtime_registry::runtime_registry;
+use dsl_analysis::suggestions::predict_next_steps;
+use dsl_analysis::verb_registry::{find_unified_verb, registry};
+use dsl_core::binding_context::{BindingContext, BindingInfo};
+use dsl_core::parser::parse_program;
 
 /// Generate completions based on cursor position.
-pub async fn get_completions(
+pub(crate) async fn get_completions(
     doc: &DocumentState,
     position: Position,
     symbols: &SymbolTable,
@@ -28,7 +29,7 @@ pub async fn get_completions(
     );
 
     match context {
-        CompletionContext::VerbName { prefix } => complete_verb_names(&prefix, position),
+        CompletionContext::VerbName { prefix } => complete_verb_names(&doc.text, &prefix, position),
         CompletionContext::Keyword { verb_name, prefix } => complete_keywords(&verb_name, &prefix),
         CompletionContext::KeywordValue {
             verb_name,
@@ -42,21 +43,39 @@ pub async fn get_completions(
                 &prefix,
                 in_string,
                 position,
+                &doc.text,
                 entity_client,
             )
             .await
         }
         CompletionContext::SymbolRef {
             prefix,
+            marker,
             verb_name,
             keyword,
-        } => complete_symbols(&prefix, symbols, verb_name.as_deref(), keyword.as_deref()),
+        } => complete_symbols(
+            &prefix,
+            marker,
+            symbols,
+            verb_name.as_deref(),
+            keyword.as_deref(),
+        ),
         CompletionContext::EntityAsSymbol {
             verb_name,
             keyword,
             prefix,
+            marker,
         } => {
-            complete_entity_as_symbol(&verb_name, &keyword, &prefix, position, entity_client).await
+            complete_entity_as_symbol(
+                &verb_name,
+                &keyword,
+                &prefix,
+                marker,
+                position,
+                &doc.text,
+                entity_client,
+            )
+            .await
         }
         CompletionContext::None => {
             // New logic: Predict next steps based on document state
@@ -104,20 +123,11 @@ pub async fn get_completions(
 
 /// Complete verb names - progressively narrows as user types.
 /// e.g., "cbu" -> all cbu.* verbs, "cbu.e" -> cbu.ensure, etc.
-fn complete_verb_names(prefix: &str, position: Position) -> Vec<CompletionItem> {
+fn complete_verb_names(source: &str, prefix: &str, position: Position) -> Vec<CompletionItem> {
     let prefix_lower = prefix.to_lowercase();
     let reg = registry();
 
-    // Calculate range to replace the prefix
-    let prefix_len = prefix.len() as u32;
-    let start_char = position.character.saturating_sub(prefix_len);
-    let range = Range {
-        start: Position {
-            line: position.line,
-            character: start_char,
-        },
-        end: position,
-    };
+    let range = replacement_range(source, position, prefix, 0);
 
     reg.all_verbs()
         .filter(|verb| {
@@ -229,6 +239,7 @@ async fn complete_keyword_values(
     prefix: &str,
     in_string: bool,
     position: Position,
+    source: &str,
     entity_client: Option<EntityLookupClient>,
 ) -> Vec<CompletionItem> {
     tracing::debug!(
@@ -253,17 +264,8 @@ async fn complete_keyword_values(
                         // - If in_string, we need to replace from opening quote to cursor
                         // - prefix.len() is chars typed after the quote (or after space)
                         // - Add 1 for the opening quote if in_string
-                        let prefix_len = prefix.len() as u32;
                         let extra = if in_string { 1 } else { 0 }; // for opening quote
-                        let start_char = position.character.saturating_sub(prefix_len + extra);
-
-                        let range = Range {
-                            start: Position {
-                                line: position.line,
-                                character: start_char,
-                            },
-                            end: position,
-                        };
+                        let range = replacement_range(source, position, prefix, extra);
 
                         return results
                             .into_iter()
@@ -317,7 +319,9 @@ async fn complete_entity_as_symbol(
     verb_name: &str,
     keyword: &str,
     prefix: &str,
+    marker: char,
     position: Position,
+    source: &str,
     entity_client: Option<EntityLookupClient>,
 ) -> Vec<CompletionItem> {
     tracing::debug!(
@@ -340,16 +344,7 @@ async fn complete_entity_as_symbol(
                         // Calculate the range to replace: from @ to cursor position
                         // prefix.len() is the number of chars after @
                         // We need to go back prefix.len() + 1 (for the @) from cursor
-                        let prefix_len = prefix.len() as u32;
-                        let at_char = position.character.saturating_sub(prefix_len + 1);
-
-                        let range = Range {
-                            start: Position {
-                                line: position.line,
-                                character: at_char,
-                            },
-                            end: position,
-                        };
+                        let range = replacement_range(source, position, prefix, 1);
 
                         return results
                             .into_iter()
@@ -357,10 +352,10 @@ async fn complete_entity_as_symbol(
                             .map(|(i, m)| {
                                 // Insert @KEY as bare token - parser/linter resolves to UUID
                                 // m.id is the key (e.g., search_name, display_name) from return_key config
-                                let new_text = format!("@{}", m.id);
+                                let new_text = format!("{}{}", marker, m.id);
 
-                                // filterText includes @ so user can filter by typing @Apex
-                                let filter = format!("@{}", m.display);
+                                // filterText includes the marker so user can filter by typing @Apex/$Apex.
+                                let filter = format!("{}{}", marker, m.display);
 
                                 CompletionItem {
                                     label: m.display.clone(),
@@ -449,6 +444,7 @@ fn get_lookup_entity_type(verb_name: &str, keyword: &str) -> Option<String> {
 /// falling back to keyword pattern matching for backwards compatibility.
 fn complete_symbols(
     prefix: &str,
+    marker: char,
     symbols: &SymbolTable,
     verb_name: Option<&str>,
     keyword: Option<&str>,
@@ -485,7 +481,7 @@ fn complete_symbols(
             };
 
             CompletionItem {
-                label: format!("@{}", name),
+                label: format!("{}{}", marker, name),
                 kind: Some(CompletionItemKind::VARIABLE),
                 detail: Some(detail),
                 documentation: Some(Documentation::String(format!(
@@ -497,7 +493,7 @@ fn complete_symbols(
                         String::new()
                     }
                 ))),
-                insert_text: Some(format!("@{}", name)),
+                insert_text: Some(format!("{}{}", marker, name)),
                 insert_text_format: Some(InsertTextFormat::PLAIN_TEXT),
                 sort_text: Some(format!("{}-{}", sort_priority, name)),
                 ..Default::default()
@@ -549,8 +545,20 @@ fn infer_type_from_keyword_pattern(keyword: &str) -> Option<String> {
     }
 }
 
+/// Build a UTF-16-safe replacement range ending at the cursor.
+fn replacement_range(
+    source: &str,
+    position: Position,
+    prefix: &str,
+    extra_ascii_prefix_len: usize,
+) -> Range {
+    let end = position_to_offset(source, position, PositionEncoding::Utf16).unwrap_or(source.len());
+    let start = end.saturating_sub(prefix.len() + extra_ascii_prefix_len);
+    span_to_range(start, end, source, PositionEncoding::Utf16)
+}
+
 /// Get verb completions for playbook files (macro verbs + primitive verbs)
-pub fn playbook_verb_completions() -> Vec<CompletionItem> {
+pub(crate) fn playbook_verb_completions() -> Vec<CompletionItem> {
     let mut items = Vec::new();
 
     // First, add macro verbs (operator vocabulary)
@@ -586,10 +594,29 @@ pub fn playbook_verb_completions() -> Vec<CompletionItem> {
 
 #[cfg(test)]
 mod tests {
+    use super::*;
+
     // Note: All completion tests require DSL_CONFIG_DIR to be set
     // pointing to the config directory. These are tested in integration tests.
     //
     // The get_lookup_entity_type function now dynamically looks up entity_type
     // from the verb registry based on verbs.yaml configuration, so tests
     // need the full config loaded.
+
+    #[test]
+    fn replacement_range_handles_utf16_before_prefix() {
+        let source = "(test.verb :name \"🎉 cbu";
+        let position = Position {
+            line: 0,
+            character: source.encode_utf16().count() as u32,
+        };
+
+        let range = replacement_range(source, position, "cbu", 0);
+
+        assert_eq!(
+            range.start.character,
+            "(test.verb :name \"🎉 ".encode_utf16().count() as u32
+        );
+        assert_eq!(range.end.character, source.encode_utf16().count() as u32);
+    }
 }

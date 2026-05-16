@@ -765,6 +765,13 @@ mod tests {
             id: None,
             kind: MacroKind::Macro,
             tier: Some(MacroTier::Composite),
+            plan_kind: None,
+            lifecycle_state: None,
+            requires_states: vec![],
+            precondition_checks: vec![],
+            state_effect: None,
+            transition_args: None,
+            side_effects: None,
             aliases: aliases.into_iter().map(String::from).collect(),
             taxonomy: None,
             ui: MacroUi {

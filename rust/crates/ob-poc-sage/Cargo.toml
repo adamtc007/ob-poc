@@ -1,0 +1,37 @@
+[package]
+name = "ob-poc-sage"
+version = "0.1.0"
+edition = "2021"
+description = "Sage intent understanding — turns raw utterances into structured intent (plane, polarity, action, domain). Owns the Sage type vocabulary plus the deterministic classifier. No DSL assembly, no execution-tier coupling."
+
+# Capability discipline (see docs/todo/capability-crate-restructure-v1.md §2.2):
+#   IN-SCOPE  : plane / polarity / outcome / context / pre_classify /
+#               drafter_result / disposition / verb_resolve_types / session_context.
+#               Later: the small pure engines (clash_matrix, arg_assembly,
+#               coder, verb_resolve, verb_index) once their mcp::intent_pipeline
+#               dep is decoupled.
+#   OUT-OF-SCOPE: valid_verb_set, llm_sage, deterministic — these wire Sage
+#                 into the execution tier and stay in ob-poc (the application).
+
+[dependencies]
+ob-poc-types = { path = "../ob-poc-types" }
+anyhow = "1.0"
+async-trait = "0.1"
+chrono = { version = "0.4", features = ["serde"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+thiserror = "1"
+uuid = { version = "1", features = ["v4", "serde"] }
+# Optional — only needed by session_context's sqlx::PgPool helpers, gated
+# behind the `database` feature.
+sqlx = { version = "0.8", features = ["runtime-tokio-rustls", "postgres", "uuid", "chrono", "json"], optional = true }
+
+[features]
+default = []
+database = ["dep:sqlx"]
+
+[dev-dependencies]
+tokio = { version = "1", features = ["macros", "rt", "rt-multi-thread"] }
+
+[lints.rust]
+unreachable_pub = "deny"

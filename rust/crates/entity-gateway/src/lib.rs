@@ -58,17 +58,15 @@ mod config;
 mod index;
 pub mod proto;
 mod refresh;
-mod search_engine;
-mod search_expr;
 mod server;
 
-// Re-export main types
+// External API surface confirmed by workspace-grep (Phase 2 audit
+// 2026-05-12). The dead `search_engine` and `search_expr` modules
+// (SearchEngine + SearchResult + RankedMatch + SearchExpr s-expression
+// parser + SearchQuery/SearchSchema/DiscriminatorDef + DateMatchMode)
+// were deleted 2026-05-14 — see git history — once dead-code sweep
+// confirmed zero consumers inside or outside the crate.
 pub use config::{EntityConfig, GatewayConfig, RefreshConfig, StartupMode};
-pub use index::{
-    IndexError, IndexRecord, IndexRegistry, MatchMode, SearchIndex, SearchMatch, SearchQuery,
-    TantivyIndex,
-};
+pub use index::{IndexRegistry, TantivyIndex};
 pub use refresh::{run_refresh_loop, RefreshPipeline};
-pub use search_engine::{RankedMatch, SearchEngine, SearchResult};
-pub use search_expr::{ParseError, SearchExpr, SearchQuery as SearchExprQuery, SearchSchema};
 pub use server::EntityGatewayService;

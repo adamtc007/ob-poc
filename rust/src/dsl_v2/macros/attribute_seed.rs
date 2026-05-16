@@ -6,7 +6,7 @@ use sem_os_obpoc_adapter::{
     scanner::generate_seed_domain_macro_calls, seeds::core_derivation_specs,
 };
 
-use sem_os_core::derivation_spec::DerivationExpression;
+use sem_os_ontology::derivation_spec::DerivationExpression;
 
 pub(crate) fn try_expand_attribute_seed_macro(
     macro_fqn: &str,

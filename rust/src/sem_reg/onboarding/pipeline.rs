@@ -605,6 +605,11 @@ mod tests {
             ],
             optional_attributes: vec!["test.widget-description".to_string()],
             parent_type: None,
+            governance_tier: None,
+            security_classification: None,
+            pii: None,
+            read_by_verbs: Vec::new(),
+            written_by_verbs: Vec::new(),
         }
     }
 

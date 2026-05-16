@@ -1,0 +1,84 @@
+# Sage BYOK conformance corpus — Phase 5.4.
+#
+# V&S R7 commits the Sage ACP runtime to producing the same
+# constrained-composition pick across any BYOK provider. This file
+# is the conformance contract: each entry names an utterance, the
+# pack the session anchors against, and the verb FQN the planning
+# loop MUST select.
+#
+# How to run:
+#   cargo run -p xtask -- byok-conformance-check
+#     # provider defaults to `stub` — deterministic, no API key,
+#     # exercises the planning loop with a canned LLM response.
+#   cargo run -p xtask -- byok-conformance-check --provider anthropic
+#     # gated behind ANTHROPIC_API_KEY; calls the real Anthropic model.
+#   cargo run -p xtask -- byok-conformance-check --provider openai
+#     # gated behind OPENAI_API_KEY; calls the real OpenAI model.
+#
+# Conformance claim:
+#   - stub run         — sanity check: planning loop wiring + pack
+#                        resolution + constrained-composition guard
+#                        all behave correctly given a known LLM
+#                        response. CI-safe.
+#   - anthropic run    — Anthropic conforms when this passes against
+#                        the live Anthropic API.
+#   - openai run       — OpenAI conforms when this passes against
+#                        the live OpenAI API. Cross-provider
+#                        conformance asserted when both real-API runs
+#                        produce identical verb FQNs against this
+#                        corpus (V&S R7).
+#
+# When adding fixtures: prefer utterances that exercise distinct
+# planning-loop paths (deterministic fallback, LLM tool, refusal,
+# substrate-pruned surface). Keep the corpus small and load-
+# bearing; broad coverage lives in golden suites elsewhere.
+
+fixtures:
+  - id: book_setup_create_first_cbu
+    description: First-touch utterance against the book-setup pack
+      should pick the canonical CBU create verb.
+    pack_id: book-setup
+    workspace: cbu
+    utterance: "set up a new book for Allianz"
+    expected_verb_fqn: cbu.create
+    expected_draft_source: llm_tool
+
+  - id: book_setup_attach_product
+    description: Once a CBU exists, attaching a product is the
+      pack's next sanctioned step.
+    pack_id: book-setup
+    workspace: cbu
+    utterance: "attach a product to the new book"
+    expected_verb_fqn: cbu.add-product
+    expected_draft_source: llm_tool
+
+  - id: book_setup_deterministic_first_allowed
+    description: Without an LLM client, the planning loop picks the
+      first verb in the pack's allowlist deterministically.
+    pack_id: book-setup
+    workspace: cbu
+    utterance: "anything"
+    expected_verb_fqn: cbu.create
+    expected_draft_source: deterministic_fallback
+    use_llm: false
+
+  - id: book_setup_deterministic_after_refusal
+    description: When the first allowed verb has been refused, the
+      deterministic fallback advances to the next sanctioned pick.
+    pack_id: book-setup
+    workspace: cbu
+    utterance: "anything"
+    expected_verb_fqn: cbu.add-product
+    expected_draft_source: deterministic_fallback
+    use_llm: false
+    refused_drafts:
+      - cbu.create
+
+  - id: kyc_case_create
+    description: KYC-case workspace utterance should land on the
+      case-creation verb.
+    pack_id: kyc-case
+    workspace: kyc
+    utterance: "start a KYC case for this entity"
+    expected_verb_fqn: kyc-case.create
+    expected_draft_source: llm_tool

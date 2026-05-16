@@ -1,10 +1,8 @@
-//! Maintenance subprocess consumer (Phase 0g Pattern A → Phase 5e cutover).
+//! Maintenance subprocess consumer.
 //!
-//! Closes the loop opened in Phase 0g: previously
-//! `MaintenanceReindexEmbeddingsOp::execute_json` queued a row to
-//! `public.outbox` and returned, leaving the actual subprocess
-//! unspawned. This consumer drains those rows post-commit and runs
-//! the subprocess.
+//! `MaintenanceReindexEmbeddingsOp` queues a row in `public.outbox` and
+//! returns; this consumer drains those rows post-commit and runs the
+//! actual subprocess (e.g. `populate_embeddings`).
 //!
 //! # Idempotency
 //!

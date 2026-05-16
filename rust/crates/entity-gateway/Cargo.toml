@@ -45,3 +45,6 @@ tonic-build = "0.12"
 [[bin]]
 name = "entity-gateway"
 path = "src/main.rs"
+
+[lints.rust]
+unreachable_pub = "deny"

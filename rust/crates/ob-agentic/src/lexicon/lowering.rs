@@ -40,7 +40,7 @@ struct InferenceContext {
 /// 1. Scans for contextual clues (law, instruments, verbs)
 /// 2. Applies type inference rules to untyped entities
 /// 3. Fuses type-indicator + name sequences
-pub fn lower_tokens(tokens: &[Token]) -> Vec<Token> {
+pub(crate) fn lower_tokens(tokens: &[Token]) -> Vec<Token> {
     if tokens.is_empty() {
         return vec![];
     }

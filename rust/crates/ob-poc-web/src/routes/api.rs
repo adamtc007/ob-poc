@@ -16,11 +16,11 @@ use crate::state::AppState;
 
 /// Query parameters for CBU search
 #[derive(Debug, serde::Deserialize)]
-pub struct CbuSearchQuery {
+pub(crate) struct CbuSearchQuery {
     /// Search query (matches against name, case-insensitive)
-    pub q: Option<String>,
+    pub(crate) q: Option<String>,
     /// Maximum results to return (default 20)
-    pub limit: Option<i64>,
+    pub(crate) limit: Option<i64>,
 }
 
 // =============================================================================
@@ -28,7 +28,7 @@ pub struct CbuSearchQuery {
 // =============================================================================
 
 /// Search CBUs by name (case-insensitive, trigram similarity)
-pub async fn search_cbus(
+pub(crate) async fn search_cbus(
     State(state): State<AppState>,
     Query(params): Query<CbuSearchQuery>,
 ) -> Result<Json<Vec<CbuSummary>>, StatusCode> {

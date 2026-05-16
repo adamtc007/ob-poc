@@ -16,17 +16,18 @@ use axum::{
     extract::{Path, Query},
     Extension, Json,
 };
-use sem_os_core::{
+use sem_os_core::principal::Principal;
+use sem_os_policy::{
     authoring::{
         bundle::{build_bundle_from_map, parse_manifest},
         types::{
-            ChangeSetFull, ChangeSetStatus, DiffSummary, DryRunReport, PublishBatch, PublishPlan,
+            ChangeSetFull, DiffSummary, DryRunReport, PublishBatch, PublishPlan,
             ValidationReport,
         },
     },
-    principal::Principal,
     service::CoreService,
 };
+use sem_os_types::ChangeSetStatus;
 use serde::Deserialize;
 use uuid::Uuid;
 
@@ -36,36 +37,36 @@ use crate::error::AppError;
 
 /// Request body for `POST /authoring/propose`.
 #[derive(Debug, Deserialize)]
-pub struct ProposeRequest {
+pub(crate) struct ProposeRequest {
     /// Raw YAML manifest content (changeset.yaml).
-    pub manifest_yaml: String,
+    pub(crate) manifest_yaml: String,
     /// Map of artifact path → content.
-    pub artifacts: std::collections::HashMap<String, String>,
+    pub(crate) artifacts: std::collections::HashMap<String, String>,
 }
 
 /// Request body for `POST /authoring/publish-batch`.
 #[derive(Debug, Deserialize)]
-pub struct PublishBatchRequest {
-    pub change_set_ids: Vec<Uuid>,
+pub(crate) struct PublishBatchRequest {
+    pub(crate) change_set_ids: Vec<Uuid>,
 }
 
 /// Request body for `POST /authoring/:id/publish`.
 #[derive(Debug, Deserialize)]
-pub struct PublishRequest {}
+pub(crate) struct PublishRequest {}
 
 /// Request body for `POST /authoring/diff`.
 #[derive(Debug, Deserialize)]
-pub struct DiffRequest {
-    pub base_id: Uuid,
-    pub target_id: Uuid,
+pub(crate) struct DiffRequest {
+    pub(crate) base_id: Uuid,
+    pub(crate) target_id: Uuid,
 }
 
 /// Query parameters for `GET /authoring`.
 #[derive(Debug, Deserialize)]
-pub struct ListQuery {
-    pub status: Option<String>,
+pub(crate) struct ListQuery {
+    pub(crate) status: Option<String>,
     #[serde(default = "default_limit")]
-    pub limit: i64,
+    pub(crate) limit: i64,
 }
 
 fn default_limit() -> i64 {
@@ -75,7 +76,7 @@ fn default_limit() -> i64 {
 // ── Handlers ─────────────────────────────────────────────────
 
 /// Propose a new ChangeSet from a bundle manifest + artifacts.
-pub async fn propose(
+pub(crate) async fn propose(
     Extension(principal): Extension<Principal>,
     Extension(service): Extension<Arc<dyn CoreService>>,
     Json(body): Json<ProposeRequest>,
@@ -90,7 +91,7 @@ pub async fn propose(
 }
 
 /// Run Stage 1 (pure) validation on a ChangeSet.
-pub async fn validate(
+pub(crate) async fn validate(
     Extension(service): Extension<Arc<dyn CoreService>>,
     Path(id): Path<String>,
 ) -> Result<Json<ValidationReport>, AppError> {
@@ -100,7 +101,7 @@ pub async fn validate(
 }
 
 /// Run Stage 2 (DB-backed) dry-run on a ChangeSet.
-pub async fn dry_run(
+pub(crate) async fn dry_run(
     Extension(service): Extension<Arc<dyn CoreService>>,
     Path(id): Path<String>,
 ) -> Result<Json<DryRunReport>, AppError> {
@@ -110,7 +111,7 @@ pub async fn dry_run(
 }
 
 /// Generate a publish plan with blast-radius analysis. Read-only.
-pub async fn plan_publish(
+pub(crate) async fn plan_publish(
     Extension(service): Extension<Arc<dyn CoreService>>,
     Path(id): Path<String>,
 ) -> Result<Json<PublishPlan>, AppError> {
@@ -121,7 +122,7 @@ pub async fn plan_publish(
 
 /// Publish a ChangeSet. Transitions DryRunPassed → Published.
 /// Requires Governed mode + admin role. Publisher is always the authenticated principal.
-pub async fn publish(
+pub(crate) async fn publish(
     Extension(principal): Extension<Principal>,
     Extension(service): Extension<Arc<dyn CoreService>>,
     Path(id): Path<String>,
@@ -137,7 +138,7 @@ pub async fn publish(
 
 /// Publish multiple ChangeSets atomically in topological order.
 /// Requires Governed mode + admin role. Publisher is always the authenticated principal.
-pub async fn publish_batch(
+pub(crate) async fn publish_batch(
     Extension(principal): Extension<Principal>,
     Extension(service): Extension<Arc<dyn CoreService>>,
     Json(body): Json<PublishBatchRequest>,
@@ -150,7 +151,7 @@ pub async fn publish_batch(
 }
 
 /// Compute structural diff between two ChangeSets.
-pub async fn diff(
+pub(crate) async fn diff(
     Extension(service): Extension<Arc<dyn CoreService>>,
     Json(body): Json<DiffRequest>,
 ) -> Result<Json<DiffSummary>, AppError> {
@@ -159,7 +160,7 @@ pub async fn diff(
 }
 
 /// List ChangeSets with optional status filter.
-pub async fn list(
+pub(crate) async fn list(
     Extension(service): Extension<Arc<dyn CoreService>>,
     Query(query): Query<ListQuery>,
 ) -> Result<Json<Vec<ChangeSetFull>>, AppError> {
@@ -173,7 +174,7 @@ pub async fn list(
 }
 
 /// Get a single ChangeSet by ID.
-pub async fn get(
+pub(crate) async fn get(
     Extension(service): Extension<Arc<dyn CoreService>>,
     Path(id): Path<String>,
 ) -> Result<Json<ChangeSetFull>, AppError> {
@@ -196,7 +197,7 @@ fn require_publish_permission(principal: &Principal) -> Result<(), AppError> {
     let mode = principal.agent_mode();
     if !matches!(
         mode,
-        sem_os_core::authoring::agent_mode::AgentMode::Governed
+        sem_os_types::agent_mode::AgentMode::Governed
     ) {
         return Err(AppError::from(
             sem_os_core::error::SemOsError::Unauthorized(format!(

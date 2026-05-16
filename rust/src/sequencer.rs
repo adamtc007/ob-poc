@@ -257,6 +257,16 @@ pub struct ReplOrchestratorV2 {
     /// loaded DAG taxonomies before execution. See
     /// `docs/backlog/catalogue-platform-refinement-v1_3.md` §3.3.
     gate_pipeline: Option<crate::runbook::step_executor_bridge::GatePipeline>,
+    /// R8 single-path unification (2026-05-11): ACP session-input draft-mode
+    /// selection. Configured once at orchestrator construction (typically
+    /// via [`crate::acp_session_input_draft_mode::AcpSessionInputDraftMode::from_env`])
+    /// rather than read per request. Used by the orchestrator's internal
+    /// ACP resolution step (R8 §13.5).
+    acp_session_input_draft_mode: crate::acp_session_input_draft_mode::AcpSessionInputDraftMode,
+    /// Maximum time a single runbook step may spend inside the execution
+    /// bridge before the REPL marks it failed and returns control to the
+    /// caller. This protects `/run` from indefinitely-held HTTP requests.
+    runbook_step_timeout: std::time::Duration,
 }
 
 impl ReplOrchestratorV2 {
@@ -287,7 +297,32 @@ impl ReplOrchestratorV2 {
             lookup_service: None,
             orchestrated_verbs: HashSet::new(),
             gate_pipeline: None,
+            acp_session_input_draft_mode:
+                crate::acp_session_input_draft_mode::AcpSessionInputDraftMode::Deterministic,
+            runbook_step_timeout: std::time::Duration::from_secs(5),
         }
+    }
+
+    /// Configure the orchestrator's ACP session-input draft mode (R8).
+    ///
+    /// Replaces the per-request env-var read that used to live in
+    /// `agent_routes::acp_session_input_draft_mode()`. Production wiring in
+    /// `crates/ob-poc-web/src/main.rs` calls
+    /// `with_acp_draft_mode(AcpSessionInputDraftMode::from_env())` once at
+    /// startup.
+    pub fn with_acp_draft_mode(
+        mut self,
+        mode: crate::acp_session_input_draft_mode::AcpSessionInputDraftMode,
+    ) -> Self {
+        self.acp_session_input_draft_mode = mode;
+        self
+    }
+
+    /// Return the configured ACP session-input draft mode.
+    pub fn acp_session_input_draft_mode(
+        &self,
+    ) -> crate::acp_session_input_draft_mode::AcpSessionInputDraftMode {
+        self.acp_session_input_draft_mode
     }
 
     /// Attach a VerbConfigIndex for sentence generation and confirm policies.
@@ -349,6 +384,12 @@ impl ReplOrchestratorV2 {
     /// Attach an extended executor that can signal parking.
     pub fn with_executor_v2(mut self, executor: Arc<dyn DslExecutorV2>) -> Self {
         self.executor_v2 = Some(executor);
+        self
+    }
+
+    /// Override the per-step execution timeout used by `/run`.
+    pub fn with_runbook_step_timeout(mut self, timeout: std::time::Duration) -> Self {
+        self.runbook_step_timeout = timeout;
         self
     }
 
@@ -591,24 +632,108 @@ impl ReplOrchestratorV2 {
 
     /// Persist the current snapshot of a session, if persistence is configured.
     pub async fn persist_session_checkpoint(&self, session_id: Uuid) -> anyhow::Result<()> {
-        let Some(session) = self.get_session(session_id).await else {
-            anyhow::bail!("session {session_id} not found for persistence");
-        };
+        self.persist_session_checkpoint_inner(session_id, false)
+            .await
+    }
+
+    async fn persist_session_checkpoint_inner(
+        &self,
+        session_id: Uuid,
+        record_lock_held: bool,
+    ) -> anyhow::Result<()> {
         #[cfg(feature = "database")]
         if let Some(ref repo) = self.session_repository {
-            let version = self
-                .persistence_versions
-                .read()
-                .await
-                .get(&session_id)
-                .copied()
-                .unwrap_or(0);
-            let new_version = repo.save_session(&session, version).await?;
-            self.persistence_versions
-                .write()
-                .await
-                .insert(session_id, new_version);
+            let Some(session) = self.get_session(session_id).await else {
+                anyhow::bail!("session {session_id} not found for persistence");
+            };
+            self.save_session_snapshot(repo, &session, record_lock_held)
+                .await?;
         }
+        #[cfg(not(feature = "database"))]
+        {
+            if self.get_session(session_id).await.is_none() {
+                anyhow::bail!("session {session_id} not found for persistence");
+            }
+        }
+        Ok(())
+    }
+
+    pub(crate) async fn persist_session_checkpoint_with_record_lock(
+        &self,
+        session_id: Uuid,
+    ) -> anyhow::Result<()> {
+        self.persist_session_checkpoint_inner(session_id, true)
+            .await
+    }
+
+    #[cfg(feature = "database")]
+    async fn save_session_snapshot(
+        &self,
+        repo: &crate::repl::session_repository::SessionRepositoryV2,
+        session: &ReplSessionV2,
+        record_lock_held: bool,
+    ) -> anyhow::Result<i64> {
+        let _ = record_lock_held;
+        let new_version = repo.save_session(session, 0).await?;
+        let mut versions = self.persistence_versions.write().await;
+        versions.insert(session.id, new_version);
+        Ok(new_version)
+    }
+
+    #[cfg(feature = "database")]
+    pub(crate) async fn acquire_session_turn_record_lock(
+        &self,
+        session_id: Uuid,
+    ) -> anyhow::Result<Option<crate::repl::session_repository::SessionRecordLock>> {
+        let Some(repo) = self.session_repository.as_ref() else {
+            return Ok(None);
+        };
+        if let Some((mut session, version)) = repo.load_session(session_id).await? {
+            session.rehydrate(&self.pack_router);
+            self.restore_session_with_version(session, version).await;
+        }
+        Ok(None)
+    }
+
+    /// Record a Sage/ACP-owned chat exchange against the shared REPL session record.
+    ///
+    /// This keeps Sage-side utterances on the same durable session surface that
+    /// REPL uses as its DSL assembly workbook.
+    ///
+    /// # Examples
+    /// ```rust,ignore
+    /// orchestrator
+    ///     .record_external_chat_exchange(session_id, user_text, assistant_text)
+    ///     .await?;
+    /// ```
+    pub async fn record_external_chat_exchange(
+        &self,
+        session_id: Uuid,
+        user_message: String,
+        assistant_message: String,
+    ) -> anyhow::Result<()> {
+        let lookup_result = if let Some(lookup_service) = &self.lookup_service {
+            Some(lookup_service.analyze(&user_message, 5).await)
+        } else {
+            None
+        };
+
+        {
+            let mut sessions = self.sessions.write().await;
+            let Some(session) = sessions.get_mut(&session_id) else {
+                drop(sessions);
+                return Err(anyhow::anyhow!(
+                    "{}",
+                    OrchestratorError::SessionNotFound(session_id)
+                ));
+            };
+            if let Some(result) = lookup_result.as_ref() {
+                session.apply_lookup_result(result);
+            }
+            session.push_message(MessageRole::User, user_message);
+            session.push_message(MessageRole::Assistant, assistant_message);
+        }
+        self.persist_session_checkpoint(session_id).await?;
         Ok(())
     }
 
@@ -789,6 +914,7 @@ impl ReplOrchestratorV2 {
         };
 
         // 3. Resume the parked entry in the runbook.
+        let mut failed_response = None;
         {
             let mut sessions = self.sessions.write().await;
             let session = sessions
@@ -819,7 +945,9 @@ impl ReplOrchestratorV2 {
                 let response = ReplResponseV2 {
                     state: ReplStateV2::RunbookEditing,
                     kind: ReplResponseKindV2::Error {
-                        error: error.unwrap_or_else(|| "External task failed".into()),
+                        error: error
+                            .clone()
+                            .unwrap_or_else(|| "External task failed".into()),
                         recoverable: true,
                     },
                     message: "External task failed. Edit the runbook or retry.".into(),
@@ -828,9 +956,17 @@ impl ReplOrchestratorV2 {
                     session_feedback: Some(session.build_session_feedback(false)),
                     narration: None,
                     trace_id: None,
+                    acp_dag_semantic: None,
                 };
-                return Ok(Some(response));
+                failed_response = Some(response);
             }
+        }
+
+        self.persist_session_checkpoint_with_record_lock(session_id)
+            .await?;
+
+        if let Some(response) = failed_response {
+            return Ok(Some(response));
         }
 
         // 4. For "completed" signals, continue execution via the state machine.
@@ -847,20 +983,163 @@ impl ReplOrchestratorV2 {
     }
 
     /// Process user input and return a response.
+    /// R8 single-path unification §13.5 (2026-05-11): ACP-aware ingress
+    /// for HTTP callers that already hold an `Arc<Self>`.
+    ///
+    /// This is the canonical entry point from `session_input`. It tries
+    /// the ACP DAG semantic resolution first (`Message` inputs only) —
+    /// state-independent, Slice 1 pack-bound utterances bind regardless
+    /// of current REPL state. On no match, falls through to the standard
+    /// `process()`.
+    ///
+    /// Tests and other in-process callers without an `Arc` continue to
+    /// use `process()` directly; they don't exercise the ACP path. The
+    /// source-scan invariant in `gate_e_single_path_invariant.rs`
+    /// requires that the resolver call site live in this module — this
+    /// method (not `session_input`) is the single ingress for the ACP
+    /// decision.
+    pub async fn process_with_acp(
+        self: &std::sync::Arc<Self>,
+        session_id: Uuid,
+        input: UserInputV2,
+    ) -> Result<ReplResponseV2, OrchestratorError> {
+        // ACP runs BEFORE the sessions write lock acquired by `process()`
+        // to avoid deadlocking against the lookups inside the ACP route
+        // helper (`get_session`, `record_external_chat_exchange`,
+        // `session_feedback` — all of which take read/write locks).
+        //
+        // Phase A transitional shape: the lifted route helper returns a
+        // pre-built `ChatResponse`. We stash it on `ReplResponseV2.
+        // prebuilt_chat_response` so the response adapter passes it
+        // through unchanged. Phase B replaces this with typed-only
+        // projection through `acp_dag_semantic` + `AcpRouteMetadata`.
+        // Tollgate answers are selections, not semantic work requests. Let the
+        // state machine consume them before ACP attempts verb-level routing.
+        let should_try_acp = if matches!(input, UserInputV2::Message { .. }) {
+            let sessions = self.sessions.read().await;
+            let state = sessions.get(&session_id).map(|session| &session.state);
+            !matches!(
+                state,
+                Some(ReplStateV2::ScopeGate { .. })
+                    | Some(ReplStateV2::WorkspaceSelection { .. })
+                    | Some(ReplStateV2::ConstellationMapSelection { .. })
+                    | Some(ReplStateV2::JourneySelection { .. })
+            )
+        } else {
+            false
+        };
+
+        if should_try_acp {
+            let content = match &input {
+                UserInputV2::Message { content } => content,
+                UserInputV2::Confirm
+                | UserInputV2::Reject
+                | UserInputV2::Edit { .. }
+                | UserInputV2::Command { .. }
+                | UserInputV2::SelectPack { .. }
+                | UserInputV2::SelectVerb { .. }
+                | UserInputV2::SelectProposal { .. }
+                | UserInputV2::SelectEntity { .. }
+                | UserInputV2::SelectScope { .. }
+                | UserInputV2::SelectWorkspace { .. }
+                | UserInputV2::SelectConstellationMap { .. }
+                | UserInputV2::Approve { .. }
+                | UserInputV2::RejectGate { .. } => "",
+            };
+            if let Some(bundle) =
+                crate::api::agent_routes::try_route_supported_acp_prompt(self, session_id, content)
+                    .await
+            {
+                let sessions = self.sessions.read().await;
+                let state = sessions
+                    .get(&session_id)
+                    .map(|s| s.state.clone())
+                    .unwrap_or(ReplStateV2::RunbookEditing);
+                drop(sessions);
+                let dsl_source = bundle.dsl.as_ref().and_then(|d| d.source.clone());
+                let session_feedback_typed = bundle
+                    .session_feedback
+                    .as_ref()
+                    .and_then(|v| serde_json::from_value(v.clone()).ok());
+                return Ok(ReplResponseV2 {
+                    state,
+                    kind: ReplResponseKindV2::AcpResolved { dsl: dsl_source },
+                    message: bundle.message,
+                    runbook_summary: None,
+                    step_count: 0,
+                    session_feedback: session_feedback_typed,
+                    narration: None,
+                    trace_id: None,
+                    acp_dag_semantic: Some(bundle.resolution),
+                });
+            }
+        }
+
+        self.process(session_id, input).await
+    }
+
     pub async fn process(
         &self,
         session_id: Uuid,
         input: UserInputV2,
     ) -> Result<ReplResponseV2, OrchestratorError> {
+        let input_kind = repl_input_kind(&input);
+        let is_run_command = matches!(
+            &input,
+            UserInputV2::Command {
+                command: ReplCommandV2::Run
+            }
+        );
+        tracing::info!(
+            session_id = %session_id,
+            input_kind,
+            "REPL process starting"
+        );
+
+        #[cfg(feature = "database")]
+        if let Some(ref repo) = self.session_repository {
+            if let Some((mut persisted, version)) = repo
+                .load_session(session_id)
+                .await
+                .map_err(|error| OrchestratorError::PersistenceFailed(error.to_string()))?
+            {
+                persisted.rehydrate(&self.pack_router);
+                self.restore_session_with_version(persisted, version).await;
+            }
+        }
+
+        tracing::info!(
+            session_id = %session_id,
+            input_kind,
+            "REPL process acquiring in-memory session write lock"
+        );
         let mut sessions = self.sessions.write().await;
-        let session = sessions
-            .get_mut(&session_id)
-            .ok_or(OrchestratorError::SessionNotFound(session_id))?;
+        tracing::info!(
+            session_id = %session_id,
+            input_kind,
+            "REPL process acquired in-memory session write lock"
+        );
+        let Some(session) = sessions.get_mut(&session_id) else {
+            drop(sessions);
+            return Err(OrchestratorError::SessionNotFound(session_id));
+        };
 
         session.pending_sem_os_envelope = None;
         session.pending_lookup_result = None;
 
+        tracing::info!(
+            session_id = %session_id,
+            input_kind,
+            state = ?session.state,
+            "REPL process persisting trace scaffold"
+        );
         let trace_scaffold = self.persist_trace_scaffold(session, &input).await;
+        tracing::info!(
+            session_id = %session_id,
+            input_kind,
+            has_trace_scaffold = trace_scaffold.is_some(),
+            "REPL process persisted trace scaffold"
+        );
 
         // Stage 1 — utterance receipt (Phase 5b-deep typed contract).
         // Computes the trace anchor / envelope-version / utterance hash
@@ -904,36 +1183,111 @@ impl ReplOrchestratorV2 {
         if let UserInputV2::Message { ref content } = input {
             if crate::agent::narration_engine::is_contextual_query(content) {
                 if let Some(narration_resp) = self.handle_contextual_query(session, content) {
+                    drop(sessions);
                     return Ok(narration_resp);
                 }
             }
         }
 
         // Dispatch based on current state.
-        let mut response = match session.state.clone() {
-            ReplStateV2::ScopeGate { .. } => self.handle_scope_gate(session, input).await,
-            ReplStateV2::WorkspaceSelection { .. } => {
-                self.handle_workspace_selection(session, input).await
-            }
-            ReplStateV2::ConstellationMapSelection { options } => {
-                self.handle_constellation_map_selection(session, input, options)
-                    .await
-            }
-            ReplStateV2::JourneySelection { .. } => {
-                self.handle_journey_selection(session, input).await
-            }
-            ReplStateV2::InPack { .. } => self.handle_in_pack(session, input).await,
-            ReplStateV2::Clarifying { .. } => self.handle_clarifying(session, input),
-            ReplStateV2::SentencePlayback { .. } => self.handle_sentence_playback(session, input),
-            ReplStateV2::RunbookEditing => self.handle_runbook_editing(session, input).await,
-            ReplStateV2::Executing {
-                runbook_id,
-                progress,
-            } => {
-                self.handle_executing(session, input, runbook_id, progress)
-                    .await
+        tracing::info!(
+            session_id = %session_id,
+            input_kind,
+            state = ?session.state,
+            "REPL process dispatching state"
+        );
+        let dispatch = async {
+            match session.state.clone() {
+                ReplStateV2::ScopeGate { .. } => self.handle_scope_gate(session, input).await,
+                ReplStateV2::WorkspaceSelection { .. } => {
+                    self.handle_workspace_selection(session, input).await
+                }
+                ReplStateV2::ConstellationMapSelection { options } => {
+                    self.handle_constellation_map_selection(session, input, options)
+                        .await
+                }
+                ReplStateV2::JourneySelection { .. } => {
+                    self.handle_journey_selection(session, input).await
+                }
+                ReplStateV2::InPack { .. } => self.handle_in_pack(session, input).await,
+                ReplStateV2::Clarifying { .. } => self.handle_clarifying(session, input),
+                ReplStateV2::SentencePlayback { .. } => {
+                    self.handle_sentence_playback(session, input)
+                }
+                ReplStateV2::RunbookEditing => self.handle_runbook_editing(session, input).await,
+                ReplStateV2::Executing {
+                    runbook_id,
+                    progress,
+                } => {
+                    self.handle_executing(session, input, runbook_id, progress)
+                        .await
+                }
             }
         };
+        let mut response = if is_run_command {
+            match tokio::time::timeout(self.runbook_step_timeout, dispatch).await {
+                Ok(response) => response,
+                Err(_) => {
+                    tracing::error!(
+                        session_id = %session_id,
+                        timeout_ms = self.runbook_step_timeout.as_millis(),
+                        "REPL /run timed out during orchestrator dispatch"
+                    );
+                    session.runbook.set_status(RunbookStatus::Ready);
+                    session.set_state(ReplStateV2::RunbookEditing);
+                    let message = format!(
+                        "Run timed out before execution completed after {} ms",
+                        self.runbook_step_timeout.as_millis()
+                    );
+                    if let Some(entry) = session.runbook.entries.first_mut() {
+                        entry.status = EntryStatus::Failed;
+                        ReplResponseV2 {
+                            state: session.state.clone(),
+                            kind: ReplResponseKindV2::Executed {
+                                results: vec![StepResult {
+                                    entry_id: entry.id,
+                                    sequence: entry.sequence,
+                                    sentence: entry.sentence.clone(),
+                                    success: false,
+                                    message: Some(message.clone()),
+                                    result: None,
+                                }],
+                            },
+                            message,
+                            runbook_summary: Some(self.runbook_summary(session)),
+                            step_count: session.runbook.entries.len(),
+                            session_feedback: Some(session.build_session_feedback(false)),
+                            narration: None,
+                            trace_id: None,
+                            acp_dag_semantic: None,
+                        }
+                    } else {
+                        ReplResponseV2 {
+                            state: session.state.clone(),
+                            kind: ReplResponseKindV2::Error {
+                                error: message.clone(),
+                                recoverable: true,
+                            },
+                            message,
+                            runbook_summary: None,
+                            step_count: 0,
+                            session_feedback: Some(session.build_session_feedback(false)),
+                            narration: None,
+                            trace_id: None,
+                            acp_dag_semantic: None,
+                        }
+                    }
+                }
+            }
+        } else {
+            dispatch.await
+        };
+        tracing::info!(
+            session_id = %session_id,
+            input_kind,
+            response_kind = ?std::mem::discriminant(&response.kind),
+            "REPL process state dispatch complete"
+        );
 
         // Re-hydrate constellation on TOS if writes occurred during this turn.
         // This ensures the response's session_feedback carries the post-execution
@@ -1161,7 +1515,10 @@ impl ReplOrchestratorV2 {
         drop(sessions);
 
         // Persist session state + trace entries to database (audit trail).
-        if let Err(e) = self.persist_session_checkpoint(session_id).await {
+        if let Err(e) = self
+            .persist_session_checkpoint_with_record_lock(session_id)
+            .await
+        {
             tracing::warn!(session_id = %session_id, error = %e, "Session checkpoint after process() failed");
         }
 
@@ -1554,6 +1911,7 @@ impl ReplOrchestratorV2 {
                     session_feedback: Some(session.build_session_feedback(false)),
                     narration: None,
                     trace_id: None,
+                    acp_dag_semantic: None,
                 }
             }
             _ => self.invalid_input(session, "Please select a scope first."),
@@ -1625,6 +1983,7 @@ impl ReplOrchestratorV2 {
                 session_feedback: Some(session.build_session_feedback(false)),
                 narration: None,
                 trace_id: None,
+                acp_dag_semantic: None,
             };
         }
 
@@ -1683,6 +2042,7 @@ impl ReplOrchestratorV2 {
             session_feedback: Some(session.build_session_feedback(false)),
             narration: None,
             trace_id: None,
+            acp_dag_semantic: None,
         }
     }
 
@@ -1786,6 +2146,7 @@ impl ReplOrchestratorV2 {
                 session_feedback: Some(session.build_session_feedback(false)),
                 narration: None,
                 trace_id: None,
+                acp_dag_semantic: None,
             };
         };
 
@@ -1835,6 +2196,7 @@ impl ReplOrchestratorV2 {
             session_feedback: Some(session.build_session_feedback(false)),
             narration: None,
             trace_id: None,
+            acp_dag_semantic: None,
         }
     }
 
@@ -2142,6 +2504,7 @@ impl ReplOrchestratorV2 {
                             session_feedback: Some(session.build_session_feedback(false)),
                             narration: None,
                             trace_id: None,
+                            acp_dag_semantic: None,
                         }
                     }
                     PackRouteOutcome::NoMatch => {
@@ -2160,6 +2523,7 @@ impl ReplOrchestratorV2 {
             session_feedback: Some(session.build_session_feedback(false)),
                     narration: None,
                     trace_id: None,
+                    acp_dag_semantic: None,
                         }
                     }
                 }
@@ -2252,6 +2616,7 @@ impl ReplOrchestratorV2 {
                             session_feedback: Some(session.build_session_feedback(false)),
                             narration: None,
                             trace_id: None,
+                            acp_dag_semantic: None,
                         };
                     }
 
@@ -2293,6 +2658,7 @@ impl ReplOrchestratorV2 {
                             session_feedback: Some(session.build_session_feedback(false)),
                             narration: None,
                             trace_id: None,
+                            acp_dag_semantic: None,
                         }
                     } else {
                         self.invalid_input(session, "Step not found.")
@@ -2313,6 +2679,7 @@ impl ReplOrchestratorV2 {
                         session_feedback: Some(session.build_session_feedback(false)),
                         narration: None,
                         trace_id: None,
+                        acp_dag_semantic: None,
                     }
                 }
                 ReplCommandV2::Disable(id) => self.handle_disable(session, id),
@@ -2355,6 +2722,7 @@ impl ReplOrchestratorV2 {
                     session_feedback: Some(session.build_session_feedback(false)),
                     narration: None,
                     trace_id: None,
+                    acp_dag_semantic: None,
                 }
             }
             UserInputV2::Command {
@@ -2419,6 +2787,7 @@ impl ReplOrchestratorV2 {
                         session_feedback: Some(session.build_session_feedback(false)),
                         narration: None,
                         trace_id: None,
+                        acp_dag_semantic: None,
                     }
                 } else {
                     self.invalid_input(session, "No sentence to confirm.")
@@ -2449,6 +2818,7 @@ impl ReplOrchestratorV2 {
                     session_feedback: Some(session.build_session_feedback(false)),
                     narration: None,
                     trace_id: None,
+                    acp_dag_semantic: None,
                 }
             }
             _ => self.invalid_input(session, "Please confirm or reject the proposed step."),
@@ -2489,6 +2859,7 @@ impl ReplOrchestratorV2 {
                             session_feedback: Some(session.build_session_feedback(false)),
                             narration: None,
                             trace_id: None,
+                            acp_dag_semantic: None,
                         }
                     } else {
                         self.invalid_input(session, "Step not found.")
@@ -2509,6 +2880,7 @@ impl ReplOrchestratorV2 {
                         session_feedback: Some(session.build_session_feedback(false)),
                         narration: None,
                         trace_id: None,
+                        acp_dag_semantic: None,
                     }
                 }
                 ReplCommandV2::Disable(id) => self.handle_disable(session, id),
@@ -2624,6 +2996,7 @@ impl ReplOrchestratorV2 {
             session_feedback: Some(session.build_session_feedback(false)),
             narration: None,
             trace_id: None,
+            acp_dag_semantic: None,
         }
     }
 
@@ -2735,7 +3108,7 @@ impl ReplOrchestratorV2 {
         }
 
         // Persist after approval (required — state changed from Parked).
-        if let Err(e) = self.persist_session_required(session).await {
+        if let Err(e) = self.persist_session_required(session, true).await {
             tracing::error!(session_id = %session.id, error = %e, "Failed to persist after gate approval");
         }
 
@@ -2803,7 +3176,7 @@ impl ReplOrchestratorV2 {
         session.set_state(ReplStateV2::RunbookEditing);
 
         // Persist after rejection (required — state changed from Parked).
-        if let Err(e) = self.persist_session_required(session).await {
+        if let Err(e) = self.persist_session_required(session, true).await {
             tracing::error!(session_id = %session.id, error = %e, "Failed to persist after gate rejection");
         }
 
@@ -2823,6 +3196,7 @@ impl ReplOrchestratorV2 {
             session_feedback: Some(session.build_session_feedback(false)),
             narration: None,
             trace_id: None,
+            acp_dag_semantic: None,
         }
     }
 
@@ -2837,7 +3211,7 @@ impl ReplOrchestratorV2 {
         session.set_state(ReplStateV2::RunbookEditing);
 
         // Persist after cancel (required — parked state cleared).
-        if let Err(e) = self.persist_session_required(session).await {
+        if let Err(e) = self.persist_session_required(session, true).await {
             tracing::error!(session_id = %session.id, error = %e, "Failed to persist after cancel");
         }
 
@@ -2854,6 +3228,7 @@ impl ReplOrchestratorV2 {
             session_feedback: Some(session.build_session_feedback(false)),
             narration: None,
             trace_id: None,
+            acp_dag_semantic: None,
         }
     }
 
@@ -3041,6 +3416,7 @@ impl ReplOrchestratorV2 {
             session_feedback: Some(session.build_session_feedback(false)),
             narration: None,
             trace_id: None,
+            acp_dag_semantic: None,
         }
     }
 
@@ -3092,6 +3468,7 @@ impl ReplOrchestratorV2 {
                 session_feedback: Some(session.build_session_feedback(false)),
                 narration: None,
                 trace_id: None,
+                acp_dag_semantic: None,
             });
         }
 
@@ -3158,6 +3535,7 @@ impl ReplOrchestratorV2 {
                 session_feedback: Some(session.build_session_feedback(false)),
                 narration: None,
                 trace_id: None,
+                acp_dag_semantic: None,
             });
         }
 
@@ -3185,6 +3563,7 @@ impl ReplOrchestratorV2 {
             session_feedback: Some(session.build_session_feedback(false)),
             narration: None,
             trace_id: None,
+            acp_dag_semantic: None,
         })
     }
 
@@ -3214,6 +3593,7 @@ impl ReplOrchestratorV2 {
             session_feedback: Some(session.build_session_feedback(false)),
             narration: None,
             trace_id: None,
+            acp_dag_semantic: None,
         }
     }
 
@@ -3340,6 +3720,7 @@ impl ReplOrchestratorV2 {
                     session_feedback: Some(session.build_session_feedback(false)),
                     narration: None,
                     trace_id: None,
+                    acp_dag_semantic: None,
                 }
             }
 
@@ -3365,6 +3746,7 @@ impl ReplOrchestratorV2 {
             session_feedback: Some(session.build_session_feedback(false)),
                     narration: None,
                     trace_id: None,
+                    acp_dag_semantic: None,
                 }
             }
 
@@ -3392,6 +3774,7 @@ impl ReplOrchestratorV2 {
                     session_feedback: Some(session.build_session_feedback(false)),
                     narration: None,
                     trace_id: None,
+                    acp_dag_semantic: None,
                 }
             }
 
@@ -3609,6 +3992,7 @@ impl ReplOrchestratorV2 {
                 session_feedback: Some(session.build_session_feedback(false)),
                 narration: None,
                 trace_id: None,
+                acp_dag_semantic: None,
             }
         } else {
             ReplResponseV2 {
@@ -3624,6 +4008,7 @@ impl ReplOrchestratorV2 {
                 session_feedback: Some(session.build_session_feedback(false)),
                 narration: None,
                 trace_id: None,
+                acp_dag_semantic: None,
             }
         }
     }
@@ -3744,6 +4129,7 @@ impl ReplOrchestratorV2 {
                     session_feedback: Some(session.build_session_feedback(false)),
                     narration: None,
                     trace_id: None,
+                    acp_dag_semantic: None,
                 }
             }
             FastCommand::DropStep(n) => {
@@ -3769,6 +4155,7 @@ impl ReplOrchestratorV2 {
                                 session_feedback: Some(session.build_session_feedback(false)),
                                 narration: None,
                                 trace_id: None,
+                                acp_dag_semantic: None,
                             }
                         } else {
                             self.invalid_input(session, &format!("Could not remove step {}.", n))
@@ -3804,6 +4191,7 @@ impl ReplOrchestratorV2 {
                     session_feedback: Some(session.build_session_feedback(false)),
                     narration: None,
                     trace_id: None,
+                    acp_dag_semantic: None,
                 }
             }
             FastCommand::Options => {
@@ -3823,6 +4211,7 @@ impl ReplOrchestratorV2 {
                     session_feedback: Some(session.build_session_feedback(false)),
                     narration: None,
                     trace_id: None,
+                    acp_dag_semantic: None,
                 }
             }
             FastCommand::SwitchJourney => {
@@ -3840,6 +4229,7 @@ impl ReplOrchestratorV2 {
                     session_feedback: Some(session.build_session_feedback(false)),
                     narration: None,
                     trace_id: None,
+                    acp_dag_semantic: None,
                 }
             }
             FastCommand::Cancel => self.handle_cancel(session),
@@ -3866,6 +4256,7 @@ impl ReplOrchestratorV2 {
                     session_feedback: Some(session.build_session_feedback(false)),
                     narration: None,
                     trace_id: None,
+                    acp_dag_semantic: None,
                 }
             }
             FastCommand::Help => self.handle_help(session),
@@ -3989,6 +4380,7 @@ impl ReplOrchestratorV2 {
             session_feedback: Some(session.build_session_feedback(false)),
             narration: Some(narration),
             trace_id: None,
+            acp_dag_semantic: None,
         })
     }
 
@@ -4114,6 +4506,7 @@ impl ReplOrchestratorV2 {
                     session_feedback: Some(session.build_session_feedback(false)),
                     narration: None,
                     trace_id: None,
+                    acp_dag_semantic: None,
                 };
             }
 
@@ -4142,6 +4535,7 @@ impl ReplOrchestratorV2 {
                 session_feedback: Some(session.build_session_feedback(false)),
                 narration: None,
                 trace_id: None,
+                acp_dag_semantic: None,
             };
         }
 
@@ -4170,6 +4564,7 @@ impl ReplOrchestratorV2 {
             session_feedback: Some(session.build_session_feedback(false)),
             narration: None,
             trace_id: None,
+            acp_dag_semantic: None,
         };
         session.last_proposal_set = Some(proposal_set);
         response
@@ -4214,6 +4609,7 @@ impl ReplOrchestratorV2 {
                     session_feedback: Some(session.build_session_feedback(false)),
                     narration: None,
                     trace_id: None,
+                    acp_dag_semantic: None,
                 }
             }
             None => self.invalid_input(session, "Proposal not found. Please try again."),
@@ -4288,7 +4684,23 @@ impl ReplOrchestratorV2 {
                 "Stage 2b — entities resolved"
             );
 
+            let subject_changed = session.apply_lookup_result(&result);
             session.pending_lookup_result = Some(result);
+            #[cfg(feature = "database")]
+            if subject_changed {
+                if let Some(pool) = self.pool() {
+                    match self.rehydrate_tos(pool, session).await {
+                        Ok(hydrated) => session.hydrate_tos(hydrated),
+                        Err(error) => {
+                            tracing::warn!(
+                                session_id = %session.id,
+                                error = %error,
+                                "DAG rehydration failed after entity resolution"
+                            );
+                        }
+                    }
+                }
+            }
         }
 
         // Phase 4 CCIR: Resolve SemOsContextEnvelope and pre-constrain verb search.
@@ -4581,7 +4993,11 @@ impl ReplOrchestratorV2 {
                     };
                     (parsed, HashMap::new(), None)
                 };
-                let dsl = generated_dsl.unwrap_or_else(|| rebuild_dsl(&verb, &args));
+                let dsl = if args.is_empty() {
+                    generated_dsl.unwrap_or_else(|| rebuild_dsl(&verb, &args))
+                } else {
+                    rebuild_dsl(&verb, &args)
+                };
 
                 // Phase G: Emit DecisionLog for this matched verb.
                 {
@@ -4661,6 +5077,7 @@ impl ReplOrchestratorV2 {
                             session_feedback: Some(session.build_session_feedback(false)),
                             narration: None,
                             trace_id: None,
+                            acp_dag_semantic: None,
                         };
                     }
                     ClarificationOutcome::Complete => {
@@ -4734,6 +5151,7 @@ impl ReplOrchestratorV2 {
                         session_feedback: Some(session.build_session_feedback(false)),
                         narration: None,
                         trace_id: None,
+                        acp_dag_semantic: None,
                     };
                 }
 
@@ -4754,6 +5172,7 @@ impl ReplOrchestratorV2 {
                     session_feedback: Some(session.build_session_feedback(false)),
                     narration: None,
                     trace_id: None,
+                    acp_dag_semantic: None,
                 }
             }
 
@@ -4839,6 +5258,7 @@ impl ReplOrchestratorV2 {
                     session_feedback: Some(session.build_session_feedback(false)),
                     narration: None,
                     trace_id: None,
+                    acp_dag_semantic: None,
                 }
             }
 
@@ -4905,6 +5325,7 @@ impl ReplOrchestratorV2 {
                     session_feedback: Some(session.build_session_feedback(false)),
                     narration: None,
                     trace_id: None,
+                    acp_dag_semantic: None,
                 }
             }
 
@@ -5049,6 +5470,7 @@ impl ReplOrchestratorV2 {
                         session_feedback: Some(session.build_session_feedback(false)),
                         narration: None,
                         trace_id: None,
+                        acp_dag_semantic: None,
                     };
                 }
 
@@ -5069,6 +5491,7 @@ impl ReplOrchestratorV2 {
                     session_feedback: Some(session.build_session_feedback(false)),
                     narration: None,
                     trace_id: None,
+                    acp_dag_semantic: None,
                 }
             }
 
@@ -5117,6 +5540,7 @@ impl ReplOrchestratorV2 {
                     session_feedback: Some(session.build_session_feedback(false)),
                     narration: None,
                     trace_id: None,
+                    acp_dag_semantic: None,
                 }
             }
 
@@ -5151,6 +5575,7 @@ impl ReplOrchestratorV2 {
                     session_feedback: Some(session.build_session_feedback(false)),
                     narration: None,
                     trace_id: None,
+                    acp_dag_semantic: None,
                 }
             }
 
@@ -5211,6 +5636,7 @@ impl ReplOrchestratorV2 {
             session_feedback: Some(session.build_session_feedback(false)),
             narration: None,
             trace_id: None,
+            acp_dag_semantic: None,
         }
     }
 
@@ -5238,6 +5664,7 @@ impl ReplOrchestratorV2 {
                     session_feedback: Some(session.build_session_feedback(false)),
                     narration: None,
                     trace_id: None,
+                    acp_dag_semantic: None,
                 };
             }
         };
@@ -5328,6 +5755,7 @@ impl ReplOrchestratorV2 {
                     session_feedback: Some(session.build_session_feedback(false)),
                     narration: None,
                     trace_id: None,
+                    acp_dag_semantic: None,
                 }
             }
             Err(e) => ReplResponseV2 {
@@ -5342,6 +5770,7 @@ impl ReplOrchestratorV2 {
                 session_feedback: Some(session.build_session_feedback(false)),
                 narration: None,
                 trace_id: None,
+                acp_dag_semantic: None,
             },
         }
     }
@@ -5430,6 +5859,7 @@ impl ReplOrchestratorV2 {
             session_feedback: Some(session.build_session_feedback(false)),
             narration: None,
             trace_id: None,
+            acp_dag_semantic: None,
         }
     }
 
@@ -5458,6 +5888,7 @@ impl ReplOrchestratorV2 {
             session_feedback: Some(session.build_session_feedback(false)),
             narration: None,
             trace_id: None,
+            acp_dag_semantic: None,
         }
     }
 
@@ -5480,6 +5911,7 @@ impl ReplOrchestratorV2 {
                 session_feedback: Some(session.build_session_feedback(false)),
                 narration: None,
                 trace_id: None,
+                acp_dag_semantic: None,
             }
         } else {
             self.invalid_input(session, "Nothing to undo.")
@@ -5504,6 +5936,7 @@ impl ReplOrchestratorV2 {
                 session_feedback: Some(session.build_session_feedback(false)),
                 narration: None,
                 trace_id: None,
+                acp_dag_semantic: None,
             }
         } else {
             self.invalid_input(session, "Nothing to redo.")
@@ -5526,6 +5959,7 @@ impl ReplOrchestratorV2 {
             session_feedback: Some(session.build_session_feedback(false)),
             narration: None,
             trace_id: None,
+            acp_dag_semantic: None,
         }
     }
 
@@ -5575,6 +6009,7 @@ impl ReplOrchestratorV2 {
             session_feedback: Some(session.build_session_feedback(false)),
             narration: None,
             trace_id: None,
+            acp_dag_semantic: None,
         }
     }
 
@@ -5601,6 +6036,7 @@ impl ReplOrchestratorV2 {
             session_feedback: Some(session.build_session_feedback(false)),
             narration: None,
             trace_id: None,
+            acp_dag_semantic: None,
         }
     }
 
@@ -5620,6 +6056,7 @@ impl ReplOrchestratorV2 {
                 session_feedback: Some(session.build_session_feedback(false)),
                 narration: None,
                 trace_id: None,
+                acp_dag_semantic: None,
             }
         } else {
             self.invalid_input(session, "Step not found or already disabled.")
@@ -5642,6 +6079,7 @@ impl ReplOrchestratorV2 {
                 session_feedback: Some(session.build_session_feedback(false)),
                 narration: None,
                 trace_id: None,
+                acp_dag_semantic: None,
             }
         } else {
             self.invalid_input(session, "Step not found or not disabled.")
@@ -5670,6 +6108,7 @@ impl ReplOrchestratorV2 {
                     session_feedback: Some(session.build_session_feedback(false)),
                     narration: None,
                     trace_id: None,
+                    acp_dag_semantic: None,
                 }
             }
             None => self.invalid_input(session, "Step not found."),
@@ -5719,6 +6158,7 @@ impl ReplOrchestratorV2 {
                     session_feedback: Some(session.build_session_feedback(false)),
                     narration: None,
                     trace_id: None,
+                    acp_dag_semantic: None,
                 };
             }
         }
@@ -5747,9 +6187,45 @@ impl ReplOrchestratorV2 {
         #[cfg(feature = "database")]
         let mut outer_scope: Option<crate::sequencer_tx::PgTransactionScope> =
             if let Some(pool) = self.pool.as_ref() {
-                match crate::sequencer_tx::PgTransactionScope::begin(pool).await {
-                    Ok(s) => Some(s),
-                    Err(e) => {
+                match tokio::time::timeout(
+                    self.runbook_step_timeout,
+                    crate::sequencer_tx::PgTransactionScope::begin(pool),
+                )
+                .await
+                {
+                    Err(_) => {
+                        session.runbook.set_status(RunbookStatus::Ready);
+                        session.set_state(ReplStateV2::RunbookEditing);
+                        let summary = self.runbook_summary(session);
+                        return ReplResponseV2 {
+                            state: session.state.clone(),
+                            kind: ReplResponseKindV2::Executed {
+                                results: vec![StepResult {
+                                    entry_id: session.runbook.entries[start_index].id,
+                                    sequence: session.runbook.entries[start_index].sequence,
+                                    sentence: session.runbook.entries[start_index].sentence.clone(),
+                                    success: false,
+                                    message: Some(format!(
+                                        "Runbook transaction setup timed out after {} ms",
+                                        self.runbook_step_timeout.as_millis()
+                                    )),
+                                    result: None,
+                                }],
+                            },
+                            message: format!(
+                                "Runbook transaction setup timed out after {} ms",
+                                self.runbook_step_timeout.as_millis()
+                            ),
+                            runbook_summary: Some(summary),
+                            step_count: session.runbook.entries.len(),
+                            session_feedback: Some(session.build_session_feedback(false)),
+                            narration: None,
+                            trace_id: None,
+                            acp_dag_semantic: None,
+                        };
+                    }
+                    Ok(Ok(s)) => Some(s),
+                    Ok(Err(e)) => {
                         tracing::error!(
                             session_id = %session.id,
                             runbook_id = %runbook_id,
@@ -5785,26 +6261,66 @@ impl ReplOrchestratorV2 {
                 let store: &dyn crate::runbook::RunbookStoreBackend =
                     self.runbook_store.as_deref().unwrap_or(&fallback_store);
 
-                if let Err(e) = crate::runbook::acquire_advisory_locks_on_scope(
-                    scope,
-                    &aggregate_write_set,
-                    store,
+                let lock_result = tokio::time::timeout(
+                    self.runbook_step_timeout,
+                    crate::runbook::acquire_advisory_locks_on_scope(
+                        scope,
+                        &aggregate_write_set,
+                        store,
+                    ),
                 )
-                .await
-                {
-                    tracing::error!(
-                        session_id = %session.id,
-                        runbook_id = %runbook_id,
-                        error = %e,
-                        "B.2b-ζ: advisory lock acquisition failed on outer scope"
-                    );
-                    // Rollback the scope (clears the lock attempt) and
-                    // fall back to None so downstream dispatch uses the
-                    // per-entry path. Alternative: return an error
-                    // response here. For now, we degrade rather than
-                    // block the runbook.
-                    if let Some(s) = outer_scope.take() {
-                        let _ = s.rollback().await;
+                .await;
+                match lock_result {
+                    Ok(Ok(_)) => {}
+                    Ok(Err(e)) => {
+                        tracing::error!(
+                            session_id = %session.id,
+                            runbook_id = %runbook_id,
+                            error = %e,
+                            "B.2b-ζ: advisory lock acquisition failed on outer scope"
+                        );
+                        // Rollback the scope (clears the lock attempt) and
+                        // fall back to None so downstream dispatch uses the
+                        // per-entry path. Alternative: return an error
+                        // response here. For now, we degrade rather than
+                        // block the runbook.
+                        if let Some(s) = outer_scope.take() {
+                            let _ = s.rollback().await;
+                        }
+                    }
+                    Err(_) => {
+                        if let Some(s) = outer_scope.take() {
+                            let _ = s.rollback().await;
+                        }
+                        session.runbook.set_status(RunbookStatus::Ready);
+                        session.set_state(ReplStateV2::RunbookEditing);
+                        let summary = self.runbook_summary(session);
+                        return ReplResponseV2 {
+                            state: session.state.clone(),
+                            kind: ReplResponseKindV2::Executed {
+                                results: vec![StepResult {
+                                    entry_id: session.runbook.entries[start_index].id,
+                                    sequence: session.runbook.entries[start_index].sequence,
+                                    sentence: session.runbook.entries[start_index].sentence.clone(),
+                                    success: false,
+                                    message: Some(format!(
+                                        "Runbook advisory lock acquisition timed out after {} ms",
+                                        self.runbook_step_timeout.as_millis()
+                                    )),
+                                    result: None,
+                                }],
+                            },
+                            message: format!(
+                                "Runbook advisory lock acquisition timed out after {} ms",
+                                self.runbook_step_timeout.as_millis()
+                            ),
+                            runbook_summary: Some(summary),
+                            step_count: session.runbook.entries.len(),
+                            session_feedback: Some(session.build_session_feedback(false)),
+                            narration: None,
+                            trace_id: None,
+                            acp_dag_semantic: None,
+                        };
                     }
                 }
             }
@@ -5826,6 +6342,19 @@ impl ReplOrchestratorV2 {
             let entry_sentence = entry.sentence.clone();
             let entry_status = entry.status;
             let execution_mode = entry.execution_mode;
+            let entry_verb = entry.verb.clone();
+
+            tracing::info!(
+                session_id = %session.id,
+                runbook_id = %runbook_id,
+                entry_id = %entry_id,
+                sequence = entry_sequence,
+                verb = %entry_verb,
+                dsl = %entry_dsl,
+                execution_mode = ?execution_mode,
+                timeout_ms = self.runbook_step_timeout.as_millis(),
+                "Runbook step execution starting"
+            );
 
             // Skip disabled entries.
             if entry_status == EntryStatus::Disabled {
@@ -5845,10 +6374,22 @@ impl ReplOrchestratorV2 {
                 continue;
             }
 
-            if let Some(outcome) = self
-                .phase5_runtime_recheck(session, idx, entry_id, &entry_sentence, &entry_dsl)
-                .await
-            {
+            let runtime_recheck = tokio::time::timeout(
+                self.runbook_step_timeout,
+                self.phase5_runtime_recheck(session, idx, entry_id, &entry_sentence, &entry_dsl),
+            )
+            .await;
+            let runtime_recheck = match runtime_recheck {
+                Ok(outcome) => outcome,
+                Err(_) => Some(StepOutcome::Failed {
+                    error: format!(
+                        "Runbook step runtime re-check timed out after {} ms",
+                        self.runbook_step_timeout.as_millis()
+                    ),
+                }),
+            };
+
+            if let Some(outcome) = runtime_recheck {
                 tracing::warn!(
                     session_id = %session.id,
                     entry_id = %entry_id,
@@ -5917,8 +6458,9 @@ impl ReplOrchestratorV2 {
                     let scope_for_entry = outer_scope
                         .as_mut()
                         .map(|s| s as &mut dyn dsl_runtime::tx::TransactionScope);
-                    let gate_outcome = self
-                        .execute_entry_via_gate_impl(
+                    let gate_outcome = match tokio::time::timeout(
+                        self.runbook_step_timeout,
+                        self.execute_entry_via_gate_impl(
                             &entry_snapshot,
                             session.id,
                             true, // is_durable
@@ -5926,8 +6468,30 @@ impl ReplOrchestratorV2 {
                             fallback_version,
                             Some(session.session_stack.clone()),
                             scope_for_entry,
-                        )
-                        .await;
+                        ),
+                    )
+                    .await
+                    {
+                        Ok(outcome) => outcome,
+                        Err(_) => {
+                            tracing::error!(
+                                session_id = %session.id,
+                                runbook_id = %runbook_id,
+                                entry_id = %entry_id,
+                                sequence = entry_sequence,
+                                verb = %entry_verb,
+                                dsl = %entry_dsl,
+                                timeout_ms = self.runbook_step_timeout.as_millis(),
+                                "Durable runbook step timed out"
+                            );
+                            StepOutcome::Failed {
+                                error: format!(
+                                    "Runbook step timed out after {} ms",
+                                    self.runbook_step_timeout.as_millis()
+                                ),
+                            }
+                        }
+                    };
 
                     match gate_outcome {
                         StepOutcome::Completed { result } => {
@@ -6058,8 +6622,9 @@ impl ReplOrchestratorV2 {
                     let scope_for_entry = outer_scope
                         .as_mut()
                         .map(|s| s as &mut dyn dsl_runtime::tx::TransactionScope);
-                    let gate_outcome = self
-                        .execute_entry_via_gate_impl(
+                    let gate_outcome = match tokio::time::timeout(
+                        self.runbook_step_timeout,
+                        self.execute_entry_via_gate_impl(
                             &entry_snapshot,
                             session.id,
                             false, // not durable
@@ -6067,8 +6632,30 @@ impl ReplOrchestratorV2 {
                             fallback_version,
                             Some(session.session_stack.clone()),
                             scope_for_entry,
-                        )
-                        .await;
+                        ),
+                    )
+                    .await
+                    {
+                        Ok(outcome) => outcome,
+                        Err(_) => {
+                            tracing::error!(
+                                session_id = %session.id,
+                                runbook_id = %runbook_id,
+                                entry_id = %entry_id,
+                                sequence = entry_sequence,
+                                verb = %entry_verb,
+                                dsl = %entry_dsl,
+                                timeout_ms = self.runbook_step_timeout.as_millis(),
+                                "Sync runbook step timed out"
+                            );
+                            StepOutcome::Failed {
+                                error: format!(
+                                    "Runbook step timed out after {} ms",
+                                    self.runbook_step_timeout.as_millis()
+                                ),
+                            }
+                        }
+                    };
 
                     // Phase A.3 (F5 follow-on, 2026-04-22): per-step stage-8
                     // shadow event carrying the turn's trace_id. Complements
@@ -6271,7 +6858,10 @@ impl ReplOrchestratorV2 {
             });
 
             // Persist session on park (required — durable execution guarantee).
-            if let Err(e) = self.persist_session_required(session).await {
+            // `process()` owns the session record lock for the turn, so save
+            // through the held-lock path instead of re-entering the same
+            // advisory lock on another connection.
+            if let Err(e) = self.persist_session_required(session, true).await {
                 tracing::error!(session_id = %session.id, error = %e, "Failed to persist parked session");
             }
 
@@ -6289,6 +6879,7 @@ impl ReplOrchestratorV2 {
                 session_feedback: Some(session.build_session_feedback(false)),
                 narration: None,
                 trace_id: None,
+                acp_dag_semantic: None,
             }
         } else {
             // All entries processed — back to editing.
@@ -6308,8 +6899,9 @@ impl ReplOrchestratorV2 {
 
             session.set_state(ReplStateV2::RunbookEditing);
 
-            // Best-effort persist on completion (non-critical).
-            self.maybe_persist_session(session).await;
+            // Best-effort persist on completion (non-critical). `process()`
+            // already holds the session record lock for this turn.
+            self.maybe_persist_session(session, true).await;
 
             let summary = self.runbook_summary(session);
             let succeeded = results.iter().filter(|r| r.success).count();
@@ -6387,6 +6979,7 @@ impl ReplOrchestratorV2 {
                 session_feedback: Some(session.build_session_feedback(false)),
                 narration: None,
                 trace_id: None,
+                acp_dag_semantic: None,
             }
         }
     }
@@ -6756,24 +7349,15 @@ impl ReplOrchestratorV2 {
     ///
     /// Used for non-critical checkpoints (e.g., execution completes normally).
     #[allow(unused_variables)]
-    async fn maybe_persist_session(&self, session: &ReplSessionV2) {
+    async fn maybe_persist_session(&self, session: &ReplSessionV2, record_lock_held: bool) {
         #[cfg(feature = "database")]
         {
             if let Some(ref repo) = self.session_repository {
-                let version = self
-                    .persistence_versions
-                    .read()
+                match self
+                    .save_session_snapshot(repo, session, record_lock_held)
                     .await
-                    .get(&session.id)
-                    .copied()
-                    .unwrap_or(0);
-                match repo.save_session(session, version).await {
-                    Ok(new_version) => {
-                        self.persistence_versions
-                            .write()
-                            .await
-                            .insert(session.id, new_version);
-                    }
+                {
+                    Ok(_) => {}
                     Err(e) => {
                         tracing::warn!(
                             session_id = %session.id,
@@ -6794,25 +7378,20 @@ impl ReplOrchestratorV2 {
     async fn persist_session_required(
         &self,
         session: &ReplSessionV2,
+        record_lock_held: bool,
     ) -> Result<(), OrchestratorError> {
         #[cfg(feature = "database")]
         {
             if let Some(ref repo) = self.session_repository {
-                let version = self
-                    .persistence_versions
-                    .read()
+                match self
+                    .save_session_snapshot(repo, session, record_lock_held)
                     .await
-                    .get(&session.id)
-                    .copied()
-                    .unwrap_or(0);
-                let new_version = repo
-                    .save_session(session, version)
-                    .await
-                    .map_err(|e| OrchestratorError::PersistenceFailed(e.to_string()))?;
-                self.persistence_versions
-                    .write()
-                    .await
-                    .insert(session.id, new_version);
+                {
+                    Ok(_) => {}
+                    Err(error) => {
+                        return Err(OrchestratorError::PersistenceFailed(error.to_string()));
+                    }
+                }
                 // Also persist any active invocation records.
                 for entry in &session.runbook.entries {
                     if let Some(ref inv) = entry.invocation {
@@ -7099,6 +7678,7 @@ impl ReplOrchestratorV2 {
                 session_feedback: Some(session.build_session_feedback(false)),
                 narration: None,
                 trace_id: None,
+                acp_dag_semantic: None,
             }),
             crate::runbook::OrchestratorResponse::ConstraintViolation(v) => {
                 let msg = format!("Pack constraint violation: {}", v.explanation,);
@@ -7114,6 +7694,7 @@ impl ReplOrchestratorV2 {
                     session_feedback: Some(session.build_session_feedback(false)),
                     narration: None,
                     trace_id: None,
+                    acp_dag_semantic: None,
                 })
             }
             crate::runbook::OrchestratorResponse::CompilationError(e) => {
@@ -7130,6 +7711,7 @@ impl ReplOrchestratorV2 {
                     session_feedback: Some(session.build_session_feedback(false)),
                     narration: None,
                     trace_id: None,
+                    acp_dag_semantic: None,
                 })
             }
         }
@@ -7179,6 +7761,7 @@ impl ReplOrchestratorV2 {
             session_feedback: Some(session.build_session_feedback(false)),
             narration: None,
             trace_id: None,
+            acp_dag_semantic: None,
         }
     }
 
@@ -7331,6 +7914,28 @@ fn input_trace_text(input: &UserInputV2) -> Option<String> {
     }
 }
 
+fn repl_input_kind(input: &UserInputV2) -> &'static str {
+    match input {
+        UserInputV2::Message { .. } => "message",
+        UserInputV2::Command {
+            command: ReplCommandV2::Run,
+        } => "command.run",
+        UserInputV2::Command { .. } => "command",
+        UserInputV2::SelectPack { .. } => "select_pack",
+        UserInputV2::SelectVerb { .. } => "select_verb",
+        UserInputV2::SelectProposal { .. } => "select_proposal",
+        UserInputV2::SelectEntity { .. } => "select_entity",
+        UserInputV2::SelectScope { .. } => "select_scope",
+        UserInputV2::SelectWorkspace { .. } => "select_workspace",
+        UserInputV2::SelectConstellationMap { .. } => "select_constellation_map",
+        UserInputV2::Approve { .. } => "approve",
+        UserInputV2::RejectGate { .. } => "reject_gate",
+        UserInputV2::Confirm => "confirm",
+        UserInputV2::Reject => "reject",
+        UserInputV2::Edit { .. } => "edit",
+    }
+}
+
 fn repl_trace_kind(session: &ReplSessionV2, input: &UserInputV2) -> TraceKind {
     match input {
         UserInputV2::Command {
@@ -7393,7 +7998,11 @@ fn update_repl_trace_lineage(
         | ReplResponseKindV2::RunbookSummary { .. }
         | ReplResponseKindV2::Info { .. }
         | ReplResponseKindV2::Prompt { .. }
-        | ReplResponseKindV2::Error { .. } => None,
+        | ReplResponseKindV2::Error { .. }
+        // R8 single-path unification: ACP-resolved short-circuit is a
+        // side-channel response that doesn't await user follow-up on
+        // the trace ring.
+        | ReplResponseKindV2::AcpResolved { .. } => None,
     };
 }
 
@@ -7412,9 +8021,13 @@ fn repl_response_needs_follow_up(response: &ReplResponseV2) -> bool {
 }
 
 fn classify_repl_trace_outcome(response: &ReplResponseV2) -> crate::traceability::TraceOutcome {
-    match response.kind {
-        ReplResponseKindV2::Executed { .. } => {
-            crate::traceability::TraceOutcome::ExecutedSuccessfully
+    match &response.kind {
+        ReplResponseKindV2::Executed { results } => {
+            if results.iter().any(|result| !result.success) {
+                crate::traceability::TraceOutcome::HaltedAtPhase
+            } else {
+                crate::traceability::TraceOutcome::ExecutedSuccessfully
+            }
         }
         ReplResponseKindV2::Error { .. } => crate::traceability::TraceOutcome::HaltedAtPhase,
         ReplResponseKindV2::JourneyOptions { .. } => crate::traceability::TraceOutcome::NoMatch,
@@ -7428,7 +8041,10 @@ fn classify_repl_trace_outcome(response: &ReplResponseV2) -> crate::traceability
         | ReplResponseKindV2::StepProposals { .. }
         | ReplResponseKindV2::Info { .. }
         | ReplResponseKindV2::Prompt { .. }
-        | ReplResponseKindV2::RunbookSummary { .. } => {
+        | ReplResponseKindV2::RunbookSummary { .. }
+        // R8 single-path unification: ACP-resolved is a side-channel
+        // proposal that may invite Sage clarification on the next turn.
+        | ReplResponseKindV2::AcpResolved { .. } => {
             crate::traceability::TraceOutcome::ClarificationTriggered
         }
     }
@@ -7441,7 +8057,12 @@ fn repl_halt_reason_code(session: &ReplSessionV2, response: &ReplResponseV2) -> 
         }
     }
 
-    match response.kind {
+    match &response.kind {
+        ReplResponseKindV2::Executed { results }
+            if results.iter().any(|result| !result.success) =>
+        {
+            Some("repl_execution_failed".to_string())
+        }
         ReplResponseKindV2::Error { .. } => Some("repl_error".to_string()),
         ReplResponseKindV2::JourneyOptions { .. } => Some("journey_selection_required".to_string()),
         _ => None,
@@ -7457,7 +8078,12 @@ fn repl_halt_phase(session: &ReplSessionV2, response: &ReplResponseV2) -> Option
         }
     }
 
-    match response.kind {
+    match &response.kind {
+        ReplResponseKindV2::Executed { results }
+            if results.iter().any(|result| !result.success) =>
+        {
+            Some(5)
+        }
         ReplResponseKindV2::Error { .. } | ReplResponseKindV2::JourneyOptions { .. } => Some(4),
         _ => None,
     }
@@ -7739,6 +8365,112 @@ mod tests {
     use super::*;
     use crate::journey::pack::load_pack_from_bytes;
 
+    struct SingleEntityLinker {
+        entity_id: Uuid,
+    }
+
+    struct NamedEntityLinker {
+        entities: std::collections::HashMap<String, Uuid>,
+    }
+
+    impl crate::entity_linking::EntityLinkingService for SingleEntityLinker {
+        fn snapshot_hash(&self) -> &str {
+            "test-snapshot"
+        }
+
+        fn snapshot_version(&self) -> u32 {
+            1
+        }
+
+        fn entity_count(&self) -> usize {
+            1
+        }
+
+        fn resolve_mentions(
+            &self,
+            utterance: &str,
+            _expected_kinds: Option<&[String]>,
+            _context_concepts: Option<&[String]>,
+            _limit: usize,
+        ) -> Vec<crate::entity_linking::EntityResolution> {
+            vec![crate::entity_linking::EntityResolution {
+                mention_span: (0, utterance.len()),
+                mention_text: utterance.to_string(),
+                candidates: vec![crate::entity_linking::EntityCandidate {
+                    entity_id: self.entity_id,
+                    entity_kind: "cbu".to_string(),
+                    canonical_name: "Allianz Fund".to_string(),
+                    score: 0.95,
+                    evidence: Vec::new(),
+                }],
+                selected: Some(self.entity_id),
+                confidence: 0.95,
+                evidence: Vec::new(),
+            }]
+        }
+
+        fn extract_mention_spans(&self, utterance: &str) -> Vec<(usize, usize)> {
+            vec![(0, utterance.len())]
+        }
+    }
+
+    impl crate::entity_linking::EntityLinkingService for NamedEntityLinker {
+        fn snapshot_hash(&self) -> &str {
+            "test-snapshot"
+        }
+
+        fn snapshot_version(&self) -> u32 {
+            1
+        }
+
+        fn entity_count(&self) -> usize {
+            self.entities.len()
+        }
+
+        fn resolve_mentions(
+            &self,
+            utterance: &str,
+            _expected_kinds: Option<&[String]>,
+            _context_concepts: Option<&[String]>,
+            _limit: usize,
+        ) -> Vec<crate::entity_linking::EntityResolution> {
+            let Some((name, entity_id)) = self
+                .entities
+                .iter()
+                .find(|(name, _)| utterance.contains(name.as_str()))
+            else {
+                return Vec::new();
+            };
+
+            vec![crate::entity_linking::EntityResolution {
+                mention_span: (0, utterance.len()),
+                mention_text: utterance.to_string(),
+                candidates: vec![crate::entity_linking::EntityCandidate {
+                    entity_id: *entity_id,
+                    entity_kind: "cbu".to_string(),
+                    canonical_name: name.clone(),
+                    score: 0.95,
+                    evidence: Vec::new(),
+                }],
+                selected: Some(*entity_id),
+                confidence: 0.95,
+                evidence: Vec::new(),
+            }]
+        }
+
+        fn extract_mention_spans(&self, utterance: &str) -> Vec<(usize, usize)> {
+            if self
+                .entities
+                .keys()
+                .any(|name| utterance.contains(name.as_str()))
+            {
+                vec![(0, utterance.len())]
+            } else {
+                Vec::new()
+            }
+        }
+    }
+
     fn onboarding_yaml() -> &'static str {
         r#"
 id: onboarding-request
@@ -7794,6 +8526,288 @@ definition_of_done:
         let id = orch.create_session().await;
         let session = orch.get_session(id).await.unwrap();
         assert!(matches!(session.state, ReplStateV2::ScopeGate { .. }));
+    }
+
+    #[tokio::test]
+    async fn test_external_chat_exchange_updates_shared_entity_session_record() {
+        let entity_id = Uuid::new_v4();
+        let lookup_service = LookupService::new(Arc::new(SingleEntityLinker { entity_id }));
+        let orch = make_orchestrator().with_lookup_service(lookup_service);
+        let session_id = orch.create_session().await;
+        {
+            let mut sessions = orch.sessions.write().await;
+            let session = sessions.get_mut(&session_id).unwrap();
+            session.set_client_scope(Uuid::new_v4());
+            session.set_workspace_root(crate::repl::types_v2::WorkspaceKind::Cbu);
+        }
+
+        orch.record_external_chat_exchange(
+            session_id,
+            "Allianz Fund".to_string(),
+            "Structured ACP response".to_string(),
+        )
+        .await
+        .unwrap();
+
+        let session = orch.get_session(session_id).await.unwrap();
+        assert_eq!(
+            session
+                .last_entity_resolution
+                .as_ref()
+                .and_then(|resolution| resolution.dominant_entity.as_ref())
+                .map(|entity| entity.entity_id),
+            Some(entity_id)
+        );
+        assert_eq!(session.cbu_ids, vec![entity_id]);
+        assert_eq!(
+            session.tos_frame().and_then(|frame| frame.subject_id),
+            Some(entity_id)
+        );
+        assert_eq!(
+            session
+                .bindings
+                .get("last_entity_id")
+                .and_then(|value| value.as_str())
+                .map(ToOwned::to_owned),
+            Some(entity_id.to_string())
+        );
+    }
+
+    #[cfg(feature = "database")]
+    #[sqlx::test(migrations = "./test-migrations/session_repository")]
+    async fn test_checkpoint_rejects_stale_version_without_overwriting_workbook_state(
+        pool: sqlx::PgPool,
+    ) {
+        let repo = Arc::new(crate::repl::session_repository::SessionRepositoryV2::new(
+            pool,
+        ));
+        let orch = make_orchestrator().with_session_repository(Arc::clone(&repo));
+        let session_id = orch.create_session().await;
+
+        {
+            let mut sessions = orch.sessions.write().await;
+            let session = sessions.get_mut(&session_id).unwrap();
+            session.push_message(MessageRole::User, "Sage design pass".to_string());
+        }
+        orch.persist_session_checkpoint(session_id).await.unwrap();
+
+        let proposed_source = "(cbu.update :name \"Compiler Workbook\")";
+        {
+            let mut sessions = orch.sessions.write().await;
+            let session = sessions.get_mut(&session_id).unwrap();
+            session.push_message(MessageRole::User, proposed_source.to_string());
+            session.bindings.insert(
+                "proposed_repl_source".to_string(),
+                serde_json::json!(proposed_source),
+            );
+        }
+
+        orch.persistence_versions
+            .write()
+            .await
+            .insert(session_id, 0);
+        let stale_result = orch.persist_session_checkpoint(session_id).await;
+        assert!(stale_result.is_err());
+
+        let (loaded, version) = repo.load_session(session_id).await.unwrap().unwrap();
+        assert_eq!(version, 1);
+        assert!(!loaded
+            .messages
+            .iter()
+            .any(|message| message.content == proposed_source));
+        assert!(!loaded.bindings.contains_key("proposed_repl_source"));
+    }
+
+    #[cfg(feature = "database")]
+    #[sqlx::test(migrations = "./test-migrations/session_repository")]
+    async fn test_cross_orchestrator_stale_session_cannot_overwrite_newer_workbook_state(
+        pool: sqlx::PgPool,
+    ) {
+        let repo = Arc::new(crate::repl::session_repository::SessionRepositoryV2::new(
+            pool,
+        ));
+        let orch_a = make_orchestrator().with_session_repository(Arc::clone(&repo));
+        let orch_b = make_orchestrator().with_session_repository(Arc::clone(&repo));
+        let session_id = orch_a.create_session().await;
+        orch_a.persist_session_checkpoint(session_id).await.unwrap();
+
+        let (stale_session, stale_version) = repo.load_session(session_id).await.unwrap().unwrap();
+        orch_b
+            .restore_session_with_version(stale_session, stale_version)
+            .await;
+
+        let source_a = "(cbu.update :name \"Committed\")";
+        {
+            let mut sessions = orch_a.sessions.write().await;
+            let session = sessions.get_mut(&session_id).unwrap();
+            session.push_message(MessageRole::User, source_a.to_string());
+            session.bindings.insert(
+                "proposed_repl_source".to_string(),
+                serde_json::json!(source_a),
+            );
+        }
+        orch_a.persist_session_checkpoint(session_id).await.unwrap();
+
+        let source_b = "(cbu.update :name \"Stale\")";
+        {
+            let mut sessions = orch_b.sessions.write().await;
+            let session = sessions.get_mut(&session_id).unwrap();
+            session.push_message(MessageRole::User, source_b.to_string());
+            session.bindings.insert(
+                "proposed_repl_source".to_string(),
+                serde_json::json!(source_b),
+            );
+        }
+        let stale_result = orch_b.persist_session_checkpoint(session_id).await;
+        assert!(stale_result.is_err());
+
+        let (loaded, version) = repo.load_session(session_id).await.unwrap().unwrap();
+        assert_eq!(version, stale_version + 1);
+        assert!(loaded
+            .messages
+            .iter()
+            .any(|message| message.content == source_a));
+        assert!(!loaded
+            .messages
+            .iter()
+            .any(|message| message.content == source_b));
+        assert_eq!(
+            loaded
+                .bindings
+                .get("proposed_repl_source")
+                .and_then(|value| value.as_str()),
+            Some(source_a)
+        );
+    }
+
+    #[cfg(feature = "database")]
+    #[sqlx::test(migrations = "./test-migrations/session_repository")]
+    async fn test_turn_record_lock_blocks_same_session_writer_until_release(pool: sqlx::PgPool) {
+        let repo = Arc::new(crate::repl::session_repository::SessionRepositoryV2::new(
+            pool,
+        ));
+        let orch = Arc::new(make_orchestrator().with_session_repository(Arc::clone(&repo)));
+        let session_id = orch.create_session().await;
+        orch.persist_session_checkpoint(session_id).await.unwrap();
+
+        let lock = repo.acquire_session_record_lock(session_id).await.unwrap();
+        let writer = Arc::clone(&orch);
+        let handle = tokio::spawn(async move {
+            writer
+                .record_external_chat_exchange(
+                    session_id,
+                    "blocked writer".to_string(),
+                    "released writer".to_string(),
+                )
+                .await
+        });
+
+        tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+        assert!(
+            !handle.is_finished(),
+            "same-session writer must block behind the durable turn lock"
+        );
+
+        lock.release().await.unwrap();
+        handle.await.unwrap().unwrap();
+
+        let (loaded, _) = repo.load_session(session_id).await.unwrap().unwrap();
+        assert!(loaded
+            .messages
+            .iter()
+            .any(|message| message.content == "blocked writer"));
+        assert!(loaded
+            .messages
+            .iter()
+            .any(|message| message.content == "released writer"));
+    }
+
+    #[cfg(feature = "database")]
+    #[sqlx::test(migrations = "./test-migrations/session_repository_without_traces")]
+    async fn test_session_checkpoint_survives_missing_trace_table(pool: sqlx::PgPool) {
+        let repo = Arc::new(crate::repl::session_repository::SessionRepositoryV2::new(
+            pool,
+        ));
+        let orch = make_orchestrator().with_session_repository(Arc::clone(&repo));
+        let session_id = orch.create_session().await;
+
+        {
+            let mut sessions = orch.sessions.write().await;
+            let session = sessions.get_mut(&session_id).unwrap();
+            session.push_message(MessageRole::User, "persist without trace table".to_string());
+        }
+
+        orch.persist_session_checkpoint(session_id).await.unwrap();
+
+        let (loaded, version) = repo.load_session(session_id).await.unwrap().unwrap();
+        assert_eq!(version, 1);
+        assert!(loaded
+            .messages
+            .iter()
+            .any(|message| message.content == "persist without trace table"));
+    }
+
+    #[cfg(feature = "database")]
+    #[sqlx::test(migrations = "./test-migrations/session_repository")]
+    async fn test_concurrent_sage_checkpoints_preserve_shared_session_record(pool: sqlx::PgPool) {
+        let entities: std::collections::HashMap<String, Uuid> = (0..6)
+            .map(|idx| (format!("Fund {idx}"), Uuid::new_v4()))
+            .collect();
+        let entity_ids: Vec<Uuid> = entities.values().copied().collect();
+        let lookup_service = LookupService::new(Arc::new(NamedEntityLinker { entities }));
+        let repo = Arc::new(crate::repl::session_repository::SessionRepositoryV2::new(
+            pool,
+        ));
+        let orch = Arc::new(
+            make_orchestrator()
+                .with_lookup_service(lookup_service)
+                .with_session_repository(Arc::clone(&repo)),
+        );
+        let session_id = orch.create_session().await;
+        {
+            let mut sessions = orch.sessions.write().await;
+            let session = sessions.get_mut(&session_id).unwrap();
+            session.set_client_scope(Uuid::new_v4());
+            session.set_workspace_root(crate::repl::types_v2::WorkspaceKind::Cbu);
+        }
+
+        let mut handles = Vec::new();
+        for idx in 0..6 {
+            let orch = Arc::clone(&orch);
+            handles.push(tokio::spawn(async move {
+                orch.record_external_chat_exchange(
+                    session_id,
+                    format!("Open workspace for Fund {idx}"),
+                    format!("Structured response {idx}"),
+                )
+                .await
+            }));
+        }
+        for handle in handles {
+            handle.await.unwrap().unwrap();
+        }
+
+        let (loaded, version) = repo.load_session(session_id).await.unwrap().unwrap();
+        assert!(version >= 6);
+        for idx in 0..6 {
+            assert!(loaded
+                .messages
+                .iter()
+                .any(|message| message.content == format!("Open workspace for Fund {idx}")));
+            assert!(loaded
+                .messages
+                .iter()
+                .any(|message| message.content == format!("Structured response {idx}")));
+        }
+        for entity_id in &entity_ids {
+            assert!(loaded.cbu_ids.contains(entity_id));
+        }
+        assert!(loaded
+            .bindings
+            .get("last_entity_id")
+            .and_then(|value| value.as_str())
+            .and_then(|value| Uuid::parse_str(value).ok())
+            .is_some_and(|entity_id| entity_ids.contains(&entity_id)));
     }
 
     #[tokio::test]
@@ -8036,9 +9050,9 @@ definition_of_done:
     #[test]
     fn test_phase5_recheck_failure_surfaces_constellation_block() {
         let mut envelope = crate::agent::sem_os_context_envelope::SemOsContextEnvelope::deny_all();
-        envelope.grounded_action_surface =
-            Some(sem_os_core::context_resolution::GroundedActionSurface {
-                resolved_subject: sem_os_core::context_resolution::SubjectRef::TaskId(Uuid::nil()),
+        envelope.grounded_action_surface = Some(
+            sem_os_policy::context_resolution::GroundedActionSurface {
+                resolved_subject: sem_os_policy::context_resolution::SubjectRef::TaskId(Uuid::nil()),
                 resolved_constellation: Some("constellation.kyc".to_string()),
                 resolved_slot_path: Some("case".to_string()),
                 resolved_node_id: Some("node-1".to_string()),
@@ -8046,7 +9060,7 @@ definition_of_done:
                 current_state: Some("intake".to_string()),
                 traversed_edges: vec![],
                 constraint_signals: vec![
-                    sem_os_core::context_resolution::GroundedConstraintSignal {
+                    sem_os_policy::context_resolution::GroundedConstraintSignal {
                         kind: "dependency_block".to_string(),
                         slot_path: "case".to_string(),
                         related_slot: Some("cbu".to_string()),
@@ -8057,7 +9071,7 @@ definition_of_done:
                     },
                 ],
                 valid_actions: vec![],
-                blocked_actions: vec![sem_os_core::context_resolution::BlockedActionOption {
+                blocked_actions: vec![sem_os_policy::context_resolution::BlockedActionOption {
                     action_id: "case.open".to_string(),
                     action_kind: "primitive".to_string(),
                     description: "Blocked action for slot 'case'".to_string(),
@@ -8066,7 +9080,8 @@ definition_of_done:
                     ],
                 }],
                 dsl_candidates: vec![],
-            });
+            },
+        );
 
         let outcome = phase5_recheck_failure("case.open", &envelope).expect("blocked");
         let StepOutcome::Failed { error } = outcome else {
@@ -8843,6 +9858,7 @@ definition_of_done:
             session_feedback: Some(session.build_session_feedback(false)),
             narration: None,
             trace_id: None,
+            acp_dag_semantic: None,
         };
 
         assert_eq!(
@@ -8856,6 +9872,11 @@ definition_of_done:
     fn test_repl_phase2_halt_reason_uses_ambiguous_lookup() {
         let mut session = ReplSessionV2::new();
         session.pending_lookup_result = Some(crate::lookup::LookupResult {
+            entity_snapshot: crate::lookup::service::EntitySnapshotMetadata {
+                hash: "test".to_string(),
+                version: 1,
+                entity_count: 2,
+            },
             verbs: vec![],
             entities: vec![crate::entity_linking::EntityResolution {
                 mention_span: (0, 7),
@@ -8898,6 +9919,7 @@ definition_of_done:
             session_feedback: Some(session.build_session_feedback(false)),
             narration: None,
             trace_id: None,
+            acp_dag_semantic: None,
         };
 
         assert_eq!(
@@ -8912,9 +9934,9 @@ definition_of_done:
         let orch = ReplOrchestratorV2::new(PackRouter::new(vec![]), Arc::new(StubExecutor));
         let mut session = ReplSessionV2::new();
         let mut envelope = crate::agent::sem_os_context_envelope::SemOsContextEnvelope::deny_all();
-        envelope.grounded_action_surface =
-            Some(sem_os_core::context_resolution::GroundedActionSurface {
-                resolved_subject: sem_os_core::context_resolution::SubjectRef::TaskId(Uuid::nil()),
+        envelope.grounded_action_surface = Some(
+            sem_os_policy::context_resolution::GroundedActionSurface {
+                resolved_subject: sem_os_policy::context_resolution::SubjectRef::TaskId(Uuid::nil()),
                 resolved_constellation: Some("constellation.kyc".to_string()),
                 resolved_slot_path: Some("case".to_string()),
                 resolved_node_id: Some("node-1".to_string()),
@@ -8922,7 +9944,7 @@ definition_of_done:
                 current_state: Some("intake".to_string()),
                 traversed_edges: vec![],
                 constraint_signals: vec![
-                    sem_os_core::context_resolution::GroundedConstraintSignal {
+                    sem_os_policy::context_resolution::GroundedConstraintSignal {
                         kind: "dependency_block".to_string(),
                         slot_path: "case".to_string(),
                         related_slot: Some("cbu".to_string()),
@@ -8933,7 +9955,7 @@ definition_of_done:
                     },
                 ],
                 valid_actions: vec![],
-                blocked_actions: vec![sem_os_core::context_resolution::BlockedActionOption {
+                blocked_actions: vec![sem_os_policy::context_resolution::BlockedActionOption {
                     action_id: "case.open".to_string(),
                     action_kind: "primitive".to_string(),
                     description: "Blocked action for slot 'case'".to_string(),
@@ -8942,7 +9964,8 @@ definition_of_done:
                     ],
                 }],
                 dsl_candidates: vec![],
-            });
+            },
+        );
         session.pending_sem_os_envelope = Some(envelope);
 
         let response = orch.phase2_gate_response(&session).expect("phase 2 gate");
@@ -8959,6 +9982,11 @@ definition_of_done:
         let orch = ReplOrchestratorV2::new(PackRouter::new(vec![]), Arc::new(StubExecutor));
         let mut session = ReplSessionV2::new();
         session.pending_lookup_result = Some(crate::lookup::LookupResult {
+            entity_snapshot: crate::lookup::service::EntitySnapshotMetadata {
+                hash: "test".to_string(),
+                version: 1,
+                entity_count: 2,
+            },
             verbs: vec![],
             entities: vec![crate::entity_linking::EntityResolution {
                 mention_span: (0, 7),
@@ -9020,6 +10048,7 @@ definition_of_done:
             session_feedback: Some(session.build_session_feedback(false)),
             narration: None,
             trace_id: None,
+            acp_dag_semantic: None,
         };
 
         let payload = build_repl_phase4_evaluation(

@@ -48,23 +48,24 @@
 //! surface is added here deliberately so the plane boundary is reviewable
 //! at a glance.
 
+// dsl-runtime is now the data plane only. The 13 analyser-tier modules
+// (validation, verb_registry, runtime_registry, catalogue_loader,
+// entity_kind, macros, ref_resolver, gateway_resolver, lsp_validator,
+// suggestions, planning_facade, stategraph, verification) live in
+// `dsl-analysis`. See docs/todo/dsl-runtime-split-v1.md.
 pub mod bods;
-pub mod catalogue_loader;
 pub mod cross_workspace;
 pub mod crud_executor;
 pub mod document_bundles;
 pub mod document_requirements;
 pub mod domain_ops;
-pub mod entity_kind;
 pub mod execution;
 pub mod placeholder;
 pub mod port;
 pub mod service_traits;
 pub mod services;
 pub mod state_reducer;
-pub mod stategraph;
 pub mod tx;
-pub mod verification;
 
 // Explicit re-exports — do NOT add `pub use module::*`.
 pub use crud_executor::PgCrudExecutor;

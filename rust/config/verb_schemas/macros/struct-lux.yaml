@@ -13,6 +13,12 @@
 # =============================================================================
 struct.lux.ucits.sicav:
   kind: macro
+  plan-kind: composite_sequence
+  lifecycle-state: active
+  requires-states: []
+  precondition-checks: ["requires_scope:client"]
+  state-effect: transition
+  side-effects: state_write
 
   ui:
     label: "Luxembourg UCITS SICAV"
@@ -194,6 +200,12 @@ struct.lux.ucits.sicav:
 # =============================================================================
 struct.lux.aif.raif:
   kind: macro
+  plan-kind: composite_sequence
+  lifecycle-state: active
+  requires-states: []
+  precondition-checks: ["requires_scope:client"]
+  state-effect: transition
+  side-effects: state_write
 
   ui:
     label: "Luxembourg AIF RAIF"
@@ -406,6 +418,12 @@ struct.lux.aif.raif:
 # =============================================================================
 struct.lux.pe.scsp:
   kind: macro
+  plan-kind: composite_sequence
+  lifecycle-state: active
+  requires-states: []
+  precondition-checks: ["requires_scope:client"]
+  state-effect: transition
+  side-effects: state_write
 
   ui:
     label: "Luxembourg PE SCSp"

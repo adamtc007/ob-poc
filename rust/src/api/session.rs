@@ -1360,7 +1360,7 @@ impl AgentSession {
             intents: None,
             dsl: None,
             sage_explain: None,
-            coder_proposal: None,
+            drafter_proposal: None,
             discovery_bootstrap: None,
             parked_entries: None,
         });
@@ -1384,7 +1384,7 @@ impl AgentSession {
             intents: None,
             dsl,
             sage_explain: None,
-            coder_proposal: None,
+            drafter_proposal: None,
             discovery_bootstrap: None,
             parked_entries: None,
         });
@@ -1457,9 +1457,9 @@ pub struct ChatMessage {
     /// Sage explanation payload for this message.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub sage_explain: Option<ob_poc_types::chat::SageExplainPayload>,
-    /// Coder proposal payload for this message.
+    /// Drafter proposal payload for this message.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub coder_proposal: Option<ob_poc_types::chat::CoderProposalPayload>,
+    pub drafter_proposal: Option<ob_poc_types::chat::DraftProposalPayload>,
     /// Sem OS discovery bootstrap payload for this message.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub discovery_bootstrap: Option<ob_poc_types::chat::DiscoveryBootstrapPayload>,

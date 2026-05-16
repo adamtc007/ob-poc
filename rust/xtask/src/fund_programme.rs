@@ -38,101 +38,101 @@ use std::path::Path;
 
 /// Configuration for a fund programme loader
 #[derive(Debug, Deserialize, Serialize)]
-pub struct FundProgrammeConfig {
+pub(crate) struct FundProgrammeConfig {
     /// Name of the fund programme (for logging/display)
-    pub programme_name: String,
+    pub(crate) programme_name: String,
 
     /// Default values for fields not in CSV
     #[serde(default)]
-    pub defaults: FundDefaults,
+    pub(crate) defaults: FundDefaults,
 
     /// Column name mapping (config key -> CSV column name)
-    pub column_mapping: ColumnMapping,
+    pub(crate) column_mapping: ColumnMapping,
 
     /// Vehicle type value mapping (CSV value -> DB enum value)
     #[serde(default)]
-    pub vehicle_type_mapping: HashMap<String, String>,
+    pub(crate) vehicle_type_mapping: HashMap<String, String>,
 
     /// Investor type value mapping (CSV value -> DB enum value)
     #[serde(default)]
-    pub investor_type_mapping: HashMap<String, String>,
+    pub(crate) investor_type_mapping: HashMap<String, String>,
 }
 
 #[derive(Debug, Default, Deserialize, Serialize)]
-pub struct FundDefaults {
+pub(crate) struct FundDefaults {
     /// Default holder affiliation: INTRA_GROUP, EXTERNAL, MIXED, UNKNOWN
-    pub holder_affiliation: Option<String>,
+    pub(crate) holder_affiliation: Option<String>,
     /// Default for BO data availability
-    pub bo_data_available: Option<bool>,
+    pub(crate) bo_data_available: Option<bool>,
     /// Default domicile country (ISO 2-letter)
-    pub domicile_country: Option<String>,
+    pub(crate) domicile_country: Option<String>,
     /// Default role type for investors
-    pub role_type: Option<String>,
+    pub(crate) role_type: Option<String>,
     /// Default lookthrough policy
-    pub lookthrough_policy: Option<String>,
+    pub(crate) lookthrough_policy: Option<String>,
 }
 
 #[derive(Debug, Default, Deserialize, Serialize)]
-pub struct ColumnMapping {
+pub(crate) struct ColumnMapping {
     /// LEI column (required for entity matching)
-    pub lei: Option<String>,
+    pub(crate) lei: Option<String>,
     /// Entity name column (required)
-    pub entity_name: String,
+    pub(crate) entity_name: String,
     /// Vehicle type column
-    pub vehicle_type: Option<String>,
+    pub(crate) vehicle_type: Option<String>,
     /// Umbrella LEI column (for sub-fund relationships)
-    pub umbrella_lei: Option<String>,
+    pub(crate) umbrella_lei: Option<String>,
     /// Compartment code column
-    pub compartment_code: Option<String>,
+    pub(crate) compartment_code: Option<String>,
     /// Compartment name column
-    pub compartment_name: Option<String>,
+    pub(crate) compartment_name: Option<String>,
     /// Manager LEI column
-    pub manager_lei: Option<String>,
+    pub(crate) manager_lei: Option<String>,
     /// Domicile country column
-    pub domicile_country: Option<String>,
+    pub(crate) domicile_country: Option<String>,
     /// Is umbrella flag column
-    pub is_umbrella: Option<String>,
+    pub(crate) is_umbrella: Option<String>,
     /// Investor type column (for investor records)
-    pub investor_type: Option<String>,
+    pub(crate) investor_type: Option<String>,
     /// Holder affiliation column
-    pub holder_affiliation: Option<String>,
+    pub(crate) holder_affiliation: Option<String>,
     /// BO data available column
-    pub bo_data_available: Option<String>,
+    pub(crate) bo_data_available: Option<String>,
 }
 
 /// A parsed fund record from CSV
 #[derive(Debug, Clone)]
 #[allow(dead_code)]
-pub struct FundRecord {
-    pub lei: Option<String>,
-    pub entity_name: String,
-    pub vehicle_type: Option<String>,
-    pub umbrella_lei: Option<String>,
-    pub compartment_code: Option<String>,
-    pub compartment_name: Option<String>,
-    pub manager_lei: Option<String>,
-    pub domicile_country: Option<String>,
-    pub is_umbrella: bool,
-    pub investor_type: Option<String>,
-    pub holder_affiliation: Option<String>,
-    pub bo_data_available: Option<bool>,
+pub(crate) struct FundRecord {
+    pub(crate) lei: Option<String>,
+    pub(crate) entity_name: String,
+    pub(crate) vehicle_type: Option<String>,
+    pub(crate) umbrella_lei: Option<String>,
+    pub(crate) compartment_code: Option<String>,
+    pub(crate) compartment_name: Option<String>,
+    pub(crate) manager_lei: Option<String>,
+    pub(crate) domicile_country: Option<String>,
+    pub(crate) is_umbrella: bool,
+    pub(crate) investor_type: Option<String>,
+    pub(crate) holder_affiliation: Option<String>,
+    pub(crate) bo_data_available: Option<bool>,
 }
 
 /// Result of loading a fund programme
 #[derive(Debug, Default)]
 #[allow(dead_code)]
-pub struct LoadResult {
-    pub entities_created: usize,
-    pub entities_updated: usize,
-    pub fund_vehicles_created: usize,
-    pub compartments_created: usize,
-    pub role_profiles_created: usize,
-    pub errors: Vec<String>,
+pub(crate) struct LoadResult {
+    pub(crate) entities_created: usize,
+    pub(crate) entities_updated: usize,
+    pub(crate) fund_vehicles_created: usize,
+    pub(crate) compartments_created: usize,
+    pub(crate) role_profiles_created: usize,
+    pub(crate) errors: Vec<String>,
 }
 
 impl FundProgrammeConfig {
     /// Load config from YAML file
-    pub fn from_file(path: &Path) -> Result<Self> {
+    pub(crate) fn from_file(path: &Path) -> Result<Self> {
         let content = std::fs::read_to_string(path)
             .with_context(|| format!("Failed to read config file: {}", path.display()))?;
         let config: Self = serde_yaml::from_str(&content)
@@ -141,7 +141,7 @@ impl FundProgrammeConfig {
     }
 
     /// Parse a CSV row into a FundRecord using this config
-    pub fn parse_row(
+    pub(crate) fn parse_row(
         &self,
         row: &csv::StringRecord,
         headers: &csv::StringRecord,
@@ -246,7 +246,10 @@ impl FundProgrammeConfig {
 }
 
 /// Generate DSL statements for a fund record
-pub fn generate_dsl_for_fund(record: &FundRecord, config: &FundProgrammeConfig) -> Vec<String> {
+pub(crate) fn generate_dsl_for_fund(
+    record: &FundRecord,
+    config: &FundProgrammeConfig,
+) -> Vec<String> {
     let mut statements = Vec::new();
 
     // 1. Create or ensure entity exists
@@ -353,7 +356,7 @@ pub fn generate_dsl_for_fund(record: &FundRecord, config: &FundProgrammeConfig) 
 }
 
 /// Load funds from CSV using config
-pub fn load_csv_with_config(
+pub(crate) fn load_csv_with_config(
     csv_path: &Path,
     config: &FundProgrammeConfig,
     limit: Option<usize>,
@@ -384,7 +387,7 @@ pub fn load_csv_with_config(
 }
 
 /// Generate complete DSL file for a fund programme
-pub fn generate_dsl_file(records: &[FundRecord], config: &FundProgrammeConfig) -> String {
+pub(crate) fn generate_dsl_file(records: &[FundRecord], config: &FundProgrammeConfig) -> String {
     let mut lines = Vec::new();
 
     lines.push(format!(";; Fund Programme: {}", config.programme_name));

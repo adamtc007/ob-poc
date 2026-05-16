@@ -14,7 +14,7 @@
 //! 3. **Diagram generation** (3 verbs) — read physical schema via
 //!    `information_schema`, load the `AffinityGraph` cache (reused
 //!    from `dsl-runtime::domain_ops::affinity_graph_cache`, as
-//!    slice #9 does), render Mermaid via `sem_os_core::diagram`.
+//!    slice #9 does), render Mermaid via `sem_os_policy::diagram`.
 //!
 //! Both AgentModes (Research + Governed) are read-only here.
 

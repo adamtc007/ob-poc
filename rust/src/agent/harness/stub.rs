@@ -58,7 +58,7 @@ pub fn build_stub_context(
         policy_gate: Arc::new(policy),
         source: UtteranceSource::Chat,
         sem_os_client: Some(HarnessSemOsClient::new_arc()),
-        agent_mode: sem_os_core::authoring::agent_mode::AgentMode::default(),
+        agent_mode: sem_os_types::agent_mode::AgentMode::default(),
         goals: vec![],
         stage_focus: None,
         sage_engine: None,

@@ -4,7 +4,7 @@
 //! orchestrator produces `ReplResponseV2`. This adapter bridges the two so the
 //! frontend works unchanged as we migrate to the REPL V2 session model.
 
-use ob_poc_types::chat::{ChatResponse, CoderProposalPayload, SessionStateEnum};
+use ob_poc_types::chat::{ChatResponse, DraftProposalPayload, SessionStateEnum};
 use ob_poc_types::decision::{
     ClarificationPayload, DecisionKind, DecisionPacket, DecisionTrace, GroupClarificationPayload,
     SessionStateView, UserChoice,
@@ -38,13 +38,21 @@ pub fn repl_to_chat_response(resp: ReplResponseV2, session_id: Uuid) -> ChatResp
         available_verbs: None,
         surface_fingerprint: None,
         sage_explain: None,
-        coder_proposal: None,
+        drafter_proposal: None,
         discovery_bootstrap: None,
         parked_entries: None,
         onboarding_state: None,
         runbook_plan: None,
         session_feedback,
         narration: resp.narration.clone(),
+        // R8 Phase B (2026-05-11): typed projection of the ACP DAG
+        // semantic resolution into `acp_trace`. Replaces Phase A's
+        // pre-built `ChatResponse` carrier. The typed summary mirrors
+        // the ~30-key flat shape the chat UI's `AcpTraceCard` consumes.
+        acp_trace: resp
+            .acp_dag_semantic
+            .as_ref()
+            .map(crate::acp_dag_semantic::acp_chat_trace_summary_typed),
         // Phase A.2 (F5 follow-on): forward the turn-level correlation id.
         trace_id: resp.trace_id,
     };
@@ -132,7 +140,7 @@ pub fn repl_to_chat_response(resp: ReplResponseV2, session_id: Uuid) -> ChatResp
             ref verb,
             ..
         } => {
-            chat.coder_proposal = Some(CoderProposalPayload {
+            chat.drafter_proposal = Some(DraftProposalPayload {
                 verb_fqn: Some(verb.clone()),
                 dsl: Some(sentence.clone()),
                 change_summary: vec![resp.message.clone()],
@@ -177,7 +185,7 @@ pub fn repl_to_chat_response(resp: ReplResponseV2, session_id: Uuid) -> ChatResp
 
         ReplResponseKindV2::StepProposals { ref proposals, .. } => {
             if let Some(top) = proposals.first() {
-                chat.coder_proposal = Some(CoderProposalPayload {
+                chat.drafter_proposal = Some(DraftProposalPayload {
                     verb_fqn: Some(top.verb.clone()),
                     dsl: Some(top.sentence.clone()),
                     change_summary: vec![top.sentence.clone()],
@@ -195,6 +203,24 @@ pub fn repl_to_chat_response(resp: ReplResponseV2, session_id: Uuid) -> ChatResp
         | ReplResponseKindV2::Prompt { .. }
         | ReplResponseKindV2::Error { .. } => {
             // Message field already carries the human-readable content.
+        }
+
+        // R8 single-path unification (2026-05-11): ACP-resolved short-
+        // circuit. The orchestrator's first-step ACP resolution produced
+        // a Slice 1 pack-bound match. `resp.message` already carries the
+        // human-readable text. `chat.acp_trace` is already populated from
+        // `resp.acp_dag_semantic` at the top of this function. Project
+        // the typed draft DSL into `chat.dsl` for the chat UI.
+        ReplResponseKindV2::AcpResolved { ref dsl } => {
+            chat.session_state = SessionStateEnum::Scoped;
+            if let Some(source) = dsl {
+                chat.dsl = Some(ob_poc_types::DslState {
+                    source: Some(source.clone()),
+                    ast: None,
+                    can_execute: false,
+                    bindings: Default::default(),
+                });
+            }
         }
     }
 
@@ -283,6 +309,7 @@ mod tests {
             session_feedback: None,
             narration: None,
             trace_id: None,
+            acp_dag_semantic: None,
         };
         let chat = repl_to_chat_response(resp, Uuid::nil());
         assert!(chat.decision.is_some());
@@ -315,6 +342,7 @@ mod tests {
             session_feedback: None,
             narration: None,
             trace_id: None,
+            acp_dag_semantic: None,
         };
         let chat = repl_to_chat_response(resp, Uuid::nil());
         assert!(chat.decision.is_some());
@@ -343,6 +371,7 @@ mod tests {
             session_feedback: None,
             narration: None,
             trace_id: None,
+            acp_dag_semantic: None,
         };
         let chat = repl_to_chat_response(resp, Uuid::nil());
         let decision = chat.decision.expect("constellation map decision");
@@ -372,6 +401,7 @@ mod tests {
             session_feedback: None,
             narration: None,
             trace_id: None,
+            acp_dag_semantic: None,
         };
         let chat = repl_to_chat_response(resp, Uuid::nil());
         let d = chat.decision.unwrap();
@@ -399,10 +429,11 @@ mod tests {
             session_feedback: None,
             narration: None,
             trace_id: None,
+            acp_dag_semantic: None,
         };
         let chat = repl_to_chat_response(resp, Uuid::nil());
-        assert!(chat.coder_proposal.is_some());
-        let cp = chat.coder_proposal.unwrap();
+        assert!(chat.drafter_proposal.is_some());
+        let cp = chat.drafter_proposal.unwrap();
         assert_eq!(cp.verb_fqn.unwrap(), "cbu.create");
         assert!(cp.requires_confirmation);
     }
@@ -421,6 +452,7 @@ mod tests {
             session_feedback: None,
             narration: None,
             trace_id: None,
+            acp_dag_semantic: None,
         };
         let chat = repl_to_chat_response(resp, Uuid::nil());
         assert!(chat.message.contains("Could not find"));

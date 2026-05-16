@@ -7,12 +7,12 @@ use std::sync::Arc;
 use axum::{extract::Extension, Json};
 use sem_os_core::{
     principal::Principal, proto::BootstrapSeedBundleResponse, seeds::SeedBundle,
-    service::CoreService,
 };
+use sem_os_policy::service::CoreService;
 
 use crate::error::AppError;
 
-pub async fn publish(
+pub(crate) async fn publish(
     Extension(principal): Extension<Principal>,
     Extension(service): Extension<Arc<dyn CoreService>>,
     Json(bundle): Json<SeedBundle>,

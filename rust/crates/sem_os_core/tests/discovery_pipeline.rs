@@ -1,10 +1,10 @@
 use std::collections::{HashMap, HashSet};
 
-use sem_os_core::affinity::{
-    discover_dsl, AffinityEdge, AffinityGraph, AffinityKind, AffinityProvenance, DataRef, TableRef,
-};
-use sem_os_core::verb_contract::{
+use sem_os_ontology::verb_contract::{
     ActionClass, HarmClass, VerbArgDef, VerbArgLookup, VerbContractBody, VerbCrudMapping,
+};
+use sem_os_policy::affinity::{
+    discover_dsl, AffinityEdge, AffinityGraph, AffinityKind, AffinityProvenance, DataRef, TableRef,
 };
 
 fn verb_contracts() -> Vec<VerbContractBody> {

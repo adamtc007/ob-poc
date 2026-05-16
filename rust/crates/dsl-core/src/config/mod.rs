@@ -34,7 +34,7 @@ pub mod tier_gate;
 pub mod types;
 pub mod validator;
 
-pub use dag::{load_dags_from_dir, Dag, LoadedDag};
+pub use dag::{load_dags_from_dir, load_domain_pack_owned_dags, Dag, LoadedDag};
 pub use dag_registry::{DagRegistry, SlotKey, TransitionKey};
 pub use dag_validator::{
     entity_kinds_from_taxonomy_yaml, validate_constellation_map_dir_schema_coordination,
@@ -67,10 +67,10 @@ pub use types::{
     EscalationRule, ExternalEffect, FuzzyCheckConfig, GraphQueryConfig, GraphQueryOperation,
     HarmClass, JurisdictionCondition, JurisdictionRule, LookupConfig, ResolutionMode,
     ReturnTypeConfig, ReturnsConfig, RuleCondition, RuleRequirement, RuleSeverity, SearchKeyConfig,
-    SlotType, SourceOfTruth, StateEffect, ThreeAxisDeclaration, TransitionEdge, VerbBehavior,
-    VerbConfig, VerbConsumes, VerbFlavour, VerbLifecycle, VerbMetadata, VerbOutputConfig,
-    VerbProduces, VerbRoleGuard, VerbScope, VerbSentences, VerbStatus, VerbTier, VerbTransitions,
-    VerbsConfig, WarningRule,
+    SlotType, SourceOfTruth, StateEffect, ThreeAxisDeclaration, TransitionArgs, TransitionEdge,
+    VerbBehavior, VerbConfig, VerbConsumes, VerbFlavour, VerbLifecycle, VerbMetadata,
+    VerbOutputConfig, VerbProduces, VerbRoleGuard, VerbScope, VerbSentences, VerbStatus, VerbTier,
+    VerbTransitions, VerbsConfig, WarningRule,
 };
 pub use validator::{
     collect_declared_fqns, validate_pack_fqns, validate_verb, validate_verbs_config, Location,

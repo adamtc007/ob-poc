@@ -13,6 +13,9 @@ use uuid::Uuid;
 /// Result of unified lookup analysis
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct LookupResult {
+    /// Entity snapshot metadata used for this lookup pass.
+    pub entity_snapshot: EntitySnapshotMetadata,
+
     /// Verb candidates from search (sorted by score)
     pub verbs: Vec<VerbSearchResult>,
 
@@ -33,6 +36,14 @@ pub struct LookupResult {
 
     /// Whether entity resolution found unambiguous matches
     pub entities_resolved: bool,
+}
+
+/// Metadata for the entity-linking snapshot used during lookup.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct EntitySnapshotMetadata {
+    pub hash: String,
+    pub version: u32,
+    pub entity_count: usize,
 }
 
 /// The dominant entity from analysis
@@ -149,6 +160,11 @@ impl LookupService {
         let has_dominant = dominant_entity.is_some();
 
         LookupResult {
+            entity_snapshot: EntitySnapshotMetadata {
+                hash: self.entity_linker.snapshot_hash().to_string(),
+                version: self.entity_linker.snapshot_version(),
+                entity_count: self.entity_linker.entity_count(),
+            },
             verbs,
             entities,
             dominant_entity,
@@ -320,6 +336,11 @@ mod tests {
     #[test]
     fn test_lookup_result_serializable() {
         let result = LookupResult {
+            entity_snapshot: EntitySnapshotMetadata {
+                hash: "test".to_string(),
+                version: 1,
+                entity_count: 0,
+            },
             verbs: vec![],
             entities: vec![],
             dominant_entity: None,

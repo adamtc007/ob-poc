@@ -12,6 +12,12 @@
 # =============================================================================
 struct.hedge.cross-border:
   kind: macro
+  plan-kind: composite_sequence
+  lifecycle-state: active
+  requires-states: []
+  precondition-checks: ["requires_scope:client"]
+  state-effect: transition
+  side-effects: state_write
 
   ui:
     label: "Cross-Border Hedge Fund"
@@ -307,6 +313,12 @@ struct.hedge.cross-border:
 # =============================================================================
 struct.pe.cross-border:
   kind: macro
+  plan-kind: composite_sequence
+  lifecycle-state: active
+  requires-states: []
+  precondition-checks: ["requires_scope:client"]
+  state-effect: transition
+  side-effects: state_write
 
   ui:
     label: "Cross-Border PE Fund"

@@ -7,6 +7,7 @@ import { User, Bot, AlertCircle, CheckCircle, Loader2 } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import type {
+  AcpTraceSummary,
   ChatMessage as ChatMessageType,
   DiscoverySelection,
   ToolCall,
@@ -131,6 +132,170 @@ function CoderProposalCard({ message }: { message: ChatMessageType }) {
           <code>{message.coder_proposal.dsl}</code>
         </pre>
       )}
+    </div>
+  );
+}
+
+function AcpTraceCard({ trace }: { trace: AcpTraceSummary }) {
+  const statusLabel = trace.outcome || trace.status;
+  const provider = trace.state_anchor_provider;
+  const detailItems = [
+    trace.route ? `route: ${trace.route}` : null,
+    trace.draft_source ? `draft: ${trace.draft_source}` : null,
+    trace.requested_draft_source &&
+    trace.requested_draft_source !== trace.draft_source
+      ? `requested: ${trace.requested_draft_source}`
+      : null,
+    trace.outcome_layer ? `layer: ${trace.outcome_layer}` : null,
+    trace.transition_ref ? `transition: ${trace.transition_ref}` : null,
+    trace.refusal_code ? `refusal: ${trace.refusal_code}` : null,
+    trace.pending_question_code
+      ? `pending: ${trace.pending_question_code}`
+      : null,
+    trace.revision_count !== undefined
+      ? `revisions: ${trace.revision_count}`
+      : null,
+    trace.performance?.total_ms !== undefined
+      ? `total: ${trace.performance.total_ms}ms`
+      : trace.route_latency_ms !== undefined
+        ? `route: ${trace.route_latency_ms}ms`
+        : null,
+    trace.performance?.llm_draft_ms !== undefined &&
+    trace.performance.llm_draft_ms > 0
+      ? `llm: ${trace.performance.llm_draft_ms}ms`
+      : null,
+  ].filter((item): item is string => Boolean(item));
+  const providerItems = provider
+    ? [
+        provider.task ? `task: ${provider.task}` : null,
+        provider.status ? `provider: ${provider.status}` : null,
+        provider.state_anchor_source
+          ? `anchor: ${provider.state_anchor_source}`
+          : null,
+        provider.language_pack_generated !== undefined
+          ? `language pack: ${provider.language_pack_generated ? "yes" : "no"}`
+          : null,
+        provider.dry_run_valid !== undefined
+          ? `provider dry-run: ${provider.dry_run_valid ? "valid" : "not valid"}`
+          : null,
+        provider.no_mutation_authority ? "mutation: no authority" : null,
+      ].filter((item): item is string => Boolean(item))
+    : [];
+
+  return (
+    <div className="mt-2 rounded-lg border border-[var(--border-primary)] bg-[var(--bg-tertiary)] p-3 text-sm">
+      <div className="flex items-center justify-between gap-2">
+        <div className="text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]">
+          ACP Trace
+        </div>
+        <span className="rounded bg-[var(--bg-secondary)] px-2 py-1 text-xs font-mono text-[var(--text-secondary)]">
+          {statusLabel}
+        </span>
+      </div>
+
+      {trace.human_summary && (
+        <div className="mt-2 text-xs text-[var(--text-secondary)]">
+          {trace.human_summary}
+        </div>
+      )}
+
+      {detailItems.length > 0 && (
+        <div className="mt-2 flex flex-wrap gap-2">
+          {detailItems.map((item) => (
+            <span
+              key={item}
+              className="rounded bg-[var(--bg-secondary)] px-2 py-1 text-xs text-[var(--text-secondary)]"
+            >
+              {item}
+            </span>
+          ))}
+        </div>
+      )}
+
+      {provider && (
+        <div className="mt-3 border-t border-[var(--border-primary)] pt-3">
+          <div className="text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]">
+            State Anchor Provider
+          </div>
+          <div className="mt-2 flex flex-wrap gap-2">
+            {providerItems.map((item) => (
+              <span
+                key={item}
+                className="rounded bg-[var(--bg-secondary)] px-2 py-1 text-xs text-[var(--text-secondary)]"
+              >
+                {item}
+              </span>
+            ))}
+            {provider.provider_id && (
+              <span className="rounded bg-[var(--bg-secondary)] px-2 py-1 font-mono text-xs text-[var(--text-secondary)]">
+                {provider.provider_id}
+              </span>
+            )}
+          </div>
+          {provider.supported_tasks && provider.supported_tasks.length > 0 && (
+            <div className="mt-2 text-xs text-[var(--text-secondary)]">
+              supported: {provider.supported_tasks.join(", ")}
+            </div>
+          )}
+          {provider.needed && provider.needed.length > 0 && (
+            <div className="mt-1 text-xs text-[var(--text-secondary)]">
+              needed:{" "}
+              {provider.needed
+                .map((need) => need.replaceAll("_", " "))
+                .join(", ")}
+            </div>
+          )}
+        </div>
+      )}
+
+      {trace.needed_from_user && trace.needed_from_user.length > 0 && (
+        <div className="mt-3">
+          <div className="text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]">
+            Needed From User
+          </div>
+          <ul className="mt-1 list-disc pl-5 text-xs text-[var(--text-secondary)]">
+            {trace.needed_from_user.map((need) => (
+              <li key={need}>{need.replaceAll("_", " ")}</li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {trace.diagnostic_codes && trace.diagnostic_codes.length > 0 && (
+        <div className="mt-3">
+          <div className="text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]">
+            Diagnostics
+          </div>
+          <div className="mt-1 flex flex-wrap gap-2">
+            {trace.diagnostic_codes.map((code) => (
+              <span
+                key={code}
+                className="rounded bg-[var(--bg-secondary)] px-2 py-1 font-mono text-xs text-[var(--text-secondary)]"
+              >
+                {code}
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
+
+      <div className="mt-3 flex flex-wrap gap-2 text-xs text-[var(--text-secondary)]">
+        {trace.dry_run_valid !== undefined && (
+          <span className="rounded bg-[var(--bg-secondary)] px-2 py-1">
+            dry-run: {trace.dry_run_valid ? "valid" : "not valid"}
+          </span>
+        )}
+        {trace.prose_only_failure !== undefined && (
+          <span className="rounded bg-[var(--bg-secondary)] px-2 py-1">
+            prose-only failure: {trace.prose_only_failure ? "yes" : "no"}
+          </span>
+        )}
+        {trace.semantic_diff_uri && (
+          <span className="rounded bg-[var(--bg-secondary)] px-2 py-1 font-mono">
+            {trace.semantic_diff_uri}
+          </span>
+        )}
+      </div>
     </div>
   );
 }
@@ -430,6 +595,7 @@ export function ChatMessage({
             />
             <ParkedEntriesCard message={message} />
             <CoderProposalCard message={message} />
+            {message.acp_trace && <AcpTraceCard trace={message.acp_trace} />}
             <OnboardingStateCard
               message={message}
               onVerbClick={onSendMessage}

@@ -9,7 +9,7 @@ use xshell::{cmd, Shell};
 use super::project_root;
 
 /// Build the bpmn-lite workspace.
-pub fn build(sh: &Shell, release: bool) -> Result<()> {
+pub(crate) fn build(sh: &Shell, release: bool) -> Result<()> {
     let bpmn_dir = project_root()?.join("bpmn-lite");
     sh.change_dir(&bpmn_dir);
 
@@ -28,7 +28,7 @@ pub fn build(sh: &Shell, release: bool) -> Result<()> {
 }
 
 /// Run all tests in the bpmn-lite workspace.
-pub fn test(sh: &Shell, filter: Option<&str>) -> Result<()> {
+pub(crate) fn test(sh: &Shell, filter: Option<&str>) -> Result<()> {
     let bpmn_dir = project_root()?.join("bpmn-lite");
     sh.change_dir(&bpmn_dir);
 
@@ -47,7 +47,7 @@ pub fn test(sh: &Shell, filter: Option<&str>) -> Result<()> {
 }
 
 /// Run clippy on the bpmn-lite workspace.
-pub fn clippy(sh: &Shell) -> Result<()> {
+pub(crate) fn clippy(sh: &Shell) -> Result<()> {
     let bpmn_dir = project_root()?.join("bpmn-lite");
     sh.change_dir(&bpmn_dir);
 
@@ -60,7 +60,7 @@ pub fn clippy(sh: &Shell) -> Result<()> {
 }
 
 /// Build the Docker image for bpmn-lite.
-pub fn docker_build(sh: &Shell) -> Result<()> {
+pub(crate) fn docker_build(sh: &Shell) -> Result<()> {
     let root = project_root()?;
     sh.change_dir(&root);
 
@@ -73,7 +73,7 @@ pub fn docker_build(sh: &Shell) -> Result<()> {
 }
 
 /// Deploy bpmn-lite via docker compose.
-pub fn deploy(sh: &Shell, build_image: bool) -> Result<()> {
+pub(crate) fn deploy(sh: &Shell, build_image: bool) -> Result<()> {
     let root = project_root()?;
     sh.change_dir(&root);
 
@@ -90,7 +90,7 @@ pub fn deploy(sh: &Shell, build_image: bool) -> Result<()> {
 }
 
 /// Start the bpmn-lite gRPC server natively (release build, background process).
-pub fn start(sh: &Shell, port: u16) -> Result<()> {
+pub(crate) fn start(sh: &Shell, port: u16) -> Result<()> {
     let bpmn_dir = project_root()?.join("bpmn-lite");
 
     // Stop any existing instance first
@@ -150,7 +150,7 @@ pub fn start(sh: &Shell, port: u16) -> Result<()> {
 }
 
 /// Stop the bpmn-lite gRPC server.
-pub fn stop(sh: &Shell, port: u16) -> Result<()> {
+pub(crate) fn stop(sh: &Shell, port: u16) -> Result<()> {
     stop_inner(sh, port);
     Ok(())
 }
@@ -174,7 +174,7 @@ fn stop_inner(sh: &Shell, port: u16) {
 }
 
 /// Show status of the bpmn-lite service (native and Docker).
-pub fn status(sh: &Shell, port: u16) -> Result<()> {
+pub(crate) fn status(sh: &Shell, port: u16) -> Result<()> {
     let port_str = port.to_string();
 
     println!("=== bpmn-lite service status ===\n");

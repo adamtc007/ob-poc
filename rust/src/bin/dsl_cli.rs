@@ -1341,12 +1341,8 @@ async fn cmd_generate(
     let db_url = db_url
         .ok_or("--db-url or DATABASE_URL required for generate (needed for CSG validation)")?;
 
-    // Check for API key
-    let api_key = std::env::var("ANTHROPIC_API_KEY")
-        .map_err(|_| "ANTHROPIC_API_KEY environment variable not set".to_string())?;
-
     // =========================================================================
-    // STEP 1: GENERATE DSL (Claude API)
+    // STEP 1: GENERATE DSL
     // =========================================================================
     if format == OutputFormat::Pretty {
         println!("{}", "Generating DSL from instruction...".dimmed());
@@ -1360,39 +1356,12 @@ async fn cmd_generate(
     // Build system prompt
     let system_prompt = build_generation_system_prompt(&vocab);
 
-    // Call Claude API
-    let client = reqwest::Client::new();
-    let response = client
-        .post("https://api.anthropic.com/v1/messages")
-        .header("x-api-key", &api_key)
-        .header("anthropic-version", "2023-06-01")
-        .header("content-type", "application/json")
-        .json(&serde_json::json!({
-            "model": "claude-sonnet-4-20250514",
-            "max_tokens": 2048,
-            "system": system_prompt,
-            "messages": [
-                {"role": "user", "content": prompt}
-            ]
-        }))
-        .send()
+    let client = ob_agentic::create_llm_client()
+        .map_err(|e| format!("Failed to create LLM client: {e}"))?;
+    let generated = client
+        .chat(&system_prompt, &prompt)
         .await
-        .map_err(|e| format!("API request failed: {}", e))?;
-
-    if !response.status().is_success() {
-        let status = response.status();
-        let body = response.text().await.unwrap_or_default();
-        return Err(format!("API error {}: {}", status, body));
-    }
-
-    let json: serde_json::Value = response
-        .json()
-        .await
-        .map_err(|e| format!("Failed to parse API response: {}", e))?;
-
-    let generated = json["content"][0]["text"]
-        .as_str()
-        .unwrap_or("")
+        .map_err(|e| format!("API request failed: {e}"))?
         .trim()
         .to_string();
 

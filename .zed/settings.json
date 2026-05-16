@@ -39,7 +39,7 @@
             "enable": true,
           },
           "unsetTest": ["dsl_types"],
-          "targetDir": "target/rust-analyzer",
+          "targetDir": "/Users/adamtc007/.cargo-target-ra",
         },
         "check": {
           "command": "clippy",

@@ -17,6 +17,9 @@ invocation_phrases:
   - "add entity to CBU"
   - "assign role"
   - "attach product"
+  - "attach product to CBU"
+  - "product onboarding for CBU"
+  - "CBU product onboarding"
   - "configure CBU"
   - "CBU setup"
 
@@ -32,13 +35,16 @@ workspaces:
 
 allowed_verbs:
   - cbu.create
+  - cbu.ensure
   - cbu.read
   - cbu.list
   - cbu.update
   - cbu.rename
   - cbu.inspect
   - cbu.assign-role
+  - cbu.link-structure
   - cbu.remove-role
+  - cbu.parties
   - cbu.add-product
   - cbu.remove-product
   - cbu.list-subscriptions

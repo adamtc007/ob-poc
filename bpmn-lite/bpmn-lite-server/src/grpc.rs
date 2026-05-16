@@ -6,8 +6,8 @@ use tokio::sync::Semaphore;
 use tonic::{Request, Response, Status};
 use uuid::Uuid;
 
-use bpmn_lite_core::engine::BpmnLiteEngine;
-use bpmn_lite_core::types::{ErrorClass, Value};
+use bpmn_lite_engine::BpmnLiteEngine;
+use bpmn_lite_types::{ErrorClass, Value};
 
 use crate::event_fanout::EventFanout;
 
@@ -228,6 +228,32 @@ fn proto_to_value(pv: &ProtoValue) -> Value {
     }
 }
 
+#[allow(clippy::result_large_err)]
+fn proto_to_correlation_value(pv: &Option<ProtoValue>) -> Result<Value, Status> {
+    match pv.as_ref().and_then(|value| value.kind.as_ref()) {
+        Some(proto_value::Kind::BoolValue(b)) => Ok(Value::Bool(*b)),
+        Some(proto_value::Kind::I64Value(n)) => Ok(Value::I64(*n)),
+        Some(proto_value::Kind::StrValue(s)) => {
+            if let Some(rest) = s.strip_prefix("str_") {
+                return rest
+                    .parse::<u32>()
+                    .map(Value::Str)
+                    .map_err(|_| Status::invalid_argument("invalid str_ correlation key"));
+            }
+            if let Some(rest) = s.strip_prefix("ref_") {
+                return rest
+                    .parse::<u32>()
+                    .map(Value::Ref)
+                    .map_err(|_| Status::invalid_argument("invalid ref_ correlation key"));
+            }
+            Err(Status::invalid_argument(
+                "string correlation keys must use str_<id> or ref_<id>",
+            ))
+        }
+        None => Ok(Value::Bool(false)),
+    }
+}
+
 fn proto_to_orch_flags(
     map: &std::collections::HashMap<String, ProtoValue>,
 ) -> BTreeMap<String, Value> {
@@ -257,6 +283,16 @@ fn parse_hash(bytes: &[u8]) -> Result<[u8; 32], Status> {
 
 fn engine_err(e: anyhow::Error) -> Status {
     Status::internal(format!("{:#}", e))
+}
+
+#[allow(clippy::result_large_err)]
+fn request_tenant_id(limits: &RequestLimits, tenant_id: &str) -> Result<String, Status> {
+    limits.check_string("tenant_id", tenant_id)?;
+    if tenant_id.is_empty() {
+        Ok("default".to_string())
+    } else {
+        Ok(tenant_id.to_string())
+    }
 }
 
 /// Extract the instance_id (UUID) from a job_key formatted as "instance_id:service_task_id:pc".
@@ -309,6 +345,7 @@ impl BpmnLite for BpmnLiteService {
         self.metrics.request_started();
         let req = request.into_inner();
         self.limits.check_string("process_key", &req.process_key)?;
+        let tenant_id = request_tenant_id(&self.limits, &req.tenant_id)?;
         self.limits
             .check_string("correlation_id", &req.correlation_id)?;
         self.limits.check_bytes(
@@ -324,7 +361,7 @@ impl BpmnLite for BpmnLiteService {
         self.limits.check_orch_flags(&req.orch_flags)?;
         let bytecode_version = parse_bytecode_version(&req.bytecode_version)?;
         let hash = parse_hash(&req.domain_payload_hash)?;
-        let actual_hash = bpmn_lite_core::vm::compute_hash(&req.domain_payload);
+        let actual_hash = bpmn_lite_vm::compute_hash(&req.domain_payload);
         if actual_hash != hash {
             return Err(Status::invalid_argument(
                 "domain_payload_hash does not match domain_payload",
@@ -337,9 +374,9 @@ impl BpmnLite for BpmnLiteService {
                 .map_err(|e| Status::invalid_argument(format!("invalid session_stack_json: {e}")))?
         };
 
-        let instance_id = self
-            .engine
-            .start_with_params(bpmn_lite_core::engine::StartParams {
+        let engine = self.engine.for_tenant(tenant_id);
+        let instance_id = engine
+            .start_with_params(bpmn_lite_engine::StartParams {
                 process_key: req.process_key.clone(),
                 bytecode_version,
                 domain_payload: req.domain_payload.clone(),
@@ -353,7 +390,7 @@ impl BpmnLite for BpmnLiteService {
             .map_err(engine_err)?;
 
         // Tick the instance to kick off any initial work (jobs stay in queue for ActivateJobs)
-        self.engine
+        engine
             .tick_instance(instance_id)
             .await
             .map_err(engine_err)?;
@@ -374,6 +411,11 @@ impl BpmnLite for BpmnLiteService {
         self.limits.check_string("msg_id", &req.msg_id)?;
         self.limits
             .check_bytes("payload", req.payload.len(), self.limits.max_payload_bytes)?;
+        if req.msg_id.is_empty() {
+            return Err(Status::invalid_argument("msg_id is required"));
+        }
+        let tenant_id = request_tenant_id(&self.limits, &req.tenant_id)?;
+        let corr_key = proto_to_correlation_value(&req.correlation_key)?;
         let instance_id = parse_uuid(&req.process_instance_id)?;
 
         let payload = if req.payload.is_empty() {
@@ -387,29 +429,24 @@ impl BpmnLite for BpmnLiteService {
         let hash = if req.payload.is_empty() {
             None
         } else {
-            Some(bpmn_lite_core::vm::compute_hash(
-                payload.unwrap_or_default(),
-            ))
+            Some(bpmn_lite_vm::compute_hash(payload.unwrap_or_default()))
         };
 
-        self.engine
-            .signal(
+        let engine = self.engine.for_tenant(tenant_id);
+        engine
+            .signal_with_value(
                 instance_id,
                 &req.message_name,
-                "",
+                corr_key,
                 payload,
                 hash,
-                if req.msg_id.is_empty() {
-                    None
-                } else {
-                    Some(req.msg_id.as_str())
-                },
+                Some(req.msg_id.as_str()),
             )
             .await
             .map_err(engine_err)?;
 
         // Tick instance to advance past the signal (jobs stay in queue)
-        self.engine
+        engine
             .tick_instance(instance_id)
             .await
             .map_err(engine_err)?;
@@ -426,9 +463,11 @@ impl BpmnLite for BpmnLiteService {
         self.limits
             .check_string("process_instance_id", &req.process_instance_id)?;
         self.limits.check_string("reason", &req.reason)?;
+        let tenant_id = request_tenant_id(&self.limits, &req.tenant_id)?;
         let instance_id = parse_uuid(&req.process_instance_id)?;
 
         self.engine
+            .for_tenant(tenant_id)
             .cancel(instance_id, &req.reason)
             .await
             .map_err(engine_err)?;
@@ -444,16 +483,22 @@ impl BpmnLite for BpmnLiteService {
         let req = request.into_inner();
         self.limits
             .check_string("process_instance_id", &req.process_instance_id)?;
+        let tenant_id = request_tenant_id(&self.limits, &req.tenant_id)?;
         let instance_id = parse_uuid(&req.process_instance_id)?;
 
-        let inspection = self.engine.inspect(instance_id).await.map_err(engine_err)?;
+        let inspection = self
+            .engine
+            .for_tenant(tenant_id)
+            .inspect(instance_id)
+            .await
+            .map_err(engine_err)?;
 
         let state_str = match &inspection.state {
-            bpmn_lite_core::types::ProcessState::Running => "RUNNING",
-            bpmn_lite_core::types::ProcessState::Completed { .. } => "COMPLETED",
-            bpmn_lite_core::types::ProcessState::Cancelled { .. } => "CANCELLED",
-            bpmn_lite_core::types::ProcessState::Failed { .. } => "FAILED",
-            bpmn_lite_core::types::ProcessState::Terminated { .. } => "TERMINATED",
+            bpmn_lite_types::ProcessState::Running => "RUNNING",
+            bpmn_lite_types::ProcessState::Completed { .. } => "COMPLETED",
+            bpmn_lite_types::ProcessState::Cancelled { .. } => "CANCELLED",
+            bpmn_lite_types::ProcessState::Failed { .. } => "FAILED",
+            bpmn_lite_types::ProcessState::Terminated { .. } => "TERMINATED",
         };
 
         let fibers: Vec<FiberInfo> = inspection
@@ -472,28 +517,26 @@ impl BpmnLite for BpmnLiteService {
         let waits: Vec<WaitInfo> = inspection
             .fibers
             .iter()
-            .filter(|f| !matches!(f.wait_state, bpmn_lite_core::types::WaitState::Running))
+            .filter(|f| !matches!(f.wait_state, bpmn_lite_types::WaitState::Running))
             .map(|f| {
                 let (wt, detail) = match &f.wait_state {
-                    bpmn_lite_core::types::WaitState::Timer { .. } => {
+                    bpmn_lite_types::WaitState::Timer { .. } => {
                         ("TIMER".to_string(), String::new())
                     }
-                    bpmn_lite_core::types::WaitState::Msg { .. } => {
+                    bpmn_lite_types::WaitState::Msg { .. } => {
                         ("MESSAGE".to_string(), String::new())
                     }
-                    bpmn_lite_core::types::WaitState::Job { job_key } => {
+                    bpmn_lite_types::WaitState::Job { job_key } => {
                         ("JOB".to_string(), job_key.clone())
                     }
-                    bpmn_lite_core::types::WaitState::Join { .. } => {
-                        ("JOIN".to_string(), String::new())
-                    }
-                    bpmn_lite_core::types::WaitState::Incident { incident_id } => {
+                    bpmn_lite_types::WaitState::Join { .. } => ("JOIN".to_string(), String::new()),
+                    bpmn_lite_types::WaitState::Incident { incident_id } => {
                         ("INCIDENT".to_string(), incident_id.to_string())
                     }
-                    bpmn_lite_core::types::WaitState::Race { race_id, .. } => {
+                    bpmn_lite_types::WaitState::Race { race_id, .. } => {
                         ("RACE".to_string(), format!("race_{}", race_id))
                     }
-                    bpmn_lite_core::types::WaitState::Running => unreachable!(),
+                    bpmn_lite_types::WaitState::Running => unreachable!(),
                 };
                 WaitInfo {
                     fiber_id: f.fiber_id.to_string(),
@@ -509,6 +552,7 @@ impl BpmnLite for BpmnLiteService {
             waits,
             bytecode_version: inspection.bytecode_version.to_vec(),
             domain_payload_hash: hex::encode(inspection.domain_payload_hash),
+            tenant_id: inspection.tenant_id,
         }))
     }
 
@@ -534,12 +578,28 @@ impl BpmnLite for BpmnLiteService {
         for task_type in &req.task_types {
             self.limits.check_string("task_type", task_type)?;
         }
+        self.limits.check_string("worker_id", &req.worker_id)?;
+        if req.worker_id.is_empty() {
+            return Err(Status::invalid_argument("worker_id is required"));
+        }
+        let tenant_id = request_tenant_id(&self.limits, &req.tenant_id)?;
         let requested = req.max_jobs.max(1) as usize;
         let max_jobs = requested.min(self.limits.max_activate_jobs);
+        let lease_ms = if req.timeout_ms > 0 {
+            req.timeout_ms as u64
+        } else {
+            300_000
+        };
 
         let jobs = self
             .engine
-            .activate_jobs(&req.task_types, max_jobs)
+            .for_tenant(tenant_id)
+            .activate_jobs_for_worker_with_lease(
+                &req.task_types,
+                max_jobs,
+                &req.worker_id,
+                lease_ms,
+            )
             .await
             .map_err(engine_err)?;
 
@@ -567,6 +627,9 @@ impl BpmnLite for BpmnLiteService {
                 retries_remaining: job.retries_remaining as i32,
                 entry_id: job.entry_id.to_string(),
                 runbook_id: job.runbook_id.to_string(),
+                worker_id: job.worker_id,
+                claim_token: job.claim_token,
+                tenant_id: job.tenant_id,
             };
             let _ = tx.send(Ok(msg)).await;
         }
@@ -583,6 +646,14 @@ impl BpmnLite for BpmnLiteService {
         self.metrics.request_started();
         let req = request.into_inner();
         self.limits.check_string("job_key", &req.job_key)?;
+        self.limits.check_string("worker_id", &req.worker_id)?;
+        self.limits.check_string("claim_token", &req.claim_token)?;
+        if req.worker_id.is_empty() || req.claim_token.is_empty() {
+            return Err(Status::invalid_argument(
+                "worker_id and claim_token are required",
+            ));
+        }
+        let tenant_id = request_tenant_id(&self.limits, &req.tenant_id)?;
         self.limits.check_bytes(
             "domain_payload",
             req.domain_payload.len(),
@@ -595,8 +666,16 @@ impl BpmnLite for BpmnLiteService {
         // Extract instance_id from job_key before completing
         let instance_id = extract_instance_id_from_job_key(&req.job_key)?;
 
-        self.engine
-            .complete_job(&req.job_key, &req.domain_payload, hash, orch_flags)
+        let engine = self.engine.for_tenant(tenant_id);
+        engine
+            .complete_job_with_claim(
+                &req.job_key,
+                &req.domain_payload,
+                hash,
+                orch_flags,
+                &req.worker_id,
+                &req.claim_token,
+            )
             .await
             .map_err(engine_err)?;
         self.metrics
@@ -604,7 +683,7 @@ impl BpmnLite for BpmnLiteService {
             .fetch_add(1, Ordering::Relaxed);
 
         // Tick the instance so the resumed fiber advances (may hit End or next ExecNative)
-        self.engine
+        engine
             .tick_instance(instance_id)
             .await
             .map_err(engine_err)?;
@@ -619,6 +698,14 @@ impl BpmnLite for BpmnLiteService {
         self.metrics.request_started();
         let req = request.into_inner();
         self.limits.check_string("job_key", &req.job_key)?;
+        self.limits.check_string("worker_id", &req.worker_id)?;
+        self.limits.check_string("claim_token", &req.claim_token)?;
+        if req.worker_id.is_empty() || req.claim_token.is_empty() {
+            return Err(Status::invalid_argument(
+                "worker_id and claim_token are required",
+            ));
+        }
+        let tenant_id = request_tenant_id(&self.limits, &req.tenant_id)?;
         self.limits.check_string("error_class", &req.error_class)?;
         self.limits.check_string("message", &req.message)?;
 
@@ -631,7 +718,14 @@ impl BpmnLite for BpmnLiteService {
         };
 
         self.engine
-            .fail_job(&req.job_key, error_class, &req.message)
+            .for_tenant(tenant_id)
+            .fail_job_with_claim(
+                &req.job_key,
+                error_class,
+                &req.message,
+                &req.worker_id,
+                &req.claim_token,
+            )
             .await
             .map_err(engine_err)?;
         self.metrics
@@ -653,10 +747,12 @@ impl BpmnLite for BpmnLiteService {
         let req = request.into_inner();
         self.limits
             .check_string("process_instance_id", &req.process_instance_id)?;
+        let tenant_id = request_tenant_id(&self.limits, &req.tenant_id)?;
         let instance_id = parse_uuid(&req.process_instance_id)?;
 
         // Verify the instance exists before starting the tail.
         self.engine
+            .for_tenant(tenant_id)
             .read_events(instance_id, 0)
             .await
             .map_err(engine_err)?;

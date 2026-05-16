@@ -115,30 +115,6 @@ pub struct EntityDiscriminatorConfig {
     pub match_mode: Option<String>,
 }
 
-/// Match mode for date discriminators
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum DateMatchMode {
-    /// Exact date match required
-    Exact,
-    /// Year match only (for approximate DOB)
-    YearOnly,
-    /// Match if year matches OR exact date matches (progressive refinement)
-    YearOrExact,
-}
-
-impl std::str::FromStr for DateMatchMode {
-    type Err = std::convert::Infallible;
-
-    /// Parse from string, defaulting to Exact if unrecognized
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        Ok(match s.to_lowercase().as_str() {
-            "year_only" | "year-only" => Self::YearOnly,
-            "year_or_exact" | "year-or-exact" => Self::YearOrExact,
-            _ => Self::Exact,
-        })
-    }
-}
-
 fn default_selectivity() -> f32 {
     0.5
 }
@@ -368,31 +344,4 @@ entities:
         assert_eq!(dob.match_mode.as_deref(), Some("year_or_exact"));
     }
 
-    #[test]
-    fn test_date_match_mode_parsing() {
-        assert_eq!(
-            "exact".parse::<DateMatchMode>().unwrap(),
-            DateMatchMode::Exact
-        );
-        assert_eq!(
-            "year_only".parse::<DateMatchMode>().unwrap(),
-            DateMatchMode::YearOnly
-        );
-        assert_eq!(
-            "year-only".parse::<DateMatchMode>().unwrap(),
-            DateMatchMode::YearOnly
-        );
-        assert_eq!(
-            "year_or_exact".parse::<DateMatchMode>().unwrap(),
-            DateMatchMode::YearOrExact
-        );
-        assert_eq!(
-            "year-or-exact".parse::<DateMatchMode>().unwrap(),
-            DateMatchMode::YearOrExact
-        );
-        assert_eq!(
-            "unknown".parse::<DateMatchMode>().unwrap(),
-            DateMatchMode::Exact
-        ); // default
-    }
 }

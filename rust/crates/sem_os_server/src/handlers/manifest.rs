@@ -3,11 +3,12 @@
 use std::sync::Arc;
 
 use axum::{extract::Path, Extension, Json};
-use sem_os_core::{proto::GetManifestResponse, service::CoreService};
+use sem_os_core::proto::GetManifestResponse;
+use sem_os_policy::service::CoreService;
 
 use crate::error::AppError;
 
-pub async fn get_manifest(
+pub(crate) async fn get_manifest(
     Extension(service): Extension<Arc<dyn CoreService>>,
     Path(id): Path<String>,
 ) -> Result<Json<GetManifestResponse>, AppError> {

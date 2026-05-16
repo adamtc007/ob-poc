@@ -7,7 +7,7 @@ use axum::{
     routing::{get, post},
     Extension, Router,
 };
-use sem_os_core::service::CoreService;
+use sem_os_policy::service::CoreService;
 
 use crate::handlers;
 use crate::middleware::jwt::{jwt_auth, JwtConfig};

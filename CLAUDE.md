@@ -1,15 +1,15 @@
 # CLAUDE.md
 
-> **Last reviewed:** 2026-04-26
+> **Last reviewed:** 2026-05-15
 > **Frontend:** React/TypeScript (`ob-poc-ui-react/`) — Chat UI with scope panel, Inspector, Semantic OS Tab
 > **Backend:** Rust/Axum (`rust/crates/ob-poc-web/`) — Serves React + REST API
-> **Crates:** 23 active Rust crates (17 ob-poc + 6 sem_os_*) — `dsl-runtime-macros` deleted in Phase 5c-migrate slice #80
+> **Crates:** 41 workspace crates (incl. `ob-poc` application root) — 18 ob-poc-* library (web, types, diagnostics, boundary, sage, journey, authoring, agent, macros · split-v1: bods, deal, booking-principal, semtaxonomy, ontology, entity-linking, trading-profile, derived-attributes, taxonomy) · 10 sem_os_* (core, types, ontology, policy, postgres, server, client, obpoc_adapter, harness, mcp) · 4 dsl-* (dsl-core, dsl-lsp, dsl-runtime, dsl-analysis) · 4 ob-* (ob-agentic, ob-templates, ob-workflow, ob-semantic-matcher) · 4 misc (entity-gateway, xtask, playbook-core, inspector-projection)
 > **Verbs:** 1,282 canonical verbs across 134 domains (795 declared with three-axis = 62.0%); 24,587 intent patterns (DB-sourced)
 > **Macros:** 103 operator macros (22 YAML files, 18 domains, 3 composite), Tier -2B in intent pipeline
 > **MCP Tools:** ~102 tools (DSL, verbs, learning, session, batch, research, taxonomy, sem_reg, stewardship, db_introspect, session_verb_surface)
-> **DAG Taxonomies:** 11 (CBU + KYC + Deal + InstrumentMatrix + BookingPrincipal + LifecycleResources + ProductMaintenance + SemOsMaintenance + SessionBootstrap + OnboardingRequest + BookSetup) — see `rust/config/sem_os_seeds/dag_taxonomies/`
-> **Latest schema additions:** `rust/migrations/20260424_tranche_2_3_dag_alignment.sql`, `rust/migrations/20260425_manco_regulatory_status.sql`, `rust/migrations/20260427_lifecycle_resources_workspace.sql`, `rust/migrations/20260428_service_lifecycle.sql`, `rust/migrations/20260429_booking_principal_clearance.sql`
-> **Workspaces:** 11 (7 domain: CBU, KYC, Deal, InstrumentMatrix, BookingPrincipal, LifecycleResources, ProductMaintenance) + (4 infrastructure: SemOsMaintenance, SessionBootstrap, OnboardingRequest, BookSetup)
+> **DAG Taxonomies:** 12 (CBU + KYC + Deal + Catalogue + InstrumentMatrix + BookingPrincipal + LifecycleResources + ProductServiceTaxonomy + SemOsMaintenance + SessionBootstrap + OnboardingRequest + BookSetup) — see `rust/config/sem_os_seeds/dag_taxonomies/`
+> **Latest schema additions:** `rust/migrations/20260503_sem_os_dag_taxonomy_object.sql`, `rust/migrations/20260514_sem_os_domain_pack_object.sql`, `rust/migrations/20260514_domain_pack_reload_index.sql`
+> **Workspaces:** 12 (8 domain: CBU, KYC, Deal, Catalogue, InstrumentMatrix, BookingPrincipal, LifecycleResources, ProductServiceTaxonomy) + (4 infrastructure: SemOsMaintenance, SessionBootstrap, OnboardingRequest, BookSetup)
 > **Catalogue spec:** `docs/todo/catalogue-platform-refinement-v1_2.md` (consolidated authoritative spec, 2026-04-26 — supersedes v1.0/v1.1/v1.3). Tranche 1 implementation complete: validator (transition_args + EXISTS predicate), Sage/REPL policies, P-G provisional designation, GatePipeline default-on, CI gate. Tranche 2 (estate reconciliation: 487 verbs to declare, 153 preserving-with-transition_args migration warnings to fix) follows.
 > **Schema Overview:** `migrations/OB_POC_SCHEMA_ENTITY_OVERVIEW.md`
 > **Embeddings:** Candle local (384-dim, BGE-small-en-v1.5) — 24,587 patterns vectorized
@@ -78,19 +78,26 @@ DATABASE_URL="postgresql:///data_designer" \
 
 # Semantic OS standalone server
 SEM_OS_DATABASE_URL="postgresql:///data_designer" SEM_OS_JWT_SECRET=dev-secret cargo run -p sem_os_server
+
+# Sem OS domain-pack reload check (build-engine style index; no snapshot publication)
+cargo run --manifest-path xtask/Cargo.toml -- sem-reg domain-pack-check
+cargo run --manifest-path xtask/Cargo.toml -- sem-reg domain-pack-check --pack-id ob-poc.cbu --force-check --update-index
 ```
 
 Current schema export target: `migrations/master-schema.sql` (canonical), `schema_export.sql` (convenience copy)
 
-### BPMN-Lite Status
+### BPMN-Lite and dmn-lite Status
 
-- `bpmn-lite/` now has a local `xtask` entrypoint for reusable smoke/stress automation.
-- The harness implementation lives in `bpmn-lite-server/src/load_harness.rs`; `xtask` owns optional server spawn and argument forwarding.
-- Completion hash semantics are hardened: the worker-supplied completion hash is only a snapshot guard, while the server persists the hash of the new payload it actually stores.
-- `ProcessInstance.domain_payload` uses `Arc<str>` internally to reduce activation-path clone pressure.
-- VM runtime events are batched through the `ProcessStore` boundary.
-- Instance scans and job dequeue paths are tenant-scoped with migration `bpmn-lite-core/migrations/014_add_tenant_id.sql`.
-- gRPC `Inspect` now returns real bytecode and payload-hash metadata.
+Both vocabularies are now in their own GitHub repos and are no longer tracked as subdirectories of ob-poc:
+
+- **github.com/adamtc007/bpmn-lite** — process vocabulary (compiler, fiber VM, FFI catalogue infrastructure, gRPC server). A3–A11 complete: `Instr::ExecFfi`, in-process FFI dispatch, BPMN data-object + FFI annotation parser, compile-time schema verifier, json_path evaluator. 224 tests.
+- **github.com/adamtc007/dmn-lite** — decision vocabulary (s-expression DSL, compiler, stack VM, static analysis, dmn-lite-bridge FFI owner). Phase 1 complete (Profile v0.1). 345 tests (including dmn-lite-bridge A10).
+
+The local `bpmn-lite/` and `dmn-lite/` directories remain inside ob-poc for monorepo development convenience (each has its own `.git`; ob-poc does not track them as submodules).
+
+ob-poc consumes bpmn-lite over gRPC (`bpmn_integration/` — 12 files). See `docs/annex-bpmn-lite.md` for the integration pattern.
+
+For bpmn-lite internals, see `bpmn-lite/CLAUDE.md`. For dmn-lite internals, see `dmn-lite/CLAUDE.md`.
 
 **SemOS is the hub for all things.** All paths lead to SemOS — nowhere else. The PostgreSQL schema is a supplementary store, a materialized projection, switchable if needed.
 
@@ -136,7 +143,65 @@ SemOS Maintenance workspace (2026-03-28):
 - PACK001 lint rule: workspace-macro bleed detection — checks every macro in a pack's `allowed_verbs` has mode-tags compatible with all pack workspaces; prevents KYC/screening macros from leaking into CBU/InstrumentMatrix contexts; workspace-to-mode-tag compatibility table in `docs/annex-macros.md`
 - `cargo clippy` clean across entire codebase
 
+SemOS domain-pack taxonomy reload (2026-05-14):
+- Sem OS domain packs are the configuration-native ownership boundary for domain-specific YAML shape. Business crates are clients/implementation homes; they do not own Sem OS taxonomy shape.
+- Domain Pack manifests live in `rust/config/sem_os_seeds/domain_packs/*.yaml` and declare owned DAGs, DSL packs, state machines, constellation maps/families, universes, verb prefixes, entity kinds, and informational business-crate links.
+- `DomainPack` is a SemReg object type. Domain packs are scanned into `SeedBundle.domain_packs` by `sem_os_obpoc_adapter` and published through the existing Sem OS seed bootstrap path.
+- Runtime DAG discovery and Sem OS seed assembly are manifest-owned: DAG/state-machine/constellation/universe seeds are visible only when declared by a Domain Pack. Macro definitions are visible only when an owned DSL pack exposes the macro FQN in `allowed_verbs`; the macro is then unpacked through `expands-to[]` into atomic DSL verbs for reconciliation. Direct directory walkers are parser/tooling utilities, not the production ownership source.
+- Reload uses a build-engine index in `sem_reg.domain_pack_reload_index`: path + mtime + size are the cheap "maybe dirty" check; canonical surface hash is the correctness check.
+- Reload checking does not publish snapshots directly. It reports `clean`, `index_only`, or `publish_required`; actual Sem OS mutation remains behind `bootstrap_seed_bundle()`, where identical payloads skip and changed payloads publish non-breaking successor snapshots.
+- Manual trigger: `cargo run --manifest-path xtask/Cargo.toml -- sem-reg domain-pack-check [--pack-id ob-poc.cbu] [--force-check] [--update-index] [--json]`.
+- Architecture note: `docs/architecture/sem-os-domain-pack-taxonomy-reload.md`.
+
 ---
+
+## What "macro" means in ob-poc
+
+> **Macros are governed recipes: pack-scoped, hashable, versioned multi-step
+> domain patterns that Sage may discover and bind, but which the compiler
+> must expand into ordinary DSL atomics before any REPL execution occurs.**
+
+This definition is load-bearing. The word "macro" carries different meanings
+in other ecosystems (C preprocessor text substitution, Rust `macro_rules!`
+hygienic AST transformation, Lisp symbolic code rewriting) — none of those
+apply here.
+
+In ob-poc, a macro is:
+
+- **A first-class SemOS registry entity.** Hashed, versioned, lifecycle
+  FSM (`draft → active → deprecated → retired`). Authored as YAML,
+  catalogued like a verb.
+- **Pack-scoped and governed.** Pack manifests gate which macros are
+  allowed. The pack governs; the macro proposes affinity via `mode_tags`.
+- **A multi-step domain recipe.** Each macro encodes an expert outcome
+  pattern — slot contract, preconditions, ordered expansion, expected
+  state transitions, refusal/pending-question conditions.
+- **A planning + compilation surface, not an execution surface.** ACP
+  exposes macros to Sage so the agent picks the right recipe. The
+  compiler then expands the macro into an ordered DSL atomic sequence,
+  and the REPL executes only those atomics. Macros have **no mutation
+  authority after expansion** — execution is verb-only.
+
+The reason for the macro tier to exist: without it, Sage is operating at
+the verb floor (one mutation at a time) and has to invent multi-step arcs
+itself. Macros encode the multi-step pattern as a registered, hashed,
+versioned, governed object, which Sage chooses as an atomic option. This
+reduces hallucination surface and encodes expert domain knowledge into
+the dispatch surface itself.
+
+See `docs/annex-macros.md` and
+`docs/architecture/sem-os-domain-pack-taxonomy-reload.md` for the durable
+macro and domain-pack architecture notes that protect this discipline under
+LLM pressure.
+
+## Repository Hygiene
+
+- Root `todo/` is transient planning scratch space and is ignored by git.
+  Do not use it as an architecture source of truth.
+- Durable project guidance belongs in `CLAUDE.md`, `AGENTS.md`, and
+  persistent docs under `docs/`, especially `docs/architecture/`.
+- Generated screenshots and local UI smoke artifacts are local evidence only
+  unless a task explicitly promotes them into a reviewed artifact.
 
 ## Non-Negotiable Implementation Rules
 
@@ -325,7 +390,6 @@ The egui canvas renders `GraphSceneModel` from the Observatory API (polled every
 | `POST /api/session/:id/runbook/execute` | Execute next plan step (INV-3 gate) |
 | `POST /api/session/:id/runbook/cancel` | Cancel plan mid-execution |
 | `GET /api/session/:id/runbook/status` | Current plan status + cursor |
-| `GET /api/session/:id/acp/capabilities` | ACP protocol capabilities + stdio launch metadata |
 | `GET /api/session/:id/acp/policy` | ACP-visible SemOS policy/capability decisions |
 | `GET /api/session/:id/acp/projections` | ACP-visible SemOS projection catalogue |
 | `GET /api/session/:id/acp/projections/:kind` | Typed ACP projection envelope with hash/classification metadata |
@@ -445,9 +509,13 @@ Verify plugin coverage: `cargo test -p ob-poc --lib -- test_plugin_verb_coverage
 
 ```
 ob-poc/
-├── bpmn-lite/                  # Standalone BPMN orchestration (NOT inside rust/)
-│   ├── bpmn-lite-core/         # Core: types, compiler, VM, store, authoring
-│   └── bpmn-lite-server/       # gRPC server (tonic), proto definitions
+├── bpmn-lite/                  # Process vocabulary — own git repo (github.com/adamtc007/bpmn-lite)
+│   │                           # 9 crates: types/compiler/vm/engine/store/store-postgres/
+│   │                           # authoring/server + ffi-types/ffi-catalogue/ffi-dispatcher
+│   └── CLAUDE.md               # bpmn-lite-specific guide (see there for crate map + A-phases)
+├── dmn-lite/                   # Decision vocabulary — own git repo (github.com/adamtc007/dmn-lite)
+│   │                           # 6 crates: types/parser/compiler/engine/analysis/bridge
+│   └── CLAUDE.md               # dmn-lite-specific guide (see there for profile roadmap)
 ├── observatory-wasm/             # Observatory egui constellation canvas (WASM, embedded in React)
 │   ├── src/                      # Canvas renderer, level painters, observation controls
 │   └── pkg/                      # wasm-pack output (WASM + JS glue, served at /observatory/pkg/)
@@ -633,12 +701,14 @@ Automated browser testing via Chrome DevTools MCP. Claude Code can navigate, typ
 | When working on... | Read this annex |
 |--------------------|-----------------|
 | DSL pipeline, verb search, embeddings, intent resolution, disambiguation, teaching, promotion, scenarios, AffinityGraph, discovery | `docs/annex-dsl-and-intent.md` |
-| Semantic OS, SemReg, context resolution, ABAC, stewardship, governed authoring, CCIR, verb surface, scanner, **v1.3 cross-workspace runtime stack** (DagRegistry, GateChecker, DerivedStateEvaluator, CascadePlanner, GatePipeline) | `docs/annex-sem-os.md` |
+| Semantic OS, SemReg, context resolution, ABAC, stewardship, governed authoring, CCIR, verb surface, scanner, domain-pack reload, **v1.3 cross-workspace runtime stack** (DagRegistry, GateChecker, DerivedStateEvaluator, CascadePlanner, GatePipeline) | `docs/annex-sem-os.md` |
+| Sem OS domain-pack YAML ownership, reload index, timestamp/hash refresh, publication boundary | `docs/architecture/sem-os-domain-pack-taxonomy-reload.md` |
 | BPMN-Lite service, fiber VM, race semantics, gRPC, orchestration, bpmn_integration | `docs/annex-bpmn-lite.md` |
 | V2 REPL, packs, scoring, preconditions, context stack, golden corpus, replay tuner | `docs/annex-repl-v2.md` |
 | Macros: operator vocabulary, expansion engine, MacroIndex, lint, composite macros, state DAG, pack mapping | `docs/annex-macros.md` |
 | Contracts, deals, billing, client groups, documents, entity linking, inspector, lexicon, lookup, playbooks, transactional execution | `docs/annex-domain-features.md` |
 | React frontend details, Zed extension, LSP, ob-agentic onboarding pipeline | `docs/annex-frontend-and-tools.md` |
+| ACP: stdio JSON-RPC server, REST surface, `AcpFacade`, projection live-overlay model, persona modes | `docs/annex-acp.md` |
 | Observatory: egui WASM app, OrientationContract, GraphSceneModel, navigation verbs | `docs/observatory-implementation-plan.md` |
 | **Catalogue Platform v1.3** — DAG taxonomies, cross_workspace_constraints (Mode A blocking), derived_cross_workspace_state (Mode B aggregation/tollgate), parent_slot + state_dependency (Mode C cascade), TransitionArgs verb metadata, GatePipeline | `docs/todo/catalogue-platform-refinement-v1_3.md` |
 
@@ -707,6 +777,7 @@ When you see these in a task, read the corresponding annex first:
 | "DerivedStateEvaluator", "DerivedStateProjector", "CascadePlanner", "SqlPredicateResolver", "SlotStateProvider", "PostgresChildEntityResolver" | `docs/annex-sem-os.md` |
 | "DAG taxonomy", "dag_taxonomies", "overall_lifecycle", "dual_lifecycle", "category_gated", "periodic_review_cadence" | `docs/annex-sem-os.md` |
 | "scanner", "drift detection", "bootstrap", "seed bundle" | `docs/annex-sem-os.md` |
+| "domain pack", "domain-pack reload", "reload index", "taxonomy reload", "publish_required", "domain_pack_reload_index" | `docs/architecture/sem-os-domain-pack-taxonomy-reload.md` + `docs/annex-sem-os.md` |
 | "shared atom", "cross-workspace", "staleness propagation", "constellation replay", "remediation event" | `docs/annex-cross-workspace-state-consistency.md` |
 | "RebuildContext", "shared fact version", "workspace fact ref", "produces_shared_facts" | `rust/src/cross_workspace/` |
 | "BPMN", "bpmn-lite", "fiber VM", "orchestration", "durable workflow" | `docs/annex-bpmn-lite.md` |

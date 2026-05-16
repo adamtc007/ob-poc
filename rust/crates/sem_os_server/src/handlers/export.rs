@@ -3,11 +3,12 @@
 use std::sync::Arc;
 
 use axum::{extract::Path, Extension, Json};
-use sem_os_core::{proto::ExportSnapshotSetResponse, service::CoreService};
+use sem_os_core::proto::ExportSnapshotSetResponse;
+use sem_os_policy::service::CoreService;
 
 use crate::error::AppError;
 
-pub async fn export_snapshot_set(
+pub(crate) async fn export_snapshot_set(
     Extension(service): Extension<Arc<dyn CoreService>>,
     Path(id): Path<String>,
 ) -> Result<Json<ExportSnapshotSetResponse>, AppError> {

@@ -1,0 +1,77 @@
+name: Sage ACP audits
+
+# Three replay-grade audit gates landed alongside the Sage ACP
+# capability v1.0. Each protects a specific invariant:
+#
+#   1. schema-authority drift — sem_os_core is the single home for
+#      canonical schema types per V&S §O7 / ADN §7.3. Parallel
+#      definitions fail unless explicitly allowlisted with reason.
+#   2. runbook envelope determinism — RunbookEnvelope hashing per
+#      V&S §6.5 / Phase 4.5 (D2=c). Replay-grade audit artefact;
+#      any byte / hash drift across the corpus fails the build.
+#   3. BYOK conformance (stub provider) — V&S R7 commits the
+#      planning loop to producing the same constrained-composition
+#      pick across any BYOK provider. The stub corpus exercises
+#      the wiring without API keys; live-provider runs are opt-in.
+#
+# Each gate has a `--bless` mode for deliberate baseline refresh;
+# reviewers can run it locally after acknowledging the change and
+# commit the refreshed baseline.
+
+on:
+  pull_request:
+    paths:
+      - 'rust/tools/schema-authority-drift-allowlist.txt'
+      - 'rust/tools/runbook-envelope-determinism-baseline.json'
+      - 'rust/tools/sage-conformance-corpus.yaml'
+      - 'rust/xtask/src/audit.rs'
+      - 'rust/xtask/src/runbook_envelope_determinism.rs'
+      - 'rust/xtask/src/byok_conformance.rs'
+      - 'rust/crates/sem_os_core/src/**'
+      - 'rust/crates/ob-poc-boundary/src/runbook_envelope.rs'
+      - 'rust/crates/ob-poc-agent/**'
+      - 'rust/crates/sem_os_mcp/**'
+      - 'rust/crates/ob-poc-types/src/**'
+      - 'rust/crates/ob-poc-domain/src/**'
+      - 'rust/crates/dsl-core/src/config/**'
+      - 'rust/crates/dsl-runtime/src/**'
+      - 'rust/crates/ob-workflow/src/**'
+      - 'rust/config/packs/**'
+      - 'rust/src/sem_reg/**'
+      - 'rust/src/api/capital_routes.rs'
+      - 'rust/src/graph/types.rs'
+      - '.github/workflows/sage-acp-audits.yml'
+  push:
+    branches:
+      - main
+
+jobs:
+  audits:
+    name: schema-authority + envelope determinism + BYOK conformance
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: 1.95
+
+      - name: Cargo cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: rust
+
+      - name: Schema-authority drift audit
+        working-directory: rust
+        run: cargo run --package xtask -- audit
+
+      - name: Runbook envelope determinism check
+        working-directory: rust
+        run: cargo run --package xtask -- runbook-envelope-determinism-check
+
+      - name: BYOK conformance check (stub provider)
+        working-directory: rust
+        run: cargo run --package xtask -- byok-conformance-check --provider stub

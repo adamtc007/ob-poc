@@ -24,17 +24,17 @@ mod integration {
     use sqlx::PgPool;
     use uuid::Uuid;
 
-    use sem_os_core::authoring::bundle::{build_bundle_from_map, parse_manifest, BundleContents};
-    use sem_os_core::authoring::cleanup::CleanupPolicy;
-    use sem_os_core::authoring::governance_verbs::GovernanceVerbService;
-    use sem_os_core::authoring::types::*;
+    use sem_os_policy::authoring::bundle::{build_bundle_from_map, parse_manifest, BundleContents};
+    use sem_os_policy::authoring::cleanup::CleanupPolicy;
+    use sem_os_policy::authoring::governance_verbs::GovernanceVerbService;
+    use sem_os_policy::authoring::types::*;
     use sem_os_core::principal::Principal;
 
     use sem_os_postgres::PgAuthoringStore;
     use sem_os_postgres::PgScratchSchemaRunner;
 
-    use sem_os_core::authoring::agent_mode::AgentMode;
-    use sem_os_core::authoring::ports::AuthoringStore;
+    use sem_os_types::agent_mode::AgentMode;
+    use sem_os_policy::authoring::ports::AuthoringStore;
 
     // ── Helpers ──────────────────────────────────────────────────────
 

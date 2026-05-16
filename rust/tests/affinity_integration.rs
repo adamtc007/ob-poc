@@ -24,10 +24,10 @@ mod integration {
     use anyhow::Result;
     use sqlx::PgPool;
 
-    use sem_os_core::affinity::types::{DataRef, TableRef};
-    use sem_os_core::affinity::AffinityGraph;
-    use sem_os_core::diagram::model::{ColumnInput, RenderOptions, TableInput};
-    use sem_os_core::diagram::{build_diagram_model, render_erd};
+    use sem_os_policy::affinity::types::{DataRef, TableRef};
+    use sem_os_policy::affinity::AffinityGraph;
+    use sem_os_policy::diagram::model::{ColumnInput, RenderOptions, TableInput};
+    use sem_os_policy::diagram::{build_diagram_model, render_erd};
     use sem_os_core::ports::SnapshotStore;
     use sem_os_postgres::PgStores;
 

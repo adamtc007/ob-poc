@@ -18,10 +18,10 @@ use sqlx::PgPool;
 use tokio::sync::RwLock;
 use uuid::Uuid;
 
-use sem_os_core::authoring::agent_mode::AgentMode;
-use sem_os_core::observatory::orientation::*;
-use sem_os_core::observatory::projection;
-use sem_os_core::stewardship::types::{FocusState, FocusUpdateSource, OverlayMode};
+use sem_os_types::agent_mode::AgentMode;
+use sem_os_policy::observatory::orientation::*;
+use sem_os_policy::observatory::projection;
+use sem_os_policy::stewardship::types::{FocusState, FocusUpdateSource, OverlayMode};
 
 use crate::api::session::SessionStore;
 use crate::repl::session_v2::ReplSessionV2;
@@ -473,7 +473,7 @@ async fn get_graph_scene(
     Path(session_id): Path<Uuid>,
 ) -> impl IntoResponse {
     use ob_poc_types::galaxy::ViewLevel;
-    use sem_os_core::observatory::graph_scene_projection;
+    use sem_os_policy::observatory::graph_scene_projection;
 
     // 1. Try to read from REPL session's TOS hydrated constellation (canonical DAG)
     if let Some(ref repl_sessions) = state.repl_sessions {
@@ -667,7 +667,7 @@ async fn get_session_stack_graph(
 /// This is the single conversion point — used by both the TOS path and fallback path.
 fn slots_from_hydrated(
     slots: &[HydratedSlot],
-) -> Vec<sem_os_core::observatory::graph_scene_projection::SlotProjection> {
+) -> Vec<sem_os_policy::observatory::graph_scene_projection::SlotProjection> {
     let mut result = Vec::new();
     flatten_slots_recursive(slots, &mut result);
     result
@@ -675,10 +675,10 @@ fn slots_from_hydrated(
 
 fn flatten_slots_recursive(
     slots: &[HydratedSlot],
-    result: &mut Vec<sem_os_core::observatory::graph_scene_projection::SlotProjection>,
+    result: &mut Vec<sem_os_policy::observatory::graph_scene_projection::SlotProjection>,
 ) {
-    use sem_os_core::observatory::graph_scene_projection::GraphEdgeProjection;
-    use sem_os_core::observatory::graph_scene_projection::SlotProjection;
+    use sem_os_policy::observatory::graph_scene_projection::GraphEdgeProjection;
+    use sem_os_policy::observatory::graph_scene_projection::SlotProjection;
     for slot in slots {
         result.push(SlotProjection {
             name: slot.name.clone(),
@@ -788,7 +788,7 @@ async fn navigate(
     Path(session_id): Path<Uuid>,
     Json(request): Json<NavigateRequest>,
 ) -> impl IntoResponse {
-    use sem_os_core::observatory::graph_scene_projection::{
+    use sem_os_policy::observatory::graph_scene_projection::{
         self, GraphEdgeProjection, SlotProjection,
     };
 

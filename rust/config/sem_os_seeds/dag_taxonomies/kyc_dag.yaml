@@ -23,6 +23,25 @@ version: "1.0"
 workspace: kyc
 dag_id: kyc_dag
 
+dsl_verb_reconciliation:
+  kyc_case_read_model:
+    - kyc-case.list-by-cbu
+  kyc_macro_surface:
+    - kyc.check-readiness
+    - kyc.collect-documents
+    - kyc.full-review
+  screening_macro_surface:
+    - screening.adverse-media
+    - screening.bulk-refresh
+    - screening.full
+    - screening.media-check
+    - screening.pep
+    - screening.pep-check
+    - screening.review-hit
+    - screening.run
+    - screening.sanctions
+    - screening.sanctions-check
+
 # =============================================================================
 # 1. OVERALL KYC-CASE LIFECYCLE (per case, derived)
 # =============================================================================

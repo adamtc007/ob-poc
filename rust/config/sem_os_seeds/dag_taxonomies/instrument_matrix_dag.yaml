@@ -85,6 +85,56 @@ version: "1.0"
 workspace: instrument_matrix
 dag_id: instrument_matrix_dag
 
+dsl_verb_reconciliation:
+  instrument_macro_surface:
+    - instrument.activate-profile
+    - instrument.clone-profile
+    - instrument.configure-corporate-actions
+    - instrument.full-matrix-setup
+    - instrument.review-coverage
+    - instrument.setup-equity
+    - instrument.setup-fixed-income
+    - instrument.setup-funds
+    - instrument.setup-fx
+    - instrument.setup-listed-derivatives
+    - instrument.setup-money-market
+    - instrument.setup-otc-derivatives
+  settlement_chain_surface:
+    - settlement-chain.create-chain
+    - settlement-chain.deactivate-cross-border
+    - settlement-chain.list-chains
+    - settlement-chain.list-cross-border
+    - settlement-chain.list-hops
+    - settlement-chain.list-location-preferences
+    - settlement-chain.list-locations
+    - settlement-chain.remove-hop
+    - settlement-chain.set-cross-border
+    - settlement-chain.set-location-preference
+  trade_gateway_surface:
+    - trade-gateway.add-routing-rule
+    - trade-gateway.define-gateway
+    - trade-gateway.list-cbu-gateways
+    - trade-gateway.list-fallbacks
+    - trade-gateway.list-gateways
+    - trade-gateway.list-routing-rules
+    - trade-gateway.read-gateway
+    - trade-gateway.remove-routing-rule
+    - trade-gateway.set-fallback
+  trading_profile_surface:
+    - trading-profile.activate
+    - trading-profile.add-component
+    - trading-profile.clone-to
+    - trading-profile.diff
+    - trading-profile.get-active
+    - trading-profile.import
+    - trading-profile.link-csa-ssi
+    - trading-profile.list-versions
+    - trading-profile.materialize
+    - trading-profile.read
+    - trading-profile.remove-component
+    - trading-profile.set-base-currency
+    - trading-profile.update-im-scope
+
 # =============================================================================
 # 1. OVERALL INSTRUMENT-MATRIX LIFECYCLE (per CBU, derived)
 # =============================================================================
@@ -120,7 +170,7 @@ overall_lifecycle:
           - "NOT EXISTS cbu_trading_profiles WHERE cbu_id = this.cbu_id"
           - "cbu_trading_profiles.status = 'DRAFT'"
       progression_verbs:
-        - trading-profile.create
+        - trading-profile.create-draft
         - trading-profile.submit
       next_phase: configuring
 

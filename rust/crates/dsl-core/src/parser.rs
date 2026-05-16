@@ -2,7 +2,7 @@
 //!
 //! This parser produces a "raw" AST where:
 //! - All string values are `Literal::String`
-//! - Symbol references (`@name`) are `SymbolRef`
+//! - Symbol references (`@name` or `$name`) are `SymbolRef`
 //! - Entity references are NOT identified yet (that's the enrichment pass)
 //! - All spans are ABSOLUTE byte offsets into the original input
 //!
@@ -197,7 +197,7 @@ fn as_binding_parser<'a, E: NomParseError<NomSpan<'a>>>(
 ) -> IResult<NomSpan<'a>, String, E> {
     let (input, _) = tag(":as")(input)?;
     let (input, _) = multispace1(input)?;
-    let (input, _) = char('@')(input)?;
+    let (input, _) = alt((char('@'), char('$')))(input)?;
     let (input, name) = identifier(input)?;
     Ok((input, name.to_string()))
 }
@@ -289,7 +289,7 @@ fn value_parser_with_span<'a, E: NomParseError<NomSpan<'a>> + ContextError<NomSp
         boolean_literal_with_span,
         // Null literal (with span)
         null_literal_with_span,
-        // Symbol reference: @name
+        // Symbol reference: @name or $name
         symbol_ref_with_span,
         // String literal
         string_literal_with_span,
@@ -403,12 +403,12 @@ fn number_literal_with_span<'a, E: NomParseError<NomSpan<'a>>>(
     }
 }
 
-// Symbol reference: @identifier with span
+// Symbol reference: @identifier or $identifier with span
 fn symbol_ref_with_span<'a, E: NomParseError<NomSpan<'a>>>(
     input: NomSpan<'a>,
 ) -> IResult<NomSpan<'a>, AstNode, E> {
     let start = input.location_offset();
-    let (input, _) = char('@')(input)?;
+    let (input, _) = alt((char('@'), char('$')))(input)?;
     let (input, name) = identifier(input)?;
     let end = input.location_offset();
 
@@ -627,6 +627,21 @@ mod tests {
     }
 
     #[test]
+    fn test_dollar_symbol_reference() {
+        let input = r#"(cbu.assign-role :cbu-id $fund :entity-id $person :role "DIRECTOR")"#;
+        let result = parse_program(input).unwrap();
+
+        if let Statement::VerbCall(vc) = &result.statements[0] {
+            assert!(vc.arguments[0].value.is_symbol_ref());
+            assert_eq!(vc.arguments[0].value.as_symbol(), Some("fund"));
+            assert!(vc.arguments[1].value.is_symbol_ref());
+            assert_eq!(vc.arguments[1].value.as_symbol(), Some("person"));
+        } else {
+            panic!("Expected VerbCall");
+        }
+    }
+
+    #[test]
     fn test_nested_verb_call() {
         let input =
             r#"(cbu.create :name "Fund" :roles [(cbu.assign-role :entity-id @e :role "Mgr")])"#;
@@ -655,6 +670,18 @@ mod tests {
     #[test]
     fn test_as_binding() {
         let input = r#"(cbu.ensure :name "Test Fund" :jurisdiction "LU" :as @fund)"#;
+        let result = parse_program(input).unwrap();
+
+        if let Statement::VerbCall(vc) = &result.statements[0] {
+            assert_eq!(vc.binding, Some("fund".to_string()));
+        } else {
+            panic!("Expected VerbCall");
+        }
+    }
+
+    #[test]
+    fn test_dollar_as_binding() {
+        let input = r#"(cbu.ensure :name "Test Fund" :jurisdiction "LU" :as $fund)"#;
         let result = parse_program(input).unwrap();
 
         if let Statement::VerbCall(vc) = &result.statements[0] {

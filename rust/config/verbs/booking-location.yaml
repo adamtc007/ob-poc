@@ -106,6 +106,7 @@ domains:
         - "show booking locations"
         - "all jurisdictions"
         - "get booking locations"
+        args: []
         returns:
           type: record_set
           name: booking_locations

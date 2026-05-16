@@ -84,6 +84,10 @@ New verbs add catalogue entries and (when needed) registry entries. Structural c
 
 Runtime writes and SemOS state advances ride a single transaction. Post-commit external effects (narration, UI push, broadcast, cross-system notifications) ride an outbox with at-least-once delivery. No committed-writes-with-stale-control-plane failure mode is permitted. See §10.7.
 
+### P12 — Domain shape is configuration-owned
+
+SemOS domain packs and their owned YAML surfaces are the source of truth for domain DAG taxonomies, DSL pack membership, state machines, constellation maps/families, universes, verb prefixes, and entity kinds. Business crates are clients and execution-mechanics homes; they do not own the SemOS taxonomy shape. Reload uses a build-engine index for cheap source fingerprint checks, but canonical content hashes and SemOS snapshots remain the correctness and durability gates.
+
 ---
 
 ## 4. Context — ground truth
@@ -145,7 +149,7 @@ The `execute_json` migration created the contractual separation. Without the str
 
 | Plane | Crates (target) | Owns | Does not own |
 |---|---|---|---|
-| **Control (SemOS)** | `sem_os_core`, `sem_os_postgres` (metadata only), `sem_os_server`, `sem_os_client`, `sem_os_harness`, `sem_os_obpoc_adapter` | verb catalogue, workspace DAG, taxonomy registries, deterministic entity resolution (from structured input), state-machine navigation, verb-surface derivation, gating (ABAC + state validity + session scope), narration hints, phrase bank, allowed-verb fingerprints, constellation rehydration metadata, change-set lifecycle, application of `PendingStateAdvance` within a Sequencer-supplied transaction | verb execution, pool management, NLP / embedding, transaction scope decisions, outbox drainage, UI push, utterance interpretation |
+| **Control (SemOS)** | `sem_os_core`, `sem_os_postgres` (metadata only), `sem_os_server`, `sem_os_client`, `sem_os_harness`, `sem_os_obpoc_adapter` | verb catalogue, workspace DAG, taxonomy registries, domain-pack ownership manifests, reload-index planning, deterministic entity resolution (from structured input), state-machine navigation, verb-surface derivation, gating (ABAC + state validity + session scope), narration hints, phrase bank, allowed-verb fingerprints, constellation rehydration metadata, change-set lifecycle, application of `PendingStateAdvance` within a Sequencer-supplied transaction | verb execution, pool management, NLP / embedding, transaction scope decisions, outbox drainage, UI push, utterance interpretation, business-crate ownership of SemOS taxonomy shape |
 | **Execution (DSL runtime)** | `dsl-core` (unchanged — parser/AST/compiler, DB-free), **new `dsl-runtime`** | `VerbExecutionPort`, `CustomOperation`, `CustomOperationRegistry`, `VerbRegistrar`, `PgCrudExecutor`, **transaction mechanics within a scope supplied by the Sequencer** (statement execution, row accounting, deadlock retries inside the scope), the domain-neutral ops, macro-expansion runtime | verb governance, verb discovery, session scope, UI, narration, catalogue storage, **transaction scope decisions** (when to commit, how long to hold locks), outbox |
 | **Composition (ob-poc)** | `ob-poc`, `ob-poc-web`, `ob-poc-ui-react`, `dsl-lsp`, app services, repositories, **Agentic Sequencer**, **outbox drainer**, app-coupled op adapters | HTTP/REST, session lifecycle, the Agentic Sequencer (§8), **transaction scope ownership** (opening, committing, rolling back), **outbox writing and drainage**, repositories, domain services, app-coupled op adapters, embedding / NLP / utterance interpretation, the unified REPL pipeline | verb contracts, execution mechanics, catalogue storage, state-advance semantics |
 

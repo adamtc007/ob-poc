@@ -18,8 +18,8 @@ use serde_json::json;
 /// Shared state for JWT validation.
 #[derive(Clone)]
 pub struct JwtConfig {
-    pub decoding_key: DecodingKey,
-    pub validation: Validation,
+    pub(crate) decoding_key: DecodingKey,
+    pub(crate) validation: Validation,
 }
 
 impl JwtConfig {
@@ -36,7 +36,7 @@ impl JwtConfig {
 }
 
 /// Axum middleware layer that validates JWT and injects `Principal`.
-pub async fn jwt_auth(mut req: Request, next: Next) -> Result<Response, Response> {
+pub(crate) async fn jwt_auth(mut req: Request, next: Next) -> Result<Response, Response> {
     let jwt_config = req
         .extensions()
         .get::<JwtConfig>()

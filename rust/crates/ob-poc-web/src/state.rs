@@ -8,12 +8,12 @@ use sqlx::PgPool;
 
 /// Shared application state for CBU/graph endpoints
 #[derive(Clone)]
-pub struct AppState {
-    pub pool: PgPool,
+pub(crate) struct AppState {
+    pub(crate) pool: PgPool,
 }
 
 impl AppState {
-    pub fn new(pool: PgPool) -> Self {
+    pub(crate) fn new(pool: PgPool) -> Self {
         Self { pool }
     }
 }

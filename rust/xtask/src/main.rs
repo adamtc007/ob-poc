@@ -9,9 +9,12 @@ use anyhow::{Context, Result};
 use clap::{Parser, Subcommand};
 use xshell::{cmd, Shell};
 
+mod acp_envelope_byte_equality;
 mod allianz_harness;
+mod audit;
 mod aviva_deal_harness;
 mod bpmn_lite;
+mod byok_conformance;
 mod calibration;
 mod catalogue;
 mod dag_test;
@@ -23,14 +26,14 @@ mod gleif_crawl_dsl;
 mod gleif_import;
 mod gleif_load;
 mod gleif_test;
-mod governed_cache;
-mod governed_check;
 mod harness;
 mod instrument_harness;
 mod lexicon;
 mod onboarding_harness;
+mod pub_lint;
 mod reconcile;
 mod replay_tuner;
+mod runbook_envelope_determinism;
 mod seed_allianz;
 mod sem_reg;
 mod ubo_test;
@@ -106,6 +109,56 @@ enum Command {
 
     /// Pre-commit hook: check + clippy + test
     PreCommit,
+
+    /// Check root-crate public API against the reviewed allowlist
+    PubLint {
+        /// Refresh the allowlist after reviewing intentional API changes
+        #[arg(long)]
+        bless: bool,
+    },
+
+    /// Phase 4.7 — schema-authority audit. Reports parallel
+    /// definitions of canonical sem_os_core types (DAG primitives,
+    /// verb contracts, entity types, transitions) found outside
+    /// sem_os_core. Fails on drift not in
+    /// `tools/schema-authority-drift-allowlist.txt`.
+    Audit {
+        /// Refresh the drift allowlist after deliberate review.
+        #[arg(long)]
+        bless: bool,
+    },
+
+    /// Phase 5.5 — runbook envelope determinism check. Hashes a
+    /// fixed set of canonical RunbookEnvelope fixtures and asserts
+    /// the hashes match the persisted baseline at
+    /// `tools/runbook-envelope-determinism-baseline.json`. Replay-
+    /// grade audit gate per V&S §6.5 / Phase 4.5 (D2=c).
+    RunbookEnvelopeDeterminismCheck {
+        /// Refresh the baseline after reviewing intentional changes.
+        #[arg(long)]
+        bless: bool,
+    },
+
+    /// Phase 5.4 — BYOK conformance check. Runs the corpus at
+    /// `tools/sage-conformance-corpus.yaml` through the planning
+    /// loop against the chosen provider. `stub` is CI-safe;
+    /// `anthropic` calls the real model (requires
+    /// `ANTHROPIC_API_KEY`); `openai` errors until the OpenAI
+    /// client lands in `ob-agentic`.
+    ByokConformanceCheck {
+        /// LLM provider to validate. One of: stub|anthropic|openai.
+        #[arg(long, default_value = "stub")]
+        provider: String,
+    },
+
+    /// R6 — rebuild Slice 1 ACP pack context envelopes and assert
+    /// byte-equality + hash-equality against the persisted CLI baseline.
+    /// Fails the build on envelope drift. PR-gated.
+    AcpEnvelopeByteEqualityCheck {
+        /// Refresh the persisted baseline after reviewing the drift.
+        #[arg(long)]
+        bless: bool,
+    },
 
     /// Build and deploy web server, then start
     Deploy {
@@ -662,26 +715,6 @@ enum Command {
         action: BpmnLiteAction,
     },
 
-    /// GovernedQuery cache management (refresh, stats)
-    ///
-    /// Generates the bincode cache file used by #[governed_query] proc macro
-    /// for compile-time governance verification.
-    GovernedCache {
-        #[command(subcommand)]
-        action: GovernedCacheAction,
-    },
-
-    /// GovernedQuery governance checker
-    ///
-    /// Scans source files for #[governed_query] annotations and checks
-    /// against the live Semantic OS registry. Reports hard errors
-    /// (GC001-GC003) and soft warnings (GC010-GC011).
-    GovernedCheck {
-        /// Fail with non-zero exit code on hard errors (for CI)
-        #[arg(long)]
-        strict: bool,
-    },
-
     /// Live utterance -> Sem OS -> DSL round-trip harness
     UtteranceRoundtrip {
         /// API base URL hosting the ob-poc server
@@ -781,21 +814,6 @@ enum BpmnLiteAction {
         #[arg(long)]
         skip_build: bool,
     },
-}
-
-#[derive(Subcommand)]
-enum GovernedCacheAction {
-    /// Refresh the governed cache from the database
-    ///
-    /// Queries sem_reg.snapshots for active entries and writes
-    /// assets/governed_cache.bin for compile-time verification.
-    Refresh,
-
-    /// Show governed cache statistics
-    ///
-    /// Reads the cache file and prints counts by object type,
-    /// governance tier, and PII status.
-    Stats,
 }
 
 #[derive(Subcommand)]
@@ -1064,6 +1082,25 @@ enum SemRegAction {
         /// Show per-object detail
         #[arg(long, short = 'v')]
         verbose: bool,
+    },
+
+    /// Check Sem OS domain-pack YAML reload state against the persisted reload index
+    DomainPackCheck {
+        /// Restrict check to one pack id, e.g. ob-poc.cbu
+        #[arg(long)]
+        pack_id: Option<String>,
+        /// Config root directory
+        #[arg(long, default_value = "config")]
+        config_root: std::path::PathBuf,
+        /// Bypass the mtime/size short-circuit and recompute content hashes
+        #[arg(long)]
+        force_check: bool,
+        /// Persist the refreshed reload-index rows
+        #[arg(long)]
+        update_index: bool,
+        /// Output JSON
+        #[arg(long)]
+        json: bool,
     },
 
     /// Describe a derivation spec by FQN
@@ -1341,6 +1378,13 @@ fn main() -> Result<()> {
         Command::Serve { port } => serve(&sh, port),
         Command::Ci => ci(&sh),
         Command::PreCommit => pre_commit(&sh),
+        Command::PubLint { bless } => pub_lint::run(bless),
+        Command::Audit { bless } => audit::run(bless),
+        Command::RunbookEnvelopeDeterminismCheck { bless } => {
+            runbook_envelope_determinism::run(bless)
+        }
+        Command::ByokConformanceCheck { provider } => byok_conformance::run(&provider),
+        Command::AcpEnvelopeByteEqualityCheck { bless } => acp_envelope_byte_equality::run(bless),
         Command::Deploy {
             release,
             port,
@@ -1540,6 +1584,19 @@ fn main() -> Result<()> {
                 SemRegAction::Scan { dry_run, verbose } => {
                     rt.block_on(sem_reg::scan(dry_run, verbose))
                 }
+                SemRegAction::DomainPackCheck {
+                    pack_id,
+                    config_root,
+                    force_check,
+                    update_index,
+                    json,
+                } => rt.block_on(sem_reg::domain_pack_check(
+                    pack_id.as_deref(),
+                    &config_root,
+                    force_check,
+                    update_index,
+                    json,
+                )),
                 SemRegAction::DerivationDescribe { fqn } => {
                     rt.block_on(sem_reg::derivation_describe(&fqn))
                 }
@@ -1780,17 +1837,6 @@ fn main() -> Result<()> {
             BpmnLiteAction::DockerBuild => bpmn_lite::docker_build(&sh),
             BpmnLiteAction::Deploy { skip_build } => bpmn_lite::deploy(&sh, !skip_build),
         },
-        Command::GovernedCache { action } => {
-            let rt = tokio::runtime::Runtime::new()?;
-            match action {
-                GovernedCacheAction::Refresh => rt.block_on(governed_cache::refresh(None)),
-                GovernedCacheAction::Stats => rt.block_on(governed_cache::stats(None)),
-            }
-        }
-        Command::GovernedCheck { strict } => {
-            let rt = tokio::runtime::Runtime::new()?;
-            rt.block_on(governed_check::run_check(strict))
-        }
         Command::UtteranceRoundtrip {
             base_url,
             fixture,
@@ -2082,6 +2128,12 @@ fn check(sh: &Shell, db: bool) -> Result<()> {
     println!("  Checking compilation...");
     cmd!(sh, "cargo check --workspace").run()?;
 
+    println!("  Checking public API allowlist...");
+    pub_lint::run(false)?;
+
+    println!("  Checking ACP envelope byte-equality (R6)...");
+    acp_envelope_byte_equality::run(false)?;
+
     // Clippy (workspace, all targets)
     println!("  Running clippy...");
     cmd!(sh, "cargo clippy --workspace --all-targets -- -D warnings").run()?;
@@ -2090,11 +2142,6 @@ fn check(sh: &Shell, db: bool) -> Result<()> {
     println!("  Running tests...");
     if db {
         cmd!(sh, "cargo test --features database").run()?;
-
-        // Governance drift check (only with DB access)
-        println!("  Running governance check...");
-        let rt = tokio::runtime::Runtime::new()?;
-        rt.block_on(governed_check::run_check(true))?;
 
         // Cross-workspace DAG harness (mock + live, both require DB).
         // Live mode uses #[sqlx::test] ephemeral databases.
@@ -2267,6 +2314,21 @@ fn ci(sh: &Shell) -> Result<()> {
     println!("\n=== Format Check ===");
     fmt(sh, true)?;
 
+    println!("\n=== Public API Allowlist ===");
+    pub_lint::run(false)?;
+
+    println!("\n=== ACP Envelope Byte-Equality (R6) ===");
+    acp_envelope_byte_equality::run(false)?;
+
+    println!("\n=== Schema-authority drift audit (Phase 4.7) ===");
+    audit::run(false)?;
+
+    println!("\n=== Runbook envelope determinism (Phase 5.5) ===");
+    runbook_envelope_determinism::run(false)?;
+
+    println!("\n=== BYOK conformance — stub provider (Phase 5.4) ===");
+    byok_conformance::run("stub")?;
+
     println!("\n=== Clippy (workspace) ===");
     cmd!(sh, "cargo clippy --workspace --all-targets -- -D warnings").run()?;
 
@@ -2295,13 +2357,6 @@ fn ci(sh: &Shell) -> Result<()> {
         cmd!(sh, "npx tsc --noEmit").run()?;
     }
 
-    // Governance drift check (requires DATABASE_URL)
-    if std::env::var("DATABASE_URL").is_ok() {
-        println!("\n=== Governance Check ===");
-        let rt = tokio::runtime::Runtime::new()?;
-        rt.block_on(governed_check::run_check(true))?;
-    }
-
     println!("\nCI pipeline passed!");
     Ok(())
 }
@@ -2312,6 +2367,21 @@ fn pre_commit(sh: &Shell) -> Result<()> {
     // Fast checks only
     println!("\n=== Format Check ===");
     fmt(sh, true)?;
+
+    println!("\n=== Public API Allowlist ===");
+    pub_lint::run(false)?;
+
+    println!("\n=== ACP Envelope Byte-Equality (R6) ===");
+    acp_envelope_byte_equality::run(false)?;
+
+    println!("\n=== Schema-authority drift audit (Phase 4.7) ===");
+    audit::run(false)?;
+
+    println!("\n=== Runbook envelope determinism (Phase 5.5) ===");
+    runbook_envelope_determinism::run(false)?;
+
+    println!("\n=== BYOK conformance — stub provider (Phase 5.4) ===");
+    byok_conformance::run("stub")?;
 
     println!("\n=== Clippy (workspace) ===");
     cmd!(sh, "cargo clippy --workspace --all-targets -- -D warnings").run()?;
@@ -3456,8 +3526,7 @@ async fn run_aviva_deal_harness(verbose: bool, dry_run: bool) -> Result<()> {
 // ============================================================================
 
 fn playbook_check(files: Vec<std::path::PathBuf>, format: &str, verbose: bool) -> Result<()> {
-    use playbook_core::parse_playbook;
-    use playbook_lower::{lower_playbook, SlotState};
+    use playbook_core::{lower_playbook, parse_playbook, SlotState};
 
     let _ = format; // unused for now
 

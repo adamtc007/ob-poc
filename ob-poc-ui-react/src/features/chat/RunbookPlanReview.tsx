@@ -344,6 +344,24 @@ function WorkbookDryRunCard({
           </div>
         </div>
       </div>
+      <div className="grid gap-2 text-xs text-cyan-900 sm:grid-cols-2">
+        <div>
+          <div className="font-medium text-cyan-700">Semantic Diff URI</div>
+          <div className="break-all font-mono">{result.dry_run.semantic_diff_uri}</div>
+        </div>
+        <div>
+          <div className="font-medium text-cyan-700">Validation</div>
+          <div>
+            {result.dry_run.validation_trace.length} checks,{" "}
+            {
+              result.dry_run.validation_trace.filter(
+                (step) => step.status === "passed",
+              ).length
+            }{" "}
+            passed
+          </div>
+        </div>
+      </div>
     </div>
   );
 }

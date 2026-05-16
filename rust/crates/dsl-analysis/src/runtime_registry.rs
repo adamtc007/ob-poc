@@ -1,0 +1,1409 @@
+//! Runtime verb registry built from YAML configuration
+//!
+//! This replaces the static STANDARD_VERBS array with a dynamic
+//! registry that can be reloaded at runtime.
+//!
+//! Also loads templates from config/verbs/templates/ as first-class
+//! language constructs (macros that expand to DSL statements).
+
+// §9 item 9 slice 1 (2026-05-13): cfg(feature = "database") gates
+// dropped on relocation — dsl-runtime has sqlx as an unconditional
+// dependency (unlike ob-poc, where this module previously lived).
+use anyhow::{anyhow, Result};
+use std::collections::HashMap;
+use std::path::Path;
+use std::sync::{Arc, OnceLock};
+use tracing::{info, warn};
+
+use sqlx::PgPool;
+
+use crate::entity_kind::canonicalize as canonicalize_entity_kind;
+use dsl_core::config::types::*;
+use ob_templates::{TemplateDefinition, TemplateRegistry};
+
+// =============================================================================
+// RUNTIME VERB DEFINITION
+// =============================================================================
+
+/// Runtime verb definition (built from YAML config)
+#[derive(Debug, Clone)]
+pub struct RuntimeVerb {
+    pub domain: String,
+    pub verb: String,
+    pub full_name: String,
+    pub description: String,
+    /// Safety tier for routing and fail-closed audits.
+    pub harm_class: Option<HarmClass>,
+    /// Entity kinds this verb applies to. Empty means globally applicable.
+    pub subject_kinds: Vec<String>,
+    pub behavior: RuntimeBehavior,
+    pub args: Vec<RuntimeArg>,
+    pub returns: RuntimeReturn,
+    /// Dataflow: what this verb produces (binding type)
+    pub produces: Option<VerbProduces>,
+    /// Dataflow: what this verb consumes (required bindings)
+    pub consumes: Vec<VerbConsumes>,
+    /// Lifecycle constraints and transitions for this verb
+    pub lifecycle: Option<VerbLifecycle>,
+    /// Execution policy for batch operations and entity locking
+    pub policy: Option<RuntimePolicyConfig>,
+}
+
+/// Runtime policy configuration (built from YAML)
+#[derive(Debug, Clone, Default)]
+pub struct RuntimePolicyConfig {
+    /// Batch execution policy: atomic or best_effort
+    pub batch: RuntimeBatchPolicy,
+    /// Locking configuration
+    pub locking: Option<RuntimeLockingConfig>,
+}
+
+/// Batch execution policy (runtime representation)
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum RuntimeBatchPolicy {
+    /// All statements succeed or all are rolled back
+    Atomic,
+    /// Continue on failure, aggregate errors (default)
+    #[default]
+    BestEffort,
+}
+
+/// Locking configuration (runtime representation)
+#[derive(Debug, Clone)]
+pub struct RuntimeLockingConfig {
+    /// Lock acquisition mode
+    pub mode: RuntimeLockMode,
+    /// Timeout in milliseconds
+    pub timeout_ms: Option<u64>,
+    /// Lock targets
+    pub targets: Vec<RuntimeLockTarget>,
+}
+
+/// Lock acquisition mode (runtime representation)
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum RuntimeLockMode {
+    /// Non-blocking
+    #[default]
+    Try,
+    /// Blocking with optional timeout
+    Block,
+}
+
+/// Lock target specification (runtime representation)
+#[derive(Debug, Clone)]
+pub struct RuntimeLockTarget {
+    /// Argument name
+    pub arg: String,
+    /// Entity type
+    pub entity_type: String,
+    /// Access type (read or write)
+    pub access: RuntimeLockAccess,
+}
+
+/// Lock access type (runtime representation)
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum RuntimeLockAccess {
+    Read,
+    #[default]
+    Write,
+}
+
+#[derive(Debug, Clone)]
+pub enum RuntimeBehavior {
+    /// Standard CRUD operation (boxed to reduce enum size)
+    Crud(Box<RuntimeCrudConfig>),
+    /// Plugin handler (Rust function)
+    Plugin(String),
+    /// Graph query operation
+    GraphQuery(Box<RuntimeGraphQueryConfig>),
+    /// Durable execution via external workflow engine (e.g., BPMN-Lite)
+    Durable(Box<RuntimeDurableConfig>),
+}
+
+#[derive(Debug, Clone)]
+pub struct RuntimeCrudConfig {
+    pub operation: CrudOperation,
+    pub table: String,
+    pub schema: String,
+    pub key: Option<String>,
+    pub returning: Option<String>,
+    pub conflict_keys: Vec<String>,
+    /// Named constraint for ON CONFLICT (used when conflict_keys has computed columns)
+    pub conflict_constraint: Option<String>,
+    // Junction config
+    pub junction: Option<String>,
+    pub from_col: Option<String>,
+    pub to_col: Option<String>,
+    pub role_table: Option<String>,
+    pub role_col: Option<String>,
+    pub fk_col: Option<String>,
+    pub filter_col: Option<String>,
+    // Join config
+    pub primary_table: Option<String>,
+    pub join_table: Option<String>,
+    pub join_col: Option<String>,
+    // Entity create config
+    pub base_table: Option<String>,
+    pub extension_table: Option<String>,
+    /// Explicit type_code for entity_create (e.g., "fund_umbrella")
+    /// If not set, derived from verb name
+    pub type_code: Option<String>,
+    // List operations
+    pub order_by: Option<String>,
+    // Update with fixed values
+    pub set_values: Option<std::collections::HashMap<String, serde_yaml::Value>>,
+    pub extension_table_column: Option<String>,
+    pub type_id_column: Option<String>,
+}
+
+/// Configuration for graph query operations
+#[derive(Debug, Clone)]
+pub struct RuntimeGraphQueryConfig {
+    /// The type of graph query operation
+    pub operation: GraphQueryOperation,
+    /// Root entity type for the query (e.g., "cbu", "entity")
+    pub root_type: Option<String>,
+    /// Edge types to include in traversal
+    pub edge_types: Vec<String>,
+    /// Maximum traversal depth
+    pub max_depth: u32,
+    /// Default view mode for visualization queries
+    pub default_view_mode: Option<String>,
+}
+
+/// Runtime configuration for durable (workflow-engine-backed) verb execution.
+/// Built from `DurableConfig` in verb YAML.
+#[derive(Debug, Clone)]
+pub struct RuntimeDurableConfig {
+    /// Which workflow runtime to use
+    pub runtime: DurableRuntime,
+    /// The process definition key in the workflow engine (e.g., "kyc-open-case")
+    pub process_key: String,
+    /// The verb argument whose value becomes the correlation key for signal routing
+    pub correlation_field: String,
+    /// Map of BPMN service-task name → ob-poc verb FQN
+    pub task_bindings: std::collections::BTreeMap<String, String>,
+    /// Maximum duration before escalation (ISO 8601 duration)
+    pub timeout: Option<String>,
+    /// Escalation action when timeout expires
+    pub escalation: Option<String>,
+}
+
+use dsl_core::config::types::{DurableRuntime, GraphQueryOperation};
+
+#[derive(Debug, Clone)]
+pub struct RuntimeArg {
+    pub name: String,
+    pub arg_type: ArgType,
+    pub required: bool,
+    pub maps_to: Option<String>,
+    pub lookup: Option<LookupConfig>,
+    pub valid_values: Option<Vec<String>>,
+    pub default: Option<serde_yaml::Value>,
+    pub description: Option<String>,
+    pub fuzzy_check: Option<FuzzyCheckConfig>,
+}
+
+#[derive(Debug, Clone)]
+pub struct RuntimeReturn {
+    pub return_type: ReturnTypeConfig,
+    pub name: Option<String>,
+    pub capture: bool,
+}
+
+// =============================================================================
+// RUNTIME REGISTRY
+// =============================================================================
+
+/// Runtime verb registry - can be hot-reloaded
+///
+/// Contains both verbs and templates, loaded at startup from:
+/// - config/verbs/*.yaml (verb definitions)
+/// - config/verbs/templates/**/*.yaml (template definitions)
+pub struct RuntimeVerbRegistry {
+    verbs: HashMap<String, RuntimeVerb>,
+    by_domain: HashMap<String, Vec<String>>,
+    domains: Vec<String>,
+    /// Template registry (macros that expand to DSL statements)
+    templates: TemplateRegistry,
+}
+
+impl RuntimeVerbRegistry {
+    /// Build registry from configuration
+    pub fn from_config(config: &VerbsConfig) -> Self {
+        Self::from_config_with_templates(config, TemplateRegistry::new())
+    }
+
+    /// Build registry from configuration with template directory
+    pub fn from_config_and_templates_dir(config: &VerbsConfig, templates_dir: &Path) -> Self {
+        let templates = match TemplateRegistry::load_from_dir(templates_dir) {
+            Ok(registry) => {
+                info!(
+                    "Loaded {} templates from {:?}",
+                    registry.len(),
+                    templates_dir
+                );
+                registry
+            }
+            Err(e) => {
+                warn!("Failed to load templates from {:?}: {}", templates_dir, e);
+                TemplateRegistry::new()
+            }
+        };
+        Self::from_config_with_templates(config, templates)
+    }
+
+    /// Build registry from configuration with pre-loaded templates
+    pub fn from_config_with_templates(config: &VerbsConfig, templates: TemplateRegistry) -> Self {
+        let mut verbs = HashMap::new();
+        let mut by_domain: HashMap<String, Vec<String>> = HashMap::new();
+
+        // Process each domain
+        for (domain_name, domain_config) in &config.domains {
+            // Process static verbs
+            for (verb_name, verb_config) in &domain_config.verbs {
+                let full_name = format!("{}.{}", domain_name, verb_name);
+
+                let runtime_verb = Self::build_verb(domain_name, verb_name, verb_config);
+
+                verbs.insert(full_name.clone(), runtime_verb);
+                by_domain
+                    .entry(domain_name.clone())
+                    .or_default()
+                    .push(full_name);
+            }
+        }
+
+        // Sort domain lists
+        for list in by_domain.values_mut() {
+            list.sort();
+            list.dedup();
+        }
+
+        let mut domains: Vec<String> = by_domain.keys().cloned().collect();
+        domains.sort();
+
+        Self {
+            verbs,
+            by_domain,
+            domains,
+            templates,
+        }
+    }
+
+    /// Build registry with dynamic verbs from database
+    pub async fn from_config_with_db(config: &VerbsConfig, pool: &PgPool) -> Result<Self> {
+        let mut registry = Self::from_config(config);
+
+        // Process dynamic verbs
+        for (domain_name, domain_config) in &config.domains {
+            for dynamic in &domain_config.dynamic_verbs {
+                registry
+                    .expand_dynamic_verbs(domain_name, dynamic, pool)
+                    .await?;
+            }
+        }
+
+        Ok(registry)
+    }
+
+    async fn expand_dynamic_verbs(
+        &mut self,
+        domain: &str,
+        dynamic: &DynamicVerbConfig,
+        pool: &PgPool,
+    ) -> Result<()> {
+        let source = dynamic
+            .source
+            .as_ref()
+            .ok_or_else(|| anyhow!("Dynamic verb requires source config"))?;
+
+        let schema = source.schema.as_deref().unwrap_or("ob-poc");
+
+        // Query entity types from database
+        let query = format!(
+            r#"SELECT {} FROM "{}".{}"#,
+            source.type_code_column, schema, source.table
+        );
+
+        let rows: Vec<(String,)> = sqlx::query_as(&query).fetch_all(pool).await?;
+        let row_count = rows.len();
+
+        for (type_code,) in rows {
+            let verb_name = dynamic.pattern.replace("{type_code}", &type_code);
+            let verb_name = Self::transform_name(&verb_name, source.transform.as_deref());
+            let full_name = format!("{}.{}", domain, verb_name);
+
+            // Build verb from dynamic config
+            let runtime_verb = RuntimeVerb {
+                domain: domain.to_string(),
+                verb: verb_name.clone(),
+                full_name: full_name.clone(),
+                description: format!("Create {} entity", type_code),
+                harm_class: Some(HarmClass::Reversible),
+                subject_kinds: vec!["entity".to_string()],
+                behavior: RuntimeBehavior::Crud(Box::new(RuntimeCrudConfig {
+                    operation: dynamic
+                        .crud
+                        .as_ref()
+                        .map(|c| c.operation)
+                        .unwrap_or(CrudOperation::EntityCreate),
+                    table: dynamic
+                        .crud
+                        .as_ref()
+                        .and_then(|c| c.base_table.clone())
+                        .unwrap_or_else(|| "entities".to_string()),
+                    schema: schema.to_string(),
+                    key: None,
+                    returning: Some("entity_id".to_string()),
+                    conflict_keys: vec![],
+                    conflict_constraint: None,
+                    junction: None,
+                    from_col: None,
+                    to_col: None,
+                    role_table: None,
+                    role_col: None,
+                    fk_col: None,
+                    order_by: None,
+                    set_values: None,
+                    filter_col: None,
+                    primary_table: None,
+                    join_table: None,
+                    join_col: None,
+                    base_table: Some("entities".to_string()),
+                    extension_table: dynamic
+                        .crud
+                        .as_ref()
+                        .and_then(|c| c.extension_table.clone()),
+                    // For dynamic verbs, type_code comes from the database row
+                    type_code: Some(type_code.clone()),
+                    extension_table_column: dynamic
+                        .crud
+                        .as_ref()
+                        .and_then(|c| c.extension_table_column.clone()),
+                    type_id_column: dynamic.crud.as_ref().and_then(|c| c.type_id_column.clone()),
+                })),
+                args: dynamic.base_args.iter().map(Self::convert_arg).collect(),
+                returns: RuntimeReturn {
+                    return_type: ReturnTypeConfig::Uuid,
+                    name: Some("entity_id".to_string()),
+                    capture: true,
+                },
+                // Dynamic implicit-create registrations still produce an entity with subtype
+                produces: Some(VerbProduces {
+                    produced_type: "entity".to_string(),
+                    subtype: Some(type_code.clone()),
+                    subtype_from_arg: None,
+                    resolved: false,
+                    initial_state: Some("DRAFT".to_string()),
+                }),
+                consumes: vec![],
+                lifecycle: None, // Dynamic verbs don't have lifecycle constraints by default
+                policy: None,    // Dynamic verbs don't have policy by default
+            };
+
+            self.verbs.insert(full_name.clone(), runtime_verb);
+            self.by_domain
+                .entry(domain.to_string())
+                .or_default()
+                .push(full_name);
+        }
+
+        info!("Expanded {} dynamic verbs for domain {}", row_count, domain);
+        Ok(())
+    }
+
+    fn transform_name(name: &str, transform: Option<&str>) -> String {
+        match transform {
+            Some("kebab_case") => name.to_lowercase().replace('_', "-"),
+            Some("snake_case") => name.to_lowercase().replace('-', "_"),
+            _ => name.to_string(),
+        }
+    }
+
+    fn build_verb(domain: &str, verb: &str, config: &VerbConfig) -> RuntimeVerb {
+        let behavior = match (&config.behavior, &config.crud, &config.handler) {
+            (VerbBehavior::Crud, Some(crud), _) => {
+                // For entity_create/entity_upsert operations, table defaults to base_table
+                let table = crud.table.clone().unwrap_or_else(|| {
+                    if matches!(
+                        crud.operation,
+                        CrudOperation::EntityCreate | CrudOperation::EntityUpsert
+                    ) {
+                        crud.base_table.clone().unwrap_or_default()
+                    } else {
+                        String::new()
+                    }
+                });
+                RuntimeBehavior::Crud(Box::new(RuntimeCrudConfig {
+                    operation: crud.operation,
+                    table,
+                    schema: crud.schema.clone().unwrap_or_else(|| "ob-poc".to_string()),
+                    key: crud.key.clone(),
+                    returning: crud.returning.clone(),
+                    conflict_keys: crud.conflict_keys.clone().unwrap_or_default(),
+                    conflict_constraint: crud.conflict_constraint.clone(),
+                    junction: crud.junction.clone(),
+                    from_col: crud.from_col.clone(),
+                    to_col: crud.to_col.clone(),
+                    role_table: crud.role_table.clone(),
+                    role_col: crud.role_col.clone(),
+                    fk_col: crud.fk_col.clone(),
+                    filter_col: crud.filter_col.clone(),
+                    primary_table: crud.primary_table.clone(),
+                    join_table: crud.join_table.clone(),
+                    join_col: crud.join_col.clone(),
+                    base_table: crud.base_table.clone(),
+                    extension_table: crud.extension_table.clone(),
+                    type_code: crud.type_code.clone(),
+                    order_by: crud.order_by.clone(),
+                    set_values: crud.set_values.clone(),
+                    extension_table_column: crud.extension_table_column.clone(),
+                    type_id_column: crud.type_id_column.clone(),
+                }))
+            }
+            (VerbBehavior::Plugin, _, Some(handler)) => RuntimeBehavior::Plugin(handler.clone()),
+            (VerbBehavior::Plugin, _, None) => {
+                warn!(
+                    "Plugin verb {}.{} missing handler, using verb name",
+                    domain, verb
+                );
+                RuntimeBehavior::Plugin(verb.replace('-', "_"))
+            }
+            (VerbBehavior::GraphQuery, _, _) => {
+                let graph_query = config.graph_query.as_ref();
+                RuntimeBehavior::GraphQuery(Box::new(RuntimeGraphQueryConfig {
+                    operation: graph_query
+                        .map(|g| g.operation)
+                        .unwrap_or(GraphQueryOperation::View),
+                    root_type: graph_query.and_then(|g| g.root_type.clone()),
+                    edge_types: graph_query
+                        .map(|g| g.edge_types.clone())
+                        .unwrap_or_default(),
+                    max_depth: graph_query.map(|g| g.max_depth).unwrap_or(10),
+                    default_view_mode: graph_query.and_then(|g| g.default_view_mode.clone()),
+                }))
+            }
+            (VerbBehavior::Durable, _, _) => {
+                if let Some(durable) = &config.durable {
+                    RuntimeBehavior::Durable(Box::new(RuntimeDurableConfig {
+                        runtime: durable.runtime,
+                        process_key: durable.process_key.clone(),
+                        correlation_field: durable.correlation_field.clone(),
+                        task_bindings: durable.task_bindings.clone(),
+                        timeout: durable.timeout.clone(),
+                        escalation: durable.escalation.clone(),
+                    }))
+                } else {
+                    warn!(
+                        "Durable verb {}.{} missing durable config, defaulting to plugin",
+                        domain, verb
+                    );
+                    RuntimeBehavior::Plugin(verb.replace('-', "_"))
+                }
+            }
+            _ => {
+                warn!(
+                    "Verb {}.{} has no valid behavior config, defaulting to empty CRUD",
+                    domain, verb
+                );
+                RuntimeBehavior::Crud(Box::new(RuntimeCrudConfig {
+                    operation: CrudOperation::Select,
+                    table: String::new(),
+                    schema: "ob-poc".to_string(),
+                    key: None,
+                    returning: None,
+                    conflict_keys: vec![],
+                    conflict_constraint: None,
+                    junction: None,
+                    from_col: None,
+                    to_col: None,
+                    role_table: None,
+                    role_col: None,
+                    fk_col: None,
+                    filter_col: None,
+                    primary_table: None,
+                    join_table: None,
+                    join_col: None,
+                    base_table: None,
+                    extension_table: None,
+                    type_code: None,
+                    order_by: None,
+                    set_values: None,
+                    extension_table_column: None,
+                    type_id_column: None,
+                }))
+            }
+        };
+
+        RuntimeVerb {
+            domain: domain.to_string(),
+            verb: verb.to_string(),
+            full_name: format!("{}.{}", domain, verb),
+            description: config.description.clone(),
+            harm_class: config.metadata.as_ref().and_then(|meta| meta.harm_class),
+            subject_kinds: derive_subject_kinds(domain, config),
+            behavior,
+            args: config.args.iter().map(Self::convert_arg).collect(),
+            returns: config
+                .returns
+                .as_ref()
+                .map(|r| RuntimeReturn {
+                    return_type: r.return_type,
+                    name: r.name.clone(),
+                    capture: r.capture.unwrap_or(false),
+                })
+                .unwrap_or(RuntimeReturn {
+                    return_type: ReturnTypeConfig::Void,
+                    name: None,
+                    capture: false,
+                }),
+            produces: config.produces.clone(),
+            consumes: config.consumes.clone(),
+            lifecycle: config.lifecycle.clone(),
+            policy: config.policy.as_ref().map(Self::convert_policy),
+        }
+    }
+
+    /// Convert YAML policy config to runtime representation
+    fn convert_policy(config: &PolicyConfig) -> RuntimePolicyConfig {
+        RuntimePolicyConfig {
+            batch: match config.batch {
+                BatchPolicyConfig::Atomic => RuntimeBatchPolicy::Atomic,
+                BatchPolicyConfig::BestEffort => RuntimeBatchPolicy::BestEffort,
+            },
+            locking: config.locking.as_ref().map(|l| RuntimeLockingConfig {
+                mode: match l.mode {
+                    LockModeConfig::Try => RuntimeLockMode::Try,
+                    LockModeConfig::Block => RuntimeLockMode::Block,
+                },
+                timeout_ms: l.timeout_ms,
+                targets: l
+                    .targets
+                    .iter()
+                    .map(|t| RuntimeLockTarget {
+                        arg: t.arg.clone(),
+                        entity_type: t.entity_type.clone(),
+                        access: match t.access {
+                            LockAccessConfig::Read => RuntimeLockAccess::Read,
+                            LockAccessConfig::Write => RuntimeLockAccess::Write,
+                        },
+                    })
+                    .collect(),
+            }),
+        }
+    }
+
+    fn convert_arg(arg: &ArgConfig) -> RuntimeArg {
+        RuntimeArg {
+            name: arg.name.clone(),
+            arg_type: arg.arg_type,
+            required: arg.required,
+            maps_to: arg.maps_to.clone(),
+            lookup: arg.lookup.clone(),
+            valid_values: arg.valid_values.clone(),
+            default: arg.default.clone(),
+            description: arg.description.clone(),
+            fuzzy_check: arg.fuzzy_check.clone(),
+        }
+    }
+
+    /// Create registry from pre-built parts (used by V2 loader)
+    pub fn from_parts(
+        verbs: HashMap<String, RuntimeVerb>,
+        by_domain: HashMap<String, Vec<String>>,
+        domains: Vec<String>,
+        templates: TemplateRegistry,
+    ) -> Self {
+        Self {
+            verbs,
+            by_domain,
+            domains,
+            templates,
+        }
+    }
+
+    // =========================================================================
+    // LOOKUP METHODS
+    // =========================================================================
+
+    pub fn get(&self, domain: &str, verb: &str) -> Option<&RuntimeVerb> {
+        let key = format!("{}.{}", domain, verb);
+        self.verbs.get(&key)
+    }
+
+    pub fn get_by_name(&self, full_name: &str) -> Option<&RuntimeVerb> {
+        self.verbs.get(full_name)
+    }
+
+    pub fn verbs_for_domain(&self, domain: &str) -> Vec<&RuntimeVerb> {
+        self.by_domain
+            .get(domain)
+            .map(|keys| keys.iter().filter_map(|k| self.verbs.get(k)).collect())
+            .unwrap_or_default()
+    }
+
+    pub fn domains(&self) -> &[String] {
+        &self.domains
+    }
+
+    pub fn all_verbs(&self) -> impl Iterator<Item = &RuntimeVerb> {
+        self.verbs.values()
+    }
+
+    pub fn len(&self) -> usize {
+        self.verbs.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.verbs.is_empty()
+    }
+
+    pub fn contains(&self, domain: &str, verb: &str) -> bool {
+        self.get(domain, verb).is_some()
+    }
+
+    // =========================================================================
+    // TEMPLATE METHODS
+    // =========================================================================
+
+    /// Get the template registry
+    pub fn templates(&self) -> &TemplateRegistry {
+        &self.templates
+    }
+
+    /// Get a template by ID
+    pub fn get_template(&self, id: &str) -> Option<&TemplateDefinition> {
+        self.templates.get(id)
+    }
+
+    /// Find templates by tag
+    pub fn find_templates_by_tag(&self, tag: &str) -> Vec<&TemplateDefinition> {
+        self.templates.find_by_tag(tag)
+    }
+
+    /// Find templates that resolve a blocker
+    pub fn find_templates_by_blocker(&self, blocker_type: &str) -> Vec<&TemplateDefinition> {
+        self.templates.find_by_blocker(blocker_type)
+    }
+
+    /// Find templates for a workflow state
+    pub fn find_templates_by_workflow_state(
+        &self,
+        workflow: &str,
+        state: &str,
+    ) -> Vec<&TemplateDefinition> {
+        self.templates.find_by_workflow_state(workflow, state)
+    }
+
+    /// Search templates by text
+    pub fn search_templates(&self, query: &str) -> Vec<&TemplateDefinition> {
+        self.templates.search(query)
+    }
+
+    /// List all templates
+    pub fn list_templates(&self) -> Vec<&TemplateDefinition> {
+        self.templates.list()
+    }
+
+    /// Get template count
+    pub fn template_count(&self) -> usize {
+        self.templates.len()
+    }
+
+    // =========================================================================
+    // DATAFLOW METHODS
+    // =========================================================================
+
+    /// Get what a verb produces (if anything)
+    pub fn get_produces(&self, domain: &str, verb: &str) -> Option<&VerbProduces> {
+        self.get(domain, verb)?.produces.as_ref()
+    }
+
+    /// Get what a verb consumes
+    pub fn get_consumes(&self, domain: &str, verb: &str) -> &[VerbConsumes] {
+        self.get(domain, verb)
+            .map(|v| v.consumes.as_slice())
+            .unwrap_or(&[])
+    }
+
+    /// Get the expected ref_type for an argument (from lookup config)
+    pub fn get_arg_ref_type(&self, domain: &str, verb: &str, arg: &str) -> Option<&str> {
+        self.get(domain, verb)?
+            .args
+            .iter()
+            .find(|a| a.name == arg)?
+            .lookup
+            .as_ref()?
+            .entity_type
+            .as_deref()
+    }
+
+    /// Get the full lookup config for an argument
+    ///
+    /// This provides access to the SearchKeyConfig including discriminators,
+    /// which is needed for disambiguation during resolution.
+    pub fn get_arg_lookup(&self, domain: &str, verb: &str, arg: &str) -> Option<&LookupConfig> {
+        self.get(domain, verb)?
+            .args
+            .iter()
+            .find(|a| a.name == arg)?
+            .lookup
+            .as_ref()
+    }
+
+    /// Get all verbs that can execute given available binding types
+    /// Returns verbs where all required consumes are satisfied
+    pub fn verbs_satisfiable_by<'a>(
+        &'a self,
+        available_types: &'a std::collections::HashSet<String>,
+    ) -> impl Iterator<Item = &'a RuntimeVerb> {
+        self.verbs.values().filter(move |v| {
+            v.consumes
+                .iter()
+                .all(|c| !c.required || available_types.contains(&c.consumed_type))
+        })
+    }
+
+    /// Get verbs grouped by satisfaction status
+    pub fn verbs_by_satisfaction<'a>(
+        &'a self,
+        available_types: &'a std::collections::HashSet<String>,
+    ) -> (Vec<&'a RuntimeVerb>, Vec<&'a RuntimeVerb>) {
+        let mut satisfied = vec![];
+        let mut unsatisfied = vec![];
+
+        for verb in self.verbs.values() {
+            let all_satisfied = verb
+                .consumes
+                .iter()
+                .all(|c| !c.required || available_types.contains(&c.consumed_type));
+            if all_satisfied {
+                satisfied.push(verb);
+            } else {
+                unsatisfied.push(verb);
+            }
+        }
+
+        (satisfied, unsatisfied)
+    }
+}
+
+fn derive_subject_kinds(domain: &str, config: &VerbConfig) -> Vec<String> {
+    if let Some(ref meta) = config.metadata {
+        if !meta.subject_kinds.is_empty() {
+            return dedupe_subject_kinds(
+                meta.subject_kinds
+                    .iter()
+                    .map(|kind| canonicalize_entity_kind(kind))
+                    .collect(),
+            );
+        }
+    }
+
+    let mut inferred = Vec::new();
+
+    if let Some(ref produces) = config.produces {
+        inferred.push(canonicalize_entity_kind(&produces.produced_type));
+    }
+
+    inferred.extend(
+        config
+            .consumes
+            .iter()
+            .map(|consume| canonicalize_entity_kind(&consume.consumed_type)),
+    );
+
+    inferred.extend(derive_subject_kinds_from_crud(config));
+
+    inferred.extend(
+        config
+            .args
+            .iter()
+            .filter(|arg| arg.required || arg.lookup.is_some())
+            .filter_map(derive_subject_kind_from_arg),
+    );
+
+    if let Some(entity_arg) = config
+        .lifecycle
+        .as_ref()
+        .and_then(|lifecycle| lifecycle.entity_arg.as_deref())
+    {
+        if let Some(arg) = config.args.iter().find(|arg| arg.name == entity_arg) {
+            if let Some(kind) = derive_subject_kind_from_arg(arg) {
+                inferred.push(kind);
+            }
+        }
+    }
+
+    if let Some(meta) = &config.metadata {
+        inferred.extend(
+            meta.noun
+                .iter()
+                .filter_map(|noun| derive_subject_kind_from_hint(noun)),
+        );
+        inferred.extend(
+            meta.tags
+                .iter()
+                .filter_map(|tag| derive_subject_kind_from_hint(tag)),
+        );
+    }
+
+    let inferred = dedupe_subject_kinds(inferred);
+    if !inferred.is_empty() {
+        return inferred;
+    }
+
+    vec![canonicalize_entity_kind(&domain_to_subject_kind(domain))]
+}
+
+fn dedupe_subject_kinds(mut kinds: Vec<String>) -> Vec<String> {
+    kinds.retain(|kind| !kind.is_empty());
+    kinds.sort();
+    kinds.dedup();
+    kinds
+}
+
+fn derive_subject_kinds_from_crud(config: &VerbConfig) -> Vec<String> {
+    let Some(ref crud) = config.crud else {
+        return Vec::new();
+    };
+
+    [
+        crud.table.as_deref(),
+        crud.base_table.as_deref(),
+        crud.extension_table.as_deref(),
+        crud.junction.as_deref(),
+        crud.primary_table.as_deref(),
+        crud.join_table.as_deref(),
+    ]
+    .into_iter()
+    .flatten()
+    .filter_map(derive_subject_kind_from_hint)
+    .collect()
+}
+
+fn derive_subject_kind_from_arg(arg: &ArgConfig) -> Option<String> {
+    arg.lookup
+        .as_ref()
+        .and_then(|lookup| {
+            lookup
+                .entity_type
+                .as_deref()
+                .filter(|kind| !is_generic_lookup_kind(kind))
+                .map(canonicalize_entity_kind)
+                .or_else(|| derive_subject_kind_from_hint(&lookup.table))
+        })
+        .or_else(|| derive_subject_kind_from_arg_name(&arg.name))
+}
+
+fn derive_subject_kind_from_arg_name(name: &str) -> Option<String> {
+    let normalized = name.trim().to_ascii_lowercase().replace('_', "-");
+    let trimmed = normalized
+        .trim_end_matches("-id")
+        .trim_end_matches("-ref")
+        .trim_end_matches("-uuid");
+    derive_subject_kind_from_hint(trimmed)
+}
+
+fn derive_subject_kind_from_hint(hint: &str) -> Option<String> {
+    let normalized = hint.trim().to_ascii_lowercase().replace('_', "-");
+    let kind = match normalized.as_str() {
+        "cbu" | "cbus" | "client-business-unit" | "client-business-units" | "structure" => "cbu",
+        "entity"
+        | "entities"
+        | "party"
+        | "parties"
+        | "company"
+        | "companies"
+        | "person"
+        | "people"
+        | "legal-entity"
+        | "legal-entities"
+        | "counterparty"
+        | "counterparties"
+        | "investment-manager"
+        | "investment-managers"
+        | "management-company"
+        | "management-companies"
+        | "depositary"
+        | "depositaries" => "entity",
+        "deal" | "deals" => "deal",
+        "contract" | "contracts" | "contract-pack" | "contract-packs" | "agreement" => "contract",
+        "document" | "documents" | "requirement" | "requirements" | "evidence" | "attachments" => {
+            "document"
+        }
+        "trading-profile"
+        | "trading-profiles"
+        | "mandate"
+        | "mandates"
+        | "ssi"
+        | "custody"
+        | "cbu-trading-profiles" => "trading-profile",
+        "billing" | "billings" | "billing-profile" | "billing-profiles" | "invoice"
+        | "invoices" | "fee" | "fees" => "billing-profile",
+        "fund" | "funds" | "sub-fund" | "sub-funds" | "umbrella" | "umbrellas" => "fund",
+        "investor" | "investors" | "holding" | "holdings" | "investor-register" => "investor",
+        "kyc-case"
+        | "kyc"
+        | "case"
+        | "cases"
+        | "tollgate"
+        | "tollgate-evaluations"
+        | "screening"
+        | "screenings" => "kyc-case",
+        "session" | "view" => "session",
+        "workflow" => "workflow",
+        _ => return None,
+    };
+    Some(canonicalize_entity_kind(kind))
+}
+
+fn is_generic_lookup_kind(kind: &str) -> bool {
+    matches!(
+        canonicalize_entity_kind(kind).as_str(),
+        "jurisdiction"
+            | "country"
+            | "currency"
+            | "role"
+            | "status"
+            | "market"
+            | "user"
+            | "team"
+            | "security"
+    )
+}
+
+fn domain_to_subject_kind(domain: &str) -> String {
+    match domain {
+        "cbu" | "cbu-role" | "role" => "cbu".into(),
+        "entity" | "entity-role" | "party" | "ownership" | "legal-entity" => "entity".into(),
+        "kyc" | "kyc-case" | "screening" => "kyc-case".into(),
+        "case" | "tollgate" => "kyc-case".into(),
+        "deal" => "deal".into(),
+        "contract" | "contract-pack" => "contract".into(),
+        "billing" => "billing-profile".into(),
+        "trading-profile" | "custody" | "ssi" | "mandate" => "trading-profile".into(),
+        "fund" => "fund".into(),
+        "investor" | "holding" => "investor".into(),
+        "document" | "requirement" => "document".into(),
+        "session" | "view" => "session".into(),
+        "gleif" | "research" => "entity".into(),
+        "workflow" | "bpmn" => "workflow".into(),
+        _ => domain.into(),
+    }
+}
+
+// =============================================================================
+// GLOBAL REGISTRY ACCESSOR
+// =============================================================================
+
+/// Global runtime registry instance (loaded once from YAML)
+static RUNTIME_REGISTRY: OnceLock<RuntimeVerbRegistry> = OnceLock::new();
+
+/// Get or initialize the global runtime verb registry
+///
+/// Loads from config/verbs/*.yaml and config/verbs/templates/**/*.yaml on first access.
+/// Returns an empty registry if loading fails (with warning logged).
+pub fn runtime_registry() -> &'static RuntimeVerbRegistry {
+    RUNTIME_REGISTRY.get_or_init(|| {
+        use dsl_core::config::ConfigLoader;
+
+        let loader = ConfigLoader::from_env();
+        match loader.load_verbs() {
+            Ok(config) => {
+                // Load templates from config/verbs/templates/
+                let templates_dir = loader.config_dir().join("templates");
+                let registry =
+                    RuntimeVerbRegistry::from_config_and_templates_dir(&config, &templates_dir);
+                info!(
+                    "Loaded runtime registry: {} verbs across {} domains, {} templates",
+                    registry.len(),
+                    registry.domains().len(),
+                    registry.template_count()
+                );
+                registry
+            }
+            Err(e) => {
+                warn!("Failed to load verbs.yaml, using empty registry: {}", e);
+                RuntimeVerbRegistry {
+                    verbs: HashMap::new(),
+                    by_domain: HashMap::new(),
+                    domains: vec![],
+                    templates: TemplateRegistry::new(),
+                }
+            }
+        }
+    })
+}
+
+/// Global Arc-wrapped registry for use with PlanningInput
+static RUNTIME_REGISTRY_ARC: OnceLock<Arc<RuntimeVerbRegistry>> = OnceLock::new();
+
+/// Get an Arc-wrapped runtime verb registry for use with PlanningInput
+///
+/// This loads a fresh registry (not sharing the static reference) wrapped in Arc.
+/// Use this when you need `Arc<RuntimeVerbRegistry>` for planning operations.
+pub fn runtime_registry_arc() -> Arc<RuntimeVerbRegistry> {
+    RUNTIME_REGISTRY_ARC
+        .get_or_init(|| {
+            use dsl_core::config::ConfigLoader;
+
+            let loader = ConfigLoader::from_env();
+            match loader.load_verbs() {
+                Ok(config) => {
+                    let templates_dir = loader.config_dir().join("templates");
+                    let registry =
+                        RuntimeVerbRegistry::from_config_and_templates_dir(&config, &templates_dir);
+                    info!(
+                        "Loaded Arc runtime registry: {} verbs, {} templates",
+                        registry.len(),
+                        registry.template_count()
+                    );
+                    Arc::new(registry)
+                }
+                Err(e) => {
+                    warn!(
+                        "Failed to load verbs.yaml for Arc registry, using empty: {}",
+                        e
+                    );
+                    Arc::new(RuntimeVerbRegistry {
+                        verbs: HashMap::new(),
+                        by_domain: HashMap::new(),
+                        domains: vec![],
+                        templates: TemplateRegistry::new(),
+                    })
+                }
+            }
+        })
+        .clone()
+}
+
+// =============================================================================
+// TESTS
+// =============================================================================
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn create_test_config() -> VerbsConfig {
+        let mut domains = HashMap::new();
+
+        let mut cbu_verbs = HashMap::new();
+        cbu_verbs.insert(
+            "create".to_string(),
+            VerbConfig {
+                description: "Create a CBU".to_string(),
+                behavior: VerbBehavior::Crud,
+                produces: None,
+                consumes: vec![],
+                lifecycle: None,
+                graph_query: None,
+                durable: None,
+                handler: None,
+                crud: Some(CrudConfig {
+                    operation: CrudOperation::Insert,
+                    table: Some("cbus".to_string()),
+                    schema: Some("ob-poc".to_string()),
+                    key: None,
+                    returning: Some("cbu_id".to_string()),
+                    conflict_keys: None,
+                    conflict_constraint: None,
+                    junction: None,
+                    from_col: None,
+                    to_col: None,
+                    role_table: None,
+                    role_col: None,
+                    fk_col: None,
+                    filter_col: None,
+                    primary_table: None,
+                    join_table: None,
+                    join_col: None,
+                    base_table: None,
+                    extension_table: None,
+                    order_by: None,
+                    set_values: None,
+                    extension_table_column: None,
+                    type_id_column: None,
+                    type_code: None,
+                }),
+                args: vec![ArgConfig {
+                    name: "name".to_string(),
+                    arg_type: ArgType::String,
+                    required: true,
+                    maps_to: Some("name".to_string()),
+                    lookup: None,
+                    valid_values: None,
+                    default: None,
+                    description: None,
+                    validation: None,
+                    fuzzy_check: None,
+                    slot_type: None,
+                    preferred_roles: vec![],
+                }],
+                returns: Some(ReturnsConfig {
+                    return_type: ReturnTypeConfig::Uuid,
+                    name: Some("cbu_id".to_string()),
+                    capture: Some(true),
+                }),
+                metadata: None,
+                invocation_phrases: vec![],
+                policy: None,
+                sentences: None,
+                confirm_policy: None,
+                outputs: vec![],
+                three_axis: None,
+                transition_args: None,
+                ..Default::default()
+            },
+        );
+
+        domains.insert(
+            "cbu".to_string(),
+            DomainConfig {
+                description: "CBU operations".to_string(),
+                verbs: cbu_verbs,
+                dynamic_verbs: vec![],
+                invocation_hints: vec![],
+            },
+        );
+
+        VerbsConfig {
+            version: "1.0".to_string(),
+            domains,
+        }
+    }
+
+    #[test]
+    fn test_build_registry() {
+        let config = create_test_config();
+        let registry = RuntimeVerbRegistry::from_config(&config);
+
+        assert_eq!(registry.len(), 1);
+        assert!(registry.contains("cbu", "create"));
+        assert_eq!(
+            registry
+                .get("cbu", "create")
+                .expect("runtime verb")
+                .subject_kinds,
+            vec!["cbu".to_string()]
+        );
+    }
+
+    #[test]
+    fn test_get_verb() {
+        let config = create_test_config();
+        let registry = RuntimeVerbRegistry::from_config(&config);
+
+        let verb = registry.get("cbu", "create").unwrap();
+        assert_eq!(verb.domain, "cbu");
+        assert_eq!(verb.verb, "create");
+        assert_eq!(verb.description, "Create a CBU");
+    }
+
+    #[test]
+    fn test_domains() {
+        let config = create_test_config();
+        let registry = RuntimeVerbRegistry::from_config(&config);
+
+        let domains = registry.domains();
+        assert!(domains.contains(&"cbu".to_string()));
+    }
+
+    #[test]
+    fn test_subject_kind_hint_maps_case_and_party_surfaces() {
+        assert_eq!(
+            derive_subject_kind_from_hint("party"),
+            Some("entity".to_string())
+        );
+        assert_eq!(
+            derive_subject_kind_from_hint("tollgate_evaluations"),
+            Some("kyc-case".to_string())
+        );
+        assert_eq!(domain_to_subject_kind("party"), "entity");
+        assert_eq!(domain_to_subject_kind("case"), "kyc-case");
+    }
+
+    #[test]
+    fn test_transform_name() {
+        assert_eq!(
+            RuntimeVerbRegistry::transform_name("PROPER_PERSON", Some("kebab_case")),
+            "proper-person"
+        );
+        assert_eq!(
+            RuntimeVerbRegistry::transform_name("proper-person", Some("snake_case")),
+            "proper_person"
+        );
+        assert_eq!(
+            RuntimeVerbRegistry::transform_name("unchanged", None),
+            "unchanged"
+        );
+    }
+
+    #[test]
+    fn test_load_templates_from_directory() {
+        use std::path::Path;
+
+        // Load from actual config directory
+        let templates_dir = Path::new(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/config/verbs/templates"
+        ));
+
+        if templates_dir.exists() {
+            let config = create_test_config();
+            let registry =
+                RuntimeVerbRegistry::from_config_and_templates_dir(&config, templates_dir);
+
+            // Should have loaded templates
+            assert!(
+                registry.template_count() > 0,
+                "Should have loaded templates"
+            );
+
+            // Check specific templates exist
+            assert!(
+                registry.get_template("onboard-director").is_some(),
+                "Should have onboard-director template"
+            );
+            assert!(
+                registry.get_template("create-kyc-case").is_some(),
+                "Should have create-kyc-case template"
+            );
+
+            // Check template search works
+            let director_templates = registry.find_templates_by_tag("director");
+            assert!(
+                !director_templates.is_empty(),
+                "Should find templates by tag"
+            );
+
+            // Check primary_entity
+            let template = registry.get_template("onboard-director").unwrap();
+            assert!(
+                template.primary_entity.is_some(),
+                "Template should have primary_entity"
+            );
+            assert!(
+                template.is_cbu_scoped(),
+                "onboard-director should be CBU scoped"
+            );
+
+            println!("Loaded {} templates", registry.template_count());
+            for t in registry.list_templates() {
+                println!("  - {} ({})", t.template, t.metadata.summary);
+            }
+        }
+    }
+
+    // =========================================================================
+    // Durable behavior mapping (B4.2)
+    // =========================================================================
+
+    #[test]
+    fn test_durable_verb_maps_to_runtime_durable() {
+        use dsl_core::config::types::{DurableConfig, DurableRuntime};
+        use std::collections::BTreeMap;
+
+        let mut domains = HashMap::new();
+        let mut kyc_verbs = HashMap::new();
+
+        let mut task_bindings = BTreeMap::new();
+        task_bindings.insert(
+            "create_case_record".to_string(),
+            "kyc-case.create".to_string(),
+        );
+
+        kyc_verbs.insert(
+            "open-case".to_string(),
+            VerbConfig {
+                description: "Open KYC case via BPMN".to_string(),
+                behavior: VerbBehavior::Durable,
+                produces: None,
+                consumes: vec![],
+                lifecycle: None,
+                graph_query: None,
+                durable: Some(DurableConfig {
+                    runtime: DurableRuntime::BpmnLite,
+                    process_key: "kyc-open-case".to_string(),
+                    correlation_field: "case_id".to_string(),
+                    task_bindings,
+                    timeout: Some("P90D".to_string()),
+                    escalation: None,
+                }),
+                handler: None,
+                crud: None,
+                args: vec![ArgConfig {
+                    name: "cbu-id".to_string(),
+                    arg_type: ArgType::Uuid,
+                    required: true,
+                    maps_to: None,
+                    lookup: None,
+                    valid_values: None,
+                    default: None,
+                    description: None,
+                    validation: None,
+                    fuzzy_check: None,
+                    slot_type: None,
+                    preferred_roles: vec![],
+                }],
+                returns: Some(ReturnsConfig {
+                    return_type: ReturnTypeConfig::Uuid,
+                    name: Some("case_id".to_string()),
+                    capture: Some(true),
+                }),
+                metadata: None,
+                invocation_phrases: vec![],
+                policy: None,
+                sentences: None,
+                confirm_policy: None,
+                outputs: vec![],
+                three_axis: None,
+                transition_args: None,
+                ..Default::default()
+            },
+        );
+
+        domains.insert(
+            "kyc".to_string(),
+            DomainConfig {
+                description: "KYC operations".to_string(),
+                verbs: kyc_verbs,
+                dynamic_verbs: vec![],
+                invocation_hints: vec![],
+            },
+        );
+
+        let config = VerbsConfig {
+            version: "1.0".to_string(),
+            domains,
+        };
+
+        let registry = RuntimeVerbRegistry::from_config(&config);
+
+        // Verify verb exists
+        assert!(registry.contains("kyc", "open-case"));
+
+        let verb = registry.get("kyc", "open-case").unwrap();
+        assert_eq!(verb.full_name, "kyc.open-case");
+
+        // Verify behavior is Durable
+        match &verb.behavior {
+            RuntimeBehavior::Durable(durable_cfg) => {
+                assert_eq!(durable_cfg.process_key, "kyc-open-case");
+                assert_eq!(durable_cfg.correlation_field, "case_id");
+                assert_eq!(durable_cfg.timeout.as_deref(), Some("P90D"));
+                assert_eq!(durable_cfg.task_bindings.len(), 1);
+                assert_eq!(
+                    durable_cfg.task_bindings.get("create_case_record").unwrap(),
+                    "kyc-case.create"
+                );
+            }
+            other => panic!(
+                "Expected RuntimeBehavior::Durable, got {:?}",
+                std::mem::discriminant(other)
+            ),
+        }
+    }
+}

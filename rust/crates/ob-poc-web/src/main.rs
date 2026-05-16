@@ -162,6 +162,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     tracing::info!("Starting OB-POC Hybrid Web Server");
 
+    // Phase 3D of capability-crate restructure (2026-05-13): register
+    // the boundary-side pack provider hooks so `acp_dag_semantic` and
+    // `acp_registry_projection` can resolve pack manifests without
+    // depending on `ob-poc-journey` at the crate level. Idempotent —
+    // OnceLock-backed; subsequent calls in the same process are no-ops.
+    ob_poc::journey::providers::register_pack_providers();
+    tracing::info!("Pack-projection + pack-manifest providers registered");
+
     // =========================================================================
     // P.1.g — DB-free catalogue-load gate (v1.1 P3 / DoD item 7)
     //
@@ -395,13 +403,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Currently we LOG the resolved source + opportunistically seed the
     // DB table; full Stage 4 swap-out (replace all `load_verbs()` with
     // DB load) is a separate refactor.
-    let catalogue_source = dsl_runtime::catalogue_loader::CatalogueSource::from_env();
+    let catalogue_source = dsl_analysis::catalogue_loader::CatalogueSource::from_env();
     tracing::info!(
         "Catalogue source: {:?} (Tranche 3 Phase 3.F Stage {})",
         catalogue_source,
         match catalogue_source {
-            dsl_runtime::catalogue_loader::CatalogueSource::Yaml => "1/2 (YAML primary)",
-            dsl_runtime::catalogue_loader::CatalogueSource::Db => "3/4 (DB primary)",
+            dsl_analysis::catalogue_loader::CatalogueSource::Yaml => "1/2 (YAML primary)",
+            dsl_analysis::catalogue_loader::CatalogueSource::Db => "3/4 (DB primary)",
         }
     );
 
@@ -413,12 +421,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             // YAML removed).
             if matches!(
                 catalogue_source,
-                dsl_runtime::catalogue_loader::CatalogueSource::Db
+                dsl_analysis::catalogue_loader::CatalogueSource::Db
             ) {
                 let seed_pool = pool.clone();
                 let seed_cfg = verbs_config.clone();
                 tokio::spawn(async move {
-                    match dsl_runtime::catalogue_loader::seed_committed_verbs_from_yaml(
+                    match dsl_analysis::catalogue_loader::seed_committed_verbs_from_yaml(
                         &seed_pool, &seed_cfg,
                     )
                     .await
@@ -665,10 +673,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // =========================================================================
     // Shared CoreService — built once at startup, reused by MCP tool handlers.
     // Only available in inprocess mode.
-    let sem_os_core_service: Option<Arc<dyn sem_os_core::service::CoreService>> = {
+    let sem_os_core_service: Option<Arc<dyn sem_os_policy::service::CoreService>> = {
         let mode = std::env::var("SEM_OS_MODE").unwrap_or_else(|_| "inprocess".to_string());
         if mode == "inprocess" {
-            use sem_os_core::service::CoreServiceImpl;
+            use sem_os_policy::service::CoreServiceImpl;
             use sem_os_postgres::PgStores;
 
             let stores = PgStores::new(pool.clone());
@@ -684,7 +692,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             .with_authoring(Arc::new(stores.authoring))
             .with_scratch_runner(Arc::new(stores.scratch_runner))
             .with_cleanup(Arc::new(stores.cleanup));
-            Some(Arc::new(core_service) as Arc<dyn sem_os_core::service::CoreService>)
+            Some(Arc::new(core_service) as Arc<dyn sem_os_policy::service::CoreService>)
         } else {
             None
         }
@@ -1220,11 +1228,22 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         // Create RunbookStore — shared store for compiled runbook artifacts.
         // INV-3: all execution must go through execute_runbook(CompiledRunbookId).
         let runbook_store = Arc::new(ob_poc::runbook::RunbookStore::new());
+        let session_repository = Arc::new(
+            ob_poc::repl::session_repository::SessionRepositoryV2::new(pool.clone()),
+        );
+
+        // R8 §13.1 (2026-05-11): read ACP session-input draft mode from env
+        // once at orchestrator construction. Replaces the per-request env
+        // read previously in `agent_routes::acp_session_input_draft_mode()`.
+        let acp_draft_mode =
+            ob_poc::acp_session_input_draft_mode::AcpSessionInputDraftMode::from_env();
 
         let mut orchestrator = ReplOrchestratorV2::new(pack_router, legacy_executor)
             .with_pool(pool.clone())
+            .with_session_repository(session_repository)
             .with_runbook_store(runbook_store)
-            .with_orchestrated_verbs(orchestrated_verbs);
+            .with_orchestrated_verbs(orchestrated_verbs)
+            .with_acp_draft_mode(acp_draft_mode);
 
         // v1.2 Tranche 1 T1.F (DoD item 13): wire GatePipeline default-on
         // in production. The runtime gate (GateChecker for Mode A blocking,

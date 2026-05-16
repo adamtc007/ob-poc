@@ -157,6 +157,7 @@ fn apply_trace_op(
         | TraceOp::AcpContextAssembled { .. }
         | TraceOp::AcpProjectionServed { .. }
         | TraceOp::WorkbookDryRunValidated { .. }
+        | TraceOp::AcpLanguageLoopTraced { .. }
         | TraceOp::ApprovalTokenIssued { .. }
         | TraceOp::RestrictedMutationPreflightPrepared { .. }
         | TraceOp::LlmInferenceTraced { .. } => {

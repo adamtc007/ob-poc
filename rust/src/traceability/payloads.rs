@@ -480,8 +480,8 @@ fn phase2_constellation_blocks(
 
 #[cfg(feature = "database")]
 fn blocked_verb_for_signal(
-    surface: &sem_os_core::context_resolution::GroundedActionSurface,
-    signal: &sem_os_core::context_resolution::GroundedConstraintSignal,
+    surface: &sem_os_policy::context_resolution::GroundedActionSurface,
+    signal: &sem_os_policy::context_resolution::GroundedConstraintSignal,
 ) -> serde_json::Value {
     surface
         .blocked_actions
@@ -498,7 +498,7 @@ fn blocked_verb_for_signal(
 
 #[cfg(feature = "database")]
 fn constellation_block_resolution_hint(
-    signal: &sem_os_core::context_resolution::GroundedConstraintSignal,
+    signal: &sem_os_policy::context_resolution::GroundedConstraintSignal,
 ) -> String {
     match (
         &signal.related_slot,
@@ -956,7 +956,7 @@ fn token_confidence(token: &str) -> f64 {
 mod tests {
     use super::build_phase2_trace_payload;
     use crate::agent::sem_os_context_envelope::SemOsContextEnvelope;
-    use sem_os_core::context_resolution::{
+    use sem_os_policy::context_resolution::{
         BlockedActionOption, GroundedActionSurface, GroundedConstraintSignal,
         GroundedTraversalEdge, SubjectRef,
     };

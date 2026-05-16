@@ -11,17 +11,17 @@ use std::{
 };
 
 use anyhow::{anyhow, Result};
-use chrono::{DateTime, Utc};
+use chrono::Utc;
 use dsl_core::resolver::{resolve_template, ResolverInputs};
-use sem_os_core::{
+use sem_os_ontology::{
     constellation_map_def::{
         Cardinality, ConstellationMapDefBody, DependencyEntry as CoreDependencyEntry,
         JoinDef as CoreJoinDef, SlotDef as CoreSlotDef, SlotType as CoreSlotType,
         VerbAvailability as CoreVerbAvailability, VerbPaletteEntry as CoreVerbPaletteEntry,
     },
-    grounding::{compute_slot_action_surface, ConstellationModel},
     state_machine_def::{ReducerDef, StateMachineDefBody, TransitionDef},
 };
+use sem_os_policy::grounding::{compute_slot_action_surface, ConstellationModel};
 use uuid::Uuid;
 
 use crate::sem_os_runtime::constellation_runtime::{
@@ -33,64 +33,15 @@ use crate::sem_os_runtime::constellation_runtime::{
 use super::session_context::EntityState;
 
 // ---------------------------------------------------------------------------
-// Types
+// Types — Phase 2.2 (2026-05-13): the DTOs (ValidVerbSet, VerbCandidate,
+// VerbSource) live in `ob_poc_sage::valid_verb_set` so the trait surface
+// in `ob_poc_sage::engine::ValidVerbSetEngine` and consumers in
+// `ob-poc-agent` can reference them without depending on ob-poc. The
+// compute functions below stay here because they reach
+// `sem_os_runtime::constellation_runtime` and other execution-tier deps.
 // ---------------------------------------------------------------------------
 
-/// A verb that is legal in the current session context.
-#[derive(Debug, Clone)]
-pub struct VerbCandidate {
-    pub verb_fqn: String,
-    pub entity_id: Option<Uuid>,
-    pub entity_type: String,
-    pub source: VerbSource,
-    pub priority: u32,
-    pub keywords: Vec<String>,
-}
-
-/// How this verb became part of the valid set.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum VerbSource {
-    /// Outgoing FSM transition from current entity state.
-    FsmTransition,
-    /// Creation verb for an entity that doesn't exist yet.
-    CreationVerb,
-    /// Always available (observation verbs: read, list, show).
-    AlwaysAvailable,
-}
-
-/// The computed set of valid verbs for a session context.
-#[derive(Debug, Clone)]
-pub struct ValidVerbSet {
-    pub verbs: Vec<VerbCandidate>,
-    pub client_group_id: Uuid,
-    pub constellation_id: String,
-    pub computed_at: DateTime<Utc>,
-}
-
-impl ValidVerbSet {
-    /// Get all verb FQNs in the set.
-    pub fn verb_fqns(&self) -> Vec<&str> {
-        self.verbs.iter().map(|v| v.verb_fqn.as_str()).collect()
-    }
-
-    pub fn is_empty(&self) -> bool {
-        self.verbs.is_empty()
-    }
-
-    pub fn len(&self) -> usize {
-        self.verbs.len()
-    }
-
-    /// Check if a specific verb FQN is in the valid set.
-    pub fn contains_verb(&self, fqn: &str) -> bool {
-        self.verbs.iter().any(|v| v.verb_fqn == fqn)
-    }
-
-    /// Convert to a HashSet for passing to the constrained embedding search.
-    pub fn to_allowed_set(&self) -> HashSet<String> {
-        self.verbs.iter().map(|v| v.verb_fqn.clone()).collect()
-    }
-}
+pub use ob_poc_sage::valid_verb_set::{ValidVerbSet, VerbCandidate, VerbSource};
 
 static VERB_KEYWORDS: OnceLock<HashMap<String, Vec<String>>> = OnceLock::new();
 static RESOLVER_INPUTS: OnceLock<Result<ResolverInputs, String>> = OnceLock::new();
@@ -426,7 +377,7 @@ fn entity_type_for_slot(slot_name: &str, model: &ConstellationModel) -> String {
 
 fn normalize_slot_state(
     current_state: &str,
-    slot: &sem_os_core::grounding::ResolvedSlot,
+    slot: &sem_os_policy::grounding::ResolvedSlot,
 ) -> String {
     let normalized = current_state.to_lowercase();
     if slot.def.state_machine.is_none() {
@@ -867,6 +818,35 @@ fn to_core_slot(slot: RuntimeSlotDef) -> CoreSlotDef {
         justification_required: None,
         audit_class: None,
         completeness_assertion: None,
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Engine impl — Phase 2.3 (2026-05-13)
+// ---------------------------------------------------------------------------
+
+/// Default `ValidVerbSetEngine` impl: loads the constellation stack via
+/// `load_constellation_stack_for_workspace` and computes the verb set
+/// via `compute_valid_verb_set_for_constellations`. Lives in ob-poc
+/// because the underlying functions reach `dsl_core::resolver` +
+/// `sem_os_core::constellation_map_def` + the constellation runtime.
+/// The agent integrator wires this impl into the Sage ACP runtime at
+/// startup.
+pub struct DefaultValidVerbSetEngine;
+
+#[async_trait::async_trait]
+impl ob_poc_sage::engine::ValidVerbSetEngine for DefaultValidVerbSetEngine {
+    async fn compute(
+        &self,
+        scope: ob_poc_sage::engine::ValidVerbSetScope<'_>,
+    ) -> Result<ValidVerbSet> {
+        let stack =
+            load_constellation_stack_for_workspace(scope.constellation_id, scope.workspace)?;
+        Ok(compute_valid_verb_set_for_constellations(
+            scope.entity_states,
+            &stack,
+            scope.client_group_id,
+        ))
     }
 }
 

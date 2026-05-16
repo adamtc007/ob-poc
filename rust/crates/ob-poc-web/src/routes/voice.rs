@@ -33,14 +33,14 @@ use ob_semantic_matcher::SemanticMatcher;
 ///
 /// The matcher is lazily initialized on first request since it downloads
 /// the ML model (~22MB) on first use.
-pub struct VoiceMatcherState {
+pub(crate) struct VoiceMatcherState {
     matcher: RwLock<Option<SemanticMatcher>>,
     feedback: FeedbackService,
     pool: sqlx::PgPool,
 }
 
 impl VoiceMatcherState {
-    pub fn new(pool: sqlx::PgPool) -> Self {
+    pub(crate) fn new(pool: sqlx::PgPool) -> Self {
         let feedback = FeedbackService::new(pool.clone());
         Self {
             matcher: RwLock::new(None),
@@ -85,21 +85,21 @@ impl VoiceMatcherState {
 
 /// Request body for voice match endpoint
 #[derive(Debug, Deserialize)]
-pub struct VoiceMatchRequest {
+pub(crate) struct VoiceMatchRequest {
     /// Session ID for feedback tracking
     #[serde(default = "default_session_id")]
-    pub session_id: Uuid,
+    pub(crate) session_id: Uuid,
     /// The voice transcript to match
-    pub transcript: String,
+    pub(crate) transcript: String,
     /// Confidence from speech recognition (0.0-1.0)
     #[serde(default = "default_confidence")]
-    pub confidence: f32,
+    pub(crate) confidence: f32,
     /// Voice provider (e.g., "deepgram", "webspeech") - reserved for future use
     #[serde(default)]
-    pub _provider: Option<String>,
+    pub(crate) _provider: Option<String>,
     /// Current context for disambiguation
     #[serde(default)]
-    pub context: Option<VoiceMatchContext>,
+    pub(crate) context: Option<VoiceMatchContext>,
 }
 
 fn default_confidence() -> f32 {
@@ -112,62 +112,62 @@ fn default_session_id() -> Uuid {
 
 /// Context for better matching
 #[derive(Debug, Deserialize, Default)]
-pub struct VoiceMatchContext {
+pub(crate) struct VoiceMatchContext {
     /// Currently focused entity ID - reserved for future use
-    pub _focused_entity_id: Option<String>,
+    pub(crate) _focused_entity_id: Option<String>,
     /// Current CBU ID
-    pub current_cbu_id: Option<String>,
+    pub(crate) current_cbu_id: Option<String>,
     /// Current view mode
-    pub view_mode: Option<String>,
+    pub(crate) view_mode: Option<String>,
 }
 
 /// Response from voice match endpoint
 #[derive(Debug, Serialize)]
-pub struct VoiceMatchResponse {
+pub(crate) struct VoiceMatchResponse {
     /// Interaction ID for feedback tracking (use with /api/voice/outcome)
-    pub interaction_id: Uuid,
+    pub(crate) interaction_id: Uuid,
     /// Whether a match was found
-    pub matched: bool,
+    pub(crate) matched: bool,
     /// The matched verb name (e.g., "ui.zoom-in", "ubo.list-owners")
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub verb_name: Option<String>,
+    pub(crate) verb_name: Option<String>,
     /// The pattern that matched (for debugging)
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub pattern_phrase: Option<String>,
+    pub(crate) pattern_phrase: Option<String>,
     /// Similarity score (0.0-1.0)
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub similarity: Option<f32>,
+    pub(crate) similarity: Option<f32>,
     /// How the match was made (exact, semantic, phonetic, cached)
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub match_method: Option<String>,
+    pub(crate) match_method: Option<String>,
     /// Category (navigation, investigation)
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub category: Option<String>,
+    pub(crate) category: Option<String>,
     /// Whether this verb requires agent processing
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub is_agent_bound: Option<bool>,
+    pub(crate) is_agent_bound: Option<bool>,
     /// Suggested action for the UI
-    pub action: VoiceMatchAction,
+    pub(crate) action: VoiceMatchAction,
     /// Alternative matches (for selection feedback)
     #[serde(skip_serializing_if = "Vec::is_empty")]
-    pub alternatives: Vec<AlternativeMatch>,
+    pub(crate) alternatives: Vec<AlternativeMatch>,
     /// Error message if matching failed
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub error: Option<String>,
+    pub(crate) error: Option<String>,
 }
 
 /// Alternative match for user selection
 #[derive(Debug, Serialize)]
-pub struct AlternativeMatch {
-    pub verb_name: String,
-    pub pattern_phrase: String,
-    pub similarity: f32,
+pub(crate) struct AlternativeMatch {
+    pub(crate) verb_name: String,
+    pub(crate) pattern_phrase: String,
+    pub(crate) similarity: f32,
 }
 
 /// Suggested action for the UI based on match result
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "snake_case")]
-pub enum VoiceMatchAction {
+pub(crate) enum VoiceMatchAction {
     /// Execute navigation command locally
     ExecuteNavigation,
     /// Send to agent for processing
@@ -184,7 +184,7 @@ pub enum VoiceMatchAction {
 ///
 /// Captures feedback for ML learning. Returns `interaction_id` that should be
 /// passed to `/api/voice/outcome` when the user takes action.
-pub async fn match_voice_command(
+pub(crate) async fn match_voice_command(
     State(state): State<Arc<VoiceMatcherState>>,
     Json(request): Json<VoiceMatchRequest>,
 ) -> impl IntoResponse {
@@ -342,16 +342,16 @@ pub async fn match_voice_command(
 ///
 /// POST /api/voice/match/batch
 #[derive(Debug, Deserialize)]
-pub struct BatchMatchRequest {
-    pub transcripts: Vec<String>,
+pub(crate) struct BatchMatchRequest {
+    pub(crate) transcripts: Vec<String>,
 }
 
 #[derive(Debug, Serialize)]
-pub struct BatchMatchResponse {
-    pub results: Vec<VoiceMatchResponse>,
+pub(crate) struct BatchMatchResponse {
+    pub(crate) results: Vec<VoiceMatchResponse>,
 }
 
-pub async fn batch_match_voice_commands(
+pub(crate) async fn batch_match_voice_commands(
     State(state): State<Arc<VoiceMatcherState>>,
     Json(request): Json<BatchMatchRequest>,
 ) -> impl IntoResponse {
@@ -453,28 +453,28 @@ pub async fn batch_match_voice_commands(
 
 /// Request to record outcome of a voice match
 #[derive(Debug, Deserialize)]
-pub struct VoiceOutcomeRequest {
+pub(crate) struct VoiceOutcomeRequest {
     /// The interaction_id from the match response
-    pub interaction_id: Uuid,
+    pub(crate) interaction_id: Uuid,
     /// What the user did
-    pub outcome: String,
+    pub(crate) outcome: String,
     /// If user selected alternative or corrected, which verb
     #[serde(default)]
-    pub outcome_verb: Option<String>,
+    pub(crate) outcome_verb: Option<String>,
     /// If user corrected by rephrasing, the correction text
     #[serde(default)]
-    pub correction_input: Option<String>,
+    pub(crate) correction_input: Option<String>,
     /// Time from match to outcome in milliseconds
     #[serde(default)]
-    pub time_to_outcome_ms: Option<i32>,
+    pub(crate) time_to_outcome_ms: Option<i32>,
 }
 
 /// Response from outcome recording
 #[derive(Debug, Serialize)]
-pub struct VoiceOutcomeResponse {
-    pub success: bool,
+pub(crate) struct VoiceOutcomeResponse {
+    pub(crate) success: bool,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub error: Option<String>,
+    pub(crate) error: Option<String>,
 }
 
 /// Record the outcome of a voice match
@@ -483,7 +483,7 @@ pub struct VoiceOutcomeResponse {
 ///
 /// Call this after the user takes action on a voice match to complete the
 /// feedback loop for ML learning.
-pub async fn record_voice_outcome(
+pub(crate) async fn record_voice_outcome(
     State(state): State<Arc<VoiceMatcherState>>,
     Json(request): Json<VoiceOutcomeRequest>,
 ) -> impl IntoResponse {
@@ -539,7 +539,7 @@ pub async fn record_voice_outcome(
 /// Health check for voice matching service
 ///
 /// GET /api/voice/health
-pub async fn voice_health(State(state): State<Arc<VoiceMatcherState>>) -> impl IntoResponse {
+pub(crate) async fn voice_health(State(state): State<Arc<VoiceMatcherState>>) -> impl IntoResponse {
     #[derive(Serialize)]
     struct HealthResponse {
         status: String,
@@ -565,7 +565,7 @@ pub async fn voice_health(State(state): State<Arc<VoiceMatcherState>>) -> impl I
 /// - `POST /api/voice/outcome` - Record outcome for ML learning
 /// - `POST /api/voice/match/batch` - Batch match multiple transcripts
 /// - `GET /api/voice/health` - Health check
-pub fn create_voice_router(pool: sqlx::PgPool) -> axum::Router<()> {
+pub(crate) fn create_voice_router(pool: sqlx::PgPool) -> axum::Router<()> {
     use axum::routing::{get, post};
 
     let state = Arc::new(VoiceMatcherState::new(pool));

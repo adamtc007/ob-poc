@@ -1,7 +1,5 @@
 //! Go-to-definition and find-references handler.
 
-#![allow(dead_code)] // Public API - functions may be used by LSP server
-
 use tower_lsp::lsp_types::*;
 
 use crate::analysis::{DocumentState, SymbolTable};
@@ -10,7 +8,7 @@ use crate::analysis::{DocumentState, SymbolTable};
 ///
 /// The `uri` parameter is the document URI, passed by the caller
 /// so we can build proper Location objects.
-pub fn get_definition(
+pub(crate) fn get_definition(
     doc: &DocumentState,
     position: Position,
     symbols: &SymbolTable,
@@ -22,7 +20,7 @@ pub fn get_definition(
     let word = find_word_at_position(line, col)?;
 
     // Check if it's a symbol reference
-    if let Some(symbol_name) = word.strip_prefix('@') {
+    if let Some(symbol_name) = strip_symbol_marker(&word) {
         // Look up in symbol table (cross-document)
         if let Some(info) = symbols.get(symbol_name) {
             return Some(GotoDefinitionResponse::Scalar(info.definition.clone()));
@@ -42,7 +40,7 @@ pub fn get_definition(
 }
 
 /// Get definition with proper URI (called from server with document URI).
-pub fn get_definition_with_uri(
+pub(crate) fn get_definition_with_uri(
     doc: &DocumentState,
     position: Position,
     symbols: &SymbolTable,
@@ -55,7 +53,7 @@ pub fn get_definition_with_uri(
     let word = find_word_at_position(line, col)?;
 
     // Check if it's a symbol reference
-    if let Some(symbol_name) = word.strip_prefix('@') {
+    if let Some(symbol_name) = strip_symbol_marker(&word) {
         // Look up in symbol table (cross-document)
         if let Some(info) = symbols.get(symbol_name) {
             return Some(GotoDefinitionResponse::Scalar(info.definition.clone()));
@@ -74,7 +72,7 @@ pub fn get_definition_with_uri(
 }
 
 /// Get all references to symbol at position.
-pub fn get_references(
+pub(crate) fn get_references(
     doc: &DocumentState,
     position: Position,
     symbols: &SymbolTable,
@@ -86,7 +84,7 @@ pub fn get_references(
     let word = find_word_at_position(line, col)?;
 
     // Check if it's a symbol reference or definition
-    let symbol_name = word.strip_prefix('@')?;
+    let symbol_name = strip_symbol_marker(&word)?;
 
     // Look up in symbol table (cross-document)
     if let Some(info) = symbols.get(symbol_name) {
@@ -99,7 +97,7 @@ pub fn get_references(
 }
 
 /// Get all references with proper URI for document-local fallback.
-pub fn get_references_with_uri(
+pub(crate) fn get_references_with_uri(
     doc: &DocumentState,
     position: Position,
     symbols: &SymbolTable,
@@ -112,7 +110,7 @@ pub fn get_references_with_uri(
     let word = find_word_at_position(line, col)?;
 
     // Check if it's a symbol reference or definition
-    let symbol_name = word.strip_prefix('@')?;
+    let symbol_name = strip_symbol_marker(&word)?;
 
     // Look up in symbol table (cross-document)
     if let Some(info) = symbols.get(symbol_name) {
@@ -184,6 +182,10 @@ fn find_word_at_position(line: &str, col: usize) -> Option<String> {
 }
 
 /// Check if a character is part of a word.
+fn strip_symbol_marker(word: &str) -> Option<&str> {
+    word.strip_prefix('@').or_else(|| word.strip_prefix('$'))
+}
+
 fn is_word_char(c: char) -> bool {
-    c.is_alphanumeric() || c == '-' || c == '_' || c == '.' || c == ':' || c == '@'
+    c.is_alphanumeric() || c == '-' || c == '_' || c == '.' || c == ':' || c == '@' || c == '$'
 }

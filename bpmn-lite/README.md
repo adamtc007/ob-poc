@@ -2,6 +2,11 @@
 
 Standalone BPMN runtime and gRPC service.
 
+## Runtime Contract
+
+- [Runtime invariants](docs/runtime-invariants.md)
+- [Executable BPMN subset](docs/bpmn-subset.md)
+
 ## Boundary
 
 - BPMN-lite owns its own database schema and migrations.

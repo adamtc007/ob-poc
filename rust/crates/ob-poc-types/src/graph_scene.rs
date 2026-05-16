@@ -16,7 +16,7 @@ use crate::galaxy::ViewLevel;
 /// The render scene — server-prepared projection of a constellation.
 ///
 /// Every field is derivable from `HydratedConstellation` + `HydratedSlot`.
-/// The projection function lives in `sem_os_core::observatory::graph_scene_projection`.
+/// The projection function lives in `sem_os_policy::observatory::graph_scene_projection`.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct GraphSceneModel {
     /// Scene generation counter — incremented on each server update.

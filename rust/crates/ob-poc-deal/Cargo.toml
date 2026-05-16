@@ -1,0 +1,20 @@
+[package]
+name = "ob-poc-deal"
+version = "0.1.0"
+edition = "2021"
+description = "Deal taxonomy reference data. Deal, Product, ProductLine, RateCard, RateCardLine, Participant, Contract, OnboardingRequest, FeeMatrixLine, DealViewMode — the shapes for the deal/fee-billing capability."
+
+# Capability discipline (see docs/todo/ob-poc-domain-split-v1.md):
+#   IN-SCOPE  : Deal taxonomy DTOs (chrono/rust_decimal/serde/uuid).
+#   OUT-OF-SCOPE: Deal repository / negotiation workflow / billing run logic.
+
+[dependencies]
+anyhow = "1"
+chrono = { version = "0.4", features = ["serde"] }
+rust_decimal = { version = "1", features = ["serde"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+uuid = { version = "1", features = ["v4", "serde"] }
+
+[lints.rust]
+unreachable_pub = "deny"

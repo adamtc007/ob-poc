@@ -6,10 +6,6 @@
 //! `crate::service_resources::*` (engines, orchestrators, SRDEF
 //! registry loader) — multi-consumer modules that have no dsl-runtime
 //! analogue.
-//!
-//! Dispatch table is a verbatim port of the previous
-//! `execute_json` bodies from the relocated
-//! `dsl-runtime::domain_ops::service_pipeline_ops`.
 
 use anyhow::{anyhow, Result};
 use async_trait::async_trait;

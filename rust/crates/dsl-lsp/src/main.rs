@@ -11,10 +11,10 @@ use std::fs::OpenOptions;
 use tower_lsp::{LspService, Server};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
-mod analysis;
+pub mod analysis;
 mod encoding;
 mod entity_client;
-mod handlers;
+pub mod handlers;
 mod server;
 
 use server::DslLanguageServer;

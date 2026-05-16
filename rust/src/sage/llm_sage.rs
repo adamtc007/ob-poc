@@ -14,7 +14,7 @@ use serde::{Deserialize, Serialize};
 use super::context::SageContext;
 use super::deterministic::DeterministicSage;
 use super::outcome::{
-    CoderHandoff, OutcomeAction, OutcomeIntent, OutcomeStep, SageConfidence, SageExplain,
+    DrafterHandoff, OutcomeAction, OutcomeIntent, OutcomeStep, SageConfidence, SageExplain,
     UtteranceHints,
 };
 use super::pre_classify::{pre_classify, SagePreClassification};
@@ -351,7 +351,7 @@ fn parse_sage_response(
         confidence,
         pending_clarifications: vec![],
         explain: build_llm_explain(context, utterance, confidence, pre.polarity, &domain),
-        coder_handoff: build_llm_handoff(utterance, pre.polarity, &domain, &hints),
+        drafter_handoff: build_llm_handoff(utterance, pre.polarity, &domain, &hints),
         hints,
     })
 }
@@ -416,10 +416,10 @@ fn build_llm_handoff(
     polarity: IntentPolarity,
     domain: &str,
     hints: &UtteranceHints,
-) -> CoderHandoff {
+) -> DrafterHandoff {
     let mut hint_terms = hints.explicit_domain_terms.clone();
     hint_terms.extend(hints.explicit_action_terms.iter().cloned());
-    CoderHandoff {
+    DrafterHandoff {
         goal: if matches!(polarity, IntentPolarity::Write) {
             "prepare deterministic mutation proposal".to_string()
         } else {

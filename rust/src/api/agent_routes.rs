@@ -41,7 +41,8 @@ use crate::dsl_v2::syntax::parse_program;
 use crate::dsl_v2::tooling::SemanticValidator;
 use crate::dsl_v2::{expand_templates_simple, BatchPolicy};
 use crate::ontology::SemanticStageRegistry;
-use ob_poc_types::{SessionInputRequest, SessionInputResponse};
+use ob_poc_types::{DslState, SessionInputRequest, SessionInputResponse};
+use std::time::Instant;
 
 use axum::{
     extract::{Path, Query, State},
@@ -144,9 +145,16 @@ async fn session_input(
     _headers: axum::http::HeaderMap,
     Json(req): Json<SessionInputRequest>,
 ) -> Result<Json<SessionInputResponse>, StatusCode> {
-    // Try routing through REPL V2 orchestrator first (unified pipeline).
+    // R8 single-path unification (2026-05-11): `session_input` is now a
+    // single dispatch decision. The ACP DAG semantic resolution previously
+    // racing here (via `try_route_supported_acp_prompt`) now fires inside
+    // `ReplOrchestratorV2::process_with_acp()` as the orchestrator's
+    // first step. ACP-resolved responses surface here as a
+    // `ReplResponseV2` with `prebuilt_chat_response: Some(_)`; the
+    // response adapter short-circuits on that field to preserve the
+    // original wire shape.
     if let Some(ref orchestrator) = state.repl_v2_orchestrator {
-        if let Some(repl_response) = try_route_through_repl(&req, orchestrator, session_id).await {
+        if let Some(repl_response) = dispatch_to_v2_repl(&req, orchestrator, session_id).await {
             // Extract onboarding state from REPL response BEFORE moving it into
             // the chat response adapter (which takes ownership). Reads from the
             // hydrated constellation on session feedback — same DAG the compiler uses.
@@ -192,12 +200,499 @@ async fn session_input(
     Err(StatusCode::NOT_FOUND)
 }
 
-/// Try to route input through the REPL V2 orchestrator.
+/// Dispatch session input through the V2 REPL orchestrator.
 ///
-/// Returns `Some(ReplResponseV2)` if the REPL session exists and is in a gate state
-/// (ScopeGate, WorkspaceSelection, JourneySelection) or any later REPL state.
-/// Returns `None` if no REPL session exists for this ID (legacy agent session).
-async fn try_route_through_repl(
+/// **R5 (2026-05-11):** renamed from `try_route_through_repl` to remove the
+/// misleading "try/fallback" framing. This is the **canonical V2 REPL
+/// ingress for the unified session pipeline** — not a legacy bypass.
+///
+/// Routing order in `session_input`:
+/// 1. `try_route_supported_acp_prompt` — narrow ACP DAG semantic
+///    resolution for Slice 1 pack-bound utterances.
+/// 2. **`dispatch_to_v2_repl`** (this fn) — canonical V2 REPL for
+///    everything else: slash commands, confirmations, decision replies,
+///    generic messages. Drives tollgate state, runbook execution,
+///    narration, and decision-log emission via `orchestrator.process()`.
+/// 3. `404` — no V2 REPL session exists; unrecoverable.
+///
+/// The V2 REPL orchestrator is itself envelope-aware — it loads packs,
+/// verifies SemOS context, and gates DSL emission through its internal
+/// pack resolution. End-to-end envelope-gating proof of `orchestrator
+/// .process()` is tracked as TECH DEBT TD-4.
+///
+/// Returns `Some(ReplResponseV2)` if a V2 REPL session exists; returns
+/// `None` if it doesn't (caller returns 404).
+// R8 single-path unification (2026-05-11, §13.1):
+//   `AcpSessionInputDraftMode` moved to `crate::acp_session_input_draft_mode`
+//   and is now an `ReplOrchestratorV2` field. The env-var read fires once at
+//   orchestrator construction (see `ReplOrchestratorV2::with_acp_draft_mode`
+//   + `AcpSessionInputDraftMode::from_env`). HTTP callers consult the
+//   orchestrator instead of reading env per request.
+use crate::acp_session_input_draft_mode::AcpSessionInputDraftMode;
+
+/// R8 Phase B bundle returned to the orchestrator. Carries the typed
+/// resolution (with `route_metadata` populated) alongside the message
+/// and DSL the chat response needs. Replaces Phase A's `ChatResponse`
+/// pre-built carrier — the orchestrator builds the typed
+/// `ReplResponseV2` from this bundle, and the adapter projects to
+/// `ChatResponse` from typed sources.
+pub(crate) struct AcpResolvedBundle {
+    pub resolution: crate::acp_dag_semantic::AcpDagSemanticResolution,
+    pub message: String,
+    pub dsl: Option<ob_poc_types::DslState>,
+    pub session_feedback: Option<serde_json::Value>,
+}
+
+pub(crate) async fn try_route_supported_acp_prompt(
+    orchestrator: &std::sync::Arc<crate::sequencer::ReplOrchestratorV2>,
+    session_id: Uuid,
+    message: &str,
+) -> Option<AcpResolvedBundle> {
+    try_route_supported_acp_prompt_with_draft_mode(
+        orchestrator,
+        session_id,
+        message,
+        orchestrator.acp_session_input_draft_mode(),
+    )
+    .await
+}
+
+async fn try_route_supported_acp_prompt_with_draft_mode(
+    orchestrator: &std::sync::Arc<crate::sequencer::ReplOrchestratorV2>,
+    session_id: Uuid,
+    message: &str,
+    requested_draft_mode: AcpSessionInputDraftMode,
+) -> Option<AcpResolvedBundle> {
+    let route_started_at = Instant::now();
+    let prompt_text = message.trim();
+    if prompt_text.is_empty() {
+        return None;
+    }
+    let prompt = vec![crate::acp_protocol::AcpContentBlock::Text {
+        text: prompt_text.to_string(),
+    }];
+    let supported_provider_task =
+        crate::acp_state_anchor::acp_prompt_supported_provider_task(&prompt);
+    orchestrator.get_session(session_id).await.as_ref()?;
+
+    let route_state = crate::api::repl_routes_v2::ReplV2RouteState {
+        orchestrator: orchestrator.clone(),
+    };
+    let mut effective_draft_mode = supported_provider_task
+        .filter(|task| requested_draft_mode.can_run_for_task(task))
+        .map(|_| requested_draft_mode)
+        .unwrap_or(AcpSessionInputDraftMode::Deterministic);
+    let mut envelope = match effective_draft_mode {
+        AcpSessionInputDraftMode::Deterministic => {
+            crate::api::repl_routes_v2::process_acp_prompt_deterministic_envelope(
+                &route_state,
+                session_id,
+                prompt,
+                serde_json::json!("session-input-acp"),
+                "acp_session_input_processed",
+            )
+            .await
+        }
+        AcpSessionInputDraftMode::LiveLlm => {
+            let client = ob_agentic::create_llm_client().map_err(|error| error.to_string());
+            match crate::api::repl_routes_v2::process_acp_prompt_llm_envelope(
+                &route_state,
+                session_id,
+                prompt,
+                serde_json::json!("session-input-acp"),
+                "acp_session_input_processed",
+                client,
+            )
+            .await
+            {
+                Ok(envelope) => envelope,
+                Err((status, error)) => {
+                    let provider_task = supported_provider_task.unwrap_or("dag.semantic");
+                    tracing::warn!(
+                        session_id = %session_id,
+                        task = provider_task,
+                        requested_draft_source = requested_draft_mode.as_str(),
+                        status = %status,
+                        error = %error.0.error,
+                        "ACP session input LLM draft failed before structured result; falling back to deterministic ACP"
+                    );
+                    effective_draft_mode = AcpSessionInputDraftMode::Deterministic;
+                    crate::api::repl_routes_v2::process_acp_prompt_deterministic_envelope(
+                        &route_state,
+                        session_id,
+                        vec![crate::acp_protocol::AcpContentBlock::Text {
+                            text: prompt_text.to_string(),
+                        }],
+                        serde_json::json!("session-input-acp"),
+                        "acp_session_input_processed",
+                    )
+                    .await
+                }
+            }
+        }
+    };
+    let task = acp_session_input_task_label(supported_provider_task, &envelope);
+    annotate_acp_session_input_envelope(
+        &mut envelope,
+        &task,
+        requested_draft_mode,
+        effective_draft_mode,
+        route_started_at,
+    );
+    let result = envelope.get("result")?;
+    let result_status = result.get("status").and_then(serde_json::Value::as_str)?;
+    if !matches!(
+        result_status,
+        "dry_run_validated" | "structured_refusal" | "pending_question" | "dag_semantic_proposal"
+    ) {
+        tracing::warn!(
+            session_id = %session_id,
+            task = %task,
+            result_status,
+            "ACP prompt returned non-structured result; falling back to REPL"
+        );
+        return None;
+    }
+
+    emit_acp_session_input_observability(
+        session_id,
+        &task,
+        requested_draft_mode,
+        effective_draft_mode,
+        &envelope,
+        result_status,
+    );
+
+    let assistant_message = acp_agent_message_text(&envelope)
+        .or_else(|| value_string(result, &["traceProjection", "humanSummary"]))
+        .unwrap_or_else(|| {
+            "ACP handled this state-transition request with a structured dry-run-only outcome."
+                .to_string()
+        });
+    let dsl = acp_valid_dag_semantic_draft_dsl(&envelope);
+    if let Err(error) = orchestrator
+        .record_external_chat_exchange(
+            session_id,
+            prompt_text.to_string(),
+            assistant_message.clone(),
+        )
+        .await
+    {
+        tracing::warn!(
+            session_id = %session_id,
+            task = %task,
+            error = %error,
+            "Failed to record ACP chat exchange in REPL session history"
+        );
+    }
+    let session_feedback = orchestrator
+        .session_feedback(session_id)
+        .await
+        .ok()
+        .and_then(|feedback| serde_json::to_value(feedback).ok());
+
+    // R8 Phase B (2026-05-11): parse typed resolution from the envelope
+    // and build typed `AcpRouteMetadata` from the `session_input` block
+    // we just annotated. The orchestrator builds `ReplResponseV2` from
+    // these typed sources; the response adapter projects `acp_trace`
+    // via `acp_chat_trace_summary_typed` instead of carrying the
+    // pre-built ChatResponse.
+    // R8 Phase B.7: the deal language-pack flow produces a result with
+    // status `dry_run_validated` but no `dag_semantic` block — for that
+    // path we synthesize a stub resolution and use `override_status` to
+    // carry the language-pack outcome through the typed chat-trace.
+    let mut resolution = match result.get("dag_semantic").and_then(|v| {
+        serde_json::from_value::<crate::acp_dag_semantic::AcpDagSemanticResolution>(v.clone()).ok()
+    }) {
+        Some(r) => r,
+        None => crate::acp_dag_semantic::AcpDagSemanticResolution {
+            status: crate::acp_dag_semantic::AcpDagSemanticStatus::Matched,
+            utterance: prompt_text.to_string(),
+            selected_dispatch: None,
+            selected_verb: None,
+            selected_domain: None,
+            selected_description: None,
+            pack: None,
+            selected_template: None,
+            top_candidates: Vec::new(),
+            rejected_candidates: Vec::new(),
+            draft_dsl: None,
+            workflow_plan: None,
+            missing_required_args: Vec::new(),
+            unresolved_refs: Vec::new(),
+            read_only: true,
+            mutation_allowed: false,
+            requires_hitl: false,
+            structured_outcome_supported: true,
+            registry_trace: None,
+            envelope_trace: None,
+            runtime_trace: None,
+            diagnostics: Vec::new(),
+            route_metadata: None,
+            state_anchor_provider: None,
+            observability: None,
+            override_status: None,
+        },
+    };
+
+    // Augment runtime_trace with the session-context-aware version that
+    // `attach_session_runtime_trace_to_result` produced under
+    // `dag_semantic.runtime_trace` on the envelope. The resolver itself
+    // produced one without session context (session_id: None); the HTTP
+    // attachment overrides it. Parsing back into typed picks up the
+    // overridden one if it's present in the envelope.
+    //
+    // Read the typed route metadata from the envelope's session_input
+    // block (just annotated by `annotate_acp_session_input_envelope`).
+    let route_latency_us =
+        value_u64(&envelope, &["session_input", "route_latency_us"]).unwrap_or(0);
+    let route_latency_ms =
+        value_u64(&envelope, &["session_input", "route_latency_ms"]).unwrap_or(0);
+    let effective_draft_source =
+        value_string(&envelope, &["session_input", "effective_draft_source"])
+            .unwrap_or_else(|| effective_draft_mode.as_str().to_string());
+    resolution.route_metadata = Some(crate::acp_dag_semantic::AcpRouteMetadata {
+        route: "session_input".to_string(),
+        provider_task: task.clone(),
+        requested_draft_source: requested_draft_mode.as_str().to_string(),
+        effective_draft_source,
+        route_latency_us,
+        route_latency_ms,
+    });
+
+    // R8 Phase B.7 (2026-05-11): parse the typed `state_anchor_provider`
+    // block + observability summary so the chat-trace projection has
+    // them without re-reading the JSON envelope.
+    resolution.state_anchor_provider = envelope
+        .get("state_anchor_provider")
+        .and_then(|v| serde_json::from_value(v.clone()).ok());
+    resolution.observability = Some(crate::acp_dag_semantic::AcpObservabilitySummary {
+        structured_failure_mode: value_string(
+            result,
+            &[
+                "observability",
+                "conversationEfficiency",
+                "structuredFailureMode",
+            ],
+        ),
+        prose_only_failure: value_bool(
+            result,
+            &[
+                "observability",
+                "conversationEfficiency",
+                "proseOnlyFailure",
+            ],
+        ),
+        revision_count: value_u64(
+            result,
+            &[
+                "observability",
+                "conversationEfficiency",
+                "localRevisionCount",
+            ],
+        )
+        .or_else(|| value_u64(result, &["metrics", "revision_count"])),
+        pending_user_turn_required: value_bool(
+            result,
+            &[
+                "observability",
+                "conversationEfficiency",
+                "pendingUserTurnRequired",
+            ],
+        ),
+        estimated_user_repair_turns_avoided: value_u64(
+            result,
+            &[
+                "observability",
+                "conversationEfficiency",
+                "estimatedUserRepairTurnsAvoided",
+            ],
+        ),
+        transition_ref: value_string(result, &["traceProjection", "transitionRef"])
+            .or_else(|| value_string(result, &["output", "dry_run", "transition_ref"])),
+    });
+    if matches!(result_status, "dry_run_validated") {
+        resolution.override_status = Some("dry_run_validated".to_string());
+    }
+
+    Some(AcpResolvedBundle {
+        resolution,
+        message: assistant_message,
+        dsl,
+        session_feedback,
+    })
+}
+
+fn acp_session_input_task_label(
+    supported_provider_task: Option<&'static str>,
+    envelope: &serde_json::Value,
+) -> String {
+    supported_provider_task
+        .map(str::to_string)
+        .or_else(|| value_string(envelope, &["result", "dag_semantic", "selected_verb"]))
+        .or_else(|| {
+            envelope
+                .get("result")
+                .and_then(dag_semantic_candidate_verbs)
+                .and_then(|candidates| candidates.into_iter().next())
+        })
+        .or_else(|| value_string(envelope, &["state_anchor_provider", "task"]))
+        .unwrap_or_else(|| "dag.semantic".to_string())
+}
+
+fn annotate_acp_session_input_envelope(
+    envelope: &mut serde_json::Value,
+    task: &str,
+    requested_draft_mode: AcpSessionInputDraftMode,
+    effective_draft_mode: AcpSessionInputDraftMode,
+    route_started_at: Instant,
+) {
+    let route_latency_us = route_started_at
+        .elapsed()
+        .as_micros()
+        .min(u128::from(u64::MAX)) as u64;
+    let route_latency_ms = route_latency_us.div_ceil(1_000);
+    let effective_draft_source = envelope
+        .get("result")
+        .and_then(|result| value_string(result, &["draft_source"]))
+        .unwrap_or_else(|| effective_draft_mode.as_str().to_string());
+    let session_input = serde_json::json!({
+        "route": "session_input",
+        "provider_task": task,
+        "requested_draft_source": requested_draft_mode.as_str(),
+        "effective_draft_source": effective_draft_source,
+        "route_latency_ms": route_latency_ms,
+        "route_latency_us": route_latency_us,
+        "selected": true,
+        "dry_run_only": true,
+        "no_mutation_authority": true
+    });
+
+    if let Some(object) = envelope.as_object_mut() {
+        object.insert("session_input".to_string(), session_input.clone());
+    }
+    if let Some(result_object) = envelope
+        .get_mut("result")
+        .and_then(serde_json::Value::as_object_mut)
+    {
+        result_object.insert("session_input".to_string(), session_input);
+    }
+}
+
+fn emit_acp_session_input_observability(
+    session_id: Uuid,
+    task: &str,
+    requested_draft_mode: AcpSessionInputDraftMode,
+    effective_draft_mode: AcpSessionInputDraftMode,
+    envelope: &serde_json::Value,
+    result_status: &str,
+) {
+    let result = envelope.get("result").unwrap_or(&serde_json::Value::Null);
+    let metrics = result.get("metrics").unwrap_or(&serde_json::Value::Null);
+    let efficiency = result
+        .pointer("/observability/conversationEfficiency")
+        .unwrap_or(&serde_json::Value::Null);
+    let session_input = envelope
+        .get("session_input")
+        .unwrap_or(&serde_json::Value::Null);
+
+    tracing::info!(
+        session_id = %session_id,
+        provider_task = task,
+        requested_draft_source = requested_draft_mode.as_str(),
+        effective_draft_source = value_string(session_input, &["effective_draft_source"]).as_deref().unwrap_or(effective_draft_mode.as_str()),
+        result_status,
+        invented_verb_count = value_u64(metrics, &["invented_verb_count"]).unwrap_or(0),
+        uuid_binding_complete = value_bool(metrics, &["uuid_binding_complete"]).unwrap_or(false),
+        state_valid_transition_selected = value_bool(metrics, &["state_valid_transition_selected"]).unwrap_or(false),
+        first_pass_valid = value_bool(efficiency, &["firstPassValid"])
+            .or_else(|| value_bool(metrics, &["first_pass_valid"]))
+            .unwrap_or(false),
+        revision_count = value_u64(efficiency, &["localRevisionCount"])
+            .or_else(|| value_u64(metrics, &["revision_count"]))
+            .unwrap_or(0),
+        dry_run_valid = value_bool(efficiency, &["dryRunValid"])
+            .or_else(|| value_bool(metrics, &["dry_run_valid"]))
+            .unwrap_or(false),
+        pending_user_turn_required = value_bool(efficiency, &["pendingUserTurnRequired"]).unwrap_or(false),
+        prose_only_failure = value_bool(efficiency, &["proseOnlyFailure"]).unwrap_or(false),
+        route_latency_us = value_u64(session_input, &["route_latency_us"]).unwrap_or(0),
+        "ACP session input route completed"
+    );
+}
+
+fn acp_agent_message_text(envelope: &serde_json::Value) -> Option<String> {
+    envelope
+        .get("outgoing")
+        .and_then(serde_json::Value::as_array)
+        .and_then(|outgoing| {
+            outgoing.iter().find_map(|item| {
+                let update = item.pointer("/params/update")?;
+                if update
+                    .get("sessionUpdate")
+                    .and_then(serde_json::Value::as_str)
+                    != Some("agent_message_chunk")
+                {
+                    return None;
+                }
+                value_string(update, &["content", "text"])
+            })
+        })
+}
+
+fn acp_valid_dag_semantic_draft_dsl(envelope: &serde_json::Value) -> Option<DslState> {
+    let result = envelope.get("result")?;
+    let first_pass_valid = result
+        .pointer("/traceProjection/firstPassValid")
+        .and_then(serde_json::Value::as_bool)
+        .unwrap_or(false);
+    if !first_pass_valid {
+        return None;
+    }
+    value_string(result, &["dsl"])
+        .or_else(|| value_string(result, &["dag_semantic", "draft_dsl"]))
+        .map(|source| DslState {
+            source: Some(source),
+            ast: None,
+            can_execute: false,
+            bindings: Default::default(),
+        })
+}
+
+fn dag_semantic_candidate_verbs(result: &serde_json::Value) -> Option<Vec<String>> {
+    let candidates = result
+        .pointer("/dag_semantic/top_candidates")?
+        .as_array()?
+        .iter()
+        // R3: candidate field renamed from `verb` to `fqn`. Read both
+        // for safety during the migration window.
+        .filter_map(|candidate| {
+            value_string(candidate, &["fqn"]).or_else(|| value_string(candidate, &["verb"]))
+        })
+        .collect::<Vec<_>>();
+    (!candidates.is_empty()).then_some(candidates)
+}
+
+fn value_at_path<'a>(value: &'a serde_json::Value, path: &[&str]) -> Option<&'a serde_json::Value> {
+    path.iter()
+        .try_fold(value, |current, key| current.get(*key))
+}
+
+fn value_string(value: &serde_json::Value, path: &[&str]) -> Option<String> {
+    value_at_path(value, path)
+        .and_then(serde_json::Value::as_str)
+        .map(str::to_string)
+}
+
+fn value_bool(value: &serde_json::Value, path: &[&str]) -> Option<bool> {
+    value_at_path(value, path).and_then(serde_json::Value::as_bool)
+}
+
+fn value_u64(value: &serde_json::Value, path: &[&str]) -> Option<u64> {
+    value_at_path(value, path).and_then(serde_json::Value::as_u64)
+}
+
+async fn dispatch_to_v2_repl(
     req: &SessionInputRequest,
     orchestrator: &std::sync::Arc<crate::sequencer::ReplOrchestratorV2>,
     session_id: Uuid,
@@ -207,7 +702,7 @@ async fn try_route_through_repl(
     // Check if a REPL V2 session exists for this ID
     let session_exists = orchestrator.get_session(session_id).await.is_some();
     if !session_exists {
-        return None; // No REPL session — fall through to legacy agent pipeline
+        return None; // No V2 REPL session for this id — caller emits 404.
     }
 
     let input = match req {
@@ -288,19 +783,38 @@ async fn try_route_through_repl(
                     content: text.clone(),
                 },
                 ob_poc_types::UserReply::Confirm { .. } => UserInputV2::Confirm,
-                _ => return None, // Narrow/More/Reject — fall through to legacy
+                _ => return None, // Narrow/More/Reject — not a V2 REPL UserInput shape; caller emits 404.
             }
         }
-        _ => return None, // DiscoverySelection / ReplV2 — not handled here
+        SessionInputRequest::ReplV2 { input } => {
+            let input: crate::api::repl_routes_v2::InputRequestV2 =
+                match serde_json::from_value(input.clone()) {
+                    Ok(input) => input,
+                    Err(error) => {
+                        tracing::warn!(
+                            session_id = %session_id,
+                            error = %error,
+                            "Invalid REPL V2 input payload; caller will surface 404."
+                        );
+                        return None;
+                    }
+                };
+            input.into()
+        }
+        _ => return None, // DiscoverySelection is handled by the chat adapter, not the V2 REPL.
     };
 
-    match orchestrator.process(session_id, input).await {
+    // R8 §13.5 (2026-05-11): call `process_with_acp` so the orchestrator
+    // owns the ACP DAG semantic resolution decision as its first step
+    // (Message inputs only; state-independent). On no match it falls
+    // through to the standard `process()`.
+    match orchestrator.process_with_acp(session_id, input).await {
         Ok(response) => Some(response),
         Err(e) => {
             tracing::warn!(
                 session_id = %session_id,
                 error = %e,
-                "REPL V2 orchestrator failed, falling through to legacy pipeline"
+                "V2 REPL orchestrator returned an error; caller will surface 404."
             );
             None
         }
@@ -582,7 +1096,7 @@ async fn get_semos_context(
         .collect();
 
     // 3. Agent mode — default is Governed
-    let agent_mode = sem_os_core::authoring::agent_mode::AgentMode::default().to_string();
+    let agent_mode = sem_os_types::agent_mode::AgentMode::default().to_string();
 
     Ok(Json(SemOsContextResponse {
         registry_stats,
@@ -925,7 +1439,7 @@ fn v2_message_to_wire(
         intents: None,
         dsl: None,
         sage_explain: None,
-        coder_proposal: None,
+        drafter_proposal: None,
         discovery_bootstrap: None,
         parked_entries: None,
     }
@@ -1316,7 +1830,7 @@ async fn execute_session_dsl_raw(
         // already passed SemOS) remains the only execution route.
         let dsl_source = if let Some(ref req) = req {
             if req.dsl.is_some() {
-                let actor = crate::policy::ActorResolver::from_headers(&headers);
+                let actor = crate::api::policy_headers::actor_from_headers(&headers);
                 tracing::warn!(
                     session = %session_id,
                     actor_id = %actor.actor_id,
@@ -2775,7 +3289,7 @@ async fn get_session_verb_surface(
             .cloned()
             .ok_or(StatusCode::NOT_FOUND)?
     };
-    let agent_mode = sem_os_core::authoring::agent_mode::AgentMode::default();
+    let agent_mode = sem_os_types::agent_mode::AgentMode::default();
 
     // Resolve real Sem OS verb set via the same path as the chat pipeline.
     // On failure, fall back to unavailable envelope with FailOpen (this is a
@@ -2949,6 +3463,9 @@ async fn get_enriched_dsl(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::journey::router::PackRouter;
+    use crate::sequencer::{ReplOrchestratorV2, StubExecutor};
+    use std::sync::Arc;
 
     #[test]
     fn test_validate_dsl() {
@@ -2979,6 +3496,9 @@ mod tests {
         let chat_api_path = manifest_dir.join("../ob-poc-ui-react/src/api/chat.ts");
         let source = std::fs::read_to_string(&chat_api_path)
             .unwrap_or_else(|e| panic!("Failed to read {}: {}", chat_api_path.display(), e));
+        let chat_page_path = manifest_dir.join("../ob-poc-ui-react/src/features/chat/ChatPage.tsx");
+        let chat_page_source = std::fs::read_to_string(&chat_page_path)
+            .unwrap_or_else(|e| panic!("Failed to read {}: {}", chat_page_path.display(), e));
 
         assert!(
             source.contains("`/session/${sessionId}/input`"),
@@ -2988,6 +3508,27 @@ mod tests {
             !source.contains("/execute"),
             "chat UI must not call /execute directly"
         );
+        assert!(
+            !chat_page_source.contains("sendAcpPrompt"),
+            "user-facing chat page must not divert /acp commands around /input"
+        );
+        assert!(
+            !chat_page_source.contains("isAcpPromptCommand"),
+            "user-facing chat page must let the backend choose ACP routing"
+        );
+    }
+
+    #[test]
+    fn test_acp_session_input_draft_mode_parsing() {
+        assert_eq!(
+            "deterministic".parse::<AcpSessionInputDraftMode>(),
+            Ok(AcpSessionInputDraftMode::Deterministic)
+        );
+        assert_eq!(
+            "live_llm".parse::<AcpSessionInputDraftMode>(),
+            Ok(AcpSessionInputDraftMode::LiveLlm)
+        );
+        assert!("random".parse::<AcpSessionInputDraftMode>().is_err());
     }
 
     #[test]
@@ -3004,6 +3545,213 @@ mod tests {
         assert!(
             !source.contains("SEMTAXONOMY_ENABLED"),
             "routes should not branch on SEMTAXONOMY_ENABLED"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_supported_acp_prompt_routes_before_repl_on_normal_input() {
+        let orchestrator = Arc::new(ReplOrchestratorV2::new(
+            PackRouter::new(vec![]),
+            Arc::new(StubExecutor),
+        ));
+        let session_id = orchestrator.create_session().await;
+
+        let bundle = try_route_supported_acp_prompt(
+            &orchestrator,
+            session_id,
+            "Advance deal 11111111-1111-1111-1111-111111111111 from PROSPECT to QUALIFYING with evidence sha256:evidence",
+        )
+        .await
+        .expect("supported ACP prompt should route through ACP");
+
+        assert!(bundle.message.contains("validated a dry-run workbook"));
+        let trace = crate::acp_dag_semantic::acp_chat_trace_summary_typed(&bundle.resolution);
+        assert_eq!(trace["status"], "dry_run_validated");
+        assert_eq!(trace["route"], "session_input");
+        assert_eq!(trace["provider_task"], "deal.update-status");
+        assert_eq!(trace["requested_draft_source"], "deterministic");
+        assert_eq!(trace["draft_source"], "deterministic_provider");
+        assert_eq!(trace["transition_ref"], "deal.prospect-to-qualifying");
+        assert_eq!(trace["state_anchor_provider"]["task"], "deal.update-status");
+        assert_eq!(
+            trace["state_anchor_provider"]["language_pack_boundary"],
+            "update_status_language_pack_v1"
+        );
+        assert_eq!(
+            trace["state_anchor_provider"]["no_mutation_authority"],
+            true
+        );
+
+        let session = orchestrator
+            .get_session(session_id)
+            .await
+            .expect("session should still exist");
+        assert!(session.messages.iter().any(|message| message
+            .content
+            .contains("Advance deal 11111111-1111-1111-1111-111111111111")));
+        assert!(session
+            .messages
+            .iter()
+            .any(|message| message.content.contains("validated a dry-run workbook")));
+    }
+
+    #[tokio::test]
+    async fn test_live_llm_session_input_mode_is_task_bounded_for_deal_provider() {
+        let orchestrator = Arc::new(ReplOrchestratorV2::new(
+            PackRouter::new(vec![]),
+            Arc::new(StubExecutor),
+        ));
+        let session_id = orchestrator.create_session().await;
+
+        let bundle = try_route_supported_acp_prompt_with_draft_mode(
+            &orchestrator,
+            session_id,
+            "Advance deal 11111111-1111-1111-1111-111111111111 from PROSPECT to QUALIFYING with evidence sha256:evidence",
+            AcpSessionInputDraftMode::LiveLlm,
+        )
+        .await
+        .expect("supported deal prompt should still route through ACP");
+
+        let trace = crate::acp_dag_semantic::acp_chat_trace_summary_typed(&bundle.resolution);
+        assert_eq!(trace["status"], "dry_run_validated");
+        assert_eq!(trace["provider_task"], "deal.update-status");
+        assert_eq!(trace["requested_draft_source"], "llm_tool_call");
+        assert_eq!(trace["draft_source"], "deterministic_provider");
+        assert_eq!(trace["transition_ref"], "deal.prospect-to-qualifying");
+    }
+
+    #[tokio::test]
+    async fn test_generic_dag_prompt_routes_through_acp_before_repl_on_normal_input() {
+        let orchestrator = Arc::new(ReplOrchestratorV2::new(
+            PackRouter::new(vec![]),
+            Arc::new(StubExecutor),
+        ));
+        let session_id = orchestrator.create_session().await;
+
+        let bundle =
+            try_route_supported_acp_prompt(&orchestrator, session_id, "assign role to cbu")
+                .await
+                .expect("authored DAG prompt should route through ACP semantic surface");
+
+        assert!(bundle.message.contains("No mutation has run"));
+        let trace = crate::acp_dag_semantic::acp_chat_trace_summary_typed(&bundle.resolution);
+        assert_eq!(trace["status"], "pending_question");
+        assert_eq!(trace["route"], "session_input");
+        assert_eq!(trace["provider_task"], "cbu.assign-role");
+        assert_eq!(trace["selected_verb"], "cbu.assign-role");
+        assert_eq!(trace["registry_verified"], true);
+        assert_eq!(trace["envelope_verified"], true);
+        assert_eq!(trace["envelope_pack_id"], "cbu-maintenance");
+        assert!(trace["envelope_hash"]
+            .as_str()
+            .expect("envelope hash")
+            .starts_with("sha256:"));
+        assert!(
+            trace["projection_hash"]
+                .as_str()
+                .expect("projection hash")
+                .len()
+                >= 64
+        );
+        assert_eq!(trace["structured_failure_mode"], "missing_required_args");
+        assert!(trace["candidate_verbs"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|verb| verb == "cbu.assign-role"));
+        assert_eq!(trace["prose_only_failure"], false);
+    }
+
+    #[tokio::test]
+    async fn test_instrument_matrix_pack_routes_through_acp_before_repl_on_normal_input() {
+        let orchestrator = Arc::new(ReplOrchestratorV2::new(
+            PackRouter::new(vec![]),
+            Arc::new(StubExecutor),
+        ));
+        let session_id = orchestrator.create_session().await;
+
+        let bundle =
+            try_route_supported_acp_prompt(&orchestrator, session_id, "show trading matrix")
+                .await
+                .expect("instrument matrix pack prompt should route through ACP semantic surface");
+
+        assert!(bundle.message.contains("Instrument Matrix"));
+        assert!(bundle.message.contains("No mutation has run"));
+        let trace = crate::acp_dag_semantic::acp_chat_trace_summary_typed(&bundle.resolution);
+        assert_eq!(trace["status"], "pending_question");
+        assert_eq!(trace["route"], "session_input");
+        assert_eq!(trace["provider_task"], "trading-profile.read");
+        assert_eq!(trace["selected_verb"], "trading-profile.read");
+        assert_eq!(trace["pack_id"], "instrument-matrix");
+        assert_eq!(trace["pack_name"], "Instrument Matrix");
+        assert_eq!(trace["pack_ref"], "instrument-matrix@1.0");
+        assert!(trace["pack_allowed_verb_count"].as_u64().unwrap() > 100);
+        assert!(trace["candidate_verbs"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|verb| verb == "trading-profile.read"));
+        assert_eq!(trace["structured_failure_mode"], "missing_required_args");
+        assert_eq!(trace["prose_only_failure"], false);
+    }
+
+    #[tokio::test]
+    async fn test_onboarding_dictionary_routes_through_acp_workflow_plan_on_normal_input() {
+        let orchestrator = Arc::new(ReplOrchestratorV2::new(
+            PackRouter::new(vec![]),
+            Arc::new(StubExecutor),
+        ));
+        let session_id = orchestrator.create_session().await;
+
+        let bundle = try_route_supported_acp_prompt(
+            &orchestrator,
+            session_id,
+            "resource dictionary for product onboarding",
+        )
+        .await
+        .expect("onboarding dictionary prompt should route through ACP semantic surface");
+
+        assert!(bundle.message.contains("Onboarding Request"));
+        assert!(bundle.message.contains("workflow plan"));
+        let trace = crate::acp_dag_semantic::acp_chat_trace_summary_typed(&bundle.resolution);
+        assert_eq!(trace["status"], "pending_question");
+        assert_eq!(trace["route"], "session_input");
+        assert_eq!(trace["provider_task"], "onboarding.compile-data-request");
+        assert_eq!(trace["selected_verb"], "onboarding.compile-data-request");
+        assert_eq!(trace["pack_id"], "onboarding-request");
+        assert_eq!(trace["pack_name"], "Onboarding Request");
+        assert_eq!(
+            trace["workflow_plan_id"],
+            "onboarding.compile-data-request.preview.v1"
+        );
+        assert_eq!(
+            trace["workflow_plan_verb"],
+            "onboarding.compile-data-request"
+        );
+        assert_eq!(trace["workflow_plan_dry_run_only"], true);
+        assert!(trace["workflow_plan_needed_from_user"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|field| field == "onboarding-request-id"));
+        assert_eq!(trace["structured_failure_mode"], "missing_required_args");
+        assert_eq!(trace["prose_only_failure"], false);
+    }
+
+    #[tokio::test]
+    async fn test_non_authored_prompt_still_falls_through_to_repl_input_path() {
+        let orchestrator = Arc::new(ReplOrchestratorV2::new(
+            PackRouter::new(vec![]),
+            Arc::new(StubExecutor),
+        ));
+        let session_id = orchestrator.create_session().await;
+
+        let chat =
+            try_route_supported_acp_prompt(&orchestrator, session_id, "assemble context").await;
+
+        assert!(
+            chat.is_none(),
+            "non-DAG control prompts should still fall through to the normal REPL path"
         );
     }
 }

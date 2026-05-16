@@ -1,6 +1,6 @@
 //! Route modules
 
-pub mod api;
-pub mod chat;
-pub mod static_files;
-pub mod voice;
+pub(crate) mod api;
+pub(crate) mod chat;
+pub(crate) mod static_files;
+pub(crate) mod voice;

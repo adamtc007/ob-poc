@@ -14,7 +14,7 @@ use std::sync::OnceLock;
 use tokio::sync::RwLock;
 
 use chrono::{DateTime, Utc};
-use sem_os_core::affinity::AffinityGraph;
+use sem_os_policy::affinity::AffinityGraph;
 use sem_os_core::types::{
     ChangeType, GovernanceTier, ObjectType, SnapshotRow, SnapshotStatus, TrustClass,
 };

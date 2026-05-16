@@ -1,0 +1,55 @@
+pack_id: ob-poc.lifecycle-resources
+name: ob-poc Lifecycle Resources Domain Pack
+version: 0.1.0
+implementation_mode: native_compiled
+compatibility_tier: dry_run_only
+owned_dags: [lifecycle_resources_dag]
+owned_packs: [lifecycle-resources]
+owned_state_machines:
+  - application_instance_lifecycle
+  - capability_binding_lifecycle
+owned_constellation_maps:
+  - lifecycle.resources
+owned_constellation_families:
+  - lifecycle_resources
+owned_universes: []
+owned_verb_prefixes:
+  - application.
+  - application-instance.
+  - capability-binding.
+owned_entity_kinds:
+  - application
+  - application_instance
+  - capability_binding
+business_crates: []
+owned_constellations:
+  - lifecycle.resources
+allowed_transitions:
+  - transition_ref: lifecycle-resources.instance-activated
+    entity_type: application_instance
+    state_machine: application_instance_lifecycle
+    verb: application-instance.activate
+    from_state: provisioned
+    to_state: active
+    dry_run_enabled: true
+    mutation_enabled: false
+    hitl_required: true
+discovery_probes:
+  - probe_id: lifecycle-resources.read-state
+    operation: read_state
+    target: semos.lifecycle_resources
+    idempotent: true
+    modeled: true
+    first_class_state_mutation: false
+projection_catalog: []
+mention_namespaces: []
+declared_modes: []
+workflow_phases: []
+acp_personas: []
+resource_uri_schemes: []
+external_mcp_transports: []
+typed_extension_points: []
+classification_policy:
+  max_prompt_classification: internal
+  allow_external_llm: false
+  required_redactions: []

@@ -238,6 +238,7 @@ async fn seed_verb_contract(pool: &PgPool, verb: &VerbExtract) -> Result<bool> {
                 lookup: None,
                 valid_values: None,
                 default: None,
+                maps_to: None,
             })
             .collect(),
         returns: None,
@@ -261,6 +262,10 @@ async fn seed_verb_contract(pool: &PgPool, verb: &VerbExtract) -> Result<bool> {
         produces_focus: false,
         metadata: None,
         crud_mapping: None,
+        reads_from: Vec::new(),
+        writes_to: Vec::new(),
+        outputs: Vec::new(),
+        produces_shared_facts: Vec::new(),
     };
 
     publish_idempotent(pool, ObjectType::VerbContract, &verb.fqn, &body).await
@@ -306,6 +311,11 @@ async fn seed_entity_type_def(pool: &PgPool, entity: &EntityTypeCandidate) -> Re
         required_attributes: vec![],
         optional_attributes: entity.attribute_fqns.clone(),
         parent_type: None,
+        governance_tier: None,
+        security_classification: None,
+        pii: None,
+        read_by_verbs: Vec::new(),
+        written_by_verbs: Vec::new(),
     };
 
     publish_idempotent(pool, ObjectType::EntityTypeDef, fqn, &body).await

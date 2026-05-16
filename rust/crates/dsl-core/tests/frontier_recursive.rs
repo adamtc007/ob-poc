@@ -8,7 +8,7 @@ use dsl_core::{
         VersionHash,
     },
 };
-use sem_os_core::constellation_map_def::Cardinality;
+use sem_os_ontology::constellation_map_def::Cardinality;
 
 fn template() -> ResolvedTemplate {
     ResolvedTemplate {

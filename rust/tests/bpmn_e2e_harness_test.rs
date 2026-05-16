@@ -26,8 +26,10 @@ use tonic::transport::Server;
 use uuid::Uuid;
 
 // bpmn-lite crates (dev-dependencies)
-use bpmn_lite_core::engine::BpmnLiteEngine;
-use bpmn_lite_core::store_memory::MemoryStore;
+// bpmn-lite-core retired in bpmn-lite Phase 2.8 (3344bb57); the engine
+// and memory store moved to bpmn-lite-engine + bpmn-lite-store.
+use bpmn_lite_engine::BpmnLiteEngine;
+use bpmn_lite_store::MemoryStore;
 use bpmn_lite_server::grpc::proto::bpmn_lite_server::BpmnLiteServer;
 use bpmn_lite_server::grpc::BpmnLiteService;
 

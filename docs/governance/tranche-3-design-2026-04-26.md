@@ -64,10 +64,10 @@ catalogue_dag.yaml
 The Catalogue workspace gates **into other workspaces:**
 
 ```
-catalogue_proposal.COMMITTED → triggers seed reload across all 11 domain workspaces
+catalogue_proposal.COMMITTED → triggers Sem OS domain-pack reload checks across active domain packs
 ```
 
-This is the *forward-discipline activation point* (Phase 3.F) — once Tranche 3 ships, any change to the verb catalogue MUST flow through `catalogue_proposal.COMMITTED`. Direct YAML edits become uneditable (the YAML files are write-locked at the filesystem level; reads come from a runtime-managed store).
+This is the *forward-discipline activation point* (Phase 3.F) — once Tranche 3 ships, any change to the verb catalogue MUST flow through `catalogue_proposal.COMMITTED`. The 2026-05-14 Sem OS Domain Pack reload architecture refines the trigger: committed catalogue changes should first update the owning YAML/runtime store, then run the build-engine reload index check. Source fingerprints are a cheap dirty check; canonical surface hash determines whether the owning Domain Pack is `publish_required`; actual snapshot publication remains behind Sem OS seed bootstrap.
 
 ### 3.3 ABAC gate
 
@@ -344,17 +344,17 @@ Per CLAUDE.md the Observatory has Phases 1-7 complete (egui canvas embedded in C
 
 ## 9. Forward-discipline activation (Phase 3.F)
 
-This is the architectural payoff: once activated, **direct YAML edits become impossible**. All catalogue changes flow through `catalogue.commit-verb-declaration`.
+This is the architectural payoff: once activated, **direct uncontrolled YAML edits become impossible**. All catalogue changes flow through `catalogue.commit-verb-declaration`, then through the Domain Pack reload index and Sem OS seed bootstrap boundary.
 
 **Activation steps (sequenced for safety):**
 
 1. **Stage 1 — Pilot.** Add the Catalogue workspace + authorship verbs. Direct YAML still works; the workspace is opt-in. (This session's deliverable.)
 
-2. **Stage 2 — Soft enforcement.** Add a CI check that fails if `git log --diff-filter=M -- rust/config/verbs/` has commits not authored by `catalogue.commit-verb-declaration`. Surface as a warning in PR descriptions. (1-2 sessions out.)
+2. **Stage 2 — Soft enforcement.** Add a CI check that fails if `git log --diff-filter=M -- rust/config/verbs/ rust/config/packs/ rust/config/sem_os_seeds/` has commits not authored by `catalogue.commit-verb-declaration` or a Domain Pack maintenance flow. Surface as a warning in PR descriptions and run `xtask sem-reg domain-pack-check` for changed packs. (1-2 sessions out.)
 
-3. **Stage 3 — Read-only filesystem.** Mount `rust/config/verbs/` read-only at runtime. Catalogue load now reads from a runtime store seeded from YAML at boot. (Half-week of work.)
+3. **Stage 3 — Read-only filesystem.** Mount `rust/config/verbs/`, `rust/config/packs/`, and `rust/config/sem_os_seeds/` read-only at runtime. Catalogue and Domain Pack load now read from a runtime-managed store seeded from YAML plus the Domain Pack reload index. (Half-week of work.)
 
-4. **Stage 4 — Hard enforcement.** Remove YAML loading entirely. Catalogue is loaded exclusively from a database table populated by `commit-verb-declaration`. (Architectural commitment; ~1 week.)
+4. **Stage 4 — Hard enforcement.** Remove direct runtime YAML loading from normal operation. Catalogue and Domain Pack surfaces are loaded from governed runtime stores populated by `commit-verb-declaration` / Domain Pack maintenance flows, with Sem OS seed bootstrap as the publication boundary. (Architectural commitment; ~1 week.)
 
 **Phase 3.F is OUT OF SCOPE for this session.** The Catalogue workspace + authorship verbs (this session) are Stage 1. Stages 2-4 are architectural commitments that need separate planning.
 

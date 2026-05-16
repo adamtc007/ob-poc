@@ -917,7 +917,7 @@ mod tests {
     use crate::agent::sem_os_context_envelope::SemOsContextEnvelope;
     use crate::entity_linking::{EntityCandidate, EntityResolution};
     use crate::lookup::LookupResult;
-    use sem_os_core::context_resolution::{
+    use sem_os_policy::context_resolution::{
         BlockedActionOption, GroundedActionSurface, GroundedConstraintSignal, SubjectRef,
     };
     use uuid::Uuid;
@@ -939,6 +939,11 @@ mod tests {
     fn test_phase2_artifacts_detect_ambiguous_entity() {
         let artifacts = Phase2Artifacts::new(
             Some(LookupResult {
+                entity_snapshot: crate::lookup::EntitySnapshotMetadata {
+                    hash: "test".to_string(),
+                    version: 1,
+                    entity_count: 2,
+                },
                 verbs: vec![],
                 entities: vec![EntityResolution {
                     mention_span: (0, 7),

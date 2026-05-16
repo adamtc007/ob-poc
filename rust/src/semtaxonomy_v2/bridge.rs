@@ -28,7 +28,7 @@ use super::{
 ///     pending_clarifications: vec![],
 ///     hints: Default::default(),
 ///     explain: Default::default(),
-///     coder_handoff: Default::default(),
+///     drafter_handoff: Default::default(),
 /// };
 /// let envelope = compiler_input_from_outcome_intent(
 ///     &outcome,
@@ -273,7 +273,7 @@ mod tests {
             pending_clarifications: vec![],
             hints: Default::default(),
             explain: Default::default(),
-            coder_handoff: Default::default(),
+            drafter_handoff: Default::default(),
         };
 
         let envelope = compiler_input_from_outcome_intent(
@@ -337,7 +337,7 @@ mod tests {
             pending_clarifications: vec![],
             hints: Default::default(),
             explain: Default::default(),
-            coder_handoff: Default::default(),
+            drafter_handoff: Default::default(),
         };
 
         let envelope = compiler_input_from_outcome_intent(

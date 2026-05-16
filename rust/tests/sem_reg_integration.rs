@@ -25,10 +25,10 @@
 mod integration {
     use anyhow::Result;
     use chrono::Utc;
-    use sem_os_core::context_resolution::{
+    use sem_os_policy::context_resolution::{
         ContextResolutionRequest, DiscoveryContext, EvidenceMode, SubjectRef,
     };
-    use sem_os_core::service::{CoreService, CoreServiceImpl};
+    use sem_os_policy::service::{CoreService, CoreServiceImpl};
     use sem_os_core::types::EvidenceGrade;
     use sem_os_postgres::PgStores;
     use serde_json::json;
@@ -141,6 +141,10 @@ mod integration {
                 produces_focus: false,
                 metadata: None,
                 crud_mapping: None,
+                reads_from: Vec::new(),
+                writes_to: Vec::new(),
+                outputs: Vec::new(),
+                produces_shared_facts: Vec::new(),
             };
             let sid =
                 RegistryService::publish_verb_contract(&self.pool, &meta, &body, None).await?;
@@ -211,8 +215,8 @@ mod integration {
         )
     }
 
-    fn to_sem_os_actor(actor: &ActorContext) -> sem_os_core::abac::ActorContext {
-        sem_os_core::abac::ActorContext {
+    fn to_sem_os_actor(actor: &ActorContext) -> sem_os_policy::abac::ActorContext {
+        sem_os_policy::abac::ActorContext {
             actor_id: actor.actor_id.clone(),
             roles: actor.roles.clone(),
             department: actor.department.clone(),
@@ -225,7 +229,7 @@ mod integration {
         pool: &PgPool,
         actor: &ActorContext,
         request: ContextResolutionRequest,
-    ) -> sem_os_core::service::Result<sem_os_core::context_resolution::ContextResolutionResponse>
+    ) -> sem_os_policy::service::Result<sem_os_policy::context_resolution::ContextResolutionResponse>
     {
         let service = build_sem_os_service(pool);
         let principal =
@@ -860,6 +864,11 @@ mod integration {
                 required_attributes: vec![attr_name_fqn.clone(), attr_status_fqn.clone()],
                 optional_attributes: vec![attr_notes_fqn.clone()],
                 parent_type: None,
+                governance_tier: None,
+                security_classification: None,
+                pii: None,
+                read_by_verbs: Vec::new(),
+                written_by_verbs: Vec::new(),
             },
             attributes: vec![],     // use defaults
             verb_contracts: vec![], // use defaults
@@ -1281,6 +1290,11 @@ mod integration {
             required_attributes: vec![],
             optional_attributes: vec![],
             parent_type: None,
+            governance_tier: None,
+            security_classification: None,
+            pii: None,
+            read_by_verbs: Vec::new(),
+            written_by_verbs: Vec::new(),
         };
         RegistryService::publish_entity_type_def(&db.pool, &et_meta, &et_body, None).await?;
 
@@ -1335,6 +1349,10 @@ mod integration {
             produces_focus: false,
             metadata: None,
             crud_mapping: None,
+            reads_from: Vec::new(),
+            writes_to: Vec::new(),
+            outputs: Vec::new(),
+            produces_shared_facts: Vec::new(),
         };
         RegistryService::publish_verb_contract(&db.pool, &verb_a_meta, &verb_a_body, None).await?;
 

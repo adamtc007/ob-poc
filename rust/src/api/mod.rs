@@ -6,7 +6,12 @@
 #[cfg(feature = "server")]
 pub mod attribute_routes;
 
-pub mod booking_principal_types;
+// ob-poc-domain split v1 Slice A3 (2026-05-14): booking_principal_types now
+// lives in `ob-poc-booking-principal`. Compat re-export keeps
+// `crate::api::booking_principal_types::*` working for the 4 ob-poc
+// consumers (booking_principal_repository, rule_evaluator,
+// booking_principal_ops, plus this module).
+pub use ob_poc_booking_principal as booking_principal_types;
 
 #[cfg(feature = "server")]
 pub mod agent_types;
@@ -18,8 +23,10 @@ pub mod agent_types;
 pub mod agent_routes;
 
 #[cfg(feature = "server")]
-#[allow(dead_code)]
 pub mod agent_state;
+
+#[cfg(feature = "server")]
+pub mod policy_headers;
 
 #[cfg(feature = "server")]
 pub mod session;
@@ -32,9 +39,6 @@ pub mod dsl_session_file;
 
 #[cfg(feature = "server")]
 pub mod agent_service;
-
-#[cfg(feature = "server")]
-pub mod client_group_adapter;
 
 #[cfg(feature = "server")]
 pub mod entity_routes;
@@ -78,14 +82,21 @@ pub mod service_resource_routes;
 #[cfg(feature = "server")]
 pub mod workflow_routes;
 
+// Phase 3 slice 2z (2026-05-13): display-noun translation table relocated to
+// ob-poc-boundary. Zero internal-crate deps; only serde_json/HashMap/LazyLock.
+// The pub-use `translate_json` / `translate_string` / `DisplayNounTranslator`
+// re-export below keeps the same external API surface.
 #[cfg(feature = "server")]
-pub mod display_nouns;
+pub use ob_poc_authoring::display_nouns;
 
 #[cfg(feature = "server")]
 pub mod projection_routes;
 
+// ob-poc-domain split v1 Slice A2 (2026-05-14): deal_types now lives in
+// `ob-poc-deal`. Compat re-export keeps `crate::api::deal_types::*` paths
+// in `deal_routes`, `deal_repository`, and `deal_graph_builder` working.
 #[cfg(feature = "server")]
-pub mod deal_types;
+pub use ob_poc_deal as deal_types;
 
 #[cfg(feature = "server")]
 pub mod deal_routes;
@@ -99,6 +110,7 @@ pub mod catalogue_routes;
 #[cfg(feature = "server")]
 pub mod stewardship_routes;
 
+pub mod acp_dsl_dag_coverage;
 pub mod agent_enrichment;
 pub mod repl_routes_v2;
 pub mod response_adapter;

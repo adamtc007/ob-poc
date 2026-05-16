@@ -28,16 +28,23 @@
 //! existing orchestrator pipeline. Full macro/pack/constraint integration
 //! is wired in Phases 1-3.
 
-pub(crate) mod approval_token;
+// Phase 3 slice 2c.2 (2026-05-12): relocated to ob-poc-boundary.
+pub(crate) use ob_poc_boundary::approval_token;
 pub(crate) mod canonical;
 pub(crate) mod compiler;
 pub(crate) mod constraint_gate;
-pub(crate) mod dsl_coder;
+// Phase 3 slice 2c.2 (2026-05-12): relocated to ob-poc-boundary.
+pub(crate) use ob_poc_boundary::dsl_drafter;
 pub(crate) mod envelope;
 pub(crate) mod errors;
 pub(crate) mod executor;
-pub(crate) mod kyc_dry_run;
-pub(crate) mod mutation_preflight;
+// Phase 3 slice 2d-prep (2026-05-12): relocated to ob-poc-boundary.
+pub(crate) use ob_poc_boundary::kyc_dry_run;
+// Phase 3 slice 2d-prep (2026-05-12): relocated to ob-poc-boundary.
+pub(crate) use ob_poc_boundary::language_pack;
+pub(crate) mod llm_draft_adapter;
+// Phase 3 slice 2c.2 (2026-05-12): relocated to ob-poc-boundary.
+pub(crate) use ob_poc_boundary::mutation_preflight;
 pub(crate) mod narration;
 pub(crate) mod plan_compiler;
 pub(crate) mod plan_executor;
@@ -48,7 +55,11 @@ pub(crate) mod sem_os_filter;
 pub(crate) mod step_executor_bridge;
 pub(crate) mod types;
 pub(crate) mod verb_classifier;
-pub(crate) mod workbook;
+// Phase 3 slice 2c (2026-05-12): workbook relocated to ob-poc-boundary; alias for crate use.
+pub(crate) use ob_poc_boundary::workbook;
+// Phase 3 slice 2d-prep (2026-05-12): relocated to ob-poc-boundary.
+pub(crate) use ob_poc_boundary::workbook_diagnostics;
+pub(crate) use ob_poc_boundary::workbook_revision;
 pub(crate) mod write_set;
 
 // Re-export key types at module boundary
@@ -64,9 +75,10 @@ pub use canonical::{
 };
 pub use compiler::compile_verb;
 pub use constraint_gate::check_pack_constraints;
-pub use dsl_coder::{
-    validate_workbook_for_dry_run, DslCoderDryRunResult, DslCoderExecutionMode,
-    DslCoderRefusalCode, DslCoderValidationError,
+pub use dsl_drafter::{
+    validate_workbook_for_dry_run, DslDrafterDryRunResult, DslDrafterExecutionMode,
+    DslDrafterRefusalCode, DslDrafterValidationError, DslDrafterValidationStep,
+    DslDrafterValidationStepStatus,
 };
 pub use envelope::{EnvelopeCore, ReplayEnvelope};
 pub use errors::{CompilationError, CompilationErrorKind};
@@ -78,8 +90,21 @@ pub use executor::{
     RunbookStoreBackend, StepExecutionResult, StepExecutor, StepOutcome,
 };
 pub use kyc_dry_run::{
-    build_kyc_update_status_dry_run, KycUpdateStatusDryRunInput, KycUpdateStatusDryRunOutput,
-    KycUpdateStatusDryRunRefusal,
+    build_kyc_update_status_dry_run, build_kyc_update_status_dry_run_with_manifest,
+    KycUpdateStatusDryRunInput, KycUpdateStatusDryRunOutput, KycUpdateStatusDryRunRefusal,
+};
+pub use language_pack::{
+    build_kyc_update_status_language_pack, build_update_status_language_pack,
+    transition_language_pack_readiness, transition_language_pack_readiness_report, BlockedVerb,
+    CanonicalMicroPattern, EvidencePolicySummary, KycLanguagePackRequest, LanguagePackArg,
+    LanguagePackError, LanguagePackSubject, LanguagePackTransition, LanguagePackVerb,
+    SemOsLanguagePack, TransitionEffect, TransitionLanguagePackReadiness,
+    UpdateStatusLanguagePackRequest, UuidBindingRequirement,
+};
+pub use llm_draft_adapter::{
+    run_kyc_update_status_llm_draft_loop, run_kyc_update_status_llm_draft_loop_with_prompt_pack,
+    LlmDraftAdapterRefusal, LlmDraftLoopOutcome,
+    KYC_UPDATE_STATUS_LLM_DRAFT_PROMPT_TEMPLATE_VERSION,
 };
 pub use mutation_preflight::{
     prepare_restricted_mutation_preflight, MutationExecutor, MutationSemanticDiff,
@@ -90,7 +115,8 @@ pub use response::{
     MissingField, OrchestratorResponse, Remediation, StepPreview,
 };
 pub use restricted_mutation::{
-    compile_restricted_mutation_preflight, RestrictedMutationRunbookCompilation,
+    compile_restricted_mutation_preflight, record_restricted_mutation_execution_receipt,
+    RestrictedMutationExecutionReceipt, RestrictedMutationRunbookCompilation,
     RestrictedMutationRunbookCompilationError,
 };
 pub use sem_os_filter::{filter_verbs_against_allowed_set, SemOsDeniedVerb, SemOsFilterResult};
@@ -106,7 +132,17 @@ pub use verb_classifier::{classify_verb, VerbClassification};
 pub use workbook::{
     compute_workbook_id, EvidenceRef, ExecutionWorkbook, ExecutionWorkbookCore,
     ExecutionWorkbookId, ExecutionWorkbookValidationError, LlmTraceRef, StaleWorkbookPolicy,
-    WorkbookActor, WorkbookSubject,
+    WorkbookActor, WorkbookCheck, WorkbookCheckStatus, WorkbookExecutionMode, WorkbookSubject,
+};
+pub use workbook_diagnostics::{
+    diagnostic_from_state_simulation, diagnostic_from_workbook_validation,
+    diagnostics_from_dry_run_refusal, WorkbookDiagnostic,
+};
+pub use workbook_revision::{
+    run_kyc_update_status_revision_loop, validate_kyc_update_status_draft_without_revision,
+    KycUpdateStatusWorkbookDraft, LanguageAcquisitionMetrics, LanguageLoopTraceEvent,
+    StructuredWorkbookRefusal, WorkbookDraftAttempt, WorkbookRevisionOutcome,
+    MAX_WORKBOOK_REVISIONS,
 };
 pub use write_set::{derive_write_set, derive_write_set_heuristic};
 

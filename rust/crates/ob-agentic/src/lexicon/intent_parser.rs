@@ -1104,7 +1104,7 @@ fn parse_verbless(input: Input) -> ParseResult<IntentAst> {
 /// 5. Universe add - instruments/markets
 /// 6. Query - list/show operations
 /// 7. Verbless - infer intent from entity types (fallback)
-pub fn parse_intent(input: Input) -> ParseResult<IntentAst> {
+pub(crate) fn parse_intent(input: Input) -> ParseResult<IntentAst> {
     // Skip conversational preamble like "I need to", "can you please"
     let input = skip_to_verb(input);
 

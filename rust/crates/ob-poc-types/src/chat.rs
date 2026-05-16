@@ -39,9 +39,9 @@ pub struct ChatMessage {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub sage_explain: Option<SageExplainPayload>,
 
-    /// Coder proposal payload for this message, when present.
+    /// Drafter proposal payload for this message, when present.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub coder_proposal: Option<CoderProposalPayload>,
+    pub drafter_proposal: Option<DraftProposalPayload>,
 
     /// Runbook parked-state payload for this message, when present.
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -341,9 +341,9 @@ pub struct ChatResponse {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub sage_explain: Option<SageExplainPayload>,
 
-    /// Typed Coder/REPL proposal for UI rendering.
+    /// Typed Drafter/REPL proposal for UI rendering.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub coder_proposal: Option<CoderProposalPayload>,
+    pub drafter_proposal: Option<DraftProposalPayload>,
     /// Typed Sem OS discovery/bootstrap payload for onboarding-stage sessions.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub discovery_bootstrap: Option<DiscoveryBootstrapPayload>,
@@ -378,6 +378,10 @@ pub struct ChatResponse {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub narration: Option<crate::narration::NarrationPayload>,
 
+    /// Structured ACP prompt / language-loop trace shown to the HIL.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub acp_trace: Option<serde_json::Value>,
+
     /// Phase A.2 (F5 follow-on, 2026-04-22): turn-level correlation id.
     /// Set on every response that reaches a consumer; threaded into the
     /// shadow `GatedVerbEnvelope` and every `tracing::debug!` event so an
@@ -398,9 +402,9 @@ pub struct SageExplainPayload {
     pub clarifications: Vec<String>,
 }
 
-/// Typed Coder proposal payload for UI rendering.
+/// Typed Drafter proposal payload for UI rendering.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct CoderProposalPayload {
+pub struct DraftProposalPayload {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub verb_fqn: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]

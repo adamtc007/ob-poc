@@ -27,6 +27,8 @@ pub struct SeedBundle {
     pub state_graphs: Vec<StateGraphSeed>,
     #[serde(default)]
     pub dag_taxonomies: Vec<DagTaxonomySeed>,
+    #[serde(default)]
+    pub domain_packs: Vec<DomainPackSeed>,
     pub attributes: Vec<AttributeSeed>,
     pub entity_types: Vec<EntityTypeSeed>,
     pub taxonomies: Vec<TaxonomySeed>,
@@ -64,6 +66,7 @@ impl SeedBundle {
     ///     state_machines: vec![],
     ///     state_graphs: vec![],
     ///     dag_taxonomies: vec![],
+    ///     domain_packs: vec![],
     ///     attributes: vec![],
     ///     entity_types: vec![],
     ///     taxonomies: vec![],
@@ -89,6 +92,7 @@ impl SeedBundle {
             state_machines: Vec<&'a StateMachineSeed>,
             state_graphs: Vec<&'a StateGraphSeed>,
             dag_taxonomies: Vec<&'a DagTaxonomySeed>,
+            domain_packs: Vec<&'a DomainPackSeed>,
             attributes: Vec<&'a AttributeSeed>,
             entity_types: Vec<&'a EntityTypeSeed>,
             taxonomies: Vec<&'a TaxonomySeed>,
@@ -123,6 +127,9 @@ impl SeedBundle {
 
         let mut dt: Vec<&DagTaxonomySeed> = bundle.dag_taxonomies.iter().collect();
         dt.sort_by_key(|s| &s.fqn);
+
+        let mut dp: Vec<&DomainPackSeed> = bundle.domain_packs.iter().collect();
+        dp.sort_by_key(|s| &s.fqn);
 
         let mut at: Vec<&AttributeSeed> = bundle.attributes.iter().collect();
         at.sort_by_key(|s| &s.fqn);
@@ -160,6 +167,7 @@ impl SeedBundle {
             state_machines: sm,
             state_graphs: sg,
             dag_taxonomies: dt,
+            domain_packs: dp,
             attributes: at,
             entity_types: et,
             taxonomies: tx,
@@ -222,6 +230,12 @@ pub struct StateGraphSeed {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DagTaxonomySeed {
+    pub fqn: String,
+    pub payload: serde_json::Value,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DomainPackSeed {
     pub fqn: String,
     pub payload: serde_json::Value,
 }
@@ -310,6 +324,7 @@ mod tests {
             state_machines: vec![],
             state_graphs: vec![],
             dag_taxonomies: vec![],
+            domain_packs: vec![],
             attributes: attrs.to_vec(),
             entity_types: vec![],
             taxonomies: vec![],
@@ -371,6 +386,7 @@ mod tests {
             state_machines: vec![],
             state_graphs: vec![],
             dag_taxonomies: vec![],
+            domain_packs: vec![],
             attributes: vec![make_attr("cbu.name")],
             entity_types: vec![EntityTypeSeed {
                 fqn: "cbu".into(),
@@ -416,6 +432,7 @@ mod tests {
         assert!(restored.state_machines.is_empty());
         assert!(restored.state_graphs.is_empty());
         assert!(restored.dag_taxonomies.is_empty());
+        assert!(restored.domain_packs.is_empty());
         assert_eq!(restored.attributes.len(), 1);
         assert_eq!(restored.entity_types.len(), 1);
         assert_eq!(restored.taxonomies.len(), 1);
@@ -463,6 +480,11 @@ mod tests {
             serde_json::to_value(DagTaxonomySeed {
                 fqn: "d.t".into(),
                 payload: json!(24),
+            })
+            .unwrap(),
+            serde_json::to_value(DomainPackSeed {
+                fqn: "d.p".into(),
+                payload: json!(25),
             })
             .unwrap(),
             serde_json::to_value(EntityTypeSeed {

@@ -14,10 +14,12 @@
 //! Set `AGENT_BACKEND` environment variable:
 //! - `anthropic` (default): Anthropic Claude API, `claude-sonnet-4-6`
 //! - `openai`: OpenAI API
+//! - `claude-code-cli`: local Claude Code CLI, usually authenticated through Zed/Claude Code
 
 // LLM client abstraction
 pub mod anthropic_client;
 pub mod backend;
+pub mod claude_code_cli_client;
 pub mod client_factory;
 pub mod llm_client;
 pub mod openai_client;

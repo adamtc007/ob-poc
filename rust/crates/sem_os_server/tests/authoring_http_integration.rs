@@ -14,7 +14,7 @@ use http_body_util::BodyExt;
 use hyper::{Request, StatusCode};
 use jsonwebtoken::{encode, EncodingKey, Header};
 use sem_os_core::ports::BootstrapAuditStore;
-use sem_os_core::service::CoreServiceImpl;
+use sem_os_policy::service::CoreServiceImpl;
 use sem_os_postgres::PgStores;
 use sem_os_server::{build_router, JwtConfig};
 use serde::Serialize;
@@ -80,7 +80,7 @@ async fn build_test_app() -> axum::Router {
     let outbox: Arc<dyn sem_os_core::ports::OutboxStore> = Arc::new(stores.outbox);
     let projections: Arc<dyn sem_os_core::ports::ProjectionWriter> = Arc::new(stores.projections);
 
-    let service: Arc<dyn sem_os_core::service::CoreService> = Arc::new(
+    let service: Arc<dyn sem_os_policy::service::CoreService> = Arc::new(
         CoreServiceImpl::new(
             Arc::new(stores.snapshots),
             Arc::new(stores.objects),

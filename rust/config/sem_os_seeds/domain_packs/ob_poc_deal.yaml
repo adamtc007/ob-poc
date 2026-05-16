@@ -1,0 +1,58 @@
+pack_id: ob-poc.deal
+name: ob-poc Deal Domain Pack
+version: 0.1.0
+implementation_mode: native_compiled
+compatibility_tier: dry_run_only
+owned_dags: [deal_dag]
+owned_packs: [deal-lifecycle]
+owned_state_machines:
+  - deal_commercial_lifecycle
+  - agreement_lifecycle
+owned_constellation_maps:
+  - deal.lifecycle
+  - deal.workspace
+owned_constellation_families:
+  - deal_lifecycle
+  - deal_workspace
+  - deal_commercial
+owned_universes:
+  - universe.deal_execution
+owned_verb_prefixes:
+  - deal.
+  - contract.
+  - billing.
+owned_entity_kinds: []
+business_crates:
+  - ob-poc-deal
+owned_constellations:
+  - deal.lifecycle
+  - deal.workspace
+allowed_transitions:
+  - transition_ref: deal.created
+    entity_type: deal
+    state_machine: deal_commercial_lifecycle
+    verb: deal.create
+    from_state: draft
+    to_state: proposed
+    dry_run_enabled: true
+    mutation_enabled: false
+    hitl_required: true
+discovery_probes:
+  - probe_id: deal.read-state
+    operation: read_state
+    target: semos.deal
+    idempotent: true
+    modeled: true
+    first_class_state_mutation: false
+projection_catalog: []
+mention_namespaces: []
+declared_modes: []
+workflow_phases: []
+acp_personas: []
+resource_uri_schemes: []
+external_mcp_transports: []
+typed_extension_points: []
+classification_policy:
+  max_prompt_classification: internal
+  allow_external_llm: false
+  required_redactions: [pii]

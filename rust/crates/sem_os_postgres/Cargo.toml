@@ -6,7 +6,13 @@ description = "Semantic OS PostgreSQL adapter — implements core port traits wi
 
 [dependencies]
 sem_os_core = { path = "../sem_os_core" }
+sem_os_policy = { path = "../sem_os_policy" }
+sem_os_ontology = { path = "../sem_os_ontology" }
+sem_os_types = { path = "../sem_os_types" }
 dsl-runtime = { path = "../dsl-runtime" }
+# dsl-runtime-split v1 Phase 11 (2026-05-14): ops::{discovery, verify}
+# reach `dsl_analysis::{entity_kind, stategraph, verification}` directly.
+dsl-analysis = { path = "../dsl-analysis" }
 async-trait = "0.1"
 anyhow = "1.0"
 # Phase 5c-migrate Phase B slice #29: rust_decimal re-added to unblock
@@ -42,3 +48,6 @@ entity-gateway = { path = "../entity-gateway" }
 tonic = "0.12"
 
 [dev-dependencies]
+
+[lints.rust]
+unreachable_pub = "deny"

@@ -28,12 +28,25 @@ pub mod galaxy;
 pub mod gated_envelope;
 pub mod graph_scene;
 pub mod investor_register;
+// Phase 3C-prep of capability-crate restructure (2026-05-13). Pack
+// manifest DTOs hoisted from ob-poc-boundary::journey::pack per plan §6.5.
+// Boundary's acp_registry_projection consumes these field-by-field but
+// must not depend on ob-poc-journey (plan §6 decision 2), so the pure
+// types live here and the YAML loader stays with ob-poc-journey.
+pub mod journey;
 pub mod manco_group;
 pub mod narration;
 pub mod onboarding_state;
 pub mod orientation;
 pub mod resolution;
 pub mod semantic_stage;
+// Phase 3C-prep of capability-crate restructure (2026-05-13). Session enums
+// (WorkspaceKind, SubjectKind, AgentMode, WorkspaceRegistryEntry) hoisted
+// from ob-poc-boundary::session per plan §6.5 — they cross capability
+// boundaries (boundary acp_dag_semantic + audit_chain, ob-poc-journey
+// pack manifest, ob-poc app session/repl machinery). Pure types, no
+// crate-internal deps.
+pub mod session;
 pub mod session_input;
 pub mod session_stack;
 pub mod state_token_resolver;
@@ -96,15 +109,56 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
-// Re-export sub-module types for convenience (backward compatible)
-pub use chat::*;
-pub use commands::*;
-pub use decision::*;
-pub use disambiguation::*;
-pub use onboarding_state::*;
-pub use resolution::*;
-pub use session_input::*;
-pub use session_stack::*;
+// Explicit re-exports per feedback_no_wildcard_reexports.md.
+// Replaces 8 wildcard re-exports — surface unchanged, but every type is now
+// reviewable at a glance and follow-on dead-surface audits can prune the list.
+pub use chat::{
+    BindingSummary, ChatDebugInfo, ChatMessage, ChatMessageRole, ChatPayload, ChatRequest,
+    ChatResponse, ChatResponseV2, ChatStreamEvent, DiscoveryBootstrapPayload,
+    DiscoveryConstellationOption, DiscoveryDomainOption, DiscoveryFamilyOption,
+    DiscoveryInputPrompt, DiscoveryQuestionPrompt, DiscoveryUniverseOption, DraftProposalPayload,
+    DslDisplaySegment, EnrichedDsl, EntityCandidateDebug, EntityMentionDebug,
+    EntityResolutionDebug, ParkedEntryPayload, SageExplainPayload, SessionStateEnum,
+    VerbArgProfile, VerbCandidateDebug, VerbEvidenceDebug, VerbMatchDebug, VerbMatchSource,
+    VerbProfile, VerbSelectionPolicyDebug, VerbSurfaceEntry, VerbSurfaceExcludedEntry,
+    VerbSurfaceFilterSummary, VerbSurfacePruneReason, VerbSurfaceResponse,
+};
+pub use commands::{AgentCommand, PanDirection};
+pub use decision::{
+    AffectedEntityPreview, ClarificationPayload, DealClarificationPayload, DealOption,
+    DecisionKind, DecisionPacket, DecisionReplyRequest, DecisionReplyResponse, DecisionTrace,
+    EffectMode, EffectsPreview, EntityChoice, EntityClarificationPayload,
+    GroupClarificationPayload, GroupOption, PlanPreview, ProposalPayload, RefusePayload,
+    ScopeOption, ScopePayload, ScopeSample, SessionStateView, UserChoice, UserReply, VerbPayload,
+};
+pub use disambiguation::{
+    ClientGroupCandidate, DisambiguationItem, DisambiguationRequest, DisambiguationResponse,
+    DisambiguationSelection, EntityMatch, IntentTierNextStep, IntentTierOption, IntentTierRequest,
+    IntentTierSelection, IntentTierSelectionRequest, IntentTierSelectionResponse, Interpretation,
+    VerbDisambiguationRequest, VerbOption, VerbSelectionRequest, VerbSelectionResponse,
+};
+pub use onboarding_state::{
+    BlockedVerb, CbuPhaseStatus, CbuStateCard, ContextResetHint, LayerState, OnboardingLayer,
+    OnboardingStateView, SuggestedVerb, UnreachableVerb, VerbDirection,
+};
+pub use resolution::{
+    CancelResolutionResponse, CommitResolutionResponse, ConfirmAllRequest,
+    ConfirmResolutionRequest, DiscriminatorField, DiscriminatorFieldType, EntityMatchResponse,
+    EntityStatus, EnumValue, RefContext, ResolutionContextInfo, ResolutionMethod,
+    ResolutionModeHint, ResolutionRequiredPayload, ResolutionSearchRequest,
+    ResolutionSearchResponse, ResolutionSessionResponse, ResolutionStateResponse,
+    ResolutionSummary, ResolutionWarning, ResolvedRefResponse, ReviewRequirement, SearchKeyField,
+    SearchKeyFieldType, SearchSuggestions, SelectResolutionRequest, SelectResolutionResponse,
+    StartResolutionRequest, SuggestedAction, SuggestedActionType, UnresolvedRefResponse,
+    WarningSeverity,
+};
+pub use session_input::{
+    DiscoverySelection, DiscoverySelectionKind, SessionInputRequest, SessionInputResponse,
+};
+pub use session_stack::{
+    ConstraintCascadeState, SessionScopeState, SessionStackFrame, SessionStackState,
+    SessionSubjectKind, SessionWorkspaceKind,
+};
 
 // ============================================================================
 // RESOLVED KEY - UUID vs Code distinction

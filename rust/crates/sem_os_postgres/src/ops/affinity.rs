@@ -18,14 +18,14 @@ use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
-use sem_os_core::abac::ActorContext;
-use sem_os_core::affinity::{discover_dsl, AffinityKind, DataRef, TableRef};
-use sem_os_core::context_resolution::{
-    ContextResolutionRequest, DiscoveryContext, EvidenceMode, SubjectRef,
-};
 use sem_os_core::principal::Principal;
 use sem_os_core::types::Classification;
-use sem_os_core::verb_contract::VerbContractBody;
+use sem_os_ontology::verb_contract::VerbContractBody;
+use sem_os_policy::abac::ActorContext;
+use sem_os_policy::affinity::{discover_dsl, AffinityKind, DataRef, TableRef};
+use sem_os_policy::context_resolution::{
+    ContextResolutionRequest, DiscoveryContext, EvidenceMode, SubjectRef,
+};
 
 use dsl_runtime::domain_ops::affinity_graph_cache::load_affinity_graph_cached;
 use dsl_runtime::domain_ops::helpers::{
@@ -179,7 +179,7 @@ async fn load_active_verb_contracts(
         .collect())
 }
 
-fn map_verb_affinity(va: sem_os_core::affinity::VerbAffinity) -> VerbAffinityRow {
+fn map_verb_affinity(va: sem_os_policy::affinity::VerbAffinity) -> VerbAffinityRow {
     VerbAffinityRow {
         verb_fqn: va.verb_fqn,
         affinity_kind: format!("{:?}", va.affinity_kind),
@@ -187,7 +187,7 @@ fn map_verb_affinity(va: sem_os_core::affinity::VerbAffinity) -> VerbAffinityRow
     }
 }
 
-fn map_data_affinity(da: sem_os_core::affinity::DataAffinity) -> DataAffinityRow {
+fn map_data_affinity(da: sem_os_policy::affinity::DataAffinity) -> DataAffinityRow {
     let data_ref_kind = match &da.data_ref {
         DataRef::Table(_) => "table",
         DataRef::Column(_) => "column",

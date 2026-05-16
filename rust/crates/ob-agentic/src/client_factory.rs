@@ -7,6 +7,7 @@ use std::sync::Arc;
 
 use super::anthropic_client::AnthropicClient;
 use super::backend::AgentBackend;
+use super::claude_code_cli_client::ClaudeCodeCliClient;
 use super::llm_client::LlmClient;
 use super::openai_client::OpenAiClient;
 
@@ -15,6 +16,7 @@ use super::openai_client::OpenAiClient;
 /// Uses the appropriate API key environment variable:
 /// - Anthropic: ANTHROPIC_API_KEY
 /// - OpenAI: OPENAI_API_KEY
+/// - Claude Code CLI: local Claude Code auth, no API key required
 pub fn create_llm_client() -> Result<Arc<dyn LlmClient>> {
     let backend = AgentBackend::from_env()?;
     match backend {
@@ -24,6 +26,10 @@ pub fn create_llm_client() -> Result<Arc<dyn LlmClient>> {
         }
         AgentBackend::OpenAi => {
             let client = OpenAiClient::from_env()?;
+            Ok(Arc::new(client))
+        }
+        AgentBackend::ClaudeCodeCli => {
+            let client = ClaudeCodeCliClient::from_env()?;
             Ok(Arc::new(client))
         }
     }
@@ -47,6 +53,10 @@ pub fn create_llm_client_with_key(api_key: String) -> Result<Arc<dyn LlmClient>>
                 Ok(Arc::new(OpenAiClient::new(api_key)))
             }
         }
+        AgentBackend::ClaudeCodeCli => {
+            let client = ClaudeCodeCliClient::from_env()?;
+            Ok(Arc::new(client))
+        }
     }
 }
 
@@ -63,6 +73,10 @@ pub fn create_llm_client_for_backend(backend: AgentBackend) -> Result<Arc<dyn Ll
             let client = OpenAiClient::from_env()?;
             Ok(Arc::new(client))
         }
+        AgentBackend::ClaudeCodeCli => {
+            let client = ClaudeCodeCliClient::from_env()?;
+            Ok(Arc::new(client))
+        }
     }
 }
 
@@ -76,6 +90,13 @@ pub fn has_api_key_for(backend: AgentBackend) -> bool {
     match backend {
         AgentBackend::Anthropic => std::env::var("ANTHROPIC_API_KEY").is_ok(),
         AgentBackend::OpenAi => std::env::var("OPENAI_API_KEY").is_ok(),
+        AgentBackend::ClaudeCodeCli => {
+            let bin = std::env::var("CLAUDE_CODE_CLI_BIN").unwrap_or_else(|_| "claude".to_string());
+            std::process::Command::new(bin)
+                .arg("--version")
+                .output()
+                .is_ok()
+        }
     }
 }
 
@@ -88,6 +109,9 @@ pub fn get_api_key_for(backend: AgentBackend) -> Result<String> {
         AgentBackend::OpenAi => {
             std::env::var("OPENAI_API_KEY").map_err(|_| anyhow!("OPENAI_API_KEY not set"))
         }
+        AgentBackend::ClaudeCodeCli => Err(anyhow!(
+            "Claude Code CLI backend uses local Claude Code auth, not an API key"
+        )),
     }
 }
 
@@ -100,5 +124,6 @@ mod tests {
         // This test just verifies the function runs without panic
         let _ = has_api_key_for(AgentBackend::Anthropic);
         let _ = has_api_key_for(AgentBackend::OpenAi);
+        let _ = has_api_key_for(AgentBackend::ClaudeCodeCli);
     }
 }

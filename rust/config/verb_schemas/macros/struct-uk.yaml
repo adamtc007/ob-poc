@@ -16,6 +16,12 @@
 # =============================================================================
 struct.uk.authorised.oeic:
   kind: macro
+  plan-kind: composite_sequence
+  lifecycle-state: active
+  requires-states: []
+  precondition-checks: ["requires_scope:client"]
+  state-effect: transition
+  side-effects: state_write
 
   ui:
     label: "UK Authorised OEIC"
@@ -225,6 +231,12 @@ struct.uk.authorised.oeic:
 # =============================================================================
 struct.uk.authorised.aut:
   kind: macro
+  plan-kind: composite_sequence
+  lifecycle-state: active
+  requires-states: []
+  precondition-checks: ["requires_scope:client"]
+  state-effect: transition
+  side-effects: state_write
 
   ui:
     label: "UK Authorised Unit Trust"
@@ -409,6 +421,12 @@ struct.uk.authorised.aut:
 # =============================================================================
 struct.uk.authorised.acs:
   kind: macro
+  plan-kind: composite_sequence
+  lifecycle-state: active
+  requires-states: []
+  precondition-checks: ["requires_scope:client"]
+  state-effect: transition
+  side-effects: state_write
 
   ui:
     label: "UK Authorised Contractual Scheme"
@@ -592,6 +610,12 @@ struct.uk.authorised.acs:
 # =============================================================================
 struct.uk.authorised.ltaf:
   kind: macro
+  plan-kind: composite_sequence
+  lifecycle-state: active
+  requires-states: []
+  precondition-checks: ["requires_scope:client"]
+  state-effect: transition
+  side-effects: state_write
 
   ui:
     label: "UK Long-Term Asset Fund"
@@ -720,6 +744,12 @@ struct.uk.authorised.ltaf:
 # =============================================================================
 struct.uk.manager.llp:
   kind: macro
+  plan-kind: composite_sequence
+  lifecycle-state: active
+  requires-states: []
+  precondition-checks: ["requires_scope:client"]
+  state-effect: transition
+  side-effects: state_write
 
   ui:
     label: "UK Manager LLP"
@@ -886,6 +916,12 @@ struct.uk.manager.llp:
 # =============================================================================
 struct.uk.private-equity.lp:
   kind: macro
+  plan-kind: composite_sequence
+  lifecycle-state: active
+  requires-states: []
+  precondition-checks: ["requires_scope:client"]
+  state-effect: transition
+  side-effects: state_write
 
   ui:
     label: "UK Private Equity LP"

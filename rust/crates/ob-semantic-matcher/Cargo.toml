@@ -72,3 +72,6 @@ path = "src/bin/populate_embeddings.rs"
 
 [dev-dependencies]
 tokio = { version = "1", features = ["full", "test-util"] }
+
+[lints.rust]
+unreachable_pub = "deny"

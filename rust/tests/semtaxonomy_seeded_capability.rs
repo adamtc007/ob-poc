@@ -177,17 +177,17 @@ mod tests {
                 .ok_or_else(|| anyhow::anyhow!("missing chat response"))?;
 
             let predicted_verb = response
-                .get("coder_proposal")
+                .get("drafter_proposal")
                 .and_then(|value| value.get("verb_fqn"))
                 .and_then(|value| value.as_str())
                 .map(ToOwned::to_owned);
             let requires_confirmation = response
-                .get("coder_proposal")
+                .get("drafter_proposal")
                 .and_then(|value| value.get("requires_confirmation"))
                 .and_then(|value| value.as_bool())
                 .unwrap_or(false);
             let ready_to_execute = response
-                .get("coder_proposal")
+                .get("drafter_proposal")
                 .and_then(|value| value.get("ready_to_execute"))
                 .and_then(|value| value.as_bool())
                 .unwrap_or(false);

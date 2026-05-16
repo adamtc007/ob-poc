@@ -12,15 +12,15 @@ use dsl_core::config::types::{
     VerbMetadata, VerbsConfig,
 };
 
-use sem_os_core::{
+use sem_os_ontology::{
     attribute_def::{AttributeDataType, AttributeDefBody, AttributeSource},
     entity_type_def::{DbTableMapping, EntityTypeDefBody},
-    types::{Classification, EvidenceGrade, HandlingControl, SecurityLabel},
     verb_contract::{
         ActionClass, HarmClass, VerbArgDef, VerbArgLookup, VerbContractBody, VerbContractMetadata,
         VerbCrudMapping, VerbOutput, VerbPrecondition, VerbProducesSpec, VerbReturnSpec,
     },
 };
+use sem_os_types::{Classification, EvidenceGrade, HandlingControl, SecurityLabel};
 
 use crate::metadata::DomainMetadata;
 
@@ -1531,7 +1531,7 @@ domains:
 
     #[test]
     fn test_enrich_entity_types_populates_governance() {
-        use sem_os_core::entity_type_def::{DbTableMapping, EntityTypeDefBody};
+        use sem_os_ontology::entity_type_def::{DbTableMapping, EntityTypeDefBody};
 
         let meta = enrichment_metadata();
         let mut entity_types = vec![EntityTypeDefBody {
@@ -1569,7 +1569,7 @@ domains:
 
     #[test]
     fn test_enrich_entity_types_populates_reverse_verbs() {
-        use sem_os_core::entity_type_def::{DbTableMapping, EntityTypeDefBody};
+        use sem_os_ontology::entity_type_def::{DbTableMapping, EntityTypeDefBody};
 
         let meta = enrichment_metadata();
         let mut entity_types = vec![EntityTypeDefBody {
@@ -1610,7 +1610,7 @@ domains:
 
     #[test]
     fn test_enrich_entity_types_fqn_heuristic() {
-        use sem_os_core::entity_type_def::EntityTypeDefBody;
+        use sem_os_ontology::entity_type_def::EntityTypeDefBody;
 
         let meta = enrichment_metadata();
         // Entity type without db_table — uses fqn + "s" heuristic

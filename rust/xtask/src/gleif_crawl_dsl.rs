@@ -23,25 +23,25 @@ use std::path::PathBuf;
 use std::time::Instant;
 
 /// Allianz Global Investors GmbH - Fund manager with managed funds
-pub const ALLIANZ_GI_LEI: &str = "529900FAHFDMSXCPII15";
+pub(crate) const ALLIANZ_GI_LEI: &str = "529900FAHFDMSXCPII15";
 
 /// Configuration for DSL-based GLEIF crawl
 #[derive(Debug, Clone)]
-pub struct DslCrawlConfig {
+pub(crate) struct DslCrawlConfig {
     /// Root LEI to start from (defaults to Allianz GI for fund import)
-    pub root_lei: String,
+    pub(crate) root_lei: String,
     /// Maximum funds to import (None = all)
-    pub limit: Option<usize>,
+    pub(crate) limit: Option<usize>,
     /// Whether to create CBUs for each fund
-    pub create_cbus: bool,
+    pub(crate) create_cbus: bool,
     /// Whether to trace parent chains
-    pub trace_parents: bool,
+    pub(crate) trace_parents: bool,
     /// Dry run - generate DSL but don't execute
-    pub dry_run: bool,
+    pub(crate) dry_run: bool,
     /// Verbose output
-    pub verbose: bool,
+    pub(crate) verbose: bool,
     /// Output directory for generated DSL
-    pub output_dir: PathBuf,
+    pub(crate) output_dir: PathBuf,
 }
 
 impl Default for DslCrawlConfig {
@@ -60,20 +60,20 @@ impl Default for DslCrawlConfig {
 
 /// Statistics from the DSL-based crawl
 #[derive(Debug, Default, Clone, Serialize, Deserialize)]
-pub struct DslCrawlStats {
-    pub dsl_statements_generated: usize,
-    pub dsl_statements_executed: usize,
-    pub funds_imported: usize,
-    pub entities_created: usize,
-    pub cbus_created: usize,
-    pub roles_assigned: usize,
-    pub parent_chains_traced: usize,
-    pub errors: Vec<String>,
-    pub elapsed_secs: f64,
+pub(crate) struct DslCrawlStats {
+    pub(crate) dsl_statements_generated: usize,
+    pub(crate) dsl_statements_executed: usize,
+    pub(crate) funds_imported: usize,
+    pub(crate) entities_created: usize,
+    pub(crate) cbus_created: usize,
+    pub(crate) roles_assigned: usize,
+    pub(crate) parent_chains_traced: usize,
+    pub(crate) errors: Vec<String>,
+    pub(crate) elapsed_secs: f64,
 }
 
 /// DSL-based GLEIF crawler
-pub struct GleifDslCrawler {
+pub(crate) struct GleifDslCrawler {
     config: DslCrawlConfig,
     pool: Option<PgPool>,
     dsl_statements: Vec<String>,
@@ -82,7 +82,7 @@ pub struct GleifDslCrawler {
 }
 
 impl GleifDslCrawler {
-    pub fn new(config: DslCrawlConfig, pool: Option<PgPool>) -> Result<Self> {
+    pub(crate) fn new(config: DslCrawlConfig, pool: Option<PgPool>) -> Result<Self> {
         fs::create_dir_all(&config.output_dir)?;
 
         Ok(Self {
@@ -151,7 +151,7 @@ impl GleifDslCrawler {
     }
 
     /// Run the DSL-based crawl
-    pub async fn crawl(&mut self) -> Result<DslCrawlStats> {
+    pub(crate) async fn crawl(&mut self) -> Result<DslCrawlStats> {
         let start_time = Instant::now();
 
         println!("\n{}", "=".repeat(70));
@@ -352,7 +352,7 @@ impl GleifDslCrawler {
 }
 
 /// Run the DSL-based GLEIF crawl
-pub async fn run_gleif_crawl_dsl(
+pub(crate) async fn run_gleif_crawl_dsl(
     root_lei: Option<String>,
     limit: Option<usize>,
     create_cbus: bool,

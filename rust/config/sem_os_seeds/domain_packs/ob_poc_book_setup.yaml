@@ -1,0 +1,58 @@
+pack_id: ob-poc.book-setup
+name: ob-poc Book Setup Domain Pack
+version: 0.1.0
+implementation_mode: native_compiled
+compatibility_tier: dry_run_only
+owned_dags: [book_setup_dag]
+owned_packs: [book-setup]
+owned_state_machines: []
+owned_constellation_maps:
+  - cbu.workspace
+  - onboarding.workspace
+owned_constellation_families:
+  - cbu_workspace
+  - onboarding_workspace
+owned_universes:
+  - universe.client_lifecycle
+  - universe.fund_structures
+owned_verb_prefixes:
+  - book.
+  - structure.
+  - struct.
+  - party.
+  - mandate.
+owned_entity_kinds:
+  - cbu
+business_crates: []
+owned_constellations:
+  - cbu.workspace
+  - onboarding.workspace
+allowed_transitions:
+  - transition_ref: book-setup.structure-selected
+    entity_type: cbu
+    state_machine: book_setup_lifecycle
+    verb: book.select-structure
+    from_state: draft
+    to_state: structure_selected
+    dry_run_enabled: true
+    mutation_enabled: false
+    hitl_required: true
+discovery_probes:
+  - probe_id: book-setup.read-state
+    operation: read_state
+    target: semos.book_setup
+    idempotent: true
+    modeled: true
+    first_class_state_mutation: false
+projection_catalog: []
+mention_namespaces: []
+declared_modes: []
+workflow_phases: []
+acp_personas: []
+resource_uri_schemes: []
+external_mcp_transports: []
+typed_extension_points: []
+classification_policy:
+  max_prompt_classification: internal
+  allow_external_llm: false
+  required_redactions: [pii]

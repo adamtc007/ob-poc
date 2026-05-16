@@ -3,14 +3,15 @@ use super::{
     ResolverProvenance, ShapeRef, SlotProvenance, WorkspaceId,
 };
 use crate::config::dag::{
-    load_dags_from_dir, ClosureType, CompletenessAssertionConfig as DagCompletenessAssertionConfig,
-    Dag, EligibilityConstraint, LoadedDag, PredicateBinding, Slot as DagSlot, SlotStateMachine,
+    load_domain_pack_owned_dags, ClosureType,
+    CompletenessAssertionConfig as DagCompletenessAssertionConfig, Dag, EligibilityConstraint,
+    LoadedDag, PredicateBinding, Slot as DagSlot, SlotStateMachine,
 };
 use crate::resolver::shape_rule::{
     load_shape_rules_from_dir, LoadedShapeRule, SlotGateMetadataRefinement, StructuralFacts,
 };
 use anyhow::{Context, Result};
-use sem_os_core::constellation_map_def as core_map;
+use sem_os_ontology::constellation_map_def as core_map;
 use serde::{Deserialize, Serialize};
 use serde_yaml::Value as YamlValue;
 use std::{
@@ -69,7 +70,10 @@ pub struct ResolverInputs {
 impl ResolverInputs {
     pub fn from_seed_root(seed_root: impl Into<PathBuf>) -> Result<Self> {
         let seed_root = seed_root.into();
-        let dag_taxonomies = load_dags_from_dir(&seed_root.join("dag_taxonomies"))?;
+        let config_root = seed_root
+            .parent()
+            .with_context(|| format!("seed root {} has no config parent", seed_root.display()))?;
+        let dag_taxonomies = load_domain_pack_owned_dags(config_root)?;
         let constellation_maps =
             load_constellation_maps_from_dir(&seed_root.join("constellation_maps"))?;
         let shape_rules = load_shape_rules_from_dir(&seed_root.join("shape_rules"))?;

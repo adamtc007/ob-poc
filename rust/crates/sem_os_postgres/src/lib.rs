@@ -13,20 +13,20 @@
 //! concern. `sem_os_postgres` retains only metadata-loading and
 //! store-implementation code.
 
-pub mod authoring;
-pub mod cleanup;
+pub(crate) mod authoring;
+pub(crate) mod cleanup;
 pub mod constellation_hydration;
 pub mod ops;
-pub mod service_options;
+pub(crate) mod service_options;
 pub(crate) mod sqlx_types;
-pub mod store;
+pub(crate) mod store;
 
 pub use authoring::{PgAuthoringStore, PgScratchSchemaRunner};
 pub use cleanup::PgCleanupStore;
 pub use ops::{SemOsVerbOp, SemOsVerbOpRegistry};
 pub use store::{
-    PgAuditStore, PgBootstrapAuditStore, PgChangesetStore, PgEvidenceStore, PgObjectStore,
-    PgOutboxStore, PgProjectionWriter, PgSnapshotStore,
+    PgAuditStore, PgBootstrapAuditStore, PgChangesetStore, PgDomainPackReloadIndexStore,
+    PgEvidenceStore, PgObjectStore, PgOutboxStore, PgProjectionWriter, PgSnapshotStore,
 };
 
 use sqlx::PgPool;
@@ -44,6 +44,7 @@ pub struct PgStores {
     pub scratch_runner: PgScratchSchemaRunner,
     pub cleanup: PgCleanupStore,
     pub bootstrap_audit: PgBootstrapAuditStore,
+    pub domain_pack_reload_index: PgDomainPackReloadIndexStore,
 }
 
 impl PgStores {
@@ -59,7 +60,8 @@ impl PgStores {
             authoring: PgAuthoringStore::new(pool.clone()),
             scratch_runner: PgScratchSchemaRunner::new(pool.clone()),
             cleanup: PgCleanupStore::new(pool.clone()),
-            bootstrap_audit: PgBootstrapAuditStore::new(pool),
+            bootstrap_audit: PgBootstrapAuditStore::new(pool.clone()),
+            domain_pack_reload_index: PgDomainPackReloadIndexStore::new(pool),
         }
     }
 }

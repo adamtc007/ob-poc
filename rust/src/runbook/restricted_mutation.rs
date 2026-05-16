@@ -24,6 +24,18 @@ pub struct RestrictedMutationRunbookCompilation {
     pub compiled_runbook: CompiledRunbook,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RestrictedMutationExecutionReceipt {
+    pub compiled_runbook_id: CompiledRunbookId,
+    pub workbook_id: super::workbook::ExecutionWorkbookId,
+    pub approval_token_id: super::approval_token::ApprovalTokenId,
+    pub transition_ref: String,
+    pub intended_diff: MutationSemanticDiff,
+    pub predicted_diff: sem_os_policy::state_simulation::StateSimulationResult,
+    pub actual_diff: MutationSemanticDiff,
+    pub executed_at: chrono::DateTime<chrono::Utc>,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "kind", rename_all = "snake_case")]
 pub enum RestrictedMutationRunbookCompilationError {
@@ -41,8 +53,18 @@ pub enum RestrictedMutationRunbookCompilationError {
         expected: String,
         actual: Option<String>,
     },
+    ReceiptBindingMismatch {
+        field: String,
+        expected: String,
+        actual: String,
+    },
+    ActualDiffMismatch {
+        expected: MutationSemanticDiff,
+        actual: MutationSemanticDiff,
+    },
 }
 
+#[allow(clippy::result_large_err)]
 pub fn compile_restricted_mutation_preflight(
     session_id: Uuid,
     runbook_version: u64,
@@ -132,6 +154,7 @@ pub fn compile_restricted_mutation_preflight(
             macro_audit_digests: vec![],
             snapshot_manifest,
         },
+        binding_resolution_audits: vec![],
         external_lookups: vec![],
         macro_audits: vec![],
         sealed_at: chrono::Utc::now(),
@@ -149,6 +172,59 @@ pub fn compile_restricted_mutation_preflight(
     })
 }
 
+#[allow(clippy::result_large_err)]
+pub fn record_restricted_mutation_execution_receipt(
+    compilation: &RestrictedMutationRunbookCompilation,
+    preflight: &RestrictedMutationPreflight,
+    actual_diff: MutationSemanticDiff,
+    executed_at: chrono::DateTime<chrono::Utc>,
+) -> Result<RestrictedMutationExecutionReceipt, RestrictedMutationRunbookCompilationError> {
+    require_receipt_binding(
+        "workbook_id",
+        &compilation.workbook_id.to_string(),
+        &preflight.workbook_id.to_string(),
+    )?;
+    require_receipt_binding(
+        "approval_token_id",
+        &compilation.approval_token_id.to_string(),
+        &preflight.approval.approval_token_id.to_string(),
+    )?;
+    require_receipt_binding(
+        "transition_ref",
+        &compilation.transition_ref,
+        &preflight.transition_ref,
+    )?;
+    if compilation.expected_diff != preflight.intended_diff {
+        return Err(
+            RestrictedMutationRunbookCompilationError::ReceiptBindingMismatch {
+                field: "intended_diff".to_string(),
+                expected: format!("{:?}", compilation.expected_diff),
+                actual: format!("{:?}", preflight.intended_diff),
+            },
+        );
+    }
+    if actual_diff != compilation.expected_diff {
+        return Err(
+            RestrictedMutationRunbookCompilationError::ActualDiffMismatch {
+                expected: compilation.expected_diff.clone(),
+                actual: actual_diff,
+            },
+        );
+    }
+
+    Ok(RestrictedMutationExecutionReceipt {
+        compiled_runbook_id: compilation.compiled_runbook_id,
+        workbook_id: compilation.workbook_id.clone(),
+        approval_token_id: compilation.approval_token_id.clone(),
+        transition_ref: compilation.transition_ref.clone(),
+        intended_diff: preflight.intended_diff.clone(),
+        predicted_diff: preflight.predicted_diff.clone(),
+        actual_diff,
+        executed_at,
+    })
+}
+
+#[allow(clippy::result_large_err)]
 fn require_arg(
     preflight: &RestrictedMutationPreflight,
     field: &str,
@@ -161,6 +237,24 @@ fn require_arg(
             expected: expected.to_string(),
             actual,
         });
+    }
+    Ok(())
+}
+
+#[allow(clippy::result_large_err)]
+fn require_receipt_binding(
+    field: &str,
+    expected: &str,
+    actual: &str,
+) -> Result<(), RestrictedMutationRunbookCompilationError> {
+    if expected != actual {
+        return Err(
+            RestrictedMutationRunbookCompilationError::ReceiptBindingMismatch {
+                field: field.to_string(),
+                expected: expected.to_string(),
+                actual: actual.to_string(),
+            },
+        );
     }
     Ok(())
 }
@@ -184,7 +278,7 @@ mod tests {
     use crate::runbook::{
         ApprovalTokenId, ExecutionWorkbookId, MutationSemanticDiff, RestrictedMutationApprovalCheck,
     };
-    use sem_os_core::state_simulation::{
+    use sem_os_policy::state_simulation::{
         SemanticStateDiff, SimulatedStateAdvance, StateSimulationResult,
     };
     use uuid::uuid;
@@ -305,6 +399,51 @@ mod tests {
         assert!(matches!(
             err,
             RestrictedMutationRunbookCompilationError::AlreadyExecuted { .. }
+        ));
+    }
+
+    #[test]
+    fn records_execution_receipt_when_actual_diff_matches_intended_and_predicted() {
+        let preflight = preflight();
+        let compilation = compile_restricted_mutation_preflight(SESSION_ID, 7, &preflight).unwrap();
+
+        let receipt = record_restricted_mutation_execution_receipt(
+            &compilation,
+            &preflight,
+            preflight.intended_diff.clone(),
+            chrono::Utc::now(),
+        )
+        .unwrap();
+
+        assert_eq!(receipt.compiled_runbook_id, compilation.compiled_runbook_id);
+        assert_eq!(receipt.workbook_id, preflight.workbook_id);
+        assert_eq!(
+            receipt.approval_token_id,
+            preflight.approval.approval_token_id
+        );
+        assert_eq!(receipt.intended_diff, preflight.intended_diff);
+        assert_eq!(receipt.predicted_diff, preflight.predicted_diff);
+        assert_eq!(receipt.actual_diff, preflight.intended_diff);
+    }
+
+    #[test]
+    fn refuses_execution_receipt_when_actual_diff_does_not_match_expected_diff() {
+        let preflight = preflight();
+        let compilation = compile_restricted_mutation_preflight(SESSION_ID, 7, &preflight).unwrap();
+        let mut actual_diff = preflight.intended_diff.clone();
+        actual_diff.after = "APPROVED".to_string();
+
+        let err = record_restricted_mutation_execution_receipt(
+            &compilation,
+            &preflight,
+            actual_diff,
+            chrono::Utc::now(),
+        )
+        .unwrap_err();
+
+        assert!(matches!(
+            err,
+            RestrictedMutationRunbookCompilationError::ActualDiffMismatch { .. }
         ));
     }
 }

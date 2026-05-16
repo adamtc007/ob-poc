@@ -6,7 +6,11 @@ use anyhow::{Context, Result};
 use std::path::Path;
 
 /// Compile lexicon YAML files into a binary snapshot.
-pub fn compile(config_root: Option<&Path>, output: Option<&Path>, verbose: bool) -> Result<()> {
+pub(crate) fn compile(
+    config_root: Option<&Path>,
+    output: Option<&Path>,
+    verbose: bool,
+) -> Result<()> {
     use ob_poc::lexicon::LexiconCompiler;
 
     println!("===========================================");
@@ -69,7 +73,7 @@ pub fn compile(config_root: Option<&Path>, output: Option<&Path>, verbose: bool)
 }
 
 /// Lint lexicon YAML files for consistency.
-pub fn lint(config_root: Option<&Path>, errors_only: bool) -> Result<()> {
+pub(crate) fn lint(config_root: Option<&Path>, errors_only: bool) -> Result<()> {
     println!("===========================================");
     println!("  Lexicon Lint");
     println!("===========================================\n");
@@ -159,7 +163,7 @@ pub fn lint(config_root: Option<&Path>, errors_only: bool) -> Result<()> {
 }
 
 /// Benchmark lexicon search performance.
-pub fn bench(snapshot_path: Option<&Path>, iterations: usize) -> Result<()> {
+pub(crate) fn bench(snapshot_path: Option<&Path>, iterations: usize) -> Result<()> {
     use ob_poc::lexicon::{LexiconService, LexiconServiceImpl, LexiconSnapshot};
     use std::sync::Arc;
     use std::time::Instant;

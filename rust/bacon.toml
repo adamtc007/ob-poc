@@ -188,15 +188,6 @@ need_stdout = false
 command = ["cargo", "clippy", "-p", "playbook-core", "--color", "always"]
 need_stdout = false
 
-# playbook-lower
-[jobs.check-playbook-lower]
-command = ["cargo", "check", "-p", "playbook-lower", "--color", "always"]
-need_stdout = false
-
-[jobs.clippy-playbook-lower]
-command = ["cargo", "clippy", "-p", "playbook-lower", "--color", "always"]
-need_stdout = false
-
 # dsl-lsp (LSP server)
 [jobs.check-lsp]
 command = ["cargo", "check", "-p", "dsl-lsp", "--color", "always"]
@@ -288,15 +279,6 @@ need_stdout = false
 [jobs.test-sem-all]
 command = ["cargo", "test", "-p", "sem_os_core", "-p", "sem_os_server", "--color", "always"]
 need_stdout = true
-
-# governed_query_proc (proc-macro)
-[jobs.check-governed-query]
-command = ["cargo", "check", "-p", "governed_query_proc", "--color", "always"]
-need_stdout = false
-
-[jobs.clippy-governed-query]
-command = ["cargo", "clippy", "-p", "governed_query_proc", "--color", "always"]
-need_stdout = false
 
 # =============================================================================
 # XTASK

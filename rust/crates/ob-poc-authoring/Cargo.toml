@@ -1,0 +1,61 @@
+[package]
+name = "ob-poc-authoring"
+version = "0.1.0"
+edition = "2021"
+description = "Authoring / editor-facing surface — clarification UX (DecisionPacket), lexicon lookup, macro registry, schema lint, data dictionary (AttributeId), display-noun translation table, feedback inspector, language pack. The toolkit that serves a human (or LLM) author shaping the registry."
+
+# Capability discipline (see docs/todo/capability-crate-restructure-v1.md §2.2):
+#   IN-SCOPE: tools that present the registry to an author and turn
+#             author input into structured proposals — clarify
+#             prompts/answers, lexicon lookups, lint diagnostics, macro
+#             definitions, data-dictionary attribute keys, display-noun
+#             projection, feedback failure inspection, language packs.
+#   OUT-OF-SCOPE: the runtime that EXECUTES author proposals
+#                 (changesets, governance gates, persistence) lives in
+#                 sem_os_*. The boundary that contracts WITH the
+#                 author's editor (ACP discovery, workbook approval)
+#                 lives in ob-poc-boundary. This crate is the tooling
+#                 layer between them.
+
+[dependencies]
+ob-poc-types = { path = "../ob-poc-types" }
+# ob-poc-macros supplies #[derive(IdType)] for AttributeId in
+# data_dictionary. Proc-macro crate, tooling tier.
+ob-poc-macros = { path = "../ob-poc-macros" }
+# ob-poc-diagnostics carries events::* types referenced by feedback
+# inspector. Primitive tier.
+ob-poc-diagnostics = { path = "../ob-poc-diagnostics" }
+anyhow = "1.0"
+# clarify::confirm signs confirmation tokens with base64(random_bytes || ts).
+base64 = "0.22"
+# data_dictionary defines an #[async_trait]'d AttributeRepository surface.
+async-trait = "0.1"
+bincode = "1"
+chrono = { version = "0.4", features = ["serde"] }
+hex = "0.4"
+regex = "1.12.2"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+serde_yaml = "0.9"
+sha2 = "0.10"
+smallvec = { version = "1.11", features = ["serde"] }
+thiserror = "1"
+unicode-normalization = "0.1"
+uuid = { version = "1", features = ["v4", "serde"] }
+# lexicon::compiler emits tracing events during snapshot build.
+tracing = "0.1"
+# Optional — feedback inspector reads failure repros from sqlx::PgPool.
+sqlx = { version = "0.8", features = ["runtime-tokio-rustls", "postgres", "uuid", "chrono", "json"], optional = true }
+
+[features]
+default = []
+database = ["dep:sqlx", "ob-poc-diagnostics/database"]
+
+[dev-dependencies]
+# clarify::confirm tests generate random tokens.
+rand = "0.8"
+# lexicon::compiler / snapshot + macros::registry tests use temp files.
+tempfile = "3"
+
+[lints.rust]
+unreachable_pub = "deny"

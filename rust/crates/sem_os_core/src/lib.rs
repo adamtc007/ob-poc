@@ -1,49 +1,20 @@
-pub mod abac;
-pub mod acp_projection;
-pub mod affinity;
-pub mod authoring;
-pub mod constellation_family_def;
-pub mod constellation_map_def;
-pub mod context_policy;
-pub mod context_resolution;
-pub mod diagram;
-pub mod domain_pack;
-pub mod enforce;
+//! sem_os_core — engine + foundation primitives.
+//!
+//! After sem_os_core-split v1 (docs/todo/sem-os-core-split-v1.md), this
+//! crate holds only the engine tier:
+//!   error, execution, ids, ports, principal, proto, seeds, service,
+//!   types (compat shim → sem_os_types).
+//!
+//! The `*_def` vocabulary lives in `sem_os_ontology`. Policy / projection
+//! / observatory / authoring / stewardship live in `sem_os_policy`.
+//! Foundational vocabulary (Classification, EvidenceGrade, SecurityLabel,
+//! Changeset, ChangeSetStatus, …) lives in `sem_os_types`.
+
 pub mod error;
 pub mod execution;
-pub mod gates;
-pub mod grounding;
 pub mod ids;
-pub mod macro_def;
-pub mod observatory;
 pub mod ports;
 pub mod principal;
 pub mod proto;
-pub mod security;
 pub mod seeds;
-pub mod service;
-pub mod state_simulation;
-pub mod stewardship;
 pub mod types;
-pub mod universe_def;
-
-// ── Body type modules (13 object types) ───────────────────────
-pub mod attribute_def;
-pub mod derivation;
-pub mod derivation_spec;
-pub mod document_type_def;
-pub mod entity_type_def;
-pub mod evidence;
-pub mod evidence_strategy_def;
-pub mod membership;
-pub mod observation_def;
-pub mod policy_rule;
-pub mod proof_obligation_def;
-pub mod relationship_type_def;
-pub mod requirement_profile_def;
-pub mod service_resource_def;
-pub mod state_graph_def;
-pub mod state_machine_def;
-pub mod taxonomy_def;
-pub mod verb_contract;
-pub mod view_def;

@@ -2,7 +2,7 @@
 
 > **Version:** 3.1
 > **Date:** 2026-03-28
-> **Status:** Living document — consolidation of 9 prior specs, updated for the 2026-03-08 runtime schema consolidation, the 2026-03-12 document-governance bootstrap, the 2026-03-13 NLCI/CBU surface reconciliation, the 2026-03-15 reducer/constellation runtime cutover, the 2026-03-16 DB harness/runtime verification pass, the 2026-03-16 CODEX data-integrity/parser/serialization remediation, the 2026-03-17 discovery-universe + single-pipeline cutover, the 2026-03-21 SemOS reconciliation remediation verification pass, the 2026-03-24 attribute identity + derivation reconciliation pass, the 2026-03-24 taxonomy/evidence unification pass, the 2026-03-24 attribute DSL + Phase 4 schema cleanup pass, the 2026-03-27 derived attribute canonical persistence (D0-D12), the 2026-03-28 SemOS-first hub implementation (Phases 1-7), and the 2026-04-16 capability-boundary and dead-code cleanup pass
+> **Status:** Living document — consolidation of 9 prior specs, updated for the 2026-03-08 runtime schema consolidation, the 2026-03-12 document-governance bootstrap, the 2026-03-13 NLCI/CBU surface reconciliation, the 2026-03-15 reducer/constellation runtime cutover, the 2026-03-16 DB harness/runtime verification pass, the 2026-03-16 CODEX data-integrity/parser/serialization remediation, the 2026-03-17 discovery-universe + single-pipeline cutover, the 2026-03-21 SemOS reconciliation remediation verification pass, the 2026-03-24 attribute identity + derivation reconciliation pass, the 2026-03-24 taxonomy/evidence unification pass, the 2026-03-24 attribute DSL + Phase 4 schema cleanup pass, the 2026-03-27 derived attribute canonical persistence (D0-D12), the 2026-03-28 SemOS-first hub implementation (Phases 1-7), the 2026-04-16 capability-boundary and dead-code cleanup pass, and the 2026-05-14 domain-pack taxonomy reload/index implementation
 > **Audience:** Engineering, governance, architecture review
 
 ---
@@ -37,6 +37,42 @@ The Sem OS crate split now more closely matches the intended capability boundary
 - dormant server tool endpoints have been removed rather than preserved as commented placeholder capability
 
 What remains intentionally unresolved is adapter leakage from `sem_os_obpoc_adapter` into `ob-poc`. That is a bridge-facade problem, not a reason to widen the standalone Sem OS service surface.
+
+### Domain-Pack Taxonomy Reload State (2026-05-14)
+
+SemOS domain-specific shape is now explicitly configuration-owned. Domain
+packs under `rust/config/sem_os_seeds/domain_packs/*.yaml` declare ownership
+over DAG taxonomies, DSL packs, state machines, constellation maps/families,
+universes, verb prefixes, and entity kinds. Business crates are clients and
+execution/mechanics homes; they do not own SemOS taxonomy shape.
+
+Reload uses a build-engine index:
+
+- source path, mtime, and byte length are the cheap "maybe dirty" check
+- canonical surface hash is the correctness check
+- unchanged fingerprints skip YAML parsing
+- changed fingerprints reload YAML and recompute the canonical hash
+- unchanged hash updates only the reload index
+- changed hash reports `publish_required`
+
+The persisted index lives in `sem_reg.domain_pack_reload_index`. It is an
+optimization and diagnostic surface, not canonical truth. Canonical truth is
+still the immutable SemOS snapshot graph.
+
+`DomainPack` is a SemReg object type and is scanned into
+`SeedBundle.domain_packs`. Publication stays behind
+`CoreService::bootstrap_seed_bundle()`: identical payloads skip; changed
+payloads publish non-breaking successor snapshots.
+
+Manual trigger:
+
+```bash
+cd rust
+cargo run --manifest-path xtask/Cargo.toml -- sem-reg domain-pack-check
+cargo run --manifest-path xtask/Cargo.toml -- sem-reg domain-pack-check --pack-id ob-poc.cbu --force-check --update-index
+```
+
+Architecture note: `docs/architecture/sem-os-domain-pack-taxonomy-reload.md`.
 
 ### Current Discovery/Bootstrap State (2026-03-17)
 
@@ -686,9 +722,61 @@ Verified smoke behavior on the live `ob-poc-web` path:
 
 ## 5. Core Domain Model
 
-### 13 Object Types
+### 5.0 What "macro" means in this system
 
-All 13 types share a single table (`sem_reg.snapshots`) with type-specific bodies stored as JSONB:
+> **Macros are governed recipes: pack-scoped, hashable, versioned multi-step
+> domain patterns that Sage may discover and bind, but which the compiler
+> must expand into ordinary DSL atomics before any REPL execution occurs.**
+
+This is the load-bearing definition of "macro" in ob-poc's SemOS. The
+word means something very different in adjacent ecosystems:
+
+| Ecosystem | "Macro" means |
+|---|---|
+| C/C++ preprocessor | Textual substitution at compile time |
+| Rust `macro_rules!` / proc-macros | Hygienic AST transformation at compile time |
+| Lisp / Scheme | Symbolic code rewriting via the macro expander |
+| **ob-poc SemOS** | **Governed multi-step domain recipe; first-class registry entity** |
+
+A SemOS macro is:
+
+- **A first-class registry entity**, alongside verbs, attribute defs,
+  entity-type defs, etc. It has identity (FQN), a content hash, a
+  lifecycle FSM (`draft → active → deprecated → retired`), a pack-scope
+  governance boundary, and an audit trail.
+- **A multi-step recipe.** It declares a slot contract, preconditions,
+  ordered expansion, expected FSM transitions, refusal conditions,
+  pending-question conditions, and a redacted expansion summary that
+  the agent reads.
+- **A planning + compilation surface, not an execution surface.** ACP
+  exposes macros to Sage as peers to verbs at the dispatch decision
+  point. The compiler expands a selected macro into an ordered DSL
+  atomic sequence; the REPL executes only those atomics. **Macros have
+  no mutation authority after expansion** — see the two invariants in
+  `todo/acp-pack-context-parity-gate-a/r1-schema-parity-adr.md`.
+
+The three-tier ob-poc planning hierarchy:
+
+```text
+DAG pack    — workspace boundary, governance, allowed verbs, neighbours
+  └─ Macro  — bounded outcome pattern (this entity)
+       └─ Verb — atomic DSL primitive (one read/mutation shape)
+```
+
+The pack governs the macro; the macro governs the verb sequence. Authority
+flows one direction; no tier may override a higher tier's gate.
+
+The reason the macro tier exists at all: without it, the agent operates
+at the verb floor (one mutation at a time) and has to invent multi-step
+arcs itself. Macros catalogue expert domain knowledge as registered,
+hashed, versioned objects that the agent picks as an atomic option.
+This reduces hallucination surface and lets ACP project expert recipes
+without leaking implementation detail (the full ordered expansion stays
+SemOS-internal; only a redacted summary is projected).
+
+### Core Object Types
+
+SemOS registry objects share a single table (`sem_reg.snapshots`) with type-specific bodies stored as JSONB:
 
 | Object Type | Body Struct | Domain |
 |-------------|-------------|--------|
@@ -705,6 +793,8 @@ All 13 types share a single table (`sem_reg.snapshots`) with type-specific bodie
 | `document_type_def` | `DocumentTypeDefBody` | Document type classification |
 | `observation_def` | `ObservationDefBody` | Observation recording templates |
 | `derivation_spec` | `DerivationSpecBody` | Derived/composite attribute computation specs |
+| `dag_taxonomy` | YAML taxonomy body | Workspace DAG ordering, state constraints, DSL reconciliation |
+| `domain_pack` | `DomainPackManifest` | Domain ownership manifest for DAGs, DSL packs, state machines, constellations, universes, verb prefixes, and entity kinds |
 
 ### Snapshot Structure
 
@@ -713,7 +803,7 @@ All 13 types share a single table (`sem_reg.snapshots`) with type-specific bodie
 │  sem_reg.snapshots                                          │
 │                                                             │
 │  snapshot_id       UUID (PK)                                │
-│  object_type       ENUM (13 variants)                       │
+│  object_type       ENUM (SemOS registry object variant)     │
 │  object_id         UUID (deterministic v5 from type:fqn)    │
 │  fqn               TEXT (fully qualified name)              │
 │  version           INTEGER (monotonically increasing)       │
@@ -1021,89 +1111,24 @@ Allowed verbs are threaded as **pre-constraints** into verb search (not just pos
 
 ---
 
-## 10. GovernedQuery — Compile-Time Enforcement
+## 10. GovernedQuery — Removed (2026-05-14)
 
-### Purpose
+The `#[governed_query]` proc macro and the `governed_query_proc` crate
+that prepared compile-time enforcement of registry governance were
+deleted on 2026-05-14 after the post-restructure audit (Tier 4 #10) found
+zero adopters in the codebase: no source file ever carried a
+`#[governed_query(...)]` annotation in production. The bincode cache
+(`assets/governed_cache.bin`), the xtask commands (`cargo x
+governed-cache refresh`, `cargo x governed-check`), and the bacon jobs
+were removed in the same slice.
 
-GovernedQuery is a Rust proc macro that makes the Semantic OS registry a **compiler input**. Functions annotated with `#[governed_query(verb = "cbu.create")]` are checked at compile time against a governance cache. This catches lifecycle violations, missing authorization, and PII handling errors before code ships.
-
-### Architecture
-
-```
-assets/governed_cache.bin  (bincode, generated by xtask)
-        │
-        ▼
-governed_query_proc crate  (proc-macro, reads cache at compile time)
-        │
-        ▼
-#[governed_query(verb = "cbu.create")]
-fn create_cbu(pool: &PgPool, principal: &Principal, ...) -> Result<...>
-```
-
-### 5 Governance Checks
-
-| # | Check | Error On | Condition |
-|---|-------|----------|-----------|
-| 1 | Verb lifecycle | `compile_error!` | Verb not found OR status = Deprecated/Retired |
-| 2 | Principal requirement | `compile_error!` | Governed tier AND no `&Principal` param AND !skip_principal_check |
-| 3 | PII authorization | `compile_error!` | Verb/attr has pii = true AND !allow_pii |
-| 4 | Proof rule | `compile_error!` | trust_class = Proof AND governance_tier != Governed |
-| 5 | Attribute lifecycle | `compile_error!` | Referenced attr status = Deprecated/Retired |
-
-### Usage
-
-```rust
-// Active governed verb with Principal — compiles
-#[governed_query(verb = "cbu.create")]
-fn create_cbu(pool: &PgPool, principal: &Principal, name: &str) -> Result<Uuid> {
-    // ...
-}
-
-// PII verb — requires allow_pii
-#[governed_query(verb = "entity.get-pii", attrs = ["entity.tax_id"], allow_pii = true)]
-fn get_entity_pii(pool: &PgPool, principal: &Principal, id: Uuid) -> Result<PiiData> {
-    // ...
-}
-
-// System-internal function — skip Principal check
-#[governed_query(verb = "agent.set-mode", skip_principal_check = true)]
-fn set_agent_mode(pool: &PgPool, mode: AgentMode) -> Result<()> {
-    // ...
-}
-```
-
-### Cache Management
-
-```bash
-# Generate/refresh cache from database
-cargo x governed-cache refresh
-
-# View cache statistics
-cargo x governed-cache stats
-
-# Run soft-warning checker (deprecation approaching, unused PII auth)
-cargo x governed-check
-```
-
-### Compose-Not-Replace
-
-GovernedQuery **composes on top of sqlx** — it does not replace the query layer:
-
-```rust
-// GovernedQuery verifies governance at compile time
-// sqlx verifies SQL at compile time
-// Both coexist on the same function
-#[governed_query(verb = "cbu.create")]
-async fn create_cbu(pool: &PgPool, principal: &Principal, name: &str) -> Result<Uuid> {
-    sqlx::query_scalar!("INSERT INTO cbus (name) VALUES ($1) RETURNING cbu_id", name)
-        .fetch_one(pool)
-        .await
-}
-```
-
-### Bootstrap Mode
-
-When building for the first time (before the cache exists), set `GOVERNED_CACHE_SKIP=1` to bypass governance checks. The macro emits the function unchanged.
+Compile-time governance is a worthwhile goal — if the team chooses to
+revisit it, the old design lives in git history (search for
+`governed_query_proc` and the related ADR in the audit thread). The
+five checks it enforced (verb lifecycle, principal requirement, PII
+authorization, proof rule, attribute lifecycle) remain relevant; today
+they are enforced at runtime by the SemOS context envelope and the
+gate pipeline described in the surrounding sections.
 
 ---
 

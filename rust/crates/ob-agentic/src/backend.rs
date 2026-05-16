@@ -1,6 +1,6 @@
 //! Backend Selection
 //!
-//! Enum for selecting between LLM providers (Anthropic, OpenAI).
+//! Enum for selecting between LLM providers.
 
 use anyhow::{anyhow, Result};
 use std::str::FromStr;
@@ -13,12 +13,14 @@ pub enum AgentBackend {
     Anthropic,
     /// OpenAI GPT
     OpenAi,
+    /// Local Claude Code CLI, usually authenticated through Claude Code/Zed.
+    ClaudeCodeCli,
 }
 
 impl AgentBackend {
     /// Create from AGENT_BACKEND environment variable
     ///
-    /// Valid values: "anthropic", "claude", "openai", "gpt"
+    /// Valid values: "anthropic", "claude", "openai", "gpt", "claude-code-cli"
     /// Defaults to Anthropic if not set
     pub fn from_env() -> Result<Self> {
         let value = std::env::var("AGENT_BACKEND").unwrap_or_else(|_| "anthropic".to_string());
@@ -32,6 +34,7 @@ impl AgentBackend {
         match self {
             AgentBackend::Anthropic => "Anthropic",
             AgentBackend::OpenAi => "OpenAI",
+            AgentBackend::ClaudeCodeCli => "Claude Code CLI",
         }
     }
 }
@@ -55,8 +58,11 @@ impl FromStr for AgentBackend {
         match s.to_lowercase().as_str() {
             "anthropic" | "claude" => Ok(AgentBackend::Anthropic),
             "openai" | "gpt" => Ok(AgentBackend::OpenAi),
+            "claude-code-cli" | "claude_code_cli" | "claudecode" | "claude-code" => {
+                Ok(AgentBackend::ClaudeCodeCli)
+            }
             other => Err(ParseBackendError(format!(
-                "Unknown AGENT_BACKEND '{}'. Valid values: anthropic, claude, openai, gpt",
+                "Unknown AGENT_BACKEND '{}'. Valid values: anthropic, claude, openai, gpt, claude-code-cli",
                 other
             ))),
         }
@@ -92,6 +98,14 @@ mod tests {
             AgentBackend::OpenAi
         );
         assert_eq!("gpt".parse::<AgentBackend>().unwrap(), AgentBackend::OpenAi);
+        assert_eq!(
+            "claude-code-cli".parse::<AgentBackend>().unwrap(),
+            AgentBackend::ClaudeCodeCli
+        );
+        assert_eq!(
+            "claude_code_cli".parse::<AgentBackend>().unwrap(),
+            AgentBackend::ClaudeCodeCli
+        );
         assert!("invalid".parse::<AgentBackend>().is_err());
     }
 

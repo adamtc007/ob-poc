@@ -13,7 +13,7 @@ use tower_lsp::lsp_types::Position;
 
 /// Position encoding mode (negotiated at initialize)
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
-pub enum PositionEncoding {
+pub(crate) enum PositionEncoding {
     /// UTF-16 code units (default for LSP)
     #[default]
     Utf16,
@@ -30,7 +30,11 @@ pub enum PositionEncoding {
 ///
 /// # Returns
 /// LSP Position with 0-based line and character
-pub fn offset_to_position(text: &str, offset: usize, encoding: PositionEncoding) -> Position {
+pub(crate) fn offset_to_position(
+    text: &str,
+    offset: usize,
+    encoding: PositionEncoding,
+) -> Position {
     let offset = offset.min(text.len());
     let mut line = 0u32;
     let mut line_start_offset = 0usize;
@@ -63,7 +67,7 @@ pub fn offset_to_position(text: &str, offset: usize, encoding: PositionEncoding)
 ///
 /// # Returns
 /// Byte offset, or None if position is invalid
-pub fn position_to_offset(
+pub(crate) fn position_to_offset(
     text: &str,
     position: Position,
     encoding: PositionEncoding,
@@ -126,7 +130,7 @@ fn utf16_offset_to_byte_offset(text: &str, utf16_offset: usize) -> Option<usize>
 }
 
 /// Create an LSP Range from byte offsets
-pub fn span_to_range(
+pub(crate) fn span_to_range(
     start_offset: usize,
     end_offset: usize,
     text: &str,

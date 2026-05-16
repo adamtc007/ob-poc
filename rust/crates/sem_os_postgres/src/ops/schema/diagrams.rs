@@ -2,7 +2,7 @@
 //! → Mermaid.
 //!
 //! `generate-erd` walks `information_schema` for tables/columns/PKs/FKs
-//! and renders via `sem_os_core::diagram::{enrichment, mermaid, model}`.
+//! and renders via `sem_os_policy::diagram::{enrichment, mermaid, model}`.
 //! `generate-verb-flow` renders a verb-centric or domain-centric flow
 //! over `AffinityGraph`. `generate-discovery-map` composes verb
 //! invocation phrases → intent matches → mermaid discovery map.
@@ -19,13 +19,13 @@ use anyhow::{anyhow, Result};
 use async_trait::async_trait;
 use serde_json::{json, Value};
 
-use sem_os_core::affinity::{match_intent, AffinityGraph, DataRef};
-use sem_os_core::diagram::{
+use sem_os_ontology::verb_contract::VerbContractBody;
+use sem_os_policy::affinity::{match_intent, AffinityGraph, DataRef};
+use sem_os_policy::diagram::{
     enrichment::build_diagram_model,
     mermaid,
     model::{ColumnInput, ForeignKeyInput, RenderOptions, TableInput},
 };
-use sem_os_core::verb_contract::VerbContractBody;
 
 use dsl_runtime::domain_ops::affinity_graph_cache::load_affinity_graph_cached;
 use dsl_runtime::domain_ops::helpers::{
@@ -377,11 +377,11 @@ impl SemOsVerbOp for SchemaGenerateDiscoveryMap {
         });
         intent_matches.truncate(32);
 
-        let discovery = sem_os_core::affinity::DiscoveryResponse {
+        let discovery = sem_os_policy::affinity::DiscoveryResponse {
             intent_matches: intent_matches.clone(),
             suggested_sequence: Vec::new(),
             disambiguation_needed: Vec::new(),
-            governance_context: sem_os_core::affinity::GovernanceContext {
+            governance_context: sem_os_policy::affinity::GovernanceContext {
                 all_tables_governed: true,
                 required_mode: cluster_by.clone(),
                 policy_check: None,

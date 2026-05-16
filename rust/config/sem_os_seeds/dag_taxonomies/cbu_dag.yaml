@@ -59,6 +59,28 @@ version: "1.0"
 workspace: cbu
 dag_id: cbu_dag
 
+# DSL reconciliation surface:
+# These verbs are canonical `config/verbs/cbu*.yaml` DSL surface area that are
+# not all lifecycle-transition verbs. Keep them in the DAG as an explicit
+# ownership cross-reference so pack projection and macro expansion can verify
+# that every CBU DSL primitive has SemOS backing.
+dsl_verb_reconciliation:
+  read_model_verbs:
+    - cbu.read
+    - cbu.list
+  root_attribute_verbs:
+    - cbu.rename
+    - cbu.update
+    - cbu.set-jurisdiction
+    - cbu.set-client-type
+    - cbu.set-commercial-client
+  administrative_delete_aliases:
+    - cbu.delete
+  service_option_control_verbs:
+    - cbu.bind-service-options
+    - cbu.validate-option-coverage
+    - cbu.compute-resource-fanout
+
 # =============================================================================
 # 1. OVERALL CBU LIFECYCLE (per CBU, derived)
 # =============================================================================
@@ -108,10 +130,12 @@ overall_lifecycle:
         - cbu.assign-role
         - cbu.link-structure
         - cbu.set-category
-        - cbu-specialist-roles.assign-ownership
-        - cbu-specialist-roles.assign-control
-        - cbu-specialist-roles.assign-fund-role
-        - cbu-specialist-roles.assign-service-provider
+        - cbu.assign-ownership
+        - cbu.assign-control
+        - cbu.assign-trust-role
+        - cbu.assign-fund-role
+        - cbu.assign-service-provider
+        - cbu.assign-signatory
       next_phase: evidenced
 
     - name: evidenced
@@ -140,7 +164,7 @@ overall_lifecycle:
       progression_verbs:
         - cbu.decide               # APPROVE → VALIDATED
         - cbu.decide               # REJECT  → VALIDATION_FAILED
-        - cbu-specialist-roles.validate-roles
+        - cbu.validate-roles
         - cbu.request-proof-update
         - cbu.reopen-validation
       next_phase: "(validated | validation_failed | update_pending_proof)"
@@ -156,6 +180,7 @@ overall_lifecycle:
           - "cbus.status = 'VALIDATED'"
       progression_verbs:
         - cbu.add-product
+        - cbu.remove-product
         - cbu.list-subscriptions
         - cbu-custody.setup-ssi
       next_phase: configuring
@@ -175,6 +200,7 @@ overall_lifecycle:
           - "EXISTS fee_billing_profiles WHERE cbu_id = this.cbu_id AND status = 'DRAFT'"
       progression_verbs:
         - cbu.add-product
+        - cbu.remove-product
         - cbu-custody.setup-ssi
       next_phase: operationally_active
 

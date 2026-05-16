@@ -17,7 +17,7 @@
 //! code after Phase 5b; lint L2 enforces the single-dispatch-site rule.
 
 use async_trait::async_trait;
-use sem_os_core::verb_contract::VerbContractBody;
+use sem_os_ontology::verb_contract::VerbContractBody;
 
 use crate::execution::{Result, VerbExecutionContext, VerbExecutionOutcome, VerbExecutionResult};
 

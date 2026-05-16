@@ -425,7 +425,7 @@ pub struct OnboardingLayer {
 
 ## Playbooks
 
-**Crates:** `rust/crates/playbook-core/`, `rust/crates/playbook-lower/`
+**Crate:** `rust/crates/playbook-core/` (parser, AST, and lowering — `playbook-lower` was folded in by the Tier 3 #9 cleanup).
 
 Declarative YAML templates for multi-step workflows with DAG dependencies and slot-based parameter binding.
 

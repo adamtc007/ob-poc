@@ -137,15 +137,15 @@ struct FeeLineConfig {
 
 /// Results from the harness run
 #[derive(Debug)]
-pub struct AvivaHarnessResults {
-    pub deal_id: Option<String>,
-    pub contract_1_id: Option<String>,
-    pub contract_2_id: Option<String>,
-    pub products_added: Vec<String>,
-    pub rate_cards_created: Vec<String>,
-    pub steps_passed: usize,
-    pub steps_failed: usize,
-    pub errors: Vec<String>,
+pub(crate) struct AvivaHarnessResults {
+    pub(crate) deal_id: Option<String>,
+    pub(crate) contract_1_id: Option<String>,
+    pub(crate) contract_2_id: Option<String>,
+    pub(crate) products_added: Vec<String>,
+    pub(crate) rate_cards_created: Vec<String>,
+    pub(crate) steps_passed: usize,
+    pub(crate) steps_failed: usize,
+    pub(crate) errors: Vec<String>,
 }
 
 impl AvivaHarnessResults {
@@ -321,7 +321,7 @@ async fn find_existing_rate_card(
 }
 
 /// Main harness function
-pub async fn run_aviva_deal_harness(
+pub(crate) async fn run_aviva_deal_harness(
     pool: PgPool,
     verbose: bool,
     dry_run: bool,

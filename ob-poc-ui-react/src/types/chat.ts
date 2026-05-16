@@ -28,6 +28,68 @@ export interface ChatMessage {
   runbook_plan?: import("../api/runbookPlan").RunbookPlan;
   /** Proactive narration — progress, gaps, suggested next steps (ADR 043). */
   narration?: NarrationPayload;
+  /** Structured ACP prompt / language-loop trace shown to the HIL. */
+  acp_trace?: AcpTraceSummary;
+}
+
+export interface AcpTraceSummary {
+  status: string;
+  outcome?: string;
+  route?: string;
+  provider_task?: string;
+  requested_draft_source?: string;
+  draft_source?: string;
+  route_latency_ms?: number;
+  route_latency_us?: number;
+  outcome_layer?: string;
+  human_summary?: string;
+  prompt_context_variant?: string;
+  transition_ref?: string;
+  semantic_diff_uri?: string;
+  refusal_code?: string;
+  pending_question_code?: string;
+  needed_from_user?: string[];
+  diagnostic_codes?: string[];
+  dry_run_valid?: boolean;
+  first_pass_valid?: boolean;
+  revision_count?: number;
+  prose_only_failure?: boolean;
+  pending_user_turn_required?: boolean;
+  estimated_user_repair_turns_avoided?: number;
+  performance?: AcpTracePerformanceSummary;
+  state_anchor_provider?: AcpStateAnchorProviderSummary;
+}
+
+export interface AcpTracePerformanceSummary {
+  prompt_route_ms?: number;
+  prompt_route_us?: number;
+  language_pack_ms?: number;
+  language_pack_us?: number;
+  llm_draft_ms?: number;
+  llm_draft_us?: number;
+  revision_loop_ms?: number;
+  revision_loop_us?: number;
+  dry_run_ms?: number;
+  dry_run_us?: number;
+  acp_emit_ms?: number;
+  acp_emit_us?: number;
+  total_ms?: number;
+  total_us?: number;
+}
+
+export interface AcpStateAnchorProviderSummary {
+  provider_selected?: boolean;
+  provider_id?: string;
+  task?: string;
+  status?: string;
+  state_anchor_source?: string;
+  subject_id?: string;
+  supported_tasks?: string[];
+  needed?: string[];
+  language_pack_generated?: boolean;
+  dry_run_valid?: boolean;
+  structured_outcome?: boolean;
+  no_mutation_authority?: boolean;
 }
 
 export interface SageExplain {

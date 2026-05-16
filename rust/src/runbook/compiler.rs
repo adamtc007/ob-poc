@@ -25,6 +25,10 @@ use std::collections::{BTreeMap, HashMap};
 
 use uuid::Uuid;
 
+use dsl_core::ast::{Argument, AstNode, Literal, Program, Span, Statement, VerbCall};
+use dsl_core::compiler::compile_scoped_runbook_bindings;
+use dsl_core::parser::parse_program;
+
 use crate::dsl_v2::execution::{runtime_registry_arc, RuntimeVerbRegistry};
 use crate::dsl_v2::macros::{
     expand_macro_fixpoint, MacroExpansionError, MacroRegistry, MacroSchema, EXPANSION_LIMITS,
@@ -272,15 +276,23 @@ fn compile_macro(
         }
     };
 
+    let finalised_bindings = match finalise_scoped_runbook_bindings(&expanded_statements) {
+        Ok(finalised) => finalised,
+        Err(error) => return OrchestratorResponse::CompilationError(error),
+    };
+    let finalised_statements = finalised_bindings.statements;
+    let binding_entity_bindings = finalised_bindings.entity_bindings;
+    let binding_resolution_audits = finalised_bindings.binding_resolution_audits;
+
     // Extract expanded verb names for downstream gates.
-    let expanded_verbs: Vec<String> = expanded_statements
+    let expanded_verbs: Vec<String> = finalised_statements
         .iter()
         .map(|dsl| extract_verb_from_dsl(dsl))
         .collect();
 
     // §6.2 Step 2: DAG — build steps then run PlanAssembler for dependency ordering (INV-5).
     // Build raw steps first (write_set is empty — populated after Step 5).
-    let raw_steps: Vec<CompiledStep> = expanded_statements
+    let raw_steps: Vec<CompiledStep> = finalised_statements
         .iter()
         .enumerate()
         .map(|(i, dsl)| {
@@ -396,11 +408,12 @@ fn compile_macro(
     let envelope = ReplayEnvelope {
         core: envelope::EnvelopeCore {
             session_cursor: runbook_version,
-            entity_bindings: std::collections::BTreeMap::new(),
+            entity_bindings: binding_entity_bindings,
             external_lookup_digests: vec![],
             macro_audit_digests,
             snapshot_manifest,
         },
+        binding_resolution_audits,
         external_lookups: vec![],
         macro_audits,
         sealed_at: chrono::Utc::now(),
@@ -517,6 +530,7 @@ fn compile_primitive(
             macro_audit_digests: vec![],
             snapshot_manifest,
         },
+        binding_resolution_audits: vec![],
         external_lookups: vec![],
         macro_audits: vec![],
         sealed_at: chrono::Utc::now(),
@@ -620,6 +634,138 @@ fn validate_expanded_macro_output(
     errors
 }
 
+#[derive(Debug)]
+struct FinalisedScopedBindings {
+    statements: Vec<String>,
+    entity_bindings: BTreeMap<String, Uuid>,
+    binding_resolution_audits: Vec<envelope::BindingResolutionAudit>,
+}
+
+fn finalise_scoped_runbook_bindings(
+    statements: &[String],
+) -> Result<FinalisedScopedBindings, CompilationError> {
+    let source = statements.join("\n");
+    let mut program = parse_program(&source).map_err(|error| {
+        CompilationError::new(
+            CompilationErrorKind::DagError {
+                reason: format!("Scoped binding parse failed: {error}"),
+            },
+            "binding",
+        )
+    })?;
+
+    let compiled = compile_scoped_runbook_bindings(&program);
+    if !compiled.is_ok() {
+        let reason = compiled
+            .errors
+            .iter()
+            .map(ToString::to_string)
+            .collect::<Vec<_>>()
+            .join("; ");
+        return Err(CompilationError::new(
+            CompilationErrorKind::DagError { reason },
+            "binding",
+        ));
+    }
+
+    let binding_finalisation = assign_and_lower_scoped_binding_uuids(&mut program);
+    Ok(FinalisedScopedBindings {
+        statements: program
+            .statements
+            .iter()
+            .map(Statement::to_dsl_string)
+            .collect(),
+        entity_bindings: binding_finalisation.entity_bindings,
+        binding_resolution_audits: binding_finalisation.binding_resolution_audits,
+    })
+}
+
+#[derive(Debug)]
+struct ScopedBindingFinalisation {
+    entity_bindings: BTreeMap<String, Uuid>,
+    binding_resolution_audits: Vec<envelope::BindingResolutionAudit>,
+}
+
+fn assign_and_lower_scoped_binding_uuids(program: &mut Program) -> ScopedBindingFinalisation {
+    let mut assigned = BTreeMap::new();
+    let mut audits = Vec::new();
+
+    for (statement_idx, statement) in program.statements.iter_mut().enumerate() {
+        let Statement::VerbCall(call) = statement else {
+            continue;
+        };
+
+        lower_scoped_symbol_refs(call, &assigned);
+
+        if call.domain == "cbu" && call.verb == "create" {
+            if let Some(binding) = call.binding.take() {
+                let uuid = Uuid::now_v7();
+                upsert_uuid_arg(call, uuid);
+                let symbol = format!("@{binding}");
+                assigned.insert(symbol.clone(), uuid);
+                audits.push(envelope::BindingResolutionAudit {
+                    symbol,
+                    entity_type: "cbu".to_string(),
+                    producer_statement: statement_idx,
+                    assigned_uuid: uuid,
+                    source: "compile-time-uuid-v7".to_string(),
+                });
+            }
+        }
+    }
+
+    ScopedBindingFinalisation {
+        entity_bindings: assigned,
+        binding_resolution_audits: audits,
+    }
+}
+
+fn lower_scoped_symbol_refs(call: &mut VerbCall, assigned: &BTreeMap<String, Uuid>) {
+    for arg in &mut call.arguments {
+        lower_scoped_symbol_ref_node(&mut arg.value, assigned);
+    }
+}
+
+fn lower_scoped_symbol_ref_node(node: &mut AstNode, assigned: &BTreeMap<String, Uuid>) {
+    match node {
+        AstNode::SymbolRef { name, span } => {
+            if let Some(uuid) = assigned.get(&format!("@{name}")) {
+                *node = AstNode::Literal(Literal::Uuid(*uuid), *span);
+            }
+        }
+        AstNode::List { items, .. } => {
+            for item in items {
+                lower_scoped_symbol_ref_node(item, assigned);
+            }
+        }
+        AstNode::Map { entries, .. } => {
+            for (_key, value) in entries {
+                lower_scoped_symbol_ref_node(value, assigned);
+            }
+        }
+        AstNode::Nested(call) => {
+            lower_scoped_symbol_refs(call, assigned);
+        }
+        _ => {}
+    }
+}
+
+fn upsert_uuid_arg(call: &mut VerbCall, uuid: Uuid) {
+    let value = AstNode::Literal(Literal::Uuid(uuid), Span::synthetic());
+    if let Some(arg) = call.arguments.iter_mut().find(|arg| arg.key == "uuid") {
+        arg.value = value;
+    } else {
+        call.arguments.insert(
+            0,
+            Argument {
+                key: "uuid".to_string(),
+                value,
+                span: Span::synthetic(),
+            },
+        );
+    }
+}
+
 /// Build a DSL s-expression from verb FQN and args.
 ///
 /// BTreeMap iteration is deterministic (sorted by key), so no explicit
@@ -668,6 +814,7 @@ mod tests {
         for v in [
             "structure.setup",
             "cbu.create",
+            "cbu.assign-role",
             "cbu.delete",
             "cbu.set-attr",
             "entity.create",
@@ -732,6 +879,13 @@ mod tests {
                 id: None,
                 kind: MacroKind::Macro,
                 tier: None,
+                plan_kind: None,
+                lifecycle_state: None,
+                requires_states: vec![],
+                precondition_checks: vec![],
+                state_effect: None,
+                transition_args: None,
+                side_effects: None,
                 aliases: vec![],
                 taxonomy: None,
                 ui: MacroUi {
@@ -788,6 +942,13 @@ mod tests {
                 id: None,
                 kind: MacroKind::Macro,
                 tier: None,
+                plan_kind: None,
+                lifecycle_state: None,
+                requires_states: vec![],
+                precondition_checks: vec![],
+                state_effect: None,
+                transition_args: None,
+                side_effects: None,
                 aliases: vec![],
                 taxonomy: None,
                 ui: MacroUi {
@@ -825,6 +986,87 @@ mod tests {
         registry
     }
 
+    fn test_macro_registry_with_scoped_cbu_binding() -> MacroRegistry {
+        let mut registry = MacroRegistry::new();
+        registry.add(
+            "structure.setup-with-role".to_string(),
+            MacroSchema {
+                id: None,
+                kind: MacroKind::Macro,
+                tier: None,
+                plan_kind: None,
+                lifecycle_state: None,
+                requires_states: vec![],
+                precondition_checks: vec![],
+                state_effect: None,
+                transition_args: None,
+                side_effects: None,
+                aliases: vec![],
+                taxonomy: None,
+                ui: MacroUi {
+                    label: "Set up Structure with Role".to_string(),
+                    description: "Create a structure and bind it into downstream steps".to_string(),
+                    target_label: "Structure".to_string(),
+                },
+                routing: MacroRouting {
+                    mode_tags: vec![],
+                    operator_domain: Some("structure".to_string()),
+                },
+                target: MacroTarget {
+                    operates_on: "client-ref".to_string(),
+                    produces: Some("structure-ref".to_string()),
+                    allowed_structure_types: vec![],
+                },
+                args: MacroArgs {
+                    style: ArgStyle::Keyworded,
+                    required: Default::default(),
+                    optional: Default::default(),
+                },
+                required_roles: vec![],
+                optional_roles: vec![],
+                docs_bundle: None,
+                prereqs: vec![],
+                expands_to: vec![
+                    MacroExpansionStep::VerbCall(VerbCallStep {
+                        verb: "cbu.create".to_string(),
+                        args: {
+                            let mut m = HashMap::new();
+                            m.insert(
+                                "name".to_string(),
+                                serde_json::Value::String("\"BlackRock\"".to_string()),
+                            );
+                            m
+                        },
+                        bind_as: Some("$cbu".to_string()),
+                    }),
+                    MacroExpansionStep::VerbCall(VerbCallStep {
+                        verb: "cbu.assign-role".to_string(),
+                        args: {
+                            let mut m = HashMap::new();
+                            m.insert(
+                                "cbu-id".to_string(),
+                                serde_json::Value::String("$cbu".to_string()),
+                            );
+                            m.insert(
+                                "entity-id".to_string(),
+                                serde_json::Value::String("\"existing-director\"".to_string()),
+                            );
+                            m.insert(
+                                "role".to_string(),
+                                serde_json::Value::String("\"DIRECTOR\"".to_string()),
+                            );
+                            m
+                        },
+                        bind_as: None,
+                    }),
+                ],
+                sets_state: vec![],
+                unlocks: vec![],
+            },
+        );
+        registry
+    }
+
     #[test]
     fn test_compile_macro_success() {
         let registry = test_macro_registry();
@@ -854,6 +1096,111 @@ mod tests {
             assert_eq!(summary.runbook_version, 1);
             assert_eq!(summary.preview[0].verb, "cbu.create");
         }
+    }
+
+    #[test]
+    fn scoped_bindings_macro_cascades_created_uuid_to_expanded_dsl() {
+        let registry = test_macro_registry_with_scoped_cbu_binding();
+        let session = test_session();
+        let verb_index = VerbConfigIndex::empty();
+        let classification = classify_verb("structure.setup-with-role", &verb_index, &registry);
+        let constraints = EffectiveConstraints::unconstrained();
+        let args = BTreeMap::new();
+
+        let resp = compile_verb(
+            Uuid::new_v4(),
+            &classification,
+            &args,
+            &session,
+            &registry,
+            1,
+            &constraints,
+            Some(&permissive_allowed_verbs()),
+            None,
+        );
+
+        let OrchestratorResponse::Compiled(summary) = resp else {
+            panic!("Expected compiled macro, got {resp:?}");
+        };
+        let runbook = summary
+            .compiled_runbook
+            .expect("compiled summary should carry runbook");
+        let assigned = runbook
+            .envelope
+            .entity_bindings()
+            .get("@cbu")
+            .expect("macro should assign @cbu");
+
+        assert_eq!(summary.step_count, 2);
+        assert_eq!(assigned.get_version_num(), 7);
+        assert_eq!(runbook.envelope.binding_resolution_audits.len(), 1);
+        assert_eq!(
+            runbook.envelope.binding_resolution_audits[0].assigned_uuid,
+            *assigned
+        );
+
+        let frozen_dsl = runbook
+            .steps
+            .iter()
+            .map(|step| step.dsl.as_str())
+            .collect::<Vec<_>>()
+            .join("\n");
+        assert!(!frozen_dsl.contains("$cbu"));
+        assert!(!frozen_dsl.contains("@cbu"));
+        assert!(frozen_dsl.contains(":uuid"));
+        assert!(
+            frozen_dsl.matches(&assigned.to_string()).count() >= 2,
+            "created UUID must appear in create and downstream statements: {frozen_dsl}"
+        );
+    }
+
+    #[test]
+    fn scoped_bindings_finalise_to_uuid_resolved_dsl() {
+        let statements = vec![
+            r#"(cbu.create :name "BlackRock" :jurisdiction "GB" :as $cbu)"#.to_string(),
+            r#"(cbu.assign-role :cbu-id $cbu :entity-id "existing-director" :role "DIRECTOR")"#
+                .to_string(),
+        ];
+
+        let finalised = finalise_scoped_runbook_bindings(&statements).expect("finalise bindings");
+        let assigned = finalised
+            .entity_bindings
+            .get("@cbu")
+            .expect("assigned cbu binding");
+
+        assert_eq!(assigned.get_version_num(), 7);
+        assert_eq!(finalised.entity_bindings.len(), 1);
+        assert_eq!(finalised.binding_resolution_audits.len(), 1);
+        assert_eq!(finalised.statements.len(), 2);
+        assert!(!finalised.statements.join("\n").contains("@cbu"));
+        assert!(!finalised.statements.join("\n").contains("$cbu"));
+        assert!(finalised.statements[0].contains(":uuid"));
+        assert!(finalised.statements[0].contains(&assigned.to_string()));
+        assert!(finalised.statements[1].contains(&assigned.to_string()));
+
+        let audit = &finalised.binding_resolution_audits[0];
+        assert_eq!(audit.symbol, "@cbu");
+        assert_eq!(audit.entity_type, "cbu");
+        assert_eq!(audit.producer_statement, 0);
+        assert_eq!(audit.assigned_uuid, *assigned);
+        assert_eq!(audit.source, "compile-time-uuid-v7");
+    }
+
+    #[test]
+    fn scoped_bindings_finalisation_rejects_non_create_binding() {
+        let statements = vec![
+            r#"(cbu.create :name "BlackRock" :as @cbu)"#.to_string(),
+            r#"(cbu.assign-role :cbu-id @cbu :entity-id "existing-director" :role "DIRECTOR" :as @role_link)"#
+                .to_string(),
+        ];
+
+        let error =
+            finalise_scoped_runbook_bindings(&statements).expect_err("non-create binding fails");
+
+        assert!(matches!(error.kind, CompilationErrorKind::DagError { .. }));
+        assert!(error
+            .to_string()
+            .contains("does not declare an entity output"));
     }
 
     #[test]

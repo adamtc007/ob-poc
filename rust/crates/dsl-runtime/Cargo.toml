@@ -20,21 +20,29 @@ description = "DSL verb execution runtime — the data plane of the three-plane 
 # `dsl-runtime-macros` path dep were removed in the same slice.
 [dependencies]
 ob-poc-types = { path = "../ob-poc-types" }
-# Phase 5a composite-blocker #23 — discovery_ops + stategraph use
-# `dsl_core::config::loader::ConfigLoader` and `dsl_core::config::types::*`
-# for verb metadata loading; entity-gateway proto + client for
-# search-entities op.
+# dsl-runtime-split v1 Phase 11 cleanup (2026-05-14): the transitional
+# `dsl-analysis = { path = "../dsl-analysis" }` dep is gone — all 13
+# analyser-tier modules + their compat re-exports moved out, and every
+# consumer reaches `dsl_analysis::*` directly. Hard invariant restored:
+# no edge between dsl-runtime and dsl-analysis in either direction.
+# Phase 5a composite-blocker #23 — domain_ops still uses dsl_core::config
+# loader/types for verb metadata loading.
 dsl-core = { path = "../dsl-core" }
-entity-gateway = { path = "../entity-gateway" }
-tonic = "0.12"
+# dsl-runtime-split v1 Phase 10 (2026-05-14): the following deps were
+# removed after the analyser-tier modules consuming them moved to
+# `dsl-analysis`:
+#   - regex          (macros::variable, Phase 4)
+#   - ob-templates   (runtime_registry, Phase 3)
+#   - entity-gateway (gateway_resolver, Phase 5)
+#   - tonic          (gateway_resolver, Phase 5)
+#   - governed_query_proc (crate deleted 2026-05-14 — zero adopters)
+#
 # Remaining transitional dep — sem_os_core provides Principal, SemOsError,
 # and the VerbContractBody consumed by CrudExecutionPort. Kept deliberately
 # until a later slice resolves the cycle cleanly.
 sem_os_core = { path = "../sem_os_core" }
-# Composite-blocker #1 (agent_ops) uses `#[governed_query]` on a live
-# execute_json method; keeping the attribute requires the proc-macro
-# crate in dsl-runtime's graph. Zero transitive ob-poc pull.
-governed_query_proc = { path = "../governed_query_proc" }
+sem_os_policy = { path = "../sem_os_policy" }
+sem_os_ontology = { path = "../sem_os_ontology" }
 async-trait = "0.1"
 anyhow = "1.0"
 serde = { version = "1", features = ["derive"] }
@@ -84,3 +92,6 @@ required-features = ["harness"]
 [[test]]
 name = "cross_workspace_dag_live_scenarios"
 required-features = ["harness"]
+
+[lints.rust]
+unreachable_pub = "deny"

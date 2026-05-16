@@ -416,6 +416,7 @@ mod tests {
             session_feedback: None,
             narration: None,
             trace_id: None,
+            acp_dag_semantic: None,
         };
 
         let session = ReplSessionV2::new();
@@ -478,6 +479,7 @@ mod tests {
             session_feedback: None,
             narration: None,
             trace_id: None,
+            acp_dag_semantic: None,
         };
 
         let payload = build_phase5_repl_payload(&session, &response);
@@ -508,6 +510,7 @@ mod tests {
             session_feedback: None,
             narration: None,
             trace_id: None,
+            acp_dag_semantic: None,
         };
 
         let evaluation = evaluate_phase5_repl(&session, &response);
@@ -547,7 +550,7 @@ mod tests {
             intent_tier: None,
             decision: None,
             sage_explain: None,
-            coder_proposal: None,
+            drafter_proposal: None,
             discovery_bootstrap: None,
             parked_entries: None,
             onboarding_state: None,
@@ -588,7 +591,7 @@ mod tests {
             intent_tier: None,
             decision: None,
             sage_explain: None,
-            coder_proposal: None,
+            drafter_proposal: None,
             discovery_bootstrap: None,
             parked_entries: None,
             onboarding_state: None,

@@ -1,0 +1,67 @@
+[package]
+name = "ob-poc-boundary"
+version = "0.1.0"
+edition = "2021"
+description = "The typed boundary between Sage (intent understanding) and the sequencer (execution). Owns envelope construction, TOCTOU recheck, approval tokens, audit chain, workbook DTOs, ACP discovery projection, policy gate, and session-input draft-mode selection. Must not depend on execution crates."
+
+[dependencies]
+ob-poc-types = { path = "../ob-poc-types" }
+# ob-poc-diagnostics carries the canonical events::* types (DslEvent,
+# EventPayload, ErrorSnapshot) consumed by the feedback inspector.
+ob-poc-diagnostics = { path = "../ob-poc-diagnostics" }
+# ob-poc-macros supplies the #[derive(IdType)] proc macro used by
+# data_dictionary's AttributeId. Proc-macro crate — tooling tier, not
+# execution tier.
+ob-poc-macros = { path = "../ob-poc-macros" }
+# llm_trace builds PromptContextAssembly audits — sem_os_core is the
+# control-plane (canonical domain types) and acceptable here. Not the
+# execution tier — see the boundary-tier discipline in lib.rs.
+sem_os_core = { path = "../sem_os_core" }
+sem_os_ontology = { path = "../sem_os_ontology" }
+sem_os_policy = { path = "../sem_os_policy" }
+# dsl-core supplies VerbConfig metadata for ACP registry/pack projection
+# (slice 2d.3). Pure-data crate — no execution-tier dependency.
+dsl-core = { path = "../dsl-core" }
+anyhow = "1.0"
+tracing = "0.1"
+async-trait = "0.1"
+chrono = { version = "0.4", features = ["serde"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+serde_yaml = "0.9"
+sha2 = "0.10"
+hex = "0.4"
+bincode = "1"
+base64 = "0.22"
+thiserror = "1"
+regex = "1.12.2"
+smallvec = { version = "1.11", features = ["serde"] }
+unicode-normalization = "0.1"
+uuid = { version = "1", features = ["v4", "serde"] }
+# Optional — only needed by the SqlRowVersionProvider gated behind the
+# `database` feature in toctou_recheck.
+sqlx = { version = "0.8", features = ["runtime-tokio-rustls", "postgres", "uuid", "chrono", "json", "bigdecimal"], optional = true }
+# bigdecimal — used for view_config_service NUMERIC columns (gated behind `database`).
+bigdecimal = { version = "0.4", features = ["serde"], optional = true }
+# rust_decimal — used for bods_types ownership/share fields (gated behind `database`).
+rust_decimal = { version = "1", features = ["serde", "db-postgres"], optional = true }
+
+[features]
+default = []
+database = ["dep:sqlx", "dep:bigdecimal", "dep:rust_decimal", "ob-poc-diagnostics/database"]
+
+[dev-dependencies]
+tokio = { version = "1", features = ["macros", "rt", "rt-multi-thread"] }
+tempfile = "3"
+rand = "0.8"
+# Test-only dep: Phase 3C of capability-crate restructure (2026-05-13)
+# relocated the pack manifest YAML loader to `ob-poc-journey`. Boundary's
+# `#[cfg(test)] ensure_test_provider_registered()` fixture in
+# `pack_projection.rs` calls `ob_poc_journey::pack::load_packs_from_dir`
+# to exercise the projection pipeline against real on-disk packs.
+# Production code reaches the loader through the registered provider
+# hook, NOT via a direct `ob-poc-journey` import.
+ob-poc-journey = { path = "../ob-poc-journey" }
+
+[lints.rust]
+unreachable_pub = "deny"
