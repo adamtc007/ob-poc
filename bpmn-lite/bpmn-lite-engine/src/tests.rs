@@ -594,6 +594,9 @@ async fn test_signal_matches_message_name_and_correlation_key() {
         write_set: BTreeMap::new(),
         task_manifest: vec![],
         error_route_map: BTreeMap::new(),
+        flag_symbol_table: BTreeMap::new(),
+            data_objects: BTreeMap::new(),
+            ffi_task_decls: BTreeMap::new(),
     };
     store
         .store_program(program.bytecode_version, &program)
@@ -686,6 +689,9 @@ async fn test_signal_before_wait_msg_is_buffered_and_consumed() {
         write_set: BTreeMap::new(),
         task_manifest: vec![],
         error_route_map: BTreeMap::new(),
+        flag_symbol_table: BTreeMap::new(),
+            data_objects: BTreeMap::new(),
+            ffi_task_decls: BTreeMap::new(),
     };
     store
         .store_program(program.bytecode_version, &program)
@@ -1241,6 +1247,9 @@ async fn t_term_1_single_fiber_terminate() {
         write_set: BTreeMap::new(),
         task_manifest: vec!["task_a".to_string()],
         error_route_map: BTreeMap::new(),
+        flag_symbol_table: BTreeMap::new(),
+            data_objects: BTreeMap::new(),
+            ffi_task_decls: BTreeMap::new(),
     };
     store
         .store_program(program.bytecode_version, &program)
@@ -1313,6 +1322,9 @@ async fn t_term_2_parallel_terminate_kills_siblings() {
         write_set: BTreeMap::new(),
         task_manifest: vec!["slow_task".to_string()],
         error_route_map: BTreeMap::new(),
+        flag_symbol_table: BTreeMap::new(),
+            data_objects: BTreeMap::new(),
+            ffi_task_decls: BTreeMap::new(),
     };
     store
         .store_program(program.bytecode_version, &program)
@@ -1399,6 +1411,9 @@ async fn t_term_3_complete_job_after_terminate() {
         write_set: BTreeMap::new(),
         task_manifest: vec!["task_x".to_string()],
         error_route_map: BTreeMap::new(),
+        flag_symbol_table: BTreeMap::new(),
+            data_objects: BTreeMap::new(),
+            ffi_task_decls: BTreeMap::new(),
     };
     store
         .store_program(program.bytecode_version, &program)
@@ -1549,6 +1564,9 @@ async fn t_err_1_business_error_routes_to_handler() {
                 boundary_element_id: "catch_sanctions".to_string(),
             }],
         )]),
+        flag_symbol_table: BTreeMap::new(),
+            data_objects: BTreeMap::new(),
+            ffi_task_decls: BTreeMap::new(),
     };
     store
         .store_program(program.bytecode_version, &program)
@@ -1660,6 +1678,9 @@ async fn t_err_2_unmatched_error_creates_incident() {
                 boundary_element_id: "catch_sanctions".to_string(),
             }],
         )]),
+        flag_symbol_table: BTreeMap::new(),
+            data_objects: BTreeMap::new(),
+            ffi_task_decls: BTreeMap::new(),
     };
     store
         .store_program(program.bytecode_version, &program)
@@ -1739,6 +1760,9 @@ async fn t_err_3_catch_all_routes_any_business_error() {
                 boundary_element_id: "catch_all".to_string(),
             }],
         )]),
+        flag_symbol_table: BTreeMap::new(),
+            data_objects: BTreeMap::new(),
+            ffi_task_decls: BTreeMap::new(),
     };
     store
         .store_program(program.bytecode_version, &program)
@@ -1807,6 +1831,9 @@ async fn t_err_4_transient_error_always_incident() {
                 boundary_element_id: "catch_all".to_string(),
             }],
         )]),
+        flag_symbol_table: BTreeMap::new(),
+            data_objects: BTreeMap::new(),
+            ffi_task_decls: BTreeMap::new(),
     };
     store
         .store_program(program.bytecode_version, &program)
@@ -1867,6 +1894,9 @@ async fn t_err_5_fail_job_on_terminated_instance() {
         write_set: BTreeMap::new(),
         task_manifest: vec!["task_a".to_string()],
         error_route_map: BTreeMap::new(),
+        flag_symbol_table: BTreeMap::new(),
+            data_objects: BTreeMap::new(),
+            ffi_task_decls: BTreeMap::new(),
     };
     store
         .store_program(program.bytecode_version, &program)
@@ -1974,6 +2004,9 @@ async fn t_loop_1_bounded_retry_executes_n_times() {
                 boundary_element_id: "catch_retry".to_string(),
             }],
         )]),
+        flag_symbol_table: BTreeMap::new(),
+            data_objects: BTreeMap::new(),
+            ffi_task_decls: BTreeMap::new(),
     };
     store
         .store_program(program.bytecode_version, &program)
@@ -2095,6 +2128,9 @@ async fn t_loop_2_unique_job_keys_per_iteration() {
                 boundary_element_id: "catch_all".to_string(),
             }],
         )]),
+        flag_symbol_table: BTreeMap::new(),
+            data_objects: BTreeMap::new(),
+            ffi_task_decls: BTreeMap::new(),
     };
     store
         .store_program(program.bytecode_version, &program)
@@ -2173,6 +2209,9 @@ async fn t_loop_3_counter_starts_at_zero() {
         write_set: BTreeMap::new(),
         task_manifest: vec![],
         error_route_map: BTreeMap::new(),
+        flag_symbol_table: BTreeMap::new(),
+            data_objects: BTreeMap::new(),
+            ffi_task_decls: BTreeMap::new(),
     };
     store
         .store_program(program.bytecode_version, &program)
@@ -2240,6 +2279,9 @@ async fn t_loop_4_verifier_rejects_backward_jump() {
         write_set: BTreeMap::new(),
         task_manifest: vec!["task_a".to_string()],
         error_route_map: BTreeMap::new(),
+        flag_symbol_table: BTreeMap::new(),
+            data_objects: BTreeMap::new(),
+            ffi_task_decls: BTreeMap::new(),
     };
 
     let errors = bpmn_lite_compiler::verifier::verify_bytecode(&program);
@@ -2279,6 +2321,9 @@ async fn t_loop_5_verifier_allows_br_counter_lt_backward() {
         write_set: BTreeMap::new(),
         task_manifest: vec!["task_a".to_string()],
         error_route_map: BTreeMap::new(),
+        flag_symbol_table: BTreeMap::new(),
+            data_objects: BTreeMap::new(),
+            ffi_task_decls: BTreeMap::new(),
     };
 
     let errors = bpmn_lite_compiler::verifier::verify_bytecode(&program);
@@ -2358,6 +2403,9 @@ async fn t_ig_1_all_branches_taken() {
             "pep_screening".to_string(),
         ],
         error_route_map: BTreeMap::new(),
+        flag_symbol_table: BTreeMap::new(),
+            data_objects: BTreeMap::new(),
+            ffi_task_decls: BTreeMap::new(),
     };
     store
         .store_program(program.bytecode_version, &program)
@@ -2486,6 +2534,9 @@ async fn t_ig_2_single_branch_taken() {
             "pep_screening".to_string(),
         ],
         error_route_map: BTreeMap::new(),
+        flag_symbol_table: BTreeMap::new(),
+            data_objects: BTreeMap::new(),
+            ffi_task_decls: BTreeMap::new(),
     };
     store
         .store_program(program.bytecode_version, &program)
@@ -2577,6 +2628,9 @@ async fn t_ig_3_zero_match_no_default_incident() {
         write_set: BTreeMap::new(),
         task_manifest: vec!["task_a".to_string(), "task_b".to_string()],
         error_route_map: BTreeMap::new(),
+        flag_symbol_table: BTreeMap::new(),
+            data_objects: BTreeMap::new(),
+            ffi_task_decls: BTreeMap::new(),
     };
     store
         .store_program(program.bytecode_version, &program)
@@ -2650,6 +2704,9 @@ async fn t_ig_4_zero_match_with_default() {
         write_set: BTreeMap::new(),
         task_manifest: vec!["conditional_task".to_string(), "default_task".to_string()],
         error_route_map: BTreeMap::new(),
+        flag_symbol_table: BTreeMap::new(),
+            data_objects: BTreeMap::new(),
+            ffi_task_decls: BTreeMap::new(),
     };
     store
         .store_program(program.bytecode_version, &program)
@@ -2757,6 +2814,9 @@ async fn t_ig_5_join_waits_for_dynamic_count() {
             "task_c".to_string(),
         ],
         error_route_map: BTreeMap::new(),
+        flag_symbol_table: BTreeMap::new(),
+            data_objects: BTreeMap::new(),
+            ffi_task_decls: BTreeMap::new(),
     };
     store
         .store_program(program.bytecode_version, &program)

@@ -209,6 +209,18 @@ fn ir_node_to_dto(ir_node: &IRNode) -> Result<NodeDto> {
             host: attached_to.clone(),
             error_code: error_code.clone(),
         },
+
+        // DataObject and FfiServiceTask are not represented in the DTO/YAML
+        // authoring layer (they are FFI-specific constructs). If encountered,
+        // omit them by returning a minimal placeholder that the DTO round-trip
+        // can skip. A future authoring-layer pass will handle these properly.
+        IRNode::DataObject { id, .. } | IRNode::FfiServiceTask { id, .. } => {
+            return Err(anyhow::anyhow!(
+                "ir_to_dto: unsupported node type at id '{}' (DataObject / FfiServiceTask \
+                 are not part of the YAML authoring DTO format)",
+                id
+            ))
+        }
     };
     Ok(dto)
 }

@@ -91,6 +91,36 @@ pub fn lower(graph: &IRGraph) -> Result<CompiledProgram> {
         }
     }
 
+    // ── Data-object pre-pass ──────────────────────────────────────────────────
+    // Run before the instruction emission loop so that FfiServiceTask lowering
+    // can resolve `Expression::VarRef` to compiled `BindingSource` values.
+    // Bool/I64 data objects get FlagKey assignments from flag_intern (same map
+    // used by XOR gateway conditions — shared keys, consistent runtime).
+    let mut data_objects: BTreeMap<String, bpmn_lite_types::ffi_bindings::DataObjectDecl> =
+        BTreeMap::new();
+    let mut ffi_task_decls: BTreeMap<Addr, bpmn_lite_types::ffi_bindings::FfiTaskDecl> =
+        BTreeMap::new();
+    for &node_idx in &order {
+        if let IRNode::DataObject {
+            id,
+            name: _,
+            type_decl,
+            role,
+        } = &graph[node_idx]
+        {
+            let storage = assign_storage(type_decl, id, &mut flag_intern);
+            data_objects.insert(
+                id.clone(),
+                bpmn_lite_types::ffi_bindings::DataObjectDecl {
+                    id: id.clone(),
+                    type_decl: type_decl.clone(),
+                    storage,
+                    role: role.clone(),
+                },
+            );
+        }
+    }
+
     // Second pass: emit instructions
     for &node_idx in &order {
         let base = node_addr[&node_idx];
@@ -454,6 +484,130 @@ pub fn lower(graph: &IRGraph) -> Result<CompiledProgram> {
                 // Structural metadata only — no instruction emitted.
                 // Lowering resolves boundary error successor to build error_route_map.
             }
+
+            IRNode::DataObject { .. } => {
+                // Structural declaration — no bytecode emitted.
+                // Resolved during the data-object pre-pass above.
+            }
+
+            IRNode::FfiServiceTask {
+                id,
+                template_id,
+                inputs,
+                outputs,
+                ..
+            } => {
+                let exec_addr = base;
+
+                // Compile input bindings.
+                let compiled_inputs: Vec<bpmn_lite_types::ffi_bindings::CompiledFfiInputBinding> =
+                    inputs
+                        .iter()
+                        .map(|b| {
+                            Ok(bpmn_lite_types::ffi_bindings::CompiledFfiInputBinding {
+                                target_field: b.target_field.clone(),
+                                source: resolve_expression(&b.expression, &data_objects)?,
+                            })
+                        })
+                        .collect::<Result<Vec<_>>>()?;
+
+                // Compile output bindings.
+                let compiled_outputs: Vec<bpmn_lite_types::ffi_bindings::CompiledFfiOutputBinding> =
+                    outputs
+                        .iter()
+                        .map(|b| {
+                            Ok(bpmn_lite_types::ffi_bindings::CompiledFfiOutputBinding {
+                                source_field: b.source_field.clone(),
+                                target: resolve_output_target(&b.target_variable, &data_objects)?,
+                            })
+                        })
+                        .collect::<Result<Vec<_>>>()?;
+
+                let argc = compiled_inputs.len() as u16;
+                let retc = compiled_outputs.len() as u16;
+
+                // Emit ExecFfi instruction.
+                instructions.push(Instr::ExecFfi {
+                    template_id: *template_id,
+                    argc,
+                    retc,
+                });
+
+                // Normal-path Jump to first successor.
+                let successors = get_successors(graph, node_idx);
+                let normal_resume = if let Some(next) = successors.first() {
+                    let target = node_addr.get(next).copied().unwrap_or(base + 2);
+                    instructions.push(Instr::Jump { target });
+                    target
+                } else {
+                    let next_addr = instructions.len() as Addr;
+                    instructions.push(Instr::End);
+                    next_addr
+                };
+
+                // Boundary timer wiring (same as ServiceTask).
+                if let Some((bt_node_idx, spec)) = boundary_lookup.get(id) {
+                    let race_id = race_id_counter;
+                    race_id_counter += 1;
+                    let timer_resume = node_addr
+                        .get(bt_node_idx)
+                        .copied()
+                        .unwrap_or(exec_addr + 2);
+                    let duration_ms = match spec {
+                        TimerSpec::Duration { ms } => *ms,
+                        TimerSpec::Date { deadline_ms } => {
+                            let now = std::time::SystemTime::now()
+                                .duration_since(std::time::UNIX_EPOCH)
+                                .unwrap()
+                                .as_millis() as u64;
+                            deadline_ms.saturating_sub(now)
+                        }
+                        TimerSpec::Cycle { interval_ms, .. } => *interval_ms,
+                    };
+                    let interrupting = matches!(
+                        graph[*bt_node_idx],
+                        IRNode::BoundaryTimer { interrupting: true, .. }
+                    );
+                    let cycle = if let TimerSpec::Cycle { interval_ms, max_fires } = spec {
+                        Some(bpmn_lite_types::CycleSpec {
+                            interval_ms: *interval_ms,
+                            max_fires: *max_fires,
+                        })
+                    } else {
+                        None
+                    };
+                    race_plan.insert(
+                        race_id,
+                        RacePlanEntry {
+                            arms: vec![
+                                WaitArm::Internal {
+                                    kind: 0,
+                                    key_reg: 0,
+                                    resume_at: normal_resume,
+                                },
+                                WaitArm::Timer {
+                                    duration_ms,
+                                    resume_at: timer_resume,
+                                    interrupting,
+                                    cycle,
+                                },
+                            ],
+                            boundary_element_id: Some(graph[*bt_node_idx].id().to_string()),
+                        },
+                    );
+                    boundary_map.insert(exec_addr, race_id);
+                }
+
+                // Register FfiTaskDecl.
+                ffi_task_decls.insert(
+                    exec_addr,
+                    bpmn_lite_types::ffi_bindings::FfiTaskDecl {
+                        template_id: *template_id,
+                        inputs: compiled_inputs,
+                        outputs: compiled_outputs,
+                    },
+                );
+            }
         }
     }
 
@@ -461,9 +615,9 @@ pub fn lower(graph: &IRGraph) -> Result<CompiledProgram> {
     let mut error_route_map: BTreeMap<Addr, Vec<ErrorRoute>> = BTreeMap::new();
     for (host_task_id, error_boundaries) in &boundary_error_lookup {
         // Find the host task's bytecode address
-        let host_node_idx = graph.node_indices().find(
-            |&idx| matches!(&graph[idx], IRNode::ServiceTask { id, .. } if id == host_task_id),
-        );
+        let host_node_idx = graph.node_indices().find(|&idx| {
+            matches!(&graph[idx], IRNode::ServiceTask { id, .. } | IRNode::FfiServiceTask { id, .. } if id == host_task_id)
+        });
         let Some(host_idx) = host_node_idx else {
             continue; // verifier should have caught this
         };
@@ -502,6 +656,10 @@ pub fn lower(graph: &IRGraph) -> Result<CompiledProgram> {
         write_set.entry(name.clone()).or_default().insert(key);
     }
 
+    // Preserve the intern map so the FFI binding layer can resolve names to keys.
+    let flag_symbol_table: BTreeMap<FlagKey, String> =
+        flag_intern.into_iter().map(|(name, key)| (key, name)).collect();
+
     Ok(CompiledProgram {
         bytecode_version,
         program: instructions,
@@ -514,6 +672,9 @@ pub fn lower(graph: &IRGraph) -> Result<CompiledProgram> {
         write_set,
         task_manifest,
         error_route_map,
+        flag_symbol_table,
+        data_objects,
+        ffi_task_decls,
     })
 }
 
@@ -575,6 +736,117 @@ fn estimate_instr_count(graph: &IRGraph, node: NodeIndex) -> Addr {
         IRNode::HumanWait { .. } => 2,        // WaitMsg + Jump
         IRNode::BoundaryTimer { .. } => 0,    // structural only — no bytecode emitted
         IRNode::BoundaryError { .. } => 0,    // structural only — no bytecode emitted
+        IRNode::DataObject { .. } => 0,       // structural only — no bytecode emitted
+        IRNode::FfiServiceTask { .. } => 2,   // ExecFfi + Jump
+    }
+}
+
+// ── FFI / data-object lowering helpers ────────────────────────────────────────
+
+/// Intern a flag name into the flag_intern map. Returns the assigned FlagKey.
+/// If the name is already interned, returns the existing key.
+pub(crate) fn intern_flag(map: &mut HashMap<String, FlagKey>, name: &str) -> FlagKey {
+    if let Some(&key) = map.get(name) {
+        return key;
+    }
+    let key = map.len() as FlagKey;
+    map.insert(name.to_string(), key);
+    key
+}
+
+/// Assign a storage location to a data object based on its type declaration.
+/// For Bool and I64 primitives: intern a FlagKey using the data object id.
+/// For everything else: top-level DomainPayload path equal to the data object id.
+pub(crate) fn assign_storage(
+    type_decl: &bpmn_lite_types::ffi_bindings::DataObjectType,
+    id: &str,
+    flag_intern: &mut HashMap<String, FlagKey>,
+) -> bpmn_lite_types::ffi_bindings::DataObjectStorage {
+    use bpmn_lite_types::ffi_bindings::{DataObjectStorage, DataObjectType, PrimitiveType};
+    match type_decl {
+        DataObjectType::Primitive(PrimitiveType::Bool)
+        | DataObjectType::Primitive(PrimitiveType::I64) => {
+            DataObjectStorage::Flag(intern_flag(flag_intern, id))
+        }
+        DataObjectType::Primitive(PrimitiveType::F64)
+        | DataObjectType::Primitive(PrimitiveType::String)
+        | DataObjectType::SemOsDomain { .. } => {
+            DataObjectStorage::DomainPayload(vec![id.to_string()])
+        }
+    }
+}
+
+/// Convert an IR-level literal to a compiled-artifact literal.
+pub(crate) fn lower_literal(
+    lit: &crate::ir::IrLiteral,
+) -> bpmn_lite_types::ffi_bindings::Literal {
+    use bpmn_lite_types::ffi_bindings::Literal;
+    use crate::ir::IrLiteral;
+    match lit {
+        IrLiteral::Bool(b) => Literal::Bool(*b),
+        IrLiteral::I64(n) => Literal::I64(*n),
+        IrLiteral::F64(f) => Literal::F64(*f),
+        IrLiteral::String(s) => Literal::String(s.clone()),
+    }
+}
+
+/// Resolve an IR-level expression to a `BindingSource`, using the resolved
+/// data-object map to translate variable references to storage locations.
+pub(crate) fn resolve_expression(
+    expr: &crate::ir::Expression,
+    data_objects: &BTreeMap<String, bpmn_lite_types::ffi_bindings::DataObjectDecl>,
+) -> Result<bpmn_lite_types::ffi_bindings::BindingSource> {
+    use bpmn_lite_types::ffi_bindings::{BindingSource, DataObjectStorage};
+    use crate::ir::Expression;
+    match expr {
+        Expression::Literal(lit) => Ok(BindingSource::Literal(lower_literal(lit))),
+        Expression::VarRef(path) => {
+            let first = path.first().ok_or_else(|| anyhow!("empty var ref path"))?;
+            let decl = data_objects.get(first.as_str()).ok_or_else(|| {
+                anyhow!(
+                    "unresolved variable reference '{}': no data object with id '{}'",
+                    path.join("."),
+                    first
+                )
+            })?;
+            match &decl.storage {
+                DataObjectStorage::Flag(key) => {
+                    if path.len() > 1 {
+                        anyhow::bail!(
+                            "flag-typed data object '{}' cannot have sub-path segments (got '{}')",
+                            first,
+                            path[1..].join(".")
+                        );
+                    }
+                    Ok(BindingSource::FlagRef(*key))
+                }
+                DataObjectStorage::DomainPayload(base_path) => {
+                    let mut full_path = base_path.clone();
+                    full_path.extend(path[1..].iter().cloned());
+                    Ok(BindingSource::DomainPayloadRef(full_path))
+                }
+            }
+        }
+    }
+}
+
+/// Resolve an output target variable name to a `BindingTarget`.
+pub(crate) fn resolve_output_target(
+    target_variable: &str,
+    data_objects: &BTreeMap<String, bpmn_lite_types::ffi_bindings::DataObjectDecl>,
+) -> Result<bpmn_lite_types::ffi_bindings::BindingTarget> {
+    use bpmn_lite_types::ffi_bindings::{BindingTarget, DataObjectStorage};
+    let decl = data_objects.get(target_variable).ok_or_else(|| {
+        anyhow!(
+            "unresolved output target '{}': no data object with this id",
+            target_variable
+        )
+    })?;
+    match &decl.storage {
+        DataObjectStorage::Flag(key) => Ok(BindingTarget::FlagWrite(*key)),
+        DataObjectStorage::DomainPayload(path) => {
+            Ok(BindingTarget::DomainPayloadWrite(path.clone()))
+        }
     }
 }
 
@@ -584,15 +856,6 @@ fn intern_task(map: &mut HashMap<String, u32>, manifest: &mut Vec<String>, name:
     }
     let id = manifest.len() as u32;
     manifest.push(name.to_string());
-    map.insert(name.to_string(), id);
-    id
-}
-
-fn intern_flag(map: &mut HashMap<String, FlagKey>, name: &str) -> FlagKey {
-    if let Some(&id) = map.get(name) {
-        return id;
-    }
-    let id = map.len() as FlagKey;
     map.insert(name.to_string(), id);
     id
 }
@@ -922,5 +1185,83 @@ mod tests {
 
         // Task manifest should list task types
         assert!(program.task_manifest.contains(&"create_case".to_string()));
+    }
+
+    /// Δ8 — flag_symbol_table is preserved from the lowering intern map.
+    ///
+    /// A process with a named XOR gateway condition produces a non-empty
+    /// symbol table whose entry maps the interned FlagKey back to the
+    /// source flag_name string.
+    #[test]
+    fn test_flag_symbol_table_preserved() {
+        // Build: Start → XOR (condition on "approved") → task_a / task_b → End
+        let mut graph = IRGraph::new();
+        let start = graph.add_node(IRNode::Start { id: "start".to_string() });
+        let gw = graph.add_node(IRNode::GatewayXor {
+            id: "gw1".to_string(),
+            name: "Decision".to_string(),
+        });
+        let task_a = graph.add_node(IRNode::ServiceTask {
+            id: "task_a".to_string(),
+            name: "Task A".to_string(),
+            task_type: "do_a".to_string(),
+        });
+        let task_b = graph.add_node(IRNode::ServiceTask {
+            id: "task_b".to_string(),
+            name: "Task B".to_string(),
+            task_type: "do_b".to_string(),
+        });
+        let end = graph.add_node(IRNode::End { id: "end".to_string(), terminate: false });
+
+        graph.add_edge(start, gw, IREdge { id: "f1".to_string(), condition: None });
+        graph.add_edge(
+            gw,
+            task_a,
+            IREdge {
+                id: "f2".to_string(),
+                condition: Some(ConditionExpr {
+                    flag_name: "approved".to_string(),
+                    op: ConditionOp::Eq,
+                    literal: ConditionLiteral::Bool(true),
+                }),
+            },
+        );
+        graph.add_edge(gw, task_b, IREdge { id: "f3".to_string(), condition: None });
+        graph.add_edge(task_a, end, IREdge { id: "f4".to_string(), condition: None });
+        graph.add_edge(task_b, end, IREdge { id: "f5".to_string(), condition: None });
+
+        let program = lower(&graph).unwrap();
+
+        // The symbol table must be non-empty and contain "approved".
+        assert!(
+            !program.flag_symbol_table.is_empty(),
+            "flag_symbol_table should be non-empty when conditions reference named flags"
+        );
+        assert!(
+            program.flag_symbol_table.values().any(|n| n == "approved"),
+            "flag_symbol_table should contain the condition flag name 'approved'"
+        );
+
+        // The FlagKey stored in the table must be used as a LoadFlag operand.
+        let table_key = *program
+            .flag_symbol_table
+            .iter()
+            .find(|(_, n)| *n == "approved")
+            .unwrap()
+            .0;
+        assert!(
+            program
+                .program
+                .iter()
+                .any(|i| matches!(i, Instr::LoadFlag { key } if *key == table_key)),
+            "the FlagKey from flag_symbol_table must appear as a LoadFlag operand"
+        );
+
+        // Linear graph (no conditions) produces an empty symbol table.
+        let linear = lower(&make_linear_graph()).unwrap();
+        assert!(
+            linear.flag_symbol_table.is_empty(),
+            "flag_symbol_table should be empty when no conditions reference named flags"
+        );
     }
 }

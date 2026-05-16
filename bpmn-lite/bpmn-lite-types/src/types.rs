@@ -136,6 +136,19 @@ pub enum Instr {
         retc: u16,
     },
 
+    // In-process FFI invocation (A2 dispatch model / A5 lowering target)
+    /// Invoke a registered FFI execution owner in-process.
+    ///
+    /// `template_id` is the 32-byte BLAKE3 digest identifying the published
+    /// `FfiTemplate` in the catalogue. The `FfiTaskDecl` stored at this
+    /// instruction's bytecode address in `CompiledProgram.ffi_task_decls`
+    /// carries the compiled input/output bindings.
+    ExecFfi {
+        template_id: [u8; 32],
+        argc: u16,
+        retc: u16,
+    },
+
     // Concurrency
     Fork {
         targets: Box<[Addr]>,
@@ -427,6 +440,18 @@ pub struct CompiledProgram {
     pub task_manifest: Vec<String>,
     /// ExecNative bytecode addr → ordered error routes (specific codes first, catch-all last).
     pub error_route_map: BTreeMap<Addr, Vec<ErrorRoute>>,
+    /// Compile-time flag name → FlagKey mapping. Inverted from the lowering intern table;
+    /// preserved so the FFI binding layer can resolve symbolic variable names to storage keys.
+    pub flag_symbol_table: BTreeMap<FlagKey, String>,
+    /// Resolved data-object declarations keyed by data-object id attribute.
+    /// Populated by the A5 lowering pass; empty for processes with no
+    /// `<bpmn:dataObject>` declarations.
+    pub data_objects: BTreeMap<String, crate::ffi_bindings::DataObjectDecl>,
+    /// Compiled FFI task declarations indexed by the bytecode address of
+    /// the corresponding `Instr::ExecFfi` instruction.
+    /// Populated by the A5 lowering pass; empty for processes with no
+    /// `<bpmn:taskDefinition implementation="...">` annotations.
+    pub ffi_task_decls: BTreeMap<Addr, crate::ffi_bindings::FfiTaskDecl>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]

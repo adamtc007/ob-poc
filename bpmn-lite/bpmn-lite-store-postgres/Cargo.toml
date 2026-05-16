@@ -17,6 +17,8 @@ description = "BPMN-Lite PostgreSQL persistence — PostgresProcessStore + migra
 [dependencies]
 bpmn-lite-store = { path = "../bpmn-lite-store" }
 bpmn-lite-types = { path = "../bpmn-lite-types" }
+ffi-catalogue = { path = "../ffi-catalogue" }
+ffi-types = { path = "../ffi-types" }
 async-trait = { workspace = true }
 anyhow = { workspace = true }
 uuid = { workspace = true }

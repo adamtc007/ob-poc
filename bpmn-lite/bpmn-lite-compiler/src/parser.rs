@@ -1,9 +1,11 @@
 use crate::ir::*;
 use anyhow::{anyhow, Context, Result};
+use bpmn_lite_types::ffi_bindings::{DataObjectRole, DataObjectType, PrimitiveType};
 use petgraph::graph::NodeIndex;
 use quick_xml::events::{BytesStart, Event};
 use quick_xml::reader::Reader;
 use std::collections::HashMap;
+use uuid::Uuid;
 
 const MAX_TIMER_MS: u64 = 366 * 24 * 60 * 60 * 1_000;
 const MAX_TIMER_CYCLE_FIRES: u32 = 1_000;
@@ -37,6 +39,17 @@ pub fn parse_bpmn(xml: &str) -> Result<IRGraph> {
     // Error definitions: <bpmn:error id="X" errorCode="Y"/> → id → errorCode
     let mut error_defs: HashMap<String, String> = HashMap::new();
 
+    // FFI service task state — accumulated while parsing the serviceTask's
+    // <bpmn:taskDefinition implementation="..."> block.
+    let mut ffi_template_id: Option<[u8; 32]> = None;
+    let mut ffi_inputs: Vec<FfiInputBinding> = Vec::new();
+    let mut ffi_outputs: Vec<FfiOutputBinding> = Vec::new();
+    let mut in_ffi_task_definition: bool = false;
+
+    // Data object type declaration — accumulated while parsing
+    // <bpmn:dataObject>...<bpmn:dataType .../>...</bpmn:dataObject>.
+    let mut data_object_type_decl: Option<(DataObjectType, DataObjectRole)> = None;
+
     let mut buf = Vec::new();
 
     loop {
@@ -61,6 +74,11 @@ pub fn parse_bpmn(xml: &str) -> Result<IRGraph> {
                     &mut timer_kind,
                     &mut in_timer_child,
                     &mut error_defs,
+                    &mut ffi_template_id,
+                    &mut ffi_inputs,
+                    &mut ffi_outputs,
+                    &mut in_ffi_task_definition,
+                    &mut data_object_type_decl,
                 )?;
             }
             Ok(Event::Empty(ref e)) => {
@@ -82,6 +100,11 @@ pub fn parse_bpmn(xml: &str) -> Result<IRGraph> {
                     &mut timer_kind,
                     &mut in_timer_child,
                     &mut error_defs,
+                    &mut ffi_template_id,
+                    &mut ffi_inputs,
+                    &mut ffi_outputs,
+                    &mut in_ffi_task_definition,
+                    &mut data_object_type_decl,
                 )?;
             }
             Ok(Event::End(ref e)) => {
@@ -103,6 +126,11 @@ pub fn parse_bpmn(xml: &str) -> Result<IRGraph> {
                     &mut timer_kind,
                     &mut in_timer_child,
                     &error_defs,
+                    &mut ffi_template_id,
+                    &mut ffi_inputs,
+                    &mut ffi_outputs,
+                    &mut in_ffi_task_definition,
+                    &mut data_object_type_decl,
                 )?;
             }
             Ok(Event::Text(ref e)) => {
@@ -175,6 +203,11 @@ fn handle_open_tag(
     timer_kind: &mut Option<TimerKind>,
     in_timer_child: &mut bool,
     error_defs: &mut HashMap<String, String>,
+    ffi_template_id: &mut Option<[u8; 32]>,
+    ffi_inputs: &mut Vec<FfiInputBinding>,
+    ffi_outputs: &mut Vec<FfiOutputBinding>,
+    in_ffi_task_definition: &mut bool,
+    data_object_type_decl: &mut Option<(DataObjectType, DataObjectRole)>,
 ) -> Result<()> {
     let local = local_name(e.name().as_ref());
 
@@ -223,6 +256,13 @@ fn handle_open_tag(
                 *current_element = Some(ElementContext::ServiceTask { id, name });
                 *extension_task_type = None;
             }
+        }
+        "dataObject" if *in_process && !is_empty => {
+            let id = get_attr(e, "id")?;
+            let name = get_attr_opt(e, "name").unwrap_or_else(|| id.clone());
+            *current_element = Some(ElementContext::DataObject { id, name });
+            *data_object_type_decl = None;
+            // Self-closing <bpmn:dataObject/> with no type declaration is silently ignored.
         }
         "userTask" if *in_process => {
             let id = get_attr(e, "id")?;
@@ -340,9 +380,36 @@ fn handle_open_tag(
             *in_extension_elements = true;
         }
         "taskDefinition" if *in_extension_elements => {
-            if let Ok(tt) = get_attr(e, "type") {
+            if let Ok(impl_hex) = get_attr(e, "implementation") {
+                // FFI service task: <bpmn:taskDefinition implementation="<64hex>">
+                *ffi_template_id = Some(decode_template_id(&impl_hex)?);
+                *in_ffi_task_definition = true;
+            } else if let Ok(tt) = get_attr(e, "type") {
+                // External-job task: <zeebe:taskDefinition type="..."/>
                 *extension_task_type = Some(tt);
             }
+        }
+        "input" if *in_ffi_task_definition && *in_extension_elements => {
+            // <bpmn:input target="<field>" expression="<expr>"/>
+            let target_field = get_attr(e, "target")
+                .context("<bpmn:input> missing target= attribute")?;
+            let expr_str = get_attr(e, "expression")
+                .context("<bpmn:input> missing expression= attribute")?;
+            let expression = parse_expression(&expr_str)?;
+            ffi_inputs.push(FfiInputBinding { target_field, expression });
+        }
+        "output" if *in_ffi_task_definition && *in_extension_elements => {
+            // <bpmn:output source="<field>" target="<variable>"/>
+            let source_field = get_attr(e, "source")
+                .context("<bpmn:output> missing source= attribute")?;
+            let target_variable = get_attr(e, "target")
+                .context("<bpmn:output> missing target= attribute")?;
+            ffi_outputs.push(FfiOutputBinding { source_field, target_variable });
+        }
+        "dataType" if *in_extension_elements => {
+            // <bpmn:dataType primitive="..." role="..."/> or
+            // <bpmn:dataType domain="<uuid>" version-hash="<32hex>" role="..."/>
+            *data_object_type_decl = Some(parse_data_object_type(e)?);
         }
         "subscription" if *in_extension_elements => {
             if let Ok(ck) = get_attr(e, "correlationKey") {
@@ -398,6 +465,11 @@ fn handle_close_tag(
     timer_kind: &mut Option<TimerKind>,
     in_timer_child: &mut bool,
     error_defs: &HashMap<String, String>,
+    ffi_template_id: &mut Option<[u8; 32]>,
+    ffi_inputs: &mut Vec<FfiInputBinding>,
+    ffi_outputs: &mut Vec<FfiOutputBinding>,
+    in_ffi_task_definition: &mut bool,
+    data_object_type_decl: &mut Option<(DataObjectType, DataObjectRole)>,
 ) -> Result<()> {
     match local {
         "process" => {
@@ -412,17 +484,50 @@ fn handle_close_tag(
         "timeDuration" | "timeDate" | "timeCycle" => {
             *in_timer_child = false;
         }
-        "serviceTask" => {
-            if let Some(ElementContext::ServiceTask { id, name }) = current_element.take() {
-                let task_type = extension_task_type
-                    .take()
-                    .unwrap_or_else(|| name_to_snake(&name));
-                let idx = graph.add_node(IRNode::ServiceTask {
+        "taskDefinition" if *in_ffi_task_definition => {
+            *in_ffi_task_definition = false;
+        }
+        "dataObject" => {
+            if let Some(ElementContext::DataObject { id, name }) = current_element.take() {
+                let (type_decl, role) = data_object_type_decl.take().unwrap_or((
+                    DataObjectType::Primitive(PrimitiveType::String),
+                    DataObjectRole::Internal,
+                ));
+                let idx = graph.add_node(IRNode::DataObject {
                     id: id.clone(),
                     name,
-                    task_type,
+                    type_decl,
+                    role,
                 });
                 node_map.insert(id, idx);
+            }
+        }
+        "serviceTask" => {
+            if let Some(ElementContext::ServiceTask { id, name }) = current_element.take() {
+                if let Some(tid) = ffi_template_id.take() {
+                    // FFI service task — build FfiServiceTask node.
+                    let inputs = std::mem::take(ffi_inputs);
+                    let outputs = std::mem::take(ffi_outputs);
+                    let idx = graph.add_node(IRNode::FfiServiceTask {
+                        id: id.clone(),
+                        name,
+                        template_id: tid,
+                        inputs,
+                        outputs,
+                    });
+                    node_map.insert(id, idx);
+                } else {
+                    // External-job service task — existing path.
+                    let task_type = extension_task_type
+                        .take()
+                        .unwrap_or_else(|| name_to_snake(&name));
+                    let idx = graph.add_node(IRNode::ServiceTask {
+                        id: id.clone(),
+                        name,
+                        task_type,
+                    });
+                    node_map.insert(id, idx);
+                }
             }
         }
         "userTask" => {
@@ -594,6 +699,10 @@ enum ElementContext {
     },
     EndEvent {
         id: String,
+    },
+    DataObject {
+        id: String,
+        name: String,
     },
 }
 
@@ -846,6 +955,112 @@ fn parse_iso_cycle(s: &str) -> Result<(u64, u32)> {
 
     let interval_ms = parse_iso_duration(duration_str)?;
     Ok((interval_ms, max_fires))
+}
+
+// ── FFI / data-object parser helpers ──────────────────────────────────────────
+
+/// Decode a 64-character lowercase hex string to a 32-byte BLAKE3 template id.
+fn decode_template_id(hex: &str) -> Result<[u8; 32]> {
+    let hex = hex.trim();
+    if hex.len() != 64 {
+        anyhow::bail!(
+            "FFI template_id must be exactly 64 hex characters (got {}): '{}'",
+            hex.len(),
+            &hex[..hex.len().min(16)]
+        );
+    }
+    let mut bytes = [0u8; 32];
+    for (i, chunk) in hex.as_bytes().chunks(2).enumerate() {
+        let s = std::str::from_utf8(chunk)
+            .map_err(|_| anyhow!("non-UTF-8 in template_id hex at byte {}", i * 2))?;
+        bytes[i] = u8::from_str_radix(s, 16)
+            .map_err(|_| anyhow!("invalid hex in template_id at byte {}: '{}'", i * 2, s))?;
+    }
+    Ok(bytes)
+}
+
+/// Parse a C-minimal expression string (A2 §5 / V&S v1.1 §10.6).
+///
+/// Grammar:
+/// ```text
+/// expression   ::= literal | variable-ref
+/// variable-ref ::= "${" identifier ("." identifier)* "}"
+/// literal      ::= boolean | integer | float | string | symbol
+/// ```
+///
+/// Rules:
+/// - `${identifier}` or `${a.b.c}` → VarRef
+/// - `true` / `false` (case-insensitive) → Bool literal
+/// - Numeric strings that parse as i64 → I64 literal
+/// - Numeric strings that parse as f64 → F64 literal
+/// - Everything else → String literal (bare symbol or quoted string)
+fn parse_expression(s: &str) -> Result<Expression> {
+    let s = s.trim();
+    if let Some(inner) = s.strip_prefix("${").and_then(|t| t.strip_suffix('}')) {
+        let path: Vec<String> = inner
+            .split('.')
+            .map(|seg| seg.trim().to_string())
+            .collect();
+        if path.is_empty() || path.iter().any(|p| p.is_empty()) {
+            anyhow::bail!("invalid variable reference '{}': empty path segment", s);
+        }
+        return Ok(Expression::VarRef(path));
+    }
+    if s.eq_ignore_ascii_case("true") {
+        return Ok(Expression::Literal(IrLiteral::Bool(true)));
+    }
+    if s.eq_ignore_ascii_case("false") {
+        return Ok(Expression::Literal(IrLiteral::Bool(false)));
+    }
+    if let Ok(n) = s.parse::<i64>() {
+        return Ok(Expression::Literal(IrLiteral::I64(n)));
+    }
+    if let Ok(f) = s.parse::<f64>() {
+        return Ok(Expression::Literal(IrLiteral::F64(f)));
+    }
+    // Quoted string: strip outer quotes
+    let stripped = s
+        .strip_prefix('"')
+        .and_then(|t| t.strip_suffix('"'))
+        .or_else(|| s.strip_prefix('\'').and_then(|t| t.strip_suffix('\'')));
+    Ok(Expression::Literal(IrLiteral::String(
+        stripped.unwrap_or(s).to_string(),
+    )))
+}
+
+/// Parse a `<bpmn:dataType .../>` element into a type + role declaration.
+fn parse_data_object_type(
+    e: &BytesStart,
+) -> Result<(DataObjectType, DataObjectRole)> {
+    let role = match get_attr_opt(e, "role").as_deref() {
+        Some("input") => DataObjectRole::Input,
+        Some("output") => DataObjectRole::Output,
+        _ => DataObjectRole::Internal,
+    };
+    if let Some(prim_str) = get_attr_opt(e, "primitive") {
+        let prim = match prim_str.to_lowercase().as_str() {
+            "bool" | "boolean" => PrimitiveType::Bool,
+            "integer" | "int" | "i64" => PrimitiveType::I64,
+            "float" | "f64" | "decimal" | "number" => PrimitiveType::F64,
+            "string" | "str" | "text" => PrimitiveType::String,
+            other => anyhow::bail!("<bpmn:dataType> unknown primitive='{}': expected bool/integer/float/string", other),
+        };
+        return Ok((DataObjectType::Primitive(prim), role));
+    }
+    if let Some(domain_str) = get_attr_opt(e, "domain") {
+        let domain_id: Uuid = domain_str
+            .parse()
+            .map_err(|_| anyhow!("<bpmn:dataType> invalid UUID in domain='{}': must be a UUIDv7 hex string", domain_str))?;
+        let version_hash_str = get_attr_opt(e, "version-hash").unwrap_or_default();
+        let version_hash = if version_hash_str.is_empty() {
+            [0u8; 32]
+        } else {
+            decode_template_id(&version_hash_str)
+                .with_context(|| format!("<bpmn:dataType> invalid version-hash: '{}'", version_hash_str))?
+        };
+        return Ok((DataObjectType::SemOsDomain { domain_id, version_hash }, role));
+    }
+    anyhow::bail!("<bpmn:dataType> requires either primitive= or domain= attribute")
 }
 
 #[cfg(test)]

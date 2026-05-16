@@ -8,6 +8,9 @@ members = [
     "bpmn-lite-store-postgres",
     "bpmn-lite-types",
     "bpmn-lite-vm",
+    "ffi-catalogue",
+    "ffi-dispatcher",
+    "ffi-types",
     "xtask",
 ]
 resolver = "2"

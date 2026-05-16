@@ -212,4 +212,27 @@ pub enum RuntimeEvent {
         join_id: JoinId,
         expected: u16,
     },
+
+    // ── FFI audit events (A8) ─────────────────────────────────────────────────
+
+    /// Written BEFORE dispatching an in-process FFI call.
+    /// Paired with FfiInvocationCompleted; together they form an
+    /// audit record matching `ffi_invocation_record` table rows.
+    FfiInvocationPending {
+        invocation_id: Uuid,
+        /// 32-byte BLAKE3 digest stored as hex string for readability.
+        template_id_hex: String,
+        caller_task_id: String,
+        caller_pc: Addr,
+        owner_type: String,
+    },
+
+    /// Written AFTER an in-process FFI call returns.
+    FfiInvocationCompleted {
+        invocation_id: Uuid,
+        /// "success" | "no_match" | "incident"
+        outcome_kind: String,
+        /// For incidents: structured error description.
+        error_message: Option<String>,
+    },
 }

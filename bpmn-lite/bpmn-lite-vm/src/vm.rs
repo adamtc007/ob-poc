@@ -22,6 +22,16 @@ pub enum TickOutcome {
     Terminated,
     /// Fiber hit a Fail instruction.
     Failed { code: u32 },
+    /// Fiber hit ExecFfi — engine must dispatch the call in-process.
+    ///
+    /// The VM does NOT advance `fiber.pc` or park the fiber. The engine
+    /// handles dispatch, applies output bindings, advances pc, and
+    /// re-runs the fiber. Per A2 §2 dispatch model.
+    ExecFfi {
+        template_id: [u8; 32],
+        pc: Addr,
+        invocation_id: Uuid,
+    },
 }
 
 /// The BPMN-Lite VM. Executes bytecode fibers against a ProcessStore.
@@ -747,6 +757,21 @@ impl Vm {
                 self.store.save_fiber(instance.instance_id, fiber).await?;
                 Ok(TickOutcome::Failed { code: *code })
             }
+
+            // ExecFfi — signal the engine to dispatch in-process.
+            //
+            // The VM assigns a UUIDv7 invocation id and returns a typed
+            // TickOutcome::ExecFfi. PC is NOT advanced here; the engine
+            // advances it after successful dispatch (or parks the fiber
+            // on incident). Per A2 §2.
+            Instr::ExecFfi { template_id, .. } => {
+                let invocation_id = Uuid::now_v7();
+                Ok(TickOutcome::ExecFfi {
+                    template_id: *template_id,
+                    pc: fiber.pc,
+                    invocation_id,
+                })
+            }
         }
     }
 
@@ -1018,6 +1043,9 @@ mod tests {
             write_set: BTreeMap::new(),
             task_manifest: vec!["create_case".to_string(), "request_docs".to_string()],
             error_route_map: BTreeMap::new(),
+            flag_symbol_table: BTreeMap::new(),
+            data_objects: BTreeMap::new(),
+            ffi_task_decls: BTreeMap::new(),
         }
     }
 
@@ -1661,6 +1689,9 @@ mod tests {
             write_set: BTreeMap::new(),
             task_manifest: vec![],
             error_route_map: BTreeMap::new(),
+            flag_symbol_table: BTreeMap::new(),
+            data_objects: BTreeMap::new(),
+            ffi_task_decls: BTreeMap::new(),
         };
 
         let mut instance = make_instance();
@@ -1785,6 +1816,9 @@ mod tests {
             write_set: BTreeMap::new(),
             task_manifest: vec![],
             error_route_map: BTreeMap::new(),
+            flag_symbol_table: BTreeMap::new(),
+            data_objects: BTreeMap::new(),
+            ffi_task_decls: BTreeMap::new(),
         };
 
         let mut instance = make_instance();
@@ -1870,6 +1904,9 @@ mod tests {
             write_set: BTreeMap::new(),
             task_manifest: vec![],
             error_route_map: BTreeMap::new(),
+            flag_symbol_table: BTreeMap::new(),
+            data_objects: BTreeMap::new(),
+            ffi_task_decls: BTreeMap::new(),
         };
 
         let mut instance = make_instance();
@@ -1962,6 +1999,9 @@ mod tests {
             write_set: BTreeMap::new(),
             task_manifest: vec![],
             error_route_map: BTreeMap::new(),
+            flag_symbol_table: BTreeMap::new(),
+            data_objects: BTreeMap::new(),
+            ffi_task_decls: BTreeMap::new(),
         };
 
         let mut instance = make_instance();
@@ -2051,6 +2091,9 @@ mod tests {
             write_set: BTreeMap::new(),
             task_manifest: vec!["verify_docs".to_string()],
             error_route_map: BTreeMap::new(),
+            flag_symbol_table: BTreeMap::new(),
+            data_objects: BTreeMap::new(),
+            ffi_task_decls: BTreeMap::new(),
         };
 
         let mut instance = make_instance();
@@ -2169,6 +2212,9 @@ mod tests {
             write_set: BTreeMap::new(),
             task_manifest: vec!["verify_docs".to_string()],
             error_route_map: BTreeMap::new(),
+            flag_symbol_table: BTreeMap::new(),
+            data_objects: BTreeMap::new(),
+            ffi_task_decls: BTreeMap::new(),
         };
 
         let mut instance = make_instance();

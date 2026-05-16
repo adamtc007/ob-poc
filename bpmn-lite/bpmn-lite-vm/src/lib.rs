@@ -8,6 +8,7 @@
 //! Phase 2.5 (2026-05-14) migrated `vm.rs` (2,010 LOC) here from
 //! `bpmn-lite-core/src/`.
 
+pub mod json_path;
 pub mod vm;
 
 pub use vm::*;

@@ -29,6 +29,8 @@ bpmn-lite-types = { path = "../bpmn-lite-types" }
 bpmn-lite-compiler = { path = "../bpmn-lite-compiler" }
 bpmn-lite-vm = { path = "../bpmn-lite-vm" }
 bpmn-lite-store = { path = "../bpmn-lite-store" }
+ffi-types = { path = "../ffi-types" }
+ffi-dispatcher = { path = "../ffi-dispatcher" }
 async-trait = { workspace = true }
 anyhow = { workspace = true }
 serde_json = { workspace = true }
@@ -39,6 +41,11 @@ ob-poc-types = { path = "../../rust/crates/ob-poc-types" }
 
 [dev-dependencies]
 bpmn-lite-authoring = { path = "../bpmn-lite-authoring" }
+ffi-catalogue = { path = "../ffi-catalogue" }
+dmn-lite-bridge = { path = "../../dmn-lite/crates/dmn-lite-bridge" }
+dmn-lite-compiler = { path = "../../dmn-lite/crates/dmn-lite-compiler" }
+dmn-lite-parser = { path = "../../dmn-lite/crates/dmn-lite-parser" }
+ffi-types = { path = "../ffi-types" }
 
 [lints]
 workspace = true

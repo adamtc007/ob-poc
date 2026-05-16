@@ -1,3 +1,4 @@
+use bpmn_lite_types::ffi_bindings::{DataObjectRole, DataObjectType};
 use petgraph::graph::{DiGraph, NodeIndex};
 use serde::{Deserialize, Serialize};
 
@@ -93,6 +94,77 @@ pub enum IRNode {
         name: String,
         direction: GatewayDirection,
     },
+
+    /// A BPMN data object declaration with a type annotation.
+    ///
+    /// These are structural nodes: no sequence-flow edges and zero bytecode
+    /// instructions. They participate in the graph only so the lowering
+    /// pre-pass can discover them alongside process-flow nodes in a single
+    /// traversal. `estimate_instr_count` returns 0 for DataObject.
+    DataObject {
+        id: String,
+        name: String,
+        type_decl: DataObjectType,
+        role: DataObjectRole,
+    },
+
+    /// A BPMN ServiceTask annotated with `<bpmn:taskDefinition implementation="...">`.
+    ///
+    /// Distinct from `ServiceTask` (which uses `<zeebe:taskDefinition type="...">` and
+    /// dispatches via the external-job path). `FfiServiceTask` lowers to
+    /// `Instr::ExecFfi` and stores a `FfiTaskDecl` in `CompiledProgram.ffi_task_decls`.
+    FfiServiceTask {
+        id: String,
+        name: String,
+        /// Decoded 32-byte BLAKE3 template_id from the `implementation="<64hex>"` attribute.
+        template_id: [u8; 32],
+        inputs: Vec<FfiInputBinding>,
+        outputs: Vec<FfiOutputBinding>,
+    },
+}
+
+// ── C-minimal expression language ────────────────────────────────────────────
+
+/// Literal value types at the IR (pre-lowering) level.
+///
+/// Maps 1:1 to `bpmn_lite_types::ffi_bindings::Literal` after lowering.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(tag = "kind", rename_all = "snake_case")]
+pub enum IrLiteral {
+    Bool(bool),
+    I64(i64),
+    F64(f64),
+    String(String),
+}
+
+/// A C-minimal expression from a `<bpmn:input expression="...">` attribute.
+///
+/// Per A2 §5. At lowering time, `VarRef` is resolved against `data_objects`
+/// to produce a `BindingSource`. `Literal` is copied as-is.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(tag = "expr", rename_all = "snake_case")]
+pub enum Expression {
+    Literal(IrLiteral),
+    /// Dotted variable path, e.g. `${customer.jurisdiction}` → `["customer", "jurisdiction"]`.
+    VarRef(Vec<String>),
+}
+
+/// One `<bpmn:input>` element inside a `FfiServiceTask` extension.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct FfiInputBinding {
+    /// FFI template input field name (`target=` attribute).
+    pub target_field: String,
+    pub expression: Expression,
+}
+
+/// One `<bpmn:output>` element inside a `FfiServiceTask` extension.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct FfiOutputBinding {
+    /// FFI template output field name (`source=` attribute).
+    pub source_field: String,
+    /// Process variable name (`target=` attribute) — resolved to a
+    /// `DataObjectDecl` during lowering.
+    pub target_variable: String,
 }
 
 impl IRNode {
@@ -109,6 +181,8 @@ impl IRNode {
             IRNode::BoundaryTimer { id, .. } => id,
             IRNode::BoundaryError { id, .. } => id,
             IRNode::GatewayInclusive { id, .. } => id,
+            IRNode::DataObject { id, .. } => id,
+            IRNode::FfiServiceTask { id, .. } => id,
         }
     }
 }

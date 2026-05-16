@@ -14,12 +14,14 @@ description = "BPMN-Lite compiler — BPMN-XML parse → IR → bytecode lowerin
 
 [dependencies]
 bpmn-lite-types = { path = "../bpmn-lite-types" }
+ffi-types = { path = "../ffi-types" }
 anyhow = { workspace = true }
 petgraph = { workspace = true }
 quick-xml = "0.36"
 serde = { workspace = true }
 serde_json = { workspace = true }
 sha2 = { workspace = true }
+uuid = { workspace = true }
 
 [lints]
 workspace = true

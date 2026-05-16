@@ -3,8 +3,11 @@ use anyhow::{anyhow, Result};
 use bpmn_lite_compiler::{lowering, parser, verifier};
 use bpmn_lite_store::store::ProcessStore;
 use bpmn_lite_types::events::RuntimeEvent;
+use bpmn_lite_types::ffi_bindings::{BindingSource, BindingTarget, Literal};
 use bpmn_lite_types::*;
-use bpmn_lite_vm::{apply_completion, compute_hash, TickOutcome, Vm};
+use bpmn_lite_vm::{apply_completion, compute_hash, json_path, TickOutcome, Vm};
+use ffi_dispatcher::FfiDispatcher;
+use ffi_types::wire::{FfiCall, FfiIncidentClass, FfiResult};
 use ob_poc_types::session_stack::SessionStackState;
 use std::collections::BTreeMap;
 use std::sync::Arc;
@@ -29,6 +32,8 @@ pub struct BpmnLiteEngine {
     tenant_id: String,
     transition_owner: String,
     transition_lease_ms: u64,
+    /// Optional in-process FFI dispatcher. None = ExecFfi produces an incident.
+    ffi_dispatcher: Option<Arc<FfiDispatcher>>,
 }
 
 /// Parameters for starting a new process instance.
@@ -126,7 +131,15 @@ impl BpmnLiteEngine {
             tenant_id: tenant_id.into(),
             transition_owner: format!("engine-{}", Uuid::now_v7()),
             transition_lease_ms: DEFAULT_TRANSITION_LEASE_MS,
+            ffi_dispatcher: None,
         }
+    }
+
+    /// Attach an FFI dispatcher. Call before starting instances that contain
+    /// `ExecFfi` instructions; without a dispatcher ExecFfi produces an incident.
+    pub fn with_ffi_dispatcher(mut self, dispatcher: Arc<FfiDispatcher>) -> Self {
+        self.ffi_dispatcher = Some(dispatcher);
+        self
     }
 
     pub fn for_tenant(&self, tenant_id: impl Into<String>) -> Self {
@@ -135,6 +148,7 @@ impl BpmnLiteEngine {
             tenant_id: tenant_id.into(),
             transition_owner: format!("engine-{}", Uuid::now_v7()),
             transition_lease_ms: self.transition_lease_ms,
+            ffi_dispatcher: self.ffi_dispatcher.clone(),
         }
     }
 
@@ -410,13 +424,16 @@ impl BpmnLiteEngine {
 
         let fibers = self.store.load_fibers(instance_id).await?;
 
-        for fiber in fibers {
+        'fiber_loop: for fiber in fibers {
             if fiber.wait != WaitState::Running {
                 continue;
             }
 
             let mut fiber = fiber;
             let vm = Vm::new(self.store.clone());
+
+            // Inner loop allows re-running the fiber after an in-process FFI call.
+            loop {
             let outcome = vm
                 .run_fiber(&mut fiber, &mut instance, &program, 1000)
                 .await?;
@@ -425,8 +442,21 @@ impl BpmnLiteEngine {
             self.store.save_instance(&instance).await?;
 
             match outcome {
+                TickOutcome::ExecFfi { template_id: _, pc, invocation_id } => {
+                    let incident = self
+                        .handle_ffi_dispatch(&mut instance, &mut fiber, &program, invocation_id, pc)
+                        .await?;
+                    if incident {
+                        // Fiber parked on incident — stop inner loop.
+                        break;
+                    }
+                    // Dispatch succeeded (Success or NoMatch) — fiber.pc advanced.
+                    // Continue inner loop to keep running the fiber.
+                    continue;
+                }
                 TickOutcome::Parked(WaitState::Job { .. }) => {
                     // Job enqueued by VM — leave in queue for activate_jobs()
+                    break;
                 }
                 TickOutcome::Ended => {
                     // Fiber ended — check if all fibers are done
@@ -442,6 +472,7 @@ impl BpmnLiteEngine {
                             .append_event(instance_id, &RuntimeEvent::Completed { at: now_ms() })
                             .await?;
                     }
+                    break;
                 }
                 TickOutcome::Terminated => {
                     // EndTerminate: kill the entire instance immediately.
@@ -492,13 +523,16 @@ impl BpmnLiteEngine {
                         .await?;
 
                     // 6. BREAK — no more fibers to process
-                    break;
+                    break 'fiber_loop;
                 }
                 _ => {
-                    // Parked on timer/msg/join/incident, or still running
+                    // Continue → hit max_steps; parked on timer/msg/join/race/incident → break inner loop
+                    break;
                 }
             }
-        }
+            } // end inner FFI-retry loop
+
+        } // end 'fiber_loop
 
         // --- Boundary timer promotion pass: Job → Race ---
         let fibers_for_promotion = self.store.load_fibers(instance_id).await?;
@@ -799,6 +833,342 @@ impl BpmnLiteEngine {
                 &RuntimeEvent::SignalIgnored { signal_desc: desc },
             )
             .await?;
+        Ok(())
+    }
+
+    /// Dispatch an in-process FFI call (ExecFfi opcode path).
+    ///
+    /// Serialises input bindings from instance state, calls the registered
+    /// FfiDispatcher, applies output bindings, writes audit events, and
+    /// advances `fiber.pc`.
+    ///
+    /// Returns `true` if the call produced an incident (fiber is now
+    /// parked on `WaitState::Incident`), `false` for Success/NoMatch.
+    async fn handle_ffi_dispatch(
+        &self,
+        instance: &mut ProcessInstance,
+        fiber: &mut Fiber,
+        program: &CompiledProgram,
+        invocation_id: Uuid,
+        pc: Addr,
+    ) -> Result<bool> {
+        // No dispatcher → create an incident.
+        let Some(dispatcher) = &self.ffi_dispatcher else {
+            let incident_id = self
+                .create_incident(
+                    instance,
+                    fiber,
+                    pc,
+                    ErrorClass::ContractViolation,
+                    "ExecFfi reached engine with no FfiDispatcher configured",
+                )
+                .await?;
+            instance.state = ProcessState::Failed { incident_id };
+            self.store.save_instance(instance).await?;
+            return Ok(true); // incident
+        };
+
+        // Get the compiled task declaration for this instruction.
+        let task_decl = program.ffi_task_decls.get(&pc).ok_or_else(|| {
+            anyhow!("ExecFfi at pc={} has no FfiTaskDecl in CompiledProgram", pc)
+        })?;
+
+        // Caller task id for audit.
+        let caller_task_id = program
+            .debug_map
+            .get(&pc)
+            .cloned()
+            .unwrap_or_else(|| format!("pc_{}", pc));
+
+        // Serialise input bindings.
+        let input_obj = self.build_ffi_input_payload(instance, task_decl, program)?;
+        let input_payload = serde_json::to_vec(&input_obj)?;
+
+        // Look up owner_type for audit.
+        let owner_type = dispatcher
+            .owner_type_for(&task_decl.template_id)
+            .await;
+
+        // Write Pending audit event (before dispatch — A2 §9).
+        self.store
+            .append_event(
+                instance.instance_id,
+                &RuntimeEvent::FfiInvocationPending {
+                    invocation_id,
+                    template_id_hex: bytes_to_hex(&task_decl.template_id),
+                    caller_task_id: caller_task_id.clone(),
+                    caller_pc: pc,
+                    owner_type: owner_type.clone(),
+                },
+            )
+            .await?;
+
+        // Dispatch.
+        let call = FfiCall {
+            invocation_id,
+            template_id: task_decl.template_id,
+            tenant_id: instance.tenant_id.clone(),
+            process_instance_id: instance.instance_id,
+            caller_task_id,
+            input_payload,
+        };
+        let result = dispatcher.dispatch(call).await;
+
+        match result {
+            Err(e) => {
+                // Transport-level error (owner panicked, dispatch failed internally).
+                let msg = format!("FFI dispatch error: {}", e);
+                self.store
+                    .append_event(
+                        instance.instance_id,
+                        &RuntimeEvent::FfiInvocationCompleted {
+                            invocation_id,
+                            outcome_kind: "incident".to_string(),
+                            error_message: Some(msg.clone()),
+                        },
+                    )
+                    .await?;
+                let incident_id = self
+                    .create_incident(instance, fiber, pc, ErrorClass::Transient, &msg)
+                    .await?;
+                instance.state = ProcessState::Failed { incident_id };
+                self.store.save_instance(instance).await?;
+                Ok(true)
+            }
+            Ok(FfiResult::Success { output_payload, trace_payload: _, new_domain_payload }) => {
+                // Apply output bindings.
+                if let Some(new_payload) = new_domain_payload {
+                    instance.domain_payload = Arc::<str>::from(new_payload.as_str());
+                    instance.domain_payload_hash = compute_hash(&new_payload);
+                } else {
+                    self.apply_ffi_outputs(instance, task_decl, &output_payload)?;
+                }
+                self.store
+                    .append_event(
+                        instance.instance_id,
+                        &RuntimeEvent::FfiInvocationCompleted {
+                            invocation_id,
+                            outcome_kind: "success".to_string(),
+                            error_message: None,
+                        },
+                    )
+                    .await?;
+                fiber.pc += 1;
+                fiber.wait = WaitState::Running;
+                self.store.save_fiber(instance.instance_id, fiber).await?;
+                Ok(false)
+            }
+            Ok(FfiResult::NoMatch { trace_payload: _ }) => {
+                // Business "no result" — advance fiber, no output bindings.
+                self.store
+                    .append_event(
+                        instance.instance_id,
+                        &RuntimeEvent::FfiInvocationCompleted {
+                            invocation_id,
+                            outcome_kind: "no_match".to_string(),
+                            error_message: None,
+                        },
+                    )
+                    .await?;
+                fiber.pc += 1;
+                fiber.wait = WaitState::Running;
+                self.store.save_fiber(instance.instance_id, fiber).await?;
+                Ok(false)
+            }
+            Ok(FfiResult::Incident { error_class, message, retry_hint_ms: _ }) => {
+                let ec = ffi_incident_class_to_error_class(error_class);
+                // Check error_route_map for BusinessRejection routing.
+                if let ErrorClass::BusinessRejection { ref rejection_code } = ec {
+                    if let Some(routes) = program.error_route_map.get(&pc) {
+                        let route = routes
+                            .iter()
+                            .find(|r| r.error_code.as_deref() == Some(rejection_code.as_str()))
+                            .or_else(|| routes.iter().find(|r| r.error_code.is_none()));
+                        if let Some(r) = route {
+                            self.store
+                                .append_event(
+                                    instance.instance_id,
+                                    &RuntimeEvent::FfiInvocationCompleted {
+                                        invocation_id,
+                                        outcome_kind: "incident".to_string(),
+                                        error_message: Some(message.clone()),
+                                    },
+                                )
+                                .await?;
+                            self.store
+                                .append_event(
+                                    instance.instance_id,
+                                    &RuntimeEvent::ErrorRouted {
+                                        job_key: format!("ffi:{}", invocation_id),
+                                        error_code: rejection_code.clone(),
+                                        boundary_id: r.boundary_element_id.clone(),
+                                        resume_at: r.resume_at,
+                                    },
+                                )
+                                .await?;
+                            fiber.pc = r.resume_at;
+                            fiber.wait = WaitState::Running;
+                            self.store.save_fiber(instance.instance_id, fiber).await?;
+                            return Ok(false); // routed, not an incident
+                        }
+                    }
+                }
+                self.store
+                    .append_event(
+                        instance.instance_id,
+                        &RuntimeEvent::FfiInvocationCompleted {
+                            invocation_id,
+                            outcome_kind: "incident".to_string(),
+                            error_message: Some(message.clone()),
+                        },
+                    )
+                    .await?;
+                let incident_id = self
+                    .create_incident(instance, fiber, pc, ec, &message)
+                    .await?;
+                instance.state = ProcessState::Failed { incident_id };
+                self.store.save_instance(instance).await?;
+                Ok(true)
+            }
+        }
+    }
+
+    /// Create an Incident record and park the fiber.
+    async fn create_incident(
+        &self,
+        instance: &mut ProcessInstance,
+        fiber: &mut Fiber,
+        pc: Addr,
+        error_class: ErrorClass,
+        message: &str,
+    ) -> Result<Uuid> {
+        let incident_id = Uuid::now_v7();
+        let service_task_id = format!("pc_{}", pc);
+        let incident = Incident {
+            incident_id,
+            process_instance_id: instance.instance_id,
+            fiber_id: fiber.fiber_id,
+            service_task_id: service_task_id.clone(),
+            bytecode_addr: pc,
+            error_class,
+            message: message.to_string(),
+            retry_count: 0,
+            created_at: now_ms(),
+            resolved_at: None,
+            resolution: None,
+        };
+        self.store.save_incident(&incident).await?;
+        self.store
+            .append_event(
+                instance.instance_id,
+                &RuntimeEvent::IncidentCreated {
+                    incident_id,
+                    service_task_id,
+                    job_key: None,
+                },
+            )
+            .await?;
+        fiber.wait = WaitState::Incident { incident_id };
+        self.store.save_fiber(instance.instance_id, fiber).await?;
+        Ok(incident_id)
+    }
+
+    /// Serialise FFI input bindings from the current instance state.
+    fn build_ffi_input_payload(
+        &self,
+        instance: &ProcessInstance,
+        task_decl: &bpmn_lite_types::ffi_bindings::FfiTaskDecl,
+        program: &CompiledProgram,
+    ) -> Result<serde_json::Value> {
+        let mut obj = serde_json::Map::new();
+        let parsed_payload: Option<serde_json::Value> = if task_decl
+            .inputs
+            .iter()
+            .any(|b| matches!(&b.source, BindingSource::DomainPayloadRef(_)))
+        {
+            Some(json_path::parse_json(&instance.domain_payload)?)
+        } else {
+            None
+        };
+        for binding in &task_decl.inputs {
+            let value: serde_json::Value = match &binding.source {
+                BindingSource::Literal(lit) => literal_to_json(lit),
+                BindingSource::FlagRef(key) => {
+                    match instance.flags.get(key) {
+                        Some(Value::Bool(b)) => serde_json::Value::Bool(*b),
+                        Some(Value::I64(n)) => serde_json::Value::Number((*n).into()),
+                        Some(Value::Str(_)) | Some(Value::Ref(_)) | None => {
+                            serde_json::Value::Null
+                        }
+                    }
+                }
+                BindingSource::DomainPayloadRef(path) => {
+                    if let Some(ref root) = parsed_payload {
+                        json_path::read(root, path).unwrap_or(serde_json::Value::Null)
+                    } else {
+                        serde_json::Value::Null
+                    }
+                }
+            };
+            obj.insert(binding.target_field.clone(), value);
+        }
+        // suppress unused-variable warning — program only needed for future use
+        let _ = program;
+        Ok(serde_json::Value::Object(obj))
+    }
+
+    /// Apply FFI output bindings back into instance state.
+    fn apply_ffi_outputs(
+        &self,
+        instance: &mut ProcessInstance,
+        task_decl: &bpmn_lite_types::ffi_bindings::FfiTaskDecl,
+        output_payload_bytes: &[u8],
+    ) -> Result<()> {
+        if task_decl.outputs.is_empty() {
+            return Ok(());
+        }
+        let output: serde_json::Value = serde_json::from_slice(output_payload_bytes)
+            .map_err(|e| anyhow!("FFI output_payload is not valid JSON: {}", e))?;
+
+        // For DomainPayloadWrite: parse domain_payload once.
+        let needs_domain_write = task_decl
+            .outputs
+            .iter()
+            .any(|b| matches!(&b.target, BindingTarget::DomainPayloadWrite(_)));
+        let mut parsed_domain: Option<serde_json::Value> = if needs_domain_write {
+            Some(json_path::parse_json(&instance.domain_payload)?)
+        } else {
+            None
+        };
+
+        for binding in &task_decl.outputs {
+            let field_value = output.get(&binding.source_field);
+            match &binding.target {
+                BindingTarget::FlagWrite(key) => {
+                    let v = match field_value {
+                        Some(serde_json::Value::Bool(b)) => Value::Bool(*b),
+                        Some(serde_json::Value::Number(n)) if n.is_i64() => {
+                            Value::I64(n.as_i64().unwrap())
+                        }
+                        _ => continue, // skip non-flag-compatible values
+                    };
+                    instance.flags.insert(*key, v);
+                }
+                BindingTarget::DomainPayloadWrite(path) => {
+                    if let Some(ref mut root) = parsed_domain {
+                        if let Some(field_val) = field_value {
+                            json_path::write_at_path(root, path, field_val.clone())?;
+                        }
+                    }
+                }
+            }
+        }
+
+        if let Some(new_domain) = parsed_domain {
+            let canonical = json_path::canonicalise_json(&new_domain);
+            instance.domain_payload = Arc::<str>::from(canonical.as_str());
+            instance.domain_payload_hash = compute_hash(&canonical);
+        }
         Ok(())
     }
 
@@ -1850,4 +2220,33 @@ fn now_ms() -> i64 {
         .duration_since(std::time::UNIX_EPOCH)
         .unwrap_or_default()
         .as_millis() as i64
+}
+
+// ── A8 FFI helpers ────────────────────────────────────────────────────────────
+
+fn bytes_to_hex(bytes: &[u8; 32]) -> String {
+    let mut s = String::with_capacity(64);
+    for b in bytes {
+        s.push_str(&format!("{:02x}", b));
+    }
+    s
+}
+
+fn ffi_incident_class_to_error_class(c: FfiIncidentClass) -> ErrorClass {
+    match c {
+        FfiIncidentClass::Transient => ErrorClass::Transient,
+        FfiIncidentClass::ContractViolation => ErrorClass::ContractViolation,
+        FfiIncidentClass::BusinessRejection { rejection_code } => {
+            ErrorClass::BusinessRejection { rejection_code }
+        }
+    }
+}
+
+fn literal_to_json(lit: &Literal) -> serde_json::Value {
+    match lit {
+        Literal::Bool(b) => serde_json::Value::Bool(*b),
+        Literal::I64(n) => serde_json::Value::Number((*n).into()),
+        Literal::F64(f) => serde_json::json!(*f),
+        Literal::String(s) => serde_json::Value::String(s.clone()),
+    }
 }

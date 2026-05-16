@@ -15,10 +15,12 @@
 //! below).
 
 pub mod events;
+pub mod ffi_bindings;
 pub mod types;
 
 // Crate-prelude re-exports — every external consumer can `use
 // bpmn_lite_types::*` and get the full vocabulary, mirroring the
 // way `bpmn-lite-core` used to expose these via `pub mod`.
 pub use events::*;
+pub use ffi_bindings::*;
 pub use types::*;
