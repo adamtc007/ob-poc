@@ -86,15 +86,18 @@ cargo run --manifest-path xtask/Cargo.toml -- sem-reg domain-pack-check --pack-i
 
 Current schema export target: `migrations/master-schema.sql` (canonical), `schema_export.sql` (convenience copy)
 
-### BPMN-Lite Status
+### BPMN-Lite and dmn-lite Status
 
-- `bpmn-lite/` now has a local `xtask` entrypoint for reusable smoke/stress automation.
-- The harness implementation lives in `bpmn-lite-server/src/load_harness.rs`; `xtask` owns optional server spawn and argument forwarding.
-- Completion hash semantics are hardened: the worker-supplied completion hash is only a snapshot guard, while the server persists the hash of the new payload it actually stores.
-- `ProcessInstance.domain_payload` uses `Arc<str>` internally to reduce activation-path clone pressure.
-- VM runtime events are batched through the `ProcessStore` boundary.
-- Instance scans and job dequeue paths are tenant-scoped with migration `bpmn-lite-core/migrations/014_add_tenant_id.sql`.
-- gRPC `Inspect` now returns real bytecode and payload-hash metadata.
+Both vocabularies are now in their own GitHub repos and are no longer tracked as subdirectories of ob-poc:
+
+- **github.com/adamtc007/bpmn-lite** — process vocabulary (compiler, fiber VM, FFI catalogue infrastructure, gRPC server). A3–A11 complete: `Instr::ExecFfi`, in-process FFI dispatch, BPMN data-object + FFI annotation parser, compile-time schema verifier, json_path evaluator. 224 tests.
+- **github.com/adamtc007/dmn-lite** — decision vocabulary (s-expression DSL, compiler, stack VM, static analysis, dmn-lite-bridge FFI owner). Phase 1 complete (Profile v0.1). 345 tests (including dmn-lite-bridge A10).
+
+The local `bpmn-lite/` and `dmn-lite/` directories remain inside ob-poc for monorepo development convenience (each has its own `.git`; ob-poc does not track them as submodules).
+
+ob-poc consumes bpmn-lite over gRPC (`bpmn_integration/` — 12 files). See `docs/annex-bpmn-lite.md` for the integration pattern.
+
+For bpmn-lite internals, see `bpmn-lite/CLAUDE.md`. For dmn-lite internals, see `dmn-lite/CLAUDE.md`.
 
 **SemOS is the hub for all things.** All paths lead to SemOS — nowhere else. The PostgreSQL schema is a supplementary store, a materialized projection, switchable if needed.
 
@@ -506,9 +509,13 @@ Verify plugin coverage: `cargo test -p ob-poc --lib -- test_plugin_verb_coverage
 
 ```
 ob-poc/
-├── bpmn-lite/                  # Standalone BPMN orchestration (NOT inside rust/)
-│   ├── bpmn-lite-core/         # Core: types, compiler, VM, store, authoring
-│   └── bpmn-lite-server/       # gRPC server (tonic), proto definitions
+├── bpmn-lite/                  # Process vocabulary — own git repo (github.com/adamtc007/bpmn-lite)
+│   │                           # 9 crates: types/compiler/vm/engine/store/store-postgres/
+│   │                           # authoring/server + ffi-types/ffi-catalogue/ffi-dispatcher
+│   └── CLAUDE.md               # bpmn-lite-specific guide (see there for crate map + A-phases)
+├── dmn-lite/                   # Decision vocabulary — own git repo (github.com/adamtc007/dmn-lite)
+│   │                           # 6 crates: types/parser/compiler/engine/analysis/bridge
+│   └── CLAUDE.md               # dmn-lite-specific guide (see there for profile roadmap)
 ├── observatory-wasm/             # Observatory egui constellation canvas (WASM, embedded in React)
 │   ├── src/                      # Canvas renderer, level painters, observation controls
 │   └── pkg/                      # wasm-pack output (WASM + JS glue, served at /observatory/pkg/)
