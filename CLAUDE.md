@@ -86,18 +86,22 @@ cargo run --manifest-path xtask/Cargo.toml -- sem-reg domain-pack-check --pack-i
 
 Current schema export target: `migrations/master-schema.sql` (canonical), `schema_export.sql` (convenience copy)
 
-### BPMN-Lite and dmn-lite Status
+### BPMN-Lite Platform Status (bpmn-lite + dmn-lite consolidated, B0 — 2026-05-16)
 
-Both vocabularies are now in their own GitHub repos and are no longer tracked as subdirectories of ob-poc:
+The compilation-and-execution kernel described in V&S v1.1 ships as a single platform repo at **github.com/adamtc007/bpmn-lite**. The dmn-lite vocabulary was consolidated into the bpmn-lite workspace during B0 (pre-flight to B1 deployment work); the dmn-lite repo is archived.
 
-- **github.com/adamtc007/bpmn-lite** — process vocabulary (compiler, fiber VM, FFI catalogue infrastructure, gRPC server). A3–A11 complete: `Instr::ExecFfi`, in-process FFI dispatch, BPMN data-object + FFI annotation parser, compile-time schema verifier, json_path evaluator. 224 tests.
-- **github.com/adamtc007/dmn-lite** — decision vocabulary (s-expression DSL, compiler, stack VM, static analysis, dmn-lite-bridge FFI owner). Phase 1 complete (Profile v0.1). 345 tests (including dmn-lite-bridge A10).
+The unified workspace (edition 2024, resolver "3", rust-version "1.95") ships both vocabularies as peer crates:
 
-The local `bpmn-lite/` and `dmn-lite/` directories remain inside ob-poc for monorepo development convenience (each has its own `.git`; ob-poc does not track them as submodules).
+- **bpmn-lite** — process vocabulary (compiler, fiber VM, FFI catalogue infrastructure, gRPC server). A3–A11 complete: `Instr::ExecFfi`, in-process FFI dispatch, BPMN data-object + FFI annotation parser, compile-time schema verifier, json_path evaluator.
+- **dmn-lite** — decision vocabulary (s-expression DSL, compiler, stack VM, static analysis, dmn-lite-bridge FFI owner). Phase 1 complete (Profile v0.1).
 
-ob-poc consumes bpmn-lite over gRPC (`bpmn_integration/` — 12 files). See `docs/annex-bpmn-lite.md` for the integration pattern.
+**Test count (post-B7):** 579 passing, 5 ignored across the consolidated workspace (excluding Postgres integration tests). The single workspace eliminates the previous `[patch]` mechanism — `ffi-types` resolves as a workspace path dep for all consumers.
 
-For bpmn-lite internals, see `bpmn-lite/CLAUDE.md`. For dmn-lite internals, see `dmn-lite/CLAUDE.md`.
+**B-phase complete (2026-05-16, tag `v0.1.0-heterogeneous-ffi`):** B1 (Dockerfile, cargo-chef), B5 (`docker-ffi-smoke` dmn-lite proof), B6 (HTTP FFI contract), B7 (`docker-http-smoke` HTTP proof), B8 (inline with B7), B9 (`docker-heterogeneous-smoke` — both HTTP and dmn-lite in one BPMN process, shared Flag bridge). V&S Claims 1 and 2 substantiated against the deployed containerised stack.
+
+The local `bpmn-lite/` directory remains inside ob-poc for monorepo development convenience (has its own `.git`; ob-poc does not track it as a submodule). bpmn-lite consumes `ob-poc-types` as a rev-pinned git dep (currently `397470cb`); ob-poc consumes bpmn-lite over gRPC (`bpmn_integration/` — 12 files). See `docs/annex-bpmn-lite.md` for the integration pattern.
+
+For internals of both vocabularies, see `bpmn-lite/CLAUDE.md`.
 
 **SemOS is the hub for all things.** All paths lead to SemOS — nowhere else. The PostgreSQL schema is a supplementary store, a materialized projection, switchable if needed.
 
@@ -509,13 +513,13 @@ Verify plugin coverage: `cargo test -p ob-poc --lib -- test_plugin_verb_coverage
 
 ```
 ob-poc/
-├── bpmn-lite/                  # Process vocabulary — own git repo (github.com/adamtc007/bpmn-lite)
-│   │                           # 9 crates: types/compiler/vm/engine/store/store-postgres/
-│   │                           # authoring/server + ffi-types/ffi-catalogue/ffi-dispatcher
-│   └── CLAUDE.md               # bpmn-lite-specific guide (see there for crate map + A-phases)
-├── dmn-lite/                   # Decision vocabulary — own git repo (github.com/adamtc007/dmn-lite)
-│   │                           # 6 crates: types/parser/compiler/engine/analysis/bridge
-│   └── CLAUDE.md               # dmn-lite-specific guide (see there for profile roadmap)
+├── bpmn-lite/                  # Consolidated platform repo — own git repo (github.com/adamtc007/bpmn-lite)
+│   │                           # 18 workspace crates after B0 consolidation:
+│   │                           #   bpmn-lite-{types,compiler,vm,engine,store,store-postgres,authoring,server}
+│   │                           #   ffi-{types,catalogue,dispatcher}
+│   │                           #   dmn-lite-{types,parser,compiler,engine,analysis,bridge}
+│   │                           #   xtask
+│   └── CLAUDE.md               # Unified guide for both vocabularies (crate map, A-phases, dmn-lite roadmap)
 ├── observatory-wasm/             # Observatory egui constellation canvas (WASM, embedded in React)
 │   ├── src/                      # Canvas renderer, level painters, observation controls
 │   └── pkg/                      # wasm-pack output (WASM + JS glue, served at /observatory/pkg/)
