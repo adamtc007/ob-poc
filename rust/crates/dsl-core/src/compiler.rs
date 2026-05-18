@@ -57,30 +57,53 @@ impl std::fmt::Display for CompileError {
     }
 }
 
-/// Compile an AST Program to Ops
-pub fn compile_to_ops(program: &Program) -> CompiledProgram {
+/// Consumer-provided verb compilation handler.
+///
+/// Returns `Some(result)` if the verb was handled, `None` to fall through to
+/// the built-in ob-poc dispatch, or `Some(Err(msg))` for a verb that is
+/// recognized but has invalid arguments.
+pub type VerbHandler = fn(
+    vc: &VerbCall,
+    stmt_idx: usize,
+    symbols: &HashMap<String, EntityKey>,
+) -> Option<Result<(Vec<Op>, Option<(String, EntityKey)>), String>>;
+
+/// Compile with an optional consumer verb handler.
+///
+/// The handler is consulted first. `None` from the handler falls through to
+/// the built-in ob-poc dispatch (`compile_ob_poc_verb`).
+///
+/// Use this to add consumer-specific verbs before the ob-poc fallback.
+/// Once the ob-poc verbs migrate to dsl_v2, the fallback will be an error.
+pub fn compile_to_ops_ext(program: &Program, handler: Option<VerbHandler>) -> CompiledProgram {
     let mut ops = Vec::new();
     let mut symbols: HashMap<String, EntityKey> = HashMap::new();
     let mut errors = Vec::new();
 
     for (stmt_idx, stmt) in program.statements.iter().enumerate() {
         if let Statement::VerbCall(vc) = stmt {
-            match compile_verb_call(vc, stmt_idx, &symbols) {
+            let result = if let Some(h) = handler {
+                match h(vc, stmt_idx, &symbols) {
+                    Some(r) => r,
+                    None => compile_ob_poc_verb(vc, stmt_idx, &symbols),
+                }
+            } else {
+                compile_ob_poc_verb(vc, stmt_idx, &symbols)
+            };
+
+            match result {
                 Ok((new_ops, binding)) => {
                     ops.extend(new_ops);
                     if let Some((name, key)) = binding {
                         symbols.insert(name, key);
                     }
                 }
-                Err(e) => {
-                    errors.push(CompileError {
-                        stmt_idx,
-                        message: e,
-                    });
-                }
+                Err(e) => errors.push(CompileError {
+                    stmt_idx,
+                    message: e,
+                }),
             }
         }
-        // Comments are ignored
     }
 
     CompiledProgram {
@@ -88,6 +111,15 @@ pub fn compile_to_ops(program: &Program) -> CompiledProgram {
         symbols,
         errors,
     }
+}
+
+/// Compile an AST Program to Ops using the built-in ob-poc verb dispatch.
+///
+/// Delegates to `compile_to_ops_ext(program, None)`.
+/// `planning_facade` in dsl-analysis calls this directly and will continue
+/// to work until it is migrated to pass an explicit handler.
+pub fn compile_to_ops(program: &Program) -> CompiledProgram {
+    compile_to_ops_ext(program, None)
 }
 
 /// Compile a runbook-finalisation surface with scoped authoring bindings.
@@ -272,11 +304,18 @@ fn strip_authoring_binding(op: &mut Op) {
     }
 }
 
-/// Compile a single VerbCall to Ops
+/// ob-poc verb dispatch — compile a single VerbCall to Ops.
 ///
-/// Returns (ops, optional_binding) where binding is (name, EntityKey).
+/// This function encodes ob-poc domain knowledge (CBU, Entity, KYC, Custody,
+/// Trading Profile, Document verbs). It is the migration target for CR1 of
+/// the DSL crate cleanup plan: once `planning_facade` in dsl-analysis is
+/// updated to pass an explicit handler, this moves to `dsl_v2::ob_poc_compiler`
+/// and is removed from dsl-core.
+///
+/// Do not add new ob-poc verbs here — add them in `dsl_v2::ob_poc_compiler`
+/// and pass the handler via `compile_to_ops_ext`.
 #[allow(clippy::type_complexity)]
-fn compile_verb_call(
+fn compile_ob_poc_verb(
     vc: &VerbCall,
     stmt_idx: usize,
     symbols: &HashMap<String, EntityKey>,
@@ -878,7 +917,7 @@ fn compile_verb_call(
 // =============================================================================
 
 /// Get string argument from VerbCall
-fn get_string_arg(vc: &VerbCall, key: &str) -> Result<String, String> {
+pub fn get_string_arg(vc: &VerbCall, key: &str) -> Result<String, String> {
     for arg in &vc.arguments {
         if arg.key == key {
             return extract_string(&arg.value);
@@ -888,7 +927,7 @@ fn get_string_arg(vc: &VerbCall, key: &str) -> Result<String, String> {
 }
 
 /// Get decimal argument from VerbCall
-fn get_decimal_arg(vc: &VerbCall, key: &str) -> Result<Decimal, String> {
+pub fn get_decimal_arg(vc: &VerbCall, key: &str) -> Result<Decimal, String> {
     for arg in &vc.arguments {
         if arg.key == key {
             return extract_decimal(&arg.value);
@@ -898,7 +937,7 @@ fn get_decimal_arg(vc: &VerbCall, key: &str) -> Result<Decimal, String> {
 }
 
 /// Get integer argument from VerbCall
-fn get_int_arg(vc: &VerbCall, key: &str) -> Result<i32, String> {
+pub fn get_int_arg(vc: &VerbCall, key: &str) -> Result<i32, String> {
     for arg in &vc.arguments {
         if arg.key == key {
             return extract_int(&arg.value);
@@ -908,7 +947,7 @@ fn get_int_arg(vc: &VerbCall, key: &str) -> Result<i32, String> {
 }
 
 /// Get boolean argument from VerbCall
-fn get_bool_arg(vc: &VerbCall, key: &str) -> Result<bool, String> {
+pub fn get_bool_arg(vc: &VerbCall, key: &str) -> Result<bool, String> {
     for arg in &vc.arguments {
         if arg.key == key {
             return extract_bool(&arg.value);
@@ -918,7 +957,7 @@ fn get_bool_arg(vc: &VerbCall, key: &str) -> Result<bool, String> {
 }
 
 /// Get string list argument from VerbCall
-fn get_string_list_arg(vc: &VerbCall, key: &str) -> Result<Vec<String>, String> {
+pub fn get_string_list_arg(vc: &VerbCall, key: &str) -> Result<Vec<String>, String> {
     for arg in &vc.arguments {
         if arg.key == key {
             return extract_string_list(&arg.value);
@@ -928,7 +967,7 @@ fn get_string_list_arg(vc: &VerbCall, key: &str) -> Result<Vec<String>, String> 
 }
 
 /// Resolve an entity argument (symbol ref or literal)
-fn resolve_entity_arg(
+pub fn resolve_entity_arg(
     vc: &VerbCall,
     key: &str,
     symbols: &HashMap<String, EntityKey>,
@@ -942,7 +981,7 @@ fn resolve_entity_arg(
 }
 
 /// Resolve an AstNode to an EntityKey
-fn resolve_to_entity_key(
+pub fn resolve_to_entity_key(
     node: &AstNode,
     symbols: &HashMap<String, EntityKey>,
 ) -> Result<EntityKey, String> {
@@ -972,7 +1011,7 @@ fn resolve_to_entity_key(
 }
 
 /// Extract string from AstNode
-fn extract_string(node: &AstNode) -> Result<String, String> {
+pub fn extract_string(node: &AstNode) -> Result<String, String> {
     match node {
         AstNode::Literal(Literal::String(s), _) => Ok(s.clone()),
         AstNode::EntityRef { value, .. } => Ok(value.clone()),

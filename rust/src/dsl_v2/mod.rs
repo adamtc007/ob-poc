@@ -65,9 +65,16 @@ pub use dsl_core::dag::{
 pub use dsl_core::ops;
 pub use dsl_core::ops::{DocKey, EntityKey, Op, OpRef};
 
-// Compiler
+// Compiler — generic infrastructure from dsl-core
 pub use dsl_core::compiler;
-pub use dsl_core::compiler::{compile_to_ops, CompileError as OpCompileError, CompiledProgram};
+pub use dsl_core::compiler::{
+    compile_to_ops_ext, CompileError as OpCompileError, CompiledProgram, VerbHandler,
+};
+// ob-poc verb dispatch lives in dsl_v2 (config-over-code: domain knowledge out of shared crates).
+// `compile_to_ops` here uses the ob-poc handler; `dsl_core::compiler::compile_to_ops` still
+// exists for `dsl_analysis::planning_facade` until it migrates to pass an explicit handler.
+pub mod ob_poc_compiler;
+pub use ob_poc_compiler::compile_to_ops;
 
 // =============================================================================
 // Local modules (require database or other dependencies not in dsl-core)
