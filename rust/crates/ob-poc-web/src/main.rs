@@ -397,6 +397,22 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let verb_sync_service = VerbSyncService::new(pool.clone());
     let config_loader = ConfigLoader::from_env();
 
+    // CR2: Load entity kind aliases from config and register with dsl-analysis.
+    // Replaces the hardcoded match arms that were previously in entity_kind::canonicalize().
+    match config_loader.load_entity_kind_aliases() {
+        Ok(aliases) => {
+            let count = aliases.len();
+            dsl_analysis::entity_kind::set_entity_kind_aliases(aliases);
+            tracing::info!("Entity kind aliases loaded: {} entries", count);
+        }
+        Err(e) => {
+            tracing::warn!(
+                "Failed to load entity kind aliases: {} — canonicalization will be identity",
+                e
+            );
+        }
+    }
+
     // Tranche 3 Phase 3.F Stages 3+4 — log + seed catalogue source.
     // CATALOGUE_SOURCE=db enables forward-discipline: the catalogue is
     // loaded from `catalogue_committed_verbs` rather than YAML.

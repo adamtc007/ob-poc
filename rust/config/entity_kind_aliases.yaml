@@ -1,0 +1,64 @@
+# Entity kind alias table for ob-poc.
+#
+# Maps user-facing aliases (keys) to canonical entity kind identifiers
+# (values) used throughout verb search, discovery, and planning.
+#
+# Loaded at ob-poc-web startup via ConfigLoader::load_entity_kind_aliases()
+# and registered with dsl_analysis::entity_kind::set_entity_kind_aliases().
+#
+# Consumers on other platforms (bpmn-lite) supply their own alias files or
+# register no aliases, in which case canonicalize() is an identity function.
+#
+# Format: flat YAML map of alias → canonical.
+# Both keys and values are lowercased at registration time.
+
+# KYC
+kyc_case: kyc-case
+case: kyc-case
+
+# Client group
+client_group: client-group
+client-book: client-group
+client_book: client-group
+
+# Legal entities
+legal-entity: company
+legal_entity: company
+organization: company
+org: company
+
+# Natural persons
+individual: person
+natural_person: person
+
+# Investor / holding
+investor-register: investor
+investor_register: investor
+
+# Funds / vehicles
+investment-fund: fund
+umbrella: fund
+sub-fund: fund
+compartment: fund
+
+# Documents
+doc: document
+evidence-document: document
+
+# Contracts
+legal-contract: contract
+agreement: contract
+msa: contract
+
+# Trading profile / mandate
+mandate: trading-profile
+trading-mandate: trading-profile
+
+# Deal
+deal-record: deal
+sales-deal: deal
+
+# CBU
+client-business-unit: cbu
+structure: cbu
+trading-unit: cbu

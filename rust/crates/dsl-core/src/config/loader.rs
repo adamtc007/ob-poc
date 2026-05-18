@@ -420,6 +420,35 @@ impl ConfigLoader {
 
         Ok(())
     }
+
+    /// Load entity kind aliases from `config/entity_kind_aliases.yaml`.
+    ///
+    /// Returns a flat `HashMap<alias, canonical>` ready to pass to
+    /// `dsl_analysis::entity_kind::set_entity_kind_aliases()`.
+    ///
+    /// Returns an empty map (with a warning) if the file does not exist —
+    /// allows running without aliases (identity canonicalization).
+    pub fn load_entity_kind_aliases(&self) -> Result<std::collections::HashMap<String, String>> {
+        let path = Path::new(&self.config_dir).join("entity_kind_aliases.yaml");
+        if !path.exists() {
+            tracing::warn!(
+                "entity_kind_aliases.yaml not found at {:?} — \
+                 entity kind canonicalization will be identity",
+                path
+            );
+            return Ok(std::collections::HashMap::new());
+        }
+        let content =
+            std::fs::read_to_string(&path).with_context(|| format!("reading {path:?}"))?;
+        let raw: std::collections::HashMap<String, String> =
+            serde_yaml::from_str(&content).with_context(|| format!("parsing {path:?}"))?;
+        // Normalize keys and values to lowercase for consistent lookup.
+        let aliases = raw
+            .into_iter()
+            .map(|(k, v)| (k.trim().to_ascii_lowercase(), v.trim().to_ascii_lowercase()))
+            .collect();
+        Ok(aliases)
+    }
 }
 
 #[cfg(test)]
