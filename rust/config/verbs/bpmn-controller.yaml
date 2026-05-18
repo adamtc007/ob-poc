@@ -46,7 +46,7 @@ domains:
             required: false
             description: "'default' or 'dedicated'. Default: 'default'."
           - name: tenants
-            type: array
+            type: string_list
             required: false
             description: "Tenant IDs to assign to this pool at creation."
           - name: replicas
@@ -64,11 +64,11 @@ domains:
         returns:
           type: void
         three_axis:
-          state_effect: modifying
+          state_effect: transition
           external_effects:
-            - mutating
+            - emitting
           consequence:
-            baseline: consequential
+            baseline: requires_confirmation
 
       deprovision-pool:
         flavour: attribute_mutating
@@ -95,11 +95,11 @@ domains:
         returns:
           type: void
         three_axis:
-          state_effect: modifying
+          state_effect: transition
           external_effects:
-            - mutating
+            - emitting
           consequence:
-            baseline: consequential
+            baseline: requires_confirmation
 
       pool-status:
         flavour: attribute_mutating
@@ -108,7 +108,7 @@ domains:
           live Kubernetes replica counts.
         behavior: plugin
         metadata:
-          tier: operational
+          tier: projection
           source_of_truth: external
           subject_kinds: [pool]
           phase_tags: [monitoring]
@@ -139,7 +139,7 @@ domains:
         description: "List all registered bpmn-lite worker pools."
         behavior: plugin
         metadata:
-          tier: operational
+          tier: projection
           source_of_truth: external
           subject_kinds: [pool]
           phase_tags: [monitoring]
@@ -173,7 +173,7 @@ domains:
           instance_id. Execution is asynchronous — pool workers pick it up.
         behavior: plugin
         metadata:
-          tier: operational
+          tier: intent
           source_of_truth: external
           subject_kinds: [process_instance]
           phase_tags: [execution]
@@ -206,18 +206,18 @@ domains:
           type: uuid
           description: "instance_id of the started (or existing idempotent) instance."
         three_axis:
-          state_effect: modifying
+          state_effect: transition
           external_effects:
-            - mutating
+            - emitting
           consequence:
-            baseline: consequential
+            baseline: requires_confirmation
 
       instance-status:
         flavour: attribute_mutating
         description: "Return the current status of a BPMN process instance."
         behavior: plugin
         metadata:
-          tier: operational
+          tier: projection
           source_of_truth: external
           subject_kinds: [process_instance]
           phase_tags: [monitoring]
@@ -247,7 +247,7 @@ domains:
         description: "List BPMN process instances for a tenant."
         behavior: plugin
         metadata:
-          tier: operational
+          tier: projection
           source_of_truth: external
           subject_kinds: [process_instance]
           phase_tags: [monitoring]

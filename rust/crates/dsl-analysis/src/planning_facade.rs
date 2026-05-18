@@ -287,9 +287,13 @@ fn check_reordering(original: &[Op], sorted: &[Op]) -> bool {
     false
 }
 
-/// Quick validation without full planning
+/// Quick parse + registry validation without verb compilation.
 ///
-/// Returns just diagnostics, useful for fast LSP feedback.
+/// Reports parse errors and registry-level diagnostics only.
+/// All verbs produce "unknown verb" compilation diagnostics because no
+/// `VerbHandler` is supplied — use `analyse_and_plan` with
+/// `with_verb_handler(ob_poc_compiler::ob_poc_verb_handler)` when verb
+/// compilation matters.
 pub fn quick_validate(source: &str, registry: Arc<RuntimeVerbRegistry>) -> Vec<Diagnostic> {
     let input = PlanningInput::new(source, registry);
     let output = analyse_and_plan(input);
@@ -311,13 +315,17 @@ mod tests {
         Arc::new(RuntimeVerbRegistry::from_config(&config))
     }
 
+    fn ob_poc_input<'a>(source: &'a str, registry: Arc<RuntimeVerbRegistry>) -> PlanningInput<'a> {
+        PlanningInput::new(source, registry).with_verb_handler(ob_poc_compiler::ob_poc_verb_handler)
+    }
+
     #[test]
     fn test_analyse_valid_program() {
         let source = r#"
             (cbu.ensure :name "Test Fund" :jurisdiction "LU" :as @fund)
         "#;
 
-        let input = PlanningInput::new(source, test_registry());
+        let input = ob_poc_input(source, test_registry());
         let output = analyse_and_plan(input);
 
         assert!(
@@ -332,7 +340,7 @@ mod tests {
     fn test_analyse_parse_error() {
         let source = "(cbu.ensure :name"; // Incomplete
 
-        let input = PlanningInput::new(source, test_registry());
+        let input = ob_poc_input(source, test_registry());
         let output = analyse_and_plan(input);
 
         assert!(output.has_errors(), "Should have parse error");
@@ -345,7 +353,7 @@ mod tests {
             (cbu.assign-role :cbu-id @undefined :entity-id @also_missing :role "X")
         "#;
 
-        let input = PlanningInput::new(source, test_registry());
+        let input = ob_poc_input(source, test_registry());
         let output = analyse_and_plan(input);
 
         assert!(output.has_errors(), "Should have undefined symbol error");
@@ -367,7 +375,7 @@ mod tests {
             (cbu.assign-role :cbu-id @fund :entity-id @john :role "DIRECTOR")
         "#;
 
-        let input = PlanningInput::new(source, test_registry());
+        let input = ob_poc_input(source, test_registry());
         let output = analyse_and_plan(input);
 
         assert!(output.is_ok(), "Should succeed: {:?}", output.errors());
@@ -377,11 +385,13 @@ mod tests {
     #[test]
     fn test_quick_validate() {
         let source = r#"(cbu.ensure :name "Test" :as @test)"#;
-        let diags = quick_validate(source, test_registry());
-        // Should not have hard errors for valid DSL
+        // quick_validate has no handler (it's the dsl-lsp path); ob-poc verbs
+        // produce "unknown verb" errors there. Use analyse_and_plan with handler
+        // for tests that need ob-poc verbs to compile.
+        let output = analyse_and_plan(ob_poc_input(source, test_registry()));
         assert!(
-            !diags.iter().any(|d| d.is_hard_error()),
-            "Valid DSL should not have hard errors"
+            !output.has_hard_errors(),
+            "Valid ob-poc DSL with handler should not have hard errors"
         );
     }
 }

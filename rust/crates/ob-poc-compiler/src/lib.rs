@@ -578,3 +578,56 @@ pub fn ob_poc_verb_handler(
 
 /// The ob-poc verb handler as a typed `VerbHandler` constant.
 pub const OB_POC_VERB_HANDLER: VerbHandler = ob_poc_verb_handler;
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use dsl_core::parser::parse_program;
+
+    fn compile_ok(source: &str) {
+        let program = parse_program(source).expect("parse failed");
+        let compiled = compile_to_ops(&program);
+        assert!(
+            compiled.is_ok(),
+            "compile failed for `{}`: {:?}",
+            source,
+            compiled.errors
+        );
+    }
+
+    /// Startup-safety coverage: one representative verb from every family.
+    /// If any arm is accidentally deleted or broken, this test fails at CI time
+    /// rather than at runtime when a user tries to execute the verb.
+    #[test]
+    fn test_ob_poc_verb_handler_coverage() {
+        compile_ok(r#"(cbu.ensure :name "Fund" :jurisdiction "LU")"#);
+        compile_ok(r#"(cbu.ensure :name "Fund" :as @f)"#);
+
+        compile_ok(
+            r#"(entity.create :entity-type "proper-person" :first-name "Jane" :last-name "Doe")"#,
+        );
+        compile_ok(r#"(entity.create-proper-person :first-name "Jane" :last-name "Doe")"#);
+        compile_ok(r#"(entity.create-limited-company :name "Acme Ltd")"#);
+        compile_ok(r#"(entity.create-partnership-limited :name "Acme LP")"#);
+        compile_ok(r#"(entity.create-trust-discretionary :name "Acme Trust")"#);
+
+        compile_ok(
+            r#"(ubo.add-ownership :owner-entity-id "e1" :owned-entity-id "e2" :percentage 50.0 :ownership-type "direct")"#,
+        );
+
+        compile_ok(r#"(kyc-case.create :cbu-id "cbu-1")"#);
+        compile_ok(r#"(kyc-case.update-status :case-id "case-1" :status "APPROVED")"#);
+
+        compile_ok(r#"(case-screening.run :workstream-id "ws-1" :screening-type "PEP")"#);
+        compile_ok(r#"(screening.pep :entity-id "e-1")"#);
+
+        compile_ok(r#"(cbu-custody.add-universe :cbu-id "cbu-1" :instrument-class "EQ")"#);
+        compile_ok(r#"(cbu-custody.create-ssi :cbu-id "cbu-1" :name "SSI-1" :type "EUROCLEAR")"#);
+
+        compile_ok(r#"(trading-profile.import :cbu-id "cbu-1")"#);
+
+        compile_ok(r#"(document.catalog :cbu-id "cbu-1" :doc-type "KYC" :title "Passport")"#);
+
+        compile_ok(r#"(cbu.attach-evidence :cbu-id "cbu-1" :evidence-type "passport")"#);
+    }
+}

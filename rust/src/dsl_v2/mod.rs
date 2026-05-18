@@ -70,10 +70,7 @@ pub use dsl_core::compiler;
 pub use dsl_core::compiler::{
     compile_to_ops_ext, CompileError as OpCompileError, CompiledProgram, VerbHandler,
 };
-// ob-poc verb dispatch lives in dsl_v2 (config-over-code: domain knowledge out of shared crates).
-// `compile_to_ops` here uses the ob-poc handler; `dsl_core::compiler::compile_to_ops` still
-// exists for `dsl_analysis::planning_facade` until it migrates to pass an explicit handler.
-pub mod ob_poc_compiler;
+// ob-poc verb dispatch in its own crate (dsl-lsp + ob-agentic can depend on it directly).
 pub use ob_poc_compiler::compile_to_ops;
 
 // =============================================================================

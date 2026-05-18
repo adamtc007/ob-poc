@@ -635,7 +635,7 @@ impl ToolHandlers {
         // Run planning facade with ob-poc verb handler so ob-poc verbs compile
         // via dsl_v2::ob_poc_compiler rather than the legacy dsl-core fallback.
         let planning_input = PlanningInput::new(source, registry)
-            .with_verb_handler(crate::dsl_v2::ob_poc_compiler::ob_poc_verb_handler);
+            .with_verb_handler(ob_poc_compiler::ob_poc_verb_handler);
         let output = analyse_and_plan(planning_input);
 
         // Convert diagnostics to agent-friendly format

@@ -59,6 +59,10 @@ sem_os_ontology = { path = "../sem_os_ontology" }
 
 [dev-dependencies]
 tokio = { version = "1", features = ["macros", "rt"] }
+# Tests that compile ob-poc DSL programs must pass the ob-poc verb handler;
+# ob-poc-compiler is fine as a dev dep since it doesn't enter the production
+# dependency graph (only dsl-core + serde_json).
+ob-poc-compiler = { path = "../ob-poc-compiler" }
 
 [lints.rust]
 unreachable_pub = "deny"

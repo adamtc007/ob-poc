@@ -607,7 +607,7 @@ fn validate_expanded_macro_output(
     // Use analyse_and_plan directly so we can pass the ob-poc verb handler;
     // quick_validate is the dsl-lsp-friendly (no-handler) variant.
     let planning_input = PlanningInput::new(&expanded_source, runtime_registry_arc())
-        .with_verb_handler(crate::dsl_v2::ob_poc_compiler::ob_poc_verb_handler);
+        .with_verb_handler(ob_poc_compiler::ob_poc_verb_handler);
     let mut errors: Vec<String> = analyse_and_plan(planning_input)
         .diagnostics
         .into_iter()
