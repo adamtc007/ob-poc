@@ -70,11 +70,9 @@ pub type VerbHandler = fn(
 
 /// Compile with an optional consumer verb handler.
 ///
-/// The handler is consulted first. `None` from the handler falls through to
-/// the built-in ob-poc dispatch (`compile_ob_poc_verb`).
-///
-/// Use this to add consumer-specific verbs before the ob-poc fallback.
-/// Once the ob-poc verbs migrate to dsl_v2, the fallback will be an error.
+/// The handler is consulted for every verb. If it returns `None` (or no
+/// handler is supplied), the verb produces an "unknown verb" error.
+/// Pass `ob_poc_compiler::ob_poc_verb_handler` for ob-poc programs.
 pub fn compile_to_ops_ext(program: &Program, handler: Option<VerbHandler>) -> CompiledProgram {
     let mut ops = Vec::new();
     let mut symbols: HashMap<String, EntityKey> = HashMap::new();
