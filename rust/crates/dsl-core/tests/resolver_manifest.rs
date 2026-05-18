@@ -13,7 +13,23 @@ fn manifest_reports_zero_missing_for_lux_sicav_pilot_inventory() {
     let inputs = inputs();
     let template = resolve_template("struct.lux.ucits.sicav", "cbu", &inputs)
         .expect("Lux SICAV template resolves");
-    let manifest = ResolverManifest::from_template(&template, &ManifestOptions::pilot_lux_sicav());
+    let manifest = ResolverManifest::from_template(
+        &template,
+        &ManifestOptions::with_required_slots([
+            "cbu",
+            "entity_proper_person",
+            "entity_limited_company_ubo",
+            "manco",
+            "share_class",
+            "cbu_evidence",
+            "management_company",
+            "depositary",
+            "investment_manager",
+            "mandate",
+            "administrator",
+            "auditor",
+        ]),
+    );
 
     assert_eq!(manifest.slots_with_missing_gate_metadata, 0);
     assert_eq!(

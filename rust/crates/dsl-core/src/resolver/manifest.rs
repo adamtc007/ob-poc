@@ -7,27 +7,9 @@ pub struct ManifestOptions {
 }
 
 impl ManifestOptions {
-    pub fn pilot_lux_sicav() -> Self {
+    pub fn with_required_slots(slots: impl IntoIterator<Item = impl Into<String>>) -> Self {
         Self {
-            required_slots: Some(
-                [
-                    "cbu",
-                    "entity_proper_person",
-                    "entity_limited_company_ubo",
-                    "manco",
-                    "share_class",
-                    "cbu_evidence",
-                    "management_company",
-                    "depositary",
-                    "investment_manager",
-                    "mandate",
-                    "administrator",
-                    "auditor",
-                ]
-                .into_iter()
-                .map(str::to_string)
-                .collect(),
-            ),
+            required_slots: Some(slots.into_iter().map(Into::into).collect()),
         }
     }
 }
