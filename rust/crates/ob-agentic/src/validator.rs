@@ -32,7 +32,8 @@ impl AgentValidator {
 
     /// Validate DSL source code
     pub fn validate(&self, dsl_source: &str) -> ValidationResult {
-        use dsl_core::{compiler::compile_to_ops, parse_program};
+        use dsl_core::parse_program;
+        use ob_poc_compiler::compile_to_ops;
 
         // Phase 1: Parse
         let program = match parse_program(dsl_source) {

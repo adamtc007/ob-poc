@@ -1,0 +1,13 @@
+[package]
+name = "ob-poc-compiler"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.95"
+description = "ob-poc verb compiler — consumer-side VerbHandler for ob-poc DSL programs. Depends only on dsl-core + serde_json, so dsl-lsp, ob-agentic, and bpmn-lite can all depend on it without pulling in ob-poc internals."
+
+[lints.rust]
+unreachable_pub = "deny"
+
+[dependencies]
+dsl-core = { path = "../dsl-core" }
+serde_json = "1"

@@ -12,6 +12,7 @@ rust-version = "1.95"
 [dependencies]
 # Workspace crates
 dsl-core = { path = "crates/dsl-core" }
+ob-poc-compiler = { path = "crates/ob-poc-compiler" }
 inspector-projection = { path = "crates/inspector-projection" }
 ob-agentic = { path = "crates/ob-agentic", features = ["gateway"] }
 ob-semantic-matcher = { path = "crates/ob-semantic-matcher" }
@@ -271,6 +272,7 @@ write-set-contract = []  # Enables contract-driven write_set derivation from ver
 members = [
     ".",
     "crates/dsl-core",
+    "crates/ob-poc-compiler",
     "crates/ob-agentic",
     "crates/ob-templates",
     "crates/ob-workflow",

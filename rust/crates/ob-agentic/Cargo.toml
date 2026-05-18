@@ -33,6 +33,7 @@ clap = { version = "4", features = ["derive"], optional = true }
 
 # Local crate dependencies
 dsl-core = { path = "../dsl-core" }
+ob-poc-compiler = { path = "../ob-poc-compiler" }
 entity-gateway = { path = "../entity-gateway", optional = true }
 
 # gRPC (for entity resolution, optional)
