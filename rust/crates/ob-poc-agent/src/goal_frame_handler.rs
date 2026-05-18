@@ -19,7 +19,9 @@
 //! after the transition stay in the store; Phase 3.6 wires the
 //! pruning policy.
 
-use ob_poc_boundary::acp_protocol::{JsonRpcError, JsonRpcOutgoing, JsonRpcRequest, JsonRpcResponse};
+use ob_poc_boundary::acp_protocol::{
+    JsonRpcError, JsonRpcOutgoing, JsonRpcRequest, JsonRpcResponse,
+};
 use serde::Deserialize;
 use serde_json::{json, Value};
 use uuid::Uuid;
@@ -90,10 +92,7 @@ pub async fn try_handle_goal_frame(
             })
             .await
             .map(|frame| validate_transition(&frame, GoalFrame::confirm_check)),
-        "obpoc/goal_frame/refuse" => frames
-            .update(session_uuid, GoalFrame::refuse)
-            .await
-            .map(Ok),
+        "obpoc/goal_frame/refuse" => frames.update(session_uuid, GoalFrame::refuse).await.map(Ok),
         "obpoc/goal_frame/refuse_draft" => {
             let verb_fqn = match params.verb_fqn.as_deref() {
                 Some(v) if !v.is_empty() => v.to_string(),
@@ -270,8 +269,11 @@ progress_signals: []
     #[tokio::test]
     async fn non_goal_frame_method_falls_through() {
         let store = GoalFrameStore::new();
-        let outcome =
-            try_handle_goal_frame(&req("session/prompt", "00000000-0000-0000-0000-000000000001", 1), &store).await;
+        let outcome = try_handle_goal_frame(
+            &req("session/prompt", "00000000-0000-0000-0000-000000000001", 1),
+            &store,
+        )
+        .await;
         assert!(outcome.is_none());
     }
 
@@ -316,10 +318,12 @@ progress_signals: []
         let store = GoalFrameStore::new();
         let sid = Uuid::new_v4();
         populate(&store, sid).await;
-        let outcome =
-            try_handle_goal_frame(&req("obpoc/goal_frame/confirm", &sid.to_string(), 1), &store)
-                .await
-                .unwrap();
+        let outcome = try_handle_goal_frame(
+            &req("obpoc/goal_frame/confirm", &sid.to_string(), 1),
+            &store,
+        )
+        .await
+        .unwrap();
         match &outcome[0] {
             JsonRpcOutgoing::Response(resp) => {
                 let frame = &resp.result.as_ref().unwrap()["frame"];
@@ -336,18 +340,24 @@ progress_signals: []
         let store = GoalFrameStore::new();
         let sid = Uuid::new_v4();
         populate(&store, sid).await;
-        try_handle_goal_frame(&req("obpoc/goal_frame/confirm", &sid.to_string(), 1), &store)
-            .await
-            .unwrap();
+        try_handle_goal_frame(
+            &req("obpoc/goal_frame/confirm", &sid.to_string(), 1),
+            &store,
+        )
+        .await
+        .unwrap();
         try_handle_goal_frame(
             &req("obpoc/goal_frame/start_execution", &sid.to_string(), 2),
             &store,
         )
         .await
         .unwrap();
-        try_handle_goal_frame(&req("obpoc/goal_frame/complete", &sid.to_string(), 3), &store)
-            .await
-            .unwrap();
+        try_handle_goal_frame(
+            &req("obpoc/goal_frame/complete", &sid.to_string(), 3),
+            &store,
+        )
+        .await
+        .unwrap();
         let stored = store.get(sid).await.unwrap();
         assert_eq!(stored.status, GoalFrameStatus::Completed);
     }
@@ -402,10 +412,12 @@ progress_signals: []
         try_handle_goal_frame(&req("obpoc/goal_frame/refuse", &sid.to_string(), 1), &store)
             .await
             .unwrap();
-        let outcome =
-            try_handle_goal_frame(&req("obpoc/goal_frame/confirm", &sid.to_string(), 2), &store)
-                .await
-                .unwrap();
+        let outcome = try_handle_goal_frame(
+            &req("obpoc/goal_frame/confirm", &sid.to_string(), 2),
+            &store,
+        )
+        .await
+        .unwrap();
         match &outcome[0] {
             JsonRpcOutgoing::Response(resp) => {
                 let err = resp.error.as_ref().unwrap();

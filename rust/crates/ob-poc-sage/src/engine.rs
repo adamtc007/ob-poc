@@ -32,11 +32,11 @@ use crate::outcome::OutcomeIntent;
 // SageEngine trait below is unconditional; ValidVerbSetEngine and
 // ValidVerbSetScope are gated to match.
 #[cfg(feature = "database")]
-use uuid::Uuid;
-#[cfg(feature = "database")]
 use crate::session_context::EntityState;
 #[cfg(feature = "database")]
 use crate::valid_verb_set::ValidVerbSet;
+#[cfg(feature = "database")]
+use uuid::Uuid;
 
 /// Sage classifier surface.
 ///

@@ -18,6 +18,7 @@
 //! 3. UUIDs as strings for JSON compatibility
 
 pub mod batch_control;
+pub mod bpmn_controller;
 pub mod chat;
 pub mod commands;
 pub mod control;
@@ -53,6 +54,9 @@ pub mod state_token_resolver;
 pub mod trading_matrix;
 pub mod viewport;
 
+pub use bpmn_controller::{
+    InstanceState, InstanceStatus, InstanceSummary, Pool, PoolConfig, PoolStatus, PoolType,
+};
 pub use state_token_resolver::{resolve_pending_state_advance, resolve_state_token};
 
 // --------------------------------------------------------------------------

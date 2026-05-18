@@ -43,6 +43,7 @@
 //! 28. Golden loop mixed modes
 
 use std::collections::HashMap;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 
 use async_trait::async_trait;
@@ -63,7 +64,8 @@ use ob_poc::repl::types::{IntentMatchResult, MatchContext, MatchOutcome};
 use ob_poc::repl::types_v2::{ReplCommandV2, ReplStateV2, UserInputV2, WorkspaceKind};
 use ob_poc::repl::verb_config_index::VerbConfigIndex;
 use ob_poc::sequencer::{
-    DslExecutionOutcome, DslExecutorV2, ParkableStubExecutor, ReplOrchestratorV2, StubExecutor,
+    DslExecutionOutcome, DslExecutor, DslExecutorV2, ParkableStubExecutor, ReplOrchestratorV2,
+    StubExecutor,
 };
 
 // ===========================================================================
@@ -248,6 +250,47 @@ fn build_orchestrator_with_parkable_executor(matcher: MockIntentMatcher) -> Repl
         .with_intent_service(intent_service)
         .with_proposal_engine(engine)
         .with_executor_v2(Arc::new(ParkableStubExecutor))
+}
+
+struct SlowExecutor {
+    slow_mode: Arc<AtomicBool>,
+}
+
+#[async_trait]
+impl DslExecutor for SlowExecutor {
+    async fn execute(&self, _dsl: &str) -> Result<serde_json::Value, String> {
+        if self.slow_mode.load(Ordering::SeqCst) {
+            tokio::time::sleep(std::time::Duration::from_secs(5)).await;
+        }
+        Ok(serde_json::json!({"status": "slow_success"}))
+    }
+}
+
+fn build_orchestrator_with_slow_executor(
+    matcher: MockIntentMatcher,
+) -> (ReplOrchestratorV2, Arc<AtomicBool>) {
+    let index = Arc::new(build_real_index());
+    let intent_matcher: Arc<dyn IntentMatcher> = Arc::new(matcher.clone());
+    let intent_service = Arc::new(IntentService::new(intent_matcher.clone(), index.clone()));
+    let engine = Arc::new(ProposalEngine::new(intent_service.clone(), index.clone()));
+
+    let (pack, hash) = build_freeform_pack();
+    let router = PackRouter::new(vec![(pack, hash)]);
+    let slow_mode = Arc::new(AtomicBool::new(false));
+
+    let orchestrator = ReplOrchestratorV2::new(
+        router,
+        Arc::new(SlowExecutor {
+            slow_mode: Arc::clone(&slow_mode),
+        }),
+    )
+    .with_verb_config_index(index)
+    .with_intent_matcher(intent_matcher)
+    .with_intent_service(intent_service)
+    .with_proposal_engine(engine)
+    .with_runbook_step_timeout(std::time::Duration::from_millis(50));
+
+    (orchestrator, slow_mode)
 }
 
 /// Helper: scope + pack selection -> session lands in InPack.
@@ -2007,5 +2050,57 @@ async fn test_golden_loop_mixed_modes() {
     assert_eq!(ue[2].status, EntryStatus::Completed);
 
     // 8. Session back to RunbookEditing
+    assert!(matches!(session.state, ReplStateV2::RunbookEditing));
+}
+
+#[tokio::test]
+async fn test_run_command_times_out_slow_step_and_returns_response() {
+    let (orch, slow_mode) = build_orchestrator_with_slow_executor(MockIntentMatcher::matched(
+        "cbu.create",
+        0.95,
+        Some("(cbu.create :name \"Slow CBU\")"),
+    ));
+    let (session_id, entry_id) = setup_with_one_entry(&orch).await;
+    slow_mode.store(true, Ordering::SeqCst);
+
+    let run_started = std::time::Instant::now();
+    let response = tokio::time::timeout(
+        std::time::Duration::from_secs(1),
+        orch.process(
+            session_id,
+            UserInputV2::Command {
+                command: ReplCommandV2::Run,
+            },
+        ),
+    )
+    .await
+    .expect("/run should return before the client-level timeout")
+    .expect("/run should produce a REPL response");
+    let run_elapsed = run_started.elapsed();
+    assert!(
+        run_elapsed < std::time::Duration::from_millis(500),
+        "/run should return promptly after the step timeout, elapsed {:?}",
+        run_elapsed
+    );
+
+    let results = match response.kind {
+        ReplResponseKindV2::Executed { results } => results,
+        other => panic!("expected Executed response, got {:?}", other),
+    };
+    assert_eq!(results.len(), 1);
+    assert!(!results[0].success);
+    assert!(
+        results[0]
+            .message
+            .as_deref()
+            .unwrap_or_default()
+            .contains("timed out"),
+        "expected timeout failure message, got {:?}",
+        results[0].message
+    );
+
+    let session = orch.get_session(session_id).await.unwrap();
+    let entry = session.runbook.entry_by_id(entry_id).unwrap();
+    assert_eq!(entry.status, EntryStatus::Failed);
     assert!(matches!(session.state, ReplStateV2::RunbookEditing));
 }

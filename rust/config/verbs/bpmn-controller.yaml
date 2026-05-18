@@ -1,0 +1,273 @@
+# bpmn-controller DSL verbs
+#
+# Two domains:
+#   loader.*           — pool lifecycle (K8s Deployment + HPA + DB membership)
+#   bpmn-controller.*  — instance kick-off and status queries
+#
+# All verbs are Shape 1 (plugin / SemOsVerbOp) bridging to the
+# bpmn-controller crate via Pattern B ops in domain_ops/bpmn_controller_ops.rs.
+# Requires BPMN_LITE_DATABASE_URL (bpmn-lite Postgres) and, for pool mutating
+# verbs, a reachable Kubernetes API server.
+
+domains:
+  loader:
+    description: "BPMN worker pool lifecycle — provision, deprovision, and inspect pools."
+
+    verbs:
+      provision-pool:
+        flavour: attribute_mutating
+        description: >
+          Provision a new bpmn-lite worker pool: create the pool record, assign
+          initial tenants, and deploy a Kubernetes Deployment + HPA.
+        behavior: plugin
+        metadata:
+          tier: composite
+          source_of_truth: external
+          subject_kinds: [pool]
+          phase_tags: [infrastructure]
+          side_effects: state_write
+        invocation_phrases:
+          - "provision a bpmn worker pool"
+          - "create worker pool"
+          - "provision bpmn pool"
+          - "set up a dedicated pool"
+          - "provision a dedicated bpmn pool"
+        args:
+          - name: pool-id
+            type: string
+            required: true
+            description: "Unique pool identifier (alphanumeric + hyphens)."
+          - name: image
+            type: string
+            required: true
+            description: "Container image for bpmn-lite worker pods."
+          - name: pool-type
+            type: string
+            required: false
+            description: "'default' or 'dedicated'. Default: 'default'."
+          - name: tenants
+            type: array
+            required: false
+            description: "Tenant IDs to assign to this pool at creation."
+          - name: replicas
+            type: integer
+            required: false
+            description: "Initial replica count. Default: 2."
+          - name: min-replicas
+            type: integer
+            required: false
+            description: "HPA minimum replicas. Default: 1."
+          - name: max-replicas
+            type: integer
+            required: false
+            description: "HPA maximum replicas. Default: 5."
+        returns:
+          type: void
+        three_axis:
+          state_effect: modifying
+          external_effects:
+            - mutating
+          consequence:
+            baseline: consequential
+
+      deprovision-pool:
+        flavour: attribute_mutating
+        description: >
+          Deprovision a pool: delete the Kubernetes Deployment + HPA and
+          remove the pool record. Fails if the pool still has tenants.
+        behavior: plugin
+        metadata:
+          tier: composite
+          source_of_truth: external
+          subject_kinds: [pool]
+          phase_tags: [infrastructure]
+          side_effects: state_write
+        invocation_phrases:
+          - "deprovision bpmn pool"
+          - "remove worker pool"
+          - "delete worker pool"
+          - "tear down bpmn pool"
+        args:
+          - name: pool-id
+            type: string
+            required: true
+            description: "Pool to deprovision. Cannot be 'default'."
+        returns:
+          type: void
+        three_axis:
+          state_effect: modifying
+          external_effects:
+            - mutating
+          consequence:
+            baseline: consequential
+
+      pool-status:
+        flavour: attribute_mutating
+        description: >
+          Return current status of a pool: tenant count, queue depth, and
+          live Kubernetes replica counts.
+        behavior: plugin
+        metadata:
+          tier: operational
+          source_of_truth: external
+          subject_kinds: [pool]
+          phase_tags: [monitoring]
+          side_effects: none
+        invocation_phrases:
+          - "check pool status"
+          - "pool status"
+          - "bpmn pool status"
+          - "how many workers in pool"
+          - "pool health"
+        args:
+          - name: pool-id
+            type: string
+            required: true
+            description: "Pool to inspect."
+        returns:
+          type: record
+          description: "Pool status including tenant count, queue depth, and replica counts."
+        three_axis:
+          state_effect: preserving
+          external_effects:
+            - observational
+          consequence:
+            baseline: benign
+
+      list-pools:
+        flavour: attribute_mutating
+        description: "List all registered bpmn-lite worker pools."
+        behavior: plugin
+        metadata:
+          tier: operational
+          source_of_truth: external
+          subject_kinds: [pool]
+          phase_tags: [monitoring]
+          side_effects: none
+        invocation_phrases:
+          - "list bpmn pools"
+          - "show worker pools"
+          - "list worker pools"
+          - "what pools exist"
+        args: []
+        returns:
+          type: record_set
+          description: "List of all pools with metadata."
+        three_axis:
+          state_effect: preserving
+          external_effects:
+            - observational
+          consequence:
+            baseline: benign
+
+  bpmn-controller:
+    description: >
+      BPMN process instance operations — start instances and query their status.
+
+    verbs:
+      start-instance:
+        flavour: attribute_mutating
+        description: >
+          Start a new BPMN process instance for a tenant. Validates the tenant
+          and process definition, writes the instance row, and returns the
+          instance_id. Execution is asynchronous — pool workers pick it up.
+        behavior: plugin
+        metadata:
+          tier: operational
+          source_of_truth: external
+          subject_kinds: [process_instance]
+          phase_tags: [execution]
+          side_effects: state_write
+        invocation_phrases:
+          - "start bpmn process"
+          - "start bpmn instance"
+          - "kick off bpmn workflow"
+          - "launch bpmn process"
+          - "start process instance"
+          - "trigger bpmn workflow"
+        args:
+          - name: tenant-id
+            type: string
+            required: true
+            description: "Tenant that owns the instance."
+          - name: process-key
+            type: string
+            required: true
+            description: "Process key identifying the latest published template."
+          - name: payload
+            type: object
+            required: false
+            description: "Initial domain payload (JSON object). Default: {}."
+          - name: idempotency-key
+            type: string
+            required: false
+            description: "If supplied, deduplicates retries for this key."
+        returns:
+          type: uuid
+          description: "instance_id of the started (or existing idempotent) instance."
+        three_axis:
+          state_effect: modifying
+          external_effects:
+            - mutating
+          consequence:
+            baseline: consequential
+
+      instance-status:
+        flavour: attribute_mutating
+        description: "Return the current status of a BPMN process instance."
+        behavior: plugin
+        metadata:
+          tier: operational
+          source_of_truth: external
+          subject_kinds: [process_instance]
+          phase_tags: [monitoring]
+          side_effects: none
+        invocation_phrases:
+          - "bpmn instance status"
+          - "check bpmn instance"
+          - "process instance status"
+          - "is bpmn instance running"
+        args:
+          - name: instance-id
+            type: string
+            required: true
+            description: "UUID of the process instance."
+        returns:
+          type: record
+          description: "Instance status including state, process_key, and timestamps."
+        three_axis:
+          state_effect: preserving
+          external_effects:
+            - observational
+          consequence:
+            baseline: benign
+
+      list-instances:
+        flavour: attribute_mutating
+        description: "List BPMN process instances for a tenant."
+        behavior: plugin
+        metadata:
+          tier: operational
+          source_of_truth: external
+          subject_kinds: [process_instance]
+          phase_tags: [monitoring]
+          side_effects: none
+        invocation_phrases:
+          - "list bpmn instances"
+          - "show process instances"
+          - "list process instances for tenant"
+          - "what bpmn processes are running"
+        args:
+          - name: tenant-id
+            type: string
+            required: true
+            description: "Tenant whose instances to list."
+        returns:
+          type: record_set
+          description: "List of instance summaries ordered by creation time descending."
+        three_axis:
+          state_effect: preserving
+          external_effects:
+            - observational
+          consequence:
+            baseline: benign

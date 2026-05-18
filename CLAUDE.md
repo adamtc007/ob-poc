@@ -576,7 +576,8 @@ ANTHROPIC_API_KEY="sk-ant-..."
 ANTHROPIC_MODEL=claude-sonnet-4-6
 
 # Optional
-BPMN_LITE_GRPC_URL=http://localhost:50052   # Enable BPMN integration
+BPMN_LITE_GRPC_URL=http://localhost:50052   # Enable BPMN integration (existing gRPC verbs)
+BPMN_LITE_DATABASE_URL=postgresql:///bpmn_lite  # Enable loader.* + bpmn-controller.* verbs
 SEM_OS_MODE=inprocess                        # inprocess | remote
 SEM_OS_DATABASE_URL="postgresql:///..."      # For standalone sem_os_server
 SEM_OS_JWT_SECRET=dev-secret                 # JWT for sem_os_server

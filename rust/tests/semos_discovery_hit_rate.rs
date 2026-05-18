@@ -11,11 +11,6 @@ use std::sync::Arc;
 use async_trait::async_trait;
 use chrono::Utc;
 use dsl_core::config::loader::ConfigLoader;
-use sem_os_policy::abac::ActorContext;
-use sem_os_policy::context_resolution::{
-    ContextResolutionRequest, DiscoveryContext, DiscoverySurface, EvidenceMode,
-    ResolutionConstraints, ResolutionStage, SubjectRef,
-};
 use sem_os_core::error::SemOsError;
 use sem_os_core::ids::object_id_for;
 use sem_os_core::ports::{
@@ -23,7 +18,6 @@ use sem_os_core::ports::{
     OutboxStore, ProjectionWriter, SnapshotStore,
 };
 use sem_os_core::principal::Principal;
-use sem_os_policy::service::{CoreService, CoreServiceImpl};
 use sem_os_core::types::{
     AuditEntry, ChangeType, Changeset, ChangesetEntry, ChangesetReview, ChangesetStatus,
     CreateChangesetInput, DependentSnapshot, EventId, EvidenceInstance, Fqn, GovernanceTier,
@@ -32,6 +26,12 @@ use sem_os_core::types::{
 };
 use sem_os_obpoc_adapter::build_seed_bundle_with_metadata;
 use sem_os_obpoc_adapter::metadata::DomainMetadata;
+use sem_os_policy::abac::ActorContext;
+use sem_os_policy::context_resolution::{
+    ContextResolutionRequest, DiscoveryContext, DiscoverySurface, EvidenceMode,
+    ResolutionConstraints, ResolutionStage, SubjectRef,
+};
+use sem_os_policy::service::{CoreService, CoreServiceImpl};
 use serde::Deserialize;
 use uuid::Uuid;
 

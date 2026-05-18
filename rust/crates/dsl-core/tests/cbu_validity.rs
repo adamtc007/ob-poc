@@ -13,7 +13,7 @@ const CBU_VALIDATED_GREEN_WHEN: &str = r#"
 every entity_proper_person.state = VERIFIED
 AND every entity_limited_company_ubo.state in {DISCOVERED, PUBLIC_FLOAT, EXEMPT}
 AND every mandate.state in {approved, active}
-AND every cbu_evidence.state = APPROVED
+AND every cbu_evidence.state = VERIFIED
 AND no investor_disqualifying_flag exists
 AND investment_managers.completeness = green
 "#;
@@ -111,7 +111,7 @@ fn happy_facts() -> BTreeMap<String, Vec<FrontierFact>> {
             ],
         ),
         ("mandate".to_string(), vec![state_fact("approved")]),
-        ("cbu_evidence".to_string(), vec![state_fact("APPROVED")]),
+        ("cbu_evidence".to_string(), vec![state_fact("VERIFIED")]),
         (
             "investment_managers".to_string(),
             vec![attr_fact("completeness", "green")],
@@ -202,9 +202,9 @@ fn cbu_validated_fails_when_mandate_is_not_approved_or_active() {
 }
 
 #[test]
-fn cbu_validated_fails_when_evidence_is_not_approved() {
+fn cbu_validated_fails_when_evidence_is_not_verified() {
     let mut facts = happy_facts();
-    facts.insert("cbu_evidence".to_string(), vec![state_fact("REVIEWED")]);
+    facts.insert("cbu_evidence".to_string(), vec![state_fact("PENDING")]);
 
     assert_red_invalid_entity(validated_status(facts), "this");
 }
@@ -214,7 +214,7 @@ fn cbu_validated_fails_when_evidence_population_has_mixed_states() {
     let mut facts = happy_facts();
     facts.insert(
         "cbu_evidence".to_string(),
-        vec![state_fact("APPROVED"), state_fact("REVIEWED")],
+        vec![state_fact("VERIFIED"), state_fact("PENDING")],
     );
 
     assert_red_invalid_entity(validated_status(facts), "this");

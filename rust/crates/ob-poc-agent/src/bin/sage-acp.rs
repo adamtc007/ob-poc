@@ -42,13 +42,13 @@ use ob_poc_agent::goal_frame_handler::try_handle_goal_frame;
 use ob_poc_agent::goal_proposal_trace::{GoalProposalTraceSink, LoggingTraceSink};
 use ob_poc_agent::index::{DiskPackIndexLoader, IndexLoadRequest, IndexLoader};
 use ob_poc_agent::knowledge::SemOsKnowledgeClient;
+use ob_poc_agent::lsp_subprocess::SubprocessLspChannel;
 use ob_poc_agent::mcp_client::{
     InProcessTransport, McpConstellationHydrator, McpKnowledgeClient, McpTransport,
     SubprocessTransport,
 };
 use ob_poc_agent::planning::PlanningLoop;
 use ob_poc_agent::prompt_handler::try_handle_prompt;
-use ob_poc_agent::lsp_subprocess::SubprocessLspChannel;
 use ob_poc_agent::repl_channel::{LocalRunbookChannel, ReplChannelClient};
 use ob_poc_agent::runbook_handler::try_handle_runbook;
 use ob_poc_boundary::acp_protocol::{AcpJsonRpcAgent, JsonRpcOutgoing, JsonRpcRequest};
@@ -65,8 +65,7 @@ async fn main() -> anyhow::Result<()> {
     let packs_dir: PathBuf = std::env::var("OBPOC_PACKS_DIR")
         .unwrap_or_else(|_| DEFAULT_PACKS_DIR.to_string())
         .into();
-    let pack_id =
-        std::env::var("SAGE_PACK_ID").unwrap_or_else(|_| DEFAULT_PACK_ID.to_string());
+    let pack_id = std::env::var("SAGE_PACK_ID").unwrap_or_else(|_| DEFAULT_PACK_ID.to_string());
 
     let loader = DiskPackIndexLoader::new(&packs_dir);
     let request = IndexLoadRequest {
@@ -182,9 +181,7 @@ async fn main() -> anyhow::Result<()> {
     }
     match default_otlp_endpoint() {
         OtlpEndpoint::Disabled => {
-            eprintln!(
-                "[sage-acp] OTLP audit exporter disabled (OBPOC_SAGE_OTLP_ENDPOINT unset)"
-            );
+            eprintln!("[sage-acp] OTLP audit exporter disabled (OBPOC_SAGE_OTLP_ENDPOINT unset)");
         }
         OtlpEndpoint::Endpoint(url) => {
             eprintln!("[sage-acp] OTLP audit exporter: {url}");
@@ -230,7 +227,8 @@ async fn main() -> anyhow::Result<()> {
                     messages
                 } else if let Some(messages) = try_handle_goal_frame(&request, &frames).await {
                     messages
-                } else if let Some(messages) = try_handle_runbook(&request, channel.as_ref()).await {
+                } else if let Some(messages) = try_handle_runbook(&request, channel.as_ref()).await
+                {
                     messages
                 } else {
                     agent.handle_request(request)
@@ -353,9 +351,7 @@ fn wire_openai(key: String) -> Arc<dyn LlmClient> {
 /// automatically).
 ///
 /// Empty / unset env values fall back to defaults.
-async fn pick_mcp_transport(
-    mcp_server: Arc<McpServer>,
-) -> anyhow::Result<Arc<dyn McpTransport>> {
+async fn pick_mcp_transport(mcp_server: Arc<McpServer>) -> anyhow::Result<Arc<dyn McpTransport>> {
     let mode = std::env::var("OBPOC_SAGE_MCP_TRANSPORT")
         .ok()
         .map(|v| v.trim().to_ascii_lowercase())
@@ -418,7 +414,10 @@ async fn pick_runbook_channel() -> anyhow::Result<Arc<dyn ReplChannelClient>> {
         }
         "subprocess" => {
             let bin_path = locate_dsl_lsp_bin()?;
-            eprintln!("[sage-acp] Spawning dsl-lsp subprocess: {}", bin_path.display());
+            eprintln!(
+                "[sage-acp] Spawning dsl-lsp subprocess: {}",
+                bin_path.display()
+            );
             let channel = SubprocessLspChannel::spawn(&bin_path, &[])
                 .await
                 .map_err(|error| {

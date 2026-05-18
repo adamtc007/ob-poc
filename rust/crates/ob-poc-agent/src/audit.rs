@@ -213,11 +213,7 @@ pub struct MultiAuditSink {
 
 impl MultiAuditSink {
     pub fn new(sinks: Vec<Box<dyn AuditSink>>) -> Self {
-        let label = sinks
-            .iter()
-            .map(|_| "sink")
-            .collect::<Vec<_>>()
-            .join(",");
+        let label = sinks.iter().map(|_| "sink").collect::<Vec<_>>().join(",");
         Self { sinks, label }
     }
 
@@ -384,13 +380,7 @@ fn int_attribute(key: &str, value: i64) -> serde_json::Value {
 impl AuditSink for OtlpAuditSink {
     async fn emit(&self, record: AuditRecord) {
         let payload = self.build_payload(&record);
-        match self
-            .client
-            .post(&self.endpoint)
-            .json(&payload)
-            .send()
-            .await
-        {
+        match self.client.post(&self.endpoint).json(&payload).send().await {
             Ok(response) => {
                 let status = response.status();
                 if !status.is_success() {
@@ -466,7 +456,11 @@ pub fn default_audit_path() -> AuditPath {
         return AuditPath::File(PathBuf::from(value));
     }
     if let Ok(xdg_state) = std::env::var("XDG_STATE_HOME") {
-        return AuditPath::File(PathBuf::from(xdg_state).join("sage-acp").join("audit.jsonl"));
+        return AuditPath::File(
+            PathBuf::from(xdg_state)
+                .join("sage-acp")
+                .join("audit.jsonl"),
+        );
     }
     if let Ok(home) = std::env::var("HOME") {
         return AuditPath::File(
@@ -613,9 +607,7 @@ mod tests {
         assert_eq!(resource_logs.len(), 1);
         let scope_logs = resource_logs[0]["scopeLogs"].as_array().expect("scopeLogs");
         assert_eq!(scope_logs.len(), 1);
-        let log_records = scope_logs[0]["logRecords"]
-            .as_array()
-            .expect("logRecords");
+        let log_records = scope_logs[0]["logRecords"].as_array().expect("logRecords");
         assert_eq!(log_records.len(), 1);
         let log = &log_records[0];
 
@@ -634,10 +626,7 @@ mod tests {
 
         // Record fields all project onto LogRecord attributes.
         let attrs = log["attributes"].as_array().expect("attrs");
-        let keys: Vec<&str> = attrs
-            .iter()
-            .filter_map(|a| a["key"].as_str())
-            .collect();
+        let keys: Vec<&str> = attrs.iter().filter_map(|a| a["key"].as_str()).collect();
         for expected in [
             "goal_frame_id",
             "pack_id",
@@ -679,7 +668,9 @@ mod tests {
         let payload = sink.build_payload(&record);
         let log = &payload["resourceLogs"][0]["scopeLogs"][0]["logRecords"][0];
         let time = &log["timeUnixNano"];
-        let s = time.as_str().expect("timeUnixNano must be string per OTLP JSON");
+        let s = time
+            .as_str()
+            .expect("timeUnixNano must be string per OTLP JSON");
         // Must parse as i64 and be in the right ballpark (post-2020 nanos).
         let parsed: i64 = s.parse().expect("string must parse to i64");
         assert!(parsed > 1_577_836_800_000_000_000, "got {parsed}");
@@ -709,7 +700,12 @@ mod tests {
 
         for path in [&path_a, &path_b] {
             let contents = tokio::fs::read_to_string(path).await.unwrap();
-            assert_eq!(contents.lines().count(), 1, "{} did not get record", path.display());
+            assert_eq!(
+                contents.lines().count(),
+                1,
+                "{} did not get record",
+                path.display()
+            );
         }
     }
 

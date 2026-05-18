@@ -804,11 +804,55 @@ async fn dispatch_to_v2_repl(
         _ => return None, // DiscoverySelection is handled by the chat adapter, not the V2 REPL.
     };
 
+    let is_run_command = matches!(
+        &input,
+        UserInputV2::Command {
+            command: crate::repl::types_v2::ReplCommandV2::Run
+        }
+    );
+
     // R8 §13.5 (2026-05-11): call `process_with_acp` so the orchestrator
     // owns the ACP DAG semantic resolution decision as its first step
     // (Message inputs only; state-independent). On no match it falls
     // through to the standard `process()`.
-    match orchestrator.process_with_acp(session_id, input).await {
+    //
+    // `/run` is the one session-input command that can cross from chat into
+    // execution, persistence, and lock planning. Keep the HTTP ingress bounded
+    // even if a lower layer blocks before the per-step runbook timeout starts.
+    let process_result = if is_run_command {
+        match tokio::time::timeout(
+            std::time::Duration::from_secs(6),
+            orchestrator.process_with_acp(session_id, input),
+        )
+        .await
+        {
+            Ok(result) => result,
+            Err(_) => {
+                tracing::error!(
+                    session_id = %session_id,
+                    "V2 REPL /run timed out at session-input ingress"
+                );
+                return Some(crate::repl::response_v2::ReplResponseV2 {
+                    state: crate::repl::types_v2::ReplStateV2::RunbookEditing,
+                    kind: crate::repl::response_v2::ReplResponseKindV2::Error {
+                        error: "Run timed out before execution completed".to_string(),
+                        recoverable: true,
+                    },
+                    message: "Run timed out before execution completed. The runbook was left editable so you can inspect or retry.".to_string(),
+                    runbook_summary: None,
+                    step_count: 0,
+                    session_feedback: None,
+                    narration: None,
+                    trace_id: None,
+                    acp_dag_semantic: None,
+                });
+            }
+        }
+    } else {
+        orchestrator.process_with_acp(session_id, input).await
+    };
+
+    match process_result {
         Ok(response) => Some(response),
         Err(e) => {
             tracing::warn!(

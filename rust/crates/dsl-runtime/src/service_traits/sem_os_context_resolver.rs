@@ -23,8 +23,8 @@
 
 use anyhow::Result;
 use async_trait::async_trait;
-use sem_os_policy::context_resolution::{ContextResolutionRequest, ContextResolutionResponse};
 use sem_os_core::principal::Principal;
+use sem_os_policy::context_resolution::{ContextResolutionRequest, ContextResolutionResponse};
 
 /// Single-method trait for SemOS context resolution. Returns
 /// `anyhow::Result` to keep `sem_os_policy::service::SemOsError` out

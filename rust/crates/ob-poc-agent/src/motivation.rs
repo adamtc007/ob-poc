@@ -79,12 +79,11 @@ impl MotivationPromptBuilder {
             .collect();
         ToolDefinition {
             name: "propose_verb".to_string(),
-            description:
-                "Select the verb FQN that best advances the frontier given the blockers, \
+            description: "Select the verb FQN that best advances the frontier given the blockers, \
                  plus a one-sentence intent summary explaining the choice. The verb_fqn \
                  MUST be drawn from the enum below — the drafter rejects any FQN outside \
                  it."
-                    .to_string(),
+            .to_string(),
             parameters: serde_json::json!({
                 "type": "object",
                 "properties": {
@@ -295,12 +294,8 @@ progress_signals: []
             Some("cbu.create"),
         );
 
-        let prompt = MotivationPromptBuilder::build(
-            &index,
-            "set up a book",
-            &frontier,
-            Some(&blockers),
-        );
+        let prompt =
+            MotivationPromptBuilder::build(&index, "set up a book", &frontier, Some(&blockers));
         assert!(prompt.user.contains("Editor utterance: set up a book"));
         assert!(prompt.user.contains("Frontier"));
         assert!(prompt.user.contains("Which jurisdiction?"));
@@ -315,10 +310,8 @@ progress_signals: []
         assert_eq!(tool.name, "propose_verb");
         let required = tool.parameters["required"].as_array().unwrap();
         assert_eq!(required.len(), 2);
-        let required_set: std::collections::HashSet<&str> = required
-            .iter()
-            .filter_map(|v| v.as_str())
-            .collect();
+        let required_set: std::collections::HashSet<&str> =
+            required.iter().filter_map(|v| v.as_str()).collect();
         assert!(required_set.contains("verb_fqn"));
         assert!(required_set.contains("intent_summary"));
     }

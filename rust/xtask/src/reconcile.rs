@@ -295,6 +295,8 @@ async fn hygiene_report() -> Result<()> {
 
     let cfg = load_catalogue()?;
     let declared = collect_declared_fqns(&cfg);
+    let macros = collect_macro_fqns();
+    let declared_or_macro: HashSet<_> = declared.union(&macros).cloned().collect();
     let mut registry = sem_os_postgres::ops::build_registry();
     ob_poc::domain_ops::extend_registry(&mut registry);
     let registered: HashSet<String> = registry.manifest().into_iter().collect();
@@ -306,6 +308,7 @@ async fn hygiene_report() -> Result<()> {
 
     println!("Inputs:");
     println!("  declared YAML verbs:      {}", declared.len());
+    println!("  declared macro YAML:      {}", macros.len());
     println!("  registered SemOs ops:     {}", registered.len());
     println!("  SimpleStatus configs:     {}", simple_status.len());
     println!("  DAG verb references:      {}", dag_refs.len());
@@ -360,7 +363,7 @@ async fn hygiene_report() -> Result<()> {
     println!("\nDAG references without YAML declaration:");
     let missing_yaml: Vec<_> = dag_refs
         .iter()
-        .filter(|fqn| !declared.contains(*fqn))
+        .filter(|fqn| !declared_or_macro.contains(*fqn))
         .cloned()
         .collect();
     print_limited(&missing_yaml, 50);
@@ -871,7 +874,7 @@ fn parse_schema_sql(
 fn collect_dag_verb_refs() -> Result<HashSet<String>> {
     let mut refs = HashSet::new();
     let path = PathBuf::from("config/sem_os_seeds/dag_taxonomies");
-    let verb_re = regex::Regex::new(r#"\b[a-z][a-z0-9-]*\.[a-z][a-z0-9-]*\b"#)?;
+    let verb_re = regex::Regex::new(r#"\b[a-z][a-z0-9-]*(?:\.[a-z][a-z0-9-]*)+\b"#)?;
 
     for entry in std::fs::read_dir(&path).with_context(|| format!("reading {path:?}"))? {
         let entry = entry?;

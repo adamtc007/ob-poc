@@ -55,6 +55,7 @@
 // Phase 4 Slice B Group 3 — bods_ops relocated to `dsl-runtime::domain_ops::bods_ops`
 // alongside the `bods/` module it consumes.
 mod booking_principal_ops;
+mod bpmn_controller_ops;
 mod bpmn_lite_ops;
 mod catalogue_ops;
 mod simple_status_op;
@@ -456,6 +457,17 @@ pub fn extend_registry(registry: &mut sem_os_postgres::ops::SemOsVerbOpRegistry)
     registry.register(Arc::new(bpmn_lite_ops::BpmnSignal));
     registry.register(Arc::new(bpmn_lite_ops::BpmnCancel));
     registry.register(Arc::new(bpmn_lite_ops::BpmnInspect));
+
+    // L6 — bpmn-controller verbs: pool lifecycle + instance kick-off.
+    // Shape 1 (Pattern B) — direct calls to the bpmn-controller crate
+    // via BPMN_LITE_DATABASE_URL. Pool mutating verbs also need K8s API.
+    registry.register(Arc::new(bpmn_controller_ops::LoaderProvisionPool));
+    registry.register(Arc::new(bpmn_controller_ops::LoaderDeprovisionPool));
+    registry.register(Arc::new(bpmn_controller_ops::LoaderPoolStatus));
+    registry.register(Arc::new(bpmn_controller_ops::LoaderListPools));
+    registry.register(Arc::new(bpmn_controller_ops::BpmnControllerStartInstance));
+    registry.register(Arc::new(bpmn_controller_ops::BpmnControllerInstanceStatus));
+    registry.register(Arc::new(bpmn_controller_ops::BpmnControllerListInstances));
 
     // Phase B Pattern B slice #74: template.* (template invocation +
     // batch execution; bridges to crate::templates::TemplateExpander,

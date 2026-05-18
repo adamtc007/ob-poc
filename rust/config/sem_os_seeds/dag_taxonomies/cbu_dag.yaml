@@ -373,7 +373,7 @@ slots:
             every entity_proper_person.state = VERIFIED
             AND every entity_limited_company_ubo.state in {DISCOVERED, PUBLIC_FLOAT, EXEMPT}
             AND every mandate.state in {approved, active}
-            AND every cbu_evidence.state = APPROVED
+            AND every cbu_evidence.state = VERIFIED
             AND no investor_disqualifying_flag exists
             AND investment_managers.completeness = green
         - id: UPDATE_PENDING_PROOF
@@ -618,7 +618,7 @@ slots:
           via: "(backend: pipeline failure)"
         - from: MANUAL_REQUIRED
           to: DISCOVERED
-          via: ubo-registry.promote-to-ubo  # cross-workspace from KYC
+          via: ubo.registry.promote  # cross-workspace from KYC
       terminal_states: [DISCOVERED, PUBLIC_FLOAT, EXEMPT]
 
   # ---------------------------------------------------------------------------
@@ -628,7 +628,7 @@ slots:
   - id: cbu_evidence
     stateless: false
     closure: closed_unbounded
-    entry_state: UPLOADED
+    entry_state: PENDING
     state_machine:
       id: cbu_evidence_lifecycle
       source_entity: '"ob-poc".cbu_evidence'
@@ -637,61 +637,54 @@ slots:
       description: |
         Per-evidence-item lifecycle. Evidence supports CBU validation:
         ownership proofs, formation docs, attestations, registry
-        checks, manual verifications.
+        checks, manual verifications. The schema-backed source of truth is
+        cbu_evidence.verification_status: PENDING, VERIFIED, REJECTED,
+        or EXPIRED.
       predicate_bindings:
+        - entity: cbu_evidence
+          source_kind: dag_entity
+          scope: this evidence item
         - entity: evidence_blob
           source_kind: dag_entity
           source_entity: evidence_blob
-          scope: attached_to this cbu_evidence
-        - entity: evidence_review
-          source_kind: dag_entity
-          source_entity: evidence_review
           scope: attached_to this cbu_evidence
         - entity: evidence_expiry
           source_kind: dag_entity
           source_entity: evidence_expiry
           scope: attached_to this cbu_evidence
       states:
-        - id: UPLOADED
+        - id: PENDING
           entry: true
-          description: "Evidence uploaded and linked; review not complete."
+          description: "Evidence uploaded and linked; verification pending."
           green_when: |
             evidence_blob exists
-        - id: REVIEWED
-          description: "Evidence reviewed; approval decision pending."
+        - id: VERIFIED
+          description: "Evidence verified and accepted."
           green_when: |
-            evidence_review exists
-            AND evidence_review.state = COMPLETE
-        - id: APPROVED
-          description: "Evidence reviewed and accepted."
-          green_when: |
-            evidence_review exists
-            AND evidence_review.state = APPROVED
+            cbu_evidence.verification_status = VERIFIED
             AND evidence_expiry.status = CURRENT
         - id: REJECTED
           description: "Evidence rejected (insufficient, expired, fraudulent)."
         - id: EXPIRED
-          description: "Previously APPROVED; time-decay invalidation."
+          description: "Previously VERIFIED; time-decay invalidation."
           green_when: |
             evidence_expiry.status = EXPIRED
       transitions:
-        - from: UPLOADED
-          to: REVIEWED
-          via: cbu.review-evidence
-        - from: REVIEWED
-          to: APPROVED
-          via: cbu.approve-evidence
-        - from: REVIEWED
+        - from: PENDING
+          to: VERIFIED
+          via: cbu.verify-evidence
+          args: { verification-status: VERIFIED }
+        - from: PENDING
           to: REJECTED
-          via: cbu.reject-evidence
-          args: { decision: reject }
-        - from: APPROVED
+          via: cbu.verify-evidence
+          args: { verification-status: REJECTED }
+        - from: VERIFIED
           to: EXPIRED
           via: "(backend: time-decay trigger based on evidence_type validity window)"
         - from: EXPIRED
-          to: UPLOADED
+          to: PENDING
           via: cbu.attach-evidence  # re-attach refresh
-      terminal_states: [APPROVED, REJECTED]
+      terminal_states: [VERIFIED, REJECTED]
 
   # ---------------------------------------------------------------------------
   # 2.4 Investor lifecycle (two interleaved state machines)
@@ -1477,12 +1470,12 @@ cross_slot_constraints:
   - id: cbu_validated_requires_evidence_set_verified
     description: |
       CBU → VALIDATED requires ALL required cbu_evidence rows at
-      status = APPROVED. Required set depends on kyc_scope_template.
+      status = VERIFIED. Required set depends on kyc_scope_template.
     rule: |
       cbus.status = 'VALIDATED'
         → ALL cbu_evidence WHERE cbu_id = this.cbu_id
             AND evidence_required = true
-            .verification_status = 'APPROVED'
+            .verification_status = 'VERIFIED'
     severity: error
 
   - id: cbu_validated_requires_commercial_client_entity
@@ -1694,13 +1687,13 @@ derived_cross_workspace_state:
         - workspace: instrument_matrix
           slot: trading_profile
           predicate: "trading_profiles.cbu_id = this_cbu.cbu_id AND trading_profiles.status = 'ACTIVE'"
-        # All required cbu_evidence APPROVED
+        # All required cbu_evidence VERIFIED
         - workspace: cbu
           slot: cbu_evidence
           predicate: |
             ALL cbu_evidence WHERE cbu_id = this_cbu.cbu_id
               AND evidence_required = true
-              HAVE verification_status = 'APPROVED'
+              HAVE verification_status = 'VERIFIED'
         # At least one service_consumption in active state
         - workspace: cbu
           slot: service_consumption

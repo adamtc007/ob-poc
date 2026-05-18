@@ -156,6 +156,13 @@ pub fn try_deterministic_extraction(
             if !result.has(key) && has_arg(&required_args, key) {
                 result.insert(key.clone(), value.clone(), SlotSource::CopiedFromPrevious);
             }
+            let hyphen_key = key.replace('_', "-");
+            if hyphen_key != *key
+                && !result.has(&hyphen_key)
+                && has_arg(&required_args, &hyphen_key)
+            {
+                result.insert(hyphen_key, value.clone(), SlotSource::CopiedFromPrevious);
+            }
         }
     }
 
@@ -167,7 +174,7 @@ pub fn try_deterministic_extraction(
         }
 
         // Check if arg expects an entity type that matches focus.
-        if is_entity_arg(&arg.arg_type) {
+        if is_entity_arg(arg) {
             if let Some(focus_ref) = resolve_focus_for_arg(arg, &input_lower, context) {
                 result.insert(
                     arg.name.clone(),
@@ -201,7 +208,7 @@ pub fn try_deterministic_extraction(
             continue;
         }
         // Try to match canonical form against arg type expectations.
-        if (arg.arg_type == "string" || arg.name == "jurisdiction")
+        if (is_string_arg(arg) || arg.name == "jurisdiction")
             && is_jurisdiction_value(&canonical)
             && arg.name.contains("jurisdiction")
         {
@@ -210,6 +217,15 @@ pub fn try_deterministic_extraction(
                 canonical.clone(),
                 SlotSource::InferredFromContext,
             );
+        }
+        if arg.name == "product" {
+            if let Some(product_code) = extract_product_code(user_input) {
+                result.insert(
+                    arg.name.clone(),
+                    product_code,
+                    SlotSource::InferredFromContext,
+                );
+            }
         }
     }
 
@@ -220,6 +236,49 @@ pub fn try_deterministic_extraction(
     } else {
         None
     }
+}
+
+fn extract_product_code(input: &str) -> Option<String> {
+    let normalized = input
+        .to_ascii_uppercase()
+        .replace('-', "_")
+        .replace('/', " ");
+    let compact = normalized.replace('_', " ");
+
+    let candidates: &[(&str, &[&str])] = &[
+        (
+            "FUND_ACCOUNTING",
+            &[
+                "FUND_ACCOUNTING",
+                "FUND ACCOUNTING",
+                "NAV CALC",
+                "NAV CALCULATION",
+                "FUND ADMIN",
+            ],
+        ),
+        (
+            "TRANSFER_AGENCY",
+            &["TRANSFER_AGENCY", "TRANSFER AGENCY", "TRANSFER AGENT", "TA"],
+        ),
+        ("MIDDLE_OFFICE", &["MIDDLE_OFFICE", "MIDDLE OFFICE"]),
+        (
+            "COLLATERAL_MGMT",
+            &["COLLATERAL_MGMT", "COLLATERAL MANAGEMENT", "COLLATERAL"],
+        ),
+        ("MARKETS_FX", &["MARKETS_FX", "MARKETS FX", "FX"]),
+        ("CUSTODY", &["CUSTODY", "CUSTODIAN", "SAFEKEEPING"]),
+        ("ALTS", &["ALTS", "ALTERNATIVES"]),
+    ];
+
+    for (code, aliases) in candidates {
+        if aliases
+            .iter()
+            .any(|alias| normalized.contains(alias) || compact.contains(&alias.replace('_', " ")))
+        {
+            return Some((*code).to_string());
+        }
+    }
+    None
 }
 
 // ============================================================================
@@ -491,12 +550,28 @@ pub fn build_pack_enriched_prompt(context: &ContextStack) -> String {
 // Helpers
 // ============================================================================
 
-/// Check if an arg type refers to an entity (uuid, entity_ref, etc.).
-fn is_entity_arg(arg_type: &str) -> bool {
-    matches!(
-        arg_type,
-        "uuid" | "entity_ref" | "entity-ref" | "structure_ref" | "party_ref"
-    )
+/// Check if an arg refers to an entity (uuid, entity_ref, lookup-backed refs, etc.).
+fn is_entity_arg(arg: &ArgSummary) -> bool {
+    let normalized = arg
+        .arg_type
+        .to_ascii_lowercase()
+        .replace('-', "_")
+        .replace(' ', "");
+    arg.lookup_entity_type.is_some()
+        || matches!(
+            normalized.as_str(),
+            "uuid"
+                | "entity_ref"
+                | "entityref"
+                | "structure_ref"
+                | "structureref"
+                | "party_ref"
+                | "partyref"
+        )
+}
+
+fn is_string_arg(arg: &ArgSummary) -> bool {
+    matches!(arg.arg_type.to_ascii_lowercase().as_str(), "string" | "str")
 }
 
 /// Check if a value is a known jurisdiction code.
@@ -555,6 +630,7 @@ mod tests {
         ContextStack, DerivedScope, ExclusionSet, FocusContext, FocusRef, OutcomeRegistry,
         PackContext, RecentContext, RecentMention, TemplateStepHint,
     };
+    use super::super::verb_config_index::VerbIndexEntry;
     use super::*;
     use std::collections::{HashMap, HashSet};
     use uuid::Uuid;
@@ -643,6 +719,34 @@ mod tests {
                 },
             ],
             crud_key: Some("case_id".to_string()),
+            confirm_policy: super::super::runbook::ConfirmPolicy::Always,
+            precondition_checks: vec![],
+        });
+        index.insert_test_entry(VerbIndexEntry {
+            fqn: "cbu.add-product".to_string(),
+            description: "Add a product to a CBU".to_string(),
+            invocation_phrases: vec!["add product to cbu".to_string()],
+            sentence_templates: vec![],
+            sentences: None,
+            args: vec![
+                ArgSummary {
+                    name: "cbu-id".to_string(),
+                    arg_type: "uuid".to_string(),
+                    required: true,
+                    description: Some("CBU ID".to_string()),
+                    maps_to: Some("cbu_id".to_string()),
+                    lookup_entity_type: Some("cbu".to_string()),
+                },
+                ArgSummary {
+                    name: "product".to_string(),
+                    arg_type: "string".to_string(),
+                    required: true,
+                    description: Some("Product code".to_string()),
+                    maps_to: Some("product_code".to_string()),
+                    lookup_entity_type: Some("product".to_string()),
+                },
+            ],
+            crud_key: Some("cbu_id".to_string()),
             confirm_policy: super::super::runbook::ConfirmPolicy::Always,
             precondition_checks: vec![],
         });
@@ -757,6 +861,113 @@ mod tests {
         let r = result.unwrap();
         assert_eq!(r.args.get("case-id").unwrap(), &case_id.to_string());
         assert_eq!(r.args.get("entity-id").unwrap(), &entity_id.to_string());
+    }
+
+    #[test]
+    fn test_extraction_add_product_uses_focus_cbu_and_product_code() {
+        let mut ctx = empty_context();
+        let cbu_id = Uuid::new_v4();
+        ctx.focus.cbu = Some(FocusRef {
+            id: cbu_id,
+            display_name: "Lifecycle CBU".to_string(),
+            entity_type: "cbu".to_string(),
+            set_at_turn: 1,
+        });
+        let vc = simple_verb_config();
+
+        let result = try_deterministic_extraction(
+            "cbu.add-product",
+            "add CUSTODY product to this CBU",
+            &ctx,
+            &vc,
+        );
+
+        assert!(result.is_some());
+        let r = result.unwrap();
+        assert_eq!(r.args.get("cbu-id").unwrap(), &cbu_id.to_string());
+        assert_eq!(r.args.get("product").unwrap(), "CUSTODY");
+    }
+
+    #[test]
+    fn test_extraction_add_product_uses_yaml_style_arg_types() {
+        let mut ctx = empty_context();
+        let cbu_id = Uuid::new_v4();
+        ctx.focus.cbu = Some(FocusRef {
+            id: cbu_id,
+            display_name: "Lifecycle CBU".to_string(),
+            entity_type: "cbu".to_string(),
+            set_at_turn: 1,
+        });
+        let mut vc = VerbConfigIndex::empty();
+        vc.insert_test_entry(VerbIndexEntry {
+            fqn: "cbu.add-product".to_string(),
+            description: "Add a product to a CBU".to_string(),
+            invocation_phrases: vec!["add product to cbu".to_string()],
+            sentence_templates: vec![],
+            sentences: None,
+            args: vec![
+                ArgSummary {
+                    name: "cbu-id".to_string(),
+                    arg_type: "Uuid".to_string(),
+                    required: true,
+                    description: Some("CBU ID".to_string()),
+                    maps_to: Some("cbu_id".to_string()),
+                    lookup_entity_type: Some("cbu".to_string()),
+                },
+                ArgSummary {
+                    name: "product".to_string(),
+                    arg_type: "String".to_string(),
+                    required: true,
+                    description: Some("Product code".to_string()),
+                    maps_to: Some("product_code".to_string()),
+                    lookup_entity_type: Some("product".to_string()),
+                },
+            ],
+            crud_key: Some("cbu_id".to_string()),
+            confirm_policy: super::super::runbook::ConfirmPolicy::Always,
+            precondition_checks: vec![],
+        });
+
+        let result = try_deterministic_extraction(
+            "cbu.add-product",
+            "add CUSTODY product to this CBU",
+            &ctx,
+            &vc,
+        );
+
+        assert!(result.is_some());
+        let r = result.unwrap();
+        assert_eq!(r.args.get("cbu-id").unwrap(), &cbu_id.to_string());
+        assert_eq!(r.args.get("product").unwrap(), "CUSTODY");
+    }
+
+    #[test]
+    fn test_extraction_add_product_maps_cbu_id_carry_forward_alias() {
+        let mut ctx = empty_context();
+        let cbu_id = Uuid::new_v4();
+        ctx.template_hint = Some(TemplateStepHint {
+            template_id: "cbu-maintenance".to_string(),
+            step_index: 1,
+            total_steps: 2,
+            expected_verb: "cbu.add-product".to_string(),
+            next_entry_id: Uuid::new_v4(),
+            section: None,
+            section_progress: None,
+            carry_forward_args: HashMap::from([("cbu_id".to_string(), cbu_id.to_string())]),
+        });
+        let vc = simple_verb_config();
+
+        let result = try_deterministic_extraction(
+            "cbu.add-product",
+            "enable fund accounting service",
+            &ctx,
+            &vc,
+        );
+
+        assert!(result.is_some());
+        let r = result.unwrap();
+        assert_eq!(r.args.get("cbu-id").unwrap(), &cbu_id.to_string());
+        assert_eq!(r.args.get("product").unwrap(), "FUND_ACCOUNTING");
     }
 
     #[test]

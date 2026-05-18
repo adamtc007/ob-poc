@@ -321,10 +321,10 @@ slots:
           via: skeleton.build
         - from: filled
           to: workstream_open
-          via: entity-workstream.add
+          via: entity-workstream.create
         - from: workstream_open
           to: screening_complete
-          via: screening-ops.full
+          via: screening.run
         - from: screening_complete
           to: evidence_collected
           via: evidence.attach-document
@@ -333,7 +333,7 @@ slots:
           via: evidence.mark-verified
         - from: verified
           to: approved
-          via: entity-workstream.close
+          via: entity-workstream.complete
       terminal_states: [approved]
 
   # ---------------------------------------------------------------------------
@@ -374,19 +374,19 @@ slots:
       transitions:
         - from: PENDING
           to: COLLECT
-          via: entity-workstream.add
+          via: entity-workstream.create
         - from: COLLECT
           to: VERIFY
           via: evidence.mark-verified
         - from: VERIFY
           to: SCREEN
-          via: screening-ops.full
+          via: screening.run
         - from: SCREEN
           to: ASSESS
           via: "(backend: screenings cleared)"
         - from: ASSESS
           to: COMPLETE
-          via: entity-workstream.close
+          via: entity-workstream.complete
         - from: "(any non-terminal)"
           to: BLOCKED
           via: entity-workstream.update-status
@@ -432,31 +432,31 @@ slots:
       transitions:
         - from: PENDING
           to: RUNNING
-          via: screening-ops.start
+          via: screening.run
         - from: RUNNING
           to: CLEAR
           via: "(backend: no hits)"
         - from: RUNNING
           to: HIT_PENDING_REVIEW
-          via: screening.record-hit
+          via: screening.complete
         - from: HIT_PENDING_REVIEW
           to: HIT_CONFIRMED
-          via: screening.confirm
+          via: screening.review-hit
         - from: HIT_PENDING_REVIEW
           to: HIT_DISMISSED
-          via: screening.dismiss
+          via: screening.review-hit
         - from: RUNNING
           to: ERROR
           via: "(backend: provider error)"
         - from: ERROR
           to: PENDING
-          via: screening-ops.retry
+          via: screening.bulk-refresh
         - from: "(CLEAR, HIT_DISMISSED)"
           to: EXPIRED
           via: "(time-decay trigger)"
         - from: EXPIRED
           to: PENDING
-          via: screening-ops.refresh
+          via: screening.bulk-refresh
       terminal_states: [HIT_CONFIRMED]  # needs red_flag escalation
 
   - id: ubo_evidence
@@ -564,31 +564,31 @@ slots:
         # the destination's green_when.
         - from: CANDIDATE
           to: IDENTIFIED
-          via: ubo-registry.promote
+          via: ubo.registry.promote
         - from: IDENTIFIED
           to: PROVABLE
-          via: ubo-registry.advance
+          via: ubo.registry.advance
         - from: PROVABLE
           to: PROVED
-          via: ubo-registry.advance
+          via: ubo.registry.advance
         - from: PROVED
           to: REVIEWED
           via: "(compliance review)"
         - from: REVIEWED
           to: APPROVED
-          via: ubo-registry.advance
+          via: ubo.registry.advance
         - from: REVIEWED
           to: WAIVED
           via: "(compliance waiver)"
         - from: REVIEWED
           to: REJECTED
-          via: ubo-registry.reject
+          via: ubo.registry.reject
         - from: APPROVED
           to: EXPIRED
           via: "(time-decay)"
         - from: EXPIRED
           to: CANDIDATE
-          via: "(periodic review: ubo-registry.expire then re-enter as candidate)"
+          via: "(periodic review: ubo.registry.expire then re-enter as candidate)"
       terminal_states: [APPROVED, WAIVED, REJECTED]
 
   - id: kyc_ubo_evidence
@@ -737,16 +737,16 @@ slots:
           via: request.create
         - from: PENDING
           to: SENT
-          via: request.send
+          via: request.remind
         - from: SENT
           to: REMINDED
           via: request.remind
         - from: "(SENT, REMINDED)"
           to: RESPONDED
-          via: request.record-response
+          via: request.fulfill
         - from: "(RESPONDED, REMINDED)"
           to: CLOSED
-          via: request.close
+          via: request.fulfill
         - from: "(SENT, REMINDED)"
           to: EXPIRED
           via: "(cutoff passed)"
@@ -805,16 +805,16 @@ slots:
       transitions:
         - from: DRAFT
           to: ACTIVE
-          via: kyc-agreement.update (status=ACTIVE)
+          via: kyc-agreement.update-status (status=ACTIVE)
         - from: ACTIVE
           to: SUSPENDED
-          via: kyc-agreement.update (status=SUSPENDED)
+          via: kyc-agreement.update-status (status=SUSPENDED)
         - from: SUSPENDED
           to: ACTIVE
-          via: kyc-agreement.update (status=ACTIVE)
+          via: kyc-agreement.update-status (status=ACTIVE)
         - from: "(ACTIVE, SUSPENDED)"
           to: TERMINATED
-          via: kyc-agreement.delete
+          via: kyc-agreement.update-status
       terminal_states: [TERMINATED]
     product_gates:
       activated_by: [product.kyc_service]

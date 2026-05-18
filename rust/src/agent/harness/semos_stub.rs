@@ -20,8 +20,6 @@ use std::sync::Arc;
 use async_trait::async_trait;
 use chrono::Utc;
 use sem_os_client::SemOsClient;
-use sem_os_policy::abac::AccessDecision;
-use sem_os_policy::context_resolution::{ContextResolutionResponse, ResolutionStage, VerbCandidate};
 use sem_os_core::error::SemOsError;
 use sem_os_core::principal::Principal;
 use sem_os_core::proto::{
@@ -30,9 +28,13 @@ use sem_os_core::proto::{
     ListChangesetsQuery, ListChangesetsResponse, ListToolSpecsResponse, ToolCallRequest,
     ToolCallResponse,
 };
+use sem_os_policy::abac::AccessDecision;
 use sem_os_policy::context_resolution::{
     ContextResolutionRequest as ResolveContextRequest,
     ContextResolutionResponse as ResolveContextResponse,
+};
+use sem_os_policy::context_resolution::{
+    ContextResolutionResponse, ResolutionStage, VerbCandidate,
 };
 use sem_os_types::{Changeset, GovernanceTier, TrustClass};
 use uuid::Uuid;

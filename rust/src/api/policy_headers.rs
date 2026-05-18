@@ -5,8 +5,8 @@
 //! axum/HTTP types. The transport-specific lift from headers happens
 //! here, then the canonical `ActorContext` is handed to the gate.
 
-use sem_os_policy::abac::ActorContext;
 use sem_os_core::types::Classification;
+use sem_os_policy::abac::ActorContext;
 
 /// Build an `ActorContext` from request headers using the
 /// `x-obpoc-actor-id` / `x-obpoc-roles` / `x-obpoc-department` /

@@ -64,7 +64,7 @@ slots:
       transitions:
         - from: DRAFT
           to: STAGED
-          via: catalogue.stage-proposal     # auto on validator-clean (out-of-band)
+          via: catalogue.propose-verb-declaration
         - from: STAGED
           to: COMMITTED
           via: catalogue.commit-verb-declaration
@@ -73,10 +73,10 @@ slots:
           via: catalogue.rollback-verb-declaration
         - from: DRAFT
           to: REJECTED
-          via: catalogue.reject-proposal
+          via: catalogue.rollback-verb-declaration
         - from: REJECTED
           to: DRAFT
-          via: catalogue.reopen-proposal
+          via: catalogue.propose-verb-declaration
       terminal_states: [COMMITTED, ROLLED_BACK]
 
   - id: verb

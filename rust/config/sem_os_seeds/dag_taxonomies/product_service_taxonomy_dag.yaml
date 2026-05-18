@@ -164,7 +164,7 @@ slots:
           via: service.define
         - from: draft
           to: active
-          via: "(backend: changeset.publish includes this service)"
+          via: "(backend: governance.publish includes this service)"
         - from: active
           to: draft
           via: service.propose-revision

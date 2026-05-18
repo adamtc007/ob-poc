@@ -211,8 +211,8 @@ progress_signals: []
 
     #[test]
     fn session_index_verb_sanction_check() {
-        let (manifest, hash) = load_pack_from_bytes(book_setup_manifest_yaml())
-            .expect("fixture parses");
+        let (manifest, hash) =
+            load_pack_from_bytes(book_setup_manifest_yaml()).expect("fixture parses");
         let index = SessionIndex {
             pack: manifest,
             pack_hash: hash,

@@ -25,11 +25,11 @@
 mod integration {
     use anyhow::Result;
     use chrono::Utc;
+    use sem_os_core::types::EvidenceGrade;
     use sem_os_policy::context_resolution::{
         ContextResolutionRequest, DiscoveryContext, EvidenceMode, SubjectRef,
     };
     use sem_os_policy::service::{CoreService, CoreServiceImpl};
-    use sem_os_core::types::EvidenceGrade;
     use sem_os_postgres::PgStores;
     use serde_json::json;
     use sqlx::PgPool;
@@ -235,6 +235,50 @@ mod integration {
         let principal =
             sem_os_core::principal::Principal::in_process(&actor.actor_id, actor.roles.clone());
         service.resolve_context(&principal, request).await
+    }
+
+    #[tokio::test]
+    #[ignore]
+    async fn test_attribute_def_enum_materializes_to_registry_enum_value_type() -> Result<()> {
+        let db = TestDb::new().await?;
+        let attr_fqn = db.fqn("attr.enum_materialization");
+        let object_id = Uuid::new_v4();
+        let meta =
+            SnapshotMeta::new_operational(ObjectType::AttributeDef, object_id, "integration_test");
+        let body = AttributeDefBody {
+            fqn: attr_fqn.clone(),
+            name: "Enum Materialization".into(),
+            description: "Regression coverage for SemOS enum projection".into(),
+            domain: "test".into(),
+            data_type: AttributeDataType::Enum(vec!["PENDING".into(), "VERIFIED".into()]),
+            evidence_grade: EvidenceGrade::None,
+            source: None,
+            constraints: None,
+            sinks: vec![],
+            category: None,
+            validation_rules: None,
+            applicability: None,
+            is_required: None,
+            default_value: None,
+            group_id: None,
+            is_derived: None,
+            derivation_spec_fqn: None,
+            visibility: None,
+        };
+
+        RegistryService::publish_attribute_def(&db.pool, &meta, &body, None).await?;
+
+        let value_type: String = sqlx::query_scalar(
+            r#"SELECT value_type FROM "ob-poc".attribute_registry WHERE id = $1"#,
+        )
+        .bind(&attr_fqn)
+        .fetch_one(&db.pool)
+        .await?;
+
+        assert_eq!(value_type, "enum");
+
+        db.cleanup().await;
+        Ok(())
     }
 
     // ═══════════════════════════════════════════════════════════════════════

@@ -142,7 +142,7 @@ impl AttributeDataType {
             "uuid" => Some(Self::Uuid),
             "date" => Some(Self::Date),
             "timestamp" => Some(Self::Timestamp),
-            "datetime" | "timestamp_tz" => Some(Self::DateTime),
+            "datetime" | "date_time" | "timestamp_tz" => Some(Self::DateTime),
             "json" | "jsonb" => Some(Self::Json),
             "email" => Some(Self::Email),
             "phone" => Some(Self::Phone),
@@ -281,5 +281,9 @@ mod tests {
             let pg = sample.to_pg_check_value();
             assert_eq!(AttributeDataType::from_pg_check_value(pg), Some(sample));
         }
+        assert_eq!(
+            AttributeDataType::from_pg_check_value("date_time"),
+            Some(AttributeDataType::DateTime)
+        );
     }
 }

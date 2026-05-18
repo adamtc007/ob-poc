@@ -219,8 +219,9 @@ fn derive_session_state(runbook: &Runbook) -> DerivedScope {
             }
             "session.load-cbu" => {
                 if let Some(result) = &entry.result {
-                    if let Some(cbu_id) = result
-                        .get("cbu_id")
+                    if let Some(cbu_id) = result_value_object(result)
+                        .and_then(|result| result.get("cbu_id"))
+                        .or_else(|| result.get("cbu_id"))
                         .and_then(|v| v.as_str())
                         .and_then(|s| Uuid::parse_str(s).ok())
                     {
@@ -229,6 +230,21 @@ fn derive_session_state(runbook: &Runbook) -> DerivedScope {
                         }
                         scope.default_cbu = Some(cbu_id);
                     }
+                }
+            }
+            "cbu.create" => {
+                if let Some(cbu_id) = entry
+                    .result
+                    .as_ref()
+                    .and_then(result_value_object)
+                    .and_then(|result| result.get("cbu_id"))
+                    .and_then(|v| v.as_str())
+                    .and_then(|s| Uuid::parse_str(s).ok())
+                {
+                    if !scope.loaded_cbu_ids.contains(&cbu_id) {
+                        scope.loaded_cbu_ids.push(cbu_id);
+                    }
+                    scope.default_cbu = Some(cbu_id);
                 }
             }
             "session.set-cbu" | "session.focus-cbu" => {
@@ -515,7 +531,7 @@ fn build_carry_forward(runbook: &Runbook) -> HashMap<String, String> {
         }
         // Also carry forward result-derived values (e.g. created UUIDs).
         if let Some(result) = &entry.result {
-            if let Some(obj) = result.as_object() {
+            if let Some(obj) = result_value_object(result) {
                 for (key, value) in obj {
                     if let Some(s) = value.as_str() {
                         carry.insert(key.clone(), s.to_string());
@@ -525,6 +541,15 @@ fn build_carry_forward(runbook: &Runbook) -> HashMap<String, String> {
         }
     }
     carry
+}
+
+fn result_value_object(
+    result: &serde_json::Value,
+) -> Option<&serde_json::Map<String, serde_json::Value>> {
+    result
+        .get("value")
+        .and_then(|value| value.as_object())
+        .or_else(|| result.as_object())
 }
 
 // ---------------------------------------------------------------------------
@@ -673,6 +698,15 @@ fn derive_focus(runbook: &Runbook) -> FocusContext {
                 .get("cbu-id")
                 .or(entry.args.get("cbu_id"))
                 .and_then(|s| Uuid::parse_str(s).ok())
+                .or_else(|| {
+                    entry
+                        .result
+                        .as_ref()
+                        .and_then(result_value_object)
+                        .and_then(|result| result.get("cbu_id"))
+                        .and_then(|v| v.as_str())
+                        .and_then(|s| Uuid::parse_str(s).ok())
+                })
             {
                 let name = entry
                     .args

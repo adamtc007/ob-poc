@@ -210,7 +210,10 @@ progress_signals:
         assert!(!frontier.is_complete());
 
         // Candidate verbs: allowlist minus denylist.
-        assert_eq!(frontier.candidate_verbs, vec!["cbu.create", "cbu.attach-product"]);
+        assert_eq!(
+            frontier.candidate_verbs,
+            vec!["cbu.create", "cbu.attach-product"]
+        );
     }
 
     #[test]
@@ -220,10 +223,7 @@ progress_signals:
                 entity_id: "cbu:abc".to_string(),
                 entity_kind: "cbu".to_string(),
                 state: "draft".to_string(),
-                attributes: HashMap::from([(
-                    "jurisdiction".to_string(),
-                    serde_json::json!("LU"),
-                )]),
+                attributes: HashMap::from([("jurisdiction".to_string(), serde_json::json!("LU"))]),
             }],
             hydrated_at: Utc::now(),
         };

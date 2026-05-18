@@ -160,6 +160,8 @@ impl VerbExecutionPort for ObPocVerbExecutor {
                 use crate::sequencer_tx::PgTransactionScope;
                 use dsl_runtime::tx::TransactionScope;
 
+                ctx.services = self.executor.service_registry();
+
                 let pool = self.executor.pool();
                 let mut scope = PgTransactionScope::begin(pool).await.map_err(|e| {
                     SemOsError::Internal(anyhow::anyhow!(

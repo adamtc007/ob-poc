@@ -2,10 +2,10 @@
 
 use anyhow::{anyhow, Result};
 use sem_os_client::{inprocess::InProcessClient, SemOsClient};
-use sem_os_types::agent_mode::AgentMode;
 use sem_os_policy::context_resolution::{
     ContextResolutionRequest, DiscoveryContext, EvidenceMode, SubjectRef,
 };
+use sem_os_types::agent_mode::AgentMode;
 use sqlx::PgPool;
 use uuid::Uuid;
 

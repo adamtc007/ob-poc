@@ -5,8 +5,8 @@
 //! (header → ActorContext) lives in `ob_poc::api::policy_headers`
 //! because envelope is transport-neutral.
 
-use sem_os_policy::abac::ActorContext;
 use sem_os_core::types::Classification;
+use sem_os_policy::abac::ActorContext;
 use serde::Serialize;
 
 /// Server-side policy configuration. Loaded once at startup.

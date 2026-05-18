@@ -3360,10 +3360,6 @@ mod tests {
     use async_trait::async_trait;
     use chrono::Utc;
     use sem_os_client::SemOsClient;
-    use sem_os_policy::abac::AccessDecision;
-    use sem_os_policy::context_resolution::{
-        ContextResolutionResponse, DiscoverySurface, GroundingReadiness, ResolutionStage,
-    };
     use sem_os_core::error::SemOsError;
     use sem_os_core::principal::Principal;
     use sem_os_core::proto::{
@@ -3372,12 +3368,16 @@ mod tests {
         GetManifestResponse, ListChangesetsQuery, ListChangesetsResponse, ListToolSpecsResponse,
         ToolCallRequest, ToolCallResponse,
     };
+    use sem_os_ontology::universe_def::{EntryQuestion, GroundingInput};
+    use sem_os_policy::abac::AccessDecision;
     use sem_os_policy::context_resolution::{
         ContextResolutionRequest as ResolveContextRequest,
         ContextResolutionResponse as ResolveContextResponse,
     };
+    use sem_os_policy::context_resolution::{
+        ContextResolutionResponse, DiscoverySurface, GroundingReadiness, ResolutionStage,
+    };
     use sem_os_types::Changeset;
-    use sem_os_ontology::universe_def::{EntryQuestion, GroundingInput};
     use uuid::Uuid;
 
     /// Helper to build a default IntentTrace for tests.

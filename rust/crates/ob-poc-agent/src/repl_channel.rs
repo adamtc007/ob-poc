@@ -137,11 +137,7 @@ pub trait ReplChannelClient: Send + Sync {
     /// `source`. Default impl no-ops so legacy clients
     /// (`LocalParseChannel`) don't have to implement the document
     /// lifecycle.
-    async fn open_runbook(
-        &self,
-        _uri: &str,
-        _source: &str,
-    ) -> Result<(), RunbookChannelError> {
+    async fn open_runbook(&self, _uri: &str, _source: &str) -> Result<(), RunbookChannelError> {
         Ok(())
     }
 
@@ -230,11 +226,7 @@ impl ReplChannelClient for LocalRunbookChannel {
         parse_into_outcome(source)
     }
 
-    async fn open_runbook(
-        &self,
-        uri: &str,
-        source: &str,
-    ) -> Result<(), RunbookChannelError> {
+    async fn open_runbook(&self, uri: &str, source: &str) -> Result<(), RunbookChannelError> {
         let mut guard = self.documents.lock().await;
         if guard.contains_key(uri) {
             return Err(RunbookChannelError::AlreadyOpen(uri.to_string()));
@@ -243,11 +235,7 @@ impl ReplChannelClient for LocalRunbookChannel {
         Ok(())
     }
 
-    async fn change_runbook(
-        &self,
-        uri: &str,
-        new_source: &str,
-    ) -> Result<(), RunbookChannelError> {
+    async fn change_runbook(&self, uri: &str, new_source: &str) -> Result<(), RunbookChannelError> {
         let mut guard = self.documents.lock().await;
         if !guard.contains_key(uri) {
             return Err(RunbookChannelError::NotOpen(uri.to_string()));
@@ -284,9 +272,7 @@ impl ReplChannelClient for LocalRunbookChannel {
             return Ok(ValidateAndExecuteOutcome::Refused {
                 reason: ExecutionRefusalReason::ValidationFailed,
                 validation,
-                detail: format!(
-                    "runbook '{uri}' failed validation; cannot proceed to execution"
-                ),
+                detail: format!("runbook '{uri}' failed validation; cannot proceed to execution"),
             });
         }
         // Spike always refuses with ApprovalRequired. Execution
@@ -334,7 +320,9 @@ mod tests {
     #[tokio::test]
     async fn parse_passes_for_valid_no_arg_verb() {
         let channel = LocalParseChannel::new();
-        let outcome = channel.validate(&minimal_source_for_verb("cbu.create")).await;
+        let outcome = channel
+            .validate(&minimal_source_for_verb("cbu.create"))
+            .await;
         assert!(outcome.passed(), "diagnostics: {:?}", outcome.diagnostics);
         assert!(outcome.diagnostics.is_empty());
     }
@@ -345,7 +333,10 @@ mod tests {
         let outcome = channel.validate("not a valid dsl program").await;
         assert!(!outcome.passed());
         assert_eq!(outcome.diagnostics.len(), 1);
-        assert_eq!(outcome.diagnostics[0].severity, DraftDiagnosticSeverity::Error);
+        assert_eq!(
+            outcome.diagnostics[0].severity,
+            DraftDiagnosticSeverity::Error
+        );
     }
 
     #[tokio::test]
@@ -381,10 +372,7 @@ mod tests {
     #[tokio::test]
     async fn runbook_channel_change_updates_source() {
         let channel = LocalRunbookChannel::new();
-        channel
-            .open_runbook("uri", "(cbu.create)")
-            .await
-            .unwrap();
+        channel.open_runbook("uri", "(cbu.create)").await.unwrap();
         channel.change_runbook("uri", "garbage").await.unwrap();
         let outcome = channel.validate_only("uri").await.unwrap();
         assert!(!outcome.passed());
@@ -394,10 +382,7 @@ mod tests {
     #[tokio::test]
     async fn runbook_channel_open_twice_errors() {
         let channel = LocalRunbookChannel::new();
-        channel
-            .open_runbook("uri", "(cbu.create)")
-            .await
-            .unwrap();
+        channel.open_runbook("uri", "(cbu.create)").await.unwrap();
         let err = channel
             .open_runbook("uri", "(cbu.attach-product)")
             .await
@@ -408,41 +393,27 @@ mod tests {
     #[tokio::test]
     async fn runbook_channel_validate_unopened_errors() {
         let channel = LocalRunbookChannel::new();
-        let err = channel
-            .validate_only("uri")
-            .await
-            .expect_err("must reject");
+        let err = channel.validate_only("uri").await.expect_err("must reject");
         assert!(matches!(err, RunbookChannelError::NotOpen(_)));
     }
 
     #[tokio::test]
     async fn runbook_channel_close_then_validate_errors() {
         let channel = LocalRunbookChannel::new();
-        channel
-            .open_runbook("uri", "(cbu.create)")
-            .await
-            .unwrap();
+        channel.open_runbook("uri", "(cbu.create)").await.unwrap();
         channel.close_runbook("uri").await.unwrap();
-        let err = channel
-            .validate_only("uri")
-            .await
-            .expect_err("must reject");
+        let err = channel.validate_only("uri").await.expect_err("must reject");
         assert!(matches!(err, RunbookChannelError::NotOpen(_)));
     }
 
     #[tokio::test]
     async fn validate_and_execute_refuses_passing_runbook_with_approval_required() {
         let channel = LocalRunbookChannel::new();
-        channel
-            .open_runbook("uri", "(cbu.create)")
-            .await
-            .unwrap();
+        channel.open_runbook("uri", "(cbu.create)").await.unwrap();
         let outcome = channel.validate_and_execute("uri").await.unwrap();
         match outcome {
             ValidateAndExecuteOutcome::Refused {
-                reason,
-                validation,
-                ..
+                reason, validation, ..
             } => {
                 assert_eq!(reason, ExecutionRefusalReason::ApprovalRequired);
                 assert!(validation.passed());
@@ -457,9 +428,7 @@ mod tests {
         let outcome = channel.validate_and_execute("uri").await.unwrap();
         match outcome {
             ValidateAndExecuteOutcome::Refused {
-                reason,
-                validation,
-                ..
+                reason, validation, ..
             } => {
                 assert_eq!(reason, ExecutionRefusalReason::ValidationFailed);
                 assert!(!validation.passed());

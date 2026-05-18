@@ -21,6 +21,10 @@ entity-gateway = { path = "crates/entity-gateway", optional = true }
 ob-poc-types = { path = "crates/ob-poc-types" }
 ob-poc-diagnostics = { path = "crates/ob-poc-diagnostics" }
 ob-poc-boundary = { path = "crates/ob-poc-boundary" }
+# bpmn-controller: pool lifecycle (K8s Deployment + HPA) and instance
+# kick-off via direct writes to bpmn-lite's Postgres schema.
+# Reached from loader.* and bpmn-controller.* DSL verbs via Pattern B ops.
+bpmn-controller = { path = "crates/bpmn-controller" }
 # Phase 1 capability crates (see docs/todo/capability-crate-restructure-v1.md).
 # Empty skeletons populated by Phases 2–5.
 ob-poc-sage = { path = "crates/ob-poc-sage" }           # Sage intent understanding (Phase 2 dest)
@@ -313,6 +317,9 @@ members = [
     "crates/sem_os_obpoc_adapter",
     "crates/sem_os_harness",
     "crates/sem_os_mcp",
+
+    # BPMN controller — pool lifecycle + instance kick-off (L1+)
+    "crates/bpmn-controller",
 
     # Three-plane refactor — dsl-runtime (Phase 1 onwards)
     "crates/dsl-runtime",

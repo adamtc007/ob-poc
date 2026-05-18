@@ -2624,6 +2624,11 @@ fn infer_arg_value(arg: &str, utterance: &str) -> Option<String> {
             return Some(role);
         }
     }
+    if arg == "product" || arg.contains("product-code") || arg.contains("product_code") {
+        if let Some(product) = infer_product_code(&lower) {
+            return Some(product);
+        }
+    }
     if arg == "name" || arg.ends_with("-name") || arg.ends_with("_name") {
         if let Some(name) = extract_after_keyword(utterance, "called")
             .or_else(|| extract_after_keyword(utterance, "named"))
@@ -2635,6 +2640,46 @@ fn infer_arg_value(arg: &str, utterance: &str) -> Option<String> {
         }
     }
     None
+}
+
+fn infer_product_code(lower: &str) -> Option<String> {
+    let products: &[(&str, &[&str])] = &[
+        (
+            "FUND_ACCOUNTING",
+            &[
+                "fund_accounting",
+                "fund accounting",
+                "nav calc",
+                "nav calculation",
+                "fund admin",
+            ],
+        ),
+        (
+            "TRANSFER_AGENCY",
+            &[
+                "transfer_agency",
+                "transfer agency",
+                "transfer agent",
+                " ta ",
+            ],
+        ),
+        ("MIDDLE_OFFICE", &["middle_office", "middle office"]),
+        (
+            "COLLATERAL_MGMT",
+            &["collateral_mgmt", "collateral management", "collateral"],
+        ),
+        ("MARKETS_FX", &["markets_fx", "markets fx", " fx "]),
+        ("CUSTODY", &["custody", "custodian", "safekeeping"]),
+        ("ALTS", &["alts", "alternatives"]),
+    ];
+
+    let padded = format!(" {lower} ");
+    products.iter().find_map(|(code, aliases)| {
+        aliases
+            .iter()
+            .any(|alias| lower.contains(alias) || padded.contains(alias))
+            .then(|| (*code).to_string())
+    })
 }
 
 fn is_plausible_name_binding(value: &str) -> bool {
@@ -3097,6 +3142,20 @@ mod tests {
 
         assert_eq!(pack.pack_id, "cbu-maintenance");
         assert_eq!(resolved.selected_verb.as_deref(), Some("cbu.add-product"));
+    }
+
+    #[test]
+    fn infers_cbu_add_product_product_code() {
+        let resolved = resolve_acp_dag_semantic_prompt("add CUSTODY product to CBU C-123")
+            .expect("resolver")
+            .expect("semantic match");
+
+        assert_eq!(resolved.selected_verb.as_deref(), Some("cbu.add-product"));
+        assert!(resolved.missing_required_args.is_empty());
+        assert_eq!(
+            resolved.draft_dsl.as_deref(),
+            Some("(cbu.add-product :cbu-id \"C-123\" :product \"CUSTODY\")")
+        );
     }
 
     #[test]

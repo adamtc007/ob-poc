@@ -21,8 +21,7 @@ use sem_os_policy::{
     authoring::{
         bundle::{build_bundle_from_map, parse_manifest},
         types::{
-            ChangeSetFull, DiffSummary, DryRunReport, PublishBatch, PublishPlan,
-            ValidationReport,
+            ChangeSetFull, DiffSummary, DryRunReport, PublishBatch, PublishPlan, ValidationReport,
         },
     },
     service::CoreService,
@@ -195,10 +194,7 @@ fn parse_uuid(s: &str) -> Result<Uuid, AppError> {
 /// Research mode agents cannot publish. Non-admin users cannot publish.
 fn require_publish_permission(principal: &Principal) -> Result<(), AppError> {
     let mode = principal.agent_mode();
-    if !matches!(
-        mode,
-        sem_os_types::agent_mode::AgentMode::Governed
-    ) {
+    if !matches!(mode, sem_os_types::agent_mode::AgentMode::Governed) {
         return Err(AppError::from(
             sem_os_core::error::SemOsError::Unauthorized(format!(
                 "blocked by AgentMode: {} cannot publish",

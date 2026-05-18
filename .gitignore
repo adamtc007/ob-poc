@@ -387,3 +387,4 @@ artifacts/peer_review/
 
 # Package lock files (npm)
 **/package-lock.json
+dmn-lite/

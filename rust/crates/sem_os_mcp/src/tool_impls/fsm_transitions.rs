@@ -34,11 +34,10 @@ impl KnowledgeTool for FsmTransitionsTool {
     fn spec(&self) -> ToolSpec {
         ToolSpec {
             name: "fsm_transitions".to_string(),
-            description:
-                "Return FSM transition options from the given state for the named entity \
+            description: "Return FSM transition options from the given state for the named entity \
                  kind. Each option carries `from_state`, `to_state`, and the trigger verb \
                  FQN. Read-only."
-                    .to_string(),
+                .to_string(),
             input_schema: json!({
                 "type": "object",
                 "properties": {

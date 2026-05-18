@@ -55,10 +55,7 @@ pub struct RunbookEnvelope {
 
 impl RunbookEnvelope {
     /// Construct a fresh envelope at `version = 1`.
-    pub fn new(
-        runbook_id: impl Into<String>,
-        source: impl Into<String>,
-    ) -> Self {
+    pub fn new(runbook_id: impl Into<String>, source: impl Into<String>) -> Self {
         Self {
             runbook_id: runbook_id.into(),
             version: 1,

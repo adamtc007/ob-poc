@@ -231,8 +231,10 @@ impl PlanningLoop {
         // refuses with a structured constrained-composition error
         // before either the LLM or the deterministic fallback is
         // invoked.
-        let effective_allowlist =
-            self.compute_effective_allowlist(goal_frame.active_verb_surface.as_deref(), &goal_frame.refused_drafts);
+        let effective_allowlist = self.compute_effective_allowlist(
+            goal_frame.active_verb_surface.as_deref(),
+            &goal_frame.refused_drafts,
+        );
         if effective_allowlist.is_empty() {
             return Err(anyhow!(
                 "constrained-composition refusal: pack '{}' allowlist intersected with substrate \
@@ -289,7 +291,11 @@ impl PlanningLoop {
                         self.index.pack.id
                     ));
                 }
-                (result.verb_fqn, Some(result.intent_summary), DraftSource::LlmTool)
+                (
+                    result.verb_fqn,
+                    Some(result.intent_summary),
+                    DraftSource::LlmTool,
+                )
             }
             None => {
                 let fallback = effective_allowlist.first().cloned().ok_or_else(|| {
@@ -508,7 +514,10 @@ progress_signals: []
             verb_fqn: "cbu.attach-product".to_string(),
         });
         let loop_ = PlanningLoop::new(make_index(), Some(llm), None, None);
-        let outcome = loop_.propose_draft("attach the new product", None).await.unwrap();
+        let outcome = loop_
+            .propose_draft("attach the new product", None)
+            .await
+            .unwrap();
         assert_eq!(outcome.verb_fqn, "cbu.attach-product");
         assert_eq!(outcome.source, DraftSource::LlmTool);
     }
@@ -524,7 +533,8 @@ progress_signals: []
             .await
             .expect_err("denylist hit must reject");
         assert!(
-            err.to_string().contains("constrained-composition violation"),
+            err.to_string()
+                .contains("constrained-composition violation"),
             "{err}"
         );
     }
@@ -540,7 +550,8 @@ progress_signals: []
             .await
             .expect_err("unlisted verb must reject");
         assert!(
-            err.to_string().contains("constrained-composition violation"),
+            err.to_string()
+                .contains("constrained-composition violation"),
             "{err}"
         );
     }
@@ -573,9 +584,10 @@ progress_signals: []
 
     #[tokio::test]
     async fn substrate_surface_records_on_goal_frame() {
-        let knowledge: Arc<dyn crate::knowledge::SemOsKnowledgeClient> = Arc::new(SurfaceKnowledge {
-            fqns: vec!["cbu.create".to_string(), "cbu.attach-product".to_string()],
-        });
+        let knowledge: Arc<dyn crate::knowledge::SemOsKnowledgeClient> =
+            Arc::new(SurfaceKnowledge {
+                fqns: vec!["cbu.create".to_string(), "cbu.attach-product".to_string()],
+            });
         let loop_ = PlanningLoop::new(make_index(), None, Some(knowledge), None);
         let outcome = loop_.propose_draft("set up a book", None).await.unwrap();
         assert_eq!(
@@ -593,9 +605,10 @@ progress_signals: []
         // Pack allows {cbu.create, cbu.attach-product}; substrate
         // surface excludes cbu.create. Deterministic fallback must
         // skip past it and land on cbu.attach-product.
-        let knowledge: Arc<dyn crate::knowledge::SemOsKnowledgeClient> = Arc::new(SurfaceKnowledge {
-            fqns: vec!["cbu.attach-product".to_string()],
-        });
+        let knowledge: Arc<dyn crate::knowledge::SemOsKnowledgeClient> =
+            Arc::new(SurfaceKnowledge {
+                fqns: vec!["cbu.attach-product".to_string()],
+            });
         let loop_ = PlanningLoop::new(make_index(), None, Some(knowledge), None);
         let outcome = loop_.propose_draft("set up a book", None).await.unwrap();
         assert_eq!(outcome.verb_fqn, "cbu.attach-product");
@@ -607,9 +620,8 @@ progress_signals: []
         // Pack allows two verbs but substrate explicitly reports an
         // empty active-verb-surface — the loop must refuse rather
         // than silently degrade to a pack-allowlist pick.
-        let knowledge: Arc<dyn crate::knowledge::SemOsKnowledgeClient> = Arc::new(SurfaceKnowledge {
-            fqns: Vec::new(),
-        });
+        let knowledge: Arc<dyn crate::knowledge::SemOsKnowledgeClient> =
+            Arc::new(SurfaceKnowledge { fqns: Vec::new() });
         let loop_ = PlanningLoop::new(make_index(), None, Some(knowledge), None);
         let err = loop_
             .propose_draft("set up a book", None)
@@ -630,20 +642,21 @@ progress_signals: []
         let llm: Arc<dyn LlmClient> = Arc::new(StubLlm {
             verb_fqn: "cbu.attach-product".to_string(),
         });
-        let knowledge: Arc<dyn crate::knowledge::SemOsKnowledgeClient> = Arc::new(SurfaceKnowledge {
-            fqns: vec!["cbu.create".to_string()],
-        });
+        let knowledge: Arc<dyn crate::knowledge::SemOsKnowledgeClient> =
+            Arc::new(SurfaceKnowledge {
+                fqns: vec!["cbu.create".to_string()],
+            });
         let loop_ = PlanningLoop::new(make_index(), Some(llm), Some(knowledge), None);
         let err = loop_
             .propose_draft("attach the product", None)
             .await
             .expect_err("substrate exclusion must reject");
         let msg = err.to_string();
+        assert!(msg.contains("constrained-composition violation"), "{msg}");
         assert!(
-            msg.contains("constrained-composition violation"),
-            "{msg}"
+            msg.contains("substrate"),
+            "expected substrate mention: {msg}"
         );
-        assert!(msg.contains("substrate"), "expected substrate mention: {msg}");
     }
 
     #[test]

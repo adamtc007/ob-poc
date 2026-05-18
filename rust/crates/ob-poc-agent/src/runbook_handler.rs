@@ -49,9 +49,7 @@ pub async fn try_handle_runbook(
         "runbook/didOpen" => handle_did_open(id, request.params.clone(), channel).await,
         "runbook/didChange" => handle_did_change(id, request.params.clone(), channel).await,
         "runbook/didClose" => handle_did_close(id, request.params.clone(), channel).await,
-        "runbook/validateOnly" => {
-            handle_validate_only(id, request.params.clone(), channel).await
-        }
+        "runbook/validateOnly" => handle_validate_only(id, request.params.clone(), channel).await,
         "runbook/validateAndExecute" => {
             handle_validate_and_execute(id, request.params.clone(), channel).await
         }
@@ -268,8 +266,7 @@ mod tests {
     #[tokio::test]
     async fn non_runbook_method_falls_through() {
         let channel = LocalRunbookChannel::new();
-        let outcome =
-            try_handle_runbook(&req(1, "session/prompt", json!({})), &channel).await;
+        let outcome = try_handle_runbook(&req(1, "session/prompt", json!({})), &channel).await;
         assert!(outcome.is_none());
     }
 
@@ -277,7 +274,11 @@ mod tests {
     async fn open_then_validate_only_returns_passed_outcome() {
         let channel = LocalRunbookChannel::new();
         let open = try_handle_runbook(
-            &req(1, "runbook/didOpen", json!({"uri": "u", "source": "(cbu.create)"})),
+            &req(
+                1,
+                "runbook/didOpen",
+                json!({"uri": "u", "source": "(cbu.create)"}),
+            ),
             &channel,
         )
         .await
@@ -285,10 +286,12 @@ mod tests {
         let resp = extract_response(&open);
         assert!(resp.error.is_none(), "didOpen must succeed");
 
-        let validate =
-            try_handle_runbook(&req(2, "runbook/validateOnly", json!({"uri": "u"})), &channel)
-                .await
-                .unwrap();
+        let validate = try_handle_runbook(
+            &req(2, "runbook/validateOnly", json!({"uri": "u"})),
+            &channel,
+        )
+        .await
+        .unwrap();
         let resp = extract_response(&validate);
         let result = resp.result.as_ref().unwrap();
         assert_eq!(result["validation"]["passed"], true);
@@ -298,21 +301,31 @@ mod tests {
     async fn change_updates_source_seen_by_validate_only() {
         let channel = LocalRunbookChannel::new();
         try_handle_runbook(
-            &req(1, "runbook/didOpen", json!({"uri": "u", "source": "(cbu.create)"})),
+            &req(
+                1,
+                "runbook/didOpen",
+                json!({"uri": "u", "source": "(cbu.create)"}),
+            ),
             &channel,
         )
         .await
         .unwrap();
         try_handle_runbook(
-            &req(2, "runbook/didChange", json!({"uri": "u", "source": "garbage"})),
+            &req(
+                2,
+                "runbook/didChange",
+                json!({"uri": "u", "source": "garbage"}),
+            ),
             &channel,
         )
         .await
         .unwrap();
-        let validate =
-            try_handle_runbook(&req(3, "runbook/validateOnly", json!({"uri": "u"})), &channel)
-                .await
-                .unwrap();
+        let validate = try_handle_runbook(
+            &req(3, "runbook/validateOnly", json!({"uri": "u"})),
+            &channel,
+        )
+        .await
+        .unwrap();
         let resp = extract_response(&validate);
         assert_eq!(resp.result.as_ref().unwrap()["validation"]["passed"], false);
     }
@@ -321,7 +334,11 @@ mod tests {
     async fn validate_and_execute_refuses_with_approval_required() {
         let channel = LocalRunbookChannel::new();
         try_handle_runbook(
-            &req(1, "runbook/didOpen", json!({"uri": "u", "source": "(cbu.create)"})),
+            &req(
+                1,
+                "runbook/didOpen",
+                json!({"uri": "u", "source": "(cbu.create)"}),
+            ),
             &channel,
         )
         .await
@@ -341,10 +358,12 @@ mod tests {
     #[tokio::test]
     async fn validate_only_on_unopened_uri_returns_not_open() {
         let channel = LocalRunbookChannel::new();
-        let outcome =
-            try_handle_runbook(&req(1, "runbook/validateOnly", json!({"uri": "u"})), &channel)
-                .await
-                .unwrap();
+        let outcome = try_handle_runbook(
+            &req(1, "runbook/validateOnly", json!({"uri": "u"})),
+            &channel,
+        )
+        .await
+        .unwrap();
         let resp = extract_response(&outcome);
         let err = resp.error.as_ref().unwrap();
         assert_eq!(err.code, INTERNAL_ERROR);
@@ -355,7 +374,11 @@ mod tests {
     async fn close_then_validate_returns_not_open() {
         let channel = LocalRunbookChannel::new();
         try_handle_runbook(
-            &req(1, "runbook/didOpen", json!({"uri": "u", "source": "(cbu.create)"})),
+            &req(
+                1,
+                "runbook/didOpen",
+                json!({"uri": "u", "source": "(cbu.create)"}),
+            ),
             &channel,
         )
         .await
@@ -363,10 +386,12 @@ mod tests {
         try_handle_runbook(&req(2, "runbook/didClose", json!({"uri": "u"})), &channel)
             .await
             .unwrap();
-        let outcome =
-            try_handle_runbook(&req(3, "runbook/validateOnly", json!({"uri": "u"})), &channel)
-                .await
-                .unwrap();
+        let outcome = try_handle_runbook(
+            &req(3, "runbook/validateOnly", json!({"uri": "u"})),
+            &channel,
+        )
+        .await
+        .unwrap();
         let resp = extract_response(&outcome);
         assert_eq!(
             resp.error.as_ref().unwrap().data.as_ref().unwrap()["errorKind"],
@@ -377,10 +402,9 @@ mod tests {
     #[tokio::test]
     async fn malformed_did_open_returns_invalid_params() {
         let channel = LocalRunbookChannel::new();
-        let outcome =
-            try_handle_runbook(&req(1, "runbook/didOpen", json!({"uri": "u"})), &channel)
-                .await
-                .unwrap();
+        let outcome = try_handle_runbook(&req(1, "runbook/didOpen", json!({"uri": "u"})), &channel)
+            .await
+            .unwrap();
         let resp = extract_response(&outcome);
         assert_eq!(resp.error.as_ref().unwrap().code, INVALID_PARAMS);
     }

@@ -14,10 +14,10 @@ use std::sync::OnceLock;
 use tokio::sync::RwLock;
 
 use chrono::{DateTime, Utc};
-use sem_os_policy::affinity::AffinityGraph;
 use sem_os_core::types::{
     ChangeType, GovernanceTier, ObjectType, SnapshotRow, SnapshotStatus, TrustClass,
 };
+use sem_os_policy::affinity::AffinityGraph;
 use uuid::Uuid;
 
 type GraphCache = Option<(i64, AffinityGraph)>;

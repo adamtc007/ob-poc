@@ -18,10 +18,10 @@ use sqlx::PgPool;
 use tokio::sync::RwLock;
 use uuid::Uuid;
 
-use sem_os_types::agent_mode::AgentMode;
 use sem_os_policy::observatory::orientation::*;
 use sem_os_policy::observatory::projection;
 use sem_os_policy::stewardship::types::{FocusState, FocusUpdateSource, OverlayMode};
+use sem_os_types::agent_mode::AgentMode;
 
 use crate::api::session::SessionStore;
 use crate::repl::session_v2::ReplSessionV2;

@@ -163,13 +163,13 @@ impl SubprocessTransport {
             std::io::Error::new(std::io::ErrorKind::Other, "child stdin missing after spawn")
         })?;
         let stdout = child.stdout.take().ok_or_else(|| {
-            std::io::Error::new(std::io::ErrorKind::Other, "child stdout missing after spawn")
+            std::io::Error::new(
+                std::io::ErrorKind::Other,
+                "child stdout missing after spawn",
+            )
         })?;
         let pid = child.id().unwrap_or(0);
-        let command_lossy = command
-            .as_ref()
-            .to_string_lossy()
-            .into_owned();
+        let command_lossy = command.as_ref().to_string_lossy().into_owned();
 
         Ok(Self {
             inner: tokio::sync::Mutex::new(SubprocessInner {
@@ -280,21 +280,14 @@ pub struct McpKnowledgeClient {
 }
 
 impl McpKnowledgeClient {
-    pub fn new(
-        transport: Arc<dyn McpTransport>,
-        provider_label: impl Into<String>,
-    ) -> Self {
+    pub fn new(transport: Arc<dyn McpTransport>, provider_label: impl Into<String>) -> Self {
         Self {
             transport,
             provider_label: provider_label.into(),
         }
     }
 
-    async fn invoke_tool(
-        &self,
-        name: &str,
-        arguments: Value,
-    ) -> Result<Value, KnowledgeError> {
+    async fn invoke_tool(&self, name: &str, arguments: Value) -> Result<Value, KnowledgeError> {
         let request = JsonRpcRequest {
             jsonrpc: "2.0".to_string(),
             id: Some(json!(0)),
@@ -373,10 +366,7 @@ pub struct McpConstellationHydrator {
 }
 
 impl McpConstellationHydrator {
-    pub fn new(
-        transport: Arc<dyn McpTransport>,
-        provider_label: impl Into<String>,
-    ) -> Self {
+    pub fn new(transport: Arc<dyn McpTransport>, provider_label: impl Into<String>) -> Self {
         Self {
             transport,
             provider_label: provider_label.into(),
@@ -415,8 +405,8 @@ impl ConstellationHydrator for McpConstellationHydrator {
             }
         };
         // `result.result.slots` per server contract.
-        let entity_states = parse_slot_tree(&result["result"]["slots"])
-            .map_err(HydrationError::Transport)?;
+        let entity_states =
+            parse_slot_tree(&result["result"]["slots"]).map_err(HydrationError::Transport)?;
         Ok(ConstellationSnapshot {
             entity_states,
             hydrated_at: chrono::Utc::now(),
@@ -428,10 +418,7 @@ impl ConstellationHydrator for McpConstellationHydrator {
     }
 }
 
-fn extract_tool_result(
-    tool: &str,
-    response: JsonRpcResponse,
-) -> Result<Value, KnowledgeError> {
+fn extract_tool_result(tool: &str, response: JsonRpcResponse) -> Result<Value, KnowledgeError> {
     if let Some(error) = response.error {
         return Err(KnowledgeError::Transport(format!(
             "{tool} failed: {} (code {})",
@@ -529,8 +516,7 @@ mod tests {
 
     #[tokio::test]
     async fn stub_bridge_yields_empty_response_for_resolve_entity() {
-        let client =
-            McpKnowledgeClient::new(build_transport(), "phase-4-test");
+        let client = McpKnowledgeClient::new(build_transport(), "phase-4-test");
         let response = client
             .query(KnowledgeQuery::ResolveEntity {
                 entity_kind: Some("cbu".to_string()),

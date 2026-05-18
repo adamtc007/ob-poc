@@ -6692,16 +6692,17 @@ CREATE FUNCTION sem_reg.materialize_attribute_def_to_registry() RETURNS trigger
     LANGUAGE plpgsql
     AS $$
 DECLARE
-    v_fqn          text;
-    v_uuid         uuid;
-    v_name         text;
-    v_domain       text;
-    v_data_type    text;
-    v_category     text;
-    v_evidence     text;
-    v_is_derived   boolean;
-    v_deriv_fqn    text;
-    v_val_rules    jsonb;
+    v_fqn           text;
+    v_uuid          uuid;
+    v_name          text;
+    v_domain        text;
+    v_data_type     text;
+    v_raw_data_type jsonb;
+    v_category      text;
+    v_evidence      text;
+    v_is_derived    boolean;
+    v_deriv_fqn     text;
+    v_val_rules     jsonb;
     v_applicability jsonb;
 BEGIN
     -- Only fire for active attribute_def snapshots that are not yet superseded
@@ -6713,20 +6714,54 @@ BEGIN
     END IF;
 
     -- Extract fields from the snapshot definition
-    v_fqn          := NEW.definition ->> 'fqn';
-    v_name         := NEW.definition ->> 'name';
-    v_domain       := NEW.definition ->> 'domain';
-    v_data_type    := NEW.definition ->> 'data_type';
-    v_category     := NEW.definition ->> 'category';
-    v_evidence     := COALESCE(NEW.definition ->> 'evidence_grade', 'none');
-    v_is_derived   := COALESCE((NEW.definition ->> 'is_derived')::boolean, false);
-    v_deriv_fqn    := NEW.definition ->> 'derivation_spec_fqn';
-    v_val_rules    := NEW.definition -> 'validation_rules';
+    v_fqn           := NEW.definition ->> 'fqn';
+    v_name          := NEW.definition ->> 'name';
+    v_domain        := NEW.definition ->> 'domain';
+    v_raw_data_type := NEW.definition -> 'data_type';
+    v_data_type     := CASE
+        WHEN v_raw_data_type IS NULL OR v_raw_data_type = 'null'::jsonb THEN 'string'
+        WHEN jsonb_typeof(v_raw_data_type) = 'object' AND v_raw_data_type ? 'enum' THEN 'enum'
+        WHEN jsonb_typeof(v_raw_data_type) IN ('object', 'array') THEN 'json'
+        ELSE lower(NEW.definition ->> 'data_type')
+    END;
+    v_data_type     := CASE v_data_type
+        WHEN 'text' THEN 'string'
+        WHEN 'varchar' THEN 'string'
+        WHEN 'character_varying' THEN 'string'
+        WHEN 'int' THEN 'integer'
+        WHEN 'bigint' THEN 'integer'
+        WHEN 'smallint' THEN 'integer'
+        WHEN 'numeric' THEN 'decimal'
+        WHEN 'float' THEN 'number'
+        WHEN 'double' THEN 'number'
+        WHEN 'real' THEN 'number'
+        WHEN 'bool' THEN 'boolean'
+        WHEN 'date_time' THEN 'datetime'
+        WHEN 'timestamp_tz' THEN 'datetime'
+        WHEN 'jsonb' THEN 'json'
+        WHEN 'percent' THEN 'percentage'
+        WHEN 'taxid' THEN 'tax_id'
+        ELSE v_data_type
+    END;
+    v_category      := NEW.definition ->> 'category';
+    v_evidence      := COALESCE(NEW.definition ->> 'evidence_grade', 'none');
+    v_is_derived    := COALESCE((NEW.definition ->> 'is_derived')::boolean, false);
+    v_deriv_fqn     := NEW.definition ->> 'derivation_spec_fqn';
+    v_val_rules     := NEW.definition -> 'validation_rules';
     v_applicability := NEW.definition -> 'applicability';
 
     -- Cannot materialize without an FQN
     IF v_fqn IS NULL THEN
         RETURN NEW;
+    END IF;
+
+    IF v_data_type <> ALL (ARRAY[
+        'string', 'integer', 'number', 'decimal', 'boolean',
+        'date', 'datetime', 'timestamp', 'uuid', 'email', 'phone',
+        'address', 'currency', 'percentage', 'tax_id', 'json', 'enum'
+    ]) THEN
+        RAISE EXCEPTION 'Unsupported SemOS AttributeDef data_type % for %, snapshot %',
+            v_raw_data_type, v_fqn, NEW.snapshot_id;
     END IF;
 
     -- Deterministic UUID from the object_id (same logic as Rust object_id_for)
@@ -6743,7 +6778,7 @@ BEGIN
         v_uuid,
         COALESCE(v_name, v_fqn),
         COALESCE(v_category, 'entity'),
-        COALESCE(v_data_type, 'string'),
+        v_data_type,
         v_domain,
         COALESCE(v_val_rules, '{}'::jsonb),
         COALESCE(v_applicability, '{}'::jsonb),

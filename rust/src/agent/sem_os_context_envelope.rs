@@ -392,7 +392,9 @@ impl SemOsContextEnvelope {
 }
 
 /// Derive a structured prune reason from a denied VerbCandidate.
-fn prune_reason_from_candidate(vc: &sem_os_policy::context_resolution::VerbCandidate) -> PruneReason {
+fn prune_reason_from_candidate(
+    vc: &sem_os_policy::context_resolution::VerbCandidate,
+) -> PruneReason {
     match &vc.access_decision {
         AccessDecision::Deny { reason } => PruneReason::AbacDenied {
             actor_role: String::new(),
@@ -551,11 +553,13 @@ mod tests {
             policy_verdicts: vec![],
             security_handling: AccessDecision::Allow,
             governance_signals: vec![],
-            entity_kind_pruned_verbs: vec![sem_os_policy::context_resolution::EntityKindPrunedVerb {
-                fqn: "deal.create".into(),
-                verb_kinds: vec!["deal".into()],
-                subject_kind: "company".into(),
-            }],
+            entity_kind_pruned_verbs: vec![
+                sem_os_policy::context_resolution::EntityKindPrunedVerb {
+                    fqn: "deal.create".into(),
+                    verb_kinds: vec!["deal".into()],
+                    subject_kind: "company".into(),
+                },
+            ],
             confidence: 0.9,
             grounded_action_surface: None,
             resolution_stage: ResolutionStage::Grounded,
@@ -592,19 +596,23 @@ mod tests {
             governance_signals: vec![],
             entity_kind_pruned_verbs: vec![],
             confidence: 0.9,
-            grounded_action_surface: Some(sem_os_policy::context_resolution::GroundedActionSurface {
-                resolved_subject: sem_os_policy::context_resolution::SubjectRef::TaskId(Uuid::nil()),
-                resolved_constellation: Some("constellation.kyc".into()),
-                resolved_slot_path: Some("case".into()),
-                resolved_node_id: Some("node-1".into()),
-                resolved_state_machine: Some("case_machine".into()),
-                current_state: Some("intake".into()),
-                traversed_edges: vec![],
-                constraint_signals: vec![],
-                valid_actions: vec![],
-                blocked_actions: vec![],
-                dsl_candidates: vec![],
-            }),
+            grounded_action_surface: Some(
+                sem_os_policy::context_resolution::GroundedActionSurface {
+                    resolved_subject: sem_os_policy::context_resolution::SubjectRef::TaskId(
+                        Uuid::nil(),
+                    ),
+                    resolved_constellation: Some("constellation.kyc".into()),
+                    resolved_slot_path: Some("case".into()),
+                    resolved_node_id: Some("node-1".into()),
+                    resolved_state_machine: Some("case_machine".into()),
+                    current_state: Some("intake".into()),
+                    traversed_edges: vec![],
+                    constraint_signals: vec![],
+                    valid_actions: vec![],
+                    blocked_actions: vec![],
+                    dsl_candidates: vec![],
+                },
+            ),
             resolution_stage: ResolutionStage::Grounded,
             discovery_surface: None,
         };

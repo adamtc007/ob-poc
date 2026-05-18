@@ -39,10 +39,9 @@ impl KnowledgeTool for EntityResolveTool {
     fn spec(&self) -> ToolSpec {
         ToolSpec {
             name: "entity_resolve".to_string(),
-            description:
-                "Resolve a natural-language fragment to candidate substrate entities. \
+            description: "Resolve a natural-language fragment to candidate substrate entities. \
                  Read-only."
-                    .to_string(),
+                .to_string(),
             input_schema: json!({
                 "type": "object",
                 "properties": {

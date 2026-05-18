@@ -1,52 +1,41 @@
 state_machine: cbu_evidence_lifecycle
-description: CBU evidence item lifecycle - uploaded, reviewed, approved, expired
-states: [UPLOADED, REVIEWED, APPROVED, REJECTED, EXPIRED]
-initial: UPLOADED
+description: CBU evidence item lifecycle - pending, verified, rejected, expired
+states: [PENDING, VERIFIED, REJECTED, EXPIRED]
+initial: PENDING
 transitions:
-  - from: UPLOADED
-    to: REVIEWED
-    verbs: [cbu.review-evidence]
-  - from: REVIEWED
-    to: APPROVED
-    verbs: [cbu.approve-evidence]
-  - from: REVIEWED
+  - from: PENDING
+    to: VERIFIED
+    verbs: [cbu.verify-evidence]
+  - from: PENDING
     to: REJECTED
-    verbs: [cbu.reject-evidence]
-  - from: APPROVED
+    verbs: [cbu.verify-evidence]
+  - from: VERIFIED
     to: EXPIRED
     verbs: [evidence.expire]
   - from: EXPIRED
-    to: UPLOADED
+    to: PENDING
     verbs: [cbu.attach-evidence]
 reducer:
   overlay_sources:
     evidence:
       table: cbu_evidence
       join: evidence_id
-      provides: [verification_status, review_status, expiry_status]
-    review:
-      table: cbu_evidence_reviews
-      join: evidence_id
-      provides: [review_status, decision]
+      provides: [verification_status, expiry_status]
   conditions:
-    has_uploaded_evidence:
-      expr: "evidence.verification_status IS NOT NULL"
-    review_complete:
-      expr: "review.review_status = 'COMPLETE'"
-    review_approved:
-      expr: "review.decision = 'APPROVED'"
-    review_rejected:
-      expr: "review.decision = 'REJECTED'"
+    evidence_pending:
+      expr: "evidence.verification_status = 'PENDING'"
+    evidence_verified:
+      expr: "evidence.verification_status = 'VERIFIED'"
+    evidence_rejected:
+      expr: "evidence.verification_status = 'REJECTED'"
     evidence_expired:
-      expr: "evidence.expiry_status = 'EXPIRED'"
+      expr: "evidence.verification_status = 'EXPIRED' OR evidence.expiry_status = 'EXPIRED'"
   rules:
     - state: EXPIRED
       requires: [evidence_expired]
-    - state: APPROVED
-      requires: [review_complete, review_approved]
+    - state: VERIFIED
+      requires: [evidence_verified]
     - state: REJECTED
-      requires: [review_complete, review_rejected]
-    - state: REVIEWED
-      requires: [review_complete]
-    - state: UPLOADED
-      requires: [has_uploaded_evidence]
+      requires: [evidence_rejected]
+    - state: PENDING
+      requires: [evidence_pending]

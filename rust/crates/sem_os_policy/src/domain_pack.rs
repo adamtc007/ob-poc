@@ -201,10 +201,8 @@ pub fn reload_domain_pack_taxonomy_from_yaml(
         insert_surface(&mut surfaces, format!("pack:{pack_id}"), path, &yaml)?;
 
         for macro_fqn in owned_pack_macro_fqns(config_root, pack_id)? {
-            let (path, yaml) = find_macro_yaml_by_fqn(
-                &config_root.join("verb_schemas/macros"),
-                &macro_fqn,
-            )?;
+            let (path, yaml) =
+                find_macro_yaml_by_fqn(&config_root.join("verb_schemas/macros"), &macro_fqn)?;
             insert_surface(&mut surfaces, format!("macro:{macro_fqn}"), path, &yaml)?;
         }
     }
@@ -1136,7 +1134,12 @@ fn owned_pack_macro_fqns(config_root: &Path, pack_id: &str) -> Result<Vec<String
 fn find_macro_yaml_by_fqn(dir: &Path, expected: &str) -> Result<(PathBuf, serde_yaml::Value)> {
     macro_definition_index(dir)?
         .remove(expected)
-        .with_context(|| format!("failed to find macro definition {expected} in {}", dir.display()))
+        .with_context(|| {
+            format!(
+                "failed to find macro definition {expected} in {}",
+                dir.display()
+            )
+        })
 }
 
 fn macro_definition_index(dir: &Path) -> Result<BTreeMap<String, (PathBuf, serde_yaml::Value)>> {

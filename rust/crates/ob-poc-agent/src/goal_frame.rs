@@ -547,7 +547,10 @@ progress_signals: []
         let store = GoalFrameStore::new();
         let session_id = Uuid::new_v4();
         store
-            .put(session_id, GoalFrame::seed_for_spike("first", &make_index()))
+            .put(
+                session_id,
+                GoalFrame::seed_for_spike("first", &make_index()),
+            )
             .await;
         let prior = store
             .put(

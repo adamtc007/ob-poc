@@ -91,9 +91,7 @@ pub async fn try_handle_prompt(
         Ok(outcome) => {
             // Persist the (possibly-refined) frame back to the store
             // so the next prompt sees it.
-            frames
-                .put(session_uuid, outcome.goal_frame.clone())
-                .await;
+            frames.put(session_uuid, outcome.goal_frame.clone()).await;
 
             // Phase 2.7: round-trip the draft through the LSP-shaped
             // channel before the response leaves the agent. The spike
@@ -151,9 +149,7 @@ fn collect_utterance(blocks: &[AcpContentBlock]) -> String {
             // Resource URIs are not resolved in the Phase 2.6 spike —
             // Phase 4 wires `semos://...` resolution through the MCP
             // knowledge surface.
-            AcpContentBlock::ResourceLink { .. } | AcpContentBlock::EmbeddedResource { .. } => {
-                None
-            }
+            AcpContentBlock::ResourceLink { .. } | AcpContentBlock::EmbeddedResource { .. } => None,
         })
         .collect::<Vec<_>>()
         .join("\n")
@@ -336,7 +332,15 @@ progress_signals: []
         let audit = NullAuditSink;
         let frames = GoalFrameStore::new();
         let traces = NullTraceSink;
-        let outcome = try_handle_prompt(&request, &make_planning_loop(), &channel, &audit, &frames, &traces).await;
+        let outcome = try_handle_prompt(
+            &request,
+            &make_planning_loop(),
+            &channel,
+            &audit,
+            &frames,
+            &traces,
+        )
+        .await;
         assert!(outcome.is_none());
     }
 
@@ -355,9 +359,16 @@ progress_signals: []
         let audit = NullAuditSink;
         let frames = GoalFrameStore::new();
         let traces = NullTraceSink;
-        let outcome = try_handle_prompt(&request, &make_planning_loop(), &channel, &audit, &frames, &traces)
-            .await
-            .expect("session/prompt must be handled");
+        let outcome = try_handle_prompt(
+            &request,
+            &make_planning_loop(),
+            &channel,
+            &audit,
+            &frames,
+            &traces,
+        )
+        .await
+        .expect("session/prompt must be handled");
         assert_eq!(outcome.len(), 3, "plan update + diagnostics + response");
         match &outcome[0] {
             JsonRpcOutgoing::Notification(note) => {
@@ -403,9 +414,16 @@ progress_signals: []
         let audit = NullAuditSink;
         let frames = GoalFrameStore::new();
         let traces = NullTraceSink;
-        let outcome = try_handle_prompt(&request, &make_planning_loop(), &channel, &audit, &frames, &traces)
-            .await
-            .expect("handled");
+        let outcome = try_handle_prompt(
+            &request,
+            &make_planning_loop(),
+            &channel,
+            &audit,
+            &frames,
+            &traces,
+        )
+        .await
+        .expect("handled");
         assert_eq!(outcome.len(), 1);
         match &outcome[0] {
             JsonRpcOutgoing::Response(resp) => {
@@ -447,9 +465,16 @@ progress_signals: []
         let audit = NullAuditSink;
         let frames = GoalFrameStore::new();
         let traces = NullTraceSink;
-        let outcome = try_handle_prompt(&request, &make_planning_loop(), &channel, &audit, &frames, &traces)
-            .await
-            .expect("handled");
+        let outcome = try_handle_prompt(
+            &request,
+            &make_planning_loop(),
+            &channel,
+            &audit,
+            &frames,
+            &traces,
+        )
+        .await
+        .expect("handled");
         assert_eq!(outcome.len(), 1);
         match &outcome[0] {
             JsonRpcOutgoing::Response(resp) => {

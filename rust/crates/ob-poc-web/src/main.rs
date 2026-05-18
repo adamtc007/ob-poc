@@ -765,6 +765,43 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let voice_router = routes::voice::create_voice_router(pool.clone());
 
     // =========================================================================
+    // SemOS plugin op registry — canonical home for every plugin verb
+    // implementation post-Phase-5c-migrate slice #80. Built once here and
+    // threaded into every inner executor (BPMN inner, job worker, REPL V2
+    // legacy + V2).
+    // =========================================================================
+    let sem_os_ops = {
+        let mut reg = sem_os_postgres::ops::build_registry();
+        ob_poc::domain_ops::extend_registry(&mut reg);
+        Arc::new(reg)
+    };
+    tracing::info!(
+        registered_ops = sem_os_ops.len(),
+        "SemOsVerbOpRegistry initialised"
+    );
+
+    // F3 fix (Slice 2.2): drift-check the registry against every YAML plugin
+    // verb BEFORE serving traffic. Missing registrations → panic. This is
+    // the same computation `test_plugin_verb_coverage` runs in CI, so
+    // startup and tests can never diverge on what "covered" means.
+    {
+        let missing = ob_poc::domain_ops::find_missing_plugin_ops(&sem_os_ops);
+        if !missing.is_empty() {
+            panic!(
+                "FATAL: {} YAML plugin verb(s) have no SemOsVerbOp registered. \
+                 Plugin dispatch for these verbs will hard-fail at runtime. \
+                 Wire them in `sem_os_postgres::ops::build_registry()` or \
+                 `ob_poc::domain_ops::extend_registry()`. Missing FQNs: {:?}",
+                missing.len(),
+                missing
+            );
+        }
+        tracing::info!(
+            "SemOsVerbOpRegistry coverage check passed — every YAML plugin verb has a handler"
+        );
+    }
+
+    // =========================================================================
     // Platform service registry — trait-object injection for relocated
     // plugin ops (Phase 5a). Host-side impls are constructed here once and
     // threaded through every DslExecutor / step-executor bridge.
@@ -906,6 +943,16 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             "ServiceRegistry: registered dyn ServicePipelineService (service_resources::*)"
         );
 
+        // dyn SemOsChildDispatcher — lets composite SemOS ops invoke their
+        // child DSL atomics through the same canonical op registry and
+        // transaction scope.
+        builder.register::<dyn dsl_runtime::service_traits::SemOsChildDispatcher>(Arc::new(
+            sem_os_postgres::ops::RegistryChildDispatcher::new(sem_os_ops.clone()),
+        ));
+        tracing::info!(
+            "ServiceRegistry: registered dyn SemOsChildDispatcher (SemOsVerbOpRegistry child dispatch)"
+        );
+
         // dyn PhraseService — used by relocated phrase_ops for the 9
         // governed-phrase-authoring verbs. Bridge wraps
         // `crate::sem_reg::store::SnapshotStore` + types/ids and the
@@ -971,43 +1018,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         tracing::info!("OutboxDrainer: spawning background task");
         drainer.spawn()
     };
-
-    // =========================================================================
-    // SemOS plugin op registry — canonical home for every plugin verb
-    // implementation post-Phase-5c-migrate slice #80. Built once here and
-    // threaded into every inner executor (BPMN inner, job worker, REPL V2
-    // legacy + V2).
-    // =========================================================================
-    let sem_os_ops = {
-        let mut reg = sem_os_postgres::ops::build_registry();
-        ob_poc::domain_ops::extend_registry(&mut reg);
-        Arc::new(reg)
-    };
-    tracing::info!(
-        registered_ops = sem_os_ops.len(),
-        "SemOsVerbOpRegistry initialised"
-    );
-
-    // F3 fix (Slice 2.2): drift-check the registry against every YAML plugin
-    // verb BEFORE serving traffic. Missing registrations → panic. This is
-    // the same computation `test_plugin_verb_coverage` runs in CI, so
-    // startup and tests can never diverge on what "covered" means.
-    {
-        let missing = ob_poc::domain_ops::find_missing_plugin_ops(&sem_os_ops);
-        if !missing.is_empty() {
-            panic!(
-                "FATAL: {} YAML plugin verb(s) have no SemOsVerbOp registered. \
-                 Plugin dispatch for these verbs will hard-fail at runtime. \
-                 Wire them in `sem_os_postgres::ops::build_registry()` or \
-                 `ob_poc::domain_ops::extend_registry()`. Missing FQNs: {:?}",
-                missing.len(),
-                missing
-            );
-        }
-        tracing::info!(
-            "SemOsVerbOpRegistry coverage check passed — every YAML plugin verb has a handler"
-        );
-    }
 
     // =========================================================================
     // BPMN-Lite Integration (before REPL V2 — determines executor)

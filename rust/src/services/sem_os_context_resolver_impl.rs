@@ -8,8 +8,8 @@
 
 use anyhow::Result;
 use async_trait::async_trait;
-use sem_os_policy::context_resolution::{ContextResolutionRequest, ContextResolutionResponse};
 use sem_os_core::principal::Principal;
+use sem_os_policy::context_resolution::{ContextResolutionRequest, ContextResolutionResponse};
 use sqlx::PgPool;
 
 use dsl_runtime::service_traits::SemOsContextResolver;

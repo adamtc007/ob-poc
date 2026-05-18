@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
-use sem_os_types::agent_mode::AgentMode;
 use crate::error::SemOsError;
+use sem_os_types::agent_mode::AgentMode;
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct Principal {

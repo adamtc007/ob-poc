@@ -375,7 +375,7 @@ slots:
           via: onboarding.dispatch-ready-slices
         - from: sent
           to: ack
-          via: resource-owner-dispatch.ack
+          via: service-resource.confirm-provisioning-result
         - from: [sent, ack]
           to: completed
           via: service-resource.confirm-provisioning-result

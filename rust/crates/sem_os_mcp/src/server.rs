@@ -53,11 +53,9 @@ impl McpServer {
                 }),
             ),
             "tools/invoke" => self.invoke_tool(id, request.params).await,
-            other => JsonRpcResponse::error(
-                id,
-                METHOD_NOT_FOUND,
-                format!("unknown method: {other}"),
-            ),
+            other => {
+                JsonRpcResponse::error(id, METHOD_NOT_FOUND, format!("unknown method: {other}"))
+            }
         }
     }
 
@@ -164,7 +162,9 @@ mod tests {
     #[tokio::test]
     async fn initialize_returns_capability_handshake() {
         let server = server_with_echo();
-        let resp = server.handle_request(request(1, "initialize", json!({}))).await;
+        let resp = server
+            .handle_request(request(1, "initialize", json!({})))
+            .await;
         let result = resp.result.unwrap();
         assert_eq!(result["protocolVersion"], PROTOCOL_VERSION);
         assert_eq!(result["serverInfo"]["name"], SERVER_NAME);
@@ -173,7 +173,9 @@ mod tests {
     #[tokio::test]
     async fn tools_list_returns_registered_specs() {
         let server = server_with_echo();
-        let resp = server.handle_request(request(1, "tools/list", json!({}))).await;
+        let resp = server
+            .handle_request(request(1, "tools/list", json!({})))
+            .await;
         let tools = &resp.result.unwrap()["tools"];
         assert_eq!(tools.as_array().unwrap().len(), 1);
         assert_eq!(tools[0]["name"], "echo");

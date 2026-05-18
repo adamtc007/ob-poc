@@ -1,0 +1,39 @@
+[package]
+name = "bpmn-controller"
+version = "0.1.0"
+edition = "2021"
+description = "BPMN pool lifecycle and instance kick-off for OB-POC. Rust-direct operations against bpmn-lite's Postgres schema; K8s Deployment management. No gRPC server — functions called directly by ob-poc-web."
+
+[dependencies]
+ob-poc-types = { path = "../ob-poc-types" }
+
+# Async/error fundamentals
+anyhow = "1.0"
+thiserror = "1.0"
+async-trait = "0.1"
+tokio = { version = "1", features = ["rt-multi-thread", "macros"] }
+tracing = "0.1"
+
+# Serialisation
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+uuid = { version = "1", features = ["v4", "v7", "serde"] }
+chrono = { version = "0.4", features = ["serde"] }
+
+# Postgres — always required; bpmn-controller's raison d'être is DB operations
+sqlx = { version = "0.8", features = ["runtime-tokio-rustls", "postgres", "uuid", "chrono", "json"] }
+
+# Hashing — BLAKE3 for domain_payload_hash and integrity_hash (A19).
+blake3 = { version = "1", default-features = false }
+
+# K8s client — required from L3. Only client features needed (no runtime/derive/controllers).
+# kube 0.93 + k8s-openapi 0.22 target Kubernetes 1.29.
+kube = { version = "0.93", default-features = false, features = ["client", "rustls-tls"] }
+k8s-openapi = { version = "0.22", features = ["v1_29"] }
+
+[dev-dependencies]
+tokio = { version = "1", features = ["rt-multi-thread", "macros"] }
+uuid = { version = "1", features = ["v4"] }
+
+[lints.rust]
+unreachable_pub = "deny"

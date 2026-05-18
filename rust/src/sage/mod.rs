@@ -69,10 +69,10 @@ pub mod verb_resolve;
 // Re-export core types for convenience
 pub use arg_assembly::assemble_args_from_step;
 pub use clash_matrix::{build_clash_matrix, render_clash_reports, ClashRow};
-pub use drafter::{DraftResolution, DraftResult, DrafterEngine};
 pub use context::{RecentIntent, SageContext};
 pub use deterministic::DeterministicSage;
 pub use disposition::{DelegateIntent, PendingMutation, ServeIntent, UtteranceDisposition};
+pub use drafter::{DraftResolution, DraftResult, DrafterEngine};
 pub use llm_sage::LlmSage;
 pub use outcome::{
     Clarification, DrafterHandoff, EntityRef, OutcomeAction, OutcomeIntent, OutcomeStep,

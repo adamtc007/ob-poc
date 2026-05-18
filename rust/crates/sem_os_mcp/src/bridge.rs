@@ -217,14 +217,22 @@ mod tests {
     #[tokio::test]
     async fn stub_bridge_returns_empty_for_every_method() {
         let bridge = StubBridge::new();
-        assert!(bridge.entity_resolve(Some("cbu"), "Allianz").await.unwrap().is_empty());
+        assert!(bridge
+            .entity_resolve(Some("cbu"), "Allianz")
+            .await
+            .unwrap()
+            .is_empty());
         assert!(bridge
             .active_verb_surface_at_state("cbu", "struct.lux.ucits.sicav", "draft")
             .await
             .unwrap()
             .is_empty());
         assert!(bridge.pack_catalogue("cbu").await.unwrap().is_empty());
-        assert!(bridge.fsm_transitions("cbu", "draft").await.unwrap().is_empty());
+        assert!(bridge
+            .fsm_transitions("cbu", "draft")
+            .await
+            .unwrap()
+            .is_empty());
         assert!(bridge
             .constellation_walk("cbu", "struct.lux.ucits.sicav")
             .await

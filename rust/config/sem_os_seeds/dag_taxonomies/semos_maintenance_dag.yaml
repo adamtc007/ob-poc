@@ -320,19 +320,19 @@ slots:
       transitions:
         - from: composing
           to: submitted
-          via: changeset.submit
+          via: governance.submit-for-review
         - from: submitted
           to: reviewing
-          via: changeset.enter-review
+          via: governance.record-review
         - from: reviewing
           to: approved
-          via: changeset.approve
+          via: governance.record-review
         - from: reviewing
           to: rejected
-          via: changeset.reject
+          via: governance.rollback
         - from: approved
           to: published
-          via: changeset.publish
+          via: governance.publish
       terminal_states: [published, rejected]
     # V1.3-4: changeset is long-lived in the sense of "active governance
     # work" but rejection acts as SUSPENDED/terminal. No separate SUSPENDED
@@ -386,16 +386,16 @@ slots:
           via: attribute.define
         - from: draft
           to: active
-          via: "(backend: changeset.publish includes this attribute)"
+          via: "(backend: governance.publish includes this attribute)"
         - from: active
           to: draft
-          via: attribute.propose-revision  # V1.3-6 periodic-review re-entry
+          via: attribute.update  # V1.3-6 periodic-review re-entry
         - from: active
           to: deprecated
           via: attribute.deprecate
         - from: deprecated
           to: retired
-          via: attribute.retire
+          via: attribute.deprecate
       terminal_states: [retired]
     # V1.3-4: governance equivalents of SUSPENDED are deprecated +
     # rollback. No generic SUSPENDED.
@@ -465,7 +465,7 @@ slots:
       transitions:
         - from: draft
           to: active
-          via: derivation.activate
+          via: governance.publish
         - from: active
           to: stale
           via: "(backend: upstream attribute version bump)"
@@ -515,10 +515,10 @@ slots:
           via: service-resource.sync-definitions     # re-sync after filling gaps
         - from: synced
           to: complete
-          via: service-resource.mark-complete
+          via: service-resource.sync-definitions
         - from: gaps_found
           to: complete
-          via: service-resource.mark-complete        # force-complete (steward override)
+          via: service-resource.sync-definitions        # force-complete (steward override)
       terminal_states: [complete]
     suspended_state_exempt: true
 
@@ -561,22 +561,22 @@ slots:
       transitions:
         - from: proposed
           to: collision_checked
-          via: phrase.check-collision
+          via: phrase.check-collisions
         - from: collision_checked
           to: quality_checked
-          via: phrase.check-quality
+          via: phrase.review-proposals
         - from: quality_checked
           to: reviewed
-          via: phrase.submit-for-review
+          via: phrase.review-proposals
         - from: reviewed
           to: published
-          via: phrase.approve-proposal
+          via: phrase.approve
         - from: reviewed
           to: rejected
-          via: phrase.reject-proposal
+          via: phrase.reject
         - from: reviewed
           to: refined
-          via: phrase.request-refinement
+          via: phrase.review-proposals
         - from: reviewed
           to: deferred
           via: phrase.defer
@@ -585,7 +585,7 @@ slots:
           via: phrase.propose         # re-submit after refinement
         - from: deferred
           to: proposed
-          via: phrase.reactivate
+          via: phrase.propose
       terminal_states: [published, rejected]
     suspended_state_exempt: true
 

@@ -43,8 +43,7 @@ use std::time::Duration;
 use async_trait::async_trait;
 use lsp_types::{
     notification::{
-        DidChangeTextDocument, DidCloseTextDocument, DidOpenTextDocument, Initialized,
-        Notification,
+        DidChangeTextDocument, DidCloseTextDocument, DidOpenTextDocument, Initialized, Notification,
     },
     request::{Initialize, Request},
     DidChangeTextDocumentParams, DidCloseTextDocumentParams, DidOpenTextDocumentParams,
@@ -169,8 +168,10 @@ impl SubprocessLspChannel {
         }
 
         // Send `initialized` notification.
-        let notification =
-            Message::notification(Initialized::METHOD, serde_json::to_value(InitializedParams {})?);
+        let notification = Message::notification(
+            Initialized::METHOD,
+            serde_json::to_value(InitializedParams {})?,
+        );
         write_message(&mut inner.stdin, &notification).await?;
         Ok(())
     }
@@ -265,11 +266,7 @@ impl ReplChannelClient for SubprocessLspChannel {
         }
     }
 
-    async fn open_runbook(
-        &self,
-        uri: &str,
-        source: &str,
-    ) -> Result<(), RunbookChannelError> {
+    async fn open_runbook(&self, uri: &str, source: &str) -> Result<(), RunbookChannelError> {
         let version = self.bump_version(uri).await;
         let url = parse_uri(uri)?;
         let params = DidOpenTextDocumentParams {
@@ -280,20 +277,14 @@ impl ReplChannelClient for SubprocessLspChannel {
                 text: source.to_string(),
             },
         };
-        let notification = Message::notification(
-            DidOpenTextDocument::METHOD,
-            serde_json::to_value(params)?,
-        );
+        let notification =
+            Message::notification(DidOpenTextDocument::METHOD, serde_json::to_value(params)?);
         let mut inner = self.inner.lock().await;
         write_message(&mut inner.stdin, &notification).await?;
         Ok(())
     }
 
-    async fn change_runbook(
-        &self,
-        uri: &str,
-        new_source: &str,
-    ) -> Result<(), RunbookChannelError> {
+    async fn change_runbook(&self, uri: &str, new_source: &str) -> Result<(), RunbookChannelError> {
         let version = self.bump_version(uri).await;
         let url = parse_uri(uri)?;
         let params = DidChangeTextDocumentParams {
@@ -304,10 +295,8 @@ impl ReplChannelClient for SubprocessLspChannel {
                 text: new_source.to_string(),
             }],
         };
-        let notification = Message::notification(
-            DidChangeTextDocument::METHOD,
-            serde_json::to_value(params)?,
-        );
+        let notification =
+            Message::notification(DidChangeTextDocument::METHOD, serde_json::to_value(params)?);
         let mut inner = self.inner.lock().await;
         write_message(&mut inner.stdin, &notification).await?;
         Ok(())
@@ -318,10 +307,8 @@ impl ReplChannelClient for SubprocessLspChannel {
         let params = DidCloseTextDocumentParams {
             text_document: TextDocumentIdentifier { uri: url },
         };
-        let notification = Message::notification(
-            DidCloseTextDocument::METHOD,
-            serde_json::to_value(params)?,
-        );
+        let notification =
+            Message::notification(DidCloseTextDocument::METHOD, serde_json::to_value(params)?);
         let mut inner = self.inner.lock().await;
         write_message(&mut inner.stdin, &notification).await?;
         drop(inner);
@@ -429,9 +416,7 @@ async fn write_message(
     Ok(())
 }
 
-async fn read_message(
-    stdout: &mut BufReader<ChildStdout>,
-) -> Result<Message, RunbookChannelError> {
+async fn read_message(stdout: &mut BufReader<ChildStdout>) -> Result<Message, RunbookChannelError> {
     let mut content_length: Option<usize> = None;
     loop {
         let mut line = String::new();
@@ -449,14 +434,10 @@ async fn read_message(
             break;
         }
         if let Some(value) = trimmed.strip_prefix("Content-Length:") {
-            content_length = value
-                .trim()
-                .parse::<usize>()
-                .ok()
-                .or_else(|| {
-                    tracing::warn!(target: "sage-acp", "malformed Content-Length: {trimmed}");
-                    None
-                });
+            content_length = value.trim().parse::<usize>().ok().or_else(|| {
+                tracing::warn!(target: "sage-acp", "malformed Content-Length: {trimmed}");
+                None
+            });
         }
         // Other headers (Content-Type, etc.) are ignored.
     }

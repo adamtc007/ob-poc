@@ -32,13 +32,13 @@ fn resolver_lux_sicav_composes_pilot_template() {
             && transition
                 .destination_green_when
                 .as_deref()
-                .is_some_and(|predicate| predicate.contains("cbu_evidence.state = APPROVED"))
+                .is_some_and(|predicate| predicate.contains("cbu_evidence.state = VERIFIED"))
     }));
     assert!(template.transitions.iter().any(|transition| {
         transition.slot_id == "cbu_evidence"
-            && transition.from == "UPLOADED"
-            && transition.to == "REVIEWED"
-            && transition.via.as_deref() == Some("cbu.review-evidence")
+            && transition.from == "PENDING"
+            && transition.to == "VERIFIED"
+            && transition.via.as_deref() == Some("cbu.verify-evidence")
     }));
 
     let management_company = template

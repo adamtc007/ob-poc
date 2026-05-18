@@ -8,10 +8,10 @@
 use tower_lsp::lsp_types::*;
 
 use crate::encoding::{span_to_range, PositionEncoding};
-use dsl_core::ast::Statement;
-use dsl_core::diagnostics::{DiagnosticCode, SuggestedFix};
 use dsl_analysis::planning_facade::{PlanningOutput, SyntheticStep as PlanningSyntheticStep};
 use dsl_analysis::validation::{Diagnostic as SemanticDiagnostic, Suggestion};
+use dsl_core::ast::Statement;
+use dsl_core::diagnostics::{DiagnosticCode, SuggestedFix};
 
 /// Generate code actions from planning output and semantic diagnostics
 ///

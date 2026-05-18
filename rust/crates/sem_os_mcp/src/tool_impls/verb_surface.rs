@@ -76,11 +76,7 @@ impl KnowledgeTool for ActiveVerbSurfaceTool {
             .map_err(|error| ToolError::InvalidArguments(error.to_string()))?;
         let verbs = self
             .bridge
-            .active_verb_surface_at_state(
-                &args.workspace,
-                &args.constellation_id,
-                &args.state_node,
-            )
+            .active_verb_surface_at_state(&args.workspace, &args.constellation_id, &args.state_node)
             .await
             .map_err(|error| ToolError::Transport(error.to_string()))?;
         Ok(json!({"verbs": verbs}))
@@ -102,7 +98,10 @@ mod tests {
             .iter()
             .filter_map(|v| v.as_str())
             .collect();
-        assert_eq!(required, vec!["workspace", "constellation_id", "state_node"]);
+        assert_eq!(
+            required,
+            vec!["workspace", "constellation_id", "state_node"]
+        );
     }
 
     #[tokio::test]

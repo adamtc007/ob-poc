@@ -343,5 +343,4 @@ entities:
         assert_eq!(dob.selectivity, 0.95);
         assert_eq!(dob.match_mode.as_deref(), Some("year_or_exact"));
     }
-
 }

@@ -223,7 +223,10 @@ mod tests {
         assert_eq!(parsed.entity_states.len(), 2);
         assert_eq!(parsed.entity_states[0].entity_id, "cbu:abc");
         assert_eq!(
-            parsed.entity_states[0].attributes.get("jurisdiction").unwrap(),
+            parsed.entity_states[0]
+                .attributes
+                .get("jurisdiction")
+                .unwrap(),
             "LU"
         );
     }

@@ -141,10 +141,7 @@ impl EntityTaxonomy {
     }
 
     /// Get the lifecycle for an entity type.
-    pub fn get_lifecycle(
-        &self,
-        entity_type: &str,
-    ) -> Option<&crate::types::EntityLifecycle> {
+    pub fn get_lifecycle(&self, entity_type: &str) -> Option<&crate::types::EntityLifecycle> {
         // Handle aliases
         let resolved_type = self
             .entities
@@ -176,18 +173,12 @@ impl EntityTaxonomy {
     }
 
     /// Get a reference table definition.
-    pub fn get_reference_table(
-        &self,
-        name: &str,
-    ) -> Option<&crate::types::ReferenceTableDef> {
+    pub fn get_reference_table(&self, name: &str) -> Option<&crate::types::ReferenceTableDef> {
         self.reference_tables.get(name)
     }
 
     /// Get the DB config for an entity type.
-    pub fn get_db_config(
-        &self,
-        entity_type: &str,
-    ) -> Option<&crate::types::EntityDbConfig> {
+    pub fn get_db_config(&self, entity_type: &str) -> Option<&crate::types::EntityDbConfig> {
         self.entities.get(entity_type).map(|e| &e.db)
     }
 

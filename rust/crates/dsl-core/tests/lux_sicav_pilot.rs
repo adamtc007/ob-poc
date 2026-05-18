@@ -91,7 +91,7 @@ fn cbu_dag_pilot_slots_have_gate_metadata() {
             Some("limited_company"),
             "PENDING",
         ),
-        ("cbu_evidence", None, "UPLOADED"),
+        ("cbu_evidence", None, "PENDING"),
         ("share_class", None, "DRAFT"),
     ] {
         let slot = slots
