@@ -33,7 +33,7 @@ use crate::dsl_v2::execution::{runtime_registry_arc, RuntimeVerbRegistry};
 use crate::dsl_v2::macros::{
     expand_macro_fixpoint, MacroExpansionError, MacroRegistry, MacroSchema, EXPANSION_LIMITS,
 };
-use crate::dsl_v2::planning::quick_validate;
+use crate::dsl_v2::planning::{analyse_and_plan, PlanningInput};
 use crate::dsl_v2::runtime_registry::{runtime_registry, RuntimeBehavior};
 use crate::dsl_v2::Severity;
 use crate::journey::pack_manager::EffectiveConstraints;
@@ -604,7 +604,12 @@ fn validate_expanded_macro_output(
     registry: &RuntimeVerbRegistry,
 ) -> Vec<String> {
     let expanded_source = statements.join("\n");
-    let mut errors: Vec<String> = quick_validate(&expanded_source, runtime_registry_arc())
+    // Use analyse_and_plan directly so we can pass the ob-poc verb handler;
+    // quick_validate is the dsl-lsp-friendly (no-handler) variant.
+    let planning_input = PlanningInput::new(&expanded_source, runtime_registry_arc())
+        .with_verb_handler(crate::dsl_v2::ob_poc_compiler::ob_poc_verb_handler);
+    let mut errors: Vec<String> = analyse_and_plan(planning_input)
+        .diagnostics
         .into_iter()
         .filter(|diagnostic| diagnostic.severity == Severity::Error)
         .map(|diagnostic| diagnostic.message)

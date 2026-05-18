@@ -12,7 +12,7 @@ use std::sync::Arc;
 use crate::runtime_registry::RuntimeVerbRegistry;
 use dsl_core::ast::Program;
 use dsl_core::binding_context::BindingContext;
-use dsl_core::compiler::compile_to_ops;
+use dsl_core::compiler::{compile_to_ops_ext, VerbHandler};
 use dsl_core::dag::{build_execution_plan as build_dag_plan, describe_plan, CycleError};
 use dsl_core::diagnostics::{Diagnostic, DiagnosticCode, SourceSpan};
 use dsl_core::ops::Op;
@@ -42,6 +42,10 @@ pub struct PlanningInput<'a> {
     pub strict_semantics: bool,
     /// How to handle missing producers (implicit create)
     pub implicit_create_mode: ImplicitCreateMode,
+    /// Optional consumer-supplied verb compilation handler. When `None`,
+    /// dsl-core's built-in ob-poc dispatch handles verbs (legacy path);
+    /// when `Some`, the handler is consulted first.
+    pub verb_handler: Option<VerbHandler>,
 }
 
 impl<'a> PlanningInput<'a> {
@@ -53,6 +57,7 @@ impl<'a> PlanningInput<'a> {
             executed_bindings: None,
             strict_semantics: false,
             implicit_create_mode: ImplicitCreateMode::default(),
+            verb_handler: None,
         }
     }
 
@@ -71,6 +76,16 @@ impl<'a> PlanningInput<'a> {
     /// Set implicit create mode
     pub fn with_implicit_create(mut self, mode: ImplicitCreateMode) -> Self {
         self.implicit_create_mode = mode;
+        self
+    }
+
+    /// Supply a consumer-specific verb compilation handler.
+    ///
+    /// ob-poc callers pass `dsl_v2::ob_poc_compiler::ob_poc_verb_handler` here so
+    /// ob-poc verbs compile via the handler rather than dsl-core's legacy
+    /// `compile_ob_poc_verb` fallback.
+    pub fn with_verb_handler(mut self, handler: VerbHandler) -> Self {
+        self.verb_handler = Some(handler);
         self
     }
 }
@@ -187,8 +202,8 @@ pub fn analyse_and_plan(input: PlanningInput) -> PlanningOutput {
     };
     output.program = program.clone();
 
-    // Phase 2: Compile to ops
-    let compiled = compile_to_ops(&program);
+    // Phase 2: Compile to ops (using consumer-supplied handler if any)
+    let compiled = compile_to_ops_ext(&program, input.verb_handler);
 
     // Record compile errors as diagnostics
     for err in &compiled.errors {
