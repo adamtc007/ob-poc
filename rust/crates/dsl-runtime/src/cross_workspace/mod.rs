@@ -153,4 +153,4 @@ pub use hierarchy_cascade::{
 };
 pub use postgres_child_resolver::PostgresChildEntityResolver;
 pub use slot_state::{PostgresSlotStateProvider, SlotStateProvider};
-pub use sql_predicate_resolver::SqlPredicateResolver;
+pub use sql_predicate_resolver::{set_table_pk_overrides, SqlPredicateResolver};

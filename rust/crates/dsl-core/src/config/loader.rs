@@ -465,6 +465,31 @@ impl ConfigLoader {
         Ok((normalize(raw.hints), normalize(raw.domains)))
     }
 
+    /// Load table PK overrides from `config/table_pk_overrides.yaml`.
+    ///
+    /// Returns a flat `HashMap<table_name, pk_column>` ready to pass to
+    /// `dsl_runtime::cross_workspace::set_table_pk_overrides()`. Returns an
+    /// empty map (with a warning) if the file is absent.
+    pub fn load_table_pk_overrides(&self) -> Result<std::collections::HashMap<String, String>> {
+        let path = Path::new(&self.config_dir).join("table_pk_overrides.yaml");
+        if !path.exists() {
+            tracing::warn!(
+                "table_pk_overrides.yaml not found at {:?} — \
+                 SqlPredicateResolver will use generic PK heuristic only",
+                path
+            );
+            return Ok(std::collections::HashMap::new());
+        }
+        let content =
+            std::fs::read_to_string(&path).with_context(|| format!("reading {path:?}"))?;
+        let raw: std::collections::HashMap<String, String> =
+            serde_yaml::from_str(&content).with_context(|| format!("parsing {path:?}"))?;
+        Ok(raw
+            .into_iter()
+            .map(|(k, v)| (k.trim().to_string(), v.trim().to_string()))
+            .collect())
+    }
+
     /// Load entity kind aliases from `config/entity_kind_aliases.yaml`.
     ///
     /// Returns a flat `HashMap<alias, canonical>` ready to pass to

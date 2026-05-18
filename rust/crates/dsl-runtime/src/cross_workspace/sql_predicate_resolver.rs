@@ -38,6 +38,9 @@
 //! fail-closed behaviour. Callers that need richer predicate semantics
 //! can layer their own resolver in front.
 
+use std::collections::HashMap;
+use std::sync::OnceLock;
+
 use anyhow::Result;
 use async_trait::async_trait;
 use sqlx::{PgPool, Row};
@@ -45,6 +48,26 @@ use uuid::Uuid;
 
 use super::gate_checker::PredicateResolver;
 use super::slot_state::resolve_slot_table;
+
+// ---------------------------------------------------------------------------
+// Consumer-supplied PK overrides
+// ---------------------------------------------------------------------------
+
+/// Per-table primary key column overrides. Consulted by `guess_source_pk`
+/// before applying the generic {singular}_id heuristic.
+///
+/// Register once at startup via [`set_table_pk_overrides`].
+static TABLE_PK_OVERRIDES: OnceLock<HashMap<String, String>> = OnceLock::new();
+
+/// Register consumer-specific table → PK column overrides.
+///
+/// Replaces the hardcoded match arms that were previously in `guess_source_pk`.
+/// Loaded from `config/table_pk_overrides.yaml` via
+/// `ConfigLoader::load_table_pk_overrides()`. Subsequent calls are ignored
+/// (OnceLock semantics).
+pub fn set_table_pk_overrides(overrides: HashMap<String, String>) {
+    let _ = TABLE_PK_OVERRIDES.set(overrides);
+}
 
 // ---------------------------------------------------------------------------
 // Resolver
@@ -358,25 +381,15 @@ fn is_safe_ident(s: &str) -> bool {
 /// surface a SQL error which the caller turns into a constraint
 /// violation.
 fn guess_source_pk(table: &str) -> String {
-    // Special-case the few that diverge from the {singular}_id pattern
-    // (manco_regulatory_status keys by manco_entity_id, etc.).
-    match table {
-        "manco_regulatory_status" => "manco_entity_id".to_string(),
-        "cbu_trading_activity" => "cbu_id".to_string(),
-        "cbu_service_consumption" => "consumption_id".to_string(),
-        // R3 (2026-04-26): bp_clearances + R1 lifecycle_resources tables use
-        // single-column PK named just `id` (DEFAULT gen_random_uuid()).
-        // Surfaced by the live test harness — without this case the
-        // SqlPredicateResolver would generate booking_principal_clearance_id
-        // and fail with "column does not exist" against the real schema.
-        "booking_principal_clearances" => "id".to_string(),
-        "application_instances" => "id".to_string(),
-        "capability_bindings" => "id".to_string(),
-        "service_versions" => "id".to_string(),
-        // {plural}s → {singular}_id
-        t if t.ends_with('s') => format!("{}_id", t.trim_end_matches('s')),
-        // Fallback: id
-        _ => "id".to_string(),
+    // Consult consumer-registered overrides first (loaded from table_pk_overrides.yaml).
+    if let Some(pk) = TABLE_PK_OVERRIDES.get().and_then(|m| m.get(table)) {
+        return pk.clone();
+    }
+    // Generic heuristic: {plural}s → {singular}_id, else "id".
+    if table.ends_with('s') {
+        format!("{}_id", table.trim_end_matches('s'))
+    } else {
+        "id".to_string()
     }
 }
 
@@ -477,9 +490,24 @@ mod tests {
 
     #[test]
     fn guess_source_pk_canonical() {
+        // Generic heuristic (no overrides needed)
         assert_eq!(guess_source_pk("cases"), "case_id");
         assert_eq!(guess_source_pk("deals"), "deal_id");
         assert_eq!(guess_source_pk("cbus"), "cbu_id");
+
+        // Register ob-poc overrides so special-case tables resolve correctly.
+        // OnceLock: idempotent; safe across test runs.
+        set_table_pk_overrides(
+            [
+                (
+                    "manco_regulatory_status".to_string(),
+                    "manco_entity_id".to_string(),
+                ),
+                ("cbu_trading_activity".to_string(), "cbu_id".to_string()),
+            ]
+            .into_iter()
+            .collect(),
+        );
         assert_eq!(
             guess_source_pk("manco_regulatory_status"),
             "manco_entity_id"

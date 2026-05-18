@@ -429,6 +429,19 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             );
         }
     }
+    // CR3: Load table PK overrides (replaces hardcoded match in SqlPredicateResolver).
+    match config_loader.load_table_pk_overrides() {
+        Ok(overrides) => {
+            tracing::info!("Table PK overrides loaded: {} entries", overrides.len());
+            dsl_runtime::cross_workspace::set_table_pk_overrides(overrides);
+        }
+        Err(e) => {
+            tracing::warn!(
+                "Failed to load table PK overrides: {} — generic heuristic only",
+                e
+            );
+        }
+    }
 
     // Tranche 3 Phase 3.F Stages 3+4 — log + seed catalogue source.
     // CATALOGUE_SOURCE=db enables forward-discipline: the catalogue is

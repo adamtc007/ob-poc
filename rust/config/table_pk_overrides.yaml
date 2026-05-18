@@ -1,0 +1,26 @@
+# Table primary key overrides for SqlPredicateResolver.
+#
+# Maps table names to their primary key column when the column does not follow
+# the default {singular}_id convention (strip trailing 's', append '_id').
+#
+# Loaded at startup via ConfigLoader::load_table_pk_overrides() and registered
+# with dsl_runtime::cross_workspace::sql_predicate_resolver::set_table_pk_overrides().
+#
+# Format: flat YAML map of table_name → pk_column.
+
+# Management company regulatory status: keyed by manco_entity_id, not manco_regulatory_status_id
+manco_regulatory_status: manco_entity_id
+
+# CBU trading activity: keyed by cbu_id (not cbu_trading_activity_id)
+cbu_trading_activity: cbu_id
+
+# CBU service consumption: keyed by consumption_id
+cbu_service_consumption: consumption_id
+
+# R3 (2026-04-26): these tables use a plain 'id' PK (DEFAULT gen_random_uuid()).
+# SqlPredicateResolver would generate <table_singular>_id and fail with
+# "column does not exist" against the real schema without this override.
+booking_principal_clearances: id
+application_instances: id
+capability_bindings: id
+service_versions: id
