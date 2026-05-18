@@ -1144,21 +1144,7 @@ mod tests {
 
     #[test]
     fn test_subject_kind_hint_maps_case_and_party_surfaces() {
-        // Register a minimal ob-poc registry so lookups resolve in this test.
-        // OnceLock: if another test already set it, the set() is a no-op —
-        // the entries below must be present in subject_kind_registry.yaml.
-        use crate::entity_kind::{set_subject_kind_registry, SubjectKindRegistry};
-        let hints: std::collections::HashMap<String, String> =
-            [("party", "entity"), ("tollgate-evaluations", "kyc-case")]
-                .iter()
-                .map(|(k, v)| (k.to_string(), v.to_string()))
-                .collect();
-        let domains: std::collections::HashMap<String, String> =
-            [("party", "entity"), ("case", "kyc-case")]
-                .iter()
-                .map(|(k, v)| (k.to_string(), v.to_string()))
-                .collect();
-        set_subject_kind_registry(SubjectKindRegistry { hints, domains });
+        crate::entity_kind::register_test_vocabularies();
 
         assert_eq!(subject_kind_from_hint("party"), Some("entity".to_string()));
         assert_eq!(

@@ -185,3 +185,95 @@ mod tests {
         assert_eq!(canonicalize("POOL"), "pool");
     }
 }
+
+/// Test infrastructure — register minimal ob-poc vocabulary tables so that
+/// `canonicalize`, `subject_kind_from_hint`, and `subject_kind_for_domain`
+/// resolve correctly in tests without a full startup sequence.
+///
+/// OnceLock semantics: idempotent. Call at the start of any test that needs
+/// resolved entity kinds. Safe to call from multiple tests in the same binary.
+#[cfg(test)]
+pub fn register_test_vocabularies() {
+    let aliases: EntityKindAliases = [
+        ("kyc_case", "kyc-case"),
+        ("case", "kyc-case"),
+        ("client_group", "client-group"),
+        ("legal-entity", "company"),
+        ("legal_entity", "company"),
+        ("organization", "company"),
+        ("org", "company"),
+        ("individual", "person"),
+        ("natural_person", "person"),
+        ("client-book", "client-group"),
+        ("client_book", "client-group"),
+        ("investor-register", "investor"),
+        ("investor_register", "investor"),
+        ("investment-fund", "fund"),
+        ("umbrella", "fund"),
+        ("sub-fund", "fund"),
+        ("compartment", "fund"),
+        ("doc", "document"),
+        ("evidence-document", "document"),
+        ("legal-contract", "contract"),
+        ("agreement", "contract"),
+        ("msa", "contract"),
+        ("mandate", "trading-profile"),
+        ("trading-mandate", "trading-profile"),
+        ("deal-record", "deal"),
+        ("sales-deal", "deal"),
+        ("client-business-unit", "cbu"),
+        ("structure", "cbu"),
+        ("trading-unit", "cbu"),
+    ]
+    .iter()
+    .map(|(a, c)| (a.to_string(), c.to_string()))
+    .collect();
+
+    let hints: HashMap<String, String> = [
+        ("cbu", "cbu"),
+        ("entity", "entity"),
+        ("party", "entity"),
+        ("kyc-case", "kyc-case"),
+        ("kyc", "kyc-case"),
+        ("case", "kyc-case"),
+        ("tollgate-evaluations", "kyc-case"),
+        ("screening", "kyc-case"),
+        ("deal", "deal"),
+        ("contract", "contract"),
+        ("document", "document"),
+        ("trading-profile", "trading-profile"),
+        ("mandate", "trading-profile"),
+        ("fund", "fund"),
+        ("investor", "investor"),
+    ]
+    .iter()
+    .map(|(k, v)| (k.to_string(), v.to_string()))
+    .collect();
+
+    let domains: HashMap<String, String> = [
+        ("cbu", "cbu"),
+        ("entity", "entity"),
+        ("party", "entity"),
+        ("kyc", "kyc-case"),
+        ("kyc-case", "kyc-case"),
+        ("case", "kyc-case"),
+        ("screening", "kyc-case"),
+        ("tollgate", "kyc-case"),
+        ("deal", "deal"),
+        ("contract", "contract"),
+        ("document", "document"),
+        ("trading-profile", "trading-profile"),
+        ("custody", "trading-profile"),
+        ("mandate", "trading-profile"),
+        ("fund", "fund"),
+        ("investor", "investor"),
+        ("gleif", "entity"),
+        ("research", "entity"),
+    ]
+    .iter()
+    .map(|(k, v)| (k.to_string(), v.to_string()))
+    .collect();
+
+    set_entity_kind_aliases(aliases);
+    set_subject_kind_registry(SubjectKindRegistry { hints, domains });
+}
