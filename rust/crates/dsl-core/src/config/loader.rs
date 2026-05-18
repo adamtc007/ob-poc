@@ -421,6 +421,50 @@ impl ConfigLoader {
         Ok(())
     }
 
+    /// Load subject kind registry from `config/subject_kind_registry.yaml`.
+    ///
+    /// Returns `(hints_map, domains_map)` ready to construct a
+    /// `dsl_analysis::entity_kind::SubjectKindRegistry`. Returns empty maps
+    /// with a warning if the file is absent.
+    pub fn load_subject_kind_registry(
+        &self,
+    ) -> Result<(
+        std::collections::HashMap<String, String>,
+        std::collections::HashMap<String, String>,
+    )> {
+        let path = Path::new(&self.config_dir).join("subject_kind_registry.yaml");
+        if !path.exists() {
+            tracing::warn!(
+                "subject_kind_registry.yaml not found at {:?} — \
+                 subject kind inference will return None for all hints",
+                path
+            );
+            return Ok((
+                std::collections::HashMap::new(),
+                std::collections::HashMap::new(),
+            ));
+        }
+        let content =
+            std::fs::read_to_string(&path).with_context(|| format!("reading {path:?}"))?;
+
+        #[derive(serde::Deserialize)]
+        struct Registry {
+            hints: std::collections::HashMap<String, String>,
+            domains: std::collections::HashMap<String, String>,
+        }
+
+        let raw: Registry =
+            serde_yaml::from_str(&content).with_context(|| format!("parsing {path:?}"))?;
+
+        let normalize = |m: std::collections::HashMap<String, String>| {
+            m.into_iter()
+                .map(|(k, v)| (k.trim().to_ascii_lowercase(), v.trim().to_ascii_lowercase()))
+                .collect()
+        };
+
+        Ok((normalize(raw.hints), normalize(raw.domains)))
+    }
+
     /// Load entity kind aliases from `config/entity_kind_aliases.yaml`.
     ///
     /// Returns a flat `HashMap<alias, canonical>` ready to pass to

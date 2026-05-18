@@ -17,7 +17,9 @@ use tracing::{info, warn};
 
 use sqlx::PgPool;
 
-use crate::entity_kind::canonicalize as canonicalize_entity_kind;
+use crate::entity_kind::{
+    canonicalize as canonicalize_entity_kind, subject_kind_for_domain, subject_kind_from_hint,
+};
 use dsl_core::config::types::*;
 use ob_templates::{TemplateDefinition, TemplateRegistry};
 
@@ -840,12 +842,12 @@ fn derive_subject_kinds(domain: &str, config: &VerbConfig) -> Vec<String> {
         inferred.extend(
             meta.noun
                 .iter()
-                .filter_map(|noun| derive_subject_kind_from_hint(noun)),
+                .filter_map(|noun| subject_kind_from_hint(noun)),
         );
         inferred.extend(
             meta.tags
                 .iter()
-                .filter_map(|tag| derive_subject_kind_from_hint(tag)),
+                .filter_map(|tag| subject_kind_from_hint(tag)),
         );
     }
 
@@ -854,7 +856,7 @@ fn derive_subject_kinds(domain: &str, config: &VerbConfig) -> Vec<String> {
         return inferred;
     }
 
-    vec![canonicalize_entity_kind(&domain_to_subject_kind(domain))]
+    vec![canonicalize_entity_kind(&subject_kind_for_domain(domain))]
 }
 
 fn dedupe_subject_kinds(mut kinds: Vec<String>) -> Vec<String> {
@@ -879,7 +881,7 @@ fn derive_subject_kinds_from_crud(config: &VerbConfig) -> Vec<String> {
     ]
     .into_iter()
     .flatten()
-    .filter_map(derive_subject_kind_from_hint)
+    .filter_map(subject_kind_from_hint)
     .collect()
 }
 
@@ -892,7 +894,7 @@ fn derive_subject_kind_from_arg(arg: &ArgConfig) -> Option<String> {
                 .as_deref()
                 .filter(|kind| !is_generic_lookup_kind(kind))
                 .map(canonicalize_entity_kind)
-                .or_else(|| derive_subject_kind_from_hint(&lookup.table))
+                .or_else(|| subject_kind_from_hint(&lookup.table))
         })
         .or_else(|| derive_subject_kind_from_arg_name(&arg.name))
 }
@@ -903,62 +905,11 @@ fn derive_subject_kind_from_arg_name(name: &str) -> Option<String> {
         .trim_end_matches("-id")
         .trim_end_matches("-ref")
         .trim_end_matches("-uuid");
-    derive_subject_kind_from_hint(trimmed)
+    subject_kind_from_hint(trimmed)
 }
 
-fn derive_subject_kind_from_hint(hint: &str) -> Option<String> {
-    let normalized = hint.trim().to_ascii_lowercase().replace('_', "-");
-    let kind = match normalized.as_str() {
-        "cbu" | "cbus" | "client-business-unit" | "client-business-units" | "structure" => "cbu",
-        "entity"
-        | "entities"
-        | "party"
-        | "parties"
-        | "company"
-        | "companies"
-        | "person"
-        | "people"
-        | "legal-entity"
-        | "legal-entities"
-        | "counterparty"
-        | "counterparties"
-        | "investment-manager"
-        | "investment-managers"
-        | "management-company"
-        | "management-companies"
-        | "depositary"
-        | "depositaries" => "entity",
-        "deal" | "deals" => "deal",
-        "contract" | "contracts" | "contract-pack" | "contract-packs" | "agreement" => "contract",
-        "document" | "documents" | "requirement" | "requirements" | "evidence" | "attachments" => {
-            "document"
-        }
-        "trading-profile"
-        | "trading-profiles"
-        | "mandate"
-        | "mandates"
-        | "ssi"
-        | "custody"
-        | "cbu-trading-profiles" => "trading-profile",
-        "billing" | "billings" | "billing-profile" | "billing-profiles" | "invoice"
-        | "invoices" | "fee" | "fees" => "billing-profile",
-        "fund" | "funds" | "sub-fund" | "sub-funds" | "umbrella" | "umbrellas" => "fund",
-        "investor" | "investors" | "holding" | "holdings" | "investor-register" => "investor",
-        "kyc-case"
-        | "kyc"
-        | "case"
-        | "cases"
-        | "tollgate"
-        | "tollgate-evaluations"
-        | "screening"
-        | "screenings" => "kyc-case",
-        "session" | "view" => "session",
-        "workflow" => "workflow",
-        _ => return None,
-    };
-    Some(canonicalize_entity_kind(kind))
-}
-
+/// Returns true for generic reference-data kinds that are not domain entities.
+/// Used to filter these out during subject kind inference.
 fn is_generic_lookup_kind(kind: &str) -> bool {
     matches!(
         canonicalize_entity_kind(kind).as_str(),
@@ -972,26 +923,6 @@ fn is_generic_lookup_kind(kind: &str) -> bool {
             | "team"
             | "security"
     )
-}
-
-fn domain_to_subject_kind(domain: &str) -> String {
-    match domain {
-        "cbu" | "cbu-role" | "role" => "cbu".into(),
-        "entity" | "entity-role" | "party" | "ownership" | "legal-entity" => "entity".into(),
-        "kyc" | "kyc-case" | "screening" => "kyc-case".into(),
-        "case" | "tollgate" => "kyc-case".into(),
-        "deal" => "deal".into(),
-        "contract" | "contract-pack" => "contract".into(),
-        "billing" => "billing-profile".into(),
-        "trading-profile" | "custody" | "ssi" | "mandate" => "trading-profile".into(),
-        "fund" => "fund".into(),
-        "investor" | "holding" => "investor".into(),
-        "document" | "requirement" => "document".into(),
-        "session" | "view" => "session".into(),
-        "gleif" | "research" => "entity".into(),
-        "workflow" | "bpmn" => "workflow".into(),
-        _ => domain.into(),
-    }
 }
 
 // =============================================================================
@@ -1213,16 +1144,29 @@ mod tests {
 
     #[test]
     fn test_subject_kind_hint_maps_case_and_party_surfaces() {
+        // Register a minimal ob-poc registry so lookups resolve in this test.
+        // OnceLock: if another test already set it, the set() is a no-op —
+        // the entries below must be present in subject_kind_registry.yaml.
+        use crate::entity_kind::{set_subject_kind_registry, SubjectKindRegistry};
+        let hints: std::collections::HashMap<String, String> =
+            [("party", "entity"), ("tollgate-evaluations", "kyc-case")]
+                .iter()
+                .map(|(k, v)| (k.to_string(), v.to_string()))
+                .collect();
+        let domains: std::collections::HashMap<String, String> =
+            [("party", "entity"), ("case", "kyc-case")]
+                .iter()
+                .map(|(k, v)| (k.to_string(), v.to_string()))
+                .collect();
+        set_subject_kind_registry(SubjectKindRegistry { hints, domains });
+
+        assert_eq!(subject_kind_from_hint("party"), Some("entity".to_string()));
         assert_eq!(
-            derive_subject_kind_from_hint("party"),
-            Some("entity".to_string())
-        );
-        assert_eq!(
-            derive_subject_kind_from_hint("tollgate_evaluations"),
+            subject_kind_from_hint("tollgate_evaluations"),
             Some("kyc-case".to_string())
         );
-        assert_eq!(domain_to_subject_kind("party"), "entity");
-        assert_eq!(domain_to_subject_kind("case"), "kyc-case");
+        assert_eq!(subject_kind_for_domain("party"), "entity");
+        assert_eq!(subject_kind_for_domain("case"), "kyc-case");
     }
 
     #[test]

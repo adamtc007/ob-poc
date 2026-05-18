@@ -1,0 +1,160 @@
+# Subject kind registry for ob-poc.
+#
+# Two tables used by dsl-analysis::runtime_registry to infer entity kinds
+# from DSL structure without hardcoding ob-poc vocabulary in shared code.
+#
+# Loaded at ob-poc-web startup via ConfigLoader::load_subject_kind_registry()
+# and registered with dsl_analysis::entity_kind::set_subject_kind_registry().
+#
+# Consumers on other platforms supply their own registry YAML; if absent,
+# both lookup functions return None / the input unchanged.
+
+# ---------------------------------------------------------------------------
+# hints: arg name hint → subject kind
+# Applied after stripping -id / -ref / -uuid suffixes from arg names.
+# Many-to-one: multiple hints can map to the same subject kind.
+# ---------------------------------------------------------------------------
+hints:
+  # CBU
+  cbu: cbu
+  cbus: cbu
+  client-business-unit: cbu
+  client-business-units: cbu
+  structure: cbu
+
+  # Entity / party
+  entity: entity
+  entities: entity
+  party: entity
+  parties: entity
+  company: entity
+  companies: entity
+  person: entity
+  people: entity
+  legal-entity: entity
+  legal-entities: entity
+  counterparty: entity
+  counterparties: entity
+  investment-manager: entity
+  investment-managers: entity
+  management-company: entity
+  management-companies: entity
+  depositary: entity
+  depositaries: entity
+
+  # Deal
+  deal: deal
+  deals: deal
+
+  # Contract
+  contract: contract
+  contracts: contract
+  contract-pack: contract
+  contract-packs: contract
+  agreement: contract
+
+  # Document
+  document: document
+  documents: document
+  requirement: document
+  requirements: document
+  evidence: document
+  attachments: document
+
+  # Trading profile / custody
+  trading-profile: trading-profile
+  trading-profiles: trading-profile
+  mandate: trading-profile
+  mandates: trading-profile
+  ssi: trading-profile
+  custody: trading-profile
+  cbu-trading-profiles: trading-profile
+
+  # Billing
+  billing: billing-profile
+  billings: billing-profile
+  billing-profile: billing-profile
+  billing-profiles: billing-profile
+  invoice: billing-profile
+  invoices: billing-profile
+  fee: billing-profile
+  fees: billing-profile
+
+  # Fund
+  fund: fund
+  funds: fund
+  sub-fund: fund
+  sub-funds: fund
+  umbrella: fund
+  umbrellas: fund
+
+  # Investor / holding
+  investor: investor
+  investors: investor
+  holding: investor
+  holdings: investor
+  investor-register: investor
+
+  # KYC case
+  kyc-case: kyc-case
+  kyc: kyc-case
+  case: kyc-case
+  cases: kyc-case
+  tollgate: kyc-case
+  tollgate-evaluations: kyc-case
+  screening: kyc-case
+  screenings: kyc-case
+
+  # Session / workflow
+  session: session
+  view: session
+  workflow: workflow
+
+# ---------------------------------------------------------------------------
+# domains: DSL domain name → primary subject kind
+# Used to infer what entity kind a verb domain primarily operates on.
+# ---------------------------------------------------------------------------
+domains:
+  cbu: cbu
+  cbu-role: cbu
+  role: cbu
+
+  entity: entity
+  entity-role: entity
+  party: entity
+  ownership: entity
+  legal-entity: entity
+
+  kyc: kyc-case
+  kyc-case: kyc-case
+  screening: kyc-case
+  case: kyc-case
+  tollgate: kyc-case
+
+  deal: deal
+
+  contract: contract
+  contract-pack: contract
+
+  billing: billing-profile
+
+  trading-profile: trading-profile
+  custody: trading-profile
+  ssi: trading-profile
+  mandate: trading-profile
+
+  fund: fund
+  investor: investor
+  holding: investor
+
+  document: document
+  requirement: document
+
+  session: session
+  view: session
+
+  gleif: entity
+  research: entity
+
+  workflow: workflow
+  bpmn: workflow

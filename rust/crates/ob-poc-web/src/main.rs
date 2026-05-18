@@ -397,17 +397,34 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let verb_sync_service = VerbSyncService::new(pool.clone());
     let config_loader = ConfigLoader::from_env();
 
-    // CR2: Load entity kind aliases from config and register with dsl-analysis.
-    // Replaces the hardcoded match arms that were previously in entity_kind::canonicalize().
+    // CR2: Load and register entity kind vocabulary tables.
+    // Replaces hardcoded ob-poc match arms in dsl-analysis.
     match config_loader.load_entity_kind_aliases() {
         Ok(aliases) => {
-            let count = aliases.len();
+            tracing::info!("Entity kind aliases loaded: {} entries", aliases.len());
             dsl_analysis::entity_kind::set_entity_kind_aliases(aliases);
-            tracing::info!("Entity kind aliases loaded: {} entries", count);
         }
         Err(e) => {
             tracing::warn!(
                 "Failed to load entity kind aliases: {} — canonicalization will be identity",
+                e
+            );
+        }
+    }
+    match config_loader.load_subject_kind_registry() {
+        Ok((hints, domains)) => {
+            tracing::info!(
+                "Subject kind registry loaded: {} hints, {} domains",
+                hints.len(),
+                domains.len()
+            );
+            dsl_analysis::entity_kind::set_subject_kind_registry(
+                dsl_analysis::entity_kind::SubjectKindRegistry { hints, domains },
+            );
+        }
+        Err(e) => {
+            tracing::warn!(
+                "Failed to load subject kind registry: {} — hint inference will return None",
                 e
             );
         }
