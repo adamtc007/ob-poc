@@ -27,33 +27,24 @@ pub fn predict_next_steps(
     for verb in reg.all_verbs() {
         let consumes = verb.consumes();
 
-        // Skip verbs that consume nothing (unless they are creation verbs like cbu.create)
-        // Creating a CBU is usually a starting step.
+        // Creation verbs (consume nothing, produce a new entity): suggest based on
+        // whether a binding of the produced type already exists in scope.
         if consumes.is_empty() {
-            if verb.domain == "cbu" && (verb.verb == "create" || verb.verb == "ensure") {
-                // Determine if we should suggest CBU creation
-                // If we don't have a CBU binding yet, this is a high priority
-                let has_cbu = bindings.all().any(|b| b.produced_type == "CBU");
-                if !has_cbu {
-                    suggestions.push(Suggestion {
-                        verb: verb.full_name(),
-                        score: 0.9,
-                        reason: "Start by creating a CBU".to_string(),
-                    });
-                } else {
-                    // We already have a CBU, creating another is possible but less likely
-                    suggestions.push(Suggestion {
-                        verb: verb.full_name(),
-                        score: 0.1,
-                        reason: "Create another CBU".to_string(),
-                    });
-                }
-            } else if verb.domain == "entity" && (verb.verb.starts_with("create")) {
-                // Entity creation is always valid if we have a CBU (implied context) or generally
+            if let Some(produces) = &verb.produces {
+                let produced_kind =
+                    crate::entity_kind::canonicalize(&produces.produced_type.to_lowercase());
+                let has_kind = bindings.all().any(|b| {
+                    crate::entity_kind::canonicalize(&b.produced_type.to_lowercase())
+                        == produced_kind
+                });
                 suggestions.push(Suggestion {
                     verb: verb.full_name(),
-                    score: 0.5,
-                    reason: "Create a new entity".to_string(),
+                    score: if has_kind { 0.1 } else { 0.9 },
+                    reason: if has_kind {
+                        format!("Create another {}", produced_kind)
+                    } else {
+                        format!("Start by creating a {}", produced_kind)
+                    },
                 });
             }
             continue;

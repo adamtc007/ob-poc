@@ -575,16 +575,16 @@ fn span_to_source_span(span: &Span, source: &str) -> SourceSpan {
     }
 }
 
-/// Determine what RefType a verb returns (for symbol bindings)
+/// Determine what RefType a verb returns (for symbol bindings).
+///
+/// Derives the type from the verb's domain via the registered subject kind
+/// table — no hardcoded ob-poc domain names.
 fn verb_return_type(verb: &str) -> RefType {
-    if verb.starts_with("cbu.") {
-        RefType::Cbu
-    } else if verb.starts_with("entity.") {
-        RefType::Entity
-    } else if verb.starts_with("document.") {
-        RefType::Document
-    } else {
-        RefType::Entity
+    let domain = verb.split('.').next().unwrap_or("");
+    match crate::entity_kind::subject_kind_for_domain(domain).as_str() {
+        "cbu" => RefType::Cbu,
+        "document" => RefType::Document,
+        _ => RefType::Entity,
     }
 }
 
