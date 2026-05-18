@@ -456,6 +456,21 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
     }
 
+    // CR2 (phrase_gen): Load noun vocabulary before load_verbs() so phrase
+    // enrichment can expand domain nouns during verb config loading.
+    match config_loader.load_phrase_gen_nouns() {
+        Ok(nouns) => {
+            tracing::info!("Phrase gen nouns loaded: {} domains", nouns.len());
+            ob_poc::dsl_v2::set_phrase_gen_nouns(nouns);
+        }
+        Err(e) => {
+            tracing::warn!(
+                "Failed to load phrase gen nouns: {} — phrases will not expand domain synonyms",
+                e
+            );
+        }
+    }
+
     // Tranche 3 Phase 3.F Stages 3+4 — log + seed catalogue source.
     // CATALOGUE_SOURCE=db enables forward-discipline: the catalogue is
     // loaded from `catalogue_committed_verbs` rather than YAML.

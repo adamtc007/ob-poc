@@ -465,6 +465,28 @@ impl ConfigLoader {
         Ok((normalize(raw.hints), normalize(raw.domains)))
     }
 
+    /// Load phrase generation noun vocabulary from `config/phrase_gen_nouns.yaml`.
+    ///
+    /// Returns a `HashMap<domain, Vec<noun_synonyms>>` ready to pass to
+    /// `dsl_core::config::set_phrase_gen_nouns()`. Must be called **before**
+    /// `load_verbs()` so phrase enrichment uses the registered vocabulary.
+    pub fn load_phrase_gen_nouns(&self) -> Result<super::phrase_gen::PhraseGenNouns> {
+        let path = Path::new(&self.config_dir).join("phrase_gen_nouns.yaml");
+        if !path.exists() {
+            tracing::warn!(
+                "phrase_gen_nouns.yaml not found at {:?} — \
+                 verb phrases will not expand domain noun synonyms",
+                path
+            );
+            return Ok(std::collections::HashMap::new());
+        }
+        let content =
+            std::fs::read_to_string(&path).with_context(|| format!("reading {path:?}"))?;
+        let raw: std::collections::HashMap<String, Vec<String>> =
+            serde_yaml::from_str(&content).with_context(|| format!("parsing {path:?}"))?;
+        Ok(raw)
+    }
+
     /// Load slot state table from `config/slot_state_table.yaml`.
     ///
     /// Returns a `HashMap<"workspace.slot", (table, status_col, pk)>` ready to pass to

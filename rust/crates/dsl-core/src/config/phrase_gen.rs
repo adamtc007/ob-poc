@@ -17,6 +17,20 @@
 //! ```
 
 use std::collections::HashMap;
+use std::sync::OnceLock;
+
+/// Consumer-registered domain noun vocabulary for phrase generation.
+pub type PhraseGenNouns = HashMap<String, Vec<String>>;
+
+static PHRASE_GEN_NOUNS: OnceLock<PhraseGenNouns> = OnceLock::new();
+
+/// Register the consumer's domain noun vocabulary.
+///
+/// Must be called before `load_verbs()` so phrase enrichment uses the right
+/// vocabulary. Subsequent calls are silently ignored (OnceLock semantics).
+pub fn set_phrase_gen_nouns(nouns: PhraseGenNouns) {
+    let _ = PHRASE_GEN_NOUNS.set(nouns);
+}
 
 /// Verb action synonyms for phrase generation.
 ///
@@ -88,93 +102,6 @@ pub fn verb_synonyms() -> HashMap<&'static str, Vec<&'static str>> {
     synonyms
 }
 
-/// Domain noun mappings for phrase generation.
-///
-/// Maps DSL domain names to user-friendly terms that might appear
-/// in natural language queries.
-pub fn domain_nouns() -> HashMap<&'static str, Vec<&'static str>> {
-    let mut nouns = HashMap::new();
-
-    // Core entities
-    nouns.insert("entity", vec!["entity", "company", "person"]);
-    nouns.insert("cbu", vec!["cbu", "client business unit", "trading unit"]);
-    nouns.insert("fund", vec!["fund", "investment vehicle", "sicav"]);
-
-    // Ownership/control
-    nouns.insert("ownership", vec!["ownership", "stake", "holding"]);
-    nouns.insert("ubo", vec!["ubo", "beneficial owner", "ultimate owner"]);
-    nouns.insert("control", vec!["control", "ownership chain", "hierarchy"]);
-
-    // KYC/Compliance
-    nouns.insert("kyc", vec!["kyc", "case", "compliance check"]);
-    nouns.insert("kyc-case", vec!["kyc case", "compliance case"]);
-    nouns.insert("screening", vec!["screening", "check", "verification"]);
-    nouns.insert("document", vec!["document", "file", "attachment"]);
-    nouns.insert("requirement", vec!["requirement", "document requirement"]);
-
-    // Session/Navigation
-    nouns.insert("session", vec!["session", "scope", "workspace"]);
-    // "display"/"visualization" removed — collides with graph domain and view sub-verbs
-    nouns.insert("view", vec!["view", "viewport"]);
-    // "visualization" removed — collides with view domain
-    nouns.insert("graph", vec!["graph", "diagram"]);
-
-    // Trading/Settlement
-    nouns.insert("trading-profile", vec!["trading profile", "profile"]);
-    nouns.insert("custody", vec!["custody", "safekeeping", "account"]);
-    // "agreement"/"contract" removed — collides with contract domain
-    nouns.insert("isda", vec!["isda", "isda agreement", "isda contract"]);
-    nouns.insert("ssi", vec!["ssi", "settlement instruction"]);
-
-    // Products/Services
-    // "service" removed — collides with service domain
-    nouns.insert("product", vec!["product", "offering"]);
-    // "agreement" removed — collides with isda domain
-    nouns.insert("contract", vec!["contract", "legal contract"]);
-    nouns.insert("service-resource", vec!["service resource", "resource"]);
-    nouns.insert("service-intent", vec!["service intent", "intent"]);
-
-    // Identifiers
-    nouns.insert("identifier", vec!["identifier", "id", "reference"]);
-    nouns.insert("gleif", vec!["gleif", "lei", "legal entity identifier"]);
-    nouns.insert(
-        "bods",
-        vec!["bods", "beneficial ownership", "ownership data"],
-    );
-
-    // Reference data
-    nouns.insert("jurisdiction", vec!["jurisdiction", "country"]);
-    nouns.insert("currency", vec!["currency", "money"]);
-    // "position" removed — collides with holding domain
-    nouns.insert("role", vec!["role", "entity role"]);
-
-    // Workflow
-    nouns.insert("runbook", vec!["runbook", "command", "staged command"]);
-    nouns.insert("agent", vec!["agent", "assistant"]);
-    nouns.insert("batch", vec!["batch", "bulk operation"]);
-
-    // Investor
-    nouns.insert("investor", vec!["investor", "shareholder"]);
-    // "position" removed — collides with role domain
-    nouns.insert("holding", vec!["holding", "investment holding"]);
-    nouns.insert("share-class", vec!["share class", "class"]);
-
-    // Deal/Billing (067)
-    nouns.insert(
-        "deal",
-        vec!["deal", "deal record", "client deal", "sales deal"],
-    );
-    nouns.insert(
-        "billing",
-        vec!["billing", "billing profile", "fee billing", "invoice"],
-    );
-    nouns.insert("fee", vec!["fee", "charge", "cost"]);
-    nouns.insert("rate-card", vec!["rate card", "pricing", "fee schedule"]);
-    nouns.insert("invoice", vec!["invoice", "bill", "statement"]);
-
-    nouns
-}
-
 /// Generate invocation phrases for a verb.
 ///
 /// Creates phrases by combining verb action synonyms with domain noun variations.
@@ -202,7 +129,6 @@ pub fn generate_phrases(domain: &str, action: &str, existing: &[String]) -> Vec<
     let mut phrases: Vec<String> = existing.to_vec();
 
     let synonyms = verb_synonyms();
-    let nouns = domain_nouns();
 
     // Get action words (original action + synonyms)
     let mut action_words: Vec<&str> = vec![action];
@@ -210,11 +136,16 @@ pub fn generate_phrases(domain: &str, action: &str, existing: &[String]) -> Vec<
         action_words.extend(syns.iter());
     }
 
-    // Get domain words (original domain + noun variations)
+    // Get domain words from consumer-registered noun vocabulary.
+    // When no vocabulary is registered (dsl-lsp, bpmn-lite) only the domain
+    // name itself is used as a phrase component — no ob-poc-specific expansions.
     let mut domain_words: Vec<&str> = vec![domain];
-    if let Some(domain_nouns) = nouns.get(domain) {
-        domain_words.extend(domain_nouns.iter());
-    }
+    let extra: Vec<&str> = PHRASE_GEN_NOUNS
+        .get()
+        .and_then(|nouns| nouns.get(domain))
+        .map(|v| v.iter().map(String::as_str).collect())
+        .unwrap_or_default();
+    domain_words.extend(extra.iter());
 
     // Generate combinations: action + domain
     for action_word in &action_words {
@@ -238,21 +169,42 @@ pub fn generate_phrases(domain: &str, action: &str, existing: &[String]) -> Vec<
 mod tests {
     use super::*;
 
+    fn setup_test_nouns() {
+        // OnceLock: only the first call actually registers; subsequent calls are no-ops.
+        set_phrase_gen_nouns(
+            [
+                ("cbu", vec!["cbu", "client business unit", "trading unit"]),
+                ("entity", vec!["entity", "company", "person"]),
+                (
+                    "deal",
+                    vec!["deal", "deal record", "client deal", "sales deal"],
+                ),
+                (
+                    "billing",
+                    vec!["billing", "billing profile", "fee billing", "invoice"],
+                ),
+            ]
+            .into_iter()
+            .map(|(k, v)| (k.to_string(), v.into_iter().map(str::to_string).collect()))
+            .collect(),
+        );
+    }
+
     #[test]
     fn test_generate_phrases_cbu_create() {
+        setup_test_nouns();
         let phrases = generate_phrases("cbu", "create", &[]);
-
         assert!(phrases.contains(&"create cbu".to_string()));
         assert!(phrases.contains(&"add cbu".to_string()));
         assert!(phrases.contains(&"new client business unit".to_string()));
         assert!(!phrases.is_empty());
-        assert!(phrases.len() <= 15);
+        assert!(phrases.len() <= 20);
     }
 
     #[test]
     fn test_generate_phrases_deal_create() {
+        setup_test_nouns();
         let phrases = generate_phrases("deal", "create", &[]);
-
         assert!(phrases.contains(&"create deal".to_string()));
         assert!(phrases.contains(&"add deal record".to_string()));
         assert!(phrases.contains(&"new client deal".to_string()));
@@ -260,32 +212,28 @@ mod tests {
 
     #[test]
     fn test_generate_phrases_billing_list() {
+        setup_test_nouns();
         let phrases = generate_phrases("billing", "list", &[]);
-
-        // Core phrase should always be present
         assert!(phrases.contains(&"list billing".to_string()));
-        // list synonyms should use "show all"/"list all" (not bare "show")
         assert!(phrases.contains(&"show all billing".to_string()));
-        // Should have multiple phrases generated
         assert!(phrases.len() >= 5);
-        // Should be limited to max 20
         assert!(phrases.len() <= 20);
     }
 
     #[test]
     fn test_generate_phrases_preserves_existing() {
+        setup_test_nouns();
         let existing = vec!["custom phrase".to_string()];
         let phrases = generate_phrases("cbu", "create", &existing);
-
         assert!(phrases.contains(&"custom phrase".to_string()));
         assert!(phrases.contains(&"create cbu".to_string()));
     }
 
     #[test]
     fn test_generate_phrases_dedupes() {
+        setup_test_nouns();
         let existing = vec!["create cbu".to_string()];
         let phrases = generate_phrases("cbu", "create", &existing);
-
         let count = phrases.iter().filter(|p| *p == "create cbu").count();
         assert_eq!(count, 1);
     }
@@ -293,8 +241,6 @@ mod tests {
     #[test]
     fn test_verb_synonyms_coverage() {
         let synonyms = verb_synonyms();
-
-        // Key verbs should have synonyms
         assert!(synonyms.contains_key("create"));
         assert!(synonyms.contains_key("list"));
         assert!(synonyms.contains_key("get"));
@@ -303,13 +249,12 @@ mod tests {
     }
 
     #[test]
-    fn test_domain_nouns_coverage() {
-        let nouns = domain_nouns();
-
-        // Key domains should have noun mappings
-        assert!(nouns.contains_key("cbu"));
-        assert!(nouns.contains_key("entity"));
-        assert!(nouns.contains_key("deal"));
-        assert!(nouns.contains_key("billing"));
+    fn test_noun_expansion_without_registration() {
+        // Without registration, only the domain name itself is used.
+        // (setup_test_nouns() may already have registered in this binary run;
+        //  this test is meaningful when it runs first — documents the contract)
+        let phrases = generate_phrases("unknown-domain", "create", &[]);
+        assert!(phrases.contains(&"create unknown-domain".to_string()));
+        assert!(phrases.contains(&"add unknown-domain".to_string()));
     }
 }

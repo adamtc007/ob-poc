@@ -1,0 +1,51 @@
+# Domain noun vocabulary for invocation phrase generation.
+#
+# Maps DSL domain names to user-friendly natural language terms used by
+# generate_phrases() to auto-generate verb invocation phrases.
+#
+# Loaded at startup (before load_verbs()) via
+# ConfigLoader::load_phrase_gen_nouns() and registered with
+# dsl_core::config::phrase_gen::set_phrase_gen_nouns().
+#
+# Format: domain_name → [noun, synonym, synonym, ...]
+# Consumers on other platforms supply their own noun YAML.
+
+entity: [entity, company, person]
+cbu: [cbu, client business unit, trading unit]
+fund: [fund, investment vehicle, sicav]
+
+ownership: [ownership, stake, holding]
+ubo: [ubo, beneficial owner, ultimate owner]
+control: [control, ownership chain, hierarchy]
+
+kyc: [kyc, case, compliance check]
+kyc-case: [kyc case, compliance case]
+screening: [screening, check, verification]
+document: [document, file, attachment]
+requirement: [requirement, document requirement]
+
+session: [session, scope, workspace]
+view: [view, viewport]
+graph: [graph, diagram]
+
+trading-profile: [trading profile, profile]
+custody: [custody, safekeeping, account]
+isda: [isda, isda agreement, isda contract]
+ssi: [ssi, settlement instruction]
+
+product: [product, offering]
+contract: [contract, legal contract]
+service-resource: [service resource, resource]
+service-intent: [service intent, intent]
+
+identifier: [identifier, id, reference]
+gleif: [gleif, lei, legal entity identifier]
+bods: [bods, beneficial ownership, ownership data]
+
+jurisdiction: [jurisdiction, country]
+currency: [currency, money]
+role: [role, entity role]
+deal: [deal, transaction, mandate arrangement]
+billing: [billing, billing profile, fee profile]
+investor: [investor, shareholder]
+holding: [holding, position, investment]

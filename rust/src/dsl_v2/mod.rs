@@ -46,7 +46,7 @@ pub use dsl_core::binding_context::{BindingContext, BindingInfo};
 // Config types
 pub use dsl_core::config;
 pub use dsl_core::config::types::LookupConfig;
-pub use dsl_core::config::ConfigLoader;
+pub use dsl_core::config::{set_phrase_gen_nouns, ConfigLoader, PhraseGenNouns};
 
 // Diagnostics
 pub use dsl_core::diagnostics;

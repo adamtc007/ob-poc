@@ -54,7 +54,7 @@ pub use escalation::{
     EvaluationContext,
 };
 pub use loader::ConfigLoader;
-pub use phrase_gen::generate_phrases;
+pub use phrase_gen::{generate_phrases, set_phrase_gen_nouns, PhraseGenNouns};
 pub use runbook_composition::{
     component_a, component_b, component_c, compute_runbook_tier, compute_runbook_tier_with_trace,
     AggregationRule, CrossScopeRule, RunbookStep, RunbookTierTrace,
