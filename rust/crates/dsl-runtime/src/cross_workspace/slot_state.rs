@@ -16,10 +16,31 @@
 //! See: docs/backlog/catalogue-platform-refinement-v1_3.md §3.3
 //! (runtime impact for V1.3-1 + V1.3-2)
 
+use std::collections::HashMap;
+use std::sync::OnceLock;
+
 use anyhow::{anyhow, Result};
 use async_trait::async_trait;
 use sqlx::{PgPool, Row};
 use uuid::Uuid;
+
+// ---------------------------------------------------------------------------
+// Consumer-supplied slot state table
+// ---------------------------------------------------------------------------
+
+/// Key: `"workspace.slot"`, Value: `(table, status_column, pk_column)`.
+pub type SlotStateTable = HashMap<String, (String, String, String)>;
+
+static SLOT_STATE_TABLE: OnceLock<SlotStateTable> = OnceLock::new();
+
+/// Register the consumer's slot state table.
+///
+/// Loaded from `config/slot_state_table.yaml` via
+/// `ConfigLoader::load_slot_state_table()`. Subsequent calls are ignored
+/// (OnceLock semantics).
+pub fn set_slot_state_table(table: SlotStateTable) {
+    let _ = SLOT_STATE_TABLE.set(table);
+}
 
 /// Read the current state of a slot for a specific entity.
 #[async_trait]
@@ -82,179 +103,23 @@ impl SlotStateProvider for PostgresSlotStateProvider {
     }
 }
 
-/// Static mapping from (workspace, slot) → (table, state_column, pk_column).
+/// Resolve (workspace, slot) → (table, state_column, pk_column).
 ///
-/// Returned tuple is `(table_name, state_column, primary_key_column)`.
-/// All names are unquoted-identifier-safe (alphanumeric + underscores).
-///
-/// Public so other modules in `cross_workspace::*` (e.g. the SQL
-/// predicate resolver) can resolve the same mapping when constructing
-/// predicate-driven queries.
-type SlotKey = (&'static str, &'static str);
-type SlotTarget = (&'static str, &'static str, &'static str);
-
-pub fn resolve_slot_table(
-    workspace: &str,
-    slot: &str,
-) -> Result<(&'static str, &'static str, &'static str)> {
-    let mapping: &[(SlotKey, SlotTarget)] = &[
-        // CBU workspace
-        (("cbu", "cbu"), ("cbus", "status", "cbu_id")),
-        (
-            ("cbu", "cbu_evidence"),
-            ("cbu_evidence", "verification_status", "evidence_id"),
-        ),
-        (
-            ("cbu", "service_consumption"),
-            ("cbu_service_consumption", "status", "consumption_id"),
-        ),
-        (
-            ("cbu", "trading_activity"),
-            ("cbu_trading_activity", "activity_state", "cbu_id"),
-        ),
-        (
-            ("cbu", "investor"),
-            ("investors", "lifecycle_state", "investor_id"),
-        ),
-        (
-            ("cbu", "investor_kyc"),
-            ("investors", "kyc_status", "investor_id"),
-        ),
-        (
-            ("cbu", "holding"),
-            ("holdings", "holding_status", "holding_id"),
-        ),
-        // Deal workspace
-        (("deal", "deal"), ("deals", "deal_status", "deal_id")),
-        (
-            ("deal", "deal_product"),
-            ("deal_products", "product_status", "deal_product_id"),
-        ),
-        (
-            ("deal", "deal_rate_card"),
-            ("deal_rate_cards", "status", "rate_card_id"),
-        ),
-        (
-            ("deal", "deal_onboarding_request"),
-            ("deal_onboarding_requests", "request_status", "request_id"),
-        ),
-        (
-            ("deal", "deal_document"),
-            ("deal_documents", "document_status", "document_id"),
-        ),
-        (
-            ("deal", "deal_ubo_assessment"),
-            ("deal_ubo_assessments", "assessment_status", "assessment_id"),
-        ),
-        (
-            ("deal", "billing_profile"),
-            ("fee_billing_profiles", "status", "profile_id"),
-        ),
-        (
-            ("deal", "billing_period"),
-            ("fee_billing_periods", "calc_status", "period_id"),
-        ),
-        (("deal", "deal_sla"), ("deal_slas", "sla_status", "sla_id")),
-        // R3.5 (2026-04-26): Booking Principal clearance hoisted to its own
-        // workspace (booking_principal_dag). Third leg of Adam's deal
-        // tollgate triad (BAC + KYC + BP). Per-deal-per-principal scope.
-        // Gates deal KYC_CLEARANCE → CONTRACTED via cross_workspace_constraint.
-        (
-            ("booking_principal", "clearance"),
-            ("booking_principal_clearances", "clearance_status", "id"),
-        ),
-        // KYC workspace
-        (("kyc", "kyc_case"), ("cases", "status", "case_id")),
-        (
-            ("kyc", "entity_workstream"),
-            ("entity_workstreams", "status", "workstream_id"),
-        ),
-        (
-            ("kyc", "screening"),
-            ("screenings", "status", "screening_id"),
-        ),
-        // IM workspace
-        (
-            ("instrument_matrix", "trading_profile"),
-            ("cbu_trading_profiles", "status", "profile_id"),
-        ),
-        (
-            ("instrument_matrix", "trading_activity"),
-            ("cbu_trading_activity", "activity_state", "cbu_id"),
-        ),
-        // v1.2 Phase 2.C revisit (2026-04-26) — added 6 IM dispatch
-        // entries to unblock the 14 grandfathered transition verbs
-        // (legacy `transitions:` block, no `transition_args:`). The
-        // table targets match `simple_status_op.rs::STATUS_FLIP_VERBS`.
-        (
-            ("instrument_matrix", "corporate_action_event"),
-            ("corporate_action_events", "status", "event_id"),
-        ),
-        (
-            ("instrument_matrix", "settlement_pattern_template"),
-            ("cbu_settlement_chains", "status", "chain_id"),
-        ),
-        (
-            ("instrument_matrix", "trade_gateway"),
-            ("cbu_gateway_connectivity", "status", "connectivity_id"),
-        ),
-        (
-            ("instrument_matrix", "service_resource"),
-            ("cbu_lifecycle_instances", "status", "instance_id"),
-        ),
-        (
-            ("instrument_matrix", "collateral_management"),
-            ("cbu_collateral_management", "status", "collateral_id"),
-        ),
-        (
-            ("instrument_matrix", "reconciliation"),
-            ("cbu_reconciliation_configs", "status", "config_id"),
-        ),
-        // SemOS workspace
-        (
-            ("semos_maintenance", "changeset"),
-            ("changesets", "status", "changeset_id"),
-        ),
-        (
-            ("semos_maintenance", "attribute_def"),
-            ("attribute_defs", "lifecycle_status", "attribute_def_id"),
-        ),
-        (
-            ("semos_maintenance", "manco"),
-            (
-                "manco_regulatory_status",
-                "regulatory_status",
-                "manco_entity_id",
-            ),
-        ),
-        // Product-maintenance workspace (R2 — service catalogue lifecycle)
-        (
-            ("product_maintenance", "service"),
-            ("services", "lifecycle_status", "service_id"),
-        ),
-        (
-            ("product_maintenance", "service_version"),
-            ("service_versions", "lifecycle_status", "id"),
-        ),
-        // Lifecycle Resources workspace (Tranche 4 R1)
-        (
-            ("lifecycle_resources", "application_instance"),
-            ("application_instances", "lifecycle_status", "id"),
-        ),
-        (
-            ("lifecycle_resources", "capability_binding"),
-            ("capability_bindings", "binding_status", "id"),
-        ),
-    ];
-    for ((ws, sl), value) in mapping {
-        if *ws == workspace && *sl == slot {
-            return Ok(*value);
-        }
-    }
-    Err(anyhow!(
-        "no SlotStateProvider mapping for ({workspace}, {slot}) — \
-         add an entry in cross_workspace::slot_state::resolve_slot"
-    ))
+/// Looks up the consumer-registered slot state table (set via
+/// [`set_slot_state_table`], loaded from `config/slot_state_table.yaml`).
+/// Returns `Err` if no table is registered or the pair is not found.
+pub fn resolve_slot_table(workspace: &str, slot: &str) -> Result<(String, String, String)> {
+    let key = format!("{workspace}.{slot}");
+    SLOT_STATE_TABLE
+        .get()
+        .and_then(|t| t.get(&key))
+        .cloned()
+        .ok_or_else(|| {
+            anyhow!(
+                "no SlotStateProvider mapping for ({workspace}, {slot}) — \
+                 register an entry via set_slot_state_table() / slot_state_table.yaml"
+            )
+        })
 }
 
 // ---------------------------------------------------------------------------
@@ -267,7 +132,36 @@ mod tests {
 
     #[test]
     fn resolve_slot_known_pairs() {
-        // Spot-check that the canonical cross-workspace lookups resolve.
+        // Register a minimal ob-poc slot table for this test.
+        // OnceLock: idempotent; safe across test runs.
+        set_slot_state_table(
+            [
+                ("cbu.cbu", ("cbus", "status", "cbu_id")),
+                ("kyc.kyc_case", ("cases", "status", "case_id")),
+                ("deal.deal", ("deals", "deal_status", "deal_id")),
+                (
+                    "instrument_matrix.trading_profile",
+                    ("cbu_trading_profiles", "status", "profile_id"),
+                ),
+                (
+                    "semos_maintenance.manco",
+                    (
+                        "manco_regulatory_status",
+                        "regulatory_status",
+                        "manco_entity_id",
+                    ),
+                ),
+            ]
+            .into_iter()
+            .map(|(k, (t, sc, pk))| {
+                (
+                    k.to_string(),
+                    (t.to_string(), sc.to_string(), pk.to_string()),
+                )
+            })
+            .collect(),
+        );
+
         let cases = [
             (("cbu", "cbu"), ("cbus", "status", "cbu_id")),
             (("kyc", "kyc_case"), ("cases", "status", "case_id")),
@@ -285,10 +179,12 @@ mod tests {
                 ),
             ),
         ];
-        for ((ws, slot), expected) in cases {
+        for ((ws, slot), (t, sc, pk)) in cases {
             let got = resolve_slot_table(ws, slot)
                 .unwrap_or_else(|_| panic!("({ws}, {slot}) should resolve"));
-            assert_eq!(got, expected, "mismatch for ({ws}, {slot})");
+            assert_eq!(got.0, t, "table mismatch for ({ws}, {slot})");
+            assert_eq!(got.1, sc, "status_col mismatch for ({ws}, {slot})");
+            assert_eq!(got.2, pk, "pk mismatch for ({ws}, {slot})");
         }
     }
 

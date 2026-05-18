@@ -152,5 +152,6 @@ pub use hierarchy_cascade::{
     CascadeAction, CascadePlanner, ChildEntityResolver, NoChildrenResolver,
 };
 pub use postgres_child_resolver::PostgresChildEntityResolver;
+pub use slot_state::set_slot_state_table;
 pub use slot_state::{PostgresSlotStateProvider, SlotStateProvider};
 pub use sql_predicate_resolver::{set_table_pk_overrides, SqlPredicateResolver};

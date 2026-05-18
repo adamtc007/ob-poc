@@ -465,6 +465,46 @@ impl ConfigLoader {
         Ok((normalize(raw.hints), normalize(raw.domains)))
     }
 
+    /// Load slot state table from `config/slot_state_table.yaml`.
+    ///
+    /// Returns a `HashMap<"workspace.slot", (table, status_col, pk)>` ready to pass to
+    /// `dsl_runtime::cross_workspace::set_slot_state_table()`.
+    /// Returns an empty map (with a warning) if the file is absent.
+    pub fn load_slot_state_table(
+        &self,
+    ) -> Result<std::collections::HashMap<String, (String, String, String)>> {
+        let path = Path::new(&self.config_dir).join("slot_state_table.yaml");
+        if !path.exists() {
+            tracing::warn!(
+                "slot_state_table.yaml not found at {:?} — \
+                 PostgresSlotStateProvider will fail all slot lookups",
+                path
+            );
+            return Ok(std::collections::HashMap::new());
+        }
+        let content =
+            std::fs::read_to_string(&path).with_context(|| format!("reading {path:?}"))?;
+
+        #[derive(serde::Deserialize)]
+        #[serde(transparent)]
+        struct RawTable(std::collections::HashMap<String, Vec<String>>);
+
+        let raw: RawTable =
+            serde_yaml::from_str(&content).with_context(|| format!("parsing {path:?}"))?;
+
+        let mut out = std::collections::HashMap::new();
+        for (key, parts) in raw.0 {
+            if parts.len() != 3 {
+                anyhow::bail!(
+                    "{path:?}: entry {key:?} must have exactly 3 elements [table, status_col, pk], got {}",
+                    parts.len()
+                );
+            }
+            out.insert(key, (parts[0].clone(), parts[1].clone(), parts[2].clone()));
+        }
+        Ok(out)
+    }
+
     /// Load table PK overrides from `config/table_pk_overrides.yaml`.
     ///
     /// Returns a flat `HashMap<table_name, pk_column>` ready to pass to

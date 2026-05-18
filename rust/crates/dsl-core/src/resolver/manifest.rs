@@ -146,14 +146,10 @@ fn needs_closure(slot: &ResolvedSlot) -> bool {
 
 fn needs_eligibility(slot: &ResolvedSlot) -> bool {
     !slot.entity_kinds.is_empty()
-        || matches!(
-            slot.id.as_str(),
-            "cbu" | "entity_proper_person" | "entity_limited_company_ubo" | "manco"
-        )
 }
 
 fn needs_entry_state(slot: &ResolvedSlot) -> bool {
-    slot.state_machine.is_some() || slot.id == "cbu"
+    slot.state_machine.is_some()
 }
 
 fn needs_cardinality_max(slot: &ResolvedSlot) -> bool {

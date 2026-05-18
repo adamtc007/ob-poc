@@ -442,6 +442,19 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             );
         }
     }
+    // CR3 (continued): Load slot state table (replaces static dispatch in resolve_slot_table).
+    match config_loader.load_slot_state_table() {
+        Ok(table) => {
+            tracing::info!("Slot state table loaded: {} entries", table.len());
+            dsl_runtime::cross_workspace::set_slot_state_table(table);
+        }
+        Err(e) => {
+            tracing::warn!(
+                "Failed to load slot state table: {} — slot state lookups will fail",
+                e
+            );
+        }
+    }
 
     // Tranche 3 Phase 3.F Stages 3+4 — log + seed catalogue source.
     // CATALOGUE_SOURCE=db enables forward-discipline: the catalogue is
