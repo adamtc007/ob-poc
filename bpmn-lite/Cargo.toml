@@ -8,33 +8,60 @@ members = [
     "bpmn-lite-store-postgres",
     "bpmn-lite-types",
     "bpmn-lite-vm",
+    "dmn-lite-analysis",
+    "dmn-lite-bridge",
+    "dmn-lite-compiler",
+    "dmn-lite-engine",
+    "dmn-lite-parser",
+    "dmn-lite-types",
     "ffi-catalogue",
     "ffi-dispatcher",
     "ffi-types",
+    "bpmn-lite-analysis",
+    "bpmn-lite-ffi-http",
+    "bpmn-lite-ffi-grpc",
     "xtask",
 ]
-resolver = "2"
+resolver = "3"
 
-# Pub-discipline ratchet (bpmn-lite cleanup Phase 0.1).
-# Every retained `pub` must be reachable from the crate's public root
-# (lib.rs / main.rs). Items that aren't get an unreachable_pub error
-# at build time. Each crate opts in via `[lints] workspace = true`.
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.95"
+authors = ["Adam Cearns <adamtc007@gmail.com>"]
+license = "MIT"
+repository = "https://github.com/adamtc007/bpmn-lite"
+description = "bpmn-lite: Rust-native process vocabulary — BPMN compiler, fiber VM, FFI catalogue, gRPC server, and dmn-lite decision vocabulary"
+
+# Pub-discipline ratchet — every retained `pub` must be reachable from the
+# crate's public root. Each crate opts in via `[lints] workspace = true`.
 [workspace.lints.rust]
 unreachable_pub = "deny"
 
 [workspace.dependencies]
+# Shared across bpmn-lite and dmn-lite crates
 uuid = { version = "1", features = ["v7", "serde"] }
 serde = { version = "1", features = ["derive", "rc"] }
 serde_json = "1"
 async-trait = "0.1"
 thiserror = "2"
-sha2 = "0.10"
+blake3 = "1"
 petgraph = "0.6"
-tokio = { version = "1", features = ["rt-multi-thread", "macros", "time", "sync"] }
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "time", "sync", "signal"] }
 anyhow = "1"
 tonic = "0.12"
+tonic-health = "0.12"
 prost = "0.13"
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 sqlx = { version = "0.8", features = ["runtime-tokio-rustls", "postgres", "uuid", "chrono", "json"] }
 chrono = { version = "0.4", features = ["serde"] }
+# dmn-lite workspace deps (carried over)
+smallvec = { version = "1", features = ["serde"] }
+toml = "0.8"
+reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
+axum = "0.7"
+# ob-poc-types: git dep pinned to the ob-poc commit that this platform was
+# last built and tested against. Bump deliberately when ob-poc-types interface changes.
+# Pin: 397470cb (ob-poc codex/acp-workflow-validity-harness, 2026-05-16)
+ob-poc-types = { git = "https://github.com/adamtc007/ob-poc.git", rev = "397470cb" }

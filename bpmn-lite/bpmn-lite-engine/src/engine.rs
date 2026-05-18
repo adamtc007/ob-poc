@@ -54,6 +54,9 @@ pub struct CompileResult {
     pub bytecode_version: [u8; 32],
     pub task_types: Vec<String>,
     pub diagnostics: Vec<String>,
+    /// Maps FlagKey (u32) → symbolic data-object name.
+    /// Clients use this to address flags by name via `orch_flags` keys like `"flag_<N>"`.
+    pub flag_symbol_table: std::collections::BTreeMap<u32, String>,
 }
 
 /// Snapshot of a process instance for the Inspect RPC.
@@ -163,6 +166,7 @@ impl BpmnLiteEngine {
         Ok(())
     }
 
+    /// A19 — Combined pickup guard: tenant check then integrity verification.
     async fn claim_transition_as(&self, instance_id: Uuid, owner: &str) -> Result<()> {
         let claimed = self
             .store
@@ -247,6 +251,7 @@ impl BpmnLiteEngine {
 
         let bytecode_version = program.bytecode_version;
         let task_types = program.task_manifest.clone();
+        let flag_symbol_table = program.flag_symbol_table.clone();
 
         self.store.store_program(bytecode_version, &program).await?;
 
@@ -254,7 +259,16 @@ impl BpmnLiteEngine {
             bytecode_version,
             task_types,
             diagnostics: vec![],
+            flag_symbol_table,
         })
+    }
+
+    /// Load a previously compiled program by its bytecode_version hash.
+    pub async fn load_program(
+        &self,
+        bytecode_version: [u8; 32],
+    ) -> Result<Option<CompiledProgram>> {
+        self.store.load_program(bytecode_version).await
     }
 
     /// Persist an already-compiled program through this engine's
@@ -284,6 +298,7 @@ impl BpmnLiteEngine {
 
         let bytecode_version = program.bytecode_version;
         let task_types = program.task_manifest.clone();
+        let flag_symbol_table = program.flag_symbol_table.clone();
 
         self.store.store_program(bytecode_version, &program).await?;
 
@@ -291,6 +306,7 @@ impl BpmnLiteEngine {
             bytecode_version,
             task_types,
             diagnostics: vec![],
+            flag_symbol_table,
         })
     }
 
@@ -341,6 +357,9 @@ impl BpmnLiteEngine {
             entry_id: params.entry_id,
             runbook_id: params.runbook_id,
             created_at: now_ms(),
+            // integrity_hash and quarantine_state are set/managed by the store.
+            integrity_hash: None,
+            quarantine_state: None,
         };
         let fiber_id = Uuid::now_v7();
         let root_fiber = Fiber::new(fiber_id, 0);
@@ -434,104 +453,116 @@ impl BpmnLiteEngine {
 
             // Inner loop allows re-running the fiber after an in-process FFI call.
             loop {
-            let outcome = vm
-                .run_fiber(&mut fiber, &mut instance, &program, 1000)
-                .await?;
+                let outcome = vm
+                    .run_fiber(&mut fiber, &mut instance, &program, 1000)
+                    .await?;
 
-            // Save updated instance (flags + counters)
-            self.store.save_instance(&instance).await?;
+                // Save updated instance (flags + counters)
+                self.store.save_instance(&instance).await?;
 
-            match outcome {
-                TickOutcome::ExecFfi { template_id: _, pc, invocation_id } => {
-                    let incident = self
-                        .handle_ffi_dispatch(&mut instance, &mut fiber, &program, invocation_id, pc)
-                        .await?;
-                    if incident {
-                        // Fiber parked on incident — stop inner loop.
-                        break;
-                    }
-                    // Dispatch succeeded (Success or NoMatch) — fiber.pc advanced.
-                    // Continue inner loop to keep running the fiber.
-                    continue;
-                }
-                TickOutcome::Parked(WaitState::Job { .. }) => {
-                    // Job enqueued by VM — leave in queue for activate_jobs()
-                    break;
-                }
-                TickOutcome::Ended => {
-                    // Fiber ended — check if all fibers are done
-                    let remaining = self.store.load_fibers(instance_id).await?;
-                    if remaining.is_empty() {
-                        self.store
-                            .update_instance_state(
-                                instance_id,
-                                ProcessState::Completed { at: now_ms() },
+                match outcome {
+                    TickOutcome::ExecFfi {
+                        template_id: _,
+                        pc,
+                        invocation_id,
+                    } => {
+                        let incident = self
+                            .handle_ffi_dispatch(
+                                &mut instance,
+                                &mut fiber,
+                                &program,
+                                invocation_id,
+                                pc,
                             )
                             .await?;
-                        self.store
-                            .append_event(instance_id, &RuntimeEvent::Completed { at: now_ms() })
-                            .await?;
-                    }
-                    break;
-                }
-                TickOutcome::Terminated => {
-                    // EndTerminate: kill the entire instance immediately.
-                    let terminating_fiber_id = fiber.fiber_id;
-
-                    // 1. Emit WaitCancelled for all OTHER fibers with active waits
-                    let all_fibers = self.store.load_fibers(instance_id).await?;
-                    for other in &all_fibers {
-                        if other.fiber_id == terminating_fiber_id {
-                            continue;
+                        if incident {
+                            // Fiber parked on incident — stop inner loop.
+                            break;
                         }
-                        let wait_desc = describe_wait(&other.wait);
-                        if !wait_desc.is_empty() {
+                        // Dispatch succeeded (Success or NoMatch) — fiber.pc advanced.
+                        // Continue inner loop to keep running the fiber.
+                        continue;
+                    }
+                    TickOutcome::Parked(WaitState::Job { .. }) => {
+                        // Job enqueued by VM — leave in queue for activate_jobs()
+                        break;
+                    }
+                    TickOutcome::Ended => {
+                        // Fiber ended — check if all fibers are done
+                        let remaining = self.store.load_fibers(instance_id).await?;
+                        if remaining.is_empty() {
+                            self.store
+                                .update_instance_state(
+                                    instance_id,
+                                    ProcessState::Completed { at: now_ms() },
+                                )
+                                .await?;
                             self.store
                                 .append_event(
                                     instance_id,
-                                    &RuntimeEvent::WaitCancelled {
-                                        fiber_id: other.fiber_id,
-                                        wait_desc,
-                                        reason: "terminate_end_event".to_string(),
-                                    },
+                                    &RuntimeEvent::Completed { at: now_ms() },
                                 )
                                 .await?;
                         }
+                        break;
                     }
+                    TickOutcome::Terminated => {
+                        // EndTerminate: kill the entire instance immediately.
+                        let terminating_fiber_id = fiber.fiber_id;
 
-                    // 2. Purge pending/inflight jobs
-                    self.store.cancel_jobs_for_instance(instance_id).await?;
+                        // 1. Emit WaitCancelled for all OTHER fibers with active waits
+                        let all_fibers = self.store.load_fibers(instance_id).await?;
+                        for other in &all_fibers {
+                            if other.fiber_id == terminating_fiber_id {
+                                continue;
+                            }
+                            let wait_desc = describe_wait(&other.wait);
+                            if !wait_desc.is_empty() {
+                                self.store
+                                    .append_event(
+                                        instance_id,
+                                        &RuntimeEvent::WaitCancelled {
+                                            fiber_id: other.fiber_id,
+                                            wait_desc,
+                                            reason: "terminate_end_event".to_string(),
+                                        },
+                                    )
+                                    .await?;
+                            }
+                        }
 
-                    // 3. Delete ALL fibers (including the terminating one)
-                    self.store.delete_all_fibers(instance_id).await?;
+                        // 2. Purge pending/inflight jobs
+                        self.store.cancel_jobs_for_instance(instance_id).await?;
 
-                    // 4. Set state → Terminated
-                    let at = now_ms();
-                    self.store
-                        .update_instance_state(instance_id, ProcessState::Terminated { at })
-                        .await?;
+                        // 3. Delete ALL fibers (including the terminating one)
+                        self.store.delete_all_fibers(instance_id).await?;
 
-                    // 5. Emit Terminated event
-                    self.store
-                        .append_event(
-                            instance_id,
-                            &RuntimeEvent::Terminated {
-                                at,
-                                fiber_id: terminating_fiber_id,
-                            },
-                        )
-                        .await?;
+                        // 4. Set state → Terminated
+                        let at = now_ms();
+                        self.store
+                            .update_instance_state(instance_id, ProcessState::Terminated { at })
+                            .await?;
 
-                    // 6. BREAK — no more fibers to process
-                    break 'fiber_loop;
+                        // 5. Emit Terminated event
+                        self.store
+                            .append_event(
+                                instance_id,
+                                &RuntimeEvent::Terminated {
+                                    at,
+                                    fiber_id: terminating_fiber_id,
+                                },
+                            )
+                            .await?;
+
+                        // 6. BREAK — no more fibers to process
+                        break 'fiber_loop;
+                    }
+                    _ => {
+                        // Continue → hit max_steps; parked on timer/msg/join/race/incident → break inner loop
+                        break;
+                    }
                 }
-                _ => {
-                    // Continue → hit max_steps; parked on timer/msg/join/race/incident → break inner loop
-                    break;
-                }
-            }
             } // end inner FFI-retry loop
-
         } // end 'fiber_loop
 
         // --- Boundary timer promotion pass: Job → Race ---
@@ -869,9 +900,10 @@ impl BpmnLiteEngine {
         };
 
         // Get the compiled task declaration for this instruction.
-        let task_decl = program.ffi_task_decls.get(&pc).ok_or_else(|| {
-            anyhow!("ExecFfi at pc={} has no FfiTaskDecl in CompiledProgram", pc)
-        })?;
+        let task_decl = program
+            .ffi_task_decls
+            .get(&pc)
+            .ok_or_else(|| anyhow!("ExecFfi at pc={} has no FfiTaskDecl in CompiledProgram", pc))?;
 
         // Caller task id for audit.
         let caller_task_id = program
@@ -885,9 +917,7 @@ impl BpmnLiteEngine {
         let input_payload = serde_json::to_vec(&input_obj)?;
 
         // Look up owner_type for audit.
-        let owner_type = dispatcher
-            .owner_type_for(&task_decl.template_id)
-            .await;
+        let owner_type = dispatcher.owner_type_for(&task_decl.template_id).await;
 
         // Write Pending audit event (before dispatch — A2 §9).
         self.store
@@ -935,7 +965,11 @@ impl BpmnLiteEngine {
                 self.store.save_instance(instance).await?;
                 Ok(true)
             }
-            Ok(FfiResult::Success { output_payload, trace_payload: _, new_domain_payload }) => {
+            Ok(FfiResult::Success {
+                output_payload,
+                trace_payload: _,
+                new_domain_payload,
+            }) => {
                 // Apply output bindings.
                 if let Some(new_payload) = new_domain_payload {
                     instance.domain_payload = Arc::<str>::from(new_payload.as_str());
@@ -975,7 +1009,11 @@ impl BpmnLiteEngine {
                 self.store.save_fiber(instance.instance_id, fiber).await?;
                 Ok(false)
             }
-            Ok(FfiResult::Incident { error_class, message, retry_hint_ms: _ }) => {
+            Ok(FfiResult::Incident {
+                error_class,
+                message,
+                retry_hint_ms: _,
+            }) => {
                 let ec = ffi_incident_class_to_error_class(error_class);
                 // Check error_route_map for BusinessRejection routing.
                 if let ErrorClass::BusinessRejection { ref rejection_code } = ec {
@@ -1093,15 +1131,11 @@ impl BpmnLiteEngine {
         for binding in &task_decl.inputs {
             let value: serde_json::Value = match &binding.source {
                 BindingSource::Literal(lit) => literal_to_json(lit),
-                BindingSource::FlagRef(key) => {
-                    match instance.flags.get(key) {
-                        Some(Value::Bool(b)) => serde_json::Value::Bool(*b),
-                        Some(Value::I64(n)) => serde_json::Value::Number((*n).into()),
-                        Some(Value::Str(_)) | Some(Value::Ref(_)) | None => {
-                            serde_json::Value::Null
-                        }
-                    }
-                }
+                BindingSource::FlagRef(key) => match instance.flags.get(key) {
+                    Some(Value::Bool(b)) => serde_json::Value::Bool(*b),
+                    Some(Value::I64(n)) => serde_json::Value::Number((*n).into()),
+                    Some(Value::Str(_)) | Some(Value::Ref(_)) | None => serde_json::Value::Null,
+                },
                 BindingSource::DomainPayloadRef(path) => {
                     if let Some(ref root) = parsed_payload {
                         json_path::read(root, path).unwrap_or(serde_json::Value::Null)
@@ -2088,6 +2122,155 @@ impl BpmnLiteEngine {
 
     pub async fn health_check(&self) -> Result<()> {
         self.store.health_check().await
+    }
+
+    /// A17 — Scan running instances for interrupted FFI calls and recover.
+    ///
+    /// - **Idempotent / IdempotentWithKey:** no action — tick loop re-invokes.
+    /// - **NonIdempotent:** creates an Incident on the stalled fiber and marks
+    ///   the instance Failed. Operator must resolve the incident manually.
+    ///
+    /// Returns the number of interrupted calls processed.
+    pub async fn detect_interrupted_ffi_calls(&self, tenant_id: &str) -> Result<usize> {
+        use bpmn_lite_types::events::RuntimeEvent;
+        use ffi_types::Idempotency;
+        use std::collections::HashSet;
+
+        let Some(dispatcher) = &self.ffi_dispatcher else {
+            return Ok(0);
+        };
+
+        let running = self.store.list_running_instances(tenant_id).await?;
+        let mut count = 0usize;
+
+        for instance_id in running {
+            // A19 note: integrity verification is NOT performed here.
+            // This scan runs at startup before the scheduler loop; the
+            // scheduler's first tick of each instance fires Boundary (a)
+            // verification within seconds. Adding load_instance here would
+            // double DB calls for 10k+ running instances (~10s extra startup
+            // latency). Boundary (a) + (b) provide sufficient coverage.
+            let events = self.store.read_events(instance_id, 0).await?;
+
+            let completed_ids: HashSet<Uuid> = events
+                .iter()
+                .filter_map(|(_, ev)| match ev {
+                    RuntimeEvent::FfiInvocationCompleted { invocation_id, .. } => {
+                        Some(*invocation_id)
+                    }
+                    _ => None,
+                })
+                .collect();
+
+            for (_, ev) in &events {
+                let RuntimeEvent::FfiInvocationPending {
+                    invocation_id,
+                    template_id_hex,
+                    caller_task_id,
+                    caller_pc,
+                    owner_type,
+                } = ev
+                else {
+                    continue;
+                };
+
+                if completed_ids.contains(invocation_id) {
+                    continue;
+                }
+                count += 1;
+
+                // Decode template_id from 64-char hex.
+                let template_id: Option<[u8; 32]> = (template_id_hex.len() == 64)
+                    .then(|| {
+                        (0..32)
+                            .map(|i| {
+                                u8::from_str_radix(&template_id_hex[i * 2..i * 2 + 2], 16).ok()
+                            })
+                            .collect::<Option<Vec<u8>>>()
+                    })
+                    .flatten()
+                    .and_then(|v| v.try_into().ok());
+
+                let idempotency = if let Some(tid) = &template_id {
+                    dispatcher.idempotency_for(tid).await
+                } else {
+                    None
+                };
+
+                match &idempotency {
+                    Some(Idempotency::NonIdempotent) => {
+                        tracing::warn!(
+                            %instance_id, %invocation_id,
+                            template_id = %&template_id_hex[..16],
+                            %owner_type, %caller_task_id,
+                            "A17: non-idempotent FFI call interrupted — creating incident"
+                        );
+
+                        let result: Result<()> = async {
+                            let mut instance = self.store.load_instance(instance_id).await?
+                                .ok_or_else(|| anyhow!("A17: instance {} not found", instance_id))?;
+
+                            if !matches!(instance.state, ProcessState::Running) {
+                                return Ok(());
+                            }
+
+                            // Fibers are stored separately from the instance.
+                            let mut fibers = self.store.load_fibers(instance_id).await?;
+                            let fiber_idx = fibers.iter().position(|f| f.pc == *caller_pc);
+                            let Some(idx) = fiber_idx else {
+                                tracing::warn!(%instance_id, "A17: fiber at pc={} not found; skipping", caller_pc);
+                                return Ok(());
+                            };
+
+                            let incident_id = Uuid::now_v7();
+                            let fiber = &fibers[idx];
+                            let incident = Incident {
+                                incident_id,
+                                process_instance_id: instance_id,
+                                fiber_id: fiber.fiber_id,
+                                service_task_id: caller_task_id.clone(),
+                                bytecode_addr: *caller_pc,
+                                error_class: ErrorClass::ContractViolation,
+                                message: format!(
+                                    "non-idempotent FFI call to {} interrupted at restart; manual resolution required",
+                                    &template_id_hex[..16]
+                                ),
+                                retry_count: 0,
+                                created_at: now_ms(),
+                                resolved_at: None,
+                                resolution: None,
+                            };
+                            self.store.save_incident(&incident).await?;
+                            self.store.append_event(instance_id, &RuntimeEvent::IncidentCreated {
+                                incident_id,
+                                service_task_id: caller_task_id.clone(),
+                                job_key: None,
+                            }).await?;
+
+                            fibers[idx].wait = WaitState::Incident { incident_id };
+                            self.store.save_fiber(instance_id, &fibers[idx]).await?;
+                            instance.state = ProcessState::Failed { incident_id };
+                            self.store.save_instance(&instance).await?;
+                            Ok(())
+                        }.await;
+
+                        if let Err(e) = result {
+                            tracing::warn!(%instance_id, error = %e, "A17: incident creation failed");
+                        }
+                    }
+                    _ => {
+                        tracing::info!(
+                            %instance_id, %invocation_id,
+                            template_id = %&template_id_hex[..16],
+                            %owner_type, %caller_task_id,
+                            "A17: idempotent FFI call interrupted — tick loop will re-invoke"
+                        );
+                    }
+                }
+            }
+        }
+
+        Ok(count)
     }
 }
 

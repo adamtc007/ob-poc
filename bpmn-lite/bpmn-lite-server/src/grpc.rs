@@ -6,8 +6,16 @@ use tokio::sync::Semaphore;
 use tonic::{Request, Response, Status};
 use uuid::Uuid;
 
+use bpmn_lite_analysis;
 use bpmn_lite_engine::BpmnLiteEngine;
+use bpmn_lite_ffi_grpc::GrpcFfiOwner;
+use bpmn_lite_ffi_http::{HttpFfiOwner, HttpIdempotency, HttpMethod};
 use bpmn_lite_types::{ErrorClass, Value};
+use dmn_lite_bridge::DmnLiteOwner;
+use dmn_lite_compiler::{compile_and_verify, load_catalogue_from_str};
+use dmn_lite_parser::parse;
+use ffi_catalogue::{FfiCatalogue, FfiTemplateStore};
+use ffi_types::{FieldSchema, Idempotency, SchemaKind};
 
 use crate::event_fanout::EventFanout;
 
@@ -198,6 +206,16 @@ pub struct BpmnLiteService {
     pub limits: RequestLimits,
     pub metrics: Arc<ServerMetrics>,
     pub subscription_limiter: Arc<Semaphore>,
+    /// In-process dmn-lite FFI execution owner (registers decisions, evaluates them).
+    pub ffi_owner: Arc<DmnLiteOwner>,
+    /// In-process HTTP FFI execution owner.
+    pub http_ffi_owner: Arc<HttpFfiOwner>,
+    /// In-process gRPC FFI execution owner.
+    pub grpc_ffi_owner: Arc<GrpcFfiOwner>,
+    /// FFI template catalogue (shared with FfiDispatcher via Arc).
+    pub ffi_catalogue: Arc<FfiCatalogue>,
+    /// Backing store for the FFI catalogue; used to publish new templates.
+    pub ffi_store: Arc<dyn FfiTemplateStore>,
 }
 
 // --- Proto ↔ Core conversions ---
@@ -305,6 +323,32 @@ fn extract_instance_id_from_job_key(job_key: &str) -> Result<Uuid, Status> {
     parse_uuid(uuid_str)
 }
 
+#[allow(clippy::result_large_err)]
+fn proto_fields_to_schema(fields: &[FfiFieldSchemaProto]) -> Result<Vec<FieldSchema>, Status> {
+    fields
+        .iter()
+        .map(|f| {
+            let kind = match f.kind.as_str() {
+                "bool" => SchemaKind::Bool,
+                "i64" => SchemaKind::I64,
+                "f64" => SchemaKind::F64,
+                "string" => SchemaKind::String,
+                other => {
+                    return Err(Status::invalid_argument(format!(
+                        "unknown field kind '{}'; use bool, i64, f64, or string",
+                        other
+                    )))
+                }
+            };
+            Ok(FieldSchema {
+                name: f.name.clone(),
+                kind,
+                required: f.required,
+            })
+        })
+        .collect()
+}
+
 #[tonic::async_trait]
 impl BpmnLite for BpmnLiteService {
     async fn compile(
@@ -324,17 +368,58 @@ impl BpmnLite for BpmnLiteService {
             .await
             .map_err(|e| Status::invalid_argument(format!("Compilation failed: {:#}", e)))?;
 
+        // Run static analysis on the compiled program and surface findings as diagnostics.
+        let analysis_diagnostics = if !req.validate_only {
+            // Load the program we just compiled to run analysis.
+            // The engine stores it; reload via the engine's store.
+            let maybe_program = self
+                .engine
+                .load_program(result.bytecode_version)
+                .await
+                .ok()
+                .flatten();
+            if let Some(program) = maybe_program {
+                let report = bpmn_lite_analysis::analyse(&program);
+                if report.warning_count() > 0 {
+                    tracing::warn!(
+                        warnings = report.warning_count(),
+                        "static analysis found potential issues in compiled BPMN"
+                    );
+                }
+                report
+                    .findings
+                    .into_iter()
+                    .map(|f| Diagnostic {
+                        severity: match f.severity {
+                            bpmn_lite_analysis::Severity::Warning => "warning".to_string(),
+                            bpmn_lite_analysis::Severity::Info => "info".to_string(),
+                        },
+                        message: f.message,
+                        element_id: f.element_id.unwrap_or_default(),
+                    })
+                    .collect()
+            } else {
+                vec![]
+            }
+        } else {
+            vec![]
+        };
+
+        let mut diagnostics: Vec<Diagnostic> = result
+            .diagnostics
+            .into_iter()
+            .map(|msg| Diagnostic {
+                severity: "info".to_string(),
+                message: msg,
+                element_id: String::new(),
+            })
+            .collect();
+        diagnostics.extend(analysis_diagnostics);
+
         Ok(Response::new(CompileResponse {
             bytecode_version: result.bytecode_version.to_vec(),
-            diagnostics: result
-                .diagnostics
-                .into_iter()
-                .map(|msg| Diagnostic {
-                    severity: "info".to_string(),
-                    message: msg,
-                    element_id: String::new(),
-                })
-                .collect(),
+            diagnostics,
+            flag_symbol_table: result.flag_symbol_table.into_iter().collect(),
         }))
     }
 
@@ -833,5 +918,229 @@ impl BpmnLite for BpmnLiteService {
     ) -> Result<Response<MetricsResponse>, Status> {
         self.metrics.request_started();
         Ok(Response::new(self.metrics.snapshot()))
+    }
+
+    async fn register_dmn_decision(
+        &self,
+        request: Request<RegisterDmnDecisionRequest>,
+    ) -> Result<Response<RegisterDmnDecisionResponse>, Status> {
+        self.metrics.request_started();
+        let req = request.into_inner();
+        let tenant_id = request_tenant_id(&self.limits, &req.tenant_id)?;
+        let publisher = if req.publisher.is_empty() {
+            "server".to_string()
+        } else {
+            req.publisher.clone()
+        };
+
+        // Parse catalogue (empty TOML = minimal catalogue with no domains).
+        let catalogue_toml = if req.catalogue_toml.is_empty() {
+            concat!(
+                "snapshot_id = \"00000000-0000-7000-8000-000000000000\"\n",
+                "snapshot_version = \"v1\"\n",
+                "created_at = \"2026-01-01T00:00:00Z\"\n",
+            )
+            .to_string()
+        } else {
+            req.catalogue_toml.clone()
+        };
+        let catalogue = load_catalogue_from_str(&catalogue_toml)
+            .map_err(|e| Status::invalid_argument(format!("catalogue_toml invalid: {e}")))?;
+
+        // Parse and compile the DMN source.
+        let ast = parse(&req.dmn_source)
+            .map_err(|e| Status::invalid_argument(format!("dmn_source parse error: {e}")))?;
+        let decision = compile_and_verify(ast, &catalogue, &req.dmn_source)
+            .map_err(|e| Status::invalid_argument(format!("dmn_source compile error: {e}")))?;
+
+        // Convert proto field schemas.
+        let input_schema = proto_fields_to_schema(&req.input_fields)?;
+        let output_schema = proto_fields_to_schema(&req.output_fields)?;
+
+        // Register with the DmnLiteOwner and publish the template.
+        let template = self.ffi_owner.register_decision(
+            decision,
+            input_schema,
+            output_schema,
+            Idempotency::Idempotent,
+            tenant_id.clone(),
+            publisher,
+        );
+
+        let template_id_hex: String = template
+            .template_id
+            .iter()
+            .map(|b| format!("{b:02x}"))
+            .collect();
+
+        self.ffi_store
+            .publish(&template)
+            .await
+            .map_err(|e| Status::internal(format!("publish template: {e}")))?;
+
+        // Refresh cache so the dispatcher sees the new template immediately.
+        self.ffi_catalogue
+            .load_into_cache(&tenant_id)
+            .await
+            .map_err(|e| Status::internal(format!("refresh catalogue cache: {e}")))?;
+
+        tracing::info!(template_id = %template_id_hex, %tenant_id, "registered dmn-lite decision as FFI template");
+        Ok(Response::new(RegisterDmnDecisionResponse {
+            template_id_hex,
+        }))
+    }
+
+    async fn register_http_template(
+        &self,
+        request: Request<RegisterHttpTemplateRequest>,
+    ) -> Result<Response<RegisterHttpTemplateResponse>, Status> {
+        self.metrics.request_started();
+        let req = request.into_inner();
+        let tenant_id = request_tenant_id(&self.limits, &req.tenant_id)?;
+        let publisher = if req.publisher.is_empty() {
+            "server".to_string()
+        } else {
+            req.publisher.clone()
+        };
+
+        let method: HttpMethod = match req.method.to_uppercase().as_str() {
+            "GET" => HttpMethod::Get,
+            "POST" => HttpMethod::Post,
+            other => {
+                return Err(Status::invalid_argument(format!(
+                    "unsupported HTTP method '{}'; use GET or POST",
+                    other
+                )))
+            }
+        };
+
+        let idempotency = match req.idempotency.to_lowercase().as_str() {
+            "idempotent" => HttpIdempotency::Idempotent,
+            "non_idempotent" | "nonidempotent" => HttpIdempotency::NonIdempotent,
+            "" => method.default_idempotency(),
+            other => {
+                return Err(Status::invalid_argument(format!(
+                    "unknown idempotency '{}'; use idempotent or non_idempotent",
+                    other
+                )))
+            }
+        };
+
+        let timeout_ms = if req.timeout_ms == 0 {
+            5000
+        } else {
+            req.timeout_ms
+        };
+        let success_codes: Vec<u16> = if req.success_status_codes.is_empty() {
+            vec![200]
+        } else {
+            req.success_status_codes.iter().map(|&c| c as u16).collect()
+        };
+
+        let input_schema = proto_fields_to_schema(&req.input_fields)?;
+        let output_schema = proto_fields_to_schema(&req.output_fields)?;
+
+        let template = self
+            .http_ffi_owner
+            .register_template(
+                req.url,
+                method,
+                req.static_headers.into_iter().collect(),
+                timeout_ms,
+                req.path_params,
+                success_codes,
+                idempotency,
+                input_schema,
+                output_schema,
+                tenant_id.clone(),
+                publisher,
+            )
+            .map_err(|e| Status::invalid_argument(format!("invalid HTTP template: {:#}", e)))?;
+
+        let template_id_hex: String = template
+            .template_id
+            .iter()
+            .map(|b| format!("{b:02x}"))
+            .collect();
+
+        self.ffi_store
+            .publish(&template)
+            .await
+            .map_err(|e| Status::internal(format!("publish: {e}")))?;
+        self.ffi_catalogue
+            .load_into_cache(&tenant_id)
+            .await
+            .map_err(|e| Status::internal(format!("refresh cache: {e}")))?;
+
+        tracing::info!(template_id = %template_id_hex, %tenant_id, "registered HTTP template");
+        Ok(Response::new(RegisterHttpTemplateResponse {
+            template_id_hex,
+        }))
+    }
+
+    async fn register_grpc_template(
+        &self,
+        request: Request<RegisterGrpcTemplateRequest>,
+    ) -> Result<Response<RegisterGrpcTemplateResponse>, Status> {
+        self.metrics.request_started();
+        let req = request.into_inner();
+        let tenant_id = request_tenant_id(&self.limits, &req.tenant_id)?;
+        let publisher = if req.publisher.is_empty() {
+            "server".to_string()
+        } else {
+            req.publisher.clone()
+        };
+        let timeout_ms = if req.timeout_ms == 0 {
+            5000
+        } else {
+            req.timeout_ms
+        };
+
+        let idempotency = match req.idempotency.to_lowercase().as_str() {
+            "idempotent" => Idempotency::Idempotent,
+            "non_idempotent" | "nonidempotent" | "" => Idempotency::NonIdempotent,
+            other => {
+                return Err(Status::invalid_argument(format!(
+                    "unknown idempotency '{}'",
+                    other
+                )))
+            }
+        };
+
+        let input_schema = proto_fields_to_schema(&req.input_fields)?;
+        let output_schema = proto_fields_to_schema(&req.output_fields)?;
+
+        let template = self
+            .grpc_ffi_owner
+            .register_template(
+                req.endpoint,
+                timeout_ms,
+                input_schema,
+                output_schema,
+                idempotency,
+                tenant_id.clone(),
+                publisher,
+            )
+            .map_err(|e| Status::invalid_argument(format!("invalid gRPC template: {:#}", e)))?;
+
+        let template_id_hex: String = template
+            .template_id
+            .iter()
+            .map(|b| format!("{b:02x}"))
+            .collect();
+
+        self.ffi_store
+            .publish(&template)
+            .await
+            .map_err(|e| Status::internal(format!("{e}")))?;
+        self.ffi_catalogue
+            .load_into_cache(&tenant_id)
+            .await
+            .map_err(|e| Status::internal(format!("{e}")))?;
+
+        tracing::info!(template_id = %template_id_hex, %tenant_id, "registered gRPC template");
+        Ok(Response::new(RegisterGrpcTemplateResponse {
+            template_id_hex,
+        }))
     }
 }

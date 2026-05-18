@@ -14,7 +14,20 @@ bpmn-lite-engine = { path = "../bpmn-lite-engine" }
 bpmn-lite-store = { path = "../bpmn-lite-store" }
 bpmn-lite-store-postgres = { path = "../bpmn-lite-store-postgres", optional = true }
 bpmn-lite-vm = { path = "../bpmn-lite-vm" }
+# FFI catalogue + dispatcher
+ffi-types = { path = "../ffi-types" }
+ffi-catalogue = { path = "../ffi-catalogue" }
+ffi-dispatcher = { path = "../ffi-dispatcher" }
+# dmn-lite vocabulary (in-process FFI owner)
+dmn-lite-types = { path = "../dmn-lite-types" }
+dmn-lite-parser = { path = "../dmn-lite-parser" }
+dmn-lite-compiler = { path = "../dmn-lite-compiler" }
+dmn-lite-bridge = { path = "../dmn-lite-bridge" }
+bpmn-lite-ffi-http = { path = "../bpmn-lite-ffi-http" }
+bpmn-lite-ffi-grpc = { path = "../bpmn-lite-ffi-grpc" }
+bpmn-lite-analysis = { path = "../bpmn-lite-analysis" }
 tonic = { workspace = true }
+tonic-health = { workspace = true }
 prost = { workspace = true }
 tokio = { workspace = true }
 anyhow = { workspace = true }
@@ -25,7 +38,9 @@ serde_json = { workspace = true }
 tokio-stream = "0.1"
 sqlx = { workspace = true, optional = true }
 hex = "0.4"
-ob-poc-types = { path = "../../rust/crates/ob-poc-types" }
+axum = { workspace = true }
+serde = { workspace = true }
+ob-poc-types = { workspace = true }
 
 [dev-dependencies]
 tokio = { workspace = true, features = ["test-util"] }
