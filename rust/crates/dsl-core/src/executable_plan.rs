@@ -27,6 +27,7 @@
 use chrono::{DateTime, Utc};
 use uuid::Uuid;
 
+use crate::config::resource_dependency::ResolvedResourceDependency;
 use crate::execution_dag::{BindingSlotId, NodeId, PopulatedExecutionDag};
 
 // =============================================================================
@@ -274,6 +275,12 @@ pub struct RuntimeInstruction {
     /// When `None`, the coordination strategy table (T12) falls back to
     /// `PessimisticResourceLock` (the current default behaviour).
     pub effect_class: Option<EffectClass>,
+    /// Resource dependencies for this instruction (v0.5 §6.1–6.3).
+    ///
+    /// Populated from `transition_args` (EntityUuid) and `produces: { resolved: false }`
+    /// (NaturalKey) at plan compile time. Empty until T09 wiring is complete.
+    /// Used by the coordination strategy table (T12) to derive ResourceCoordEdges.
+    pub resource_dependencies: Vec<ResolvedResourceDependency>,
     /// Source statement index in the original DSL program (for error reporting).
     pub source_stmt: usize,
 }
@@ -371,6 +378,7 @@ impl ExecutablePlan {
                     .collect(),
                 output_binding: s.bind_as.as_ref().map(|n| BindingSlotId::new(n)),
                 effect_class: s.effect_class,
+                resource_dependencies: s.resource_dependencies.clone(),
                 source_stmt: s.step_index,
             })
             .collect();
@@ -418,6 +426,7 @@ pub struct ExecutionStepSummary {
     pub input_names: Vec<String>,
     pub bind_as: Option<String>,
     pub effect_class: Option<EffectClass>,
+    pub resource_dependencies: Vec<ResolvedResourceDependency>,
 }
 
 #[cfg(test)]

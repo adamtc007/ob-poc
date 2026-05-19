@@ -40,6 +40,9 @@ pub use config::types::{
     VerbMetadata, VerbOutputConfig, VerbProduces, VerbsConfig,
 };
 pub use diagnostics::{Diagnostic, DiagnosticCode, Severity, SourceSpan};
+pub use config::resource_dependency::{
+    ResolvedResourceDependency, ResolutionMode, ResourceDependency,
+};
 pub use executable_plan::{
     AuthorityContext, BindingFrameSchema, BindingSlot, EffectClass, ExecutablePlan,
     ExecutionStepSummary, InstructionInput, PlanId, RuntimeInstruction, SemOsSnapshotId,

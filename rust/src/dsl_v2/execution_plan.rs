@@ -33,6 +33,7 @@ use super::ast::{Argument, AstNode, Program, Span, Statement, VerbCall};
 use super::runtime_registry::runtime_registry;
 use super::verb_registry::{registry, VerbBehavior};
 use crate::ontology::ontology;
+use dsl_core::config::resource_dependency::ResolvedResourceDependency;
 use dsl_core::execution_dag::{BindingSlotId, DagEdge, NodeId, PopulatedExecutionDag};
 use std::collections::{HashMap, HashSet};
 
@@ -76,6 +77,13 @@ pub struct ExecutionStep {
     /// `DagEdge::BindingEdge` in `dag_edges`. T10 will retire this field once
     /// all consumers use the typed binding-slot path.
     pub injections: Vec<Injection>,
+
+    /// Resource dependencies for this step (v0.5 §6.1–6.3).
+    ///
+    /// Populated from `transition_args` (EntityUuid, T09) and `produces: {resolved: false}`
+    /// (NaturalKey, T09). Used by the coordination strategy table (T12) and
+    /// the `ResourceCoordEdge` emission in `ExecutionPlan::from_steps`.
+    pub resource_dependencies: Vec<ResolvedResourceDependency>,
 
     /// Typed edges from this step in the Populated Execution DAG (v0.5 §4.1).
     ///
@@ -998,9 +1006,9 @@ impl Compiler {
         let (flat_vc, nested_children) = extract_nested_children(vc);
 
         // Build typed dag_edges — BindingEdge for each Injection (v0.5 §4.1).
-        // StateEdge, ResourceCoordEdge, and SnapshotVersionEdge are populated in T09
-        // once ResourceDependency taxonomy and transition_args wiring are in place.
         let my_step_index = self.steps.len();
+
+        // Build typed BindingEdges for each Injection (v0.5 §4.1).
         let dag_edges: Vec<DagEdge> = injections
             .iter()
             .map(|inj| DagEdge::BindingEdge {
@@ -1010,11 +1018,21 @@ impl Compiler {
             })
             .collect();
 
+        // ResourceDependency population from transition_args (v0.5 §6.1, T09).
+        // The transition_args field lives on VerbConfig (dsl-core), not on
+        // UnifiedVerbDef (dsl-analysis). Until UnifiedVerbDef is extended to
+        // carry transition_args, resource_dependencies are left empty here.
+        // The coordination strategy table (T12) falls back to effect_class-driven
+        // locking for all steps; ResourceCoordEdge emission happens when a full
+        // VerbConfig is accessible at plan compile time (T09b follow-on).
+        let resource_dependencies: Vec<ResolvedResourceDependency> = Vec::new();
+
         // Add this step
         self.steps.push(ExecutionStep {
             verb_call: flat_vc,
             injections,
             dag_edges,
+            resource_dependencies,
             bind_as: vc.binding.clone(),
             step_index: my_step_index,
             behavior: verb_def.behavior,

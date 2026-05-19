@@ -23,6 +23,7 @@
 pub mod dag;
 pub mod dag_registry;
 pub mod effect_class;
+pub mod resource_dependency;
 pub mod dag_validator;
 pub mod escalation;
 pub mod green_when_coverage;
