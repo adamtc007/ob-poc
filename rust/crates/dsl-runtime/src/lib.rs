@@ -54,6 +54,7 @@
 // suggestions, planning_facade, stategraph, verification) live in
 // `dsl-analysis`. See docs/todo/dsl-runtime-split-v1.md.
 pub mod bods;
+pub mod coordination;
 pub mod cross_workspace;
 pub mod frame;
 pub mod crud_executor;

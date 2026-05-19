@@ -2425,11 +2425,39 @@ impl DslExecutor {
                 )
             })??;
 
-        // Acquire locks if expansion report has them
+        // Coordination strategy gate (v0.5 §5.3, T12).
+        // If every step in the plan declares a lock-free effect_class
+        // (pure, read_snapshot, idempotent_ensure, append_fact, external_effect),
+        // skip advisory lock acquisition entirely — the DB constraint or
+        // idempotency guard is the coordination mechanism for those classes.
+        // Steps with undeclared effect_class (None) fall back conservatively
+        // to PessimisticResourceLock (pre-T12 behaviour).
+        // Look up effect_class per step from VerbConfig (dsl_core config loader).
+        // T09b will move this to a direct registry lookup once UnifiedVerbDef
+        // exposes effect_class; for now we load from YAML at plan-check time
+        // (once per plan, not once per step — loader is cached via OnceLock).
+        let step_effect_classes: Vec<Option<dsl_core::executable_plan::EffectClass>> = {
+            use dsl_core::config::ConfigLoader;
+            let verbs_opt = ConfigLoader::from_env().load_verbs().ok();
+            plan.steps
+                .iter()
+                .map(|s| {
+                    verbs_opt
+                        .as_ref()
+                        .and_then(|cfg| cfg.domains.get(&s.verb_call.domain))
+                        .and_then(|d| d.verbs.get(&s.verb_call.verb))
+                        .and_then(|v| v.effect_class)
+                })
+                .collect()
+        };
+        let plan_needs_locks =
+            dsl_runtime::coordination::plan_requires_locking(step_effect_classes);
+
+        // Acquire locks if expansion report has them AND the plan requires locking
         let (locks_held, lock_wait_ms) = if let Some(report) = expansion_report {
-            if !report.derived_lock_set.is_empty() {
+            if !report.derived_lock_set.is_empty() && plan_needs_locks {
                 tracing::debug!(
-                    "execute_plan_atomic_with_locks: acquiring {} locks",
+                    "execute_plan_atomic_with_locks: acquiring {} locks (coordination gate: locking required)",
                     report.derived_lock_set.len()
                 );
 
