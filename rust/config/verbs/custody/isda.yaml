@@ -79,6 +79,7 @@ domains:
       add-coverage:
         flavour: instance_adding
         description: Add instrument class coverage to ISDA (idempotent by isda+instrument_class). Internal - use trading-profile.add-component for authoring.
+        effect_class: idempotent_ensure
         metadata:
           tier: projection
           source_of_truth: operational

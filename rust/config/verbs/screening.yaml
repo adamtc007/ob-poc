@@ -204,6 +204,7 @@ domains:
       run:
         flavour: attribute_mutating
         description: Initiate a workstream screening. Idempotent by (workstream_id, screening_type).
+        effect_class: idempotent_ensure
         metadata:
           tier: intent
           source_of_truth: operational

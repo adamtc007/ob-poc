@@ -8,6 +8,7 @@ domains:
       create:
         flavour: instance_adding
         description: "Create KYC service agreement with sponsor (idempotent by sponsor+reference)"
+        effect_class: idempotent_ensure
         metadata:
           tier: intent
           source_of_truth: workflow

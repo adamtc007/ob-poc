@@ -567,6 +567,7 @@ domains:
       map-to-document:
         flavour: attribute_mutating
         description: "Map attribute to document type (source or sink relationship)"
+        effect_class: idempotent_ensure
         metadata:
           tier: intent
           source_of_truth: catalog

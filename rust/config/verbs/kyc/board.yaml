@@ -9,6 +9,7 @@ domains:
       appoint:
         flavour: attribute_mutating
         description: Appoint a person to a board position
+        effect_class: idempotent_ensure
         metadata:
           tier: intent
           source_of_truth: operational
@@ -284,6 +285,7 @@ domains:
       grant-appointment-right:
         flavour: attribute_mutating
         description: Record an appointment right from SHA/articles
+        effect_class: idempotent_ensure
         metadata:
           tier: intent
           source_of_truth: operational

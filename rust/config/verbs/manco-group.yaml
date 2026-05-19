@@ -363,6 +363,7 @@ domains:
         flavour: attribute_mutating
         description: Add a CBU to a governance controller group
         behavior: crud
+        effect_class: idempotent_ensure
         invocation_phrases:
           - add CBU to group
           - add member

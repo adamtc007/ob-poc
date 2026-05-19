@@ -181,6 +181,7 @@ domains:
       add-member:
         flavour: instance_adding
         description: "Add user to team with role"
+        effect_class: idempotent_ensure
         invocation_phrases:
           - "add team member"
           - "add member to team"
@@ -417,6 +418,7 @@ domains:
       add-governance-member:
         flavour: instance_adding
         description: "Add governance member with optional legal appointment link"
+        effect_class: idempotent_ensure
         invocation_phrases:
           - "add governance member"
           - "assign governance role"
@@ -534,6 +536,7 @@ domains:
       add-cbu-access:
         flavour: instance_adding
         description: "Add CBU to team's explicit access list"
+        effect_class: idempotent_ensure
         invocation_phrases:
           - "grant CBU access"
           - "add CBU access to team"
@@ -628,6 +631,7 @@ domains:
       grant-service:
         flavour: attribute_mutating
         description: "Grant service entitlement to team"
+        effect_class: idempotent_ensure
         invocation_phrases:
           - "grant service to team"
           - "add service access"

@@ -6,6 +6,7 @@ domains:
         flavour: instance_adding
         description: Create a new share class for a fund CBU (idempotent by cbu+name)
         behavior: crud
+        effect_class: idempotent_ensure
         metadata:
           tier: intent
           source_of_truth: register
@@ -158,6 +159,7 @@ domains:
         flavour: instance_adding
         description: Create or update share class by ISIN
         behavior: crud
+        effect_class: idempotent_ensure
         metadata:
           tier: intent
           source_of_truth: register

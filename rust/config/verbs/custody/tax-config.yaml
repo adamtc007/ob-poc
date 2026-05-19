@@ -10,6 +10,7 @@ domains:
       define-jurisdiction:
         flavour: attribute_mutating
         description: "Define tax jurisdiction with withholding rates"
+        effect_class: idempotent_ensure
         metadata:
           tier: intent
           source_of_truth: operational
@@ -139,6 +140,7 @@ domains:
       set-treaty-rate:
         flavour: attribute_mutating
         description: "Set bilateral tax treaty rate"
+        effect_class: idempotent_ensure
         metadata:
           tier: intent
           source_of_truth: operational
@@ -302,6 +304,7 @@ domains:
       set-tax-status:
         flavour: attribute_mutating
         description: "Set CBU tax status for jurisdiction"
+        effect_class: idempotent_ensure
         metadata:
           tier: intent
           source_of_truth: operational
@@ -477,6 +480,7 @@ domains:
       set-reclaim-config:
         flavour: attribute_mutating
         description: "Configure tax reclaim processing"
+        effect_class: idempotent_ensure
         metadata:
           tier: intent
           source_of_truth: operational
@@ -686,6 +690,7 @@ domains:
       set-reporting:
         flavour: attribute_mutating
         description: "Set tax reporting obligation"
+        effect_class: idempotent_ensure
         metadata:
           tier: intent
           source_of_truth: operational

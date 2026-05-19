@@ -5,6 +5,7 @@ domains:
       ensure:
         flavour: instance_adding
         description: Create or update instrument class with CFI/SMPG/ISDA mappings
+        effect_class: idempotent_ensure
         metadata:
           tier: intent
           source_of_truth: operational

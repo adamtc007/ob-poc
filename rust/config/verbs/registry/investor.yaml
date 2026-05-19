@@ -101,6 +101,7 @@ domains:
       ensure:
         flavour: instance_adding
         description: Create or update investor by entity_id + owning_cbu_id (idempotent)
+        effect_class: idempotent_ensure
         metadata:
           tier: intent
           source_of_truth: register

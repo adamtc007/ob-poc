@@ -10,6 +10,7 @@ domains:
       define-location:
         flavour: attribute_mutating
         description: "Define settlement location (CSD/ICSD)"
+        effect_class: idempotent_ensure
         invocation_phrases:
           - "define settlement location"
           - "add settlement location"
@@ -137,6 +138,7 @@ domains:
       create-chain:
         flavour: instance_adding
         description: "Create settlement chain for CBU"
+        effect_class: idempotent_ensure
         invocation_phrases:
           - "create settlement chain"
           - "add settlement chain"
@@ -343,6 +345,7 @@ domains:
       add-hop:
         flavour: instance_adding
         description: "Add intermediary hop to settlement chain"
+        effect_class: idempotent_ensure
         invocation_phrases:
           - "add settlement hop"
           - "add intermediary"
@@ -537,6 +540,7 @@ domains:
       set-location-preference:
         flavour: attribute_mutating
         description: "Set preferred settlement location for market/instrument"
+        effect_class: idempotent_ensure
         invocation_phrases:
           - "set settlement preference"
           - "set location preference"
@@ -684,6 +688,7 @@ domains:
       set-cross-border:
         flavour: attribute_mutating
         description: "Configure cross-border settlement routing"
+        effect_class: idempotent_ensure
         invocation_phrases:
           - "set cross-border routing"
           - "configure cross-border"

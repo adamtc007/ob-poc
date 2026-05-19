@@ -11,6 +11,7 @@ domains:
         description: |
           Allocate shares to a shareholder. Creates holding record.
           Validates total allocations don't exceed issued_shares.
+        effect_class: idempotent_ensure
         metadata:
           tier: intent
           source_of_truth: register

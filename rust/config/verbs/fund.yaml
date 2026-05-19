@@ -484,6 +484,7 @@ domains:
       link-feeder:
         flavour: instance_adding
         description: Link an existing feeder fund to a master fund (idempotent by parent+child+type)
+        effect_class: idempotent_ensure
         invocation_phrases:
           - "link feeder to master"
           - "connect feeder"
@@ -551,6 +552,7 @@ domains:
       add-to-umbrella:
         flavour: instance_adding
         description: Add an existing sub-fund to an umbrella (idempotent by parent+child+type)
+        effect_class: idempotent_ensure
         invocation_phrases:
           - "add to umbrella"
           - "attach sub-fund"
@@ -614,6 +616,7 @@ domains:
       add-share-class:
         flavour: instance_adding
         description: Add a share class to a sub-fund (idempotent by parent+child+type)
+        effect_class: idempotent_ensure
         invocation_phrases:
           - "add share class to fund"
           - "attach share class"
@@ -836,6 +839,7 @@ domains:
       upsert-vehicle:
         flavour: attribute_mutating
         description: Create or update fund vehicle metadata for an existing fund entity.
+        effect_class: idempotent_ensure
         invocation_phrases:
           - "create fund vehicle"
           - "set fund type"
@@ -1117,6 +1121,7 @@ domains:
       upsert-compartment:
         flavour: attribute_mutating
         description: Create or update a compartment under an umbrella fund.
+        effect_class: idempotent_ensure
         invocation_phrases:
           - "create compartment"
           - "add sub-fund"
@@ -1301,6 +1306,7 @@ domains:
       add-investment:
         flavour: instance_adding
         description: Record a fund's investment in another fund (idempotent by investor+investee)
+        effect_class: idempotent_ensure
         invocation_phrases:
           - "add fund investment"
           - "record fund holding"

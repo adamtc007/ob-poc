@@ -5,6 +5,7 @@ domains:
       create:
         flavour: instance_adding
         description: Create a new entity workstream (idempotent by case+entity)
+        effect_class: idempotent_ensure
         invocation_phrases:
         - "create workstream"
         - "add entity workstream"

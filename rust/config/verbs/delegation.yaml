@@ -5,6 +5,7 @@ domains:
       add:
         flavour: instance_adding
         description: Add a delegation relationship (idempotent by delegator+delegate+scope+cbu)
+        effect_class: idempotent_ensure
         invocation_phrases:
           - "add delegation"
           - "delegate investment management"

@@ -240,6 +240,7 @@ domains:
       create-request:
         flavour: instance_adding
         description: Create a document request for a KYC workstream.
+        effect_class: idempotent_ensure
         metadata:
           tier: intent
           source_of_truth: operational

@@ -10,6 +10,7 @@ domains:
       set:
         flavour: attribute_mutating
         description: Set pricing source for instrument class
+        effect_class: idempotent_ensure
         invocation_phrases:
           - "set pricing config"
           - "configure pricing"
@@ -400,6 +401,7 @@ domains:
       set-valuation-schedule:
         flavour: attribute_mutating
         description: "Set position valuation frequency and timing"
+        effect_class: idempotent_ensure
         invocation_phrases:
           - "set valuation schedule"
           - "configure NAV schedule"
@@ -549,6 +551,7 @@ domains:
       set-fallback-chain:
         flavour: attribute_mutating
         description: "Define multi-source pricing fallback chain"
+        effect_class: idempotent_ensure
         invocation_phrases:
           - "set pricing fallback chain"
           - "configure fallback pricing"
@@ -689,6 +692,7 @@ domains:
       set-stale-policy:
         flavour: attribute_mutating
         description: "Configure stale price handling policy"
+        effect_class: idempotent_ensure
         invocation_phrases:
           - "set stale price policy"
           - "configure stale pricing rules"
@@ -821,6 +825,7 @@ domains:
       set-nav-threshold:
         flavour: attribute_mutating
         description: "Set NAV impact alert threshold"
+        effect_class: idempotent_ensure
         invocation_phrases:
           - "set NAV threshold"
           - "configure NAV tolerance"

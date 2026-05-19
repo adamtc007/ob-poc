@@ -10,6 +10,7 @@ domains:
       define-gateway:
         flavour: attribute_mutating
         description: "Define available trade gateway"
+        effect_class: idempotent_ensure
         metadata:
           tier: intent
           source_of_truth: matrix
@@ -179,6 +180,7 @@ domains:
       enable-gateway:
         flavour: attribute_mutating
         description: "Enable gateway connectivity for CBU"
+        effect_class: idempotent_ensure
         metadata:
           tier: intent
           source_of_truth: matrix
@@ -432,6 +434,7 @@ domains:
       add-routing-rule:
         flavour: instance_adding
         description: "Add gateway routing rule for CBU"
+        effect_class: idempotent_ensure
         metadata:
           tier: intent
           source_of_truth: matrix
@@ -642,6 +645,7 @@ domains:
       set-fallback:
         flavour: attribute_mutating
         description: "Configure fallback gateway"
+        effect_class: idempotent_ensure
         metadata:
           tier: intent
           source_of_truth: matrix

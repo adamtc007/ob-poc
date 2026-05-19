@@ -1045,6 +1045,7 @@ domains:
       control-config.set:
         flavour: attribute_mutating
         description: Set control thresholds for an issuer
+        effect_class: idempotent_ensure
         invocation_phrases:
           - "set control configuration"
           - "configure control thresholds"

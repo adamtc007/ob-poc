@@ -5,6 +5,7 @@ domains:
       create:
         flavour: instance_adding
         description: Create a new investor holding in a share class (idempotent by share_class+investor)
+        effect_class: idempotent_ensure
         metadata:
           tier: intent
           source_of_truth: register
@@ -77,6 +78,7 @@ domains:
       create-for-investor:
         flavour: instance_adding
         description: Create holding linked to an investor record (for TA KYC-as-a-Service)
+        effect_class: idempotent_ensure
         metadata:
           tier: intent
           source_of_truth: register
@@ -181,6 +183,7 @@ domains:
       ensure:
         flavour: instance_adding
         description: Ensure investor holding exists (upsert)
+        effect_class: idempotent_ensure
         metadata:
           tier: intent
           source_of_truth: register

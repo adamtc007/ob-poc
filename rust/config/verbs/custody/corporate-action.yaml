@@ -13,6 +13,7 @@ domains:
         flavour: attribute_mutating
         description: "Define corporate action event type"
         behavior: crud
+        effect_class: idempotent_ensure
         metadata:
           tier: reference
           source_of_truth: catalog
@@ -135,6 +136,7 @@ domains:
         flavour: attribute_mutating
         description: "Set corporate action processing preferences for CBU"
         behavior: crud
+        effect_class: idempotent_ensure
         metadata:
           tier: projection
           source_of_truth: operational
@@ -330,6 +332,7 @@ domains:
         flavour: attribute_mutating
         description: "Configure CA instruction deadline rules"
         behavior: crud
+        effect_class: idempotent_ensure
         metadata:
           tier: projection
           source_of_truth: operational
@@ -480,6 +483,7 @@ domains:
         flavour: instance_adding
         description: "Link CA payment/delivery to specific SSI"
         behavior: crud
+        effect_class: idempotent_ensure
         metadata:
           tier: projection
           source_of_truth: operational

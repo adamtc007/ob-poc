@@ -109,6 +109,7 @@ domains:
       commit:
         flavour: attribute_mutating
         description: Create SLA commitment for CBU (idempotent by cbu+template+profile)
+        effect_class: idempotent_ensure
         invocation_phrases:
           - "commit SLA"
           - "create SLA commitment"

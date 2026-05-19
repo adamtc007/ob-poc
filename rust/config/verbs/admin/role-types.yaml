@@ -92,6 +92,7 @@ domains:
       create:
         flavour: instance_adding
         description: "Create new role type (idempotent by code)"
+        effect_class: idempotent_ensure
         metadata:
           tier: intent
           source_of_truth: operational

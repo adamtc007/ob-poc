@@ -5,6 +5,7 @@ domains:
       set-identity:
         flavour: attribute_mutating
         description: Set primary settlement identity for an entity
+        effect_class: idempotent_ensure
         metadata:
           tier: intent
           source_of_truth: operational
@@ -69,6 +70,7 @@ domains:
       add-ssi:
         flavour: instance_adding
         description: Add counterparty SSI (idempotent by entity+counterparty_bic+market+currency)
+        effect_class: idempotent_ensure
         metadata:
           tier: intent
           source_of_truth: operational

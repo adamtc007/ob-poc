@@ -608,6 +608,7 @@ domains:
       ensure:
         flavour: instance_adding
         description: Create or update a CBU by natural key
+        effect_class: idempotent_ensure
         invocation_phrases:
           - "ensure CBU exists"
           - "create or update CBU"

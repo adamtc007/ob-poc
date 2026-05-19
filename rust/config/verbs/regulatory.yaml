@@ -8,6 +8,7 @@ domains:
       add:
         flavour: instance_adding
         description: "Add regulatory registration for an entity (idempotent by entity+regulator+type)"
+        effect_class: idempotent_ensure
         metadata:
           tier: intent
           source_of_truth: external

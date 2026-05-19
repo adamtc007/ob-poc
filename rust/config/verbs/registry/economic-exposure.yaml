@@ -278,6 +278,7 @@ domains:
 
           These settings are temporal (effective_from) for audit trail and
           can be changed when regulations or fund policies change.
+        effect_class: idempotent_ensure
         metadata:
           tier: intent
           source_of_truth: register

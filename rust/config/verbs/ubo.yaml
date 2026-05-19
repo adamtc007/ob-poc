@@ -290,6 +290,7 @@ domains:
       add-trust-role:
         flavour: instance_adding
         description: Add trust role relationship (settlor, trustee, beneficiary, protector)
+        effect_class: idempotent_ensure
         invocation_phrases:
           - "add trust role"
           - "add settlor"
@@ -1095,6 +1096,7 @@ domains:
       mark-terminus:
         flavour: attribute_mutating
         description: Mark an entity as a UBO chain terminus (ownership tracing stops here)
+        effect_class: idempotent_ensure
         invocation_phrases:
           - "mark chain terminus"
           - "ownership stops here"

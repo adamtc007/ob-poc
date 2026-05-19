@@ -10,6 +10,7 @@ domains:
       assign:
         flavour: instance_adding
         description: Assign investment manager to CBU with trading scope (idempotent by cbu+manager_lei+role)
+        effect_class: idempotent_ensure
         metadata:
           tier: intent
           source_of_truth: register

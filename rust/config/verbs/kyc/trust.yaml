@@ -9,6 +9,7 @@ domains:
       record-provision:
         flavour: attribute_mutating
         description: Record a provision from the trust deed affecting control or benefit
+        effect_class: idempotent_ensure
         metadata:
           tier: intent
           source_of_truth: operational

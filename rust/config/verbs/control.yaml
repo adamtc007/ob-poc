@@ -5,6 +5,7 @@ domains:
       add:
         flavour: instance_adding
         description: Add a control relationship between entities (idempotent by controller+controlled+type)
+        effect_class: idempotent_ensure
         invocation_phrases:
           - "add control relationship"
           - "create control link"

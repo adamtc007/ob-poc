@@ -5,6 +5,7 @@ domains:
       subscribe:
         flavour: instance_adding
         description: Record a subscription (investor buying units). Idempotent via (holding_id, trade_date, reference).
+        effect_class: idempotent_ensure
         metadata:
           tier: intent
           source_of_truth: register
@@ -98,6 +99,7 @@ domains:
       redeem:
         flavour: attribute_mutating
         description: Record a redemption (investor selling units). Idempotent via (holding_id, trade_date, reference).
+        effect_class: idempotent_ensure
         metadata:
           tier: intent
           source_of_truth: register
@@ -183,6 +185,7 @@ domains:
       transfer-in:
         flavour: attribute_mutating
         description: Record an incoming transfer of units. Idempotent via (holding_id, trade_date, reference).
+        effect_class: idempotent_ensure
         metadata:
           tier: intent
           source_of_truth: register
@@ -255,6 +258,7 @@ domains:
       transfer-out:
         flavour: attribute_mutating
         description: Record an outgoing transfer of units. Idempotent via (holding_id, trade_date, reference).
+        effect_class: idempotent_ensure
         metadata:
           tier: intent
           source_of_truth: register
@@ -328,6 +332,7 @@ domains:
       record-commitment:
         flavour: attribute_mutating
         description: Record LP commitment to PE/VC fund (total amount investor commits to invest)
+        effect_class: idempotent_ensure
         metadata:
           tier: intent
           source_of_truth: register
@@ -408,6 +413,7 @@ domains:
       capital-call:
         flavour: attribute_mutating
         description: Record capital call (drawdown from LP commitment)
+        effect_class: idempotent_ensure
         metadata:
           tier: intent
           source_of_truth: register
@@ -493,6 +499,7 @@ domains:
       distribute:
         flavour: attribute_mutating
         description: Record distribution to LP (return of capital or profit)
+        effect_class: idempotent_ensure
         metadata:
           tier: intent
           source_of_truth: register
@@ -593,6 +600,7 @@ domains:
       distribute-recallable:
         flavour: attribute_mutating
         description: Record a recallable distribution (can be called back by GP)
+        effect_class: idempotent_ensure
         metadata:
           tier: intent
           source_of_truth: register

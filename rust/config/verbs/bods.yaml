@@ -103,6 +103,7 @@ domains:
       link-entity:
         flavour: instance_adding
         description: Link a local entity to a BODS entity statement
+        effect_class: idempotent_ensure
         metadata:
           tier: intent
           source_of_truth: external

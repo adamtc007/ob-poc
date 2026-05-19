@@ -10,6 +10,7 @@ domains:
       define-message-type:
         flavour: attribute_mutating
         description: "Define instruction message type for a lifecycle event"
+        effect_class: idempotent_ensure
         metadata:
           tier: intent
           source_of_truth: operational
@@ -127,6 +128,7 @@ domains:
       create-template:
         flavour: instance_adding
         description: "Create instruction message template"
+        effect_class: idempotent_ensure
         metadata:
           tier: intent
           source_of_truth: operational

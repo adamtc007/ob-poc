@@ -5,6 +5,7 @@ domains:
       ensure:
         flavour: instance_adding
         description: Create or update sub-custodian entry for market/currency
+        effect_class: idempotent_ensure
         metadata:
           tier: intent
           source_of_truth: operational
