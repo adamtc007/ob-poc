@@ -3086,12 +3086,6 @@ impl DslExecutor {
                 None
             }
 
-            Op::Materialize { .. } => {
-                // Materialize is a custom operation - skip for now
-                tracing::warn!("Materialize op not yet implemented in DAG executor");
-                None
-            }
-
             Op::GenericCrud { verb, args, .. } => {
                 // GenericCrud ops are executed via the generic executor
                 // Parse verb into domain.verb format

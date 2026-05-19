@@ -240,20 +240,6 @@ pub enum Op {
     },
 
     // =========================================================================
-    // Materialization Operations (Phase 3 in execution)
-    // =========================================================================
-    /// Materialize trading profile to operational tables
-    ///
-    /// Dependencies: UpsertDoc for the profile, and optionally entities
-    /// referenced in the profile (but only if they're in THIS DSL program).
-    Materialize {
-        source: DocKey,
-        sections: Vec<String>,
-        force: bool,
-        source_stmt: usize,
-    },
-
-    // =========================================================================
     // Generic CRUD Operations
     // =========================================================================
     /// Generic CRUD operation for YAML-defined verbs
@@ -292,7 +278,6 @@ impl Op {
             Op::AddUniverse { source_stmt, .. } => *source_stmt,
             Op::CreateSSI { source_stmt, .. } => *source_stmt,
             Op::AddBookingRule { source_stmt, .. } => *source_stmt,
-            Op::Materialize { source_stmt, .. } => *source_stmt,
             Op::GenericCrud { source_stmt, .. } => *source_stmt,
         }
     }
@@ -375,15 +360,6 @@ impl Op {
             }
             Op::AddBookingRule { cbu, ssi, name, .. } => {
                 format!("Add booking rule '{}' → {} for {}", name, ssi.key, cbu.key)
-            }
-            Op::Materialize {
-                source, sections, ..
-            } => {
-                if sections.is_empty() || sections == &["all"] {
-                    format!("Materialize {}", source.key)
-                } else {
-                    format!("Materialize {} → {:?}", source.key, sections)
-                }
             }
             Op::GenericCrud { verb, binding, .. } => {
                 if let Some(b) = binding {
@@ -549,11 +525,6 @@ impl Op {
             Op::AddBookingRule { cbu, ssi, .. } => {
                 vec![OpRef::Entity(cbu.clone()), OpRef::SSI(ssi.clone())]
             }
-
-            // Materialize depends on the document
-            // NOTE: Does NOT depend on entities referenced in the doc that exist
-            // in DB but not in this DSL program - those are runtime lookups
-            Op::Materialize { source, .. } => vec![OpRef::Doc(source.clone())],
 
             // GenericCrud depends on entities specified in depends_on
             Op::GenericCrud { depends_on, .. } => depends_on

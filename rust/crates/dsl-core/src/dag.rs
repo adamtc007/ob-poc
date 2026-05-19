@@ -208,11 +208,6 @@ fn group_into_phases(ops: &[Op]) -> Vec<ExecutionPhase> {
         name: "5. Custody".to_string(),
         op_indices: vec![],
     };
-    let mut phase_materialize = ExecutionPhase {
-        name: "6. Materialization".to_string(),
-        op_indices: vec![],
-    };
-
     for (idx, op) in ops.iter().enumerate() {
         match op {
             Op::EnsureEntity { .. } => phase_entities.op_indices.push(idx),
@@ -235,8 +230,6 @@ fn group_into_phases(ops: &[Op]) -> Vec<ExecutionPhase> {
                 phase_custody.op_indices.push(idx)
             }
 
-            Op::Materialize { .. } => phase_materialize.op_indices.push(idx),
-
             Op::GenericCrud { .. } => {
                 // GenericCrud ops go in the entities phase by default
                 // They could be refined based on verb domain if needed
@@ -252,7 +245,6 @@ fn group_into_phases(ops: &[Op]) -> Vec<ExecutionPhase> {
         phase_documents,
         phase_kyc,
         phase_custody,
-        phase_materialize,
     ]
     .into_iter()
     .filter(|p| !p.op_indices.is_empty())

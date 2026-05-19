@@ -17,7 +17,7 @@ use std::collections::HashMap;
 
 use dsl_core::ast::{Program, VerbCall};
 use dsl_core::compiler::{
-    compile_to_ops_ext, get_bool_arg, get_decimal_arg, get_int_arg, get_string_arg,
+    compile_to_ops_ext, get_decimal_arg, get_int_arg, get_string_arg,
     get_string_list_arg, resolve_entity_arg, CompiledProgram, VerbHandler,
 };
 use dsl_core::ops::{DocKey, EntityKey, Op};
@@ -513,22 +513,6 @@ pub fn ob_poc_verb_handler(
             let entity_key = EntityKey::new("trading_profile", &key.key);
             let binding = vc.binding.as_ref().map(|b| (b.clone(), entity_key));
             Ok((vec![op], binding))
-        })()),
-
-        "trading-profile.materialize" => Some((|| -> R {
-            let profile = resolve_entity_arg(vc, "profile-id", symbols)?;
-            let sections =
-                get_string_list_arg(vc, "sections").unwrap_or_else(|_| vec!["all".to_string()]);
-            let force = get_bool_arg(vc, "force").unwrap_or(false);
-            Ok((
-                vec![Op::Materialize {
-                    source: DocKey::trading_profile(&profile.key),
-                    sections,
-                    force,
-                    source_stmt: stmt_idx,
-                }],
-                None,
-            ))
         })()),
 
         // =================================================================
