@@ -5,13 +5,10 @@
 //! 1. **Ops are nodes, not entities** - The DAG contains Op nodes. Entities are
 //!    just identifiers that Ops reference.
 //!
-//! 2. **Two-phase FK strategy** - Create entities with null FKs first, then
-//!    populate FKs with SetFK ops. This eliminates most circular dependencies.
-//!
-//! 3. **Source tracking** - Every Op tracks its source statement index for
+//! 2. **Source tracking** - Every Op tracks its source statement index for
 //!    error mapping back to DSL source lines.
 //!
-//! 4. **Stable sort** - When ops have no dependency relationship, preserve
+//! 3. **Stable sort** - When ops have no dependency relationship, preserve
 //!    source order to prevent LSP thrashing.
 
 use rust_decimal::Decimal;
@@ -104,9 +101,7 @@ pub enum Op {
     // =========================================================================
     // Entity Operations (Phase 1 in execution)
     // =========================================================================
-    /// Create or update an entity
-    ///
-    /// Creates with null FKs - FKs are populated by SetFK ops in phase 2.
+    /// Create or update an entity (idempotent upsert by natural key)
     EnsureEntity {
         entity_type: String,
         key: EntityKey,
@@ -120,16 +115,6 @@ pub enum Op {
     // =========================================================================
     // Relationship Operations (Phase 2 in execution)
     // =========================================================================
-    /// Set a foreign key on an entity
-    ///
-    /// Used for FKs that reference other entities created in the same DSL.
-    SetFK {
-        source: EntityKey,
-        field: String,
-        target: EntityKey,
-        source_stmt: usize,
-    },
-
     /// Link role to entity within CBU
     LinkRole {
         cbu: EntityKey,
@@ -269,19 +254,6 @@ pub enum Op {
     },
 
     // =========================================================================
-    // Reference Lookups (validation only, no execution)
-    // =========================================================================
-    /// Placeholder for reference data that must exist
-    ///
-    /// Doesn't execute anything but declares that this ref must exist.
-    /// Used for validation - if the ref doesn't exist, compilation fails.
-    RequireRef {
-        ref_type: String,
-        value: String,
-        source_stmt: usize,
-    },
-
-    // =========================================================================
     // Generic CRUD Operations
     // =========================================================================
     /// Generic CRUD operation for YAML-defined verbs
@@ -307,7 +279,6 @@ impl Op {
     pub fn source_stmt(&self) -> usize {
         match self {
             Op::EnsureEntity { source_stmt, .. } => *source_stmt,
-            Op::SetFK { source_stmt, .. } => *source_stmt,
             Op::LinkRole { source_stmt, .. } => *source_stmt,
             Op::UnlinkRole { source_stmt, .. } => *source_stmt,
             Op::AddOwnership { source_stmt, .. } => *source_stmt,
@@ -322,7 +293,6 @@ impl Op {
             Op::CreateSSI { source_stmt, .. } => *source_stmt,
             Op::AddBookingRule { source_stmt, .. } => *source_stmt,
             Op::Materialize { source_stmt, .. } => *source_stmt,
-            Op::RequireRef { source_stmt, .. } => *source_stmt,
             Op::GenericCrud { source_stmt, .. } => *source_stmt,
         }
     }
@@ -334,14 +304,6 @@ impl Op {
                 entity_type, key, ..
             } => {
                 format!("Ensure {} '{}'", entity_type, key.key)
-            }
-            Op::SetFK {
-                source,
-                field,
-                target,
-                ..
-            } => {
-                format!("Set {}.{} → {}", source.key, field, target.key)
             }
             Op::LinkRole {
                 cbu, entity, role, ..
@@ -422,11 +384,6 @@ impl Op {
                 } else {
                     format!("Materialize {} → {:?}", source.key, sections)
                 }
-            }
-            Op::RequireRef {
-                ref_type, value, ..
-            } => {
-                format!("Require {} '{}'", ref_type, value)
             }
             Op::GenericCrud { verb, binding, .. } => {
                 if let Some(b) = binding {
@@ -526,11 +483,6 @@ impl Op {
             // Entity ensure has no deps (created with null FKs)
             Op::EnsureEntity { .. } => vec![],
 
-            // SetFK depends on both source and target existing
-            Op::SetFK { source, target, .. } => {
-                vec![OpRef::Entity(source.clone()), OpRef::Entity(target.clone())]
-            }
-
             // LinkRole depends on CBU and entity
             Op::LinkRole { cbu, entity, .. } => {
                 vec![OpRef::Entity(cbu.clone()), OpRef::Entity(entity.clone())]
@@ -602,9 +554,6 @@ impl Op {
             // NOTE: Does NOT depend on entities referenced in the doc that exist
             // in DB but not in this DSL program - those are runtime lookups
             Op::Materialize { source, .. } => vec![OpRef::Doc(source.clone())],
-
-            // RequireRef has no runtime deps (validated at compile time)
-            Op::RequireRef { .. } => vec![],
 
             // GenericCrud depends on entities specified in depends_on
             Op::GenericCrud { depends_on, .. } => depends_on

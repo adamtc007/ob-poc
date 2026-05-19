@@ -3086,21 +3086,9 @@ impl DslExecutor {
                 None
             }
 
-            Op::SetFK { .. } => {
-                // SetFK is handled by the entity creation - FKs are set via attrs
-                // This is a placeholder for future two-phase execution
-                tracing::debug!("SetFK op - skipping (handled during entity creation)");
-                None
-            }
-
             Op::Materialize { .. } => {
                 // Materialize is a custom operation - skip for now
                 tracing::warn!("Materialize op not yet implemented in DAG executor");
-                None
-            }
-
-            Op::RequireRef { .. } => {
-                // RequireRef is validation-only, no execution needed
                 None
             }
 

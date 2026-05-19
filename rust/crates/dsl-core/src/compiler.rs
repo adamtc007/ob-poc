@@ -12,11 +12,6 @@
 //! 2. Extracts arguments and resolves symbol references
 //! 3. Produces one or more Ops per VerbCall
 //! 4. Tracks bindings (`:as @name`) in a symbol table
-//!
-//! # Two-Phase FK Strategy
-//!
-//! Entities are created with null FKs (Phase 1), then FKs are populated
-//! by SetFK ops (Phase 2). This eliminates most circular dependencies.
 
 use crate::ast::{AstNode, Literal, Program, Statement, VerbCall};
 use crate::ops::{EntityKey, Op};

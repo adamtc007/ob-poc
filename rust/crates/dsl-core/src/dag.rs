@@ -217,8 +217,7 @@ fn group_into_phases(ops: &[Op]) -> Vec<ExecutionPhase> {
         match op {
             Op::EnsureEntity { .. } => phase_entities.op_indices.push(idx),
 
-            Op::SetFK { .. }
-            | Op::LinkRole { .. }
+            Op::LinkRole { .. }
             | Op::UnlinkRole { .. }
             | Op::AddOwnership { .. }
             | Op::RegisterUBO { .. } => phase_relationships.op_indices.push(idx),
@@ -237,8 +236,6 @@ fn group_into_phases(ops: &[Op]) -> Vec<ExecutionPhase> {
             }
 
             Op::Materialize { .. } => phase_materialize.op_indices.push(idx),
-
-            Op::RequireRef { .. } => {} // No-op, skip
 
             Op::GenericCrud { .. } => {
                 // GenericCrud ops go in the entities phase by default
@@ -451,8 +448,8 @@ mod tests {
         assert!(description.contains("Ensure cbu 'Fund'"));
     }
 
-    // Note: Actual cycle detection test is tricky because our current Op
-    // definitions don't easily create cycles. SetFK would be needed.
-    // The algorithm is correct - cycles would be detected if ops had
-    // mutual dependencies.
+    // Note: Actual cycle detection test is tricky because current Op
+    // definitions don't easily create cycles — relationship ops depend on
+    // entity ops unidirectionally. The algorithm is correct; cycles would
+    // surface if ops had mutual dependencies.
 }
