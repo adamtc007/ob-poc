@@ -1083,6 +1083,16 @@ impl ToolHandlers {
                                 entity_type, entity_id
                             )),
                         ),
+                        AtomicExecutionResult::IdempotentReplayReturned { prior_result } => {
+                            (prior_result.len(), None)
+                        }
+                        AtomicExecutionResult::OptimisticConflict { constraint_name } => (
+                            0,
+                            Some(format!(
+                                "Optimistic conflict on constraint '{}' — concurrent plan won",
+                                constraint_name
+                            )),
+                        ),
                     },
                     MpcExecutionOutcome::BestEffort(best_effort) => {
                         let success_count = best_effort

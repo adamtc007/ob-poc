@@ -326,6 +326,22 @@ pub enum AtomicExecutionResult {
         /// Locks that were acquired before contention
         locks_acquired_before_contention: Vec<LockKey>,
     },
+    /// A prior execution with the same idempotency key already committed.
+    /// The prior result is returned without re-executing (v0.5 §9.1, §9.4).
+    IdempotentReplayReturned {
+        /// The results from the prior committed execution.
+        prior_result: Vec<ExecutionResult>,
+    },
+    /// A DB unique constraint was violated — the plan lost a race with a
+    /// concurrent execution. Caller may retry with a fresh read.
+    ///
+    /// Maps the `UniqueInsert` coordination strategy outcome (v0.5 §9.1,
+    /// §9.3: "conflict is a normal runtime outcome"). This is NOT a failure;
+    /// it is an expected outcome under concurrent `idempotent_ensure` plans.
+    OptimisticConflict {
+        /// The DB constraint name that was violated (e.g., "cbus_name_key").
+        constraint_name: String,
+    },
 }
 
 #[cfg(feature = "database")]
@@ -343,6 +359,16 @@ impl AtomicExecutionResult {
     /// Check if there was lock contention
     pub fn is_lock_contention(&self) -> bool {
         matches!(self, AtomicExecutionResult::LockContention { .. })
+    }
+
+    /// Check if this was an idempotent replay (prior result returned).
+    pub fn is_idempotent_replay(&self) -> bool {
+        matches!(self, AtomicExecutionResult::IdempotentReplayReturned { .. })
+    }
+
+    /// Check if this was an optimistic conflict (lost race; no failure).
+    pub fn is_conflict(&self) -> bool {
+        matches!(self, AtomicExecutionResult::OptimisticConflict { .. })
     }
 
     /// Get the step results if committed
@@ -389,6 +415,18 @@ impl AtomicExecutionResult {
                 format!(
                     "⚠ Lock contention on {}:{} - another session is modifying this entity",
                     entity_type, entity_id
+                )
+            }
+            AtomicExecutionResult::IdempotentReplayReturned { prior_result } => {
+                format!(
+                    "↩ Idempotent replay: prior result returned ({} steps, no re-execution)",
+                    prior_result.len()
+                )
+            }
+            AtomicExecutionResult::OptimisticConflict { constraint_name } => {
+                format!(
+                    "⚡ Optimistic conflict on constraint '{constraint_name}' \
+                     — concurrent plan won the race; caller may retry"
                 )
             }
         }
@@ -2524,8 +2562,33 @@ impl DslExecutor {
             let result = match self.execute_verb_in_tx(&vc, ctx, &mut tx).await {
                 Ok(r) => r,
                 Err(e) => {
-                    // Rollback on any error
                     let error_msg = e.to_string();
+                    // UniqueInsert coordination (v0.5 §5.3, T13): detect DB
+                    // unique-constraint violations and return OptimisticConflict
+                    // instead of RolledBack. This is a normal outcome under
+                    // concurrent idempotent_ensure plans — not a failure.
+                    if let Some(db_err) = e.downcast_ref::<sqlx::Error>() {
+                        if let sqlx::Error::Database(db) = db_err {
+                            // Postgres unique_violation = SQLSTATE 23505
+                            if db.code().as_deref() == Some("23505") {
+                                let constraint = db
+                                    .constraint()
+                                    .unwrap_or("unknown_constraint")
+                                    .to_string();
+                                tracing::debug!(
+                                    "execute_plan_atomic_with_locks: step {} unique-constraint \
+                                     violation on '{}' → OptimisticConflict",
+                                    step_index,
+                                    constraint
+                                );
+                                tx.rollback().await?;
+                                return Ok(AtomicExecutionResult::OptimisticConflict {
+                                    constraint_name: constraint,
+                                });
+                            }
+                        }
+                    }
+                    // Other errors: rollback and return RolledBack.
                     tracing::error!(
                         "execute_plan_atomic_with_locks: step {} ({}.{}) failed: {}. Rolling back.",
                         step_index,

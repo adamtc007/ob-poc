@@ -2341,6 +2341,17 @@ async fn execute_session_dsl_raw(
                         ));
                         Vec::new()
                     }
+                    AtomicExecutionResult::IdempotentReplayReturned { prior_result } => {
+                        prior_result.clone()
+                    }
+                    AtomicExecutionResult::OptimisticConflict { constraint_name } => {
+                        all_success = false;
+                        errors.push(format!(
+                            "Optimistic conflict on constraint '{}' — retry with fresh read",
+                            constraint_name
+                        ));
+                        Vec::new()
+                    }
                 },
                 ExecutionOutcome::BestEffort(best_effort) => {
                     // Check for partial failures
