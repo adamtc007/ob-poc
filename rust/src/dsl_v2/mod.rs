@@ -221,7 +221,7 @@ pub mod execution {
     #[cfg(not(feature = "database"))]
     pub use super::executor::{DslExecutor, ExecutionContext, ExecutionResult};
 
-    pub use super::executor::{DagExecutionResult, OpExecutionResult, ReturnType};
+    pub use super::executor::ReturnType;
     #[cfg(feature = "database")]
     pub use super::gateway_resolver::{gateway_addr, GatewayRefResolver};
     #[cfg(feature = "database")]
