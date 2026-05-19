@@ -80,6 +80,7 @@ domains:
       read:
         flavour: attribute_mutating
         description: "Read team details"
+        effect_class: read_snapshot
         invocation_phrases:
           - "show team"
           - "get team details"
@@ -489,6 +490,7 @@ domains:
       verify-governance-access:
         flavour: attribute_mutating
         description: "Audit governance access against legal appointments"
+        effect_class: read_snapshot
         invocation_phrases:
           - "verify governance access"
           - "check governance permissions"
@@ -1115,6 +1117,7 @@ domains:
       check-access:
         flavour: attribute_mutating
         description: "Check user access to specific CBU"
+        effect_class: read_snapshot
         invocation_phrases:
           - "check user access"
           - "verify user permissions"

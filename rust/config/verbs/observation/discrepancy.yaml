@@ -240,6 +240,7 @@ domains:
       list-open:
         flavour: attribute_mutating
         description: List open discrepancies
+        effect_class: read_snapshot
         metadata:
           tier: reference
           source_of_truth: operational

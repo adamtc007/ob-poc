@@ -341,6 +341,7 @@ domains:
       list-pending:
         flavour: attribute_mutating
         description: List pending allegations for a CBU
+        effect_class: read_snapshot
         metadata:
           tier: reference
           source_of_truth: operational

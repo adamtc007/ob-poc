@@ -93,6 +93,7 @@ domains:
       read:
         flavour: attribute_mutating
         description: "Get service agreement details"
+        effect_class: read_snapshot
         metadata:
           tier: reference
           source_of_truth: workflow
@@ -134,6 +135,7 @@ domains:
       list:
         flavour: attribute_mutating
         description: "List service agreements for a sponsor"
+        effect_class: read_snapshot
         metadata:
           tier: reference
           source_of_truth: workflow

@@ -56,6 +56,7 @@ domains:
           List all governance controller groups with summary information.
           Includes CBU counts and names for each group.
         behavior: crud
+        effect_class: read_snapshot
         invocation_phrases:
           - list groups
           - show all books
@@ -860,6 +861,7 @@ domains:
           List holding control links for an issuer or holder.
           Shows all shareholdings that establish control/influence.
         behavior: crud
+        effect_class: read_snapshot
         invocation_phrases:
           - list control links
           - show shareholding control

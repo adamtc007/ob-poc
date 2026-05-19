@@ -381,6 +381,7 @@ domains:
 
           Returns the active configuration including all threshold levels
           and look-through parameters.
+        effect_class: read_snapshot
         metadata:
           tier: diagnostics
           source_of_truth: register

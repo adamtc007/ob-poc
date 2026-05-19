@@ -462,6 +462,7 @@ domains:
       find-by-lei:
         flavour: attribute_mutating
         description: Find entity by LEI
+        effect_class: read_snapshot
         metadata:
           tier: reference
           source_of_truth: entity
@@ -502,6 +503,7 @@ domains:
       find-by-clearstream:
         flavour: attribute_mutating
         description: Find entity by Clearstream reference
+        effect_class: read_snapshot
         metadata:
           tier: reference
           source_of_truth: entity
@@ -545,6 +547,7 @@ domains:
       find-by-isin:
         flavour: attribute_mutating
         description: Find entity by ISIN (for share classes/funds)
+        effect_class: read_snapshot
         metadata:
           tier: reference
           source_of_truth: entity

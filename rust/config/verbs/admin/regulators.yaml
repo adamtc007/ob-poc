@@ -8,6 +8,7 @@ domains:
       list:
         flavour: attribute_mutating
         description: "List recognized regulators"
+        effect_class: read_snapshot
         metadata:
           tier: reference
           source_of_truth: operational
@@ -56,6 +57,7 @@ domains:
       read:
         flavour: attribute_mutating
         description: "Get regulator by code"
+        effect_class: read_snapshot
         metadata:
           tier: reference
           source_of_truth: operational
@@ -248,6 +250,7 @@ domains:
       list:
         flavour: attribute_mutating
         description: "List regulatory tiers"
+        effect_class: read_snapshot
         metadata:
           tier: reference
           source_of_truth: operational
@@ -283,6 +286,7 @@ domains:
       read:
         flavour: attribute_mutating
         description: "Get tier by code"
+        effect_class: read_snapshot
         metadata:
           tier: reference
           source_of_truth: operational

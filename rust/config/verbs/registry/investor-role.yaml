@@ -249,6 +249,7 @@ domains:
 
           Use this to check how a holder is currently classified for a specific issuer.
           For historical/point-in-time queries, use read-as-of instead.
+        effect_class: read_snapshot
         metadata:
           tier: diagnostics
           source_of_truth: register

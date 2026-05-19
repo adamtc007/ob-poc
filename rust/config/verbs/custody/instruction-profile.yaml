@@ -80,6 +80,7 @@ domains:
       list-message-types:
         flavour: attribute_mutating
         description: "List available message types"
+        effect_class: read_snapshot
         metadata:
           tier: reference
           source_of_truth: operational
@@ -197,6 +198,7 @@ domains:
       read-template:
         flavour: attribute_mutating
         description: "Read instruction template"
+        effect_class: read_snapshot
         metadata:
           tier: reference
           source_of_truth: operational
@@ -239,6 +241,7 @@ domains:
       list-templates:
         flavour: attribute_mutating
         description: "List instruction templates"
+        effect_class: read_snapshot
         metadata:
           tier: reference
           source_of_truth: operational

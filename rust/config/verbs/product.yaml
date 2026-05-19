@@ -5,6 +5,7 @@ domains:
       read:
         flavour: attribute_mutating
         description: Read a product by ID or code
+        effect_class: read_snapshot
         metadata:
           tier: reference
           source_of_truth: catalog
@@ -56,6 +57,7 @@ domains:
       list:
         flavour: attribute_mutating
         description: List products with optional filters
+        effect_class: read_snapshot
         metadata:
           tier: reference
           source_of_truth: catalog

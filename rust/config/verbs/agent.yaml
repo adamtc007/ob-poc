@@ -27,6 +27,7 @@ domains:
       start:
         flavour: instance_adding
         description: Start agent mode with a specific task
+        effect_class: pure
         metadata:
           tier: intent
           source_of_truth: session
@@ -90,6 +91,7 @@ domains:
       pause:
         flavour: attribute_mutating
         description: Pause the running agent loop
+        effect_class: pure
         metadata:
           tier: intent
           source_of_truth: session
@@ -122,6 +124,7 @@ domains:
       resume:
         flavour: attribute_mutating
         description: Resume a paused agent loop
+        effect_class: pure
         metadata:
           tier: intent
           source_of_truth: session
@@ -154,6 +157,7 @@ domains:
       stop:
         flavour: attribute_mutating
         description: Stop the agent loop completely
+        effect_class: pure
         metadata:
           tier: intent
           source_of_truth: session
@@ -188,6 +192,7 @@ domains:
             baseline: reviewable
       confirm-decision:
         flavour: discretionary
+        effect_class: pure
         role_guard:
           any_of: [compliance_admin, senior_compliance, mlro]
         audit_class: agent_confirm_decision
@@ -234,6 +239,7 @@ domains:
             baseline: reviewable
       reject-decision:
         flavour: discretionary
+        effect_class: pure
         role_guard:
           any_of: [compliance_officer, senior_compliance, mlro]
         audit_class: agent_reject_decision
@@ -277,6 +283,7 @@ domains:
             baseline: reviewable
       select-decision-option:
         flavour: discretionary
+        effect_class: pure
         role_guard:
           any_of: [compliance_admin, senior_compliance, mlro]
         audit_class: agent_select_decision_option

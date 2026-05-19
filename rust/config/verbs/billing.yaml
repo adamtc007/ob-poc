@@ -274,6 +274,7 @@ domains:
         flavour: attribute_mutating
         description: "Retrieve billing profile with account targets"
         behavior: crud
+        effect_class: read_snapshot
         crud:
           operation: select
           table: v_billing_profile_summary
@@ -315,6 +316,7 @@ domains:
         flavour: attribute_mutating
         description: "List billing profiles for a deal or CBU"
         behavior: crud
+        effect_class: read_snapshot
         crud:
           operation: select
           table: v_billing_profile_summary
@@ -484,6 +486,7 @@ domains:
         flavour: attribute_mutating
         description: "List account targets for a billing profile"
         behavior: crud
+        effect_class: read_snapshot
         crud:
           operation: select
           table: fee_billing_account_targets

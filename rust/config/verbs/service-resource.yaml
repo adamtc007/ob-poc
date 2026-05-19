@@ -6,6 +6,7 @@ domains:
       read:
         flavour: attribute_mutating
         description: Read a service resource type by ID or code
+        effect_class: read_snapshot
         metadata:
           tier: reference
           source_of_truth: catalog
@@ -53,6 +54,7 @@ domains:
       list:
         flavour: attribute_mutating
         description: List service resource types with optional filters
+        effect_class: read_snapshot
         metadata:
           tier: reference
           source_of_truth: catalog
@@ -417,6 +419,7 @@ domains:
       read-resource-owner:
         flavour: attribute_mutating
         description: Read an addressable resource-owner principal
+        effect_class: read_snapshot
         metadata:
           tier: reference
           source_of_truth: operational
@@ -460,6 +463,7 @@ domains:
       list-resource-owners:
         flavour: attribute_mutating
         description: List resource-owner principals available for service-resource dispatch
+        effect_class: read_snapshot
         metadata:
           tier: reference
           source_of_truth: operational
@@ -730,6 +734,7 @@ domains:
       read-lifecycle:
         flavour: attribute_mutating
         description: Read a lifecycle by ID or code
+        effect_class: read_snapshot
         metadata:
           tier: reference
           source_of_truth: workflow
@@ -767,6 +772,7 @@ domains:
       list-lifecycles:
         flavour: attribute_mutating
         description: List lifecycles with optional filters
+        effect_class: read_snapshot
         metadata:
           tier: reference
           source_of_truth: workflow
@@ -850,6 +856,7 @@ domains:
       read-lifecycle-resource-type:
         flavour: attribute_mutating
         description: Read a lifecycle resource type
+        effect_class: read_snapshot
         metadata:
           tier: reference
           source_of_truth: workflow
@@ -885,6 +892,7 @@ domains:
       list-lifecycle-resource-types:
         flavour: attribute_mutating
         description: List lifecycle resource types
+        effect_class: read_snapshot
         metadata:
           tier: reference
           source_of_truth: workflow

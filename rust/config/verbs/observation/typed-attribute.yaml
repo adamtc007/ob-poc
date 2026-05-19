@@ -82,6 +82,7 @@ domains:
       get:
         flavour: attribute_mutating
         description: Read the current typed attribute value for an entity
+        effect_class: read_snapshot
         metadata:
           tier: reference
           source_of_truth: operational

@@ -103,6 +103,7 @@ domains:
       list:
         flavour: attribute_mutating
         description: List outstanding requests
+        effect_class: read_snapshot
         metadata:
           tier: reference
           source_of_truth: operational

@@ -359,6 +359,7 @@ domains:
       list-thresholds:
         flavour: attribute_mutating
         description: List all configured thresholds
+        effect_class: read_snapshot
         metadata:
           tier: reference
           source_of_truth: operational
@@ -459,6 +460,7 @@ domains:
       list-overrides:
         flavour: attribute_mutating
         description: List overrides for a case or evaluation
+        effect_class: read_snapshot
         metadata:
           tier: reference
           source_of_truth: operational

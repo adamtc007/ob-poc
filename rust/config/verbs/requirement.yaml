@@ -318,6 +318,7 @@ domains:
         flavour: attribute_mutating
         description: Get a requirement by ID
         behavior: crud
+        effect_class: read_snapshot
         invocation_phrases:
           - "get requirement details"
           - "show requirement by ID"
@@ -357,6 +358,7 @@ domains:
         flavour: attribute_mutating
         description: List all requirements for an entity
         behavior: crud
+        effect_class: read_snapshot
         invocation_phrases:
           - show requirements for entity
           - list entity requirements
@@ -401,6 +403,7 @@ domains:
         flavour: attribute_mutating
         description: List all requirements for a workflow instance
         behavior: crud
+        effect_class: read_snapshot
         invocation_phrases:
           - show workflow requirements
           - list requirements for workflow
@@ -487,6 +490,7 @@ domains:
         flavour: attribute_mutating
         description: Get requirements with latest version status (joined view)
         behavior: crud
+        effect_class: read_snapshot
         invocation_phrases:
           - "requirements with status"
           - "show requirement collection progress"

@@ -85,6 +85,7 @@ domains:
       read-gateway:
         flavour: attribute_mutating
         description: "Read gateway definition"
+        effect_class: read_snapshot
         metadata:
           tier: reference
           source_of_truth: matrix
@@ -129,6 +130,7 @@ domains:
       list-gateways:
         flavour: attribute_mutating
         description: "List available gateways"
+        effect_class: read_snapshot
         metadata:
           tier: reference
           source_of_truth: matrix

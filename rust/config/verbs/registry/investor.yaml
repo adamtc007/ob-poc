@@ -193,6 +193,7 @@ domains:
       read:
         flavour: attribute_mutating
         description: Read investor by ID
+        effect_class: read_snapshot
         metadata:
           tier: reference
           source_of_truth: register

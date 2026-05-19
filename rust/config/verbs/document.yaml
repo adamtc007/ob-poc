@@ -1093,6 +1093,7 @@ domains:
       get:
         flavour: attribute_mutating
         description: Get document with latest version status
+        effect_class: read_snapshot
         invocation_phrases:
           - "get document details"
           - "show me document"
@@ -1132,6 +1133,7 @@ domains:
       list-versions:
         flavour: attribute_mutating
         description: List all versions of a document
+        effect_class: read_snapshot
         invocation_phrases:
           - "list document versions"
           - "show version history"
@@ -1171,6 +1173,7 @@ domains:
         flavour: attribute_mutating
         description: List all documents for an entity
         behavior: crud
+        effect_class: read_snapshot
         invocation_phrases:
           - show documents for entity
           - show me documents for entity

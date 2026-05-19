@@ -84,6 +84,7 @@ domains:
         flavour: attribute_mutating
         description: "Get contract details by ID"
         behavior: crud
+        effect_class: read_snapshot
         crud:
           operation: select
           table: legal_contracts
@@ -123,6 +124,7 @@ domains:
         flavour: attribute_mutating
         description: "List contracts, optionally filtered by client"
         behavior: crud
+        effect_class: read_snapshot
         crud:
           operation: select
           table: v_contract_summary
@@ -356,6 +358,7 @@ domains:
         flavour: attribute_mutating
         description: "List products for a contract"
         behavior: crud
+        effect_class: read_snapshot
         crud:
           operation: select
           table: contract_products
@@ -449,6 +452,7 @@ domains:
         flavour: attribute_mutating
         description: "List all rate cards"
         behavior: crud
+        effect_class: read_snapshot
         crud:
           operation: select
           table: rate_cards
@@ -579,6 +583,7 @@ domains:
         flavour: attribute_mutating
         description: "List CBU subscriptions, optionally filtered"
         behavior: crud
+        effect_class: read_snapshot
         crud:
           operation: select
           table: v_cbu_subscriptions
@@ -625,6 +630,7 @@ domains:
         flavour: attribute_mutating
         description: "Get the active contract for a client"
         behavior: crud
+        effect_class: read_snapshot
         crud:
           operation: select
           table: legal_contracts

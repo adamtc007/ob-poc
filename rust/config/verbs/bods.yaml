@@ -297,6 +297,7 @@ domains:
       list-persons:
         flavour: attribute_mutating
         description: List person statements with beneficial ownership
+        effect_class: read_snapshot
         metadata:
           tier: reference
           source_of_truth: external

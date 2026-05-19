@@ -74,6 +74,7 @@ domains:
         flavour: attribute_mutating
         description: "Read the root client group record"
         behavior: crud
+        effect_class: read_snapshot
         crud:
           operation: select
           table: client_group

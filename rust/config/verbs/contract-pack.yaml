@@ -52,6 +52,7 @@ domains:
         flavour: attribute_mutating
         description: "Read a contract pack by ID"
         behavior: crud
+        effect_class: read_snapshot
         metadata:
           tier: diagnostics
           source_of_truth: operational

@@ -82,6 +82,7 @@ domains:
         flavour: attribute_mutating
         description: "List CA event types"
         behavior: crud
+        effect_class: read_snapshot
         metadata:
           tier: diagnostics
           source_of_truth: catalog

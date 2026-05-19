@@ -544,6 +544,7 @@ domains:
       my-pending:
         flavour: attribute_mutating
         description: Get my pending review items
+        effect_class: read_snapshot
         metadata:
           tier: intent
           source_of_truth: operational
@@ -593,6 +594,7 @@ domains:
       campaign-status:
         flavour: attribute_mutating
         description: Get campaign details with review items
+        effect_class: read_snapshot
         metadata:
           tier: intent
           source_of_truth: operational
@@ -717,6 +719,7 @@ domains:
       list-flagged:
         flavour: attribute_mutating
         description: List items with detected issues
+        effect_class: read_snapshot
         metadata:
           tier: intent
           source_of_truth: operational

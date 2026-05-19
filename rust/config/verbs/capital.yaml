@@ -1141,6 +1141,7 @@ domains:
       control-config.get:
         flavour: attribute_mutating
         description: Get control configuration for an issuer
+        effect_class: read_snapshot
         invocation_phrases:
           - "get control configuration"
           - "show control config"

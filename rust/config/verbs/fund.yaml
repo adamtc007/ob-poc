@@ -939,6 +939,7 @@ domains:
       read-vehicle:
         flavour: attribute_mutating
         description: Read fund vehicle metadata by fund entity ID.
+        effect_class: read_snapshot
         invocation_phrases:
           - "get fund vehicle"
           - "read fund type"
@@ -1185,6 +1186,7 @@ domains:
       read-compartment:
         flavour: attribute_mutating
         description: Read compartment details by ID.
+        effect_class: read_snapshot
         invocation_phrases:
           - "get compartment"
           - "read sub-fund"

@@ -89,6 +89,7 @@ domains:
         flavour: attribute_mutating
         description: Read a trading profile by ID
         behavior: crud
+        effect_class: read_snapshot
         invocation_phrases:
           - "show trading profile"
           - "get trading profile"

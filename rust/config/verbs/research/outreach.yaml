@@ -278,6 +278,7 @@ domains:
       list-pending:
         flavour: attribute_mutating
         description: "List pending outreach requests"
+        effect_class: read_snapshot
         metadata:
           tier: diagnostics
           source_of_truth: workflow
@@ -357,6 +358,7 @@ domains:
       get-request:
         flavour: attribute_mutating
         description: "Get details of a specific request"
+        effect_class: read_snapshot
         metadata:
           tier: diagnostics
           source_of_truth: workflow

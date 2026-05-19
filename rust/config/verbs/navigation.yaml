@@ -15,6 +15,7 @@ domains:
         description: "Drill into a focused object — opens deeper level"
         behavior: plugin
         handler: NavDrillOp
+        effect_class: pure
         invocation_phrases:
           - "drill into"
           - "zoom into"
@@ -53,6 +54,7 @@ domains:
         description: "Semantic zoom out — go up one level"
         behavior: plugin
         handler: NavZoomOutOp
+        effect_class: pure
         invocation_phrases:
           - "zoom out"
           - "go up"
@@ -82,6 +84,7 @@ domains:
         description: "Set semantic focus to a specific entity or object"
         behavior: plugin
         handler: NavSelectOp
+        effect_class: pure
         invocation_phrases:
           - "select"
           - "focus on"
@@ -182,6 +185,7 @@ domains:
         description: "Navigate back in history — replay previous OrientationContract"
         behavior: plugin
         handler: NavHistoryBackOp
+        effect_class: pure
         invocation_phrases:
           - "back"
           - "previous"
@@ -210,6 +214,7 @@ domains:
         description: "Navigate forward in history"
         behavior: plugin
         handler: NavHistoryForwardOp
+        effect_class: pure
         invocation_phrases:
           - "forward"
           - "next"

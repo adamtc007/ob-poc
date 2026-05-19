@@ -574,6 +574,7 @@ domains:
       pending-decisions:
         flavour: attribute_mutating
         description: "List decisions awaiting user input"
+        effect_class: read_snapshot
         metadata:
           tier: diagnostics
           source_of_truth: workflow

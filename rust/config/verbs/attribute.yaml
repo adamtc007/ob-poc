@@ -488,6 +488,7 @@ domains:
       read:
         flavour: attribute_mutating
         description: "Read an attribute by semantic ID"
+        effect_class: read_snapshot
         metadata:
           tier: reference
           source_of_truth: catalog
@@ -525,6 +526,7 @@ domains:
       list:
         flavour: attribute_mutating
         description: "List attributes, optionally filtered by category or domain"
+        effect_class: read_snapshot
         metadata:
           tier: reference
           source_of_truth: catalog

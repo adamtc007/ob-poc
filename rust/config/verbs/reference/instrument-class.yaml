@@ -89,6 +89,7 @@ domains:
       read:
         flavour: attribute_mutating
         description: Read instrument class by code
+        effect_class: read_snapshot
         metadata:
           tier: reference
           source_of_truth: operational
@@ -125,6 +126,7 @@ domains:
       list:
         flavour: attribute_mutating
         description: List instrument classes with filters
+        effect_class: read_snapshot
         metadata:
           tier: reference
           source_of_truth: operational

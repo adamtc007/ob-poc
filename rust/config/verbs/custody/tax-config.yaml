@@ -90,6 +90,7 @@ domains:
       list-jurisdictions:
         flavour: attribute_mutating
         description: "List tax jurisdictions"
+        effect_class: read_snapshot
         metadata:
           tier: reference
           source_of_truth: operational
@@ -250,6 +251,7 @@ domains:
       list-treaty-rates:
         flavour: attribute_mutating
         description: "List treaty rates for jurisdiction pair"
+        effect_class: read_snapshot
         metadata:
           tier: reference
           source_of_truth: operational

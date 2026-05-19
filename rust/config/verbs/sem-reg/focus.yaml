@@ -58,6 +58,7 @@ domains:
       set:
         flavour: attribute_mutating
         description: Set the focus state to a specific registry object
+        effect_class: pure
         metadata:
           tier: diagnostics
           source_of_truth: operational

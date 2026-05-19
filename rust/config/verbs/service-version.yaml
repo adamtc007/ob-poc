@@ -265,6 +265,7 @@ domains:
       compare:
         flavour: attribute_mutating
         description: Compare two versions of a service
+        effect_class: read_snapshot
         invocation_phrases:
           - "compare service versions"
           - "diff service versions"

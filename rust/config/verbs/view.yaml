@@ -351,6 +351,7 @@ domains:
       set-selection:
         flavour: attribute_mutating
         description: "Explicitly set selection within the current view"
+        effect_class: pure
         invocation_phrases:
           - "select these items"
           - "select all visible"

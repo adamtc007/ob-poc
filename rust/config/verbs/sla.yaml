@@ -11,6 +11,7 @@ domains:
       list-templates:
         flavour: attribute_mutating
         description: List available SLA templates
+        effect_class: read_snapshot
         invocation_phrases:
           - "list SLA templates"
           - "show SLA templates"
@@ -66,6 +67,7 @@ domains:
       read-template:
         flavour: attribute_mutating
         description: Read SLA template by code
+        effect_class: read_snapshot
         invocation_phrases:
           - "read SLA template"
           - "show SLA template details"

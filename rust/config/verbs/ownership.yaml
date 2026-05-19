@@ -153,6 +153,7 @@ domains:
       snapshot.get:
         flavour: attribute_mutating
         description: Get a specific ownership snapshot
+        effect_class: read_snapshot
         invocation_phrases:
           - "get ownership snapshot"
           - "show specific snapshot"

@@ -233,6 +233,7 @@ domains:
       list-versions:
         flavour: attribute_mutating
         description: List versions for a service
+        effect_class: read_snapshot
         invocation_phrases:
           - "list service versions"
           - "show all service versions"
@@ -274,6 +275,7 @@ domains:
       show:
         flavour: attribute_mutating
         description: Show full service detail including lifecycle status
+        effect_class: read_snapshot
         invocation_phrases:
           - "show service"
           - "describe service in full"
@@ -315,6 +317,7 @@ domains:
       read:
         flavour: attribute_mutating
         description: Read a service by ID or code
+        effect_class: read_snapshot
         metadata:
           tier: reference
           source_of_truth: catalog
@@ -364,6 +367,7 @@ domains:
       list:
         flavour: attribute_mutating
         description: List services with optional filters
+        effect_class: read_snapshot
         metadata:
           tier: reference
           source_of_truth: catalog

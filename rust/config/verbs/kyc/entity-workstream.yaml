@@ -413,6 +413,7 @@ domains:
       read:
         flavour: attribute_mutating
         description: Read workstream details
+        effect_class: read_snapshot
         invocation_phrases:
         - "read workstream"
         - "get workstream details"

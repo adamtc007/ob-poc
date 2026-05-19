@@ -17,6 +17,7 @@ domains:
         description: Select a journey pack for the current session
         behavior: plugin
         handler: PackSelectOp
+        effect_class: pure
         invocation_phrases:
           - "select pack"
           - "use pack"
@@ -62,6 +63,7 @@ domains:
         description: Record an answer to a pack question
         behavior: plugin
         handler: PackAnswerOp
+        effect_class: pure
         invocation_phrases:
           - "answer question"
           - "set answer"
