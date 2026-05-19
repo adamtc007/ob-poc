@@ -50,9 +50,7 @@ impl AgentValidator {
             }
         };
 
-        // Phase 2: Op-free compilation (CR A2 migration).
-        // compile_to_steps emits VerbCalls directly; no handler needed.
-        // Verb existence is validated at execution time against runtime_registry.
+        // Phase 2: Op-free compilation — emits CompileSteps from all VerbCalls.
         use dsl_core::compiler::compile_to_steps;
         let compiled = compile_to_steps(&program);
 
@@ -64,6 +62,42 @@ impl AgentValidator {
                     message: "Compilation produced no steps".to_string(),
                     suggestion: None,
                 }],
+                warnings: vec![],
+            };
+        }
+
+        // Phase 3: Verb existence check against the loaded verb catalogue.
+        // The Op-free compiler emits all VerbCalls without checking existence;
+        // this phase catches unknown verbs before execution.
+        use dsl_core::config::ConfigLoader;
+        let verbs_config = ConfigLoader::from_env().load_verbs().ok();
+        let mut errors: Vec<ValidationError> = Vec::new();
+
+        if let Some(ref cfg) = verbs_config {
+            for step in &compiled.steps {
+                let vc = &step.verb_call;
+                let known = cfg
+                    .domains
+                    .get(&vc.domain)
+                    .and_then(|d| d.verbs.get(&vc.verb))
+                    .is_some();
+                if !known {
+                    errors.push(ValidationError {
+                        line: None,
+                        message: format!(
+                            "Unknown verb '{}.{}': not declared in the verb catalogue",
+                            vc.domain, vc.verb
+                        ),
+                        suggestion: None,
+                    });
+                }
+            }
+        }
+
+        if !errors.is_empty() {
+            return ValidationResult {
+                is_valid: false,
+                errors,
                 warnings: vec![],
             };
         }
