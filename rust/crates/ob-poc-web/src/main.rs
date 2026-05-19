@@ -854,24 +854,46 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         "SemOsVerbOpRegistry initialised"
     );
 
-    // F3 fix (Slice 2.2): drift-check the registry against every YAML plugin
-    // verb BEFORE serving traffic. Missing registrations → panic. This is
-    // the same computation `test_plugin_verb_coverage` runs in CI, so
-    // startup and tests can never diverge on what "covered" means.
+    // Wiring check (CR L2): compare VerbManifest (L1) against registry.
+    // Unimplemented declarations → panic (hard-fail; same as pre-L2 behaviour).
+    // Orphan implementations → warn (soft, since registry may include internal
+    // ops that intentionally have no YAML declaration e.g. test helpers).
     {
-        let missing = ob_poc::domain_ops::find_missing_plugin_ops(&sem_os_ops);
-        if !missing.is_empty() {
+        use ob_poc::dsl_v2::config::{wiring_check, ConfigLoader};
+
+        let manifest = ConfigLoader::from_env().load_verb_manifest();
+        let registered_fqns = sem_os_ops.manifest();
+        let report = wiring_check(&manifest, &registered_fqns);
+
+        if !report.unimplemented_declarations.is_empty() {
             panic!(
                 "FATAL: {} YAML plugin verb(s) have no SemOsVerbOp registered. \
                  Plugin dispatch for these verbs will hard-fail at runtime. \
                  Wire them in `sem_os_postgres::ops::build_registry()` or \
                  `ob_poc::domain_ops::extend_registry()`. Missing FQNs: {:?}",
-                missing.len(),
-                missing
+                report.unimplemented_declarations.len(),
+                report.unimplemented_declarations
             );
         }
+
+        if !report.orphan_implementations.is_empty() {
+            tracing::warn!(
+                orphan_count = report.orphan_implementations.len(),
+                orphans = ?report.orphan_implementations,
+                "SemOsVerbOpRegistry: registered ops have no YAML verb declaration — \
+                 they can never be invoked through the DSL pipeline"
+            );
+        }
+
         tracing::info!(
-            "SemOsVerbOpRegistry coverage check passed — every YAML plugin verb has a handler"
+            declared_plugin_verbs = manifest
+                .declarations
+                .values()
+                .filter(|d| matches!(d.behavior, ob_poc::dsl_v2::config::types::VerbBehavior::Plugin))
+                .count(),
+            registered_ops = sem_os_ops.len(),
+            orphan_ops = report.orphan_implementations.len(),
+            "wiring check passed — every YAML plugin verb has a handler"
         );
     }
 

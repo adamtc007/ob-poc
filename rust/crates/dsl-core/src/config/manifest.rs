@@ -153,6 +153,96 @@ pub fn build_manifest(config: &VerbsConfig) -> VerbManifest {
     manifest
 }
 
+/// Result of comparing YAML declarations against registered implementations.
+///
+/// Produced by `wiring_check`. A clean report means every `behavior: plugin`
+/// verb in YAML has a registered `SemOsVerbOp`, and every registered op has a
+/// corresponding YAML declaration (of any behavior).
+#[derive(Debug, Default)]
+pub struct WiringReport {
+    /// `behavior: plugin` verbs declared in YAML with no registered implementation.
+    /// These verbs would produce "unknown verb" errors at execution time.
+    pub unimplemented_declarations: Vec<String>,
+    /// Registered ops with no matching YAML declaration.
+    /// These ops can never be invoked through the DSL pipeline.
+    pub orphan_implementations: Vec<String>,
+}
+
+impl WiringReport {
+    /// True when there are no mismatches in either direction.
+    pub fn is_clean(&self) -> bool {
+        self.unimplemented_declarations.is_empty() && self.orphan_implementations.is_empty()
+    }
+
+    /// Human-readable summary for startup logs or error messages.
+    pub fn summary(&self) -> String {
+        if self.is_clean() {
+            return "wiring check: clean".to_string();
+        }
+        let mut parts = Vec::new();
+        if !self.unimplemented_declarations.is_empty() {
+            parts.push(format!(
+                "{} plugin verb(s) have no registered impl: {}",
+                self.unimplemented_declarations.len(),
+                self.unimplemented_declarations.join(", ")
+            ));
+        }
+        if !self.orphan_implementations.is_empty() {
+            parts.push(format!(
+                "{} registered op(s) have no YAML declaration: {}",
+                self.orphan_implementations.len(),
+                self.orphan_implementations.join(", ")
+            ));
+        }
+        parts.join("; ")
+    }
+}
+
+/// Compare YAML declarations against registered implementations.
+///
+/// `registered_fqns` is the sorted list of FQNs from the consumer's
+/// `SemOsVerbOpRegistry` (e.g. via `registry.manifest()`).
+///
+/// - **Unimplemented declarations:** `behavior: plugin` verbs in YAML that are
+///   absent from `registered_fqns`. They will fail at execution time with
+///   "unknown verb".
+/// - **Orphan implementations:** FQNs in `registered_fqns` with no corresponding
+///   YAML verb (regardless of behavior). They can never be invoked through the
+///   DSL pipeline.
+///
+/// CRUD verbs are excluded from the unimplemented check because they are
+/// dispatched automatically by `GenericCrudExecutor` without a Rust impl.
+pub fn wiring_check(manifest: &VerbManifest, registered_fqns: &[impl AsRef<str>]) -> WiringReport {
+    use std::collections::HashSet;
+
+    let registered: HashSet<&str> = registered_fqns.iter().map(|s| s.as_ref()).collect();
+
+    // Plugin verbs declared in YAML that have no registered impl
+    let mut unimplemented: Vec<String> = manifest
+        .declarations
+        .values()
+        .filter(|d| matches!(d.behavior, VerbBehavior::Plugin))
+        .map(|d| d.fqn.as_str())
+        .filter(|fqn| !registered.contains(fqn))
+        .map(str::to_string)
+        .collect();
+    unimplemented.sort();
+
+    // Registered ops with no YAML declaration at all
+    let mut orphan: Vec<String> = registered_fqns
+        .iter()
+        .map(|s| s.as_ref())
+        .filter(|fqn| manifest.get(fqn).is_none())
+        .map(str::to_string)
+        .collect();
+    orphan.sort();
+
+    WiringReport {
+        unimplemented_declarations: unimplemented,
+        orphan_implementations: orphan,
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use crate::config::loader::ConfigLoader;

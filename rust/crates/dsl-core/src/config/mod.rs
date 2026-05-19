@@ -55,7 +55,10 @@ pub use escalation::{
     EvaluationContext,
 };
 pub use loader::ConfigLoader;
-pub use manifest::{build_manifest, build_manifest_with_validation, ManifestError, VerbDeclaration, VerbManifest};
+pub use manifest::{
+    build_manifest, build_manifest_with_validation, wiring_check, ManifestError, VerbDeclaration,
+    VerbManifest, WiringReport,
+};
 pub use phrase_gen::{generate_phrases, set_phrase_gen_nouns, PhraseGenNouns};
 pub use runbook_composition::{
     component_a, component_b, component_c, compute_runbook_tier, compute_runbook_tier_with_trace,
