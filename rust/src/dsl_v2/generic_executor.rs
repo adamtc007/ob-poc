@@ -363,12 +363,17 @@ impl GenericCrudExecutor {
                 CrudOperation::EntityUpsert => {
                     self.execute_entity_upsert_in_tx(tx, verb, crud, args).await
                 }
-                // Read operations can safely use pool (no state changes)
-                CrudOperation::Select => self.execute_select(verb, crud, args).await,
-                CrudOperation::ListByFk => self.execute_list_by_fk(verb, crud, args).await,
-                CrudOperation::ListParties => self.execute_list_parties(verb, crud, args).await,
+                // Read operations use the active transaction so that plan writes
+                // from earlier steps are visible to subsequent reads (B1 fix).
+                CrudOperation::Select => self.execute_select_in_tx(tx, verb, crud, args).await,
+                CrudOperation::ListByFk => {
+                    self.execute_list_by_fk_in_tx(tx, verb, crud, args).await
+                }
+                CrudOperation::ListParties => {
+                    self.execute_list_parties_in_tx(tx, verb, crud, args).await
+                }
                 CrudOperation::SelectWithJoin => {
-                    self.execute_select_with_join(verb, crud, args).await
+                    self.execute_select_with_join_in_tx(tx, verb, crud, args).await
                 }
             }
         } else {
@@ -1983,6 +1988,254 @@ impl GenericCrudExecutor {
 
         let sql_val = self.json_to_sql_value(filter_value, filter_arg)?;
         let rows = self.execute_many_with_bindings(&sql, &[sql_val]).await?;
+
+        let records: Result<Vec<JsonValue>> = rows.iter().map(|r| self.row_to_json(r)).collect();
+        Ok(GenericExecutionResult::RecordSet(records?))
+    }
+
+    // =========================================================================
+    // TRANSACTION-AWARE READ VARIANTS
+    // These mirror the pool-based read methods above but execute within the
+    // caller's active transaction so plan writes are visible to subsequent reads.
+    // =========================================================================
+
+    async fn execute_select_in_tx(
+        &self,
+        tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
+        verb: &RuntimeVerb,
+        crud: &RuntimeCrudConfig,
+        args: &HashMap<String, JsonValue>,
+    ) -> Result<GenericExecutionResult> {
+        let mut conditions = Vec::new();
+        let mut bind_values: Vec<SqlValue> = Vec::new();
+        let mut idx = 1;
+        let mut limit: Option<i64> = None;
+        let mut offset: Option<i64> = None;
+
+        for arg_def in &verb.args {
+            if let Some(value) = args.get(&arg_def.name) {
+                if arg_def.name == "limit" {
+                    limit = value.as_i64();
+                    continue;
+                }
+                if arg_def.name == "offset" {
+                    offset = value.as_i64();
+                    continue;
+                }
+                if let Some(col) = &arg_def.maps_to {
+                    conditions.push(format!("\"{}\" = ${}", col, idx));
+                    bind_values.push(self.json_to_sql_value(value, arg_def)?);
+                    idx += 1;
+                }
+            }
+        }
+
+        let where_clause = if conditions.is_empty() {
+            self.active_row_predicate(&crud.schema, &crud.table, None)
+                .map(|predicate| format!(" WHERE {predicate}"))
+                .unwrap_or_default()
+        } else {
+            if let Some(predicate) = self.active_row_predicate(&crud.schema, &crud.table, None) {
+                conditions.push(predicate);
+            }
+            format!(" WHERE {}", conditions.join(" AND "))
+        };
+
+        let limit_clause = limit.map(|l| format!(" LIMIT {}", l)).unwrap_or_default();
+        let offset_clause = offset.map(|o| format!(" OFFSET {}", o)).unwrap_or_default();
+
+        let sql = format!(
+            "SELECT * FROM \"{}\".\"{}\"{}{}{}",
+            crud.schema, crud.table, where_clause, limit_clause, offset_clause
+        );
+
+        let rows = Self::execute_many_with_bindings_in_tx(tx, &sql, &bind_values).await?;
+
+        match verb.returns.return_type {
+            ReturnTypeConfig::Record => {
+                if rows.is_empty() {
+                    Ok(GenericExecutionResult::Record(JsonValue::Null))
+                } else {
+                    Ok(GenericExecutionResult::Record(self.row_to_json(&rows[0])?))
+                }
+            }
+            _ => {
+                let records: Result<Vec<JsonValue>> =
+                    rows.iter().map(|r| self.row_to_json(r)).collect();
+                Ok(GenericExecutionResult::RecordSet(records?))
+            }
+        }
+    }
+
+    async fn execute_list_by_fk_in_tx(
+        &self,
+        tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
+        verb: &RuntimeVerb,
+        crud: &RuntimeCrudConfig,
+        args: &HashMap<String, JsonValue>,
+    ) -> Result<GenericExecutionResult> {
+        let fk_col = crud
+            .fk_col
+            .as_deref()
+            .ok_or_else(|| anyhow!("ListByFk requires fk_col"))?;
+
+        let fk_arg = verb
+            .args
+            .iter()
+            .find(|a| a.required)
+            .ok_or_else(|| anyhow!("ListByFk requires a required argument"))?;
+
+        let fk_value = args
+            .get(&fk_arg.name)
+            .ok_or_else(|| anyhow!("Missing FK argument: {}", fk_arg.name))?;
+
+        let sql =
+            if let Some(predicate) = self.active_row_predicate(&crud.schema, &crud.table, None) {
+                format!(
+                    r#"SELECT * FROM "{}"."{}" WHERE "{}" = $1 AND {}"#,
+                    crud.schema, crud.table, fk_col, predicate
+                )
+            } else {
+                format!(
+                    r#"SELECT * FROM "{}"."{}" WHERE "{}" = $1"#,
+                    crud.schema, crud.table, fk_col
+                )
+            };
+
+        let sql_val = self.json_to_sql_value(fk_value, fk_arg)?;
+        let rows = Self::execute_many_with_bindings_in_tx(tx, &sql, &[sql_val]).await?;
+
+        let records: Result<Vec<JsonValue>> = rows.iter().map(|r| self.row_to_json(r)).collect();
+        Ok(GenericExecutionResult::RecordSet(records?))
+    }
+
+    async fn execute_list_parties_in_tx(
+        &self,
+        tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
+        verb: &RuntimeVerb,
+        crud: &RuntimeCrudConfig,
+        args: &HashMap<String, JsonValue>,
+    ) -> Result<GenericExecutionResult> {
+        let junction = crud
+            .junction
+            .as_deref()
+            .ok_or_else(|| anyhow!("ListParties requires junction"))?;
+        let fk_col = crud
+            .fk_col
+            .as_deref()
+            .ok_or_else(|| anyhow!("ListParties requires fk_col"))?;
+
+        let fk_arg = verb
+            .args
+            .iter()
+            .find(|a| a.required)
+            .ok_or_else(|| anyhow!("ListParties requires FK argument"))?;
+
+        let fk_value = args
+            .get(&fk_arg.name)
+            .ok_or_else(|| anyhow!("Missing FK argument"))?;
+
+        let as_of_date = args
+            .get("as-of-date")
+            .and_then(|v| v.as_str())
+            .and_then(|s| chrono::NaiveDate::parse_from_str(s, "%Y-%m-%d").ok())
+            .unwrap_or_else(|| chrono::Utc::now().date_naive());
+
+        let sql = format!(
+            r#"SELECT
+                cer.cbu_entity_role_id,
+                cer.cbu_id,
+                cer.entity_id,
+                e.name as entity_name,
+                et.name as entity_type,
+                r.role_id,
+                r.name as role_name,
+                r.description as role_description,
+                cer.created_at
+            FROM "{}"."{}" cer
+            JOIN "{}".entities e ON e.entity_id = cer.entity_id
+            JOIN "{}".entity_types et ON et.entity_type_id = e.entity_type_id
+            JOIN "{}".roles r ON r.role_id = cer.role_id
+            WHERE cer."{}" = $1
+            AND (cer.effective_from IS NULL OR cer.effective_from <= $2)
+            AND (cer.effective_to IS NULL OR cer.effective_to >= $2)
+            AND e.deleted_at IS NULL
+            ORDER BY e.name, r.name"#,
+            crud.schema, junction, crud.schema, crud.schema, crud.schema, fk_col
+        );
+
+        let sql_val = self.json_to_sql_value(fk_value, fk_arg)?;
+        let rows = Self::execute_many_with_bindings_in_tx(
+            tx,
+            &sql,
+            &[sql_val, SqlValue::Date(as_of_date)],
+        )
+        .await?;
+
+        let records: Result<Vec<JsonValue>> = rows.iter().map(|r| self.row_to_json(r)).collect();
+        Ok(GenericExecutionResult::RecordSet(records?))
+    }
+
+    async fn execute_select_with_join_in_tx(
+        &self,
+        tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
+        verb: &RuntimeVerb,
+        crud: &RuntimeCrudConfig,
+        args: &HashMap<String, JsonValue>,
+    ) -> Result<GenericExecutionResult> {
+        let primary = crud
+            .primary_table
+            .as_deref()
+            .ok_or_else(|| anyhow!("SelectWithJoin requires primary_table"))?;
+        let join_table = crud
+            .join_table
+            .as_deref()
+            .ok_or_else(|| anyhow!("SelectWithJoin requires join_table"))?;
+        let join_col = crud
+            .join_col
+            .as_deref()
+            .ok_or_else(|| anyhow!("SelectWithJoin requires join_col"))?;
+        let filter_col = crud
+            .filter_col
+            .as_deref()
+            .ok_or_else(|| anyhow!("SelectWithJoin requires filter_col"))?;
+
+        let filter_arg = verb
+            .args
+            .iter()
+            .find(|a| a.required)
+            .ok_or_else(|| anyhow!("SelectWithJoin requires filter argument"))?;
+
+        let filter_value = args
+            .get(&filter_arg.name)
+            .ok_or_else(|| anyhow!("Missing filter argument"))?;
+
+        let sql =
+            if let Some(predicate) = self.active_row_predicate(&crud.schema, primary, Some("p")) {
+                format!(
+                    r#"SELECT p.* FROM "{}"."{}" p
+                   JOIN "{}"."{}" j ON p."{}" = j."{}"
+                   WHERE j."{}" = $1 AND {}"#,
+                    crud.schema,
+                    primary,
+                    crud.schema,
+                    join_table,
+                    join_col,
+                    join_col,
+                    filter_col,
+                    predicate
+                )
+            } else {
+                format!(
+                    r#"SELECT p.* FROM "{}"."{}" p
+                   JOIN "{}"."{}" j ON p."{}" = j."{}"
+                   WHERE j."{}" = $1"#,
+                    crud.schema, primary, crud.schema, join_table, join_col, join_col, filter_col
+                )
+            };
+
+        let sql_val = self.json_to_sql_value(filter_value, filter_arg)?;
+        let rows = Self::execute_many_with_bindings_in_tx(tx, &sql, &[sql_val]).await?;
 
         let records: Result<Vec<JsonValue>> = rows.iter().map(|r| self.row_to_json(r)).collect();
         Ok(GenericExecutionResult::RecordSet(records?))
@@ -3877,6 +4130,22 @@ impl GenericCrudExecutor {
         let row = query.fetch_one(&mut **tx).await?;
         tracing::debug!("execute_with_bindings_in_tx: fetch_one returned OK");
         Ok(row)
+    }
+
+    /// Execute query returning multiple rows within a transaction
+    async fn execute_many_with_bindings_in_tx(
+        tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
+        sql: &str,
+        values: &[SqlValue],
+    ) -> Result<Vec<PgRow>> {
+        tracing::trace!(sql = %sql, bind_count = values.len(), "executing SQL in tx (multi row)");
+        let mut query = sqlx::query(sql);
+        for val in values {
+            query = Self::bind_sql_value(query, val);
+        }
+        let rows = query.fetch_all(&mut **tx).await?;
+        tracing::trace!(row_count = rows.len(), "SQL returned rows");
+        Ok(rows)
     }
 
     /// Execute non-query within a transaction (INSERT/UPDATE/DELETE without RETURNING)
