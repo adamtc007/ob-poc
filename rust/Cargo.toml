@@ -158,6 +158,10 @@ smallvec = { version = "1.11", features = ["serde"] }
 bpmn-lite-engine = { path = "../bpmn-lite/bpmn-lite-engine" }
 bpmn-lite-store = { path = "../bpmn-lite/bpmn-lite-store" }
 bpmn-lite-server = { path = "../bpmn-lite/bpmn-lite-server" }
+ffi-catalogue = { path = "../bpmn-lite/ffi-catalogue" }
+dmn-lite-bridge = { path = "../bpmn-lite/dmn-lite-bridge" }
+bpmn-lite-ffi-http = { path = "../bpmn-lite/bpmn-lite-ffi-http" }
+bpmn-lite-ffi-grpc = { path = "../bpmn-lite/bpmn-lite-ffi-grpc" }
 sem_os_core = { path = "crates/sem_os_core" }
 sem_os_ontology = { path = "crates/sem_os_ontology" }
 sem_os_policy = { path = "crates/sem_os_policy" }

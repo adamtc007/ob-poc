@@ -29,9 +29,13 @@ use uuid::Uuid;
 // bpmn-lite-core retired in bpmn-lite Phase 2.8 (3344bb57); the engine
 // and memory store moved to bpmn-lite-engine + bpmn-lite-store.
 use bpmn_lite_engine::BpmnLiteEngine;
+use bpmn_lite_ffi_grpc::GrpcFfiOwner;
+use bpmn_lite_ffi_http::HttpFfiOwner;
 use bpmn_lite_server::grpc::proto::bpmn_lite_server::BpmnLiteServer;
 use bpmn_lite_server::grpc::BpmnLiteService;
 use bpmn_lite_store::MemoryStore;
+use dmn_lite_bridge::DmnLiteOwner;
+use ffi_catalogue::{FfiCatalogue, MemoryFfiTemplateStore};
 
 // ob-poc crates
 use ob_poc::bpmn_integration::{
@@ -113,6 +117,8 @@ impl BpmnTestRig {
         // 1. In-process bpmn-lite server
         let store = Arc::new(MemoryStore::new());
         let engine = Arc::new(BpmnLiteEngine::new(store));
+        let ffi_store = Arc::new(MemoryFfiTemplateStore::new());
+        let ffi_catalogue = Arc::new(FfiCatalogue::new(ffi_store.clone()));
         let service = BpmnLiteService {
             engine: engine.clone(),
             event_fanout: std::sync::Arc::new(bpmn_lite_server::event_fanout::EventFanout::new(
@@ -122,6 +128,11 @@ impl BpmnTestRig {
             limits: bpmn_lite_server::grpc::RequestLimits::default(),
             metrics: std::sync::Arc::new(bpmn_lite_server::grpc::ServerMetrics::default()),
             subscription_limiter: std::sync::Arc::new(tokio::sync::Semaphore::new(64)),
+            ffi_owner: Arc::new(DmnLiteOwner::new()),
+            http_ffi_owner: Arc::new(HttpFfiOwner::new()),
+            grpc_ffi_owner: Arc::new(GrpcFfiOwner::new()),
+            ffi_catalogue,
+            ffi_store,
         };
 
         let listener = TcpListener::bind("[::1]:0")

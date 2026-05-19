@@ -2773,7 +2773,7 @@ mod tests {
     fn slice1_projection_includes_verb_binding_metadata() {
         let projection = build_slice1_acp_registry_projection(repo_config_root()).unwrap();
 
-        assert_eq!(projection.verb_binding_count, 71);
+        assert_eq!(projection.verb_binding_count, 74);
 
         let add_product = find_binding(&projection, "cbu.add-product");
         let cbu_id = add_product
