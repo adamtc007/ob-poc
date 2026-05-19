@@ -32,6 +32,7 @@
 use dsl_runtime::tx::TransactionScope;
 use ob_poc_types::TransactionScopeId;
 use sqlx::{PgPool, Postgres, Transaction};
+use std::time::Duration;
 
 /// Postgres-backed transaction scope. Owns a `sqlx::Transaction`, a
 /// clone of the pool the txn was opened on, and a stable
@@ -58,6 +59,31 @@ impl PgTransactionScope {
             pool: pool.clone(),
             id: TransactionScopeId::new(),
         })
+    }
+
+    /// Begin a new transaction with a wall-clock timeout on the pool.begin() call.
+    ///
+    /// Returns `Err` if the pool cannot acquire a connection within `timeout`.
+    /// Callers should use this instead of `begin()` in production dispatch paths
+    /// to prevent indefinite hangs when the connection pool is exhausted.
+    pub async fn begin_timeout(
+        pool: &PgPool,
+        timeout: Duration,
+    ) -> Result<Self, anyhow::Error> {
+        tokio::time::timeout(timeout, pool.begin())
+            .await
+            .map_err(|_| {
+                anyhow::anyhow!(
+                    "pool.begin() timed out after {:?} — connection pool likely exhausted",
+                    timeout
+                )
+            })?
+            .map(|tx| Self {
+                tx,
+                pool: pool.clone(),
+                id: TransactionScopeId::new(),
+            })
+            .map_err(Into::into)
     }
 
     /// Commit the transaction. Consumes the scope.

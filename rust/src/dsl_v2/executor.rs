@@ -63,6 +63,21 @@ use super::errors::ExecutionErrors;
 #[cfg(feature = "database")]
 use crate::database::locks::{acquire_locks, LockError};
 
+/// Wall-clock timeout applied to every `pool.begin()` call in the DSL executor.
+///
+/// Prevents indefinite hangs when the connection pool is exhausted (E1 from
+/// Phase 3 audit). Set `DSL_POOL_ACQUIRE_TIMEOUT_SECS` env var at startup to
+/// override. The 30-second default is appropriate for interactive DSL sessions;
+/// reduce for latency-sensitive paths, increase for bulk import workloads.
+#[cfg(feature = "database")]
+fn pool_acquire_timeout() -> std::time::Duration {
+    let secs = std::env::var("DSL_POOL_ACQUIRE_TIMEOUT_SECS")
+        .ok()
+        .and_then(|v| v.parse::<u64>().ok())
+        .unwrap_or(30);
+    std::time::Duration::from_secs(secs)
+}
+
 // Expansion types for lock derivation
 #[cfg(feature = "database")]
 use super::expansion::{ExpansionReport, LockKey, LockMode};
@@ -1319,14 +1334,16 @@ impl DslExecutor {
 
         // Legacy per-verb scope. Phase B.2b-ζ replaces this with an outer
         // Sequencer-owned scope threaded into `execute_verb_in_scope`.
-        let mut scope = PgTransactionScope::begin(&self.pool).await.map_err(|e| {
-            anyhow!(
-                "execute_verb({}.{}): begin txn failed: {}",
-                vc.domain,
-                vc.verb,
-                e
-            )
-        })?;
+        let mut scope = PgTransactionScope::begin_timeout(&self.pool, pool_acquire_timeout())
+            .await
+            .map_err(|e| {
+                anyhow!(
+                    "execute_verb({}.{}): begin txn failed: {}",
+                    vc.domain,
+                    vc.verb,
+                    e
+                )
+            })?;
 
         let outcome = {
             let scope_dyn: &mut dyn dsl_runtime::tx::TransactionScope = &mut scope;
@@ -1346,16 +1363,26 @@ impl DslExecutor {
                 tracing::debug!("execute_verb: EXIT success {}.{}", vc.domain, vc.verb);
                 Ok(result)
             }
-            Err(e) => {
-                if let Err(rollback_err) = scope.rollback().await {
-                    tracing::warn!(
-                        domain = %vc.domain,
-                        verb = %vc.verb,
-                        %rollback_err,
-                        "execute_verb rollback failed after op error"
-                    );
+            Err(step_err) => {
+                match scope.rollback().await {
+                    Ok(()) => Err(step_err),
+                    Err(rollback_err) => {
+                        tracing::error!(
+                            domain = %vc.domain,
+                            verb = %vc.verb,
+                            %rollback_err,
+                            step_error = %step_err,
+                            "execute_verb: CRITICAL — verb failed AND rollback failed; \
+                             DB state is unknown"
+                        );
+                        Err(anyhow::anyhow!(
+                            "{}.{} failed ({step_err:#}) AND rollback failed ({rollback_err:#}); \
+                             DB state is unknown",
+                            vc.domain,
+                            vc.verb
+                        ))
+                    }
                 }
-                Err(e)
             }
         }
     }
@@ -2145,7 +2172,8 @@ impl DslExecutor {
             plan.steps.len()
         );
 
-        let mut scope = PgTransactionScope::begin(&self.pool).await?;
+        let mut scope = PgTransactionScope::begin_timeout(&self.pool, pool_acquire_timeout())
+            .await?;
 
         let outcome = {
             let scope_dyn: &mut dyn dsl_runtime::tx::TransactionScope = &mut scope;
@@ -2162,14 +2190,24 @@ impl DslExecutor {
                 );
                 Ok(results)
             }
-            Err(e) => {
-                if let Err(rollback_err) = scope.rollback().await {
-                    tracing::warn!(
-                        %rollback_err,
-                        "execute_plan_atomic: rollback failed after step error"
-                    );
+            Err(step_err) => {
+                match scope.rollback().await {
+                    Ok(()) => Err(step_err),
+                    Err(rollback_err) => {
+                        // Both the step and the rollback failed. DB state is unknown.
+                        // Surface both errors so the caller knows atomicity was not preserved.
+                        tracing::error!(
+                            %rollback_err,
+                            step_error = %step_err,
+                            "execute_plan_atomic: CRITICAL — step failed AND rollback failed; \
+                             DB state is unknown, manual intervention may be required"
+                        );
+                        Err(anyhow::anyhow!(
+                            "step failed ({step_err:#}) AND rollback failed ({rollback_err:#}); \
+                             DB state is unknown — manual intervention may be required"
+                        ))
+                    }
                 }
-                Err(e)
             }
         }
     }
@@ -2328,8 +2366,15 @@ impl DslExecutor {
             plan.steps.len()
         );
 
-        // Start a transaction
-        let mut tx = self.pool.begin().await?;
+        // Start a transaction (with pool-acquire timeout — E1 fix)
+        let mut tx = tokio::time::timeout(pool_acquire_timeout(), self.pool.begin())
+            .await
+            .map_err(|_| {
+                anyhow::anyhow!(
+                    "execute_plan_atomic_with_locks: pool.begin() timed out after {:?}",
+                    pool_acquire_timeout()
+                )
+            })??;
 
         // Acquire locks if expansion report has them
         let (locks_held, lock_wait_ms) = if let Some(report) = expansion_report {
