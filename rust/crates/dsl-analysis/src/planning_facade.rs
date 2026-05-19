@@ -256,9 +256,27 @@ pub fn analyse_and_plan(input: PlanningInput) -> PlanningOutput {
     // Dependency ordering is resolved at execution time via injection graph
     // (execute_plan_atomic_in_scope). No topological reorder at planning time.
     output.was_reordered = false;
+    // Build phase groupings from YAML phase_tags on each verb (CR A5).
+    // Primary phase = first tag; untagged verbs go in "default".
+    let phases = {
+        let mut phase_vec: Vec<(String, Vec<usize>)> = Vec::new();
+        for (step_idx, step) in compiled.steps.iter().enumerate() {
+            let primary = input
+                .registry
+                .get(&step.verb_call.domain, &step.verb_call.verb)
+                .and_then(|rv| rv.phase_tags.first().cloned())
+                .unwrap_or_else(|| "default".to_string());
+            match phase_vec.iter_mut().find(|(name, _)| name == &primary) {
+                Some(entry) => entry.1.push(step_idx),
+                None => phase_vec.push((primary, vec![step_idx])),
+            }
+        }
+        phase_vec
+    };
+
     output.plan = Some(PlannedExecution {
         steps: compiled.steps,
-        phases: vec![], // populated in CR A5 via YAML phase_tags
+        phases,
     });
 
     output

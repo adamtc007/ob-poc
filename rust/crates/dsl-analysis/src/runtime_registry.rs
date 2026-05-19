@@ -49,6 +49,9 @@ pub struct RuntimeVerb {
     pub lifecycle: Option<VerbLifecycle>,
     /// Execution policy for batch operations and entity locking
     pub policy: Option<RuntimePolicyConfig>,
+    /// Phase tags from YAML metadata (e.g., ["kyc"], ["trading"], ["onboarding"]).
+    /// Used by planning_facade to group steps into phases for display and code actions.
+    pub phase_tags: Vec<String>,
 }
 
 /// Runtime policy configuration (built from YAML)
@@ -400,8 +403,9 @@ impl RuntimeVerbRegistry {
                     initial_state: Some("DRAFT".to_string()),
                 }),
                 consumes: vec![],
-                lifecycle: None, // Dynamic verbs don't have lifecycle constraints by default
-                policy: None,    // Dynamic verbs don't have policy by default
+                lifecycle: None,
+                policy: None,
+                phase_tags: vec![],
             };
 
             self.verbs.insert(full_name.clone(), runtime_verb);
@@ -564,6 +568,11 @@ impl RuntimeVerbRegistry {
             consumes: config.consumes.clone(),
             lifecycle: config.lifecycle.clone(),
             policy: config.policy.as_ref().map(Self::convert_policy),
+            phase_tags: config
+                .metadata
+                .as_ref()
+                .map(|meta| meta.phase_tags.clone())
+                .unwrap_or_default(),
         }
     }
 

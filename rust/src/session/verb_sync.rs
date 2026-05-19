@@ -1054,6 +1054,7 @@ mod tests {
             consumes: vec![],
             lifecycle: None,
             policy: None,
+            phase_tags: vec![],
         };
 
         let hash1 = test_compute_hash(&verb);
