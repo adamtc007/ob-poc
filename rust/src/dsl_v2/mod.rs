@@ -70,6 +70,9 @@ pub use dsl_core::compiler;
 pub use dsl_core::compiler::{
     compile_to_ops_ext, CompileError as OpCompileError, CompiledProgram, VerbHandler,
 };
+// Phase 3 Op-free compilation path (CR A1). Replaces compile_to_ops_ext once
+// A2-A4 migrate all callers.
+pub use dsl_core::compiler::{compile_to_steps, CompileStep, CompiledSteps};
 // ob-poc verb dispatch in its own crate (dsl-lsp + ob-agentic can depend on it directly).
 pub use ob_poc_compiler::compile_to_ops;
 

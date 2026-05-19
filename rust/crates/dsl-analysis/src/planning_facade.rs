@@ -10,12 +10,12 @@
 use std::sync::Arc;
 
 use crate::runtime_registry::RuntimeVerbRegistry;
-use dsl_core::ast::Program;
+use dsl_core::ast::{AstNode, Program, Span, VerbCall};
 use dsl_core::binding_context::BindingContext;
-use dsl_core::compiler::{compile_to_ops_ext, VerbHandler};
-use dsl_core::dag::{build_execution_plan as build_dag_plan, describe_plan, CycleError};
+// VerbHandler kept for API backward-compatibility; deprecated — no longer
+// consulted by analyse_and_plan (removed in A4 when compile_to_ops_ext is deleted).
+use dsl_core::compiler::{compile_to_steps, CompileStep, VerbHandler};
 use dsl_core::diagnostics::{Diagnostic, DiagnosticCode, SourceSpan};
-use dsl_core::ops::Op;
 use dsl_core::parser::parse_program;
 
 /// Context for implicit create behavior
@@ -105,36 +105,46 @@ pub struct SyntheticStep {
     pub suggested_dsl: String,
 }
 
-/// Execution plan with ops in topological order
+/// Execution plan — steps in source order (Op-free path, CR A2).
+///
+/// Under Option α the Op layer is removed: each step carries the `VerbCall`
+/// directly. Dependency ordering (injection) is resolved at execution time by
+/// `execute_plan_atomic_in_scope`. Phase grouping (from YAML `phase_tags`) is
+/// added in CR A5.
 #[derive(Clone, Debug)]
 pub struct PlannedExecution {
-    /// Ops in execution order (topologically sorted)
-    pub ops: Vec<Op>,
-    /// Phase groupings for display
+    /// Steps in source order.
+    pub steps: Vec<CompileStep>,
+    /// Phase groupings for display (populated in A5 via YAML phase_tags).
+    /// Empty until A5 lands.
     pub phases: Vec<(String, Vec<usize>)>,
 }
 
 impl PlannedExecution {
-    /// Describe the plan for display
+    /// Describe the plan for display.
     pub fn describe(&self) -> String {
-        let dag_plan = dsl_core::dag::ExecutionPlan {
-            ops: self.ops.clone(),
-            phases: self
-                .phases
-                .iter()
-                .map(|(name, indices)| dsl_core::dag::ExecutionPhase {
-                    name: name.clone(),
-                    op_indices: indices.clone(),
-                })
-                .collect(),
-            original_count: self.ops.len(),
-        };
-        describe_plan(&dag_plan)
+        if self.steps.is_empty() {
+            return "(empty plan)".to_string();
+        }
+        self.steps
+            .iter()
+            .enumerate()
+            .map(|(i, s)| {
+                let binding = s
+                    .verb_call
+                    .binding
+                    .as_deref()
+                    .map(|b| format!(" :as @{b}"))
+                    .unwrap_or_default();
+                format!("{}. {}.{}{}", i + 1, s.verb_call.domain, s.verb_call.verb, binding)
+            })
+            .collect::<Vec<_>>()
+            .join("\n")
     }
 
-    /// Get total op count
+    /// Get total step count.
     pub fn op_count(&self) -> usize {
-        self.ops.len()
+        self.steps.len()
     }
 }
 
@@ -145,8 +155,8 @@ pub struct PlanningOutput {
     pub program: Program,
     /// All diagnostics collected during parsing, validation, and planning
     pub diagnostics: Vec<Diagnostic>,
-    /// Compiled ops (before toposort) - stored as raw ops since CompiledProgram doesn't impl Clone
-    pub compiled_ops: Option<Vec<Op>>,
+    /// Compiled steps (source order) — Op-free path; was Vec<Op> pre-A2.
+    pub compiled_ops: Option<Vec<CompileStep>>,
     /// Execution plan (topologically sorted ops)
     pub plan: Option<PlannedExecution>,
     /// True if the source order was different from execution order
@@ -202,89 +212,72 @@ pub fn analyse_and_plan(input: PlanningInput) -> PlanningOutput {
     };
     output.program = program.clone();
 
-    // Phase 2: Compile to ops (using consumer-supplied handler if any)
-    let compiled = compile_to_ops_ext(&program, input.verb_handler);
+    // Phase 2: Op-free compilation (CR A2).
+    // compile_to_steps emits VerbCalls directly; no VerbHandler needed.
+    // input.verb_handler is accepted for backward-compat but ignored.
+    let compiled = compile_to_steps(&program);
 
-    // Record compile errors as diagnostics
-    for err in &compiled.errors {
-        let mut diag = Diagnostic::error(DiagnosticCode::UndefinedSymbol, err.message.clone());
-
-        // Try to get span from the statement
-        if let Some(dsl_core::ast::Statement::VerbCall(vc)) = program.statements.get(err.stmt_idx) {
+    // Unknown-verb diagnostics via registry lookup (replaces handler-based detection).
+    for step in &compiled.steps {
+        if !input
+            .registry
+            .contains(&step.verb_call.domain, &step.verb_call.verb)
+        {
+            let mut diag = Diagnostic::error(
+                DiagnosticCode::UndefinedSymbol,
+                format!(
+                    "unknown verb: {}.{}",
+                    step.verb_call.domain, step.verb_call.verb
+                ),
+            );
             diag = diag.with_span(SourceSpan::from_byte_offset(
                 input.source,
-                vc.span.start,
-                vc.span.end,
+                step.verb_call.span.start,
+                step.verb_call.span.end,
             ));
+            output.diagnostics.push(diag);
         }
-
-        output.diagnostics.push(diag);
     }
 
-    // If there are compile errors, we can still try to build partial plan
-    // but mark that we have issues
-    output.compiled_ops = Some(compiled.ops.clone());
-
-    // Phase 3: Build DAG and toposort
-    if compiled.is_ok() {
-        match build_dag_plan(compiled.ops.clone()) {
-            Ok(dag_plan) => {
-                // Check if reordering occurred
-                let was_reordered = check_reordering(&compiled.ops, &dag_plan.ops);
-                output.was_reordered = was_reordered;
-
-                if was_reordered {
-                    output.diagnostics.push(Diagnostic::warning(
-                        DiagnosticCode::ReorderingSuggested,
-                        "Statements will be reordered for dependency resolution".to_string(),
+    // Undefined symbol (@name) check — forward-reference detection (replaces
+    // compile-time C7 from the failure-mode audit). Track declared bindings
+    // in source order; emit a diagnostic for any @name that hasn't been declared
+    // by a prior `:as @name` binding in the same program.
+    {
+        let mut declared: std::collections::HashSet<String> = std::collections::HashSet::new();
+        for step in &compiled.steps {
+            for (sym_name, sym_span) in symbol_refs_in_verb_call(&step.verb_call) {
+                if !declared.contains(&sym_name) {
+                    let mut diag = Diagnostic::error(
+                        DiagnosticCode::UndefinedSymbol,
+                        format!("undefined symbol @{sym_name}"),
+                    );
+                    diag = diag.with_span(SourceSpan::from_byte_offset(
+                        input.source,
+                        sym_span.start,
+                        sym_span.end,
                     ));
+                    output.diagnostics.push(diag);
                 }
-
-                output.plan = Some(PlannedExecution {
-                    ops: dag_plan.ops,
-                    phases: dag_plan
-                        .phases
-                        .into_iter()
-                        .map(|p| (p.name, p.op_indices))
-                        .collect(),
-                });
             }
-            Err(CycleError {
-                cycle_stmts,
-                explanation,
-            }) => {
-                output.diagnostics.push(Diagnostic::error(
-                    DiagnosticCode::CyclicDependency,
-                    format!(
-                        "Circular dependency detected: {} (involves {} ops)",
-                        explanation,
-                        cycle_stmts.len()
-                    ),
-                ));
+            if let Some(ref b) = step.verb_call.binding {
+                declared.insert(b.clone());
             }
         }
     }
+
+    output.compiled_ops = Some(compiled.steps.clone());
+
+    // Phase 3: Plan = steps in source order.
+    // Dependency ordering is resolved at execution time via injection graph
+    // (execute_plan_atomic_in_scope). No topological reorder at planning time.
+    output.was_reordered = false;
+    output.plan = Some(PlannedExecution {
+        steps: compiled.steps,
+        phases: vec![], // populated in CR A5 via YAML phase_tags
+    });
 
     output
-}
-
-/// Check if ops were reordered from source order
-fn check_reordering(original: &[Op], sorted: &[Op]) -> bool {
-    if original.len() != sorted.len() {
-        return true;
-    }
-
-    for (i, (orig, sort)) in original.iter().zip(sorted.iter()).enumerate() {
-        if orig.source_stmt() != sort.source_stmt() {
-            return true;
-        }
-        // Also check if position changed
-        if sort.source_stmt() != i {
-            return true;
-        }
-    }
-
-    false
 }
 
 /// Quick parse + registry validation without verb compilation.
@@ -298,6 +291,33 @@ pub fn quick_validate(source: &str, registry: Arc<RuntimeVerbRegistry>) -> Vec<D
     let input = PlanningInput::new(source, registry);
     let output = analyse_and_plan(input);
     output.diagnostics
+}
+
+/// Collect all `@name` SymbolRef occurrences in a VerbCall's arguments.
+/// Used by `analyse_and_plan` for forward-reference diagnostics.
+fn symbol_refs_in_verb_call(vc: &VerbCall) -> Vec<(String, Span)> {
+    let mut refs = Vec::new();
+    for arg in &vc.arguments {
+        collect_symbol_refs_from_node(&arg.value, &mut refs);
+    }
+    refs
+}
+
+fn collect_symbol_refs_from_node(node: &AstNode, refs: &mut Vec<(String, Span)>) {
+    match node {
+        AstNode::SymbolRef { name, span } => refs.push((name.clone(), *span)),
+        AstNode::List { items, .. } => {
+            for item in items {
+                collect_symbol_refs_from_node(item, refs);
+            }
+        }
+        AstNode::Map { entries, .. } => {
+            for (_, v) in entries {
+                collect_symbol_refs_from_node(v, refs);
+            }
+        }
+        _ => {}
+    }
 }
 
 // =============================================================================

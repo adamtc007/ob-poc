@@ -136,8 +136,8 @@ fn create_reorder_action(
     let mut reordered_lines: Vec<String> = Vec::new();
     let mut seen_stmts = std::collections::HashSet::new();
 
-    for op in &plan.ops {
-        let stmt_idx = op.source_stmt();
+    for step in &plan.steps {
+        let stmt_idx = step.source_stmt;
         if !seen_stmts.contains(&stmt_idx) {
             seen_stmts.insert(stmt_idx);
             let stmt = planning_output.program.statements.get(stmt_idx)?;

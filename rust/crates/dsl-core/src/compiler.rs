@@ -120,6 +120,80 @@ pub fn compile_to_ops(program: &Program) -> CompiledProgram {
     compile_to_ops_ext(program, None)
 }
 
+// =============================================================================
+// Phase 3 Option α — Op-free compilation path
+// =============================================================================
+//
+// compile_to_steps / CompileStep / CompiledSteps are the replacement for
+// compile_to_ops_ext / Op / CompiledProgram. They are introduced here
+// (CR A1) alongside the existing Op path; callers migrate in A2-A4.
+
+/// A single step in the Op-free compilation output.
+///
+/// Carries the `VerbCall` directly — no domain-specific Op variant needed.
+/// Binding metadata is preserved in `verb_call.binding`.
+/// Verb validation (unknown verb, missing required args) happens at dispatch
+/// time against `runtime_registry`, not at compile time.
+#[derive(Debug, Clone)]
+pub struct CompileStep {
+    /// The verb call as parsed — domain, verb, arguments, and `:as @name` binding.
+    pub verb_call: VerbCall,
+    /// Index into the source `Program::statements` for error reporting.
+    pub source_stmt: usize,
+}
+
+/// Result of Op-free compilation.
+#[derive(Debug)]
+pub struct CompiledSteps {
+    /// Steps in source order. Dependency ordering is applied at plan-build
+    /// time using the injection graph, not via Op-level `dependencies()`.
+    pub steps: Vec<CompileStep>,
+    /// Errors encountered during compilation (parse/syntax only).
+    pub errors: Vec<CompileError>,
+}
+
+impl CompiledSteps {
+    /// True when there were no compile errors.
+    pub fn is_ok(&self) -> bool {
+        self.errors.is_empty()
+    }
+}
+
+/// Compile a DSL `Program` to a sequence of `CompileStep`s.
+///
+/// This is the Op-free compilation path introduced in Phase 3 CR A1. It
+/// replaces `compile_to_ops_ext` once A2-A4 migrate all callers:
+///
+/// - **No `VerbHandler` required.** Each `VerbCall` in the AST is emitted
+///   directly as a `CompileStep`. Verb existence and argument validation
+///   happen at `execute_verb_in_scope` time against `runtime_registry()`.
+/// - **No domain coupling.** The compiler has no knowledge of ob-poc verbs.
+/// - **Binding names preserved.** `:as @name` is carried in
+///   `CompileStep::verb_call.binding`; injection resolution happens at
+///   plan-build time.
+pub fn compile_to_steps(program: &Program) -> CompiledSteps {
+    let steps = program
+        .statements
+        .iter()
+        .enumerate()
+        .filter_map(|(source_stmt, stmt)| {
+            if let Statement::VerbCall(vc) = stmt {
+                Some(CompileStep {
+                    verb_call: vc.clone(),
+                    source_stmt,
+                })
+            } else {
+                None
+            }
+        })
+        .collect();
+
+    CompiledSteps {
+        steps,
+        errors: vec![],
+    }
+}
+
 /// Compile a runbook-finalisation surface with scoped authoring bindings.
 ///
 /// This is intentionally stricter than the legacy `compile_to_ops` path:

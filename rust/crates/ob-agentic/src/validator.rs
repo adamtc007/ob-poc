@@ -33,7 +33,6 @@ impl AgentValidator {
     /// Validate DSL source code
     pub fn validate(&self, dsl_source: &str) -> ValidationResult {
         use dsl_core::parse_program;
-        use ob_poc_compiler::compile_to_ops;
 
         // Phase 1: Parse
         let program = match parse_program(dsl_source) {
@@ -51,16 +50,18 @@ impl AgentValidator {
             }
         };
 
-        // Phase 2: Compile to ops (basic validation without DB-dependent CSG lint)
-        let compiled = compile_to_ops(&program);
+        // Phase 2: Op-free compilation (CR A2 migration).
+        // compile_to_steps emits VerbCalls directly; no handler needed.
+        // Verb existence is validated at execution time against runtime_registry.
+        use dsl_core::compiler::compile_to_steps;
+        let compiled = compile_to_steps(&program);
 
-        // Check for any diagnostics/errors in the compiled result
-        if compiled.ops.is_empty() && !program.statements.is_empty() {
+        if compiled.steps.is_empty() && !program.statements.is_empty() {
             return ValidationResult {
                 is_valid: false,
                 errors: vec![ValidationError {
                     line: None,
-                    message: "Compilation produced no operations".to_string(),
+                    message: "Compilation produced no steps".to_string(),
                     suggestion: None,
                 }],
                 warnings: vec![],
