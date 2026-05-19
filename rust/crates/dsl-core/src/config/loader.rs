@@ -264,6 +264,37 @@ impl ConfigLoader {
     /// Returns a `DagRegistry` with all DAGs pre-indexed for V1.3
     /// runtime lookups (cross_workspace_constraints,
     /// derived_cross_workspace_state, parent_slot). Intended to be
+    /// Load the verb manifest — a flat FQN-keyed registry of all declared verbs.
+    ///
+    /// Builds on `load_verbs()` + `validate_verbs_config()`. Structural errors
+    /// from validation are forwarded as `ManifestError`s so the caller can
+    /// decide whether to fail-fast or tolerate partial manifests.
+    ///
+    /// This is the entry point for the wiring check (CR L2): compare the
+    /// manifest's declared FQNs against the registered `SemOsVerbOp` FQNs.
+    pub fn load_verb_manifest(&self) -> super::manifest::VerbManifest {
+        use super::manifest::{build_manifest_with_validation, ManifestError, VerbManifest};
+        use super::validator::{validate_verbs_config, ValidationContext};
+
+        let config = match self.load_verbs() {
+            Ok(c) => c,
+            Err(e) => {
+                let mut manifest = VerbManifest::default();
+                manifest.errors.push(ManifestError {
+                    fqn: None,
+                    file: None,
+                    field: None,
+                    message: format!("Failed to load verb YAML: {:#}", e),
+                });
+                return manifest;
+            }
+        };
+
+        let ctx = ValidationContext::default();
+        let report = validate_verbs_config(&config, &ctx);
+        build_manifest_with_validation(&config, &report)
+    }
+
     /// called once at runtime startup and shared via `Arc`.
     ///
     /// Returns an empty registry (logged warning) if the domain-pack manifest

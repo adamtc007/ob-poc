@@ -26,6 +26,7 @@ pub mod dag_validator;
 pub mod escalation;
 pub mod green_when_coverage;
 pub mod loader;
+pub mod manifest;
 pub mod pack_loader;
 pub mod phrase_gen;
 pub mod predicate;
@@ -54,6 +55,7 @@ pub use escalation::{
     EvaluationContext,
 };
 pub use loader::ConfigLoader;
+pub use manifest::{build_manifest, build_manifest_with_validation, ManifestError, VerbDeclaration, VerbManifest};
 pub use phrase_gen::{generate_phrases, set_phrase_gen_nouns, PhraseGenNouns};
 pub use runbook_composition::{
     component_a, component_b, component_c, compute_runbook_tier, compute_runbook_tier_with_trace,
