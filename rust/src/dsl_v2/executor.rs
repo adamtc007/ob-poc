@@ -2327,10 +2327,10 @@ impl DslExecutor {
         // Binding slots are populated as steps produce bindings (T10 typed slots).
         // Audit records are accumulated in frame.audit_buffer (written to DB in T14).
         // Phase 6: frame replaces ExecutionContext as the primary state carrier.
-        let mut _frame = dsl_runtime::frame::ExecutionFrame::new(30);
+        let frame = dsl_runtime::frame::ExecutionFrame::new(30);
         tracing::debug!(
-            execution_id = %_frame.execution_id,
-            attempt_id = %_frame.attempt_id,
+            execution_id = %frame.execution_id,
+            attempt_id = %frame.attempt_id,
             scope_id = ?scope.scope_id(),
             "execute_plan_atomic_in_scope: starting with {} steps",
             plan.steps.len()
@@ -2452,6 +2452,9 @@ impl DslExecutor {
             "execute_plan_atomic_with_locks: starting atomic execution with {} steps",
             plan.steps.len()
         );
+
+        // Create ExecutionFrame for this execution (T14: audit buffer written before commit).
+        let mut frame = dsl_runtime::frame::ExecutionFrame::new(30);
 
         // Start a transaction (with pool-acquire timeout — E1 fix)
         let mut tx = tokio::time::timeout(pool_acquire_timeout(), self.pool.begin())
@@ -2629,10 +2632,47 @@ impl DslExecutor {
                 }
             }
 
+            // Record step outcome in the audit buffer (T14).
+            frame.record_outcome(
+                step_index,
+                format!("{}.{}", step.verb_call.domain, step.verb_call.verb),
+                chrono::Utc::now(),
+                "committed",
+            );
+
             results.push(result);
         }
 
-        // All steps succeeded - commit the transaction
+        // Audit-as-commit-boundary (v0.5 §13.5.3, T14).
+        // Write accumulated audit records inside the transaction before commit.
+        // If the INSERT fails, the whole transaction rolls back — ensuring no
+        // durable workflow state exists without a matching audit record.
+        if !frame.audit_buffer.is_empty() {
+            for record in &frame.audit_buffer.records {
+                sqlx::query(
+                    r#"
+                    INSERT INTO "ob-poc".dsl_execution_audit
+                        (execution_id, attempt_id, node_id, verb_fqn,
+                         started_at, completed_at, outcome)
+                    VALUES ($1, $2, $3, $4, $5, $6, $7)
+                    "#,
+                )
+                .bind(record.execution_id.0)
+                .bind(record.attempt_id.0 as i32)
+                .bind(record.node_id as i32)
+                .bind(&record.verb_fqn)
+                .bind(record.started_at)
+                .bind(record.completed_at)
+                .bind(&record.outcome)
+                .execute(tx.as_mut())
+                .await
+                .map_err(|e| {
+                    anyhow::anyhow!("audit write failed before commit: {e}")
+                })?;
+            }
+        }
+
+        // All steps succeeded - commit the transaction (audit records commit together)
         tx.commit().await?;
         tracing::info!(
             "execute_plan_atomic_with_locks: committed {} steps successfully (held {} locks)",

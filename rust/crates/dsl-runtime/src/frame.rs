@@ -144,8 +144,8 @@ pub struct AuditRecord {
     /// The step index within the plan (maps to `node_id` in the typed DAG).
     pub node_id: usize,
     pub verb_fqn: String,
-    pub started_at: std::time::SystemTime,
-    pub completed_at: Option<std::time::SystemTime>,
+    pub started_at: chrono::DateTime<chrono::Utc>,
+    pub completed_at: Option<chrono::DateTime<chrono::Utc>>,
     /// Outcome string — "committed", "rolled_back", "failed", etc.
     pub outcome: String,
 }
@@ -242,7 +242,7 @@ impl ExecutionFrame {
         &mut self,
         node_id: usize,
         verb_fqn: impl Into<String>,
-        started_at: std::time::SystemTime,
+        started_at: chrono::DateTime<chrono::Utc>,
         outcome: impl Into<String>,
     ) {
         self.audit_buffer.push(AuditRecord {
@@ -251,7 +251,7 @@ impl ExecutionFrame {
             node_id,
             verb_fqn: verb_fqn.into(),
             started_at,
-            completed_at: Some(std::time::SystemTime::now()),
+            completed_at: Some(chrono::Utc::now()),
             outcome: outcome.into(),
         });
     }
@@ -299,7 +299,7 @@ mod tests {
     fn execution_frame_records_outcome() {
         let mut frame = ExecutionFrame::new(30);
         assert!(!frame.is_expired());
-        frame.record_outcome(0, "cbu.ensure", std::time::SystemTime::now(), "committed");
+        frame.record_outcome(0, "cbu.ensure", chrono::Utc::now(), "committed");
         assert_eq!(frame.audit_buffer.records.len(), 1);
         assert_eq!(frame.audit_buffer.records[0].outcome, "committed");
     }
