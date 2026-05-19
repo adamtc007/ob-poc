@@ -26,6 +26,7 @@ domains:
       describe-object:
         flavour: attribute_mutating
         description: Describe a registered object by FQN (attribute, verb, entity type, policy, view)
+        effect_class: read_snapshot
         metadata:
           tier: diagnostics
           source_of_truth: operational
@@ -69,6 +70,7 @@ domains:
       search:
         flavour: attribute_mutating
         description: Search registry objects by keyword or pattern
+        effect_class: read_snapshot
         metadata:
           tier: diagnostics
           source_of_truth: operational
@@ -113,6 +115,7 @@ domains:
       list-objects:
         flavour: attribute_mutating
         description: List registered objects by type with optional filters
+        effect_class: read_snapshot
         metadata:
           tier: diagnostics
           source_of_truth: operational
@@ -155,6 +158,7 @@ domains:
       resolve-context:
         flavour: attribute_mutating
         description: Resolve full context for a subject (verbs, attributes, policies, governance signals)
+        effect_class: read_modify_write
         metadata:
           tier: intent
           source_of_truth: operational
@@ -202,6 +206,7 @@ domains:
       verb-surface:
         flavour: attribute_mutating
         description: Get the verb surface for a view or entity type
+        effect_class: read_modify_write
         metadata:
           tier: diagnostics
           source_of_truth: operational
@@ -240,6 +245,7 @@ domains:
       attribute-producers:
         flavour: attribute_mutating
         description: Find which verbs produce a given attribute
+        effect_class: read_modify_write
         metadata:
           tier: diagnostics
           source_of_truth: operational
@@ -277,6 +283,7 @@ domains:
       lineage:
         flavour: attribute_mutating
         description: Trace lineage for an object (forward impact or reverse provenance)
+        effect_class: read_modify_write
         metadata:
           tier: diagnostics
           source_of_truth: operational
@@ -317,6 +324,7 @@ domains:
       regulation-trace:
         flavour: attribute_mutating
         description: Trace regulatory requirements for an object
+        effect_class: read_modify_write
         metadata:
           tier: diagnostics
           source_of_truth: operational
@@ -354,6 +362,7 @@ domains:
       taxonomy-tree:
         flavour: attribute_mutating
         description: Get taxonomy tree structure
+        effect_class: read_modify_write
         metadata:
           tier: diagnostics
           source_of_truth: operational
@@ -393,6 +402,7 @@ domains:
       taxonomy-members:
         flavour: attribute_mutating
         description: List members of a taxonomy node
+        effect_class: read_modify_write
         metadata:
           tier: diagnostics
           source_of_truth: operational
@@ -431,6 +441,7 @@ domains:
       classify:
         flavour: attribute_mutating
         description: Classify an object against a taxonomy
+        effect_class: read_modify_write
         metadata:
           tier: diagnostics
           source_of_truth: operational
@@ -472,6 +483,7 @@ domains:
       describe-view:
         flavour: attribute_mutating
         description: Describe a view definition (verb surface + attribute prominence)
+        effect_class: read_snapshot
         metadata:
           tier: diagnostics
           source_of_truth: operational
@@ -506,6 +518,7 @@ domains:
       apply-view:
         flavour: attribute_mutating
         description: Apply a view to filter and rank verbs/attributes for a subject
+        effect_class: read_modify_write
         metadata:
           tier: intent
           source_of_truth: operational
@@ -547,6 +560,7 @@ domains:
       describe-policy:
         flavour: attribute_mutating
         description: Describe a policy rule definition
+        effect_class: read_snapshot
         metadata:
           tier: diagnostics
           source_of_truth: operational
@@ -584,6 +598,7 @@ domains:
       coverage-report:
         flavour: attribute_mutating
         description: Generate coverage report for registry (tier distribution, completeness)
+        effect_class: read_modify_write
         metadata:
           tier: diagnostics
           source_of_truth: operational
@@ -619,6 +634,7 @@ domains:
       evidence-freshness:
         flavour: attribute_mutating
         description: Check evidence freshness for registered objects
+        effect_class: read_modify_write
         metadata:
           tier: diagnostics
           source_of_truth: operational
@@ -658,6 +674,7 @@ domains:
       evidence-gaps:
         flavour: attribute_mutating
         description: Identify evidence gaps in the registry
+        effect_class: read_modify_write
         metadata:
           tier: diagnostics
           source_of_truth: operational
@@ -695,6 +712,7 @@ domains:
       snapshot-history:
         flavour: attribute_mutating
         description: Get snapshot history for an object (all versions over time)
+        effect_class: read_snapshot
         metadata:
           tier: diagnostics
           source_of_truth: operational
@@ -738,6 +756,7 @@ domains:
       snapshot-diff:
         flavour: attribute_mutating
         description: Diff two snapshots of the same object
+        effect_class: read_modify_write
         metadata:
           tier: diagnostics
           source_of_truth: operational
@@ -779,6 +798,7 @@ domains:
       active-manifest:
         flavour: attribute_mutating
         description: Get the active snapshot set manifest
+        effect_class: read_modify_write
         metadata:
           tier: diagnostics
           source_of_truth: operational
@@ -812,6 +832,7 @@ domains:
       verbs-for-table:
         flavour: attribute_mutating
         description: Find all verbs that read, write, or reference a database table
+        effect_class: read_modify_write
         metadata:
           tier: intent
           source_of_truth: operational
@@ -862,6 +883,7 @@ domains:
       verbs-for-attribute:
         flavour: attribute_mutating
         description: Find all verbs that produce or consume a given attribute
+        effect_class: read_modify_write
         metadata:
           tier: intent
           source_of_truth: operational
@@ -907,6 +929,7 @@ domains:
       data-for-verb:
         flavour: attribute_mutating
         description: Find all data assets a verb touches (tables, columns, attributes, entities)
+        effect_class: read_modify_write
         metadata:
           tier: intent
           source_of_truth: operational
@@ -953,6 +976,7 @@ domains:
       adjacent-verbs:
         flavour: attribute_mutating
         description: Find verbs sharing data dependencies with a given verb
+        effect_class: read_modify_write
         metadata:
           tier: intent
           source_of_truth: operational
@@ -999,6 +1023,7 @@ domains:
       governance-gaps:
         flavour: attribute_mutating
         description: Identify ungoverned tables, orphan verbs, and attribute coverage gaps
+        effect_class: read_modify_write
         metadata:
           tier: intent
           source_of_truth: operational
@@ -1045,6 +1070,7 @@ domains:
       discover-dsl:
         flavour: attribute_mutating
         description: Discover a DSL chain from an utterance using affinity graph (Phase 2 stub)
+        effect_class: read_modify_write
         metadata:
           tier: intent
           source_of_truth: operational

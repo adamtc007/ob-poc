@@ -13,6 +13,7 @@ domains:
         flavour: attribute_mutating
         description: "Set three-lane service availability for a booking principal × service combination"
         behavior: plugin
+        effect_class: read_modify_write
         lifecycle:
           precondition_checks:
             - "requires_prior:booking-principal.create"
@@ -70,6 +71,7 @@ domains:
         flavour: attribute_mutating
         description: "List active service availability for a booking principal"
         behavior: plugin
+        effect_class: read_snapshot
         metadata:
           tier: intent
           source_of_truth: operational
@@ -100,6 +102,7 @@ domains:
         flavour: attribute_mutating
         description: "List service availability grouped by principal"
         behavior: plugin
+        effect_class: read_snapshot
         metadata:
           tier: intent
           source_of_truth: operational

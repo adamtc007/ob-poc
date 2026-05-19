@@ -17,6 +17,7 @@ domains:
         description: |
           Run tollgate evaluation for a case.
           Computes all metrics and compares against thresholds.
+        effect_class: read_modify_write
         metadata:
           tier: intent
           source_of_truth: operational
@@ -90,6 +91,7 @@ domains:
       get-metrics:
         flavour: attribute_mutating
         description: Compute current metrics for a CBU without recording evaluation
+        effect_class: read_snapshot
         metadata:
           tier: reference
           source_of_truth: operational
@@ -236,6 +238,7 @@ domains:
 
       override:
         flavour: discretionary
+        effect_class: admin_override
         role_guard:
           any_of: [senior_compliance, mlro, executive, board]
         audit_class: tollgate_override
@@ -306,6 +309,7 @@ domains:
       list-evaluations:
         flavour: attribute_mutating
         description: List tollgate evaluations for a case
+        effect_class: read_snapshot
         metadata:
           tier: reference
           source_of_truth: operational
@@ -407,6 +411,7 @@ domains:
             - What's blocking?
             - What's complete?
             - What needs attention?
+        effect_class: read_snapshot
         metadata:
           tier: reference
           source_of_truth: operational
@@ -561,6 +566,7 @@ domains:
       check-gate:
         flavour: attribute_mutating
         description: "Check a named tollgate gate against case state and coverage data"
+        effect_class: read_snapshot
         invocation_phrases:
         - "check tollgate gate"
         - "check gate status"

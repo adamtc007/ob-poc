@@ -13,6 +13,7 @@ domains:
       begin:
         flavour: attribute_mutating
         description: "Begin a new graph import run with optional case linkage"
+        effect_class: read_modify_write
         invocation_phrases:
           - "begin import run"
           - "start graph import"
@@ -89,6 +90,7 @@ domains:
       complete:
         flavour: attribute_mutating
         description: "Mark an import run as complete with counts"
+        effect_class: read_modify_write
         invocation_phrases:
           - "complete import run"
           - "finish import"
@@ -127,6 +129,7 @@ domains:
       supersede:
         flavour: attribute_mutating
         description: "Supersede an import run — soft-ends edges and logs corrections"
+        effect_class: read_modify_write
         invocation_phrases:
           - "supersede import run"
           - "rollback import"

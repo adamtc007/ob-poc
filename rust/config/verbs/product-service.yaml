@@ -5,6 +5,7 @@ domains:
       override-option:
         flavour: attribute_mutating
         description: Declare a product-specific override for a service option
+        effect_class: read_modify_write
         invocation_phrases:
           - "override product service option"
           - "set product option override"

@@ -20,6 +20,7 @@ domains:
           Provision a new bpmn-lite worker pool: create the pool record, assign
           initial tenants, and deploy a Kubernetes Deployment + HPA.
         behavior: plugin
+        effect_class: read_modify_write
         metadata:
           tier: composite
           source_of_truth: external
@@ -78,6 +79,7 @@ domains:
           Deprovision a pool: delete the Kubernetes Deployment + HPA and
           remove the pool record. Fails if the pool still has tenants.
         behavior: plugin
+        effect_class: read_modify_write
         metadata:
           tier: composite
           source_of_truth: external
@@ -110,6 +112,7 @@ domains:
           Return current status of a pool: tenant count, queue depth, and
           live Kubernetes replica counts.
         behavior: plugin
+        effect_class: read_snapshot
         metadata:
           tier: projection
           source_of_truth: external
@@ -141,6 +144,7 @@ domains:
         flavour: attribute_mutating
         description: "List all registered bpmn-lite worker pools."
         behavior: plugin
+        effect_class: read_snapshot
         metadata:
           tier: projection
           source_of_truth: external
@@ -175,6 +179,7 @@ domains:
           and process definition, writes the instance row, and returns the
           instance_id. Execution is asynchronous — pool workers pick it up.
         behavior: plugin
+        effect_class: read_modify_write
         metadata:
           tier: intent
           source_of_truth: external
@@ -221,6 +226,7 @@ domains:
         flavour: attribute_mutating
         description: "Return the current status of a BPMN process instance."
         behavior: plugin
+        effect_class: read_snapshot
         metadata:
           tier: projection
           source_of_truth: external
@@ -251,6 +257,7 @@ domains:
         flavour: attribute_mutating
         description: "List BPMN process instances for a tenant."
         behavior: plugin
+        effect_class: read_snapshot
         metadata:
           tier: projection
           source_of_truth: external

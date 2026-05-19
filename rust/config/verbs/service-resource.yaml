@@ -112,6 +112,7 @@ domains:
       list-by-service:
         flavour: attribute_mutating
         description: List service resource types for a service
+        effect_class: read_snapshot
         metadata:
           tier: reference
           source_of_truth: catalog
@@ -158,6 +159,7 @@ domains:
       list-attributes:
         flavour: attribute_mutating
         description: List attribute requirements for a service resource type
+        effect_class: read_snapshot
         metadata:
           tier: reference
           source_of_truth: catalog
@@ -208,6 +210,7 @@ domains:
       provision:
         flavour: instance_adding
         description: Provision a service resource instance for a CBU
+        effect_class: read_modify_write
         metadata:
           tier: intent
           source_of_truth: catalog
@@ -379,6 +382,7 @@ domains:
       get-provisioning-status:
         flavour: attribute_mutating
         description: Read provisioning and resource-instance status for a data-request slice
+        effect_class: read_snapshot
         metadata:
           tier: reference
           source_of_truth: operational
@@ -510,6 +514,7 @@ domains:
       set-attr:
         flavour: attribute_mutating
         description: Set an attribute value on a service resource instance
+        effect_class: read_modify_write
         metadata:
           tier: intent
           source_of_truth: catalog
@@ -647,6 +652,7 @@ domains:
           target_slot: service_resource
       decommission:
         flavour: discretionary
+        effect_class: read_modify_write
         role_guard:
           any_of: [compliance_officer, senior_compliance, mlro]
         audit_class: service_resource_decommission
@@ -690,6 +696,7 @@ domains:
 
       validate-attrs:
         flavour: discretionary
+        effect_class: read_snapshot
         role_guard:
           any_of: [compliance_officer, senior_compliance, mlro]
         audit_class: service_resource_validate_attrs
@@ -816,6 +823,7 @@ domains:
       list-lifecycles-by-instrument:
         flavour: attribute_mutating
         description: List lifecycles for an instrument class
+        effect_class: read_snapshot
         metadata:
           tier: reference
           source_of_truth: workflow
@@ -931,6 +939,7 @@ domains:
       list-resources-for-lifecycle:
         flavour: attribute_mutating
         description: List resource types required by a lifecycle
+        effect_class: read_snapshot
         metadata:
           tier: reference
           source_of_truth: workflow
@@ -974,6 +983,7 @@ domains:
       provision-lifecycle:
         flavour: instance_adding
         description: Provision a lifecycle resource instance for a CBU
+        effect_class: read_modify_write
         metadata:
           tier: intent
           source_of_truth: workflow
@@ -1188,6 +1198,7 @@ domains:
       list-lifecycle-instances:
         flavour: attribute_mutating
         description: List lifecycle resource instances for a CBU
+        effect_class: read_snapshot
         metadata:
           tier: reference
           source_of_truth: workflow
@@ -1234,6 +1245,7 @@ domains:
       analyze-lifecycle-gaps:
         flavour: attribute_mutating
         description: Analyze lifecycle provisioning gaps for a CBU
+        effect_class: read_modify_write
         metadata:
           tier: intent
           source_of_truth: workflow
@@ -1273,6 +1285,7 @@ domains:
       check-lifecycle-readiness:
         flavour: attribute_mutating
         description: Check if CBU is ready to trade an instrument
+        effect_class: read_snapshot
         metadata:
           tier: diagnostics
           source_of_truth: workflow
@@ -1335,6 +1348,7 @@ domains:
       generate-lifecycle-plan:
         flavour: attribute_mutating
         description: Generate DSL provisioning plan for lifecycle gaps
+        effect_class: read_modify_write
         metadata:
           tier: intent
           source_of_truth: workflow
@@ -1373,6 +1387,7 @@ domains:
       execute-lifecycle-plan:
         flavour: attribute_mutating
         description: Execute a provisioning plan
+        effect_class: read_modify_write
         metadata:
           tier: intent
           source_of_truth: workflow
@@ -1415,6 +1430,7 @@ domains:
       discover-lifecycles:
         flavour: attribute_mutating
         description: Discover all lifecycles and resources for an instrument
+        effect_class: read_modify_write
         metadata:
           tier: composite
           source_of_truth: workflow
@@ -1455,6 +1471,7 @@ domains:
       check-attribute-gaps:
         flavour: attribute_mutating
         description: Cross-reference SRDEF attribute requirements against SemOS active AttributeDefs
+        effect_class: read_snapshot
         metadata:
           tier: diagnostics
           source_of_truth: sem_reg
@@ -1488,6 +1505,7 @@ domains:
       sync-definitions:
         flavour: attribute_mutating
         description: Re-sync service resource definitions from YAML config to database
+        effect_class: read_modify_write
         metadata:
           tier: intent
           source_of_truth: config
@@ -1556,6 +1574,7 @@ domains:
       declare-eligibility:
         flavour: attribute_mutating
         description: Declare option-value eligibility for a service resource
+        effect_class: read_modify_write
         invocation_phrases:
           - "declare service resource eligibility"
           - "set resource eligibility for option"
@@ -1612,6 +1631,7 @@ domains:
       declare-fanout-rule:
         flavour: attribute_mutating
         description: Declare how a service resource fans out from option values
+        effect_class: read_modify_write
         invocation_phrases:
           - "declare service resource fanout"
           - "set resource fanout rule"

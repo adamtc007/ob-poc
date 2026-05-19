@@ -14,6 +14,7 @@ domains:
         flavour: instance_adding
         description: Create a document requirement for an entity
         behavior: crud
+        effect_class: append_fact
         invocation_phrases:
           - create requirement
           - add document requirement
@@ -110,6 +111,7 @@ domains:
         flavour: instance_adding
         description: Create multiple document requirements for an entity
         behavior: plugin
+        effect_class: read_modify_write
         invocation_phrases:
           - create requirements
           - add document requirements
@@ -441,6 +443,7 @@ domains:
         flavour: attribute_mutating
         description: List unsatisfied requirements for a workflow
         behavior: plugin
+        effect_class: read_snapshot
         invocation_phrases:
           - show missing requirements
           - list unsatisfied requirements

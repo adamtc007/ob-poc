@@ -5,6 +5,7 @@ domains:
       add-ownership:
         flavour: instance_adding
         description: Add ownership relationship between entities (idempotent by owner+owned)
+        effect_class: append_fact
         invocation_phrases:
           - "add ownership"
           - "create ownership link"
@@ -137,6 +138,7 @@ domains:
           Serializes computed candidates and ownership chains into JSONB
           output_snapshot + chains_snapshot columns, recording code_hash
           and config_version for replay auditing.
+        effect_class: read_modify_write
         invocation_phrases:
           - "capture ubo snapshot"
           - "snapshot determination run"
@@ -187,6 +189,7 @@ domains:
           Compare two UBO determination snapshots by run_id.
           Returns added, removed, and changed candidates between
           the two snapshots for audit trail and change review.
+        effect_class: read_snapshot
         invocation_phrases:
           - "diff ubo snapshots"
           - "compare determination runs"
@@ -436,6 +439,7 @@ domains:
       delete-relationship:
         flavour: attribute_mutating
         description: Hard delete any entity relationship by ID (generic fallback)
+        effect_class: read_modify_write
         invocation_phrases:
           - "delete relationship"
           - "remove relationship"
@@ -481,6 +485,7 @@ domains:
       list-owners:
         flavour: attribute_mutating
         description: List owners of an entity as of a specific date
+        effect_class: read_snapshot
         invocation_phrases:
           - "list owners"
           - "show who owns"
@@ -533,6 +538,7 @@ domains:
       list-owned:
         flavour: attribute_mutating
         description: List entities owned by an entity (what does this entity own)
+        effect_class: read_snapshot
         invocation_phrases:
           - "list owned entities"
           - "what do they own"
@@ -577,6 +583,7 @@ domains:
       list-ubos:
         flavour: attribute_mutating
         description: List UBO candidates for a CBU (natural persons with ≥25% ownership)
+        effect_class: read_snapshot
         invocation_phrases:
           - "list UBOs"
           - "find UBO candidates"
@@ -629,6 +636,7 @@ domains:
       list-owners-of:
         flavour: attribute_mutating
         description: List ownership relationships where entity is the owned party
+        effect_class: read_snapshot
         invocation_phrases:
           - "list by subject"
           - "show owners of"
@@ -673,6 +681,7 @@ domains:
       trace-chains:
         flavour: attribute_mutating
         description: Trace all ownership and control chains to natural persons for a CBU or client
+        effect_class: read_snapshot
         invocation_phrases:
           - "trace UBO chains"
           - "follow ownership to persons"
@@ -752,6 +761,7 @@ domains:
       compute-chains:
         flavour: attribute_mutating
         description: Compute UBO ownership chains for entities linked to a KYC case
+        effect_class: read_snapshot
         invocation_phrases:
           - "compute UBO chains"
           - "compute ownership chains"
@@ -816,6 +826,7 @@ domains:
       mark-deceased:
         flavour: attribute_mutating
         description: Mark a person as deceased and cascade effects to ownership/control relationships
+        effect_class: read_modify_write
         invocation_phrases:
           - "mark as deceased"
           - "person has died"
@@ -862,6 +873,7 @@ domains:
       convergence-supersede:
         flavour: attribute_mutating
         description: Atomically supersede an ownership relationship with a new one in the convergence model
+        effect_class: read_modify_write
         invocation_phrases:
           - "supersede ownership"
           - "transfer ownership"
@@ -931,6 +943,7 @@ domains:
             baseline: requires_confirmation
       transfer-control:
         flavour: discretionary
+        effect_class: admin_override
         role_guard:
           any_of: [compliance_admin, senior_compliance, mlro]
         audit_class: ubo_transfer_control
@@ -1020,6 +1033,7 @@ domains:
             baseline: requires_explicit_authorisation
       waive-verification:
         flavour: discretionary
+        effect_class: read_modify_write
         role_guard:
           any_of: [compliance_admin, senior_compliance, mlro]
         audit_class: ubo_waive_verification

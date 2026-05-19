@@ -130,6 +130,7 @@ domains:
       record-contribution:
         flavour: attribute_mutating
         description: Record capital contribution (drawdown)
+        effect_class: read_modify_write
         metadata:
           tier: intent
           source_of_truth: operational
@@ -192,6 +193,7 @@ domains:
       record-distribution:
         flavour: attribute_mutating
         description: Record distribution to partner
+        effect_class: read_modify_write
         metadata:
           tier: intent
           source_of_truth: operational
@@ -312,6 +314,7 @@ domains:
       list-partners:
         flavour: attribute_mutating
         description: List all partners in a partnership
+        effect_class: read_snapshot
         metadata:
           tier: reference
           source_of_truth: operational
@@ -369,6 +372,7 @@ domains:
           - Verify profit shares sum to 100%
           - Calculate total committed/contributed/unfunded
           - Identify control (GP or majority LP)
+        effect_class: read_modify_write
         metadata:
           tier: intent
           source_of_truth: operational
@@ -436,6 +440,7 @@ domains:
           Analyze control structure of partnership for UBO identification.
           GPs have presumptive control regardless of capital percentage.
           LPs may have control through voting rights or super-majority stake.
+        effect_class: read_snapshot
         metadata:
           tier: intent
           source_of_truth: operational

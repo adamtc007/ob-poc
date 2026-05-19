@@ -5,6 +5,7 @@ domains:
       upsert:
         flavour: attribute_mutating
         description: Upsert a structural ownership, control, or trust relationship between two entities
+        effect_class: read_modify_write
         invocation_phrases:
           - "upsert entity relationship"
           - "record entity relationship"

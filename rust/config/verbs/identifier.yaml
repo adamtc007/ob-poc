@@ -380,6 +380,7 @@ domains:
       remove:
         flavour: attribute_mutating
         description: Remove an identifier from an entity (hard delete)
+        effect_class: read_modify_write
         metadata:
           tier: intent
           source_of_truth: entity
@@ -418,6 +419,7 @@ domains:
       list-by-entity:
         flavour: attribute_mutating
         description: List all identifiers for an entity
+        effect_class: read_snapshot
         metadata:
           tier: reference
           source_of_truth: entity

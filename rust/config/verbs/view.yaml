@@ -22,6 +22,7 @@ domains:
       universe:
         flavour: attribute_mutating
         description: "View all CBUs with optional filters"
+        effect_class: read_snapshot
         invocation_phrases:
           - "show me everything"
           - "view all CBUs"
@@ -100,6 +101,7 @@ domains:
       book:
         flavour: attribute_mutating
         description: "View all CBUs for a commercial client (book view)"
+        effect_class: read_snapshot
         invocation_phrases:
           - "show client book"
           - "view the book"
@@ -149,6 +151,7 @@ domains:
       cbu:
         flavour: attribute_mutating
         description: "Focus on a single CBU with specified view mode"
+        effect_class: read_snapshot
         invocation_phrases:
           - "focus on CBU"
           - "view this CBU"
@@ -204,6 +207,7 @@ domains:
       entity-forest:
         flavour: attribute_mutating
         description: "View entities by type/ownership filters"
+        effect_class: read_snapshot
         invocation_phrases:
           - "show entity tree"
           - "view entity forest"
@@ -257,6 +261,7 @@ domains:
       refine:
         flavour: attribute_mutating
         description: "Refine current view with additional filter"
+        effect_class: read_snapshot
         invocation_phrases:
           - "filter the view"
           - "refine current selection"
@@ -311,6 +316,7 @@ domains:
       clear-refinements:
         flavour: attribute_mutating
         description: "Clear refinements and return to the base view"
+        effect_class: read_snapshot
         invocation_phrases:
           - "clear all filters"
           - "reset the view"
@@ -405,6 +411,7 @@ domains:
       set-layout:
         flavour: attribute_mutating
         description: "Set the layout strategy for the current view"
+        effect_class: read_snapshot
         invocation_phrases:
           - "change layout"
           - "switch to grid view"
@@ -476,6 +483,7 @@ domains:
       zoom-in:
         flavour: attribute_mutating
         description: "Zoom into a node, expanding it into its child taxonomy"
+        effect_class: read_snapshot
         invocation_phrases:
           - "zoom in"
           - "zoom into this"
@@ -519,6 +527,7 @@ domains:
       zoom-out:
         flavour: attribute_mutating
         description: "Zoom out to the parent taxonomy"
+        effect_class: read_snapshot
         invocation_phrases:
           - "zoom out"
           - "zoom back out"
@@ -558,6 +567,7 @@ domains:
       navigate-back-to:
         flavour: attribute_mutating
         description: "Navigate back to a specific breadcrumb level"
+        effect_class: read_snapshot
         invocation_phrases:
           - "go back to"
           - "jump back to"
@@ -604,6 +614,7 @@ domains:
       read-breadcrumbs:
         flavour: attribute_mutating
         description: "Read the current navigation breadcrumbs"
+        effect_class: read_snapshot
         invocation_phrases:
           - "show breadcrumbs"
           - "where am I"
@@ -646,6 +657,7 @@ domains:
       read-status:
         flavour: attribute_mutating
         description: "Read the current view state summary"
+        effect_class: read_snapshot
         invocation_phrases:
           - "show current status"
           - "what's the status"
@@ -682,6 +694,7 @@ domains:
       read-selection-info:
         flavour: attribute_mutating
         description: "Read detailed info about the current selection"
+        effect_class: read_snapshot
         invocation_phrases:
           - "show selection details"
           - "what's selected"

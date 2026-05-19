@@ -16,6 +16,7 @@ domains:
       search:
         flavour: attribute_mutating
         description: Search UK Companies House for companies by name
+        effect_class: read_snapshot
         invocation_phrases:
           - "search Companies House"
           - "find UK company"
@@ -57,6 +58,7 @@ domains:
       fetch-company:
         flavour: attribute_mutating
         description: Fetch company profile from Companies House
+        effect_class: read_snapshot
         invocation_phrases:
           - "get UK company"
           - "fetch from Companies House"
@@ -92,6 +94,7 @@ domains:
       fetch-psc:
         flavour: attribute_mutating
         description: Fetch Persons with Significant Control from Companies House
+        effect_class: read_snapshot
         invocation_phrases:
           - "get PSCs"
           - "who controls this UK company"
@@ -133,6 +136,7 @@ domains:
       fetch-officers:
         flavour: attribute_mutating
         description: Fetch officers (directors, secretaries) from Companies House
+        effect_class: read_snapshot
         invocation_phrases:
           - "get UK directors"
           - "company officers"
@@ -173,6 +177,7 @@ domains:
       import-company:
         flavour: instance_adding
         description: Import company and optionally PSC/officers to database
+        effect_class: read_snapshot
         invocation_phrases:
           - "import from Companies House"
           - "add UK company to database"

@@ -4,6 +4,7 @@ domains:
     verbs:
       create-campaign:
         flavour: discretionary
+        effect_class: append_fact
         role_guard:
           any_of: [compliance_officer, senior_compliance, mlro]
         audit_class: access_review_create_campaign
@@ -77,6 +78,7 @@ domains:
             baseline: reviewable
       populate-campaign:
         flavour: discretionary
+        effect_class: read_modify_write
         role_guard:
           any_of: [compliance_officer, senior_compliance, mlro]
         audit_class: access_review_populate_campaign
@@ -119,6 +121,7 @@ domains:
             baseline: reviewable
       launch-campaign:
         flavour: discretionary
+        effect_class: read_modify_write
         role_guard:
           any_of: [compliance_officer, senior_compliance, mlro]
         audit_class: access_review_launch_campaign
@@ -199,6 +202,7 @@ domains:
             baseline: reviewable
       revoke-access:
         flavour: discretionary
+        effect_class: read_modify_write
         role_guard:
           any_of: [compliance_officer, senior_compliance, mlro]
         audit_class: access_review_revoke_access
@@ -343,6 +347,7 @@ domains:
             baseline: reviewable
       bulk-confirm:
         flavour: discretionary
+        effect_class: read_modify_write
         role_guard:
           any_of: [compliance_officer, senior_compliance, mlro]
         audit_class: access_review_bulk_confirm
@@ -377,6 +382,7 @@ domains:
             baseline: reviewable
       confirm-all-clean:
         flavour: discretionary
+        effect_class: read_modify_write
         role_guard:
           any_of: [compliance_officer, senior_compliance, mlro]
         audit_class: access_review_confirm_all_clean
@@ -412,6 +418,7 @@ domains:
             baseline: reviewable
       attest:
         flavour: discretionary
+        effect_class: admin_override
         role_guard:
           any_of: [compliance_officer, senior_compliance, mlro]
         audit_class: access_review_attest
@@ -468,6 +475,7 @@ domains:
             baseline: requires_explicit_authorisation
       process-deadline:
         flavour: discretionary
+        effect_class: read_modify_write
         role_guard:
           any_of: [compliance_officer, senior_compliance, mlro]
         audit_class: access_review_process_deadline
@@ -511,6 +519,7 @@ domains:
             baseline: reviewable
       send-reminders:
         flavour: discretionary
+        effect_class: read_modify_write
         role_guard:
           any_of: [compliance_officer, senior_compliance, mlro]
         audit_class: access_review_send_reminders
@@ -638,6 +647,7 @@ domains:
       list-items:
         flavour: attribute_mutating
         description: List review items for a campaign
+        effect_class: read_snapshot
         metadata:
           tier: intent
           source_of_truth: operational
@@ -682,6 +692,7 @@ domains:
       audit-report:
         flavour: attribute_mutating
         description: List attestations for audit trail
+        effect_class: read_snapshot
         metadata:
           tier: intent
           source_of_truth: operational

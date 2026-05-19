@@ -515,6 +515,7 @@ pub(crate) async fn verbs_lint(errors_only: bool, verbose: bool, tier: &str) -> 
         println!("===========================================");
         let ctx = ValidationContext {
             require_declaration: false,
+            require_effect_class: true, // T08: all verbs now have effect_class; fail closed
             ..ValidationContext::default()
         };
         let mut three_axis_report = validate_verbs_config(&verbs_config, &ctx);

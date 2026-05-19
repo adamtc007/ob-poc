@@ -5,6 +5,7 @@ domains:
       terminate:
         flavour: attribute_mutating
         description: Terminate or remove all CBU entity roles for a CBU
+        effect_class: read_modify_write
         invocation_phrases:
           - "terminate cbu roles"
           - "remove all cbu roles"

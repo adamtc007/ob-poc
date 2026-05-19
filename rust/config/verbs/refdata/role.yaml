@@ -126,6 +126,7 @@ domains:
       delete:
         flavour: attribute_mutating
         description: Delete a role
+        effect_class: read_modify_write
         metadata:
           tier: intent
           source_of_truth: operational

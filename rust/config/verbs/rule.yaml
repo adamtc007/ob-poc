@@ -13,6 +13,7 @@ domains:
         flavour: instance_adding
         description: "Add a new rule to a ruleset (validates JSON condition and effect structures)"
         behavior: plugin
+        effect_class: read_modify_write
         lifecycle:
           precondition_checks:
             - "requires_prior:ruleset.create"
@@ -77,6 +78,7 @@ domains:
         flavour: attribute_mutating
         description: "Update an existing rule's fields"
         behavior: plugin
+        effect_class: read_modify_write
         metadata:
           tier: intent
           source_of_truth: operational
@@ -122,6 +124,7 @@ domains:
         flavour: attribute_mutating
         description: "Disable a rule (soft delete — sets kind to 'disabled')"
         behavior: plugin
+        effect_class: read_modify_write
         metadata:
           tier: intent
           source_of_truth: operational

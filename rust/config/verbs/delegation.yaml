@@ -154,6 +154,7 @@ domains:
       list-delegates:
         flavour: attribute_mutating
         description: List who an entity delegates to
+        effect_class: read_snapshot
         invocation_phrases:
           - "list delegates"
           - "show delegated service providers"
@@ -199,6 +200,7 @@ domains:
       list-delegations-received:
         flavour: attribute_mutating
         description: List delegations an entity has received
+        effect_class: read_snapshot
         invocation_phrases:
           - "list delegations received"
           - "show inbound delegations"

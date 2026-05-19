@@ -12,6 +12,7 @@ domains:
         flavour: instance_adding
         description: "Create a new contract pack"
         behavior: plugin
+        effect_class: read_modify_write
         metadata:
           tier: intent
           source_of_truth: operational
@@ -87,6 +88,7 @@ domains:
         flavour: instance_adding
         description: "Add a template to a contract pack"
         behavior: plugin
+        effect_class: read_modify_write
         lifecycle:
           precondition_checks:
             - "requires_prior:contract-pack.create"

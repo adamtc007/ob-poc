@@ -72,6 +72,7 @@ domains:
 
       commit-verb-declaration:
         flavour: discretionary
+        effect_class: admin_override
         role_guard:
           any_of: [compliance_admin, senior_compliance, mlro]
         audit_class: catalogue_commit_verb_declaration
@@ -145,6 +146,7 @@ domains:
       list-proposals:
         flavour: attribute_mutating
         description: "List pending and recently-committed verb-declaration proposals"
+        effect_class: read_snapshot
         invocation_phrases:
           - "list proposals"
           - "show pending verb changes"

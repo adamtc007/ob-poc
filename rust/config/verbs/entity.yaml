@@ -13,6 +13,7 @@ domains:
         flavour: instance_adding
         description: Create an entity of the requested entity type
         behavior: crud
+        effect_class: idempotent_ensure
         invocation_phrases:
           - "create entity"
           - "create company"
@@ -240,6 +241,7 @@ domains:
         flavour: instance_adding
         description: Create or update an entity of the requested entity type
         behavior: crud
+        effect_class: idempotent_ensure
         invocation_phrases:
           - "ensure entity"
           - "ensure company"
@@ -453,6 +455,7 @@ domains:
             baseline: reviewable
       delete:
         flavour: discretionary
+        effect_class: admin_override
         role_guard:
           any_of: [compliance_admin, senior_compliance, mlro]
         audit_class: entity_delete
@@ -569,6 +572,7 @@ domains:
       query:
         flavour: attribute_mutating
         description: Query entities for batch template iteration (returns entity refs, not records)
+        effect_class: read_snapshot
         invocation_phrases:
           - "query entities"
           - "search entities"
@@ -631,6 +635,7 @@ domains:
       ghost:
         flavour: attribute_mutating
         description: Create a ghost person entity (name only, minimal attributes)
+        effect_class: read_modify_write
         invocation_phrases:
           - "create ghost entity"
           - "add ghost person"
@@ -877,6 +882,7 @@ domains:
         flavour: instance_adding
         description: Return existing entity or create placeholder for later resolution
         behavior: plugin
+        effect_class: read_modify_write
         invocation_phrases:
           - "ensure entity or create placeholder"
           - "get or placeholder"
@@ -960,6 +966,7 @@ domains:
         flavour: attribute_mutating
         description: Resolve a placeholder entity to a real entity
         behavior: plugin
+        effect_class: read_modify_write
         invocation_phrases:
           - "resolve placeholder"
           - "resolve this placeholder to the real entity"
@@ -1031,6 +1038,7 @@ domains:
         flavour: attribute_mutating
         description: List pending placeholder entities for a CBU
         behavior: plugin
+        effect_class: read_snapshot
         invocation_phrases:
           - "list placeholders"
           - "show pending placeholders"
@@ -1082,6 +1090,7 @@ domains:
       placeholder-summary:
         flavour: attribute_mutating
         description: Get placeholder summary statistics for a CBU
+        effect_class: read_snapshot
         invocation_phrases:
           - "placeholder summary"
           - "placeholder statistics"
@@ -1132,6 +1141,7 @@ domains:
       deactivate:
         flavour: attribute_mutating
         description: Soft-delete an entity
+        effect_class: read_modify_write
         invocation_phrases:
           - "deactivate entity"
           - "soft delete entity"

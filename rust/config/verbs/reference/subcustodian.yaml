@@ -91,6 +91,7 @@ domains:
           consequence:
             baseline: reviewable
       list-by-market:
+        effect_class: read_snapshot
         flavour: attribute_mutating
         description: List sub-custodian entries for a market
         metadata:
@@ -138,6 +139,7 @@ domains:
           consequence:
             baseline: benign
       lookup:
+        effect_class: read_snapshot
         flavour: attribute_mutating
         description: Find sub-custodian for market/currency
         metadata:

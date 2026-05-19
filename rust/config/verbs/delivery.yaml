@@ -5,6 +5,7 @@ domains:
       record:
         flavour: attribute_mutating
         description: Record a service delivery for a CBU (upsert by cbu+product+service)
+        effect_class: read_modify_write
         invocation_phrases:
         - "record service delivery"
         - "log delivery for CBU"

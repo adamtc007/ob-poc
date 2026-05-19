@@ -135,6 +135,7 @@ domains:
       verify:
         flavour: attribute_mutating
         description: "Verify a regulatory registration"
+        effect_class: read_modify_write
         metadata:
           tier: intent
           source_of_truth: external
@@ -242,6 +243,7 @@ domains:
       check:
         flavour: attribute_mutating
         description: "Check entity's overall regulatory status"
+        effect_class: read_snapshot
         metadata:
           tier: diagnostics
           source_of_truth: external

@@ -332,6 +332,7 @@ domains:
       read-status:
         flavour: attribute_mutating
         description: Read current agent status
+        effect_class: read_snapshot
         metadata:
           tier: diagnostics
           source_of_truth: session
@@ -371,6 +372,7 @@ domains:
       read-history:
         flavour: attribute_mutating
         description: Read agent decision and action history for current session
+        effect_class: read_snapshot
         metadata:
           tier: intent
           source_of_truth: session
@@ -412,6 +414,7 @@ domains:
       set-selection-threshold:
         flavour: attribute_mutating
         description: Set confidence thresholds for auto-selection
+        effect_class: read_modify_write
         metadata:
           tier: intent
           source_of_truth: session
@@ -455,6 +458,7 @@ domains:
       set-execution-mode:
         flavour: attribute_mutating
         description: Set the agent execution mode
+        effect_class: read_modify_write
         metadata:
           tier: intent
           source_of_truth: session
@@ -496,6 +500,7 @@ domains:
       set-authoring-mode:
         flavour: attribute_mutating
         description: Set the authoring mode boundary
+        effect_class: read_modify_write
         metadata:
           tier: intent
           source_of_truth: session
@@ -547,6 +552,7 @@ domains:
       teach:
         flavour: attribute_mutating
         description: Teach a phrase→verb mapping to improve intent recognition
+        effect_class: read_modify_write
         metadata:
           tier: intent
           source_of_truth: operational
@@ -601,6 +607,7 @@ domains:
       unteach:
         flavour: attribute_mutating
         description: Remove a previously taught phrase→verb mapping
+        effect_class: read_modify_write
         metadata:
           tier: intent
           source_of_truth: operational
@@ -652,6 +659,7 @@ domains:
       read-teaching-status:
         flavour: attribute_mutating
         description: Read recently taught patterns and their embedding status
+        effect_class: read_snapshot
         metadata:
           tier: diagnostics
           source_of_truth: operational
@@ -704,6 +712,7 @@ domains:
       read-mode:
         flavour: attribute_mutating
         description: Read the current agent operating mode (Research or Governed)
+        effect_class: read_snapshot
         metadata:
           tier: diagnostics
           source_of_truth: operational
@@ -739,6 +748,7 @@ domains:
       read-policy:
         flavour: attribute_mutating
         description: Read the current PolicyGate configuration and active policy snapshot
+        effect_class: read_snapshot
         metadata:
           tier: diagnostics
           source_of_truth: operational
@@ -773,6 +783,7 @@ domains:
       list-tools:
         flavour: attribute_mutating
         description: List available MCP tool specifications from the registry
+        effect_class: read_snapshot
         metadata:
           tier: diagnostics
           source_of_truth: operational
@@ -823,6 +834,7 @@ domains:
       read-telemetry-summary:
         flavour: attribute_mutating
         description: Read intent event telemetry for hit-rate analysis and pipeline health
+        effect_class: read_snapshot
         metadata:
           tier: diagnostics
           source_of_truth: operational
@@ -872,6 +884,7 @@ domains:
       activate-teaching:
         flavour: attribute_mutating
         description: Activate taught patterns by generating embeddings for semantic search
+        effect_class: read_modify_write
         metadata:
           tier: intent
           source_of_truth: operational

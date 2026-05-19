@@ -16,6 +16,7 @@ domains:
       add:
         flavour: instance_adding
         description: "Add a product overlay to matrix entries"
+        effect_class: read_modify_write
         metadata:
           tier: intent
           source_of_truth: matrix
@@ -128,6 +129,7 @@ domains:
       remove:
         flavour: attribute_mutating
         description: "Remove a product overlay"
+        effect_class: read_modify_write
         metadata:
           tier: intent
           source_of_truth: matrix
@@ -251,6 +253,7 @@ domains:
       list:
         flavour: attribute_mutating
         description: "List overlays for a CBU"
+        effect_class: read_snapshot
         metadata:
           tier: reference
           source_of_truth: matrix
@@ -302,6 +305,7 @@ domains:
       list-by-subscription:
         flavour: attribute_mutating
         description: "List overlays for a product subscription"
+        effect_class: read_snapshot
         metadata:
           tier: reference
           source_of_truth: matrix
@@ -344,6 +348,7 @@ domains:
       effective-matrix:
         flavour: attribute_mutating
         description: "Get effective matrix with all product overlays"
+        effect_class: read_modify_write
         metadata:
           tier: intent
           source_of_truth: matrix
@@ -413,6 +418,7 @@ domains:
       unified-gaps:
         flavour: attribute_mutating
         description: "Get all gaps from both lifecycle and service domains"
+        effect_class: read_modify_write
         metadata:
           tier: intent
           source_of_truth: matrix
@@ -467,6 +473,7 @@ domains:
       compare-products:
         flavour: attribute_mutating
         description: "Compare what different products add to a matrix entry"
+        effect_class: read_snapshot
         metadata:
           tier: intent
           source_of_truth: matrix

@@ -204,6 +204,7 @@ domains:
 
           Returns all share classes linked to the specified compartment.
           Useful for viewing fee structures and investor breakdowns by sleeve.
+        effect_class: read_snapshot
         metadata:
           tier: diagnostics
           source_of_truth: register

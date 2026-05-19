@@ -5,6 +5,7 @@ domains:
       ensure:
         flavour: instance_adding
         description: Create or update a reference data record for the requested domain
+        effect_class: read_modify_write
         metadata:
           tier: intent
           source_of_truth: operational
@@ -94,6 +95,7 @@ domains:
       read:
         flavour: attribute_mutating
         description: Read a reference data record for the requested domain
+        effect_class: read_snapshot
         metadata:
           tier: reference
           source_of_truth: operational
@@ -133,6 +135,7 @@ domains:
       list:
         flavour: attribute_mutating
         description: List reference data records for the requested domain
+        effect_class: read_snapshot
         metadata:
           tier: reference
           source_of_truth: operational
@@ -174,6 +177,7 @@ domains:
       deactivate:
         flavour: attribute_mutating
         description: Deactivate or remove a reference data record for the requested domain
+        effect_class: read_modify_write
         metadata:
           tier: intent
           source_of_truth: operational

@@ -5,6 +5,7 @@ domains:
       pause:
         flavour: attribute_mutating
         description: Pause the current batch execution
+        effect_class: read_modify_write
         metadata:
           tier: intent
           source_of_truth: operational
@@ -39,6 +40,7 @@ domains:
       resume:
         flavour: attribute_mutating
         description: Resume a paused batch execution
+        effect_class: read_modify_write
         metadata:
           tier: intent
           source_of_truth: operational
@@ -72,6 +74,7 @@ domains:
       continue:
         flavour: attribute_mutating
         description: Continue batch execution for N more items
+        effect_class: read_modify_write
         metadata:
           tier: intent
           source_of_truth: operational
@@ -110,6 +113,7 @@ domains:
       skip:
         flavour: attribute_mutating
         description: Skip the current batch item
+        effect_class: read_modify_write
         metadata:
           tier: intent
           source_of_truth: operational
@@ -147,6 +151,7 @@ domains:
       abort:
         flavour: attribute_mutating
         description: Abort the current batch execution
+        effect_class: read_modify_write
         metadata:
           tier: intent
           source_of_truth: operational
@@ -185,6 +190,7 @@ domains:
       status:
         flavour: attribute_mutating
         description: Get the current batch execution status
+        effect_class: read_snapshot
         metadata:
           tier: diagnostics
           source_of_truth: operational
@@ -219,6 +225,7 @@ domains:
       add-products:
         flavour: instance_adding
         description: Add products to multiple CBUs in bulk
+        effect_class: read_modify_write
         metadata:
           tier: intent
           source_of_truth: operational

@@ -12,6 +12,7 @@ domains:
         description: Register a new shared atom declaration. Enters Draft state.
         behavior: plugin
         handler: SharedAtomRegisterOp
+        effect_class: read_modify_write
         metadata:
           tier: governance
           source_of_truth: sem_reg
@@ -61,6 +62,7 @@ domains:
         description: Promote a shared atom from Draft to Active. Propagation enforcement begins.
         behavior: plugin
         handler: SharedAtomActivateOp
+        effect_class: read_modify_write
         metadata:
           tier: governance
           source_of_truth: sem_reg
@@ -96,6 +98,7 @@ domains:
         description: Mark a shared atom as deprecated. Still enforced but no new consumers allowed.
         behavior: plugin
         handler: SharedAtomDeprecateOp
+        effect_class: read_modify_write
         metadata:
           tier: governance
           source_of_truth: sem_reg
@@ -127,6 +130,7 @@ domains:
 
       retire:
         flavour: discretionary
+        effect_class: admin_override
         role_guard:
           any_of: [compliance_admin, senior_compliance, mlro]
         audit_class: shared_atom_retire
@@ -167,6 +171,7 @@ domains:
         description: List all shared atoms, optionally filtered by lifecycle status
         behavior: plugin
         handler: SharedAtomListOp
+        effect_class: read_snapshot
         metadata:
           tier: diagnostics
           source_of_truth: sem_reg
@@ -204,6 +209,7 @@ domains:
         description: Show discovered consumers of a shared atom from verb footprint analysis
         behavior: plugin
         handler: SharedAtomListConsumersOp
+        effect_class: read_snapshot
         metadata:
           tier: diagnostics
           source_of_truth: sem_reg
@@ -241,6 +247,7 @@ domains:
         description: Replay a consuming constellation from the top after a shared fact supersession
         behavior: plugin
         handler: SharedAtomReplayConstellationOp
+        effect_class: read_modify_write
         metadata:
           tier: governance
           source_of_truth: sem_reg
@@ -286,6 +293,7 @@ domains:
         description: Acknowledge a shared fact supersession for an in-flight entity, advancing the consumer ref to current
         behavior: plugin
         handler: SharedAtomAcknowledgeOp
+        effect_class: read_modify_write
         metadata:
           tier: governance
           source_of_truth: sem_reg

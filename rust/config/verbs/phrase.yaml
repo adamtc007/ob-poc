@@ -5,6 +5,7 @@ domains:
       observe-misses:
         flavour: attribute_mutating
         description: Trawl session traces for utterance miss and wrong-match patterns
+        effect_class: read_modify_write
         metadata:
           tier: diagnostics
           source_of_truth: sem_reg
@@ -39,6 +40,7 @@ domains:
       coverage-report:
         flavour: attribute_mutating
         description: Per-workspace phrase coverage and gap analysis
+        effect_class: read_modify_write
         metadata:
           tier: diagnostics
           source_of_truth: sem_reg
@@ -67,6 +69,7 @@ domains:
       check-collisions:
         flavour: attribute_mutating
         description: Check a candidate phrase for collisions against the phrase bank
+        effect_class: read_snapshot
         metadata:
           tier: diagnostics
           source_of_truth: sem_reg
@@ -107,6 +110,7 @@ domains:
       propose:
         flavour: attribute_mutating
         description: Generate a governed phrase proposal with evidence and collision report
+        effect_class: read_modify_write
         metadata:
           tier: intent
           source_of_truth: sem_reg
@@ -146,6 +150,7 @@ domains:
       batch-propose:
         flavour: attribute_mutating
         description: Generate bulk proposals from aggregated miss analysis (max 50)
+        effect_class: read_modify_write
         metadata:
           tier: intent
           source_of_truth: sem_reg
@@ -177,6 +182,7 @@ domains:
       review-proposals:
         flavour: attribute_mutating
         description: List pending phrase proposals grouped by risk tier
+        effect_class: read_snapshot
         metadata:
           tier: diagnostics
           source_of_truth: sem_reg
@@ -244,6 +250,7 @@ domains:
 
       reject:
         flavour: discretionary
+        effect_class: admin_override
         role_guard:
           any_of: [compliance_officer, senior_compliance, mlro]
         audit_class: phrase_reject
@@ -284,6 +291,7 @@ domains:
       defer:
         flavour: attribute_mutating
         description: Park a phrase proposal for later review
+        effect_class: read_modify_write
         metadata:
           tier: intent
           source_of_truth: sem_reg

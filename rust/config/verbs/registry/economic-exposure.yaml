@@ -83,6 +83,7 @@ domains:
           | BlackRock Inc  | 15.2%          | 2     | END_INVESTOR   |
           | State Street   | 8.1%           | 1     | POLICY_NONE    |
           | Unknown Feeder | 3.4%           | 3     | NO_BO_DATA     |
+        effect_class: read_snapshot
         metadata:
           tier: diagnostics
           source_of_truth: operational
@@ -179,6 +180,7 @@ domains:
           - Aggregation of smaller holders by category
           - Total coverage percentage
           - Count of terminal vs intermediate holders
+        effect_class: read_snapshot
         metadata:
           tier: diagnostics
           source_of_truth: operational

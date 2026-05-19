@@ -26,6 +26,7 @@ domains:
       compose:
         flavour: attribute_mutating
         description: Create a new changeset for authoring registry changes
+        effect_class: read_modify_write
         metadata:
           tier: diagnostics
           source_of_truth: operational
@@ -65,6 +66,7 @@ domains:
       add-item:
         flavour: instance_adding
         description: Add an item (snapshot) to an existing changeset
+        effect_class: read_modify_write
         metadata:
           tier: diagnostics
           source_of_truth: operational
@@ -112,6 +114,7 @@ domains:
       remove-item:
         flavour: attribute_mutating
         description: Remove an item from a changeset
+        effect_class: read_modify_write
         metadata:
           tier: diagnostics
           source_of_truth: operational
@@ -150,6 +153,7 @@ domains:
       refine-item:
         flavour: attribute_mutating
         description: Refine an existing changeset item (update its definition)
+        effect_class: read_modify_write
         metadata:
           tier: diagnostics
           source_of_truth: operational
@@ -200,6 +204,7 @@ domains:
       suggest:
         flavour: attribute_mutating
         description: Get AI suggestions for a changeset (fill gaps, improve completeness)
+        effect_class: read_modify_write
         metadata:
           tier: diagnostics
           source_of_truth: operational
@@ -235,6 +240,7 @@ domains:
       apply-template:
         flavour: attribute_mutating
         description: Apply a changeset template to pre-populate items
+        effect_class: read_modify_write
         metadata:
           tier: diagnostics
           source_of_truth: operational
@@ -276,6 +282,7 @@ domains:
       attach-basis:
         flavour: instance_adding
         description: Attach evidence basis to a changeset item
+        effect_class: read_modify_write
         metadata:
           tier: diagnostics
           source_of_truth: operational
@@ -319,6 +326,7 @@ domains:
       validate-edit:
         flavour: attribute_mutating
         description: Validate a single changeset edit against guardrails
+        effect_class: read_snapshot
         metadata:
           tier: diagnostics
           source_of_truth: operational
@@ -361,6 +369,7 @@ domains:
       cross-reference:
         flavour: attribute_mutating
         description: Cross-reference changeset items against existing registry
+        effect_class: read_snapshot
         metadata:
           tier: diagnostics
           source_of_truth: operational
@@ -396,6 +405,7 @@ domains:
       impact-analysis:
         flavour: attribute_mutating
         description: Analyze the impact of publishing a changeset
+        effect_class: read_snapshot
         metadata:
           tier: diagnostics
           source_of_truth: operational
@@ -434,6 +444,7 @@ domains:
       resolve-conflict:
         flavour: attribute_mutating
         description: Resolve a detected conflict in a changeset
+        effect_class: read_modify_write
         metadata:
           tier: diagnostics
           source_of_truth: operational
@@ -480,6 +491,7 @@ domains:
       list:
         flavour: attribute_mutating
         description: List changesets with optional status filter
+        effect_class: read_snapshot
         metadata:
           tier: diagnostics
           source_of_truth: operational
@@ -515,6 +527,7 @@ domains:
       get:
         flavour: attribute_mutating
         description: Get detailed changeset information
+        effect_class: read_snapshot
         metadata:
           tier: diagnostics
           source_of_truth: operational
@@ -550,6 +563,7 @@ domains:
       diff:
         flavour: attribute_mutating
         description: Diff two changesets or a changeset against the active snapshot set
+        effect_class: read_snapshot
         metadata:
           tier: diagnostics
           source_of_truth: operational

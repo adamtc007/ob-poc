@@ -48,6 +48,7 @@ domains:
 
       approve:
         flavour: discretionary
+        effect_class: admin_override
         role_guard:
           any_of: [compliance_officer, senior_compliance, mlro]
         audit_class: cbu_ca_approve
@@ -85,6 +86,7 @@ domains:
 
       reject:
         flavour: discretionary
+        effect_class: admin_override
         role_guard:
           any_of: [compliance_officer, senior_compliance, mlro]
         audit_class: cbu_ca_reject

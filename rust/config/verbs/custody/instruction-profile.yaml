@@ -287,6 +287,7 @@ domains:
       list-assignments:
         flavour: attribute_mutating
         description: "List instruction template assignments for CBU"
+        effect_class: read_snapshot
         metadata:
           tier: reference
           source_of_truth: operational
@@ -344,6 +345,7 @@ domains:
       list-field-overrides:
         flavour: attribute_mutating
         description: "List field overrides for assignment"
+        effect_class: read_snapshot
         metadata:
           tier: reference
           source_of_truth: operational

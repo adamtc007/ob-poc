@@ -10,6 +10,7 @@ domains:
       draft:
         flavour: instance_adding
         description: Draft a new capability binding (creates row in DRAFT state)
+        effect_class: append_fact
         invocation_phrases:
           - "draft capability binding"
           - "create new binding"

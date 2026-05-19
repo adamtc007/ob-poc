@@ -15,6 +15,7 @@ domains:
     - umbrella fund
     verbs:
       enrich:
+        effect_class: read_modify_write
         flavour: attribute_mutating
         description: Enrich an entity with GLEIF data by LEI (creates entity if not exists)
         invocation_phrases:
@@ -73,6 +74,7 @@ domains:
           consequence:
             baseline: reviewable
       search:
+        effect_class: read_snapshot
         flavour: attribute_mutating
         description: Search GLEIF for entities by name, jurisdiction, or category
         invocation_phrases:
@@ -142,6 +144,7 @@ domains:
           consequence:
             baseline: benign
       import-tree:
+        effect_class: read_modify_write
         flavour: instance_adding
         description: Import corporate tree (parents and/or children) from GLEIF
         invocation_phrases:
@@ -209,6 +212,7 @@ domains:
           consequence:
             baseline: reviewable
       import-managed-funds:
+        effect_class: read_modify_write
         flavour: instance_adding
         description: Import funds managed by an investment manager with full CBU structure
         invocation_phrases:
@@ -269,6 +273,7 @@ domains:
           consequence:
             baseline: reviewable
       refresh:
+        effect_class: read_modify_write
         flavour: attribute_mutating
         description: Refresh stale GLEIF data for entities
         metadata:
@@ -326,6 +331,7 @@ domains:
           consequence:
             baseline: reviewable
       trace-ownership:
+        effect_class: read_snapshot
         flavour: attribute_mutating
         description: Trace ownership chain from entity to UBO terminus via GLEIF parent relationships
         invocation_phrases:
@@ -379,6 +385,7 @@ domains:
           consequence:
             baseline: benign
       resolve-successor:
+        effect_class: read_snapshot
         flavour: attribute_mutating
         description: Resolve a merged or inactive LEI to its current successor entity
         metadata:
@@ -423,6 +430,7 @@ domains:
           consequence:
             baseline: benign
       lookup:
+        effect_class: read_snapshot
         flavour: attribute_mutating
         description: 'Consolidated GLEIF lookup — fetch relationship data by target-type. Replaces 8 individual get-* verbs
           with a single entry point. target-type: record | parent | children | manager | managed-funds | master-fund | umbrella
@@ -513,6 +521,7 @@ domains:
           consequence:
             baseline: benign
       import-to-client-group:
+        effect_class: read_modify_write
         flavour: instance_adding
         description: Import GLEIF tree and populate client_group tables with role tagging. Optionally includes managed funds
           (IM relationships).

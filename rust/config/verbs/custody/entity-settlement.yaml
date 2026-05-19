@@ -180,6 +180,7 @@ domains:
       remove-ssi:
         flavour: attribute_mutating
         description: Remove a counterparty SSI
+        effect_class: read_modify_write
         metadata:
           tier: intent
           source_of_truth: operational

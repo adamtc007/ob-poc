@@ -30,6 +30,7 @@ domains:
         flavour: instance_adding
         description: "Create a new client group root record"
         behavior: crud
+        effect_class: append_fact
         crud:
           operation: insert
           table: client_group
@@ -172,6 +173,7 @@ domains:
         description: >
           Consolidated entity lifecycle verb — add, remove, confirm, or reject
           an entity's membership in a client group. The action arg selects the operation.
+        effect_class: read_modify_write
         metadata:
           tier: intent
           noun: client_group
@@ -231,6 +233,7 @@ domains:
       entity-add:
         flavour: attribute_mutating
         description: "Add an entity to this client group's universe"
+        effect_class: read_modify_write
         invocation_phrases:
           - "add entity to client group"
           - "include entity in group"
@@ -294,6 +297,7 @@ domains:
       link-cbu:
         flavour: attribute_mutating
         description: "Link active client-group entity memberships to a CBU"
+        effect_class: read_modify_write
         invocation_phrases:
           - "link entity membership to cbu"
           - "attach client group entity to cbu"
@@ -329,6 +333,7 @@ domains:
       unlink-cbu:
         flavour: attribute_mutating
         description: "Unlink client-group entity memberships from a CBU"
+        effect_class: read_modify_write
         invocation_phrases:
           - "unlink client group memberships from cbu"
           - "detach client group entities from cbu"
@@ -359,6 +364,7 @@ domains:
       entity-remove:
         flavour: attribute_mutating
         description: "Remove an entity from this client group (or mark historical)"
+        effect_class: read_modify_write
         invocation_phrases:
           - "remove entity from group"
           - "drop entity from client group"
@@ -418,6 +424,7 @@ domains:
         description: "List all entities in this client group"
         behavior: plugin
         handler: ClientGroupEntityListOp
+        effect_class: read_snapshot
         invocation_phrases:
           - "list entities in group"
           - "show group entities"
@@ -469,6 +476,7 @@ domains:
         description: "Add a shorthand tag to an entity within client context"
         behavior: plugin
         handler: ClientGroupTagAddOp
+        effect_class: read_modify_write
         invocation_phrases:
           - "tag this as"
           - "call this"
@@ -528,6 +536,7 @@ domains:
       tag-remove:
         flavour: attribute_mutating
         description: "Remove a shorthand tag"
+        effect_class: read_modify_write
         invocation_phrases:
           - "remove tag from entity"
           - "delete shorthand label"
@@ -566,6 +575,7 @@ domains:
         description: "List tags for entities in client group"
         behavior: plugin
         handler: ClientGroupTagListOp
+        effect_class: read_snapshot
         invocation_phrases:
           - "show tags"
           - "list tags"
@@ -622,6 +632,7 @@ domains:
         description: "Search entities by shorthand tags (Candle-assisted fuzzy search)"
         behavior: plugin
         handler: ClientGroupSearchOp
+        effect_class: read_snapshot
         invocation_phrases:
           - "find"
           - "show me the"
@@ -694,6 +705,7 @@ domains:
         description: "Discover entities that might belong to this client (onboarding)"
         behavior: plugin
         handler: ClientGroupDiscoverEntitiesOp
+        effect_class: read_snapshot
         invocation_phrases:
           - "find all entities for"
           - "discover entities for"
@@ -750,6 +762,7 @@ domains:
         description: "Confirm a suspected entity as belonging to client"
         behavior: plugin
         handler: ClientGroupConfirmEntityOp
+        effect_class: read_modify_write
         invocation_phrases:
           - "confirm this entity"
           - "confirm this entity belongs to the group"
@@ -803,6 +816,7 @@ domains:
             baseline: reviewable
       reject-entity:
         flavour: discretionary
+        effect_class: read_modify_write
         role_guard:
           any_of: [compliance_officer, senior_compliance, mlro]
         audit_class: client_group_reject_entity
@@ -869,6 +883,7 @@ domains:
         description: "Assign a role to an entity within the client group context"
         behavior: plugin
         handler: ClientGroupAssignRoleOp
+        effect_class: read_modify_write
         invocation_phrases:
           - "assign role"
           - "make this the"
@@ -955,6 +970,7 @@ domains:
       remove-role:
         flavour: attribute_mutating
         description: "Remove a role assignment from an entity"
+        effect_class: read_modify_write
         invocation_phrases:
           - "remove role from entity"
           - "unassign role in group"
@@ -993,6 +1009,7 @@ domains:
         description: "List role assignments for entities in a client group"
         behavior: plugin
         handler: ClientGroupListRolesOp
+        effect_class: read_snapshot
         invocation_phrases:
           - "list roles"
           - "show roles"
@@ -1054,6 +1071,7 @@ domains:
         description: "List all parties (entities with roles) in a client group"
         behavior: plugin
         handler: ClientGroupPartiesOp
+        effect_class: read_snapshot
         invocation_phrases:
           - "show parties"
           - "list parties"
@@ -1107,6 +1125,7 @@ domains:
         description: "Add a provisional ownership/control edge between entities"
         behavior: plugin
         handler: ClientGroupAddRelationshipOp
+        effect_class: read_modify_write
         invocation_phrases:
           - "this owns"
           - "set parent"
@@ -1174,6 +1193,7 @@ domains:
         description: "List ownership/control relationships in a client group"
         behavior: plugin
         handler: ClientGroupListRelationshipsOp
+        effect_class: read_snapshot
         invocation_phrases:
           - "show ownership"
           - "list relationships"
@@ -1232,6 +1252,7 @@ domains:
         description: "Add an ownership source/allegation for a relationship"
         behavior: plugin
         handler: ClientGroupAddOwnershipSourceOp
+        effect_class: read_modify_write
         invocation_phrases:
           - "add ownership source"
           - "record ownership from"
@@ -1296,6 +1317,7 @@ domains:
         description: "Mark an ownership source as verified"
         behavior: plugin
         handler: ClientGroupVerifyOwnershipOp
+        effect_class: read_modify_write
         invocation_phrases:
           - "verify ownership"
           - "confirm ownership"
@@ -1334,6 +1356,7 @@ domains:
         description: "Designate a source as the canonical value for a relationship"
         behavior: plugin
         handler: ClientGroupSetCanonicalOp
+        effect_class: read_modify_write
         invocation_phrases:
           - "set canonical"
           - "use this value"
@@ -1373,6 +1396,7 @@ domains:
         description: "List unverified ownership allegations needing review"
         behavior: plugin
         handler: ClientGroupListUnverifiedOp
+        effect_class: read_snapshot
         invocation_phrases:
           - "show unverified"
           - "list allegations"
@@ -1416,6 +1440,7 @@ domains:
         description: "List ownership relationships with conflicting source values"
         behavior: plugin
         handler: ClientGroupListDiscrepanciesOp
+        effect_class: read_snapshot
         invocation_phrases:
           - "show discrepancies"
           - "ownership conflicts"
@@ -1464,6 +1489,7 @@ domains:
         description: "Start discovery process for a client group"
         behavior: plugin
         handler: ClientGroupStartDiscoveryOp
+        effect_class: read_modify_write
         invocation_phrases:
           - "start discovery"
           - "begin research"
@@ -1513,6 +1539,7 @@ domains:
         description: "Mark discovery process as complete"
         behavior: plugin
         handler: ClientGroupCompleteDiscoveryOp
+        effect_class: read_modify_write
         invocation_phrases:
           - "complete discovery"
           - "finish research"

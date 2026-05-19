@@ -5,6 +5,7 @@ domains:
       invoke:
         flavour: attribute_mutating
         description: Invoke a single template with parameters
+        effect_class: read_modify_write
         metadata:
           tier: intent
           source_of_truth: catalog
@@ -48,6 +49,7 @@ domains:
       batch:
         flavour: attribute_mutating
         description: Execute template in batch over query results
+        effect_class: read_modify_write
         metadata:
           tier: intent
           source_of_truth: catalog

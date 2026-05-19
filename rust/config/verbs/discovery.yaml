@@ -7,6 +7,7 @@ domains:
       search-entities:
         flavour: attribute_mutating
         description: "Search entities by free text with optional entity-type narrowing"
+        effect_class: read_snapshot
         metadata:
           tier: diagnostics
           source_of_truth: operational
@@ -56,6 +57,7 @@ domains:
       entity-context:
         flavour: attribute_mutating
         description: "Return activity and context signals for a single entity"
+        effect_class: read_snapshot
         metadata:
           tier: diagnostics
           source_of_truth: operational
@@ -100,6 +102,7 @@ domains:
       entity-relationships:
         flavour: attribute_mutating
         description: "Return relationship graph summary for an entity"
+        effect_class: read_snapshot
         metadata:
           tier: diagnostics
           source_of_truth: operational
@@ -148,6 +151,7 @@ domains:
       cascade-research:
         flavour: attribute_mutating
         description: "Run search, context, and relationship discovery as one read-only research pass"
+        effect_class: read_snapshot
         metadata:
           tier: diagnostics
           source_of_truth: operational
@@ -192,6 +196,7 @@ domains:
       available-actions:
         flavour: attribute_mutating
         description: "Show the currently available action surface for a domain and entity type"
+        effect_class: read_snapshot
         metadata:
           tier: diagnostics
           source_of_truth: operational
@@ -240,6 +245,7 @@ domains:
       verb-detail:
         flavour: attribute_mutating
         description: "Return the full contract for a verb"
+        effect_class: read_snapshot
         metadata:
           tier: diagnostics
           source_of_truth: operational
@@ -273,6 +279,7 @@ domains:
       valid-transitions:
         flavour: attribute_mutating
         description: "Return verbs whose preconditions are currently satisfiable for the grounded entity state"
+        effect_class: read_snapshot
         metadata:
           tier: diagnostics
           source_of_truth: operational
@@ -316,6 +323,7 @@ domains:
       graph-walk:
         flavour: attribute_mutating
         description: "Walk applicable StateGraphs for an entity and return valid and blocked transitions"
+        effect_class: read_snapshot
         metadata:
           tier: diagnostics
           source_of_truth: operational
@@ -355,6 +363,7 @@ domains:
       inspect-data:
         flavour: attribute_mutating
         description: "Inspect entity-scoped data for a domain and optional aspect"
+        effect_class: read_snapshot
         metadata:
           tier: diagnostics
           source_of_truth: operational
@@ -408,6 +417,7 @@ domains:
       search-data:
         flavour: attribute_mutating
         description: "Search data and schema-adjacent surfaces for a scoped entity"
+        effect_class: read_snapshot
         metadata:
           tier: diagnostics
           source_of_truth: operational

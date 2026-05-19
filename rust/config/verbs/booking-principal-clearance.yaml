@@ -31,6 +31,7 @@ domains:
         flavour: instance_adding
         description: "Create a new booking-principal clearance row for (deal, booking_principal[, cbu]) — entry state PENDING"
         behavior: plugin
+        effect_class: read_modify_write
         metadata:
           tier: intent
           source_of_truth: operational
@@ -364,6 +365,7 @@ domains:
 
       revoke:
         flavour: discretionary
+        effect_class: admin_override
         role_guard:
           any_of: [compliance_admin, senior_compliance, mlro]
         audit_class: booking_principal_clearance_revoke

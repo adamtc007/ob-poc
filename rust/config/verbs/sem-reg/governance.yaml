@@ -27,6 +27,7 @@ domains:
       gate-precheck:
         flavour: attribute_mutating
         description: Gate precheck before submitting a changeset for review
+        effect_class: read_modify_write
         metadata:
           tier: diagnostics
           source_of_truth: operational
@@ -61,6 +62,7 @@ domains:
 
       submit-for-review:
         flavour: discretionary
+        effect_class: read_modify_write
         role_guard:
           any_of: [compliance_officer, senior_compliance, mlro]
         audit_class: governance_submit_for_review
@@ -99,6 +101,7 @@ domains:
 
       record-review:
         flavour: discretionary
+        effect_class: read_modify_write
         role_guard:
           any_of: [compliance_officer, senior_compliance, mlro]
         audit_class: governance_record_review
@@ -148,6 +151,7 @@ domains:
       # ============================================
       validate:
         flavour: discretionary
+        effect_class: read_modify_write
         role_guard:
           any_of: [compliance_officer, senior_compliance, mlro]
         audit_class: governance_validate
@@ -187,6 +191,7 @@ domains:
       dry-run:
         flavour: attribute_mutating
         description: Dry-run a changeset (Stage 2 scratch schema validation)
+        effect_class: read_snapshot
         metadata:
           tier: diagnostics
           source_of_truth: operational
@@ -224,6 +229,7 @@ domains:
       plan-publish:
         flavour: attribute_mutating
         description: Plan a publish operation (diff preview against active snapshot set)
+        effect_class: read_modify_write
         metadata:
           tier: diagnostics
           source_of_truth: operational
@@ -257,6 +263,7 @@ domains:
 
       publish:
         flavour: discretionary
+        effect_class: admin_override
         role_guard:
           any_of: [compliance_officer, senior_compliance, mlro]
         audit_class: governance_publish
@@ -299,6 +306,7 @@ domains:
 
       publish-batch:
         flavour: discretionary
+        effect_class: admin_override
         role_guard:
           any_of: [compliance_officer, senior_compliance, mlro]
         audit_class: governance_publish_batch
@@ -341,6 +349,7 @@ domains:
 
       rollback:
         flavour: discretionary
+        effect_class: admin_override
         role_guard:
           any_of: [compliance_admin, senior_compliance, mlro]
         audit_class: governance_rollback

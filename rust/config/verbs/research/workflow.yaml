@@ -19,6 +19,7 @@ domains:
 
       record-decision:
         flavour: discretionary
+        effect_class: append_fact
         role_guard:
           any_of: [compliance_admin, senior_compliance, mlro]
         audit_class: research_workflow_record_decision
@@ -108,6 +109,7 @@ domains:
             baseline: reviewable
       confirm-decision:
         flavour: discretionary
+        effect_class: read_modify_write
         role_guard:
           any_of: [compliance_admin, senior_compliance, mlro]
         audit_class: research_workflow_confirm_decision
@@ -148,6 +150,7 @@ domains:
             baseline: reviewable
       reject-decision:
         flavour: discretionary
+        effect_class: read_modify_write
         role_guard:
           any_of: [compliance_officer, senior_compliance, mlro]
         audit_class: research_workflow_reject_decision
@@ -188,6 +191,7 @@ domains:
       record-action:
         flavour: instance_adding
         description: "Record a research action (Phase 2 execution)"
+        effect_class: append_fact
         metadata:
           tier: intent
           source_of_truth: workflow
@@ -292,6 +296,7 @@ domains:
       record-correction:
         flavour: instance_adding
         description: "Record a correction to a previous decision"
+        effect_class: append_fact
         invocation_phrases:
           - "correct this"
           - "fix the mistake"
@@ -360,6 +365,7 @@ domains:
       record-anomaly:
         flavour: instance_adding
         description: "Record a post-import validation anomaly"
+        effect_class: append_fact
         metadata:
           tier: intent
           source_of_truth: workflow
@@ -475,6 +481,7 @@ domains:
       audit-trail:
         flavour: attribute_mutating
         description: "Get research audit trail for an entity including import run history"
+        effect_class: read_snapshot
         invocation_phrases:
           - "show audit trail"
           - "what research was done"
@@ -535,6 +542,7 @@ domains:
       supersession-trail:
         flavour: attribute_mutating
         description: "Get the full supersession chain for a KYC case — import runs, corrections, stale UBO runs, reset outreach plans, stale tollgates"
+        effect_class: read_snapshot
         invocation_phrases:
           - "show supersession trail"
           - "what was superseded"

@@ -180,6 +180,7 @@ domains:
       list:
         flavour: attribute_mutating
         description: List cash sweep configurations for CBU
+        effect_class: read_snapshot
         metadata:
           tier: reference
           source_of_truth: operational
@@ -478,6 +479,7 @@ domains:
       remove:
         flavour: attribute_mutating
         description: Remove cash sweep configuration
+        effect_class: read_modify_write
         metadata:
           tier: intent
           source_of_truth: operational

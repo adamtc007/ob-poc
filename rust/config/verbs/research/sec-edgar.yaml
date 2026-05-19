@@ -18,6 +18,7 @@ domains:
       search:
         flavour: attribute_mutating
         description: Search SEC EDGAR for companies by name
+        effect_class: read_snapshot
         invocation_phrases:
           - "search SEC"
           - "find US public company"
@@ -54,6 +55,7 @@ domains:
       fetch-company:
         flavour: attribute_mutating
         description: Fetch company information from SEC EDGAR
+        effect_class: read_snapshot
         invocation_phrases:
           - "get SEC company"
           - "fetch from EDGAR"
@@ -89,6 +91,7 @@ domains:
       fetch-beneficial-owners:
         flavour: attribute_mutating
         description: Fetch 13D/13G beneficial ownership filings
+        effect_class: read_snapshot
         invocation_phrases:
           - "get 13D filings"
           - "13G beneficial owners"
@@ -139,6 +142,7 @@ domains:
       fetch-filings:
         flavour: attribute_mutating
         description: Fetch recent SEC filings for a company
+        effect_class: read_snapshot
         invocation_phrases:
           - "get SEC filings"
           - "recent EDGAR filings"
@@ -179,6 +183,7 @@ domains:
       import-company:
         flavour: instance_adding
         description: Import SEC company and optionally beneficial owners to database
+        effect_class: read_snapshot
         invocation_phrases:
           - "import from SEC"
           - "add US company to database"

@@ -884,6 +884,7 @@ domains:
       list-by-holding:
         flavour: attribute_mutating
         description: List movements for a holding
+        effect_class: read_snapshot
         metadata:
           tier: reference
           source_of_truth: register

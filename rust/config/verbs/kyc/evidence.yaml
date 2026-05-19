@@ -13,6 +13,7 @@ domains:
       create-requirement:
         flavour: instance_adding
         description: "Create a new evidence requirement for a UBO registry entry"
+        effect_class: read_modify_write
         invocation_phrases:
           - "require evidence"
           - "add evidence requirement"
@@ -71,6 +72,7 @@ domains:
       attach-document:
         flavour: instance_adding
         description: "Link a document to an evidence record"
+        effect_class: read_modify_write
         invocation_phrases:
           - "link evidence"
           - "attach document to evidence"
@@ -155,6 +157,7 @@ domains:
 
       mark-rejected:
         flavour: discretionary
+        effect_class: admin_override
         role_guard:
           any_of: [compliance_officer, senior_compliance, mlro]
         audit_class: evidence_mark_rejected
@@ -197,6 +200,7 @@ domains:
 
       mark-waived:
         flavour: discretionary
+        effect_class: read_modify_write
         role_guard:
           any_of: [compliance_admin, senior_compliance, mlro]
         audit_class: evidence_mark_waived

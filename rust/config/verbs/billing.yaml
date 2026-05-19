@@ -18,6 +18,7 @@ domains:
         flavour: instance_adding
         description: "Create a fee billing profile - bridges commercial to operational"
         behavior: plugin
+        effect_class: read_modify_write
         lifecycle:
           precondition_checks:
             - "requires_prior:deal.create"
@@ -226,6 +227,7 @@ domains:
 
       close-profile:
         flavour: discretionary
+        effect_class: admin_override
         role_guard:
           any_of: [compliance_admin, senior_compliance, mlro]
         audit_class: billing_close_profile
@@ -373,6 +375,7 @@ domains:
         flavour: instance_adding
         description: "Link a CBU resource instance (account) to a billing profile"
         behavior: plugin
+        effect_class: read_modify_write
         lifecycle:
           precondition_checks:
             - "requires_prior:billing.create-profile"
@@ -451,6 +454,7 @@ domains:
         flavour: attribute_mutating
         description: "Soft-remove an account target from billing"
         behavior: plugin
+        effect_class: read_modify_write
         metadata:
           tier: intent
           source_of_truth: operational
@@ -534,6 +538,7 @@ domains:
         flavour: instance_adding
         description: "Create a billing period for calculation"
         behavior: plugin
+        effect_class: read_modify_write
         lifecycle:
           precondition_checks:
             - "requires_prior:billing.create-profile"
@@ -847,6 +852,7 @@ domains:
         flavour: attribute_mutating
         description: "Get billing period with line-level detail"
         behavior: plugin
+        effect_class: read_snapshot
         metadata:
           tier: intent
           source_of_truth: operational
@@ -884,6 +890,7 @@ domains:
         flavour: attribute_mutating
         description: "Revenue summary across deals, periods, products"
         behavior: plugin
+        effect_class: read_snapshot
         metadata:
           tier: intent
           source_of_truth: operational

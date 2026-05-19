@@ -158,6 +158,7 @@ domains:
       list-controllers:
         flavour: attribute_mutating
         description: List who controls an entity
+        effect_class: read_snapshot
         invocation_phrases:
           - "list controllers"
           - "show controllers"
@@ -207,6 +208,7 @@ domains:
       list-controlled:
         flavour: attribute_mutating
         description: List what an entity controls
+        effect_class: read_snapshot
         invocation_phrases:
           - "list controlled entities"
           - "what do they control"
@@ -264,6 +266,7 @@ domains:
           Comprehensive control analysis for any entity type.
           Routes to appropriate analyzer based on entity_type.
           Aggregates all control vectors: ownership, board, trust, partnership.
+        effect_class: read_snapshot
         invocation_phrases:
           - "analyze control for entity"
           - "run control analysis"
@@ -337,6 +340,7 @@ domains:
           Build full control graph for a CBU.
           Nodes: entities, persons, positions
           Edges: OWNS, CONTROLS, APPOINTS, INFLUENCES, HOLDS_POSITION
+        effect_class: read_snapshot
         invocation_phrases:
           - "build control graph"
           - "generate ownership graph for CBU"
@@ -408,6 +412,7 @@ domains:
           - Board majority control
           - Trust control (trustee discretion, appointor power)
           - Partnership GP control
+        effect_class: read_snapshot
         invocation_phrases:
           - "identify UBOs across all control vectors"
           - "run UBO identification for this CBU"
@@ -485,6 +490,7 @@ domains:
           Show the computed board controller for a CBU.
           Returns the natural person or entity that controls the board,
           with derivation explanation, confidence level, and data gaps.
+        effect_class: read_snapshot
         invocation_phrases:
           - "show board controller"
           - "board controller for"
@@ -561,6 +567,7 @@ domains:
           Recompute the board controller for a CBU.
           Traverses ownership/control graph, analyzes board compositions,
           and determines who has effective control.
+        effect_class: read_modify_write
         invocation_phrases:
           - "recompute board controller"
           - "recalculate board controller"
@@ -632,6 +639,7 @@ domains:
           Manually set the board controller for a CBU.
           Creates an override that takes precedence over computed values.
           Requires justification and evidence document.
+        effect_class: read_modify_write
         invocation_phrases:
           - "set board controller"
           - "override board controller"
@@ -707,6 +715,7 @@ domains:
             baseline: requires_confirmation
       clear-board-controller-override:
         flavour: discretionary
+        effect_class: read_modify_write
         role_guard:
           any_of: [senior_compliance, mlro, executive, board]
         audit_class: control_clear_board_controller_override
@@ -767,6 +776,7 @@ domains:
         description: |
           Import board controller data from a PSC (Persons with Significant Control) register.
           Supports UK Companies House PSC format.
+        effect_class: read_snapshot
         invocation_phrases:
           - "import psc register"
           - "import persons with significant control"
@@ -845,6 +855,7 @@ domains:
           Loads CONTROL and MANAGEMENT edges, applies priority ordering,
           bridges to cbu_entity_roles for officers, and outputs controller
           candidates with control_type and basis.
+        effect_class: read_snapshot
         invocation_phrases:
           - "compute controllers"
           - "derive governance controllers"
@@ -909,6 +920,7 @@ domains:
         description: |
           Import control data from GLEIF (Global LEI Foundation).
           Uses the LEI-RR (Relationship Record) data for parent/child control.
+        effect_class: read_snapshot
         invocation_phrases:
           - "import gleif control"
           - "import lei control data"

@@ -10,6 +10,7 @@ domains:
       create:
         flavour: instance_adding
         description: "Create a new team with delegated authority"
+        effect_class: append_fact
         invocation_phrases:
           - "create team"
           - "new team"
@@ -254,6 +255,7 @@ domains:
       remove-member:
         flavour: attribute_mutating
         description: "Remove user from team (specific role)"
+        effect_class: read_modify_write
         invocation_phrases:
           - "remove team member"
           - "remove member from team"
@@ -355,6 +357,7 @@ domains:
       transfer-member:
         flavour: attribute_mutating
         description: "Move user from one team to another (end old, create new)"
+        effect_class: read_modify_write
         invocation_phrases:
           - "transfer team member"
           - "move member to another team"
@@ -588,6 +591,7 @@ domains:
       remove-cbu-access:
         flavour: attribute_mutating
         description: "Remove CBU from team's access"
+        effect_class: read_modify_write
         invocation_phrases:
           - "revoke CBU access"
           - "remove CBU access from team"
@@ -690,6 +694,7 @@ domains:
             baseline: reviewable
       revoke-service:
         flavour: discretionary
+        effect_class: read_modify_write
         role_guard:
           any_of: [compliance_admin, senior_compliance, mlro]
         audit_class: team_revoke_service
@@ -745,6 +750,7 @@ domains:
       list-members:
         flavour: attribute_mutating
         description: "List team members"
+        effect_class: read_snapshot
         invocation_phrases:
           - "list team members"
           - "show team members"
@@ -789,6 +795,7 @@ domains:
       list-cbus:
         flavour: attribute_mutating
         description: "List CBUs team can access"
+        effect_class: read_snapshot
         invocation_phrases:
           - "list team CBUs"
           - "show team CBU access"
@@ -842,6 +849,7 @@ domains:
       create:
         flavour: instance_adding
         description: "Create portal user"
+        effect_class: append_fact
         invocation_phrases:
           - "create user"
           - "new user"
@@ -1043,6 +1051,7 @@ domains:
       list-teams:
         flavour: attribute_mutating
         description: "List user's team memberships"
+        effect_class: read_snapshot
         invocation_phrases:
           - "list user teams"
           - "show user teams"
@@ -1081,6 +1090,7 @@ domains:
       list-cbus:
         flavour: attribute_mutating
         description: "List all CBUs user can access"
+        effect_class: read_snapshot
         invocation_phrases:
           - "list user CBUs"
           - "show user CBU access"

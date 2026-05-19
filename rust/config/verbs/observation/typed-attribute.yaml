@@ -5,6 +5,7 @@ domains:
       record:
         flavour: instance_adding
         description: Record a typed attribute value for an entity
+        effect_class: append_fact
         metadata:
           tier: intent
           source_of_truth: operational
@@ -119,6 +120,7 @@ domains:
       list-for-entity:
         flavour: attribute_mutating
         description: List all typed attribute values for an entity
+        effect_class: read_snapshot
         metadata:
           tier: reference
           source_of_truth: operational

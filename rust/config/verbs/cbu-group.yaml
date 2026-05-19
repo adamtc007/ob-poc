@@ -5,6 +5,7 @@ domains:
       remove-member:
         flavour: attribute_mutating
         description: Remove or terminate CBU group memberships for a CBU
+        effect_class: read_modify_write
         invocation_phrases:
           - "remove cbu from group"
           - "terminate cbu group membership"

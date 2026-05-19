@@ -12,6 +12,7 @@ domains:
         flavour: attribute_mutating
         description: "Compile BPMN XML to bytecode via bpmn-lite"
         behavior: plugin
+        effect_class: read_snapshot
         metadata:
           tier: composite
           source_of_truth: external
@@ -41,6 +42,7 @@ domains:
         flavour: instance_adding
         description: "Start a BPMN process instance"
         behavior: plugin
+        effect_class: read_modify_write
         metadata:
           tier: composite
           source_of_truth: external
@@ -74,6 +76,7 @@ domains:
         flavour: attribute_mutating
         description: "Send a signal to a running BPMN process instance"
         behavior: plugin
+        effect_class: read_modify_write
         metadata:
           tier: composite
           source_of_truth: external
@@ -109,6 +112,7 @@ domains:
         flavour: attribute_mutating
         description: "Cancel a running BPMN process instance"
         behavior: plugin
+        effect_class: read_modify_write
         metadata:
           tier: composite
           source_of_truth: external
@@ -141,6 +145,7 @@ domains:
         flavour: attribute_mutating
         description: "Inspect a running BPMN process instance"
         behavior: plugin
+        effect_class: read_snapshot
         metadata:
           tier: composite
           source_of_truth: external

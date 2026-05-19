@@ -11,6 +11,7 @@ domains:
         description: List unresolved remediation events, optionally filtered by entity or workspace
         behavior: plugin
         handler: RemediationListOpenOp
+        effect_class: read_snapshot
         metadata:
           tier: diagnostics
           source_of_truth: sem_reg
@@ -51,6 +52,7 @@ domains:
         description: Explicitly accept divergence from a superseded shared attribute version
         behavior: plugin
         handler: RemediationDeferOp
+        effect_class: read_modify_write
         metadata:
           tier: governance
           source_of_truth: sem_reg
@@ -87,6 +89,7 @@ domains:
 
       revoke-deferral:
         flavour: discretionary
+        effect_class: read_modify_write
         role_guard:
           any_of: [compliance_admin, senior_compliance, mlro]
         audit_class: remediation_revoke_deferral
@@ -127,6 +130,7 @@ domains:
         description: Record that a manual external correction has been confirmed by the provider
         behavior: plugin
         handler: RemediationConfirmExternalOp
+        effect_class: read_modify_write
         metadata:
           tier: governance
           source_of_truth: sem_reg

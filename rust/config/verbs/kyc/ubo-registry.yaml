@@ -13,6 +13,7 @@ domains:
       create:
         flavour: instance_adding
         description: "Create a new UBO registry allegation"
+        effect_class: append_fact
         invocation_phrases:
           - "create ubo allegation"
           - "record beneficial owner allegation"
@@ -96,6 +97,7 @@ domains:
 
       promote:
         flavour: discretionary
+        effect_class: admin_override
         role_guard:
           any_of: [compliance_admin, senior_compliance, mlro]
         audit_class: ubo_registry_promote
@@ -189,6 +191,7 @@ domains:
 
       waive:
         flavour: discretionary
+        effect_class: read_modify_write
         role_guard:
           any_of: [compliance_admin, senior_compliance, mlro]
         audit_class: ubo_registry_waive
@@ -231,6 +234,7 @@ domains:
 
       reject:
         flavour: discretionary
+        effect_class: admin_override
         role_guard:
           any_of: [compliance_officer, senior_compliance, mlro]
         audit_class: ubo_registry_reject
@@ -273,6 +277,7 @@ domains:
 
       expire:
         flavour: discretionary
+        effect_class: admin_override
         role_guard:
           any_of: [compliance_admin, senior_compliance, mlro]
         audit_class: ubo_registry_expire

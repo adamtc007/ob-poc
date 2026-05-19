@@ -12,6 +12,7 @@ domains:
         flavour: instance_adding
         description: "Create a new booking location (jurisdictional perimeter)"
         behavior: plugin
+        effect_class: read_modify_write
         metadata:
           tier: intent
           source_of_truth: operational
@@ -58,6 +59,7 @@ domains:
         flavour: attribute_mutating
         description: "Update a booking location's fields"
         behavior: plugin
+        effect_class: read_modify_write
         metadata:
           tier: intent
           source_of_truth: operational
@@ -94,6 +96,7 @@ domains:
         flavour: attribute_mutating
         description: "List all booking locations"
         behavior: plugin
+        effect_class: read_snapshot
         metadata:
           tier: intent
           source_of_truth: operational

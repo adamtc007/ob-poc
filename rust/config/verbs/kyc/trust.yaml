@@ -262,6 +262,7 @@ domains:
       list-provisions:
         flavour: attribute_mutating
         description: List all provisions for a trust
+        effect_class: read_snapshot
         metadata:
           tier: reference
           source_of_truth: operational
@@ -313,6 +314,7 @@ domains:
       list-by-holder:
         flavour: attribute_mutating
         description: List all trust provisions held by an entity
+        effect_class: read_snapshot
         metadata:
           tier: reference
           source_of_truth: operational
@@ -366,6 +368,7 @@ domains:
           - Appointor with trustee removal = control
           - Protector with veto = influence
           - Settlor with reserved powers = control
+        effect_class: read_snapshot
         metadata:
           tier: intent
           source_of_truth: operational
@@ -424,6 +427,7 @@ domains:
             - Settlor (if reserved powers)
             - Trustee with absolute discretion
             - Appointor/Protector with removal power
+        effect_class: read_modify_write
         metadata:
           tier: intent
           source_of_truth: operational
@@ -482,6 +486,7 @@ domains:
             - ACCUMULATION: Income can be accumulated
             - PURPOSE: Non-charitable purpose trust
             - CHARITABLE: Charitable trust
+        effect_class: read_modify_write
         metadata:
           tier: intent
           source_of_truth: operational

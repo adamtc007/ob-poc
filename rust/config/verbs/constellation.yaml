@@ -10,6 +10,7 @@ domains:
         description: Hydrate a full constellation with reducer states and action surfaces
         behavior: plugin
         handler: ConstellationHydrateOp
+        effect_class: read_snapshot
         metadata:
           tier: diagnostics
           source_of_truth: operational
@@ -52,6 +53,7 @@ domains:
         description: Constellation summary counts
         behavior: plugin
         handler: ConstellationSummaryOp
+        effect_class: read_snapshot
         metadata:
           tier: diagnostics
           source_of_truth: operational

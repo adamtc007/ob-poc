@@ -91,6 +91,7 @@ domains:
       list:
         flavour: attribute_mutating
         description: "List all service intents for a CBU"
+        effect_class: read_snapshot
         metadata:
           tier: diagnostics
           source_of_truth: operational
@@ -131,6 +132,7 @@ domains:
       supersede:
         flavour: attribute_mutating
         description: "Supersede an existing service intent with new options"
+        effect_class: read_modify_write
         metadata:
           tier: intent
           source_of_truth: operational
@@ -255,6 +257,7 @@ domains:
 
       cancel:
         flavour: discretionary
+        effect_class: admin_override
         role_guard:
           any_of: [compliance_admin, senior_compliance, mlro]
         audit_class: service_intent_cancel
@@ -356,6 +359,7 @@ domains:
       explain:
         flavour: attribute_mutating
         description: "Explain why specific SRDEFs were discovered"
+        effect_class: read_snapshot
         metadata:
           tier: diagnostics
           source_of_truth: operational
@@ -685,6 +689,7 @@ domains:
       status:
         flavour: attribute_mutating
         description: "Check provisioning request status"
+        effect_class: read_modify_write
         metadata:
           tier: diagnostics
           source_of_truth: operational
@@ -723,6 +728,7 @@ domains:
       compute:
         flavour: attribute_mutating
         description: "Compute service readiness - determines 'good to transact' status"
+        effect_class: read_modify_write
         metadata:
           tier: composite
           source_of_truth: operational
@@ -767,6 +773,7 @@ domains:
       explain:
         flavour: attribute_mutating
         description: "Explain blocking reasons for a service"
+        effect_class: read_snapshot
         metadata:
           tier: diagnostics
           source_of_truth: operational
@@ -821,6 +828,7 @@ domains:
       full:
         flavour: attribute_mutating
         description: "Run the entire pipeline: discovery -> rollup -> populate -> provision -> readiness"
+        effect_class: read_modify_write
         metadata:
           tier: composite
           source_of_truth: operational

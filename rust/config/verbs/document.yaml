@@ -26,6 +26,7 @@ domains:
         flavour: instance_adding
         description: Solicit a single document from an entity and track through to fulfillment
         behavior: durable
+        effect_class: external_effect
         durable:
           runtime: bpmn-lite
           process_key: kyc-document-request
@@ -151,6 +152,7 @@ domains:
         flavour: instance_adding
         description: Solicit multiple documents from an entity and track through to fulfillment
         behavior: durable
+        effect_class: external_effect
         durable:
           runtime: bpmn-lite
           process_key: kyc-document-request-set
@@ -632,6 +634,7 @@ domains:
       list-requests-by-workstream:
         flavour: attribute_mutating
         description: List document requests for a workstream.
+        effect_class: read_snapshot
         metadata:
           tier: reference
           source_of_truth: operational
@@ -686,6 +689,7 @@ domains:
         flavour: attribute_mutating
         description: Catalog a document with type lookup (legacy - prefer document.create)
         behavior: plugin
+        effect_class: read_modify_write
         invocation_phrases:
           - catalog document
           - add document to catalog
@@ -744,6 +748,7 @@ domains:
         flavour: attribute_mutating
         description: Extract data from document using AI/OCR
         behavior: plugin
+        effect_class: read_modify_write
         invocation_phrases:
           - extract document data
           - OCR document
@@ -781,6 +786,7 @@ domains:
         flavour: instance_adding
         description: Create a document record (Layer B - logical identity)
         behavior: crud
+        effect_class: append_fact
         invocation_phrases:
           - create document
           - add document record
@@ -861,6 +867,7 @@ domains:
         flavour: instance_adding
         description: Upload a new version of a document (Layer C - immutable submission)
         behavior: plugin
+        effect_class: read_modify_write
         invocation_phrases:
           - upload document
           - upload version
@@ -923,6 +930,7 @@ domains:
         flavour: attribute_mutating
         description: QA approves a document version
         behavior: plugin
+        effect_class: read_snapshot
         invocation_phrases:
           - verify document
           - approve document
@@ -971,6 +979,7 @@ domains:
 
       reject:
         flavour: discretionary
+        effect_class: admin_override
         role_guard:
           any_of: [compliance_officer, senior_compliance, mlro]
         audit_class: document_reject
@@ -1238,6 +1247,7 @@ domains:
         flavour: attribute_mutating
         description: List missing document requirements for an entity
         behavior: plugin
+        effect_class: read_modify_write
         invocation_phrases:
           - what documents are missing
           - missing documents for entity
@@ -1303,6 +1313,7 @@ domains:
         flavour: attribute_mutating
         description: Compute governed document requirement matrix for an entity
         behavior: plugin
+        effect_class: read_snapshot
         invocation_phrases:
           - compute document requirements
           - show governed document requirements

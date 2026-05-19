@@ -424,6 +424,7 @@ domains:
       list-by-product:
         flavour: attribute_mutating
         description: List services for a product
+        effect_class: read_snapshot
         metadata:
           tier: reference
           source_of_truth: catalog
@@ -476,6 +477,7 @@ domains:
       declare-option:
         flavour: attribute_mutating
         description: Declare or update a version-scoped service option definition
+        effect_class: read_modify_write
         invocation_phrases:
           - "declare service option"
           - "add service option"
@@ -536,6 +538,7 @@ domains:
       constrain-option-values:
         flavour: attribute_mutating
         description: Set allowed values on a service option definition
+        effect_class: read_modify_write
         invocation_phrases:
           - "constrain service option values"
           - "set allowed service option values"
@@ -577,6 +580,7 @@ domains:
       bind-option-source:
         flavour: attribute_mutating
         description: Bind a service option definition to a source kind and path
+        effect_class: read_modify_write
         invocation_phrases:
           - "bind service option source"
           - "set service option source"
@@ -624,6 +628,7 @@ domains:
       deprecate-option:
         flavour: attribute_mutating
         description: Deprecate a service option definition
+        effect_class: read_modify_write
         invocation_phrases:
           - "deprecate service option"
           - "retire service option definition"

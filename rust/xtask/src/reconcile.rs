@@ -154,6 +154,7 @@ async fn validate(strict_warnings: bool) -> Result<()> {
 
     let ctx = ValidationContext {
         require_declaration: false,
+        require_effect_class: true, // T08: all verbs now have effect_class; fail closed
         known_slots: known_slots.clone(),
         ..ValidationContext::default()
     };

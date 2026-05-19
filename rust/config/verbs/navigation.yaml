@@ -117,6 +117,7 @@ domains:
         description: "Change cluster grouping mode (jurisdiction, client, risk, product)"
         behavior: plugin
         handler: NavSetClusterTypeOp
+        effect_class: read_snapshot
         invocation_phrases:
           - "group by"
           - "cluster by"
@@ -148,6 +149,7 @@ domains:
         description: "Change observation lens (overlay, depth probe, filters)"
         behavior: plugin
         handler: NavSetLensOp
+        effect_class: read_snapshot
         invocation_phrases:
           - "show drafts"
           - "show active only"

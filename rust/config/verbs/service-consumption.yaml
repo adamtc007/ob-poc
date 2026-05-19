@@ -158,6 +158,7 @@ domains:
 
       begin-winddown:
         flavour: discretionary
+        effect_class: admin_override
         role_guard:
           any_of: [compliance_admin, senior_compliance, mlro]
         audit_class: service_consumption_begin_winddown
@@ -195,6 +196,7 @@ domains:
 
       retire:
         flavour: discretionary
+        effect_class: admin_override
         role_guard:
           any_of: [compliance_admin, senior_compliance, mlro]
         audit_class: service_consumption_retire

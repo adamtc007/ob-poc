@@ -11,6 +11,7 @@ domains:
       create:
         flavour: instance_adding
         description: Create a new Client Business Unit (idempotent by fund-entity-id if provided)
+        effect_class: read_modify_write
         invocation_phrases:
           - "create CBU"
           - "new CBU"
@@ -434,6 +435,7 @@ domains:
             baseline: reviewable
       delete:
         flavour: discretionary
+        effect_class: admin_override
         role_guard:
           any_of: [compliance_admin, senior_compliance, mlro]
         audit_class: cbu_delete
@@ -484,6 +486,7 @@ domains:
 
       delete-cascade:
         flavour: discretionary
+        effect_class: admin_override
         role_guard:
           any_of: [compliance_admin, senior_compliance, mlro]
         audit_class: cbu_delete_cascade
@@ -750,6 +753,7 @@ domains:
       assign-role:
         flavour: instance_adding
         description: Assign a role to an entity within a CBU
+        effect_class: read_modify_write
         invocation_phrases:
           - "assign role to entity"
           - "give role in CBU"
@@ -848,6 +852,7 @@ domains:
       link-structure:
         flavour: instance_adding
         description: Persist a parent-child structure link between two CBUs
+        effect_class: read_modify_write
         invocation_phrases:
           - "link CBU structure"
           - "link parallel fund"
@@ -912,6 +917,7 @@ domains:
       list-structure-links:
         flavour: attribute_mutating
         description: List persisted structure links for a parent or child CBU
+        effect_class: read_snapshot
         invocation_phrases:
           - "list CBU structure links"
           - "show feeder links"
@@ -974,6 +980,7 @@ domains:
       unlink-structure:
         flavour: attribute_mutating
         description: Terminate an active parent-child structure link between two CBUs
+        effect_class: read_modify_write
         invocation_phrases:
           - "unlink CBU structure"
           - "terminate feeder link"
@@ -1010,6 +1017,7 @@ domains:
       remove-role:
         flavour: attribute_mutating
         description: Remove a specific role from an entity within a CBU
+        effect_class: read_modify_write
         invocation_phrases:
           - "remove role from CBU"
           - "unassign role"
@@ -1073,6 +1081,7 @@ domains:
       parties:
         flavour: attribute_mutating
         description: List all parties (entities with their roles) for a CBU
+        effect_class: read_snapshot
         invocation_phrases:
           - "show parties in CBU"
           - "list entities in CBU"
@@ -1182,6 +1191,7 @@ domains:
       inspect:
         flavour: attribute_mutating
         description: Inspect full CBU structure including entities, roles, documents, screenings
+        effect_class: read_snapshot
         invocation_phrases:
           - "inspect CBU"
           - "inspect CBU structure"
@@ -1236,6 +1246,7 @@ domains:
       add-product:
         flavour: instance_adding
         description: Add a product to a CBU and derive service intents for its service-resource lifecycle
+        effect_class: read_modify_write
         invocation_phrases:
           - "add product to CBU"
           - "assign product to structure"
@@ -1308,6 +1319,7 @@ domains:
       remove-product:
         flavour: attribute_mutating
         description: Remove a product from a CBU (deletes service_delivery_map entries)
+        effect_class: read_modify_write
         invocation_phrases:
           - "remove product from CBU"
           - "unsubscribe CBU from product"
@@ -1410,6 +1422,7 @@ domains:
 
       decide:
         flavour: discretionary
+        effect_class: admin_override
         role_guard:
           any_of: [compliance_officer, senior_compliance, mlro]
         audit_class: cbu_decide
@@ -1615,6 +1628,7 @@ domains:
       attach-evidence:
         flavour: instance_adding
         description: Attach evidence (document or attestation) to CBU
+        effect_class: append_fact
         invocation_phrases:
           - "attach evidence to CBU"
           - "add document to CBU"
@@ -1762,6 +1776,7 @@ domains:
       list-evidence:
         flavour: attribute_mutating
         description: List evidence for a CBU
+        effect_class: read_snapshot
         invocation_phrases:
           - "list CBU evidence"
           - "show evidence for CBU"
@@ -1817,6 +1832,7 @@ domains:
       create-from-client-group:
         flavour: instance_adding
         description: Generate DSL batch to create CBUs from client group entities (stages in runbook)
+        effect_class: read_modify_write
         invocation_phrases:
           - "create CBUs from client group"
           - "bulk create CBUs for funds"
@@ -2071,6 +2087,7 @@ domains:
 
       begin-winding-down:
         flavour: discretionary
+        effect_class: admin_override
         role_guard:
           any_of: [compliance_admin, senior_compliance, mlro]
         audit_class: cbu_begin_winding_down
@@ -2114,6 +2131,7 @@ domains:
 
       complete-offboard:
         flavour: discretionary
+        effect_class: admin_override
         role_guard:
           any_of: [compliance_admin, senior_compliance, mlro]
         audit_class: cbu_complete_offboard
@@ -2228,6 +2246,7 @@ domains:
 
       hard-delete:
         flavour: discretionary
+        effect_class: admin_override
         role_guard:
           any_of: [compliance_admin, senior_compliance, mlro]
         audit_class: cbu_hard_delete
@@ -2342,6 +2361,7 @@ domains:
       bind-service-options:
         flavour: attribute_mutating
         description: Bind current service options for a CBU service subscription
+        effect_class: read_modify_write
         invocation_phrases:
           - "bind service options"
           - "bind CBU service options"
@@ -2387,6 +2407,7 @@ domains:
       override-option-binding:
         flavour: attribute_mutating
         description: Supersede one CBU option binding with a manual value
+        effect_class: read_modify_write
         invocation_phrases:
           - "override CBU option binding"
           - "override service option binding"
@@ -2434,6 +2455,7 @@ domains:
       validate-option-coverage:
         flavour: attribute_mutating
         description: Validate required service option bindings for a CBU service
+        effect_class: read_snapshot
         invocation_phrases:
           - "validate service option coverage"
           - "check CBU service option coverage"
@@ -2468,6 +2490,7 @@ domains:
       dirty-flag-bindings:
         flavour: attribute_mutating
         description: Mark current CBU option bindings dirty after source changes
+        effect_class: read_modify_write
         invocation_phrases:
           - "dirty flag option bindings"
           - "mark service option bindings dirty"
@@ -2503,6 +2526,7 @@ domains:
       recompute-bindings:
         flavour: attribute_mutating
         description: Mark dirty CBU option bindings clean after recomputation
+        effect_class: read_modify_write
         invocation_phrases:
           - "recompute service option bindings"
           - "clean dirty option bindings"
@@ -2535,6 +2559,7 @@ domains:
       compute-resource-fanout:
         flavour: attribute_mutating
         description: Compute the resource fan-out plan from CBU option bindings
+        effect_class: read_snapshot
         invocation_phrases:
           - "compute resource fanout"
           - "show resource fanout plan"

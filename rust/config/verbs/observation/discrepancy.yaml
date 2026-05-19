@@ -5,6 +5,7 @@ domains:
       record:
         flavour: instance_adding
         description: Record a discrepancy between observations
+        effect_class: append_fact
         metadata:
           tier: intent
           source_of_truth: operational

@@ -5,6 +5,7 @@ domains:
       raise:
         flavour: instance_adding
         description: Raise a new red flag
+        effect_class: append_fact
         metadata:
           tier: intent
           source_of_truth: operational
@@ -110,6 +111,7 @@ domains:
             baseline: requires_confirmation
       escalate:
         flavour: discretionary
+        effect_class: admin_override
         role_guard:
           any_of: [compliance_officer, senior_compliance, mlro]
         audit_class: red_flag_escalate
@@ -494,6 +496,7 @@ domains:
       list-by-case:
         flavour: attribute_mutating
         description: List red flags for a case
+        effect_class: read_snapshot
         metadata:
           tier: reference
           source_of_truth: operational
@@ -545,6 +548,7 @@ domains:
       list-by-workstream:
         flavour: attribute_mutating
         description: List red flags for a workstream
+        effect_class: read_snapshot
         metadata:
           tier: reference
           source_of_truth: operational

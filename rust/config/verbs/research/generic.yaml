@@ -15,6 +15,7 @@ domains:
           Takes a source name and raw JSON payload, validates against
           config schema, produces canonical JSON with SHA-256 content hash.
           Persists the normalized payload for audit and deduplication.
+        effect_class: read_snapshot
         invocation_phrases:
           - "normalize research payload"
           - "normalize source data"

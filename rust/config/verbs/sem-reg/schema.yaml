@@ -33,6 +33,7 @@ domains:
       domain.describe:
         flavour: attribute_mutating
         description: Describe a data-management domain from structure semantics
+        effect_class: read_snapshot
         metadata:
           tier: diagnostics
           source_of_truth: operational
@@ -69,6 +70,7 @@ domains:
       entity.describe:
         flavour: attribute_mutating
         description: Describe an entity type with fields, relationships, and available verbs
+        effect_class: read_snapshot
         metadata:
           tier: intent
           source_of_truth: operational
@@ -106,6 +108,7 @@ domains:
       entity.list-fields:
         flavour: attribute_mutating
         description: List fields for an entity type from registry or ontology metadata
+        effect_class: read_snapshot
         metadata:
           tier: diagnostics
           source_of_truth: operational
@@ -142,6 +145,7 @@ domains:
       entity.list-relationships:
         flavour: attribute_mutating
         description: List relationships for an entity type from ontology metadata
+        effect_class: read_snapshot
         metadata:
           tier: diagnostics
           source_of_truth: operational
@@ -177,6 +181,7 @@ domains:
       entity.list-verbs:
         flavour: attribute_mutating
         description: List DSL verbs available for an entity type's domain
+        effect_class: read_snapshot
         metadata:
           tier: diagnostics
           source_of_truth: operational
@@ -216,6 +221,7 @@ domains:
       introspect:
         flavour: attribute_mutating
         description: Introspect database schema (tables, columns, foreign keys)
+        effect_class: read_snapshot
         metadata:
           tier: diagnostics
           source_of_truth: operational
@@ -265,6 +271,7 @@ domains:
       extract-attributes:
         flavour: attribute_mutating
         description: Extract attribute definitions from schema columns
+        effect_class: read_snapshot
         metadata:
           tier: diagnostics
           source_of_truth: operational
@@ -308,6 +315,7 @@ domains:
       extract-verbs:
         flavour: attribute_mutating
         description: Extract verb contracts from YAML config
+        effect_class: read_snapshot
         metadata:
           tier: diagnostics
           source_of_truth: operational
@@ -353,6 +361,7 @@ domains:
       extract-entities:
         flavour: attribute_mutating
         description: Extract entity type definitions from schema tables
+        effect_class: read_snapshot
         metadata:
           tier: diagnostics
           source_of_truth: operational
@@ -392,6 +401,7 @@ domains:
       cross-reference:
         flavour: attribute_mutating
         description: Cross-reference schema against registry snapshots for drift detection
+        effect_class: read_snapshot
         metadata:
           tier: diagnostics
           source_of_truth: operational
@@ -438,6 +448,7 @@ domains:
       generate-erd:
         flavour: attribute_mutating
         description: Generate an entity-relationship diagram with verb surface annotations
+        effect_class: read_snapshot
         metadata:
           tier: intent
           source_of_truth: operational
@@ -523,6 +534,7 @@ domains:
       generate-verb-flow:
         flavour: attribute_mutating
         description: Generate a verb-flow diagram showing what data a verb touches
+        effect_class: read_snapshot
         metadata:
           tier: intent
           source_of_truth: operational
@@ -579,6 +591,7 @@ domains:
       generate-discovery-map:
         flavour: attribute_mutating
         description: Generate a domain discovery map (Phase 2 stub)
+        effect_class: read_snapshot
         metadata:
           tier: intent
           source_of_truth: operational

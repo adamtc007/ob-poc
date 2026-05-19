@@ -5,6 +5,7 @@ domains:
       pep:
         flavour: attribute_mutating
         description: Run PEP (Politically Exposed Persons) screening
+        effect_class: read_modify_write
         invocation_phrases:
           - "run PEP screening"
           - "check for PEP"
@@ -66,6 +67,7 @@ domains:
       sanctions:
         flavour: attribute_mutating
         description: Run sanctions list screening
+        effect_class: read_modify_write
         invocation_phrases:
           - "run sanctions check"
           - "sanctions screening"
@@ -142,6 +144,7 @@ domains:
       adverse-media:
         flavour: attribute_mutating
         description: Run adverse media screening
+        effect_class: read_modify_write
         invocation_phrases:
           - "run adverse media check"
           - "adverse media screening"
@@ -478,6 +481,7 @@ domains:
       bulk-refresh:
         flavour: attribute_mutating
         description: Refresh screening coverage for all workstreams in a case.
+        effect_class: read_modify_write
         metadata:
           tier: intent
           source_of_truth: operational
@@ -535,6 +539,7 @@ domains:
       list-by-workstream:
         flavour: attribute_mutating
         description: List screenings for a workstream.
+        effect_class: read_snapshot
         metadata:
           tier: reference
           source_of_truth: operational

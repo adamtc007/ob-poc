@@ -12,6 +12,7 @@ domains:
         flavour: instance_adding
         description: "Create a new BNY legal entity"
         behavior: plugin
+        effect_class: read_modify_write
         metadata:
           tier: intent
           source_of_truth: operational
@@ -59,6 +60,7 @@ domains:
         flavour: attribute_mutating
         description: "Update a legal entity's fields"
         behavior: plugin
+        effect_class: read_modify_write
         metadata:
           tier: intent
           source_of_truth: operational
@@ -101,6 +103,7 @@ domains:
         flavour: attribute_mutating
         description: "List active BNY legal entities"
         behavior: plugin
+        effect_class: read_snapshot
         metadata:
           tier: intent
           source_of_truth: operational

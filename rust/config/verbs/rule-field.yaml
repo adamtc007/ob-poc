@@ -12,6 +12,7 @@ domains:
         flavour: instance_adding
         description: "Register a new field in the rule field dictionary (unknown fields fail at ruleset publish)"
         behavior: plugin
+        effect_class: read_modify_write
         metadata:
           tier: intent
           source_of_truth: operational
@@ -58,6 +59,7 @@ domains:
         flavour: attribute_mutating
         description: "List all registered fields in the rule field dictionary"
         behavior: plugin
+        effect_class: read_snapshot
         metadata:
           tier: intent
           source_of_truth: operational

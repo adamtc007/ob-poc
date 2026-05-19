@@ -430,6 +430,7 @@ domains:
       list-tax-status:
         flavour: attribute_mutating
         description: "List tax status for CBU"
+        effect_class: read_snapshot
         metadata:
           tier: diagnostics
           source_of_truth: operational
@@ -591,6 +592,7 @@ domains:
       list-reclaim-configs:
         flavour: attribute_mutating
         description: "List reclaim configurations for CBU"
+        effect_class: read_snapshot
         metadata:
           tier: reference
           source_of_truth: operational
@@ -812,6 +814,7 @@ domains:
       list-reporting:
         flavour: attribute_mutating
         description: "List tax reporting obligations for CBU"
+        effect_class: read_snapshot
         metadata:
           tier: reference
           source_of_truth: operational

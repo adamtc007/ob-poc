@@ -207,6 +207,7 @@ domains:
       list:
         flavour: attribute_mutating
         description: List pricing configurations for CBU
+        effect_class: read_snapshot
         invocation_phrases:
           - "list pricing configs"
           - "show pricing configurations"
@@ -262,6 +263,7 @@ domains:
       remove:
         flavour: attribute_mutating
         description: Remove pricing configuration
+        effect_class: read_modify_write
         invocation_phrases:
           - "remove pricing config"
           - "delete pricing configuration"
@@ -344,6 +346,7 @@ domains:
       find-for-instrument:
         flavour: attribute_mutating
         description: Find pricing source for given instrument characteristics
+        effect_class: read_snapshot
         invocation_phrases:
           - "find pricing for instrument"
           - "which pricing applies"
@@ -500,6 +503,7 @@ domains:
       list-valuation-schedules:
         flavour: attribute_mutating
         description: "List valuation schedules for CBU"
+        effect_class: read_snapshot
         invocation_phrases:
           - "list valuation schedules"
           - "show NAV schedules"
@@ -641,6 +645,7 @@ domains:
       list-fallback-chains:
         flavour: attribute_mutating
         description: "List pricing fallback chains for CBU"
+        effect_class: read_snapshot
         invocation_phrases:
           - "list fallback chains"
           - "show pricing fallbacks"
@@ -774,6 +779,7 @@ domains:
       list-stale-policies:
         flavour: attribute_mutating
         description: "List stale price policies for CBU"
+        effect_class: read_snapshot
         invocation_phrases:
           - "list stale price policies"
           - "show staleness rules"
@@ -908,6 +914,7 @@ domains:
       list-nav-thresholds:
         flavour: attribute_mutating
         description: "List NAV impact thresholds for CBU"
+        effect_class: read_snapshot
         invocation_phrases:
           - "list NAV thresholds"
           - "show NAV tolerances"

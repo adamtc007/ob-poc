@@ -9,6 +9,7 @@ domains:
       define:
         flavour: attribute_mutating
         description: "Define a new governed attribute in the registry and SemOS"
+        effect_class: read_modify_write
         metadata:
           tier: intent
           source_of_truth: sem_reg
@@ -91,6 +92,7 @@ domains:
       define-derived:
         flavour: attribute_mutating
         description: "Define a derived attribute with its governed computation recipe"
+        effect_class: read_modify_write
         metadata:
           tier: intent
           source_of_truth: sem_reg
@@ -164,6 +166,7 @@ domains:
       define-internal:
         flavour: attribute_mutating
         description: "Define an internal/system attribute with lightweight governance"
+        effect_class: read_modify_write
         metadata:
           tier: intent
           source_of_truth: sem_reg
@@ -235,6 +238,7 @@ domains:
       update-internal:
         flavour: attribute_mutating
         description: "Update metadata on an internal/system attribute (lightweight, no changeset)"
+        effect_class: read_modify_write
         metadata:
           tier: intent
           source_of_truth: sem_reg
@@ -332,6 +336,7 @@ domains:
       set-evidence-grade:
         flavour: attribute_mutating
         description: "Set or change the evidence grade sensitivity classification for an attribute"
+        effect_class: read_modify_write
         metadata:
           tier: intent
           source_of_truth: sem_reg
@@ -410,6 +415,7 @@ domains:
       inspect:
         flavour: attribute_mutating
         description: "Show full attribute definition including governance state, evidence grade, derivation recipe, and observation statistics"
+        effect_class: read_snapshot
         metadata:
           tier: reference
           source_of_truth: sem_reg
@@ -661,6 +667,7 @@ domains:
       unmap-from-document:
         flavour: attribute_mutating
         description: "Remove attribute mapping from document type"
+        effect_class: read_modify_write
         metadata:
           tier: intent
           source_of_truth: catalog
@@ -713,6 +720,7 @@ domains:
       list-sources:
         flavour: attribute_mutating
         description: "List all document types that provide (source) a given attribute"
+        effect_class: read_snapshot
         metadata:
           tier: reference
           source_of_truth: catalog
@@ -746,6 +754,7 @@ domains:
       list-sinks:
         flavour: attribute_mutating
         description: "List all document types that require (sink) a given attribute"
+        effect_class: read_snapshot
         metadata:
           tier: reference
           source_of_truth: catalog
@@ -779,6 +788,7 @@ domains:
       trace-lineage:
         flavour: attribute_mutating
         description: "Show complete lineage for an attribute - sources, sinks, and resources that require it"
+        effect_class: read_snapshot
         metadata:
           tier: intent
           source_of_truth: catalog
@@ -812,6 +822,7 @@ domains:
       list-by-document:
         flavour: attribute_mutating
         description: "List all attributes linked to a document type"
+        effect_class: read_snapshot
         metadata:
           tier: reference
           source_of_truth: catalog
@@ -850,6 +861,7 @@ domains:
       check-coverage:
         flavour: attribute_mutating
         description: "Check attribute coverage for a document type - what's mapped vs what's required"
+        effect_class: read_snapshot
         metadata:
           tier: diagnostics
           source_of_truth: catalog
@@ -883,6 +895,7 @@ domains:
       bridge-to-semos:
         flavour: attribute_mutating
         description: Publish SemOS AttributeDef snapshots for store attributes that lack governance
+        effect_class: read_modify_write
         metadata:
           tier: intent
           source_of_truth: sem_reg

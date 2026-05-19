@@ -19,6 +19,7 @@ domains:
         flavour: instance_adding
         description: "Create a new deal record for a sales opportunity"
         behavior: plugin
+        effect_class: read_modify_write
         metadata:
           tier: intent
           source_of_truth: operational
@@ -232,6 +233,7 @@ domains:
         flavour: attribute_mutating
         description: "Search deal records by name or reference"
         behavior: plugin
+        effect_class: read_snapshot
         metadata:
           tier: intent
           source_of_truth: operational
@@ -262,6 +264,7 @@ domains:
         flavour: attribute_mutating
         description: "Update primary deal record fields"
         behavior: plugin
+        effect_class: read_modify_write
         metadata:
           tier: intent
           source_of_truth: operational
@@ -372,6 +375,7 @@ domains:
 
       cancel:
         flavour: discretionary
+        effect_class: admin_override
         role_guard:
           any_of: [compliance_admin, senior_compliance, mlro]
         audit_class: deal_cancel
@@ -425,6 +429,7 @@ domains:
         flavour: instance_adding
         description: "Add a participating entity (regional LEI) to a deal"
         behavior: plugin
+        effect_class: read_modify_write
         metadata:
           tier: intent
           source_of_truth: operational
@@ -482,6 +487,7 @@ domains:
         flavour: attribute_mutating
         description: "Remove a participant from a deal"
         behavior: plugin
+        effect_class: read_modify_write
         metadata:
           tier: intent
           source_of_truth: operational
@@ -561,6 +567,7 @@ domains:
         flavour: instance_adding
         description: "Add a product to the deal's commercial scope"
         behavior: plugin
+        effect_class: read_modify_write
         metadata:
           tier: intent
           source_of_truth: operational
@@ -624,6 +631,7 @@ domains:
         flavour: attribute_mutating
         description: "Update the status of a product in the deal scope"
         behavior: plugin
+        effect_class: read_modify_write
         metadata:
           tier: intent
           source_of_truth: operational
@@ -747,6 +755,7 @@ domains:
         flavour: instance_adding
         description: "Link a service contract to a deal"
         behavior: plugin
+        effect_class: read_modify_write
         metadata:
           tier: intent
           source_of_truth: operational
@@ -796,6 +805,7 @@ domains:
         flavour: attribute_mutating
         description: "Unlink a contract from a deal"
         behavior: plugin
+        effect_class: read_modify_write
         metadata:
           tier: intent
           source_of_truth: operational
@@ -869,6 +879,7 @@ domains:
         flavour: instance_adding
         description: "Create a negotiated rate card for a product within a deal"
         behavior: plugin
+        effect_class: read_modify_write
         lifecycle:
           precondition_checks:
             - "requires_prior:deal.create"
@@ -950,6 +961,7 @@ domains:
         flavour: instance_adding
         description: "Add a fee line to a rate card"
         behavior: plugin
+        effect_class: read_modify_write
         lifecycle:
           precondition_checks:
             - "requires_prior:deal.create-rate-card"
@@ -1036,6 +1048,7 @@ domains:
         flavour: attribute_mutating
         description: "Modify an existing rate card line"
         behavior: plugin
+        effect_class: read_modify_write
         metadata:
           tier: intent
           source_of_truth: operational
@@ -1082,6 +1095,7 @@ domains:
         flavour: attribute_mutating
         description: "Remove a fee line from a rate card"
         behavior: plugin
+        effect_class: read_modify_write
         metadata:
           tier: intent
           source_of_truth: operational
@@ -1266,6 +1280,7 @@ domains:
 
       agree-rate-card:
         flavour: discretionary
+        effect_class: admin_override
         role_guard:
           any_of: [compliance_admin, senior_compliance, mlro]
         audit_class: deal_agree_rate_card
@@ -1442,6 +1457,7 @@ domains:
         flavour: instance_adding
         description: "Add a service level agreement to a deal"
         behavior: plugin
+        effect_class: read_modify_write
         metadata:
           tier: intent
           source_of_truth: operational
@@ -1519,6 +1535,7 @@ domains:
         flavour: attribute_mutating
         description: "Remove an SLA from a deal"
         behavior: crud
+        effect_class: read_modify_write
         crud:
           operation: delete
           table: deal_slas
@@ -1592,6 +1609,7 @@ domains:
         flavour: instance_adding
         description: "Link a document to a deal"
         behavior: plugin
+        effect_class: read_modify_write
         metadata:
           tier: intent
           source_of_truth: operational
@@ -1721,6 +1739,7 @@ domains:
         flavour: instance_adding
         description: "Link an entity's UBO assessment to a deal"
         behavior: plugin
+        effect_class: read_modify_write
         metadata:
           tier: intent
           source_of_truth: operational
@@ -1811,6 +1830,7 @@ domains:
         flavour: attribute_mutating
         description: "Create onboarding request for an existing CBU - handoff from Sales to Ops after KYC clearance and contracting"
         behavior: plugin
+        effect_class: read_modify_write
         lifecycle:
           precondition_checks:
             - "requires_prior:deal.create"
@@ -1910,6 +1930,7 @@ domains:
         flavour: attribute_mutating
         description: "Batch onboarding request - multiple existing CBUs to multiple products after KYC clearance and contracting"
         behavior: plugin
+        effect_class: read_modify_write
         lifecycle:
           precondition_checks:
             - "requires_prior:deal.create"
@@ -2058,6 +2079,7 @@ domains:
         flavour: attribute_mutating
         description: "Read full deal summary with linked entities, status, and progress"
         behavior: plugin
+        effect_class: read_snapshot
         metadata:
           tier: intent
           source_of_truth: operational
@@ -2211,6 +2233,7 @@ domains:
         flavour: attribute_mutating
         description: "Mark BAC clearance as in review — sets deals.bac_status='in_review' while preserving deal_status=IN_CLEARANCE"
         behavior: plugin
+        effect_class: read_modify_write
         metadata:
           tier: intent
           source_of_truth: operational
@@ -2243,6 +2266,7 @@ domains:
 
       bac-approve:
         flavour: discretionary
+        effect_class: admin_override
         role_guard:
           any_of: [compliance_officer, senior_compliance, mlro]
         audit_class: deal_bac_approve
@@ -2285,6 +2309,7 @@ domains:
 
       bac-reject:
         flavour: discretionary
+        effect_class: admin_override
         role_guard:
           any_of: [compliance_officer, senior_compliance, mlro]
         audit_class: deal_bac_reject
@@ -2333,6 +2358,7 @@ domains:
         flavour: attribute_mutating
         description: "Mark deal KYC clearance as in review — sets deals.kyc_clearance_status='in_review' while preserving deal_status=IN_CLEARANCE"
         behavior: plugin
+        effect_class: read_modify_write
         metadata:
           tier: intent
           source_of_truth: operational
@@ -2367,6 +2393,7 @@ domains:
         flavour: attribute_mutating
         description: "Propagate KYC case outcome to deals.kyc_clearance_status — preserving verb invoked from the KYC workspace's case approval/rejection handler. The parallel substate of IN_CLEARANCE complementing bac_status."
         behavior: plugin
+        effect_class: read_snapshot
         metadata:
           tier: intent
           source_of_truth: operational
@@ -2527,6 +2554,7 @@ domains:
 
       mark-lost:
         flavour: discretionary
+        effect_class: admin_override
         role_guard:
           any_of: [compliance_admin, senior_compliance, mlro]
         audit_class: deal_mark_lost
@@ -2569,6 +2597,7 @@ domains:
 
       mark-withdrawn:
         flavour: discretionary
+        effect_class: admin_override
         role_guard:
           any_of: [compliance_admin, senior_compliance, mlro]
         audit_class: deal_mark_withdrawn
@@ -2610,6 +2639,7 @@ domains:
 
       reject:
         flavour: discretionary
+        effect_class: admin_override
         role_guard:
           any_of: [compliance_officer, senior_compliance, mlro]
         audit_class: deal_reject
@@ -2728,6 +2758,7 @@ domains:
 
       begin-winding-down:
         flavour: discretionary
+        effect_class: admin_override
         role_guard:
           any_of: [compliance_admin, senior_compliance, mlro]
         audit_class: deal_begin_winding_down
@@ -2835,6 +2866,7 @@ domains:
 
       waive-sla-breach:
         flavour: discretionary
+        effect_class: admin_override
         role_guard:
           any_of: [compliance_admin, senior_compliance, mlro]
         audit_class: deal_waive_sla_breach

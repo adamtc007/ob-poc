@@ -13,6 +13,7 @@ domains:
         flavour: instance_adding
         description: "Create a new ruleset (starts in draft status)"
         behavior: plugin
+        effect_class: read_modify_write
         metadata:
           tier: intent
           source_of_truth: operational
@@ -57,6 +58,7 @@ domains:
             baseline: reviewable
       publish:
         flavour: discretionary
+        effect_class: read_modify_write
         role_guard:
           any_of: [compliance_officer, senior_compliance, mlro]
         audit_class: ruleset_publish
@@ -96,6 +98,7 @@ domains:
         flavour: attribute_mutating
         description: "Retire an active ruleset"
         behavior: plugin
+        effect_class: read_modify_write
         metadata:
           tier: intent
           source_of_truth: operational

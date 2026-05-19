@@ -238,6 +238,7 @@ domains:
         flavour: attribute_mutating
         description: "List CA preferences for CBU"
         behavior: crud
+        effect_class: read_snapshot
         metadata:
           tier: diagnostics
           source_of_truth: operational
@@ -288,6 +289,7 @@ domains:
         flavour: attribute_mutating
         description: "Remove CA preference"
         behavior: crud
+        effect_class: read_modify_write
         metadata:
           tier: projection
           source_of_truth: operational
@@ -432,6 +434,7 @@ domains:
         flavour: attribute_mutating
         description: "List instruction window configurations"
         behavior: crud
+        effect_class: read_snapshot
         metadata:
           tier: diagnostics
           source_of_truth: operational
@@ -567,6 +570,7 @@ domains:
         flavour: attribute_mutating
         description: "List CA SSI mappings"
         behavior: crud
+        effect_class: read_snapshot
         metadata:
           tier: diagnostics
           source_of_truth: operational

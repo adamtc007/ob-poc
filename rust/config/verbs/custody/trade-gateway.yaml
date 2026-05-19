@@ -382,6 +382,7 @@ domains:
       list-cbu-gateways:
         flavour: attribute_mutating
         description: "List gateway connectivity for CBU"
+        effect_class: read_snapshot
         metadata:
           tier: reference
           source_of_truth: matrix
@@ -551,6 +552,7 @@ domains:
       list-routing-rules:
         flavour: attribute_mutating
         description: "List gateway routing rules for CBU"
+        effect_class: read_snapshot
         metadata:
           tier: reference
           source_of_truth: matrix
@@ -606,6 +608,7 @@ domains:
       remove-routing-rule:
         flavour: attribute_mutating
         description: "Remove routing rule"
+        effect_class: read_modify_write
         metadata:
           tier: intent
           source_of_truth: matrix
@@ -739,6 +742,7 @@ domains:
       list-fallbacks:
         flavour: attribute_mutating
         description: "List fallback configurations"
+        effect_class: read_snapshot
         metadata:
           tier: reference
           source_of_truth: matrix
@@ -831,6 +835,7 @@ domains:
           target_slot: trade_gateway
       retire-gateway:
         flavour: discretionary
+        effect_class: admin_override
         role_guard:
           any_of: [compliance_admin, senior_compliance, mlro]
         audit_class: trade_gateway_retire_gateway

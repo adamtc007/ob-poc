@@ -453,6 +453,7 @@ domains:
       list-by-share-class:
         flavour: attribute_mutating
         description: List holdings for a share class
+        effect_class: read_snapshot
         metadata:
           tier: reference
           source_of_truth: register
@@ -504,6 +505,7 @@ domains:
       list-by-investor:
         flavour: attribute_mutating
         description: List holdings for an investor across all share classes
+        effect_class: read_snapshot
         metadata:
           tier: reference
           source_of_truth: register
@@ -547,6 +549,7 @@ domains:
       list-by-investor-record:
         flavour: attribute_mutating
         description: List holdings for an investor record (TA workflow)
+        effect_class: read_snapshot
         metadata:
           tier: reference
           source_of_truth: register

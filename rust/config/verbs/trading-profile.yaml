@@ -16,6 +16,7 @@ domains:
         description: Import a trading profile document from YAML/JSON file or inline content
         behavior: plugin
         handler: import_trading_profile
+        effect_class: read_modify_write
         invocation_phrases:
           - "import trading profile"
           - "load trading profile"
@@ -134,6 +135,7 @@ domains:
         description: Get the active trading profile for a CBU
         behavior: plugin
         handler: get_active_trading_profile
+        effect_class: read_snapshot
         invocation_phrases:
           - "get active profile"
           - "show active trading profile"
@@ -174,6 +176,7 @@ domains:
       list-versions:
         flavour: attribute_mutating
         description: List all versions of trading profiles for a CBU
+        effect_class: read_snapshot
         invocation_phrases:
           - "list trading profile versions"
           - "show profile version history"
@@ -220,6 +223,7 @@ domains:
 
       activate:
         flavour: discretionary
+        effect_class: admin_override
         role_guard:
           any_of: [compliance_admin, senior_compliance, mlro]
         audit_class: trading_profile_activate
@@ -287,6 +291,7 @@ domains:
         description: Materialize trading profile to operational tables (universe, SSIs, booking rules)
         behavior: plugin
         handler: materialize_trading_profile
+        effect_class: read_modify_write
         invocation_phrases:
           - "materialize trading profile"
           - "materialize profile"
@@ -345,6 +350,7 @@ domains:
       diff:
         flavour: attribute_mutating
         description: Compare two trading profile versions
+        effect_class: read_snapshot
         invocation_phrases:
           - "diff trading profiles"
           - "compare profiles"
@@ -392,6 +398,7 @@ domains:
       create-draft:
         flavour: instance_adding
         description: Create a new draft trading profile for a CBU (use clone-to to copy from existing)
+        effect_class: read_modify_write
         invocation_phrases:
           - "create draft profile"
           - "start new profile draft"
@@ -443,6 +450,7 @@ domains:
       clone-to:
         flavour: attribute_mutating
         description: Clone a trading profile to another CBU, creating a new DRAFT profile
+        effect_class: read_modify_write
         invocation_phrases:
           - "clone profile to CBU"
           - "copy trading profile"
@@ -509,6 +517,7 @@ domains:
       create-new-version:
         flavour: instance_adding
         description: Create a new draft version from the current ACTIVE profile. Used when modifying a live trading matrix.
+        effect_class: read_modify_write
         invocation_phrases:
           - "create new profile version"
           - "version this profile"
@@ -565,6 +574,7 @@ domains:
       add-component:
         flavour: instance_adding
         description: Add a component to the trading profile document
+        effect_class: read_modify_write
         invocation_phrases:
           - "add component to trading profile"
           - "add equity component"
@@ -790,6 +800,7 @@ domains:
       remove-component:
         flavour: attribute_mutating
         description: Remove a component from the trading profile document
+        effect_class: read_modify_write
         invocation_phrases:
           - "remove component from trading profile"
           - "remove standing instruction"
@@ -853,6 +864,7 @@ domains:
       set-base-currency:
         flavour: attribute_mutating
         description: Set base currency for trading profile
+        effect_class: read_modify_write
         invocation_phrases:
           - "set base currency"
           - "change base currency"
@@ -898,6 +910,7 @@ domains:
       link-csa-ssi:
         flavour: instance_adding
         description: Link CSA to collateral SSI in standing instructions
+        effect_class: read_modify_write
         invocation_phrases:
           - "link CSA to SSI"
           - "connect CSA SSI"
@@ -943,6 +956,7 @@ domains:
       update-im-scope:
         flavour: attribute_mutating
         description: Update scope for existing IM mandate
+        effect_class: read_modify_write
         invocation_phrases:
           - "update IM scope"
           - "modify mandate scope"
@@ -992,6 +1006,7 @@ domains:
 
       validate-go-live-ready:
         flavour: discretionary
+        effect_class: read_snapshot
         role_guard:
           any_of: [compliance_officer, senior_compliance, mlro]
         audit_class: trading_profile_validate_go_live_ready
@@ -1038,6 +1053,7 @@ domains:
       validate-universe-coverage:
         flavour: attribute_mutating
         description: Validate all universe entries have required SSIs and booking rules
+        effect_class: read_snapshot
         invocation_phrases:
           - "validate universe coverage"
           - "check universe completeness"
@@ -1313,6 +1329,7 @@ domains:
       ca.enable-event-types:
         flavour: attribute_mutating
         description: Enable CA event types for this trading profile
+        effect_class: read_modify_write
         invocation_phrases:
           - "enable corporate action types"
           - "turn on CA events"
@@ -1357,6 +1374,7 @@ domains:
       ca.disable-event-types:
         flavour: attribute_mutating
         description: Disable CA event types for this trading profile
+        effect_class: read_modify_write
         invocation_phrases:
           - "disable corporate action types"
           - "turn off CA events"
@@ -1397,6 +1415,7 @@ domains:
       ca.set-notification-policy:
         flavour: attribute_mutating
         description: Configure CA notification settings
+        effect_class: read_modify_write
         invocation_phrases:
           - "set CA notification policy"
           - "configure CA notifications"
@@ -1446,6 +1465,7 @@ domains:
       ca.set-election-policy:
         flavour: attribute_mutating
         description: Configure who makes CA elections and requirements
+        effect_class: read_modify_write
         invocation_phrases:
           - "set CA election policy"
           - "configure election defaults"
@@ -1502,6 +1522,7 @@ domains:
       ca.set-default-option:
         flavour: attribute_mutating
         description: Set default election for specific event type
+        effect_class: read_modify_write
         invocation_phrases:
           - "set default CA option"
           - "configure default election"
@@ -1552,6 +1573,7 @@ domains:
       ca.remove-default-option:
         flavour: attribute_mutating
         description: Remove default election for specific event type
+        effect_class: read_modify_write
         invocation_phrases:
           - "remove default CA option"
           - "clear default election"
@@ -1591,6 +1613,7 @@ domains:
       ca.add-cutoff-rule:
         flavour: attribute_mutating
         description: Add deadline cutoff rule for market/depository
+        effect_class: read_modify_write
         invocation_phrases:
           - "add CA cutoff rule"
           - "set election cutoff"
@@ -1653,6 +1676,7 @@ domains:
       ca.remove-cutoff-rule:
         flavour: attribute_mutating
         description: Remove cutoff rule by market/depository
+        effect_class: read_modify_write
         invocation_phrases:
           - "remove CA cutoff rule"
           - "delete cutoff rule"
@@ -1695,6 +1719,7 @@ domains:
       ca.link-proceeds-ssi:
         flavour: attribute_mutating
         description: Map CA proceeds to settlement instruction
+        effect_class: read_modify_write
         invocation_phrases:
           - "link proceeds SSI"
           - "set CA proceeds account"
@@ -1746,6 +1771,7 @@ domains:
       ca.remove-proceeds-ssi:
         flavour: attribute_mutating
         description: Remove CA proceeds SSI mapping
+        effect_class: read_modify_write
         invocation_phrases:
           - "remove proceeds SSI"
           - "unlink proceeds account"
@@ -1791,6 +1817,7 @@ domains:
       ca.get-policy:
         flavour: attribute_mutating
         description: Get current CA policy configuration from trading profile
+        effect_class: read_snapshot
         invocation_phrases:
           - "get CA policy"
           - "show CA configuration"
@@ -1870,6 +1897,7 @@ domains:
           target_slot: trading_profile
       go-live:
         flavour: discretionary
+        effect_class: admin_override
         role_guard:
           any_of: [compliance_admin, senior_compliance, mlro]
         audit_class: trading_profile_go_live
@@ -1948,6 +1976,7 @@ domains:
           target_slot: trading_profile
       suspend:
         flavour: discretionary
+        effect_class: admin_override
         role_guard:
           any_of: [compliance_officer, senior_compliance, mlro]
         audit_class: trading_profile_suspend
@@ -1989,6 +2018,7 @@ domains:
 
       reactivate:
         flavour: discretionary
+        effect_class: admin_override
         role_guard:
           any_of: [compliance_admin, senior_compliance, mlro]
         audit_class: trading_profile_reactivate
@@ -2027,6 +2057,7 @@ domains:
 
       supersede:
         flavour: discretionary
+        effect_class: admin_override
         role_guard:
           any_of: [compliance_admin, senior_compliance, mlro]
         audit_class: trading_profile_supersede
@@ -2073,6 +2104,7 @@ domains:
           target_slot: trading_profile
       retire-template:
         flavour: discretionary
+        effect_class: admin_override
         role_guard:
           any_of: [compliance_admin, senior_compliance, mlro]
         audit_class: trading_profile_retire_template
@@ -2115,6 +2147,7 @@ domains:
       add-instrument-class:
         flavour: instance_adding
         description: "Add instrument class to trading profile / template"
+        effect_class: read_modify_write
         invocation_phrases:
           - "add instrument class"
           - "enable instrument class"
@@ -2147,6 +2180,7 @@ domains:
       remove-instrument-class:
         flavour: attribute_mutating
         description: "Remove instrument class from trading profile / template (no cascade)"
+        effect_class: read_modify_write
         invocation_phrases:
           - "remove instrument class"
           - "disable instrument class"
@@ -2176,6 +2210,7 @@ domains:
       add-market:
         flavour: instance_adding
         description: "Add market to trading profile / template"
+        effect_class: read_modify_write
         invocation_phrases:
           - "add market"
           - "enable market"
@@ -2205,6 +2240,7 @@ domains:
       remove-market:
         flavour: attribute_mutating
         description: "Remove market from trading profile / template (no cascade)"
+        effect_class: read_modify_write
         invocation_phrases:
           - "remove market"
           - "disable market"
@@ -2234,6 +2270,7 @@ domains:
       add-counterparty-type:
         flavour: instance_adding
         description: "Add counterparty type to template"
+        effect_class: read_modify_write
         metadata:
           tier: intent
           source_of_truth: matrix
@@ -2259,6 +2296,7 @@ domains:
 
       publish-template-version:
         flavour: discretionary
+        effect_class: admin_override
         role_guard:
           any_of: [compliance_officer, senior_compliance, mlro]
         audit_class: trading_profile_publish_template_version
@@ -2286,6 +2324,7 @@ domains:
       list-components:
         flavour: attribute_mutating
         description: "List all components of a trading profile / template"
+        effect_class: read_snapshot
         invocation_phrases:
           - "list components"
           - "show trading profile components"
@@ -2319,6 +2358,7 @@ domains:
 
       prune-asset-family:
         flavour: discretionary
+        effect_class: admin_override
         role_guard:
           any_of: [compliance_admin, senior_compliance, mlro]
         audit_class: trading_profile_prune_asset_family
@@ -2356,6 +2396,7 @@ domains:
 
       prune-market:
         flavour: discretionary
+        effect_class: admin_override
         role_guard:
           any_of: [compliance_admin, senior_compliance, mlro]
         audit_class: trading_profile_prune_market
@@ -2389,6 +2430,7 @@ domains:
 
       prune-instrument-class:
         flavour: discretionary
+        effect_class: admin_override
         role_guard:
           any_of: [compliance_admin, senior_compliance, mlro]
         audit_class: trading_profile_prune_instrument_class
@@ -2422,6 +2464,7 @@ domains:
 
       prune-counterparty:
         flavour: discretionary
+        effect_class: admin_override
         role_guard:
           any_of: [compliance_admin, senior_compliance, mlro]
         audit_class: trading_profile_prune_counterparty
@@ -2455,6 +2498,7 @@ domains:
 
       prune-counterparty-type:
         flavour: discretionary
+        effect_class: admin_override
         role_guard:
           any_of: [compliance_admin, senior_compliance, mlro]
         audit_class: trading_profile_prune_counterparty_type
@@ -2489,6 +2533,7 @@ domains:
       prune-impact:
         flavour: attribute_mutating
         description: "Read-only impact analysis before invoking a destructive prune"
+        effect_class: read_snapshot
         invocation_phrases:
           - "prune impact"
           - "preview prune"
@@ -2526,6 +2571,7 @@ domains:
       sync-from-template:
         flavour: attribute_mutating
         description: "Sync a CBU mandate from its group template (adopt forward-only template changes)"
+        effect_class: read_modify_write
         invocation_phrases:
           - "sync from template"
           - "pull template updates"

@@ -8,6 +8,7 @@ domains:
       load-markets:
         flavour: instance_adding
         description: Load markets from YAML file into custody.markets table
+        effect_class: read_modify_write
         metadata:
           tier: intent
           source_of_truth: operational
@@ -48,6 +49,7 @@ domains:
       load-instrument-classes:
         flavour: instance_adding
         description: Load instrument class taxonomy from YAML into custody.instrument_classes
+        effect_class: read_modify_write
         metadata:
           tier: intent
           source_of_truth: operational
@@ -87,6 +89,7 @@ domains:
       load-subcustodians:
         flavour: instance_adding
         description: Load subcustodian network from YAML into custody.subcustodian_network
+        effect_class: read_modify_write
         metadata:
           tier: intent
           source_of_truth: operational
@@ -126,6 +129,7 @@ domains:
       load-sla-templates:
         flavour: instance_adding
         description: Load SLA templates from YAML into ob-poc.sla_templates
+        effect_class: read_modify_write
         metadata:
           tier: intent
           source_of_truth: operational
@@ -165,6 +169,7 @@ domains:
       load-all:
         flavour: instance_adding
         description: Load all reference data from directory
+        effect_class: read_modify_write
         metadata:
           tier: intent
           source_of_truth: operational

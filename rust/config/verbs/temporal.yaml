@@ -17,6 +17,7 @@ domains:
       ownership-as-of:
         flavour: attribute_mutating
         description: Get ownership relationships for an entity as of a specific date
+        effect_class: read_snapshot
         metadata:
           tier: intent
           source_of_truth: operational
@@ -65,6 +66,7 @@ domains:
       ubo-chain-as-of:
         flavour: attribute_mutating
         description: Trace ownership chain to UBOs as of a specific date
+        effect_class: read_snapshot
         metadata:
           tier: intent
           source_of_truth: operational
@@ -122,6 +124,7 @@ domains:
       cbu-relationships-as-of:
         flavour: attribute_mutating
         description: Get all relationships (ownership, control, trust) for a CBU as of a date
+        effect_class: read_snapshot
         metadata:
           tier: intent
           source_of_truth: operational
@@ -170,6 +173,7 @@ domains:
       cbu-roles-as-of:
         flavour: attribute_mutating
         description: Get entity roles within a CBU as of a specific date
+        effect_class: read_snapshot
         metadata:
           tier: intent
           source_of_truth: operational
@@ -217,6 +221,7 @@ domains:
 
       cbu-state-at-approval:
         flavour: discretionary
+        effect_class: read_snapshot
         role_guard:
           any_of: [compliance_admin, senior_compliance, mlro]
         audit_class: temporal_cbu_state_at_approval
@@ -268,6 +273,7 @@ domains:
       relationship-history:
         flavour: attribute_mutating
         description: Get change history for a specific relationship
+        effect_class: read_snapshot
         metadata:
           tier: intent
           source_of_truth: operational
@@ -310,6 +316,7 @@ domains:
       entity-history:
         flavour: attribute_mutating
         description: Get all relationship changes involving an entity
+        effect_class: read_snapshot
         metadata:
           tier: intent
           source_of_truth: operational
@@ -370,6 +377,7 @@ domains:
       compare-ownership:
         flavour: attribute_mutating
         description: Compare ownership structure between two dates
+        effect_class: read_snapshot
         metadata:
           tier: intent
           source_of_truth: operational

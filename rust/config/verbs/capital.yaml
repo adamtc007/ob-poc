@@ -16,6 +16,7 @@ domains:
       share-class.create:
         flavour: attribute_mutating
         description: Create a new share class for an issuer
+        effect_class: read_modify_write
         invocation_phrases:
           - "create share class"
           - "add share class"
@@ -112,6 +113,7 @@ domains:
       share-class.add-identifier:
         flavour: instance_adding
         description: Add an identifier (ISIN, SEDOL, etc.) to a share class
+        effect_class: append_fact
         invocation_phrases:
           - "add share class identifier"
           - "set share class ISIN"
@@ -182,6 +184,7 @@ domains:
       share-class.list:
         flavour: attribute_mutating
         description: List share classes for an issuer
+        effect_class: read_snapshot
         invocation_phrases:
           - "show share classes"
           - "get all share classes"
@@ -224,6 +227,7 @@ domains:
       share-class.get-supply:
         flavour: attribute_mutating
         description: Get current supply state for a share class
+        effect_class: read_snapshot
         invocation_phrases:
           - "get share supply"
           - "show share supply"
@@ -270,6 +274,7 @@ domains:
       issue.initial:
         flavour: attribute_mutating
         description: Initial issuance of shares (incorporation/fund launch)
+        effect_class: read_modify_write
         invocation_phrases:
           - "initial share issuance"
           - "IPO shares"
@@ -324,6 +329,7 @@ domains:
       issue.new:
         flavour: attribute_mutating
         description: Subsequent issuance (capital raise)
+        effect_class: read_modify_write
         invocation_phrases:
           - "secondary issuance"
           - "additional share issue"
@@ -380,6 +386,7 @@ domains:
       split:
         flavour: attribute_mutating
         description: Stock split (e.g., 2:1 doubles shares)
+        effect_class: read_modify_write
         invocation_phrases:
           - "stock split"
           - "share split"
@@ -435,6 +442,7 @@ domains:
       buyback:
         flavour: attribute_mutating
         description: Share buyback into treasury
+        effect_class: read_modify_write
         invocation_phrases:
           - "share buyback"
           - "buy back shares"
@@ -489,6 +497,7 @@ domains:
       cancel:
         flavour: attribute_mutating
         description: Permanent share cancellation
+        effect_class: read_modify_write
         invocation_phrases:
           - "cancel shares"
           - "retire shares"
@@ -543,6 +552,7 @@ domains:
       dilution.grant-options:
         flavour: attribute_mutating
         description: Grant stock options to a holder
+        effect_class: read_modify_write
         invocation_phrases:
           - "grant stock options"
           - "issue employee options"
@@ -631,6 +641,7 @@ domains:
       dilution.issue-warrant:
         flavour: attribute_mutating
         description: Issue warrants to an investor
+        effect_class: read_modify_write
         invocation_phrases:
           - "issue warrant"
           - "create warrant"
@@ -702,6 +713,7 @@ domains:
       dilution.create-safe:
         flavour: attribute_mutating
         description: Create a SAFE (Simple Agreement for Future Equity)
+        effect_class: read_modify_write
         invocation_phrases:
           - "create SAFE"
           - "issue SAFE"
@@ -772,6 +784,7 @@ domains:
       dilution.create-convertible-note:
         flavour: attribute_mutating
         description: Create a convertible note
+        effect_class: read_modify_write
         invocation_phrases:
           - "create convertible note"
           - "issue convertible"
@@ -843,6 +856,7 @@ domains:
       dilution.exercise:
         flavour: attribute_mutating
         description: Exercise options/warrants and convert to shares
+        effect_class: read_modify_write
         invocation_phrases:
           - "exercise options"
           - "exercise warrant"
@@ -896,6 +910,7 @@ domains:
       dilution.forfeit:
         flavour: attribute_mutating
         description: Forfeit/cancel unvested or unexercised instruments
+        effect_class: read_modify_write
         invocation_phrases:
           - "forfeit options"
           - "cancel vested options"
@@ -939,6 +954,7 @@ domains:
       dilution.list:
         flavour: attribute_mutating
         description: List dilution instruments for an issuer
+        effect_class: read_snapshot
         invocation_phrases:
           - "list dilution instruments"
           - "show options and warrants"
@@ -1000,6 +1016,7 @@ domains:
       dilution.get-summary:
         flavour: attribute_mutating
         description: Get dilution summary for an issuer
+        effect_class: read_snapshot
         invocation_phrases:
           - "dilution summary"
           - "show dilution impact"
@@ -1189,6 +1206,7 @@ domains:
       cap-table:
         flavour: attribute_mutating
         description: Get full cap table for an issuer
+        effect_class: read_snapshot
         invocation_phrases:
           - "show cap table"
           - "capitalization table"
@@ -1252,6 +1270,7 @@ domains:
       holders:
         flavour: attribute_mutating
         description: List all holders for an issuer with ownership percentages
+        effect_class: read_snapshot
         invocation_phrases:
           - "list shareholders"
           - "show holders"

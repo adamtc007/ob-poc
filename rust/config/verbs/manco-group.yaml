@@ -18,6 +18,7 @@ domains:
           Derive CBU groups from governance controller (board appointment/control) with MANCO_ROLE fallback.
           Creates groups and memberships based on computed control signals.
         behavior: plugin
+        effect_class: read_modify_write
         invocation_phrases:
           - derive groups
           - compute groups
@@ -102,6 +103,7 @@ domains:
           Get all CBUs in a governance controller group.
           Returns CBU details including fund entity and membership source.
         behavior: plugin
+        effect_class: read_snapshot
         invocation_phrases:
           - get CBUs for controller
           - list book CBUs
@@ -140,6 +142,7 @@ domains:
           Find the governance controller group for a specific CBU.
           Returns controller details and group information.
         behavior: plugin
+        effect_class: read_snapshot
         invocation_phrases:
           - find controller for CBU
           - which manco manages this CBU
@@ -181,6 +184,7 @@ domains:
           Get the primary governance controller for an issuer.
           Returns single deterministic winner based on: board rights > voting control > significant influence.
         behavior: plugin
+        effect_class: read_snapshot
         invocation_phrases:
           - who controls
           - primary controller
@@ -241,6 +245,7 @@ domains:
           Trace the shareholding control chain upward from a controller.
           Returns the chain of controlling entities up to the ultimate parent.
         behavior: plugin
+        effect_class: read_snapshot
         invocation_phrases:
           - control chain
           - who controls the controller
@@ -287,6 +292,7 @@ domains:
           Create a new CBU group manually.
           Use for groups that can't be auto-derived from control signals.
         behavior: crud
+        effect_class: append_fact
         invocation_phrases:
           - create group
           - create book
@@ -471,6 +477,7 @@ domains:
           Get a comprehensive summary of a governance controller "book".
           Includes group info, all CBUs, and control chain.
         behavior: plugin
+        effect_class: read_snapshot
         invocation_phrases:
           - book summary
           - full group info
@@ -550,6 +557,7 @@ domains:
 
       reject:
         flavour: discretionary
+        effect_class: admin_override
         role_guard:
           any_of: [compliance_officer, senior_compliance, mlro]
         audit_class: manco_reject
@@ -664,6 +672,7 @@ domains:
 
       suspend:
         flavour: discretionary
+        effect_class: admin_override
         role_guard:
           any_of: [compliance_officer, senior_compliance, mlro]
         audit_class: manco_suspend
@@ -740,6 +749,7 @@ domains:
 
       begin-sunset:
         flavour: discretionary
+        effect_class: admin_override
         role_guard:
           any_of: [compliance_admin, senior_compliance, mlro]
         audit_class: manco_begin_sunset
@@ -777,6 +787,7 @@ domains:
 
       terminate:
         flavour: discretionary
+        effect_class: admin_override
         role_guard:
           any_of: [compliance_officer, senior_compliance, mlro]
         audit_class: manco_terminate
@@ -824,6 +835,7 @@ domains:
           Compute control links from holdings.
           Materializes shareholding control relationships for efficient queries.
         behavior: plugin
+        effect_class: read_snapshot
         invocation_phrases:
           - compute control links
           - refresh ownership links
@@ -933,6 +945,7 @@ domains:
           Bridge MANAGEMENT_COMPANY role assignments to BOARD_APPOINTMENT special rights.
           Enables governance controller to fire for CBUs with ManCo roles assigned.
         behavior: plugin
+        effect_class: read_modify_write
         invocation_phrases:
           - bridge manco roles
           - convert roles to rights
@@ -969,6 +982,7 @@ domains:
           Bridge GLEIF IS_FUND_MANAGED_BY relationships to BOARD_APPOINTMENT special rights.
           Run after GLEIF import to enable governance controller for fund entities.
         behavior: plugin
+        effect_class: read_modify_write
         invocation_phrases:
           - bridge gleif managers
           - gleif to board rights
@@ -1005,6 +1019,7 @@ domains:
           Bridge BODS ownership statements to kyc.holdings.
           Run after BODS import to enable governance controller from ownership percentages.
         behavior: plugin
+        effect_class: read_modify_write
         invocation_phrases:
           - bridge bods ownership
           - bods to holdings
@@ -1054,6 +1069,7 @@ domains:
 
           Idempotent - safe to run repeatedly.
         behavior: plugin
+        effect_class: read_modify_write
         invocation_phrases:
           - refresh governance
           - full governance refresh

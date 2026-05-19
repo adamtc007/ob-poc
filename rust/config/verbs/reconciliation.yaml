@@ -31,6 +31,7 @@ domains:
       create-config:
         flavour: instance_adding
         description: "Create new reconciliation config (entry state: draft)"
+        effect_class: read_modify_write
         invocation_phrases:
           - "create reconciliation config"
           - "set up recon"
@@ -189,6 +190,7 @@ domains:
 
       retire:
         flavour: discretionary
+        effect_class: admin_override
         role_guard:
           any_of: [compliance_admin, senior_compliance, mlro]
         audit_class: reconciliation_retire

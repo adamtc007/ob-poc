@@ -5,6 +5,7 @@ domains:
       recompute-stale:
         flavour: attribute_mutating
         description: Recompute stale derived values from the canonical queue in dependency-depth order
+        effect_class: read_modify_write
         metadata:
           tier: intent
           source_of_truth: sem_reg

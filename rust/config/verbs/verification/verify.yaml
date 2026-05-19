@@ -8,6 +8,7 @@ domains:
       detect-patterns:
         flavour: attribute_mutating
         description: Run adversarial pattern detection on CBU (circular ownership, layering, nominees, opacity)
+        effect_class: read_snapshot
         metadata:
           tier: intent
           source_of_truth: workflow
@@ -56,6 +57,7 @@ domains:
       detect-evasion:
         flavour: attribute_mutating
         description: Analyze doc_request history for evasion signals (delays, selective response, changing explanations)
+        effect_class: read_snapshot
         metadata:
           tier: intent
           source_of_truth: workflow
@@ -98,6 +100,7 @@ domains:
       challenge:
         flavour: instance_adding
         description: Raise formal verification challenge requiring client response
+        effect_class: append_fact
         metadata:
           tier: intent
           source_of_truth: workflow
@@ -343,6 +346,7 @@ domains:
       list-challenges:
         flavour: attribute_mutating
         description: List verification challenges for CBU or case
+        effect_class: read_snapshot
         metadata:
           tier: reference
           source_of_truth: workflow
@@ -402,6 +406,7 @@ domains:
             baseline: benign
       escalate:
         flavour: discretionary
+        effect_class: append_fact
         role_guard:
           any_of: [compliance_officer, senior_compliance, mlro]
         audit_class: verify_escalate
@@ -560,6 +565,7 @@ domains:
       list-escalations:
         flavour: attribute_mutating
         description: List escalations for CBU
+        effect_class: read_snapshot
         metadata:
           tier: reference
           source_of_truth: workflow
@@ -619,6 +625,7 @@ domains:
       calculate-confidence:
         flavour: attribute_mutating
         description: Aggregate confidence score across observations for entity/attribute
+        effect_class: read_snapshot
         metadata:
           tier: diagnostics
           source_of_truth: workflow
@@ -662,6 +669,7 @@ domains:
       get-status:
         flavour: attribute_mutating
         description: Get comprehensive verification status report for CBU
+        effect_class: read_snapshot
         metadata:
           tier: diagnostics
           source_of_truth: workflow
@@ -702,6 +710,7 @@ domains:
       verify-against-registry:
         flavour: attribute_mutating
         description: Check entity against external registry (GLEIF, Companies House)
+        effect_class: read_modify_write
         metadata:
           tier: intent
           source_of_truth: workflow
@@ -750,6 +759,7 @@ domains:
       assert:
         flavour: attribute_mutating
         description: Declarative gate - assert minimum confidence threshold for CBU/entity
+        effect_class: read_modify_write
         metadata:
           tier: intent
           source_of_truth: workflow
@@ -814,6 +824,7 @@ domains:
       record-pattern:
         flavour: instance_adding
         description: Manually record a detected pattern
+        effect_class: append_fact
         metadata:
           tier: intent
           source_of_truth: workflow
@@ -967,6 +978,7 @@ domains:
       list-patterns:
         flavour: attribute_mutating
         description: List detected patterns for CBU
+        effect_class: read_snapshot
         metadata:
           tier: reference
           source_of_truth: workflow

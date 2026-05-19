@@ -5,6 +5,7 @@ domains:
       list-by-service:
         flavour: attribute_mutating
         description: List option definitions for a service version
+        effect_class: read_snapshot
         invocation_phrases:
           - "show service options"
           - "list options for service"
@@ -40,6 +41,7 @@ domains:
       read:
         flavour: attribute_mutating
         description: Read one service option definition
+        effect_class: read_snapshot
         invocation_phrases:
           - "read service option"
           - "inspect service option"

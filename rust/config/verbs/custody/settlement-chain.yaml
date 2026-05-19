@@ -239,6 +239,7 @@ domains:
       list-chains:
         flavour: attribute_mutating
         description: "List settlement chains for CBU"
+        effect_class: read_snapshot
         invocation_phrases:
           - "list settlement chains"
           - "show settlement chains"
@@ -453,6 +454,7 @@ domains:
       list-hops:
         flavour: attribute_mutating
         description: "List hops in a settlement chain"
+        effect_class: read_snapshot
         invocation_phrases:
           - "list settlement hops"
           - "show chain hops"
@@ -495,6 +497,7 @@ domains:
       remove-hop:
         flavour: attribute_mutating
         description: "Remove hop from settlement chain"
+        effect_class: read_modify_write
         invocation_phrases:
           - "remove settlement hop"
           - "delete chain hop"
@@ -639,6 +642,7 @@ domains:
       list-location-preferences:
         flavour: attribute_mutating
         description: "List settlement location preferences for CBU"
+        effect_class: read_snapshot
         invocation_phrases:
           - "list settlement preferences"
           - "show location preferences"
@@ -806,6 +810,7 @@ domains:
       list-cross-border:
         flavour: attribute_mutating
         description: "List cross-border configurations for CBU"
+        effect_class: read_snapshot
         invocation_phrases:
           - "list cross-border configs"
           - "show cross-border routing"

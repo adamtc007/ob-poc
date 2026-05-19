@@ -17,6 +17,7 @@ domains:
         flavour: instance_adding
         description: "Create a new legal contract for a client"
         behavior: crud
+        effect_class: append_fact
         crud:
           operation: insert
           table: legal_contracts
@@ -269,6 +270,7 @@ domains:
         flavour: instance_adding
         description: "Add a product to a contract with rate card"
         behavior: crud
+        effect_class: append_fact
         crud:
           operation: insert
           table: contract_products
@@ -322,6 +324,7 @@ domains:
         flavour: attribute_mutating
         description: "Remove a product from a contract"
         behavior: crud
+        effect_class: read_modify_write
         crud:
           operation: delete
           table: contract_products
@@ -400,6 +403,7 @@ domains:
         flavour: instance_adding
         description: "Create a new rate card"
         behavior: crud
+        effect_class: append_fact
         crud:
           operation: insert
           table: rate_cards
@@ -490,6 +494,7 @@ domains:
         flavour: instance_adding
         description: "Subscribe a CBU to a contract+product (onboarding gate)"
         behavior: crud
+        effect_class: append_fact
         crud:
           operation: insert
           table: cbu_subscriptions
@@ -544,6 +549,7 @@ domains:
         flavour: attribute_mutating
         description: "Unsubscribe a CBU from a contract+product"
         behavior: crud
+        effect_class: read_modify_write
         crud:
           operation: delete
           table: cbu_subscriptions

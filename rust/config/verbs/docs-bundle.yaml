@@ -15,6 +15,7 @@ domains:
         flavour: attribute_mutating
         description: Apply a document bundle to a CBU, creating document requirements
         behavior: plugin
+        effect_class: read_modify_write
         invocation_phrases:
           - apply document bundle
           - apply docs bundle
@@ -97,6 +98,7 @@ domains:
         flavour: attribute_mutating
         description: List document bundles applied to a CBU
         behavior: plugin
+        effect_class: read_snapshot
         invocation_phrases:
           - list applied bundles
           - show applied document bundles
@@ -142,6 +144,7 @@ domains:
         flavour: attribute_mutating
         description: List all available document bundles
         behavior: plugin
+        effect_class: read_snapshot
         invocation_phrases:
           - list available bundles
           - show available document bundles

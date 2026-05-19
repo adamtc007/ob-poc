@@ -29,6 +29,7 @@ domains:
         description: Start a new session or resume a previous one with fresh state
         behavior: plugin
         handler: SessionStartOp
+        effect_class: read_snapshot
         invocation_phrases:
         - "new session"
         - "start new session"
@@ -80,6 +81,7 @@ domains:
         description: Load all CBUs (optionally filtered by client)
         behavior: plugin
         handler: SessionLoadUniverseOp
+        effect_class: read_snapshot
         invocation_phrases:
         - "load universe"
         - "load all"
@@ -124,6 +126,7 @@ domains:
         description: Load all CBUs in a region/jurisdiction (Galaxy = regional)
         behavior: plugin
         handler: SessionLoadGalaxyOp
+        effect_class: read_snapshot
         invocation_phrases:
         - "load galaxy"
         - "load jurisdiction"
@@ -173,6 +176,7 @@ domains:
         description: Load all CBUs under a GROUP entity (apex of ownership hierarchy)
         behavior: plugin
         handler: SessionLoadClusterOp
+        effect_class: read_snapshot
         invocation_phrases:
           # Scope-setting trigger phrases (signal intent to set working scope)
         - "work on"
@@ -286,6 +290,7 @@ domains:
         description: Load a single CBU (Solar System = CBU container)
         behavior: plugin
         handler: SessionLoadSystemOp
+        effect_class: read_snapshot
         invocation_phrases:
         - "load system"
         - "load cbu"
@@ -335,6 +340,7 @@ domains:
         description: Narrow session to only CBUs in a specific jurisdiction
         behavior: plugin
         handler: SessionFilterJurisdictionOp
+        effect_class: read_snapshot
         invocation_phrases:
         - "filter to jurisdiction"
         - "narrow to"
@@ -377,6 +383,7 @@ domains:
         description: Remove a single CBU from the session
         behavior: plugin
         handler: SessionUnloadSystemOp
+        effect_class: read_snapshot
         invocation_phrases:
         - "unload system"
         - "unload cbu"
@@ -418,6 +425,7 @@ domains:
       clear:
         flavour: attribute_mutating
         description: Remove all CBUs from session
+        effect_class: read_snapshot
         invocation_phrases:
         - "clear session"
         - "reset session"
@@ -456,6 +464,7 @@ domains:
       undo:
         flavour: attribute_mutating
         description: Rollback to previous session state
+        effect_class: read_snapshot
         invocation_phrases:
         - "undo"
         - "go back"
@@ -490,6 +499,7 @@ domains:
       redo:
         flavour: attribute_mutating
         description: Re-apply undone state change
+        effect_class: read_snapshot
         invocation_phrases:
         - "redo"
         - "go forward"
@@ -528,6 +538,7 @@ domains:
       info:
         flavour: attribute_mutating
         description: Get session summary
+        effect_class: read_snapshot
         invocation_phrases:
         - "session info"
         - "show session"
@@ -562,6 +573,7 @@ domains:
       list:
         flavour: attribute_mutating
         description: List loaded CBUs
+        effect_class: read_snapshot
         invocation_phrases:
         - "show loaded CBUs"
         - "what CBUs are loaded"
@@ -610,6 +622,7 @@ domains:
         description: "Set client group context for entity resolution"
         behavior: plugin
         handler: SessionSetClientOp
+        effect_class: read_snapshot
         invocation_phrases:
         - "set client context"
         - "I'm working with"
@@ -666,6 +679,7 @@ domains:
         description: "Set persona context for tag filtering"
         behavior: plugin
         handler: SessionSetPersonaOp
+        effect_class: read_snapshot
         invocation_phrases:
         - "I'm doing kyc"
         - "trading view"
@@ -714,6 +728,7 @@ domains:
         description: "Set current structure (CBU) context for subsequent operations"
         behavior: plugin
         handler: SessionSetStructureOp
+        effect_class: read_snapshot
         invocation_phrases:
         - "select structure"
         - "use structure"
@@ -767,6 +782,7 @@ domains:
         description: "Set current KYC case context for subsequent operations"
         behavior: plugin
         handler: SessionSetCaseOp
+        effect_class: read_snapshot
         invocation_phrases:
         - "select case"
         - "use case"
@@ -813,6 +829,7 @@ domains:
         description: "Set current mandate (trading profile) context for subsequent operations"
         behavior: plugin
         handler: SessionSetMandateOp
+        effect_class: read_snapshot
         invocation_phrases:
         - "select mandate"
         - "use mandate"
@@ -864,6 +881,7 @@ domains:
         description: "Load a deal into session context for taxonomy visualization"
         behavior: plugin
         handler: SessionLoadDealOp
+        effect_class: read_snapshot
         invocation_phrases:
         - "load deal"
         - "show deal"
@@ -918,6 +936,7 @@ domains:
         description: "Clear deal context from session"
         behavior: plugin
         handler: SessionUnloadDealOp
+        effect_class: read_snapshot
         invocation_phrases:
         - "unload deal"
         - "close deal"

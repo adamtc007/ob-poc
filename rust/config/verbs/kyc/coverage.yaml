@@ -15,6 +15,7 @@ domains:
       compute:
         flavour: attribute_mutating
         description: "Compute per-prong coverage for a UBO determination run"
+        effect_class: read_snapshot
         invocation_phrases:
         - "compute coverage"
         - "calculate coverage"

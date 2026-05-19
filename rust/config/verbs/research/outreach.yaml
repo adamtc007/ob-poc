@@ -20,6 +20,7 @@ domains:
       create-request:
         flavour: instance_adding
         description: "Create an outreach request"
+        effect_class: append_fact
         invocation_phrases:
           - "create outreach request"
           - "request ownership disclosure"
@@ -184,6 +185,7 @@ domains:
       record-response:
         flavour: attribute_mutating
         description: "Record response to outreach request"
+        effect_class: read_modify_write
         invocation_phrases:
           - "record the response"
           - "they responded"
@@ -330,6 +332,7 @@ domains:
       list-overdue:
         flavour: attribute_mutating
         description: "List overdue outreach requests"
+        effect_class: read_snapshot
         invocation_phrases:
           - "what's overdue"
           - "pending outreach"
@@ -405,6 +408,7 @@ domains:
       plan-generate:
         flavour: attribute_mutating
         description: "Generate outreach plan from coverage gaps and UBO candidates"
+        effect_class: read_modify_write
         invocation_phrases:
           - "generate outreach plan"
           - "create outreach plan"

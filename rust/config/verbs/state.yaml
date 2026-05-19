@@ -12,6 +12,7 @@ domains:
         description: Compute reducer state for a single slot
         behavior: plugin
         handler: StateDeriveOp
+        effect_class: read_snapshot
         metadata:
           tier: diagnostics
           source_of_truth: operational
@@ -65,6 +66,7 @@ domains:
         description: Compute a full reducer trace for a single slot
         behavior: plugin
         handler: StateDiagnoseOp
+        effect_class: read_snapshot
         metadata:
           tier: diagnostics
           source_of_truth: operational
@@ -118,6 +120,7 @@ domains:
         description: Compute reducer state across all discovered slots for a constellation
         behavior: plugin
         handler: StateDeriveAllOp
+        effect_class: read_snapshot
         metadata:
           tier: diagnostics
           source_of_truth: operational
@@ -165,6 +168,7 @@ domains:
         description: Explain why a verb is blocked for a slot
         behavior: plugin
         handler: StateBlockedWhyOp
+        effect_class: read_snapshot
         metadata:
           tier: diagnostics
           source_of_truth: operational
@@ -221,6 +225,7 @@ domains:
         description: Run reducer consistency checks across discovered slots
         behavior: plugin
         handler: StateCheckConsistencyOp
+        effect_class: read_snapshot
         metadata:
           tier: diagnostics
           source_of_truth: operational
@@ -265,6 +270,7 @@ domains:
             baseline: benign
       override:
         flavour: discretionary
+        effect_class: read_modify_write
         role_guard:
           any_of: [senior_compliance, mlro, executive, board]
         audit_class: state_override
@@ -339,6 +345,7 @@ domains:
             baseline: requires_confirmation
       revoke-override:
         flavour: discretionary
+        effect_class: read_modify_write
         role_guard:
           any_of: [senior_compliance, mlro, executive, board]
         audit_class: state_revoke_override
@@ -391,6 +398,7 @@ domains:
         description: List active reducer overrides for a CBU
         behavior: plugin
         handler: StateListOverridesOp
+        effect_class: read_snapshot
         metadata:
           tier: diagnostics
           source_of_truth: operational

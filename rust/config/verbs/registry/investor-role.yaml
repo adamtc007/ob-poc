@@ -74,6 +74,7 @@ domains:
           TEMPORAL BEHAVIOR: If a profile already exists for this issuer-holder pair,
           and you provide a different effective_from date, the old record gets closed
           (effective_to set) and a new version is created. This preserves history.
+        effect_class: read_modify_write
         metadata:
           tier: intent
           source_of_truth: register
@@ -312,6 +313,7 @@ domains:
           on July 1, 2024:
           - read-as-of with date=2024-03-15 returns END_INVESTOR
           - read-as-of with date=2024-09-15 returns INTERMEDIARY_FOF
+        effect_class: read_snapshot
         metadata:
           tier: diagnostics
           source_of_truth: register
@@ -370,6 +372,7 @@ domains:
           nominees vs end investors, or auditing UBO eligibility settings.
 
           Can filter by role_type or is_ubo_eligible to find specific classifications.
+        effect_class: read_snapshot
         metadata:
           tier: diagnostics
           source_of_truth: register
@@ -428,6 +431,7 @@ domains:
           Use this to see how a specific investor (e.g., BlackRock) is classified
           across different funds. The same holder may have different roles for
           different issuers - this shows the complete picture.
+        effect_class: read_snapshot
         metadata:
           tier: diagnostics
           source_of_truth: register
@@ -476,6 +480,7 @@ domains:
 
           Use for regulatory audit trails, investigating classification changes,
           or understanding how holder treatment evolved over time.
+        effect_class: read_snapshot
         metadata:
           tier: diagnostics
           source_of_truth: register
@@ -542,6 +547,7 @@ domains:
 
           This is the most common classification for custodial holdings. The beneficial
           owners behind the nominee should be identified separately.
+        effect_class: read_modify_write
         metadata:
           tier: intent
           source_of_truth: register
@@ -613,6 +619,7 @@ domains:
           FoFs are not end investors - they're intermediaries. Economic exposure
           computation can traverse through them to find underlying investors
           when look-through is requested and BO data is available.
+        effect_class: read_modify_write
         metadata:
           tier: intent
           source_of_truth: register
@@ -687,6 +694,7 @@ domains:
 
           Master-feeder structures are common for institutional funds. The master
           is not an end investor - it's a pooling mechanism.
+        effect_class: read_modify_write
         metadata:
           tier: intent
           source_of_truth: register
@@ -767,6 +775,7 @@ domains:
 
           End investors ARE UBO-eligible and WILL create UBO edges when their
           holdings exceed disclosure thresholds.
+        effect_class: read_modify_write
         metadata:
           tier: intent
           source_of_truth: register

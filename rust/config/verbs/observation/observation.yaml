@@ -5,6 +5,7 @@ domains:
       record:
         flavour: instance_adding
         description: Record an attribute observation
+        effect_class: append_fact
         metadata:
           tier: intent
           source_of_truth: operational
@@ -106,6 +107,7 @@ domains:
       record-from-document:
         flavour: attribute_mutating
         description: Record observation extracted from a document
+        effect_class: read_modify_write
         metadata:
           tier: intent
           source_of_truth: operational
@@ -219,6 +221,7 @@ domains:
       list-for-entity:
         flavour: attribute_mutating
         description: List all observations for an entity
+        effect_class: read_snapshot
         metadata:
           tier: reference
           source_of_truth: operational
@@ -324,6 +327,7 @@ domains:
       get-current:
         flavour: attribute_mutating
         description: Get current best observation for an attribute
+        effect_class: read_snapshot
         metadata:
           tier: reference
           source_of_truth: operational
@@ -366,6 +370,7 @@ domains:
       reconcile:
         flavour: attribute_mutating
         description: Compare observations for an attribute and auto-create discrepancies
+        effect_class: read_modify_write
         metadata:
           tier: intent
           source_of_truth: operational
@@ -421,6 +426,7 @@ domains:
       verify-allegations:
         flavour: attribute_mutating
         description: Batch verify pending allegations against observations
+        effect_class: read_modify_write
         metadata:
           tier: intent
           source_of_truth: operational

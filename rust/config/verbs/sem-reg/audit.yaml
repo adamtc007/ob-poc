@@ -24,6 +24,7 @@ domains:
       create-plan:
         flavour: instance_adding
         description: Create a new agent plan with goal and assumptions
+        effect_class: read_modify_write
         metadata:
           tier: diagnostics
           source_of_truth: operational
@@ -63,6 +64,7 @@ domains:
       add-plan-step:
         flavour: instance_adding
         description: Add a step to an existing agent plan
+        effect_class: read_modify_write
         metadata:
           tier: diagnostics
           source_of_truth: operational
@@ -105,6 +107,7 @@ domains:
       validate-plan:
         flavour: attribute_mutating
         description: Validate an agent plan (check all steps have valid verbs and snapshots)
+        effect_class: read_snapshot
         metadata:
           tier: diagnostics
           source_of_truth: operational
@@ -140,6 +143,7 @@ domains:
       execute-plan-step:
         flavour: attribute_mutating
         description: Execute a specific step in an agent plan
+        effect_class: read_modify_write
         metadata:
           tier: diagnostics
           source_of_truth: operational
@@ -181,6 +185,7 @@ domains:
             baseline: reviewable
       record-decision:
         flavour: discretionary
+        effect_class: read_modify_write
         role_guard:
           any_of: [compliance_admin, senior_compliance, mlro]
         audit_class: audit_record_decision
@@ -229,6 +234,7 @@ domains:
       record-escalation:
         flavour: attribute_mutating
         description: Record an escalation to a human reviewer
+        effect_class: read_modify_write
         metadata:
           tier: diagnostics
           source_of_truth: operational
@@ -273,6 +279,7 @@ domains:
       record-disambiguation:
         flavour: attribute_mutating
         description: Record a disambiguation prompt and selected choice
+        effect_class: read_modify_write
         metadata:
           tier: diagnostics
           source_of_truth: operational
@@ -320,6 +327,7 @@ domains:
       record-observation:
         flavour: attribute_mutating
         description: Record an observation on a subject entity
+        effect_class: read_modify_write
         metadata:
           tier: diagnostics
           source_of_truth: operational

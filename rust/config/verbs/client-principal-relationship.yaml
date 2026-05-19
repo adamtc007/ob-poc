@@ -13,6 +13,7 @@ domains:
         flavour: attribute_mutating
         description: "Record a new client-principal-offering relationship"
         behavior: plugin
+        effect_class: read_modify_write
         lifecycle:
           precondition_checks:
             - "requires_prior:booking-principal.create"
@@ -67,6 +68,7 @@ domains:
             baseline: reviewable
       terminate:
         flavour: discretionary
+        effect_class: read_modify_write
         role_guard:
           any_of: [compliance_officer, senior_compliance, mlro]
         audit_class: client_principal_relationship_terminate
@@ -102,6 +104,7 @@ domains:
         flavour: attribute_mutating
         description: "List client-principal relationships with optional status filter"
         behavior: plugin
+        effect_class: read_snapshot
         metadata:
           tier: intent
           source_of_truth: operational
@@ -143,6 +146,7 @@ domains:
         flavour: attribute_mutating
         description: "Check cross-sell opportunities — compare existing offerings against available offerings"
         behavior: plugin
+        effect_class: read_snapshot
         lifecycle:
           precondition_checks:
             - "requires_scope:client_group"

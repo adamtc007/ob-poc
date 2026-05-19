@@ -26,6 +26,7 @@ domains:
       get:
         flavour: attribute_mutating
         description: Get the current focus state (what object the agent is working on)
+        effect_class: read_snapshot
         metadata:
           tier: diagnostics
           source_of_truth: operational
@@ -102,6 +103,7 @@ domains:
       render:
         flavour: attribute_mutating
         description: Render the current focus context (computes ShowPacket with all viewports)
+        effect_class: read_snapshot
         metadata:
           tier: diagnostics
           source_of_truth: operational
@@ -134,6 +136,7 @@ domains:
       viewport:
         flavour: attribute_mutating
         description: Compute a single viewport by kind (Focus Summary, Inspector, Diff, Gates)
+        effect_class: read_snapshot
         metadata:
           tier: diagnostics
           source_of_truth: operational
@@ -176,6 +179,7 @@ domains:
       diff:
         flavour: attribute_mutating
         description: Compute a structured diff between predecessor and current draft
+        effect_class: read_snapshot
         metadata:
           tier: diagnostics
           source_of_truth: operational
@@ -215,6 +219,7 @@ domains:
       capture-manifest:
         flavour: attribute_mutating
         description: Capture and persist a ViewportManifest snapshot of the current focus
+        effect_class: read_snapshot
         metadata:
           tier: diagnostics
           source_of_truth: operational

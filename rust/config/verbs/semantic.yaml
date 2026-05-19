@@ -22,6 +22,7 @@ domains:
       get-state:
         flavour: attribute_mutating
         description: "Derive semantic state for a CBU - shows stage progress, gaps, and blockers"
+        effect_class: read_snapshot
         metadata:
           tier: reference
           source_of_truth: catalog
@@ -72,6 +73,7 @@ domains:
       list-stages:
         flavour: attribute_mutating
         description: "List all defined semantic stages with their dependencies"
+        effect_class: read_snapshot
         metadata:
           tier: reference
           source_of_truth: catalog
@@ -107,6 +109,7 @@ domains:
       stages-for-product:
         flavour: attribute_mutating
         description: "Get required stages for a specific product"
+        effect_class: read_snapshot
         metadata:
           tier: intent
           source_of_truth: catalog
@@ -157,6 +160,7 @@ domains:
       next-actions:
         flavour: attribute_mutating
         description: "Get the next actionable stages for a CBU (unblocked, incomplete stages)"
+        effect_class: read_snapshot
         metadata:
           tier: intent
           source_of_truth: catalog
@@ -202,6 +206,7 @@ domains:
       missing-entities:
         flavour: attribute_mutating
         description: "Get entities that are missing for stage completion"
+        effect_class: read_snapshot
         metadata:
           tier: intent
           source_of_truth: catalog
@@ -255,6 +260,7 @@ domains:
       prompt-context:
         flavour: attribute_mutating
         description: "Get semantic state formatted for agent prompt injection"
+        effect_class: read_snapshot
         metadata:
           tier: intent
           source_of_truth: catalog

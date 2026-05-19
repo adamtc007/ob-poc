@@ -25,6 +25,7 @@ domains:
       health-pending:
         flavour: attribute_mutating
         description: Check pending changeset health (counts by status)
+        effect_class: read_snapshot
         metadata:
           tier: diagnostics
           source_of_truth: operational
@@ -57,6 +58,7 @@ domains:
       health-stale-dryruns:
         flavour: attribute_mutating
         description: Check for stale dry-run results older than threshold
+        effect_class: read_snapshot
         metadata:
           tier: diagnostics
           source_of_truth: operational
@@ -92,6 +94,7 @@ domains:
       cleanup:
         flavour: attribute_mutating
         description: Run retention cleanup on old rejected/failed changesets
+        effect_class: read_modify_write
         metadata:
           tier: diagnostics
           source_of_truth: operational
@@ -127,6 +130,7 @@ domains:
       bootstrap-seeds:
         flavour: attribute_mutating
         description: Bootstrap seed bundles into the registry
+        effect_class: read_modify_write
         metadata:
           tier: diagnostics
           source_of_truth: operational
@@ -161,6 +165,7 @@ domains:
       drain-outbox:
         flavour: attribute_mutating
         description: Check outbox event queue status and trigger flush
+        effect_class: read_snapshot
         metadata:
           tier: diagnostics
           source_of_truth: operational
@@ -196,6 +201,7 @@ domains:
       reindex-embeddings:
         flavour: attribute_mutating
         description: Trigger embedding reindex by spawning populate_embeddings binary
+        effect_class: read_modify_write
         metadata:
           tier: diagnostics
           source_of_truth: operational
@@ -235,6 +241,7 @@ domains:
       validate-schema-sync:
         flavour: attribute_mutating
         description: Validate that schema and registry are in sync (drift detection)
+        effect_class: read_snapshot
         metadata:
           tier: diagnostics
           source_of_truth: operational

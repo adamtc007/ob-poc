@@ -65,6 +65,7 @@ domains:
       list:
         flavour: attribute_mutating
         description: List security types for an instrument class
+        effect_class: read_snapshot
         metadata:
           tier: reference
           source_of_truth: operational

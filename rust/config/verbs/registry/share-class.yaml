@@ -408,6 +408,7 @@ domains:
         flavour: attribute_mutating
         description: List share classes for a fund
         behavior: crud
+        effect_class: read_snapshot
         metadata:
           tier: diagnostics
           source_of_truth: register
@@ -612,6 +613,7 @@ domains:
 
       hard-close:
         flavour: discretionary
+        effect_class: admin_override
         role_guard:
           any_of: [compliance_admin, senior_compliance, mlro]
         audit_class: share_class_hard_close
@@ -688,6 +690,7 @@ domains:
 
       begin-winddown:
         flavour: discretionary
+        effect_class: admin_override
         role_guard:
           any_of: [compliance_admin, senior_compliance, mlro]
         audit_class: share_class_begin_winddown

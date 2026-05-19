@@ -13,6 +13,7 @@ domains:
       list:
         flavour: attribute_mutating
         description: List all available research sources
+        effect_class: read_snapshot
         invocation_phrases:
           - "list research sources"
           - "what sources are available"
@@ -41,6 +42,7 @@ domains:
       info:
         flavour: attribute_mutating
         description: Get information about a specific research source
+        effect_class: read_snapshot
         invocation_phrases:
           - "tell me about this source"
           - "source capabilities"
@@ -76,6 +78,7 @@ domains:
       search:
         flavour: attribute_mutating
         description: Search a specific source for entities by name
+        effect_class: read_snapshot
         invocation_phrases:
           - "search source for"
           - "find in source"
@@ -125,6 +128,7 @@ domains:
       fetch:
         flavour: attribute_mutating
         description: Fetch entity data from a source by its key
+        effect_class: read_snapshot
         invocation_phrases:
           - "fetch from source"
           - "get record from"
@@ -169,6 +173,7 @@ domains:
       find-for-jurisdiction:
         flavour: attribute_mutating
         description: Find the best source for a jurisdiction and data type
+        effect_class: read_snapshot
         invocation_phrases:
           - "which source for"
           - "best source for jurisdiction"

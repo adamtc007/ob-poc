@@ -5,6 +5,7 @@ domains:
       record:
         flavour: instance_adding
         description: Record a client allegation about an entity attribute
+        effect_class: append_fact
         metadata:
           tier: intent
           source_of_truth: operational
@@ -297,6 +298,7 @@ domains:
       list-by-entity:
         flavour: attribute_mutating
         description: List allegations for an entity
+        effect_class: read_snapshot
         metadata:
           tier: reference
           source_of_truth: operational

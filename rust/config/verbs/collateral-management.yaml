@@ -198,6 +198,7 @@ domains:
 
       terminate:
         flavour: discretionary
+        effect_class: admin_override
         role_guard:
           any_of: [compliance_officer, senior_compliance, mlro]
         audit_class: collateral_management_terminate

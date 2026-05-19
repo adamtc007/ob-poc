@@ -188,6 +188,7 @@ domains:
       list-by-entity:
         flavour: attribute_mutating
         description: List current board composition for an entity
+        effect_class: read_snapshot
         metadata:
           tier: reference
           source_of_truth: operational
@@ -237,6 +238,7 @@ domains:
       list-by-person:
         flavour: attribute_mutating
         description: List all board positions held by a person
+        effect_class: read_snapshot
         metadata:
           tier: reference
           source_of_truth: operational
@@ -473,6 +475,7 @@ domains:
       list-appointment-rights:
         flavour: attribute_mutating
         description: List who has appointment rights over an entity's board
+        effect_class: read_snapshot
         metadata:
           tier: reference
           source_of_truth: operational
@@ -522,6 +525,7 @@ domains:
       list-rights-held:
         flavour: attribute_mutating
         description: List appointment rights held by an entity
+        effect_class: read_snapshot
         metadata:
           tier: reference
           source_of_truth: operational
@@ -575,6 +579,7 @@ domains:
           - Majority of appointments
           - Appointment/removal rights
           - Veto powers
+        effect_class: read_snapshot
         metadata:
           tier: intent
           source_of_truth: operational

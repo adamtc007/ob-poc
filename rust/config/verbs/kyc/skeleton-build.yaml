@@ -5,6 +5,7 @@ domains:
       build:
         flavour: attribute_mutating
         description: Run the full skeleton build pipeline for a KYC case
+        effect_class: read_modify_write
         invocation_phrases:
         - "build skeleton"
         - "run skeleton build"

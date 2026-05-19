@@ -5,6 +5,7 @@ domains:
       create:
         flavour: instance_adding
         description: Create ISDA agreement with counterparty (idempotent by cbu+counterparty+date). Internal - use trading-profile.add-component for authoring.
+        effect_class: read_modify_write
         metadata:
           tier: projection
           source_of_truth: operational
@@ -150,6 +151,7 @@ domains:
       add-csa:
         flavour: instance_adding
         description: Add CSA (Credit Support Annex) to ISDA (idempotent by isda+csa_type). Internal - use trading-profile.add-component for authoring.
+        effect_class: read_modify_write
         metadata:
           tier: projection
           source_of_truth: operational
@@ -226,6 +228,7 @@ domains:
       remove-coverage:
         flavour: attribute_mutating
         description: Remove instrument class coverage from ISDA. Internal - use trading-profile.remove-component for authoring.
+        effect_class: read_modify_write
         metadata:
           tier: projection
           source_of_truth: operational
@@ -265,6 +268,7 @@ domains:
       remove-csa:
         flavour: attribute_mutating
         description: Remove CSA from ISDA. Internal - use trading-profile.remove-component for authoring.
+        effect_class: read_modify_write
         metadata:
           tier: projection
           source_of_truth: operational
@@ -304,6 +308,7 @@ domains:
       list:
         flavour: attribute_mutating
         description: List ISDA agreements for CBU
+        effect_class: read_snapshot
         metadata:
           tier: diagnostics
           source_of_truth: operational

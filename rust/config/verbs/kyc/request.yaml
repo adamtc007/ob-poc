@@ -9,6 +9,7 @@ domains:
       create:
         flavour: instance_adding
         description: Create an outstanding request (generic)
+        effect_class: read_modify_write
         metadata:
           tier: intent
           source_of_truth: operational
@@ -174,6 +175,7 @@ domains:
       overdue:
         flavour: attribute_mutating
         description: List overdue requests
+        effect_class: read_modify_write
         metadata:
           tier: intent
           source_of_truth: operational
@@ -232,6 +234,7 @@ domains:
       fulfill:
         flavour: attribute_mutating
         description: Mark request as fulfilled
+        effect_class: read_modify_write
         metadata:
           tier: intent
           source_of_truth: operational
@@ -293,6 +296,7 @@ domains:
       cancel:
         flavour: attribute_mutating
         description: Cancel a pending request
+        effect_class: read_modify_write
         metadata:
           tier: intent
           source_of_truth: operational
@@ -338,6 +342,7 @@ domains:
       extend:
         flavour: attribute_mutating
         description: Extend request due date
+        effect_class: read_modify_write
         metadata:
           tier: intent
           source_of_truth: operational
@@ -388,6 +393,7 @@ domains:
       remind:
         flavour: attribute_mutating
         description: Send reminder for pending request
+        effect_class: read_modify_write
         metadata:
           tier: intent
           source_of_truth: operational
@@ -439,6 +445,7 @@ domains:
 
       escalate:
         flavour: discretionary
+        effect_class: read_modify_write
         role_guard:
           any_of: [compliance_officer, senior_compliance, mlro]
         audit_class: request_escalate
@@ -491,6 +498,7 @@ domains:
 
       waive:
         flavour: discretionary
+        effect_class: read_modify_write
         role_guard:
           any_of: [compliance_admin, senior_compliance, mlro]
         audit_class: request_waive

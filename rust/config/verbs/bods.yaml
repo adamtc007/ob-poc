@@ -5,6 +5,7 @@ domains:
       discover-ubos:
         flavour: attribute_mutating
         description: Discover Ultimate Beneficial Owners for an entity using GLEIF + BODS data
+        effect_class: read_snapshot
         invocation_phrases:
           - "discover UBOs"
           - "find UBOs"
@@ -51,6 +52,7 @@ domains:
       import:
         flavour: instance_adding
         description: Bulk import BODS statements from data dump
+        effect_class: read_snapshot
         invocation_phrases:
           - "import from BODS"
           - "load BODS data"
@@ -173,6 +175,7 @@ domains:
       get-statement:
         flavour: attribute_mutating
         description: Get a BODS statement by ID
+        effect_class: read_snapshot
         invocation_phrases:
           - "get BODS statement"
           - "fetch BODS record"
@@ -213,6 +216,7 @@ domains:
       list-by-entity:
         flavour: attribute_mutating
         description: List BODS statements linked to an entity
+        effect_class: read_snapshot
         metadata:
           tier: reference
           source_of_truth: external
@@ -257,6 +261,7 @@ domains:
       find-by-lei:
         flavour: attribute_mutating
         description: Find BODS entity statement by LEI
+        effect_class: read_snapshot
         metadata:
           tier: reference
           source_of_truth: external
@@ -343,6 +348,7 @@ domains:
       list-ownership:
         flavour: attribute_mutating
         description: List ownership statements for an entity
+        effect_class: read_snapshot
         metadata:
           tier: reference
           source_of_truth: external
@@ -390,6 +396,7 @@ domains:
       sync-from-gleif:
         flavour: attribute_mutating
         description: Sync BODS data from GLEIF reporting exceptions
+        effect_class: read_snapshot
         metadata:
           tier: composite
           source_of_truth: external

@@ -14,6 +14,7 @@ domains:
         flavour: instance_adding
         description: "Create a new booking principal (legal entity + booking location envelope)"
         behavior: plugin
+        effect_class: read_modify_write
         lifecycle:
           precondition_checks:
           - "requires_prior:legal-entity.create"
@@ -73,6 +74,7 @@ domains:
         flavour: attribute_mutating
         description: "Update a booking principal's fields"
         behavior: plugin
+        effect_class: read_modify_write
         metadata:
           tier: intent
           source_of_truth: operational
@@ -111,6 +113,7 @@ domains:
         flavour: attribute_mutating
         description: "Retire a booking principal (checks active relationships first)"
         behavior: plugin
+        effect_class: read_modify_write
         metadata:
           tier: intent
           source_of_truth: operational
@@ -145,6 +148,7 @@ domains:
         flavour: attribute_mutating
         description: "Run full eligibility evaluation — snapshot client profile, gather rules, merge by boundary, check delivery, pin audit record"
         behavior: plugin
+        effect_class: read_modify_write
         lifecycle:
           precondition_checks:
           - "requires_scope:client_group"
@@ -212,6 +216,7 @@ domains:
         flavour: attribute_mutating
         description: "Record selection of a principal from an evaluation"
         behavior: plugin
+        effect_class: read_modify_write
         lifecycle:
           precondition_checks:
           - "requires_prior:booking-principal.evaluate"
@@ -250,6 +255,7 @@ domains:
         flavour: attribute_mutating
         description: "Retrieve full explain payload and audit trail for an evaluation"
         behavior: plugin
+        effect_class: read_snapshot
         metadata:
           tier: intent
           source_of_truth: operational
@@ -288,6 +294,7 @@ domains:
         flavour: attribute_mutating
         description: "Generate coverage matrix showing principal × jurisdiction × service availability"
         behavior: plugin
+        effect_class: read_snapshot
         metadata:
           tier: intent
           source_of_truth: operational
@@ -322,6 +329,7 @@ domains:
         flavour: attribute_mutating
         description: "Generate gap report across regulatory, commercial, and operational boundaries"
         behavior: plugin
+        effect_class: read_snapshot
         metadata:
           tier: intent
           source_of_truth: operational
@@ -348,6 +356,7 @@ domains:
         flavour: attribute_mutating
         description: "Analyse impact of retiring a booking principal on active client relationships"
         behavior: plugin
+        effect_class: read_snapshot
         metadata:
           tier: intent
           source_of_truth: operational

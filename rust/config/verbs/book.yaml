@@ -126,6 +126,7 @@ domains:
 
       abandon:
         flavour: discretionary
+        effect_class: admin_override
         role_guard:
           any_of: [compliance_admin, senior_compliance, mlro]
         audit_class: book_abandon

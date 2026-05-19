@@ -12,6 +12,7 @@ domains:
         flavour: attribute_mutating
         description: List CBU's traded universe (read from operational tables)
         behavior: crud
+        effect_class: read_snapshot
         metadata:
           tier: diagnostics
           source_of_truth: operational
@@ -55,6 +56,7 @@ domains:
         flavour: attribute_mutating
         description: List SSIs for a CBU (read from operational tables)
         behavior: crud
+        effect_class: read_snapshot
         metadata:
           tier: diagnostics
           source_of_truth: operational
@@ -107,6 +109,7 @@ domains:
         flavour: attribute_mutating
         description: List booking rules for a CBU (read from operational tables)
         behavior: crud
+        effect_class: read_snapshot
         metadata:
           tier: diagnostics
           source_of_truth: operational
@@ -156,6 +159,7 @@ domains:
         flavour: attribute_mutating
         description: List agent overrides for an SSI
         behavior: crud
+        effect_class: read_snapshot
         metadata:
           tier: diagnostics
           source_of_truth: operational
@@ -207,6 +211,7 @@ domains:
         description: Compare universe to booking rules, find gaps
         behavior: plugin
         handler: derive_required_coverage
+        effect_class: read_modify_write
         metadata:
           tier: diagnostics
           source_of_truth: operational
@@ -247,6 +252,7 @@ domains:
         description: Validate that all universe entries have matching booking rules
         behavior: plugin
         handler: validate_booking_coverage
+        effect_class: read_snapshot
         metadata:
           tier: diagnostics
           source_of_truth: operational
@@ -292,6 +298,7 @@ domains:
         description: Find SSI for given trade characteristics (simulate ALERT lookup)
         behavior: plugin
         handler: lookup_ssi_for_trade
+        effect_class: read_snapshot
         metadata:
           tier: diagnostics
           source_of_truth: operational
@@ -358,6 +365,7 @@ domains:
         description: Bulk import SSIs from SSI_ONBOARDING document
         behavior: plugin
         handler: setup_ssi_from_document
+        effect_class: read_modify_write
         metadata:
           tier: composite
           source_of_truth: operational
