@@ -25,7 +25,9 @@
 
 /// Identifies a node (step) within a `PopulatedExecutionDag` by its index in the
 /// `ExecutionPlan::steps` vector.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, serde::Serialize, serde::Deserialize,
+)]
 pub struct NodeId(pub usize);
 
 impl std::fmt::Display for NodeId {
@@ -35,7 +37,7 @@ impl std::fmt::Display for NodeId {
 }
 
 /// Identifies a binding slot by name (the `@name` in DSL source, or `$name` in typed form).
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 pub struct BindingSlotId(pub String);
 
 impl BindingSlotId {
@@ -54,7 +56,7 @@ impl std::fmt::Display for BindingSlotId {
 ///
 /// Phase 5 implements `WaitAll` only. `WaitN` and `WaitSubset` are Phase 6
 /// (require BPMN inclusive-gateway / race-pattern use cases).
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub enum JoinBarrierMode {
     /// All declared predecessor nodes must complete with a compatible outcome
     /// before the join node fires. Failure of any predecessor propagates as
@@ -71,7 +73,8 @@ pub enum JoinBarrierMode {
 /// The six edge types have distinct runtime meanings. The runtime does NOT
 /// infer a single meaning from a generic "dependency" edge; each type is
 /// dispatched to its own evaluation path.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "snake_case", tag = "kind")]
 pub enum DagEdge {
     /// Consumer node consumes a typed binding produced by producer node.
     ///
@@ -194,7 +197,7 @@ impl DagEdge {
 /// - cancellation scope (CancellationScopeEdge stub)
 ///
 /// v0.5 §4.5
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, serde::Serialize, serde::Deserialize)]
 pub struct PopulatedExecutionDag {
     pub edges: Vec<DagEdge>,
 }

@@ -17,6 +17,7 @@ pub mod binding_context;
 pub mod compiler;
 pub mod config;
 pub mod diagnostics;
+pub mod executable_plan;
 pub mod execution_dag;
 pub mod frontier;
 pub mod parser;
@@ -39,5 +40,10 @@ pub use config::types::{
     VerbMetadata, VerbOutputConfig, VerbProduces, VerbsConfig,
 };
 pub use diagnostics::{Diagnostic, DiagnosticCode, Severity, SourceSpan};
+pub use executable_plan::{
+    AuthorityContext, BindingFrameSchema, BindingSlot, EffectClass, ExecutablePlan,
+    ExecutionStepSummary, InstructionInput, PlanId, RuntimeInstruction, SemOsSnapshotId,
+    TransactionPolicy,
+};
 pub use execution_dag::{BindingSlotId, DagEdge, JoinBarrierMode, NodeId, PopulatedExecutionDag};
 pub use parser::parse_program;
