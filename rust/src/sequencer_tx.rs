@@ -66,10 +66,7 @@ impl PgTransactionScope {
     /// Returns `Err` if the pool cannot acquire a connection within `timeout`.
     /// Callers should use this instead of `begin()` in production dispatch paths
     /// to prevent indefinite hangs when the connection pool is exhausted.
-    pub async fn begin_timeout(
-        pool: &PgPool,
-        timeout: Duration,
-    ) -> Result<Self, anyhow::Error> {
+    pub async fn begin_timeout(pool: &PgPool, timeout: Duration) -> Result<Self, anyhow::Error> {
         tokio::time::timeout(timeout, pool.begin())
             .await
             .map_err(|_| {

@@ -1347,27 +1347,25 @@ impl DslExecutor {
                 tracing::debug!("execute_verb: EXIT success {}.{}", vc.domain, vc.verb);
                 Ok(result)
             }
-            Err(step_err) => {
-                match scope.rollback().await {
-                    Ok(()) => Err(step_err),
-                    Err(rollback_err) => {
-                        tracing::error!(
-                            domain = %vc.domain,
-                            verb = %vc.verb,
-                            %rollback_err,
-                            step_error = %step_err,
-                            "execute_verb: CRITICAL — verb failed AND rollback failed; \
-                             DB state is unknown"
-                        );
-                        Err(anyhow::anyhow!(
-                            "{}.{} failed ({step_err:#}) AND rollback failed ({rollback_err:#}); \
+            Err(step_err) => match scope.rollback().await {
+                Ok(()) => Err(step_err),
+                Err(rollback_err) => {
+                    tracing::error!(
+                        domain = %vc.domain,
+                        verb = %vc.verb,
+                        %rollback_err,
+                        step_error = %step_err,
+                        "execute_verb: CRITICAL — verb failed AND rollback failed; \
+                         DB state is unknown"
+                    );
+                    Err(anyhow::anyhow!(
+                        "{}.{} failed ({step_err:#}) AND rollback failed ({rollback_err:#}); \
                              DB state is unknown",
-                            vc.domain,
-                            vc.verb
-                        ))
-                    }
+                        vc.domain,
+                        vc.verb
+                    ))
                 }
-            }
+            },
         }
     }
 
@@ -2029,7 +2027,9 @@ impl DslExecutor {
             let mut step_scope =
                 PgTransactionScope::begin_timeout(&self.pool, pool_acquire_timeout())
                     .await
-                    .map_err(|e| anyhow!("execute_plan step {} ({}): {}", step_index, verb_name, e))?;
+                    .map_err(|e| {
+                        anyhow!("execute_plan step {} ({}): {}", step_index, verb_name, e)
+                    })?;
 
             let verb_result = {
                 let scope_dyn: &mut dyn dsl_runtime::tx::TransactionScope = &mut step_scope;
@@ -2112,7 +2112,9 @@ impl DslExecutor {
             step_scope.commit().await.map_err(|e| {
                 anyhow!(
                     "execute_plan step {} ({}): commit failed: {:#}",
-                    step_index, verb_name, e
+                    step_index,
+                    verb_name,
+                    e
                 )
             })?;
 
@@ -2211,8 +2213,8 @@ impl DslExecutor {
             plan.steps.len()
         );
 
-        let mut scope = PgTransactionScope::begin_timeout(&self.pool, pool_acquire_timeout())
-            .await?;
+        let mut scope =
+            PgTransactionScope::begin_timeout(&self.pool, pool_acquire_timeout()).await?;
 
         let outcome = {
             let scope_dyn: &mut dyn dsl_runtime::tx::TransactionScope = &mut scope;
@@ -2735,7 +2737,6 @@ impl DslExecutor {
         self.execute_plan(&plan, ctx).await
     }
 }
-
 
 #[cfg(test)]
 mod tests {

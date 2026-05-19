@@ -71,7 +71,6 @@ impl<'a> PlanningInput<'a> {
         self.implicit_create_mode = mode;
         self
     }
-
 }
 
 /// A synthetic step to inject (for implicit creates)
@@ -120,7 +119,13 @@ impl PlannedExecution {
                     .as_deref()
                     .map(|b| format!(" :as @{b}"))
                     .unwrap_or_default();
-                format!("{}. {}.{}{}", i + 1, s.verb_call.domain, s.verb_call.verb, binding)
+                format!(
+                    "{}. {}.{}{}",
+                    i + 1,
+                    s.verb_call.domain,
+                    s.verb_call.verb,
+                    binding
+                )
             })
             .collect::<Vec<_>>()
             .join("\n")

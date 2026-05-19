@@ -58,7 +58,9 @@ pub use dsl_core::diagnostics::{
 
 // Compiler — Op-free path (Phase 3 CR A4; Op enum, DAG, and VerbHandler removed)
 pub use dsl_core::compiler;
-pub use dsl_core::compiler::{compile_to_steps, CompileError as OpCompileError, CompileStep, CompiledSteps};
+pub use dsl_core::compiler::{
+    compile_to_steps, CompileError as OpCompileError, CompileStep, CompiledSteps,
+};
 
 // =============================================================================
 // Local modules (require database or other dependencies not in dsl-core)

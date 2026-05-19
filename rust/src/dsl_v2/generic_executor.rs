@@ -282,7 +282,8 @@ impl GenericCrudExecutor {
                     self.execute_list_parties_in_tx(tx, verb, crud, args).await
                 }
                 CrudOperation::SelectWithJoin => {
-                    self.execute_select_with_join_in_tx(tx, verb, crud, args).await
+                    self.execute_select_with_join_in_tx(tx, verb, crud, args)
+                        .await
                 }
             }
         } else {
@@ -4000,4 +4001,3 @@ mod tests {
 // =============================================================================
 // DAG EXECUTION TESTS
 // =============================================================================
-
