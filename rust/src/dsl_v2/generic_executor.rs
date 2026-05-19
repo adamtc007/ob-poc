@@ -318,16 +318,6 @@ impl GenericCrudExecutor {
     // DAG-BASED EXECUTION
     // =========================================================================
 
-    /// Execute a program using DAG-based ordering
-    ///
-    /// This method:
-    /// 1. Compiles the AST to primitive Ops
-    /// 2. Builds an execution plan with topological sort
-    /// 3. Executes ops in dependency order
-    ///
-    /// Benefits:
-    /// - Correct execution order regardless of source order
-    /// - Cycle detection at compile time
     /// Execute INSERT with idempotency support
     ///
     /// If conflict_keys are defined in YAML, uses ON CONFLICT DO UPDATE (upsert behavior).

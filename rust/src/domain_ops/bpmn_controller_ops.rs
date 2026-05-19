@@ -250,7 +250,7 @@ impl SemOsVerbOp for LoaderListPools {
         let pools = list_pools(pg).await?;
         let rows: Vec<serde_json::Value> = pools
             .iter()
-            .map(|p| serde_json::to_value(p))
+            .map(serde_json::to_value)
             .collect::<Result<_, _>>()?;
         Ok(Some(serde_json::json!({"_pools": rows})))
     }
@@ -380,7 +380,7 @@ impl SemOsVerbOp for BpmnControllerListInstances {
         let instances = list_tenant_instances(pg, tenant_id).await?;
         let rows: Vec<serde_json::Value> = instances
             .iter()
-            .map(|i| serde_json::to_value(i))
+            .map(serde_json::to_value)
             .collect::<Result<_, _>>()?;
         Ok(Some(serde_json::json!({"_instances": rows})))
     }

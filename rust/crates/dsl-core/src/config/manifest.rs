@@ -294,7 +294,10 @@ mod tests {
         assert_eq!(cbu_ensure.action, "ensure");
         // cbu.ensure is a crud verb (upsert by natural key)
         assert!(
-            matches!(cbu_ensure.behavior, crate::config::types::VerbBehavior::Crud),
+            matches!(
+                cbu_ensure.behavior,
+                crate::config::types::VerbBehavior::Crud
+            ),
             "cbu.ensure should be crud behavior, got {:?}",
             cbu_ensure.behavior
         );
@@ -306,11 +309,7 @@ mod tests {
         let manifest = loader.load_verb_manifest();
 
         let fqn_count = manifest.fqns().count();
-        assert_eq!(
-            fqn_count,
-            manifest.len(),
-            "fqns() count must match len()"
-        );
+        assert_eq!(fqn_count, manifest.len(), "fqns() count must match len()");
     }
 }
 
@@ -327,7 +326,7 @@ pub fn build_manifest_with_validation(
 
     for err in &report.structural {
         manifest.errors.push(ManifestError {
-            fqn: None,   // embedded in message via StructuralError::Display
+            fqn: None, // embedded in message via StructuralError::Display
             file: None,
             field: None,
             message: err.to_string(),

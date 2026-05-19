@@ -889,7 +889,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             declared_plugin_verbs = manifest
                 .declarations
                 .values()
-                .filter(|d| matches!(d.behavior, ob_poc::dsl_v2::config::types::VerbBehavior::Plugin))
+                .filter(|d| matches!(
+                    d.behavior,
+                    ob_poc::dsl_v2::config::types::VerbBehavior::Plugin
+                ))
                 .count(),
             registered_ops = sem_os_ops.len(),
             orphan_ops = report.orphan_implementations.len(),
