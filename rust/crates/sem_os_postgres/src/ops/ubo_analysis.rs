@@ -15,7 +15,7 @@ use serde_json::{json, Value};
 use uuid::Uuid;
 
 use dsl_runtime::domain_ops::helpers::{
-    json_extract_cbu_id, json_extract_string_opt, json_extract_uuid, json_extract_uuid_opt,
+    json_extract_string_opt, json_extract_uuid, json_extract_uuid_aliased, json_extract_uuid_opt,
 };
 use dsl_runtime::tx::TransactionScope;
 use dsl_runtime::{VerbExecutionContext, VerbExecutionOutcome};
@@ -37,7 +37,7 @@ impl SemOsVerbOp for TraceChains {
         ctx: &mut VerbExecutionContext,
         scope: &mut dyn TransactionScope,
     ) -> Result<VerbExecutionOutcome> {
-        let cbu_id = json_extract_cbu_id(args, ctx)?;
+        let cbu_id = json_extract_uuid_aliased(args, ctx, "cbu", "cbu-id")?;
         let target_entity_id = json_extract_uuid_opt(args, ctx, "target-entity-id");
         let threshold: f64 = json_extract_string_opt(args, "threshold")
             .as_deref()

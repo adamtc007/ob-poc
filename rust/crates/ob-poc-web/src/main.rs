@@ -455,6 +455,21 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             );
         }
     }
+    // CR Z1: Load atom-path → table-name map (replaces hardcoded match in
+    // platform_dag::build_atom_table_map).
+    match config_loader.load_atom_path_table_map() {
+        Ok(map) => {
+            tracing::info!("Atom-path table map loaded: {} entries", map.len());
+            dsl_runtime::cross_workspace::set_atom_path_table_map(map);
+        }
+        Err(e) => {
+            tracing::warn!(
+                "Failed to load atom-path table map: {} — platform DAG will use \
+                 atom-path prefixes verbatim as table names",
+                e
+            );
+        }
+    }
 
     // CR2 (phrase_gen): Load noun vocabulary before load_verbs() so phrase
     // enrichment can expand domain nouns during verb config loading.

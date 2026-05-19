@@ -97,11 +97,22 @@ pub fn json_extract_string_list(args: &serde_json::Value, arg_name: &str) -> Res
         .ok_or_else(|| anyhow!("Missing {} argument", arg_name))
 }
 
-/// Extract CBU ID from JSON args, accepting "cbu" or "cbu-id".
-pub fn json_extract_cbu_id(args: &serde_json::Value, ctx: &VerbExecutionContext) -> Result<Uuid> {
-    json_extract_uuid_opt(args, ctx, "cbu-id")
-        .or_else(|| json_extract_uuid_opt(args, ctx, "cbu"))
-        .ok_or_else(|| anyhow!("Missing cbu or cbu-id argument"))
+/// Extract a UUID from JSON args, accepting either of two aliased key names.
+///
+/// Common pattern for ob-poc verb args where the canonical form is e.g.
+/// `"cbu-id"` but the legacy/short form `"cbu"` is also accepted. Generic
+/// across domains: `json_extract_uuid_aliased(args, ctx, "cbu", "cbu-id")`
+/// for CBU; `json_extract_uuid_aliased(args, ctx, "case", "case-id")` for
+/// cases, etc. The longer key is tried first; the shorter is the fallback.
+pub fn json_extract_uuid_aliased(
+    args: &serde_json::Value,
+    ctx: &VerbExecutionContext,
+    short_key: &str,
+    long_key: &str,
+) -> Result<Uuid> {
+    json_extract_uuid_opt(args, ctx, long_key)
+        .or_else(|| json_extract_uuid_opt(args, ctx, short_key))
+        .ok_or_else(|| anyhow!("Missing {short_key} or {long_key} argument"))
 }
 
 // ---------------------------------------------------------------------------

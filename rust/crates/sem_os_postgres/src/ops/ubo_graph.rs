@@ -10,7 +10,7 @@ use serde_json::{json, Value};
 use uuid::Uuid;
 
 use dsl_runtime::domain_ops::helpers::{
-    json_extract_cbu_id, json_extract_string, json_extract_string_opt, json_extract_uuid,
+    json_extract_string, json_extract_string_opt, json_extract_uuid, json_extract_uuid_aliased,
 };
 use dsl_runtime::tx::TransactionScope;
 use dsl_runtime::{VerbExecutionContext, VerbExecutionOutcome};
@@ -196,7 +196,7 @@ impl SemOsVerbOp for ConvergenceSupersede {
         ctx: &mut VerbExecutionContext,
         scope: &mut dyn TransactionScope,
     ) -> Result<VerbExecutionOutcome> {
-        let cbu_id = json_extract_cbu_id(args, ctx)?;
+        let cbu_id = json_extract_uuid_aliased(args, ctx, "cbu", "cbu-id")?;
         let old_relationship_id = if args.get("old-relationship").is_some() {
             json_extract_uuid(args, ctx, "old-relationship")?
         } else {
@@ -339,7 +339,7 @@ impl SemOsVerbOp for TransferControl {
         ctx: &mut VerbExecutionContext,
         scope: &mut dyn TransactionScope,
     ) -> Result<VerbExecutionOutcome> {
-        let cbu_id = json_extract_cbu_id(args, ctx)?;
+        let cbu_id = json_extract_uuid_aliased(args, ctx, "cbu", "cbu-id")?;
         let from_controller_id = json_extract_uuid(args, ctx, "from")?;
         let to_controller_id = json_extract_uuid(args, ctx, "to")?;
         let controlled_entity_id = json_extract_uuid(args, ctx, "controlled-entity")?;
@@ -482,7 +482,7 @@ impl SemOsVerbOp for WaiveVerification {
         ctx: &mut VerbExecutionContext,
         scope: &mut dyn TransactionScope,
     ) -> Result<VerbExecutionOutcome> {
-        let cbu_id = json_extract_cbu_id(args, ctx)?;
+        let cbu_id = json_extract_uuid_aliased(args, ctx, "cbu", "cbu-id")?;
         let relationship_id = if args.get("relationship").is_some() {
             json_extract_uuid(args, ctx, "relationship")?
         } else if args.get("relationship-id").is_some() {

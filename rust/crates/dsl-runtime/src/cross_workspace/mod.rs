@@ -151,6 +151,7 @@ pub use gate_checker::{GateChecker, GateViolation, PredicateResolver, SameEntity
 pub use hierarchy_cascade::{
     CascadeAction, CascadePlanner, ChildEntityResolver, NoChildrenResolver,
 };
+pub use platform_dag::set_atom_path_table_map;
 pub use postgres_child_resolver::PostgresChildEntityResolver;
 pub use slot_state::set_slot_state_table;
 pub use slot_state::{PostgresSlotStateProvider, SlotStateProvider};

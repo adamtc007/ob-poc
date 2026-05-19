@@ -1,0 +1,17 @@
+# Atom-path → backing-table map for Level 0 Platform DAG derivation.
+#
+# Maps the leading segment of a shared-atom path (e.g. "entity" from
+# "entity.lei") to the consumer's backing-table name (e.g. "entities").
+#
+# Loaded at startup via ConfigLoader::load_atom_path_table_map() and
+# registered with dsl_runtime::cross_workspace::set_atom_path_table_map().
+#
+# When an atom's prefix is absent from this map, the platform DAG derivation
+# falls back to using the prefix verbatim as the table name — that fallback
+# is what dsl-lsp and bpmn-lite use today.
+
+entity: entities
+cbu: cbus
+client-group: client_group
+product: products
+service: services

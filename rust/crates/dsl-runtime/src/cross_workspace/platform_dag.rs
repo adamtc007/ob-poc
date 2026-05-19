@@ -7,10 +7,43 @@
 //! See: docs/annex-cross-workspace-state-consistency.md §3.2
 
 use std::collections::{HashMap, HashSet};
+use std::sync::OnceLock;
 
 use serde::{Deserialize, Serialize};
 
 use crate::cross_workspace::types::SharedAtomDef;
+
+// ---------------------------------------------------------------------------
+// Consumer-supplied atom-path → backing-table map
+// ---------------------------------------------------------------------------
+
+/// Key: leading segment of an atom path (e.g. `"entity"` from `"entity.lei"`).
+/// Value: backing-table name in the consumer's schema (e.g. `"entities"`).
+pub type AtomPathTableMap = HashMap<String, String>;
+
+static ATOM_PATH_TABLE_MAP: OnceLock<AtomPathTableMap> = OnceLock::new();
+
+/// Register the consumer's atom-path → table-name map.
+///
+/// Loaded from `config/atom_path_table_map.yaml` via
+/// `ConfigLoader::load_atom_path_table_map()`. Subsequent calls are ignored
+/// (OnceLock semantics).
+///
+/// When no entry is registered for a given prefix, `build_atom_table_map`
+/// falls back to using the prefix verbatim as the table name. This preserves
+/// generic behaviour for consumers that don't ship a map (e.g. dsl-lsp,
+/// bpmn-lite).
+pub fn set_atom_path_table_map(map: AtomPathTableMap) {
+    let _ = ATOM_PATH_TABLE_MAP.set(map);
+}
+
+fn lookup_atom_table(prefix: &str) -> String {
+    ATOM_PATH_TABLE_MAP
+        .get()
+        .and_then(|m| m.get(prefix))
+        .cloned()
+        .unwrap_or_else(|| prefix.to_string())
+}
 
 // ── Types ────────────────────────────────────────────────────────────
 
@@ -142,25 +175,17 @@ pub fn derive_platform_dag(
     }
 }
 
-/// Map atom_path to backing table name.
+/// Map atom_path → backing table name using the consumer-registered map.
 ///
-/// Convention: the first segment of the atom path maps to a table:
-/// - "entity.*" → "entities"
-/// - "cbu.*" → "cbus"
-/// - "client-group.*" → "client_group"
+/// Looks up the atom-path's leading segment in `ATOM_PATH_TABLE_MAP` (loaded
+/// from `config/atom_path_table_map.yaml`). When no entry is registered,
+/// uses the prefix verbatim. See [`set_atom_path_table_map`].
 fn build_atom_table_map(atoms: &[SharedAtomDef]) -> HashMap<String, String> {
     atoms
         .iter()
         .map(|a| {
-            let table = match a.atom_path.split('.').next().unwrap_or("") {
-                "entity" => "entities".to_string(),
-                "cbu" => "cbus".to_string(),
-                "client-group" => "client_group".to_string(),
-                "product" => "products".to_string(),
-                "service" => "services".to_string(),
-                other => other.to_string(),
-            };
-            (a.atom_path.clone(), table)
+            let prefix = a.atom_path.split('.').next().unwrap_or("");
+            (a.atom_path.clone(), lookup_atom_table(prefix))
         })
         .collect()
 }
@@ -170,6 +195,23 @@ mod tests {
     use super::*;
     use chrono::Utc;
     use uuid::Uuid;
+
+    fn setup_atom_table_map() {
+        // OnceLock-idempotent: only the first call actually registers. Safe
+        // even when other tests in the same process have already set it.
+        set_atom_path_table_map(
+            [
+                ("entity", "entities"),
+                ("cbu", "cbus"),
+                ("client-group", "client_group"),
+                ("product", "products"),
+                ("service", "services"),
+            ]
+            .into_iter()
+            .map(|(k, v)| (k.to_string(), v.to_string()))
+            .collect(),
+        );
+    }
 
     fn make_atom(path: &str, owner: &str) -> SharedAtomDef {
         SharedAtomDef {
@@ -196,6 +238,7 @@ mod tests {
 
     #[test]
     fn test_derive_platform_dag_basic() {
+        setup_atom_table_map();
         let atoms = vec![make_atom("entity.lei", "kyc")];
 
         let footprints = vec![
@@ -233,6 +276,7 @@ mod tests {
 
     #[test]
     fn test_consumers_of_query() {
+        setup_atom_table_map();
         let atoms = vec![
             make_atom("entity.lei", "kyc"),
             make_atom("cbu.fund_structure_type", "cbu"),

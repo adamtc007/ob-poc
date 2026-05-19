@@ -577,11 +577,25 @@ fn span_to_source_span(span: &Span, source: &str) -> SourceSpan {
 
 /// Determine what RefType a verb returns (for symbol bindings).
 ///
-/// Derives the type from the verb's domain via the registered subject kind
-/// table — no hardcoded ob-poc domain names.
+/// Sourced from YAML in priority order:
+///   1. The verb's explicit `produces.type` field, when declared.
+///   2. The YAML-loaded subject-kind registry, keyed by domain
+///      (`entity_kind::subject_kind_for_domain`).
+///
+/// Both are YAML-driven. The hardcoded `"cbu"`/`"document"` arms below
+/// map the string token to the matching `RefType` enum variant — that
+/// last step is Z4 territory (`RefType` itself needs generalising).
 fn verb_return_type(verb: &str) -> RefType {
-    let domain = verb.split('.').next().unwrap_or("");
-    match crate::entity_kind::subject_kind_for_domain(domain).as_str() {
+    let kind_token = verb
+        .split_once('.')
+        .and_then(|(domain, name)| {
+            registry()
+                .get_produces(domain, name)
+                .map(|p| p.produced_type.clone())
+                .or_else(|| Some(crate::entity_kind::subject_kind_for_domain(domain)))
+        })
+        .unwrap_or_default();
+    match kind_token.as_str() {
         "cbu" => RefType::Cbu,
         "document" => RefType::Document,
         _ => RefType::Entity,

@@ -318,14 +318,20 @@ pub fn json_extract_string_list(args: &serde_json::Value, arg_name: &str) -> Res
         .ok_or_else(|| anyhow!("Missing {} argument", arg_name))
 }
 
-/// Extract CBU ID from JSON args, accepting "cbu" or "cbu-id".
-pub fn json_extract_cbu_id(
+/// Extract a UUID from JSON args, accepting either of two aliased key names.
+///
+/// Common pattern where the canonical form is e.g. `"cbu-id"` but the legacy
+/// short form `"cbu"` is also accepted. Generic across domains. The longer
+/// key is tried first; the shorter is the fallback.
+pub fn json_extract_uuid_aliased(
     args: &serde_json::Value,
     ctx: &dsl_runtime::VerbExecutionContext,
+    short_key: &str,
+    long_key: &str,
 ) -> Result<Uuid> {
-    json_extract_uuid_opt(args, ctx, "cbu-id")
-        .or_else(|| json_extract_uuid_opt(args, ctx, "cbu"))
-        .ok_or_else(|| anyhow!("Missing cbu or cbu-id argument"))
+    json_extract_uuid_opt(args, ctx, long_key)
+        .or_else(|| json_extract_uuid_opt(args, ctx, short_key))
+        .ok_or_else(|| anyhow!("Missing {short_key} or {long_key} argument"))
 }
 
 // ============================================================================
@@ -642,25 +648,31 @@ mod tests {
     }
 
     #[test]
-    fn json_extract_cbu_id_from_cbu_id_key() {
+    fn json_extract_uuid_aliased_long_key() {
         let id = uuid::Uuid::new_v4();
         let args = serde_json::json!({"cbu-id": id.to_string()});
         let ctx = dsl_runtime::VerbExecutionContext::new(Principal::system());
-        assert_eq!(json_extract_cbu_id(&args, &ctx).unwrap(), id);
+        assert_eq!(
+            json_extract_uuid_aliased(&args, &ctx, "cbu", "cbu-id").unwrap(),
+            id
+        );
     }
 
     #[test]
-    fn json_extract_cbu_id_from_cbu_key() {
+    fn json_extract_uuid_aliased_short_key() {
         let id = uuid::Uuid::new_v4();
         let args = serde_json::json!({"cbu": id.to_string()});
         let ctx = dsl_runtime::VerbExecutionContext::new(Principal::system());
-        assert_eq!(json_extract_cbu_id(&args, &ctx).unwrap(), id);
+        assert_eq!(
+            json_extract_uuid_aliased(&args, &ctx, "cbu", "cbu-id").unwrap(),
+            id
+        );
     }
 
     #[test]
-    fn json_extract_cbu_id_missing() {
+    fn json_extract_uuid_aliased_missing() {
         let args = serde_json::json!({});
         let ctx = dsl_runtime::VerbExecutionContext::new(Principal::system());
-        assert!(json_extract_cbu_id(&args, &ctx).is_err());
+        assert!(json_extract_uuid_aliased(&args, &ctx, "cbu", "cbu-id").is_err());
     }
 }

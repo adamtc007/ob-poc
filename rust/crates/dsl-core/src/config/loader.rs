@@ -558,6 +558,33 @@ impl ConfigLoader {
         Ok(out)
     }
 
+    /// Load atom-path → table-name map from `config/atom_path_table_map.yaml`.
+    ///
+    /// Returns a flat `HashMap<atom_path_prefix, table_name>` ready to pass to
+    /// `dsl_runtime::cross_workspace::set_atom_path_table_map()`. Returns an
+    /// empty map (with a warning) if the file is absent — `build_atom_table_map`
+    /// will then fall back to using each prefix verbatim as the table name.
+    pub fn load_atom_path_table_map(&self) -> Result<std::collections::HashMap<String, String>> {
+        let path = Path::new(&self.config_dir).join("atom_path_table_map.yaml");
+        if !path.exists() {
+            tracing::warn!(
+                "atom_path_table_map.yaml not found at {:?} — \
+                 platform DAG derivation will use each atom-path prefix \
+                 verbatim as its backing-table name",
+                path
+            );
+            return Ok(std::collections::HashMap::new());
+        }
+        let content =
+            std::fs::read_to_string(&path).with_context(|| format!("reading {path:?}"))?;
+        let raw: std::collections::HashMap<String, String> =
+            serde_yaml::from_str(&content).with_context(|| format!("parsing {path:?}"))?;
+        Ok(raw
+            .into_iter()
+            .map(|(k, v)| (k.trim().to_string(), v.trim().to_string()))
+            .collect())
+    }
+
     /// Load table PK overrides from `config/table_pk_overrides.yaml`.
     ///
     /// Returns a flat `HashMap<table_name, pk_column>` ready to pass to
