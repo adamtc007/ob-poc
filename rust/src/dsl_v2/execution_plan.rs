@@ -33,12 +33,34 @@ use super::ast::{Argument, AstNode, Program, Span, Statement, VerbCall};
 use super::runtime_registry::runtime_registry;
 use super::verb_registry::{registry, VerbBehavior};
 use crate::ontology::ontology;
+use dsl_core::execution_dag::{BindingSlotId, DagEdge, NodeId, PopulatedExecutionDag};
 use std::collections::{HashMap, HashSet};
 
-/// A compiled execution plan - dependency sorted sequence of steps
+/// A compiled execution plan — dependency-sorted sequence of steps.
+///
+/// The `dag` field carries the typed Populated Execution DAG (v0.5 §3.2, §4).
+/// `steps` is the topologically-sorted execution sequence derived from that DAG.
+/// Both carry the same dependency information; `dag` is the typed authority,
+/// `steps` is the ordered execution sequence.
 #[derive(Debug, Clone)]
 pub struct ExecutionPlan {
     pub steps: Vec<ExecutionStep>,
+    /// Typed Populated Execution DAG — the load-bearing runtime structure (v0.5 §4.5).
+    /// Populated from all `DagEdge` entries across every `ExecutionStep::dag_edges`.
+    pub dag: PopulatedExecutionDag,
+}
+
+impl ExecutionPlan {
+    /// Build the plan from a sorted step list, collecting all dag_edges into `dag`.
+    pub fn from_steps(steps: Vec<ExecutionStep>) -> Self {
+        let mut dag = PopulatedExecutionDag::new();
+        for step in &steps {
+            for edge in &step.dag_edges {
+                dag.add_edge(edge.clone());
+            }
+        }
+        Self { steps, dag }
+    }
 }
 
 /// A single step in the execution plan
@@ -47,8 +69,25 @@ pub struct ExecutionStep {
     /// The verb call to execute (with nested children removed)
     pub verb_call: VerbCall,
 
-    /// Values to inject from previous steps' results
+    /// Values to inject from previous steps' results.
+    ///
+    /// Legacy untyped edge record — kept for backward compatibility during the
+    /// Phase 5 typed-DAG migration. Each `Injection` has a corresponding
+    /// `DagEdge::BindingEdge` in `dag_edges`. T10 will retire this field once
+    /// all consumers use the typed binding-slot path.
     pub injections: Vec<Injection>,
+
+    /// Typed edges from this step in the Populated Execution DAG (v0.5 §4.1).
+    ///
+    /// Populated at compile time:
+    /// - `BindingEdge`: one per `Injection` (same information, typed form).
+    /// - `StateEdge`: emitted for verbs with `transition_args` (T09).
+    /// - `ResourceCoordEdge`: emitted for same-resource pairs (T09/T12).
+    /// - `SnapshotVersionEdge`, `JoinBarrierEdge`, `CancellationScopeEdge`: future tranches.
+    ///
+    /// The topological sort uses `dag_edges` ordering pairs when non-empty,
+    /// falling back to `injections` for plans compiled before T09+.
+    pub dag_edges: Vec<DagEdge>,
 
     /// Optional symbol binding (from :as @name syntax)
     pub bind_as: Option<String>,
@@ -431,7 +470,7 @@ pub fn compile(program: &Program) -> Result<ExecutionPlan, CompileError> {
         .collect();
 
     if verb_calls.is_empty() {
-        return Ok(ExecutionPlan { steps: Vec::new() });
+        return Ok(ExecutionPlan::from_steps(Vec::new()));
     }
 
     // Build dependency graph and topologically sort
@@ -443,9 +482,7 @@ pub fn compile(program: &Program) -> Result<ExecutionPlan, CompileError> {
         compiler.compile_verb_call(verb_calls[idx], None)?;
     }
 
-    Ok(ExecutionPlan {
-        steps: compiler.steps,
-    })
+    Ok(ExecutionPlan::from_steps(compiler.steps))
 }
 
 // ============================================================================
@@ -482,7 +519,7 @@ pub fn compile_with_planning(
 
     if verb_calls.is_empty() {
         return Ok(PlanningResult {
-            plan: ExecutionPlan { steps: Vec::new() },
+            plan: ExecutionPlan::from_steps(Vec::new()),
             synthetic_steps: Vec::new(),
             reordered: false,
             diagnostics: Vec::new(),
@@ -960,11 +997,24 @@ impl Compiler {
         // Extract nested children and create a "flattened" verb call
         let (flat_vc, nested_children) = extract_nested_children(vc);
 
-        // Add this step
+        // Build typed dag_edges — BindingEdge for each Injection (v0.5 §4.1).
+        // StateEdge, ResourceCoordEdge, and SnapshotVersionEdge are populated in T09
+        // once ResourceDependency taxonomy and transition_args wiring are in place.
         let my_step_index = self.steps.len();
+        let dag_edges: Vec<DagEdge> = injections
+            .iter()
+            .map(|inj| DagEdge::BindingEdge {
+                from: NodeId(inj.from_step),
+                to: NodeId(my_step_index),
+                slot: BindingSlotId::new(&inj.into_arg),
+            })
+            .collect();
+
+        // Add this step
         self.steps.push(ExecutionStep {
             verb_call: flat_vc,
             injections,
+            dag_edges,
             bind_as: vc.binding.clone(),
             step_index: my_step_index,
             behavior: verb_def.behavior,

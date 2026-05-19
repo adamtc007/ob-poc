@@ -17,6 +17,7 @@ pub mod binding_context;
 pub mod compiler;
 pub mod config;
 pub mod diagnostics;
+pub mod execution_dag;
 pub mod frontier;
 pub mod parser;
 pub mod resolver;
@@ -38,4 +39,5 @@ pub use config::types::{
     VerbMetadata, VerbOutputConfig, VerbProduces, VerbsConfig,
 };
 pub use diagnostics::{Diagnostic, DiagnosticCode, Severity, SourceSpan};
+pub use execution_dag::{BindingSlotId, DagEdge, JoinBarrierMode, NodeId, PopulatedExecutionDag};
 pub use parser::parse_program;
