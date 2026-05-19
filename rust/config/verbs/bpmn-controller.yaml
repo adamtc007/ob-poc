@@ -64,7 +64,9 @@ domains:
         returns:
           type: void
         three_axis:
-          state_effect: transition
+          # state_effect: preserving — pool lifecycle is tracked in bpmn-lite's
+          # own FSM, not in ob-poc's constellation DAGs. No transition_args needed.
+          state_effect: preserving
           external_effects:
             - emitting
           consequence:
@@ -95,7 +97,8 @@ domains:
         returns:
           type: void
         three_axis:
-          state_effect: transition
+          # state_effect: preserving — same rationale as provision-pool.
+          state_effect: preserving
           external_effects:
             - emitting
           consequence:
@@ -206,7 +209,9 @@ domains:
           type: uuid
           description: "instance_id of the started (or existing idempotent) instance."
         three_axis:
-          state_effect: transition
+          # state_effect: preserving — BPMN process instance lifecycle is tracked
+          # in bpmn-lite's own FSM, not in ob-poc's constellation DAGs.
+          state_effect: preserving
           external_effects:
             - emitting
           consequence:
