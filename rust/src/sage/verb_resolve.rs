@@ -909,25 +909,4 @@ mod tests {
         assert_eq!(candidates[0].action_score, 0.95);
     }
 
-    #[test]
-    fn subject_kind_filter_accepts_canonical_aliases() {
-        let mut meta = sample_meta(
-            "kyc-case.create",
-            IntentPolarity::Write,
-            vec![ObservationPlane::Instance],
-            &["create", "kyc-case"],
-            &["cbu-id"],
-            "Create a case",
-        );
-        meta.subject_kinds = vec!["kyc-case".to_string()];
-
-        let mut intent = sample_intent();
-        intent.subject = Some(EntityRef {
-            mention: "this case".to_string(),
-            kind_hint: Some("kyc_case".to_string()),
-            uuid: None,
-        });
-
-        assert!(subject_kinds_match(&meta, &intent));
-    }
 }

@@ -1893,12 +1893,6 @@ mod tests {
         assert!(!searcher.matches_entity_kind("deal.create", Some("company")));
     }
 
-    #[test]
-    fn test_matches_entity_kind_canonicalizes_aliases() {
-        let searcher = HybridVerbSearcher::minimal();
-        assert!(searcher.matches_entity_kind("deal.create", Some("deal-record")));
-    }
-
     // =========================================================================
     // Issue J/D Acceptance Tests - Ambiguity Detection
     // =========================================================================

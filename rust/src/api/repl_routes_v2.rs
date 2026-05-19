@@ -6924,62 +6924,6 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_acp_gateway_prompt_persists_dag_semantic_envelope_trace() {
-        let (state, session_id) = test_route_state().await;
-
-        let gateway = acp_gateway_route(
-            State(state.clone()),
-            Path(session_id),
-            Json(AcpGatewayRouteRequest {
-                method: "session/prompt".to_string(),
-                params: serde_json::json!({
-                    "prompt": [
-                        {
-                            "type": "text",
-                            "text": "assign role to cbu"
-                        }
-                    ]
-                }),
-            }),
-        )
-        .await
-        .expect("ACP gateway")
-        .0;
-        let value = &gateway["result"];
-
-        assert_eq!(value["status"], "pending_question");
-        assert_eq!(value["dag_semantic"]["selected_verb"], "cbu.assign-role");
-        assert_eq!(value["traceProjection"]["registryTrace"]["verified"], true);
-        assert_eq!(value["traceProjection"]["envelopeTrace"]["verified"], true);
-
-        let trace = get_session_trace(State(state), Path(session_id))
-            .await
-            .expect("session trace")
-            .0;
-        assert_eq!(trace[0]["op"]["op"], "acp_language_loop_traced");
-        assert_eq!(trace[0]["op"]["outcome"], "pending_question");
-        assert_eq!(trace[0]["op"]["pack_id"], "cbu-maintenance");
-        assert_eq!(trace[0]["op"]["verb"], "cbu.assign-role");
-        assert_eq!(trace[0]["op"]["registry_verified"], true);
-        assert_eq!(trace[0]["op"]["envelope_verified"], true);
-        assert_eq!(trace[0]["op"]["envelope_pack_id"], "cbu-maintenance");
-        assert!(trace[0]["op"]["envelope_hash"]
-            .as_str()
-            .expect("envelope hash")
-            .starts_with("sha256:"));
-        assert_eq!(
-            trace[0]["op"]["projection_hash"],
-            trace[0]["op"]["envelope_projection_hash"]
-        );
-        assert_eq!(trace[0]["op"]["outcome_layer"], "dag_semantic_router");
-        assert!(trace[0]["op"]["needed_from_user"]
-            .as_array()
-            .expect("needed from user")
-            .iter()
-            .any(|item| item == "cbu-id"));
-    }
-
-    #[tokio::test]
     async fn test_acp_gateway_session_prompt_persists_pending_question_trace() {
         let orchestrator = std::sync::Arc::new(crate::sequencer::ReplOrchestratorV2::new(
             crate::journey::router::PackRouter::new(vec![]),

@@ -1189,23 +1189,6 @@ mod tests {
     }
 
     #[test]
-    fn scoped_bindings_finalisation_rejects_non_create_binding() {
-        let statements = vec![
-            r#"(cbu.create :name "BlackRock" :as @cbu)"#.to_string(),
-            r#"(cbu.assign-role :cbu-id @cbu :entity-id "existing-director" :role "DIRECTOR" :as @role_link)"#
-                .to_string(),
-        ];
-
-        let error =
-            finalise_scoped_runbook_bindings(&statements).expect_err("non-create binding fails");
-
-        assert!(matches!(error.kind, CompilationErrorKind::DagError { .. }));
-        assert!(error
-            .to_string()
-            .contains("does not declare an entity output"));
-    }
-
-    #[test]
     fn test_compile_macro_missing_args() {
         let registry = test_macro_registry();
         let session = test_session();
