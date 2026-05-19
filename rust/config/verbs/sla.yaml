@@ -220,6 +220,7 @@ domains:
       bind:
         flavour: instance_adding
         description: Bind SLA commitment to a target object
+        effect_class: read_modify_write
         invocation_phrases:
           - "bind SLA"
           - "bind SLA to profile"
@@ -356,6 +357,7 @@ domains:
             baseline: benign
       suspend-commitment:
         flavour: discretionary
+        effect_class: read_modify_write
         role_guard:
           any_of: [compliance_officer, senior_compliance, mlro]
         audit_class: sla_suspend_commitment
@@ -619,6 +621,7 @@ domains:
       update-remediation:
         flavour: attribute_mutating
         description: Update breach remediation status
+        effect_class: read_modify_write
         invocation_phrases:
           - "update remediation"
           - "update SLA breach fix"
@@ -677,6 +680,7 @@ domains:
       resolve-breach:
         flavour: attribute_mutating
         description: Mark breach as resolved
+        effect_class: read_modify_write
         invocation_phrases:
           - "resolve SLA breach"
           - "close SLA breach"
@@ -718,6 +722,7 @@ domains:
             baseline: reviewable
       escalate-breach:
         flavour: discretionary
+        effect_class: read_modify_write
         role_guard:
           any_of: [compliance_officer, senior_compliance, mlro]
         audit_class: sla_escalate_breach

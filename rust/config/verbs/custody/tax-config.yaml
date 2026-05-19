@@ -641,6 +641,7 @@ domains:
       deactivate-reclaim:
         flavour: attribute_mutating
         description: "Deactivate reclaim configuration"
+        effect_class: read_modify_write
         metadata:
           tier: intent
           source_of_truth: operational

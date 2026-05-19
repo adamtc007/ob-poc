@@ -340,6 +340,7 @@ domains:
       mark-requested:
         flavour: attribute_mutating
         description: Mark a document request as formally requested.
+        effect_class: read_modify_write
         metadata:
           tier: intent
           source_of_truth: operational
@@ -391,6 +392,7 @@ domains:
       mark-received:
         flavour: attribute_mutating
         description: Record receipt against a document request.
+        effect_class: read_modify_write
         metadata:
           tier: intent
           source_of_truth: operational
@@ -455,6 +457,7 @@ domains:
       verify-request:
         flavour: attribute_mutating
         description: Verify a document request as satisfied by a valid document.
+        effect_class: read_modify_write
         metadata:
           tier: intent
           source_of_truth: operational
@@ -513,6 +516,7 @@ domains:
 
       reject-request:
         flavour: discretionary
+        effect_class: read_modify_write
         role_guard:
           any_of: [compliance_officer, senior_compliance, mlro]
         audit_class: document_reject_request
@@ -570,6 +574,7 @@ domains:
 
       waive-request:
         flavour: discretionary
+        effect_class: read_modify_write
         role_guard:
           any_of: [compliance_admin, senior_compliance, mlro]
         audit_class: document_waive_request
@@ -1051,6 +1056,7 @@ domains:
         flavour: instance_adding
         description: Move document version to QA queue
         behavior: crud
+        effect_class: read_modify_write
         invocation_phrases:
           - start QA
           - begin verification

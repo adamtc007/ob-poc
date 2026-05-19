@@ -139,6 +139,7 @@ domains:
       advance:
         flavour: attribute_mutating
         description: "Advance a UBO registry entry through the state machine"
+        effect_class: read_modify_write
         invocation_phrases:
           - "advance ubo status"
           - "move ubo forward"

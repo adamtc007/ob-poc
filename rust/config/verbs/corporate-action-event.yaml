@@ -30,6 +30,7 @@ domains:
       attach:
         flavour: instance_adding
         description: "Attach a CA event to a mandate (entry state: election_pending)"
+        effect_class: read_modify_write
         invocation_phrases:
           - "attach CA event"
           - "register corporate action"
@@ -84,6 +85,7 @@ domains:
       elect:
         flavour: attribute_mutating
         description: "Make an election on a pending CA event"
+        effect_class: read_modify_write
         invocation_phrases:
           - "elect corporate action"
           - "choose CA option"

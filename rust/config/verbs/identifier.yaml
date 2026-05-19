@@ -280,6 +280,7 @@ domains:
             baseline: reviewable
       validate:
         flavour: discretionary
+        effect_class: read_modify_write
         role_guard:
           any_of: [compliance_officer, senior_compliance, mlro]
         audit_class: identifier_validate
@@ -329,6 +330,7 @@ domains:
             baseline: reviewable
       invalidate:
         flavour: discretionary
+        effect_class: read_modify_write
         role_guard:
           any_of: [compliance_officer, senior_compliance, mlro]
         audit_class: identifier_invalidate
@@ -591,6 +593,7 @@ domains:
       update-lei-status:
         flavour: attribute_mutating
         description: Update LEI status after GLEIF refresh
+        effect_class: read_modify_write
         metadata:
           tier: intent
           source_of_truth: entity

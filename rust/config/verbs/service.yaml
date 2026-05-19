@@ -5,6 +5,7 @@ domains:
       define:
         flavour: attribute_mutating
         description: Promote an ungoverned service into the governed draft state
+        effect_class: read_modify_write
         invocation_phrases:
           - "define service"
           - "govern service"
@@ -62,6 +63,7 @@ domains:
       propose-revision:
         flavour: attribute_mutating
         description: Move an active service back to draft for revision
+        effect_class: read_modify_write
         invocation_phrases:
           - "propose service revision"
           - "revise service"
@@ -117,6 +119,7 @@ domains:
 
       deprecate:
         flavour: discretionary
+        effect_class: read_modify_write
         role_guard:
           any_of: [compliance_admin, senior_compliance, mlro]
         audit_class: service_deprecate
@@ -175,6 +178,7 @@ domains:
 
       retire:
         flavour: discretionary
+        effect_class: read_modify_write
         role_guard:
           any_of: [compliance_admin, senior_compliance, mlro]
         audit_class: service_retire

@@ -131,6 +131,7 @@ domains:
       link-resource:
         flavour: instance_adding
         description: Link sweep config to cash management resource
+        effect_class: read_modify_write
         metadata:
           tier: intent
           source_of_truth: operational
@@ -227,6 +228,7 @@ domains:
       update-threshold:
         flavour: attribute_mutating
         description: Update sweep threshold amount
+        effect_class: read_modify_write
         metadata:
           tier: intent
           source_of_truth: operational
@@ -269,6 +271,7 @@ domains:
       update-timing:
         flavour: attribute_mutating
         description: Update sweep timing
+        effect_class: read_modify_write
         metadata:
           tier: intent
           source_of_truth: operational
@@ -324,6 +327,7 @@ domains:
       change-vehicle:
         flavour: attribute_mutating
         description: Change sweep investment vehicle
+        effect_class: read_modify_write
         metadata:
           tier: intent
           source_of_truth: operational
@@ -388,6 +392,7 @@ domains:
 
       suspend:
         flavour: discretionary
+        effect_class: read_modify_write
         role_guard:
           any_of: [compliance_officer, senior_compliance, mlro]
         audit_class: cash_sweep_suspend
@@ -432,6 +437,7 @@ domains:
       reactivate:
         flavour: attribute_mutating
         description: Reactivate cash sweep
+        effect_class: read_modify_write
         metadata:
           tier: intent
           source_of_truth: operational

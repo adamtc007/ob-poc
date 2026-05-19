@@ -137,6 +137,7 @@ domains:
       resign:
         flavour: attribute_mutating
         description: Record resignation/removal from board
+        effect_class: read_modify_write
         metadata:
           tier: intent
           source_of_truth: operational
@@ -417,6 +418,7 @@ domains:
 
       revoke-appointment-right:
         flavour: discretionary
+        effect_class: read_modify_write
         role_guard:
           any_of: [compliance_admin, senior_compliance, mlro]
         audit_class: board_revoke_appointment_right

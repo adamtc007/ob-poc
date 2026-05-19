@@ -338,6 +338,7 @@ domains:
       request-documents:
         flavour: attribute_mutating
         description: Transition from ENQUIRY to PENDING_DOCUMENTS
+        effect_class: read_modify_write
         metadata:
           tier: intent
           source_of_truth: register
@@ -392,6 +393,7 @@ domains:
       start-kyc:
         flavour: instance_adding
         description: Transition from PENDING_DOCUMENTS to KYC_IN_PROGRESS
+        effect_class: read_modify_write
         metadata:
           tier: intent
           source_of_truth: register
@@ -452,6 +454,7 @@ domains:
 
       approve-kyc:
         flavour: discretionary
+        effect_class: read_modify_write
         role_guard:
           any_of: [compliance_officer, senior_compliance, mlro]
         audit_class: investor_approve_kyc
@@ -582,6 +585,7 @@ domains:
       mark-eligible:
         flavour: attribute_mutating
         description: Transition from KYC_APPROVED to ELIGIBLE_TO_SUBSCRIBE
+        effect_class: read_modify_write
         metadata:
           tier: intent
           source_of_truth: register
@@ -689,6 +693,7 @@ domains:
       activate:
         flavour: attribute_mutating
         description: Transition from SUBSCRIBED to ACTIVE_HOLDER
+        effect_class: read_modify_write
         metadata:
           tier: intent
           source_of_truth: register
@@ -782,6 +787,7 @@ domains:
       complete-redemption:
         flavour: attribute_mutating
         description: Complete redemption - return to ACTIVE_HOLDER or proceed to OFFBOARDED
+        effect_class: read_modify_write
         metadata:
           tier: intent
           source_of_truth: register
@@ -893,6 +899,7 @@ domains:
 
       suspend:
         flavour: discretionary
+        effect_class: read_modify_write
         role_guard:
           any_of: [compliance_officer, senior_compliance, mlro]
         audit_class: investor_suspend
@@ -956,6 +963,7 @@ domains:
       reinstate:
         flavour: attribute_mutating
         description: Reinstate suspended investor to previous state
+        effect_class: read_modify_write
         metadata:
           tier: intent
           source_of_truth: register
@@ -1019,6 +1027,7 @@ domains:
       # ============================================
       schedule-review:
         flavour: discretionary
+        effect_class: read_modify_write
         role_guard:
           any_of: [compliance_officer, senior_compliance, mlro]
         audit_class: investor_schedule_review

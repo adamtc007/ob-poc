@@ -63,6 +63,7 @@ domains:
 
       submit-for-review:
         flavour: discretionary
+        effect_class: read_modify_write
         role_guard:
           any_of: [compliance_officer, senior_compliance, mlro]
         audit_class: service_version_submit_for_review
@@ -115,6 +116,7 @@ domains:
 
       publish:
         flavour: discretionary
+        effect_class: read_modify_write
         role_guard:
           any_of: [compliance_officer, senior_compliance, mlro]
         audit_class: service_version_publish
@@ -167,6 +169,7 @@ domains:
 
       retire:
         flavour: discretionary
+        effect_class: read_modify_write
         role_guard:
           any_of: [compliance_admin, senior_compliance, mlro]
         audit_class: service_version_retire
@@ -220,6 +223,7 @@ domains:
       update:
         flavour: attribute_mutating
         description: Update a drafted service version's spec or notes
+        effect_class: read_modify_write
         invocation_phrases:
           - "update service version"
           - "edit service version"

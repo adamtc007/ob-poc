@@ -169,6 +169,7 @@ domains:
             baseline: reviewable
       waive:
         flavour: discretionary
+        effect_class: read_modify_write
         role_guard:
           any_of: [compliance_admin, senior_compliance, mlro]
         audit_class: requirement_waive
@@ -224,6 +225,7 @@ domains:
         flavour: attribute_mutating
         description: Mark a requirement as expired (document validity lapsed)
         behavior: crud
+        effect_class: read_modify_write
         invocation_phrases:
           - "mark requirement as expired"
           - "expire document requirement"
@@ -269,6 +271,7 @@ domains:
         flavour: attribute_mutating
         description: Reset a requirement to missing (for re-collection)
         behavior: crud
+        effect_class: read_modify_write
         invocation_phrases:
           - reset requirement
           - restart document collection

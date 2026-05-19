@@ -158,6 +158,7 @@ domains:
       set-scope:
         flavour: attribute_mutating
         description: Update scope for existing IM assignment
+        effect_class: read_modify_write
         metadata:
           tier: intent
           source_of_truth: register
@@ -216,6 +217,7 @@ domains:
       link-connectivity:
         flavour: instance_adding
         description: Link IM assignment to instruction delivery resource
+        effect_class: read_modify_write
         metadata:
           tier: intent
           source_of_truth: register
@@ -312,6 +314,7 @@ domains:
             baseline: benign
       suspend:
         flavour: discretionary
+        effect_class: read_modify_write
         role_guard:
           any_of: [compliance_officer, senior_compliance, mlro]
         audit_class: investment_manager_suspend
@@ -355,6 +358,7 @@ domains:
             baseline: requires_confirmation
       terminate:
         flavour: discretionary
+        effect_class: read_modify_write
         role_guard:
           any_of: [compliance_officer, senior_compliance, mlro]
         audit_class: investment_manager_terminate

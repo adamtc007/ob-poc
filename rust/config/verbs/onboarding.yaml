@@ -64,6 +64,7 @@ domains:
       compile-data-request:
         flavour: instance_adding
         description: "Compile a frozen service-resource data dictionary for a deal onboarding request"
+        effect_class: read_modify_write
         metadata:
           tier: intent
           source_of_truth: operational
@@ -106,6 +107,7 @@ domains:
       dispatch-ready-slices:
         flavour: attribute_mutating
         description: "Dispatch all ready service-resource data request slices to resource owners"
+        effect_class: read_modify_write
         metadata:
           tier: intent
           source_of_truth: operational
@@ -144,6 +146,7 @@ domains:
 
       cancel-data-request:
         flavour: discretionary
+        effect_class: read_modify_write
         role_guard:
           any_of: [onboarding_admin, ops_admin, mlro]
         audit_class: onboarding_data_request_cancel
@@ -179,6 +182,7 @@ domains:
 
       cancel-slice:
         flavour: discretionary
+        effect_class: read_modify_write
         role_guard:
           any_of: [onboarding_admin, ops_admin, mlro]
         audit_class: onboarding_data_request_slice_cancel

@@ -112,6 +112,7 @@ domains:
       mark-verified:
         flavour: attribute_mutating
         description: "Verify (QA approve) an evidence record"
+        effect_class: read_modify_write
         invocation_phrases:
           - "verify evidence"
           - "approve evidence"

@@ -126,6 +126,7 @@ domains:
       archive:
         flavour: attribute_mutating
         description: "Archive team (soft delete)"
+        effect_class: read_modify_write
         invocation_phrases:
           - "archive team"
           - "deactivate team"
@@ -311,6 +312,7 @@ domains:
       update-member:
         flavour: attribute_mutating
         description: "Update member's role key"
+        effect_class: read_modify_write
         invocation_phrases:
           - "update team member"
           - "change member role"
@@ -899,6 +901,7 @@ domains:
             baseline: reviewable
       suspend:
         flavour: discretionary
+        effect_class: read_modify_write
         role_guard:
           any_of: [compliance_officer, senior_compliance, mlro]
         audit_class: user_suspend
@@ -943,6 +946,7 @@ domains:
       reactivate:
         flavour: attribute_mutating
         description: "Reactivate suspended user"
+        effect_class: read_modify_write
         invocation_phrases:
           - "reactivate user"
           - "re-enable user"
@@ -983,6 +987,7 @@ domains:
       offboard:
         flavour: attribute_mutating
         description: "Offboard user completely (left company)"
+        effect_class: read_modify_write
         invocation_phrases:
           - "offboard user"
           - "remove user"

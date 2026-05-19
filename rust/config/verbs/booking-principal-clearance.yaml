@@ -84,6 +84,7 @@ domains:
         flavour: instance_adding
         description: "Transition clearance PENDING → SCREENING (begin sanctions / credit / regulatory screening)"
         behavior: plugin
+        effect_class: read_modify_write
         metadata:
           tier: intent
           source_of_truth: operational
@@ -118,6 +119,7 @@ domains:
 
       approve:
         flavour: discretionary
+        effect_class: read_modify_write
         role_guard:
           any_of: [compliance_officer, senior_compliance, mlro]
         audit_class: booking_principal_clearance_approve
@@ -161,6 +163,7 @@ domains:
 
       reject:
         flavour: discretionary
+        effect_class: read_modify_write
         role_guard:
           any_of: [compliance_officer, senior_compliance, mlro]
         audit_class: booking_principal_clearance_reject
@@ -206,6 +209,7 @@ domains:
         flavour: attribute_mutating
         description: "Transition clearance REJECTED → PENDING (retry after remediation)"
         behavior: plugin
+        effect_class: read_modify_write
         metadata:
           tier: intent
           source_of_truth: operational
@@ -245,6 +249,7 @@ domains:
         flavour: attribute_mutating
         description: "Transition clearance APPROVED → ACTIVE (clearance live for this deal)"
         behavior: plugin
+        effect_class: read_modify_write
         metadata:
           tier: intent
           source_of_truth: operational
@@ -278,6 +283,7 @@ domains:
 
       suspend:
         flavour: discretionary
+        effect_class: read_modify_write
         role_guard:
           any_of: [compliance_officer, senior_compliance, mlro]
         audit_class: booking_principal_clearance_suspend
@@ -323,6 +329,7 @@ domains:
         flavour: attribute_mutating
         description: "Transition clearance SUSPENDED → ACTIVE (lift suspension)"
         behavior: plugin
+        effect_class: read_modify_write
         metadata:
           tier: intent
           source_of_truth: operational

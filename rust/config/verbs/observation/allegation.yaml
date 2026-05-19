@@ -106,6 +106,7 @@ domains:
       verify:
         flavour: attribute_mutating
         description: Mark allegation as verified by an observation
+        effect_class: read_modify_write
         metadata:
           tier: intent
           source_of_truth: operational
@@ -170,6 +171,7 @@ domains:
       contradict:
         flavour: attribute_mutating
         description: Mark allegation as contradicted by evidence
+        effect_class: read_modify_write
         metadata:
           tier: intent
           source_of_truth: operational
@@ -234,6 +236,7 @@ domains:
       mark-partial:
         flavour: attribute_mutating
         description: Mark allegation as partially verified
+        effect_class: read_modify_write
         metadata:
           tier: intent
           source_of_truth: operational

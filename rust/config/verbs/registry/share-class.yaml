@@ -311,6 +311,7 @@ domains:
         flavour: attribute_mutating
         description: Update NAV for a share class
         behavior: crud
+        effect_class: read_modify_write
         metadata:
           tier: intent
           source_of_truth: register
@@ -454,6 +455,7 @@ domains:
         flavour: attribute_mutating
         description: Close a share class to new subscriptions
         behavior: crud
+        effect_class: read_modify_write
         metadata:
           tier: intent
           source_of_truth: register
@@ -505,6 +507,7 @@ domains:
         flavour: attribute_mutating
         description: "Launch share class from DRAFT to OPEN (accepting subscriptions)"
         behavior: plugin
+        effect_class: read_modify_write
         metadata:
           tier: intent
           source_of_truth: operational
@@ -540,6 +543,7 @@ domains:
         flavour: attribute_mutating
         description: "Soft-close share class (no new subscriptions; existing holders transact)"
         behavior: plugin
+        effect_class: read_modify_write
         metadata:
           tier: intent
           source_of_truth: operational
@@ -575,6 +579,7 @@ domains:
         flavour: attribute_mutating
         description: "Reopen soft-closed share class back to accepting subscriptions"
         behavior: plugin
+        effect_class: read_modify_write
         metadata:
           tier: intent
           source_of_truth: operational
@@ -650,6 +655,7 @@ domains:
         flavour: attribute_mutating
         description: "Lift hard-close on share class back to soft-closed"
         behavior: plugin
+        effect_class: read_modify_write
         metadata:
           tier: intent
           source_of_truth: operational

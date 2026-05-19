@@ -69,6 +69,7 @@ domains:
       activate:
         flavour: attribute_mutating
         description: Activate a provisioned (or offline / maintenance) instance — transition to ACTIVE
+        effect_class: read_modify_write
         invocation_phrases:
           - "activate application instance"
           - "activate app instance"
@@ -121,6 +122,7 @@ domains:
       enter-maintenance:
         flavour: attribute_mutating
         description: Enter maintenance window — pause traffic without retiring bindings
+        effect_class: read_modify_write
         invocation_phrases:
           - "enter maintenance window"
           - "begin maintenance"
@@ -177,6 +179,7 @@ domains:
       exit-maintenance:
         flavour: attribute_mutating
         description: Exit maintenance window — return instance to ACTIVE
+        effect_class: read_modify_write
         invocation_phrases:
           - "exit maintenance window"
           - "end maintenance"
@@ -229,6 +232,7 @@ domains:
       take-offline:
         flavour: attribute_mutating
         description: Take instance OFFLINE (operational hold — incident, security freeze, capacity action)
+        effect_class: read_modify_write
         invocation_phrases:
           - "take instance offline"
           - "offline application instance"
@@ -285,6 +289,7 @@ domains:
       bring-online:
         flavour: attribute_mutating
         description: Bring an OFFLINE instance back to ACTIVE
+        effect_class: read_modify_write
         invocation_phrases:
           - "bring instance online"
           - "online application instance"
@@ -336,6 +341,7 @@ domains:
 
       decommission:
         flavour: discretionary
+        effect_class: read_modify_write
         role_guard:
           any_of: [compliance_officer, senior_compliance, mlro]
         audit_class: application_instance_decommission

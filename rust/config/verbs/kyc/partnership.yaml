@@ -253,6 +253,7 @@ domains:
       withdraw-partner:
         flavour: attribute_mutating
         description: Record partner withdrawal/exit
+        effect_class: read_modify_write
         metadata:
           tier: intent
           source_of_truth: operational

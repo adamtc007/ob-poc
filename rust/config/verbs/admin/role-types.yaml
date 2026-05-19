@@ -175,6 +175,7 @@ domains:
       update:
         flavour: attribute_mutating
         description: "Update role type"
+        effect_class: read_modify_write
         metadata:
           tier: intent
           source_of_truth: operational
@@ -232,6 +233,7 @@ domains:
       deactivate:
         flavour: attribute_mutating
         description: "Deactivate a role type"
+        effect_class: read_modify_write
         metadata:
           tier: intent
           source_of_truth: operational

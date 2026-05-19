@@ -65,6 +65,7 @@ domains:
       update:
         flavour: attribute_mutating
         description: Update an application registry card
+        effect_class: read_modify_write
         invocation_phrases:
           - "update application"
           - "edit application registry"

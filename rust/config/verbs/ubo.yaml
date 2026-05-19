@@ -236,6 +236,7 @@ domains:
       update-ownership:
         flavour: attribute_mutating
         description: Update ownership percentage or end date
+        effect_class: read_modify_write
         invocation_phrases:
           - "update ownership"
           - "change ownership percentage"
@@ -383,6 +384,7 @@ domains:
       end-relationship:
         flavour: attribute_mutating
         description: End any entity relationship by ID (soft delete - sets effective_to date)
+        effect_class: read_modify_write
         invocation_phrases:
           - "end relationship"
           - "end ownership"

@@ -10,6 +10,7 @@ domains:
     verbs:
       submit-for-review:
         flavour: discretionary
+        effect_class: read_modify_write
         role_guard:
           any_of: [compliance_officer, senior_compliance, mlro]
         audit_class: cbu_ca_submit_for_review
@@ -126,6 +127,7 @@ domains:
         flavour: attribute_mutating
         description: "Withdraw CBU-level CA event before decision (proposer retracts)"
         behavior: plugin
+        effect_class: read_modify_write
         metadata:
           tier: intent
           source_of_truth: operational
@@ -160,6 +162,7 @@ domains:
         flavour: attribute_mutating
         description: "Mark CBU-level CA event as implemented (post-effective; terminal-positive)"
         behavior: plugin
+        effect_class: read_modify_write
         metadata:
           tier: intent
           source_of_truth: operational

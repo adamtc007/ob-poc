@@ -12,6 +12,7 @@ domains:
         flavour: instance_adding
         description: "Provision a service for a CBU (proposed → provisioned; accounts opened, routings set)"
         behavior: plugin
+        effect_class: read_modify_write
         metadata:
           tier: intent
           source_of_truth: operational
@@ -47,6 +48,7 @@ domains:
         flavour: attribute_mutating
         description: "Activate service for operational use (provisioned → active)"
         behavior: plugin
+        effect_class: read_modify_write
         metadata:
           tier: intent
           source_of_truth: operational
@@ -79,6 +81,7 @@ domains:
 
       suspend:
         flavour: discretionary
+        effect_class: read_modify_write
         role_guard:
           any_of: [compliance_officer, senior_compliance, mlro]
         audit_class: service_consumption_suspend
@@ -122,6 +125,7 @@ domains:
         flavour: attribute_mutating
         description: "Reinstate suspended service back to active"
         behavior: plugin
+        effect_class: read_modify_write
         metadata:
           tier: intent
           source_of_truth: operational

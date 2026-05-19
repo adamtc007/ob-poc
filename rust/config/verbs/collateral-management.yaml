@@ -29,6 +29,7 @@ domains:
       configure:
         flavour: attribute_mutating
         description: "Configure collateral management for a CBU (entry state)"
+        effect_class: read_modify_write
         invocation_phrases:
           - "configure collateral"
           - "set up collateral management"
@@ -83,6 +84,7 @@ domains:
       activate:
         flavour: attribute_mutating
         description: "Activate collateral management (configured → active)"
+        effect_class: read_modify_write
         invocation_phrases:
           - "activate collateral"
           - "go live on collateral"
@@ -118,6 +120,7 @@ domains:
 
       suspend:
         flavour: discretionary
+        effect_class: read_modify_write
         role_guard:
           any_of: [compliance_officer, senior_compliance, mlro]
         audit_class: collateral_management_suspend
@@ -160,6 +163,7 @@ domains:
       reactivate:
         flavour: attribute_mutating
         description: "Reactivate suspended collateral (suspended → active)"
+        effect_class: read_modify_write
         invocation_phrases:
           - "reactivate collateral"
           - "resume collateral"

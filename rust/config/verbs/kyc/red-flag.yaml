@@ -154,6 +154,7 @@ domains:
       update-rating:
         flavour: attribute_mutating
         description: Update red flag severity rating without changing lifecycle state — preserving update for risk re-assessment
+        effect_class: read_modify_write
         metadata:
           tier: intent
           source_of_truth: operational
@@ -198,6 +199,7 @@ domains:
       mitigate:
         flavour: attribute_mutating
         description: Mark red flag as mitigated
+        effect_class: read_modify_write
         metadata:
           tier: intent
           source_of_truth: operational
@@ -254,6 +256,7 @@ domains:
           target_slot: red_flag
       waive:
         flavour: discretionary
+        effect_class: read_modify_write
         role_guard:
           any_of: [compliance_admin, senior_compliance, mlro]
         audit_class: red_flag_waive
@@ -319,6 +322,7 @@ domains:
 
       close:
         flavour: discretionary
+        effect_class: read_modify_write
         role_guard:
           any_of: [compliance_admin, senior_compliance, mlro]
         audit_class: red_flag_close
@@ -380,6 +384,7 @@ domains:
       dismiss:
         flavour: attribute_mutating
         description: Dismiss red flag as false positive
+        effect_class: read_modify_write
         metadata:
           tier: intent
           source_of_truth: operational
@@ -437,6 +442,7 @@ domains:
       set-blocking:
         flavour: attribute_mutating
         description: Set red flag as blocking the case
+        effect_class: read_modify_write
         metadata:
           tier: intent
           source_of_truth: operational

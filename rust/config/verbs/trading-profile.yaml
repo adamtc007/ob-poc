@@ -1085,6 +1085,7 @@ domains:
       submit:
         flavour: attribute_mutating
         description: Submit a validated trading profile for client review (transitions VALIDATED -> PENDING_REVIEW)
+        effect_class: read_modify_write
         invocation_phrases:
           - "submit profile for approval"
           - "submit trading profile"
@@ -1150,6 +1151,7 @@ domains:
 
       approve:
         flavour: discretionary
+        effect_class: read_modify_write
         role_guard:
           any_of: [compliance_officer, senior_compliance, mlro]
         audit_class: trading_profile_approve
@@ -1202,6 +1204,7 @@ domains:
 
       reject:
         flavour: discretionary
+        effect_class: read_modify_write
         role_guard:
           any_of: [compliance_officer, senior_compliance, mlro]
         audit_class: trading_profile_reject
@@ -1255,6 +1258,7 @@ domains:
       archive:
         flavour: attribute_mutating
         description: Archive a trading profile (soft delete, transitions to ARCHIVED status)
+        effect_class: read_modify_write
         invocation_phrases:
           - "archive trading profile"
           - "archive profile"
@@ -1830,6 +1834,7 @@ domains:
       enter-parallel-run:
         flavour: attribute_mutating
         description: "Enter parallel_run state (approved → parallel_run)"
+        effect_class: read_modify_write
         invocation_phrases:
           - "enter parallel run"
           - "start shadow trading"
@@ -1905,6 +1910,7 @@ domains:
       abort-parallel-run:
         flavour: attribute_mutating
         description: "Abort parallel run — roll back to approved"
+        effect_class: read_modify_write
         invocation_phrases:
           - "abort parallel run"
           - "rollback parallel mandate"
@@ -2555,6 +2561,7 @@ domains:
         flavour: attribute_mutating
         description: "Apply partial trading restriction to mandate (pull specific markets / instruments)"
         behavior: plugin
+        effect_class: read_modify_write
         metadata:
           tier: intent
           source_of_truth: operational
@@ -2594,6 +2601,7 @@ domains:
         flavour: attribute_mutating
         description: "Lift trading-profile restriction (restore full mandate scope)"
         behavior: plugin
+        effect_class: read_modify_write
         metadata:
           tier: intent
           source_of_truth: operational

@@ -292,6 +292,7 @@ domains:
       deactivate-chain:
         flavour: attribute_mutating
         description: "Deactivate a settlement chain"
+        effect_class: read_modify_write
         invocation_phrases:
           - "deactivate settlement chain"
           - "disable settlement chain"
@@ -854,6 +855,7 @@ domains:
       deactivate-cross-border:
         flavour: attribute_mutating
         description: "Deactivate cross-border configuration"
+        effect_class: read_modify_write
         invocation_phrases:
           - "deactivate cross-border"
           - "disable cross-border routing"
@@ -904,6 +906,7 @@ domains:
 
       request-review:
         flavour: discretionary
+        effect_class: read_modify_write
         role_guard:
           any_of: [compliance_officer, senior_compliance, mlro]
         audit_class: settlement_chain_request_review
@@ -944,6 +947,7 @@ domains:
       enter-parallel-run:
         flavour: attribute_mutating
         description: "Enter parallel-run state — new chain runs alongside incumbent for 1-2 cycles"
+        effect_class: read_modify_write
         invocation_phrases:
           - "enter parallel run"
           - "start parallel settlement"
@@ -980,6 +984,7 @@ domains:
       go-live:
         flavour: attribute_mutating
         description: "Activate chain as live (parallel_run → live)"
+        effect_class: read_modify_write
         invocation_phrases:
           - "go live on chain"
           - "activate chain"
@@ -1016,6 +1021,7 @@ domains:
       abort-parallel-run:
         flavour: attribute_mutating
         description: "Abort parallel_run — roll back to reviewed state (issues found)"
+        effect_class: read_modify_write
         invocation_phrases:
           - "abort parallel run"
           - "rollback parallel chain"
@@ -1054,6 +1060,7 @@ domains:
           target_slot: settlement_pattern_template
       suspend:
         flavour: discretionary
+        effect_class: read_modify_write
         role_guard:
           any_of: [compliance_officer, senior_compliance, mlro]
         audit_class: settlement_chain_suspend
@@ -1097,6 +1104,7 @@ domains:
       reactivate:
         flavour: attribute_mutating
         description: "Reactivate a suspended settlement chain (suspended → live)"
+        effect_class: read_modify_write
         invocation_phrases:
           - "reactivate chain"
           - "resume settlement chain"

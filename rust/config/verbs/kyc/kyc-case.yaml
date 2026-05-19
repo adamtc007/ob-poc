@@ -132,6 +132,7 @@ domains:
       update-status:
         flavour: attribute_mutating
         description: Update case status with transition validation
+        effect_class: read_modify_write
         invocation_phrases:
           - "update case status"
           - "change case status"
@@ -336,6 +337,7 @@ domains:
           target_slot: kyc_case
       escalate:
         flavour: discretionary
+        effect_class: read_modify_write
         role_guard:
           any_of: [compliance_officer, senior_compliance, mlro]
         audit_class: kyc_case_escalate
@@ -406,6 +408,7 @@ domains:
       assign:
         flavour: instance_adding
         description: Assign case to analyst and/or reviewer
+        effect_class: read_modify_write
         invocation_phrases:
           - "assign case"
           - "assign to analyst"
@@ -479,6 +482,7 @@ domains:
       set-risk-rating:
         flavour: attribute_mutating
         description: Set case risk rating
+        effect_class: read_modify_write
         invocation_phrases:
           - "set risk rating"
           - "rate case risk"
@@ -718,6 +722,7 @@ domains:
       reopen:
         flavour: attribute_mutating
         description: Reopen a closed case for remediation or review
+        effect_class: read_modify_write
         invocation_phrases:
           - "reopen case"
           - "reopen kyc case"

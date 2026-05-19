@@ -308,6 +308,7 @@ domains:
         flavour: attribute_mutating
         description: "Transition deal status with lifecycle validation, including pre-contract KYC clearance"
         behavior: plugin
+        effect_class: read_modify_write
         metadata:
           tier: intent
           source_of_truth: operational
@@ -662,6 +663,7 @@ domains:
         flavour: attribute_mutating
         description: "Remove a product from the deal scope (sets status to REMOVED)"
         behavior: plugin
+        effect_class: read_modify_write
         metadata:
           tier: intent
           source_of_truth: operational
@@ -1163,6 +1165,7 @@ domains:
         flavour: attribute_mutating
         description: "Submit rate card for client review"
         behavior: plugin
+        effect_class: read_modify_write
         lifecycle:
           precondition_checks:
             - "requires_prior:deal.create-rate-card"
@@ -1211,6 +1214,7 @@ domains:
         flavour: attribute_mutating
         description: "Client counter-offer - creates new version via clone"
         behavior: plugin
+        effect_class: read_modify_write
         lifecycle:
           precondition_checks:
             - "requires_prior:deal.propose-rate-card"
@@ -1633,6 +1637,7 @@ domains:
         flavour: attribute_mutating
         description: "Update document status (e.g. DRAFT → SIGNED → EXECUTED)"
         behavior: plugin
+        effect_class: read_modify_write
         metadata:
           tier: intent
           source_of_truth: operational
@@ -1756,6 +1761,7 @@ domains:
         flavour: attribute_mutating
         description: "Update UBO assessment status and risk rating"
         behavior: plugin
+        effect_class: read_modify_write
         metadata:
           tier: intent
           source_of_truth: operational
@@ -1957,6 +1963,7 @@ domains:
         flavour: attribute_mutating
         description: "Update onboarding request status"
         behavior: plugin
+        effect_class: read_modify_write
         metadata:
           tier: intent
           source_of_truth: operational
@@ -2157,6 +2164,7 @@ domains:
         flavour: attribute_mutating
         description: "Submit deal to Business Acceptance Committee — writes deal_status='IN_CLEARANCE' and bac_status='in_review' (Q21 (b) substate model)"
         behavior: plugin
+        effect_class: read_modify_write
         metadata:
           tier: intent
           source_of_truth: operational
@@ -2400,6 +2408,7 @@ domains:
 
       submit-for-pricing-approval:
         flavour: discretionary
+        effect_class: read_modify_write
         role_guard:
           any_of: [compliance_admin, senior_compliance, mlro]
         audit_class: deal_submit_for_pricing_approval
@@ -2438,6 +2447,7 @@ domains:
 
       pricing-approve:
         flavour: discretionary
+        effect_class: read_modify_write
         role_guard:
           any_of: [compliance_officer, senior_compliance, mlro]
         audit_class: deal_pricing_approve
@@ -2475,6 +2485,7 @@ domains:
 
       pricing-reject:
         flavour: discretionary
+        effect_class: read_modify_write
         role_guard:
           any_of: [compliance_officer, senior_compliance, mlro]
         audit_class: deal_pricing_reject
@@ -2640,6 +2651,7 @@ domains:
 
       suspend:
         flavour: discretionary
+        effect_class: read_modify_write
         role_guard:
           any_of: [compliance_officer, senior_compliance, mlro]
         audit_class: deal_suspend
@@ -2683,6 +2695,7 @@ domains:
         flavour: attribute_mutating
         description: "Reinstate suspended deal back to active"
         behavior: plugin
+        effect_class: read_modify_write
         metadata:
           tier: intent
           source_of_truth: operational
@@ -2754,6 +2767,7 @@ domains:
         flavour: instance_adding
         description: "Begin remediation of a breached SLA (transition BREACHED → IN_REMEDIATION)"
         behavior: plugin
+        effect_class: read_modify_write
         metadata:
           tier: intent
           source_of_truth: operational
@@ -2788,6 +2802,7 @@ domains:
         flavour: attribute_mutating
         description: "Resolve SLA breach (remediation complete; transition to RESOLVED)"
         behavior: plugin
+        effect_class: read_modify_write
         metadata:
           tier: intent
           source_of_truth: operational

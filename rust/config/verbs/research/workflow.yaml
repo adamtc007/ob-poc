@@ -424,6 +424,7 @@ domains:
       resolve-anomaly:
         flavour: attribute_mutating
         description: "Resolve an anomaly"
+        effect_class: read_modify_write
         metadata:
           tier: intent
           source_of_truth: workflow

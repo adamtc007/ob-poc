@@ -168,6 +168,7 @@ domains:
       supersede:
         flavour: attribute_mutating
         description: Supersede an observation with a newer one
+        effect_class: read_modify_write
         metadata:
           tier: intent
           source_of_truth: operational

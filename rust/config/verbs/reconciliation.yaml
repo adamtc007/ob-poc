@@ -74,6 +74,7 @@ domains:
       activate:
         flavour: attribute_mutating
         description: "Activate a reconciliation config (draft → active)"
+        effect_class: read_modify_write
         invocation_phrases:
           - "activate reconciliation"
           - "enable recon"
@@ -109,6 +110,7 @@ domains:
 
       suspend:
         flavour: discretionary
+        effect_class: read_modify_write
         role_guard:
           any_of: [compliance_officer, senior_compliance, mlro]
         audit_class: reconciliation_suspend
@@ -151,6 +153,7 @@ domains:
       reactivate:
         flavour: attribute_mutating
         description: "Re-activate a suspended reconciliation (suspended → active)"
+        effect_class: read_modify_write
         invocation_phrases:
           - "reactivate reconciliation"
           - "resume recon"

@@ -311,6 +311,7 @@ domains:
       complete:
         flavour: attribute_mutating
         description: Record workstream screening completion.
+        effect_class: read_modify_write
         metadata:
           tier: intent
           source_of_truth: operational
@@ -389,6 +390,7 @@ domains:
 
       review-hit:
         flavour: discretionary
+        effect_class: read_modify_write
         role_guard:
           any_of: [compliance_officer, senior_compliance, mlro]
         audit_class: screening_review_hit

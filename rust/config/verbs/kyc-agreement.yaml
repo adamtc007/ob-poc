@@ -179,6 +179,7 @@ domains:
       update-status:
         flavour: attribute_mutating
         description: "Update agreement status"
+        effect_class: read_modify_write
         metadata:
           tier: intent
           source_of_truth: workflow

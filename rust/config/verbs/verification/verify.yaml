@@ -214,6 +214,7 @@ domains:
       respond-to-challenge:
         flavour: attribute_mutating
         description: Record client response to verification challenge
+        effect_class: read_modify_write
         metadata:
           tier: intent
           source_of_truth: workflow
@@ -270,6 +271,7 @@ domains:
       resolve-challenge:
         flavour: attribute_mutating
         description: Resolve verification challenge (accept/reject/escalate)
+        effect_class: read_modify_write
         metadata:
           tier: intent
           source_of_truth: workflow
@@ -492,6 +494,7 @@ domains:
       resolve-escalation:
         flavour: attribute_mutating
         description: Record escalation decision
+        effect_class: read_modify_write
         metadata:
           tier: intent
           source_of_truth: workflow
@@ -902,6 +905,7 @@ domains:
       resolve-pattern:
         flavour: attribute_mutating
         description: Resolve or dismiss a detected pattern
+        effect_class: read_modify_write
         metadata:
           tier: intent
           source_of_truth: workflow

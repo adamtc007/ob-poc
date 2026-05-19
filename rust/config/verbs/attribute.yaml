@@ -292,6 +292,7 @@ domains:
       classify:
         flavour: attribute_mutating
         description: "Assign or reassign taxonomy category for an attribute"
+        effect_class: read_modify_write
         metadata:
           tier: intent
           source_of_truth: catalog
@@ -366,6 +367,7 @@ domains:
       deprecate:
         flavour: attribute_mutating
         description: "Mark an attribute as deprecated without deleting operational references"
+        effect_class: read_modify_write
         metadata:
           tier: intent
           source_of_truth: sem_reg
@@ -440,6 +442,7 @@ domains:
       update:
         flavour: attribute_mutating
         description: "Update an existing attribute"
+        effect_class: read_modify_write
         metadata:
           tier: intent
           source_of_truth: catalog

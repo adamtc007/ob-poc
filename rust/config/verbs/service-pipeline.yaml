@@ -16,6 +16,7 @@ domains:
       create:
         flavour: instance_adding
         description: "Create a service intent for a CBU"
+        effect_class: read_modify_write
         metadata:
           tier: intent
           source_of_truth: operational
@@ -176,6 +177,7 @@ domains:
 
       suspend:
         flavour: discretionary
+        effect_class: read_modify_write
         role_guard:
           any_of: [compliance_officer, senior_compliance, mlro]
         audit_class: service_intent_suspend
@@ -218,6 +220,7 @@ domains:
       resume:
         flavour: attribute_mutating
         description: "Resume a suspended service intent (suspended → active)"
+        effect_class: read_modify_write
         invocation_phrases:
           - "resume service intent"
           - "reactivate intent"
@@ -300,6 +303,7 @@ domains:
       run:
         flavour: attribute_mutating
         description: "Run resource discovery - determines required SRDEFs from service intents"
+        effect_class: read_modify_write
         metadata:
           tier: composite
           source_of_truth: operational
@@ -395,6 +399,7 @@ domains:
       rollup:
         flavour: attribute_mutating
         description: "Roll up attribute requirements from discovered SRDEFs"
+        effect_class: read_modify_write
         metadata:
           tier: composite
           source_of_truth: operational
@@ -443,6 +448,7 @@ domains:
       populate:
         flavour: attribute_mutating
         description: "Auto-populate attribute values from available sources"
+        effect_class: read_modify_write
         metadata:
           tier: composite
           source_of_truth: operational
@@ -495,6 +501,7 @@ domains:
       gaps:
         flavour: attribute_mutating
         description: "Show attribute gaps - required values that are missing"
+        effect_class: read_modify_write
         metadata:
           tier: diagnostics
           source_of_truth: operational
@@ -553,6 +560,7 @@ domains:
       set:
         flavour: attribute_mutating
         description: "Set an attribute value manually"
+        effect_class: read_modify_write
         metadata:
           tier: intent
           source_of_truth: operational
@@ -618,6 +626,7 @@ domains:
       run:
         flavour: attribute_mutating
         description: "Run provisioning orchestrator - creates resources for ready SRDEFs"
+        effect_class: read_modify_write
         metadata:
           tier: composite
           source_of_truth: operational

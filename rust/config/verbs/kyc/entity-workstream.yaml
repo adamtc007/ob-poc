@@ -106,6 +106,7 @@ domains:
       update-status:
         flavour: attribute_mutating
         description: Update workstream status
+        effect_class: read_modify_write
         invocation_phrases:
         - "update workstream status"
         - "advance workstream"
@@ -165,6 +166,7 @@ domains:
       block:
         flavour: attribute_mutating
         description: Block workstream with reason
+        effect_class: read_modify_write
         invocation_phrases:
         - "block workstream"
         - "hold workstream"
@@ -217,6 +219,7 @@ domains:
       complete:
         flavour: attribute_mutating
         description: Mark workstream as complete
+        effect_class: read_modify_write
         invocation_phrases:
         - "complete workstream"
         - "finish workstream"
@@ -274,6 +277,7 @@ domains:
             baseline: reviewable
       escalate-dd:
         flavour: discretionary
+        effect_class: read_modify_write
         role_guard:
           any_of: [compliance_officer, senior_compliance, mlro]
         audit_class: entity_workstream_escalate_dd
@@ -324,6 +328,7 @@ domains:
       set-ubo:
         flavour: attribute_mutating
         description: Mark workstream entity as UBO
+        effect_class: read_modify_write
         invocation_phrases:
         - "mark as ubo"
         - "set ubo flag"

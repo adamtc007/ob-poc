@@ -96,6 +96,7 @@ domains:
       mark-sent:
         flavour: attribute_mutating
         description: "Mark request as sent"
+        effect_class: read_modify_write
         metadata:
           tier: intent
           source_of_truth: workflow
@@ -139,6 +140,7 @@ domains:
       send-reminder:
         flavour: attribute_mutating
         description: "Mark that a reminder was sent"
+        effect_class: read_modify_write
         metadata:
           tier: intent
           source_of_truth: workflow
@@ -227,6 +229,7 @@ domains:
       close-request:
         flavour: attribute_mutating
         description: "Close an outreach request"
+        effect_class: read_modify_write
         metadata:
           tier: intent
           source_of_truth: workflow

@@ -1395,6 +1395,7 @@ domains:
       update-investment:
         flavour: attribute_mutating
         description: Update investment allocation percentage
+        effect_class: read_modify_write
         invocation_phrases:
           - "update investment"
           - "change allocation"
@@ -1441,6 +1442,7 @@ domains:
       end-investment:
         flavour: attribute_mutating
         description: End/redeem a fund investment
+        effect_class: read_modify_write
         invocation_phrases:
           - "end investment"
           - "redeem investment"

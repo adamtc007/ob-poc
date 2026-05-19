@@ -192,6 +192,7 @@ domains:
       remove:
         flavour: attribute_mutating
         description: "Remove/withdraw registration"
+        effect_class: read_modify_write
         metadata:
           tier: intent
           source_of_truth: external

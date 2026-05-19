@@ -170,6 +170,7 @@ domains:
         flavour: attribute_mutating
         description: "Update contract details"
         behavior: crud
+        effect_class: read_modify_write
         crud:
           operation: update
           table: legal_contracts
@@ -212,6 +213,7 @@ domains:
             baseline: reviewable
       terminate:
         flavour: discretionary
+        effect_class: read_modify_write
         role_guard:
           any_of: [compliance_officer, senior_compliance, mlro]
         audit_class: contract_terminate

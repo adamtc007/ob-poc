@@ -390,6 +390,7 @@ domains:
       update:
         flavour: attribute_mutating
         description: Update an entity's base fields
+        effect_class: read_modify_write
         invocation_phrases:
           - "update entity"
           - "modify entity details"
@@ -691,6 +692,7 @@ domains:
       identify:
         flavour: attribute_mutating
         description: Add identifying attributes to a ghost entity (transitions to IDENTIFIED state)
+        effect_class: read_modify_write
         invocation_phrases:
           - "identify ghost entity"
           - "add identity to ghost"
@@ -764,6 +766,7 @@ domains:
       verify:
         flavour: attribute_mutating
         description: Mark an identified entity as verified (transitions to VERIFIED state)
+        effect_class: read_modify_write
         invocation_phrases:
           - "verify entity"
           - "confirm entity identity"

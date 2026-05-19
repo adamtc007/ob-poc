@@ -333,6 +333,7 @@ domains:
       confirm-provisioning-result:
         flavour: attribute_mutating
         description: Confirm the owner-returned provisioning result for a resource request
+        effect_class: read_modify_write
         metadata:
           tier: intent
           source_of_truth: operational
@@ -563,6 +564,7 @@ domains:
       activate:
         flavour: attribute_mutating
         description: Activate a service resource instance
+        effect_class: read_modify_write
         metadata:
           tier: intent
           source_of_truth: catalog
@@ -597,6 +599,7 @@ domains:
           target_slot: service_resource
       suspend:
         flavour: discretionary
+        effect_class: read_modify_write
         role_guard:
           any_of: [compliance_officer, senior_compliance, mlro]
         audit_class: service_resource_suspend
@@ -1058,6 +1061,7 @@ domains:
 
       activate-lifecycle:
         flavour: discretionary
+        effect_class: read_modify_write
         role_guard:
           any_of: [compliance_admin, senior_compliance, mlro]
         audit_class: service_resource_activate_lifecycle
@@ -1097,6 +1101,7 @@ domains:
 
       suspend-lifecycle:
         flavour: discretionary
+        effect_class: read_modify_write
         role_guard:
           any_of: [compliance_officer, senior_compliance, mlro]
         audit_class: service_resource_suspend_lifecycle
@@ -1139,6 +1144,7 @@ domains:
 
       decommission-lifecycle:
         flavour: discretionary
+        effect_class: read_modify_write
         role_guard:
           any_of: [compliance_officer, senior_compliance, mlro]
         audit_class: service_resource_decommission_lifecycle
@@ -1514,6 +1520,7 @@ domains:
       reactivate:
         flavour: attribute_mutating
         description: "Reactivate suspended service resource (suspended → activated)"
+        effect_class: read_modify_write
         invocation_phrases:
           - "reactivate service resource"
           - "resume service resource"

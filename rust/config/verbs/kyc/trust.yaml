@@ -151,6 +151,7 @@ domains:
       update-provision:
         flavour: attribute_mutating
         description: Update an existing trust provision
+        effect_class: read_modify_write
         metadata:
           tier: intent
           source_of_truth: operational
@@ -215,6 +216,7 @@ domains:
       end-provision:
         flavour: attribute_mutating
         description: End/revoke a trust provision
+        effect_class: read_modify_write
         metadata:
           tier: intent
           source_of_truth: operational

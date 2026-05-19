@@ -111,6 +111,7 @@ domains:
       end:
         flavour: attribute_mutating
         description: End a delegation
+        effect_class: read_modify_write
         invocation_phrases:
           - "end delegation"
           - "terminate delegation arrangement"

@@ -576,6 +576,7 @@ domains:
       right.end:
         flavour: attribute_mutating
         description: End a special right (set effective_to date)
+        effect_class: read_modify_write
         invocation_phrases:
           - "end special right"
           - "terminate right"
@@ -869,6 +870,7 @@ domains:
       reconcile.resolve-finding:
         flavour: attribute_mutating
         description: Resolve a reconciliation finding
+        effect_class: read_modify_write
         invocation_phrases:
           - "resolve finding"
           - "close reconciliation issue"

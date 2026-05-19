@@ -28,6 +28,7 @@ domains:
       propose-verb-declaration:
         flavour: attribute_mutating
         description: "Stage a new or updated verb declaration for review"
+        effect_class: read_modify_write
         invocation_phrases:
           - "propose verb change"
           - "stage verb declaration"
@@ -109,6 +110,7 @@ domains:
       rollback-verb-declaration:
         flavour: attribute_mutating
         description: "Discard a staged proposal (revert to prior authoritative state)"
+        effect_class: read_modify_write
         invocation_phrases:
           - "rollback catalogue proposal"
           - "discard verb change"

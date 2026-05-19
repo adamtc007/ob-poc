@@ -64,6 +64,7 @@ domains:
       start-pilot:
         flavour: instance_adding
         description: Start pilot — limited load, canary cohort
+        effect_class: read_modify_write
         invocation_phrases:
           - "start pilot for binding"
           - "begin canary on binding"
@@ -111,6 +112,7 @@ domains:
       promote-live:
         flavour: attribute_mutating
         description: Promote pilot binding to LIVE — full production traffic
+        effect_class: read_modify_write
         invocation_phrases:
           - "promote binding to live"
           - "go live with binding"
@@ -158,6 +160,7 @@ domains:
       abort-pilot:
         flavour: attribute_mutating
         description: Abort pilot — return binding to DRAFT (pilot did not validate)
+        effect_class: read_modify_write
         invocation_phrases:
           - "abort pilot"
           - "cancel pilot"
@@ -208,6 +211,7 @@ domains:
       deprecate:
         flavour: attribute_mutating
         description: Deprecate a LIVE binding — no new consumers; existing traffic drains
+        effect_class: read_modify_write
         invocation_phrases:
           - "deprecate capability binding"
           - "deprecate binding"
@@ -258,6 +262,7 @@ domains:
 
       retire:
         flavour: discretionary
+        effect_class: read_modify_write
         role_guard:
           any_of: [compliance_admin, senior_compliance, mlro]
         audit_class: capability_binding_retire

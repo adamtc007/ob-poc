@@ -106,6 +106,7 @@ domains:
       end:
         flavour: attribute_mutating
         description: End a control relationship
+        effect_class: read_modify_write
         invocation_phrases:
           - "end control relationship"
           - "terminate control"

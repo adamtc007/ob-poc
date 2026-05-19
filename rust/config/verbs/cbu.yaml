@@ -183,6 +183,7 @@ domains:
       rename:
         flavour: attribute_mutating
         description: Rename a CBU
+        effect_class: read_modify_write
         invocation_phrases:
           - "rename CBU"
           - "rename fund"
@@ -233,6 +234,7 @@ domains:
       update:
         flavour: attribute_mutating
         description: Update ad hoc CBU attributes
+        effect_class: read_modify_write
         invocation_phrases:
           - "update CBU"
           - "set CBU attributes"
@@ -278,6 +280,7 @@ domains:
       set-jurisdiction:
         flavour: attribute_mutating
         description: Set CBU jurisdiction
+        effect_class: read_modify_write
         invocation_phrases:
           - "set CBU jurisdiction"
           - "change CBU jurisdiction"
@@ -332,6 +335,7 @@ domains:
       set-client-type:
         flavour: attribute_mutating
         description: Set CBU client type
+        effect_class: read_modify_write
         invocation_phrases:
           - "set CBU client type"
           - "change client type"
@@ -379,6 +383,7 @@ domains:
       set-commercial-client:
         flavour: attribute_mutating
         description: Set commercial client entity for a CBU
+        effect_class: read_modify_write
         invocation_phrases:
           - "set commercial client"
           - "change commercial client"
@@ -689,6 +694,7 @@ domains:
       submit-for-validation:
         flavour: attribute_mutating
         description: Move a CBU into validation review
+        effect_class: read_modify_write
         invocation_phrases:
           - "submit CBU for validation"
           - "submit fund for validation"
@@ -1116,6 +1122,7 @@ domains:
       set-category:
         flavour: attribute_mutating
         description: Set CBU relationship category (FUND_MANDATE, CORPORATE_GROUP, etc.)
+        effect_class: read_modify_write
         invocation_phrases:
           - "set CBU category"
           - "categorize CBU"
@@ -1500,6 +1507,7 @@ domains:
       request-proof-update:
         flavour: attribute_mutating
         description: Mark a validated CBU as requiring updated proof
+        effect_class: read_modify_write
         invocation_phrases:
           - "request proof update"
           - "mark as update pending proof"
@@ -1553,6 +1561,7 @@ domains:
       reopen-validation:
         flavour: attribute_mutating
         description: Reopen validation for a CBU that previously failed
+        effect_class: read_modify_write
         invocation_phrases:
           - "reopen validation"
           - "retry validation"
@@ -1690,6 +1699,7 @@ domains:
       verify-evidence:
         flavour: attribute_mutating
         description: Mark evidence as verified or rejected
+        effect_class: read_modify_write
         invocation_phrases:
           - "verify CBU evidence"
           - "mark evidence as verified"
@@ -1902,6 +1912,7 @@ domains:
 
       suspend:
         flavour: discretionary
+        effect_class: read_modify_write
         role_guard:
           any_of: [compliance_officer, senior_compliance, mlro]
         audit_class: cbu_suspend
@@ -1948,6 +1959,7 @@ domains:
         flavour: attribute_mutating
         description: "Reinstate suspended CBU back to operationally active"
         behavior: plugin
+        effect_class: read_modify_write
         metadata:
           tier: intent
           source_of_truth: operational
@@ -1984,6 +1996,7 @@ domains:
         flavour: attribute_mutating
         description: "Apply partial trading restriction to CBU (specific markets / instruments pulled)"
         behavior: plugin
+        effect_class: read_modify_write
         metadata:
           tier: intent
           source_of_truth: operational
@@ -2024,6 +2037,7 @@ domains:
         flavour: attribute_mutating
         description: "Lift trading restriction from CBU (restore full mandate scope)"
         behavior: plugin
+        effect_class: read_modify_write
         metadata:
           tier: intent
           source_of_truth: operational
@@ -2140,6 +2154,7 @@ domains:
         flavour: attribute_mutating
         description: "Soft-delete CBU (disposition: sets deleted_at; restorable)"
         behavior: plugin
+        effect_class: read_modify_write
         metadata:
           tier: intent
           source_of_truth: operational
@@ -2179,6 +2194,7 @@ domains:
         flavour: attribute_mutating
         description: "Restore soft-deleted CBU back to active disposition"
         behavior: plugin
+        effect_class: read_modify_write
         metadata:
           tier: intent
           source_of_truth: operational
@@ -2251,6 +2267,7 @@ domains:
         flavour: attribute_mutating
         description: "Flag CBU for post-breach remediation / enhanced monitoring"
         behavior: plugin
+        effect_class: read_modify_write
         metadata:
           tier: intent
           source_of_truth: operational
@@ -2290,6 +2307,7 @@ domains:
         flavour: attribute_mutating
         description: "Clear remediation flag from CBU (remediation conditions satisfied)"
         behavior: plugin
+        effect_class: read_modify_write
         metadata:
           tier: intent
           source_of_truth: operational

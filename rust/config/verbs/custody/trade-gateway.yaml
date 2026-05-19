@@ -282,6 +282,7 @@ domains:
       activate-gateway:
         flavour: attribute_mutating
         description: "Activate gateway connectivity"
+        effect_class: read_modify_write
         metadata:
           tier: intent
           source_of_truth: matrix
@@ -327,6 +328,7 @@ domains:
 
       suspend-gateway:
         flavour: discretionary
+        effect_class: read_modify_write
         role_guard:
           any_of: [compliance_officer, senior_compliance, mlro]
         audit_class: trade_gateway_suspend_gateway
@@ -793,6 +795,7 @@ domains:
       reactivate-gateway:
         flavour: attribute_mutating
         description: "Reactivate a suspended trade gateway (suspended → active)"
+        effect_class: read_modify_write
         invocation_phrases:
           - "reactivate gateway"
           - "resume gateway"

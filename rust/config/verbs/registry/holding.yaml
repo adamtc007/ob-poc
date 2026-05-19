@@ -294,6 +294,7 @@ domains:
       update-units:
         flavour: attribute_mutating
         description: Update holding units (for position adjustments)
+        effect_class: read_modify_write
         metadata:
           tier: intent
           source_of_truth: register
@@ -346,6 +347,7 @@ domains:
       update-status:
         flavour: attribute_mutating
         description: Update holding status
+        effect_class: read_modify_write
         metadata:
           tier: intent
           source_of_truth: register
@@ -587,6 +589,7 @@ domains:
 
       close:
         flavour: discretionary
+        effect_class: read_modify_write
         role_guard:
           any_of: [compliance_admin, senior_compliance, mlro]
         audit_class: holding_close
@@ -643,6 +646,7 @@ domains:
         flavour: attribute_mutating
         description: "Apply legal restriction to holding (court order / dispute freeze)"
         behavior: plugin
+        effect_class: read_modify_write
         metadata:
           tier: intent
           source_of_truth: operational
@@ -683,6 +687,7 @@ domains:
         flavour: attribute_mutating
         description: "Lift legal restriction from holding"
         behavior: plugin
+        effect_class: read_modify_write
         metadata:
           tier: intent
           source_of_truth: operational
@@ -717,6 +722,7 @@ domains:
         flavour: attribute_mutating
         description: "Pledge holding as collateral against a loan / derivative exposure"
         behavior: plugin
+        effect_class: read_modify_write
         metadata:
           tier: intent
           source_of_truth: operational
@@ -756,6 +762,7 @@ domains:
         flavour: attribute_mutating
         description: "Release pledge on holding (collateral no longer required)"
         behavior: plugin
+        effect_class: read_modify_write
         metadata:
           tier: intent
           source_of_truth: operational

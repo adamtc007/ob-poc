@@ -156,6 +156,7 @@ domains:
       set-threshold:
         flavour: attribute_mutating
         description: Update a tollgate threshold
+        effect_class: read_modify_write
         metadata:
           tier: intent
           source_of_truth: operational
@@ -502,6 +503,7 @@ domains:
 
       expire-override:
         flavour: discretionary
+        effect_class: read_modify_write
         role_guard:
           any_of: [senior_compliance, mlro, executive, board]
         audit_class: tollgate_expire_override

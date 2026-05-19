@@ -680,6 +680,7 @@ domains:
       confirm:
         flavour: attribute_mutating
         description: Confirm a pending movement
+        effect_class: read_modify_write
         metadata:
           tier: intent
           source_of_truth: register
@@ -726,6 +727,7 @@ domains:
       settle:
         flavour: attribute_mutating
         description: Mark a movement as settled
+        effect_class: read_modify_write
         metadata:
           tier: intent
           source_of_truth: register
@@ -776,6 +778,7 @@ domains:
       cancel:
         flavour: attribute_mutating
         description: Cancel a pending movement
+        effect_class: read_modify_write
         metadata:
           tier: intent
           source_of_truth: register
@@ -826,6 +829,7 @@ domains:
       fail:
         flavour: attribute_mutating
         description: Mark a movement as failed
+        effect_class: read_modify_write
         metadata:
           tier: intent
           source_of_truth: register

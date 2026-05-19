@@ -120,6 +120,7 @@ domains:
       resolve:
         flavour: attribute_mutating
         description: Resolve a discrepancy
+        effect_class: read_modify_write
         metadata:
           tier: intent
           source_of_truth: operational
@@ -187,6 +188,7 @@ domains:
             baseline: reviewable
       escalate:
         flavour: discretionary
+        effect_class: read_modify_write
         role_guard:
           any_of: [compliance_officer, senior_compliance, mlro]
         audit_class: discrepancy_escalate

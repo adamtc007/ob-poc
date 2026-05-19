@@ -88,6 +88,7 @@ domains:
       complete:
         flavour: attribute_mutating
         description: Mark a service delivery as complete
+        effect_class: read_modify_write
         invocation_phrases:
         - "complete service delivery"
         - "mark delivery as done"
@@ -167,6 +168,7 @@ domains:
       fail:
         flavour: attribute_mutating
         description: Mark a service delivery as failed
+        effect_class: read_modify_write
         invocation_phrases:
         - "fail service delivery"
         - "mark delivery as failed"
@@ -244,6 +246,7 @@ domains:
       start:
         flavour: instance_adding
         description: "Start a pending delivery (PENDING → IN_PROGRESS)"
+        effect_class: read_modify_write
         invocation_phrases:
           - "start delivery"
           - "begin delivery"
@@ -279,6 +282,7 @@ domains:
       cancel:
         flavour: attribute_mutating
         description: "Cancel a delivery before completion"
+        effect_class: read_modify_write
         invocation_phrases:
           - "cancel delivery"
         metadata:

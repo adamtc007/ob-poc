@@ -12,6 +12,7 @@ domains:
         flavour: instance_adding
         description: "Create a new client book (scope: client_group_id). Starts book-setup journey."
         behavior: plugin
+        effect_class: read_modify_write
         metadata:
           tier: intent
           source_of_truth: operational
@@ -51,6 +52,7 @@ domains:
         flavour: attribute_mutating
         description: "Select jurisdiction-specific structure template for the book (e.g. struct.lux.ucits.sicav)"
         behavior: plugin
+        effect_class: read_modify_write
         metadata:
           tier: intent
           source_of_truth: operational
@@ -90,6 +92,7 @@ domains:
         flavour: attribute_mutating
         description: "Mark book as ready-for-deal (terminal-positive in book-setup journey)"
         behavior: plugin
+        effect_class: read_modify_write
         metadata:
           tier: intent
           source_of_truth: operational

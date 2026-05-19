@@ -115,6 +115,7 @@ domains:
         flavour: attribute_mutating
         description: "Update the root client group record"
         behavior: crud
+        effect_class: read_modify_write
         crud:
           operation: update
           table: client_group

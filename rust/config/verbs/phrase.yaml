@@ -203,6 +203,7 @@ domains:
 
       approve:
         flavour: discretionary
+        effect_class: read_modify_write
         role_guard:
           any_of: [compliance_officer, senior_compliance, mlro]
         audit_class: phrase_approve

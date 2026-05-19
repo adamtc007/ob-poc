@@ -422,6 +422,7 @@ domains:
         flavour: attribute_mutating
         description: Remove a CBU from a governance controller group (sets effective_to)
         behavior: crud
+        effect_class: read_modify_write
         invocation_phrases:
           - remove CBU from group
           - remove member
@@ -511,6 +512,7 @@ domains:
 
       approve:
         flavour: discretionary
+        effect_class: read_modify_write
         role_guard:
           any_of: [compliance_officer, senior_compliance, mlro]
         audit_class: manco_approve
@@ -590,6 +592,7 @@ domains:
         flavour: attribute_mutating
         description: "Flag manco for regulatory investigation (transitions APPROVED → UNDER_INVESTIGATION)"
         behavior: plugin
+        effect_class: read_modify_write
         metadata:
           tier: intent
           source_of_truth: operational
@@ -628,6 +631,7 @@ domains:
         flavour: attribute_mutating
         description: "Clear manco from regulatory investigation (back to APPROVED)"
         behavior: plugin
+        effect_class: read_modify_write
         metadata:
           tier: intent
           source_of_truth: operational
@@ -703,6 +707,7 @@ domains:
         flavour: attribute_mutating
         description: "Partially reinstate suspended manco (returns to UNDER_INVESTIGATION)"
         behavior: plugin
+        effect_class: read_modify_write
         metadata:
           tier: intent
           source_of_truth: operational
