@@ -1093,6 +1093,17 @@ impl ToolHandlers {
                                 constraint_name
                             )),
                         ),
+                        AtomicExecutionResult::TimedOut { stage, elapsed } => (
+                            0,
+                            Some(format!(
+                                "Execution timed out at stage '{}' after {:.1?}",
+                                stage, elapsed
+                            )),
+                        ),
+                        AtomicExecutionResult::PanicRecovered { stage, panic_info } => (
+                            0,
+                            Some(format!("Panic at stage '{}': {}", stage, panic_info)),
+                        ),
                     },
                     MpcExecutionOutcome::BestEffort(best_effort) => {
                         let success_count = best_effort

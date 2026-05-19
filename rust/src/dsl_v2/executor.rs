@@ -342,6 +342,28 @@ pub enum AtomicExecutionResult {
         /// The DB constraint name that was violated (e.g., "cbus_name_key").
         constraint_name: String,
     },
+    /// A stage exceeded its configured deadline (v0.5 §9.1, §7.4).
+    ///
+    /// Covers both pool-acquire timeout (E1 fix: no more indefinite hang on
+    /// pool.begin()) and per-plan deadline expiry (frame.is_expired()).
+    /// Transaction rolled back; locks released. Caller may retry after backoff.
+    TimedOut {
+        /// The stage that timed out (e.g., "pool.begin", "plan_execution").
+        stage: String,
+        /// How long was waited before timing out.
+        elapsed: std::time::Duration,
+    },
+    /// A stack-set worker panicked; the transaction was rolled back and the
+    /// runtime recovered (v0.5 §9.1). Caller treats this as a failed execution.
+    ///
+    /// Phase 5: variant declared; panic-recovery wiring (`catch_unwind`) is
+    /// Phase 6 (requires async-safe panic unwinding infrastructure).
+    PanicRecovered {
+        /// The stage in which the panic occurred.
+        stage: String,
+        /// Stringified panic info (message, if available).
+        panic_info: String,
+    },
 }
 
 #[cfg(feature = "database")]
@@ -427,6 +449,18 @@ impl AtomicExecutionResult {
                 format!(
                     "⚡ Optimistic conflict on constraint '{constraint_name}' \
                      — concurrent plan won the race; caller may retry"
+                )
+            }
+            AtomicExecutionResult::TimedOut { stage, elapsed } => {
+                format!(
+                    "⏱ Timed out at stage '{}' after {:?} — transaction rolled back",
+                    stage, elapsed
+                )
+            }
+            AtomicExecutionResult::PanicRecovered { stage, panic_info } => {
+                format!(
+                    "💥 Panic recovered at stage '{}': {} — transaction rolled back",
+                    stage, panic_info
                 )
             }
         }
@@ -2456,15 +2490,21 @@ impl DslExecutor {
         // Create ExecutionFrame for this execution (T14: audit buffer written before commit).
         let mut frame = dsl_runtime::frame::ExecutionFrame::new(30);
 
-        // Start a transaction (with pool-acquire timeout — E1 fix)
-        let mut tx = tokio::time::timeout(pool_acquire_timeout(), self.pool.begin())
-            .await
-            .map_err(|_| {
-                anyhow::anyhow!(
-                    "execute_plan_atomic_with_locks: pool.begin() timed out after {:?}",
-                    pool_acquire_timeout()
-                )
-            })??;
+        // Start a transaction (with pool-acquire timeout — E1 fix, v0.5 §7.4).
+        // Returns TimedOut instead of hanging indefinitely if the pool is exhausted.
+        let timeout_dur = pool_acquire_timeout();
+        let t0 = std::time::Instant::now();
+        let tx_result = tokio::time::timeout(timeout_dur, self.pool.begin()).await;
+        let mut tx = match tx_result {
+            Ok(Ok(tx)) => tx,
+            Ok(Err(e)) => return Err(e.into()),
+            Err(_elapsed) => {
+                return Ok(AtomicExecutionResult::TimedOut {
+                    stage: "pool.begin".to_string(),
+                    elapsed: t0.elapsed(),
+                });
+            }
+        };
 
         // Coordination strategy gate (v0.5 §5.3, T12).
         // If every step in the plan declares a lock-free effect_class
@@ -2630,6 +2670,21 @@ impl DslExecutor {
                     }
                     _ => {}
                 }
+            }
+
+            // Per-plan deadline check (v0.5 §7.4 — prevents indefinite hang).
+            // Checked after each step. If the frame's deadline has passed,
+            // rollback and return TimedOut rather than continuing.
+            if frame.is_expired() {
+                tracing::warn!(
+                    "execute_plan_atomic_with_locks: plan deadline expired after step {}",
+                    step_index
+                );
+                tx.rollback().await?;
+                return Ok(AtomicExecutionResult::TimedOut {
+                    stage: format!("plan_execution:step_{}", step_index),
+                    elapsed: timeout_dur,
+                });
             }
 
             // Record step outcome in the audit buffer (T14).

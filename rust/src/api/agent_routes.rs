@@ -2352,6 +2352,19 @@ async fn execute_session_dsl_raw(
                         ));
                         Vec::new()
                     }
+                    AtomicExecutionResult::TimedOut { stage, elapsed } => {
+                        all_success = false;
+                        errors.push(format!(
+                            "Execution timed out at stage '{}' after {:.1?}",
+                            stage, elapsed
+                        ));
+                        Vec::new()
+                    }
+                    AtomicExecutionResult::PanicRecovered { stage, panic_info } => {
+                        all_success = false;
+                        errors.push(format!("Panic at stage '{}': {}", stage, panic_info));
+                        Vec::new()
+                    }
                 },
                 ExecutionOutcome::BestEffort(best_effort) => {
                     // Check for partial failures
