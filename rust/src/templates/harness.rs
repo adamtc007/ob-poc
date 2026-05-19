@@ -393,9 +393,7 @@ pub async fn run_harness(
             .map(|p| p.name.clone())
             .collect();
 
-        // Run through planning facade (parse → compile → DAG → toposort)
-        let planning_input = PlanningInput::new(&expansion.dsl, verb_registry.clone())
-            .with_verb_handler(ob_poc_compiler::ob_poc_verb_handler);
+        let planning_input = PlanningInput::new(&expansion.dsl, verb_registry.clone());
         let planning_output = analyse_and_plan(planning_input);
 
         // Extract results from planning output
@@ -667,9 +665,7 @@ fn test_single_template(
         .map(|p| p.name.clone())
         .collect();
 
-    // Run through planning facade
-    let planning_input = PlanningInput::new(&expansion.dsl, verb_registry)
-        .with_verb_handler(ob_poc_compiler::ob_poc_verb_handler);
+    let planning_input = PlanningInput::new(&expansion.dsl, verb_registry);
     let planning_output = analyse_and_plan(planning_input);
 
     let parse_success = !planning_output.program.statements.is_empty()

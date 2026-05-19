@@ -56,25 +56,9 @@ pub use dsl_core::diagnostics::{
     SuggestedFix,
 };
 
-// Ops and DAG
-pub use dsl_core::dag;
-pub use dsl_core::dag::{
-    build_execution_plan, collect_external_refs, describe_plan, CycleError, ExecutionPhase,
-    ExecutionPlan as DagExecutionPlan,
-};
-pub use dsl_core::ops;
-pub use dsl_core::ops::{DocKey, EntityKey, Op, OpRef};
-
-// Compiler — generic infrastructure from dsl-core
+// Compiler — Op-free path (Phase 3 CR A4; Op enum, DAG, and VerbHandler removed)
 pub use dsl_core::compiler;
-pub use dsl_core::compiler::{
-    compile_to_ops_ext, CompileError as OpCompileError, CompiledProgram, VerbHandler,
-};
-// Phase 3 Op-free compilation path (CR A1). Replaces compile_to_ops_ext once
-// A2-A4 migrate all callers.
-pub use dsl_core::compiler::{compile_to_steps, CompileStep, CompiledSteps};
-// ob-poc verb dispatch in its own crate (dsl-lsp + ob-agentic can depend on it directly).
-pub use ob_poc_compiler::compile_to_ops;
+pub use dsl_core::compiler::{compile_to_steps, CompileError as OpCompileError, CompileStep, CompiledSteps};
 
 // =============================================================================
 // Local modules (require database or other dependencies not in dsl-core)

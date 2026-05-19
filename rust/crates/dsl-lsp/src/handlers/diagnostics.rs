@@ -110,8 +110,7 @@ pub(crate) async fn analyze_document_full(text: &str) -> AnalysisResult {
 
     let planning_output = if !has_parse_errors {
         if let Some(registry) = create_planning_registry() {
-            let planning_input = PlanningInput::new(text, registry)
-                .with_verb_handler(ob_poc_compiler::ob_poc_verb_handler);
+            let planning_input = PlanningInput::new(text, registry);
             let output = analyse_and_plan(planning_input);
 
             // Convert planning diagnostics to LSP format

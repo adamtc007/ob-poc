@@ -26,7 +26,7 @@ use std::collections::{BTreeMap, HashMap};
 use uuid::Uuid;
 
 use dsl_core::ast::{Argument, AstNode, Literal, Program, Span, Statement, VerbCall};
-use dsl_core::compiler::compile_scoped_runbook_bindings;
+use dsl_core::compiler::compile_to_steps;
 use dsl_core::parser::parse_program;
 
 use crate::dsl_v2::execution::{runtime_registry_arc, RuntimeVerbRegistry};
@@ -604,10 +604,7 @@ fn validate_expanded_macro_output(
     registry: &RuntimeVerbRegistry,
 ) -> Vec<String> {
     let expanded_source = statements.join("\n");
-    // Use analyse_and_plan directly so we can pass the ob-poc verb handler;
-    // quick_validate is the dsl-lsp-friendly (no-handler) variant.
-    let planning_input = PlanningInput::new(&expanded_source, runtime_registry_arc())
-        .with_verb_handler(ob_poc_compiler::ob_poc_verb_handler);
+    let planning_input = PlanningInput::new(&expanded_source, runtime_registry_arc());
     let mut errors: Vec<String> = analyse_and_plan(planning_input)
         .diagnostics
         .into_iter()
@@ -659,16 +656,16 @@ fn finalise_scoped_runbook_bindings(
         )
     })?;
 
-    let compiled = compile_scoped_runbook_bindings(&program);
-    if !compiled.is_ok() {
-        let reason = compiled
-            .errors
-            .iter()
-            .map(ToString::to_string)
-            .collect::<Vec<_>>()
-            .join("; ");
+    // Compile to steps (Op-free path, Phase 3 CR A4).
+    // Forward-reference validation was in compile_scoped_runbook_bindings;
+    // it is now handled by planning_facade::analyse_and_plan earlier in the
+    // pipeline before this function is reached.
+    let compiled = compile_to_steps(&program);
+    if compiled.steps.is_empty() && !program.statements.is_empty() {
         return Err(CompilationError::new(
-            CompilationErrorKind::DagError { reason },
+            CompilationErrorKind::DagError {
+                reason: "Scoped binding compilation produced no steps".to_string(),
+            },
             "binding",
         ));
     }

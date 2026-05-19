@@ -12,9 +12,7 @@ use std::sync::Arc;
 use crate::runtime_registry::RuntimeVerbRegistry;
 use dsl_core::ast::{AstNode, Program, Span, VerbCall};
 use dsl_core::binding_context::BindingContext;
-// VerbHandler kept for API backward-compatibility; deprecated — no longer
-// consulted by analyse_and_plan (removed in A4 when compile_to_ops_ext is deleted).
-use dsl_core::compiler::{compile_to_steps, CompileStep, VerbHandler};
+use dsl_core::compiler::{compile_to_steps, CompileStep};
 use dsl_core::diagnostics::{Diagnostic, DiagnosticCode, SourceSpan};
 use dsl_core::parser::parse_program;
 
@@ -42,10 +40,6 @@ pub struct PlanningInput<'a> {
     pub strict_semantics: bool,
     /// How to handle missing producers (implicit create)
     pub implicit_create_mode: ImplicitCreateMode,
-    /// Optional consumer-supplied verb compilation handler. When `None`,
-    /// dsl-core's built-in ob-poc dispatch handles verbs (legacy path);
-    /// when `Some`, the handler is consulted first.
-    pub verb_handler: Option<VerbHandler>,
 }
 
 impl<'a> PlanningInput<'a> {
@@ -57,7 +51,6 @@ impl<'a> PlanningInput<'a> {
             executed_bindings: None,
             strict_semantics: false,
             implicit_create_mode: ImplicitCreateMode::default(),
-            verb_handler: None,
         }
     }
 
@@ -79,15 +72,6 @@ impl<'a> PlanningInput<'a> {
         self
     }
 
-    /// Supply a consumer-specific verb compilation handler.
-    ///
-    /// ob-poc callers pass `dsl_v2::ob_poc_compiler::ob_poc_verb_handler` here so
-    /// ob-poc verbs compile via the handler rather than dsl-core's legacy
-    /// `compile_ob_poc_verb` fallback.
-    pub fn with_verb_handler(mut self, handler: VerbHandler) -> Self {
-        self.verb_handler = Some(handler);
-        self
-    }
 }
 
 /// A synthetic step to inject (for implicit creates)
@@ -280,13 +264,9 @@ pub fn analyse_and_plan(input: PlanningInput) -> PlanningOutput {
     output
 }
 
-/// Quick parse + registry validation without verb compilation.
+/// Quick parse + registry validation.
 ///
-/// Reports parse errors and registry-level diagnostics only.
-/// All verbs produce "unknown verb" compilation diagnostics because no
-/// `VerbHandler` is supplied — use `analyse_and_plan` with
-/// `with_verb_handler(ob_poc_compiler::ob_poc_verb_handler)` when verb
-/// compilation matters.
+/// Reports parse errors and unknown-verb diagnostics via registry lookup.
 pub fn quick_validate(source: &str, registry: Arc<RuntimeVerbRegistry>) -> Vec<Diagnostic> {
     let input = PlanningInput::new(source, registry);
     let output = analyse_and_plan(input);
@@ -336,7 +316,7 @@ mod tests {
     }
 
     fn ob_poc_input<'a>(source: &'a str, registry: Arc<RuntimeVerbRegistry>) -> PlanningInput<'a> {
-        PlanningInput::new(source, registry).with_verb_handler(ob_poc_compiler::ob_poc_verb_handler)
+        PlanningInput::new(source, registry)
     }
 
     #[test]

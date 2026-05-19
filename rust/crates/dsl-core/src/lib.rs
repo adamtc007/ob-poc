@@ -5,10 +5,10 @@
 //! - Nom-based S-expression parser
 //! - Binding context for symbol resolution
 //! - Diagnostic types for error reporting
-//! - Op enum for primitive operations
-//! - DAG builder and topological sort
+//! - Op-free compiler (compile_to_steps, CompileStep)
 //! - YAML configuration types and loader
 //!
+//! The Op enum and DAG builder were removed in Phase 3 CR A4.
 //! The execution layer (generic_executor, custom_ops) remains in ob-poc
 //! as it requires database access.
 
@@ -16,10 +16,8 @@ pub mod ast;
 pub mod binding_context;
 pub mod compiler;
 pub mod config;
-pub mod dag;
 pub mod diagnostics;
 pub mod frontier;
-pub mod ops;
 pub mod parser;
 pub mod resolver;
 pub(crate) mod viewport_parser;
