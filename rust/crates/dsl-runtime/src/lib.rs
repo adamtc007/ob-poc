@@ -55,6 +55,7 @@
 // `dsl-analysis`. See docs/todo/dsl-runtime-split-v1.md.
 pub mod bods;
 pub mod cross_workspace;
+pub mod frame;
 pub mod crud_executor;
 pub mod document_bundles;
 pub mod document_requirements;

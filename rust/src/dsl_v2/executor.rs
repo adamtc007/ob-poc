@@ -2284,9 +2284,17 @@ impl DslExecutor {
     ) -> Result<Vec<ExecutionResult>> {
         validate_all_resolved(plan)?;
 
-        tracing::info!(
+        // Create ExecutionFrame for this execution (v0.5 §7.2, T11).
+        // Phase 5: frame is created here and carries execution_id + attempt_id.
+        // Binding slots are populated as steps produce bindings (T10 typed slots).
+        // Audit records are accumulated in frame.audit_buffer (written to DB in T14).
+        // Phase 6: frame replaces ExecutionContext as the primary state carrier.
+        let mut _frame = dsl_runtime::frame::ExecutionFrame::new(30);
+        tracing::debug!(
+            execution_id = %_frame.execution_id,
+            attempt_id = %_frame.attempt_id,
             scope_id = ?scope.scope_id(),
-            "execute_plan_atomic_in_scope: starting with {} steps in caller-owned scope",
+            "execute_plan_atomic_in_scope: starting with {} steps",
             plan.steps.len()
         );
 
