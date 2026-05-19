@@ -7,6 +7,24 @@
 //!
 //! The executor creates events synchronously in the hot path,
 //! so allocation and copying must be minimal.
+//!
+//! # B4 classification: all DslEvent kinds are observability-only (loss-tolerant)
+//!
+//! [`DslEvent`] carries execution telemetry: verb name, timing, and error
+//! snapshots.  It does NOT carry mutation provenance (actor, authority,
+//! payload).  The compliance/audit trail for mutations lives in two other
+//! systems that are NOT loss-tolerant:
+//!
+//! 1. The idempotency table (`"ob-poc".dsl_idempotency`) — written inside the
+//!    verb's transaction scope (atomic per B3).
+//! 2. The session trace (`SessionTrace` / `TraceEntry`) — append-only, DB-backed,
+//!    carries full verb call, result, actor, and attribution.
+//!
+//! Because DslEvents duplicate a subset of information already captured in the
+//! above audit systems, they are intentionally routed through the in-process
+//! `SharedEmitter` (bounded crossbeam channel) rather than the outbox.  Silent
+//! drops on a full buffer are acceptable — the outbox is reserved for
+//! effect kinds where durability is required (Narrate, BpmnSignal, etc.).
 
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
