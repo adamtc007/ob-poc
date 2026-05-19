@@ -62,6 +62,27 @@ impl ExecutionPlan {
         }
         Self { steps, dag }
     }
+
+    /// Produce a `BindingFrameSchema` from this plan's producer steps (T10).
+    ///
+    /// Each step that declares `bind_as` with a known `produces_entity_type`
+    /// contributes a typed `BindingSlot`. Steps that produce bindings without
+    /// a declared entity type contribute an untyped slot (entity_type: None).
+    pub fn binding_frame_schema(&self) -> dsl_core::executable_plan::BindingFrameSchema {
+        use dsl_core::executable_plan::{BindingFrameSchema, BindingSlot};
+        use dsl_core::execution_dag::BindingSlotId;
+        let slots = self
+            .steps
+            .iter()
+            .filter_map(|s| {
+                s.bind_as.as_ref().map(|name| BindingSlot {
+                    name: BindingSlotId::new(name),
+                    entity_type: s.produces_entity_type.clone(),
+                })
+            })
+            .collect();
+        BindingFrameSchema { slots }
+    }
 }
 
 /// A single step in the execution plan
@@ -99,6 +120,11 @@ pub struct ExecutionStep {
 
     /// Optional symbol binding (from :as @name syntax)
     pub bind_as: Option<String>,
+
+    /// Entity type produced by this step when `bind_as` is set (v0.5 §1.2, T10).
+    /// Sourced from `VerbProduces.produced_type` at compile time.
+    /// `None` if the verb has no `produces` declaration or produces no binding.
+    pub produces_entity_type: Option<String>,
 
     /// Step index (for debugging/logging)
     pub step_index: usize,
@@ -1027,6 +1053,14 @@ impl Compiler {
         // VerbConfig is accessible at plan compile time (T09b follow-on).
         let resource_dependencies: Vec<ResolvedResourceDependency> = Vec::new();
 
+        // Capture the entity type this step produces (T10 — typed binding slots).
+        // Sourced from VerbProduces.produced_type when the step has a bind_as.
+        let produces_entity_type = if vc.binding.is_some() {
+            verb_def.produces.as_ref().map(|p| p.produced_type.clone())
+        } else {
+            None
+        };
+
         // Add this step
         self.steps.push(ExecutionStep {
             verb_call: flat_vc,
@@ -1034,6 +1068,7 @@ impl Compiler {
             dag_edges,
             resource_dependencies,
             bind_as: vc.binding.clone(),
+            produces_entity_type,
             step_index: my_step_index,
             behavior: verb_def.behavior,
             custom_op_id: verb_def.custom_op_id.clone(),
