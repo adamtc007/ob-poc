@@ -22,6 +22,7 @@
 
 pub mod dag;
 pub mod dag_registry;
+pub mod effect_class;
 pub mod dag_validator;
 pub mod escalation;
 pub mod green_when_coverage;
@@ -50,6 +51,7 @@ pub use green_when_coverage::{
 };
 pub use pack_loader::{flatten_pack_entries, load_packs_from_dir, LoadedPack};
 
+pub use effect_class::derive_effect_class_from_three_axis;
 pub use escalation::{
     compute_effective_tier, compute_effective_tier_with_trace, evaluate_predicate,
     EvaluationContext,

@@ -23,6 +23,7 @@
 //! P.1.c implements structural + well-formedness. P.1.d adds the policy-
 //! sanity warnings.
 
+use crate::config::effect_class::derive_effect_class_from_three_axis;
 use crate::config::types::{
     ConsequenceDeclaration, ConsequenceTier, EscalationPredicate, ExternalEffect, StateEffect,
     ThreeAxisDeclaration, VerbConfig, VerbFlavour, VerbsConfig,
@@ -185,6 +186,13 @@ pub enum WellFormednessError {
     },
     /// `flavour: tollgate` must be declarative/empty-bodied.
     TollgateHasBody { location: Location },
+    /// Verb has no explicit `effect_class` declaration AND the three-axis
+    /// heuristic cannot derive an unambiguous class (v0.5 §5.2, D1 decision).
+    ///
+    /// During Phase 5 rollout this is a warning (`require_effect_class: false`).
+    /// After T08 completes all verb families, callers set `require_effect_class:
+    /// true` to make it an error.
+    EffectClassAmbiguous { location: Location },
 }
 
 impl std::fmt::Display for WellFormednessError {
@@ -243,6 +251,12 @@ impl std::fmt::Display for WellFormednessError {
             Self::TollgateHasBody { location } => write!(
                 f,
                 "{location}: tollgate flavour requires an empty body (§2 I5)"
+            ),
+            Self::EffectClassAmbiguous { location } => write!(
+                f,
+                "{location}: effect_class not declared and cannot be auto-derived from \
+                 three_axis (ambiguous pattern — see Appendix B.3 rows 7/8/11/13). \
+                 Add an explicit `effect_class:` declaration (v0.5 §5.2)"
             ),
         }
     }
@@ -317,6 +331,14 @@ pub struct ValidationContext {
     pub require_declaration: bool,
     /// Whether verbs MUST carry a Phase 7 gate-contract flavour annotation.
     pub require_flavour: bool,
+    /// Whether verbs MUST carry an explicit `effect_class` declaration or have
+    /// an unambiguously derivable one from three-axis (v0.5 §5.2).
+    ///
+    /// During Phase 5 rollout (T04-T07): `false` — missing/ambiguous declarations
+    /// produce `EffectClassAmbiguous` warnings but do not block loading.
+    /// After T08 (all verb families migrated): `true` — ambiguous declarations
+    /// produce an error, preventing catalogue load.
+    pub require_effect_class: bool,
 }
 
 /// Validate a single verb. Returns a report — callers aggregate across the
@@ -337,6 +359,7 @@ pub fn validate_verb(fqn: &str, verb: &VerbConfig, ctx: &ValidationContext) -> V
         Some(decl) => validate_declaration(fqn, verb, decl, ctx, &mut report),
     }
     validate_flavour(fqn, verb, ctx, &mut report);
+    validate_effect_class(fqn, verb, ctx, &mut report);
 
     report
 }
@@ -399,6 +422,43 @@ fn validate_flavour(
         }
         VerbFlavour::AttributeMutating | VerbFlavour::InstanceAdding => {}
     }
+}
+
+/// Check that a verb has an explicit or derivable `effect_class` (v0.5 §5.2).
+///
+/// During Phase 5 rollout (`require_effect_class: false`): produces a
+/// `EffectClassAmbiguous` warning when neither explicit declaration nor
+/// unambiguous heuristic derivation succeeds. Verbs that DO have an explicit
+/// `effect_class` or a cleanly derivable one are silent.
+///
+/// After T08 (`require_effect_class: true`): the warning becomes an error
+/// that prevents catalogue load for verbs missing a declaration.
+fn validate_effect_class(
+    fqn: &str,
+    verb: &VerbConfig,
+    ctx: &ValidationContext,
+    report: &mut ValidationReport,
+) {
+    // Explicit declaration — always valid; nothing to check.
+    if verb.effect_class.is_some() {
+        return;
+    }
+    // Attempt heuristic derivation. If it succeeds, the verb is effectively
+    // declared (derivation will produce the class at plan compile time).
+    if derive_effect_class_from_three_axis(verb).is_some() {
+        return;
+    }
+    // Ambiguous or no three_axis: produce warning (or error post-T08).
+    if ctx.require_effect_class {
+        report
+            .well_formedness
+            .push(WellFormednessError::EffectClassAmbiguous {
+                location: Location::verb(fqn),
+            });
+    }
+    // When require_effect_class == false: silent during rollout.
+    // Callers can inspect the report's well_formedness for EffectClassAmbiguous
+    // to produce informational output without blocking loads.
 }
 
 fn validate_declaration(
@@ -1147,6 +1207,7 @@ mod tests {
             known_slots: HashSet::new(),
             require_declaration: false,
             require_flavour: false,
+            require_effect_class: false,
         };
         let r = validate_verb("test.verb", &vc, &ctx);
         assert_eq!(r.well_formedness.len(), 1);

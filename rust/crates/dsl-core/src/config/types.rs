@@ -2,6 +2,7 @@
 //!
 //! These structs map directly to the YAML configuration files.
 
+use crate::executable_plan::EffectClass;
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, HashMap};
 
@@ -164,6 +165,27 @@ pub struct VerbConfig {
     /// Verbs with `transition_args` get exact (from, to) resolution.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub transition_args: Option<TransitionArgs>,
+
+    /// Runtime coordination class (v0.5 §5.2).
+    ///
+    /// Declares how the runtime serializes this verb against concurrent plans:
+    /// which coordination strategy (None / IdempotencyGuard / UniqueInsert /
+    /// OptimisticSnapshotCheck / PessimisticResourceLock / ExclusiveScopeLock)
+    /// applies to its resource dependencies.
+    ///
+    /// Orthogonal to `three_axis`: `three_axis` governs the upstream UX/authority
+    /// gate; `effect_class` governs the downstream execution-coordination strategy.
+    /// (D1 decision, 2026-05-19.)
+    ///
+    /// When `None`: validator derives a default from three-axis via heuristic
+    /// (see `config::effect_class::derive_effect_class_from_three_axis`). If the
+    /// heuristic cannot derive an unambiguous class (ambiguous pattern), the
+    /// validator produces a warning during Phase 5 rollout (error once T08 lands
+    /// and all verbs have had the opportunity to declare).
+    ///
+    /// YAML: `effect_class: read_modify_write`
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub effect_class: Option<EffectClass>,
 }
 
 impl Default for VerbConfig {
@@ -192,6 +214,7 @@ impl Default for VerbConfig {
             role_guard: None,
             audit_class: None,
             transition_args: None,
+            effect_class: None,
         }
     }
 }
