@@ -100,10 +100,7 @@ pub enum DagEdge {
     ///   (dsl-runtime::cross_workspace::gate_checker).
     ///   Wired via `GatePipeline` pre-dispatch hook in
     ///   `src/runbook/step_executor_bridge.rs`.
-    StateEdge {
-        from: NodeId,
-        to: NodeId,
-    },
+    StateEdge { from: NodeId, to: NodeId },
 
     /// Two nodes touch the same governed resource.
     ///
@@ -117,10 +114,7 @@ pub enum DagEdge {
     ///
     /// v0.5 §4.1, §5.3, §6.4
     /// Runtime: coordination strategy table (T12).
-    ResourceCoordEdge {
-        node_a: NodeId,
-        node_b: NodeId,
-    },
+    ResourceCoordEdge { node_a: NodeId, node_b: NodeId },
 
     /// Consumer expects a specific snapshot or version produced or observed
     /// by the producer node.
@@ -131,10 +125,7 @@ pub enum DagEdge {
     /// v0.5 §4.1, §4.2 (third in ordering set)
     /// Runtime evaluator: `DerivedStateEvaluator` for Mode B tollgate conditions
     ///   (dsl-runtime::cross_workspace::derived_state).
-    SnapshotVersionEdge {
-        from: NodeId,
-        to: NodeId,
-    },
+    SnapshotVersionEdge { from: NodeId, to: NodeId },
 
     /// Join node waits for completion of declared predecessor set.
     ///
@@ -156,10 +147,7 @@ pub enum DagEdge {
     /// `CascadePlanner` (dsl-runtime::cross_workspace::hierarchy_cascade) here.
     ///
     /// v0.5 §4.1, §7.6
-    CancellationScopeEdge {
-        trigger: NodeId,
-        scope: Vec<NodeId>,
-    },
+    CancellationScopeEdge { trigger: NodeId, scope: Vec<NodeId> },
 }
 
 impl DagEdge {

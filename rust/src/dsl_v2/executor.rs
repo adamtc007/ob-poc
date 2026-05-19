@@ -2614,10 +2614,8 @@ impl DslExecutor {
                         if let sqlx::Error::Database(db) = db_err {
                             // Postgres unique_violation = SQLSTATE 23505
                             if db.code().as_deref() == Some("23505") {
-                                let constraint = db
-                                    .constraint()
-                                    .unwrap_or("unknown_constraint")
-                                    .to_string();
+                                let constraint =
+                                    db.constraint().unwrap_or("unknown_constraint").to_string();
                                 tracing::debug!(
                                     "execute_plan_atomic_with_locks: step {} unique-constraint \
                                      violation on '{}' → OptimisticConflict",
@@ -2721,9 +2719,7 @@ impl DslExecutor {
                 .bind(&record.outcome)
                 .execute(tx.as_mut())
                 .await
-                .map_err(|e| {
-                    anyhow::anyhow!("audit write failed before commit: {e}")
-                })?;
+                .map_err(|e| anyhow::anyhow!("audit write failed before commit: {e}"))?;
             }
         }
 

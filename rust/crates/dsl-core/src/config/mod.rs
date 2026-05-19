@@ -22,9 +22,8 @@
 
 pub mod dag;
 pub mod dag_registry;
-pub mod effect_class;
-pub mod resource_dependency;
 pub mod dag_validator;
+pub mod effect_class;
 pub mod escalation;
 pub mod green_when_coverage;
 pub mod loader;
@@ -32,6 +31,7 @@ pub mod manifest;
 pub mod pack_loader;
 pub mod phrase_gen;
 pub mod predicate;
+pub mod resource_dependency;
 pub mod runbook_composition;
 pub mod tier_gate;
 pub mod types;

@@ -56,12 +56,12 @@
 pub mod bods;
 pub mod coordination;
 pub mod cross_workspace;
-pub mod frame;
 pub mod crud_executor;
 pub mod document_bundles;
 pub mod document_requirements;
 pub mod domain_ops;
 pub mod execution;
+pub mod frame;
 pub mod placeholder;
 pub mod port;
 pub mod service_traits;

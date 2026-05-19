@@ -60,8 +60,7 @@ pub fn derive_effect_class_from_three_axis(verb: &VerbConfig) -> Option<EffectCl
     let externals = &decl.external_effects;
     let baseline = decl.consequence.baseline;
 
-    let only_navigating =
-        externals.len() == 1 && externals.contains(&ExternalEffect::Navigating);
+    let only_navigating = externals.len() == 1 && externals.contains(&ExternalEffect::Navigating);
     let only_observational =
         externals.len() == 1 && externals.contains(&ExternalEffect::Observational);
     let only_emitting = externals.len() == 1 && externals.contains(&ExternalEffect::Emitting);
@@ -198,7 +197,10 @@ mod tests {
             vec![ExternalEffect::Navigating],
             ConsequenceTier::Benign,
         );
-        assert_eq!(derive_effect_class_from_three_axis(&v), Some(EffectClass::Pure));
+        assert_eq!(
+            derive_effect_class_from_three_axis(&v),
+            Some(EffectClass::Pure)
+        );
     }
 
     #[test]
@@ -229,21 +231,16 @@ mod tests {
 
     #[test]
     fn benign_no_externals_preserving_is_pure() {
-        let v = verb_with_three_axis(
-            StateEffect::Preserving,
-            vec![],
-            ConsequenceTier::Benign,
+        let v = verb_with_three_axis(StateEffect::Preserving, vec![], ConsequenceTier::Benign);
+        assert_eq!(
+            derive_effect_class_from_three_axis(&v),
+            Some(EffectClass::Pure)
         );
-        assert_eq!(derive_effect_class_from_three_axis(&v), Some(EffectClass::Pure));
     }
 
     #[test]
     fn preserving_reviewable_no_externals_is_ambiguous() {
-        let v = verb_with_three_axis(
-            StateEffect::Preserving,
-            vec![],
-            ConsequenceTier::Reviewable,
-        );
+        let v = verb_with_three_axis(StateEffect::Preserving, vec![], ConsequenceTier::Reviewable);
         assert_eq!(derive_effect_class_from_three_axis(&v), None);
     }
 
@@ -275,11 +272,7 @@ mod tests {
 
     #[test]
     fn transition_benign_no_externals_is_append_transition_snapshot() {
-        let v = verb_with_three_axis(
-            StateEffect::Transition,
-            vec![],
-            ConsequenceTier::Benign,
-        );
+        let v = verb_with_three_axis(StateEffect::Transition, vec![], ConsequenceTier::Benign);
         assert_eq!(
             derive_effect_class_from_three_axis(&v),
             Some(EffectClass::AppendTransitionSnapshot)

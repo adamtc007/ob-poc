@@ -384,9 +384,7 @@ impl ExecutablePlan {
             .collect();
 
         // Derive recommended policy from effect classes.
-        let classes = instructions
-            .iter()
-            .filter_map(|i| i.effect_class);
+        let classes = instructions.iter().filter_map(|i| i.effect_class);
         let recommended_transaction_policy = TransactionPolicy::from_effect_classes(classes);
 
         // Build binding frame schema from output bindings.

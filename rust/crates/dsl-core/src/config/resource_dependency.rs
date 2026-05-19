@@ -203,7 +203,11 @@ mod tests {
         let dep = ResolvedResourceDependency::compile_resolved_entity("cbu", uuid);
         assert_eq!(dep.resolution_mode, ResolutionMode::CompileResolved);
         assert!(dep.binding_slot.is_none());
-        if let ResourceDependency::EntityUuid { entity_type, uuid: Some(u) } = &dep.dependency {
+        if let ResourceDependency::EntityUuid {
+            entity_type,
+            uuid: Some(u),
+        } = &dep.dependency
+        {
             assert_eq!(entity_type, "cbu");
             assert_eq!(*u, uuid);
         } else {
