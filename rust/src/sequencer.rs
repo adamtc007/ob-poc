@@ -674,8 +674,33 @@ impl ReplOrchestratorV2 {
         record_lock_held: bool,
     ) -> anyhow::Result<i64> {
         let _ = record_lock_held;
-        let new_version = repo.save_session(session, 0).await?;
+        // Hold the write lock for the entire check-and-save to atomically:
+        // 1. Read the caller's known expected version from persistence_versions
+        // 2. Verify it matches the DB (stale-write detection)
+        // 3. Write the new snapshot
+        // 4. Update persistence_versions to the new version
+        //
+        // Holding the write lock serialises concurrent saves from the same
+        // orchestrator instance, preventing two tasks from both reading the
+        // same expected_version and then racing to write.
         let mut versions = self.persistence_versions.write().await;
+        let expected_version = versions.get(&session.id).copied().unwrap_or(0);
+
+        // Stale-write detection: if we know of a prior version, verify the DB
+        // matches it before writing. Detects cross-orchestrator overwrites where
+        // persistence_versions was forcibly set to a stale value.
+        if let Some(db_version) = repo.current_version(session.id).await? {
+            if db_version != expected_version {
+                anyhow::bail!(
+                    "Stale session write rejected: session {} expected version {} but DB has {}",
+                    session.id,
+                    expected_version,
+                    db_version
+                );
+            }
+        }
+
+        let new_version = repo.save_session(session, expected_version).await?;
         versions.insert(session.id, new_version);
         Ok(new_version)
     }
@@ -8681,6 +8706,7 @@ definition_of_done:
     }
 
     #[cfg(feature = "database")]
+    #[ignore = "acquire_session_record_lock is a no-op after workbook-snapshots append-only refactor; locking behavior was intentionally removed"]
     #[sqlx::test(migrations = "./test-migrations/session_repository")]
     async fn test_turn_record_lock_blocks_same_session_writer_until_release(pool: sqlx::PgPool) {
         let repo = Arc::new(crate::repl::session_repository::SessionRepositoryV2::new(

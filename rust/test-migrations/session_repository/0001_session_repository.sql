@@ -10,7 +10,8 @@ CREATE TABLE IF NOT EXISTS "ob-poc".repl_sessions_v2 (
     extended_state JSONB,
     created_at TIMESTAMPTZ NOT NULL,
     last_active_at TIMESTAMPTZ NOT NULL,
-    version BIGINT NOT NULL
+    version BIGINT NOT NULL,
+    park_expires_at TIMESTAMPTZ   -- added with session parking feature
 );
 
 CREATE TABLE IF NOT EXISTS "ob-poc".runbook_plans (

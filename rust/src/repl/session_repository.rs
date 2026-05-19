@@ -48,8 +48,19 @@ impl SessionRepositoryV2 {
     /// session advisory lock.
     #[allow(deprecated)] // Reads deprecated fields for DB persistence (migration compat)
     pub async fn save_session(&self, session: &ReplSessionV2, version: i64) -> Result<i64> {
-        let _ = version;
+        let _ = version; // version used by callers for stale detection; save is an atomic upsert
         self.save_session_inner(session).await
+    }
+
+    /// Check the current DB version for a session (for stale-write detection).
+    pub async fn current_version(&self, session_id: Uuid) -> Result<Option<i64>> {
+        sqlx::query_scalar(
+            r#"SELECT version FROM "ob-poc".repl_sessions_v2 WHERE session_id = $1"#,
+        )
+        .bind(session_id)
+        .fetch_optional(&self.pool)
+        .await
+        .context("Failed to read session version")
     }
 
     /// Compatibility wrapper for older held-lock call sites.

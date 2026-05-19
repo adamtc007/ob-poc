@@ -117,10 +117,7 @@ impl BindingFrame {
     /// Validate that all declared slots in a schema are populated.
     ///
     /// Returns the names of any unpopulated slots. Empty vec = all slots ready.
-    pub fn missing_slots<'a>(
-        &self,
-        declared: impl IntoIterator<Item = &'a str>,
-    ) -> Vec<String> {
+    pub fn missing_slots<'a>(&self, declared: impl IntoIterator<Item = &'a str>) -> Vec<String> {
         declared
             .into_iter()
             .filter(|name| !self.slots.contains_key(*name))
@@ -209,7 +206,11 @@ impl ExecutionFrame {
     /// `plan_timeout_secs`: the per-plan deadline in seconds from now.
     /// Defaults to 30s if 0 is passed (prevents infinite hang).
     pub fn new(plan_timeout_secs: u64) -> Self {
-        let timeout = if plan_timeout_secs == 0 { 30 } else { plan_timeout_secs };
+        let timeout = if plan_timeout_secs == 0 {
+            30
+        } else {
+            plan_timeout_secs
+        };
         Self {
             execution_id: ExecutionId::new(),
             attempt_id: AttemptId::first(),
@@ -221,8 +222,16 @@ impl ExecutionFrame {
 
     /// Create a retry attempt frame, reusing the execution_id but
     /// incrementing the attempt_id.
-    pub fn retry(execution_id: ExecutionId, prior_attempt: AttemptId, plan_timeout_secs: u64) -> Self {
-        let timeout = if plan_timeout_secs == 0 { 30 } else { plan_timeout_secs };
+    pub fn retry(
+        execution_id: ExecutionId,
+        prior_attempt: AttemptId,
+        plan_timeout_secs: u64,
+    ) -> Self {
+        let timeout = if plan_timeout_secs == 0 {
+            30
+        } else {
+            plan_timeout_secs
+        };
         Self {
             execution_id,
             attempt_id: prior_attempt.next(),
