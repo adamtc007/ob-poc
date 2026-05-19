@@ -421,24 +421,40 @@ impl SemOsVerbOp for UpdateStatus {
             _ => None,
         };
 
-        if let Some(col) = timestamp_column {
+        // B6: include current_status in WHERE so a concurrent transition
+        // causes zero rows_affected rather than silently overwriting.
+        let rows_affected = if let Some(col) = timestamp_column {
             let query = format!(
-                r#"UPDATE "ob-poc".deals SET deal_status = $2, {} = NOW(), updated_at = NOW() WHERE deal_id = $1"#,
-                col
+                r#"UPDATE "ob-poc".deals SET deal_status = $2, {col} = NOW(), updated_at = NOW()
+                   WHERE deal_id = $1 AND deal_status = $3"#
             );
             sqlx::query(&query)
                 .bind(deal_id)
                 .bind(&new_status)
+                .bind(&current_status)
                 .execute(scope.executor())
-                .await?;
+                .await?
+                .rows_affected()
         } else {
             sqlx::query(
-                r#"UPDATE "ob-poc".deals SET deal_status = $2, updated_at = NOW() WHERE deal_id = $1"#,
+                r#"UPDATE "ob-poc".deals SET deal_status = $2, updated_at = NOW()
+                   WHERE deal_id = $1 AND deal_status = $3"#,
             )
             .bind(deal_id)
             .bind(&new_status)
+            .bind(&current_status)
             .execute(scope.executor())
-            .await?;
+            .await?
+            .rows_affected()
+        };
+
+        if rows_affected == 0 {
+            return Err(anyhow!(
+                "deal.update-status: deal {} status was modified concurrently \
+                 (expected '{}' but found a different state). Retry with the current status.",
+                deal_id,
+                current_status
+            ));
         }
 
         sqlx::query(

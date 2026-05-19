@@ -229,18 +229,33 @@ impl SemOsVerbOp for UpdateStatus {
             ));
         }
 
-        sqlx::query(
+        // B6: include current_status in WHERE clause so a concurrent transition
+        // that changes status between our SELECT and this UPDATE causes zero rows
+        // affected rather than silently overwriting the concurrent write.
+        let rows_affected = sqlx::query(
             r#"UPDATE "ob-poc".cases
                SET status = $2,
                    notes = COALESCE($3, notes),
                    updated_at = NOW()
-               WHERE case_id = $1"#,
+               WHERE case_id = $1
+                 AND status = $4"#,
         )
         .bind(case_id)
         .bind(&requested_status)
         .bind(&notes)
+        .bind(&current_status)
         .execute(scope.executor())
-        .await?;
+        .await?
+        .rows_affected();
+
+        if rows_affected == 0 {
+            return Err(anyhow!(
+                "kyc-case.update-status: case {} status was modified concurrently \
+                 (expected '{}' but found a different state). Retry with the current status.",
+                case_id,
+                current_status
+            ));
+        }
 
         // Phase C.3 rollout: state-transition emission. Status lives in
         // the DAG as `kyc-case:<lowercase-status>`. The LifecycleCatalog
