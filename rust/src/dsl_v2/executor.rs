@@ -1969,6 +1969,9 @@ impl DslExecutor {
         plan: &super::execution_plan::ExecutionPlan,
         ctx: &mut ExecutionContext,
     ) -> Result<Vec<ExecutionResult>> {
+        use crate::sequencer_tx::PgTransactionScope;
+        use dsl_runtime::tx::TransactionScope as _;
+
         // PRE-FLIGHT: Ensure all EntityRefs have been resolved before execution
         validate_all_resolved(plan)?;
 
@@ -2036,34 +2039,78 @@ impl DslExecutor {
                 tracing::debug!("execute_plan: cache MISS, executing verb...");
             }
 
-            // Execute the verb call
-            tracing::debug!("execute_plan: calling execute_verb...");
-            let result = self.execute_verb(&vc, ctx).await?;
-            tracing::debug!("execute_plan: execute_verb returned {:?}", result);
+            // Open a per-step scope so verb writes and idempotency row are
+            // committed together (B3 fix). Timeout prevents indefinite pool hang (E1).
+            let step_start = std::time::Instant::now();
+            let mut step_scope =
+                PgTransactionScope::begin_timeout(&self.pool, pool_acquire_timeout())
+                    .await
+                    .map_err(|e| anyhow!("execute_plan step {} ({}): {}", step_index, verb_name, e))?;
 
-            // Trace the result
+            let verb_result = {
+                let scope_dyn: &mut dyn dsl_runtime::tx::TransactionScope = &mut step_scope;
+                self.execute_verb_in_scope(&vc, ctx, scope_dyn).await
+            };
+
+            // Emit observability event (in-process, non-transactional).
+            if let Some(ref events) = self.events {
+                let duration_ms = step_start.elapsed().as_millis() as u64;
+                match &verb_result {
+                    Ok(_) => events.emit(crate::events::DslEvent::succeeded(
+                        ctx.session_id,
+                        verb_name.clone(),
+                        duration_ms,
+                    )),
+                    Err(e) => events.emit(crate::events::DslEvent::failed(
+                        ctx.session_id,
+                        verb_name.clone(),
+                        duration_ms,
+                        e,
+                    )),
+                }
+            }
+
+            let result = match verb_result {
+                Ok(r) => r,
+                Err(step_err) => {
+                    match step_scope.rollback().await {
+                        Ok(()) => return Err(step_err),
+                        Err(rb_err) => {
+                            tracing::error!(
+                                step = step_index,
+                                verb = %verb_name,
+                                %rb_err,
+                                step_error = %step_err,
+                                "execute_plan: CRITICAL — step failed AND rollback failed"
+                            );
+                            return Err(anyhow!(
+                                "execute_plan step {} ({}) failed ({:#}) AND rollback failed ({:#})",
+                                step_index, verb_name, step_err, rb_err
+                            ));
+                        }
+                    }
+                }
+            };
+
             tracing::debug!(
                 step = step_index,
-                verb = %format!("{}.{}", &vc.domain, &vc.verb),
+                verb = %verb_name,
                 result = ?result,
                 "DSL step completed"
             );
 
-            // Record in idempotency table if enabled (atomically with view state if present)
+            // Write idempotency row within the open step scope (B3 fix: atomic with verb).
+            // E6 fix: propagate verb_hash lookup errors instead of silently using None.
             if ctx.idempotency_enabled {
-                // Look up verb hash for audit trail
                 let verb_hash = self
                     .verb_hash_lookup
                     .get_verb_hash(&verb_name)
                     .await
-                    .ok()
-                    .flatten();
+                    .map_err(|e| anyhow!("verb_hash lookup failed for {}: {:#}", verb_name, e))?;
 
-                // Use atomic recording that commits idempotency + view state in single transaction
-                // This ensures consistency: either both are recorded or neither is
-                let _atomic_result = self
-                    .idempotency
-                    .record_with_view_state(
+                self.idempotency
+                    .record_with_view_state_in_tx(
+                        step_scope.transaction(),
                         ctx.execution_id,
                         step_index,
                         &verb_name,
@@ -2076,6 +2123,14 @@ impl DslExecutor {
                     )
                     .await?;
             }
+
+            // Commit scope: verb writes + idempotency row committed atomically.
+            step_scope.commit().await.map_err(|e| {
+                anyhow!(
+                    "execute_plan step {} ({}): commit failed: {:#}",
+                    step_index, verb_name, e
+                )
+            })?;
 
             // Handle explicit :as binding (in addition to verb's default capture)
             if let Some(ref binding_name) = step.bind_as {

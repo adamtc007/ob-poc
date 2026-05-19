@@ -463,6 +463,82 @@ impl IdempotencyManager {
         })
     }
 
+    /// Atomically record execution AND view state within a caller-supplied transaction.
+    ///
+    /// Identical to `record_with_view_state` but executes through `tx` so the
+    /// idempotency row is committed (or rolled back) together with the verb's
+    /// writes, preventing the divergence where the verb commits but the
+    /// idempotency row does not (or vice-versa).  Used by `execute_plan` (B3).
+    #[allow(clippy::too_many_arguments)]
+    pub async fn record_with_view_state_in_tx(
+        &self,
+        tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
+        execution_id: Uuid,
+        statement_index: usize,
+        verb: &str,
+        args: &HashMap<String, JsonValue>,
+        result: &ExecutionResult,
+        verb_hash: Option<&[u8]>,
+        attribution: &SourceAttribution,
+        view_state: Option<&crate::session::ViewState>,
+        session_id: Option<Uuid>,
+    ) -> Result<AtomicRecordResult> {
+        let key = compute_idempotency_key(execution_id, statement_index, verb, args);
+        let args_hash = compute_args_hash(args);
+
+        let (result_type, result_id, result_json, result_affected) =
+            Self::execution_result_to_db(result);
+
+        let (view_taxonomy, view_selection, view_refinements, view_stack_depth, view_snapshot) =
+            if let Some(vs) = view_state {
+                (
+                    Some(serde_json::to_value(&vs.context)?),
+                    Some(vs.selection.clone()),
+                    Some(serde_json::to_value(&vs.refinements)?),
+                    Some(vs.stack.depth() as i32),
+                    Some(serde_json::to_value(vs)?),
+                )
+            } else {
+                (None, None, None, None, None)
+            };
+
+        let row = sqlx::query_as::<_, ViewStateRecordRow>(
+            r#"SELECT * FROM "ob-poc".record_execution_with_view_state(
+                $1, $2, $3, $4, $5, $6, $7, $8, $9, $10,
+                $11, $12, $13, $14,
+                $15, $16, $17, $18, $19, $20
+            )"#,
+        )
+        .bind(&key)
+        .bind(execution_id)
+        .bind(statement_index as i32)
+        .bind(verb)
+        .bind(&args_hash)
+        .bind(result_type)
+        .bind(result_id)
+        .bind(&result_json)
+        .bind(result_affected)
+        .bind(verb_hash)
+        .bind(attribution.source.as_str())
+        .bind(attribution.request_id)
+        .bind(attribution.actor_id)
+        .bind(attribution.actor_type.as_str())
+        .bind(session_id)
+        .bind(&view_taxonomy)
+        .bind(&view_selection)
+        .bind(&view_refinements)
+        .bind(view_stack_depth)
+        .bind(&view_snapshot)
+        .fetch_one(&mut **tx)
+        .await?;
+
+        Ok(AtomicRecordResult {
+            idempotency_key: row.idempotency_key,
+            view_state_change_id: row.view_state_change_id,
+            was_cached: row.was_cached,
+        })
+    }
+
     /// Convert ExecutionResult to database columns
     fn execution_result_to_db(
         result: &ExecutionResult,
