@@ -678,6 +678,49 @@ pub fn find_missing_plugin_ops(
     missing
 }
 
+/// Rehydrate result: fresh verb manifest + op registry + wiring report.
+///
+/// Produced by [`rehydrate`]. The op registry can be used to construct
+/// a `DslExecutor` for the rehydration test (CR DoD).
+pub struct RehydrateResult {
+    /// Flat verb manifest built from the current YAML packs.
+    pub manifest: dsl_core::config::VerbManifest,
+    /// Fresh op registry built from the canonical builder functions.
+    pub registry: sem_os_postgres::ops::SemOsVerbOpRegistry,
+    /// Wiring check: declaration ↔ implementation mismatches.
+    pub wiring: dsl_core::config::WiringReport,
+}
+
+/// Rehydrate the verb catalogue from YAML and Rust registration.
+///
+/// Creates fresh instances — does NOT use the global `OnceLock` registries.
+/// This is the L3 rehydrate operation; the master DoD test uses the returned
+/// `registry` to build a `DslExecutor` and run the regression suite.
+///
+/// Steps:
+/// 1. Load all YAML pack files via `ConfigLoader::from_env()`
+/// 2. Build a fresh `SemOsVerbOpRegistry` via the canonical builder functions
+/// 3. Run `wiring_check` — compare YAML declarations against registrations
+///
+/// The returned `wiring` report has zero mismatches when Phase 3 is complete.
+pub fn rehydrate() -> RehydrateResult {
+    use dsl_core::config::{wiring_check, ConfigLoader};
+
+    let manifest = ConfigLoader::from_env().load_verb_manifest();
+
+    let mut registry = sem_os_postgres::ops::build_registry();
+    extend_registry(&mut registry);
+
+    let registered_fqns = registry.manifest();
+    let wiring = wiring_check(&manifest, &registered_fqns);
+
+    RehydrateResult {
+        manifest,
+        registry,
+        wiring,
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -776,6 +819,42 @@ mod tests {
             registry.len() >= 100,
             "extend_registry should add at least 100 Pattern B ops, got {}",
             registry.len()
+        );
+    }
+
+    #[test]
+    fn test_rehydrate_produces_clean_wiring() {
+        // CR L3 rehydration test: build a fresh manifest + registry from YAML
+        // and verify the wiring check reports zero mismatches.
+        //
+        // This is the same assertion as the master DoD test (CR DoD) — if this
+        // passes, the bidirectional YAML↔Rust contract is mechanically enforced.
+        let result = rehydrate();
+
+        assert!(
+            result.wiring.unimplemented_declarations.is_empty(),
+            "Rehydrate: YAML plugin verbs with no registered impl: {:?}",
+            result.wiring.unimplemented_declarations
+        );
+
+        // Orphan implementations are WARN at startup but flagged as a test failure
+        // here to catch drift early during development.
+        assert!(
+            result.wiring.orphan_implementations.is_empty(),
+            "Rehydrate: registered ops with no YAML declaration: {:?}",
+            result.wiring.orphan_implementations
+        );
+
+        // Reasonable lower bounds on manifest completeness.
+        assert!(
+            result.manifest.len() > 100,
+            "Rehydrated manifest should have >100 verb declarations, got {}",
+            result.manifest.len()
+        );
+        assert!(
+            result.registry.len() > 100,
+            "Rehydrated registry should have >100 registered ops, got {}",
+            result.registry.len()
         );
     }
 }
