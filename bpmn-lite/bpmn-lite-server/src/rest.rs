@@ -1,8 +1,8 @@
 //! REST + SSE demo API for the bpmn-lite federated stack (T6).
 //!
 //! Runs on port 8080 alongside the existing gRPC server (50051).
-//! Backed by `MemoryStore` — demo-mode only, no Postgres required for
-//! the REST path. For production process queries use the gRPC surface.
+//! Backed by `MemoryStore` — demo-mode only, no Postgres required.
+//! For production process queries use the gRPC surface.
 //!
 //! ## Endpoints
 //!
@@ -33,33 +33,26 @@ use uuid::Uuid;
 
 use bpmn_lite_compiler::dsl::plan::{ExecutionNode, WorkflowExecutionPlan};
 use bpmn_lite_engine::demo::{build_demo_plan, demo_initial_vars};
-use bpmn_lite_engine::plan_walker::PlanWalker;
-use bpmn_lite_store::pending::MemoryPendingInvocationStore;
 use bpmn_lite_store::store::ProcessStore;
 use bpmn_lite_store::store_memory::MemoryStore;
-use bpmn_lite_types::types::ProcessState;
+use bpmn_lite_types::types::{ProcessInstance, ProcessState};
+use ob_poc_types::session_stack::SessionStackState;
 
 // ── Demo state ─────────────────────────────────────────────────────────
 
 pub(crate) struct DemoState {
     store: Arc<MemoryStore>,
-    pending: Arc<MemoryPendingInvocationStore>,
     plan: Arc<WorkflowExecutionPlan>,
     cbu_types: Mutex<HashMap<Uuid, String>>,
-    pool: sqlx::PgPool,
 }
 
 impl DemoState {
     pub(crate) fn new() -> Arc<Self> {
         let plan = build_demo_plan().expect("§10 demo plan must compile");
-        let pool =
-            sqlx::PgPool::connect_lazy("postgresql://localhost/bpmn_lite_demo_inert").unwrap();
         Arc::new(Self {
             store: Arc::new(MemoryStore::new()),
-            pending: Arc::new(MemoryPendingInvocationStore::new()),
             plan: Arc::new(plan),
             cbu_types: Mutex::new(HashMap::new()),
-            pool,
         })
     }
 
@@ -69,18 +62,6 @@ impl DemoState {
 
     fn set_cbu_type(&self, id: Uuid, t: String) {
         self.cbu_types.lock().unwrap().insert(id, t);
-    }
-
-    async fn walker(&self) -> PlanWalker {
-        let client = Arc::new(
-            dsl_bus_client::BusClient::builder()
-                .pool(self.pool.clone())
-                .local_domain("bpmn-lite")
-                .build()
-                .await
-                .expect("demo BusClient"),
-        );
-        PlanWalker::new(self.store.clone(), self.pending.clone(), client)
     }
 }
 
@@ -195,12 +176,11 @@ async fn start_instance(
         other => other,
     };
     let vars = demo_initial_vars("Demo Client", client_type_input);
-    let walker = demo.walker().await;
-    match walker.start_process(&demo.plan, "demo", vars).await {
+    match create_instance(&demo.store, &demo.plan, "demo", vars).await {
         Ok(id) => {
             demo.set_cbu_type(id, body.cbu_type);
-            // Walk through StartEvent immediately (no dispatch needed).
-            let _ = walker.advance(id).await;
+            // Walk past StartEvent to the first callout node.
+            drive_forward(&demo.store, &demo.plan, id).await;
             Json(serde_json::json!({ "instance_id": id.to_string() })).into_response()
         }
         Err(e) => (
@@ -226,20 +206,18 @@ async fn next_step(
     let node_id = inst.current_node_id.clone().unwrap_or_default();
     let cbu_type = demo.cbu_type(id);
 
-    // Simulate result delivery for callout nodes.
+    // Simulate result delivery for callout nodes, then drive forward through
+    // any immediately following gateways/end events without touching the bus.
     match demo.plan.nodes.get(&node_id) {
         Some(ExecutionNode::ServiceTask(t)) => {
-            let placeholder = match t.produces_placeholder.as_deref() {
-                Some(name) => {
-                    let val = if node_id == "create-cbu" {
-                        serde_json::Value::String(Uuid::now_v7().to_string())
-                    } else {
-                        serde_json::Value::String(format!("{node_id}-done"))
-                    };
-                    Some((name, val))
-                }
-                None => None,
-            };
+            let placeholder = t.produces_placeholder.as_deref().map(|name| {
+                let val = if node_id == "create-cbu" {
+                    serde_json::Value::String(Uuid::now_v7().to_string())
+                } else {
+                    serde_json::Value::String(format!("{node_id}-done"))
+                };
+                (name, val)
+            });
             apply_step(&demo.store, id, t.next.clone(), placeholder).await;
         }
         Some(ExecutionNode::BusinessRuleTask(t)) => {
@@ -258,9 +236,8 @@ async fn next_step(
         _ => {}
     }
 
-    // Advance: handles gateway eval + end-event (no bus dispatch).
-    let walker = demo.walker().await;
-    let _ = walker.advance(id).await;
+    // Drive forward through gateways and end events without the bus.
+    drive_forward(&demo.store, &demo.plan, id).await;
 
     let updated = demo.store.load_instance(id).await.ok().flatten();
     let (current, status) = updated
@@ -299,6 +276,101 @@ fn format_state(s: &ProcessState) -> String {
         ProcessState::Failed { .. } => "Failed".into(),
         ProcessState::Cancelled { .. } => "Cancelled".into(),
         ProcessState::Terminated { .. } => "Terminated".into(),
+    }
+}
+
+/// Inline equivalent of PlanWalker::start_process that doesn't require a
+/// BusClient — the REST demo never dispatches over the bus.
+async fn create_instance(
+    store: &MemoryStore,
+    plan: &WorkflowExecutionPlan,
+    tenant_id: &str,
+    initial_variables: HashMap<String, serde_json::Value>,
+) -> anyhow::Result<Uuid> {
+    let plan_json = serde_json::to_string(plan)?;
+    let hash = *blake3::hash(plan_json.as_bytes()).as_bytes();
+    store.store_plan(hash, &plan_json).await?;
+
+    let instance_id = Uuid::now_v7();
+    let placeholder_values = if initial_variables.is_empty() {
+        None
+    } else {
+        Some(serde_json::to_value(&initial_variables)?)
+    };
+
+    let instance = ProcessInstance {
+        instance_id,
+        tenant_id: tenant_id.to_owned(),
+        process_key: plan.workflow_id.clone(),
+        bytecode_version: [0u8; 32],
+        domain_payload: "{}".into(),
+        domain_payload_hash: [0u8; 32],
+        session_stack: SessionStackState::default(),
+        flags: Default::default(),
+        counters: Default::default(),
+        join_expected: Default::default(),
+        state: ProcessState::Running,
+        correlation_id: String::new(),
+        entry_id: Uuid::nil(),
+        runbook_id: Uuid::nil(),
+        created_at: chrono::Utc::now().timestamp_millis(),
+        integrity_hash: None,
+        quarantine_state: None,
+        plan_hash: Some(hash),
+        current_node_id: Some(plan.start_node.clone()),
+        placeholder_values,
+    };
+    store.save_instance(&instance).await?;
+    Ok(instance_id)
+}
+
+/// Walk forward through non-callout nodes (StartEvent, ExclusiveGateway,
+/// EndEvent) without touching the bus. Stops at the first ServiceTask or
+/// BusinessRuleTask so the user can click "Next Step" there.
+async fn drive_forward(store: &MemoryStore, plan: &WorkflowExecutionPlan, id: Uuid) {
+    loop {
+        let Ok(Some(mut inst)) = store.load_instance(id).await else { break };
+        if !matches!(inst.state, ProcessState::Running) {
+            break;
+        }
+        let node_id = match inst.current_node_id.clone() {
+            Some(n) => n,
+            None => break,
+        };
+        let pv: HashMap<String, serde_json::Value> = inst
+            .placeholder_values
+            .as_ref()
+            .and_then(|v| serde_json::from_value(v.clone()).ok())
+            .unwrap_or_default();
+
+        match plan.nodes.get(&node_id) {
+            Some(ExecutionNode::StartEvent(n)) => {
+                inst.current_node_id = Some(n.next.clone());
+                let _ = store.save_instance(&inst).await;
+            }
+            Some(ExecutionNode::ExclusiveGateway(gw)) => {
+                let chosen = gw.flows.iter().find(|f| {
+                    pv.get(&f.placeholder).and_then(|v| v.as_str())
+                        == Some(f.expected_value.as_str())
+                });
+                if let Some(flow) = chosen {
+                    inst.current_node_id = Some(flow.next.clone());
+                    let _ = store.save_instance(&inst).await;
+                } else {
+                    break;
+                }
+            }
+            Some(ExecutionNode::EndEvent(end)) => {
+                inst.state = ProcessState::Completed {
+                    at: chrono::Utc::now().timestamp_millis(),
+                };
+                inst.current_node_id = Some(end.id.clone());
+                let _ = store.save_instance(&inst).await;
+                break;
+            }
+            // ServiceTask / BusinessRuleTask — stop here, user drives next step.
+            _ => break,
+        }
     }
 }
 
