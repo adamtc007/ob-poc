@@ -9,6 +9,7 @@ import { SettingsPage } from "./features/settings/SettingsPage";
 import { ViewportPage } from "./features/viewport/ViewportPage";
 import { ObservatoryPage } from "./features/observatory/ObservatoryPage";
 import { CataloguePage } from "./features/catalogue/CataloguePage";
+import { BpmnDemoPage } from "./features/bpmn";
 
 function App() {
   return (
@@ -52,6 +53,16 @@ function App() {
             <Route
               path="semantic-os/:sessionId"
               element={<Navigate to="/chat" replace />}
+            />
+
+            {/* BPMN Demo — full-screen, no AppShell */}
+            <Route
+              path="bpmn-demo"
+              element={
+                <ErrorBoundary>
+                  <BpmnDemoPage />
+                </ErrorBoundary>
+              }
             />
 
             {/* Observatory full-screen option */}

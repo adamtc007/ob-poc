@@ -6,7 +6,7 @@ edition = "2021"
 [features]
 default = []
 database = ["postgres"]
-postgres = ["dep:bpmn-lite-store-postgres", "dep:sqlx"]
+postgres = ["dep:bpmn-lite-store-postgres"]
 
 [dependencies]
 bpmn-lite-types = { path = "../bpmn-lite-types" }
@@ -48,7 +48,7 @@ tracing-subscriber = { workspace = true }
 uuid = { workspace = true }
 serde_json = { workspace = true }
 tokio-stream = "0.1"
-sqlx = { workspace = true, optional = true }
+sqlx = { workspace = true }
 hex = "0.4"
 axum = { workspace = true }
 serde = { workspace = true }

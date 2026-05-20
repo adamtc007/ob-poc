@@ -1,5 +1,6 @@
 #[cfg(feature = "postgres")]
 mod bus_runtime;
+mod rest;
 
 use std::sync::Arc;
 use uuid::Uuid;
@@ -147,6 +148,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         _ => None,
     };
 
+    #[allow(unused_mut)]
     let mut engine_builder = BpmnLiteEngine::new(store.clone()).with_ffi_dispatcher(ffi_dispatcher.clone());
     #[cfg(feature = "postgres")]
     if let Some((ref bc, ref ps)) = early_bus_client {
@@ -292,6 +294,26 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             gaps = coverage_gaps.len(),
             "FFI coverage gaps detected at startup"
         );
+    }
+
+    // T6 — REST demo server (axum, port 8080 by default).
+    // Runs in-process alongside the gRPC server. MemoryStore-backed;
+    // stateless across restarts — only for the §10 demo walkthrough.
+    let rest_bind = std::env::var("BPMN_LITE_REST_BIND")
+        .unwrap_or_else(|_| "0.0.0.0:8080".to_string());
+    if let Ok(rest_addr) = rest_bind.parse::<std::net::SocketAddr>() {
+        let demo_state = rest::DemoState::new();
+        let rest_app = rest::demo_router(demo_state);
+        tokio::spawn(async move {
+            tracing::info!(bind_addr = %rest_addr, "BPMN-Lite REST demo server starting");
+            let listener = tokio::net::TcpListener::bind(rest_addr).await
+                .expect("REST demo server bind failed");
+            if let Err(e) = axum::serve(listener, rest_app).await {
+                tracing::error!(error = %e, "REST demo server error");
+            }
+        });
+    } else {
+        tracing::warn!(bind = %rest_bind, "BPMN_LITE_REST_BIND is invalid — REST demo server disabled");
     }
 
     tracing::info!(

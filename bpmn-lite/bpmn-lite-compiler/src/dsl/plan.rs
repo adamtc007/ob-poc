@@ -32,7 +32,7 @@
 use std::collections::HashMap;
 
 /// A compiled, validated workflow ready for execution.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct WorkflowExecutionPlan {
     pub workflow_id: String,
     /// Nodes in the workflow, keyed by node id.
@@ -57,7 +57,7 @@ impl WorkflowExecutionPlan {
 }
 
 /// One resolved node in the execution plan.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub enum ExecutionNode {
     StartEvent(StartExecNode),
     ServiceTask(ServiceTaskExecNode),
@@ -78,7 +78,7 @@ impl ExecutionNode {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct StartExecNode {
     pub id: String,
     pub next: String,
@@ -96,7 +96,7 @@ pub struct StartExecNode {
 /// bound placeholders. The **receiver** domain compiles that request into
 /// a Phase 5 `ExecutablePlan` and runs it locally. The inner plan is not
 /// constructed here.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct ServiceTaskExecNode {
     pub id: String,
     /// Resolved verb FQN from catalogue. May be namespaced (`ob-poc:cbu.create`).
@@ -115,7 +115,7 @@ pub struct ServiceTaskExecNode {
 /// Mirrors [`ServiceTaskExecNode`]: workflow-compile-time records identity
 /// and placeholder wiring; the bus path emits the inner ExecutablePlan to
 /// the receiver at submit-time.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct BusinessRuleExecNode {
     pub id: String,
     /// Resolved decision id. May be namespaced (`dmn-lite:cbu_type_routing`).
@@ -125,13 +125,13 @@ pub struct BusinessRuleExecNode {
     pub consumes_placeholders: Vec<String>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct GatewayExecNode {
     pub id: String,
     pub flows: Vec<GatewayExecFlow>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct GatewayExecFlow {
     /// Placeholder name being tested (e.g. `"@cbu-type"`).
     pub placeholder: String,
@@ -140,21 +140,21 @@ pub struct GatewayExecFlow {
     pub next: String,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct EndExecNode {
     pub id: String,
     pub status: String,
 }
 
 /// Inferred binding flow across the workflow.
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, serde::Serialize, serde::Deserialize)]
 pub struct PlaceholderSchema {
     /// All placeholder slots, keyed by name (e.g. `"@cbu"`).
     pub slots: HashMap<String, PlaceholderSlot>,
 }
 
 /// One inferred placeholder slot.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct PlaceholderSlot {
     /// Slot name including `@` prefix (e.g. `"@cbu"`).
     pub name: String,
