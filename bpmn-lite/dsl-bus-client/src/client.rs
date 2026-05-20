@@ -177,6 +177,13 @@ impl BusClient {
         self.notifier.clone()
     }
 
+    /// Expose the underlying `PgPool` for callers that need to write
+    /// their own outbox rows atomically (e.g. the T3 plan walker which
+    /// also inserts a `PendingInvocation` in the same logical unit).
+    pub fn pool(&self) -> &PgPool {
+        &self.pool
+    }
+
     /// Write an invocation to the outbox. Returns the idempotency key
     /// (also present in `req`) and an [`InsertOutcome`] so callers can
     /// distinguish a fresh enqueue from an idempotent replay.
