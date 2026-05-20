@@ -20,6 +20,7 @@ members = [
     "bpmn-lite-analysis",
     "bpmn-lite-ffi-http",
     "bpmn-lite-ffi-grpc",
+    "dmn-lite-manifest-export",
     "dsl-bus-client",
     "dsl-bus-protocol",
     "dsl-bus-server",

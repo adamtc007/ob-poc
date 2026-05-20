@@ -1,0 +1,16 @@
+# ob-poc catalogue publication allowlist (v0.6 §7.5).
+#
+# Each entry here becomes a verb in the published manifest
+# (`bpmn-lite/manifests/ob-poc-v1.0.0.yaml`) that federated DSL peers
+# import at their compile time. Verbs NOT listed here stay private to
+# ob-poc and cannot be referenced as `ob-poc:<verb>` from a workflow.
+#
+# Owned by ob-poc. Bumped deliberately when a new verb crosses the
+# domain boundary (and the corresponding `catalogue_version` is bumped).
+
+public_verbs:
+  - cbu.create
+  - cbu.add-product
+  - instrument-matrix.attach
+
+public_decisions: []
