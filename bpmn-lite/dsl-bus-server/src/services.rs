@@ -8,11 +8,15 @@
 use std::sync::Arc;
 
 use async_trait::async_trait;
+use dsl_bus_protocol::v1::entity_service_server::EntityService;
 use dsl_bus_protocol::v1::invocation_service_server::InvocationService;
 use dsl_bus_protocol::v1::result_service_server::ResultService;
+use dsl_bus_protocol::v1::sem_os_service_server::SemOsService;
 use dsl_bus_protocol::v1::{
-    ExecutionOutcome, InvocationRequest, InvocationResult, ReceiptStatus, ResolvedBinding,
-    ResultAck, SubmissionAck, SubmissionStatus,
+    DagPackOutcome, DagPackRequest, DagPackResponse, EntityResolution, EntityResolutionRequest,
+    EntityResolutionResult, ExecutionOutcome, InvocationRequest, InvocationResult, ReceiptStatus,
+    ResolutionOutcome, ResolvedBinding, ResultAck, SubmissionAck, SubmissionStatus,
+    ValidationIssue, ValidationOutcome, ValidationResult,
 };
 use dsl_bus_storage::{
     insert_inbox, insert_outbox, lookup_inbox, BusEndpoint, InboxEntry, OutboxEntry,
@@ -200,6 +204,29 @@ impl InvocationService for InvocationServiceImpl {
             detail: String::new(),
         }))
     }
+
+    // A3 §2.1 — Validate stub. Returns NOT_IMPLEMENTED unconditionally
+    // in v0.6 per the §6 stub discipline ("no conditional dispatching
+    // based on 'is this stubbed?'"). The wire shape is the contract;
+    // real validation lands in V&S v0.4.
+    async fn validate(
+        &self,
+        _request: Request<InvocationRequest>,
+    ) -> Result<Response<ValidationResult>, Status> {
+        Ok(Response::new(ValidationResult {
+            outcome: ValidationOutcome::NotImplemented as i32,
+            issues: vec![ValidationIssue {
+                field_name: String::new(),
+                issue_kind: "not_implemented".into(),
+                detail: "InvocationService.Validate is stubbed in v0.6 — full \
+                         implementation lands in engine V&S v0.4 per addendum \
+                         v0.6-A3 §4."
+                    .into(),
+                specific: None,
+            }],
+            validation_id: Some(to_proto(Uuid::now_v7())),
+        }))
+    }
 }
 
 pub(crate) struct ResultServiceImpl {
@@ -330,3 +357,65 @@ fn internal_status<R, E: std::fmt::Display>(err: E) -> Result<R, Status> {
     Err(Status::internal(err.to_string()))
 }
 
+
+// ── A3 §2.2 — EntityService stub ─────────────────────────────────────
+//
+// Wire-only implementation: always returns `RESOLUTION_NOT_IMPLEMENTED`.
+// Per A3 §6 discipline #1 + #6, this is the *only* impl in v0.6 — no
+// conditional "real vs stub" pathways. Bus-handler crates re-export
+// this type under domain-specific names (e.g.
+// `ob_poc_bus_handler::ObPocEntityServiceImpl`) so the manifest's
+// declared service kind matches the registered impl.
+pub struct StubEntityService;
+
+#[tonic::async_trait]
+impl EntityService for StubEntityService {
+    async fn resolve(
+        &self,
+        _request: Request<EntityResolutionRequest>,
+    ) -> Result<Response<EntityResolutionResult>, Status> {
+        Ok(Response::new(EntityResolutionResult {
+            resolutions: vec![EntityResolution {
+                outcome: ResolutionOutcome::ResolutionNotImplemented as i32,
+                resolved_uuid: Vec::new(),
+                entity_type: String::new(),
+                current_state: String::new(),
+                audit_reference: String::new(),
+                detail: "EntityService.Resolve is stubbed in v0.6 — full \
+                         implementation lands in engine V&S v0.4 per addendum \
+                         v0.6-A3 §4."
+                    .into(),
+            }],
+            resolution_id: Some(to_proto(Uuid::now_v7())),
+        }))
+    }
+}
+
+// ── A3 §2.3 — SemOsService stub ──────────────────────────────────────
+pub struct StubSemOsService;
+
+#[tonic::async_trait]
+impl SemOsService for StubSemOsService {
+    async fn fetch_dag_packs(
+        &self,
+        _request: Request<DagPackRequest>,
+    ) -> Result<Response<DagPackResponse>, Status> {
+        Ok(Response::new(DagPackResponse {
+            packs: vec![dsl_bus_protocol::v1::DagPack {
+                pack_id: String::new(),
+                domain: String::new(),
+                version: String::new(),
+                semantic_graph: Vec::new(),
+                constellation_maps: Vec::new(),
+                derivation_chains: Vec::new(),
+                fsm_applicability: None,
+                detail: "SemOsService.FetchDagPacks is stubbed in v0.6 — full \
+                         implementation lands in engine V&S v0.4 per addendum \
+                         v0.6-A3 §4."
+                    .into(),
+                outcome: DagPackOutcome::DagPackNotImplemented as i32,
+            }],
+            response_id: Some(to_proto(Uuid::now_v7())),
+        }))
+    }
+}

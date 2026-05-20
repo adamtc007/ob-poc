@@ -40,6 +40,7 @@ mod uuid_convert;
 pub use server::{BusServer, BusServerBuilder, BusServerError, ServerHandle};
 pub use services::{
     InvocationContext, InvocationDispatcher, InvocationOutcome, ResultContext, ResultDispatcher,
+    StubEntityService, StubSemOsService,
 };
 
 #[cfg(test)]

@@ -487,3 +487,182 @@ fn strip_domain_prefix_unit() {
         "cbu_type_routing"
     );
 }
+
+// ── A3 §3.7 — Protocol-shape tests for federated-service stubs ──────
+
+use dsl_bus_protocol::v1::entity_service_client::EntityServiceClient;
+use dsl_bus_protocol::v1::sem_os_service_client::SemOsServiceClient;
+use dsl_bus_protocol::v1::{
+    DagPackOutcome, DagPackRequest, EntityQuery, EntityResolutionRequest, ResolutionOutcome,
+    ValidationOutcome,
+};
+
+async fn connect_entity_client(
+    addr: SocketAddr,
+) -> EntityServiceClient<tonic::transport::Channel> {
+    let url = format!("http://{addr}");
+    for _ in 0..20 {
+        if let Ok(client) = EntityServiceClient::connect(url.clone()).await {
+            return client;
+        }
+        tokio::time::sleep(std::time::Duration::from_millis(30)).await;
+    }
+    EntityServiceClient::connect(url)
+        .await
+        .expect("connect to bus server")
+}
+
+async fn connect_sem_os_client(
+    addr: SocketAddr,
+) -> SemOsServiceClient<tonic::transport::Channel> {
+    let url = format!("http://{addr}");
+    for _ in 0..20 {
+        if let Ok(client) = SemOsServiceClient::connect(url.clone()).await {
+            return client;
+        }
+        tokio::time::sleep(std::time::Duration::from_millis(30)).await;
+    }
+    SemOsServiceClient::connect(url)
+        .await
+        .expect("connect to bus server")
+}
+
+async fn spawn_bus_server(
+    pool: PgPool,
+    enable_entity: bool,
+    enable_sem_os: bool,
+) -> crate::ServerHandle {
+    let mut builder = BusServer::builder()
+        .pool(pool.clone())
+        .local_domain("test-domain")
+        .invocation_dispatcher(AcceptingInvocationDispatcher::new())
+        .result_dispatcher(RecordingResultDispatcher::new())
+        .outbox_notifier(test_outbox_notifier(pool).await)
+        .bind(ephemeral_addr());
+    if enable_entity {
+        builder = builder.enable_entity_service();
+    }
+    if enable_sem_os {
+        builder = builder.enable_sem_os_service();
+    }
+    builder.build().serve().await.unwrap()
+}
+
+#[tokio::test]
+#[ignore]
+async fn validate_stub_returns_not_implemented() {
+    // A3 §3.7 — Validate ships as a wire-only stub in v0.6. The
+    // discipline rule (A3 §6 #1) is "stubs return NOT_IMPLEMENTED
+    // consistently" — no conditional real-vs-stub paths.
+    let pool = setup_pool().await;
+    let handle = spawn_bus_server(pool, false, false).await;
+
+    let mut client = connect_invocation_client(handle.local_addr()).await;
+    let response = client
+        .validate(sample_request(Uuid::now_v7(), "ob-poc:cbu.create"))
+        .await
+        .expect("validate RPC succeeds")
+        .into_inner();
+
+    assert_eq!(response.outcome, ValidationOutcome::NotImplemented as i32);
+    assert_eq!(response.issues.len(), 1);
+    assert_eq!(response.issues[0].issue_kind, "not_implemented");
+    assert!(response.validation_id.is_some(),
+        "validation_id is a transient trace UUID even for stubs");
+
+    handle.shutdown().await.unwrap();
+}
+
+#[tokio::test]
+#[ignore]
+async fn entity_resolve_stub_returns_not_implemented() {
+    // A3 §3.7 — When EntityService is REGISTERED (enable_entity_service
+    // was called), the stub returns RESOLUTION_NOT_IMPLEMENTED. This is
+    // distinct from the route being absent.
+    let pool = setup_pool().await;
+    let handle = spawn_bus_server(pool, true, false).await;
+
+    let mut client = connect_entity_client(handle.local_addr()).await;
+    let response = client
+        .resolve(EntityResolutionRequest {
+            authority: None,
+            queries: vec![EntityQuery {
+                entity_type: "CBU".into(),
+                lookup_by: Some(
+                    dsl_bus_protocol::v1::entity_query::LookupBy::NaturalKey(
+                        "Allianz".into(),
+                    ),
+                ),
+                include_state: true,
+                include_audit_pointer: false,
+            }],
+            catalogue_version: "v1.0.0".into(),
+        })
+        .await
+        .expect("entity resolve RPC succeeds")
+        .into_inner();
+
+    assert_eq!(response.resolutions.len(), 1);
+    assert_eq!(
+        response.resolutions[0].outcome,
+        ResolutionOutcome::ResolutionNotImplemented as i32
+    );
+    assert!(response.resolution_id.is_some());
+
+    handle.shutdown().await.unwrap();
+}
+
+#[tokio::test]
+#[ignore]
+async fn sem_os_fetch_dag_packs_stub_returns_not_implemented() {
+    let pool = setup_pool().await;
+    let handle = spawn_bus_server(pool, false, true).await;
+
+    let mut client = connect_sem_os_client(handle.local_addr()).await;
+    let response = client
+        .fetch_dag_packs(DagPackRequest {
+            authority: None,
+            dag_pack_ids: vec!["ob-poc.cbu".into()],
+            verb_ids: vec![],
+            include_constellation_maps: false,
+            include_derivation_chains: false,
+            include_fsm_applicability: false,
+            catalogue_version: "v1.0.0".into(),
+        })
+        .await
+        .expect("fetch dag packs RPC succeeds")
+        .into_inner();
+
+    assert_eq!(response.packs.len(), 1);
+    assert_eq!(
+        response.packs[0].outcome,
+        DagPackOutcome::DagPackNotImplemented as i32
+    );
+    assert!(response.response_id.is_some());
+
+    handle.shutdown().await.unwrap();
+}
+
+#[tokio::test]
+#[ignore]
+async fn server_without_entity_service_returns_grpc_unimplemented() {
+    // A3 §3.7 + §6 discipline #4 — A domain that does NOT declare
+    // EntityService (e.g. dmn-lite) leaves the route absent. The gRPC
+    // server returns `UNIMPLEMENTED` natively; callers see a Status
+    // error rather than a structured NOT_IMPLEMENTED response.
+    let pool = setup_pool().await;
+    let handle = spawn_bus_server(pool, false, false).await;
+
+    let mut client = connect_entity_client(handle.local_addr()).await;
+    let err = client
+        .resolve(EntityResolutionRequest {
+            authority: None,
+            queries: vec![],
+            catalogue_version: "v1.0.0".into(),
+        })
+        .await
+        .expect_err("EntityService route must be absent");
+    assert_eq!(err.code(), tonic::Code::Unimplemented);
+
+    handle.shutdown().await.unwrap();
+}

@@ -120,6 +120,13 @@ impl InvocationDispatcher for ObPocBusHandler {
     }
 }
 
+/// A3 §3.3 — ob-poc-branded re-exports of the canonical `EntityService`
+/// / `SemOsService` stubs. The bus server registers these by name when
+/// the manifest declares the corresponding capability. v0.6 stubs
+/// return `NOT_IMPLEMENTED` per A3 §6 discipline #1.
+pub use dsl_bus_server::StubEntityService as ObPocEntityServiceImpl;
+pub use dsl_bus_server::StubSemOsService as ObPocSemOsServiceImpl;
+
 /// `ResultDispatcher` for service-side domains that never receive
 /// results. Always returns `BusServerError::UnknownVerb`, which the
 /// server translates to `ReceiptStatus::RejectedUnknownExecution`.

@@ -41,6 +41,13 @@
 //! `&mut sqlx::PgConnection` because the `FOR UPDATE SKIP LOCKED`
 //! semantics only hold *inside a transaction*, and pinning the
 //! connection at the type level makes that obvious at the call site.
+//!
+//! ## Schema management
+//!
+//! [`migrate`] applies the bundled `migrations/` set to the supplied
+//! pool — the canonical entry point every domain's app wiring uses at
+//! startup. Re-runs are no-ops; sqlx tracks applied versions in the
+//! `_sqlx_migrations` table on the same database.
 
 #![forbid(unsafe_code)]
 
@@ -56,6 +63,13 @@ pub use types::{
     BusEndpoint, BusStorageError, InboxEntry, InboxStatus, InsertOutcome, OutboxEntry,
     OutboxStatus, Result,
 };
+
+/// Apply the bus migrations to `pool`. Idempotent — `sqlx::migrate!`
+/// tracks applied versions in `_sqlx_migrations`. Run this once at
+/// startup before constructing `BusClient` or `BusServer`.
+pub async fn migrate(pool: &sqlx::PgPool) -> std::result::Result<(), sqlx::migrate::MigrateError> {
+    sqlx::migrate!("./migrations").run(pool).await
+}
 
 #[cfg(test)]
 mod tests;

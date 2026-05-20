@@ -50,6 +50,13 @@ pub struct Manifest {
     #[serde(default)]
     pub breaking_changes_since: Vec<String>,
 
+    /// A3 §2.4 — Capability declarations for the federated services
+    /// this domain exposes. Consumers read this to know whether to call
+    /// `EntityService` / `SemOsService` against the domain. Absent =
+    /// pre-A3 manifest (treated as InvocationService-only).
+    #[serde(default)]
+    pub services: Vec<ServiceDeclaration>,
+
     #[serde(default)]
     pub verbs: Vec<VerbEntry>,
     #[serde(default)]
@@ -113,6 +120,20 @@ impl Manifest {
         self.decisions.iter().map(|d| d.id.as_str())
     }
 
+    /// Iterate the federated services declared by this manifest. Empty
+    /// for pre-A3 manifests (which were InvocationService-only by
+    /// implicit convention).
+    pub fn declared_services(&self) -> &[ServiceDeclaration] {
+        &self.services
+    }
+
+    /// True if the domain declares the named service. A3 §6 discipline
+    /// point #3: consumers consult this before calling — they don't
+    /// probe blindly.
+    pub fn declares_service(&self, kind: ServiceKind) -> bool {
+        self.services.iter().any(|s| s.available && s.kind == kind)
+    }
+
     fn rebuild_indexes(&mut self) {
         self.verb_index = self
             .verbs
@@ -133,6 +154,33 @@ impl Manifest {
             .map(|(i, t)| (t.name.clone(), i))
             .collect();
     }
+}
+
+// ── Service declarations (A3 §2.4) ──────────────────────────────────
+
+/// One federated service a domain declares it implements. Per A3 §6
+/// discipline #3, this declaration is authoritative: a domain that
+/// declares a service must register it (even as stub returning
+/// NOT_IMPLEMENTED), and a domain that doesn't declare it must not
+/// register the gRPC route (so callers see UNIMPLEMENTED, not a
+/// confused stub).
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct ServiceDeclaration {
+    pub kind: ServiceKind,
+    pub available: bool,
+    #[serde(default)]
+    pub capabilities: Vec<String>,
+}
+
+/// The three federated service kinds defined in v0.6-A3 §1. Capability
+/// matrix: every domain *may* expose InvocationService; only domains
+/// that hold entity state expose EntityService; only domains that
+/// publish semantic grounding expose SemOsService.
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Hash)]
+pub enum ServiceKind {
+    InvocationService,
+    EntityService,
+    SemOsService,
 }
 
 // ── Verb entry ────────────────────────────────────────────────────────────────

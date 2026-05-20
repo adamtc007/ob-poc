@@ -74,6 +74,20 @@ impl InvocationService for MockService {
             detail: String::new(),
         }))
     }
+
+    async fn validate(
+        &self,
+        _req: Request<InvocationRequest>,
+    ) -> Result<Response<dsl_bus_protocol::v1::ValidationResult>, Status> {
+        // A3 §2.1 — Validate stub for the dsl-bus-client mock. The
+        // sender-side tests never call Validate, so this is just
+        // contract-coverage to keep tonic happy.
+        Ok(Response::new(dsl_bus_protocol::v1::ValidationResult {
+            outcome: dsl_bus_protocol::v1::ValidationOutcome::NotImplemented as i32,
+            issues: Vec::new(),
+            validation_id: None,
+        }))
+    }
 }
 
 #[tonic::async_trait]

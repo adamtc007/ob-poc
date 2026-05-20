@@ -23,6 +23,7 @@ members = [
     "bpmn-lite-bus-handler",
     "dmn-lite-bus-handler",
     "dmn-lite-manifest-export",
+    "dmn-lite-server",
     "dsl-bus-client",
     "dsl-bus-protocol",
     "dsl-bus-server",

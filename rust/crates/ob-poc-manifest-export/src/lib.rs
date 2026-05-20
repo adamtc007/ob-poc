@@ -405,6 +405,21 @@ fn build_yaml(
     let _ = writeln!(s, "breaking_changes_since: []");
 
     s.push('\n');
+    // A3 §2.4 — ob-poc declares all three federated services. Entity +
+    // SemOs are stubbed in v0.6 per A3 §6 discipline #4: declared
+    // (returns NOT_IMPLEMENTED) ≠ absent (returns gRPC UNIMPLEMENTED).
+    s.push_str("services:\n");
+    s.push_str("  - kind: InvocationService\n");
+    s.push_str("    available: true\n");
+    s.push_str("    capabilities: [\"Submit\", \"Validate\"]\n");
+    s.push_str("  - kind: EntityService\n");
+    s.push_str("    available: true\n");
+    s.push_str("    capabilities: [\"Resolve\"]\n");
+    s.push_str("  - kind: SemOsService\n");
+    s.push_str("    available: true\n");
+    s.push_str("    capabilities: [\"FetchDagPacks\"]\n");
+
+    s.push('\n');
     s.push_str("verbs:\n");
     for v in verbs {
         emit_verb(&mut s, v);

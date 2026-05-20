@@ -3,6 +3,7 @@
 //! Serves the React frontend and provides all API endpoints
 //! for DSL generation, entity search, attributes, and DSL viewer.
 
+mod bus_runtime;
 mod routes;
 mod state;
 
@@ -1422,7 +1423,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         //
         // Phase 3 (three-plane architecture v0.3 §13): PgCrudExecutor
         // relocated from sem_os_postgres to dsl-runtime.
-        {
+        let verb_executor_arc = {
             use dsl_runtime::PgCrudExecutor;
             use ob_poc::sem_os_runtime::verb_executor_adapter::ObPocVerbExecutor;
             use std::sync::Arc;
@@ -1431,9 +1432,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 ObPocVerbExecutor::from_pool_with_services(pool.clone(), service_registry.clone())
                     .with_crud_port(Arc::new(PgCrudExecutor::new(pool.clone())))
                     .with_sem_os_ops(sem_os_ops.clone());
-            orchestrator = orchestrator.with_verb_execution_port(Arc::new(verb_executor));
+            let arc = Arc::new(verb_executor);
+            orchestrator = orchestrator.with_verb_execution_port(arc.clone());
             tracing::info!("VerbExecutionPort wired with SemOsVerbOpRegistry + PgCrudExecutor");
-        }
+            arc
+        };
 
         // Wire the V2 executor that supports parking (WorkflowDispatcher or RealDslExecutor)
         if let Some(ref bpmn_exec) = bpmn_executor_v2 {
@@ -1708,8 +1711,65 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             dispatcher.attach_orchestrator(repl_v2_orchestrator.clone());
         }
         tracing::info!("REPL V2 orchestrator initialized with semantic intent service");
-        repl_v2_orchestrator
+
+        // ─── T2B.9 — Federated DSL bus runtime ────────────────────────
+        // Co-located with axum; binds on OB_POC_BUS_LISTEN (default
+        // 0.0.0.0:50061). Disabled when the env var is unset so the
+        // existing deployment story keeps working unchanged.
+        //
+        // A future tranche may split into an `ob-poc-bus-server` bin
+        // (tech debt logged for after T3 lands).
+        // ─────────────────────────────────────────────────────────────
+        let bus_runtime_handle = match std::env::var("OB_POC_BUS_LISTEN") {
+            Ok(listen) => match listen.parse::<std::net::SocketAddr>() {
+                Ok(bind_addr) => {
+                    let mut peers = Vec::new();
+                    if let Ok(uri) = std::env::var("BPMN_LITE_BUS_ENDPOINT") {
+                        peers.push(("bpmn-lite".to_owned(), uri));
+                    }
+                    if let Ok(uri) = std::env::var("DMN_LITE_BUS_ENDPOINT") {
+                        peers.push(("dmn-lite".to_owned(), uri));
+                    }
+                    tracing::info!(
+                        bind_addr = %bind_addr,
+                        peer_count = peers.len(),
+                        "starting ob-poc federated bus runtime"
+                    );
+                    match bus_runtime::start(bus_runtime::BusRuntimeConfig {
+                        pool: pool.clone(),
+                        verb_executor: verb_executor_arc.clone(),
+                        bind_addr,
+                        peers,
+                    })
+                    .await
+                    {
+                        Ok(handle) => Some(handle),
+                        Err(e) => {
+                            tracing::error!(error = %e, "ob-poc bus runtime startup failed");
+                            None
+                        }
+                    }
+                }
+                Err(e) => {
+                    tracing::error!(
+                        listen = %listen,
+                        error = %e,
+                        "OB_POC_BUS_LISTEN parse failed — bus disabled"
+                    );
+                    None
+                }
+            },
+            Err(_) => {
+                tracing::info!(
+                    "federated bus runtime disabled (set OB_POC_BUS_LISTEN to enable)"
+                );
+                None
+            }
+        };
+
+        (repl_v2_orchestrator, bus_runtime_handle)
     };
+    let (repl_v2_orchestrator, bus_runtime) = repl_v2_orchestrator;
 
     // Extract the REPL session store before moving the orchestrator Arc.
     // Observatory endpoints read `tos.hydrated_state` from this store.
@@ -1947,7 +2007,17 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     tracing::info!("Background learning task spawned");
 
-    if let Err(e) = axum::serve(listener, app).await {
+    let serve_result = axum::serve(listener, app).await;
+
+    if let Some(handle) = bus_runtime {
+        if let Err(e) = handle.shutdown().await {
+            tracing::warn!(error = %e, "ob-poc federated bus runtime shutdown reported error");
+        } else {
+            tracing::info!("ob-poc federated bus runtime stopped cleanly");
+        }
+    }
+
+    if let Err(e) = serve_result {
         tracing::error!("Server error: {}", e);
         return Err(format!("Server error: {}", e).into());
     }

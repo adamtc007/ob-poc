@@ -341,6 +341,14 @@ fn build_yaml(
     }
     let _ = writeln!(s, "breaking_changes_since: []");
     s.push('\n');
+    // A3 §2.4 — dmn-lite declares only InvocationService. No
+    // EntityService (decisions are stateless; no entity state). No
+    // SemOsService (decisions are self-contained).
+    s.push_str("services:\n");
+    s.push_str("  - kind: InvocationService\n");
+    s.push_str("    available: true\n");
+    s.push_str("    capabilities: [\"Submit\", \"Validate\"]\n");
+    s.push('\n');
     s.push_str("verbs: []\n");
     s.push('\n');
     s.push_str("decisions:\n");
