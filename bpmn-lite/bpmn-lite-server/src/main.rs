@@ -189,6 +189,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     pool,
                     bind_addr,
                     client: bc,
+                    store: store.clone(),
                 })
                 .await?,
             )

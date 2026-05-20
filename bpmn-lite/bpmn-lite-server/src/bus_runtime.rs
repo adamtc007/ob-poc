@@ -1,23 +1,21 @@
-//! Federated DSL bus runtime for `bpmn-lite-server` (v0.6 §T2B.9
-//! item 34, co-located with the existing 50051 BPMN gRPC service).
+//! Federated DSL bus runtime for `bpmn-lite-server` (v0.6 §T2B.9 + T3.4).
 //!
-//! Owns three things at startup:
+//! T3.4 update: `StoreBackedAdvancer` now operates on `ProcessStore`
+//! (the bytecode engine store with plan_hash support) instead of the
+//! separate `BpmnProcessInstanceStore`. When a result arrives for a
+//! plan-based instance it:
 //!
-//! 1. `BusClient` — outbox writer + sender task. bpmn-lite is the
-//!    *workflow* domain so most outbox rows are `submit_invocation`
-//!    payloads to ob-poc / dmn-lite.
-//! 2. `BusServer` — receives `DeliverResult` payloads from peer
-//!    domains. The accompanying `RejectInvocationDispatcher` rejects
-//!    any inbound Submit (workflow domain doesn't host verbs).
-//! 3. `StoreBackedAdvancer` — the v0.6 §T2B.9 "real-store-layer"
-//!    ProcessAdvancer. It deletes the matching pending row via
-//!    `take_by_execution_id` and transitions the process instance's
-//!    status. **It does not walk to the next BPMN node** — that lives
-//!    in T3 (RIP-AND-REPLACE of the executor). A structured event is
-//!    emitted so T3 can pick up the handoff.
+//! 1. Takes the pending invocation row (establishes which node fired).
+//! 2. Loads the `ProcessInstance` via `ProcessStore`.
+//! 3. If the instance has a `plan_hash`, loads the plan and advances
+//!    `current_node_id` to the completed node's `next` neighbour.
+//! 4. Populates `placeholder_values` from the result bindings.
+//! 5. Sets `instance.state = ProcessState::Running` so the tick loop
+//!    picks it up and walks the next plan node.
 
 #![cfg(feature = "postgres")]
 
+use std::collections::HashMap;
 use std::net::SocketAddr;
 use std::sync::Arc;
 
@@ -26,25 +24,21 @@ use bpmn_lite_bus_handler::{
     BpmnLiteBusHandler, ProcessAdvanceInput, ProcessAdvancer, ProcessAdvancerError,
     RejectInvocationDispatcher,
 };
+use bpmn_lite_compiler::dsl::plan::{ExecutionNode, WorkflowExecutionPlan};
 use bpmn_lite_store::pending::PendingInvocationStore;
-use bpmn_lite_store::process_instance::{
-    BpmnProcessInstanceStore, ProcessStatus,
-};
-use bpmn_lite_store_postgres::{
-    PostgresBpmnProcessInstanceStore, PostgresPendingInvocationStore,
-};
+use bpmn_lite_store::store::ProcessStore;
+use bpmn_lite_store_postgres::PostgresPendingInvocationStore;
+use bpmn_lite_types::types::ProcessState;
 use dsl_bus_client::BusClient;
-use dsl_bus_protocol::v1::ExecutionOutcomeKind;
+use dsl_bus_protocol::v1::{typed_value::Value as ProtoValueKind, ExecutionOutcomeKind};
 use dsl_bus_server::{BusServer, ServerHandle};
 use sqlx::PgPool;
+use uuid::Uuid;
 
-/// Owned bus runtime — drop or call [`shutdown`](Self::shutdown) to
-/// stop both the server and the outbox sender cleanly.
+/// Owned bus runtime.
 pub(crate) struct BusRuntime {
     server: ServerHandle,
     sender: dsl_bus_client::SenderHandle,
-    /// T3 — exposed so main.rs can wire the bus client into
-    /// BpmnLiteEngine via `.with_bus_client(runtime.bus_client())`.
     client: Arc<BusClient>,
 }
 
@@ -65,16 +59,12 @@ impl BusRuntime {
 pub(crate) struct BusRuntimeConfig {
     pub(crate) pool: PgPool,
     pub(crate) bind_addr: SocketAddr,
-    /// Pre-built bus client (already configured with peers + pool).
-    /// main.rs builds it early to wire into BpmnLiteEngine before the
-    /// server starts (T3.3).
+    /// Pre-built bus client (T3.3 — built before engine so it can be wired in).
     pub(crate) client: Arc<BusClient>,
+    /// T3.4 — engine's ProcessStore for loading/saving plan-based instances.
+    pub(crate) store: Arc<dyn ProcessStore>,
 }
 
-/// Stand up the bus runtime: apply bus migrations, build the advancer
-/// against the bpmn-lite-store-postgres backends, spawn the outbox
-/// sender, bind the bus server. Returns a handle owning the
-/// background lifecycle.
 pub(crate) async fn start(config: BusRuntimeConfig) -> anyhow::Result<BusRuntime> {
     dsl_bus_storage::migrate(&config.pool).await?;
 
@@ -84,14 +74,9 @@ pub(crate) async fn start(config: BusRuntimeConfig) -> anyhow::Result<BusRuntime
 
     let advancer = StoreBackedAdvancer {
         pending: Arc::new(PostgresPendingInvocationStore::new(config.pool.clone())),
-        instances: Arc::new(PostgresBpmnProcessInstanceStore::new(config.pool.clone())),
+        store: config.store,
     };
 
-    // A3 §3.4 / §6 — bpmn-lite is a workflow domain. It exposes
-    // InvocationService (Submit rejects; Validate is the stub provided
-    // by dsl-bus-server) and ResultService. No EntityService — bpmn-lite
-    // doesn't host entity state. No SemOsService — process instances
-    // aren't a semantic catalogue.
     let server = BusServer::builder()
         .pool(config.pool)
         .local_domain("bpmn-lite")
@@ -111,15 +96,23 @@ pub(crate) async fn start(config: BusRuntimeConfig) -> anyhow::Result<BusRuntime
     Ok(BusRuntime { server, sender, client })
 }
 
-/// "Real-store-layer" advancer for T2B.9.
+// ── StoreBackedAdvancer ──────────────────────────────────────────────
+
+/// T3.4 — advances plan-based process instances on result arrival.
 ///
-/// `advance()` consumes the pending row keyed by `execution_id`,
-/// transitions the matching process instance to a sensible status, and
-/// records a structured event flagging the T3 executor handoff. The
-/// next-node walker itself is T3 territory.
+/// Flow:
+/// 1. Take pending invocation row (establishes node_id + process_instance_id).
+/// 2. Load ProcessInstance from ProcessStore.
+/// 3. For plan-based instances (plan_hash.is_some()):
+///    a. Load the WorkflowExecutionPlan.
+///    b. Advance current_node_id to the completed node's `next` neighbour
+///       so the next tick walks past the completed service/business-rule node.
+///    c. Bind placeholder values from result bindings.
+/// 4. Set state = Running (tick loop will call PlanWalker.advance() on next cycle).
+/// 5. For terminal outcomes (VerbFailed etc.) set state = Failed.
 struct StoreBackedAdvancer {
     pending: Arc<PostgresPendingInvocationStore>,
-    instances: Arc<PostgresBpmnProcessInstanceStore>,
+    store: Arc<dyn ProcessStore>,
 }
 
 #[async_trait]
@@ -136,59 +129,55 @@ impl ProcessAdvancer for StoreBackedAdvancer {
         };
 
         let mut instance = self
-            .instances
-            .load(row.process_instance_id)
+            .store
+            .load_instance(row.process_instance_id)
             .await
-            .map_err(|e| ProcessAdvancerError::Internal(format!("load process instance: {e}")))?
+            .map_err(|e| ProcessAdvancerError::Internal(format!("load instance: {e}")))?
             .ok_or_else(|| {
                 ProcessAdvancerError::Internal(format!(
-                    "pending row referenced unknown process instance {}",
+                    "pending row referenced unknown instance {}",
                     row.process_instance_id
                 ))
             })?;
 
-        let now = chrono::Utc::now();
-        instance.waiting_on_callout_id = None;
-        instance.waiting_on_execution_id = None;
-        instance.last_advanced_at = now;
+        let is_success = matches!(
+            input.outcome_kind,
+            ExecutionOutcomeKind::Committed | ExecutionOutcomeKind::IdempotentReplayReturned
+        );
+        let is_transient = matches!(
+            input.outcome_kind,
+            ExecutionOutcomeKind::OptimisticConflict | ExecutionOutcomeKind::LockTimeout
+        );
 
-        let (next_status, completed) = match input.outcome_kind {
-            ExecutionOutcomeKind::Committed | ExecutionOutcomeKind::IdempotentReplayReturned => {
-                // The verb completed cleanly — release the wait but leave
-                // the process in `Running` for T3's executor to pick up
-                // and walk the next node.
-                (ProcessStatus::Running, false)
+        if is_success || is_transient {
+            // T3.4 — plan-based: advance node + bind placeholders.
+            if let Some(plan_hash) = instance.plan_hash {
+                if let Ok(Some(plan_json)) = self.store.load_plan(plan_hash).await {
+                    if let Ok(plan) = serde_json::from_str::<WorkflowExecutionPlan>(&plan_json) {
+                        if let Some(node) = plan.nodes.get(&row.node_id) {
+                            advance_node_and_bind(
+                                &mut instance,
+                                node,
+                                &input,
+                            );
+                        }
+                    }
+                }
             }
-            ExecutionOutcomeKind::VerbFailed
-            | ExecutionOutcomeKind::AuthorityDenied
-            | ExecutionOutcomeKind::TimedOut
-            | ExecutionOutcomeKind::PanicRecovered
-            | ExecutionOutcomeKind::RejectedByAdmission
-            | ExecutionOutcomeKind::VersionMismatch
-            | ExecutionOutcomeKind::Cancelled => {
-                instance.completed_at = Some(now);
-                instance.end_status = Some(format!("Failed:{:?}", input.outcome_kind));
-                instance.failure_reason = Some(input.outcome_detail.clone());
-                (ProcessStatus::Failed, true)
-            }
-            ExecutionOutcomeKind::OptimisticConflict | ExecutionOutcomeKind::LockTimeout => {
-                // Transient — T3's retry policy will reschedule. For now
-                // bounce back to Running so the next tick re-tries.
-                (ProcessStatus::Running, false)
-            }
-            ExecutionOutcomeKind::OutcomeUnspecified => {
-                return Err(ProcessAdvancerError::Malformed(
-                    "ExecutionOutcomeKind::OutcomeUnspecified — peer must populate kind"
-                        .to_owned(),
-                ));
-            }
-        };
-        instance.status = next_status;
+            instance.state = ProcessState::Running;
+        } else if let ExecutionOutcomeKind::OutcomeUnspecified = input.outcome_kind {
+            return Err(ProcessAdvancerError::Malformed(
+                "ExecutionOutcomeKind::OutcomeUnspecified — peer must populate kind".to_owned(),
+            ));
+        } else {
+            // Terminal failure.
+            instance.state = ProcessState::Failed { incident_id: Uuid::now_v7() };
+        }
 
-        self.instances
-            .update(instance)
+        self.store
+            .save_instance(&instance)
             .await
-            .map_err(|e| ProcessAdvancerError::Internal(format!("update process instance: {e}")))?;
+            .map_err(|e| ProcessAdvancerError::Internal(format!("save instance: {e}")))?;
 
         tracing::info!(
             execution_id = %input.execution_id,
@@ -197,10 +186,82 @@ impl ProcessAdvancer for StoreBackedAdvancer {
             node_id = %row.node_id,
             source_domain = %input.source_domain,
             outcome = ?input.outcome_kind,
-            next_status = next_status.as_str(),
-            completed,
-            "T3-handoff: result received, process status updated; executor walker is T3 scope"
+            has_plan = instance.plan_hash.is_some(),
+            "bus result received; instance set to Running for tick loop"
         );
         Ok(())
     }
+}
+
+/// Advance `current_node_id` to the completed node's successor and
+/// populate `placeholder_values` from the result bindings.
+fn advance_node_and_bind(
+    instance: &mut bpmn_lite_types::ProcessInstance,
+    node: &ExecutionNode,
+    input: &ProcessAdvanceInput,
+) {
+    let (produces, next) = match node {
+        ExecutionNode::ServiceTask(t) => (t.produces_placeholder.as_deref(), t.next.as_str()),
+        ExecutionNode::BusinessRuleTask(t) => {
+            (t.produces_placeholder.as_deref(), t.next.as_str())
+        }
+        _ => return,
+    };
+
+    // Advance to next node so the tick walker doesn't re-dispatch.
+    instance.current_node_id = Some(next.to_owned());
+
+    // Bind placeholder value from result bindings.
+    if let Some(placeholder_name) = produces {
+        let value = extract_binding_value(input);
+        let mut placeholders: HashMap<String, serde_json::Value> = instance
+            .placeholder_values
+            .as_ref()
+            .and_then(|v| serde_json::from_value(v.clone()).ok())
+            .unwrap_or_default();
+        placeholders.insert(placeholder_name.to_owned(), value);
+        instance.placeholder_values =
+            serde_json::to_value(&placeholders).ok();
+    }
+}
+
+/// Extract the primary output value from the result, preferring the
+/// "result" binding if present, then falling back to the first binding,
+/// then to `outcome_detail`.
+fn extract_binding_value(input: &ProcessAdvanceInput) -> serde_json::Value {
+    // Look for "result" binding first (ob-poc verb output convention),
+    // then first binding, then string-encode outcome_detail.
+    let binding = input
+        .bindings
+        .iter()
+        .find(|b| b.name == "result")
+        .or_else(|| input.bindings.first());
+
+    if let Some(b) = binding {
+        if let Some(tv) = b.value.as_ref() {
+            let val: Option<serde_json::Value> = match tv.value.as_ref() {
+                Some(ProtoValueKind::StringValue(s)) => {
+                    Some(serde_json::Value::String(s.clone()))
+                }
+                Some(ProtoValueKind::UuidValue(u)) => {
+                    if u.value.len() == 16 {
+                        let mut arr = [0u8; 16];
+                        arr.copy_from_slice(&u.value);
+                        Some(serde_json::Value::String(
+                            Uuid::from_bytes(arr).to_string(),
+                        ))
+                    } else {
+                        None
+                    }
+                }
+                Some(ProtoValueKind::BoolValue(b)) => Some(serde_json::Value::Bool(*b)),
+                Some(ProtoValueKind::IntValue(n)) => Some(serde_json::Value::from(*n)),
+                _ => None,
+            };
+            if let Some(v) = val {
+                return v;
+            }
+        }
+    }
+    serde_json::Value::String(input.outcome_detail.clone())
 }
