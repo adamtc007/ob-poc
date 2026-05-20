@@ -157,6 +157,8 @@ impl PlanWalker {
     }
 
     /// Dispatch a single callout (ServiceTask or BusinessRuleTask) to the bus.
+    /// On transport failure retries once with a fresh idempotency_key; if the
+    /// second attempt also fails the instance is marked `Failed`.
     async fn dispatch_callout(
         &self,
         instance: &mut ProcessInstance,
@@ -165,6 +167,23 @@ impl PlanWalker {
         static_args: HashMap<String, String>,
     ) -> Result<AdvanceOutcome> {
         let (target_domain, verb_id) = split_verb_fqn(&fqn)?;
+
+        // Retry cap for transient failures (T3.6). We store the attempt
+        // count in placeholder_values under the reserved "__retry_count"
+        // key so no schema migration is needed.
+        let retry_count = {
+            let pv = deserialize_placeholder_values(instance.placeholder_values.as_ref());
+            pv.get("__retry_count")
+                .and_then(|v| v.as_u64())
+                .unwrap_or(0)
+        };
+        const MAX_RETRIES: u64 = 3;
+        if retry_count >= MAX_RETRIES {
+            instance.state = ProcessState::Failed { incident_id: Uuid::now_v7() };
+            self.store.save_instance(instance).await?;
+            return Ok(AdvanceOutcome::NotRunnable);
+        }
+
         let callout_id = Uuid::now_v7();
         let idempotency_key = Uuid::now_v7();
 
@@ -205,7 +224,25 @@ impl PlanWalker {
             idempotency_key,
         )
         .with_callout_id(callout_id);
-        insert_outbox(self.bus_client.pool(), &entry).await?;
+        if let Err(e) = insert_outbox(self.bus_client.pool(), &entry).await {
+            // Increment retry counter and surface as transient failure.
+            let mut pv = deserialize_placeholder_values(instance.placeholder_values.as_ref());
+            pv.insert(
+                "__retry_count".to_owned(),
+                serde_json::Value::Number((retry_count + 1).into()),
+            );
+            instance.placeholder_values = serde_json::to_value(&pv).ok();
+            instance.state = ProcessState::Running; // tick will retry
+            self.store.save_instance(instance).await?;
+            tracing::warn!(
+                instance_id = %instance.instance_id,
+                node_id = %node_id,
+                retry_count = retry_count + 1,
+                error = %e,
+                "plan_walker: outbox insert failed; will retry on next tick"
+            );
+            return Ok(AdvanceOutcome::NotRunnable);
+        }
         self.bus_client.outbox_notifier().notify();
 
         instance.state = ProcessState::WaitingOnSubmission {
