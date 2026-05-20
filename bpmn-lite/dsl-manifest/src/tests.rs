@@ -284,3 +284,197 @@ fn parse_error_for_malformed_yaml() {
     let err = Manifest::load_from_yaml("not: valid: yaml: :::").expect_err("malformed");
     assert!(matches!(err, ManifestError::Parse(_)), "got {err:?}");
 }
+
+// ── T2A.3 — round-trip without loss across every v0.6 §7 field ───────
+//
+// Build a manifest that exercises *every* optional field in §7
+// (`generated_from_snapshot`, `min_consumer_manifest_version`,
+// `breaking_changes_since`, the optional VerbEntry knobs, all type
+// kinds), serialise to YAML, parse the YAML back, and assert
+// field-by-field equivalence. Guards against accidental
+// `#[serde(skip_serializing_if = ...)]` or rename drift.
+
+const FULL_SURFACE_MANIFEST: &str = r#"
+manifest_version: "1.0"
+domain: "ob-poc"
+catalogue_version: "v1.0.0"
+generated_at: "2026-05-20T10:00:00Z"
+generated_from_snapshot: "sha256:abc123"
+min_consumer_manifest_version: "1.0"
+breaking_changes_since:
+  - "v0.9.0"
+  - "v0.8.0"
+
+verbs:
+  - id: "cbu.create"
+    signature:
+      inputs:
+        - name: "name"
+          type: "String"
+          required: true
+        - name: "client_type"
+          type: "CbuClientType"
+          required: false
+      output:
+        produces: "CBU"
+    effect_class: "idempotent_ensure"
+    coordination_policy: "UniqueInsert"
+    transaction_policy: "AtomicShort"
+    resource_dependencies:
+      - kind: "NaturalKey"
+        from_input: "name"
+        entity_type: "CBU"
+      - kind: "EntityUuid"
+        from_input: "client_type"
+    fsm_applicability:
+      entity: "CBU"
+      preconditions:
+        - "absent"
+      postconditions:
+        - "present"
+        - "active"
+    authority_required: "cbu.write"
+    description: "Create a new CBU entity."
+
+decisions:
+  - id: "cbu_type_routing"
+    inputs:
+      - name: "cbu_client_type"
+        type: "CbuClientType"
+        required: true
+    output:
+      type: "CbuType"
+      enum_values:
+        - "fund"
+        - "corporate"
+        - "trust"
+    description: "Routes CBU."
+
+types:
+  - name: "CBU"
+    kind: "entity"
+    description: "Custody Banking Unit."
+    uuid_type: "UUIDv7"
+  - name: "CbuType"
+    kind: "enum"
+    values: ["fund", "corporate", "trust"]
+  - name: "String"
+    kind: "primitive"
+    description: "Native String."
+"#;
+
+#[test]
+fn round_trip_preserves_every_top_level_field() {
+    let m = Manifest::load_from_yaml(FULL_SURFACE_MANIFEST).expect("valid");
+    let yaml = m.to_yaml().expect("serialise");
+    let m2 = Manifest::load_from_yaml(&yaml).expect("re-parse");
+
+    assert_eq!(m2.manifest_version, m.manifest_version);
+    assert_eq!(m2.domain, m.domain);
+    assert_eq!(m2.catalogue_version, m.catalogue_version);
+    assert_eq!(m2.generated_at, m.generated_at);
+    assert_eq!(m2.generated_from_snapshot, m.generated_from_snapshot);
+    assert_eq!(
+        m2.min_consumer_manifest_version,
+        m.min_consumer_manifest_version
+    );
+    assert_eq!(m2.breaking_changes_since, m.breaking_changes_since);
+}
+
+#[test]
+fn round_trip_preserves_verb_entry_optional_fields() {
+    let m = Manifest::load_from_yaml(FULL_SURFACE_MANIFEST).expect("valid");
+    let yaml = m.to_yaml().expect("serialise");
+    let m2 = Manifest::load_from_yaml(&yaml).expect("re-parse");
+    let v = m2.lookup_verb("cbu.create").expect("verb survives");
+
+    assert_eq!(v.effect_class, "idempotent_ensure");
+    assert_eq!(v.coordination_policy.as_deref(), Some("UniqueInsert"));
+    assert_eq!(v.transaction_policy.as_deref(), Some("AtomicShort"));
+    assert_eq!(v.authority_required, "cbu.write");
+    assert_eq!(v.description.as_deref(), Some("Create a new CBU entity."));
+
+    // Inputs preserved including required = false.
+    assert_eq!(v.signature.inputs.len(), 2);
+    assert_eq!(v.signature.inputs[0].name, "name");
+    assert!(v.signature.inputs[0].required);
+    assert_eq!(v.signature.inputs[1].name, "client_type");
+    assert!(!v.signature.inputs[1].required);
+
+    // Output produces survives the Option<String> path.
+    assert_eq!(
+        v.signature
+            .output
+            .as_ref()
+            .and_then(|o| o.produces.as_deref()),
+        Some("CBU")
+    );
+
+    // Resource deps survive in order, including optional entity_type.
+    assert_eq!(v.resource_dependencies.len(), 2);
+    assert_eq!(v.resource_dependencies[0].kind, "NaturalKey");
+    assert_eq!(
+        v.resource_dependencies[0].entity_type.as_deref(),
+        Some("CBU")
+    );
+    assert_eq!(v.resource_dependencies[1].kind, "EntityUuid");
+    assert!(v.resource_dependencies[1].entity_type.is_none());
+
+    // FSM applicability survives both pre + post lists.
+    let fsm = v.fsm_applicability.as_ref().expect("fsm");
+    assert_eq!(fsm.entity, "CBU");
+    assert_eq!(fsm.preconditions, vec!["absent"]);
+    assert_eq!(fsm.postconditions, vec!["present", "active"]);
+}
+
+#[test]
+fn round_trip_preserves_decision_entry_and_enum_output() {
+    let m = Manifest::load_from_yaml(FULL_SURFACE_MANIFEST).expect("valid");
+    let yaml = m.to_yaml().expect("serialise");
+    let m2 = Manifest::load_from_yaml(&yaml).expect("re-parse");
+    let d = m2.lookup_decision("cbu_type_routing").expect("present");
+
+    assert_eq!(d.output.type_name, "CbuType");
+    assert_eq!(d.output.enum_values, vec!["fund", "corporate", "trust"]);
+    assert_eq!(d.description.as_deref(), Some("Routes CBU."));
+    assert_eq!(d.inputs.len(), 1);
+    assert_eq!(d.inputs[0].name, "cbu_client_type");
+    assert_eq!(d.inputs[0].type_name, "CbuClientType");
+}
+
+#[test]
+fn round_trip_preserves_all_type_kinds_and_their_attributes() {
+    let m = Manifest::load_from_yaml(FULL_SURFACE_MANIFEST).expect("valid");
+    let yaml = m.to_yaml().expect("serialise");
+    let m2 = Manifest::load_from_yaml(&yaml).expect("re-parse");
+
+    let entity = m2.lookup_type("CBU").expect("CBU");
+    assert_eq!(entity.kind, "entity");
+    assert_eq!(entity.uuid_type.as_deref(), Some("UUIDv7"));
+    assert_eq!(entity.description.as_deref(), Some("Custody Banking Unit."));
+
+    let enum_t = m2.lookup_type("CbuType").expect("enum");
+    assert_eq!(enum_t.kind, "enum");
+    assert_eq!(enum_t.values, vec!["fund", "corporate", "trust"]);
+
+    let prim = m2.lookup_type("String").expect("prim");
+    assert_eq!(prim.kind, "primitive");
+    assert_eq!(prim.description.as_deref(), Some("Native String."));
+}
+
+#[test]
+fn round_trip_preserves_lookup_indexes_after_to_yaml() {
+    // The `verb_index` / `decision_index` / `type_index` fields are
+    // `#[serde(skip)]` — they must be rebuilt by load_from_yaml on the
+    // post-round-trip manifest. Without rebuild, lookup_verb would
+    // return None even though the verb is present in the Vec.
+    let m = Manifest::load_from_yaml(FULL_SURFACE_MANIFEST).expect("valid");
+    let yaml = m.to_yaml().expect("serialise");
+    let m2 = Manifest::load_from_yaml(&yaml).expect("re-parse");
+
+    assert!(m2.lookup_verb("cbu.create").is_some());
+    assert!(m2.lookup_decision("cbu_type_routing").is_some());
+    assert!(m2.lookup_type("CBU").is_some());
+    assert!(m2.lookup_type("CbuType").is_some());
+    assert!(m2.lookup_type("String").is_some());
+}
