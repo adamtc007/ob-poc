@@ -20,6 +20,7 @@ members = [
     "bpmn-lite-analysis",
     "bpmn-lite-ffi-http",
     "bpmn-lite-ffi-grpc",
+    "dsl-manifest",
     "xtask",
 ]
 resolver = "3"
