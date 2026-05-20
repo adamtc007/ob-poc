@@ -34,7 +34,9 @@ mod client;
 mod sender;
 mod uuid_convert;
 
-pub use client::{BusClient, BusClientBuilder, BusClientConfig, BusClientError, SenderHandle};
+pub use client::{
+    BusClient, BusClientBuilder, BusClientConfig, BusClientError, OutboxNotifier, SenderHandle,
+};
 pub use sender::SenderStats;
 
 #[cfg(test)]

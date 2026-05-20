@@ -9,6 +9,7 @@ use dsl_bus_storage::{insert_outbox, BusEndpoint, InsertOutcome, OutboxEntry};
 use prost::Message;
 use sqlx::PgPool;
 use thiserror::Error;
+use tokio::sync::Notify;
 use tokio::task::JoinHandle;
 use tonic::transport::Endpoint;
 use uuid::Uuid;
@@ -16,10 +17,23 @@ use uuid::Uuid;
 use crate::sender::{self, SenderConfig, SenderStats};
 use crate::uuid_convert::from_proto_opt;
 
-/// Default sender sweep cadence — 100 ms matches the pseudocode in
-/// v0.6 §8.5.
-const DEFAULT_SENDER_INTERVAL_MS: u64 = 100;
-/// Maximum number of outbox rows claimed per sweep.
+/// Safety-net fallback timer for the outbox sender — runs unconditionally
+/// every 30 seconds **regardless of whether a notification arrived**.
+///
+/// This is **not a polling interval**. The primary wake-up mechanism is
+/// [`tokio::sync::Notify`]: writers call [`OutboxNotifier::notify`] after
+/// committing an outbox row, and the sender wakes within microseconds.
+/// The fallback covers the rare cases where the signal is genuinely lost
+/// (writer crashes between commit and notify; tokio's wake-list races
+/// under extreme load) so a row can't sit indefinitely.
+///
+/// Per addendum v0.6-A2 §2 No.4 this value is **not configurable** via
+/// the public API. A test-only escape hatch lives in `tests.rs` so the
+/// fallback test doesn't take 30 s of wall clock; production callers
+/// always get exactly 30 s.
+pub(crate) const FALLBACK_TIMER_SECS: u64 = 30;
+
+/// Maximum number of outbox rows claimed per drain iteration.
 const DEFAULT_SENDER_BATCH: i64 = 10;
 /// Backoff ceiling for retries (caps exponential growth).
 const DEFAULT_MAX_BACKOFF_SECS: i64 = 60;
@@ -49,9 +63,11 @@ pub enum BusClientError {
 }
 
 /// Tunable knobs for the bus client. Built via [`BusClientBuilder`].
+///
+/// Per addendum v0.6-A2 §2 No.4 the 30 s fallback timer is **not**
+/// exposed here — see [`FALLBACK_TIMER_SECS`].
 #[derive(Debug, Clone)]
 pub struct BusClientConfig {
-    pub sender_interval: Duration,
     pub sender_batch_size: i64,
     pub max_backoff_secs: i64,
 }
@@ -59,10 +75,39 @@ pub struct BusClientConfig {
 impl Default for BusClientConfig {
     fn default() -> Self {
         Self {
-            sender_interval: Duration::from_millis(DEFAULT_SENDER_INTERVAL_MS),
             sender_batch_size: DEFAULT_SENDER_BATCH,
             max_backoff_secs: DEFAULT_MAX_BACKOFF_SECS,
         }
+    }
+}
+
+/// In-process signal handle for "an outbox row was just committed".
+///
+/// Writers in `dsl-bus-client` (and `dsl-bus-server`, post-A2) call
+/// [`notify`](Self::notify) after their `tx.commit().await?` so the
+/// sender task wakes from its [`tokio::sync::Notify`] park and drains
+/// the new row inside microseconds. Multiple `notify()` calls between
+/// drains coalesce into a single wake-up — the database table is the
+/// queue, not this signal.
+///
+/// Construction is `pub(crate)` so the only way to obtain an
+/// `OutboxNotifier` is via [`BusClient::outbox_notifier`]: the bus
+/// client owns the underlying `Arc<Notify>` and hands clones to writers
+/// + its own sender task.
+#[derive(Clone)]
+pub struct OutboxNotifier {
+    inner: Arc<Notify>,
+}
+
+impl OutboxNotifier {
+    pub(crate) fn new() -> (Self, Arc<Notify>) {
+        let inner = Arc::new(Notify::new());
+        (Self { inner: inner.clone() }, inner)
+    }
+
+    /// Wake the sender task. Cheap, coalescing, never blocks.
+    pub fn notify(&self) {
+        self.inner.notify_one();
     }
 }
 
@@ -89,6 +134,11 @@ pub struct BusClient {
     /// Domain id of the local participant (carried into outbound
     /// `InvocationRequest.source_domain` when callers do not set it).
     pub(crate) local_domain: Arc<String>,
+    /// Handed to writers as `OutboxNotifier` via [`outbox_notifier`].
+    pub(crate) notifier: OutboxNotifier,
+    /// Sender-side handle on the same `Arc<Notify>`. The sender task
+    /// parks on this; writers wake it via the `notifier` clone.
+    pub(crate) notify: Arc<Notify>,
 }
 
 /// Handle returned by [`BusClient::start_sender`] — call
@@ -120,6 +170,13 @@ impl BusClient {
         BusClientBuilder::default()
     }
 
+    /// Cloneable `OutboxNotifier` handle — pass to writers that commit
+    /// outbox rows (e.g. the bus server, a bpmn-lite executor) so they
+    /// can wake the sender task immediately after `tx.commit()`.
+    pub fn outbox_notifier(&self) -> OutboxNotifier {
+        self.notifier.clone()
+    }
+
     /// Write an invocation to the outbox. Returns the idempotency key
     /// (also present in `req`) and an [`InsertOutcome`] so callers can
     /// distinguish a fresh enqueue from an idempotent replay.
@@ -148,6 +205,9 @@ impl BusClient {
             key,
         );
         let outcome = insert_outbox(&self.pool, &entry).await?;
+        // A2 §2: wake the sender immediately after the outbox write
+        // commits. Coalesces with any concurrent writes.
+        self.notify.notify_one();
         Ok((key, outcome))
     }
 
@@ -173,19 +233,28 @@ impl BusClient {
             key,
         );
         let outcome = insert_outbox(&self.pool, &entry).await?;
+        self.notify.notify_one();
         Ok((key, outcome))
     }
 
-    /// Spawn the §8.5 sender task.
+    /// Spawn the §8.5 sender task with the production 30 s fallback.
     pub fn start_sender(&self) -> SenderHandle {
+        self.start_sender_internal(Duration::from_secs(FALLBACK_TIMER_SECS))
+    }
+
+    /// Internal entry that constructs the `SenderConfig`. Tests call
+    /// this directly to shorten the fallback for the fallback-timer
+    /// integration test; production goes through [`start_sender`].
+    pub(crate) fn start_sender_internal(&self, fallback: Duration) -> SenderHandle {
         let (shutdown_tx, shutdown_rx) = tokio::sync::watch::channel(false);
         let stats = Arc::new(SenderStats::default());
         let config = SenderConfig {
             pool: self.pool.clone(),
             peers: self.peers.clone(),
-            interval: self.config.sender_interval,
+            fallback,
             batch_size: self.config.sender_batch_size,
             max_backoff_secs: self.config.max_backoff_secs,
+            notify: self.notify.clone(),
             stats: stats.clone(),
             shutdown: shutdown_rx,
         };
@@ -196,7 +265,6 @@ impl BusClient {
             stats,
         }
     }
-
 }
 
 /// Builder for [`BusClient`].
@@ -227,11 +295,6 @@ impl BusClientBuilder {
         self
     }
 
-    pub fn sender_interval(mut self, interval: Duration) -> Self {
-        self.config.sender_interval = interval;
-        self
-    }
-
     pub fn sender_batch_size(mut self, batch_size: i64) -> Self {
         self.config.sender_batch_size = batch_size;
         self
@@ -252,11 +315,14 @@ impl BusClientBuilder {
             let endpoint = Endpoint::from_shared(uri)?;
             endpoints.insert(domain, endpoint);
         }
+        let (notifier, notify) = OutboxNotifier::new();
         Ok(BusClient {
             pool,
             peers: Arc::new(PeerRegistry { endpoints }),
             config: Arc::new(self.config),
             local_domain: Arc::new(local_domain),
+            notifier,
+            notify,
         })
     }
 }

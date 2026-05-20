@@ -3,6 +3,7 @@
 use std::net::SocketAddr;
 use std::sync::Arc;
 
+use dsl_bus_client::OutboxNotifier;
 use dsl_bus_protocol::v1::invocation_service_server::InvocationServiceServer;
 use dsl_bus_protocol::v1::result_service_server::ResultServiceServer;
 use sqlx::PgPool;
@@ -52,6 +53,10 @@ pub struct BusServer {
     local_domain: Arc<String>,
     invocation: Arc<dyn InvocationDispatcher>,
     result: Arc<dyn ResultDispatcher>,
+    /// Rung after committing the inbox + result-outbox transaction in
+    /// `InvocationService::submit` so the local `dsl-bus-client`
+    /// sender task drains the new row immediately (A2 §2).
+    outbox_notifier: OutboxNotifier,
     bind_addr: SocketAddr,
 }
 
@@ -67,6 +72,7 @@ impl BusServer {
             pool: self.pool.clone(),
             dispatcher: self.invocation,
             local_domain: self.local_domain,
+            outbox_notifier: self.outbox_notifier,
         };
         let result = ResultServiceImpl {
             pool: self.pool,
@@ -120,6 +126,7 @@ pub struct BusServerBuilder {
     local_domain: Option<String>,
     invocation: Option<Arc<dyn InvocationDispatcher>>,
     result: Option<Arc<dyn ResultDispatcher>>,
+    outbox_notifier: Option<OutboxNotifier>,
     bind_addr: Option<SocketAddr>,
 }
 
@@ -144,6 +151,16 @@ impl BusServerBuilder {
         self
     }
 
+    /// Required (A2 §2): the bus server enqueues a result row after
+    /// every accepted invocation. The notifier is owned by the local
+    /// `dsl-bus-client::BusClient` — call
+    /// [`BusClient::outbox_notifier`](dsl_bus_client::BusClient::outbox_notifier)
+    /// to obtain a clone.
+    pub fn outbox_notifier(mut self, n: OutboxNotifier) -> Self {
+        self.outbox_notifier = Some(n);
+        self
+    }
+
     pub fn bind(mut self, addr: SocketAddr) -> Self {
         self.bind_addr = Some(addr);
         self
@@ -162,6 +179,9 @@ impl BusServerBuilder {
             result: self
                 .result
                 .expect("BusServerBuilder.result_dispatcher is required"),
+            outbox_notifier: self
+                .outbox_notifier
+                .expect("BusServerBuilder.outbox_notifier is required"),
             bind_addr: self
                 .bind_addr
                 .expect("BusServerBuilder.bind is required"),

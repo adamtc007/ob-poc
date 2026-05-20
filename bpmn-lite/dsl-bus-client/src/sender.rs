@@ -12,19 +12,28 @@ use dsl_bus_storage::{
 };
 use prost::Message;
 use sqlx::PgPool;
-use tokio::sync::watch;
+use tokio::sync::{watch, Notify};
 use tracing::{debug, warn};
 
 use crate::client::PeerRegistry;
 use crate::uuid_convert::from_proto_opt;
 
-/// Shape of the §8.5 sender loop.
+/// Shape of the §8.5 sender loop, post-A2.
+///
+/// Primary wake-up is via the shared `notify` handle the writers ring
+/// after each successful `tx.commit()`. The `fallback` `Duration` is a
+/// safety net — production builds always pass
+/// `Duration::from_secs(client::FALLBACK_TIMER_SECS)`; the only reason
+/// it lives on the config struct rather than as a hard-coded sleep is
+/// so the in-crate fallback-timer test can swap it for a shorter value
+/// without forcing real wall-clock waits.
 pub(crate) struct SenderConfig {
     pub pool: PgPool,
     pub peers: Arc<PeerRegistry>,
-    pub interval: Duration,
+    pub fallback: Duration,
     pub batch_size: i64,
     pub max_backoff_secs: i64,
+    pub notify: Arc<Notify>,
     pub stats: Arc<SenderStats>,
     pub shutdown: watch::Receiver<bool>,
 }
@@ -61,21 +70,38 @@ impl SenderStats {
 }
 
 pub(crate) async fn run(mut cfg: SenderConfig) {
+    // Drain on startup — outbox may carry rows committed before this
+    // task spawned (post-crash recovery, deferred-retry rows whose
+    // `next_attempt_at` is already in the past).
+    if let Err(err) = drain_until_empty(&cfg).await {
+        warn!(error = %err, "startup drain failed; continuing");
+    }
+
+    let mut fallback = tokio::time::interval(cfg.fallback);
+    // The first `tick()` fires immediately — consume it so the first
+    // real iteration waits the full fallback period (the startup
+    // drain already covered the "rows from before we started" case).
+    fallback.tick().await;
+
     loop {
         if *cfg.shutdown.borrow() {
             break;
         }
-        match drain_once(&cfg).await {
-            Ok(n) => {
-                cfg.stats.rows_seen.fetch_add(n as u64, Ordering::Relaxed);
-            }
-            Err(err) => {
-                warn!(error = %err, "sender sweep failed; continuing");
-            }
-        }
 
         tokio::select! {
-            _ = tokio::time::sleep(cfg.interval) => {}
+            // Primary path: writer rang the bell.
+            _ = cfg.notify.notified() => {
+                if let Err(err) = drain_until_empty(&cfg).await {
+                    warn!(error = %err, "post-notify drain failed; continuing");
+                }
+            }
+            // Safety net: in case a notification was missed.
+            _ = fallback.tick() => {
+                if let Err(err) = drain_until_empty(&cfg).await {
+                    warn!(error = %err, "fallback drain failed; continuing");
+                }
+            }
+            // Shutdown.
             _ = cfg.shutdown.changed() => {
                 if *cfg.shutdown.borrow() {
                     break;
@@ -84,6 +110,24 @@ pub(crate) async fn run(mut cfg: SenderConfig) {
         }
     }
     debug!("dsl-bus-client sender shutting down");
+}
+
+/// Repeatedly call `drain_once` until a batch comes back empty.
+///
+/// Bursty writers (e.g. a BPMN process that emits several callouts in
+/// quick succession) coalesce their notifications into a single
+/// wake-up; this loop ensures the wake-up drains all the rows they
+/// committed, not just the first batch.
+async fn drain_until_empty(cfg: &SenderConfig) -> Result<(), sqlx::Error> {
+    loop {
+        let claimed = drain_once(cfg).await?;
+        cfg.stats
+            .rows_seen
+            .fetch_add(claimed as u64, Ordering::Relaxed);
+        if claimed == 0 {
+            return Ok(());
+        }
+    }
 }
 
 async fn drain_once(cfg: &SenderConfig) -> Result<usize, sqlx::Error> {

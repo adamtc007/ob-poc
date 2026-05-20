@@ -51,6 +51,20 @@ fn ephemeral_addr() -> SocketAddr {
     addr
 }
 
+/// A2 §2: every `BusServer` requires an `OutboxNotifier`. Tests don't
+/// need a fully-wired `BusClient`, but the only public way to obtain a
+/// notifier is via `BusClient::outbox_notifier()`. Build a minimal
+/// client just for this purpose.
+async fn test_outbox_notifier(pool: PgPool) -> dsl_bus_client::OutboxNotifier {
+    let client = dsl_bus_client::BusClient::builder()
+        .pool(pool)
+        .local_domain("test-notifier")
+        .build()
+        .await
+        .expect("test BusClient");
+    client.outbox_notifier()
+}
+
 /// Connect with a short retry loop — `BusServer::serve` spawns the tonic
 /// listener on a background task, and the first connect can land before
 /// it's accepting. Five attempts at 30 ms is more than enough.
@@ -206,6 +220,7 @@ async fn invocation_round_trip_inserts_inbox_and_enqueues_result_outbox() {
         .local_domain("ob-poc")
         .invocation_dispatcher(inv)
         .result_dispatcher(res)
+        .outbox_notifier(test_outbox_notifier(pool.clone()).await)
         .bind(ephemeral_addr())
         .build();
     let handle = server.serve().await.unwrap();
@@ -258,6 +273,7 @@ async fn duplicate_invocation_returns_cached_execution_id_without_redispatch() {
         .local_domain("ob-poc")
         .invocation_dispatcher(inv)
         .result_dispatcher(res)
+        .outbox_notifier(test_outbox_notifier(pool.clone()).await)
         .bind(ephemeral_addr())
         .build();
     let handle = server.serve().await.unwrap();
@@ -296,6 +312,7 @@ async fn unknown_verb_returns_rejected_verb_unknown() {
         .local_domain("ob-poc")
         .invocation_dispatcher(inv)
         .result_dispatcher(res)
+        .outbox_notifier(test_outbox_notifier(pool.clone()).await)
         .bind(ephemeral_addr())
         .build();
     let handle = server.serve().await.unwrap();
@@ -325,6 +342,7 @@ async fn version_mismatch_returns_rejected_version_incompatible() {
         .local_domain("ob-poc")
         .invocation_dispatcher(inv)
         .result_dispatcher(res)
+        .outbox_notifier(test_outbox_notifier(pool.clone()).await)
         .bind(ephemeral_addr())
         .build();
     let handle = server.serve().await.unwrap();
@@ -355,6 +373,7 @@ async fn missing_idempotency_key_returns_rejected_malformed() {
         .local_domain("ob-poc")
         .invocation_dispatcher(inv)
         .result_dispatcher(res)
+        .outbox_notifier(test_outbox_notifier(pool.clone()).await)
         .bind(ephemeral_addr())
         .build();
     let handle = server.serve().await.unwrap();
@@ -382,6 +401,7 @@ async fn deliver_result_invokes_dispatcher_and_records_inbox() {
         .local_domain("bpmn-lite")
         .invocation_dispatcher(inv)
         .result_dispatcher(res)
+        .outbox_notifier(test_outbox_notifier(pool.clone()).await)
         .bind(ephemeral_addr())
         .build();
     let handle = server.serve().await.unwrap();
@@ -427,6 +447,7 @@ async fn duplicate_deliver_result_returns_duplicate_ignored() {
         .local_domain("bpmn-lite")
         .invocation_dispatcher(inv)
         .result_dispatcher(res)
+        .outbox_notifier(test_outbox_notifier(pool.clone()).await)
         .bind(ephemeral_addr())
         .build();
     let handle = server.serve().await.unwrap();

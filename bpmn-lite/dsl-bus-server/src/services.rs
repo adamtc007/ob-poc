@@ -88,6 +88,9 @@ pub(crate) struct InvocationServiceImpl {
     pub pool: PgPool,
     pub dispatcher: Arc<dyn InvocationDispatcher>,
     pub local_domain: Arc<String>,
+    /// Rung after `tx.commit()` so the local outbox sender drains the
+    /// freshly-enqueued result row immediately (A2 §2).
+    pub outbox_notifier: dsl_bus_client::OutboxNotifier,
 }
 
 #[tonic::async_trait]
@@ -187,6 +190,9 @@ impl InvocationService for InvocationServiceImpl {
         if let Err(err) = tx.commit().await {
             return internal_status(err);
         }
+        // A2 §2: wake the local sender so the result row drains
+        // immediately instead of waiting for the fallback timer.
+        self.outbox_notifier.notify();
 
         Ok(Response::new(SubmissionAck {
             execution_id: Some(to_proto(outcome.execution_id)),
