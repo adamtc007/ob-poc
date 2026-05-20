@@ -1,0 +1,28 @@
+[package]
+name = "ob-poc-bus-handler"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.95"
+description = "ob-poc receiver-side bus handler. Implements dsl-bus-server's InvocationDispatcher trait, routing verb invocations into a caller-supplied VerbExecutor port (T2B.9 wires the real ob-poc engine)."
+
+# Capability discipline:
+#   IN-SCOPE  : InvocationDispatcher impl, no-op ResultDispatcher,
+#               VerbExecutor port trait, error mapping to BusServerError.
+#   OUT-OF-SCOPE: actual ob-poc engine (lives in dsl-runtime; the
+#                 caller wires the real executor at startup),
+#                 catalogue validation (dsl-manifest), durability
+#                 (dsl-bus-storage).
+
+[dependencies]
+# Build-tool / cross-repo dep — the bus crates ship in bpmn-lite.
+dsl-bus-server = { path = "../../../bpmn-lite/dsl-bus-server" }
+dsl-bus-protocol = { path = "../../../bpmn-lite/dsl-bus-protocol" }
+async-trait = "0.1"
+uuid = { version = "1", features = ["v7", "serde"] }
+thiserror = "2"
+
+[dev-dependencies]
+tokio = { version = "1", features = ["macros", "rt-multi-thread", "sync"] }
+sqlx = { version = "0.8", features = ["runtime-tokio-rustls", "postgres", "uuid", "chrono"] }
+tokio-stream = { version = "0.1", features = ["net"] }
+tempfile = "3"

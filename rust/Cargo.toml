@@ -311,6 +311,8 @@ members = [
 
     # Build-time tool: emits the v0.6 §7 catalogue manifest for federated DSL peers.
     "crates/ob-poc-manifest-export",
+    # Receiver-side bus handler — bridges ob-poc verb dispatch to dsl-bus-server.
+    "crates/ob-poc-bus-handler",
 
     # Semantic OS crates (Stage 1.1)
     "crates/sem_os_core",
