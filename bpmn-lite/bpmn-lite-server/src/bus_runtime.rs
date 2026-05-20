@@ -43,9 +43,17 @@ use sqlx::PgPool;
 pub(crate) struct BusRuntime {
     server: ServerHandle,
     sender: dsl_bus_client::SenderHandle,
+    /// T3 — exposed so main.rs can wire the bus client into
+    /// BpmnLiteEngine via `.with_bus_client(runtime.bus_client())`.
+    client: Arc<BusClient>,
 }
 
 impl BusRuntime {
+    /// Clone of the bus client for wiring into BpmnLiteEngine (T3.3).
+    pub(crate) fn bus_client(&self) -> Arc<BusClient> {
+        self.client.clone()
+    }
+
     pub(crate) async fn shutdown(self) -> anyhow::Result<()> {
         let _ = self.server.shutdown().await;
         let _ = self.sender.shutdown().await;
@@ -57,7 +65,10 @@ impl BusRuntime {
 pub(crate) struct BusRuntimeConfig {
     pub(crate) pool: PgPool,
     pub(crate) bind_addr: SocketAddr,
-    pub(crate) peers: Vec<(String, String)>,
+    /// Pre-built bus client (already configured with peers + pool).
+    /// main.rs builds it early to wire into BpmnLiteEngine before the
+    /// server starts (T3.3).
+    pub(crate) client: Arc<BusClient>,
 }
 
 /// Stand up the bus runtime: apply bus migrations, build the advancer
@@ -67,13 +78,7 @@ pub(crate) struct BusRuntimeConfig {
 pub(crate) async fn start(config: BusRuntimeConfig) -> anyhow::Result<BusRuntime> {
     dsl_bus_storage::migrate(&config.pool).await?;
 
-    let mut builder = BusClient::builder()
-        .pool(config.pool.clone())
-        .local_domain("bpmn-lite");
-    for (domain, uri) in &config.peers {
-        builder = builder.add_peer(domain.clone(), uri.clone());
-    }
-    let client = builder.build().await?;
+    let client = config.client;
     let notifier = client.outbox_notifier();
     let sender = client.start_sender();
 
@@ -103,7 +108,7 @@ pub(crate) async fn start(config: BusRuntimeConfig) -> anyhow::Result<BusRuntime
         "bpmn-lite bus server listening (result receiver)"
     );
 
-    Ok(BusRuntime { server, sender })
+    Ok(BusRuntime { server, sender, client })
 }
 
 /// "Real-store-layer" advancer for T2B.9.

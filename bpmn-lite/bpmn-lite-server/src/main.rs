@@ -125,8 +125,35 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let ffi_dispatcher = Arc::new(ffi_dispatcher);
     tracing::info!("FFI dispatcher initialised with dmn-lite + http + grpc execution owners");
 
-    let engine =
-        Arc::new(BpmnLiteEngine::new(store.clone()).with_ffi_dispatcher(ffi_dispatcher.clone()));
+    // T3.3 — Build the bus client early (before the engine) so we can
+    // wire it into the engine via .with_bus_client(). The bus server
+    // starts later (after the engine + event_fanout are ready).
+    #[cfg(feature = "postgres")]
+    let early_bus_client: Option<(Arc<dsl_bus_client::BusClient>, Arc<bpmn_lite_store_postgres::PostgresPendingInvocationStore>)> = match &bus_pool {
+        Some(pool) if std::env::var("BPMN_LITE_BUS_LISTEN").is_ok() => {
+            let mut builder = dsl_bus_client::BusClient::builder()
+                .pool(pool.clone())
+                .local_domain("bpmn-lite");
+            if let Ok(uri) = std::env::var("OB_POC_BUS_ENDPOINT") {
+                builder = builder.add_peer("ob-poc", uri);
+            }
+            if let Ok(uri) = std::env::var("DMN_LITE_BUS_ENDPOINT") {
+                builder = builder.add_peer("dmn-lite", uri);
+            }
+            let client = builder.build().await?;
+            let pending = Arc::new(bpmn_lite_store_postgres::PostgresPendingInvocationStore::new(pool.clone()));
+            Some((Arc::new(client), pending))
+        }
+        _ => None,
+    };
+
+    let mut engine_builder = BpmnLiteEngine::new(store.clone()).with_ffi_dispatcher(ffi_dispatcher.clone());
+    #[cfg(feature = "postgres")]
+    if let Some((ref bc, ref ps)) = early_bus_client {
+        engine_builder = engine_builder.with_bus_client(bc.clone(), ps.clone());
+        tracing::info!("T3: plan walker wired into engine tick loop");
+    }
+    let engine = Arc::new(engine_builder);
     let event_fanout = Arc::new(EventFanout::new(
         engine.clone(),
         std::time::Duration::from_millis(parse_u64_env("BPMN_LITE_EVENT_FANOUT_FALLBACK_MS", 500)),
@@ -151,28 +178,17 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // that contract.
     // ────────────────────────────────────────────────────────────────
     #[cfg(feature = "postgres")]
-    let bus_runtime = match (bus_pool.take(), std::env::var("BPMN_LITE_BUS_LISTEN")) {
-        (Some(pool), Ok(listen)) => {
+    let bus_runtime = match (bus_pool.take(), early_bus_client, std::env::var("BPMN_LITE_BUS_LISTEN")) {
+        (Some(pool), Some((bc, _ps)), Ok(listen)) => {
             let bind_addr: std::net::SocketAddr = listen
                 .parse()
                 .map_err(|e| config_error(&format!("invalid BPMN_LITE_BUS_LISTEN: {e}")))?;
-            let mut peers = Vec::new();
-            if let Ok(uri) = std::env::var("OB_POC_BUS_ENDPOINT") {
-                peers.push(("ob-poc".to_owned(), uri));
-            }
-            if let Ok(uri) = std::env::var("DMN_LITE_BUS_ENDPOINT") {
-                peers.push(("dmn-lite".to_owned(), uri));
-            }
-            tracing::info!(
-                bind_addr = %bind_addr,
-                peer_count = peers.len(),
-                "starting bpmn-lite federated bus runtime"
-            );
+            tracing::info!(bind_addr = %bind_addr, "starting bpmn-lite federated bus runtime");
             Some(
                 bus_runtime::start(bus_runtime::BusRuntimeConfig {
                     pool,
                     bind_addr,
-                    peers,
+                    client: bc,
                 })
                 .await?,
             )
