@@ -15,7 +15,7 @@ pub async fn insert_inbox(
 ) -> Result<InsertOutcome> {
     let res = sqlx::query(
         r#"
-        INSERT INTO inbox (
+        INSERT INTO dsl_bus.inbox (
             idempotency_key, source_domain, endpoint, execution_id,
             received_at, processed_at, status, payload
         )
@@ -50,7 +50,7 @@ pub async fn lookup_inbox(
         r#"
         SELECT idempotency_key, source_domain, endpoint, execution_id,
                received_at, processed_at, status, payload
-          FROM inbox
+          FROM dsl_bus.inbox
          WHERE idempotency_key = $1
         "#,
     )
@@ -68,7 +68,7 @@ pub async fn mark_inbox_processed(
 ) -> Result<()> {
     sqlx::query(
         r#"
-        UPDATE inbox
+        UPDATE dsl_bus.inbox
            SET status = 'processed',
                processed_at = now()
          WHERE idempotency_key = $1

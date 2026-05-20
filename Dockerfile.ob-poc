@@ -19,37 +19,40 @@ FROM chef AS planner
 # Copy the full ob-poc workspace including bpmn-lite/ path deps.
 COPY rust/ rust/
 COPY bpmn-lite/ bpmn-lite/
+COPY eval/ eval/
 # ob-poc-web Cargo.toml sits inside rust/ but has path deps to bpmn-lite/.
 WORKDIR /build/rust
-RUN cargo chef prepare --recipe-path recipe.json -p ob-poc-web
+RUN cargo chef prepare --recipe-path recipe.json
 
 # ── Stage 3: builder ─────────────────────────────────────────────────
 FROM chef AS builder
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends protobuf-compiler \
+    && apt-get install -y --no-install-recommends libprotobuf-dev protobuf-compiler \
     && rm -rf /var/lib/apt/lists/*
 
-COPY --from=planner /build/rust/recipe.json recipe.json
+COPY --from=planner /build/rust/recipe.json /build/rust/recipe.json
 
 # Cook dependencies before full copy (Docker layer cache).
 COPY bpmn-lite/ /build/bpmn-lite/
+COPY eval/ /build/eval/
 WORKDIR /build/rust
 RUN cargo chef cook --release -p ob-poc-web --recipe-path recipe.json
 
 COPY rust/ /build/rust/
+COPY eval/ /build/eval/
 RUN cargo build --release -p ob-poc-web \
-    && strip target/release/ob-poc-web
+    && mkdir -p /build/out \
+    && cp target/release/ob-poc-web /build/out/ob-poc-web \
+    && strip /build/out/ob-poc-web
 
 # ── Stage 4: runtime ─────────────────────────────────────────────────
-FROM debian:bookworm-slim
-RUN apt-get update \
-    && apt-get install -y --no-install-recommends ca-certificates \
-    && rm -rf /var/lib/apt/lists/*
+FROM gcr.io/distroless/cc-debian12:nonroot
+WORKDIR /app
 
-COPY --from=builder /build/rust/target/release/ob-poc-web /usr/local/bin/
+COPY --from=builder /build/out/ob-poc-web /usr/local/bin/
 
 # Copy ob-poc config (verbs, packs, seeds — required at runtime).
-COPY rust/config/ /app/config/
+COPY --chown=nonroot:nonroot rust/config/ /app/config/
 
 EXPOSE 3000 50061
 

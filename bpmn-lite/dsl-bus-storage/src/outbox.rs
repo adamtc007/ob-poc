@@ -17,7 +17,7 @@ pub async fn insert_outbox(
 ) -> Result<InsertOutcome> {
     let res = sqlx::query(
         r#"
-        INSERT INTO outbox (
+        INSERT INTO dsl_bus.outbox (
             id, target_domain, target_endpoint, payload, idempotency_key,
             execution_id, callout_id, status, attempt_count, next_attempt_at,
             last_error, created_at, submitted_at
@@ -67,7 +67,7 @@ pub async fn select_pending_outbox(
         SELECT id, target_domain, target_endpoint, payload, idempotency_key,
                execution_id, callout_id, status, attempt_count, next_attempt_at,
                last_error, created_at, submitted_at
-          FROM outbox
+          FROM dsl_bus.outbox
          WHERE status = 'pending' AND next_attempt_at <= now()
          ORDER BY next_attempt_at
          LIMIT $1
@@ -90,7 +90,7 @@ pub async fn mark_outbox_submitted(
 ) -> Result<()> {
     sqlx::query(
         r#"
-        UPDATE outbox
+        UPDATE dsl_bus.outbox
            SET status = 'submitted',
                execution_id = $2,
                submitted_at = now()
@@ -116,7 +116,7 @@ pub async fn mark_outbox_retry(
     let next_attempt = Utc::now() + Duration::seconds(backoff_secs);
     sqlx::query(
         r#"
-        UPDATE outbox
+        UPDATE dsl_bus.outbox
            SET status = 'pending',
                attempt_count = attempt_count + 1,
                next_attempt_at = $2,
@@ -152,4 +152,3 @@ fn row_to_entry(row: sqlx::postgres::PgRow) -> Result<OutboxEntry> {
         submitted_at: row.try_get("submitted_at")?,
     })
 }
-

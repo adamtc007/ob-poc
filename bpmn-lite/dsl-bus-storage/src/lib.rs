@@ -47,7 +47,9 @@
 //! [`migrate`] applies the bundled `migrations/` set to the supplied
 //! pool — the canonical entry point every domain's app wiring uses at
 //! startup. Re-runs are no-ops; sqlx tracks applied versions in the
-//! `_sqlx_migrations` table on the same database.
+//! `_sqlx_migrations` table on the same database. Because SQLx has one
+//! migration ledger per database, this crate ignores unrelated migration
+//! versions that belong to the embedding application.
 
 #![forbid(unsafe_code)]
 
@@ -64,11 +66,52 @@ pub use types::{
     OutboxStatus, Result,
 };
 
-/// Apply the bus migrations to `pool`. Idempotent — `sqlx::migrate!`
-/// tracks applied versions in `_sqlx_migrations`. Run this once at
-/// startup before constructing `BusClient` or `BusServer`.
+/// Apply the bus migrations to `pool`.
+///
+/// This is idempotent: `sqlx::migrate!` tracks applied versions in
+/// `_sqlx_migrations`. Run this once at startup before constructing
+/// `BusClient` or `BusServer`.
+///
+/// # Examples
+///
+/// ```rust,no_run
+/// # async fn example(pool: sqlx::PgPool) -> Result<(), sqlx::migrate::MigrateError> {
+/// dsl_bus_storage::migrate(&pool).await?;
+/// # Ok(())
+/// # }
+/// ```
 pub async fn migrate(pool: &sqlx::PgPool) -> std::result::Result<(), sqlx::migrate::MigrateError> {
-    sqlx::migrate!("./migrations").run(pool).await
+    ensure_bus_schema(pool).await?;
+
+    let mut migrator = sqlx::migrate!("./migrations");
+    migrator.set_ignore_missing(true);
+    migrator.run(pool).await
+}
+
+async fn ensure_bus_schema(pool: &sqlx::PgPool) -> std::result::Result<(), sqlx::Error> {
+    match sqlx::query("CREATE SCHEMA IF NOT EXISTS dsl_bus")
+        .execute(pool)
+        .await
+    {
+        Ok(_) => Ok(()),
+        Err(err) => {
+            let exists: bool = sqlx::query_scalar(
+                "SELECT EXISTS (
+                    SELECT 1
+                      FROM information_schema.schemata
+                     WHERE schema_name = 'dsl_bus'
+                )",
+            )
+            .fetch_one(pool)
+            .await?;
+
+            if exists {
+                Ok(())
+            } else {
+                Err(err)
+            }
+        }
+    }
 }
 
 #[cfg(test)]

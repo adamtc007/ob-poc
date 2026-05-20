@@ -6,7 +6,7 @@ description = "LLM-powered agent for DSL generation - no database dependencies"
 
 [dependencies]
 # LLM API clients
-reqwest = { version = "0.11", features = ["json"] }
+reqwest = { version = "0.11", default-features = false, features = ["json", "rustls-tls"] }
 tokio = { version = "1", features = ["rt", "macros"] }
 
 # Serialization

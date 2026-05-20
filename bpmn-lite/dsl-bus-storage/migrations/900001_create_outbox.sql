@@ -1,10 +1,9 @@
 -- v0.6 §8.1 — federated DSL bus outbox.
 --
--- Each domain runs this migration on its own Postgres. Rows are sent
--- by the outbox sender loop (§8.5) and removed from contention by the
--- `idx_outbox_pending` partial index, which only retains rows that are
--- still pending dispatch.
-CREATE TABLE outbox (
+-- Numbered in the 900000 range because some domains run bus storage
+-- migrations in the same database as their application migrations; SQLx uses
+-- one `_sqlx_migrations` table per database.
+CREATE TABLE dsl_bus.outbox (
     id                UUID PRIMARY KEY,
     target_domain     TEXT NOT NULL,
     target_endpoint   TEXT NOT NULL
@@ -23,5 +22,5 @@ CREATE TABLE outbox (
     UNIQUE (idempotency_key, target_endpoint)
 );
 
-CREATE INDEX idx_outbox_pending
-    ON outbox(next_attempt_at) WHERE status = 'pending';
+CREATE INDEX idx_dsl_bus_outbox_pending
+    ON dsl_bus.outbox(next_attempt_at) WHERE status = 'pending';

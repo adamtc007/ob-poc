@@ -91,7 +91,7 @@ prost = "0.13"
 tokio = { version = "1", features = ["full"] }
 
 # HTTP client for external integrations
-reqwest = { version = "0.11", features = ["json", "rustls-tls"] }
+reqwest = { version = "0.11", default-features = false, features = ["json", "rustls-tls"] }
 
 # REST API framework (optional for server)
 axum = { version = "0.7", optional = true }
@@ -111,7 +111,7 @@ strsim = "0.11"
 handlebars = "6.0"
 
 # JSON Schema validation for research macro output validation
-jsonschema = "0.29"
+jsonschema = { version = "0.29", default-features = false, features = ["resolve-file"] }
 
 # For attribute API endpoints
 base64 = "0.22"

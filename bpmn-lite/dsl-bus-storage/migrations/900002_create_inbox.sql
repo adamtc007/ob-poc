@@ -1,10 +1,9 @@
 -- v0.6 §8.2 — federated DSL bus inbox.
 --
--- Each domain runs this migration on its own Postgres. The receiver-side
--- gRPC handlers consult `idempotency_key` (PK) to detect duplicates so
--- the bus surface is exactly-once at the semantic layer even though
--- transport allows retries.
-CREATE TABLE inbox (
+-- Numbered in the 900000 range because some domains run bus storage
+-- migrations in the same database as their application migrations; SQLx uses
+-- one `_sqlx_migrations` table per database.
+CREATE TABLE dsl_bus.inbox (
     idempotency_key   UUID PRIMARY KEY,
     source_domain     TEXT NOT NULL,
     endpoint          TEXT NOT NULL
@@ -17,4 +16,4 @@ CREATE TABLE inbox (
     payload           BYTEA
 );
 
-CREATE INDEX idx_inbox_source ON inbox(source_domain, received_at);
+CREATE INDEX idx_dsl_bus_inbox_source ON dsl_bus.inbox(source_domain, received_at);

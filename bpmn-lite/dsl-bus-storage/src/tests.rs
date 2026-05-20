@@ -33,8 +33,14 @@ async fn setup() -> PgPool {
         .await
         .expect("run migrations");
 
-    sqlx::query("TRUNCATE outbox").execute(&pool).await.unwrap();
-    sqlx::query("TRUNCATE inbox").execute(&pool).await.unwrap();
+    sqlx::query("TRUNCATE dsl_bus.outbox")
+        .execute(&pool)
+        .await
+        .unwrap();
+    sqlx::query("TRUNCATE dsl_bus.inbox")
+        .execute(&pool)
+        .await
+        .unwrap();
     pool
 }
 
