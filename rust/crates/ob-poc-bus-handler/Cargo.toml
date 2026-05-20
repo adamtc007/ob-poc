@@ -22,7 +22,13 @@ uuid = { version = "1", features = ["v7", "serde"] }
 thiserror = "2"
 
 [dev-dependencies]
-tokio = { version = "1", features = ["macros", "rt-multi-thread", "sync"] }
+tokio = { version = "1", features = ["macros", "rt-multi-thread", "sync", "time"] }
 sqlx = { version = "0.8", features = ["runtime-tokio-rustls", "postgres", "uuid", "chrono"] }
 tokio-stream = { version = "0.1", features = ["net"] }
 tempfile = "3"
+# T2B-DoD-wire-only — the end-to-end tests drive BusClient → outbox →
+# sender → tcp → BusServer → ob-poc-bus-handler in a single process.
+dsl-bus-client = { path = "../../../bpmn-lite/dsl-bus-client" }
+dsl-bus-storage = { path = "../../../bpmn-lite/dsl-bus-storage" }
+async-trait = "0.1"
+tonic = "0.12"

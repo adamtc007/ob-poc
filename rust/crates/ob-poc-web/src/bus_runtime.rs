@@ -60,6 +60,10 @@ pub(crate) struct BusRuntimeConfig {
     pub(crate) pool: PgPool,
     pub(crate) verb_executor: Arc<ObPocVerbExecutor>,
     pub(crate) bind_addr: SocketAddr,
+    /// Catalogue version this domain hosts. Mismatched incoming
+    /// `InvocationRequest.catalogue_version` rejects with
+    /// `RejectedVersionIncompatible` per T2B master DoD #46.
+    pub(crate) catalogue_version: String,
     pub(crate) peers: Vec<(String, String)>,
 }
 
@@ -80,6 +84,8 @@ pub(crate) async fn start(config: BusRuntimeConfig) -> anyhow::Result<BusRuntime
     let adapter = ObPocVerbAdapter {
         executor: config.verb_executor,
     };
+    let handler = ObPocBusHandler::new(adapter)
+        .with_catalogue_version(config.catalogue_version);
 
     // A3 §3.5 — ob-poc declares all three federated services.
     // InvocationService is real (Submit + stubbed Validate);
@@ -89,7 +95,7 @@ pub(crate) async fn start(config: BusRuntimeConfig) -> anyhow::Result<BusRuntime
     let server = BusServer::builder()
         .pool(config.pool)
         .local_domain("ob-poc")
-        .invocation_dispatcher(ObPocBusHandler::new(adapter))
+        .invocation_dispatcher(handler)
         .result_dispatcher(NoopResultDispatcher)
         .outbox_notifier(notifier)
         .enable_entity_service()

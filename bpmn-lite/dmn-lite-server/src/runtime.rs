@@ -41,6 +41,11 @@ pub(crate) struct BusRuntimeConfig {
     pub(crate) pool: PgPool,
     pub(crate) catalogue: Arc<DecisionCatalogue>,
     pub(crate) bind_addr: SocketAddr,
+    /// Catalogue version this server claims to host. Incoming
+    /// `InvocationRequest.catalogue_version` is compared against
+    /// this — mismatches reject with `VersionIncompatible` per
+    /// T2B master DoD #46.
+    pub(crate) catalogue_version: String,
     /// `(target_domain, endpoint_uri)` pairs. The caller registers
     /// peers it might need to talk to — in v0.6 §10 dmn-lite only
     /// sends result rows back to bpmn-lite, so this is typically a
@@ -78,10 +83,12 @@ pub(crate) async fn start(config: BusRuntimeConfig) -> Result<BusRuntime> {
     // registered stub returning `NOT_IMPLEMENTED` per A3 §6
     // discipline #4. (`InvocationService.Validate` is on the same
     // service as Submit and ships as a stub automatically.)
+    let handler = DmnLiteBusHandler::new(evaluator)
+        .with_catalogue_version(config.catalogue_version.clone());
     let server = BusServer::builder()
         .pool(config.pool.clone())
         .local_domain("dmn-lite")
-        .invocation_dispatcher(DmnLiteBusHandler::new(evaluator))
+        .invocation_dispatcher(handler)
         .result_dispatcher(NoopResultDispatcher)
         .outbox_notifier(notifier)
         .bind(config.bind_addr)

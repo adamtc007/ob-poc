@@ -1735,10 +1735,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                         peer_count = peers.len(),
                         "starting ob-poc federated bus runtime"
                     );
+                    let catalogue_version = std::env::var("OB_POC_CATALOGUE_VERSION")
+                        .unwrap_or_else(|_| "v1.0.0".to_owned());
                     match bus_runtime::start(bus_runtime::BusRuntimeConfig {
                         pool: pool.clone(),
                         verb_executor: verb_executor_arc.clone(),
                         bind_addr,
+                        catalogue_version,
                         peers,
                     })
                     .await

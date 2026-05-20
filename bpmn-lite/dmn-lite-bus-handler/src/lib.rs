@@ -81,17 +81,29 @@ pub trait DecisionEvaluator: Send + Sync + 'static {
 /// shared across the tonic server's worker threads.
 pub struct DmnLiteBusHandler {
     evaluator: Arc<dyn DecisionEvaluator>,
+    /// T2B master DoD #46 — when set, mismatched
+    /// `catalogue_version` rejects with `VersionIncompatible`.
+    expected_catalogue_version: Option<String>,
 }
 
 impl DmnLiteBusHandler {
     pub fn new<E: DecisionEvaluator>(evaluator: E) -> Self {
         Self {
             evaluator: Arc::new(evaluator),
+            expected_catalogue_version: None,
         }
     }
 
     pub fn from_arc(evaluator: Arc<dyn DecisionEvaluator>) -> Self {
-        Self { evaluator }
+        Self {
+            evaluator,
+            expected_catalogue_version: None,
+        }
+    }
+
+    pub fn with_catalogue_version(mut self, version: impl Into<String>) -> Self {
+        self.expected_catalogue_version = Some(version.into());
+        self
     }
 }
 
@@ -102,6 +114,14 @@ impl InvocationDispatcher for DmnLiteBusHandler {
         ctx: InvocationContext,
         inputs: Vec<ResolvedBinding>,
     ) -> Result<InvocationOutcome, BusServerError> {
+        if let Some(ref expected) = self.expected_catalogue_version {
+            if &ctx.catalogue_version != expected {
+                return Err(BusServerError::VersionIncompatible(format!(
+                    "dmn-lite expects catalogue_version {expected}, got {}",
+                    ctx.catalogue_version
+                )));
+            }
+        }
         let outcome = self
             .evaluator
             .evaluate(&ctx.local_verb_id, &ctx.catalogue_version, inputs)

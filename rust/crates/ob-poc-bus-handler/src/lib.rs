@@ -84,17 +84,34 @@ pub trait VerbExecutor: Send + Sync + 'static {
 /// shared across the tonic server's worker threads.
 pub struct ObPocBusHandler {
     executor: Arc<dyn VerbExecutor>,
+    /// Configured catalogue version. When set, the dispatcher rejects
+    /// any `InvocationRequest` whose `catalogue_version` doesn't match
+    /// — T2B master DoD scenario #46 (version mismatch).
+    expected_catalogue_version: Option<String>,
 }
 
 impl ObPocBusHandler {
     pub fn new<E: VerbExecutor>(executor: E) -> Self {
         Self {
             executor: Arc::new(executor),
+            expected_catalogue_version: None,
         }
     }
 
     pub fn from_arc(executor: Arc<dyn VerbExecutor>) -> Self {
-        Self { executor }
+        Self {
+            executor,
+            expected_catalogue_version: None,
+        }
+    }
+
+    /// Enforce that incoming invocations carry the named
+    /// `catalogue_version`. Mismatches are rejected as
+    /// `BusServerError::VersionIncompatible` (mapped on the wire to
+    /// `SubmissionStatus::RejectedVersionIncompatible`).
+    pub fn with_catalogue_version(mut self, version: impl Into<String>) -> Self {
+        self.expected_catalogue_version = Some(version.into());
+        self
     }
 }
 
@@ -105,6 +122,14 @@ impl InvocationDispatcher for ObPocBusHandler {
         ctx: InvocationContext,
         inputs: Vec<ResolvedBinding>,
     ) -> Result<InvocationOutcome, BusServerError> {
+        if let Some(ref expected) = self.expected_catalogue_version {
+            if &ctx.catalogue_version != expected {
+                return Err(BusServerError::VersionIncompatible(format!(
+                    "ob-poc expects catalogue_version {expected}, got {}",
+                    ctx.catalogue_version
+                )));
+            }
+        }
         let outcome = self
             .executor
             .execute(&ctx.local_verb_id, &ctx.catalogue_version, inputs)

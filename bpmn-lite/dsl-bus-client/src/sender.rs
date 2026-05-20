@@ -197,7 +197,18 @@ async fn dispatch_invocation(
                     cfg.stats.submitted.fetch_add(1, Ordering::Relaxed);
                 }
                 Ok(None) => {
-                    record_retry(cfg, tx, &entry, "ack missing execution_id").await?;
+                    // Receiver responded with no execution_id — the
+                    // SubmissionStatus carries the reason. Record it
+                    // verbatim so non-retryable rejections (version
+                    // skew, malformed, authority, verb unknown)
+                    // surface in `last_error`.
+                    let label = submission_status_label(ack.status);
+                    let detail = if ack.detail.is_empty() {
+                        label.to_owned()
+                    } else {
+                        format!("{label}: {}", ack.detail)
+                    };
+                    record_retry(cfg, tx, &entry, &detail).await?;
                 }
                 Err(err) => {
                     record_retry(cfg, tx, &entry, &err.to_string()).await?;
@@ -209,6 +220,21 @@ async fn dispatch_invocation(
         }
     }
     Ok(())
+}
+
+fn submission_status_label(status: i32) -> &'static str {
+    use dsl_bus_protocol::v1::SubmissionStatus;
+    match SubmissionStatus::try_from(status).unwrap_or(SubmissionStatus::SubmissionUnspecified) {
+        SubmissionStatus::SubmissionUnspecified => "rejected (unspecified)",
+        SubmissionStatus::Accepted => "accepted but no execution_id",
+        SubmissionStatus::Duplicate => "duplicate (no execution_id)",
+        SubmissionStatus::RejectedVerbUnknown => "rejected: verb unknown",
+        SubmissionStatus::RejectedVersionIncompatible => {
+            "rejected: catalogue version incompatible"
+        }
+        SubmissionStatus::RejectedAuthority => "rejected: authority denied",
+        SubmissionStatus::RejectedMalformed => "rejected: malformed request",
+    }
 }
 
 async fn dispatch_result(

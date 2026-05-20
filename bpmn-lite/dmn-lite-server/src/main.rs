@@ -39,6 +39,7 @@ async fn main() -> Result<()> {
         decisions_dir = %cfg.decisions_dir.display(),
         catalogue_toml = %cfg.catalogue_toml.display(),
         allowlist_yaml = %cfg.allowlist_yaml.display(),
+        catalogue_version = %cfg.catalogue_version,
         bpmn_lite_endpoint = ?cfg.bpmn_lite_endpoint,
         "dmn-lite-server starting"
     );
@@ -68,6 +69,7 @@ async fn main() -> Result<()> {
         pool,
         catalogue,
         bind_addr: cfg.bind_addr,
+        catalogue_version: cfg.catalogue_version.clone(),
         peers,
     })
     .await
@@ -86,6 +88,10 @@ struct StartupConfig {
     decisions_dir: PathBuf,
     catalogue_toml: PathBuf,
     allowlist_yaml: PathBuf,
+    /// Catalogue version this server claims to host. Defaults to the
+    /// `manifests/dmn-lite-vX.Y.Z.yaml` convention. Override via
+    /// `DMN_LITE_CATALOGUE_VERSION` env.
+    catalogue_version: String,
     bpmn_lite_endpoint: Option<String>,
 }
 
@@ -116,6 +122,8 @@ impl StartupConfig {
             .unwrap_or_else(|_| decisions_dir.join("manifest-allowlist.yaml"));
 
         let bpmn_lite_endpoint = env::var("BPMN_LITE_BUS_ENDPOINT").ok();
+        let catalogue_version =
+            env::var("DMN_LITE_CATALOGUE_VERSION").unwrap_or_else(|_| "v1.0.0".to_owned());
 
         Ok(Self {
             database_url,
@@ -123,6 +131,7 @@ impl StartupConfig {
             decisions_dir,
             catalogue_toml,
             allowlist_yaml,
+            catalogue_version,
             bpmn_lite_endpoint,
         })
     }
