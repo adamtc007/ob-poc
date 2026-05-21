@@ -1,0 +1,21 @@
+---
+source: crates/dsl-core/tests/ast_golden.rs
+assertion_line: 232
+expression: program
+---
+Program {
+    statements: [
+        VerbCall(
+            VerbCall {
+                domain: "view",
+                verb: "universe",
+                arguments: [],
+                binding: None,
+                span: Span {
+                    start: 0,
+                    end: 15,
+                },
+            },
+        ),
+    ],
+}

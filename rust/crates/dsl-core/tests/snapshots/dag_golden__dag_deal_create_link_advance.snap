@@ -1,0 +1,144 @@
+---
+source: crates/dsl-core/tests/dag_golden.rs
+assertion_line: 80
+expression: compiled
+---
+CompiledSteps {
+    steps: [
+        CompileStep {
+            verb_call: VerbCall {
+                domain: "deal",
+                verb: "create",
+                arguments: [
+                    Argument {
+                        key: "client-name",
+                        value: Literal(
+                            String(
+                                "Fidelity International",
+                            ),
+                            Span {
+                                start: 35,
+                                end: 59,
+                            },
+                        ),
+                        span: Span {
+                            start: 22,
+                            end: 59,
+                        },
+                    },
+                    Argument {
+                        key: "product",
+                        value: Literal(
+                            String(
+                                "custody",
+                            ),
+                            Span {
+                                start: 69,
+                                end: 78,
+                            },
+                        ),
+                        span: Span {
+                            start: 60,
+                            end: 78,
+                        },
+                    },
+                ],
+                binding: Some(
+                    "deal",
+                ),
+                span: Span {
+                    start: 9,
+                    end: 89,
+                },
+            },
+            source_stmt: 0,
+        },
+        CompileStep {
+            verb_call: VerbCall {
+                domain: "deal",
+                verb: "link-cbu",
+                arguments: [
+                    Argument {
+                        key: "deal-id",
+                        value: SymbolRef {
+                            name: "deal",
+                            span: Span {
+                                start: 122,
+                                end: 127,
+                            },
+                        },
+                        span: Span {
+                            start: 113,
+                            end: 127,
+                        },
+                    },
+                    Argument {
+                        key: "cbu-id",
+                        value: SymbolRef {
+                            name: "cbu",
+                            span: Span {
+                                start: 136,
+                                end: 140,
+                            },
+                        },
+                        span: Span {
+                            start: 128,
+                            end: 140,
+                        },
+                    },
+                ],
+                binding: None,
+                span: Span {
+                    start: 98,
+                    end: 141,
+                },
+            },
+            source_stmt: 1,
+        },
+        CompileStep {
+            verb_call: VerbCall {
+                domain: "deal",
+                verb: "advance-stage",
+                arguments: [
+                    Argument {
+                        key: "deal-id",
+                        value: SymbolRef {
+                            name: "deal",
+                            span: Span {
+                                start: 179,
+                                end: 184,
+                            },
+                        },
+                        span: Span {
+                            start: 170,
+                            end: 184,
+                        },
+                    },
+                    Argument {
+                        key: "to",
+                        value: Literal(
+                            String(
+                                "bac_approved",
+                            ),
+                            Span {
+                                start: 189,
+                                end: 203,
+                            },
+                        ),
+                        span: Span {
+                            start: 185,
+                            end: 203,
+                        },
+                    },
+                ],
+                binding: None,
+                span: Span {
+                    start: 150,
+                    end: 204,
+                },
+            },
+            source_stmt: 2,
+        },
+    ],
+    errors: [],
+}

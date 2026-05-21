@@ -1,0 +1,160 @@
+---
+source: crates/dsl-core/tests/dag_golden.rs
+assertion_line: 172
+expression: compiled
+---
+CompiledSteps {
+    steps: [
+        CompileStep {
+            verb_call: VerbCall {
+                domain: "deal",
+                verb: "create",
+                arguments: [
+                    Argument {
+                        key: "client-name",
+                        value: Literal(
+                            String(
+                                "BNP Paribas AM",
+                            ),
+                            Span {
+                                start: 35,
+                                end: 51,
+                            },
+                        ),
+                        span: Span {
+                            start: 22,
+                            end: 51,
+                        },
+                    },
+                    Argument {
+                        key: "product",
+                        value: Literal(
+                            String(
+                                "custody",
+                            ),
+                            Span {
+                                start: 61,
+                                end: 70,
+                            },
+                        ),
+                        span: Span {
+                            start: 52,
+                            end: 70,
+                        },
+                    },
+                ],
+                binding: Some(
+                    "deal",
+                ),
+                span: Span {
+                    start: 9,
+                    end: 81,
+                },
+            },
+            source_stmt: 0,
+        },
+        CompileStep {
+            verb_call: VerbCall {
+                domain: "deal",
+                verb: "set-rate-card",
+                arguments: [
+                    Argument {
+                        key: "deal-id",
+                        value: SymbolRef {
+                            name: "deal",
+                            span: Span {
+                                start: 119,
+                                end: 124,
+                            },
+                        },
+                        span: Span {
+                            start: 110,
+                            end: 124,
+                        },
+                    },
+                    Argument {
+                        key: "rate-card-id",
+                        value: SymbolRef {
+                            name: "rc",
+                            span: Span {
+                                start: 139,
+                                end: 142,
+                            },
+                        },
+                        span: Span {
+                            start: 125,
+                            end: 142,
+                        },
+                    },
+                    Argument {
+                        key: "effective-from",
+                        value: Literal(
+                            String(
+                                "2026-01-01",
+                            ),
+                            Span {
+                                start: 159,
+                                end: 171,
+                            },
+                        ),
+                        span: Span {
+                            start: 143,
+                            end: 171,
+                        },
+                    },
+                ],
+                binding: None,
+                span: Span {
+                    start: 90,
+                    end: 172,
+                },
+            },
+            source_stmt: 1,
+        },
+        CompileStep {
+            verb_call: VerbCall {
+                domain: "deal",
+                verb: "close",
+                arguments: [
+                    Argument {
+                        key: "deal-id",
+                        value: SymbolRef {
+                            name: "deal",
+                            span: Span {
+                                start: 202,
+                                end: 207,
+                            },
+                        },
+                        span: Span {
+                            start: 193,
+                            end: 207,
+                        },
+                    },
+                    Argument {
+                        key: "reason",
+                        value: Literal(
+                            String(
+                                "completed",
+                            ),
+                            Span {
+                                start: 216,
+                                end: 227,
+                            },
+                        ),
+                        span: Span {
+                            start: 208,
+                            end: 227,
+                        },
+                    },
+                ],
+                binding: None,
+                span: Span {
+                    start: 181,
+                    end: 228,
+                },
+            },
+            source_stmt: 2,
+        },
+    ],
+    errors: [],
+}

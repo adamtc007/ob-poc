@@ -1,0 +1,97 @@
+---
+source: crates/dsl-core/tests/ast_golden.rs
+assertion_line: 168
+expression: program
+---
+Program {
+    statements: [
+        VerbCall(
+            VerbCall {
+                domain: "screening",
+                verb: "batch",
+                arguments: [
+                    Argument {
+                        key: "entity-ids",
+                        value: List {
+                            items: [
+                                Literal(
+                                    String(
+                                        "id-1",
+                                    ),
+                                    Span {
+                                        start: 30,
+                                        end: 36,
+                                    },
+                                ),
+                                Literal(
+                                    String(
+                                        "id-2",
+                                    ),
+                                    Span {
+                                        start: 37,
+                                        end: 43,
+                                    },
+                                ),
+                                Literal(
+                                    String(
+                                        "id-3",
+                                    ),
+                                    Span {
+                                        start: 44,
+                                        end: 50,
+                                    },
+                                ),
+                            ],
+                            span: Span {
+                                start: 29,
+                                end: 51,
+                            },
+                        },
+                        span: Span {
+                            start: 17,
+                            end: 51,
+                        },
+                    },
+                    Argument {
+                        key: "types",
+                        value: List {
+                            items: [
+                                Literal(
+                                    String(
+                                        "pep",
+                                    ),
+                                    Span {
+                                        start: 60,
+                                        end: 65,
+                                    },
+                                ),
+                                Literal(
+                                    String(
+                                        "sanctions",
+                                    ),
+                                    Span {
+                                        start: 66,
+                                        end: 77,
+                                    },
+                                ),
+                            ],
+                            span: Span {
+                                start: 59,
+                                end: 78,
+                            },
+                        },
+                        span: Span {
+                            start: 52,
+                            end: 78,
+                        },
+                    },
+                ],
+                binding: None,
+                span: Span {
+                    start: 0,
+                    end: 79,
+                },
+            },
+        ),
+    ],
+}

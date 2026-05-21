@@ -1,0 +1,15 @@
+---
+source: crates/dsl-core/tests/plan_golden.rs
+assertion_line: 226
+expression: ordering_pairs
+---
+[
+    (
+        0,
+        1,
+    ),
+    (
+        1,
+        2,
+    ),
+]

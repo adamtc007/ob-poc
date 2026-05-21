@@ -1,0 +1,6 @@
+---
+source: crates/dsl-core/tests/plan_golden.rs
+assertion_line: 41
+expression: policy
+---
+DurableStep

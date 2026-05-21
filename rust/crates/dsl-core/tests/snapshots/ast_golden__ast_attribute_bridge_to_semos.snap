@@ -1,0 +1,52 @@
+---
+source: crates/dsl-core/tests/ast_golden.rs
+assertion_line: 324
+expression: program
+---
+Program {
+    statements: [
+        VerbCall(
+            VerbCall {
+                domain: "attribute",
+                verb: "bridge-to-semos",
+                arguments: [
+                    Argument {
+                        key: "store-id",
+                        value: SymbolRef {
+                            name: "attr",
+                            span: Span {
+                                start: 37,
+                                end: 42,
+                            },
+                        },
+                        span: Span {
+                            start: 27,
+                            end: 42,
+                        },
+                    },
+                    Argument {
+                        key: "force",
+                        value: Literal(
+                            Boolean(
+                                false,
+                            ),
+                            Span {
+                                start: 50,
+                                end: 55,
+                            },
+                        ),
+                        span: Span {
+                            start: 43,
+                            end: 55,
+                        },
+                    },
+                ],
+                binding: None,
+                span: Span {
+                    start: 0,
+                    end: 56,
+                },
+            },
+        ),
+    ],
+}

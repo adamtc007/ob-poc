@@ -1,0 +1,70 @@
+---
+source: crates/dsl-core/tests/ast_golden.rs
+assertion_line: 317
+expression: program
+---
+Program {
+    statements: [
+        VerbCall(
+            VerbCall {
+                domain: "attribute",
+                verb: "define-derived",
+                arguments: [
+                    Argument {
+                        key: "id",
+                        value: Literal(
+                            String(
+                                "attr.derived.kyc_score",
+                            ),
+                            Span {
+                                start: 30,
+                                end: 54,
+                            },
+                        ),
+                        span: Span {
+                            start: 26,
+                            end: 54,
+                        },
+                    },
+                    Argument {
+                        key: "display-name",
+                        value: Literal(
+                            String(
+                                "KYC Risk Score",
+                            ),
+                            Span {
+                                start: 69,
+                                end: 85,
+                            },
+                        ),
+                        span: Span {
+                            start: 55,
+                            end: 85,
+                        },
+                    },
+                    Argument {
+                        key: "derivation-fqn",
+                        value: Literal(
+                            String(
+                                "derivation.kyc_score_v1",
+                            ),
+                            Span {
+                                start: 102,
+                                end: 127,
+                            },
+                        ),
+                        span: Span {
+                            start: 86,
+                            end: 127,
+                        },
+                    },
+                ],
+                binding: None,
+                span: Span {
+                    start: 0,
+                    end: 128,
+                },
+            },
+        ),
+    ],
+}

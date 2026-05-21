@@ -1,0 +1,52 @@
+---
+source: crates/dsl-core/tests/ast_golden.rs
+assertion_line: 160
+expression: program
+---
+Program {
+    statements: [
+        VerbCall(
+            VerbCall {
+                domain: "screening",
+                verb: "refresh",
+                arguments: [
+                    Argument {
+                        key: "entity-id",
+                        value: SymbolRef {
+                            name: "entity",
+                            span: Span {
+                                start: 30,
+                                end: 37,
+                            },
+                        },
+                        span: Span {
+                            start: 19,
+                            end: 37,
+                        },
+                    },
+                    Argument {
+                        key: "force",
+                        value: Literal(
+                            Boolean(
+                                true,
+                            ),
+                            Span {
+                                start: 45,
+                                end: 49,
+                            },
+                        ),
+                        span: Span {
+                            start: 38,
+                            end: 49,
+                        },
+                    },
+                ],
+                binding: None,
+                span: Span {
+                    start: 0,
+                    end: 50,
+                },
+            },
+        ),
+    ],
+}

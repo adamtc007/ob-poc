@@ -1,0 +1,50 @@
+---
+source: crates/dsl-core/tests/ast_golden.rs
+assertion_line: 107
+expression: program
+---
+Program {
+    statements: [
+        VerbCall(
+            VerbCall {
+                domain: "deal",
+                verb: "link-cbu",
+                arguments: [
+                    Argument {
+                        key: "deal-id",
+                        value: SymbolRef {
+                            name: "deal",
+                            span: Span {
+                                start: 24,
+                                end: 29,
+                            },
+                        },
+                        span: Span {
+                            start: 15,
+                            end: 29,
+                        },
+                    },
+                    Argument {
+                        key: "cbu-id",
+                        value: SymbolRef {
+                            name: "cbu",
+                            span: Span {
+                                start: 38,
+                                end: 42,
+                            },
+                        },
+                        span: Span {
+                            start: 30,
+                            end: 42,
+                        },
+                    },
+                ],
+                binding: None,
+                span: Span {
+                    start: 0,
+                    end: 43,
+                },
+            },
+        ),
+    ],
+}

@@ -1,0 +1,12 @@
+---
+source: crates/dsl-core/tests/ast_golden.rs
+assertion_line: 380
+expression: program
+---
+Program {
+    statements: [
+        Comment(
+            "This is a planning comment for the operator",
+        ),
+    ],
+}

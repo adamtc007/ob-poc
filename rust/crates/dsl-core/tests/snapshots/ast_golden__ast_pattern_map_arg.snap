@@ -1,0 +1,77 @@
+---
+source: crates/dsl-core/tests/ast_golden.rs
+assertion_line: 368
+expression: program
+---
+Program {
+    statements: [
+        VerbCall(
+            VerbCall {
+                domain: "cbu",
+                verb: "create",
+                arguments: [
+                    Argument {
+                        key: "name",
+                        value: Literal(
+                            String(
+                                "Test Fund",
+                            ),
+                            Span {
+                                start: 18,
+                                end: 29,
+                            },
+                        ),
+                        span: Span {
+                            start: 12,
+                            end: 29,
+                        },
+                    },
+                    Argument {
+                        key: "metadata",
+                        value: Map {
+                            entries: [
+                                (
+                                    "region",
+                                    Literal(
+                                        String(
+                                            "EMEA",
+                                        ),
+                                        Span {
+                                            start: 49,
+                                            end: 55,
+                                        },
+                                    ),
+                                ),
+                                (
+                                    "tier",
+                                    Literal(
+                                        String(
+                                            "premium",
+                                        ),
+                                        Span {
+                                            start: 62,
+                                            end: 71,
+                                        },
+                                    ),
+                                ),
+                            ],
+                            span: Span {
+                                start: 40,
+                                end: 72,
+                            },
+                        },
+                        span: Span {
+                            start: 30,
+                            end: 72,
+                        },
+                    },
+                ],
+                binding: None,
+                span: Span {
+                    start: 0,
+                    end: 73,
+                },
+            },
+        ),
+    ],
+}

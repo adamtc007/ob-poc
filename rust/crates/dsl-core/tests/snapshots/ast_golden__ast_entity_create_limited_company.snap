@@ -1,0 +1,56 @@
+---
+source: crates/dsl-core/tests/ast_golden.rs
+assertion_line: 193
+expression: program
+---
+Program {
+    statements: [
+        VerbCall(
+            VerbCall {
+                domain: "entity",
+                verb: "create-limited-company",
+                arguments: [
+                    Argument {
+                        key: "name",
+                        value: Literal(
+                            String(
+                                "Apex Capital Ltd",
+                            ),
+                            Span {
+                                start: 37,
+                                end: 55,
+                            },
+                        ),
+                        span: Span {
+                            start: 31,
+                            end: 55,
+                        },
+                    },
+                    Argument {
+                        key: "jurisdiction",
+                        value: Literal(
+                            String(
+                                "KY",
+                            ),
+                            Span {
+                                start: 70,
+                                end: 74,
+                            },
+                        ),
+                        span: Span {
+                            start: 56,
+                            end: 74,
+                        },
+                    },
+                ],
+                binding: Some(
+                    "company",
+                ),
+                span: Span {
+                    start: 0,
+                    end: 88,
+                },
+            },
+        ),
+    ],
+}

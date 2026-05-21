@@ -1,0 +1,72 @@
+---
+source: crates/dsl-core/tests/ast_golden.rs
+assertion_line: 186
+expression: program
+---
+Program {
+    statements: [
+        VerbCall(
+            VerbCall {
+                domain: "entity",
+                verb: "create-proper-person",
+                arguments: [
+                    Argument {
+                        key: "first-name",
+                        value: Literal(
+                            String(
+                                "John",
+                            ),
+                            Span {
+                                start: 41,
+                                end: 47,
+                            },
+                        ),
+                        span: Span {
+                            start: 29,
+                            end: 47,
+                        },
+                    },
+                    Argument {
+                        key: "last-name",
+                        value: Literal(
+                            String(
+                                "Smith",
+                            ),
+                            Span {
+                                start: 59,
+                                end: 66,
+                            },
+                        ),
+                        span: Span {
+                            start: 48,
+                            end: 66,
+                        },
+                    },
+                    Argument {
+                        key: "nationality",
+                        value: Literal(
+                            String(
+                                "GB",
+                            ),
+                            Span {
+                                start: 80,
+                                end: 84,
+                            },
+                        ),
+                        span: Span {
+                            start: 67,
+                            end: 84,
+                        },
+                    },
+                ],
+                binding: Some(
+                    "person",
+                ),
+                span: Span {
+                    start: 0,
+                    end: 97,
+                },
+            },
+        ),
+    ],
+}

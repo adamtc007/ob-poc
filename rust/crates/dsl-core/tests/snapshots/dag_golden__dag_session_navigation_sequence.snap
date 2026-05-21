@@ -1,0 +1,113 @@
+---
+source: crates/dsl-core/tests/dag_golden.rs
+assertion_line: 267
+expression: compiled
+---
+CompiledSteps {
+    steps: [
+        CompileStep {
+            verb_call: VerbCall {
+                domain: "session",
+                verb: "start",
+                arguments: [
+                    Argument {
+                        key: "mode",
+                        value: Literal(
+                            String(
+                                "new",
+                            ),
+                            Span {
+                                start: 30,
+                                end: 35,
+                            },
+                        ),
+                        span: Span {
+                            start: 24,
+                            end: 35,
+                        },
+                    },
+                ],
+                binding: None,
+                span: Span {
+                    start: 9,
+                    end: 36,
+                },
+            },
+            source_stmt: 0,
+        },
+        CompileStep {
+            verb_call: VerbCall {
+                domain: "session",
+                verb: "load-cbu",
+                arguments: [
+                    Argument {
+                        key: "name",
+                        value: Literal(
+                            String(
+                                "Allianz GI",
+                            ),
+                            Span {
+                                start: 69,
+                                end: 81,
+                            },
+                        ),
+                        span: Span {
+                            start: 63,
+                            end: 81,
+                        },
+                    },
+                ],
+                binding: None,
+                span: Span {
+                    start: 45,
+                    end: 82,
+                },
+            },
+            source_stmt: 1,
+        },
+        CompileStep {
+            verb_call: VerbCall {
+                domain: "view",
+                verb: "universe",
+                arguments: [],
+                binding: None,
+                span: Span {
+                    start: 91,
+                    end: 106,
+                },
+            },
+            source_stmt: 2,
+        },
+        CompileStep {
+            verb_call: VerbCall {
+                domain: "view",
+                verb: "cbu",
+                arguments: [
+                    Argument {
+                        key: "mode",
+                        value: Literal(
+                            String(
+                                "trading",
+                            ),
+                            Span {
+                                start: 131,
+                                end: 140,
+                            },
+                        ),
+                        span: Span {
+                            start: 125,
+                            end: 140,
+                        },
+                    },
+                ],
+                binding: None,
+                span: Span {
+                    start: 115,
+                    end: 141,
+                },
+            },
+            source_stmt: 3,
+        },
+    ],
+    errors: [],
+}

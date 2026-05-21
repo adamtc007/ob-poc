@@ -15,11 +15,40 @@ Generated: 2026-05-21
 | 8 | Integration validation (Examples 11 + 12, pack Sage stub, hardening) | 20 tests |
 | 9 | Decision pack catalogue (parallel) | 4 tests |
 
+## Tranche 1: SemOS Regression Baseline (complete 2026-05-21)
+
+Snapshot regression tests against the CURRENT SemOS pipeline (dsl-core) captured
+BEFORE Tranche 3 reshapes the ~1,282 verbs. These snapshots will catch behavioural
+drift during the reshape.
+
+- **AST golden snapshots:** 50 verb call parse trees across 10 domain areas
+  (cbu, kyc, deal, screening, entity, session/nav, governance, attribute, pattern variations, edge cases)
+- **DagGraph / compiler golden snapshots:** 20 multi-step compilation outputs
+  (linear chains, parallel-safe steps, onboarding flows, cross-domain programs)
+- **@-slot binding assertions:** 18 structural tests covering all major binding types
+  (@cbu, @entity, @person, @case, @deal, @changeset, $-sigil, no-binding, multi-step)
+- **ExecutablePlan / policy golden snapshots:** 20 snapshots covering TransactionPolicy
+  inference from effect-class combinations and PopulatedExecutionDag edge shapes
+- **Effect declaration health check:** 1,332 verbs across 103 YAML files — 100%
+  coverage, 0 Type B (missing), 0 Type C (invalid) errors; all verbs valid
+- **Dependency ordering:** 11 programs verified for source-order preservation
+
+Total new tests: **108** (90 snapshot-backed + 18 structural + 11 property + 3 health + 4 sentinel)
+Snapshot files: **90** in `rust/crates/dsl-core/tests/snapshots/`
+
+All tests at: `rust/crates/dsl-core/tests/` (ast_golden, dag_golden, slot_binding,
+plan_golden, effect_declarations, dep_ordering, regression_baseline_health)
+
+CI gate: `cargo test -p dsl-core --test ast_golden --test dag_golden --test slot_binding
+--test effect_declarations --test dep_ordering --test plan_golden --test regression_baseline_health`
+
+Note: two pre-existing failures in `green_when_coverage.rs` (`real_dag_green_when_coverage_*`)
+were already failing before Tranche 1 and are NOT caused by these changes.
+
 ## Not yet completed
 
 | Tranche | Description | Prerequisite for |
 |---|---|---|
-| 1 | Pre-refactor SemOS regression baseline | Tranche 3 (SemOS reshape) |
 | 3 | SemOS verb reshape (~1,098 verbs) | Highest-risk tranche |
 | 10 | Documentation + handoff | Final |
 

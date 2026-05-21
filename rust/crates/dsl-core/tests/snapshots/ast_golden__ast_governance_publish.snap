@@ -1,0 +1,52 @@
+---
+source: crates/dsl-core/tests/ast_golden.rs
+assertion_line: 271
+expression: program
+---
+Program {
+    statements: [
+        VerbCall(
+            VerbCall {
+                domain: "governance",
+                verb: "publish",
+                arguments: [
+                    Argument {
+                        key: "changeset-id",
+                        value: SymbolRef {
+                            name: "cs",
+                            span: Span {
+                                start: 34,
+                                end: 37,
+                            },
+                        },
+                        span: Span {
+                            start: 20,
+                            end: 37,
+                        },
+                    },
+                    Argument {
+                        key: "dry-run",
+                        value: Literal(
+                            Boolean(
+                                false,
+                            ),
+                            Span {
+                                start: 47,
+                                end: 52,
+                            },
+                        ),
+                        span: Span {
+                            start: 38,
+                            end: 52,
+                        },
+                    },
+                ],
+                binding: None,
+                span: Span {
+                    start: 0,
+                    end: 53,
+                },
+            },
+        ),
+    ],
+}

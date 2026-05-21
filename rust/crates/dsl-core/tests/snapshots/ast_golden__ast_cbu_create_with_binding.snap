@@ -1,0 +1,56 @@
+---
+source: crates/dsl-core/tests/ast_golden.rs
+assertion_line: 29
+expression: program
+---
+Program {
+    statements: [
+        VerbCall(
+            VerbCall {
+                domain: "cbu",
+                verb: "create",
+                arguments: [
+                    Argument {
+                        key: "name",
+                        value: Literal(
+                            String(
+                                "BlackRock EMEA Fund",
+                            ),
+                            Span {
+                                start: 18,
+                                end: 39,
+                            },
+                        ),
+                        span: Span {
+                            start: 12,
+                            end: 39,
+                        },
+                    },
+                    Argument {
+                        key: "jurisdiction",
+                        value: Literal(
+                            String(
+                                "IE",
+                            ),
+                            Span {
+                                start: 54,
+                                end: 58,
+                            },
+                        ),
+                        span: Span {
+                            start: 40,
+                            end: 58,
+                        },
+                    },
+                ],
+                binding: Some(
+                    "cbu",
+                ),
+                span: Span {
+                    start: 0,
+                    end: 68,
+                },
+            },
+        ),
+    ],
+}

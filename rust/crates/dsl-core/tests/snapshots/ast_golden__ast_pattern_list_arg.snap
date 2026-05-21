@@ -1,0 +1,94 @@
+---
+source: crates/dsl-core/tests/ast_golden.rs
+assertion_line: 360
+expression: program
+---
+Program {
+    statements: [
+        VerbCall(
+            VerbCall {
+                domain: "document",
+                verb: "solicit",
+                arguments: [
+                    Argument {
+                        key: "cbu-id",
+                        value: SymbolRef {
+                            name: "cbu",
+                            span: Span {
+                                start: 26,
+                                end: 30,
+                            },
+                        },
+                        span: Span {
+                            start: 18,
+                            end: 30,
+                        },
+                    },
+                    Argument {
+                        key: "doc-types",
+                        value: List {
+                            items: [
+                                Literal(
+                                    String(
+                                        "AML_POLICY",
+                                    ),
+                                    Span {
+                                        start: 43,
+                                        end: 55,
+                                    },
+                                ),
+                                Literal(
+                                    String(
+                                        "FATCA_CERT",
+                                    ),
+                                    Span {
+                                        start: 56,
+                                        end: 68,
+                                    },
+                                ),
+                                Literal(
+                                    String(
+                                        "CRS_FORM",
+                                    ),
+                                    Span {
+                                        start: 69,
+                                        end: 79,
+                                    },
+                                ),
+                            ],
+                            span: Span {
+                                start: 42,
+                                end: 80,
+                            },
+                        },
+                        span: Span {
+                            start: 31,
+                            end: 80,
+                        },
+                    },
+                    Argument {
+                        key: "deadline",
+                        value: Literal(
+                            String(
+                                "2026-06-30",
+                            ),
+                            Span {
+                                start: 91,
+                                end: 103,
+                            },
+                        ),
+                        span: Span {
+                            start: 81,
+                            end: 103,
+                        },
+                    },
+                ],
+                binding: None,
+                span: Span {
+                    start: 0,
+                    end: 104,
+                },
+            },
+        ),
+    ],
+}

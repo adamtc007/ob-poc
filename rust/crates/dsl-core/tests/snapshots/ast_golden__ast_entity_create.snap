@@ -1,0 +1,56 @@
+---
+source: crates/dsl-core/tests/ast_golden.rs
+assertion_line: 179
+expression: program
+---
+Program {
+    statements: [
+        VerbCall(
+            VerbCall {
+                domain: "entity",
+                verb: "create",
+                arguments: [
+                    Argument {
+                        key: "entity-type",
+                        value: Literal(
+                            String(
+                                "company",
+                            ),
+                            Span {
+                                start: 28,
+                                end: 37,
+                            },
+                        ),
+                        span: Span {
+                            start: 15,
+                            end: 37,
+                        },
+                    },
+                    Argument {
+                        key: "name",
+                        value: Literal(
+                            String(
+                                "HSBC Holdings plc",
+                            ),
+                            Span {
+                                start: 44,
+                                end: 63,
+                            },
+                        ),
+                        span: Span {
+                            start: 38,
+                            end: 63,
+                        },
+                    },
+                ],
+                binding: Some(
+                    "entity",
+                ),
+                span: Span {
+                    start: 0,
+                    end: 76,
+                },
+            },
+        ),
+    ],
+}

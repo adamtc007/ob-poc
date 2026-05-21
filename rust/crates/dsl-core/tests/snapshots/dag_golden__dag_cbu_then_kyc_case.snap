@@ -1,0 +1,104 @@
+---
+source: crates/dsl-core/tests/dag_golden.rs
+assertion_line: 58
+expression: compiled
+---
+CompiledSteps {
+    steps: [
+        CompileStep {
+            verb_call: VerbCall {
+                domain: "cbu",
+                verb: "create",
+                arguments: [
+                    Argument {
+                        key: "name",
+                        value: Literal(
+                            String(
+                                "BlackRock EMEA",
+                            ),
+                            Span {
+                                start: 27,
+                                end: 43,
+                            },
+                        ),
+                        span: Span {
+                            start: 21,
+                            end: 43,
+                        },
+                    },
+                    Argument {
+                        key: "jurisdiction",
+                        value: Literal(
+                            String(
+                                "IE",
+                            ),
+                            Span {
+                                start: 58,
+                                end: 62,
+                            },
+                        ),
+                        span: Span {
+                            start: 44,
+                            end: 62,
+                        },
+                    },
+                ],
+                binding: Some(
+                    "cbu",
+                ),
+                span: Span {
+                    start: 9,
+                    end: 72,
+                },
+            },
+            source_stmt: 0,
+        },
+        CompileStep {
+            verb_call: VerbCall {
+                domain: "kyc-case",
+                verb: "create",
+                arguments: [
+                    Argument {
+                        key: "cbu-id",
+                        value: SymbolRef {
+                            name: "cbu",
+                            span: Span {
+                                start: 106,
+                                end: 110,
+                            },
+                        },
+                        span: Span {
+                            start: 98,
+                            end: 110,
+                        },
+                    },
+                    Argument {
+                        key: "case-type",
+                        value: Literal(
+                            String(
+                                "standard",
+                            ),
+                            Span {
+                                start: 122,
+                                end: 132,
+                            },
+                        ),
+                        span: Span {
+                            start: 111,
+                            end: 132,
+                        },
+                    },
+                ],
+                binding: Some(
+                    "case",
+                ),
+                span: Span {
+                    start: 81,
+                    end: 143,
+                },
+            },
+            source_stmt: 1,
+        },
+    ],
+    errors: [],
+}

@@ -1,0 +1,270 @@
+---
+source: crates/dsl-core/tests/dag_golden.rs
+assertion_line: 201
+expression: compiled
+---
+CompiledSteps {
+    steps: [
+        CompileStep {
+            verb_call: VerbCall {
+                domain: "changeset",
+                verb: "compose",
+                arguments: [
+                    Argument {
+                        key: "title",
+                        value: Literal(
+                            String(
+                                "Add risk attributes Q2 2026",
+                            ),
+                            Span {
+                                start: 35,
+                                end: 64,
+                            },
+                        ),
+                        span: Span {
+                            start: 28,
+                            end: 64,
+                        },
+                    },
+                ],
+                binding: Some(
+                    "cs",
+                ),
+                span: Span {
+                    start: 9,
+                    end: 73,
+                },
+            },
+            source_stmt: 0,
+        },
+        CompileStep {
+            verb_call: VerbCall {
+                domain: "attribute",
+                verb: "define",
+                arguments: [
+                    Argument {
+                        key: "id",
+                        value: Literal(
+                            String(
+                                "attr.risk.country_risk",
+                            ),
+                            Span {
+                                start: 104,
+                                end: 128,
+                            },
+                        ),
+                        span: Span {
+                            start: 100,
+                            end: 128,
+                        },
+                    },
+                    Argument {
+                        key: "display-name",
+                        value: Literal(
+                            String(
+                                "Country Risk",
+                            ),
+                            Span {
+                                start: 143,
+                                end: 157,
+                            },
+                        ),
+                        span: Span {
+                            start: 129,
+                            end: 157,
+                        },
+                    },
+                    Argument {
+                        key: "category",
+                        value: Literal(
+                            String(
+                                "risk",
+                            ),
+                            Span {
+                                start: 168,
+                                end: 174,
+                            },
+                        ),
+                        span: Span {
+                            start: 158,
+                            end: 174,
+                        },
+                    },
+                    Argument {
+                        key: "value-type",
+                        value: Literal(
+                            String(
+                                "string",
+                            ),
+                            Span {
+                                start: 187,
+                                end: 195,
+                            },
+                        ),
+                        span: Span {
+                            start: 175,
+                            end: 195,
+                        },
+                    },
+                ],
+                binding: None,
+                span: Span {
+                    start: 82,
+                    end: 196,
+                },
+            },
+            source_stmt: 1,
+        },
+        CompileStep {
+            verb_call: VerbCall {
+                domain: "attribute",
+                verb: "define-internal",
+                arguments: [
+                    Argument {
+                        key: "id",
+                        value: Literal(
+                            String(
+                                "attr.system.risk_ts",
+                            ),
+                            Span {
+                                start: 236,
+                                end: 257,
+                            },
+                        ),
+                        span: Span {
+                            start: 232,
+                            end: 257,
+                        },
+                    },
+                    Argument {
+                        key: "display-name",
+                        value: Literal(
+                            String(
+                                "Risk Timestamp",
+                            ),
+                            Span {
+                                start: 272,
+                                end: 288,
+                            },
+                        ),
+                        span: Span {
+                            start: 258,
+                            end: 288,
+                        },
+                    },
+                    Argument {
+                        key: "category",
+                        value: Literal(
+                            String(
+                                "resource",
+                            ),
+                            Span {
+                                start: 299,
+                                end: 309,
+                            },
+                        ),
+                        span: Span {
+                            start: 289,
+                            end: 309,
+                        },
+                    },
+                    Argument {
+                        key: "value-type",
+                        value: Literal(
+                            String(
+                                "datetime",
+                            ),
+                            Span {
+                                start: 322,
+                                end: 332,
+                            },
+                        ),
+                        span: Span {
+                            start: 310,
+                            end: 332,
+                        },
+                    },
+                ],
+                binding: None,
+                span: Span {
+                    start: 205,
+                    end: 333,
+                },
+            },
+            source_stmt: 2,
+        },
+        CompileStep {
+            verb_call: VerbCall {
+                domain: "changeset",
+                verb: "validate",
+                arguments: [
+                    Argument {
+                        key: "changeset-id",
+                        value: SymbolRef {
+                            name: "cs",
+                            span: Span {
+                                start: 376,
+                                end: 379,
+                            },
+                        },
+                        span: Span {
+                            start: 362,
+                            end: 379,
+                        },
+                    },
+                ],
+                binding: None,
+                span: Span {
+                    start: 342,
+                    end: 380,
+                },
+            },
+            source_stmt: 3,
+        },
+        CompileStep {
+            verb_call: VerbCall {
+                domain: "governance",
+                verb: "publish",
+                arguments: [
+                    Argument {
+                        key: "changeset-id",
+                        value: SymbolRef {
+                            name: "cs",
+                            span: Span {
+                                start: 423,
+                                end: 426,
+                            },
+                        },
+                        span: Span {
+                            start: 409,
+                            end: 426,
+                        },
+                    },
+                    Argument {
+                        key: "dry-run",
+                        value: Literal(
+                            Boolean(
+                                false,
+                            ),
+                            Span {
+                                start: 436,
+                                end: 441,
+                            },
+                        ),
+                        span: Span {
+                            start: 427,
+                            end: 441,
+                        },
+                    },
+                ],
+                binding: None,
+                span: Span {
+                    start: 389,
+                    end: 442,
+                },
+            },
+            source_stmt: 4,
+        },
+    ],
+    errors: [],
+}

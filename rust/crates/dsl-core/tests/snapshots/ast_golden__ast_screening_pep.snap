@@ -1,0 +1,52 @@
+---
+source: crates/dsl-core/tests/ast_golden.rs
+assertion_line: 139
+expression: program
+---
+Program {
+    statements: [
+        VerbCall(
+            VerbCall {
+                domain: "screening",
+                verb: "pep",
+                arguments: [
+                    Argument {
+                        key: "entity-id",
+                        value: SymbolRef {
+                            name: "entity",
+                            span: Span {
+                                start: 26,
+                                end: 33,
+                            },
+                        },
+                        span: Span {
+                            start: 15,
+                            end: 33,
+                        },
+                    },
+                    Argument {
+                        key: "provider",
+                        value: Literal(
+                            String(
+                                "worldcheck",
+                            ),
+                            Span {
+                                start: 44,
+                                end: 56,
+                            },
+                        ),
+                        span: Span {
+                            start: 34,
+                            end: 56,
+                        },
+                    },
+                ],
+                binding: None,
+                span: Span {
+                    start: 0,
+                    end: 57,
+                },
+            },
+        ),
+    ],
+}

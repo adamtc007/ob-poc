@@ -1,0 +1,20 @@
+---
+source: crates/dsl-core/tests/plan_golden.rs
+assertion_line: 137
+expression: dag
+---
+PopulatedExecutionDag {
+    edges: [
+        BindingEdge {
+            from: NodeId(
+                0,
+            ),
+            to: NodeId(
+                1,
+            ),
+            slot: BindingSlotId(
+                "cbu",
+            ),
+        },
+    ],
+}

@@ -1,0 +1,66 @@
+---
+source: crates/dsl-core/tests/ast_golden.rs
+assertion_line: 121
+expression: program
+---
+Program {
+    statements: [
+        VerbCall(
+            VerbCall {
+                domain: "deal",
+                verb: "set-rate-card",
+                arguments: [
+                    Argument {
+                        key: "deal-id",
+                        value: SymbolRef {
+                            name: "deal",
+                            span: Span {
+                                start: 29,
+                                end: 34,
+                            },
+                        },
+                        span: Span {
+                            start: 20,
+                            end: 34,
+                        },
+                    },
+                    Argument {
+                        key: "rate-card-id",
+                        value: SymbolRef {
+                            name: "rc",
+                            span: Span {
+                                start: 49,
+                                end: 52,
+                            },
+                        },
+                        span: Span {
+                            start: 35,
+                            end: 52,
+                        },
+                    },
+                    Argument {
+                        key: "effective-from",
+                        value: Literal(
+                            String(
+                                "2026-01-01",
+                            ),
+                            Span {
+                                start: 69,
+                                end: 81,
+                            },
+                        ),
+                        span: Span {
+                            start: 53,
+                            end: 81,
+                        },
+                    },
+                ],
+                binding: None,
+                span: Span {
+                    start: 0,
+                    end: 82,
+                },
+            },
+        ),
+    ],
+}

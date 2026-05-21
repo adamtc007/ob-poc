@@ -1,0 +1,21 @@
+---
+source: crates/dsl-core/tests/ast_golden.rs
+assertion_line: 396
+expression: program
+---
+Program {
+    statements: [
+        VerbCall(
+            VerbCall {
+                domain: "session",
+                verb: "info",
+                arguments: [],
+                binding: None,
+                span: Span {
+                    start: 0,
+                    end: 14,
+                },
+            },
+        ),
+    ],
+}

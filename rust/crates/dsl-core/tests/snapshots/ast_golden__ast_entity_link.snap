@@ -1,0 +1,66 @@
+---
+source: crates/dsl-core/tests/ast_golden.rs
+assertion_line: 207
+expression: program
+---
+Program {
+    statements: [
+        VerbCall(
+            VerbCall {
+                domain: "entity",
+                verb: "link",
+                arguments: [
+                    Argument {
+                        key: "source-id",
+                        value: SymbolRef {
+                            name: "entity",
+                            span: Span {
+                                start: 24,
+                                end: 31,
+                            },
+                        },
+                        span: Span {
+                            start: 13,
+                            end: 31,
+                        },
+                    },
+                    Argument {
+                        key: "target-id",
+                        value: SymbolRef {
+                            name: "cbu",
+                            span: Span {
+                                start: 43,
+                                end: 47,
+                            },
+                        },
+                        span: Span {
+                            start: 32,
+                            end: 47,
+                        },
+                    },
+                    Argument {
+                        key: "relationship",
+                        value: Literal(
+                            String(
+                                "ASSET_OWNER",
+                            ),
+                            Span {
+                                start: 62,
+                                end: 75,
+                            },
+                        ),
+                        span: Span {
+                            start: 48,
+                            end: 75,
+                        },
+                    },
+                ],
+                binding: None,
+                span: Span {
+                    start: 0,
+                    end: 76,
+                },
+            },
+        ),
+    ],
+}

@@ -1,0 +1,56 @@
+---
+source: crates/dsl-core/tests/ast_golden.rs
+assertion_line: 257
+expression: program
+---
+Program {
+    statements: [
+        VerbCall(
+            VerbCall {
+                domain: "changeset",
+                verb: "compose",
+                arguments: [
+                    Argument {
+                        key: "title",
+                        value: Literal(
+                            String(
+                                "Add KYC attributes",
+                            ),
+                            Span {
+                                start: 26,
+                                end: 46,
+                            },
+                        ),
+                        span: Span {
+                            start: 19,
+                            end: 46,
+                        },
+                    },
+                    Argument {
+                        key: "rationale",
+                        value: Literal(
+                            String(
+                                "Phase 3 expansion",
+                            ),
+                            Span {
+                                start: 58,
+                                end: 77,
+                            },
+                        ),
+                        span: Span {
+                            start: 47,
+                            end: 77,
+                        },
+                    },
+                ],
+                binding: Some(
+                    "cs",
+                ),
+                span: Span {
+                    start: 0,
+                    end: 86,
+                },
+            },
+        ),
+    ],
+}

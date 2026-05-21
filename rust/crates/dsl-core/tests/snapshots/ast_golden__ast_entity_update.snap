@@ -1,0 +1,68 @@
+---
+source: crates/dsl-core/tests/ast_golden.rs
+assertion_line: 200
+expression: program
+---
+Program {
+    statements: [
+        VerbCall(
+            VerbCall {
+                domain: "entity",
+                verb: "update",
+                arguments: [
+                    Argument {
+                        key: "entity-id",
+                        value: SymbolRef {
+                            name: "entity",
+                            span: Span {
+                                start: 26,
+                                end: 33,
+                            },
+                        },
+                        span: Span {
+                            start: 15,
+                            end: 33,
+                        },
+                    },
+                    Argument {
+                        key: "field",
+                        value: Literal(
+                            String(
+                                "address",
+                            ),
+                            Span {
+                                start: 41,
+                                end: 50,
+                            },
+                        ),
+                        span: Span {
+                            start: 34,
+                            end: 50,
+                        },
+                    },
+                    Argument {
+                        key: "value",
+                        value: Literal(
+                            String(
+                                "123 Main St",
+                            ),
+                            Span {
+                                start: 58,
+                                end: 71,
+                            },
+                        ),
+                        span: Span {
+                            start: 51,
+                            end: 71,
+                        },
+                    },
+                ],
+                binding: None,
+                span: Span {
+                    start: 0,
+                    end: 72,
+                },
+            },
+        ),
+    ],
+}

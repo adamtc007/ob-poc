@@ -1,0 +1,84 @@
+---
+source: crates/dsl-core/tests/ast_golden.rs
+assertion_line: 336
+expression: program
+---
+Program {
+    statements: [
+        VerbCall(
+            VerbCall {
+                domain: "trading-profile",
+                verb: "set-instrument",
+                arguments: [
+                    Argument {
+                        key: "cbu-id",
+                        value: SymbolRef {
+                            name: "cbu",
+                            span: Span {
+                                start: 40,
+                                end: 44,
+                            },
+                        },
+                        span: Span {
+                            start: 32,
+                            end: 44,
+                        },
+                    },
+                    Argument {
+                        key: "instrument-type",
+                        value: Literal(
+                            String(
+                                "equity",
+                            ),
+                            Span {
+                                start: 62,
+                                end: 70,
+                            },
+                        ),
+                        span: Span {
+                            start: 45,
+                            end: 70,
+                        },
+                    },
+                    Argument {
+                        key: "venue",
+                        value: Literal(
+                            String(
+                                "LSE",
+                            ),
+                            Span {
+                                start: 78,
+                                end: 83,
+                            },
+                        ),
+                        span: Span {
+                            start: 71,
+                            end: 83,
+                        },
+                    },
+                    Argument {
+                        key: "enabled",
+                        value: Literal(
+                            Boolean(
+                                true,
+                            ),
+                            Span {
+                                start: 93,
+                                end: 97,
+                            },
+                        ),
+                        span: Span {
+                            start: 84,
+                            end: 97,
+                        },
+                    },
+                ],
+                binding: None,
+                span: Span {
+                    start: 0,
+                    end: 98,
+                },
+            },
+        ),
+    ],
+}

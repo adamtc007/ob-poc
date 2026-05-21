@@ -1,0 +1,66 @@
+---
+source: crates/dsl-core/tests/dag_golden.rs
+assertion_line: 94
+expression: compiled
+---
+CompiledSteps {
+    steps: [
+        CompileStep {
+            verb_call: VerbCall {
+                domain: "screening",
+                verb: "pep",
+                arguments: [
+                    Argument {
+                        key: "entity-id",
+                        value: SymbolRef {
+                            name: "director",
+                            span: Span {
+                                start: 35,
+                                end: 44,
+                            },
+                        },
+                        span: Span {
+                            start: 24,
+                            end: 44,
+                        },
+                    },
+                ],
+                binding: None,
+                span: Span {
+                    start: 9,
+                    end: 45,
+                },
+            },
+            source_stmt: 0,
+        },
+        CompileStep {
+            verb_call: VerbCall {
+                domain: "screening",
+                verb: "sanctions",
+                arguments: [
+                    Argument {
+                        key: "entity-id",
+                        value: SymbolRef {
+                            name: "director",
+                            span: Span {
+                                start: 86,
+                                end: 95,
+                            },
+                        },
+                        span: Span {
+                            start: 75,
+                            end: 95,
+                        },
+                    },
+                ],
+                binding: None,
+                span: Span {
+                    start: 54,
+                    end: 96,
+                },
+            },
+            source_stmt: 1,
+        },
+    ],
+    errors: [],
+}

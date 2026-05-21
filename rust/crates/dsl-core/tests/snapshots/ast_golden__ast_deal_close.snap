@@ -1,0 +1,52 @@
+---
+source: crates/dsl-core/tests/ast_golden.rs
+assertion_line: 128
+expression: program
+---
+Program {
+    statements: [
+        VerbCall(
+            VerbCall {
+                domain: "deal",
+                verb: "close",
+                arguments: [
+                    Argument {
+                        key: "deal-id",
+                        value: SymbolRef {
+                            name: "deal",
+                            span: Span {
+                                start: 21,
+                                end: 26,
+                            },
+                        },
+                        span: Span {
+                            start: 12,
+                            end: 26,
+                        },
+                    },
+                    Argument {
+                        key: "reason",
+                        value: Literal(
+                            String(
+                                "completed",
+                            ),
+                            Span {
+                                start: 35,
+                                end: 46,
+                            },
+                        ),
+                        span: Span {
+                            start: 27,
+                            end: 46,
+                        },
+                    },
+                ],
+                binding: None,
+                span: Span {
+                    start: 0,
+                    end: 47,
+                },
+            },
+        ),
+    ],
+}

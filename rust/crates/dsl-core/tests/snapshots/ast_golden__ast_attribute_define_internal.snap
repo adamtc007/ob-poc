@@ -1,0 +1,86 @@
+---
+source: crates/dsl-core/tests/ast_golden.rs
+assertion_line: 303
+expression: program
+---
+Program {
+    statements: [
+        VerbCall(
+            VerbCall {
+                domain: "attribute",
+                verb: "define-internal",
+                arguments: [
+                    Argument {
+                        key: "id",
+                        value: Literal(
+                            String(
+                                "attr.system.last_sync",
+                            ),
+                            Span {
+                                start: 31,
+                                end: 54,
+                            },
+                        ),
+                        span: Span {
+                            start: 27,
+                            end: 54,
+                        },
+                    },
+                    Argument {
+                        key: "display-name",
+                        value: Literal(
+                            String(
+                                "Last Sync",
+                            ),
+                            Span {
+                                start: 69,
+                                end: 80,
+                            },
+                        ),
+                        span: Span {
+                            start: 55,
+                            end: 80,
+                        },
+                    },
+                    Argument {
+                        key: "category",
+                        value: Literal(
+                            String(
+                                "resource",
+                            ),
+                            Span {
+                                start: 91,
+                                end: 101,
+                            },
+                        ),
+                        span: Span {
+                            start: 81,
+                            end: 101,
+                        },
+                    },
+                    Argument {
+                        key: "value-type",
+                        value: Literal(
+                            String(
+                                "datetime",
+                            ),
+                            Span {
+                                start: 114,
+                                end: 124,
+                            },
+                        ),
+                        span: Span {
+                            start: 102,
+                            end: 124,
+                        },
+                    },
+                ],
+                binding: None,
+                span: Span {
+                    start: 0,
+                    end: 125,
+                },
+            },
+        ),
+    ],
+}
