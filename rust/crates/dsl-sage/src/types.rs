@@ -40,7 +40,7 @@ impl SageContext {
 // ---------------------------------------------------------------------------
 
 /// A proposed value for a single pack parameter, produced by the extractor.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ParameterProposal {
     /// The parameter name as declared in the pack (e.g., `"gate-name"`).
     pub parameter_name: String,
@@ -58,7 +58,7 @@ pub struct ParameterProposal {
 ///
 /// The user can accept, edit individual parameters, reject the pack entirely,
 /// or cancel the whole flow.  See [`ConfirmationResponse`].
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ConfirmationRequest {
     /// The selected pack name (e.g., `"conjunctive-gate"`).
     pub pack_name: String,
@@ -74,7 +74,7 @@ pub struct ConfirmationRequest {
 }
 
 /// User response to a [`ConfirmationRequest`].
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum ConfirmationResponse {
     /// Accept all proposed parameters and proceed to DSL emission.
     Accept,
@@ -94,7 +94,7 @@ pub enum ConfirmationResponse {
 // ---------------------------------------------------------------------------
 
 /// A single ranked candidate returned by the pack matcher.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct RankedCandidate {
     /// The decision pack's name (e.g., `"conjunctive-gate"`).
     pub pack_name: String,

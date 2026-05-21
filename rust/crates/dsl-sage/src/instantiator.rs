@@ -16,6 +16,7 @@ use std::collections::HashMap;
 
 use anyhow::{anyhow, Result};
 use dsl_resolution::{DecisionPack, PackRegistry};
+use serde::{Deserialize, Serialize};
 
 use crate::types::SageContext;
 
@@ -24,7 +25,7 @@ use crate::types::SageContext;
 // ---------------------------------------------------------------------------
 
 /// The outcome of a successful pack instantiation.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct InstantiationResult {
     /// The complete DSL source: structural atoms followed by the provenance atom.
     pub dsl_source: String,
@@ -46,7 +47,7 @@ pub struct InstantiationResult {
 }
 
 /// Summary returned by [`validate_instantiation`].
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ValidationSummary {
     /// `true` when the compile pipeline produced at least one error diagnostic.
     pub has_errors: bool,

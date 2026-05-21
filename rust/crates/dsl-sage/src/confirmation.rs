@@ -35,6 +35,8 @@
 
 use std::collections::HashMap;
 
+use serde::{Deserialize, Serialize};
+
 use crate::types::{ConfirmationRequest, ConfirmationResponse, ParameterProposal};
 
 // ---------------------------------------------------------------------------
@@ -42,7 +44,7 @@ use crate::types::{ConfirmationRequest, ConfirmationResponse, ParameterProposal}
 // ---------------------------------------------------------------------------
 
 /// Current state of a [`ConfirmationSession`].
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum ConfirmationState {
     /// Awaiting user decision (initial state).
     Pending,
@@ -59,7 +61,7 @@ pub enum ConfirmationState {
 // ---------------------------------------------------------------------------
 
 /// Record of a single user-driven parameter edit.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ParameterEdit {
     pub parameter_name: String,
     pub old_value: serde_json::Value,
@@ -77,7 +79,7 @@ pub struct ParameterEdit {
 /// Create with [`ConfirmationSession::new`], drive with
 /// [`ConfirmationSession::apply_response`], poll with
 /// [`ConfirmationSession::state`] and [`ConfirmationSession::is_terminal`].
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ConfirmationSession {
     /// Stable identifier for this confirmation session.
     pub session_id: String,

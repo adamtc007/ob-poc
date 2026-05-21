@@ -27,11 +27,14 @@
 //! is expected to push that to ≥ 80%.  The evaluation harness in
 //! `tests/pack_matching_eval.rs` targets 50% as the BoW baseline.
 
+pub mod audit;
 pub mod confirmation;
 pub mod context;
 pub mod extractor;
 pub mod instantiator;
 pub mod matcher;
+pub mod orchestrator;
+pub mod repl;
 pub mod types;
 
 // Tranche 1
@@ -50,3 +53,7 @@ pub use types::{
 pub use instantiator::{
     expand_template, instantiate, validate_instantiation, InstantiationResult, ValidationSummary,
 };
+// Tranche 4
+pub use audit::{SageAuditEntry, SageAuditLog};
+pub use orchestrator::{SageInput, SageOrchestrator, SageSession, SageState};
+pub use repl::SageSessionStore;
