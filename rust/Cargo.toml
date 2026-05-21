@@ -246,6 +246,10 @@ required-features = ["database", "cli"]
 name = "sem_os_footprint_audit"
 path = "src/bin/sem_os_footprint_audit.rs"
 
+[[bin]]
+name = "verb_to_dsl"
+path = "src/bin/verb_to_dsl.rs"
+
 # Features for conditional compilation
 [features]
 default = ["server"]  # Enable for sqlx prepare; use --no-default-features to disable
