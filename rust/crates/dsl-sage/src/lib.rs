@@ -1,4 +1,4 @@
-//! dsl-sage: Sage pack matcher — utterance → ranked decision-pack candidates.
+//! dsl-sage: Sage pack matcher + parameter extractor.
 //!
 //! # Overview
 //!
@@ -6,7 +6,11 @@
 //! returns a ranked list of [`RankedCandidate`] structs, each identifying
 //! a decision pack and its confidence score.
 //!
-//! ## Two-layer pipeline
+//! Once a pack is selected, [`extract_parameters`] proposes values for the
+//! pack's declared parameters, and [`ConfirmationSession`] drives the
+//! user through a confirm / edit / reject interaction before DSL emission.
+//!
+//! ## Two-layer matching pipeline
 //!
 //! 1. **Embedding retrieval** (always synchronous, no LLM):
 //!    compute similarity between the utterance and each pack's example
@@ -23,13 +27,21 @@
 //! is expected to push that to ≥ 80%.  The evaluation harness in
 //! `tests/pack_matching_eval.rs` targets 50% as the BoW baseline.
 
+pub mod confirmation;
 pub mod context;
+pub mod extractor;
 pub mod matcher;
 pub mod types;
 
+// Tranche 1
 pub use context::context_from_session;
 pub use matcher::{
     match_packs, match_packs_embedding_only, BagOfWordsEmbedder, LlmClient, LlmRankEntry,
     MockLlmClient, PackEmbedder, PackSummary,
 };
-pub use types::{RankedCandidate, SageContext};
+// Tranche 2
+pub use confirmation::{ConfirmationSession, ConfirmationState, ParameterEdit};
+pub use extractor::{extract_parameters, HeuristicExtractor, LlmExtractor, PackSummaryWithParams};
+pub use types::{
+    ConfirmationRequest, ConfirmationResponse, ParameterProposal, RankedCandidate, SageContext,
+};
