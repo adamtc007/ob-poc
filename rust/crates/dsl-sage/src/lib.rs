@@ -30,6 +30,7 @@
 pub mod confirmation;
 pub mod context;
 pub mod extractor;
+pub mod instantiator;
 pub mod matcher;
 pub mod types;
 
@@ -44,4 +45,8 @@ pub use confirmation::{ConfirmationSession, ConfirmationState, ParameterEdit};
 pub use extractor::{extract_parameters, HeuristicExtractor, LlmExtractor, PackSummaryWithParams};
 pub use types::{
     ConfirmationRequest, ConfirmationResponse, ParameterProposal, RankedCandidate, SageContext,
+};
+// Tranche 3
+pub use instantiator::{
+    expand_template, instantiate, validate_instantiation, InstantiationResult, ValidationSummary,
 };
