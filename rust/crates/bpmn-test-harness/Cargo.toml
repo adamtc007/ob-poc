@@ -1,0 +1,26 @@
+[package]
+name = "bpmn-test-harness"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.95"
+description = "Scenario runner and test helpers for the bpmn-runtime crate (Tranche 6)"
+
+[dependencies]
+bpmn-runtime = { path = "../bpmn-runtime" }
+dsl-ast = { path = "../dsl-ast" }
+dsl-diagnostics = { path = "../dsl-diagnostics" }
+dsl-parser = { path = "../dsl-parser" }
+dsl-bpmn-frontend = { path = "../dsl-bpmn-frontend" }
+dsl-lowering = { path = "../dsl-lowering" }
+dsl-resolution = { path = "../dsl-resolution" }
+serde_json = "1.0"
+uuid = { version = "1.4", features = ["v4"] }
+tokio = { version = "1", features = ["full"] }
+anyhow = "1.0"
+async-trait = "0.1"
+
+[dev-dependencies]
+tokio = { version = "1", features = ["full"] }
+
+[lints.rust]
+unreachable_pub = "deny"

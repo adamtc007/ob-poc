@@ -594,6 +594,7 @@ pub fn extend_registry(registry: &mut sem_os_postgres::ops::SemOsVerbOpRegistry)
     registry.register(Arc::new(trading_profile::TradingProfileImportVerb));
     registry.register(Arc::new(trading_profile::TradingProfileGetActive));
     registry.register(Arc::new(trading_profile::TradingProfileActivate));
+    registry.register(Arc::new(trading_profile::InstrumentMatrixAttachOp));
     registry.register(Arc::new(trading_profile::TradingProfileMaterialize));
     registry.register(Arc::new(trading_profile::TradingProfileCreateDraft));
     registry.register(Arc::new(trading_profile::TradingProfileAddComponent));

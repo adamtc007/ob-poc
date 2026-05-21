@@ -20,6 +20,7 @@ owned_universes:
   - universe.trading_operations
 owned_verb_prefixes:
   - instrument.
+  - instrument-matrix.
   - trading-profile.
   - settlement-chain.
   - trade-gateway.
@@ -31,6 +32,15 @@ owned_constellations:
   - instrument.workspace
   - instrument.template
 allowed_transitions:
+  - transition_ref: instrument-matrix.attach
+    entity_type: cbu
+    state_machine: instrument_matrix_overall_lifecycle
+    verb: instrument-matrix.attach
+    from_state: dormant
+    to_state: configuring
+    dry_run_enabled: true
+    mutation_enabled: true
+    hitl_required: false
   - transition_ref: instrument-matrix.profile-created
     entity_type: cbu
     state_machine: trading_profile_lifecycle

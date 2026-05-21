@@ -1,0 +1,20 @@
+[package]
+name = "dsl-bpmn-frontend"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.95"
+description = "BPMN-Lite frontend for the unified DSL v0.1 — lowers typed AST atoms to bpmn-lite IR"
+
+[dependencies]
+dsl-atoms = { path = "../dsl-atoms" }
+dsl-ast = { path = "../dsl-ast" }
+dsl-diagnostics = { path = "../dsl-diagnostics" }
+dsl-parser = { path = "../dsl-parser" }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+
+[dev-dependencies]
+dsl-lowering = { path = "../dsl-lowering" }
+
+[lints.rust]
+unreachable_pub = "deny"

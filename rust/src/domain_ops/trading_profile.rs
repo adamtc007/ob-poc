@@ -3026,3 +3026,68 @@ impl SemOsVerbOp for TradingProfileCreateNewVersion {
         Ok(VerbExecutionOutcome::Record(serde_json::to_value(result)?))
     }
 }
+
+// =============================================================================
+// INSTRUMENT MATRIX ATTACH
+// =============================================================================
+
+/// `instrument-matrix.attach` — idempotent bootstrap of a CBU's instrument
+/// matrix. Creates a DRAFT trading profile if one does not already exist,
+/// then returns `{ trading_profile_id, created }`. Safe to call multiple
+/// times; subsequent calls return the existing profile without mutation.
+pub struct InstrumentMatrixAttachOp;
+
+#[async_trait]
+impl SemOsVerbOp for InstrumentMatrixAttachOp {
+    fn fqn(&self) -> &str {
+        "instrument-matrix.attach"
+    }
+
+    async fn execute(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut VerbExecutionContext,
+        scope: &mut dyn TransactionScope,
+    ) -> Result<VerbExecutionOutcome> {
+        let pool = scope.pool().clone();
+        let cbu_id: Uuid = json_extract_uuid(args, ctx, "cbu-id")
+            .map_err(|_| anyhow::anyhow!("cbu-id is required"))?;
+
+        // Check whether a trading profile already exists for this CBU.
+        let existing: Option<Uuid> = sqlx::query_scalar(
+            r#"SELECT profile_id FROM "ob-poc".cbu_trading_profiles
+               WHERE cbu_id = $1 AND is_template = false
+               ORDER BY created_at DESC LIMIT 1"#,
+        )
+        .bind(cbu_id)
+        .fetch_optional(&pool)
+        .await
+        .map_err(|e| anyhow::anyhow!("Failed to check existing profile: {}", e))?;
+
+        let (profile_id, created) = if let Some(pid) = existing {
+            (pid, false)
+        } else {
+            let notes = json_extract_string_opt(args, "template")
+                .map(|t| format!("bootstrapped from template: {}", t));
+            let (pid, _doc) = ast_db::create_draft(&pool, cbu_id, notes)
+                .await
+                .map_err(|e| anyhow::anyhow!("Failed to create draft: {}", e))?;
+            (pid, true)
+        };
+
+        ctx.bind("trading_profile_id", profile_id);
+
+        #[derive(serde::Serialize)]
+        struct AttachResult {
+            trading_profile_id: Uuid,
+            created: bool,
+        }
+
+        Ok(VerbExecutionOutcome::Record(serde_json::to_value(
+            AttachResult {
+                trading_profile_id: profile_id,
+                created,
+            },
+        )?))
+    }
+}

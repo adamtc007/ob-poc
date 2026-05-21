@@ -3,7 +3,7 @@
 > **Last reviewed:** 2026-05-15
 > **Frontend:** React/TypeScript (`ob-poc-ui-react/`) — Chat UI with scope panel, Inspector, Semantic OS Tab
 > **Backend:** Rust/Axum (`rust/crates/ob-poc-web/`) — Serves React + REST API
-> **Crates:** 41 workspace crates (incl. `ob-poc` application root) — 18 ob-poc-* library (web, types, diagnostics, boundary, sage, journey, authoring, agent, macros · split-v1: bods, deal, booking-principal, semtaxonomy, ontology, entity-linking, trading-profile, derived-attributes, taxonomy) · 10 sem_os_* (core, types, ontology, policy, postgres, server, client, obpoc_adapter, harness, mcp) · 4 dsl-* (dsl-core, dsl-lsp, dsl-runtime, dsl-analysis) · 4 ob-* (ob-agentic, ob-templates, ob-workflow, ob-semantic-matcher) · 4 misc (entity-gateway, xtask, playbook-core, inspector-projection)
+> **Crates:** 50 workspace crates (incl. `ob-poc` application root) — 18 ob-poc-* library (web, types, diagnostics, boundary, sage, journey, authoring, agent, macros · split-v1: bods, deal, booking-principal, semtaxonomy, ontology, entity-linking, trading-profile, derived-attributes, taxonomy) · 10 sem_os_* (core, types, ontology, policy, postgres, server, client, obpoc_adapter, harness, mcp) · 4 dsl-* (dsl-core, dsl-lsp, dsl-runtime, dsl-analysis) · 4 ob-* (ob-agentic, ob-templates, ob-workflow, ob-semantic-matcher) · 4 misc (entity-gateway, xtask, playbook-core, inspector-projection) · 9 unified-dsl-v0.1 (dsl-atoms, dsl-diagnostics, dsl-parser, dsl-ast, dsl-bpmn-frontend, dsl-lowering, dsl-resolution, bpmn-runtime, bpmn-test-harness)
 > **Verbs:** 1,282 canonical verbs across 134 domains (795 declared with three-axis = 62.0%); 24,587 intent patterns (DB-sourced)
 > **Macros:** 103 operator macros (22 YAML files, 18 domains, 3 composite), Tier -2B in intent pipeline
 > **MCP Tools:** ~102 tools (DSL, verbs, learning, session, batch, research, taxonomy, sem_reg, stewardship, db_introspect, session_verb_surface)
@@ -102,6 +102,24 @@ The unified workspace (edition 2024, resolver "3", rust-version "1.95") ships bo
 The local `bpmn-lite/` directory remains inside ob-poc for monorepo development convenience (has its own `.git`; ob-poc does not track it as a submodule). bpmn-lite consumes `ob-poc-types` as a rev-pinned git dep (currently `397470cb`); ob-poc consumes bpmn-lite over gRPC (`bpmn_integration/` — 12 files). See `docs/annex-bpmn-lite.md` for the integration pattern.
 
 For internals of both vocabularies, see `bpmn-lite/CLAUDE.md`.
+
+### Unified DSL v0.1 Status (2026-05-21)
+
+Nine new crates ship the v0.1 unified DSL implementation (see `docs/design/v0.1/` for full spec):
+
+- **dsl-atoms** — `StructuralKind` (20 variants), `DeclarativeKind` (4), `AtomKindClass`, `ParamType`. Atom kind taxonomy for the unified s-expression DSL.
+- **dsl-diagnostics** — `DiagnosticBag`, `Span`, 11 well-known diagnostic code constants. Source-attributed error reporting.
+- **dsl-parser** — Logos lexer + hand-written recursive-descent parser. Produces `SourceFile { atoms: Vec<RawAtom> }`. Handles `,name`/`,@name` template substitution, `$pre-node` insertion markers, `->` flow sugar.
+- **dsl-ast** — `AtomBag` with structural/declarative classification, name index, kind-filtered iteration.
+- **dsl-bpmn-frontend** — `assemble(bag, diag) -> RailwayGraph`. Full structural validation (reachability, termination, gateway fan-out, boundary attachment). 12 worked example compilation tests.
+- **dsl-lowering** — `lower(graph, name) -> JourneySpec`. Deterministic serialisation of RailwayGraph to runtime executable form.
+- **dsl-resolution** — `resolve(bag, registry, diag)`: validates decision-pack templates, provenance atoms, governance-status refs. `validate_bpmn(source, name, registry) -> ValidateResponse`. `PackRegistry` with load_packs_from_dir(). 12 seed packs loaded at `dsl-source/packs/`.
+- **bpmn-runtime** — `RuntimeEngine` (journey-persisted hydrate/dehydrate model). `InMemoryJourneyStore`. Full event loop with parallel fork/join, merge protocol (detect-and-fail on undeclared conflicts), inclusive gateway dynamic fan-in, token-death short-circuit, verb invocation interface, switch adaptor protocol. Schema at `migrations/20260521_dsl_journey_runtime.sql`.
+- **bpmn-test-harness** — `Scenario`/`RunResult` test builder. `compile_dsl()`. `instantiate_pack()` for all 12 packs (Sage stub). 89 tests total across all 9 crates.
+
+**Test count (2026-05-21):** 89 passing, 0 failures, 3 ignored (perf).
+
+**Tranche 1 (SemOS regression baseline) and Tranche 3 (SemOS reshape) are pending.** See `docs/todo/master-implementation-plan-v0_1.md`.
 
 **SemOS is the hub for all things.** All paths lead to SemOS — nowhere else. The PostgreSQL schema is a supplementary store, a materialized projection, switchable if needed.
 

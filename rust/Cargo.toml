@@ -337,4 +337,19 @@ members = [
 
     # dsl-runtime split v1 (docs/todo/dsl-runtime-split-v1.md) — analyser plane
     "crates/dsl-analysis",
+
+    # Unified DSL v0.1 — Tranche 2: atom model and parser foundation
+    "crates/dsl-atoms",
+    "crates/dsl-diagnostics",
+    "crates/dsl-parser",
+    "crates/dsl-ast",
+    # Unified DSL v0.1 — Tranche 3–5 placeholders
+    "crates/dsl-resolution",
+    "crates/dsl-lowering",
+    "crates/dsl-semos-frontend",
+    "crates/dsl-bpmn-frontend",
+
+    # Unified DSL v0.1 — Tranche 6: journey-persisted runtime + test harness
+    "crates/bpmn-runtime",
+    "crates/bpmn-test-harness",
 ]

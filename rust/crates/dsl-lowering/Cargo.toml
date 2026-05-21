@@ -1,0 +1,17 @@
+[package]
+name = "dsl-lowering"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.95"
+description = "Lowering pass from resolved atoms to target-neutral intermediate form for the unified DSL v0.1"
+
+[dependencies]
+dsl-atoms = { path = "../dsl-atoms" }
+dsl-ast = { path = "../dsl-ast" }
+dsl-diagnostics = { path = "../dsl-diagnostics" }
+dsl-bpmn-frontend = { path = "../dsl-bpmn-frontend" }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+
+[lints.rust]
+unreachable_pub = "deny"

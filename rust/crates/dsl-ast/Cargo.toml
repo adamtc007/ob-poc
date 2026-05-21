@@ -1,0 +1,15 @@
+[package]
+name = "dsl-ast"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.95"
+description = "Typed AST nodes for the unified DSL v0.1"
+
+[dependencies]
+dsl-atoms = { path = "../dsl-atoms" }
+dsl-diagnostics = { path = "../dsl-diagnostics" }
+dsl-parser = { path = "../dsl-parser" }
+serde = { version = "1.0", features = ["derive"] }
+
+[lints.rust]
+unreachable_pub = "deny"

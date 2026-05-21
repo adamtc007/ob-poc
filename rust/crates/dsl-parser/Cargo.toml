@@ -1,0 +1,15 @@
+[package]
+name = "dsl-parser"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.95"
+description = "S-expression lexer and parser for the unified DSL v0.1"
+
+[dependencies]
+dsl-atoms = { path = "../dsl-atoms" }
+dsl-diagnostics = { path = "../dsl-diagnostics" }
+logos = "0.14"
+serde = { version = "1.0", features = ["derive"] }
+
+[lints.rust]
+unreachable_pub = "deny"

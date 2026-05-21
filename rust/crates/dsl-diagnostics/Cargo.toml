@@ -1,0 +1,13 @@
+[package]
+name = "dsl-diagnostics"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.95"
+description = "Source-attributed diagnostics for the unified DSL v0.1"
+
+[dependencies]
+serde = { version = "1.0", features = ["derive"] }
+thiserror = "1.0"
+
+[lints.rust]
+unreachable_pub = "deny"

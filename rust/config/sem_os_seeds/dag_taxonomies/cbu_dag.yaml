@@ -202,6 +202,7 @@ overall_lifecycle:
         - cbu.add-product
         - cbu.remove-product
         - cbu-custody.setup-ssi
+        - instrument-matrix.attach
       next_phase: operationally_active
 
     - name: operationally_active

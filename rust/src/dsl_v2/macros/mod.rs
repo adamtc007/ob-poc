@@ -53,8 +53,6 @@ pub use dsl_analysis::macros::schema::{
     ArgStyle, MacroArg, MacroArgType, MacroArgs, MacroExpansionStep, MacroKind, MacroRouting,
     MacroTarget, MacroUi, SetState, VerbCallStep,
 };
-#[cfg(test)]
-pub use dsl_analysis::macros::scope;
 pub use dsl_analysis::macros::{
     conditions, load_macro_registry, load_macro_registry_from_dir, registry, schema, variable,
     MacroRegistry,

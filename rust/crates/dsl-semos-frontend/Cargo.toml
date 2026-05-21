@@ -1,0 +1,14 @@
+[package]
+name = "dsl-semos-frontend"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.95"
+description = "SemOS frontend for the unified DSL v0.1 — lowers typed AST atoms to SemOS registry objects"
+
+[dependencies]
+dsl-atoms = { path = "../dsl-atoms" }
+dsl-ast = { path = "../dsl-ast" }
+dsl-diagnostics = { path = "../dsl-diagnostics" }
+
+[lints.rust]
+unreachable_pub = "deny"

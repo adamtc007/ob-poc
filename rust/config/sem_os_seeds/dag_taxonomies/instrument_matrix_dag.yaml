@@ -86,6 +86,8 @@ workspace: instrument_matrix
 dag_id: instrument_matrix_dag
 
 dsl_verb_reconciliation:
+  instrument_matrix_attach_surface:
+    - instrument-matrix.attach
   instrument_macro_surface:
     - instrument.activate-profile
     - instrument.clone-profile
