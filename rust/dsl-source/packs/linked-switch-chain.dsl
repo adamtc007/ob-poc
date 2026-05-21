@@ -1,27 +1,21 @@
 (decision-pack linked-switch-chain
   :version "1.0.0"
-  :description "Sequential exclusive gateways; each check may fast-exit or proceed to next. Representative template for N=2 checks; N>=3 follows the same structural pattern."
+  :description "Sequential exclusive gateways; each check may fast-exit or proceed to next. Uses for-each for the check list. NOTE: sequential chaining between N gateways (each gate's default continuing to the next) is Sage's responsibility during instantiation — for-each emits gate declarations; Sage connects them in order."
   :domain-scope [cbu kyc onboarding]
   :parameters [
-    {:name gate-1-name    :type symbol       :required true}
-    {:name gate-2-name    :type symbol       :required true}
-    {:name condition-1    :type condition-expr :required true
-     :description "First check: if this FAILS, take exit-path-1"}
-    {:name condition-2    :type condition-expr :required true
-     :description "Second check: if this FAILS, take exit-path-2"}
-    {:name exit-path-1    :type node-ref     :required true
-     :description "Fast-exit when condition-1 fails"}
-    {:name exit-path-2    :type node-ref     :required true
-     :description "Fast-exit when condition-2 fails"}
-    {:name final-path     :type node-ref     :required true
-     :description "Destination when both checks pass"}
+    ; TODO (v0.3): replace with list-of-map when the sequential-chaining
+    ; insertion-point pattern is implemented in the Sage instantiation engine.
+    ; Until then, gateways are declared via for-each and Sage chains them.
+    {:name gateway-names :type list-of-map :required true
+     :description "List of {name, condition, exit-path} maps; each entry is one check gate. Sequential chaining (default of gate N → gate N+1) is Sage-managed."}
+    {:name final-path    :type node-ref    :required true
+     :description "Destination when all checks pass"}
   ]
   :template [
-    (flow $pre-node -> ,gate-1-name)
-    (flow ,gate-1-name -> ,exit-path-1 :default false)
-    (flow ,gate-1-name -> ,gate-2-name :default true)
-    (flow ,gate-2-name -> ,exit-path-2 :default false)
-    (flow ,gate-2-name -> ,final-path :default true)
+    (flow $pre-node -> first-gateway-placeholder)
+    (for-each :var check :in gateway-names
+      (flow ,check.name -> ,check.exit-path))
+    (flow last-gateway-placeholder -> ,final-path)
   ]
   :example-utterances [
     "first verify identity, then check sanctions - exit early on any failure"
@@ -34,7 +28,7 @@
     :evaluation-order sequential
     :gateway-kind     exclusive
     :early-exit       true
-    :fixed-checks     2
+    :fixed-checks     variable
   }
   :governance-ref linked-switch-chain-v1-status)
 

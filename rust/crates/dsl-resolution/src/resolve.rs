@@ -8,8 +8,8 @@ use std::collections::HashSet;
 use dsl_ast::{AtomBag, TypedAtom};
 use dsl_atoms::{AtomKindClass, DeclarativeKind, StructuralKind};
 use dsl_diagnostics::{
-    Diagnostic, DiagnosticBag, UNKNOWN_PACK_REFERENCE, UNKNOWN_TEMPLATE_PARAMETER,
-    UNRESOLVED_NAME_REF,
+    Diagnostic, DiagnosticBag, INVALID_PARAMETER_NAME, UNKNOWN_LOOP_VARIABLE,
+    UNKNOWN_PACK_REFERENCE, UNKNOWN_TEMPLATE_PARAMETER, UNRESOLVED_NAME_REF,
 };
 use dsl_parser::raw_ast::RawValue;
 
@@ -171,6 +171,20 @@ fn extract_params(
                     .unwrap_or(false);
                 let description = get("description");
                 let default_value = get("default");
+                // Dots in parameter names are reserved for the for-each
+                // loop-variable accessor syntax (`,var.field`).
+                if name.contains('.') {
+                    diagnostics.push(
+                        Diagnostic::error_with_code(
+                            format!(
+                                "Parameter name '{}' contains '.'; dots are reserved \
+                                 for for-each accessor syntax (,var.field)",
+                                name
+                            ),
+                            INVALID_PARAMETER_NAME,
+                        ),
+                    );
+                }
                 result.push(PackParam {
                     name,
                     param_type,
@@ -199,17 +213,45 @@ fn validate_template(
     let Some((_, template_val)) = raw.slots.iter().find(|(k, _)| k == "template") else {
         return;
     };
-    walk_value(template_val, param_names, diagnostics);
+    walk_value(template_val, param_names, None, diagnostics);
 }
 
+/// Walk a `RawValue`, validating all template reference forms.
+///
+/// `loop_var` is `Some(name)` when we are inside a `for-each` body; it
+/// permits `,loop_var.field` accessor forms without requiring them to be in
+/// `param_names`.
 fn walk_value(
     val: &RawValue,
     param_names: &HashSet<String>,
+    loop_var: Option<&str>,
     diagnostics: &mut DiagnosticBag,
 ) {
     match val {
         RawValue::TemplateSubst(name) => {
-            if !param_names.contains(name) {
+            // Allow `,var.field` inside for-each bodies where `var` matches
+            // the declared loop variable.  The field part is unchecked at
+            // v0.2 (dynamic map access; field names are not declared in the
+            // parameter schema).
+            if let Some(dot_pos) = name.find('.') {
+                let var_part = &name[..dot_pos];
+                if let Some(lv) = loop_var {
+                    if var_part == lv {
+                        return; // valid accessor form
+                    }
+                }
+                // Dot outside a for-each context, or var doesn't match.
+                diagnostics.push(
+                    Diagnostic::error_with_code(
+                        format!(
+                            "Template substitution ',{}' uses dot accessor but '{}' is not \
+                             the active loop variable",
+                            name, var_part
+                        ),
+                        UNKNOWN_LOOP_VARIABLE,
+                    ),
+                );
+            } else if !param_names.contains(name) {
                 diagnostics.push(
                     Diagnostic::error_with_code(
                         format!("Unknown template parameter ',{}'", name),
@@ -228,19 +270,37 @@ fn walk_value(
                 );
             }
         }
+        RawValue::ForEach { var, list_param, body } => {
+            // Validate that :in references a declared list-typed parameter.
+            if !param_names.contains(list_param.as_str()) {
+                diagnostics.push(
+                    Diagnostic::error_with_code(
+                        format!(
+                            "for-each :in '{}' does not reference a declared parameter",
+                            list_param
+                        ),
+                        UNKNOWN_TEMPLATE_PARAMETER,
+                    ),
+                );
+            }
+            // Walk body with the loop variable in scope.
+            for item in body {
+                walk_value(item, param_names, Some(var.as_str()), diagnostics);
+            }
+        }
         RawValue::List(items) => {
             for item in items {
-                walk_value(item, param_names, diagnostics);
+                walk_value(item, param_names, loop_var, diagnostics);
             }
         }
         RawValue::Map(pairs) => {
             for (_, v) in pairs {
-                walk_value(v, param_names, diagnostics);
+                walk_value(v, param_names, loop_var, diagnostics);
             }
         }
         RawValue::Atom(inner) => {
             for (_, v) in &inner.slots {
-                walk_value(v, param_names, diagnostics);
+                walk_value(v, param_names, loop_var, diagnostics);
             }
         }
         // Leaf values — nothing to check.

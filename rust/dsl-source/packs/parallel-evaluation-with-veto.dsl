@@ -1,28 +1,25 @@
 (decision-pack parallel-evaluation-with-veto
   :version "1.0.0"
-  :description "Two parallel evaluation tasks; any single veto at join blocks the application. Representative template for N=2; N>=3 follows the same structural pattern."
+  :description "N parallel evaluation tasks; any single veto at join blocks the application. Uses for-each for variable-arity task list."
   :domain-scope [cbu kyc screening]
   :parameters [
-    {:name fork-name        :type symbol   :required true}
-    {:name join-name        :type symbol   :required true}
-    {:name post-join-gate   :type symbol   :required true}
-    {:name eval-task-1      :type node-ref :required true
-     :description "First existing evaluation task node"}
-    {:name eval-task-2      :type node-ref :required true
-     :description "Second existing evaluation task node"}
-    {:name veto-field       :type string   :required false :default "veto-result"}
-    {:name vetoed-path      :type node-ref :required true}
-    {:name approved-path    :type node-ref :required true}
+    {:name fork-name        :type symbol      :required true}
+    {:name join-name        :type symbol      :required true}
+    {:name post-join-gate   :type symbol      :required true}
+    {:name eval-tasks       :type list-of-map :required true
+     :description "List of {name} maps; each entry has :name (node-ref) for an existing evaluation task node."}
+    {:name veto-field       :type string      :required false :default "veto-result"}
+    {:name vetoed-path      :type node-ref    :required true}
+    {:name approved-path    :type node-ref    :required true}
   ]
   :template [
     (flow $pre-node -> ,fork-name)
-    (flow ,fork-name -> ,eval-task-1)
-    (flow ,fork-name -> ,eval-task-2)
-    (flow ,eval-task-1 -> ,join-name)
-    (flow ,eval-task-2 -> ,join-name)
+    (for-each :var task :in eval-tasks
+      (flow ,fork-name -> ,task.name)
+      (flow ,task.name -> ,join-name))
     (flow ,join-name -> ,post-join-gate)
-    (flow ,post-join-gate -> ,vetoed-path :default false)
-    (flow ,post-join-gate -> ,approved-path :default true)
+    (flow ,post-join-gate -> ,vetoed-path)
+    (flow ,post-join-gate -> ,approved-path)
   ]
   :example-utterances [
     "run all checks in parallel; if any rejects, the whole application is rejected"

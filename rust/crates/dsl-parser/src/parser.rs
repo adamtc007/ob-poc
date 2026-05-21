@@ -12,8 +12,9 @@
 //! atom         ::= '(' symbol name? slot* ')'
 //! name         ::= symbol          ; only if it does NOT start with ':' (keywords are separate tokens)
 //! slot         ::= keyword value
-//! value        ::= atom | list | map | qualified-name | symbol | string | int | float | bool
+//! value        ::= atom | for-each | list | map | qualified-name | symbol | string | int | float | bool
 //!                | slot-ref | template-subst | template-splice | insertion-marker
+//! for-each     ::= '(' 'for-each' ':var' symbol ':in' symbol value* ')'
 //! list         ::= '[' value* ']'
 //! map          ::= '{' (keyword value)* '}'
 //! qualified-name ::= symbol '/' symbol    ; two symbols separated by '/'
@@ -24,6 +25,10 @@
 //! silently consumed; `src` and `tgt` are parsed as positional values for the
 //! `source` and `target` slot names respectively (no explicit `:source`/`:target`
 //! keywords needed on the wire, but the parser synthesises them).
+//!
+//! `for-each` form: `(for-each :var VAR :in LIST_PARAM body-atoms...)` is a
+//! special value-level form valid inside a `:template` slot.  It parses into
+//! `RawValue::ForEach` rather than `RawValue::Atom`.
 
 use logos::Logos;
 
@@ -146,11 +151,19 @@ impl<'src> Parser<'src> {
         }
     }
 
-    /// Parse `(kind [name] slot* ')`.
+    /// Parse `(kind [name] slot* ')` — consumes the opening `(`.
     fn parse_atom(&mut self) -> Option<RawAtom> {
         // Consume the '('
         self.stream.next();
+        // Dispatch to the body parser.
+        self.parse_atom_body()
+    }
 
+    /// Parse `kind [name] slot* ')'` — called AFTER `(` has already been consumed.
+    ///
+    /// This is also called from `parse_value` when the next paren-form is NOT a
+    /// `for-each`.
+    fn parse_atom_body(&mut self) -> Option<RawAtom> {
         // First token must be a Symbol → the atom kind
         let kind = match self.stream.next() {
             Some(Ok(Token::Symbol(s))) => s,
@@ -283,6 +296,88 @@ impl<'src> Parser<'src> {
         })
     }
 
+    /// Parse the body of a `for-each` form — called AFTER `(` and `for-each`
+    /// have already been consumed.
+    ///
+    /// Syntax consumed here: `:var VAR :in LIST_PARAM body-values... ')'`
+    fn parse_for_each_body(&mut self) -> Option<RawValue> {
+        // :var VAR
+        let var = match self.stream.next() {
+            Some(Ok(Token::Keyword(k))) if k == "var" => {
+                match self.stream.next() {
+                    Some(Ok(Token::Symbol(s))) => s,
+                    other => {
+                        self.diagnostics.push(Diagnostic::error(format!(
+                            "for-each: expected symbol after :var, got {:?}",
+                            other
+                        )));
+                        return None;
+                    }
+                }
+            }
+            other => {
+                self.diagnostics.push(Diagnostic::error(format!(
+                    "for-each: expected :var keyword, got {:?}",
+                    other
+                )));
+                return None;
+            }
+        };
+
+        // :in LIST_PARAM
+        let list_param = match self.stream.next() {
+            Some(Ok(Token::Keyword(k))) if k == "in" => {
+                match self.stream.next() {
+                    Some(Ok(Token::Symbol(s))) => s,
+                    other => {
+                        self.diagnostics.push(Diagnostic::error(format!(
+                            "for-each: expected symbol after :in, got {:?}",
+                            other
+                        )));
+                        return None;
+                    }
+                }
+            }
+            other => {
+                self.diagnostics.push(Diagnostic::error(format!(
+                    "for-each: expected :in keyword, got {:?}",
+                    other
+                )));
+                return None;
+            }
+        };
+
+        // body: zero or more values until ')'
+        let mut body = Vec::new();
+        loop {
+            match self.stream.peek() {
+                None => {
+                    self.diagnostics
+                        .push(Diagnostic::error("Unexpected EOF inside for-each body"));
+                    return None;
+                }
+                Some(Ok(Token::CloseParen)) => {
+                    self.stream.next();
+                    break;
+                }
+                _ => {
+                    match self.parse_value() {
+                        Some(v) => body.push(v),
+                        None => {
+                            // parse_value emitted a diagnostic; try to continue
+                        }
+                    }
+                }
+            }
+        }
+
+        Some(RawValue::ForEach {
+            var,
+            list_param,
+            body,
+        })
+    }
+
     /// Parse a single value (slot RHS or list element).
     fn parse_value(&mut self) -> Option<RawValue> {
         match self.stream.peek() {
@@ -299,8 +394,20 @@ impl<'src> Parser<'src> {
             }
             Some(Ok(tok)) => match tok {
                 Token::OpenParen => {
-                    // Nested atom
-                    self.parse_atom().map(RawValue::Atom)
+                    // Consume '('
+                    self.stream.next();
+                    // Peek at the kind to detect the for-each special form.
+                    let is_for_each = matches!(
+                        self.stream.peek(),
+                        Some(Ok(Token::Symbol(s))) if s == "for-each"
+                    );
+                    if is_for_each {
+                        self.stream.next(); // consume "for-each"
+                        self.parse_for_each_body()
+                    } else {
+                        // Regular nested atom: '(' already consumed, parse body.
+                        self.parse_atom_body().map(RawValue::Atom)
+                    }
                 }
                 Token::OpenBracket => {
                     self.stream.next();
@@ -644,5 +751,58 @@ mod tests {
         let count = sf.atoms[0].slots.iter().find(|(k, _)| k == "count").unwrap();
         assert_eq!(active.1, RawValue::BoolLit(true));
         assert_eq!(count.1, RawValue::IntLit(42));
+    }
+
+    #[test]
+    fn parse_for_each_in_template() {
+        // for-each inside a list (template slot value)
+        let src = r#"
+(decision-pack band-test
+  :version "1.0.0"
+  :parameters [
+    {:name bands :type list-of-map :required true}
+    {:name band-gate-name :type symbol :required true}
+  ]
+  :template [
+    (flow $pre-node -> ,band-gate-name)
+    (for-each :var band :in bands
+      (flow ,band-gate-name -> ,band.path))
+  ])
+"#;
+        let (sf, diag) = parse(src);
+        assert!(
+            !diag.has_errors(),
+            "unexpected parse errors: {:?}",
+            diag.errors().map(|d| d.message.as_str()).collect::<Vec<_>>()
+        );
+        assert_eq!(sf.atoms.len(), 1);
+        let pack = &sf.atoms[0];
+        assert_eq!(pack.kind, "decision-pack");
+        let template_slot = pack.slots.iter().find(|(k, _)| k == "template").unwrap();
+        let RawValue::List(items) = &template_slot.1 else {
+            panic!("template should be a list");
+        };
+        // items[0] is the flow atom, items[1] is the for-each
+        assert_eq!(items.len(), 2);
+        match &items[1] {
+            RawValue::ForEach { var, list_param, body } => {
+                assert_eq!(var, "band");
+                assert_eq!(list_param, "bands");
+                assert_eq!(body.len(), 1);
+            }
+            other => panic!("expected ForEach, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn parse_template_subst_with_dot() {
+        // ,band.path and ,band.upper should lex as TemplateSubst
+        let src = "(flow ,gate -> ,band.path :condition ,band.upper)";
+        let (sf, _diag) = parse(src);
+        assert_eq!(sf.atoms.len(), 1);
+        let atom = &sf.atoms[0];
+        // Find the :condition slot
+        let cond = atom.slots.iter().find(|(k, _)| k == "condition").unwrap();
+        assert_eq!(cond.1, RawValue::TemplateSubst("band.upper".to_owned()));
     }
 }

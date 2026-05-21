@@ -1,25 +1,24 @@
 (decision-pack required-evidence-checklist
   :version "1.0.0"
-  :description "Three sequential evidence tasks; final gateway evaluates aggregate. Representative for N=3 tasks."
+  :description "N sequential evidence tasks; final gateway evaluates aggregate. Uses for-each for the task list. NOTE: sequential task chaining (task N → task N+1) is Sage's responsibility — for-each declares the tasks; Sage connects them in order."
   :domain-scope [cbu kyc onboarding]
   :parameters [
-    {:name task-1              :type node-ref      :required true
-     :description "First existing evidence task node"}
-    {:name task-2              :type node-ref      :required true}
-    {:name task-3              :type node-ref      :required true}
-    {:name checklist-gate-name :type symbol        :required true}
-    {:name approval-path       :type node-ref      :required true}
-    {:name rejection-path      :type node-ref      :required true}
+    ; TODO (v0.3): replace tasks with list-of-map when the sequential-chaining
+    ; insertion-point pattern is implemented in the Sage instantiation engine.
+    {:name tasks              :type list-of-map  :required true
+     :description "List of {name} maps; each entry has :name (node-ref). Sequential chaining (task N → task N+1 → checklist gate) is Sage-managed."}
+    {:name checklist-gate-name :type symbol       :required true}
+    {:name approval-path       :type node-ref     :required true}
+    {:name rejection-path      :type node-ref     :required true}
     {:name aggregate-condition :type condition-expr :required true
      :description "Boolean over evidence task outputs; must hold for approval-path"}
   ]
   :template [
-    (flow $pre-node -> ,task-1)
-    (flow ,task-1 -> ,task-2)
-    (flow ,task-2 -> ,task-3)
-    (flow ,task-3 -> ,checklist-gate-name)
-    (flow ,checklist-gate-name -> ,approval-path :default false)
-    (flow ,checklist-gate-name -> ,rejection-path :default true)
+    (flow $pre-node -> first-task-placeholder)
+    (for-each :var task :in tasks
+      (flow ,task.name -> next-task-or-gate-placeholder))
+    (flow ,checklist-gate-name -> ,approval-path)
+    (flow ,checklist-gate-name -> ,rejection-path)
   ]
   :example-utterances [
     "collect and verify all required documents before making a decision"

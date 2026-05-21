@@ -40,6 +40,20 @@ pub enum RawValue {
     TemplateSplice(String),
     /// A `$symbol` insertion marker (pre/post-node template position).
     InsertionMarker(String),
+    /// `(for-each :var VAR :in LIST_PARAM body-atoms...)` — template loop form.
+    ///
+    /// Valid only inside a `(decision-pack :template [...])` slot.  At
+    /// instantiation time the loop is unrolled: one copy of `body` is emitted
+    /// per element of the list parameter named `list_param`, with
+    /// `,VAR.field` accessors substituted from the element's fields.
+    ForEach {
+        /// Loop variable name (e.g. `"band"`).
+        var: String,
+        /// Parameter name to iterate over (e.g. `"bands"`).
+        list_param: String,
+        /// Atom bodies to repeat per element.
+        body: Vec<RawValue>,
+    },
 }
 
 // ---------------------------------------------------------------------------

@@ -32,4 +32,9 @@ pub enum ParamType {
     DecisionRef,
     /// A map of path → value entries (used for structured metadata slots).
     PathMap,
+    /// A list of map objects, each with string keys and typed values.
+    ///
+    /// Used with `for-each` loops in pack templates.  Element fields are
+    /// accessed inside the loop body via `,var.field` syntax.
+    ListOfMap,
 }

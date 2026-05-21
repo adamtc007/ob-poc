@@ -830,6 +830,16 @@ fn raw_value_to_string(v: &RawValue) -> String {
                 format!("({} {} {})", a.kind, name_part, slots.join(" "))
             }
         }
+        RawValue::ForEach { var, list_param, body } => {
+            // Render the for-each form back to surface syntax.
+            let body_str: Vec<String> = body.iter().map(raw_value_to_string).collect();
+            format!(
+                "(for-each :var {} :in {} {})",
+                var,
+                list_param,
+                body_str.join(" ")
+            )
+        }
     }
 }
 

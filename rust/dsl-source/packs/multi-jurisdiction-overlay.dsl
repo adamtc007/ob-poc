@@ -1,24 +1,21 @@
 (decision-pack multi-jurisdiction-overlay
   :version "1.0.0"
-  :description "Jurisdiction-conditional routing to jurisdiction-specific processes. Representative for 2 explicit jurisdictions plus default."
+  :description "Jurisdiction-conditional routing to jurisdiction-specific processes. Uses for-each for variable-arity jurisdiction list; a fixed default-path handles all other jurisdictions."
   :domain-scope [cbu kyc deal compliance]
   :parameters [
-    {:name jur-gate-name        :type symbol   :required true}
-    {:name jurisdiction-field   :type string   :required true
+    {:name jur-gate-name        :type symbol      :required true}
+    {:name jurisdiction-field   :type string      :required true
      :description "Data location holding the ISO jurisdiction code"}
-    {:name jurisdiction-a       :type string   :required true
-     :description "Jurisdiction code for the first explicit path"}
-    {:name path-a               :type node-ref :required true}
-    {:name jurisdiction-b       :type string   :required true}
-    {:name path-b               :type node-ref :required true}
-    {:name default-path         :type node-ref :required true
+    {:name jurisdiction-paths   :type list-of-map :required true
+     :description "List of {code, path} maps. Each entry has :code (string) and :path (node-ref)."}
+    {:name default-path         :type node-ref    :required true
      :description "Path for all other jurisdictions"}
   ]
   :template [
     (flow $pre-node -> ,jur-gate-name)
-    (flow ,jur-gate-name -> ,path-a :default false)
-    (flow ,jur-gate-name -> ,path-b :default false)
-    (flow ,jur-gate-name -> ,default-path :default true)
+    (for-each :var jp :in jurisdiction-paths
+      (flow ,jur-gate-name -> ,jp.path))
+    (flow ,jur-gate-name -> ,default-path)
   ]
   :example-utterances [
     "apply UK rules for UK clients, EU rules for EU clients, otherwise global standard"

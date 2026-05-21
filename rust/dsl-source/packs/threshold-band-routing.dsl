@@ -1,25 +1,19 @@
 (decision-pack threshold-band-routing
   :version "1.0.0"
-  :description "Numeric value partitioned into 3 bands; each band routes to a distinct path. Representative for 3 bands."
+  :description "Numeric value partitioned into N bands; each band routes to a distinct path. Uses for-each for variable arity."
   :domain-scope [cbu kyc ubo]
   :parameters [
-    {:name band-gate-name  :type symbol  :required true}
-    {:name input-field     :type string  :required true
+    {:name band-gate-name :type symbol      :required true
+     :description "Name of the exclusive gateway that routes by band"}
+    {:name input-field    :type string      :required true
      :description "Data location of the numeric value to classify"}
-    {:name threshold-low   :type integer :required true
-     :description "Upper bound of the low band (inclusive)"}
-    {:name threshold-mid   :type integer :required true
-     :description "Upper bound of the medium band (inclusive)"}
-    {:name path-low        :type node-ref :required true}
-    {:name path-mid        :type node-ref :required true}
-    {:name path-high       :type node-ref :required true
-     :description "Path for values above threshold-mid (default)"}
+    {:name bands          :type list-of-map :required true
+     :description "Ordered list of band maps; each entry has :upper (integer) and :path (node-ref). The last entry receives :default true automatically."}
   ]
   :template [
     (flow $pre-node -> ,band-gate-name)
-    (flow ,band-gate-name -> ,path-low :default false)
-    (flow ,band-gate-name -> ,path-mid :default false)
-    (flow ,band-gate-name -> ,path-high :default true)
+    (for-each :var band :in bands
+      (flow ,band-gate-name -> ,band.path))
   ]
   :example-utterances [
     "route by ownership percentage: below 10% is minor, 10-25% is significant, above 25% is controlling"
@@ -29,10 +23,10 @@
     "ownership tier routing"
   ]
   :structural-signature {
-    :input-kind    numeric
-    :gateway-kind  exclusive
-    :band-count    3
-    :band-semantics ordered-threshold
+    :input-kind        numeric
+    :gateway-kind      exclusive
+    :band-count        variable
+    :band-semantics    ordered-threshold
   }
   :governance-ref threshold-band-routing-v1-status)
 

@@ -185,6 +185,65 @@ impl RunResult {
 }
 
 // ---------------------------------------------------------------------------
+// for-each expansion helper
+// ---------------------------------------------------------------------------
+
+/// Expand a `for-each` template body over a list of JSON objects.
+///
+/// For each element in `elements`, one copy of `template` is emitted with:
+/// - Every `,var_name.field` replaced by the field value from the current
+///   element.
+///
+/// The last element automatically gets `:default true` appended to each
+/// flow atom in its copy (recognised by `(flow` prefix) when the copy does
+/// not already contain `:default`.
+fn expand_for_each(
+    template: &str,
+    var_name: &str,
+    elements: &[serde_json::Value],
+) -> String {
+    let mut result = String::new();
+    let len = elements.len();
+    for (i, element) in elements.iter().enumerate() {
+        let is_last = i == len - 1;
+        let mut copy = template.to_string();
+        if let Some(obj) = element.as_object() {
+            for (field, value) in obj {
+                let accessor = format!(",{}.{}", var_name, field);
+                let replacement = match value {
+                    serde_json::Value::String(s) => s.clone(),
+                    serde_json::Value::Number(n) => n.to_string(),
+                    serde_json::Value::Bool(b) => b.to_string(),
+                    v => v.to_string(),
+                };
+                copy = copy.replace(&accessor, &replacement);
+            }
+        }
+        // Last element: append :default true to every flow line that does
+        // not already declare :default.
+        if is_last {
+            copy = copy
+                .lines()
+                .map(|line| {
+                    let trimmed = line.trim();
+                    if trimmed.starts_with("(flow") && !trimmed.contains(":default") {
+                        // Insert :default true before the closing ')'
+                        let close = line.rfind(')').unwrap_or(line.len());
+                        format!("{} :default true)", &line[..close])
+                    } else {
+                        line.to_string()
+                    }
+                })
+                .collect::<Vec<_>>()
+                .join("\n");
+        }
+        result.push_str(&copy);
+        result.push('\n');
+    }
+    result
+}
+
+// ---------------------------------------------------------------------------
 // Sage stub: pack instantiation
 // ---------------------------------------------------------------------------
 
@@ -192,7 +251,8 @@ impl RunResult {
 /// into a DSL fragment.
 ///
 /// This is **not** production Sage — it is a minimal template expander for
-/// testing only.  It supports the `conjunctive-gate` pack used in Example 12.
+/// testing only.  Supports all 12 seed packs, including the 5 packs that use
+/// `for-each` for variable arity.
 ///
 /// The returned string is a complete, self-contained DSL fragment that can be
 /// compiled and run with [`Scenario::new`].
@@ -356,8 +416,54 @@ pub fn instantiate_pack(
             let gate_name = params.get("post-join-gate").and_then(|v| v.as_str()).unwrap_or("veto-gate");
             let vetoed_path = params.get("vetoed-path").and_then(|v| v.as_str()).unwrap_or("vetoed-end");
             let approved_path = params.get("approved-path").and_then(|v| v.as_str()).unwrap_or("approved-end");
-            format!(
-                r#"
+
+            let tasks_val = params.get("eval-tasks");
+            if let Some(serde_json::Value::Array(tasks)) = tasks_val {
+                // Variable-arity: for-each expansion over eval-tasks
+                let fork_template = format!(
+                    "(flow {fork_name} -> ,task.name)\n",
+                    fork_name = fork_name
+                );
+                let join_template = format!("(flow ,task.name -> {join_name})\n", join_name = join_name);
+                let fork_flows = expand_for_each(&fork_template, "task", tasks);
+                let join_flows = expand_for_each(&join_template, "task", tasks);
+                let task_nodes: Vec<String> = tasks
+                    .iter()
+                    .filter_map(|t| t.get("name").and_then(|v| v.as_str()).map(String::from))
+                    .collect();
+                let node_decls: String = task_nodes
+                    .iter()
+                    .map(|n| format!("(node {} :kind service-task)\n", n))
+                    .collect();
+                format!(
+                    r#"
+(node veto-start :kind start-event)
+(gateway {fork_name} :kind parallel)
+{node_decls}(parallel-join {join_name} :expects [{fork_name}] :merge [])
+(gateway {gate_name} :kind exclusive)
+(node {vetoed_path} :kind end-event)
+(node {approved_path} :kind end-event)
+(flow veto-start -> {fork_name})
+{fork_flows}{join_flows}(flow {join_name} -> {gate_name})
+(flow {gate_name} -> {vetoed_path} :condition "vetoed")
+(flow {gate_name} -> {approved_path} :default true)
+(provenance pev-prov :covers [{fork_name} {join_name} {gate_name}]
+  :source pack :source-id parallel-evaluation-with-veto :version "1.0.0"
+  :session "sess-test" :authored-at "2026-05-21T12:00:00Z")
+"#,
+                    fork_name = fork_name,
+                    join_name = join_name,
+                    gate_name = gate_name,
+                    node_decls = node_decls,
+                    fork_flows = fork_flows,
+                    join_flows = join_flows,
+                    vetoed_path = vetoed_path,
+                    approved_path = approved_path,
+                )
+            } else {
+                // Legacy fixed-arity: eval-task-1 / eval-task-2
+                format!(
+                    r#"
 (node veto-start :kind start-event)
 (gateway {fork_name} :kind parallel)
 (node pev-eval-task-1 :kind service-task)
@@ -378,21 +484,56 @@ pub fn instantiate_pack(
   :source pack :source-id parallel-evaluation-with-veto :version "1.0.0"
   :session "sess-test" :authored-at "2026-05-21T12:00:00Z")
 "#,
-                fork_name = fork_name,
-                join_name = join_name,
-                gate_name = gate_name,
-                vetoed_path = vetoed_path,
-                approved_path = approved_path
-            )
+                    fork_name = fork_name,
+                    join_name = join_name,
+                    gate_name = gate_name,
+                    vetoed_path = vetoed_path,
+                    approved_path = approved_path
+                )
+            }
         }
 
         "threshold-band-routing" => {
             let gate_name = params.get("band-gate-name").and_then(|v| v.as_str()).unwrap_or("band-gate");
-            let path_low = params.get("path-low").and_then(|v| v.as_str()).unwrap_or("band-low-end");
-            let path_mid = params.get("path-mid").and_then(|v| v.as_str()).unwrap_or("band-mid-end");
-            let path_high = params.get("path-high").and_then(|v| v.as_str()).unwrap_or("band-high-end");
-            format!(
-                r#"
+
+            // Support both old fixed-arity API (path-low/mid/high) and new
+            // variable-arity API (bands: [{upper, path}]).
+            let bands_val = params.get("bands");
+            if let Some(serde_json::Value::Array(bands)) = bands_val {
+                // Variable-arity: use for-each expansion
+                let band_template = format!("(flow {gate_name} -> ,band.path)\n", gate_name = gate_name);
+                let flows = expand_for_each(&band_template, "band", bands);
+                // Collect unique path names for node declarations
+                let paths: Vec<String> = bands
+                    .iter()
+                    .filter_map(|b| b.get("path").and_then(|v| v.as_str()).map(String::from))
+                    .collect();
+                let node_decls: String = paths
+                    .iter()
+                    .map(|p| format!("(node {} :kind end-event)\n", p))
+                    .collect();
+                format!(
+                    r#"
+(node tbr-start :kind start-event)
+(gateway {gate_name} :kind exclusive)
+{node_decls}
+(flow tbr-start -> {gate_name})
+{flows}
+(provenance tbr-prov :covers [{gate_name}]
+  :source pack :source-id threshold-band-routing :version "1.0.0"
+  :session "sess-test" :authored-at "2026-05-21T12:00:00Z")
+"#,
+                    gate_name = gate_name,
+                    node_decls = node_decls,
+                    flows = flows,
+                )
+            } else {
+                // Legacy fixed-arity: path-low / path-mid / path-high
+                let path_low = params.get("path-low").and_then(|v| v.as_str()).unwrap_or("band-low-end");
+                let path_mid = params.get("path-mid").and_then(|v| v.as_str()).unwrap_or("band-mid-end");
+                let path_high = params.get("path-high").and_then(|v| v.as_str()).unwrap_or("band-high-end");
+                format!(
+                    r#"
 (node tbr-start :kind start-event)
 (gateway {gate_name} :kind exclusive)
 (node {path_low} :kind end-event)
@@ -406,20 +547,56 @@ pub fn instantiate_pack(
   :source pack :source-id threshold-band-routing :version "1.0.0"
   :session "sess-test" :authored-at "2026-05-21T12:00:00Z")
 "#,
-                gate_name = gate_name,
-                path_low = path_low,
-                path_mid = path_mid,
-                path_high = path_high
-            )
+                    gate_name = gate_name,
+                    path_low = path_low,
+                    path_mid = path_mid,
+                    path_high = path_high
+                )
+            }
         }
 
         "multi-jurisdiction-overlay" => {
             let gate_name = params.get("jur-gate-name").and_then(|v| v.as_str()).unwrap_or("jur-gate");
-            let path_a = params.get("path-a").and_then(|v| v.as_str()).unwrap_or("jur-path-a");
-            let path_b = params.get("path-b").and_then(|v| v.as_str()).unwrap_or("jur-path-b");
             let default_path = params.get("default-path").and_then(|v| v.as_str()).unwrap_or("jur-default");
-            format!(
-                r#"
+
+            let jur_paths_val = params.get("jurisdiction-paths");
+            if let Some(serde_json::Value::Array(jur_paths)) = jur_paths_val {
+                // Variable-arity: for-each expansion over jurisdiction-paths
+                let jp_template = format!(
+                    "(flow {gate_name} -> ,jp.path :condition \"juris-,jp.code\")\n",
+                    gate_name = gate_name
+                );
+                let flows = expand_for_each(&jp_template, "jp", jur_paths);
+                let paths: Vec<String> = jur_paths
+                    .iter()
+                    .filter_map(|jp| jp.get("path").and_then(|v| v.as_str()).map(String::from))
+                    .collect();
+                let node_decls: String = paths
+                    .iter()
+                    .map(|p| format!("(node {} :kind end-event)\n", p))
+                    .collect();
+                format!(
+                    r#"
+(node mjo-start :kind start-event)
+(gateway {gate_name} :kind exclusive)
+{node_decls}(node {default_path} :kind end-event)
+(flow mjo-start -> {gate_name})
+{flows}(flow {gate_name} -> {default_path} :default true)
+(provenance mjo-prov :covers [{gate_name}]
+  :source pack :source-id multi-jurisdiction-overlay :version "1.0.0"
+  :session "sess-test" :authored-at "2026-05-21T12:00:00Z")
+"#,
+                    gate_name = gate_name,
+                    node_decls = node_decls,
+                    default_path = default_path,
+                    flows = flows,
+                )
+            } else {
+                // Legacy fixed-arity: path-a / path-b / default-path
+                let path_a = params.get("path-a").and_then(|v| v.as_str()).unwrap_or("jur-path-a");
+                let path_b = params.get("path-b").and_then(|v| v.as_str()).unwrap_or("jur-path-b");
+                format!(
+                    r#"
 (node mjo-start :kind start-event)
 (gateway {gate_name} :kind exclusive)
 (node {path_a} :kind end-event)
@@ -433,11 +610,12 @@ pub fn instantiate_pack(
   :source pack :source-id multi-jurisdiction-overlay :version "1.0.0"
   :session "sess-test" :authored-at "2026-05-21T12:00:00Z")
 "#,
-                gate_name = gate_name,
-                path_a = path_a,
-                path_b = path_b,
-                default_path = default_path
-            )
+                    gate_name = gate_name,
+                    path_a = path_a,
+                    path_b = path_b,
+                    default_path = default_path
+                )
+            }
         }
 
         "linked-switch-chain" => {
@@ -474,10 +652,45 @@ pub fn instantiate_pack(
         "cascading-decision" => {
             let eval_name = params.get("primary-eval-name").and_then(|v| v.as_str()).unwrap_or("cd-eval");
             let gate_name = params.get("primary-gate-name").and_then(|v| v.as_str()).unwrap_or("cd-gate");
-            let path_a = params.get("path-a").and_then(|v| v.as_str()).unwrap_or("cd-path-a");
-            let path_b = params.get("path-b").and_then(|v| v.as_str()).unwrap_or("cd-path-b");
-            format!(
-                r#"
+
+            let paths_val = params.get("paths");
+            if let Some(serde_json::Value::Array(paths)) = paths_val {
+                // Variable-arity: for-each expansion over paths
+                let p_template = format!(
+                    "(flow {gate_name} -> ,p.path)\n",
+                    gate_name = gate_name
+                );
+                let flows = expand_for_each(&p_template, "p", paths);
+                let path_nodes: Vec<String> = paths
+                    .iter()
+                    .filter_map(|p| p.get("path").and_then(|v| v.as_str()).map(String::from))
+                    .collect();
+                let node_decls: String = path_nodes
+                    .iter()
+                    .map(|p| format!("(node {} :kind end-event)\n", p))
+                    .collect();
+                format!(
+                    r#"
+(node cd-start :kind start-event)
+(node {eval_name} :kind service-task)
+(gateway {gate_name} :kind exclusive)
+{node_decls}(flow cd-start -> {eval_name})
+(flow {eval_name} -> {gate_name})
+{flows}(provenance cd-prov :covers [{eval_name} {gate_name}]
+  :source pack :source-id cascading-decision :version "1.0.0"
+  :session "sess-test" :authored-at "2026-05-21T12:00:00Z")
+"#,
+                    eval_name = eval_name,
+                    gate_name = gate_name,
+                    node_decls = node_decls,
+                    flows = flows,
+                )
+            } else {
+                // Legacy fixed-arity: path-a / path-b
+                let path_a = params.get("path-a").and_then(|v| v.as_str()).unwrap_or("cd-path-a");
+                let path_b = params.get("path-b").and_then(|v| v.as_str()).unwrap_or("cd-path-b");
+                format!(
+                    r#"
 (node cd-start :kind start-event)
 (node {eval_name} :kind service-task)
 (gateway {gate_name} :kind exclusive)
@@ -491,20 +704,56 @@ pub fn instantiate_pack(
   :source pack :source-id cascading-decision :version "1.0.0"
   :session "sess-test" :authored-at "2026-05-21T12:00:00Z")
 "#,
-                eval_name = eval_name,
-                gate_name = gate_name,
-                path_a = path_a,
-                path_b = path_b
-            )
+                    eval_name = eval_name,
+                    gate_name = gate_name,
+                    path_a = path_a,
+                    path_b = path_b
+                )
+            }
         }
 
         "decision-table-classification" => {
             let classify_name = params.get("classify-name").and_then(|v| v.as_str()).unwrap_or("dtc-classify");
             let gate_name = params.get("route-gate-name").and_then(|v| v.as_str()).unwrap_or("dtc-gate");
-            let path_a = params.get("path-a").and_then(|v| v.as_str()).unwrap_or("dtc-path-a");
-            let default_path = params.get("default-path").and_then(|v| v.as_str()).unwrap_or("dtc-default");
-            format!(
-                r#"
+
+            let paths_val = params.get("paths");
+            if let Some(serde_json::Value::Array(paths)) = paths_val {
+                // Variable-arity: for-each expansion over paths
+                let p_template = format!(
+                    "(flow {gate_name} -> ,p.path)\n",
+                    gate_name = gate_name
+                );
+                let flows = expand_for_each(&p_template, "p", paths);
+                let path_nodes: Vec<String> = paths
+                    .iter()
+                    .filter_map(|p| p.get("path").and_then(|v| v.as_str()).map(String::from))
+                    .collect();
+                let node_decls: String = path_nodes
+                    .iter()
+                    .map(|p| format!("(node {} :kind end-event)\n", p))
+                    .collect();
+                format!(
+                    r#"
+(node dtc-start :kind start-event)
+(node {classify_name} :kind service-task)
+(gateway {gate_name} :kind exclusive)
+{node_decls}(flow dtc-start -> {classify_name})
+(flow {classify_name} -> {gate_name})
+{flows}(provenance dtc-prov :covers [{classify_name} {gate_name}]
+  :source pack :source-id decision-table-classification :version "1.0.0"
+  :session "sess-test" :authored-at "2026-05-21T12:00:00Z")
+"#,
+                    classify_name = classify_name,
+                    gate_name = gate_name,
+                    node_decls = node_decls,
+                    flows = flows,
+                )
+            } else {
+                // Legacy fixed-arity: path-a / default-path
+                let path_a = params.get("path-a").and_then(|v| v.as_str()).unwrap_or("dtc-path-a");
+                let default_path = params.get("default-path").and_then(|v| v.as_str()).unwrap_or("dtc-default");
+                format!(
+                    r#"
 (node dtc-start :kind start-event)
 (node {classify_name} :kind service-task)
 (gateway {gate_name} :kind exclusive)
@@ -518,11 +767,12 @@ pub fn instantiate_pack(
   :source pack :source-id decision-table-classification :version "1.0.0"
   :session "sess-test" :authored-at "2026-05-21T12:00:00Z")
 "#,
-                classify_name = classify_name,
-                gate_name = gate_name,
-                path_a = path_a,
-                default_path = default_path
-            )
+                    classify_name = classify_name,
+                    gate_name = gate_name,
+                    path_a = path_a,
+                    default_path = default_path
+                )
+            }
         }
 
         "required-evidence-checklist" => {

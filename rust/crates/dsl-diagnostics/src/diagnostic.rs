@@ -32,6 +32,12 @@ pub const RETIRED_PACK_VERSION: &str = "E0008";
 pub const MERGE_CONFLICT: &str = "E0009";
 /// A merge was attempted but the source file did not declare merge intent.
 pub const UNDECLARED_MERGE: &str = "E0010";
+/// A parameter name contains a dot (`.`), which is reserved for the
+/// `for-each` loop-variable accessor syntax (`,var.field`).
+pub const INVALID_PARAMETER_NAME: &str = "E0011";
+/// A `for-each` body uses `,var.field` but `var` is not the loop variable
+/// declared by the enclosing `for-each` form.
+pub const UNKNOWN_LOOP_VARIABLE: &str = "E0012";
 
 // ---------------------------------------------------------------------------
 // Span

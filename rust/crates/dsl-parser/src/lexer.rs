@@ -57,8 +57,12 @@ pub enum Token {
     #[regex(r",@[a-zA-Z_][a-zA-Z0-9_\-]*", |lex| lex.slice()[2..].to_owned())]
     TemplateSplice(String),
 
-    /// `,symbol` — substitution: inserts a single template parameter value.
-    #[regex(r",[a-zA-Z_][a-zA-Z0-9_\-]*", |lex| lex.slice()[1..].to_owned())]
+    /// `,symbol` or `,var.field` — substitution: inserts a single template
+    /// parameter value or accesses a field of a loop variable inside a
+    /// `(for-each ...)` body.  The `.` separator distinguishes loop-variable
+    /// field access (`,band.upper`) from plain parameter names (`,gate-name`).
+    /// Parameter names must not contain dots — dots are reserved for this form.
+    #[regex(r",[a-zA-Z_][a-zA-Z0-9_\-\.]*", |lex| lex.slice()[1..].to_owned())]
     TemplateSubst(String),
 
     /// `$symbol` — insertion marker for pre/post-node positions.
@@ -222,6 +226,20 @@ mod tests {
     fn lex_template_subst() {
         let toks = tokens(",gate-name");
         assert_eq!(toks, vec![Token::TemplateSubst("gate-name".to_owned())]);
+    }
+
+    #[test]
+    fn lex_template_subst_with_dot() {
+        // Dot accessor form for for-each loop variables: ,band.upper, ,jp.path
+        let toks = tokens(",band.upper");
+        assert_eq!(toks, vec![Token::TemplateSubst("band.upper".to_owned())]);
+
+        let toks2 = tokens(",jp.path");
+        assert_eq!(toks2, vec![Token::TemplateSubst("jp.path".to_owned())]);
+
+        // Verify that plain params without dots still work
+        let toks3 = tokens(",gate-name");
+        assert_eq!(toks3, vec![Token::TemplateSubst("gate-name".to_owned())]);
     }
 
     #[test]
