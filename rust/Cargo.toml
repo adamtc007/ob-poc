@@ -356,4 +356,7 @@ members = [
     # Unified DSL v0.1 — Tranche 6: journey-persisted runtime + test harness
     "crates/bpmn-runtime",
     "crates/bpmn-test-harness",
+
+    # Unified DSL v0.2 — Tranche 1: Sage pack matcher
+    "crates/dsl-sage",
 ]
