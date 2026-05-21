@@ -111,6 +111,8 @@ pub(crate) fn demo_router(state: Arc<DemoState>) -> Router {
         .route("/bpmn/instances/start", post(start_instance))
         .route("/bpmn/instances/:id", get(get_instance))
         .route("/bpmn/instances/:id/next-step", post(next_step))
+        .route("/bpmn/instances/:id/sage", get(list_sage_stub))
+        .route("/bpmn/instances/:id/events", get(events_stub))
         .with_state(state)
 }
 
@@ -253,6 +255,25 @@ async fn next_step(
         "message": format!("Advanced to {current}")
     }))
     .into_response()
+}
+
+/// T5 placeholder — Sage reasoning records.
+async fn list_sage_stub(Path(_id): Path<Uuid>) -> impl IntoResponse {
+    Json(Vec::<serde_json::Value>::new())
+}
+
+/// SSE event stream stub — emits a single heartbeat then idles.
+/// The React client polls on a 2s interval anyway; this just keeps EventSource
+/// connected without raising console errors.
+async fn events_stub(Path(_id): Path<Uuid>) -> impl IntoResponse {
+    use axum::http::header;
+    (
+        [
+            (header::CONTENT_TYPE, "text/event-stream"),
+            (header::CACHE_CONTROL, "no-cache"),
+        ],
+        ": heartbeat\n\n",
+    )
 }
 
 async fn reset_instances(State(demo): State<Arc<DemoState>>) -> impl IntoResponse {

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { SageReasoningRecord } from "@/api/bpmn";
+import type { SageReasoningRecord } from "@/api/bpmn";
 
 interface Props {
   records: SageReasoningRecord[];

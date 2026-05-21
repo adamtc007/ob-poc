@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
-import { bpmnApi, SageReasoningRecord, WorkflowInstanceSummary } from "@/api/bpmn";
+import { bpmnApi } from "@/api/bpmn";
+import type { SageReasoningRecord, WorkflowInstanceSummary } from "@/api/bpmn";
 import { WorkflowPanel } from "./WorkflowPanel";
 import { SagePanel } from "./SagePanel";
 import { PlanFeedPanel } from "./PlanFeedPanel";

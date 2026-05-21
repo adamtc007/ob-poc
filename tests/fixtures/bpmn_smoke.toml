@@ -1,0 +1,75 @@
+# bpmn smoke test harness — Chrome DevTools MCP
+#
+# Drives the React UI through a complete §10 demo run for each CBU type.
+# Pre-conditions:
+#   - bpmn-lite-server running on :8080 (REST) + :50051 (gRPC)
+#     `cd bpmn-lite && BPMN_LITE_STORE=memory cargo run -p bpmn-lite-server --bin bpmn-lite-server`
+#   - React dev server on :5173 (Vite proxies /bpmn -> :8080)
+#     `cd ob-poc-ui-react && npm run dev`
+#
+# What each scenario asserts:
+#   1. UI loads (no console errors on initial load)
+#   2. /bpmn-demo route renders the demo page
+#   3. Starting an instance returns an instance_id and the pipeline panel shows
+#   4. WorkflowPanel renders server-driven nodes with cross-domain labels
+#   5. Stepping advances through nodes correctly:
+#      a. fund:      create-cbu -> type-decision -> add-fund   -> attach-im -> end
+#      b. corporate: create-cbu -> type-decision -> add-corp   -> attach-im -> end
+#      c. trust:     create-cbu -> type-decision -> add-trust  -> attach-im -> end
+#   6. Final state shows "Completed" / "CBU Operational"
+#   7. No console errors after each transition
+
+[harness]
+name = "bpmn-demo-smoke"
+base_url = "http://localhost:5173"
+demo_path = "/bpmn-demo"
+rest_base = "http://localhost:8080/bpmn"
+screenshot_dir = "tests/fixtures/screenshots/bpmn"
+fail_fast = false
+
+[harness.preconditions]
+required_endpoints = [
+    "http://localhost:8080/bpmn/health",
+    "http://localhost:5173/",
+]
+
+[[scenarios]]
+id = "fund_happy_path"
+cbu_type = "fund"
+expected_path = ["create-cbu", "type-decision", "add-fund", "attach-im", "end"]
+expected_final_status = "Completed"
+expected_labels_visible = [
+    "↗ Calling ob-poc: cbu.create",
+    "↗ Evaluating dmn-lite: cbu_type_routing",
+    "◇ CBU Type Gateway",
+    "↗ Calling ob-poc: cbu.add-product",
+    "↗ Calling ob-poc: instrument-matrix.attach",
+    "✓ End: CBU Operational",
+]
+
+[[scenarios]]
+id = "corporate_happy_path"
+cbu_type = "corporate"
+expected_path = ["create-cbu", "type-decision", "add-corp", "attach-im", "end"]
+expected_final_status = "Completed"
+
+[[scenarios]]
+id = "trust_happy_path"
+cbu_type = "trust"
+expected_path = ["create-cbu", "type-decision", "add-trust", "attach-im", "end"]
+expected_final_status = "Completed"
+
+# Negative — reset endpoint should leave server healthy
+[[scenarios]]
+id = "reset_clears_state"
+type = "reset_then_list"
+expected_listing_after_reset = "empty"
+
+[[scenarios]]
+id = "cross_domain_visibility"
+type = "visual"
+description = """
+Visual check that NodeInfo.fqn + target_domain render in the WorkflowPanel
+with domain-specific colouring: ob-poc nodes violet, dmn-lite nodes cyan.
+"""
+required_colors = ["violet", "cyan"]

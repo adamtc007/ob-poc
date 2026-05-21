@@ -55,6 +55,7 @@ services:
     ports:
       - "50051:50051"   # BPMN gRPC (bytecode path — existing)
       - "50063:50063"   # Federated bus — result receiver (plan-walker path)
+      - "8080:8080"     # REST demo API (T6 — UI smoke + §10 walkthrough)
     environment:
       # A18 admin/runtime split.
       DATABASE_ADMIN_URL: postgresql://postgres@bpmn-lite-postgres/bpmn_lite

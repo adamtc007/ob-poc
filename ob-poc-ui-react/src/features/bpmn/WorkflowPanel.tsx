@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
-import { bpmnApi, NodeInfo, WorkflowInstanceDetail } from "@/api/bpmn";
+import { bpmnApi } from "@/api/bpmn";
+import type { NodeInfo, WorkflowInstanceDetail } from "@/api/bpmn";
 
 interface Props {
   instanceId: string;
