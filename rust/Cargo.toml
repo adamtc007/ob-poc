@@ -11,7 +11,7 @@ rust-version = "1.95"
 
 [dependencies]
 # Workspace crates
-dsl-core = { path = "crates/dsl-core" }
+dsl-core.workspace = true
 ob-poc-compiler = { path = "crates/ob-poc-compiler" }
 inspector-projection = { path = "crates/inspector-projection" }
 ob-agentic = { path = "crates/ob-agentic", features = ["gateway"] }
@@ -44,9 +44,9 @@ ob-poc-derived-attributes = { path = "crates/ob-poc-derived-attributes" }
 ob-poc-taxonomy = { path = "crates/ob-poc-taxonomy" }
 ob-poc-authoring = { path = "crates/ob-poc-authoring" } # Editor toolkit (Phase 5 dest)
 ob-poc-macros = { path = "crates/ob-poc-macros" }
-sem_os_core = { path = "crates/sem_os_core" }
-sem_os_types = { path = "crates/sem_os_types" }
-sem_os_ontology = { path = "crates/sem_os_ontology" }
+sem_os_core.workspace = true
+sem_os_types.workspace = true
+sem_os_ontology.workspace = true
 sem_os_policy = { path = "crates/sem_os_policy" }
 sem_os_client = { path = "crates/sem_os_client" }
 sem_os_obpoc_adapter = { path = "crates/sem_os_obpoc_adapter" }
@@ -162,8 +162,8 @@ ffi-catalogue = { path = "../bpmn-lite/ffi-catalogue" }
 dmn-lite-bridge = { path = "../bpmn-lite/dmn-lite-bridge" }
 bpmn-lite-ffi-http = { path = "../bpmn-lite/bpmn-lite-ffi-http" }
 bpmn-lite-ffi-grpc = { path = "../bpmn-lite/bpmn-lite-ffi-grpc" }
-sem_os_core = { path = "crates/sem_os_core" }
-sem_os_ontology = { path = "crates/sem_os_ontology" }
+sem_os_core.workspace = true
+sem_os_ontology.workspace = true
 sem_os_policy = { path = "crates/sem_os_policy" }
 tokio-stream = "0.1"
 proptest = "1.4"
@@ -279,7 +279,6 @@ write-set-contract = []  # Enables contract-driven write_set derivation from ver
 [workspace]
 members = [
     ".",
-    "crates/dsl-core",
     "crates/ob-poc-compiler",
     "crates/ob-agentic",
     "crates/ob-templates",
@@ -318,13 +317,8 @@ members = [
     # Receiver-side bus handler — bridges ob-poc verb dispatch to dsl-bus-server.
     "crates/ob-poc-bus-handler",
 
-    # Semantic OS crates (Stage 1.1)
-    "crates/sem_os_core",
-
-    # sem_os_core split v1 (docs/todo/sem-os-core-split-v1.md) —
-    # types (bottom tier) + ontology + policy planes
-    "crates/sem_os_types",
-    "crates/sem_os_ontology",
+    # Semantic OS crates (sem_os_core/sem_os_types/sem_os_ontology extracted to
+    # github.com/adamtc007/sem-os; sem_os_policy stays in ob-poc due to ob_poc_types coupling)
     "crates/sem_os_policy",
     "crates/sem_os_postgres",
     "crates/sem_os_server",
@@ -366,7 +360,13 @@ members = [
     # Unified DSL v0.2 — Tranche 6: SVG diagram renderer
     "crates/dsl-render",
 
-    # Extraction Phase 1 — substrate crate (Level 0, std + serde only)
-    # Homes constellation_map_def; both dsl-lang and sem-os depend on it.
-    "crates/dsl_types",
 ]
+
+[workspace.dependencies]
+# Library repos extracted to GitHub — local [patch] in rust/.cargo/config.toml
+# overrides these with ~/dev/ paths during development.
+dsl_types    = { git = "https://github.com/adamtc007/dsl",    tag = "v0.1.0" }
+dsl-core     = { git = "https://github.com/adamtc007/dsl",    tag = "v0.1.0" }
+sem_os_types    = { git = "https://github.com/adamtc007/sem-os", tag = "v0.1.0" }
+sem_os_core     = { git = "https://github.com/adamtc007/sem-os", tag = "v0.1.0" }
+sem_os_ontology = { git = "https://github.com/adamtc007/sem-os", tag = "v0.1.0" }

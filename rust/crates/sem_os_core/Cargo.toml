@@ -9,9 +9,9 @@ description = "Semantic OS core — pure domain types, port traits, gate logic. 
 # sem_os_types crate. sem_os_core/src/types.rs is now a compat shim
 # (`pub use sem_os_types::*;`). This dep stays after migration —
 # sem_os_types is the bottom tier every SemOS-touching crate needs.
-sem_os_types = { path = "../sem_os_types" }
-dsl-core = { path = "../dsl-core" }
-dsl_types = { path = "../dsl_types" }
+sem_os_types.workspace = true
+dsl-core.workspace = true
+dsl_types.workspace = true
 # Phase 9-prep (2026-05-14): the transitional sem_os_ontology and
 # sem_os_policy compat re-export deps are GONE — Phase 9 needs
 # sem_os_policy → sem_os_core (for error/principal/ports in authoring/
@@ -40,7 +40,7 @@ tokio = { version = "1", features = ["macros", "rt"] }
 # relocated in Phase 9 (affinity → sem_os_policy, verb_contract →
 # sem_os_ontology). Dev-only path-deps don't violate the "no upward
 # Cargo edge" invariant — they're only linked into the test binary.
-sem_os_ontology = { path = "../sem_os_ontology" }
+sem_os_ontology.workspace = true
 sem_os_policy = { path = "../sem_os_policy" }
 tempfile = "3"
 

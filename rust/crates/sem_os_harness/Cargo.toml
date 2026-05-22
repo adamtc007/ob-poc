@@ -5,9 +5,9 @@ edition = "2021"
 description = "Semantic OS test harness — golden/invariant tests against SemOsClient."
 
 [dependencies]
-sem_os_core = { path = "../sem_os_core" }
+sem_os_core.workspace = true
 sem_os_policy = { path = "../sem_os_policy" }
-sem_os_ontology = { path = "../sem_os_ontology" }
+sem_os_ontology.workspace = true
 sem_os_client = { path = "../sem_os_client" }
 sem_os_postgres = { path = "../sem_os_postgres" }
 dsl-runtime = { path = "../dsl-runtime" }

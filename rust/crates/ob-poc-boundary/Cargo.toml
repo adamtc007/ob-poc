@@ -16,12 +16,12 @@ ob-poc-macros = { path = "../ob-poc-macros" }
 # llm_trace builds PromptContextAssembly audits — sem_os_core is the
 # control-plane (canonical domain types) and acceptable here. Not the
 # execution tier — see the boundary-tier discipline in lib.rs.
-sem_os_core = { path = "../sem_os_core" }
-sem_os_ontology = { path = "../sem_os_ontology" }
+sem_os_core.workspace = true
+sem_os_ontology.workspace = true
 sem_os_policy = { path = "../sem_os_policy" }
 # dsl-core supplies VerbConfig metadata for ACP registry/pack projection
 # (slice 2d.3). Pure-data crate — no execution-tier dependency.
-dsl-core = { path = "../dsl-core" }
+dsl-core.workspace = true
 anyhow = "1.0"
 tracing = "0.1"
 async-trait = "0.1"

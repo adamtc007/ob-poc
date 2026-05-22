@@ -10,7 +10,7 @@ dsl-atoms = { path = "../dsl-atoms" }
 dsl-ast = { path = "../dsl-ast" }
 dsl-diagnostics = { path = "../dsl-diagnostics" }
 dsl-parser = { path = "../dsl-parser" }
-dsl-core = { path = "../dsl-core" }
+dsl-core.workspace = true
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 

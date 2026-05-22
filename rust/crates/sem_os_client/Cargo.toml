@@ -5,7 +5,7 @@ edition = "2021"
 description = "Semantic OS client — SemOsClient trait + InProcessClient + HttpClient."
 
 [dependencies]
-sem_os_core = { path = "../sem_os_core" }
+sem_os_core.workspace = true
 sem_os_policy = { path = "../sem_os_policy" }
 async-trait = "0.1"
 anyhow = "1.0"

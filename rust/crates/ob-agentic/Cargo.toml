@@ -32,7 +32,7 @@ async-trait = "0.1"
 clap = { version = "4", features = ["derive"], optional = true }
 
 # Local crate dependencies
-dsl-core = { path = "../dsl-core" }
+dsl-core.workspace = true
 ob-poc-compiler = { path = "../ob-poc-compiler" }
 entity-gateway = { path = "../entity-gateway", optional = true }
 

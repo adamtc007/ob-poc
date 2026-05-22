@@ -21,7 +21,7 @@ description = "DSL analyser plane — reads DSL text + verb metadata and produce
 [dependencies]
 # Phase 2 (validation): types module — references dsl_core::ast::Program
 # in ValidatedProgram.resolved_ast field.
-dsl-core = { path = "../dsl-core" }
+dsl-core.workspace = true
 serde = { version = "1", features = ["derive"] }
 uuid = { version = "1", features = ["v4", "serde"] }
 
@@ -54,8 +54,8 @@ tonic = "0.12"
 # graph node/edge primitives). Same transitional sem_os_core dep that
 # dsl-runtime carries — to be inverted in a later slice.
 chrono = { version = "0.4", features = ["serde"] }
-sem_os_core = { path = "../sem_os_core" }
-sem_os_ontology = { path = "../sem_os_ontology" }
+sem_os_core.workspace = true
+sem_os_ontology.workspace = true
 
 [dev-dependencies]
 tokio = { version = "1", features = ["macros", "rt"] }

@@ -26,7 +26,7 @@ tokio = { version = "1", features = ["full", "sync"] }
 # (post §9 item 9 consolidation, 2026-05-13). The previous
 # `ob-poc = { path = "../..", features = ["database"] }` inverted edge
 # is gone; dsl-lsp is now an analyser-tier consumer only.
-dsl-core = { path = "../dsl-core" }
+dsl-core.workspace = true
 # ob-poc verb handler — lets dsl-lsp compile ob-poc DSL for diagnostics.
 ob-poc-compiler = { path = "../ob-poc-compiler" }
 dsl-runtime = { path = "../dsl-runtime" }

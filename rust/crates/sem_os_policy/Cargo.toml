@@ -22,9 +22,9 @@ description = "Semantic OS governance + projection plane. Owns ABAC primitives, 
 # explicitly allows. The cycle that blocked this dep being added
 # earlier is gone: sem_os_core no longer has compat re-exports of any
 # sem_os_policy modules (eager consumer rewrite done in the same slice).
-sem_os_core = { path = "../sem_os_core" }
-sem_os_ontology = { path = "../sem_os_ontology" }
-sem_os_types = { path = "../sem_os_types" }
+sem_os_core.workspace = true
+sem_os_ontology.workspace = true
+sem_os_types.workspace = true
 
 # Phase 9 third-party deps inherited from the moved modules:
 # authoring/* uses ob-poc-types + sqlparser + tokio; service.rs uses

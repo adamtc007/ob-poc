@@ -25,7 +25,7 @@ description = "Semantic OS MCP server — exposes the SemOS knowledge surface (e
 
 [dependencies]
 sem_os_client = { path = "../sem_os_client" }
-sem_os_core = { path = "../sem_os_core" }
+sem_os_core.workspace = true
 ob-poc-types = { path = "../ob-poc-types" }
 
 tokio = { version = "1", features = ["full"] }

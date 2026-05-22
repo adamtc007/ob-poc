@@ -25,13 +25,13 @@ ob-poc-boundary = { path = "../crates/ob-poc-boundary" }
 ob-poc-agent = { path = "../crates/ob-poc-agent" }
 ob-poc-types = { path = "../crates/ob-poc-types" }
 ob-agentic = { path = "../crates/ob-agentic", features = ["gateway"] }
-sem_os_core = { path = "../crates/sem_os_core" }
-sem_os_types = { path = "../crates/sem_os_types" }
-sem_os_ontology = { path = "../crates/sem_os_ontology" }
+sem_os_core.workspace = true
+sem_os_types.workspace = true
+sem_os_ontology.workspace = true
 sem_os_policy = { path = "../crates/sem_os_policy" }
 sem_os_client = { path = "../crates/sem_os_client" }
 sem_os_postgres = { path = "../crates/sem_os_postgres" }
-dsl-core = { path = "../crates/dsl-core" }
+dsl-core.workspace = true
 playbook-core = { path = "../crates/playbook-core" }
 csv = "1.3"
 serde_yaml = "0.9"
