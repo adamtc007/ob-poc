@@ -1,8 +1,9 @@
 use dsl_core::{
     config::dag::{ClosureType, EligibilityConstraint},
-    resolver::{resolve_template, ResolvedSource, ResolverInputs},
+    resolver::ResolvedSource,
 };
-use sem_os_ontology::constellation_map_def as core_map;
+use sem_os_core::resolver::{resolve_template, ResolverInputs};
+use dsl_types::constellation_map_def as core_map;
 use std::path::PathBuf;
 
 fn inputs() -> ResolverInputs {

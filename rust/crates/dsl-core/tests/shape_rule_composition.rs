@@ -1,9 +1,9 @@
 use dsl_core::{
     config::dag::{ClosureType, EligibilityConstraint, PredicateBinding},
-    resolver::{
-        resolve_template, InsertBetween, ResolveError, ResolvedSource, ResolverInputs,
-        SlotGateMetadataRefinement,
-    },
+    resolver::ResolvedSource,
+};
+use sem_os_core::resolver::{
+    resolve_template, InsertBetween, ResolveError, ResolverInputs, SlotGateMetadataRefinement,
 };
 use std::path::PathBuf;
 

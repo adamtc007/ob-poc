@@ -1,17 +1,19 @@
-use super::{
-    compute_version_hash, ResolvedSlot, ResolvedSource, ResolvedTemplate, ResolvedTransition,
-    ResolverProvenance, ShapeRef, SlotProvenance, WorkspaceId,
-};
-use crate::config::dag::{
-    load_domain_pack_owned_dags, ClosureType,
-    CompletenessAssertionConfig as DagCompletenessAssertionConfig, Dag, EligibilityConstraint,
-    LoadedDag, PredicateBinding, Slot as DagSlot, SlotStateMachine,
+use dsl_core::{
+    config::dag::{
+        load_domain_pack_owned_dags, ClosureType,
+        CompletenessAssertionConfig as DagCompletenessAssertionConfig, Dag, EligibilityConstraint,
+        LoadedDag, PredicateBinding, Slot as DagSlot, SlotStateMachine,
+    },
+    resolver::{
+        compute_version_hash, ResolvedSlot, ResolvedSource, ResolvedTemplate, ResolvedTransition,
+        ResolverProvenance, ShapeRef, SlotProvenance, WorkspaceId,
+    },
 };
 use crate::resolver::shape_rule::{
     load_shape_rules_from_dir, LoadedShapeRule, SlotGateMetadataRefinement, StructuralFacts,
 };
 use anyhow::{Context, Result};
-use sem_os_ontology::constellation_map_def as core_map;
+use dsl_types::constellation_map_def as core_map;
 use serde::{Deserialize, Serialize};
 use serde_yaml::Value as YamlValue;
 use std::{
@@ -1110,8 +1112,8 @@ fn convert_eligibility(
 
 fn convert_role_guard(
     value: Option<&core_map::RoleGuard>,
-) -> Option<crate::config::dag::RoleGuard> {
-    value.map(|guard| crate::config::dag::RoleGuard {
+) -> Option<dsl_core::config::dag::RoleGuard> {
+    value.map(|guard| dsl_core::config::dag::RoleGuard {
         any_of: guard.any_of.clone(),
         all_of: guard.all_of.clone(),
     })

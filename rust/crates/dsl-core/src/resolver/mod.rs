@@ -1,27 +1,18 @@
 //! Resolver skeleton for SemOS DAG/constellation composition.
 
-mod composer;
 pub mod manifest;
-pub mod shape_rule;
 mod version;
 
-pub use composer::{
-    load_constellation_maps_from_dir, resolve_template, LoadedConstellationMap, ResolveError,
-    ResolverInputs,
-};
 pub use manifest::{ManifestOptions, ResolverManifest, SlotManifestRow};
-pub use shape_rule::{
-    load_shape_rules_from_dir, AddBranch, AddConstraint, AddTerminal, InsertBetween, RawStateEdit,
-    RefineReducer, ReplaceConstraint, ShapeRule, SlotGateMetadataRefinement, StructuralFacts,
-    TightenConstraint,
-};
 pub use version::{compute_version_hash, VersionHash};
 
 use crate::config::dag::{ClosureType, EligibilityConstraint, RoleGuard};
-use sem_os_ontology::constellation_map_def::{
+use dsl_types::constellation_map_def::{
     AuditClass, Cardinality, CompletenessAssertionConfig, JoinDef, SlotDef,
 };
 use std::collections::BTreeMap;
+
+pub use dsl_types::resolver_facts::StructuralFacts;
 
 pub type WorkspaceId = String;
 pub type ShapeRef = String;
@@ -46,7 +37,7 @@ pub struct ResolverProvenance {
     pub constellation_paths: Vec<String>,
     pub shape_rule_paths: Vec<String>,
     pub legacy_constellation_stack:
-        Vec<sem_os_ontology::constellation_map_def::ConstellationMapDefBody>,
+        Vec<dsl_types::constellation_map_def::ConstellationMapDefBody>,
 }
 
 #[derive(Debug, Clone)]
@@ -81,11 +72,11 @@ pub struct ResolvedSlot {
     pub join: Option<JoinDef>,
     pub entity_kinds: Vec<String>,
     pub cardinality: Option<Cardinality>,
-    pub depends_on: Vec<sem_os_ontology::constellation_map_def::DependencyEntry>,
+    pub depends_on: Vec<dsl_types::constellation_map_def::DependencyEntry>,
     pub placeholder: Option<String>,
     pub overlays: Vec<String>,
     pub edge_overlays: Vec<String>,
-    pub verbs: BTreeMap<String, sem_os_ontology::constellation_map_def::VerbPaletteEntry>,
+    pub verbs: BTreeMap<String, dsl_types::constellation_map_def::VerbPaletteEntry>,
     pub children: BTreeMap<String, SlotDef>,
     pub max_depth: Option<usize>,
     pub closure: Option<ClosureType>,

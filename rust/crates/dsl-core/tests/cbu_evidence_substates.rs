@@ -2,12 +2,13 @@ use std::collections::BTreeMap;
 
 use dsl_core::{
     config::dag::PredicateBinding,
-    frontier::{hydrate_frontier, EntityRef, FrontierFact, GreenWhenStatus},
+    frontier::{EntityRef, FrontierFact, GreenWhenStatus},
     resolver::{
         ResolvedSlot, ResolvedTemplate, ResolvedTransition, ResolverProvenance, SlotProvenance,
         VersionHash,
     },
 };
+use sem_os_core::frontier::hydrate_frontier;
 
 fn template() -> ResolvedTemplate {
     ResolvedTemplate {

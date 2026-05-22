@@ -12,7 +12,7 @@ use std::{
 
 use anyhow::{anyhow, Result};
 use chrono::Utc;
-use dsl_core::resolver::{resolve_template, ResolverInputs};
+use sem_os_core::resolver::{resolve_template, ResolverInputs};
 use sem_os_ontology::{
     constellation_map_def::{
         Cardinality, ConstellationMapDefBody, DependencyEntry as CoreDependencyEntry,

@@ -12,9 +12,11 @@
 
 pub mod error;
 pub mod execution;
+pub mod frontier;
 pub mod ids;
 pub mod ports;
 pub mod principal;
 pub mod proto;
+pub mod resolver;
 pub mod seeds;
 pub mod types;

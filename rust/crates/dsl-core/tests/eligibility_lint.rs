@@ -1,8 +1,8 @@
-use dsl_core::{
-    config::dag::EligibilityConstraint,
-    config::{validate_resolved_template_gate_metadata, DagError, DagValidationContext},
-    resolver::{resolve_template, ResolverInputs},
+use dsl_core::config::{
+    dag::EligibilityConstraint, validate_resolved_template_gate_metadata, DagError,
+    DagValidationContext,
 };
+use sem_os_core::resolver::{resolve_template, ResolverInputs};
 use std::{collections::HashSet, path::PathBuf};
 
 fn inputs() -> ResolverInputs {

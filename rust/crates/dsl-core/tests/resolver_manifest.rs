@@ -1,4 +1,5 @@
-use dsl_core::resolver::{resolve_template, ManifestOptions, ResolverInputs, ResolverManifest};
+use dsl_core::resolver::{ManifestOptions, ResolverManifest};
+use sem_os_core::resolver::{resolve_template, ResolverInputs};
 use std::{fs, path::PathBuf};
 
 fn inputs() -> ResolverInputs {

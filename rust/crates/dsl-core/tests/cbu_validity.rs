@@ -2,12 +2,13 @@ use std::collections::BTreeMap;
 
 use dsl_core::{
     config::dag::PredicateBinding,
-    frontier::{hydrate_frontier, EntityRef, FrontierFact, GreenWhenStatus, InvalidFactDetail},
+    frontier::{EntityRef, FrontierFact, GreenWhenStatus, InvalidFactDetail},
     resolver::{
         ResolvedSlot, ResolvedTemplate, ResolvedTransition, ResolverProvenance, SlotProvenance,
         VersionHash,
     },
 };
+use sem_os_core::frontier::hydrate_frontier;
 
 const CBU_VALIDATED_GREEN_WHEN: &str = r#"
 every entity_proper_person.state = VERIFIED

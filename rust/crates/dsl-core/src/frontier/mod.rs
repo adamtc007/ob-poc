@@ -1,10 +1,26 @@
 //! Frontier disclosure types for resolved SemOS DAG instances.
+//!
+//! The computation (`hydrate_frontier`) lives in `sem_os_core::frontier`.
+//! This module owns only the pure value types.
 
 use crate::config::predicate::CmpOp;
+use std::collections::BTreeMap;
 
-mod hydrator;
+/// Synthetic fact set used by the Phase 3 skeleton hydrator.
+pub type FrontierFacts = BTreeMap<String, Vec<FrontierFact>>;
 
-pub use hydrator::{hydrate_frontier, FrontierFact, FrontierFacts, HydrateFrontierError};
+/// One bound predicate fact for a synthetic substrate entity.
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub struct FrontierFact {
+    pub state: Option<String>,
+    pub attrs: BTreeMap<String, String>,
+}
+
+#[derive(Debug, thiserror::Error)]
+pub enum HydrateFrontierError {
+    #[error("slot not found in resolved template: {0}")]
+    SlotNotFound(String),
+}
 
 /// Reference to one entity instance whose frontier should be disclosed.
 #[derive(Debug, Clone, PartialEq, Eq)]

@@ -2,13 +2,14 @@ use std::collections::BTreeMap;
 
 use dsl_core::{
     config::dag::PredicateBinding,
-    frontier::{hydrate_frontier, EntityRef, FrontierFact, GreenWhenStatus, InvalidFactDetail},
+    frontier::{EntityRef, FrontierFact, GreenWhenStatus, InvalidFactDetail},
     resolver::{
         ResolvedSlot, ResolvedTemplate, ResolvedTransition, ResolverProvenance, SlotProvenance,
         VersionHash,
     },
 };
-use sem_os_ontology::constellation_map_def::Cardinality;
+use sem_os_core::frontier::hydrate_frontier;
+use dsl_types::constellation_map_def::Cardinality;
 
 fn template() -> ResolvedTemplate {
     ResolvedTemplate {

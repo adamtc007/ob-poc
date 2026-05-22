@@ -2,13 +2,14 @@ use std::collections::BTreeMap;
 
 use dsl_core::{
     config::dag::{ClosureType, PredicateBinding},
-    frontier::{hydrate_frontier, EntityRef, FrontierFact, GreenWhenStatus, HydrateFrontierError},
+    frontier::{EntityRef, FrontierFact, GreenWhenStatus, HydrateFrontierError},
     resolver::{
         ResolvedSlot, ResolvedSource, ResolvedTemplate, ResolvedTransition, ResolverProvenance,
         SlotProvenance, VersionHash,
     },
 };
-use sem_os_ontology::constellation_map_def::CompletenessAssertionConfig;
+use sem_os_core::frontier::hydrate_frontier;
+use dsl_types::constellation_map_def::CompletenessAssertionConfig;
 
 fn template() -> ResolvedTemplate {
     ResolvedTemplate {

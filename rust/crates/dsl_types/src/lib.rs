@@ -21,3 +21,4 @@
 //!   types without depending on the SemOS layer.
 
 pub mod constellation_map_def;
+pub mod resolver_facts;

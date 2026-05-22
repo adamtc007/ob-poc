@@ -1,6 +1,4 @@
-use std::collections::BTreeMap;
-
-use crate::{
+use dsl_core::{
     config::{
         dag::ClosureType,
         predicate::{
@@ -8,31 +6,15 @@ use crate::{
             Predicate, Validity,
         },
     },
+    frontier::{
+        CompletenessAssertionStatus, DiscretionaryReason, EntityRef, FrontierFact, FrontierFacts,
+        GreenWhenStatus, HydrateFrontierError, InstanceFrontier, InvalidFact, InvalidFactDetail,
+        MissingFact, ReachableDestination,
+    },
     parser::parse_single_verb,
     resolver::{ResolvedSlot, ResolvedTemplate},
 };
-use sem_os_ontology::constellation_map_def::Cardinality;
-
-use super::{
-    CompletenessAssertionStatus, DiscretionaryReason, EntityRef, GreenWhenStatus, InstanceFrontier,
-    InvalidFact, InvalidFactDetail, MissingFact, ReachableDestination,
-};
-
-/// Synthetic fact set used by the Phase 3 skeleton hydrator.
-pub type FrontierFacts = BTreeMap<String, Vec<FrontierFact>>;
-
-/// One bound predicate fact for a synthetic substrate entity.
-#[derive(Debug, Clone, PartialEq, Eq, Default)]
-pub struct FrontierFact {
-    pub state: Option<String>,
-    pub attrs: BTreeMap<String, String>,
-}
-
-#[derive(Debug, thiserror::Error)]
-pub enum HydrateFrontierError {
-    #[error("slot not found in resolved template: {0}")]
-    SlotNotFound(String),
-}
+use dsl_types::constellation_map_def::Cardinality;
 
 /// Hydrate the current action frontier from caller-supplied predicate facts.
 ///
@@ -42,7 +24,8 @@ pub enum HydrateFrontierError {
 ///
 /// # Examples
 /// ```rust,ignore
-/// use dsl_core::frontier::{hydrate_frontier, EntityRef};
+/// use dsl_core::frontier::EntityRef;
+/// use sem_os_core::frontier::hydrate_frontier;
 ///
 /// let frontier = hydrate_frontier(entity_ref, &resolved_template)?;
 /// assert_eq!(frontier.current_state, "PENDING");

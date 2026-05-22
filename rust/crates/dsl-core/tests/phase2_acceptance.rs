@@ -1,7 +1,5 @@
-use dsl_core::{
-    config::{validate_resolved_template_gate_metadata, DagValidationContext},
-    resolver::{resolve_template, ResolverInputs},
-};
+use dsl_core::config::{validate_resolved_template_gate_metadata, DagValidationContext};
+use sem_os_core::resolver::{resolve_template, ResolverInputs};
 use std::{collections::HashSet, path::PathBuf};
 
 fn inputs() -> ResolverInputs {

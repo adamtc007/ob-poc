@@ -1,6 +1,7 @@
-use crate::config::dag::{ClosureType, EligibilityConstraint, PredicateBinding, RoleGuard};
+use dsl_core::config::dag::{ClosureType, EligibilityConstraint, PredicateBinding, RoleGuard};
 use anyhow::{Context, Result};
-use sem_os_ontology::constellation_map_def::{AuditClass, CompletenessAssertionConfig};
+use dsl_types::constellation_map_def::{AuditClass, CompletenessAssertionConfig};
+pub use dsl_types::resolver_facts::StructuralFacts;
 use serde::{Deserialize, Serialize};
 use serde_yaml::Value as YamlValue;
 use std::{
@@ -56,33 +57,6 @@ pub struct ShapeRule {
 
     #[serde(default)]
     pub raw_remove: Vec<RawStateEdit>,
-}
-
-#[derive(Debug, Clone, Default, PartialEq, Eq, Deserialize, Serialize)]
-pub struct StructuralFacts {
-    #[serde(default)]
-    pub jurisdiction: Option<String>,
-
-    #[serde(default)]
-    pub structure_type: Option<String>,
-
-    #[serde(default)]
-    pub allowed_structure_types: Vec<String>,
-
-    #[serde(default)]
-    pub document_bundles: Vec<String>,
-
-    #[serde(default)]
-    pub trading_profile_type: Option<String>,
-
-    #[serde(default)]
-    pub required_roles: Vec<String>,
-
-    #[serde(default)]
-    pub optional_roles: Vec<String>,
-
-    #[serde(default)]
-    pub deferred_roles: Vec<String>,
 }
 
 #[derive(Debug, Clone, Default, Deserialize, Serialize)]
