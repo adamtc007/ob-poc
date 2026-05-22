@@ -1,0 +1,19 @@
+# Workspace-local Cargo configuration for rust/.
+# Build settings (target-dir, rustc-wrapper, jobs) and sparse registry now live
+# in ~/.cargo/config.toml so they apply uniformly across every workspace on this
+# machine. This file keeps only what is genuinely workspace-scoped.
+
+[alias]
+x = "run --package xtask --"
+
+[profile.dev]
+incremental = true
+debug = 1
+split-debuginfo = "unpacked"
+
+[profile.dev.package."*"]
+opt-level = 2
+
+[env]
+DATABASE_URL = { value = "postgresql:///data_designer", force = false }
+SQLX_OFFLINE = { value = "true", force = false }

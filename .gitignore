@@ -95,7 +95,7 @@ sqlx-data.json
 
 # Rust-specific build artifacts
 rust-project.json
-.cargo/
+/.cargo/config.toml
 
 # Generated protobuf files
 *.pb.rs
