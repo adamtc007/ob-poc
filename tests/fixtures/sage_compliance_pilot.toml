@@ -1,0 +1,322 @@
+# Sage compliance pilot — Chrome DevTools MCP harness
+#
+# Simulates a compliance officer reviewing Sage-authored workflows.
+# Replaces the manual pilot session described in v0.2 Tranche 8.
+#
+# Pre-conditions:
+#   - ob-poc server running:    cd rust && cargo x deploy
+#   - React dev server:         cd ob-poc-ui-react && npm run dev
+#   - URL:                      http://localhost:3000 (or :5173 via Vite)
+#
+# What this harness validates (7 v&s audit boxes):
+#   1. Sage matches the utterance to a pack with visible confidence
+#   2. Parameters are proposed and shown in the confirmation panel
+#   3. Human (automated) confirms — the confirmation event is recorded
+#   4. DSL is emitted and visible in the authoring panel
+#   5. Compile result is shown (pass/fail)
+#   6. SVG diagram renders in the Observatory panel
+#   7. Audit trail is accessible via the trace endpoint
+#
+# Run with Claude Code + Chrome MCP:
+#   @chrome load this fixture and execute the sage_kyc_all_conditions scenario
+
+[harness]
+name = "sage-compliance-pilot"
+base_url = "http://localhost:3000"
+api_base = "http://localhost:3000/api"
+screenshot_dir = "tests/fixtures/screenshots/sage-pilot"
+fail_fast = false
+
+[harness.preconditions]
+required_endpoints = [
+    "http://localhost:3000/",
+    "http://localhost:3000/api/sem-os/context",
+]
+
+# ── Scenario 1: KYC conjunctive gate ─────────────────────────────────────────
+[[scenarios]]
+id = "sage_kyc_all_conditions"
+description = """
+Compliance officer reviews a Sage-authored KYC activation gate.
+All three conditions (KYC approved, UBO resolved, sanctions clear)
+must hold before activation. Validates that the workflow DSL and
+diagram correctly represent the AND-logic using a conjunctive-gate pack.
+"""
+
+[[scenarios.steps]]
+action = "navigate"
+url = "http://localhost:3000"
+wait_for = ".chat-input"
+screenshot = "01_home_loaded"
+
+[[scenarios.steps]]
+action = "create_session"
+endpoint = "/api/session"
+body = '{}'
+save_as = "session_id"
+screenshot = "02_session_created"
+
+[[scenarios.steps]]
+action = "api_post"
+endpoint = "/api/session/{session_id}/input"
+body = '{"kind": "utterance", "text": "before the client can go live all three checks must pass: KYC approved UBO resolved and no sanctions hits"}'
+expect_response_contains = ["conjunctive-gate", "confidence"]
+screenshot = "03_sage_pack_matched"
+# Box 1: pack matched with confidence
+
+[[scenarios.steps]]
+action = "api_post"
+endpoint = "/api/session/{session_id}/input"
+body = '{"kind": "utterance", "text": "conjunctive-gate is correct"}'
+expect_response_contains = ["gate-name", "proposed_parameters"]
+screenshot = "04_parameters_proposed"
+# Box 2: parameters proposed
+
+[[scenarios.steps]]
+action = "api_post"
+endpoint = "/api/session/{session_id}/input"
+body = '{"kind": "utterance", "text": "correct"}'
+expect_response_contains = ["provenance", "gateway"]
+screenshot = "05_dsl_emitted"
+# Boxes 3+4: confirmed + DSL emitted
+
+[[scenarios.steps]]
+action = "api_get"
+endpoint = "/api/session/{session_id}/trace"
+expect_response_contains = ["Instantiated", "conjunctive-gate"]
+screenshot = "06_audit_trail"
+# Box 7: audit trail
+
+[[scenarios.steps]]
+action = "visual_check"
+description = "Compliance officer review checklist"
+assertions = [
+    "DSL source is visible and contains (gateway",
+    "Provenance atom names the source pack conjunctive-gate",
+    "No console errors present",
+    "Page renders without blank sections",
+]
+screenshot = "07_final_review"
+
+[scenarios.expected_results]
+pack_matched = "conjunctive-gate"
+dsl_contains = ["gateway", "flow", "provenance"]
+compile_pass = true
+diagram_renders = true
+audit_boxes_complete = 7
+
+# ── Scenario 2: Sanctions hard block ─────────────────────────────────────────
+[[scenarios]]
+id = "sage_sanctions_block"
+description = """
+Compliance officer verifies that a sanctions match results in an immediate
+hard block regardless of other conditions.
+"""
+
+[[scenarios.steps]]
+action = "navigate"
+url = "http://localhost:3000"
+wait_for = ".chat-input"
+screenshot = "01_home_loaded"
+
+[[scenarios.steps]]
+action = "create_session"
+endpoint = "/api/session"
+body = '{}'
+save_as = "session_id"
+screenshot = "02_session_created"
+
+[[scenarios.steps]]
+action = "api_post"
+endpoint = "/api/session/{session_id}/input"
+body = '{"kind": "utterance", "text": "any sanctions match immediately escalates to compliance regardless of other outcomes"}'
+expect_response_contains = ["sanction-hit-escalation", "confidence"]
+screenshot = "03_sage_pack_matched"
+# Box 1: pack matched with confidence
+
+[[scenarios.steps]]
+action = "api_post"
+endpoint = "/api/session/{session_id}/input"
+body = '{"kind": "utterance", "text": "sanction-hit-escalation is correct"}'
+expect_response_contains = ["proposed_parameters"]
+screenshot = "04_parameters_proposed"
+# Box 2: parameters proposed
+
+[[scenarios.steps]]
+action = "api_post"
+endpoint = "/api/session/{session_id}/input"
+body = '{"kind": "utterance", "text": "correct"}'
+expect_response_contains = ["provenance", "service-task"]
+screenshot = "05_dsl_emitted"
+# Boxes 3+4: confirmed + DSL emitted
+
+[scenarios.expected_results]
+pack_matched = "sanction-hit-escalation"
+dsl_contains = ["service-task", "gateway", "provenance"]
+compile_pass = true
+diagram_renders = true
+audit_boxes_complete = 7
+
+# ── Scenario 3: Periodic KYC refresh ──────────────────────────────────────────
+[[scenarios]]
+id = "sage_periodic_refresh"
+description = """
+Compliance officer reviews a time-based re-verification gate.
+KYC records older than 24 months trigger re-verification.
+"""
+
+[[scenarios.steps]]
+action = "navigate"
+url = "http://localhost:3000"
+wait_for = ".chat-input"
+screenshot = "01_home_loaded"
+
+[[scenarios.steps]]
+action = "create_session"
+endpoint = "/api/session"
+body = '{}'
+save_as = "session_id"
+screenshot = "02_session_created"
+
+[[scenarios.steps]]
+action = "api_post"
+endpoint = "/api/session/{session_id}/input"
+body = '{"kind": "utterance", "text": "if the KYC review was completed more than 24 months ago trigger a re-verification"}'
+expect_response_contains = ["periodic-refresh-trigger", "confidence"]
+screenshot = "03_sage_pack_matched"
+# Box 1: pack matched with confidence
+
+[[scenarios.steps]]
+action = "api_post"
+endpoint = "/api/session/{session_id}/input"
+body = '{"kind": "utterance", "text": "periodic-refresh-trigger is correct"}'
+expect_response_contains = ["proposed_parameters"]
+screenshot = "04_parameters_proposed"
+# Box 2: parameters proposed
+
+[[scenarios.steps]]
+action = "api_post"
+endpoint = "/api/session/{session_id}/input"
+body = '{"kind": "utterance", "text": "correct"}'
+expect_response_contains = ["provenance", "exclusive"]
+screenshot = "05_dsl_emitted"
+# Boxes 3+4: confirmed + DSL emitted
+
+[scenarios.expected_results]
+pack_matched = "periodic-refresh-trigger"
+dsl_contains = ["exclusive", "flow", "provenance"]
+compile_pass = true
+diagram_renders = true
+audit_boxes_complete = 7
+
+# ── Scenario 4: Jurisdiction routing ─────────────────────────────────────────
+[[scenarios]]
+id = "sage_jurisdiction_routing"
+description = """
+Compliance officer verifies that jurisdiction-specific regulatory tracks are
+correctly routed: UK → CASS, EU → MiFID, all others → global standard.
+"""
+
+[[scenarios.steps]]
+action = "navigate"
+url = "http://localhost:3000"
+wait_for = ".chat-input"
+screenshot = "01_home_loaded"
+
+[[scenarios.steps]]
+action = "create_session"
+endpoint = "/api/session"
+body = '{}'
+save_as = "session_id"
+screenshot = "02_session_created"
+
+[[scenarios.steps]]
+action = "api_post"
+endpoint = "/api/session/{session_id}/input"
+body = '{"kind": "utterance", "text": "UK clients go to the CASS track EU clients to MiFID track everyone else to global standard"}'
+expect_response_contains = ["multi-jurisdiction-overlay", "confidence"]
+screenshot = "03_sage_pack_matched"
+# Box 1: pack matched with confidence
+
+[[scenarios.steps]]
+action = "api_post"
+endpoint = "/api/session/{session_id}/input"
+body = '{"kind": "utterance", "text": "multi-jurisdiction-overlay is correct"}'
+expect_response_contains = ["proposed_parameters"]
+screenshot = "04_parameters_proposed"
+# Box 2: parameters proposed
+
+[[scenarios.steps]]
+action = "api_post"
+endpoint = "/api/session/{session_id}/input"
+body = '{"kind": "utterance", "text": "correct"}'
+expect_response_contains = ["provenance", "exclusive"]
+screenshot = "05_dsl_emitted"
+# Boxes 3+4: confirmed + DSL emitted
+
+[scenarios.expected_results]
+pack_matched = "multi-jurisdiction-overlay"
+dsl_contains = ["exclusive", "flow", "provenance"]
+compile_pass = true
+diagram_renders = true
+audit_boxes_complete = 7
+
+# ── Scenario 5: Manual override checkpoint ────────────────────────────────────
+[[scenarios]]
+id = "sage_manual_override"
+description = """
+Compliance officer reviews a checkpoint where an automated risk assessment
+can be overridden by a compliance officer. Validates that the user-task and
+business-rule-task nodes appear in the DSL and diagram.
+"""
+
+[[scenarios.steps]]
+action = "navigate"
+url = "http://localhost:3000"
+wait_for = ".chat-input"
+screenshot = "01_home_loaded"
+
+[[scenarios.steps]]
+action = "create_session"
+endpoint = "/api/session"
+body = '{}'
+save_as = "session_id"
+screenshot = "02_session_created"
+
+[[scenarios.steps]]
+action = "api_post"
+endpoint = "/api/session/{session_id}/input"
+body = '{"kind": "utterance", "text": "system automatically assesses risk but compliance officer can override the decision"}'
+expect_response_contains = ["manual-override-checkpoint", "confidence"]
+screenshot = "03_sage_pack_matched"
+# Box 1: pack matched with confidence
+
+[[scenarios.steps]]
+action = "api_post"
+endpoint = "/api/session/{session_id}/input"
+body = '{"kind": "utterance", "text": "manual-override-checkpoint is correct"}'
+expect_response_contains = ["proposed_parameters"]
+screenshot = "04_parameters_proposed"
+# Box 2: parameters proposed
+
+[[scenarios.steps]]
+action = "api_post"
+endpoint = "/api/session/{session_id}/input"
+body = '{"kind": "utterance", "text": "correct"}'
+expect_response_contains = ["provenance", "user-task"]
+screenshot = "05_dsl_emitted"
+# Boxes 3+4: confirmed + DSL emitted
+
+[[scenarios.steps]]
+action = "api_get"
+endpoint = "/api/session/{session_id}/trace"
+expect_response_contains = ["Instantiated", "manual-override-checkpoint"]
+screenshot = "06_audit_trail"
+# Box 7: audit trail
+
+[scenarios.expected_results]
+pack_matched = "manual-override-checkpoint"
+dsl_contains = ["service-task", "user-task", "gateway", "provenance"]
+compile_pass = true
+diagram_renders = true
+audit_boxes_complete = 7
