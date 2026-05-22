@@ -2610,8 +2610,8 @@ impl DslExecutor {
                     // unique-constraint violations and return OptimisticConflict
                     // instead of RolledBack. This is a normal outcome under
                     // concurrent idempotent_ensure plans — not a failure.
-                    if let Some(db_err) = e.downcast_ref::<sqlx::Error>() {
-                        if let sqlx::Error::Database(db) = db_err {
+                    if let Some(sqlx::Error::Database(db)) = e.downcast_ref::<sqlx::Error>() {
+                        {
                             // Postgres unique_violation = SQLSTATE 23505
                             if db.code().as_deref() == Some("23505") {
                                 let constraint =

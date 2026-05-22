@@ -32,13 +32,24 @@
     },
     "rust-analyzer": {
       "initialization_options": {
+        // Tell rust-analyzer exactly which workspace roots to analyse.
+        // Without this it auto-discovers, which can pick up stale or
+        // duplicate roots. The three paths below cover:
+        //   rust/       — ob-poc application workspace
+        //   ~/dev/dsl/  — dsl library (resolved via [patch] in rust/.cargo/config.toml)
+        //   ~/dev/sem-os/ — sem-os library (same [patch] mechanism)
+        // bpmn-lite/ has its own Cargo.toml and is auto-discovered separately.
+        "linkedProjects": [
+          "./rust/Cargo.toml",
+          "/Users/adamtc007/dev/dsl/Cargo.toml",
+          "/Users/adamtc007/dev/sem-os/Cargo.toml",
+        ],
         "cargo": {
           "features": ["database"],
           "noDefaultFeatures": false,
           "buildScripts": {
             "enable": true,
           },
-          "unsetTest": ["dsl_types"],
           "targetDir": "/Users/adamtc007/.cargo-target-ra",
         },
         "check": {
@@ -48,6 +59,11 @@
         },
         "procMacro": {
           "enable": true,
+        },
+        "diagnostics": {
+          // Suppress "unlinked-file" hints — orphaned files in extracted crate
+          // source trees that are no longer workspace members are expected.
+          "disabled": ["unlinked-file"],
         },
       },
     },
