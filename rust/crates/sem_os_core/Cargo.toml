@@ -5,7 +5,6 @@ edition = "2021"
 description = "Semantic OS core — pure domain types, port traits, gate logic. Zero sqlx."
 
 [dependencies]
-ob-poc-types = { path = "../ob-poc-types" }
 # sem_os_core-split v1 Phase 2.5 (2026-05-14): types.rs extracted to
 # sem_os_types crate. sem_os_core/src/types.rs is now a compat shim
 # (`pub use sem_os_types::*;`). This dep stays after migration —

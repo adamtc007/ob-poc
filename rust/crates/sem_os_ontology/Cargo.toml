@@ -14,6 +14,9 @@ description = "Semantic OS ontology vocabulary — the *_def family. Definition 
 #                 (core knows nothing about ontology).
 
 [dependencies]
+# Level 0 substrate — constellation_map_def lives here after Phase 1.
+dsl_types = { path = "../dsl_types" }
+
 # Phase 2 (pure-type leaves): policy_rule, observation_def, verb_contract,
 # view_def, taxonomy_def, universe_def, requirement_profile_def,
 # relationship_type_def, state_machine_def. serde + serde_json::Value

@@ -365,4 +365,8 @@ members = [
 
     # Unified DSL v0.2 — Tranche 6: SVG diagram renderer
     "crates/dsl-render",
+
+    # Extraction Phase 1 — substrate crate (Level 0, std + serde only)
+    # Homes constellation_map_def; both dsl-lang and sem-os depend on it.
+    "crates/dsl_types",
 ]

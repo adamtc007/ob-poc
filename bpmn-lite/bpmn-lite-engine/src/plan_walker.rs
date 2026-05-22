@@ -22,7 +22,7 @@ use dsl_bus_protocol::v1::{
     TypedValue as ProtoTypedValue, Uuid as ProtoUuid,
 };
 use dsl_bus_storage::{insert_outbox, BusEndpoint, OutboxEntry};
-use ob_poc_types::session_stack::SessionStackState;
+use bpmn_lite_types::session_stack::SessionStackState;
 use prost::Message;
 use uuid::Uuid;
 

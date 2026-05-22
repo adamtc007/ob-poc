@@ -36,7 +36,7 @@ use bpmn_lite_engine::demo::{build_demo_plan, demo_initial_vars};
 use bpmn_lite_store::store::ProcessStore;
 use bpmn_lite_store::store_memory::MemoryStore;
 use bpmn_lite_types::types::{ProcessInstance, ProcessState};
-use ob_poc_types::session_stack::SessionStackState;
+use bpmn_lite_types::session_stack::SessionStackState;
 
 // ── Demo state ─────────────────────────────────────────────────────────
 

@@ -1,0 +1,13 @@
+[package]
+name = "dsl_types"
+version = "0.1.0"
+edition = "2021"
+description = "Level 0 substrate types — pure data, std + serde only. The bottom layer; depends on NOTHING else in the workspace. Homes constellation_map_def and any other cross-cutting value types that must be visible to both dsl-lang and sem-os without creating circular deps."
+
+[dependencies]
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+serde_yaml = "0.9"
+
+[lints.rust]
+unreachable_pub = "deny"

@@ -172,7 +172,7 @@ async fn inject_waiting_instance(
         bytecode_version: [0u8; 32],
         domain_payload: "{}".into(),
         domain_payload_hash: [0u8; 32],
-        session_stack: ob_poc_types::session_stack::SessionStackState::default(),
+        session_stack: bpmn_lite_types::session_stack::SessionStackState::default(),
         flags: Default::default(),
         counters: Default::default(),
         join_expected: Default::default(),
