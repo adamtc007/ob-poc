@@ -16,7 +16,8 @@ on:
     paths:
       - 'rust/config/verbs/**'
       - 'rust/config/sem_os_seeds/**'
-      - 'rust/crates/dsl-core/src/config/**'
+      # dsl-core is now an external library (github.com/adamtc007/dsl);
+      # its config changes no longer live in this repo.
       - 'rust/crates/dsl-runtime/src/cross_workspace/**'
       - 'rust/xtask/src/**'
       - '.github/workflows/catalogue.yml'

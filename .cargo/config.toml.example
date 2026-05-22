@@ -1,21 +1,24 @@
-# Local-dev [patch] override for the dsl and sem-os library repos.
-# Copy this file to .cargo/config.toml (which is git-ignored) when you need
-# to edit dsl or sem-os source and have ob-poc pick up changes without a tag bump.
+# Local-dev [patch] override template for the dsl and sem-os library repos.
 #
-# Usage:
-#   cp .cargo/config.toml.example .cargo/config.toml
-#   # edit ~/dev/dsl or ~/dev/sem-os
-#   # changes are picked up automatically by cargo
+# The ACTIVE patches live in rust/.cargo/config.toml (committed) — they are
+# always on and point at ~/dev/ for development. This root-level file is a
+# reference template if you want to add repo-root-level overrides or document
+# the current dependency graph for contributors.
 #
-# PRODUCTION (once repos are pushed to GitHub with tags):
-# Remove this file. ob-poc crate Cargo.toml files will use git-tag deps.
-# Final migration step: change path deps to:
-#   dsl_types = { git = "https://github.com/adamtc007/dsl", tag = "v0.1.0" }
-#   dsl-core  = { git = "https://github.com/adamtc007/dsl", tag = "v0.1.0" }
-#   sem_os_types    = { git = "https://github.com/adamtc007/sem-os", tag = "v0.1.0" }
-#   sem_os_core     = { git = "https://github.com/adamtc007/sem-os", tag = "v0.1.0" }
-#   sem_os_ontology = { git = "https://github.com/adamtc007/sem-os", tag = "v0.1.0" }
+# Current state (migration complete as of 2026-05-22):
+#   github.com/adamtc007/dsl    v0.1.0  — dsl_types + dsl-core
+#   github.com/adamtc007/sem-os v0.1.1  — sem_os_types + sem_os_core + sem_os_ontology + sem_os_policy
 #
+# These match the tags in rust/Cargo.toml [workspace.dependencies].
+# The [patch] blocks in rust/.cargo/config.toml redirect all 6 crates to
+# ~/dev/dsl/ and ~/dev/sem-os/ so local edits are picked up without tag bumps.
+#
+# To temporarily DISABLE the local patches (test against real git tags):
+#   comment out the [patch] blocks in rust/.cargo/config.toml
+#
+# To use patches at the repository root level instead, copy the blocks below
+# to .cargo/config.toml (git-ignored at root) and adjust paths as needed.
+
 # [patch."https://github.com/adamtc007/dsl"]
 # dsl_types = { path = "../../dev/dsl/crates/dsl_types" }
 # dsl-core  = { path = "../../dev/dsl/crates/dsl-core"  }
@@ -24,3 +27,4 @@
 # sem_os_types    = { path = "../../dev/sem-os/crates/sem_os_types"    }
 # sem_os_core     = { path = "../../dev/sem-os/crates/sem_os_core"     }
 # sem_os_ontology = { path = "../../dev/sem-os/crates/sem_os_ontology" }
+# sem_os_policy   = { path = "../../dev/sem-os/crates/sem_os_policy"   }

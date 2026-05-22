@@ -27,13 +27,16 @@ on:
       - 'rust/xtask/src/audit.rs'
       - 'rust/xtask/src/runbook_envelope_determinism.rs'
       - 'rust/xtask/src/byok_conformance.rs'
-      - 'rust/crates/sem_os_core/src/**'
+      # sem_os_core and dsl-core are now external libraries:
+      #   github.com/adamtc007/sem-os (sem_os_core, sem_os_policy, …)
+      #   github.com/adamtc007/dsl    (dsl-core, dsl_types)
+      # Changes to those repos do not appear in this path filter.
+      # ob-poc-domain was deleted in Slice D (2026-05-14) — split into
+      # per-capability crates (ob-poc-bods, ob-poc-deal, etc.).
       - 'rust/crates/ob-poc-boundary/src/runbook_envelope.rs'
       - 'rust/crates/ob-poc-agent/**'
       - 'rust/crates/sem_os_mcp/**'
       - 'rust/crates/ob-poc-types/src/**'
-      - 'rust/crates/ob-poc-domain/src/**'
-      - 'rust/crates/dsl-core/src/config/**'
       - 'rust/crates/dsl-runtime/src/**'
       - 'rust/crates/ob-workflow/src/**'
       - 'rust/config/packs/**'
