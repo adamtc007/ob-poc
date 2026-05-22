@@ -1,0 +1,19 @@
+[package]
+name = "dsl-render"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.95"
+description = "Read-only SVG renderer for bpmn-lite DSL railway graphs"
+
+[dependencies]
+dsl-atoms = { path = "../dsl-atoms" }
+dsl-diagnostics = { path = "../dsl-diagnostics" }
+dsl-parser = { path = "../dsl-parser" }
+dsl-ast = { path = "../dsl-ast" }
+dsl-bpmn-frontend = { path = "../dsl-bpmn-frontend" }
+dsl-lowering = { path = "../dsl-lowering" }
+serde = { version = "1.0", features = ["derive"] }
+anyhow = "1.0"
+
+[lints.rust]
+unreachable_pub = "deny"

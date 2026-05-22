@@ -362,4 +362,7 @@ members = [
 
     # Unified DSL v0.2 — Tranche 5: Camunda 8 migration tool
     "crates/dsl-migrate",
+
+    # Unified DSL v0.2 — Tranche 6: SVG diagram renderer
+    "crates/dsl-render",
 ]
