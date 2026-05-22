@@ -48,7 +48,7 @@ ob-semantic-matcher = { path = "../ob-semantic-matcher" }
 sem_os_core.workspace = true
 sem_os_types.workspace = true
 sem_os_ontology.workspace = true
-sem_os_policy = { path = "../sem_os_policy" }
+sem_os_policy.workspace = true
 sem_os_client = { path = "../sem_os_client" }
 sem_os_postgres = { path = "../sem_os_postgres" }
 

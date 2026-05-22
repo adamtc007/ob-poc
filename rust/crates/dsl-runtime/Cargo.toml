@@ -41,7 +41,7 @@ dsl-core.workspace = true
 # and the VerbContractBody consumed by CrudExecutionPort. Kept deliberately
 # until a later slice resolves the cycle cleanly.
 sem_os_core.workspace = true
-sem_os_policy = { path = "../sem_os_policy" }
+sem_os_policy.workspace = true
 sem_os_ontology.workspace = true
 async-trait = "0.1"
 anyhow = "1.0"

@@ -2,15 +2,14 @@
 //!
 //! Pure projection: no DB calls, no new data sources.
 //! HydratedConstellation → GraphSceneModel (every field derivable).
+//!
+//! Moved here from sem_os_policy::observatory::graph_scene_projection so that
+//! sem_os_policy no longer depends on ob_poc_types.
 
 use ob_poc_types::galaxy::ViewLevel;
 use ob_poc_types::graph_scene::*;
 
 /// Project a GraphSceneModel from a HydratedConstellation at a given view level.
-///
-/// This function lives in sem_os_core (server-only) because it needs access to
-/// the HydratedConstellation type. The output (GraphSceneModel) lives in
-/// ob-poc-types so the WASM crate can consume it.
 pub fn project_graph_scene(
     constellation: &str,
     jurisdiction: &str,
@@ -77,13 +76,12 @@ pub fn project_graph_scene(
             progress: slot.progress,
             blocking: slot.blocking,
             depth,
-            position_hint: None, // Layout engine computes positions
+            position_hint: None,
             badges: vec![],
             child_count: slot.child_count,
             group_id: None,
         });
 
-        // Edge from parent to this slot
         let parent = if depth == 0 {
             cbu_id.to_string()
         } else {
@@ -104,7 +102,6 @@ pub fn project_graph_scene(
             weight: 1.0,
         });
 
-        // Drill target if has children or is an entity graph
         if slot.child_count > 0 || node_type == SceneNodeType::EntityGraph {
             let target_level = match level {
                 ViewLevel::System => ViewLevel::Planet,
@@ -118,7 +115,6 @@ pub fn project_graph_scene(
             });
         }
 
-        // Dependency edges
         for dep in &slot.depends_on {
             edges.push(SceneEdge {
                 source: dep.clone(),
@@ -129,7 +125,6 @@ pub fn project_graph_scene(
             });
         }
 
-        // Ownership/graph edges
         for graph_edge in &slot.graph_edges {
             edges.push(SceneEdge {
                 source: graph_edge.from_id.clone(),
@@ -158,7 +153,6 @@ pub fn project_graph_scene(
 }
 
 /// Lightweight slot projection — extracted from HydratedSlot for the projection function.
-/// Avoids importing the full constellation_runtime types into sem_os_core.
 #[derive(Debug, Clone)]
 pub struct SlotProjection {
     pub name: String,
@@ -191,7 +185,7 @@ mod tests {
     #[test]
     fn test_project_empty_constellation() {
         let scene = project_graph_scene("test", "LU", "cbu-1", &[], ViewLevel::System, 1);
-        assert_eq!(scene.nodes.len(), 1); // Just the CBU root
+        assert_eq!(scene.nodes.len(), 1);
         assert_eq!(scene.level, ViewLevel::System);
         assert_eq!(scene.layout_strategy, LayoutStrategy::DeterministicOrbital);
     }
@@ -229,11 +223,9 @@ mod tests {
 
         let scene =
             project_graph_scene("Allianz SICAV", "LU", "cbu-1", &slots, ViewLevel::System, 2);
-        assert_eq!(scene.nodes.len(), 3); // CBU + 2 slots
+        assert_eq!(scene.nodes.len(), 3);
         assert_eq!(scene.generation, 2);
-        // Dependency edge + 2 parent-child edges
         assert!(scene.edges.len() >= 3);
-        // Investment Manager depends on Depositary
         let dep_edge = scene.edges.iter().find(|e| {
             e.source == "depositary"
                 && e.target == "investment_manager"

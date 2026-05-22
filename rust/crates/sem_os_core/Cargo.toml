@@ -41,7 +41,7 @@ tokio = { version = "1", features = ["macros", "rt"] }
 # sem_os_ontology). Dev-only path-deps don't violate the "no upward
 # Cargo edge" invariant — they're only linked into the test binary.
 sem_os_ontology.workspace = true
-sem_os_policy = { path = "../sem_os_policy" }
+sem_os_policy.workspace = true
 tempfile = "3"
 
 [build-dependencies]

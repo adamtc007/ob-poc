@@ -7,6 +7,5 @@
 //!
 //! It does NOT add new semantic pipelines — only projections from existing types.
 
-pub mod graph_scene_projection;
 pub mod orientation;
 pub mod projection;

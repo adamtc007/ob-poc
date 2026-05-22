@@ -473,7 +473,7 @@ async fn get_graph_scene(
     Path(session_id): Path<Uuid>,
 ) -> impl IntoResponse {
     use ob_poc_types::galaxy::ViewLevel;
-    use sem_os_policy::observatory::graph_scene_projection;
+    use crate::api::graph_scene_projection;
 
     // 1. Try to read from REPL session's TOS hydrated constellation (canonical DAG)
     if let Some(ref repl_sessions) = state.repl_sessions {
@@ -667,7 +667,7 @@ async fn get_session_stack_graph(
 /// This is the single conversion point — used by both the TOS path and fallback path.
 fn slots_from_hydrated(
     slots: &[HydratedSlot],
-) -> Vec<sem_os_policy::observatory::graph_scene_projection::SlotProjection> {
+) -> Vec<crate::api::graph_scene_projection::SlotProjection> {
     let mut result = Vec::new();
     flatten_slots_recursive(slots, &mut result);
     result
@@ -675,10 +675,10 @@ fn slots_from_hydrated(
 
 fn flatten_slots_recursive(
     slots: &[HydratedSlot],
-    result: &mut Vec<sem_os_policy::observatory::graph_scene_projection::SlotProjection>,
+    result: &mut Vec<crate::api::graph_scene_projection::SlotProjection>,
 ) {
-    use sem_os_policy::observatory::graph_scene_projection::GraphEdgeProjection;
-    use sem_os_policy::observatory::graph_scene_projection::SlotProjection;
+    use crate::api::graph_scene_projection::GraphEdgeProjection;
+    use crate::api::graph_scene_projection::SlotProjection;
     for slot in slots {
         result.push(SlotProjection {
             name: slot.name.clone(),
@@ -788,7 +788,7 @@ async fn navigate(
     Path(session_id): Path<Uuid>,
     Json(request): Json<NavigateRequest>,
 ) -> impl IntoResponse {
-    use sem_os_policy::observatory::graph_scene_projection::{
+    use crate::api::graph_scene_projection::{
         self, GraphEdgeProjection, SlotProjection,
     };
 

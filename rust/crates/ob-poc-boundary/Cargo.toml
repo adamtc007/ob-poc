@@ -18,7 +18,7 @@ ob-poc-macros = { path = "../ob-poc-macros" }
 # execution tier — see the boundary-tier discipline in lib.rs.
 sem_os_core.workspace = true
 sem_os_ontology.workspace = true
-sem_os_policy = { path = "../sem_os_policy" }
+sem_os_policy.workspace = true
 # dsl-core supplies VerbConfig metadata for ACP registry/pack projection
 # (slice 2d.3). Pure-data crate — no execution-tier dependency.
 dsl-core.workspace = true

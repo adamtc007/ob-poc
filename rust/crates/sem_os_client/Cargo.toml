@@ -6,7 +6,7 @@ description = "Semantic OS client — SemOsClient trait + InProcessClient + Http
 
 [dependencies]
 sem_os_core.workspace = true
-sem_os_policy = { path = "../sem_os_policy" }
+sem_os_policy.workspace = true
 async-trait = "0.1"
 anyhow = "1.0"
 serde = { version = "1.0", features = ["derive"] }

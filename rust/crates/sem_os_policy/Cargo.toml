@@ -30,7 +30,6 @@ sem_os_types.workspace = true
 # authoring/* uses ob-poc-types + sqlparser + tokio; service.rs uses
 # tokio + tracing; observatory uses tracing; authoring + stewardship
 # both use async_trait for store traits.
-ob-poc-types = { path = "../ob-poc-types" }
 async-trait = "0.1"
 serde_yaml = "0.9"
 sqlparser = "0.53"

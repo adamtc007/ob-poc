@@ -47,7 +47,7 @@ ob-poc-macros = { path = "crates/ob-poc-macros" }
 sem_os_core.workspace = true
 sem_os_types.workspace = true
 sem_os_ontology.workspace = true
-sem_os_policy = { path = "crates/sem_os_policy" }
+sem_os_policy.workspace = true
 sem_os_client = { path = "crates/sem_os_client" }
 sem_os_obpoc_adapter = { path = "crates/sem_os_obpoc_adapter" }
 sem_os_postgres = { path = "crates/sem_os_postgres" }
@@ -164,7 +164,7 @@ bpmn-lite-ffi-http = { path = "../bpmn-lite/bpmn-lite-ffi-http" }
 bpmn-lite-ffi-grpc = { path = "../bpmn-lite/bpmn-lite-ffi-grpc" }
 sem_os_core.workspace = true
 sem_os_ontology.workspace = true
-sem_os_policy = { path = "crates/sem_os_policy" }
+sem_os_policy.workspace = true
 tokio-stream = "0.1"
 proptest = "1.4"
 toml = "0.8"
@@ -317,9 +317,7 @@ members = [
     # Receiver-side bus handler — bridges ob-poc verb dispatch to dsl-bus-server.
     "crates/ob-poc-bus-handler",
 
-    # Semantic OS crates (sem_os_core/sem_os_types/sem_os_ontology extracted to
-    # github.com/adamtc007/sem-os; sem_os_policy stays in ob-poc due to ob_poc_types coupling)
-    "crates/sem_os_policy",
+    # sem_os_policy extracted to github.com/adamtc007/sem-os v0.1.1
     "crates/sem_os_postgres",
     "crates/sem_os_server",
     "crates/sem_os_client",
@@ -367,6 +365,7 @@ members = [
 # overrides these with ~/dev/ paths during development.
 dsl_types    = { git = "https://github.com/adamtc007/dsl",    tag = "v0.1.0" }
 dsl-core     = { git = "https://github.com/adamtc007/dsl",    tag = "v0.1.0" }
-sem_os_types    = { git = "https://github.com/adamtc007/sem-os", tag = "v0.1.0" }
-sem_os_core     = { git = "https://github.com/adamtc007/sem-os", tag = "v0.1.0" }
-sem_os_ontology = { git = "https://github.com/adamtc007/sem-os", tag = "v0.1.0" }
+sem_os_types    = { git = "https://github.com/adamtc007/sem-os", tag = "v0.1.1" }
+sem_os_core     = { git = "https://github.com/adamtc007/sem-os", tag = "v0.1.1" }
+sem_os_ontology = { git = "https://github.com/adamtc007/sem-os", tag = "v0.1.1" }
+sem_os_policy   = { git = "https://github.com/adamtc007/sem-os", tag = "v0.1.1" }

@@ -29,3 +29,4 @@ dsl-core  = { path = "/Users/adamtc007/dev/dsl/crates/dsl-core"  }
 sem_os_types    = { path = "/Users/adamtc007/dev/sem-os/crates/sem_os_types"    }
 sem_os_core     = { path = "/Users/adamtc007/dev/sem-os/crates/sem_os_core"     }
 sem_os_ontology = { path = "/Users/adamtc007/dev/sem-os/crates/sem_os_ontology" }
+sem_os_policy   = { path = "/Users/adamtc007/dev/sem-os/crates/sem_os_policy"   }

@@ -6,7 +6,7 @@ description = "Semantic OS test harness — golden/invariant tests against SemOs
 
 [dependencies]
 sem_os_core.workspace = true
-sem_os_policy = { path = "../sem_os_policy" }
+sem_os_policy.workspace = true
 sem_os_ontology.workspace = true
 sem_os_client = { path = "../sem_os_client" }
 sem_os_postgres = { path = "../sem_os_postgres" }

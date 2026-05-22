@@ -102,6 +102,7 @@ pub use ob_poc_deal as deal_types;
 pub mod deal_routes;
 
 #[cfg(feature = "server")]
+pub mod graph_scene_projection;
 pub mod observatory_routes;
 
 #[cfg(feature = "server")]
