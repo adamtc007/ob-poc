@@ -5,6 +5,10 @@ edition = "2021"
 rust-version = "1.95"
 description = "Journey-persisted hydrate/dehydrate runtime for the unified DSL v0.1 (Tranche 6)"
 
+[features]
+default = []
+postgres = ["dep:sqlx"]
+
 [dependencies]
 dsl-atoms = { path = "../dsl-atoms" }
 dsl-diagnostics = { path = "../dsl-diagnostics" }
@@ -19,6 +23,7 @@ anyhow = "1.0"
 tokio = { version = "1", features = ["full"] }
 tracing = "0.1"
 async-trait = "0.1"
+sqlx = { version = "0.8", features = ["runtime-tokio-rustls", "postgres", "uuid", "chrono", "json"], optional = true }
 
 [lints.rust]
 unreachable_pub = "deny"

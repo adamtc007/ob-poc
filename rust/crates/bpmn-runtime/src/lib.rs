@@ -31,20 +31,30 @@
 //! ```
 
 pub mod event_loop;
+pub mod metrics;
 pub mod processor;
+pub mod retention;
 pub mod store;
 pub mod switch;
 pub mod types;
 pub mod verb;
 
+#[cfg(feature = "postgres")]
+pub mod store_postgres;
+
 // Re-export the most commonly used items.
 pub use event_loop::RuntimeEngine;
+pub use metrics::{MetricsSnapshot, RuntimeMetrics};
+pub use retention::RetentionPolicy;
 pub use store::{InMemoryJourneyStore, JourneyLogEntry, JourneyStore, PendingWaitInfo};
 pub use switch::{
     EdgeInfo, ScriptedAdaptor, SwitchAdaptor, SwitchError, SwitchReply, SwitchRequest,
 };
 pub use types::{
-    ActiveToken, EventEnvelope, EventId, EventKind, InstanceId, InstanceStatus,
-    TokenId, WorkflowInstance, WriteLogEntry,
+    ActiveToken, EventEnvelope, EventId, EventKind, InstanceId, InstanceStatus, TokenId,
+    WorkflowInstance, WriteLogEntry,
 };
 pub use verb::{VerbContext, VerbError, VerbHandler, VerbOutput, VerbRegistry};
+
+#[cfg(feature = "postgres")]
+pub use store_postgres::postgres::PostgresJourneyStore;

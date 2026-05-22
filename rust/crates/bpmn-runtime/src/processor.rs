@@ -5,13 +5,14 @@
 //! threads or fibers are involved — this is pure hydrate/dehydrate.
 
 use crate::{
-    store::{JourneyStore, JourneyLogEntry},
-    switch::{SwitchAdaptor, SwitchRequest, EdgeInfo},
+    metrics::RuntimeMetrics,
+    store::{JourneyLogEntry, JourneyStore},
+    switch::{EdgeInfo, SwitchAdaptor, SwitchRequest},
     types::*,
     verb::{VerbContext, VerbError, VerbRegistry},
 };
-use dsl_lowering::bpmn::{JourneyEdge, JourneyNode, JourneyParallelJoin, JourneySpec};
 use anyhow::Result;
+use dsl_lowering::bpmn::{JourneyEdge, JourneyNode, JourneyParallelJoin, JourneySpec};
 use std::collections::{BTreeMap, HashMap};
 
 /// Everything the processor needs to handle one event.
@@ -20,6 +21,8 @@ pub struct RuntimeContext<'a> {
     pub spec: &'a JourneySpec,
     pub verb_registry: &'a VerbRegistry,
     pub switch_adaptor: &'a dyn SwitchAdaptor,
+    /// Shared metrics — processor increments granular counters here.
+    pub metrics: &'a RuntimeMetrics,
 }
 
 /// Dispatch one event. This is the only public entry point.
@@ -112,6 +115,7 @@ async fn handle_timer_fired(ctx: &RuntimeContext<'_>, event: &EventEnvelope) -> 
         .and_then(|s| s.parse().ok())
         .unwrap_or_default();
     let node_name = event.payload["node_name"].as_str().unwrap_or("").to_string();
+    RuntimeMetrics::increment(&ctx.metrics.timer_events_fired);
     complete_task(ctx, event.instance_id, token_id, &node_name, serde_json::json!({})).await
 }
 
@@ -260,6 +264,7 @@ async fn handle_decision_gateway(
 
     match ctx.switch_adaptor.handle(request).await {
         Ok(reply) => {
+            RuntimeMetrics::increment(&ctx.metrics.gateway_decisions);
             ctx.store
                 .append_journey_log(JourneyLogEntry {
                     instance_id,
@@ -308,6 +313,7 @@ async fn handle_parallel_fork(
     let outgoing = outgoing_edges(ctx.spec, gateway_name);
     // Consume the parent token.
     ctx.store.delete_token(token_id).await?;
+    RuntimeMetrics::increment(&ctx.metrics.parallel_forks);
 
     ctx.store
         .append_journey_log(JourneyLogEntry {
@@ -490,6 +496,7 @@ async fn fire_join(
             }
         }
         MergeResult::Conflict { location, values } => {
+            RuntimeMetrics::increment(&ctx.metrics.merge_conflicts);
             ctx.store
                 .append_journey_log(JourneyLogEntry {
                     instance_id,
@@ -515,6 +522,7 @@ async fn fire_join(
         ctx.store.delete_token(t.id).await?;
     }
 
+    RuntimeMetrics::increment(&ctx.metrics.joins_fired);
     ctx.store
         .append_journey_log(JourneyLogEntry {
             instance_id,
@@ -625,6 +633,7 @@ async fn invoke_verb_for_task(
     };
 
     if let Some(handler) = ctx.verb_registry.get(&verb_ref) {
+        RuntimeMetrics::increment(&ctx.metrics.verbs_invoked);
         let verb_ctx = VerbContext {
             at_slots: BTreeMap::new(),
             inputs: BTreeMap::new(),

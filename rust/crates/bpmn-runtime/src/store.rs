@@ -11,6 +11,7 @@
 //! Every method is async so that the Postgres implementation can slot in
 //! without changing call sites.
 
+use crate::retention::RetentionPolicy;
 use crate::types::*;
 use anyhow::Result;
 use chrono::{DateTime, Utc};
@@ -195,6 +196,26 @@ pub trait JourneyStore: Send + Sync {
         join_name: &str,
         instance_id: InstanceId,
     ) -> Result<usize>;
+
+    // --- Retention ---
+
+    /// Return instance IDs eligible for archival under the given policy.
+    ///
+    /// Default implementation is a no-op (nothing to archive).
+    async fn find_archivable_instances(
+        &self,
+        _policy: &RetentionPolicy,
+    ) -> Result<Vec<InstanceId>> {
+        Ok(vec![])
+    }
+
+    /// Archive the journey log entries for a completed instance.
+    ///
+    /// Returns the number of log rows affected. Default implementation is a
+    /// no-op (returns 0). `PostgresJourneyStore` implements this for real.
+    async fn archive_instance_log(&self, _instance_id: InstanceId) -> Result<usize> {
+        Ok(0)
+    }
 }
 
 // ---------------------------------------------------------------------------

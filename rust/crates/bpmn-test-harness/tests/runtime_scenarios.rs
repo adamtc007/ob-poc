@@ -1032,3 +1032,83 @@ async fn token_excess_does_not_panic() {
         "expected Completed or Active, got: {:?}", status
     );
 }
+
+// ---------------------------------------------------------------------------
+// Tranche 7 — Metrics integration
+//
+// Verify that RuntimeEngine.metrics() reports accurate lifecycle counts after
+// running a simple instance to completion.
+// ---------------------------------------------------------------------------
+
+#[tokio::test]
+async fn metrics_increment_on_instance_lifecycle() {
+    use bpmn_runtime::{InMemoryJourneyStore, RuntimeEngine, ScriptedAdaptor, VerbRegistry};
+    use std::sync::Arc;
+
+    let dsl = r#"
+(node start-1 :kind start-event)
+(node task-1  :kind service-task)
+(node end-1   :kind end-event)
+(flow start-1 -> task-1)
+(flow task-1  -> end-1)
+"#;
+
+    let spec = Arc::new(bpmn_test_harness::compile_dsl(dsl));
+    let store = Arc::new(InMemoryJourneyStore::new());
+    let verbs = Arc::new(VerbRegistry::new());
+    let sw: Arc<dyn bpmn_runtime::SwitchAdaptor> = Arc::new(ScriptedAdaptor::new());
+
+    let engine = RuntimeEngine::new(store, spec, verbs, sw);
+
+    // Start one instance — it should auto-complete (no verb handler registered).
+    let instance_id = engine
+        .start_instance(serde_json::json!({"test": true}))
+        .await
+        .expect("start_instance failed");
+
+    let status = engine
+        .get_instance_status(instance_id)
+        .await
+        .expect("get_status failed")
+        .expect("instance not found");
+    assert_eq!(status, InstanceStatus::Completed);
+
+    // Verify metrics.
+    let snap = engine.metrics().snapshot();
+    assert_eq!(snap.instances_started, 1, "instances_started should be 1");
+    assert_eq!(snap.instances_completed, 1, "instances_completed should be 1");
+    assert_eq!(snap.instances_failed, 0, "instances_failed should be 0");
+    // At minimum the InstanceStart event was processed.
+    assert!(snap.events_processed >= 1, "events_processed should be >= 1");
+}
+
+#[tokio::test]
+async fn metrics_prometheus_text_after_runs() {
+    use bpmn_runtime::{InMemoryJourneyStore, RuntimeEngine, ScriptedAdaptor, VerbRegistry};
+    use std::sync::Arc;
+
+    let dsl = r#"
+(node s :kind start-event)
+(node t :kind service-task)
+(node e :kind end-event)
+(flow s -> t)
+(flow t -> e)
+"#;
+
+    let spec = Arc::new(bpmn_test_harness::compile_dsl(dsl));
+    let store = Arc::new(InMemoryJourneyStore::new());
+    let engine = RuntimeEngine::new(
+        store,
+        spec,
+        Arc::new(VerbRegistry::new()),
+        Arc::new(ScriptedAdaptor::new()),
+    );
+
+    engine.start_instance(serde_json::json!({})).await.unwrap();
+    engine.start_instance(serde_json::json!({})).await.unwrap();
+
+    let text = engine.metrics().prometheus_text();
+    assert!(text.contains("bpmn_instances_started 2"));
+    assert!(text.contains("bpmn_instances_completed 2"));
+    assert!(text.contains("bpmn_instances_failed 0"));
+}

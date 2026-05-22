@@ -5,6 +5,7 @@
 //! hydrate/dehydrate event-loop via [`RuntimeEngine::run_to_quiescence`].
 
 use crate::{
+    metrics::RuntimeMetrics,
     processor::{process_event, RuntimeContext},
     store::JourneyStore,
     switch::SwitchAdaptor,
@@ -22,6 +23,8 @@ pub struct RuntimeEngine {
     pub spec: Arc<JourneySpec>,
     pub verb_registry: Arc<VerbRegistry>,
     pub switch_adaptor: Arc<dyn SwitchAdaptor>,
+    /// Operational metrics. Incremented on each lifecycle event.
+    metrics: RuntimeMetrics,
 }
 
 impl RuntimeEngine {
@@ -31,7 +34,12 @@ impl RuntimeEngine {
         verb_registry: Arc<VerbRegistry>,
         switch_adaptor: Arc<dyn SwitchAdaptor>,
     ) -> Self {
-        Self { store, spec, verb_registry, switch_adaptor }
+        Self { store, spec, verb_registry, switch_adaptor, metrics: RuntimeMetrics::new() }
+    }
+
+    /// Return a reference to the engine's operational metrics.
+    pub fn metrics(&self) -> &RuntimeMetrics {
+        &self.metrics
     }
 
     /// Start a new process instance and run until no more events remain.
@@ -42,10 +50,28 @@ impl RuntimeEngine {
         initial_data: serde_json::Value,
     ) -> Result<InstanceId> {
         let inst = self.store.create_instance(&self.spec.name, initial_data.clone()).await?;
+        RuntimeMetrics::increment(&self.metrics.instances_started);
         self.store
             .enqueue_event(inst.id, EventKind::InstanceStart, initial_data)
             .await?;
         self.run_to_quiescence(inst.id).await?;
+
+        // Update terminal-state counters after quiescence.
+        if let Ok(Some(status)) = self.get_instance_status(inst.id).await {
+            match status {
+                InstanceStatus::Completed => {
+                    RuntimeMetrics::increment(&self.metrics.instances_completed);
+                }
+                InstanceStatus::Failed => {
+                    RuntimeMetrics::increment(&self.metrics.instances_failed);
+                }
+                InstanceStatus::Cancelled => {
+                    RuntimeMetrics::increment(&self.metrics.instances_cancelled);
+                }
+                InstanceStatus::Active => {}
+            }
+        }
+
         Ok(inst.id)
     }
 
@@ -147,11 +173,13 @@ impl RuntimeEngine {
                         .await?;
                     continue;
                 }
+                RuntimeMetrics::increment(&self.metrics.events_processed);
                 let ctx = RuntimeContext {
                     store: self.store.as_ref(),
                     spec: &self.spec,
                     verb_registry: &self.verb_registry,
                     switch_adaptor: self.switch_adaptor.as_ref(),
+                    metrics: &self.metrics,
                 };
                 process_event(&ctx, &event).await?;
                 self.store.ack_event(event.id).await?;

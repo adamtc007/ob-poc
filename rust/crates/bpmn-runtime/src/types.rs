@@ -34,6 +34,19 @@ impl std::fmt::Display for InstanceStatus {
     }
 }
 
+impl std::str::FromStr for InstanceStatus {
+    type Err = String;
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "active" => Ok(InstanceStatus::Active),
+            "completed" => Ok(InstanceStatus::Completed),
+            "failed" => Ok(InstanceStatus::Failed),
+            "cancelled" => Ok(InstanceStatus::Cancelled),
+            other => Err(format!("unknown InstanceStatus: {}", other)),
+        }
+    }
+}
+
 /// A running or completed workflow instance.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct WorkflowInstance {

@@ -94,3 +94,135 @@ WHERE instance_id = $1
 ORDER BY id DESC
 LIMIT 1;
 ```
+
+---
+
+## v0.2 Operational additions (Tranche 7)
+
+### Metrics
+
+`RuntimeEngine` now carries an internal `RuntimeMetrics` struct (12 atomic counters).
+
+**Reading metrics in code:**
+```rust
+let snap = engine.metrics().snapshot(); // MetricsSnapshot (serde::Serialize)
+let text = engine.metrics().prometheus_text(); // Prometheus text format
+```
+
+**Exposing on a `/metrics` HTTP endpoint (Axum example):**
+```rust
+async fn metrics_handler(
+    axum::extract::State(engine): axum::extract::State<Arc<RuntimeEngine>>,
+) -> impl axum::response::IntoResponse {
+    (
+        [(axum::http::header::CONTENT_TYPE, "text/plain; version=0.0.4")],
+        engine.metrics().prometheus_text(),
+    )
+}
+```
+
+**Counter descriptions:**
+
+| Counter | Meaning |
+|---|---|
+| `bpmn_instances_started` | `start_instance()` called |
+| `bpmn_instances_completed` | Instance reached end-event |
+| `bpmn_instances_failed` | Instance set to `Failed` |
+| `bpmn_instances_cancelled` | Instance set to `Cancelled` |
+| `bpmn_events_processed` | Events dequeued and dispatched |
+| `bpmn_verbs_invoked` | Registered verb handlers invoked |
+| `bpmn_gateway_decisions` | Switch adaptor returned a decision |
+| `bpmn_parallel_forks` | Parallel gateway spawned child tokens |
+| `bpmn_joins_fired` | All branches arrived at a join |
+| `bpmn_merge_conflicts` | Unresolvable merge conflict at a join |
+| `bpmn_timer_events_fired` | `TimerFired` events processed |
+| `bpmn_human_tasks_completed` | Human-task completion events |
+
+### PostgresJourneyStore startup
+
+Enable the `postgres` feature in your dependency:
+```toml
+bpmn-runtime = { path = "...", features = ["postgres"] }
+```
+
+Create the pool and store at startup:
+```rust
+use bpmn_runtime::PostgresJourneyStore;
+use sqlx::PgPool;
+
+let pool = PgPool::connect(&std::env::var("DATABASE_URL")?).await?;
+let store = Arc::new(PostgresJourneyStore::new(pool));
+let engine = RuntimeEngine::new(store, spec, verb_registry, switch_adaptor);
+```
+
+Requires the schema migration:
+```bash
+psql -d data_designer -f rust/migrations/20260521_dsl_journey_runtime.sql
+```
+
+### Retention policy
+
+```rust
+use bpmn_runtime::RetentionPolicy;
+
+let policy = RetentionPolicy {
+    archive_after_days: 90,
+    cold_storage_after_years: 7,
+};
+
+// Find candidates (PostgresJourneyStore implements this; InMemory is a no-op)
+let candidates = store.find_archivable_instances(&policy).await?;
+for id in candidates {
+    let rows = store.archive_instance_log(id).await?;
+    tracing::info!(%id, rows, "archived journey log");
+}
+```
+
+### Alerting thresholds
+
+Prometheus alert rules (paste into your `alert.rules.yaml`):
+
+```yaml
+groups:
+  - name: bpmn_runtime
+    rules:
+      - alert: HighInstanceFailureRate
+        expr: |
+          rate(bpmn_instances_failed[5m])
+          / rate(bpmn_instances_started[5m]) > 0.05
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Instance failure rate > 5%"
+
+      - alert: EventQueueDepth
+        expr: |
+          (SELECT COUNT(*) FROM dsl_event_queue WHERE claimed_at IS NULL) > 1000
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Event queue depth > 1000"
+
+      - alert: MergeConflictSpike
+        expr: rate(bpmn_merge_conflicts[5m]) > 0
+        for: 0m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Merge conflicts detected — process definitions may need :merge clauses"
+```
+
+### Performance smoke test
+
+```bash
+# Run the 100-instance in-memory smoke test (normally ignored)
+cargo test -p bpmn-test-harness -- --include-ignored smoke_100
+
+# Run all perf tests
+cargo test -p bpmn-test-harness -- --include-ignored
+```
+
+Expected: < 500 ms for 100 sequential instances with InMemoryJourneyStore.
+SLA: < 30 seconds (hard assert in the test).
