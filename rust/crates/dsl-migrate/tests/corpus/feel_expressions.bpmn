@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<bpmn:definitions
+    xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL"
+    id="feel-def"
+    targetNamespace="http://bpmn.io/schema/bpmn">
+
+  <bpmn:process id="feel-expressions-process" name="FEEL Expressions" isExecutable="true">
+    <bpmn:startEvent id="start-1" name="Start"/>
+    <bpmn:serviceTask id="score-task" name="Score Application"/>
+    <bpmn:exclusiveGateway id="gw-score" name="Score Decision"/>
+    <bpmn:endEvent id="end-approved" name="Approved"/>
+    <bpmn:endEvent id="end-declined" name="Declined"/>
+
+    <bpmn:sequenceFlow id="sf1" sourceRef="start-1" targetRef="score-task"/>
+    <bpmn:sequenceFlow id="sf2" sourceRef="score-task" targetRef="gw-score"/>
+    <bpmn:sequenceFlow id="sf3" sourceRef="gw-score" targetRef="end-approved">
+      <bpmn:conditionExpression>${score &gt;= 700}</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="sf4" sourceRef="gw-score" targetRef="end-declined">
+      <bpmn:conditionExpression>${score &lt; 700}</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+  </bpmn:process>
+
+</bpmn:definitions>

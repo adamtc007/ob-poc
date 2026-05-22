@@ -1,0 +1,20 @@
+[package]
+name = "dsl-migrate"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.95"
+description = "Camunda 8 BPMN XML → bpmn-lite DSL migration tool (no runtime, no DB, no Sage)"
+
+[dependencies]
+quick-xml  = "0.31"
+serde      = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+anyhow     = "1.0"
+tracing    = "0.1"
+
+[[bin]]
+name = "dsl-migrate"
+path = "src/bin/migrate.rs"
+
+[lints.rust]
+unreachable_pub = "deny"

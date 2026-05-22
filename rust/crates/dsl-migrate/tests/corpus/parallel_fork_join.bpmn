@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<bpmn:definitions
+    xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL"
+    id="parallel-def"
+    targetNamespace="http://bpmn.io/schema/bpmn">
+
+  <bpmn:process id="parallel-fork-join" name="Parallel Fork Join" isExecutable="true">
+    <bpmn:startEvent id="start-1" name="Start"/>
+    <bpmn:parallelGateway id="fork-1" name="Fork"/>
+    <bpmn:serviceTask id="task-a" name="KYC Check"/>
+    <bpmn:serviceTask id="task-b" name="Sanctions Screen"/>
+    <bpmn:parallelGateway id="join-1" name="Join"/>
+    <bpmn:endEvent id="end-1" name="End"/>
+    <bpmn:sequenceFlow id="sf1" sourceRef="start-1" targetRef="fork-1"/>
+    <bpmn:sequenceFlow id="sf2" sourceRef="fork-1" targetRef="task-a"/>
+    <bpmn:sequenceFlow id="sf3" sourceRef="fork-1" targetRef="task-b"/>
+    <bpmn:sequenceFlow id="sf4" sourceRef="task-a" targetRef="join-1"/>
+    <bpmn:sequenceFlow id="sf5" sourceRef="task-b" targetRef="join-1"/>
+    <bpmn:sequenceFlow id="sf6" sourceRef="join-1" targetRef="end-1"/>
+  </bpmn:process>
+
+</bpmn:definitions>

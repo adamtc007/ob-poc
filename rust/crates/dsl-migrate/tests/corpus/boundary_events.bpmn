@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<bpmn:definitions
+    xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL"
+    id="boundary-def"
+    targetNamespace="http://bpmn.io/schema/bpmn">
+
+  <bpmn:process id="boundary-events-process" name="Boundary Events" isExecutable="true">
+    <bpmn:startEvent id="start-1" name="Start"/>
+    <bpmn:userTask id="review-task" name="Manual Review"/>
+    <bpmn:boundaryEvent id="error-boundary" attachedToRef="review-task" cancelActivity="true">
+      <bpmn:errorEventDefinition id="eed1" errorRef="reviewError"/>
+    </bpmn:boundaryEvent>
+    <bpmn:boundaryEvent id="timer-boundary" attachedToRef="review-task" cancelActivity="false">
+      <bpmn:timerEventDefinition id="ted1">
+        <bpmn:timeDuration>PT1H</bpmn:timeDuration>
+      </bpmn:timerEventDefinition>
+    </bpmn:boundaryEvent>
+    <bpmn:endEvent id="end-ok" name="Completed"/>
+    <bpmn:endEvent id="end-error" name="Error"/>
+    <bpmn:endEvent id="end-timeout" name="Timeout"/>
+    <bpmn:sequenceFlow id="sf1" sourceRef="start-1" targetRef="review-task"/>
+    <bpmn:sequenceFlow id="sf2" sourceRef="review-task" targetRef="end-ok"/>
+    <bpmn:sequenceFlow id="sf3" sourceRef="error-boundary" targetRef="end-error"/>
+    <bpmn:sequenceFlow id="sf4" sourceRef="timer-boundary" targetRef="end-timeout"/>
+  </bpmn:process>
+
+</bpmn:definitions>

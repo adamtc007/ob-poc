@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<bpmn:definitions
+    xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL"
+    xmlns:camunda="http://camunda.org/schema/1.0/bpmn"
+    id="linear-sequence-def"
+    targetNamespace="http://bpmn.io/schema/bpmn">
+
+  <bpmn:process id="linear-sequence" name="Linear Sequence" isExecutable="true">
+    <bpmn:startEvent id="start-1" name="Start"/>
+    <bpmn:serviceTask id="task-1" name="Verify Identity" camunda:type="external" camunda:topic="entity-verify"/>
+    <bpmn:serviceTask id="task-2" name="Check Sanctions" camunda:type="external" camunda:topic="sanctions-check"/>
+    <bpmn:endEvent id="end-1" name="End"/>
+    <bpmn:sequenceFlow id="sf1" sourceRef="start-1" targetRef="task-1"/>
+    <bpmn:sequenceFlow id="sf2" sourceRef="task-1" targetRef="task-2"/>
+    <bpmn:sequenceFlow id="sf3" sourceRef="task-2" targetRef="end-1"/>
+  </bpmn:process>
+
+</bpmn:definitions>

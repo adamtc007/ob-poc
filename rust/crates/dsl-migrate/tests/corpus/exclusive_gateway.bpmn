@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<bpmn:definitions
+    xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL"
+    xmlns:camunda="http://camunda.org/schema/1.0/bpmn"
+    id="exclusive-gw-def"
+    targetNamespace="http://bpmn.io/schema/bpmn">
+
+  <bpmn:process id="exclusive-gateway-process" name="Exclusive Gateway" isExecutable="true">
+    <bpmn:startEvent id="start-1" name="Start"/>
+    <bpmn:serviceTask id="task-check" name="Check Eligibility" camunda:topic="kyc-verify"/>
+    <bpmn:exclusiveGateway id="gw-decision" name="Eligible?"/>
+    <bpmn:endEvent id="end-approved" name="Approved"/>
+    <bpmn:endEvent id="end-rejected" name="Rejected"/>
+    <bpmn:sequenceFlow id="sf1" sourceRef="start-1" targetRef="task-check"/>
+    <bpmn:sequenceFlow id="sf2" sourceRef="task-check" targetRef="gw-decision"/>
+    <bpmn:sequenceFlow id="sf3" name="yes" sourceRef="gw-decision" targetRef="end-approved"/>
+    <bpmn:sequenceFlow id="sf4" name="no" sourceRef="gw-decision" targetRef="end-rejected"/>
+  </bpmn:process>
+
+</bpmn:definitions>
