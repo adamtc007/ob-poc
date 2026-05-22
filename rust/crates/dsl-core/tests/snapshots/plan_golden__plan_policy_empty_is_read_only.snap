@@ -1,6 +1,0 @@
----
-source: crates/dsl-core/tests/plan_golden.rs
-assertion_line: 83
-expression: policy
----
-ReadOnly

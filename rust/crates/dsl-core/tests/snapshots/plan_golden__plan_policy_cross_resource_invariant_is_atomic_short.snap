@@ -1,6 +1,0 @@
----
-source: crates/dsl-core/tests/plan_golden.rs
-assertion_line: 68
-expression: policy
----
-AtomicShort
