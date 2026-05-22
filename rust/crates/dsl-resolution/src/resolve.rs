@@ -260,8 +260,8 @@ fn walk_value(
                 );
             }
         }
-        RawValue::TemplateSplice(name) => {
-            if !param_names.contains(name) {
+        RawValue::TemplateSplice(name)
+            if !param_names.contains(name) => {
                 diagnostics.push(
                     Diagnostic::error_with_code(
                         format!("Unknown template splice ',@{}'", name),
@@ -269,7 +269,6 @@ fn walk_value(
                     ),
                 );
             }
-        }
         RawValue::ForEach { var, list_param, body } => {
             // Validate that :in references a declared list-typed parameter.
             if !param_names.contains(list_param.as_str()) {

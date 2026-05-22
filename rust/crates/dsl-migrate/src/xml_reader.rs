@@ -404,11 +404,10 @@ fn parse_event_body(
                 let tag = strip_prefix(e.name().as_ref());
                 event_type = event_def_from_tag(&tag, e);
             }
-            Event::End(ref e) => {
-                if strip_prefix(e.name().as_ref()) == closing_tag {
+            Event::End(ref e)
+                if strip_prefix(e.name().as_ref()) == closing_tag => {
                     break;
                 }
-            }
             Event::Eof => break,
             _ => {}
         }
@@ -492,11 +491,10 @@ fn parse_task_body(
                     _ => {}
                 }
             }
-            Event::End(ref e) => {
-                if strip_prefix(e.name().as_ref()) == closing_tag {
+            Event::End(ref e)
+                if strip_prefix(e.name().as_ref()) == closing_tag => {
                     break;
                 }
-            }
             Event::Eof => break,
             _ => {}
         }
@@ -563,11 +561,10 @@ fn parse_seq_flow_condition(
                     // self-closing conditionExpression with no text — skip
                 }
             }
-            Event::Text(ref t) => {
-                if in_condition {
+            Event::Text(ref t)
+                if in_condition => {
                     condition = Some(t.unescape().unwrap_or_default().to_string());
                 }
-            }
             Event::End(ref e) => {
                 let tag = strip_prefix(e.name().as_ref());
                 if tag == "conditionExpression" {
@@ -645,19 +642,17 @@ fn skip_subtree(reader: &mut Reader<&[u8]>, closing: &str) -> Result<()> {
     let mut buf = Vec::new();
     loop {
         match reader.read_event_into(&mut buf)? {
-            Event::Start(ref e) => {
-                if strip_prefix(e.name().as_ref()) == closing {
+            Event::Start(ref e)
+                if strip_prefix(e.name().as_ref()) == closing => {
                     depth += 1;
                 }
-            }
-            Event::End(ref e) => {
-                if strip_prefix(e.name().as_ref()) == closing {
+            Event::End(ref e)
+                if strip_prefix(e.name().as_ref()) == closing => {
                     depth -= 1;
                     if depth == 0 {
                         break;
                     }
                 }
-            }
             Event::Eof => break,
             _ => {}
         }

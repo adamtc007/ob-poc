@@ -628,8 +628,8 @@ fn validate_gateway_fanout(graph: &RailwayGraph, diagnostics: &mut DiagnosticBag
                     );
                 }
             }
-            GatewayKind::Parallel => {
-                if outgoing.len() < 2 {
+            GatewayKind::Parallel
+                if outgoing.len() < 2 => {
                     diagnostics.push(
                         Diagnostic::warning(format!(
                             "Parallel gateway '{}' should have ≥2 outgoing flows (has {})",
@@ -639,9 +639,8 @@ fn validate_gateway_fanout(graph: &RailwayGraph, diagnostics: &mut DiagnosticBag
                         .with_code(GATEWAY_FAN_OUT_ERROR),
                     );
                 }
-            }
-            GatewayKind::Inclusive => {
-                if outgoing.is_empty() {
+            GatewayKind::Inclusive
+                if outgoing.is_empty() => {
                     diagnostics.push(
                         Diagnostic::warning(format!(
                             "Inclusive gateway '{}' has no outgoing flows",
@@ -650,7 +649,6 @@ fn validate_gateway_fanout(graph: &RailwayGraph, diagnostics: &mut DiagnosticBag
                         .with_code(GATEWAY_FAN_OUT_ERROR),
                     );
                 }
-            }
             _ => {}
         }
     }

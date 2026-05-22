@@ -291,8 +291,7 @@ fn task_kind(tt: &TaskType) -> &'static str {
 
 /// Convert a Camunda element ID to a DSL-safe kebab identifier.
 fn safe_id(id: &str) -> String {
-    id.replace('_', "-")
-        .replace(' ', "-")
+    id.replace(['_', ' '], "-")
         .to_lowercase()
 }
 

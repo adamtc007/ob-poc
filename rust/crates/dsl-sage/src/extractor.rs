@@ -163,15 +163,8 @@ impl HeuristicExtractor {
             }
             "boolean" => {
                 // Positive phrasing → true; negative → false; default true.
-                let positive = ["all", "every", "must", "true", "yes"];
                 let negative = ["none", "no", "false", "never", "not"];
-                let val = if negative.iter().any(|w| lower.contains(w)) {
-                    false
-                } else if positive.iter().any(|w| lower.contains(w)) {
-                    true
-                } else {
-                    true // default
-                };
+                let val = !negative.iter().any(|w| lower.contains(w));
                 (
                     serde_json::Value::Bool(val),
                     0.4,
