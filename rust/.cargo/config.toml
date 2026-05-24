@@ -24,15 +24,8 @@ opt-level = 2
 DATABASE_URL = { value = "postgresql:///data_designer", force = false }
 SQLX_OFFLINE = { value = "true", force = false }
 
-# Local-dev patch overrides — redirect git-tag deps to ~/dev/ working trees.
-# This file is committed (workspace build config); the patches are always active.
-# To deactivate (e.g. to test against real tags), comment out the blocks below.
-[patch."https://github.com/adamtc007/dsl"]
-dsl_types = { path = "/Users/adamtc007/dev/dsl/crates/dsl_types" }
-dsl-core  = { path = "/Users/adamtc007/dev/dsl/crates/dsl-core"  }
-
-[patch."https://github.com/adamtc007/sem-os"]
-sem_os_types    = { path = "/Users/adamtc007/dev/sem-os/crates/sem_os_types"    }
-sem_os_core     = { path = "/Users/adamtc007/dev/sem-os/crates/sem_os_core"     }
-sem_os_ontology = { path = "/Users/adamtc007/dev/sem-os/crates/sem_os_ontology" }
-sem_os_policy   = { path = "/Users/adamtc007/dev/sem-os/crates/sem_os_policy"   }
+# Local-dev [patch] overrides for the extracted dsl/sem-os repos live in
+# ~/.cargo/config.toml (user-global). URL-scoped, so they only fire on this
+# machine for projects depending on the relevant GitHub URLs. CI never sees
+# them — cold-clone builds resolve against the real git tags pinned in
+# rust/Cargo.toml [workspace.dependencies].
