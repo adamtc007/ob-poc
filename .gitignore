@@ -74,9 +74,12 @@ rust/target/
 */target/
 **/target/
 Cargo.lock
-
-# Remove Cargo.lock from gitignore if creating an executable, leave it for libraries
-# More information here https://doc.rust-lang.org/cargo/guide/cargo-toml-vs-cargo-lock.html
+# ob-poc is an executable (the application root) — its Cargo.lock IS tracked.
+# Without it, CI does a fresh resolve and the loose `pgvector` sqlx range
+# (>=0.8, <0.10) lets the resolver pick sqlx 0.9 while ob-semantic-matcher
+# pins 0.8 → duplicate sqlx in the graph → build failure. See PR #7 CI.
+# https://doc.rust-lang.org/cargo/guide/cargo-toml-vs-cargo-lock.html
+!rust/Cargo.lock
 
 # SQLX offline cache files
 .sqlx/
