@@ -19,10 +19,14 @@
 dsl-poc
 dsl-ob-poc
 
-# Binary directories
-bin/
-*/bin/
-**/bin/
+# NOTE: do NOT ignore `bin/` / `**/bin/` here. That collides with Rust's
+# src/bin/ convention and silently swallows new [[bin]] entries — five
+# bin source files were lost to this rule between 2026-05-22 and 2026-05-24
+# (sem_os_footprint_audit, migrate, acp_pack_context_envelope_v2,
+# acp_registry_projection, reconcile_resolver_manifest), producing
+# cold-clone build failures while local builds passed because the files
+# existed on disk. Rust binary outputs live under `target/`, which is
+# already ignored above.
 
 # Test binary, built with `go test -c`
 *.test
