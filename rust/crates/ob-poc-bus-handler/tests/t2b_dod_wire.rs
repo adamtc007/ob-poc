@@ -44,8 +44,9 @@ async fn setup_pool() -> PgPool {
         .or_else(|_| std::env::var("DATABASE_URL"))
         .unwrap_or_else(|_| DEFAULT_TEST_DATABASE_URL.to_owned());
     let pool = PgPool::connect(&url).await.expect("connect");
-    sqlx::migrate!("../../../bpmn-lite/dsl-bus-storage/migrations")
-        .run(&pool)
+    // Use the migrator exported by dsl-bus-storage — the migrations ship
+    // inside the published crate, not at a fixed relative path on disk.
+    dsl_bus_storage::migrate(&pool)
         .await
         .expect("migrations");
     pool
