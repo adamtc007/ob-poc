@@ -152,16 +152,16 @@ smallvec = { version = "1.11", features = ["serde"] }
 
 # Testing
 [dev-dependencies]
-# bpmn-lite-core retired in bpmn-lite Phase 2.8 (3344bb57) — split into
-# bpmn-lite-{types, compiler, store, store-postgres, vm, authoring, engine}.
-# Only the ob-poc bpmn integration test needs the engine + memory store.
-bpmn-lite-engine = { path = "../bpmn-lite/bpmn-lite-engine" }
-bpmn-lite-store = { path = "../bpmn-lite/bpmn-lite-store" }
-bpmn-lite-server = { path = "../bpmn-lite/bpmn-lite-server" }
-ffi-catalogue = { path = "../bpmn-lite/ffi-catalogue" }
-dmn-lite-bridge = { path = "../bpmn-lite/dmn-lite-bridge" }
-bpmn-lite-ffi-http = { path = "../bpmn-lite/bpmn-lite-ffi-http" }
-bpmn-lite-ffi-grpc = { path = "../bpmn-lite/bpmn-lite-ffi-grpc" }
+# bpmn-lite was extracted to github.com/adamtc007/bpmn-lite. Workspace
+# deps below resolve from the git tag; ~/.cargo/config.toml [patch]
+# redirects to the local ~/dev/bpmn-lite/ checkout during development.
+bpmn-lite-engine.workspace = true
+bpmn-lite-store.workspace = true
+bpmn-lite-server.workspace = true
+ffi-catalogue.workspace = true
+dmn-lite-bridge.workspace = true
+bpmn-lite-ffi-http.workspace = true
+bpmn-lite-ffi-grpc.workspace = true
 sem_os_core.workspace = true
 sem_os_ontology.workspace = true
 sem_os_policy.workspace = true
@@ -369,3 +369,20 @@ sem_os_types    = { git = "https://github.com/adamtc007/sem-os", tag = "v0.1.2" 
 sem_os_core     = { git = "https://github.com/adamtc007/sem-os", tag = "v0.1.2" }
 sem_os_ontology = { git = "https://github.com/adamtc007/sem-os", tag = "v0.1.2" }
 sem_os_policy   = { git = "https://github.com/adamtc007/sem-os", tag = "v0.1.2" }
+
+# bpmn-lite published as github.com/adamtc007/bpmn-lite v0.2.0 (T1 + T2:
+# dsl-manifest, dsl-bus-*, dmn-lite-server, bpmn-lite plan-walker bus
+# integration). Local-dev [patch] in ~/.cargo/config.toml redirects to
+# ~/dev/bpmn-lite/ for cross-repo editing.
+bpmn-lite-engine   = { git = "https://github.com/adamtc007/bpmn-lite", tag = "v0.2.0" }
+bpmn-lite-store    = { git = "https://github.com/adamtc007/bpmn-lite", tag = "v0.2.0" }
+bpmn-lite-server   = { git = "https://github.com/adamtc007/bpmn-lite", tag = "v0.2.0" }
+bpmn-lite-ffi-http = { git = "https://github.com/adamtc007/bpmn-lite", tag = "v0.2.0" }
+bpmn-lite-ffi-grpc = { git = "https://github.com/adamtc007/bpmn-lite", tag = "v0.2.0" }
+ffi-catalogue      = { git = "https://github.com/adamtc007/bpmn-lite", tag = "v0.2.0" }
+dmn-lite-bridge    = { git = "https://github.com/adamtc007/bpmn-lite", tag = "v0.2.0" }
+dsl-bus-client     = { git = "https://github.com/adamtc007/bpmn-lite", tag = "v0.2.0" }
+dsl-bus-server     = { git = "https://github.com/adamtc007/bpmn-lite", tag = "v0.2.0" }
+dsl-bus-storage    = { git = "https://github.com/adamtc007/bpmn-lite", tag = "v0.2.0" }
+dsl-bus-protocol   = { git = "https://github.com/adamtc007/bpmn-lite", tag = "v0.2.0" }
+dsl-manifest       = { git = "https://github.com/adamtc007/bpmn-lite", tag = "v0.2.0" }

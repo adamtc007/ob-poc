@@ -57,12 +57,11 @@ sem_os_postgres = { path = "../sem_os_postgres" }
 # means the startup wiring now imports it from this crate.
 dsl-runtime = { path = "../dsl-runtime" }
 
-# T2B.9 — federated DSL bus (lives in the cross-repo bpmn-lite/ workspace).
-# Cross-repo path deps; runtime stays gRPC-only.
-dsl-bus-client = { path = "../../../bpmn-lite/dsl-bus-client" }
-dsl-bus-server = { path = "../../../bpmn-lite/dsl-bus-server" }
-dsl-bus-storage = { path = "../../../bpmn-lite/dsl-bus-storage" }
-dsl-bus-protocol = { path = "../../../bpmn-lite/dsl-bus-protocol" }
+# T2B.9 — federated DSL bus (extracted to github.com/adamtc007/bpmn-lite v0.2.0).
+dsl-bus-client.workspace = true
+dsl-bus-server.workspace = true
+dsl-bus-storage.workspace = true
+dsl-bus-protocol.workspace = true
 ob-poc-bus-handler = { path = "../ob-poc-bus-handler" }
 async-trait = "0.1"
 anyhow = "1"

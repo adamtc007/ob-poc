@@ -18,9 +18,8 @@ name = "ob-poc-manifest-export"
 path = "src/main.rs"
 
 [dependencies]
-# `dsl-manifest` lives in the sibling bpmn-lite workspace. Path dep is
-# build-tool-only — ob-poc runtime continues to consume bpmn-lite via gRPC.
-dsl-manifest = { path = "../../../bpmn-lite/dsl-manifest" }
+# `dsl-manifest` ships in github.com/adamtc007/bpmn-lite v0.2.0 (workspace dep).
+dsl-manifest.workspace = true
 serde = { version = "1.0", features = ["derive"] }
 serde_yaml = "0.9"
 anyhow = "1.0"

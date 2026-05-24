@@ -14,9 +14,9 @@ description = "ob-poc receiver-side bus handler. Implements dsl-bus-server's Inv
 #                 (dsl-bus-storage).
 
 [dependencies]
-# Build-tool / cross-repo dep — the bus crates ship in bpmn-lite.
-dsl-bus-server = { path = "../../../bpmn-lite/dsl-bus-server" }
-dsl-bus-protocol = { path = "../../../bpmn-lite/dsl-bus-protocol" }
+# Bus crates ship in github.com/adamtc007/bpmn-lite v0.2.0 (workspace dep).
+dsl-bus-server.workspace = true
+dsl-bus-protocol.workspace = true
 async-trait = "0.1"
 uuid = { version = "1", features = ["v7", "serde"] }
 thiserror = "2"
@@ -28,7 +28,7 @@ tokio-stream = { version = "0.1", features = ["net"] }
 tempfile = "3"
 # T2B-DoD-wire-only — the end-to-end tests drive BusClient → outbox →
 # sender → tcp → BusServer → ob-poc-bus-handler in a single process.
-dsl-bus-client = { path = "../../../bpmn-lite/dsl-bus-client" }
-dsl-bus-storage = { path = "../../../bpmn-lite/dsl-bus-storage" }
+dsl-bus-client.workspace = true
+dsl-bus-storage.workspace = true
 async-trait = "0.1"
 tonic = "0.12"
