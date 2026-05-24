@@ -365,7 +365,7 @@ members = [
 # overrides these with ~/dev/ paths during development.
 dsl_types    = { git = "https://github.com/adamtc007/dsl",    tag = "v0.1.0" }
 dsl-core     = { git = "https://github.com/adamtc007/dsl",    tag = "v0.1.0" }
-sem_os_types    = { git = "https://github.com/adamtc007/sem-os", tag = "v0.1.1" }
-sem_os_core     = { git = "https://github.com/adamtc007/sem-os", tag = "v0.1.1" }
-sem_os_ontology = { git = "https://github.com/adamtc007/sem-os", tag = "v0.1.1" }
-sem_os_policy   = { git = "https://github.com/adamtc007/sem-os", tag = "v0.1.1" }
+sem_os_types    = { git = "https://github.com/adamtc007/sem-os", tag = "v0.1.2" }
+sem_os_core     = { git = "https://github.com/adamtc007/sem-os", tag = "v0.1.2" }
+sem_os_ontology = { git = "https://github.com/adamtc007/sem-os", tag = "v0.1.2" }
+sem_os_policy   = { git = "https://github.com/adamtc007/sem-os", tag = "v0.1.2" }

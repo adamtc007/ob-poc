@@ -6,6 +6,12 @@
 [alias]
 x = "run --package xtask --"
 
+[net]
+# Use the system git CLI for fetching, so that SSH keys and credential helpers
+# configured in ~/.gitconfig and ~/.ssh/config are available.
+# Required for private git-tag deps (github.com/adamtc007/dsl, .../sem-os).
+git-fetch-with-cli = true
+
 [profile.dev]
 incremental = true
 debug = 1
