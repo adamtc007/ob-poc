@@ -39,6 +39,12 @@ jobs:
         with:
           toolchain: 1.95
 
+      - name: Install protoc
+        # Required by entity-gateway's build.rs (prost-build) and the
+        # tonic-build steps in dsl-bus-protocol / bpmn-lite-ffi-grpc /
+        # bpmn-lite-server / sem_os_core build pipelines.
+        run: sudo apt-get update && sudo apt-get install -y protobuf-compiler
+
       - name: Cargo cache
         uses: Swatinem/rust-cache@v2
         with:
