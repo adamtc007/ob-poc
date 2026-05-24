@@ -7,10 +7,14 @@ use std::path::{Path, PathBuf};
 const ALLOWLIST_PATH: &str = "tools/public-api-allowlist.txt";
 const SCANNED_FILES: &[&str] = &[
     "src/lib.rs",
-    "src/acp_dag_semantic.rs",
-    "src/acp_pack_context_envelope_v2.rs",
-    "src/acp_registry_projection.rs",
-    "src/acp_runtime_context.rs",
+    // acp_* modules relocated to ob-poc-boundary in the capability-crate
+    // restructure (slice 2d). The ob-poc src/ shims for acp_runtime_context
+    // and acp_state_anchor re-export from there, but the public-API surface
+    // lives in the new home.
+    "crates/ob-poc-boundary/src/acp_dag_semantic.rs",
+    "crates/ob-poc-boundary/src/acp_pack_context_envelope_v2.rs",
+    "crates/ob-poc-boundary/src/acp_registry_projection.rs",
+    "crates/ob-poc-boundary/src/acp_runtime_context.rs",
 ];
 
 /// Run the public API allowlist check.
