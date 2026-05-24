@@ -134,7 +134,12 @@ pub fn load_constellation_stack_for_workspace(
 fn cached_resolver_inputs() -> Result<ResolverInputs> {
     RESOLVER_INPUTS
         .get_or_init(|| {
-            ResolverInputs::default_from_cargo_manifest().map_err(|error| error.to_string())
+            // ob-poc owns the sem_os_seeds config — sem_os_core (extracted)
+            // can't reach it via its own CARGO_MANIFEST_DIR anymore. Pass
+            // ob-poc's config dir explicitly.
+            let config_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("config");
+            ResolverInputs::from_workspace_config_dir(config_dir)
+                .map_err(|error| error.to_string())
         })
         .as_ref()
         .cloned()
