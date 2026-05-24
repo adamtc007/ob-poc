@@ -1,0 +1,22 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT COUNT(*) as \"count!\" FROM \"ob-poc\".client_group_entity\n               WHERE group_id = $1 AND membership_type != 'historical'",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "count!",
+        "type_info": "Int8"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "bc5c2171cc20eb8535f13b5b05ec8fad321d172c37ebcf7553d77207b7445a36"
+}

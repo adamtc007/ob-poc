@@ -1,0 +1,23 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n                INSERT INTO \"ob-poc\".entities (entity_type_id, name)\n                SELECT entity_type_id, $1 FROM \"ob-poc\".entity_types WHERE type_code = $2 LIMIT 1\n                RETURNING entity_id\n                ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "entity_id",
+        "type_info": "Uuid"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Varchar",
+        "Text"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "917f496ef4c2cae60fbff9b8cbb42f0afef9e50c7c26e680a44236b0cb199bfe"
+}

@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            UPDATE public.outbox\n            SET status = 'failed_retryable',\n                claimed_by = NULL,\n                claimed_at = NULL,\n                last_error = $2\n            WHERE id = $1\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "05bd52e1eab6a269c663dceeac495e9d48dd367117e98944d7a850c1674d51ff"
+}

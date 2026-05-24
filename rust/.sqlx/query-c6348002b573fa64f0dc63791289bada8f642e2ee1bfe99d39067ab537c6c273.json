@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            UPDATE public.outbox\n            SET status = 'failed_terminal',\n                processed_at = NOW(),\n                last_error = $2\n            WHERE id = $1\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "c6348002b573fa64f0dc63791289bada8f642e2ee1bfe99d39067ab537c6c273"
+}

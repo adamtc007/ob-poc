@@ -1,0 +1,22 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO \"ob-poc\".cbus (name, jurisdiction, client_type)\n                   VALUES ($1, 'LU', 'fund')\n                   RETURNING cbu_id",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "cbu_id",
+        "type_info": "Uuid"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Varchar"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "81ee2ad72abbb594dc4c475249863ecc5fbba6bec0f73235b5ef5c6118c47837"
+}

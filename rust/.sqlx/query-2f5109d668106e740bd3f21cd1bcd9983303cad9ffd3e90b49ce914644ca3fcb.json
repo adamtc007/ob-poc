@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        INSERT INTO \"ob-poc\".fund_vehicles (fund_entity_id, vehicle_type, is_umbrella, domicile_country)\n        VALUES ($1, 'SCSP', true, 'LU')\n        ON CONFLICT (fund_entity_id) DO UPDATE SET vehicle_type = EXCLUDED.vehicle_type\n        ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "2f5109d668106e740bd3f21cd1bcd9983303cad9ffd3e90b49ce914644ca3fcb"
+}

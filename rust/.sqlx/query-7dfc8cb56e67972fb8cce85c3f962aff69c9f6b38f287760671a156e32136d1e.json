@@ -1,0 +1,24 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            INSERT INTO \"ob-poc\".share_classes (\n                cbu_id, issuer_entity_id, name, instrument_kind, status\n            ) VALUES ($1, $2, $3, 'PREFERENCE_EQUITY', 'active')\n            RETURNING id\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Varchar"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "7dfc8cb56e67972fb8cce85c3f962aff69c9f6b38f287760671a156e32136d1e"
+}

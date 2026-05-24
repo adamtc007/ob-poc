@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE \"ob-poc\".cbu_ssi SET status = 'SUSPENDED' WHERE ssi_id = $1",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "ddcec93f1375f60100d261aed37707a61ca56ded1e3853ff3a3d73b57d19b6d3"
+}

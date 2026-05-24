@@ -1,0 +1,23 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            SELECT anchor_entity_id as \"anchor_entity_id!\"\n            FROM \"ob-poc\".resolve_client_group_anchor($1, 'governance_controller', COALESCE($2, ''))\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "anchor_entity_id!",
+        "type_info": "Uuid"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Text"
+      ]
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "b910bbe14dfcac1bc0d07d798428c17de4e8464bf675f70a4943ce1395a0ce2d"
+}

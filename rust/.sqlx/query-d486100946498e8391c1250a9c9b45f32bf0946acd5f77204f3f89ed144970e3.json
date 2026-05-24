@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            INSERT INTO \"ob-poc\".share_class_supply (share_class_id, as_of_date, issued_units, outstanding_units)\n            VALUES ($1, CURRENT_DATE, 1000, 1000)\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "d486100946498e8391c1250a9c9b45f32bf0946acd5f77204f3f89ed144970e3"
+}

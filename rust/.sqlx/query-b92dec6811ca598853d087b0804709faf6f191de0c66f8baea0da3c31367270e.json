@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            INSERT INTO \"ob-poc\".share_class_identifiers (share_class_id, scheme_code, identifier_value, is_primary)\n            VALUES\n            ($1, 'ISIN', 'US1234567890', true),\n            ($1, 'SEDOL', 'B123456', false),\n            ($1, 'CUSIP', '123456789', false)\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "b92dec6811ca598853d087b0804709faf6f191de0c66f8baea0da3c31367270e"
+}

@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            UPDATE public.outbox\n            SET status = 'done',\n                processed_at = NOW(),\n                last_error = NULL\n            WHERE id = $1\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "1753493bee2ff261ccd84cf15e7df188b78c5c384cbcc0f2987befe09a7b809c"
+}

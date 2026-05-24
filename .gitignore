@@ -85,10 +85,18 @@ Cargo.lock
 # https://doc.rust-lang.org/cargo/guide/cargo-toml-vs-cargo-lock.html
 !rust/Cargo.lock
 
-# SQLX offline cache files
-.sqlx/
+# NOTE: do NOT ignore .sqlx/ here. The .sqlx/ directory is the offline-mode
+# query cache that CI compiles against (SQLX_OFFLINE=true is set in
+# rust/.cargo/config.toml). Ignoring it silently swallows newly-prepared
+# entries — 173 cache files added between 2026-04 and 2026-05-24 were lost
+# this way, producing "SQLX_OFFLINE=true but no cached data" failures in
+# CI while local builds with the same source passed because the files
+# existed on disk. Run `cargo sqlx prepare --workspace` after changing
+# sqlx::query!/query_scalar!/query_as! macros and commit the diff.
 sqlx-data.json
 *.sqlx
+# But DO keep the offline-mode query cache directory itself tracked:
+!rust/.sqlx/
 
 # Rust compilation artifacts
 *.rlib
@@ -349,9 +357,7 @@ test-data/generated/
 web-server/target/
 phase6-web-client/node_modules/
 web-interface/node_modules/
-.sqlx/
-*/.sqlx/
-**/.sqlx/
+# (no .sqlx/ ignore — see explanation above near line 88)
 
 # ==============================================================================
 # Code Intelligence and API Analysis

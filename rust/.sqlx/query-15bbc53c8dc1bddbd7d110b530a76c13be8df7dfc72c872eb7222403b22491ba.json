@@ -1,0 +1,22 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            UPDATE public.outbox\n            SET status = 'pending',\n                claimed_by = NULL,\n                claimed_at = NULL\n            WHERE status = 'processing'\n              AND claimed_at < NOW() - make_interval(secs => $1::double precision)\n            RETURNING id\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Float8"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "15bbc53c8dc1bddbd7d110b530a76c13be8df7dfc72c872eb7222403b22491ba"
+}

@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO \"ob-poc\".doc_requests (workstream_id, doc_type, status, is_mandatory)\n           VALUES ($1, 'PASSPORT', 'VERIFIED', true)",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "7d5fbb399d4ecd13caf58c4339868970e0028cfe1484f0027fa584b5a200a687"
+}

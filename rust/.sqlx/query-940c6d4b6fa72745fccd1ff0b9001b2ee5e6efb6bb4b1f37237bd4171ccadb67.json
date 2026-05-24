@@ -1,0 +1,34 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT srt.resource_code, srt.name as resource_name, rar.is_mandatory\n        FROM \"ob-poc\".resource_attribute_requirements rar\n        JOIN \"ob-poc\".service_resource_types srt ON srt.resource_id = rar.resource_id\n        JOIN \"ob-poc\".attribute_registry ar ON ar.uuid = rar.attribute_id\n        WHERE ar.id = $1\n        ORDER BY rar.is_mandatory DESC, srt.resource_code\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "resource_code",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 1,
+        "name": "resource_name",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 2,
+        "name": "is_mandatory",
+        "type_info": "Bool"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text"
+      ]
+    },
+    "nullable": [
+      true,
+      false,
+      true
+    ]
+  },
+  "hash": "940c6d4b6fa72745fccd1ff0b9001b2ee5e6efb6bb4b1f37237bd4171ccadb67"
+}

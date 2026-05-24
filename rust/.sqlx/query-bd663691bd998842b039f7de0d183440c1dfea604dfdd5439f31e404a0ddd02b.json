@@ -1,0 +1,60 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            UPDATE public.outbox\n            SET status = 'processing',\n                claimed_by = $1,\n                claimed_at = NOW(),\n                attempts = attempts + 1\n            WHERE id IN (\n                SELECT id FROM public.outbox\n                WHERE status IN ('pending', 'failed_retryable')\n                  AND effect_kind = ANY($3::text[])\n                ORDER BY created_at\n                FOR UPDATE SKIP LOCKED\n                LIMIT $2\n            )\n            RETURNING id, trace_id, envelope_version, effect_kind, payload, idempotency_key, attempts\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "trace_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 2,
+        "name": "envelope_version",
+        "type_info": "Int2"
+      },
+      {
+        "ordinal": 3,
+        "name": "effect_kind",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 4,
+        "name": "payload",
+        "type_info": "Jsonb"
+      },
+      {
+        "ordinal": 5,
+        "name": "idempotency_key",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 6,
+        "name": "attempts",
+        "type_info": "Int4"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Int8",
+        "TextArray"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "bd663691bd998842b039f7de0d183440c1dfea604dfdd5439f31e404a0ddd02b"
+}
