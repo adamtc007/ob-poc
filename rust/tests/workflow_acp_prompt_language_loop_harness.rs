@@ -152,7 +152,6 @@ fn workflow_acp_prompt_language_loop_harness_reports_prompt_to_dry_run_rates() {
                 );
                 let expected_refusal = expected_prompt
                     .refusal_code
-                    .as_deref()
                     .expect("refusal fixture has code");
                 assert_eq!(
                     response["refusal"]["refusal_code"], expected_refusal,

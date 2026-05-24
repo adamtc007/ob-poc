@@ -358,7 +358,7 @@ fn example_8_interrupting_error_boundary() {
 
     // Should have at least 1 boundary attachment
     assert!(
-        spec.boundary_attachments.len() >= 1,
+        !spec.boundary_attachments.is_empty(),
         "expected ≥1 boundary attachment, got {}",
         spec.boundary_attachments.len()
     );
@@ -534,7 +534,7 @@ fn example_11_complex_kyc_onboarding() {
 
     // Should have multiple nodes, gateways, a join, and boundary attachments
     assert!(spec.nodes.len() >= 8, "expected ≥8 nodes");
-    assert!(spec.parallel_joins.len() >= 1, "expected ≥1 parallel join");
+    assert!(!spec.parallel_joins.is_empty(), "expected ≥1 parallel join");
     assert!(spec.boundary_attachments.len() >= 2, "expected ≥2 boundary attachments");
 }
 

@@ -2885,7 +2885,7 @@ mod tests {
             .expect("semantic match");
 
         assert_eq!(resolved.selected_verb.as_deref(), Some("cbu.assign-role"));
-        assert_eq!(resolved.mutation_allowed, false);
+        assert!(!resolved.mutation_allowed);
         assert!(resolved.requires_hitl);
     }
 
@@ -3101,8 +3101,8 @@ mod tests {
             Some("onboarding.compile-data-request")
         );
         assert_eq!(plan.plan_id, "onboarding.compile-data-request.preview.v1");
-        assert_eq!(plan.dry_run_only, true);
-        assert_eq!(plan.mutation_allowed, false);
+        assert!(plan.dry_run_only);
+        assert!(!plan.mutation_allowed);
         assert!(plan
             .read_model
             .iter()
@@ -3372,7 +3372,7 @@ mod tests {
             "dag_semantic_refused_direct_dsl_bypass"
         );
         assert!(resolved.pack.is_none());
-        assert_eq!(resolved.mutation_allowed, false);
+        assert!(!resolved.mutation_allowed);
     }
 
     #[test]

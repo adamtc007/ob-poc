@@ -368,7 +368,7 @@ mod tests {
                 &repo_root.join("rust/crates/ob-agentic/src/openai_client.rs"),
             ),
         ]);
-        let raw_llm_markers = vec![
+        let raw_llm_markers = [
             ["https://api.", "openai.com/v1/chat/completions"].concat(),
             ["https://api.", "anthropic.com/v1/messages"].concat(),
             ["OPENAI", "_API_KEY"].concat(),

@@ -159,15 +159,14 @@ impl SubprocessTransport {
             .kill_on_drop(true)
             .spawn()?;
 
-        let stdin = child.stdin.take().ok_or_else(|| {
-            std::io::Error::new(std::io::ErrorKind::Other, "child stdin missing after spawn")
-        })?;
-        let stdout = child.stdout.take().ok_or_else(|| {
-            std::io::Error::new(
-                std::io::ErrorKind::Other,
-                "child stdout missing after spawn",
-            )
-        })?;
+        let stdin = child
+            .stdin
+            .take()
+            .ok_or_else(|| std::io::Error::other("child stdin missing after spawn"))?;
+        let stdout = child
+            .stdout
+            .take()
+            .ok_or_else(|| std::io::Error::other("child stdout missing after spawn"))?;
         let pid = child.id().unwrap_or(0);
         let command_lossy = command.as_ref().to_string_lossy().into_owned();
 

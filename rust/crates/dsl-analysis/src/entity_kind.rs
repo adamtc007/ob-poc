@@ -95,97 +95,6 @@ pub fn matches(left: &str, right: &str) -> bool {
     canonicalize(left) == canonicalize(right)
 }
 
-#[cfg(test)]
-mod tests {
-    use super::{canonicalize, matches, set_entity_kind_aliases, EntityKindAliases};
-
-    fn ob_poc_aliases() -> EntityKindAliases {
-        let pairs = [
-            ("kyc_case", "kyc-case"),
-            ("case", "kyc-case"),
-            ("client_group", "client-group"),
-            ("legal-entity", "company"),
-            ("legal_entity", "company"),
-            ("organization", "company"),
-            ("org", "company"),
-            ("individual", "person"),
-            ("natural_person", "person"),
-            ("client-book", "client-group"),
-            ("client_book", "client-group"),
-            ("investor-register", "investor"),
-            ("investor_register", "investor"),
-            ("investment-fund", "fund"),
-            ("umbrella", "fund"),
-            ("sub-fund", "fund"),
-            ("compartment", "fund"),
-            ("doc", "document"),
-            ("evidence-document", "document"),
-            ("legal-contract", "contract"),
-            ("agreement", "contract"),
-            ("msa", "contract"),
-            ("mandate", "trading-profile"),
-            ("trading-mandate", "trading-profile"),
-            ("deal-record", "deal"),
-            ("sales-deal", "deal"),
-            ("client-business-unit", "cbu"),
-            ("structure", "cbu"),
-            ("trading-unit", "cbu"),
-        ];
-        pairs
-            .iter()
-            .map(|(a, c)| (a.to_string(), c.to_string()))
-            .collect()
-    }
-
-    #[test]
-    fn identity_without_registered_table() {
-        // Without any alias table, canonicalize is identity.
-        // Note: if another test already set the OnceLock this verifies
-        // the registered table is used; the fallback assertion covers the
-        // un-registered case documented in the API contract.
-        let result = canonicalize("some_unknown_kind");
-        // Either the alias table maps it or it passes through unchanged.
-        assert!(!result.is_empty());
-    }
-
-    #[test]
-    fn canonicalizes_known_aliases_with_table() {
-        set_entity_kind_aliases(ob_poc_aliases());
-        assert_eq!(canonicalize("kyc_case"), "kyc-case");
-        assert_eq!(canonicalize("client_group"), "client-group");
-        assert_eq!(canonicalize("organization"), "company");
-        assert_eq!(canonicalize("investor-register"), "investor");
-        assert_eq!(canonicalize("umbrella"), "fund");
-        assert_eq!(canonicalize("doc"), "document");
-        assert_eq!(canonicalize("agreement"), "contract");
-        assert_eq!(canonicalize("mandate"), "trading-profile");
-        assert_eq!(canonicalize("deal-record"), "deal");
-        assert_eq!(canonicalize("structure"), "cbu");
-    }
-
-    #[test]
-    fn compares_aliases_by_canonical_value() {
-        set_entity_kind_aliases(ob_poc_aliases());
-        assert!(matches("kyc_case", "kyc-case"));
-        assert!(matches("client_group", "client-group"));
-        assert!(matches("organization", "company"));
-        assert!(matches("investor-register", "investor"));
-        assert!(matches("umbrella", "fund"));
-        assert!(matches("agreement", "contract"));
-        assert!(matches("mandate", "trading-profile"));
-        assert!(matches("deal-record", "deal"));
-        assert!(matches("trading-unit", "cbu"));
-    }
-
-    #[test]
-    fn unknown_kind_passes_through() {
-        set_entity_kind_aliases(ob_poc_aliases());
-        // A kind not in the table is returned unchanged (lowercased).
-        assert_eq!(canonicalize("some-unknown"), "some-unknown");
-        assert_eq!(canonicalize("POOL"), "pool");
-    }
-}
-
 /// Test infrastructure — register minimal ob-poc vocabulary tables so that
 /// `canonicalize`, `subject_kind_from_hint`, and `subject_kind_for_domain`
 /// resolve correctly in tests without a full startup sequence.
@@ -276,4 +185,95 @@ pub fn register_test_vocabularies() {
 
     set_entity_kind_aliases(aliases);
     set_subject_kind_registry(SubjectKindRegistry { hints, domains });
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{canonicalize, matches, set_entity_kind_aliases, EntityKindAliases};
+
+    fn ob_poc_aliases() -> EntityKindAliases {
+        let pairs = [
+            ("kyc_case", "kyc-case"),
+            ("case", "kyc-case"),
+            ("client_group", "client-group"),
+            ("legal-entity", "company"),
+            ("legal_entity", "company"),
+            ("organization", "company"),
+            ("org", "company"),
+            ("individual", "person"),
+            ("natural_person", "person"),
+            ("client-book", "client-group"),
+            ("client_book", "client-group"),
+            ("investor-register", "investor"),
+            ("investor_register", "investor"),
+            ("investment-fund", "fund"),
+            ("umbrella", "fund"),
+            ("sub-fund", "fund"),
+            ("compartment", "fund"),
+            ("doc", "document"),
+            ("evidence-document", "document"),
+            ("legal-contract", "contract"),
+            ("agreement", "contract"),
+            ("msa", "contract"),
+            ("mandate", "trading-profile"),
+            ("trading-mandate", "trading-profile"),
+            ("deal-record", "deal"),
+            ("sales-deal", "deal"),
+            ("client-business-unit", "cbu"),
+            ("structure", "cbu"),
+            ("trading-unit", "cbu"),
+        ];
+        pairs
+            .iter()
+            .map(|(a, c)| (a.to_string(), c.to_string()))
+            .collect()
+    }
+
+    #[test]
+    fn identity_without_registered_table() {
+        // Without any alias table, canonicalize is identity.
+        // Note: if another test already set the OnceLock this verifies
+        // the registered table is used; the fallback assertion covers the
+        // un-registered case documented in the API contract.
+        let result = canonicalize("some_unknown_kind");
+        // Either the alias table maps it or it passes through unchanged.
+        assert!(!result.is_empty());
+    }
+
+    #[test]
+    fn canonicalizes_known_aliases_with_table() {
+        set_entity_kind_aliases(ob_poc_aliases());
+        assert_eq!(canonicalize("kyc_case"), "kyc-case");
+        assert_eq!(canonicalize("client_group"), "client-group");
+        assert_eq!(canonicalize("organization"), "company");
+        assert_eq!(canonicalize("investor-register"), "investor");
+        assert_eq!(canonicalize("umbrella"), "fund");
+        assert_eq!(canonicalize("doc"), "document");
+        assert_eq!(canonicalize("agreement"), "contract");
+        assert_eq!(canonicalize("mandate"), "trading-profile");
+        assert_eq!(canonicalize("deal-record"), "deal");
+        assert_eq!(canonicalize("structure"), "cbu");
+    }
+
+    #[test]
+    fn compares_aliases_by_canonical_value() {
+        set_entity_kind_aliases(ob_poc_aliases());
+        assert!(matches("kyc_case", "kyc-case"));
+        assert!(matches("client_group", "client-group"));
+        assert!(matches("organization", "company"));
+        assert!(matches("investor-register", "investor"));
+        assert!(matches("umbrella", "fund"));
+        assert!(matches("agreement", "contract"));
+        assert!(matches("mandate", "trading-profile"));
+        assert!(matches("deal-record", "deal"));
+        assert!(matches("trading-unit", "cbu"));
+    }
+
+    #[test]
+    fn unknown_kind_passes_through() {
+        set_entity_kind_aliases(ob_poc_aliases());
+        // A kind not in the table is returned unchanged (lowercased).
+        assert_eq!(canonicalize("some-unknown"), "some-unknown");
+        assert_eq!(canonicalize("POOL"), "pool");
+    }
 }

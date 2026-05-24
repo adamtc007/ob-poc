@@ -306,7 +306,7 @@ fn eval_top1_accuracy_embedding_only() {
         let top3_names: Vec<&str> = candidates.iter().take(3).map(|c| c.pack_name.as_str()).collect();
 
         let hit1 = top1_name == case.expected_pack;
-        let hit3 = top3_names.iter().any(|n| *n == case.expected_pack);
+        let hit3 = top3_names.contains(&case.expected_pack);
 
         if hit1 {
             top1_correct += 1;

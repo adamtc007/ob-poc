@@ -103,7 +103,7 @@ fn empty_dsl_produces_minimal_svg() {
 #[test]
 fn render_all_v01_examples() {
     // Various v0.1 patterns — just verify each renders without panic
-    let examples = vec![
+    let examples = [
         // Linear
         r#"(node start :kind start-event) (node t1 :kind user-task) (node end :kind end-event) (flow start -> t1) (flow t1 -> end)"#,
         // Exclusive gateway
