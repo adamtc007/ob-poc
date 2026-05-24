@@ -365,10 +365,10 @@ members = [
 # overrides these with ~/dev/ paths during development.
 dsl_types    = { git = "https://github.com/adamtc007/dsl",    tag = "v0.1.2" }
 dsl-core     = { git = "https://github.com/adamtc007/dsl",    tag = "v0.1.2" }
-sem_os_types    = { git = "https://github.com/adamtc007/sem-os", tag = "v0.1.2" }
-sem_os_core     = { git = "https://github.com/adamtc007/sem-os", tag = "v0.1.2" }
-sem_os_ontology = { git = "https://github.com/adamtc007/sem-os", tag = "v0.1.2" }
-sem_os_policy   = { git = "https://github.com/adamtc007/sem-os", tag = "v0.1.2" }
+sem_os_types    = { git = "https://github.com/adamtc007/sem-os", tag = "v0.1.3" }
+sem_os_core     = { git = "https://github.com/adamtc007/sem-os", tag = "v0.1.3" }
+sem_os_ontology = { git = "https://github.com/adamtc007/sem-os", tag = "v0.1.3" }
+sem_os_policy   = { git = "https://github.com/adamtc007/sem-os", tag = "v0.1.3" }
 
 # bpmn-lite published as github.com/adamtc007/bpmn-lite v0.2.0 (T1 + T2:
 # dsl-manifest, dsl-bus-*, dmn-lite-server, bpmn-lite plan-walker bus
