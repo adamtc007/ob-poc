@@ -29,16 +29,28 @@
 #     describes the entity-kind a verb creates (vs sem_os_core's
 #     `VerbOutput` for output-field declarations). Low remediation
 #     priority — these mirrors don't shadow the canonical type.
-#       crates/dsl-core/src/config/dag.rs               — DSL DAG config
-#       crates/ob-poc-domain/src/taxonomy/{rules,types} — taxonomy nodes
-#       crates/ob-poc-types/src/galaxy.rs               — galaxy viz
-#       crates/ob-poc-types/src/lib.rs                  — graph DTOs
-#       crates/ob-workflow/src/definition.rs            — workflow defs
-#       src/api/capital_routes.rs                       — capital graph
-#       src/graph/types.rs                              — UI graph types
-#       src/sem_reg/onboarding/verb_extract.rs          — verb-extract
-#                                                         produced-type
-#                                                         marker DTO
+#       crates/ob-poc-taxonomy/src/taxonomy/{rules,types} — taxonomy nodes
+#         (renamed from ob-poc-domain → ob-poc-taxonomy 2026-05-13)
+#       crates/ob-poc-types/src/galaxy.rs                — galaxy viz
+#       crates/ob-poc-types/src/lib.rs                   — graph DTOs
+#       crates/ob-workflow/src/definition.rs             — workflow defs
+#       src/api/capital_routes.rs                        — capital graph
+#       src/graph/types.rs                               — UI graph types
+#       src/sem_reg/onboarding/verb_extract.rs           — verb-extract
+#                                                          produced-type
+#                                                          marker DTO
+#     REMOVED: crates/dsl-core/src/config/dag.rs — dsl-core extracted
+#       to external repo github.com/adamtc007/dsl (2026-05-14); no
+#       longer present in this workspace.
+#
+# (1b) PENDING_REVIEW — requires human ruling (see B-2 notes):
+#     crates/bpmn-runtime/src/verb.rs:VerbOutput
+#       — bpmn-runtime's execution-result type { data, effects }, distinct
+#         from sem_os_ontology::VerbOutput (output-field declarations) and
+#         verb_extract::VerbOutput (entity-kind marker). No cross-crate
+#         consumers observed. Pending ruling: bucket-1 (local detail) or
+#         genuine schema-authority concern?
+#       NOT ADDED until owner rules it bucket 1 or relocates it.
 #
 # (2) HIGH-priority near-duplicates of sem_os_core schema authority:
 #     EMPTY — Phase 4.7 follow-up + walk-by audit + canonical-name
@@ -49,12 +61,11 @@
 #     into `sem_os_core/{derivation_spec, evidence, membership}.rs`
 #     and collapsed the three `src/sem_reg/*` mirrors to re-exports.
 
-crates/dsl-core/src/config/dag.rs:497:TransitionDef
-crates/ob-poc-domain/src/taxonomy/rules.rs:523:EdgeType
-crates/ob-poc-domain/src/taxonomy/types.rs:109:NodeType
+crates/ob-poc-taxonomy/src/taxonomy/rules.rs:523:EdgeType
+crates/ob-poc-taxonomy/src/taxonomy/types.rs:109:NodeType
 crates/ob-poc-types/src/galaxy.rs:1417:NodeType
-crates/ob-poc-types/src/lib.rs:784:GraphNode
-crates/ob-poc-types/src/lib.rs:888:GraphEdge
+crates/ob-poc-types/src/lib.rs:788:GraphNode
+crates/ob-poc-types/src/lib.rs:892:GraphEdge
 crates/ob-workflow/src/definition.rs:160:TransitionDef
 src/api/capital_routes.rs:255:GraphNode
 src/api/capital_routes.rs:263:GraphEdge

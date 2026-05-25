@@ -854,11 +854,19 @@ enum EntityAction {
 
 #[derive(Subcommand)]
 enum VerbsAction {
-    /// Compile all verbs from YAML and sync to database
+    /// Compile all verbs from YAML and sync to database.
+    ///
+    /// With `--validate-only` the command loads and validates the YAML without
+    /// touching the database — suitable for CI where no DB is available.
+    /// The full sync (without --validate-only) is a deploy-time operation.
     Compile {
         /// Show additional details
         #[arg(long, short = 'v')]
         verbose: bool,
+        /// Validate YAML without connecting to the database (CI-safe).
+        /// Exits non-zero if any verb config fails validation.
+        #[arg(long)]
+        validate_only: bool,
     },
 
     /// Show compiled contract for a specific verb
@@ -1517,7 +1525,13 @@ fn main() -> Result<()> {
         Command::Verbs { action } => {
             let rt = tokio::runtime::Runtime::new()?;
             match action {
-                VerbsAction::Compile { verbose } => rt.block_on(verbs::verbs_compile(verbose)),
+                VerbsAction::Compile { verbose, validate_only } => {
+                    if validate_only {
+                        rt.block_on(verbs::verbs_compile_validate_only(verbose))
+                    } else {
+                        rt.block_on(verbs::verbs_compile(verbose))
+                    }
+                }
                 VerbsAction::Show { verb_name } => rt.block_on(verbs::verbs_show(&verb_name)),
                 VerbsAction::Diagnostics { errors_only } => {
                     rt.block_on(verbs::verbs_diagnostics(errors_only))

@@ -15,6 +15,60 @@ use ob_poc::session::verb_contract::VerbDiagnostics;
 use ob_poc::session::verb_sync::VerbSyncService;
 use ob_poc::session::verb_tiering_linter;
 
+/// Validate verb YAML without connecting to the database (CI-safe).
+///
+/// Loads all verb configs, checks for structural errors (missing required
+/// fields, invalid enums, malformed three-axis metadata, bad transition_args),
+/// and exits non-zero if anything fails. No database writes.
+///
+/// This is the CI-appropriate counterpart to `verbs_compile`; the full sync
+/// is a deploy-time operation that writes to `"ob-poc".dsl_verbs`.
+pub(crate) async fn verbs_compile_validate_only(_verbose: bool) -> Result<()> {
+    use dsl_core::config::{validate_verbs_config, ValidationContext};
+    use std::collections::HashSet;
+
+    println!("===========================================");
+    println!("  Verb Contract Validation (no DB)");
+    println!("===========================================\n");
+
+    let loader = ConfigLoader::from_env();
+    let verbs_config = loader.load_verbs().context("Failed to load verb config")?;
+    let verb_count: usize = verbs_config.domains.values().map(|d| d.verbs.len()).sum();
+    println!("  Loaded {} verb declarations from YAML", verb_count);
+
+    // Permissive context (no DAG/slot cross-checks, no declaration required)
+    // matching how CI uses the validator — structure and well-formedness only.
+    let ctx = ValidationContext {
+        known_dags: HashSet::new(),
+        known_slots: HashSet::new(),
+        require_declaration: false,
+        require_flavour: false,
+        require_effect_class: false,
+    };
+
+    let report = validate_verbs_config(&verbs_config, &ctx);
+    let error_count = report.structural.len() + report.well_formedness.len();
+    println!("  Structural errors:     {}", report.structural.len());
+    println!("  Well-formedness errors: {}", report.well_formedness.len());
+    println!("  Policy warnings:        {}", report.warnings.len());
+
+    if error_count == 0 {
+        println!("\n  OK — all verb configs are valid (no DB required).");
+        Ok(())
+    } else {
+        for e in &report.structural {
+            println!("  STRUCTURAL: {e:?}");
+        }
+        for e in &report.well_formedness {
+            println!("  WELL-FORMEDNESS: {e:?}");
+        }
+        anyhow::bail!(
+            "Verb config validation failed with {} error(s).",
+            error_count
+        )
+    }
+}
+
 /// Compile all verbs from YAML and sync to database
 pub(crate) async fn verbs_compile(verbose: bool) -> Result<()> {
     println!("===========================================");

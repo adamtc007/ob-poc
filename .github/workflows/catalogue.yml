@@ -50,9 +50,13 @@ jobs:
         with:
           workspaces: rust
 
-      - name: Verb compile (sync invocation phrases)
+      - name: Verb config validate (YAML structure, no DB required)
+        # B-1(ii): validate-only path — loads all verb YAML and checks structural
+        # and well-formedness errors without connecting to the database.
+        # The full sync (verbs compile without --validate-only) is a deploy-time
+        # action; PR CI does not write to "ob-poc".dsl_verbs.
         working-directory: rust
-        run: cargo run --package xtask -- verbs compile
+        run: cargo run --package xtask -- verbs compile --validate-only
 
       - name: Catalogue validate (v1.2 Tranche 1 gate)
         working-directory: rust

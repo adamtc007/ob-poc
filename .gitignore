@@ -84,6 +84,13 @@ Cargo.lock
 # pins 0.8 → duplicate sqlx in the graph → build failure. See PR #7 CI.
 # https://doc.rust-lang.org/cargo/guide/cargo-toml-vs-cargo-lock.html
 !rust/Cargo.lock
+# eval/, observatory-wasm/, and dsl-lsp/zed-extension/ are application
+# workspaces (executables/cdylibs), not libraries — their Cargo.locks must
+# also be tracked for the same reason as rust/Cargo.lock (fresh resolves in
+# CI pick up loose semver ranges and can diverge from what dev built).
+!eval/Cargo.lock
+!observatory-wasm/Cargo.lock
+!rust/crates/dsl-lsp/zed-extension/Cargo.lock
 
 # NOTE: do NOT ignore .sqlx/ here. The .sqlx/ directory is the offline-mode
 # query cache that CI compiles against (SQLX_OFFLINE=true is set in
@@ -168,8 +175,10 @@ temp/
 *.tmp
 *.temp
 
-# Transient planning scratch space
-todo/
+# Transient planning scratch space — root /todo/ only.
+# Using /todo/ (anchored) rather than todo/ (unanchored) so it does NOT
+# silently swallow docs/todo/ planning docs. docs/todo/ has tracked files.
+/todo/
 
 # ==============================================================================
 # OS generated files
