@@ -1643,6 +1643,24 @@ dependencies = [
 ]
 
 [[package]]
+name = "dsl-migrate-verify"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "bpmn-runtime",
+ "bpmn-test-harness",
+ "dsl-ast",
+ "dsl-bpmn-frontend",
+ "dsl-diagnostics",
+ "dsl-lowering",
+ "dsl-migrate",
+ "dsl-parser",
+ "dsl-resolution",
+ "serde_json",
+ "tokio",
+]
+
+[[package]]
 name = "dsl-parser"
 version = "0.1.0"
 dependencies = [

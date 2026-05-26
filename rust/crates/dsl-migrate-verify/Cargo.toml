@@ -1,0 +1,26 @@
+[package]
+name = "dsl-migrate-verify"
+version = "0.1.0"
+edition = "2021"
+description = "Round-trip verifier for dsl-migrate output — parses emitted DSL, validates structure + reachability, starts in the runtime."
+
+[[bin]]
+name = "dsl-migrate-verify"
+path = "src/bin/verify.rs"
+
+# Capability: zero-dep XML-in/string-out kept in dsl-migrate; verification
+# (which needs the full DSL compiler chain) lives here.
+
+[dependencies]
+dsl-migrate     = { path = "../dsl-migrate" }
+dsl-parser      = { path = "../dsl-parser" }
+dsl-ast         = { path = "../dsl-ast" }
+dsl-diagnostics = { path = "../dsl-diagnostics" }
+dsl-bpmn-frontend = { path = "../dsl-bpmn-frontend" }
+dsl-lowering    = { path = "../dsl-lowering" }
+dsl-resolution  = { path = "../dsl-resolution" }
+bpmn-runtime    = { path = "../bpmn-runtime" }
+bpmn-test-harness = { path = "../bpmn-test-harness" }
+anyhow          = "1"
+serde_json      = "1"
+tokio           = { version = "1", features = ["rt", "macros"] }

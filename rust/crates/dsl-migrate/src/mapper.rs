@@ -18,9 +18,29 @@ pub fn map_process(process: &BpmnProcess) -> MappedDsl {
     let mut lines: Vec<String> = Vec::new();
     let mut statuses: Vec<MigrationElement> = Vec::new();
 
+    // Build index: Camunda boundary event id → derived DSL node name
+    // The assembler derives the name as "{attached-to-id}-boundary".
+    // When multiple boundary events attach to the same host, they share the
+    // derived name; the assembler supports one boundary per host (v1).
+    use std::collections::HashMap;
+    let boundary_id_to_dsl: HashMap<String, String> = process
+        .elements
+        .iter()
+        .filter_map(|e| {
+            if let BpmnElement::BoundaryEvent(be) = e {
+                Some((
+                    be.id.clone(),
+                    format!("{}-boundary", safe_id(&be.attached_to_ref)),
+                ))
+            } else {
+                None
+            }
+        })
+        .collect();
+
     // Migration provenance marker
     lines.push(format!(
-        "(migration-source :source-id \"{}\" :migrated-at \"2026-05-22T00:00:00Z\")",
+        "; migration-source: {} (migrated 2026-05-22)",
         process.id,
     ));
     lines.push(String::new());
@@ -52,7 +72,8 @@ pub fn map_process(process: &BpmnProcess) -> MappedDsl {
     if !process.sequence_flows.is_empty() {
         lines.push(String::new());
         for flow in &process.sequence_flows {
-            let (line, maybe_status) = map_sequence_flow_with_status(flow);
+            let (line, maybe_status) =
+                map_sequence_flow_with_status(flow, &boundary_id_to_dsl);
             lines.push(line);
             if let Some(status) = maybe_status {
                 statuses.push(status);
@@ -211,10 +232,11 @@ fn map_boundary_event(be: &BpmnBoundaryEvent) -> (Option<String>, MigrationEleme
         EventType::Compensation => "compensation",
         _ => "error",
     };
+    // The boundary event node derives its id as "<attached-to>-boundary".
+    // The assembler expects: (boundary-attachment <host-node> :event-kind ... :interrupting ...)
     let line = format!(
-        "(boundary-attachment {} {} :event-kind {} :interrupting {})",
+        "(boundary-attachment {} :event-kind {} :interrupting {})",
         safe_id(&be.attached_to_ref),
-        safe_id(&be.id),
         event_kind_str,
         be.cancel_activity,
     );
@@ -224,25 +246,27 @@ fn map_boundary_event(be: &BpmnBoundaryEvent) -> (Option<String>, MigrationEleme
     )
 }
 
-fn map_sequence_flow_with_status(flow: &SequenceFlow) -> (String, Option<MigrationElement>) {
+fn map_sequence_flow_with_status(
+    flow: &SequenceFlow,
+    boundary_id_to_dsl: &std::collections::HashMap<String, String>,
+) -> (String, Option<MigrationElement>) {
+    // Resolve source: Camunda boundary event IDs map to derived DSL names.
+    let src = boundary_id_to_dsl
+        .get(&flow.source_ref)
+        .cloned()
+        .unwrap_or_else(|| safe_id(&flow.source_ref));
+    let tgt = safe_id(&flow.target_ref);
+
     if let Some(cond) = &flow.condition_expression {
         match feel_normalise(cond) {
             FeelNormaliseResult::Clean(expr) => {
-                let line = format!(
-                    "(flow {} -> {} :condition \"{}\")",
-                    safe_id(&flow.source_ref),
-                    safe_id(&flow.target_ref),
-                    expr,
-                );
+                let line = format!("(flow {} -> {} :condition \"{}\")", src, tgt, expr);
                 (line, None)
             }
             FeelNormaliseResult::NeedsReview { stripped, reason } => {
                 let line = format!(
                     "; [HUMAN-RESOLVE] FEEL condition: {}\n(flow {} -> {} :condition \"{}\")",
-                    reason,
-                    safe_id(&flow.source_ref),
-                    safe_id(&flow.target_ref),
-                    stripped,
+                    reason, src, tgt, stripped,
                 );
                 let status = MigrationElement::human_resolve(
                     &flow.id,
@@ -254,11 +278,7 @@ fn map_sequence_flow_with_status(flow: &SequenceFlow) -> (String, Option<Migrati
             }
         }
     } else {
-        let line = format!(
-            "(flow {} -> {})",
-            safe_id(&flow.source_ref),
-            safe_id(&flow.target_ref),
-        );
+        let line = format!("(flow {} -> {})", src, tgt);
         (line, None)
     }
 }
@@ -266,16 +286,17 @@ fn map_sequence_flow_with_status(flow: &SequenceFlow) -> (String, Option<Migrati
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 fn event_kind(event_type: &EventType, prefix: &str) -> String {
+    // bpmn-lite DSL requires the "-event" suffix on all event node kinds
     match event_type {
-        EventType::None => prefix.to_string(),
-        EventType::Message { .. } => format!("{}-message", prefix),
-        EventType::Timer { .. } => format!("{}-timer", prefix),
-        EventType::Error { .. } => format!("{}-error", prefix),
-        EventType::Signal { .. } => format!("{}-signal", prefix),
-        EventType::Escalation { .. } => format!("{}-escalation", prefix),
-        EventType::Terminate => format!("{}-terminate", prefix),
-        EventType::Compensation => format!("{}-compensation", prefix),
-        EventType::Link { .. } => format!("{}-link", prefix),
+        EventType::None => format!("{}-event", prefix),
+        EventType::Message { .. } => format!("{}-message-event", prefix),
+        EventType::Timer { .. } => format!("{}-timer-event", prefix),
+        EventType::Error { .. } => format!("{}-error-event", prefix),
+        EventType::Signal { .. } => format!("{}-signal-event", prefix),
+        EventType::Escalation { .. } => format!("{}-escalation-event", prefix),
+        EventType::Terminate => format!("{}-terminate-event", prefix),
+        EventType::Compensation => format!("{}-compensation-event", prefix),
+        EventType::Link { .. } => format!("{}-link-event", prefix),
     }
 }
 
