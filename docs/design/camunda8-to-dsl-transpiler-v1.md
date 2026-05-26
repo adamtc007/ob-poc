@@ -6,6 +6,10 @@
 
 ---
 
+## Changelog (v1 → v0.7)
+
+- **§10** — tightened against existing runtime machinery: `FormPending` outcome deleted (use `RequestHumanTask` effect + `HumanTaskComplete` event, both already defined); `form_submit` REPL input kind deleted (use existing `EventKind::HumanTaskComplete`); `behavior: plugin` noted as conventional (screening.yaml:44); reclassification risk downgraded (all task kinds route identically through `is_task_kind`, `processor.rs:919`); fidelity alternative offered for `:kind user-task`; `formKey` normalisation promoted to mapping table; Q8 reframed to ask correlation key only. Net: §10.5 shrinks — most proposed-new components are existing scaffolding needing dispatch wiring, not new machinery.
+
 ## Changelog (v1 → v0.6)
 
 - **§1** — dmn-lite is a federated external peer, not a local crate; architectural table corrected.
@@ -335,57 +339,86 @@ Current mapper behaviour (verified in `mapper.rs:280`): `bpmn:userTask` → `(no
 
 ### 10.1 Architectural position
 
-Form.io is a callout from a running BPMN execution, surfaced as a standard SemOS verb `dsl.form`. It is **not** a separate bridge crate. When the runtime encounters a `(node id :kind service-task :verb dsl.form ...)` node, the verb implementation:
+Form.io is a callout from a running BPMN execution surfaced as a standard SemOS verb `dsl.form`. It is **not** a separate bridge crate — and it should not become one.
 
-1. Fetches the Form.io schema by form ref
-2. Returns a "form pending" outcome carrying the schema + process context
-3. Parks the fiber at that node (same park/resume mechanics as message events)
-4. The running session's UI renders the form in the cockpit (same channel as the chat)
-5. User interacts — reads content, presses buttons, fills fields
-6. Submission comes back through the REPL input pipeline
-7. Fiber resumes, form data injected into process context, execution continues
+dmn-lite is external because ob-poc explicitly disclaims decision authority over DMN (confirmed: manifest guard in `ob-poc-manifest-export/src/lib.rs`). Form.io owns nothing in that sense; it is a UI mechanism inside an ob-poc-owned process. A `form-bridge` crate would repeat the v0.6 `assembly.rs` mistake — new structure sitting next to machinery that already does the job.
+
+**The park/resume machine already exists.** `bpmn-runtime/src/verb.rs:6-7`: when a verb has no registered handler, the token parks via `create_pending_wait` (confirmed: `processor.rs:748`) and resumes on `EventKind::VerbCompletion`. For `dsl.form`, the verb IS registered — it runs, emits a `VerbEffect::RequestHumanTask`, and the processor creates a `pending_wait` of kind `"human_task"`. Resume fires via `EventKind::HumanTaskComplete` (confirmed: `types.rs:101`, already in the `EventKind` enum).
+
+**Critical nuance:** `VerbEffect::RequestHumanTask` and `EventKind::HumanTaskComplete` are **defined but unhandled**. The type scaffolding is correct; the dispatch arms in `processor.rs` are missing. That is the work — ~20–30 lines completing existing scaffolding, not new machinery.
+
+**Flow:**
+1. Runtime reaches `dsl.form` node → calls registered verb handler
+2. Handler fetches Form.io schema, returns `VerbOutput { effects: [RequestHumanTask { role, form_data }] }`
+3. Processor handles `RequestHumanTask` (new arm needed): creates `pending_wait("human_task", token_id, correlation_key)`
+4. Session response carries form schema to UI; cockpit renders it via Form.io SDK
+5. User interacts (display-only or capture)
+6. Submission delivers `HumanTaskComplete` event (new handler arm needed): resumes fiber with form data in process context
 
 ### 10.2 Two interaction modes
 
 | Mode | Purpose | Returns |
 |------|---------|---------|
-| `display` | Show process state / summary; single Continue button | Ack only — no data |
-| `capture` | Collect user input (fields, selections, button choices) | Form submission as named variables |
+| `display` | Show process state / summary; single Continue | Ack only — no data captured |
+| `capture` | Collect user input (fields, selections, buttons) | Form submission as named variables |
+
+Both are carried in `form_data: serde_json::Value` on `RequestHumanTask`. The field is already `serde_json::Value` — flexible enough to hold `{ "form_ref": "...", "mode": "capture", "context": {...} }` without structural change.
 
 ### 10.3 DSL representation
 
 ```
-(node "review-kyc-summary" :kind service-task
+(node "review-kyc-summary" :kind user-task
   :verb dsl.form
   :form-ref "kyc.review-summary"
   :mode display
   :context #{kyc_result entity_name risk_score})
 
-(node "collect-missing-docs" :kind service-task
+(node "collect-missing-docs" :kind user-task
   :verb dsl.form
   :form-ref "onboarding.document-checklist"
   :mode capture
   :output-binding doc_submissions)
 ```
 
+Note `:kind user-task` — see §10.4.
+
 ### 10.4 Camunda 8 transpiler mapping
 
-Camunda `bpmn:userTask` with a `formKey` attribute → `(node id :kind service-task :verb dsl.form :form-ref "formKey-value")`. This supersedes the plain `(node id :kind user-task)` output for tasks that carry form metadata. Tasks without `formKey` continue to emit `(node id :kind user-task)` (Q5 above unchanged for the no-form case).
+Camunda `bpmn:userTask` with a `formKey` attribute → `(node id :kind user-task :verb dsl.form :form-ref <normalised-ref>)`.
 
-### 10.5 New components required
+**Reclassification is behaviourally inert.** Confirmed: `processor.rs:919–930`, `is_task_kind()` routes all task kinds — `service-task`, `user-task`, `send-task`, etc. — identically through one match arm. Verb presence, not `:kind`, drives execution. Flipping `:kind` from `user-task` to `service-task` changes nothing at runtime. Recommendation: **keep `:kind user-task`** and add `:verb dsl.form` — same execution, truer to the Camunda source. Reviewer may override.
 
-| Component | Scope |
-|-----------|-------|
-| `dsl.form` verb YAML definition | Verb registry entry: `behavior: plugin`, args `form_ref/mode/context/output_binding` |
-| `DslFormOp` — `SemOsVerbOp` impl | Fetches schema, returns FormPending outcome; park/resume hooks |
-| Form.io schema registry | Stores form JSON by ref key (can be Form.io cloud or local JSON store) |
-| REPL input kind `form_submit` | New input variant to carry form submission data back to parked fiber |
-| UI form renderer | React component that receives form schema in session response and renders via Form.io SDK |
+**`formKey` normalisation — mapping table:**
+
+| `formKey` prefix | Rule | `:form-ref` output |
+|-----------------|------|-------------------|
+| `camunda-forms:embedded:` | Strip prefix | `embedded/<rest>` |
+| `deployment:` | Strip prefix | `deployment/<rest>` |
+| Plain key (no prefix, no `:`) | Pass through | `<key>` |
+| `classpath:`, `bpmn:`, other prefixed | Cannot normalise | `[HUMAN-RESOLVE]` |
+| Absent / empty | No form | Emit plain `(node id :kind user-task)` |
+
+Unknown prefixes follow the same "normalise or defer" shape as the verb resolver.
+
+Tasks without `formKey` continue to emit `(node id :kind user-task)` — Q5 unchanged.
+
+### 10.5 What is genuinely new (small list)
+
+The `behavior: plugin` verb-registry entry follows the standard pattern used by 10+ existing verbs (e.g. `config/verbs/screening.yaml:44`). Nothing structurally novel there.
+
+| Component | What's new |
+|-----------|-----------|
+| `dsl.form` verb YAML | Conventional `behavior: plugin` entry. Args: `form_ref`, `mode`, `context`, `output_binding`. |
+| `DslFormOp` — `SemOsVerbOp` impl | `fetch_schema(form_ref)` call + returns `VerbOutput { effects: [RequestHumanTask {...}] }`. |
+| `RequestHumanTask` dispatch arm | ~15 lines in `processor.rs`: handle effect, create `pending_wait("human_task", ...)`. |
+| `HumanTaskComplete` handler arm | ~15 lines in `processor.rs`: find pending_wait by correlation, resume fiber with payload. |
+| Form.io schema store | Stores/retrieves form JSON by ref. Can be Form.io cloud, self-hosted, or local JSON files behind an ob-poc-web endpoint. |
+| UI form renderer | React component receiving form schema in session response, renders via Form.io JS SDK. Lives in `ob-poc-ui-react/` — not a Rust concern. |
 
 ### 10.6 Open questions
 
-**Q7. Form.io hosting** — cloud (formio.com) vs self-hosted vs local JSON files served by ob-poc-web? The verb impl's `fetch_schema` call needs a concrete target.
+**Q7. Form.io hosting** — cloud vs self-hosted vs local JSON files? The `fetch_schema` impl needs a concrete target. Local JSON files behind `GET /api/forms/:ref` in ob-poc-web is the simplest start.
 
-**Q8. Park/resume mechanism** — the fiber park on form pending needs a resume token that Form.io (or the UI) sends back. Does this reuse the existing `decision_reply` input kind, or does it need a new `form_submit` kind with a typed payload?
+**Q8. Correlation key for pending_wait** — the `create_pending_wait` call (confirmed: `processor.rs:748`) takes a correlation kind and value. For `"human_task"` waits, what uniquely identifies a form instance so the `HumanTaskComplete` event routes to the right token? Options: `token_id` (simpler, one form per token), or a generated `form_submission_id` (allows tracking). Reviewer to decide.
 
-**Q9. formKey format in Camunda exports** — Camunda 8 `formKey` values can be `camunda-forms:embedded:...` (Camunda-native), `deployment:form.json` (deployment resource), or plain keys. The transpiler needs a normalisation rule for what becomes the `:form-ref` value.
+**Q9. formKey normalisation edge cases** — Camunda 8 `camunda-forms:embedded:` forms embed the full JSON schema inline in the BPMN XML rather than referencing an external key. If the transpiler encounters an embedded schema, should it extract and store it, or always defer to HUMAN-RESOLVE? Scope question for the transpiler, not the runtime.
