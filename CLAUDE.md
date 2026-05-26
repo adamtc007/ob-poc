@@ -1,9 +1,9 @@
 # CLAUDE.md
 
-> **Last reviewed:** 2026-05-15
+> **Last reviewed:** 2026-05-26
 > **Frontend:** React/TypeScript (`ob-poc-ui-react/`) — Chat UI with scope panel, Inspector, Semantic OS Tab
 > **Backend:** Rust/Axum (`rust/crates/ob-poc-web/`) — Serves React + REST API
-> **Crates:** 50 workspace crates (incl. `ob-poc` application root) — 18 ob-poc-* library (web, types, diagnostics, boundary, sage, journey, authoring, agent, macros · split-v1: bods, deal, booking-principal, semtaxonomy, ontology, entity-linking, trading-profile, derived-attributes, taxonomy) · 10 sem_os_* (core, types, ontology, policy, postgres, server, client, obpoc_adapter, harness, mcp) · 4 dsl-* (dsl-core, dsl-lsp, dsl-runtime, dsl-analysis) · 4 ob-* (ob-agentic, ob-templates, ob-workflow, ob-semantic-matcher) · 4 misc (entity-gateway, xtask, playbook-core, inspector-projection) · 9 unified-dsl-v0.1 (dsl-atoms, dsl-diagnostics, dsl-parser, dsl-ast, dsl-bpmn-frontend, dsl-lowering, dsl-resolution, bpmn-runtime, bpmn-test-harness)
+> **Crates:** 51 workspace crates (incl. `ob-poc` application root) — 18 ob-poc-* library (web, types, diagnostics, boundary, sage, journey, authoring, agent, macros · split-v1: bods, deal, booking-principal, semtaxonomy, ontology, entity-linking, trading-profile, derived-attributes, taxonomy) · 11 sem_os_* (core, types, ontology, policy, taxonomy, postgres, server, client, obpoc_adapter, harness, mcp) · 4 dsl-* (dsl-core, dsl-lsp, dsl-runtime, dsl-analysis) · 4 ob-* (ob-agentic, ob-templates, ob-workflow, ob-semantic-matcher) · 4 misc (entity-gateway, xtask, playbook-core, inspector-projection) · 9 unified-dsl-v0.1 (dsl-atoms, dsl-diagnostics, dsl-parser, dsl-ast, dsl-bpmn-frontend, dsl-lowering, dsl-resolution, bpmn-runtime, bpmn-test-harness)
 > **Verbs:** 1,282 canonical verbs across 134 domains (795 declared with three-axis = 62.0%); 24,587 intent patterns (DB-sourced)
 > **Macros:** 103 operator macros (22 YAML files, 18 domains, 3 composite), Tier -2B in intent pipeline
 > **MCP Tools:** ~102 tools (DSL, verbs, learning, session, batch, research, taxonomy, sem_reg, stewardship, db_introspect, session_verb_surface)

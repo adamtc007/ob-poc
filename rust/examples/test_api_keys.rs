@@ -201,7 +201,7 @@ mod tests {
     #[test]
     fn test_gemini_key_validation() {
         assert!(validate_gemini_key_format(
-            "AIzaSyA1234567890abcdefghijklmnopqrstuv"
+            "AIza-Sy-Mock-Key-For-Testing-Format-Ok"
         ));
         assert!(validate_gemini_key_format(
             "1234567890abcdefghijklmnopqrstuv123456789"
