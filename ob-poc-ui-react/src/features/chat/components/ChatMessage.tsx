@@ -17,6 +17,7 @@ import { DecisionCard } from "./DecisionCard";
 import { VerbDisambiguationCard } from "./VerbDisambiguationCard";
 import { NarrationPanel } from "./NarrationPanel";
 import { OnboardingStateCard } from "./OnboardingStateCard";
+import { FormioForm } from "../../forms/FormioForm";
 
 interface ChatMessageProps {
   message: ChatMessageType;
@@ -620,6 +621,23 @@ export function ChatMessage({
             <DecisionCard
               packet={decisionPacket}
               onReply={(reply) => onDecisionReply?.(decisionPacket.id, reply)}
+            />
+          </div>
+        )}
+
+        {/* dsl.form verb — Form.io human task */}
+        {message.bpmn_form && (
+          <div className="mt-2">
+            <FormioForm
+              formRef={message.bpmn_form.form_ref}
+              prefillData={message.bpmn_form.prefill_data}
+              mode={message.bpmn_form.mode}
+              tokenId={message.bpmn_form.token_id}
+              onComplete={() => {
+                // Form submitted — the backend delivers HumanTaskComplete
+                // and the session will receive an updated response on the
+                // next poll/push cycle.
+              }}
             />
           </div>
         )}

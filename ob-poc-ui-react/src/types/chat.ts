@@ -30,6 +30,20 @@ export interface ChatMessage {
   narration?: NarrationPayload;
   /** Structured ACP prompt / language-loop trace shown to the HIL. */
   acp_trace?: AcpTraceSummary;
+  /** dsl.form verb pending: render a Form.io form and capture submission. */
+  bpmn_form?: BpmnFormPending;
+}
+
+/** Payload surfaced when a dsl.form verb parks the BPMN fiber. */
+export interface BpmnFormPending {
+  /** Form.io schema ref key — resolved by GET /api/forms/:ref */
+  form_ref: string;
+  /** Token ID of the parked bpmn-runtime fiber */
+  token_id: string;
+  /** Interaction mode: display (read-only + ack) or capture (editable) */
+  mode: "display" | "capture";
+  /** Process context data for prefilling */
+  prefill_data: Record<string, unknown>;
 }
 
 export interface AcpTraceSummary {
