@@ -291,7 +291,7 @@ impl PromotionService {
             LIMIT 1
             "#,
         )
-        .bind(&embedding_vec)
+        .bind(embedding_vec)
         .bind(&candidate.verb)
         .bind(self.collision_threshold)
         .fetch_optional(&self.pool)

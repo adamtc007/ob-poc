@@ -212,7 +212,7 @@ impl SemanticMatcher {
             LIMIT $3
             "#,
         )
-        .bind(&embedding_vec)
+        .bind(embedding_vec)
         .bind(self.config.min_similarity)
         .bind(top_k as i32)
         .fetch_all(&self.pool)
@@ -387,7 +387,7 @@ impl SemanticMatcher {
             .bind(&pattern.pattern_phrase)
             .bind(&pattern.pattern_normalized)
             .bind(&pattern.phonetic_codes)
-            .bind(&embedding_vec)
+            .bind(embedding_vec)
             .bind(&pattern.category)
             .bind(pattern.is_agent_bound)
             .bind(pattern.priority)
