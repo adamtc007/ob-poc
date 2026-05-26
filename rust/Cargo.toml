@@ -77,7 +77,10 @@ url = "2.5"
 nom = "7.1"
 
 # Database integration (optional for Phase 1)
-sqlx = { version = "0.8", features = ["runtime-tokio-rustls", "postgres", "uuid", "chrono", "json", "macros", "bigdecimal", "rust_decimal"], optional = true }
+# sqlx held at 0.8.x: the sqlx 0.9 Encode blanket-impl change breaks pgvector's
+# &Vector binding (see commit 8ba6bba8). Lift when sqlx 0.9 compatibility is
+# confirmed — check pgvector and ob-semantic-matcher's bind sites first.
+sqlx = { version = ">=0.8.6, <0.9", features = ["runtime-tokio-rustls", "postgres", "uuid", "chrono", "json", "macros", "bigdecimal", "rust_decimal"], optional = true }
 bigdecimal = { version = "0.4", features = ["serde"], optional = true }
 pgvector = { version = "0.4", features = ["sqlx"], optional = true }
 
