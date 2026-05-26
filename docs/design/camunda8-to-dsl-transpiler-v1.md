@@ -1,8 +1,24 @@
-# Camunda 8 → bpmn-lite DSL Transpiler — Design v1
+# Camunda 8 → bpmn-lite DSL Transpiler — Design v0.6
 
 > **Status:** Draft for peer review — no implementation yet  
 > **Date:** 2026-05-26  
-> **Scope:** `dsl-migrate` crate (ob-poc) + FEEL parser (new) + round-trip harness
+> **Scope:** `dsl-migrate` crate (ob-poc) + FEEL normaliser (new) + round-trip harness + Form.io verb
+
+---
+
+## Changelog (v1 → v0.6)
+
+- **§1** — dmn-lite is a federated external peer, not a local crate; architectural table corrected.
+- **§3** — atom vocabulary corrected to match actual emitter output: `(node id :kind ...)`, `(gateway id :kind ...)`, `(flow a -> b)`; `:when` → `:condition` throughout.
+- **§4** — FEEL→s-expression translation table **deleted**. The condition receiver (`RailwayEdge.condition: Option<String>`) is opaque and not evaluated by the runtime (`ScriptedAdaptor` ignores it; bpmn-runtime passes it through). The FEEL normaliser's job is strip wrappers + validate parseable subset + emit clean FEEL string verbatim. dmn-lite evaluation is a future external-peer concern.
+- **§5.1** — API renamed `feel_normalize`; purpose is validate-and-strip, not translate.
+- **§5.3** — Q1 reframed: `assembly.rs` already exists in `dsl-bpmn-frontend`; question is coupling strategy, not building from scratch.
+- **§5.4** — Round-trip scope narrowed: validates structure + reachability only; condition executability explicitly out of scope.
+- **§6** — Binary path corrected to `src/bin/migrate.rs`.
+- **§7** — Q3 resolved (emit verbatim FEEL); Q4 resolved (`:condition` confirmed); Q5 rewritten against actual mapper behaviour.
+- **§8** — `emitter.rs` added; binary path corrected; `:condition` used throughout.
+- **§10** — Implementation order updated: s-expr translation step removed.
+- **§11 NEW** — Form.io verb integration.
 
 ---
 
@@ -10,17 +26,19 @@
 
 Camunda 8 `.bpmn` files mix two structurally distinct concerns into a single XML document:
 
-- **Process structure** — the shape of the workflow: start events, tasks, gateways, sequence flows, boundary events, end events. This is the "what happens and in what order."
-- **Execution rules** — the decision logic embedded in the flow: FEEL conditions on sequence flows, timer expressions, message correlation keys, DMN table references. This is the "under what conditions."
+- **Process structure** — the shape of the workflow: start/end events, tasks, gateways, sequence flows, boundary events. The "what happens and in what order."
+- **Execution rules** — the decision logic embedded in the flow: FEEL conditions on sequence flows, timer expressions, message correlation keys, DMN table references. The "under what conditions."
 
 Our architecture keeps these concerns separate by design:
 
-| Layer | Language | Concern |
-|-------|----------|---------|
-| Process structure | bpmn-lite DSL (s-expression) | Shape, topology, verb invocation |
-| Decision logic | dmn-lite DSL (s-expression) | Guards, conditions, expression evaluation |
+| Layer | Language | Concern | Location |
+|-------|----------|---------|----------|
+| Process structure | bpmn-lite DSL (s-expression) | Shape, topology, verb invocation | local crates |
+| Decision logic | FEEL / dmn-lite | Guards, conditions, expression evaluation | **federated external peer** |
 
-The transpiler must respect this boundary. When consuming a Camunda 8 source file, it must **split** the file along this seam rather than treating either half as a black box. The current `dsl-migrate` implementation partially does Stage 1 (XML parse) and Stage 2 (structural mapping) but stalls at FEEL conditions — emitting `[HUMAN-RESOLVE]` markers instead of parsing them. That is the gap.
+**dmn-lite is not a local crate.** The only dmn-lite references in the workspace are the external bus endpoint (`DMN_LITE_BUS_ENDPOINT` in `ob-poc-web`) and a manifest guard in `ob-poc-manifest-export` that explicitly states _ob-poc does not own DMN decisions_. The condition string passes through the local runtime as an opaque `Option<String>` on `RailwayEdge.condition` (confirmed: `dsl-bpmn-frontend/src/railway.rs:270`, comment "not yet evaluated") and through `dsl-lowering` into `bpmn-runtime/src/switch.rs:17` (`EdgeInfo.condition`). The only `SwitchAdaptor` present (`ScriptedAdaptor`) ignores the condition string entirely.
+
+**Consequence for the transpiler:** FEEL conditions should be emitted **verbatim** as the `:condition` string on flow atoms. The normaliser's job is to strip Camunda-specific wrappers and classify what it cannot parse — not to translate to a local s-expression format. Translation is the external peer's concern.
 
 ---
 
@@ -32,37 +50,38 @@ FEEL (Friendly Enough Expression Language) is the DMN standard expression langua
 ```xml
 <conditionExpression>${score >= 700}</conditionExpression>
 ```
-The `${...}` wrapper is Juel syntax. The inner expression is Java EL, not pure FEEL.
+The `${...}` wrapper is Juel syntax. Strip wrapper; inner expression is the FEEL string to emit.
 
 **Form B — Native FEEL (Camunda 8 preferred):**
 ```xml
 <conditionExpression>= score >= 700</conditionExpression>
 ```
-The leading `=` is a FEEL unary test. `score >= 700` is a FEEL expression.
+The leading `=` is a FEEL unary test marker. Strip it; emit `score >= 700`.
 
 **What FEEL is NOT in a BPMN file:**
 - DMN decision table cell expressions — those live in `.dmn` files, not `.bpmn`
-- Full FEEL programs — BPMN conditions are always single expressions, never multi-statement
+- Full FEEL programs — BPMN conditions are always single expressions
 
 **The FEEL subset that appears in BPMN sequence flow conditions:**
 
-| Pattern | Example | Frequency |
-|---------|---------|-----------|
-| Comparison | `score >= 700`, `status = "ACTIVE"` | Very common |
-| Logical and/or | `score > 500 and risk = "LOW"` | Common |
-| Negation | `not(approved)`, `status != "DECLINED"` | Common |
-| Arithmetic | `amount * rate > threshold` | Occasional |
-| String membership | `status in ["PENDING","REVIEW"]` | Occasional |
-| Null check | `entity != null` | Occasional |
-| Juel wrapper | `${...}` around any of the above | Legacy common |
+| Pattern | Example | Normaliser action |
+|---------|---------|------------------|
+| Comparison | `score >= 700`, `status = "ACTIVE"` | Emit verbatim |
+| Logical and/or | `score > 500 and risk = "LOW"` | Emit verbatim |
+| Negation | `not(approved)`, `status != "DECLINED"` | Emit verbatim |
+| Arithmetic | `amount * rate > threshold` | Emit verbatim |
+| String membership | `status in ["PENDING","REVIEW"]` | Emit verbatim |
+| Null check | `entity != null` | Emit verbatim |
+| Juel wrapper | `${...}` around any of the above | Strip `${` `}`, emit inner |
+| FEEL unary test | `= expr` | Strip leading `=`, emit expr |
 
-**Out of scope for BPMN conditions (full FEEL features, rare or absent in flow guards):**
-- `for` / `some` / `every` quantifiers
-- Date arithmetic beyond ISO duration literals
-- Context and list comprehension
-- Function definitions
+**Out-of-scope patterns (emit `[HUMAN-RESOLVE]` with diagnostic):**
+- Context dot-access: `order.amount`
+- Date functions: `date("2026-01-01")`
+- Built-in functions: `string length(name) > 5`
+- For/some/every quantifiers
 
-**Timer expressions** use ISO 8601 (`PT5M`, `R3/PT1H`, `2026-01-01T00:00:00Z`) — this is **not FEEL** and maps directly to a duration/date literal in the DSL without a FEEL parser.
+**Timer expressions** use ISO 8601 (`PT5M`, `R3/PT1H`) — not FEEL; mapped directly to a duration literal.
 
 ---
 
@@ -73,126 +92,137 @@ Camunda 8 .bpmn (XML)
          │
          ▼
 ┌─────────────────────────────────────────────┐
-│  Stage 1: XML Parse          [EXISTS]        │
+│  Stage 1: XML Parse             [EXISTS]     │
 │                                              │
 │  quick-xml → BpmnProcess IR                  │
-│  Outputs:                                    │
 │  • elements: Vec<BpmnElement>                │
 │  • sequence_flows: Vec<SequenceFlow>         │
 │    ↳ each flow may carry condition_expression│
-│                                              │
 │  Location: xml_reader.rs                     │
 └──────────────────┬──────────────────────────┘
                    │
           ┌────────┴────────┐
           ▼                 ▼
-┌──────────────────┐  ┌──────────────────────────┐
-│ Stage 2:         │  │ Stage 3:        [NEW]     │
-│ Structural Map   │  │ FEEL Parser               │
-│ [EXISTS partial] │  │                           │
-│                  │  │ Input:                    │
-│ BpmnElement →   │  │   condition_expression    │
-│ bpmn-lite atoms │  │   strings from flows      │
-│                  │  │                           │
-│ • (start ...)    │  │ Strips ${ } Juel wrapper  │
-│ • (end ...)      │  │ Strips leading = FEEL     │
-│ • (task ...)     │  │ Parses expression into    │
-│ • (gateway ...)  │  │ dmn-lite s-expr string    │
-│ • (boundary ...) │  │                           │
-│                  │  │ `score >= 700`            │
-│ Location:        │  │ → `(>= score 700)`        │
-│ mapper.rs        │  │                           │
-│ (remove          │  │ Location: feel_parser.rs  │
-│  HUMAN-RESOLVE)  │  │ (new module)              │
-└────────┬─────────┘  └─────────────┬────────────┘
-         │                          │
-         └─────────────┬────────────┘
-                       ▼
+┌──────────────────────┐  ┌─────────────────────────┐
+│ Stage 2:             │  │ Stage 3:       [NEW]     │
+│ Structural Map       │  │ FEEL Normaliser          │
+│ [EXISTS partial]     │  │                          │
+│                      │  │ Input: condition_expr    │
+│ BpmnElement →        │  │ strings from flows       │
+│ bpmn-lite atoms:     │  │                          │
+│                      │  │ 1. Strip Juel ${...}     │
+│ (node id :kind       │  │ 2. Strip FEEL = prefix   │
+│   start-event)       │  │ 3. Classify: parseable   │
+│ (node id :kind       │  │    subset or HUMAN-      │
+│   service-task       │  │    RESOLVE with diag     │
+│   :verb invoke-fqn)  │  │ 4. Emit clean FEEL       │
+│ (gateway id :kind    │  │    string verbatim as    │
+│   exclusive)         │  │    :condition value      │
+│ (flow a -> b)        │  │                          │
+│ (flow a -> b         │  │ Does NOT translate to    │
+│   :condition "...")  │  │ s-expressions.           │
+│                      │  │ Location: feel_parser.rs │
+│ mapper.rs            │  │ (new module)             │
+│ (replace TODO with   │  │                          │
+│  normalised FEEL)    │  │                          │
+└──────────┬───────────┘  └────────────┬────────────┘
+           │                           │
+           └─────────────┬─────────────┘
+                         ▼
 ┌─────────────────────────────────────────────┐
 │  Stage 4: Assembly              [NEW]        │
 │                                              │
-│  Merges structural atoms + guard             │
-│  expressions into a single SourceFile        │
+│  Merges mapper output into single string     │
+│  suitable for dsl-parser::parse_program.     │
 │                                              │
-│  SequenceFlow with condition:                │
-│    structural atom:  (-> a b)               │
-│    guard expression: (>= score 700)         │
-│    assembled:        (-> a b :when          │
-│                        (>= score 700))      │
+│  SequenceFlow with normalised condition:     │
+│    (flow gw-score -> end-approved            │
+│      :condition "score >= 700")             │
 │                                              │
-│  Output: SourceFile { atoms: Vec<RawAtom> } │
-│  (the dsl-parser's canonical input type)    │
-│                                              │
-│  Location: assembly.rs (new module)         │
+│  NOTE: assembly.rs already exists in        │
+│  dsl-bpmn-frontend (RawAtom → RailwayGraph).│
+│  This stage is string concatenation only —  │
+│  dsl-parser call lives in Stage 5.          │
+│  No new assembly.rs needed in dsl-migrate.  │
 └──────────────────┬──────────────────────────┘
                    ▼
 ┌─────────────────────────────────────────────┐
 │  Stage 5: Round-trip Validation  [NEW]       │
 │                                              │
-│  SourceFile                                  │
+│  Assembled DSL string                        │
 │    → dsl-resolution::validate_bpmn           │
 │    → dsl-lowering::lower → JourneySpec       │
-│    → RuntimeEngine::start (stub executor)   │
-│    → process advances to expected terminal  │
+│    → RuntimeEngine::start (ScriptedAdaptor) │
 │                                              │
-│  Failure here means the emitted DSL is       │
-│  syntactically valid but not executable —    │
-│  a category of bug string-match tests miss. │
+│  Validates: structure + reachability only.  │
+│  ScriptedAdaptor IGNORES :condition strings.│
+│  Does NOT prove condition executability —   │
+│  that requires the external dmn-lite peer.  │
 │                                              │
-│  Location: roundtrip.rs (new module) or      │
-│  extended bpmn-test-harness                  │
+│  Lives in: dsl-migrate-verify crate (new)   │
+│  or bpmn-test-harness extension.            │
+│  dsl-migrate stays zero intra-workspace deps│
 └─────────────────────────────────────────────┘
 ```
 
 ---
 
-## 4. FEEL → dmn-lite Expression Mapping
+## 4. FEEL Normaliser Contract
 
-The FEEL parser (Stage 3) produces dmn-lite s-expression strings. These are then embedded as `:when` guards on sequence flow atoms.
+The normaliser (Stage 3) is **not a translator**. It is a classifier and wrapper-stripper.
 
-### 4.1 Expression translation table
+### 4.1 Normaliser API
 
-| FEEL | dmn-lite s-expr | Notes |
-|------|-----------------|-------|
-| `score >= 700` | `(>= score 700)` | |
-| `status = "ACTIVE"` | `(= status "ACTIVE")` | |
-| `amount != 0` | `(!= amount 0)` | |
-| `a > 1 and b < 5` | `(and (> a 1) (< b 5))` | |
-| `a > 1 or b < 5` | `(or (> a 1) (< b 5))` | |
-| `not(approved)` | `(not approved)` | |
-| `not(a = "X")` | `(not (= a "X"))` | |
-| `amount * rate > threshold` | `(> (* amount rate) threshold)` | |
-| `status in ["PENDING","REVIEW"]` | `(in status ["PENDING" "REVIEW"])` | |
-| `entity != null` | `(not-null entity)` | |
-| `= score >= 700` | strip leading `=`, then parse | FEEL unary test prefix |
-| `${score >= 700}` | strip `${` `}`, then parse | Juel wrapper |
+```rust
+pub enum FeelNormaliseResult {
+    /// Clean FEEL expression, ready to emit as :condition string.
+    Clean(String),
+    /// Contains constructs outside the supported subset. Emit [HUMAN-RESOLVE].
+    NeedsReview { stripped: String, reason: String },
+}
 
-### 4.2 Parser grammar (subset required)
+/// Normalise a raw conditionExpression string from Camunda 8 XML.
+///
+/// - Strips Juel ${...} wrappers.
+/// - Strips FEEL unary-test leading `=`.
+/// - Classifies the inner expression against the supported subset.
+/// - Returns Clean(expr) or NeedsReview with a diagnostic.
+pub fn feel_normalise(raw: &str) -> FeelNormaliseResult
+```
+
+### 4.2 Stripping rules
+
+| Input form | Strip rule | Example in → out |
+|------------|-----------|-----------------|
+| `${expr}` | Remove `${` and `}` | `${score >= 700}` → `score >= 700` |
+| `= expr` | Remove leading `= ` | `= score >= 700` → `score >= 700` |
+| `expr` | No-op | `score >= 700` → `score >= 700` |
+
+### 4.3 Classification — supported subset (emit Clean)
+
+Parseable with a simple recursive-descent pass:
 
 ```
-expr      = logical
-logical   = comparison (("and" | "or") comparison)*
+expr       = logical
+logical    = comparison (("and" | "or") comparison)*
 comparison = arithmetic (op arithmetic)?
-op        = ">=" | "<=" | "!=" | "=" | ">" | "<"
-arithmetic = unary (("+" | "-" | "*" | "/") unary)*
-unary     = "not" "(" expr ")" | primary
-primary   = literal | identifier | "(" expr ")" | list | null-check
-literal   = number | string | "true" | "false" | "null"
-list      = "[" (literal ("," literal)*)? "]"
+op         = ">=" | "<=" | "!=" | "=" | ">" | "<"
+arithmetic = term (("+" | "-") term)*
+term       = unary (("*" | "/") unary)*
+unary      = "not" "(" expr ")" | primary
+primary    = literal | identifier | "(" expr ")" | list
+literal    = number | string | "true" | "false" | "null"
+list       = "[" (literal ("," literal)*)? "]"
 identifier = [a-zA-Z_][a-zA-Z0-9_-]*
 ```
 
-This is a hand-written recursive-descent parser (same pattern as dsl-parser). No external parser combinator needed for this scope.
+### 4.4 Out-of-scope (emit NeedsReview with diagnostic)
 
-### 4.3 Unresolvable FEEL (still `[HUMAN-RESOLVE]`)
-
-Some FEEL patterns in the wild are out of scope for v1:
-- Context access: `order.amount` (dot notation for nested context)
-- Date functions: `date("2026-01-01")`  
-- Built-in functions: `string length(name) > 5`
-- For/some/every quantifiers
-
-These should still emit `[HUMAN-RESOLVE]` with a diagnostic noting the specific construct that wasn't parsed, not a blanket failure.
+- Dot-access context: `order.amount`
+- Date/time functions: `date(...)`, `duration(...)`
+- Built-in string/numeric functions
+- Quantifiers: `for`, `some`, `every`
+- Multi-valued contexts and list comprehension
 
 ---
 
@@ -200,123 +230,162 @@ These should still emit `[HUMAN-RESOLVE]` with a diagnostic noting the specific 
 
 ### 5.1 `feel_parser.rs` — new module in `dsl-migrate`
 
-```rust
-/// Parse a FEEL condition expression (as found in Camunda 8 sequenceFlow
-/// conditionExpression) into a dmn-lite s-expression string.
-///
-/// Handles:
-///   - Juel wrapper stripping: `${...}` → inner
-///   - FEEL unary test prefix: `= expr` → `expr`
-///   - Full expression parse → s-expr string
-///
-/// Returns `Err(FeelParseError)` for out-of-scope constructs.
-/// Caller emits [HUMAN-RESOLVE] on error.
-pub fn feel_to_dmn_lite(feel: &str) -> Result<String, FeelParseError>
-```
-
-**Does not** depend on dmn-lite crate directly — produces a string that is valid dmn-lite syntax. Keeping it string-output avoids a new crate dependency and keeps the parser self-contained.
+Implements `feel_normalise` (§4.1). No crate deps beyond `thiserror`. Pure string-in, string-out or diagnostic-out.
 
 ### 5.2 Updated `mapper.rs`
 
-Remove the `is_feel_expression` + `[HUMAN-RESOLVE]` path for conditions. Replace with a call to `feel_parser::feel_to_dmn_lite(condition)`. On `Ok` → embed in `:when` clause. On `Err` → `[HUMAN-RESOLVE]` with the specific parse error as diagnostic.
-
-### 5.3 `assembly.rs` — new module in `dsl-migrate`
-
-Takes the `Vec<String>` atom lines from `mapper.rs` and produces a `dsl_parser::SourceFile`. This is the bridge from the migration string representation into the canonical dsl-parser AST, enabling the round-trip.
-
-**Dependency note:** this module adds `dsl-parser` as a dep of `dsl-migrate`. Currently `dsl-migrate` has no intra-workspace deps (pure XML-in, string-out). This is the first structural coupling — needs a decision (§7 open questions).
-
-### 5.4 `roundtrip.rs` — new module in `dsl-migrate` or `bpmn-test-harness`
+Replace the current `map_sequence_flow_with_status` FEEL path:
 
 ```rust
-pub struct RoundTripResult {
-    pub source_file: SourceFile,
-    pub validation: ValidateResponse,
-    pub journey_spec: Option<JourneySpec>,
-    pub execution_trace: Option<Vec<String>>,  // token path through the graph
+// Current (emits placeholder):
+"; [HUMAN-RESOLVE] FEEL condition: {}\n(flow {} -> {} :condition \"TODO\")"
+
+// After:
+match feel_parser::feel_normalise(cond) {
+    FeelNormaliseResult::Clean(expr) =>
+        format!("(flow {} -> {} :condition \"{}\")", src, tgt, expr),
+    FeelNormaliseResult::NeedsReview { stripped, reason } =>
+        format!("; [HUMAN-RESOLVE] {}\n(flow {} -> {} :condition \"{}\")",
+                reason, src, tgt, stripped),
 }
-
-pub fn validate_and_execute(dsl_source: &str, process_name: &str) -> RoundTripResult
 ```
 
-Runs: `validate_bpmn` → `lower` → `RuntimeEngine::start` with a stub `VerbInvoker` that records invocations and always returns success. Proves the emitted DSL is executable, not just syntactically valid.
+The test `feel_expressions_become_human_resolve` must be updated — after this change, `${score >= 700}` normalises to Clean and no longer produces a HUMAN-RESOLVE marker.
+
+### 5.3 Round-trip verifier — `dsl-migrate-verify` crate (new) **or** `bpmn-test-harness` extension
+
+**Q1 decision (see §7):** `dsl-migrate` has zero intra-workspace deps today and should stay that way — it is a pure XML-in / DSL-string-out tool. The round-trip step (parse DSL → `validate_bpmn` → `lower` → `RuntimeEngine`) requires `dsl-resolution`, `dsl-lowering`, `bpmn-runtime` — which belong in a separate verifier crate rather than in `dsl-migrate` itself.
+
+`dsl-migrate-verify` takes the string output of `dsl-migrate::emit()` and confirms structural + reachability validity only. It does **not** evaluate `:condition` strings.
+
+### 5.4 CLI
+
+Current binary: `src/bin/migrate.rs`
+
+After v1, add optional `--verify` flag that calls `dsl-migrate-verify` if the crate is present. Keeps `dsl-migrate` itself dep-free; verification is opt-in at the binary level.
 
 ---
 
-## 6. What the CLI Becomes
+## 6. Open Questions for Peer Review
 
-Current:
-```
-dsl-migrate input.bpmn output.dsl [--report report.json]
-```
+**Q1. Round-trip verifier location — `dsl-migrate-verify` crate or `bpmn-test-harness` extension?**  
+Recommendation: new `dsl-migrate-verify` crate. It's a distinct capability (import verification) from general harness testing, and keeping it separate avoids pulling migration deps into the test harness. If the harness already has the right structure, extend it instead.
 
-After v1:
-```
-dsl-migrate input.bpmn output.dsl [--report report.json] [--roundtrip]
-```
+**Q2. `feel_parser.rs` — own crate or module in `dsl-migrate`?**  
+Recommendation: module-first. Promote to `feel-parser` crate only when a second consumer appears (e.g. DMN table importer). A standalone crate for ~200 lines is premature.
 
-`--roundtrip` runs Stage 5 and appends execution trace to the report. Exit 0 = clean migration and executable. Exit 2 = human-resolve items remain. Exit 3 = DSL emitted but round-trip failed (structural issue in emitted code).
+**Q3. dmn-lite evaluation of `:condition` strings — RESOLVED**  
+FEEL is emitted verbatim. dmn-lite (external peer) owns evaluation. No local translation. The condition is opaque to the bpmn-lite runtime until the external peer is wired.
 
----
+**Q4. `:condition` keyword — RESOLVED**  
+Confirmed: `dsl-parser/src/parser.rs:818` test and `dsl-bpmn-frontend/src/assembly.rs:800` both use `"condition"`. The attachment point exists and works. No new keyword needed.
 
-## 7. Open Questions for Peer Review
+**Q5. Camunda 8 user tasks — rebaselined**  
+Current mapper behaviour (verified in `mapper.rs:280`): `bpmn:userTask` → `(node id :kind user-task)`. No assignee handling, no `[HUMAN-RESOLVE]`. The output is structurally valid DSL. Question for peer: is `(node id :kind user-task)` a sufficient v1 target, or does the runtime need a different node kind? User tasks with `formKey` will gain a richer target in §11 (Form.io verb), but that is additive — it does not block v1.
 
-**Q1. assembly.rs coupling — where does it live?**  
-Adding `dsl-parser` as a dep of `dsl-migrate` couples the migration tool to the DSL compiler chain. Alternative: keep `dsl-migrate` string-only (no dsl-parser dep) and put `assembly.rs` + `roundtrip.rs` in a new `dsl-migrate-verify` crate or in `bpmn-test-harness`. Tradeoff: cleaner separation vs more crates.
-
-**Q2. feel_parser — own crate or module?**  
-The FEEL parser is conceptually independent — it could serve other consumers (e.g. a future DMN table importer). Case for own crate: `feel-parser` with no deps beyond `thiserror`. Case for module: simpler, less overhead until there's a second consumer. Recommend module-first, promote to crate if DMN import arrives.
-
-**Q3. dmn-lite s-expression format — needs verification**  
-The mapping table in §4.1 assumes a dmn-lite s-expression syntax of `(>= score 700)`. This needs to be verified against the actual dmn-lite parser input format. If dmn-lite uses different operator names or syntax, the translation table changes. **Reviewer action: confirm dmn-lite expression syntax.**
-
-**Q4. `:when` clause on flow atoms — is this the right attachment point?**  
-The current bpmn-lite DSL has `(-> source target)` for sequence flows. The proposal is `(-> source target :when (dmn-lite-expr))`. Is `:when` already a supported keyword in the dsl-parser/dsl-bpmn-frontend? If not, this needs to be added there before Stage 4 can produce valid output. **Reviewer action: confirm or specify the guard syntax.**
-
-**Q5. Camunda 8 user tasks — DSL target?**  
-User tasks (`bpmn:userTask`) have no direct equivalent in bpmn-lite (which is verb-driven, no human task concept). Current behaviour: mapped to a generic `(task id :kind user-task)` atom with `[HUMAN-RESOLVE]` on the assignee. Is this acceptable for v1, or should user tasks be rejected outright?
-
-**Q6. Scope of verb resolver — sufficient for real Camunda workflows?**  
-The current 28-entry mapping table covers ob-poc's own domain verbs. A real Camunda 8 workflow from a customer will have worker topics we don't know. The resolver currently returns `None` → `[HUMAN-RESOLVE]`. This is correct but needs a clear path: is the verb table expected to grow per-customer, or is `[HUMAN-RESOLVE]` the permanent answer for unknown topics?
+**Q6. Verb resolver — scope for real Camunda workflows**  
+28-entry table covers ob-poc domains. Unknown `camunda:topic` values → `[HUMAN-RESOLVE]`. Is the expectation that this table grows per-deployment, or is HUMAN-RESOLVE the permanent strategy for unknowns?
 
 ---
 
-## 8. What Is Already Built (Current `dsl-migrate` State)
+## 7. What Is Already Built (Current `dsl-migrate` State)
 
 | Component | Status | Location |
 |-----------|--------|----------|
 | XML parser (BpmnProcess IR) | ✅ complete | `xml_reader.rs` |
-| Structural mapper (no conditions) | ✅ complete | `mapper.rs` |
+| Structural mapper | ✅ complete | `mapper.rs` |
+| Sequence flow emitter (conditions → TODO placeholder) | ✅ partial | `mapper.rs` |
 | Verb resolver (28 entries) | ✅ complete | `verb_resolver.rs` |
 | Coverage reporter | ✅ complete | `reporter.rs` |
-| CLI binary | ✅ complete | `bin/dsl_migrate.rs` |
+| Emitter (orchestrates map + report) | ✅ complete | `emitter.rs` |
+| CLI binary | ✅ complete | `src/bin/migrate.rs` |
 | 5 corpus BPMN fixtures | ✅ complete | `tests/corpus/` |
 | 9 integration tests | ✅ passing | `tests/migration_tests.rs` |
-| FEEL parser | ❌ missing | — |
-| Condition → `:when` assembly | ❌ missing | — |
-| SourceFile assembly (dsl-parser bridge) | ❌ missing | — |
-| Round-trip validation + execution | ❌ missing | — |
+| FEEL normaliser | ❌ missing | — |
+| Conditions → clean `:condition` string | ❌ missing (currently `"TODO"`) | — |
+| Round-trip structural verifier | ❌ missing | — |
+| Form.io verb (`dsl.form`) | ❌ missing | — |
 
 ---
 
-## 9. Non-Goals for v1
+## 8. Non-Goals for v1
 
-- **DMN table import** — `.dmn` files are a separate input format and a separate pipeline. Out of scope here; this doc covers FEEL expressions embedded in BPMN flow conditions only.
-- **Zeebe-specific extensions** — `zeebe:calledElement`, `zeebe:input`/`zeebe:output` variable mappings, `zeebe:taskHeaders` — out of scope for v1.
-- **Sub-process flattening** — collapsed sub-processes in Camunda export. The IR already parses them; mapping strategy is not defined.
-- **Migration of running instances** — this is a source-to-source transpiler for workflow definitions, not instance migration.
-- **FEEL optimisation** — no constant folding, no static evaluation of literals. Emit the expression faithfully; let the dmn-lite VM evaluate at runtime.
+- **FEEL evaluation** — the runtime does not evaluate `:condition` strings; that is the external dmn-lite peer's responsibility.
+- **DMN table import** — `.dmn` files are a separate pipeline. Out of scope.
+- **Zeebe-specific extensions** — `zeebe:calledElement`, input/output variable mappings, task headers.
+- **Sub-process flattening** — IR parses them; mapping strategy undefined.
+- **Migration of running instances** — source-to-source transpiler for definitions only.
 
 ---
 
-## 10. Proposed Implementation Order
+## 9. Proposed Implementation Order
 
-If approved after peer review:
+1. `feel_parser.rs` — `feel_normalise` + unit tests for all patterns in §4.2–§4.4
+2. Update `mapper.rs` — replace `"TODO"` condition path with `feel_normalise`
+3. Update `feel_expressions_become_human_resolve` test — now expects Clean output for `${score >= 700}`
+4. Expand corpus — `feel_conditions_complex.bpmn` covering out-of-scope patterns (verifies HUMAN-RESOLVE still fires for those)
+5. **Resolve Q1** — decide verifier crate vs harness extension
+6. `dsl-migrate-verify` (or harness extension) — structural + reachability round-trip
+7. Add `--verify` flag to `src/bin/migrate.rs`
+8. Form.io verb — see §10
 
-1. `feel_parser.rs` — parser + unit tests for all patterns in §4.1 + known-unresolvable cases
-2. Update `mapper.rs` — replace `[HUMAN-RESOLVE]` condition path with `feel_parser::feel_to_dmn_lite`
-3. Expand corpus — add a `feel_conditions_complex.bpmn` fixture covering all patterns in §4.1
-4. Resolve Q3 + Q4 (dmn-lite syntax + `:when` keyword) before proceeding to Stage 4
-5. `assembly.rs` — SourceFile bridge (depends on Q1 decision)
-6. `roundtrip.rs` — validation + execution harness (depends on Q1 + Q4)
-7. Update CLI with `--roundtrip` flag
+---
+
+## 10. Form.io Verb Integration
+
+### 10.1 Architectural position
+
+Form.io is a callout from a running BPMN execution, surfaced as a standard SemOS verb `dsl.form`. It is **not** a separate bridge crate. When the runtime encounters a `(node id :kind service-task :verb dsl.form ...)` node, the verb implementation:
+
+1. Fetches the Form.io schema by form ref
+2. Returns a "form pending" outcome carrying the schema + process context
+3. Parks the fiber at that node (same park/resume mechanics as message events)
+4. The running session's UI renders the form in the cockpit (same channel as the chat)
+5. User interacts — reads content, presses buttons, fills fields
+6. Submission comes back through the REPL input pipeline
+7. Fiber resumes, form data injected into process context, execution continues
+
+### 10.2 Two interaction modes
+
+| Mode | Purpose | Returns |
+|------|---------|---------|
+| `display` | Show process state / summary; single Continue button | Ack only — no data |
+| `capture` | Collect user input (fields, selections, button choices) | Form submission as named variables |
+
+### 10.3 DSL representation
+
+```
+(node "review-kyc-summary" :kind service-task
+  :verb dsl.form
+  :form-ref "kyc.review-summary"
+  :mode display
+  :context #{kyc_result entity_name risk_score})
+
+(node "collect-missing-docs" :kind service-task
+  :verb dsl.form
+  :form-ref "onboarding.document-checklist"
+  :mode capture
+  :output-binding doc_submissions)
+```
+
+### 10.4 Camunda 8 transpiler mapping
+
+Camunda `bpmn:userTask` with a `formKey` attribute → `(node id :kind service-task :verb dsl.form :form-ref "formKey-value")`. This supersedes the plain `(node id :kind user-task)` output for tasks that carry form metadata. Tasks without `formKey` continue to emit `(node id :kind user-task)` (Q5 above unchanged for the no-form case).
+
+### 10.5 New components required
+
+| Component | Scope |
+|-----------|-------|
+| `dsl.form` verb YAML definition | Verb registry entry: `behavior: plugin`, args `form_ref/mode/context/output_binding` |
+| `DslFormOp` — `SemOsVerbOp` impl | Fetches schema, returns FormPending outcome; park/resume hooks |
+| Form.io schema registry | Stores form JSON by ref key (can be Form.io cloud or local JSON store) |
+| REPL input kind `form_submit` | New input variant to carry form submission data back to parked fiber |
+| UI form renderer | React component that receives form schema in session response and renders via Form.io SDK |
+
+### 10.6 Open questions
+
+**Q7. Form.io hosting** — cloud (formio.com) vs self-hosted vs local JSON files served by ob-poc-web? The verb impl's `fetch_schema` call needs a concrete target.
+
+**Q8. Park/resume mechanism** — the fiber park on form pending needs a resume token that Form.io (or the UI) sends back. Does this reuse the existing `decision_reply` input kind, or does it need a new `form_submit` kind with a typed payload?
+
+**Q9. formKey format in Camunda exports** — Camunda 8 `formKey` values can be `camunda-forms:embedded:...` (Camunda-native), `deployment:form.json` (deployment resource), or plain keys. The transpiler needs a normalisation rule for what becomes the `:form-ref` value.
