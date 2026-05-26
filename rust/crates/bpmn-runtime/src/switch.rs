@@ -64,7 +64,9 @@ pub struct ScriptedAdaptor {
 
 impl ScriptedAdaptor {
     pub fn new() -> Self {
-        Self { replies: HashMap::new() }
+        Self {
+            replies: HashMap::new(),
+        }
     }
 
     /// Programme a reply: when the runtime reaches `gateway`, activate `targets`.
@@ -83,7 +85,9 @@ impl Default for ScriptedAdaptor {
 impl SwitchAdaptor for ScriptedAdaptor {
     async fn handle(&self, request: SwitchRequest) -> Result<SwitchReply, SwitchError> {
         if let Some(targets) = self.replies.get(&request.gateway_name) {
-            return Ok(SwitchReply { selected_targets: targets.clone() });
+            return Ok(SwitchReply {
+                selected_targets: targets.clone(),
+            });
         }
         // Fall back to the default edge.
         let default_target = request
@@ -92,9 +96,13 @@ impl SwitchAdaptor for ScriptedAdaptor {
             .find(|e| e.is_default)
             .map(|e| e.target.clone());
         if let Some(t) = default_target {
-            Ok(SwitchReply { selected_targets: vec![t] })
+            Ok(SwitchReply {
+                selected_targets: vec![t],
+            })
         } else {
-            Err(SwitchError::NoBranchSelected { gateway: request.gateway_name })
+            Err(SwitchError::NoBranchSelected {
+                gateway: request.gateway_name,
+            })
         }
     }
 }

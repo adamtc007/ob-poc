@@ -22,7 +22,10 @@ pub struct RetentionPolicy {
 
 impl Default for RetentionPolicy {
     fn default() -> Self {
-        Self { archive_after_days: 90, cold_storage_after_years: 7 }
+        Self {
+            archive_after_days: 90,
+            cold_storage_after_years: 7,
+        }
     }
 }
 

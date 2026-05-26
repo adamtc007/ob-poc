@@ -8,7 +8,9 @@
 //! A full 1,000-instance test against `PostgresJourneyStore` is deferred until
 //! DB integration tests are wired (requires `DATABASE_URL`).
 
-use bpmn_runtime::{InMemoryJourneyStore, InstanceStatus, RuntimeEngine, ScriptedAdaptor, VerbRegistry};
+use bpmn_runtime::{
+    InMemoryJourneyStore, InstanceStatus, RuntimeEngine, ScriptedAdaptor, VerbRegistry,
+};
 use std::sync::Arc;
 
 const LINEAR_DSL: &str = r#"
@@ -66,7 +68,10 @@ async fn smoke_100_instances_in_memory() {
     );
 
     assert_eq!(completed, 100, "all 100 instances should complete");
-    assert!(elapsed.as_secs() < 30, "100 instances should complete within 30 s");
+    assert!(
+        elapsed.as_secs() < 30,
+        "100 instances should complete within 30 s"
+    );
 }
 
 /// Metrics accumulate correctly over 10 instances on a shared engine.

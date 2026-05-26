@@ -184,11 +184,7 @@ pub mod postgres {
             Ok(())
         }
 
-        async fn append_to_write_log(
-            &self,
-            token_id: TokenId,
-            entry: WriteLogEntry,
-        ) -> Result<()> {
+        async fn append_to_write_log(&self, token_id: TokenId, entry: WriteLogEntry) -> Result<()> {
             let entry_json = serde_json::to_value(&entry)?;
             sqlx::query(
                 "UPDATE dsl_active_token \
@@ -522,10 +518,13 @@ pub mod postgres {
             join_name: &str,
             instance_id: InstanceId,
         ) -> Result<usize> {
-            let current =
-                self.get_expected_join_count(join_name, instance_id).await?.unwrap_or(0);
+            let current = self
+                .get_expected_join_count(join_name, instance_id)
+                .await?
+                .unwrap_or(0);
             let new_count = current.saturating_sub(1);
-            self.set_expected_join_count(join_name, instance_id, new_count).await?;
+            self.set_expected_join_count(join_name, instance_id, new_count)
+                .await?;
             Ok(new_count)
         }
 
@@ -554,12 +553,11 @@ pub mod postgres {
             // Mark log entries as archived by setting a flag column.
             // This assumes a future `archived` boolean on dsl_journey_log.
             // For now, count the rows we would archive (non-destructive).
-            let row = sqlx::query(
-                "SELECT COUNT(*) AS cnt FROM dsl_journey_log WHERE instance_id = $1",
-            )
-            .bind(instance_id)
-            .fetch_one(&self.pool)
-            .await?;
+            let row =
+                sqlx::query("SELECT COUNT(*) AS cnt FROM dsl_journey_log WHERE instance_id = $1")
+                    .bind(instance_id)
+                    .fetch_one(&self.pool)
+                    .await?;
 
             let count: i64 = row.try_get("cnt").unwrap_or(0);
             Ok(count as usize)

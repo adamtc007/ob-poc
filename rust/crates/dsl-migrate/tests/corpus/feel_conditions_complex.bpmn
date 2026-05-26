@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<bpmn:definitions
+    xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL"
+    id="feel-complex-def"
+    targetNamespace="http://bpmn.io/schema/bpmn">
+
+  <bpmn:process id="feel-complex-process" name="FEEL Complex" isExecutable="true">
+    <bpmn:startEvent id="start-1" name="Start"/>
+    <bpmn:serviceTask id="eval-task" name="Evaluate"/>
+    <bpmn:exclusiveGateway id="gw-1" name="Route Decision"/>
+    <bpmn:endEvent id="end-high" name="High Value"/>
+    <bpmn:endEvent id="end-review" name="Needs Review"/>
+    <bpmn:endEvent id="end-other" name="Other"/>
+
+    <!-- Simple: should normalise cleanly -->
+    <bpmn:sequenceFlow id="sf1" sourceRef="start-1" targetRef="eval-task"/>
+    <bpmn:sequenceFlow id="sf2" sourceRef="eval-task" targetRef="gw-1"/>
+
+    <!-- Simple comparison: clean -->
+    <bpmn:sequenceFlow id="sf3" sourceRef="gw-1" targetRef="end-high">
+      <bpmn:conditionExpression>${amount > 1000}</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+
+    <!-- Dot-access: out of scope → HUMAN-RESOLVE -->
+    <bpmn:sequenceFlow id="sf4" sourceRef="gw-1" targetRef="end-review">
+      <bpmn:conditionExpression>order.amount > 500</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+
+    <!-- Fallback: no condition -->
+    <bpmn:sequenceFlow id="sf5" sourceRef="gw-1" targetRef="end-other"/>
+  </bpmn:process>
+
+</bpmn:definitions>

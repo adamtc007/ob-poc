@@ -34,7 +34,13 @@ impl RuntimeEngine {
         verb_registry: Arc<VerbRegistry>,
         switch_adaptor: Arc<dyn SwitchAdaptor>,
     ) -> Self {
-        Self { store, spec, verb_registry, switch_adaptor, metrics: RuntimeMetrics::new() }
+        Self {
+            store,
+            spec,
+            verb_registry,
+            switch_adaptor,
+            metrics: RuntimeMetrics::new(),
+        }
     }
 
     /// Return a reference to the engine's operational metrics.
@@ -45,11 +51,11 @@ impl RuntimeEngine {
     /// Start a new process instance and run until no more events remain.
     ///
     /// Returns the new instance ID.
-    pub async fn start_instance(
-        &self,
-        initial_data: serde_json::Value,
-    ) -> Result<InstanceId> {
-        let inst = self.store.create_instance(&self.spec.name, initial_data.clone()).await?;
+    pub async fn start_instance(&self, initial_data: serde_json::Value) -> Result<InstanceId> {
+        let inst = self
+            .store
+            .create_instance(&self.spec.name, initial_data.clone())
+            .await?;
         RuntimeMetrics::increment(&self.metrics.instances_started);
         self.store
             .enqueue_event(inst.id, EventKind::InstanceStart, initial_data)
@@ -91,6 +97,31 @@ impl RuntimeEngine {
                     "node_name": node_name,
                     "token_id": token_id.to_string(),
                     "output_data": output,
+                }),
+            )
+            .await?;
+        self.run_to_quiescence(instance_id).await
+    }
+
+    /// Deliver a human-task completion (form submission) and run to quiescence.
+    ///
+    /// `submission_data` is the form submission payload — its keys are written
+    /// into instance data and the parked token is advanced.
+    pub async fn human_task_complete(
+        &self,
+        instance_id: InstanceId,
+        node_name: &str,
+        token_id: Uuid,
+        submission_data: serde_json::Value,
+    ) -> Result<()> {
+        self.store
+            .enqueue_event(
+                instance_id,
+                EventKind::HumanTaskComplete,
+                serde_json::json!({
+                    "node_name": node_name,
+                    "token_id": token_id.to_string(),
+                    "output_data": submission_data,
                 }),
             )
             .await?;
@@ -141,10 +172,7 @@ impl RuntimeEngine {
 
     // --- Query helpers ---
 
-    pub async fn get_instance_status(
-        &self,
-        id: InstanceId,
-    ) -> Result<Option<InstanceStatus>> {
+    pub async fn get_instance_status(&self, id: InstanceId) -> Result<Option<InstanceStatus>> {
         Ok(self.store.get_instance(id).await?.map(|i| i.status))
     }
 
@@ -165,11 +193,7 @@ impl RuntimeEngine {
                 if event.instance_id != instance_id {
                     // Re-queue events that belong to a different instance.
                     self.store
-                        .enqueue_event(
-                            event.instance_id,
-                            event.event_kind,
-                            event.payload,
-                        )
+                        .enqueue_event(event.instance_id, event.event_kind, event.payload)
                         .await?;
                     continue;
                 }

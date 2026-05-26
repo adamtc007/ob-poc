@@ -29,11 +29,25 @@ pub struct VerbContext {
 /// A side-effect that a verb can request from the runtime.
 #[derive(Debug, Clone)]
 pub enum VerbEffect {
-    WriteData { location: String, value: serde_json::Value },
-    ScheduleTimer { duration_seconds: u64 },
-    SendMessage { target: String, payload: serde_json::Value },
-    RaiseError { code: String, message: String },
-    RequestHumanTask { role: String, form_data: serde_json::Value },
+    WriteData {
+        location: String,
+        value: serde_json::Value,
+    },
+    ScheduleTimer {
+        duration_seconds: u64,
+    },
+    SendMessage {
+        target: String,
+        payload: serde_json::Value,
+    },
+    RaiseError {
+        code: String,
+        message: String,
+    },
+    RequestHumanTask {
+        role: String,
+        form_data: serde_json::Value,
+    },
 }
 
 /// The output produced by a successful verb invocation.
@@ -69,12 +83,15 @@ pub struct VerbRegistry {
 
 impl VerbRegistry {
     pub fn new() -> Self {
-        Self { handlers: HashMap::new() }
+        Self {
+            handlers: HashMap::new(),
+        }
     }
 
     /// Register a handler. Overwrites any previous registration for the same verb.
     pub fn register(&mut self, handler: Box<dyn VerbHandler>) {
-        self.handlers.insert(handler.verb_ref().to_string(), handler);
+        self.handlers
+            .insert(handler.verb_ref().to_string(), handler);
     }
 
     /// Look up a handler by verb FQN. Returns `None` when no handler is registered.
@@ -88,4 +105,3 @@ impl Default for VerbRegistry {
         Self::new()
     }
 }
-

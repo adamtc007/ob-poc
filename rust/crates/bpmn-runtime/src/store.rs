@@ -77,20 +77,13 @@ pub trait JourneyStore: Send + Sync {
         lineage: Vec<String>,
     ) -> Result<ActiveToken>;
 
-    async fn get_tokens_for_instance(
-        &self,
-        instance_id: InstanceId,
-    ) -> Result<Vec<ActiveToken>>;
+    async fn get_tokens_for_instance(&self, instance_id: InstanceId) -> Result<Vec<ActiveToken>>;
 
     async fn advance_token(&self, token_id: TokenId, new_node: &str) -> Result<()>;
 
     async fn delete_token(&self, token_id: TokenId) -> Result<()>;
 
-    async fn append_to_write_log(
-        &self,
-        token_id: TokenId,
-        entry: WriteLogEntry,
-    ) -> Result<()>;
+    async fn append_to_write_log(&self, token_id: TokenId, entry: WriteLogEntry) -> Result<()>;
 
     // --- Instance data ---
 
@@ -247,7 +240,9 @@ pub struct InMemoryJourneyStore {
 
 impl InMemoryJourneyStore {
     pub fn new() -> Self {
-        Self { state: Arc::new(Mutex::new(InMemoryState::default())) }
+        Self {
+            state: Arc::new(Mutex::new(InMemoryState::default())),
+        }
     }
 }
 
@@ -273,7 +268,11 @@ impl JourneyStore for InMemoryJourneyStore {
             completed_at: None,
             data: initial_data,
         };
-        self.state.lock().unwrap().instances.insert(inst.id, inst.clone());
+        self.state
+            .lock()
+            .unwrap()
+            .instances
+            .insert(inst.id, inst.clone());
         Ok(inst)
     }
 
@@ -310,16 +309,21 @@ impl JourneyStore for InMemoryJourneyStore {
             branch_lineage: lineage,
             write_log: Vec::new(),
         };
-        self.state.lock().unwrap().tokens.insert(token.id, token.clone());
+        self.state
+            .lock()
+            .unwrap()
+            .tokens
+            .insert(token.id, token.clone());
         Ok(token)
     }
 
-    async fn get_tokens_for_instance(
-        &self,
-        instance_id: InstanceId,
-    ) -> Result<Vec<ActiveToken>> {
+    async fn get_tokens_for_instance(&self, instance_id: InstanceId) -> Result<Vec<ActiveToken>> {
         let s = self.state.lock().unwrap();
-        Ok(s.tokens.values().filter(|t| t.instance_id == instance_id).cloned().collect())
+        Ok(s.tokens
+            .values()
+            .filter(|t| t.instance_id == instance_id)
+            .cloned()
+            .collect())
     }
 
     async fn advance_token(&self, token_id: TokenId, new_node: &str) -> Result<()> {
@@ -335,11 +339,7 @@ impl JourneyStore for InMemoryJourneyStore {
         Ok(())
     }
 
-    async fn append_to_write_log(
-        &self,
-        token_id: TokenId,
-        entry: WriteLogEntry,
-    ) -> Result<()> {
+    async fn append_to_write_log(&self, token_id: TokenId, entry: WriteLogEntry) -> Result<()> {
         let mut s = self.state.lock().unwrap();
         if let Some(t) = s.tokens.get_mut(&token_id) {
             t.write_log.push(entry);
@@ -382,11 +382,12 @@ impl JourneyStore for InMemoryJourneyStore {
         payload: serde_json::Value,
     ) -> Result<EventId> {
         let id = Uuid::new_v4();
-        self.state
-            .lock()
-            .unwrap()
-            .events
-            .push(EventEnvelope { id, instance_id, event_kind: kind, payload });
+        self.state.lock().unwrap().events.push(EventEnvelope {
+            id,
+            instance_id,
+            event_kind: kind,
+            payload,
+        });
         Ok(id)
     }
 
@@ -456,11 +457,12 @@ impl JourneyStore for InMemoryJourneyStore {
         _context: serde_json::Value,
     ) -> Result<Uuid> {
         let id = Uuid::new_v4();
-        self.state
-            .lock()
-            .unwrap()
-            .switch_requests
-            .push((id, instance_id, token_id, gateway_name.to_string()));
+        self.state.lock().unwrap().switch_requests.push((
+            id,
+            instance_id,
+            token_id,
+            gateway_name.to_string(),
+        ));
         Ok(id)
     }
 

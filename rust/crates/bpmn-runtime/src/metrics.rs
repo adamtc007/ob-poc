@@ -5,7 +5,10 @@
 //! [`RuntimeMetrics::prometheus_text`] to produce Prometheus-format output.
 
 use serde::Serialize;
-use std::sync::{atomic::{AtomicU64, Ordering}, Arc};
+use std::sync::{
+    atomic::{AtomicU64, Ordering},
+    Arc,
+};
 
 /// Operational metrics for the journey runtime.
 ///
@@ -165,7 +168,11 @@ mod tests {
         let m2 = m1.clone();
         RuntimeMetrics::increment(&m1.events_processed);
         // m2 shares the same Arc — it sees the increment.
-        assert_eq!(m2.events_processed.load(std::sync::atomic::Ordering::Relaxed), 1);
+        assert_eq!(
+            m2.events_processed
+                .load(std::sync::atomic::Ordering::Relaxed),
+            1
+        );
     }
 
     #[test]

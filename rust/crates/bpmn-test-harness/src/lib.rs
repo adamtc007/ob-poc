@@ -22,9 +22,10 @@
 // Bring dsl-resolution into scope so instantiate_pack can call validate_bpmn.
 pub use dsl_resolution;
 
+pub use bpmn_runtime::{VerbEffect, VerbError, VerbHandler, VerbOutput};
 use bpmn_runtime::{
-    InMemoryJourneyStore, InstanceId, InstanceStatus, JourneyStore, RuntimeEngine,
-    ScriptedAdaptor, SwitchAdaptor, VerbRegistry,
+    InMemoryJourneyStore, InstanceId, InstanceStatus, JourneyStore, RuntimeEngine, ScriptedAdaptor,
+    SwitchAdaptor, VerbRegistry,
 };
 use dsl_lowering::bpmn::JourneySpec;
 use std::{collections::HashMap, sync::Arc};
@@ -68,6 +69,7 @@ pub fn compile_dsl(source: &str) -> JourneySpec {
 pub struct Scenario {
     spec: Arc<JourneySpec>,
     gateway_replies: HashMap<String, Vec<String>>,
+    verb_handlers: Vec<Box<dyn VerbHandler>>,
 }
 
 impl Scenario {
@@ -78,7 +80,15 @@ impl Scenario {
         Self {
             spec: Arc::new(compile_dsl(source)),
             gateway_replies: HashMap::new(),
+            verb_handlers: Vec::new(),
         }
+    }
+
+    /// Register a verb handler. When the runtime reaches a node with this
+    /// verb_ref it calls the handler rather than parking.
+    pub fn with_verb_handler(mut self, handler: Box<dyn VerbHandler>) -> Self {
+        self.verb_handlers.push(handler);
+        self
     }
 
     /// Programme a gateway reply: when the runtime reaches `gateway` it will
@@ -101,7 +111,11 @@ impl Scenario {
             adaptor.set_reply(gw, targets.clone());
         }
         let adaptor: Arc<dyn SwitchAdaptor> = Arc::new(adaptor);
-        let verb_registry = Arc::new(VerbRegistry::new());
+        let mut registry = VerbRegistry::new();
+        for handler in self.verb_handlers {
+            registry.register(handler);
+        }
+        let verb_registry = Arc::new(registry);
 
         let engine = RuntimeEngine::new(
             Arc::clone(&store) as Arc<dyn JourneyStore>,
@@ -110,10 +124,16 @@ impl Scenario {
             adaptor,
         );
 
-        let instance_id =
-            engine.start_instance(initial_data).await.expect("start_instance failed");
+        let instance_id = engine
+            .start_instance(initial_data)
+            .await
+            .expect("start_instance failed");
 
-        RunResult { engine, store, instance_id }
+        RunResult {
+            engine,
+            store,
+            instance_id,
+        }
     }
 }
 
@@ -140,7 +160,10 @@ impl RunResult {
 
     /// All active tokens for this instance.
     pub async fn tokens(&self) -> Vec<bpmn_runtime::ActiveToken> {
-        self.engine.get_tokens(self.instance_id).await.expect("get_tokens failed")
+        self.engine
+            .get_tokens(self.instance_id)
+            .await
+            .expect("get_tokens failed")
     }
 
     /// Assert that there is exactly one token at `node_name` and return it.
@@ -152,7 +175,9 @@ impl RunResult {
             .unwrap_or_else(|| {
                 // Get all token positions for a helpful panic message.
                 let rt = tokio::runtime::Handle::current();
-                let all = rt.block_on(self.engine.get_tokens(self.instance_id)).unwrap_or_default();
+                let all = rt
+                    .block_on(self.engine.get_tokens(self.instance_id))
+                    .unwrap_or_default();
                 panic!(
                     "expected a token at '{}', found tokens at: {:?}",
                     node_name,
@@ -197,11 +222,7 @@ impl RunResult {
 /// The last element automatically gets `:default true` appended to each
 /// flow atom in its copy (recognised by `(flow` prefix) when the copy does
 /// not already contain `:default`.
-fn expand_for_each(
-    template: &str,
-    var_name: &str,
-    elements: &[serde_json::Value],
-) -> String {
+fn expand_for_each(template: &str, var_name: &str, elements: &[serde_json::Value]) -> String {
     let mut result = String::new();
     let len = elements.len();
     for (i, element) in elements.iter().enumerate() {
@@ -307,9 +328,18 @@ pub fn instantiate_pack(
             )
         }
         "disjunctive-gate" => {
-            let gate_name = params.get("gate-name").and_then(|v| v.as_str()).unwrap_or("disjunctive-gate");
-            let escalation_path = params.get("escalation-path").and_then(|v| v.as_str()).unwrap_or("escalation-end");
-            let standard_path = params.get("standard-path").and_then(|v| v.as_str()).unwrap_or("standard-end");
+            let gate_name = params
+                .get("gate-name")
+                .and_then(|v| v.as_str())
+                .unwrap_or("disjunctive-gate");
+            let escalation_path = params
+                .get("escalation-path")
+                .and_then(|v| v.as_str())
+                .unwrap_or("escalation-end");
+            let standard_path = params
+                .get("standard-path")
+                .and_then(|v| v.as_str())
+                .unwrap_or("standard-end");
             format!(
                 r#"
 (node dg-start :kind start-event)
@@ -330,10 +360,22 @@ pub fn instantiate_pack(
         }
 
         "sanction-hit-escalation" => {
-            let check_name = params.get("sanctions-check-name").and_then(|v| v.as_str()).unwrap_or("sanctions-check");
-            let gate_name = params.get("sanctions-gate-name").and_then(|v| v.as_str()).unwrap_or("sanctions-gate");
-            let escalation_path = params.get("escalation-path").and_then(|v| v.as_str()).unwrap_or("escalation-end");
-            let clear_path = params.get("clear-path").and_then(|v| v.as_str()).unwrap_or("clear-end");
+            let check_name = params
+                .get("sanctions-check-name")
+                .and_then(|v| v.as_str())
+                .unwrap_or("sanctions-check");
+            let gate_name = params
+                .get("sanctions-gate-name")
+                .and_then(|v| v.as_str())
+                .unwrap_or("sanctions-gate");
+            let escalation_path = params
+                .get("escalation-path")
+                .and_then(|v| v.as_str())
+                .unwrap_or("escalation-end");
+            let clear_path = params
+                .get("clear-path")
+                .and_then(|v| v.as_str())
+                .unwrap_or("clear-end");
             format!(
                 r#"
 (node sh-start :kind start-event)
@@ -357,9 +399,18 @@ pub fn instantiate_pack(
         }
 
         "periodic-refresh-trigger" => {
-            let gate_name = params.get("age-gate-name").and_then(|v| v.as_str()).unwrap_or("age-gate");
-            let refresh_path = params.get("refresh-path").and_then(|v| v.as_str()).unwrap_or("refresh-end");
-            let current_path = params.get("current-path").and_then(|v| v.as_str()).unwrap_or("current-end");
+            let gate_name = params
+                .get("age-gate-name")
+                .and_then(|v| v.as_str())
+                .unwrap_or("age-gate");
+            let refresh_path = params
+                .get("refresh-path")
+                .and_then(|v| v.as_str())
+                .unwrap_or("refresh-end");
+            let current_path = params
+                .get("current-path")
+                .and_then(|v| v.as_str())
+                .unwrap_or("current-end");
             format!(
                 r#"
 (node prt-start :kind start-event)
@@ -380,11 +431,26 @@ pub fn instantiate_pack(
         }
 
         "manual-override-checkpoint" => {
-            let auto_eval = params.get("auto-eval-name").and_then(|v| v.as_str()).unwrap_or("auto-eval");
-            let review_task = params.get("review-task-name").and_then(|v| v.as_str()).unwrap_or("review-task");
-            let gate_name = params.get("override-gate-name").and_then(|v| v.as_str()).unwrap_or("override-gate");
-            let confirmed_path = params.get("confirmed-path").and_then(|v| v.as_str()).unwrap_or("confirmed-end");
-            let override_path = params.get("override-path").and_then(|v| v.as_str()).unwrap_or("override-end");
+            let auto_eval = params
+                .get("auto-eval-name")
+                .and_then(|v| v.as_str())
+                .unwrap_or("auto-eval");
+            let review_task = params
+                .get("review-task-name")
+                .and_then(|v| v.as_str())
+                .unwrap_or("review-task");
+            let gate_name = params
+                .get("override-gate-name")
+                .and_then(|v| v.as_str())
+                .unwrap_or("override-gate");
+            let confirmed_path = params
+                .get("confirmed-path")
+                .and_then(|v| v.as_str())
+                .unwrap_or("confirmed-end");
+            let override_path = params
+                .get("override-path")
+                .and_then(|v| v.as_str())
+                .unwrap_or("override-end");
             format!(
                 r#"
 (node moc-start :kind start-event)
@@ -411,20 +477,34 @@ pub fn instantiate_pack(
         }
 
         "parallel-evaluation-with-veto" => {
-            let fork_name = params.get("fork-name").and_then(|v| v.as_str()).unwrap_or("parallel-fork");
-            let join_name = params.get("join-name").and_then(|v| v.as_str()).unwrap_or("parallel-join");
-            let gate_name = params.get("post-join-gate").and_then(|v| v.as_str()).unwrap_or("veto-gate");
-            let vetoed_path = params.get("vetoed-path").and_then(|v| v.as_str()).unwrap_or("vetoed-end");
-            let approved_path = params.get("approved-path").and_then(|v| v.as_str()).unwrap_or("approved-end");
+            let fork_name = params
+                .get("fork-name")
+                .and_then(|v| v.as_str())
+                .unwrap_or("parallel-fork");
+            let join_name = params
+                .get("join-name")
+                .and_then(|v| v.as_str())
+                .unwrap_or("parallel-join");
+            let gate_name = params
+                .get("post-join-gate")
+                .and_then(|v| v.as_str())
+                .unwrap_or("veto-gate");
+            let vetoed_path = params
+                .get("vetoed-path")
+                .and_then(|v| v.as_str())
+                .unwrap_or("vetoed-end");
+            let approved_path = params
+                .get("approved-path")
+                .and_then(|v| v.as_str())
+                .unwrap_or("approved-end");
 
             let tasks_val = params.get("eval-tasks");
             if let Some(serde_json::Value::Array(tasks)) = tasks_val {
                 // Variable-arity: for-each expansion over eval-tasks
-                let fork_template = format!(
-                    "(flow {fork_name} -> ,task.name)\n",
-                    fork_name = fork_name
-                );
-                let join_template = format!("(flow ,task.name -> {join_name})\n", join_name = join_name);
+                let fork_template =
+                    format!("(flow {fork_name} -> ,task.name)\n", fork_name = fork_name);
+                let join_template =
+                    format!("(flow ,task.name -> {join_name})\n", join_name = join_name);
                 let fork_flows = expand_for_each(&fork_template, "task", tasks);
                 let join_flows = expand_for_each(&join_template, "task", tasks);
                 let task_nodes: Vec<String> = tasks
@@ -494,14 +574,18 @@ pub fn instantiate_pack(
         }
 
         "threshold-band-routing" => {
-            let gate_name = params.get("band-gate-name").and_then(|v| v.as_str()).unwrap_or("band-gate");
+            let gate_name = params
+                .get("band-gate-name")
+                .and_then(|v| v.as_str())
+                .unwrap_or("band-gate");
 
             // Support both old fixed-arity API (path-low/mid/high) and new
             // variable-arity API (bands: [{upper, path}]).
             let bands_val = params.get("bands");
             if let Some(serde_json::Value::Array(bands)) = bands_val {
                 // Variable-arity: use for-each expansion
-                let band_template = format!("(flow {gate_name} -> ,band.path)\n", gate_name = gate_name);
+                let band_template =
+                    format!("(flow {gate_name} -> ,band.path)\n", gate_name = gate_name);
                 let flows = expand_for_each(&band_template, "band", bands);
                 // Collect unique path names for node declarations
                 let paths: Vec<String> = bands
@@ -529,9 +613,18 @@ pub fn instantiate_pack(
                 )
             } else {
                 // Legacy fixed-arity: path-low / path-mid / path-high
-                let path_low = params.get("path-low").and_then(|v| v.as_str()).unwrap_or("band-low-end");
-                let path_mid = params.get("path-mid").and_then(|v| v.as_str()).unwrap_or("band-mid-end");
-                let path_high = params.get("path-high").and_then(|v| v.as_str()).unwrap_or("band-high-end");
+                let path_low = params
+                    .get("path-low")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("band-low-end");
+                let path_mid = params
+                    .get("path-mid")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("band-mid-end");
+                let path_high = params
+                    .get("path-high")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("band-high-end");
                 format!(
                     r#"
 (node tbr-start :kind start-event)
@@ -556,8 +649,14 @@ pub fn instantiate_pack(
         }
 
         "multi-jurisdiction-overlay" => {
-            let gate_name = params.get("jur-gate-name").and_then(|v| v.as_str()).unwrap_or("jur-gate");
-            let default_path = params.get("default-path").and_then(|v| v.as_str()).unwrap_or("jur-default");
+            let gate_name = params
+                .get("jur-gate-name")
+                .and_then(|v| v.as_str())
+                .unwrap_or("jur-gate");
+            let default_path = params
+                .get("default-path")
+                .and_then(|v| v.as_str())
+                .unwrap_or("jur-default");
 
             let jur_paths_val = params.get("jurisdiction-paths");
             if let Some(serde_json::Value::Array(jur_paths)) = jur_paths_val {
@@ -593,8 +692,14 @@ pub fn instantiate_pack(
                 )
             } else {
                 // Legacy fixed-arity: path-a / path-b / default-path
-                let path_a = params.get("path-a").and_then(|v| v.as_str()).unwrap_or("jur-path-a");
-                let path_b = params.get("path-b").and_then(|v| v.as_str()).unwrap_or("jur-path-b");
+                let path_a = params
+                    .get("path-a")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("jur-path-a");
+                let path_b = params
+                    .get("path-b")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("jur-path-b");
                 format!(
                     r#"
 (node mjo-start :kind start-event)
@@ -619,11 +724,26 @@ pub fn instantiate_pack(
         }
 
         "linked-switch-chain" => {
-            let gate1 = params.get("gate-1-name").and_then(|v| v.as_str()).unwrap_or("lsc-gate-1");
-            let gate2 = params.get("gate-2-name").and_then(|v| v.as_str()).unwrap_or("lsc-gate-2");
-            let exit1 = params.get("exit-path-1").and_then(|v| v.as_str()).unwrap_or("lsc-exit-1");
-            let exit2 = params.get("exit-path-2").and_then(|v| v.as_str()).unwrap_or("lsc-exit-2");
-            let final_path = params.get("final-path").and_then(|v| v.as_str()).unwrap_or("lsc-final");
+            let gate1 = params
+                .get("gate-1-name")
+                .and_then(|v| v.as_str())
+                .unwrap_or("lsc-gate-1");
+            let gate2 = params
+                .get("gate-2-name")
+                .and_then(|v| v.as_str())
+                .unwrap_or("lsc-gate-2");
+            let exit1 = params
+                .get("exit-path-1")
+                .and_then(|v| v.as_str())
+                .unwrap_or("lsc-exit-1");
+            let exit2 = params
+                .get("exit-path-2")
+                .and_then(|v| v.as_str())
+                .unwrap_or("lsc-exit-2");
+            let final_path = params
+                .get("final-path")
+                .and_then(|v| v.as_str())
+                .unwrap_or("lsc-final");
             format!(
                 r#"
 (node lsc-start :kind start-event)
@@ -650,16 +770,19 @@ pub fn instantiate_pack(
         }
 
         "cascading-decision" => {
-            let eval_name = params.get("primary-eval-name").and_then(|v| v.as_str()).unwrap_or("cd-eval");
-            let gate_name = params.get("primary-gate-name").and_then(|v| v.as_str()).unwrap_or("cd-gate");
+            let eval_name = params
+                .get("primary-eval-name")
+                .and_then(|v| v.as_str())
+                .unwrap_or("cd-eval");
+            let gate_name = params
+                .get("primary-gate-name")
+                .and_then(|v| v.as_str())
+                .unwrap_or("cd-gate");
 
             let paths_val = params.get("paths");
             if let Some(serde_json::Value::Array(paths)) = paths_val {
                 // Variable-arity: for-each expansion over paths
-                let p_template = format!(
-                    "(flow {gate_name} -> ,p.path)\n",
-                    gate_name = gate_name
-                );
+                let p_template = format!("(flow {gate_name} -> ,p.path)\n", gate_name = gate_name);
                 let flows = expand_for_each(&p_template, "p", paths);
                 let path_nodes: Vec<String> = paths
                     .iter()
@@ -687,8 +810,14 @@ pub fn instantiate_pack(
                 )
             } else {
                 // Legacy fixed-arity: path-a / path-b
-                let path_a = params.get("path-a").and_then(|v| v.as_str()).unwrap_or("cd-path-a");
-                let path_b = params.get("path-b").and_then(|v| v.as_str()).unwrap_or("cd-path-b");
+                let path_a = params
+                    .get("path-a")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("cd-path-a");
+                let path_b = params
+                    .get("path-b")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("cd-path-b");
                 format!(
                     r#"
 (node cd-start :kind start-event)
@@ -713,16 +842,19 @@ pub fn instantiate_pack(
         }
 
         "decision-table-classification" => {
-            let classify_name = params.get("classify-name").and_then(|v| v.as_str()).unwrap_or("dtc-classify");
-            let gate_name = params.get("route-gate-name").and_then(|v| v.as_str()).unwrap_or("dtc-gate");
+            let classify_name = params
+                .get("classify-name")
+                .and_then(|v| v.as_str())
+                .unwrap_or("dtc-classify");
+            let gate_name = params
+                .get("route-gate-name")
+                .and_then(|v| v.as_str())
+                .unwrap_or("dtc-gate");
 
             let paths_val = params.get("paths");
             if let Some(serde_json::Value::Array(paths)) = paths_val {
                 // Variable-arity: for-each expansion over paths
-                let p_template = format!(
-                    "(flow {gate_name} -> ,p.path)\n",
-                    gate_name = gate_name
-                );
+                let p_template = format!("(flow {gate_name} -> ,p.path)\n", gate_name = gate_name);
                 let flows = expand_for_each(&p_template, "p", paths);
                 let path_nodes: Vec<String> = paths
                     .iter()
@@ -750,8 +882,14 @@ pub fn instantiate_pack(
                 )
             } else {
                 // Legacy fixed-arity: path-a / default-path
-                let path_a = params.get("path-a").and_then(|v| v.as_str()).unwrap_or("dtc-path-a");
-                let default_path = params.get("default-path").and_then(|v| v.as_str()).unwrap_or("dtc-default");
+                let path_a = params
+                    .get("path-a")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("dtc-path-a");
+                let default_path = params
+                    .get("default-path")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("dtc-default");
                 format!(
                     r#"
 (node dtc-start :kind start-event)
@@ -776,12 +914,30 @@ pub fn instantiate_pack(
         }
 
         "required-evidence-checklist" => {
-            let task1 = params.get("task-1").and_then(|v| v.as_str()).unwrap_or("rec-task-1");
-            let task2 = params.get("task-2").and_then(|v| v.as_str()).unwrap_or("rec-task-2");
-            let task3 = params.get("task-3").and_then(|v| v.as_str()).unwrap_or("rec-task-3");
-            let gate_name = params.get("checklist-gate-name").and_then(|v| v.as_str()).unwrap_or("rec-gate");
-            let approval_path = params.get("approval-path").and_then(|v| v.as_str()).unwrap_or("rec-approved");
-            let rejection_path = params.get("rejection-path").and_then(|v| v.as_str()).unwrap_or("rec-rejected");
+            let task1 = params
+                .get("task-1")
+                .and_then(|v| v.as_str())
+                .unwrap_or("rec-task-1");
+            let task2 = params
+                .get("task-2")
+                .and_then(|v| v.as_str())
+                .unwrap_or("rec-task-2");
+            let task3 = params
+                .get("task-3")
+                .and_then(|v| v.as_str())
+                .unwrap_or("rec-task-3");
+            let gate_name = params
+                .get("checklist-gate-name")
+                .and_then(|v| v.as_str())
+                .unwrap_or("rec-gate");
+            let approval_path = params
+                .get("approval-path")
+                .and_then(|v| v.as_str())
+                .unwrap_or("rec-approved");
+            let rejection_path = params
+                .get("rejection-path")
+                .and_then(|v| v.as_str())
+                .unwrap_or("rec-rejected");
             format!(
                 r#"
 (node rec-start :kind start-event)

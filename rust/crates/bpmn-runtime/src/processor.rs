@@ -9,7 +9,7 @@ use crate::{
     store::{JourneyLogEntry, JourneyStore},
     switch::{EdgeInfo, SwitchAdaptor, SwitchRequest},
     types::*,
-    verb::{VerbContext, VerbError, VerbRegistry},
+    verb::{VerbContext, VerbEffect, VerbError, VerbRegistry},
 };
 use anyhow::Result;
 use dsl_lowering::bpmn::{JourneyEdge, JourneyNode, JourneyParallelJoin, JourneySpec};
@@ -51,7 +51,10 @@ async fn handle_instance_start(ctx: &RuntimeContext<'_>, event: &EventEnvelope) 
         return Ok(());
     }
 
-    let token = ctx.store.create_token(event.instance_id, &start_node, None, vec![]).await?;
+    let token = ctx
+        .store
+        .create_token(event.instance_id, &start_node, None, vec![])
+        .await?;
 
     ctx.store
         .append_journey_log(JourneyLogEntry {
@@ -68,13 +71,19 @@ async fn handle_instance_start(ctx: &RuntimeContext<'_>, event: &EventEnvelope) 
 }
 
 async fn handle_verb_completion(ctx: &RuntimeContext<'_>, event: &EventEnvelope) -> Result<()> {
-    let node_name = event.payload["node_name"].as_str().unwrap_or("").to_string();
+    let node_name = event.payload["node_name"]
+        .as_str()
+        .unwrap_or("")
+        .to_string();
     let token_id: TokenId = event.payload["token_id"]
         .as_str()
         .and_then(|s| s.parse().ok())
         .unwrap_or_default();
-    let output =
-        event.payload.get("output_data").cloned().unwrap_or(serde_json::Value::Object(Default::default()));
+    let output = event
+        .payload
+        .get("output_data")
+        .cloned()
+        .unwrap_or(serde_json::Value::Object(Default::default()));
 
     if let Some(obj) = output.as_object() {
         for (k, v) in obj {
@@ -84,7 +93,10 @@ async fn handle_verb_completion(ctx: &RuntimeContext<'_>, event: &EventEnvelope)
             ctx.store
                 .append_to_write_log(
                     token_id,
-                    WriteLogEntry { location: k.clone(), value: v.clone() },
+                    WriteLogEntry {
+                        location: k.clone(),
+                        value: v.clone(),
+                    },
                 )
                 .await?;
         }
@@ -99,7 +111,11 @@ async fn handle_switch_reply(ctx: &RuntimeContext<'_>, event: &EventEnvelope) ->
         .unwrap_or_default();
     let selected: Vec<String> = event.payload["selected_targets"]
         .as_array()
-        .map(|a| a.iter().filter_map(|v| v.as_str().map(String::from)).collect())
+        .map(|a| {
+            a.iter()
+                .filter_map(|v| v.as_str().map(String::from))
+                .collect()
+        })
         .unwrap_or_default();
 
     for target in selected {
@@ -114,9 +130,19 @@ async fn handle_timer_fired(ctx: &RuntimeContext<'_>, event: &EventEnvelope) -> 
         .as_str()
         .and_then(|s| s.parse().ok())
         .unwrap_or_default();
-    let node_name = event.payload["node_name"].as_str().unwrap_or("").to_string();
+    let node_name = event.payload["node_name"]
+        .as_str()
+        .unwrap_or("")
+        .to_string();
     RuntimeMetrics::increment(&ctx.metrics.timer_events_fired);
-    complete_task(ctx, event.instance_id, token_id, &node_name, serde_json::json!({})).await
+    complete_task(
+        ctx,
+        event.instance_id,
+        token_id,
+        &node_name,
+        serde_json::json!({}),
+    )
+    .await
 }
 
 async fn handle_error_raised(ctx: &RuntimeContext<'_>, event: &EventEnvelope) -> Result<()> {
@@ -284,8 +310,10 @@ async fn handle_decision_gateway(
                     advance_token_boxed(ctx, instance_id, token_id, target).await?;
                 } else {
                     // Create a new token for each additional target (inclusive gateway).
-                    let new_token =
-                        ctx.store.create_token(instance_id, target, None, vec![]).await?;
+                    let new_token = ctx
+                        .store
+                        .create_token(instance_id, target, None, vec![])
+                        .await?;
                     advance_token_boxed(ctx, instance_id, new_token.id, target).await?;
                 }
             }
@@ -321,7 +349,13 @@ async fn handle_parallel_fork(
             token_id: Some(token_id),
             event_kind: "parallel_fork".to_string(),
             from_node: Some(gateway_name.to_string()),
-            to_node: Some(outgoing.iter().map(|e| e.target.as_str()).collect::<Vec<_>>().join(",")),
+            to_node: Some(
+                outgoing
+                    .iter()
+                    .map(|e| e.target.as_str())
+                    .collect::<Vec<_>>()
+                    .join(","),
+            ),
             data_delta: None,
         })
         .await?;
@@ -384,7 +418,12 @@ async fn handle_inclusive_fork(
                 .await?;
 
             // Store dynamic expected count on every join that expects this fork.
-            for pj in ctx.spec.parallel_joins.iter().filter(|j| j.expects.contains(&gateway_name.to_string())) {
+            for pj in ctx
+                .spec
+                .parallel_joins
+                .iter()
+                .filter(|j| j.expects.contains(&gateway_name.to_string()))
+            {
                 ctx.store
                     .set_expected_join_count(&pj.name, instance_id, branch_count)
                     .await?;
@@ -410,7 +449,11 @@ async fn handle_inclusive_fork(
         Err(e) => {
             tracing::error!(%instance_id, gateway = %gateway_name, "inclusive fork switch error: {}", e);
             ctx.store
-                .update_instance_status(instance_id, InstanceStatus::Failed, Some(chrono::Utc::now()))
+                .update_instance_status(
+                    instance_id,
+                    InstanceStatus::Failed,
+                    Some(chrono::Utc::now()),
+                )
                 .await?;
         }
     }
@@ -427,7 +470,10 @@ async fn handle_join_arrival(
     ctx.store.advance_token(token_id, join_name).await?;
 
     // Record this arrival.
-    let arrivals = ctx.store.record_join_arrival(join_name, instance_id, token_id).await?;
+    let arrivals = ctx
+        .store
+        .record_join_arrival(join_name, instance_id, token_id)
+        .await?;
 
     // Determine how many branches we expect.
     let join_spec = ctx.spec.parallel_joins.iter().find(|j| j.name == join_name);
@@ -461,7 +507,11 @@ async fn resolve_expected_count(
     join_spec: Option<&JourneyParallelJoin>,
 ) -> Result<usize> {
     // Check for dynamic count first (set by inclusive gateway fork).
-    if let Some(dynamic) = ctx.store.get_expected_join_count(join_name, instance_id).await? {
+    if let Some(dynamic) = ctx
+        .store
+        .get_expected_join_count(join_name, instance_id)
+        .await?
+    {
         return Ok(dynamic);
     }
     // Fall back to static: count outgoing edges from each fork gateway in `expects`.
@@ -492,7 +542,9 @@ async fn fire_join(
     match apply_merge_protocol(&branch_tokens, join_spec) {
         MergeResult::Ok(merged_data) => {
             for (key, val) in merged_data {
-                ctx.store.write_instance_data(instance_id, &key, val).await?;
+                ctx.store
+                    .write_instance_data(instance_id, &key, val)
+                    .await?;
             }
         }
         MergeResult::Conflict { location, values } => {
@@ -511,7 +563,11 @@ async fn fire_join(
                 })
                 .await?;
             ctx.store
-                .update_instance_status(instance_id, InstanceStatus::Failed, Some(chrono::Utc::now()))
+                .update_instance_status(
+                    instance_id,
+                    InstanceStatus::Failed,
+                    Some(chrono::Utc::now()),
+                )
                 .await?;
             return Ok(());
         }
@@ -536,7 +592,10 @@ async fn fire_join(
 
     // Continue with a fresh unified token.
     if let Some(next) = single_outgoing(ctx.spec, join_name) {
-        let continuation = ctx.store.create_token(instance_id, &next, None, vec![]).await?;
+        let continuation = ctx
+            .store
+            .create_token(instance_id, &next, None, vec![])
+            .await?;
         advance_token_boxed(ctx, instance_id, continuation.id, &next).await?;
     }
     Ok(())
@@ -551,7 +610,10 @@ async fn handle_end_event(
     // Token-death short-circuit: if this is a branch token that terminated
     // before reaching a join, reduce the expected count for any join that
     // expects the branch's fork gateway.
-    let token_opt = ctx.store.get_tokens_for_instance(instance_id).await?
+    let token_opt = ctx
+        .store
+        .get_tokens_for_instance(instance_id)
+        .await?
         .into_iter()
         .find(|t| t.id == token_id);
 
@@ -559,7 +621,8 @@ async fn handle_end_event(
         if let Some(fork_gateway_name) = token.branch_lineage.first() {
             let fork_name = fork_gateway_name.clone();
             // Find joins that expect this fork gateway.
-            let matching_joins: Vec<String> = ctx.spec
+            let matching_joins: Vec<String> = ctx
+                .spec
                 .parallel_joins
                 .iter()
                 .filter(|j| j.expects.contains(&fork_name))
@@ -569,10 +632,12 @@ async fn handle_end_event(
             for join_name in matching_joins {
                 // Only short-circuit if the join hasn't fired yet (check if
                 // there are still living branch tokens for this fork).
-                let new_expected = ctx.store
+                let new_expected = ctx
+                    .store
                     .reduce_expected_join_count(&join_name, instance_id)
                     .await?;
-                let arrivals = ctx.store
+                let arrivals = ctx
+                    .store
                     .record_join_arrival(&join_name, instance_id, token_id)
                     .await?;
 
@@ -645,16 +710,53 @@ async fn invoke_verb_for_task(
         match handler.invoke(verb_ctx).await {
             Ok(output) => {
                 for (k, v) in &output.data {
-                    ctx.store.write_instance_data(instance_id, k, v.clone()).await?;
+                    ctx.store
+                        .write_instance_data(instance_id, k, v.clone())
+                        .await?;
                     ctx.store
                         .append_to_write_log(
                             token_id,
-                            WriteLogEntry { location: k.clone(), value: v.clone() },
+                            WriteLogEntry {
+                                location: k.clone(),
+                                value: v.clone(),
+                            },
                         )
                         .await?;
                 }
-                let output_value = serde_json::to_value(&output.data)?;
-                complete_task(ctx, instance_id, token_id, &node.name, output_value).await?;
+                // Dispatch effects. RequestHumanTask parks the fiber instead of
+                // completing it — the token waits for a HumanTaskComplete event.
+                let mut human_task_parked = false;
+                for effect in &output.effects {
+                    if let VerbEffect::RequestHumanTask { role: _, form_data } = effect {
+                        // correlation_key = token_id so HumanTaskComplete can address it
+                        ctx.store
+                            .create_pending_wait(
+                                instance_id,
+                                token_id,
+                                "human_task",
+                                &node.name,
+                                Some(token_id.to_string()),
+                                None,
+                            )
+                            .await?;
+                        ctx.store
+                            .append_journey_log(JourneyLogEntry {
+                                instance_id,
+                                token_id: Some(token_id),
+                                event_kind: "human_task_pending".to_string(),
+                                from_node: None,
+                                to_node: Some(node.name.clone()),
+                                data_delta: Some(form_data.clone()),
+                            })
+                            .await?;
+                        human_task_parked = true;
+                        break;
+                    }
+                }
+                if !human_task_parked {
+                    let output_value = serde_json::to_value(&output.data)?;
+                    complete_task(ctx, instance_id, token_id, &node.name, output_value).await?;
+                }
             }
             Err(VerbError::Domain { code, message }) => {
                 ctx.store
@@ -675,14 +777,7 @@ async fn invoke_verb_for_task(
     } else {
         // Verb not registered: leave token waiting for an external VerbCompletion event.
         ctx.store
-            .create_pending_wait(
-                instance_id,
-                token_id,
-                "verb",
-                &node.name,
-                None,
-                None,
-            )
+            .create_pending_wait(instance_id, token_id, "verb", &node.name, None, None)
             .await?;
         ctx.store
             .append_journey_log(JourneyLogEntry {
@@ -768,8 +863,8 @@ fn apply_merge_protocol(
                 merged.insert(location, values.into_iter().next().unwrap());
             } else {
                 // Look for a merge clause.
-                let merge_op = join_spec
-                    .and_then(|j| j.merge.iter().find(|m| m.location == location));
+                let merge_op =
+                    join_spec.and_then(|j| j.merge.iter().find(|m| m.location == location));
                 match merge_op {
                     Some(clause) => {
                         let v = apply_merge_operator(&clause.operator, values);
@@ -796,11 +891,17 @@ fn apply_merge_operator(operator: &str, values: Vec<serde_json::Value>) -> serde
             serde_json::Value::Array(strings)
         }
         "max" => {
-            let max = values.iter().filter_map(|v| v.as_f64()).fold(f64::NEG_INFINITY, f64::max);
+            let max = values
+                .iter()
+                .filter_map(|v| v.as_f64())
+                .fold(f64::NEG_INFINITY, f64::max);
             serde_json::json!(max)
         }
         "min" => {
-            let min = values.iter().filter_map(|v| v.as_f64()).fold(f64::INFINITY, f64::min);
+            let min = values
+                .iter()
+                .filter_map(|v| v.as_f64())
+                .fold(f64::INFINITY, f64::min);
             serde_json::json!(min)
         }
         "sum" => {
@@ -844,8 +945,7 @@ fn single_outgoing(spec: &JourneySpec, source: &str) -> Option<String> {
 // ---------------------------------------------------------------------------
 
 fn is_start_event(k: &str) -> bool {
-    k == "start-event"
-        || k.starts_with("start-event-")
+    k == "start-event" || k.starts_with("start-event-")
 }
 
 fn is_task_kind(k: &str) -> bool {

@@ -368,49 +368,81 @@ async fn example_5_parallel_fork_join_merge() {
     // Instance is Active: the three tasks have verb_refs and are waiting.
     assert_eq!(result.status().await, InstanceStatus::Active);
     let tokens = result.tokens().await;
-    assert_eq!(tokens.len(), 3, "expected 3 fork branch tokens, got {}", tokens.len());
+    assert_eq!(
+        tokens.len(),
+        3,
+        "expected 3 fork branch tokens, got {}",
+        tokens.len()
+    );
 
     // Find tokens by their waiting nodes.
-    let tok_kyc = tokens.iter().find(|t| t.current_node == "kyc-task").cloned()
+    let tok_kyc = tokens
+        .iter()
+        .find(|t| t.current_node == "kyc-task")
+        .cloned()
         .expect("expected a token at kyc-task");
-    let tok_deal = tokens.iter().find(|t| t.current_node == "deal-task").cloned()
+    let tok_deal = tokens
+        .iter()
+        .find(|t| t.current_node == "deal-task")
+        .cloned()
         .expect("expected a token at deal-task");
-    let tok_im = tokens.iter().find(|t| t.current_node == "im-task").cloned()
+    let tok_im = tokens
+        .iter()
+        .find(|t| t.current_node == "im-task")
+        .cloned()
         .expect("expected a token at im-task");
 
     // Complete each task with distinct output data.
-    let result = result.complete_task(
-        "kyc-task",
-        tok_kyc.id,
-        serde_json::json!({"kyc-outcome": "approved"}),
-    ).await;
-    let result = result.complete_task(
-        "deal-task",
-        tok_deal.id,
-        serde_json::json!({"deal-id": "deal-001"}),
-    ).await;
-    let result = result.complete_task(
-        "im-task",
-        tok_im.id,
-        serde_json::json!({"im-config-id": "im-001"}),
-    ).await;
+    let result = result
+        .complete_task(
+            "kyc-task",
+            tok_kyc.id,
+            serde_json::json!({"kyc-outcome": "approved"}),
+        )
+        .await;
+    let result = result
+        .complete_task(
+            "deal-task",
+            tok_deal.id,
+            serde_json::json!({"deal-id": "deal-001"}),
+        )
+        .await;
+    let result = result
+        .complete_task(
+            "im-task",
+            tok_im.id,
+            serde_json::json!({"im-config-id": "im-001"}),
+        )
+        .await;
 
     // All three branches arrived → join fires → final-review auto-completes → end.
-    assert_eq!(result.status().await, InstanceStatus::Completed,
-        "expected Completed after all branches joined");
+    assert_eq!(
+        result.status().await,
+        InstanceStatus::Completed,
+        "expected Completed after all branches joined"
+    );
 
     // No tokens should remain.
     let tokens = result.tokens().await;
-    assert!(tokens.is_empty(), "expected no live tokens, got: {:?}",
-        tokens.iter().map(|t| &t.current_node).collect::<Vec<_>>());
+    assert!(
+        tokens.is_empty(),
+        "expected no live tokens, got: {:?}",
+        tokens.iter().map(|t| &t.current_node).collect::<Vec<_>>()
+    );
 
     // Merged data should be in instance store.
     let kyc_val = result.read_data("kyc-outcome").await;
-    assert_eq!(kyc_val, Some(serde_json::json!("approved")),
-        "expected kyc-outcome=approved in instance data");
+    assert_eq!(
+        kyc_val,
+        Some(serde_json::json!("approved")),
+        "expected kyc-outcome=approved in instance data"
+    );
     let deal_val = result.read_data("deal-id").await;
-    assert_eq!(deal_val, Some(serde_json::json!("deal-001")),
-        "expected deal-id=deal-001 in instance data");
+    assert_eq!(
+        deal_val,
+        Some(serde_json::json!("deal-001")),
+        "expected deal-id=deal-001 in instance data"
+    );
 }
 
 // ---------------------------------------------------------------------------
@@ -453,34 +485,52 @@ async fn example_6_parallel_merge_conflict_fails_instance() {
     let tokens = result.tokens().await;
     assert_eq!(tokens.len(), 3, "expected 3 branch tokens waiting");
 
-    let tok_kyc = tokens.iter().find(|t| t.current_node == "kyc-task").cloned()
+    let tok_kyc = tokens
+        .iter()
+        .find(|t| t.current_node == "kyc-task")
+        .cloned()
         .expect("expected token at kyc-task");
-    let tok_deal = tokens.iter().find(|t| t.current_node == "deal-task").cloned()
+    let tok_deal = tokens
+        .iter()
+        .find(|t| t.current_node == "deal-task")
+        .cloned()
         .expect("expected token at deal-task");
-    let tok_im = tokens.iter().find(|t| t.current_node == "im-task").cloned()
+    let tok_im = tokens
+        .iter()
+        .find(|t| t.current_node == "im-task")
+        .cloned()
         .expect("expected token at im-task");
 
     // Two branches write "review-status" with different values; no merge clause.
-    let result = result.complete_task(
-        "kyc-task",
-        tok_kyc.id,
-        serde_json::json!({"review-status": "approved"}),
-    ).await;
-    let result = result.complete_task(
-        "deal-task",
-        tok_deal.id,
-        serde_json::json!({"review-status": "pending-sign"}),
-    ).await;
+    let result = result
+        .complete_task(
+            "kyc-task",
+            tok_kyc.id,
+            serde_json::json!({"review-status": "approved"}),
+        )
+        .await;
+    let result = result
+        .complete_task(
+            "deal-task",
+            tok_deal.id,
+            serde_json::json!({"review-status": "pending-sign"}),
+        )
+        .await;
     // Third branch writes a different key — no conflict on its own.
-    let result = result.complete_task(
-        "im-task",
-        tok_im.id,
-        serde_json::json!({"im-config-id": "im-001"}),
-    ).await;
+    let result = result
+        .complete_task(
+            "im-task",
+            tok_im.id,
+            serde_json::json!({"im-config-id": "im-001"}),
+        )
+        .await;
 
     // Detect-and-fail: the undeclared conflict on "review-status" fails the instance.
-    assert_eq!(result.status().await, InstanceStatus::Failed,
-        "expected Failed when undeclared write conflict is detected at join");
+    assert_eq!(
+        result.status().await,
+        InstanceStatus::Failed,
+        "expected Failed when undeclared write conflict is detected at join"
+    );
 }
 
 // ---------------------------------------------------------------------------
@@ -531,33 +581,53 @@ async fn example_4_inclusive_gateway_dynamic_fanout() {
     // Instance is Active: 2 tasks waiting (basic-kyc and sanctions-check).
     assert_eq!(result.status().await, InstanceStatus::Active);
     let tokens = result.tokens().await;
-    assert_eq!(tokens.len(), 2,
+    assert_eq!(
+        tokens.len(),
+        2,
         "expected 2 active branch tokens (inclusive selected 2 of 3), got {}: {:?}",
-        tokens.len(), tokens.iter().map(|t| &t.current_node).collect::<Vec<_>>());
+        tokens.len(),
+        tokens.iter().map(|t| &t.current_node).collect::<Vec<_>>()
+    );
 
-    let tok_kyc = tokens.iter().find(|t| t.current_node == "basic-kyc").cloned()
+    let tok_kyc = tokens
+        .iter()
+        .find(|t| t.current_node == "basic-kyc")
+        .cloned()
         .expect("expected token at basic-kyc");
-    let tok_sanctions = tokens.iter().find(|t| t.current_node == "sanctions-check").cloned()
+    let tok_sanctions = tokens
+        .iter()
+        .find(|t| t.current_node == "sanctions-check")
+        .cloned()
         .expect("expected token at sanctions-check");
 
     // Complete both selected branches.
-    let result = result.complete_task(
-        "basic-kyc",
-        tok_kyc.id,
-        serde_json::json!({"basic-kyc-result": "pass"}),
-    ).await;
-    let result = result.complete_task(
-        "sanctions-check",
-        tok_sanctions.id,
-        serde_json::json!({"sanctions-result": "clear"}),
-    ).await;
+    let result = result
+        .complete_task(
+            "basic-kyc",
+            tok_kyc.id,
+            serde_json::json!({"basic-kyc-result": "pass"}),
+        )
+        .await;
+    let result = result
+        .complete_task(
+            "sanctions-check",
+            tok_sanctions.id,
+            serde_json::json!({"sanctions-result": "clear"}),
+        )
+        .await;
 
     // After 2 of 2 selected branches arrive the join fires.
     // evaluate-results has no verb_ref so it auto-completes → modular-end → Completed.
-    assert_eq!(result.status().await, InstanceStatus::Completed,
-        "expected Completed after all selected branches joined");
+    assert_eq!(
+        result.status().await,
+        InstanceStatus::Completed,
+        "expected Completed after all selected branches joined"
+    );
     let tokens = result.tokens().await;
-    assert!(tokens.is_empty(), "expected no live tokens after completion");
+    assert!(
+        tokens.is_empty(),
+        "expected no live tokens after completion"
+    );
 }
 
 // ---------------------------------------------------------------------------
@@ -664,8 +734,11 @@ async fn example_11_uk_path_compiles_and_starts() {
 
     let status = result.status().await;
     assert!(
-        status == InstanceStatus::Completed || status == InstanceStatus::Active || status == InstanceStatus::Failed,
-        "unexpected status: {:?}", status
+        status == InstanceStatus::Completed
+            || status == InstanceStatus::Active
+            || status == InstanceStatus::Failed,
+        "unexpected status: {:?}",
+        status
     );
     // No panics; compilation succeeded.
 }
@@ -675,14 +748,15 @@ async fn example_11_standard_path_completes() {
     // Default branch (no gateway reply programmed → ScriptedAdaptor uses :default → standard-kyc).
     // standard-kyc (subprocess, auto) → main-fork → deal-task + im-task (auto) → main-join →
     // sign-off (auto, single outgoing) → activate (auto) → full-end → Completed.
-    let result = Scenario::new(EXAMPLE_11)
-        .run_to_quiescence(json!({}))
-        .await;
+    let result = Scenario::new(EXAMPLE_11).run_to_quiescence(json!({})).await;
 
     let status = result.status().await;
     assert!(
-        status == InstanceStatus::Completed || status == InstanceStatus::Active || status == InstanceStatus::Failed,
-        "unexpected status: {:?}", status
+        status == InstanceStatus::Completed
+            || status == InstanceStatus::Active
+            || status == InstanceStatus::Failed,
+        "unexpected status: {:?}",
+        status
     );
 }
 
@@ -706,7 +780,8 @@ async fn example_11_full_uk_onboarding_with_completions() {
     // not a gateway, so it auto-advances via its single outgoing edge).
     assert!(
         status == InstanceStatus::Completed || status == InstanceStatus::Failed,
-        "expected terminal status, got: {:?}", status
+        "expected terminal status, got: {:?}",
+        status
     );
 
     // If Completed, verify merged data is present.
@@ -760,24 +835,43 @@ async fn example_11_parallel_join_collects_two_branches() {
     let tokens = result.tokens().await;
     assert_eq!(tokens.len(), 2, "expected 2 branch tokens at deal+im tasks");
 
-    let tok_deal = tokens.iter().find(|t| t.current_node == "e11-deal").cloned()
+    let tok_deal = tokens
+        .iter()
+        .find(|t| t.current_node == "e11-deal")
+        .cloned()
         .expect("expected token at e11-deal");
-    let tok_im = tokens.iter().find(|t| t.current_node == "e11-im").cloned()
+    let tok_im = tokens
+        .iter()
+        .find(|t| t.current_node == "e11-im")
+        .cloned()
         .expect("expected token at e11-im");
 
-    let result = result.complete_task("e11-deal", tok_deal.id, json!({"deal-id": "deal-gb-001"})).await;
-    let result = result.complete_task("e11-im", tok_im.id, json!({"im-config": "im-gb-001"})).await;
+    let result = result
+        .complete_task("e11-deal", tok_deal.id, json!({"deal-id": "deal-gb-001"}))
+        .await;
+    let result = result
+        .complete_task("e11-im", tok_im.id, json!({"im-config": "im-gb-001"}))
+        .await;
 
     // Join fires → e11-signoff (no verb_ref, auto) → e11-end → Completed
-    assert_eq!(result.status().await, InstanceStatus::Completed,
-        "expected Completed after both join branches arrived");
+    assert_eq!(
+        result.status().await,
+        InstanceStatus::Completed,
+        "expected Completed after both join branches arrived"
+    );
 
     let deal_val = result.read_data("deal-id").await;
-    assert_eq!(deal_val, Some(json!("deal-gb-001")),
-        "expected deal-id=deal-gb-001 in instance data");
+    assert_eq!(
+        deal_val,
+        Some(json!("deal-gb-001")),
+        "expected deal-id=deal-gb-001 in instance data"
+    );
     let im_val = result.read_data("im-config").await;
-    assert_eq!(im_val, Some(json!("im-gb-001")),
-        "expected im-config=im-gb-001 in instance data");
+    assert_eq!(
+        im_val,
+        Some(json!("im-gb-001")),
+        "expected im-config=im-gb-001 in instance data"
+    );
 }
 
 // ---------------------------------------------------------------------------
@@ -803,16 +897,24 @@ async fn example_12_pack_authored_validates_and_runs() {
         params.as_object().expect("params must be an object"),
     );
 
-    assert!(!dsl.is_empty(), "instantiate_pack must return non-empty DSL for conjunctive-gate");
+    assert!(
+        !dsl.is_empty(),
+        "instantiate_pack must return non-empty DSL for conjunctive-gate"
+    );
 
     // Validate via dsl-resolution pipeline.
     let mut registry = bpmn_test_harness::dsl_resolution::PackRegistry::new();
-    let response = bpmn_test_harness::dsl_resolution::validate_bpmn(&dsl, "example-12", &mut registry);
+    let response =
+        bpmn_test_harness::dsl_resolution::validate_bpmn(&dsl, "example-12", &mut registry);
 
     assert!(
         !response.has_errors,
         "validation errors: {:?}",
-        response.diagnostics.iter().map(|d| &d.message).collect::<Vec<_>>()
+        response
+            .diagnostics
+            .iter()
+            .map(|d| &d.message)
+            .collect::<Vec<_>>()
     );
 
     // Check provenance summary.
@@ -821,8 +923,7 @@ async fn example_12_pack_authored_validates_and_runs() {
         "expected at least one provenance instantiation in the response"
     );
     assert_eq!(
-        response.provenance_summary.instantiations[0].pack_id,
-        "conjunctive-gate",
+        response.provenance_summary.instantiations[0].pack_id, "conjunctive-gate",
         "expected pack_id=conjunctive-gate in provenance"
     );
 
@@ -838,7 +939,10 @@ async fn example_12_pack_authored_validates_and_runs() {
         "expected Completed when routing to activate-end"
     );
     let tokens = result.tokens().await;
-    assert!(tokens.is_empty(), "expected no live tokens after completion");
+    assert!(
+        tokens.is_empty(),
+        "expected no live tokens after completion"
+    );
 }
 
 #[tokio::test]
@@ -854,9 +958,7 @@ async fn example_12_default_path_also_completes() {
         params.as_object().expect("params must be an object"),
     );
 
-    let result = Scenario::new(&dsl)
-        .run_to_quiescence(json!({}))
-        .await;
+    let result = Scenario::new(&dsl).run_to_quiescence(json!({})).await;
 
     assert_eq!(
         result.status().await,
@@ -872,80 +974,116 @@ async fn example_12_default_path_also_completes() {
 #[tokio::test]
 async fn instantiate_all_12_packs_compile_and_run() {
     let pack_test_cases: Vec<(&str, serde_json::Value)> = vec![
-        ("conjunctive-gate", json!({
-            "gate-name": "cg-gate",
-            "enhanced-path": "cg-enhanced",
-            "standard-path": "cg-standard"
-        })),
-        ("disjunctive-gate", json!({
-            "gate-name": "dg-gate",
-            "escalation-path": "dg-escalation",
-            "standard-path": "dg-standard"
-        })),
-        ("sanction-hit-escalation", json!({
-            "sanctions-check-name": "sh-check",
-            "sanctions-gate-name": "sh-gate",
-            "escalation-path": "sh-escalation",
-            "clear-path": "sh-clear"
-        })),
-        ("periodic-refresh-trigger", json!({
-            "age-gate-name": "prt-gate",
-            "refresh-path": "prt-refresh",
-            "current-path": "prt-current"
-        })),
-        ("manual-override-checkpoint", json!({
-            "auto-eval-name": "moc-eval",
-            "review-task-name": "moc-review",
-            "override-gate-name": "moc-gate",
-            "confirmed-path": "moc-confirmed",
-            "override-path": "moc-override"
-        })),
-        ("parallel-evaluation-with-veto", json!({
-            "fork-name": "pev-fork",
-            "join-name": "pev-join",
-            "post-join-gate": "pev-gate",
-            "vetoed-path": "pev-vetoed",
-            "approved-path": "pev-approved"
-        })),
-        ("threshold-band-routing", json!({
-            "band-gate-name": "tbr-gate",
-            "path-low": "tbr-low",
-            "path-mid": "tbr-mid",
-            "path-high": "tbr-high"
-        })),
-        ("multi-jurisdiction-overlay", json!({
-            "jur-gate-name": "mjo-gate",
-            "path-a": "mjo-path-a",
-            "path-b": "mjo-path-b",
-            "default-path": "mjo-default"
-        })),
-        ("linked-switch-chain", json!({
-            "gate-1-name": "lsc-gate1",
-            "gate-2-name": "lsc-gate2",
-            "exit-path-1": "lsc-exit1",
-            "exit-path-2": "lsc-exit2",
-            "final-path": "lsc-final"
-        })),
-        ("cascading-decision", json!({
-            "primary-eval-name": "cd-eval",
-            "primary-gate-name": "cd-gate",
-            "path-a": "cd-path-a",
-            "path-b": "cd-path-b"
-        })),
-        ("decision-table-classification", json!({
-            "classify-name": "dtc-classify",
-            "route-gate-name": "dtc-gate",
-            "path-a": "dtc-path-a",
-            "default-path": "dtc-default"
-        })),
-        ("required-evidence-checklist", json!({
-            "task-1": "rec-task1",
-            "task-2": "rec-task2",
-            "task-3": "rec-task3",
-            "checklist-gate-name": "rec-gate",
-            "approval-path": "rec-approved",
-            "rejection-path": "rec-rejected"
-        })),
+        (
+            "conjunctive-gate",
+            json!({
+                "gate-name": "cg-gate",
+                "enhanced-path": "cg-enhanced",
+                "standard-path": "cg-standard"
+            }),
+        ),
+        (
+            "disjunctive-gate",
+            json!({
+                "gate-name": "dg-gate",
+                "escalation-path": "dg-escalation",
+                "standard-path": "dg-standard"
+            }),
+        ),
+        (
+            "sanction-hit-escalation",
+            json!({
+                "sanctions-check-name": "sh-check",
+                "sanctions-gate-name": "sh-gate",
+                "escalation-path": "sh-escalation",
+                "clear-path": "sh-clear"
+            }),
+        ),
+        (
+            "periodic-refresh-trigger",
+            json!({
+                "age-gate-name": "prt-gate",
+                "refresh-path": "prt-refresh",
+                "current-path": "prt-current"
+            }),
+        ),
+        (
+            "manual-override-checkpoint",
+            json!({
+                "auto-eval-name": "moc-eval",
+                "review-task-name": "moc-review",
+                "override-gate-name": "moc-gate",
+                "confirmed-path": "moc-confirmed",
+                "override-path": "moc-override"
+            }),
+        ),
+        (
+            "parallel-evaluation-with-veto",
+            json!({
+                "fork-name": "pev-fork",
+                "join-name": "pev-join",
+                "post-join-gate": "pev-gate",
+                "vetoed-path": "pev-vetoed",
+                "approved-path": "pev-approved"
+            }),
+        ),
+        (
+            "threshold-band-routing",
+            json!({
+                "band-gate-name": "tbr-gate",
+                "path-low": "tbr-low",
+                "path-mid": "tbr-mid",
+                "path-high": "tbr-high"
+            }),
+        ),
+        (
+            "multi-jurisdiction-overlay",
+            json!({
+                "jur-gate-name": "mjo-gate",
+                "path-a": "mjo-path-a",
+                "path-b": "mjo-path-b",
+                "default-path": "mjo-default"
+            }),
+        ),
+        (
+            "linked-switch-chain",
+            json!({
+                "gate-1-name": "lsc-gate1",
+                "gate-2-name": "lsc-gate2",
+                "exit-path-1": "lsc-exit1",
+                "exit-path-2": "lsc-exit2",
+                "final-path": "lsc-final"
+            }),
+        ),
+        (
+            "cascading-decision",
+            json!({
+                "primary-eval-name": "cd-eval",
+                "primary-gate-name": "cd-gate",
+                "path-a": "cd-path-a",
+                "path-b": "cd-path-b"
+            }),
+        ),
+        (
+            "decision-table-classification",
+            json!({
+                "classify-name": "dtc-classify",
+                "route-gate-name": "dtc-gate",
+                "path-a": "dtc-path-a",
+                "default-path": "dtc-default"
+            }),
+        ),
+        (
+            "required-evidence-checklist",
+            json!({
+                "task-1": "rec-task1",
+                "task-2": "rec-task2",
+                "task-3": "rec-task3",
+                "checklist-gate-name": "rec-gate",
+                "approval-path": "rec-approved",
+                "rejection-path": "rec-rejected"
+            }),
+        ),
     ];
 
     for (pack_name, params) in &pack_test_cases {
@@ -956,18 +1094,21 @@ async fn instantiate_all_12_packs_compile_and_run() {
 
         // Validate provenance via dsl-resolution
         let mut registry = bpmn_test_harness::dsl_resolution::PackRegistry::new();
-        let response = bpmn_test_harness::dsl_resolution::validate_bpmn(&dsl, pack_name, &mut registry);
+        let response =
+            bpmn_test_harness::dsl_resolution::validate_bpmn(&dsl, pack_name, &mut registry);
         assert!(
             !response.has_errors,
             "pack '{}' produced compile errors: {:?}",
             pack_name,
-            response.diagnostics.iter().map(|d| &d.message).collect::<Vec<_>>()
+            response
+                .diagnostics
+                .iter()
+                .map(|d| &d.message)
+                .collect::<Vec<_>>()
         );
 
         // Run through engine (default path — no gateway reply programmed)
-        let result = Scenario::new(&dsl)
-            .run_to_quiescence(json!({}))
-            .await;
+        let result = Scenario::new(&dsl).run_to_quiescence(json!({})).await;
         let status = result.status().await;
         use bpmn_runtime::InstanceStatus;
         assert!(
@@ -1029,7 +1170,8 @@ async fn token_excess_does_not_panic() {
     let status = result.status().await;
     assert!(
         status == InstanceStatus::Completed || status == InstanceStatus::Active,
-        "expected Completed or Active, got: {:?}", status
+        "expected Completed or Active, got: {:?}",
+        status
     );
 }
 
@@ -1076,10 +1218,16 @@ async fn metrics_increment_on_instance_lifecycle() {
     // Verify metrics.
     let snap = engine.metrics().snapshot();
     assert_eq!(snap.instances_started, 1, "instances_started should be 1");
-    assert_eq!(snap.instances_completed, 1, "instances_completed should be 1");
+    assert_eq!(
+        snap.instances_completed, 1,
+        "instances_completed should be 1"
+    );
     assert_eq!(snap.instances_failed, 0, "instances_failed should be 0");
     // At minimum the InstanceStart event was processed.
-    assert!(snap.events_processed >= 1, "events_processed should be >= 1");
+    assert!(
+        snap.events_processed >= 1,
+        "events_processed should be >= 1"
+    );
 }
 
 #[tokio::test]

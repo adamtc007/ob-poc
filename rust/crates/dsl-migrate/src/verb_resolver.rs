@@ -75,10 +75,7 @@ mod tests {
 
     #[test]
     fn maps_kyc_verify() {
-        assert_eq!(
-            resolve_verb("kyc-verify"),
-            Some("kyc.verify".to_string())
-        );
+        assert_eq!(resolve_verb("kyc-verify"), Some("kyc.verify".to_string()));
     }
 
     #[test]

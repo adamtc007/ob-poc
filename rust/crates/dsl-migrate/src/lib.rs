@@ -3,6 +3,7 @@
 //! No runtime deps, no database, no Sage. Pure XML-in, DSL-out.
 
 pub mod emitter;
+pub mod feel_parser;
 pub mod mapper;
 pub mod reporter;
 pub mod verb_resolver;

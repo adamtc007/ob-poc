@@ -21,10 +21,8 @@ async fn variable_arity_pack_n1() {
         "band-gate-name": "tbr-gate",
         "bands": [{"upper": 999, "path": "path-only"}]
     });
-    let dsl = bpmn_test_harness::instantiate_pack(
-        "threshold-band-routing",
-        params.as_object().unwrap(),
-    );
+    let dsl =
+        bpmn_test_harness::instantiate_pack("threshold-band-routing", params.as_object().unwrap());
     assert!(!dsl.is_empty(), "expected non-empty DSL for N=1");
 
     // Validate via dsl-resolution
@@ -33,19 +31,22 @@ async fn variable_arity_pack_n1() {
     assert!(
         !response.has_errors,
         "N=1 DSL has resolution errors: {:?}",
-        response.diagnostics.iter().map(|d| &d.message).collect::<Vec<_>>()
+        response
+            .diagnostics
+            .iter()
+            .map(|d| &d.message)
+            .collect::<Vec<_>>()
     );
 
     // Run through the engine (the only path has :default true → takes it)
-    let result = Scenario::new(&dsl)
-        .run_to_quiescence(json!({}))
-        .await;
+    let result = Scenario::new(&dsl).run_to_quiescence(json!({})).await;
     let status = result.status().await;
     assert!(
         status == InstanceStatus::Completed
             || status == InstanceStatus::Active
             || status == InstanceStatus::Failed,
-        "unexpected status for N=1: {:?}", status
+        "unexpected status for N=1: {:?}",
+        status
     );
 }
 
@@ -65,10 +66,8 @@ async fn variable_arity_pack_n3() {
             {"upper": 999, "path": "path-high"}
         ]
     });
-    let dsl = bpmn_test_harness::instantiate_pack(
-        "threshold-band-routing",
-        params.as_object().unwrap(),
-    );
+    let dsl =
+        bpmn_test_harness::instantiate_pack("threshold-band-routing", params.as_object().unwrap());
     assert!(!dsl.is_empty(), "expected non-empty DSL for N=3");
 
     let mut registry = bpmn_test_harness::dsl_resolution::PackRegistry::new();
@@ -76,18 +75,21 @@ async fn variable_arity_pack_n3() {
     assert!(
         !response.has_errors,
         "N=3 DSL has resolution errors: {:?}",
-        response.diagnostics.iter().map(|d| &d.message).collect::<Vec<_>>()
+        response
+            .diagnostics
+            .iter()
+            .map(|d| &d.message)
+            .collect::<Vec<_>>()
     );
 
-    let result = Scenario::new(&dsl)
-        .run_to_quiescence(json!({}))
-        .await;
+    let result = Scenario::new(&dsl).run_to_quiescence(json!({})).await;
     let status = result.status().await;
     assert!(
         status == InstanceStatus::Completed
             || status == InstanceStatus::Active
             || status == InstanceStatus::Failed,
-        "unexpected status for N=3: {:?}", status
+        "unexpected status for N=3: {:?}",
+        status
     );
 }
 
@@ -106,10 +108,8 @@ async fn variable_arity_pack_n10() {
         "band-gate-name": "tbr-gate",
         "bands": bands
     });
-    let dsl = bpmn_test_harness::instantiate_pack(
-        "threshold-band-routing",
-        params.as_object().unwrap(),
-    );
+    let dsl =
+        bpmn_test_harness::instantiate_pack("threshold-band-routing", params.as_object().unwrap());
     assert!(!dsl.is_empty(), "expected non-empty DSL for N=10");
 
     let mut registry = bpmn_test_harness::dsl_resolution::PackRegistry::new();
@@ -117,18 +117,21 @@ async fn variable_arity_pack_n10() {
     assert!(
         !response.has_errors,
         "N=10 DSL has resolution errors: {:?}",
-        response.diagnostics.iter().map(|d| &d.message).collect::<Vec<_>>()
+        response
+            .diagnostics
+            .iter()
+            .map(|d| &d.message)
+            .collect::<Vec<_>>()
     );
 
-    let result = Scenario::new(&dsl)
-        .run_to_quiescence(json!({}))
-        .await;
+    let result = Scenario::new(&dsl).run_to_quiescence(json!({})).await;
     let status = result.status().await;
     assert!(
         status == InstanceStatus::Completed
             || status == InstanceStatus::Active
             || status == InstanceStatus::Failed,
-        "unexpected status for N=10: {:?}", status
+        "unexpected status for N=10: {:?}",
+        status
     );
 }
 
@@ -149,16 +152,19 @@ async fn variable_arity_threshold_band_n3() {
             {"upper": 999, "path": "high-end"}
         ]
     });
-    let dsl = bpmn_test_harness::instantiate_pack(
-        "threshold-band-routing",
-        params.as_object().unwrap(),
-    );
+    let dsl =
+        bpmn_test_harness::instantiate_pack("threshold-band-routing", params.as_object().unwrap());
     assert!(!dsl.is_empty());
 
     // Validate
     let mut registry = bpmn_test_harness::dsl_resolution::PackRegistry::new();
-    let response = bpmn_test_harness::dsl_resolution::validate_bpmn(&dsl, "tbr-n3-routing", &mut registry);
-    assert!(!response.has_errors, "DSL errors: {:?}", response.diagnostics);
+    let response =
+        bpmn_test_harness::dsl_resolution::validate_bpmn(&dsl, "tbr-n3-routing", &mut registry);
+    assert!(
+        !response.has_errors,
+        "DSL errors: {:?}",
+        response.diagnostics
+    );
 
     // Route to mid-end via ScriptedAdaptor
     let result = Scenario::new(&dsl)
@@ -171,5 +177,8 @@ async fn variable_arity_threshold_band_n3() {
         "expected Completed when routing to mid-end"
     );
     let tokens = result.tokens().await;
-    assert!(tokens.is_empty(), "expected no live tokens after completion");
+    assert!(
+        tokens.is_empty(),
+        "expected no live tokens after completion"
+    );
 }

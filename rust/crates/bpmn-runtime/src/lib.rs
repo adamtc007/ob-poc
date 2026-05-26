@@ -54,7 +54,7 @@ pub use types::{
     ActiveToken, EventEnvelope, EventId, EventKind, InstanceId, InstanceStatus, TokenId,
     WorkflowInstance, WriteLogEntry,
 };
-pub use verb::{VerbContext, VerbError, VerbHandler, VerbOutput, VerbRegistry};
+pub use verb::{VerbContext, VerbEffect, VerbError, VerbHandler, VerbOutput, VerbRegistry};
 
 #[cfg(feature = "postgres")]
 pub use store_postgres::postgres::PostgresJourneyStore;

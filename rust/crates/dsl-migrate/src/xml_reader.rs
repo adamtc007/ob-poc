@@ -138,8 +138,7 @@ pub fn parse_bpmn_xml(xml: &str) -> Result<BpmnProcess> {
             Event::Start(ref e) => {
                 let tag = strip_prefix(e.name().as_ref());
                 if tag == "process" {
-                    let id = attr_str(e, b"id")
-                        .unwrap_or_else(|| "unknown-process".to_string());
+                    let id = attr_str(e, b"id").unwrap_or_else(|| "unknown-process".to_string());
                     let name = attr_str(e, b"name");
                     return parse_container(&mut reader, id, name, "process");
                 }
@@ -404,17 +403,20 @@ fn parse_event_body(
                 let tag = strip_prefix(e.name().as_ref());
                 event_type = event_def_from_tag(&tag, e);
             }
-            Event::End(ref e)
-                if strip_prefix(e.name().as_ref()) == closing_tag => {
-                    break;
-                }
+            Event::End(ref e) if strip_prefix(e.name().as_ref()) == closing_tag => {
+                break;
+            }
             Event::Eof => break,
             _ => {}
         }
         buf.clear();
     }
 
-    Ok(BpmnEvent { id, name, event_type })
+    Ok(BpmnEvent {
+        id,
+        name,
+        event_type,
+    })
 }
 
 fn event_def_from_tag(tag: &str, e: &quick_xml::events::BytesStart) -> EventType {
@@ -471,9 +473,7 @@ fn parse_task_body(
                 let tag = strip_prefix(e.name().as_ref());
                 match tag.as_str() {
                     "property" => {
-                        if let (Some(k), Some(v)) =
-                            (attr_str(e, b"name"), attr_str(e, b"value"))
-                        {
+                        if let (Some(k), Some(v)) = (attr_str(e, b"name"), attr_str(e, b"value")) {
                             if k == "topic" && implementation.is_none() {
                                 implementation = Some(v.clone());
                             }
@@ -491,10 +491,9 @@ fn parse_task_body(
                     _ => {}
                 }
             }
-            Event::End(ref e)
-                if strip_prefix(e.name().as_ref()) == closing_tag => {
-                    break;
-                }
+            Event::End(ref e) if strip_prefix(e.name().as_ref()) == closing_tag => {
+                break;
+            }
             Event::Eof => break,
             _ => {}
         }
@@ -561,10 +560,9 @@ fn parse_seq_flow_condition(
                     // self-closing conditionExpression with no text — skip
                 }
             }
-            Event::Text(ref t)
-                if in_condition => {
-                    condition = Some(t.unescape().unwrap_or_default().to_string());
-                }
+            Event::Text(ref t) if in_condition => {
+                condition = Some(t.unescape().unwrap_or_default().to_string());
+            }
             Event::End(ref e) => {
                 let tag = strip_prefix(e.name().as_ref());
                 if tag == "conditionExpression" {
@@ -628,7 +626,11 @@ fn attr_str(e: &quick_xml::events::BytesStart, name: &[u8]) -> Option<String> {
 
     for attr in e.attributes().flatten() {
         let key = std::str::from_utf8(attr.key.as_ref()).unwrap_or("");
-        let key_local = if let Some(p) = key.find(':') { &key[p + 1..] } else { key };
+        let key_local = if let Some(p) = key.find(':') {
+            &key[p + 1..]
+        } else {
+            key
+        };
         if key_local == search_local {
             return attr.unescape_value().ok().map(|v| v.to_string());
         }
@@ -642,17 +644,15 @@ fn skip_subtree(reader: &mut Reader<&[u8]>, closing: &str) -> Result<()> {
     let mut buf = Vec::new();
     loop {
         match reader.read_event_into(&mut buf)? {
-            Event::Start(ref e)
-                if strip_prefix(e.name().as_ref()) == closing => {
-                    depth += 1;
+            Event::Start(ref e) if strip_prefix(e.name().as_ref()) == closing => {
+                depth += 1;
+            }
+            Event::End(ref e) if strip_prefix(e.name().as_ref()) == closing => {
+                depth -= 1;
+                if depth == 0 {
+                    break;
                 }
-            Event::End(ref e)
-                if strip_prefix(e.name().as_ref()) == closing => {
-                    depth -= 1;
-                    if depth == 0 {
-                        break;
-                    }
-                }
+            }
             Event::Eof => break,
             _ => {}
         }

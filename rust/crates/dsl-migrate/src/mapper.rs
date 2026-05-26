@@ -1,5 +1,6 @@
 //! IR → bpmn-lite DSL atoms.
 
+use crate::feel_parser::{feel_normalise, FeelNormaliseResult};
 use crate::reporter::MigrationElement;
 use crate::xml_reader::{
     BpmnBoundaryEvent, BpmnElement, BpmnGateway, BpmnProcess, EventType, GatewayType, SequenceFlow,
@@ -120,7 +121,10 @@ fn map_element(element: &BpmnElement) -> (Option<String>, MigrationElement) {
                     node_kind,
                     verb,
                 );
-                (l, MigrationElement::clean(&t.id, t.name.as_deref(), node_kind))
+                (
+                    l,
+                    MigrationElement::clean(&t.id, t.name.as_deref(), node_kind),
+                )
             } else if let Some(impl_str) = &t.implementation {
                 let comment = format!(
                     "; [HUMAN-RESOLVE] verb: {} → ?\n(node {} :kind {})",
@@ -139,7 +143,10 @@ fn map_element(element: &BpmnElement) -> (Option<String>, MigrationElement) {
                 )
             } else {
                 let l = format!("(node {} :kind {})", safe_id(&t.id), node_kind);
-                (l, MigrationElement::clean(&t.id, t.name.as_deref(), node_kind))
+                (
+                    l,
+                    MigrationElement::clean(&t.id, t.name.as_deref(), node_kind),
+                )
             };
 
             (Some(line), status)
@@ -157,18 +164,10 @@ fn map_element(element: &BpmnElement) -> (Option<String>, MigrationElement) {
             (None, MigrationElement::skip("boundary-event"))
         }
         BpmnElement::Unknown { tag, id, name } => {
-            let comment = format!(
-                "; [HUMAN-RESOLVE] unsupported element: {} id={}",
-                tag, id
-            );
+            let comment = format!("; [HUMAN-RESOLVE] unsupported element: {} id={}", tag, id);
             (
                 Some(comment),
-                MigrationElement::human_resolve(
-                    id,
-                    name.as_deref(),
-                    tag,
-                    "unsupported element",
-                ),
+                MigrationElement::human_resolve(id, name.as_deref(), tag, "unsupported element"),
             )
         }
     }
@@ -227,28 +226,32 @@ fn map_boundary_event(be: &BpmnBoundaryEvent) -> (Option<String>, MigrationEleme
 
 fn map_sequence_flow_with_status(flow: &SequenceFlow) -> (String, Option<MigrationElement>) {
     if let Some(cond) = &flow.condition_expression {
-        if looks_like_feel(cond) {
-            let line = format!(
-                "; [HUMAN-RESOLVE] FEEL condition: {}\n(flow {} -> {} :condition \"TODO\")",
-                cond,
-                safe_id(&flow.source_ref),
-                safe_id(&flow.target_ref),
-            );
-            let status = MigrationElement::human_resolve(
-                &flow.id,
-                flow.name.as_deref(),
-                "sequence-flow",
-                &format!("FEEL condition requires manual translation: {}", cond),
-            );
-            (line, Some(status))
-        } else {
-            let line = format!(
-                "(flow {} -> {} :condition \"{}\")",
-                safe_id(&flow.source_ref),
-                safe_id(&flow.target_ref),
-                cond,
-            );
-            (line, None)
+        match feel_normalise(cond) {
+            FeelNormaliseResult::Clean(expr) => {
+                let line = format!(
+                    "(flow {} -> {} :condition \"{}\")",
+                    safe_id(&flow.source_ref),
+                    safe_id(&flow.target_ref),
+                    expr,
+                );
+                (line, None)
+            }
+            FeelNormaliseResult::NeedsReview { stripped, reason } => {
+                let line = format!(
+                    "; [HUMAN-RESOLVE] FEEL condition: {}\n(flow {} -> {} :condition \"{}\")",
+                    reason,
+                    safe_id(&flow.source_ref),
+                    safe_id(&flow.target_ref),
+                    stripped,
+                );
+                let status = MigrationElement::human_resolve(
+                    &flow.id,
+                    flow.name.as_deref(),
+                    "sequence-flow",
+                    &format!("FEEL condition out of scope: {}", reason),
+                );
+                (line, Some(status))
+            }
         }
     } else {
         let line = format!(
@@ -291,19 +294,6 @@ fn task_kind(tt: &TaskType) -> &'static str {
 
 /// Convert a Camunda element ID to a DSL-safe kebab identifier.
 fn safe_id(id: &str) -> String {
-    id.replace(['_', ' '], "-")
-        .to_lowercase()
+    id.replace(['_', ' '], "-").to_lowercase()
 }
 
-/// Detect FEEL expressions that cannot be directly used in our DSL.
-fn looks_like_feel(expr: &str) -> bool {
-    expr.contains("#{")
-        || expr.contains("${")
-        || expr.contains("= \"")
-        || (expr.contains("==") && !expr.starts_with('('))
-        // FEEL list/range operators
-        || expr.contains('[')
-        || expr.contains("not(")
-        // JUEL-style expressions
-        || (expr.contains("#{") || expr.starts_with("${"))
-}

@@ -8,7 +8,8 @@ fn linear_sequence_migrates_cleanly() {
 
     // No human-resolve items expected: entity-verify + sanctions-check both resolve
     assert_eq!(
-        result.coverage.human_resolve, 0,
+        result.coverage.human_resolve,
+        0,
         "no human-resolve expected; got: {:?}",
         result
             .coverage
@@ -79,23 +80,64 @@ fn boundary_events_produce_attachment_atoms() {
     );
     // Two boundary events: error + timer
     let count = result.dsl_source.matches("boundary-attachment").count();
-    assert!(count >= 2, "expected at least 2 boundary-attachment atoms, got {}", count);
+    assert!(
+        count >= 2,
+        "expected at least 2 boundary-attachment atoms, got {}",
+        count
+    );
 }
 
 #[test]
-fn feel_expressions_become_human_resolve() {
+fn feel_expressions_normalise_cleanly() {
     let xml = include_str!("corpus/feel_expressions.bpmn");
     let process = dsl_migrate::parse_bpmn_xml(xml).unwrap();
     let result = dsl_migrate::emit(&process);
 
+    // ${score >= 700} and ${score < 700} are within the supported subset — no HUMAN-RESOLVE
+    assert_eq!(
+        result.coverage.human_resolve, 0,
+        "no human-resolve expected; got: {:?}",
+        result
+            .coverage
+            .elements
+            .iter()
+            .filter(|e| e.status == dsl_migrate::MigrationStatus::HumanResolve)
+            .collect::<Vec<_>>()
+    );
+    // Conditions emitted verbatim (stripped of Juel wrappers)
     assert!(
-        result.coverage.human_resolve > 0,
-        "FEEL conditions should be marked human-resolve"
+        result.dsl_source.contains(":condition \"score >= 700\""),
+        "expected normalised condition in DSL:\n{}",
+        result.dsl_source
     );
     assert!(
-        result.dsl_source.contains("HUMAN-RESOLVE"),
-        "output should contain HUMAN-RESOLVE markers; DSL:\n{}",
+        result.dsl_source.contains(":condition \"score < 700\""),
+        "expected normalised condition in DSL:\n{}",
         result.dsl_source
+    );
+}
+
+#[test]
+fn complex_feel_out_of_scope_becomes_human_resolve() {
+    let xml = include_str!("corpus/feel_conditions_complex.bpmn");
+    let process = dsl_migrate::parse_bpmn_xml(xml).unwrap();
+    let result = dsl_migrate::emit(&process);
+
+    // Simple conditions should still resolve cleanly
+    assert!(
+        result.dsl_source.contains(":condition \"amount > 1000\""),
+        "simple condition should be clean:\n{}",
+        result.dsl_source
+    );
+    // Dot-access should produce HUMAN-RESOLVE
+    assert!(
+        result.dsl_source.contains("HUMAN-RESOLVE"),
+        "dot-access condition should produce HUMAN-RESOLVE:\n{}",
+        result.dsl_source
+    );
+    assert!(
+        result.coverage.human_resolve > 0,
+        "expected at least one human-resolve for out-of-scope FEEL"
     );
 }
 
@@ -111,7 +153,8 @@ fn complex_gateway_is_rejected() {
     let process = dsl_migrate::parse_bpmn_xml(xml).unwrap();
     let result = dsl_migrate::emit(&process);
     assert_eq!(
-        result.coverage.rejected, 1,
+        result.coverage.rejected,
+        1,
         "complex gateway should be rejected; got coverage: {:?}",
         result.coverage.summary()
     );
