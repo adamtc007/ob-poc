@@ -4,63 +4,12 @@
 # Regenerate with `cargo run -p xtask -- audit --bless` after
 # reviewing whether the mirror is still justified.
 # Run `cargo run -p xtask -- audit` to fail on new mirrors.
-#
-# Baseline buckets — current state (13 entries, down from 32).
-# Phase 4.7 follow-up collapsed the three high-priority near-
-# duplicates under `src/sem_reg/` (`entity_type_def`,
-# `relationship_type_def`, `verb_contract`) to `sem_os_core::*`
-# re-exports. The walk-by audit then landed the same kind of fix
-# for `dsl-runtime::stategraph` (6 names) and
-# `dsl-runtime::state_reducer::state_machine` (3 names) after
-# finding their leaf types were byte-identical to
-# `sem_os_core::state_graph_def` / `state_machine_def`. A second
-# round of canonical-name expansion collapsed five more
-# byte-identical mirrors (`document_type_def`, `observation_def`,
-# `policy_rule`, `taxonomy_def`, `view_def`). A third
-# wave migrated rich per-field docstrings from
-# `src/sem_reg/{derivation_spec, evidence, membership}.rs` into
-# `sem_os_core/*` and then collapsed those three mirrors as well,
-# leaving the schema-authority drift allowlist at 13 entries with
-# bucket 2 + bucket 3 both empty.
-#
-# (1) Legitimate distinct types sharing a name — unrelated UI graph,
-#     DSL stategraph, dag config, taxonomy nodes, workflow defs,
-#     capital graph, plus one verb-extract helper whose `VerbOutput`
-#     describes the entity-kind a verb creates (vs sem_os_core's
-#     `VerbOutput` for output-field declarations). Low remediation
-#     priority — these mirrors don't shadow the canonical type.
-#       crates/ob-poc-taxonomy/src/taxonomy/{rules,types} — taxonomy nodes
-#         (renamed from ob-poc-domain → ob-poc-taxonomy 2026-05-13)
-#       crates/ob-poc-types/src/galaxy.rs                — galaxy viz
-#       crates/ob-poc-types/src/lib.rs                   — graph DTOs
-#       crates/ob-workflow/src/definition.rs             — workflow defs
-#       src/api/capital_routes.rs                        — capital graph
-#       src/graph/types.rs                               — UI graph types
-#       src/sem_reg/onboarding/verb_extract.rs           — verb-extract
-#                                                          produced-type
-#                                                          marker DTO
-#     REMOVED: crates/dsl-core/src/config/dag.rs — dsl-core extracted
-#       to external repo github.com/adamtc007/dsl (2026-05-14); no
-#       longer present in this workspace.
-#
-# (1b) PENDING_REVIEW — requires human ruling (see B-2 notes):
-#     crates/bpmn-runtime/src/verb.rs:VerbOutput
-#       — bpmn-runtime's execution-result type { data, effects }, distinct
-#         from sem_os_ontology::VerbOutput (output-field declarations) and
-#         verb_extract::VerbOutput (entity-kind marker). No cross-crate
-#         consumers observed. Pending ruling: bucket-1 (local detail) or
-#         genuine schema-authority concern?
-#       NOT ADDED until owner rules it bucket 1 or relocates it.
-#
-# (2) HIGH-priority near-duplicates of sem_os_core schema authority:
-#     EMPTY — Phase 4.7 follow-up + walk-by audit + canonical-name
-#     expansion together cleared all byte-identical near-duplicates.
-#
-# (3) Structurally-equivalent mirrors with richer docstrings:
-#     EMPTY — the third migration wave lifted per-field docstrings
-#     into `sem_os_core/{derivation_spec, evidence, membership}.rs`
-#     and collapsed the three `src/sem_reg/*` mirrors to re-exports.
 
+# bpmn-runtime::VerbOutput — runtime-internal to bpmn-lite's verb invocation engine.
+# ob-poc consumes bpmn over gRPC; this type never crosses into ob-poc's type system.
+# Re-evaluate if bpmn↔ob-poc integration reads VerbOutput fields directly (not via gRPC).
+# Ruled (a) runtime-internal 2026-05-26.
+crates/bpmn-runtime/src/verb.rs:55:VerbOutput
 crates/ob-poc-taxonomy/src/taxonomy/rules.rs:523:EdgeType
 crates/ob-poc-taxonomy/src/taxonomy/types.rs:109:NodeType
 crates/ob-poc-types/src/galaxy.rs:1417:NodeType

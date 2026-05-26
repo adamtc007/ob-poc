@@ -908,5 +908,4 @@ mod tests {
         let candidates = scorer.score(&intent, 3);
         assert_eq!(candidates[0].action_score, 0.95);
     }
-
 }

@@ -1525,7 +1525,10 @@ fn main() -> Result<()> {
         Command::Verbs { action } => {
             let rt = tokio::runtime::Runtime::new()?;
             match action {
-                VerbsAction::Compile { verbose, validate_only } => {
+                VerbsAction::Compile {
+                    verbose,
+                    validate_only,
+                } => {
                     if validate_only {
                         rt.block_on(verbs::verbs_compile_validate_only(verbose))
                     } else {

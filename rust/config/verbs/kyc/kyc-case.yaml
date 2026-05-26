@@ -558,8 +558,6 @@ domains:
           - "close case"
           - "close kyc case"
           - "finalize case"
-          - "approve case"
-          - "reject case"
           - "complete kyc review"
           - "close out case"
           - "finish case"

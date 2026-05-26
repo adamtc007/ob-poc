@@ -1,28 +1,28 @@
 {
   "_comment": "R6 byte-equality baseline for ACP pack context envelopes. Bump via `cargo run -p xtask -- acp-envelope-byte-equality-check --bless` after reviewing intentional envelope changes.",
   "schema_version": "acp_pack_context_envelope_v3",
-  "captured_at": "2026-05-11",
+  "captured_at": "2026-05-26",
   "captured_under": "blessed via xtask --bless",
   "entries": [
     {
       "config": "all",
-      "bytes": 429084,
-      "sha256": "3c83898c8195b6aee67b4c8c1e7cd664599fd381e6b1d1243a754a056ca8dda3"
+      "bytes": 446275,
+      "sha256": "1777a0be83f76f7a29e5880be0c6aebaa2bc1c44afc3bbb039c565b17d29dd64"
     },
     {
       "config": "onboarding-request",
       "bytes": 73273,
-      "sha256": "a3e5ce80b33f06a158a2a913dbb684224de4262e459ab5c936aa63e13ef9d877"
+      "sha256": "e51cb599de08f5269e3d89c7f10d13b3b63ee2483de749a6128a2f551603fcf7"
     },
     {
       "config": "cbu-maintenance",
-      "bytes": 162784,
-      "sha256": "6e83bba163b0fb55f02bb153ec4fcb621a086e18f505e5be69d3c878ebb36603"
+      "bytes": 178111,
+      "sha256": "dffa1e9c8079b3eba1691ee624f7c2ac425eea8b8978972ff11387be29fe2521"
     },
     {
       "config": "product-service-taxonomy",
       "bytes": 147102,
-      "sha256": "1f943a1f52c15e1e0017c6d03ae064083916f5755e9f500107ae9fbda3b00b3f"
+      "sha256": "44331f6a0d10062bfbbf7756c5d3b13e37bcca911ac500dc2c5ff01d421fddda"
     }
   ]
 }

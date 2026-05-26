@@ -68,7 +68,7 @@ fixtures:
     pack_id: book-setup
     workspace: cbu
     utterance: "anything"
-    expected_verb_fqn: cbu.add-product
+    expected_verb_fqn: cbu.list
     expected_draft_source: deterministic_fallback
     use_llm: false
     refused_drafts:
