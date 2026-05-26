@@ -1845,7 +1845,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             ob_poc::api::catalogue_routes::create_catalogue_router(pool.clone()),
         )
         // Form.io verb integration — form schema serving + submission delivery
-        .merge(create_forms_router());
+        .merge(create_forms_router(pool.clone()));
 
     // React dist directory - serve assets from React build
     let react_dist_dir = std::env::var("REACT_DIST_DIR").unwrap_or_else(|_| {
