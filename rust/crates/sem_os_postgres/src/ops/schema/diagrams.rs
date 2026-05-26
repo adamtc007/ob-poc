@@ -22,9 +22,9 @@ use serde_json::{json, Value};
 use sem_os_ontology::verb_contract::VerbContractBody;
 use sem_os_policy::affinity::{match_intent, AffinityGraph, DataRef};
 use sem_os_policy::diagram::{
-    enrichment::build_diagram_model,
-    mermaid,
+    build_diagram_model,
     model::{ColumnInput, ForeignKeyInput, RenderOptions, TableInput},
+    render_discovery_map, render_erd, render_verb_flow, sanitize_id,
 };
 
 use dsl_runtime::domain_ops::affinity_graph_cache::load_affinity_graph_cached;
@@ -160,11 +160,11 @@ fn render_domain_verb_flow(domain: &str, graph: &AffinityGraph, depth: u32) -> S
     verbs.sort();
 
     for verb in &verbs {
-        let verb_id = mermaid::sanitize_id(verb);
+        let verb_id = sanitize_id(verb);
         out.push_str(&format!("    {verb_id}[\"{verb}\"]\n"));
         for da in graph.data_for_verb(verb) {
             let data_key = da.data_ref.index_key();
-            let data_id = mermaid::sanitize_id(&data_key);
+            let data_id = sanitize_id(&data_key);
             let label = match da.data_ref {
                 DataRef::Table(ref t) => format!("{}:{}", t.schema, t.table),
                 DataRef::Column(ref c) => format!("{}:{}.{}", c.schema, c.table, c.column),
@@ -178,10 +178,10 @@ fn render_domain_verb_flow(domain: &str, graph: &AffinityGraph, depth: u32) -> S
 
     if depth > 1 {
         for verb in &verbs {
-            let verb_id = mermaid::sanitize_id(verb);
+            let verb_id = sanitize_id(verb);
             for (adj, _) in graph.adjacent_verbs(verb) {
                 if adj.starts_with(&format!("{domain}.")) {
-                    let adj_id = mermaid::sanitize_id(&adj);
+                    let adj_id = sanitize_id(&adj);
                     out.push_str(&format!("    {verb_id} -.-> {adj_id}\n"));
                 }
             }
@@ -245,7 +245,7 @@ impl SemOsVerbOp for SchemaGenerateErd {
             format: Some(format.clone()),
         };
         let model = build_diagram_model(&tables, &graph, &options);
-        let diagram = mermaid::render_erd(&model, &options);
+        let diagram = render_erd(&model, &options);
 
         Ok(VerbExecutionOutcome::Record(json!({
             "schema": schema_name,
@@ -294,7 +294,7 @@ impl SemOsVerbOp for SchemaGenerateVerbFlow {
             Some(vfqn) => (
                 "verb".to_string(),
                 vfqn.clone(),
-                mermaid::render_verb_flow(vfqn, &graph, depth),
+                render_verb_flow(vfqn, &graph, depth),
             ),
             None => {
                 let domain_value = domain.clone().unwrap_or_default();
@@ -391,7 +391,7 @@ impl SemOsVerbOp for SchemaGenerateDiscoveryMap {
             .as_ref()
             .map(|d| format!("domain:{d}"))
             .unwrap_or_else(|| "domain:all".to_owned());
-        let diagram = mermaid::render_discovery_map(&source_utterance, &discovery, &graph);
+        let diagram = render_discovery_map(&source_utterance, &discovery, &graph);
 
         Ok(VerbExecutionOutcome::Record(json!({
             "domain": domain,
