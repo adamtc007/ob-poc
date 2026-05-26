@@ -12,6 +12,9 @@
     "test:run": "vitest run"
   },
   "dependencies": {
+    "@formio/core": "^2.6.5",
+    "@formio/js": "^5.3.5",
+    "@formio/react": "^6.2.0",
     "@tanstack/react-query": "^5.90.20",
     "@tanstack/react-table": "^8.21.3",
     "@tanstack/react-virtual": "^3.13.18",

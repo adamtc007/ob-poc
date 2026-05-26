@@ -1,19 +1,21 @@
 /**
  * FormioForm — renders a Form.io form schema and handles submission.
  *
- * This is the JS half of the dsl.form verb boundary:
- *   - Receives {formRef, prefillData, mode, tokenId} from the session response
- *   - Fetches the form schema via GET /api/forms/:ref
- *   - Renders via Form.io SDK (Formio.createForm)
- *   - Prefills: instance.submission = { data: prefillData }
- *   - On submit: POST /api/forms/:tokenId/submit → triggers HumanTaskComplete
+ * JS half of the dsl.form verb boundary:
+ *   - Fetches form schema via GET /api/forms/:ref
+ *   - Renders via @formio/react <Form> component
+ *   - Prefills with process context data
+ *   - On submit: POST /api/forms/:tokenId/submit → HumanTaskComplete
  *
- * mode = "display":  form is read-only with a single Continue button
- * mode = "capture":  form is editable, submit captures all field values
+ * mode = "display":  read-only, single Continue acknowledgement button
+ * mode = "capture":  editable, submit captures all field values
  */
 
-import React, { useEffect, useRef, useState } from "react";
-import { fetchFormSchema, submitForm, FormSchema } from "../../api/forms";
+import React, { useState } from "react";
+import { Form } from "@formio/react";
+import type { FormType, Submission } from "@formio/react/lib/components/Form";
+import { fetchFormSchema, submitForm } from "../../api/forms";
+import type { FormSchema } from "../../api/forms";
 
 export interface FormioFormProps {
   formRef: string;
@@ -23,6 +25,23 @@ export interface FormioFormProps {
   onComplete?: (submissionData: Record<string, unknown>) => void;
 }
 
+function useFormSchema(formRef: string) {
+  const [schema, setSchema] = React.useState<FormSchema | null>(null);
+  const [loading, setLoading] = React.useState(true);
+  const [error, setError] = React.useState<string | null>(null);
+
+  React.useEffect(() => {
+    setLoading(true);
+    setError(null);
+    fetchFormSchema(formRef)
+      .then(setSchema)
+      .catch((e: Error) => setError(e.message))
+      .finally(() => setLoading(false));
+  }, [formRef]);
+
+  return { schema, loading, error };
+}
+
 export function FormioForm({
   formRef,
   prefillData,
@@ -30,97 +49,37 @@ export function FormioForm({
   tokenId,
   onComplete,
 }: FormioFormProps) {
-  const containerRef = useRef<HTMLDivElement>(null);
-  const [schema, setSchema] = useState<FormSchema | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const { schema, loading, error: schemaError } = useFormSchema(formRef);
   const [submitting, setSubmitting] = useState(false);
-  const formInstanceRef = useRef<unknown>(null);
+  const [submitError, setSubmitError] = useState<string | null>(null);
 
-  // Fetch schema on mount
-  useEffect(() => {
-    fetchFormSchema(formRef)
-      .then(setSchema)
-      .catch((e: Error) => setError(e.message))
-      .finally(() => setLoading(false));
-  }, [formRef]);
-
-  // Render form when schema is ready
-  useEffect(() => {
-    if (!schema || !containerRef.current) return;
-
-    let destroyed = false;
-
-    // Dynamic import of formiojs so the SDK is only loaded when needed
-    import("formiojs")
-      .then(({ Formio }) => {
-        if (destroyed || !containerRef.current) return;
-
-        // Make display-mode forms read-only
-        const options =
-          mode === "display"
-            ? { readOnly: true, viewAsHtml: false }
-            : {};
-
-        Formio.createForm(containerRef.current, schema, options).then(
-          (instance: { submission: unknown; on: (event: string, cb: (submission: unknown) => void) => void; destroy: () => void }) => {
-            formInstanceRef.current = instance;
-
-            // Prefill with process context data
-            if (prefillData && Object.keys(prefillData).length > 0) {
-              instance.submission = { data: prefillData };
-            }
-
-            // Handle submission
-            instance.on("submit", async (submission: unknown) => {
-              const data =
-                (submission as { data?: Record<string, unknown> })?.data ?? {};
-              setSubmitting(true);
-              try {
-                await submitForm(tokenId, data);
-                onComplete?.(data);
-              } catch (e) {
-                setError(`Submission failed: ${(e as Error).message}`);
-              } finally {
-                setSubmitting(false);
-              }
-            });
-          },
-        );
-      })
-      .catch(() => {
-        setError(
-          "Form.io SDK not available. Install formiojs: npm install formiojs",
-        );
-      });
-
-    return () => {
-      destroyed = true;
-      if (
-        formInstanceRef.current &&
-        typeof (formInstanceRef.current as { destroy?: () => void }).destroy ===
-          "function"
-      ) {
-        (formInstanceRef.current as { destroy: () => void }).destroy();
-        formInstanceRef.current = null;
-      }
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [schema]);
+  const handleSubmit = async (submission: Submission) => {
+    setSubmitting(true);
+    setSubmitError(null);
+    const data = submission.data as Record<string, unknown>;
+    try {
+      await submitForm(tokenId, data);
+      onComplete?.(data);
+    } catch (e) {
+      setSubmitError(`Submission failed: ${(e as Error).message}`);
+    } finally {
+      setSubmitting(false);
+    }
+  };
 
   if (loading) {
-    return (
-      <div className="p-4 text-sm text-gray-500">Loading form…</div>
-    );
+    return <div className="p-4 text-sm text-gray-500">Loading form…</div>;
   }
 
-  if (error) {
+  if (schemaError) {
     return (
       <div className="p-4 text-sm text-red-600 bg-red-50 rounded border border-red-200">
-        <strong>Form error:</strong> {error}
+        <strong>Form error:</strong> {schemaError}
       </div>
     );
   }
+
+  if (!schema) return null;
 
   return (
     <div className="relative">
@@ -129,7 +88,19 @@ export function FormioForm({
           <span className="text-sm text-gray-500">Submitting…</span>
         </div>
       )}
-      <div ref={containerRef} className="formio-form" />
+      {submitError && (
+        <div className="mb-2 p-2 text-sm text-red-600 bg-red-50 rounded border border-red-200">
+          {submitError}
+        </div>
+      )}
+      <Form
+        src={schema as unknown as FormType}
+        // prefillData is Record<string,unknown> from the API; Form.io's JSON
+        // recursive type is structurally identical at runtime — cast via unknown.
+        submission={{ data: prefillData } as unknown as Submission}
+        options={{ readOnly: mode === "display" }}
+        onSubmit={handleSubmit}
+      />
     </div>
   );
 }
