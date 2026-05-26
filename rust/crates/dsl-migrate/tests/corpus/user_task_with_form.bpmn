@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<bpmn:definitions
+    xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL"
+    xmlns:camunda="http://camunda.org/schema/1.0/bpmn"
+    id="user-task-form-def"
+    targetNamespace="http://bpmn.io/schema/bpmn">
+
+  <bpmn:process id="user-task-form-process" name="User Task Form Test" isExecutable="true">
+    <bpmn:startEvent id="start-1" name="Start"/>
+
+    <!-- Plain key: passed through as-is -->
+    <bpmn:userTask id="task-plain" name="Plain Key Form" camunda:formKey="kyc.review-summary"/>
+
+    <!-- camunda-forms:embedded: prefix stripped → embedded/<rest> -->
+    <bpmn:userTask id="task-embedded" name="Embedded Form"
+      camunda:formKey="camunda-forms:embedded:onboarding-review"/>
+
+    <!-- deployment: prefix stripped → deployment/<rest> -->
+    <bpmn:userTask id="task-deployment" name="Deployment Form"
+      camunda:formKey="deployment:checklist.json"/>
+
+    <!-- classpath: prefix — HUMAN-RESOLVE -->
+    <bpmn:userTask id="task-classpath" name="Classpath Form"
+      camunda:formKey="classpath:forms/legacy.json"/>
+
+    <!-- No formKey — plain user-task emission -->
+    <bpmn:userTask id="task-no-form" name="No Form"/>
+
+    <bpmn:endEvent id="end-1" name="End"/>
+
+    <bpmn:sequenceFlow id="sf1" sourceRef="start-1" targetRef="task-plain"/>
+    <bpmn:sequenceFlow id="sf2" sourceRef="task-plain" targetRef="task-embedded"/>
+    <bpmn:sequenceFlow id="sf3" sourceRef="task-embedded" targetRef="task-deployment"/>
+    <bpmn:sequenceFlow id="sf4" sourceRef="task-deployment" targetRef="task-classpath"/>
+    <bpmn:sequenceFlow id="sf5" sourceRef="task-classpath" targetRef="task-no-form"/>
+    <bpmn:sequenceFlow id="sf6" sourceRef="task-no-form" targetRef="end-1"/>
+  </bpmn:process>
+
+</bpmn:definitions>

@@ -1,0 +1,33 @@
+verbs:
+  - name: dsl.form
+    description: |
+      Render a form to the current user and optionally capture their input.
+      The Rust verb is form.io-agnostic: it emits {form_ref, mode, prefill_data}
+      for the cockpit to render. The React side resolves the schema by form_ref,
+      renders via Form.io, and submits the result back as a HumanTaskComplete event.
+    metadata:
+      domain: dsl
+      noun: form
+      subject_kinds: []
+      phase_tags: [workflow]
+      side_effects: user_interaction
+    behavior: plugin
+    args:
+      - name: form-ref
+        type: string
+        required: true
+      - name: mode
+        type: string
+        required: false
+      - name: context
+        type: object
+        required: false
+      - name: output-binding
+        type: string
+        required: false
+    returns:
+      type: record
+    three_axis:
+      state_effect: preserving
+      external_effects: [user_interaction]
+      consequence: reversible

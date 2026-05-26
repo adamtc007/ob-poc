@@ -5,6 +5,7 @@
 
 mod bus_runtime;
 mod routes;
+use routes::forms::create_forms_router;
 mod state;
 
 use axum::{routing::get, Router};
@@ -1763,9 +1764,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 }
             },
             Err(_) => {
-                tracing::info!(
-                    "federated bus runtime disabled (set OB_POC_BUS_LISTEN to enable)"
-                );
+                tracing::info!("federated bus runtime disabled (set OB_POC_BUS_LISTEN to enable)");
                 None
             }
         };
@@ -1844,7 +1843,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .nest(
             "/api/catalogue",
             ob_poc::api::catalogue_routes::create_catalogue_router(pool.clone()),
-        );
+        )
+        // Form.io verb integration — form schema serving + submission delivery
+        .merge(create_forms_router());
 
     // React dist directory - serve assets from React build
     let react_dist_dir = std::env::var("REACT_DIST_DIR").unwrap_or_else(|_| {

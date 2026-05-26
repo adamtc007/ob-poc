@@ -4,6 +4,7 @@
 
 pub mod emitter;
 pub mod feel_parser;
+pub mod form_key;
 pub mod mapper;
 pub mod reporter;
 pub mod verb_resolver;

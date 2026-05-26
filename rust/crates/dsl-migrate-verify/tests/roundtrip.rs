@@ -47,3 +47,9 @@ async fn feel_conditions_complex_roundtrip() {
     // Out-of-scope FEEL produces HUMAN-RESOLVE comments but DSL is still valid.
     roundtrip(include_str!("../../dsl-migrate/tests/corpus/feel_conditions_complex.bpmn"), "feel-complex").await;
 }
+
+#[tokio::test]
+async fn user_task_with_form_roundtrips() {
+    // Tasks with formKey emit :verb dsl.form — DSL should still parse and validate.
+    roundtrip(include_str!("../../dsl-migrate/tests/corpus/user_task_with_form.bpmn"), "user-task-form").await;
+}

@@ -6,6 +6,10 @@
 
 ---
 
+## Changelog (v0.7 → v0.8)
+
+- **§10** — explicit Rust/JS process boundary diagram added; form.io rendering + schema resolution confirmed JS-side only; Rust verb is form.io-agnostic (data + park). §10.5 split into Rust-side and JS-side component tables. Q8 resolved (token_id correlation, implemented in T3). Q10 added (schema authority — open for board, EOP governance connection).
+
 ## Changelog (v1 → v0.7)
 
 - **§10** — tightened against existing runtime machinery: `FormPending` outcome deleted (use `RequestHumanTask` effect + `HumanTaskComplete` event, both already defined); `form_submit` REPL input kind deleted (use existing `EventKind::HumanTaskComplete`); `behavior: plugin` noted as conventional (screening.yaml:44); reclassification risk downgraded (all task kinds route identically through `is_task_kind`, `processor.rs:919`); fidelity alternative offered for `:kind user-task`; `formKey` normalisation promoted to mapping table; Q8 reframed to ask correlation key only. Net: §10.5 shrinks — most proposed-new components are existing scaffolding needing dispatch wiring, not new machinery.
@@ -337,23 +341,39 @@ Current mapper behaviour (verified in `mapper.rs:280`): `bpmn:userTask` → `(no
 
 ## 10. Form.io Verb Integration
 
-### 10.1 Architectural position
+### 10.1 Architectural position and process boundary
 
-Form.io is a callout from a running BPMN execution surfaced as a standard SemOS verb `dsl.form`. It is **not** a separate bridge crate — and it should not become one.
+Form.io is a callout from a running BPMN execution surfaced as a standard SemOS verb `dsl.form`. It is **not** a separate bridge crate.
 
-dmn-lite is external because ob-poc explicitly disclaims decision authority over DMN (confirmed: manifest guard in `ob-poc-manifest-export/src/lib.rs`). Form.io owns nothing in that sense; it is a UI mechanism inside an ob-poc-owned process. A `form-bridge` crate would repeat the v0.6 `assembly.rs` mistake — new structure sitting next to machinery that already does the job.
+dmn-lite is external because ob-poc explicitly disclaims decision authority over DMN. Form.io owns nothing; it is a UI rendering mechanism inside an ob-poc-owned process. A `form-bridge` crate would invent structure next to machinery that already exists.
 
-**The park/resume machine already exists.** `bpmn-runtime/src/verb.rs:6-7`: when a verb has no registered handler, the token parks via `create_pending_wait` (confirmed: `processor.rs:748`) and resumes on `EventKind::VerbCompletion`. For `dsl.form`, the verb IS registered — it runs, emits a `VerbEffect::RequestHumanTask`, and the processor creates a `pending_wait` of kind `"human_task"`. Resume fires via `EventKind::HumanTaskComplete` (confirmed: `types.rs:101`, already in the `EventKind` enum).
+**Explicit Rust / JS boundary:**
 
-**Critical nuance:** `VerbEffect::RequestHumanTask` and `EventKind::HumanTaskComplete` are **defined but unhandled**. The type scaffolding is correct; the dispatch arms in `processor.rs` are missing. That is the work — ~20–30 lines completing existing scaffolding, not new machinery.
+```
+Rust half (form.io-agnostic)          wire           JS half (form.io-specific)
+─────────────────────────────        ──────         ─────────────────────────────
+dsl.form verb:                      outbound:       FormioForm component:
+  resolve :context slots →           {form_ref,       GET /api/forms/:ref → schema
+    prefill_data                      prefill_data,    Formio.createForm(el, schema)
+  emit RequestHumanTask               mode}            instance.submission = {data: prefill_data}
+    {role, form_data}                                  user interacts
+  park pending_wait                  inbound:        on submit:
+  resume on HumanTaskComplete         {data: {...}}    POST /api/forms/:token_id/submit
+    → inject submission data        (HumanTaskComplete  → ob-poc-web dispatches
+      into process context            event)            HumanTaskComplete event
+```
+
+**The Rust verb never fetches a form schema, never renders, never references form.io at all.** It deals only in data objects. If the form engine is swapped, only the React side changes.
+
+**Park/resume:** `RequestHumanTask` effect → `create_pending_wait("human_task", token_id)` → parks fiber. Resume via `HumanTaskComplete` event (already dispatches to `handle_verb_completion` at `processor.rs:34`). Both wired in T3.
 
 **Flow:**
 1. Runtime reaches `dsl.form` node → calls registered verb handler
-2. Handler fetches Form.io schema, returns `VerbOutput { effects: [RequestHumanTask { role, form_data }] }`
-3. Processor handles `RequestHumanTask` (new arm needed): creates `pending_wait("human_task", token_id, correlation_key)`
-4. Session response carries form schema to UI; cockpit renders it via Form.io SDK
-5. User interacts (display-only or capture)
-6. Submission delivers `HumanTaskComplete` event (new handler arm needed): resumes fiber with form data in process context
+2. Handler resolves context, returns `VerbOutput { effects: [RequestHumanTask { role, form_data: {form_ref, mode, prefill_data} }] }`
+3. Processor parks fiber via `pending_wait("human_task", token_id)`
+4. Session response carries `{form_ref, prefill_data, mode}` to cockpit
+5. React side fetches schema, renders form, prefills, user submits
+6. `POST /api/forms/:token_id/submit` → `HumanTaskComplete` → fiber resumes with submission data in context
 
 ### 10.2 Two interaction modes
 
@@ -406,19 +426,38 @@ Tasks without `formKey` continue to emit `(node id :kind user-task)` — Q5 unch
 
 The `behavior: plugin` verb-registry entry follows the standard pattern used by 10+ existing verbs (e.g. `config/verbs/screening.yaml:44`). Nothing structurally novel there.
 
+The `behavior: plugin` verb-registry entry follows the standard pattern used by 10+ existing verbs (e.g. `config/verbs/screening.yaml:44`). Nothing structurally novel there.
+
+**Rust side (form.io-agnostic):**
+
 | Component | What's new |
 |-----------|-----------|
 | `dsl.form` verb YAML | Conventional `behavior: plugin` entry. Args: `form_ref`, `mode`, `context`, `output_binding`. |
-| `DslFormOp` — `SemOsVerbOp` impl | `fetch_schema(form_ref)` call + returns `VerbOutput { effects: [RequestHumanTask {...}] }`. |
-| `RequestHumanTask` dispatch arm | ~15 lines in `processor.rs`: handle effect, create `pending_wait("human_task", ...)`. |
-| `HumanTaskComplete` handler arm | ~15 lines in `processor.rs`: find pending_wait by correlation, resume fiber with payload. |
-| Form.io schema store | Stores/retrieves form JSON by ref. Can be Form.io cloud, self-hosted, or local JSON files behind an ob-poc-web endpoint. |
-| UI form renderer | React component receiving form schema in session response, renders via Form.io JS SDK. Lives in `ob-poc-ui-react/` — not a Rust concern. |
+| `DslFormOp` — `SemOsVerbOp` impl | Resolves `:context` slots → `prefill_data`; returns `VerbOutput { effects: [RequestHumanTask { role, form_data: {form_ref, mode, prefill_data} }] }`. No schema fetch. |
+| `GET /api/forms/:ref` endpoint | Serves local JSON form schemas from `config/forms/`. Schema resolution happens JS-side via this endpoint. |
+| `POST /api/forms/:token_id/submit` endpoint | Accepts form submission; dispatches `HumanTaskComplete` event into runtime; fiber resumes. |
+
+**JS/React side (form.io-specific, ob-poc-ui-react/):**
+
+| Component | What's new |
+|-----------|-----------|
+| `features/forms/FormioForm.tsx` | Fetches schema via `GET /api/forms/:ref`; `Formio.createForm(el, schema)`; `instance.submission = {data: prefill_data}`; on submit POSTs to `/api/forms/:token_id/submit`. |
+| `api/forms.ts` | Typed API client for forms endpoints. |
+| Session response wiring | Cockpit detects `form_pending` in session response, renders `<FormioForm />` inline. |
+| Form.io SDK install | `@formio/react` or `formiojs` in package.json. |
 
 ### 10.6 Open questions
 
-**Q7. Form.io hosting** — cloud vs self-hosted vs local JSON files? The `fetch_schema` impl needs a concrete target. Local JSON files behind `GET /api/forms/:ref` in ob-poc-web is the simplest start.
+**Q7. Form.io hosting** — cloud vs self-hosted vs local JSON files? For v1: local JSON files at `rust/config/forms/*.json`, served by `GET /api/forms/:ref`. Form.io cloud / self-hosted Mongo can come later behind the same endpoint. The Rust verb is unaffected — it emits `form_ref` only.
 
-**Q8. Correlation key for pending_wait** — the `create_pending_wait` call (confirmed: `processor.rs:748`) takes a correlation kind and value. For `"human_task"` waits, what uniquely identifies a form instance so the `HumanTaskComplete` event routes to the right token? Options: `token_id` (simpler, one form per token), or a generated `form_submission_id` (allows tracking). Reviewer to decide.
+**Q8. Correlation key — RESOLVED.** Correlation key = `token_id.to_string()` (T3 implementation). One form per token. `POST /api/forms/:token_id/submit` carries the token_id in the URL; ob-poc-web dispatches `HumanTaskComplete` with `token_id` in the event payload. `handle_verb_completion` reads `token_id` from the event directly.
 
-**Q9. formKey normalisation edge cases** — Camunda 8 `camunda-forms:embedded:` forms embed the full JSON schema inline in the BPMN XML rather than referencing an external key. If the transpiler encounters an embedded schema, should it extract and store it, or always defer to HUMAN-RESOLVE? Scope question for the transpiler, not the runtime.
+**Q9. formKey normalisation edge cases** — Camunda 8 `camunda-forms:embedded:` forms embed the full JSON schema inline in the BPMN XML rather than referencing an external key. If the transpiler encounters an embedded schema, should it extract and store it, or always defer to HUMAN-RESOLVE? Scope question for the transpiler, not the runtime. V1 defers embedded schemas to HUMAN-RESOLVE.
+
+**Q10. Schema authority (open for board — do not resolve without governance discussion).** Two options:
+
+- **Option A — SemOS governs form schemas:** form schemas are versioned artefacts inside SemReg (like verb contracts, attribute defs). ob-poc stores and versions the JSON; `GET /api/forms/:ref` serves from SemReg. Submissions are tagged with the schema version they were captured against (audit trail). Full governance lifecycle.
+
+- **Option B — Form.io portal+Mongo is the authority:** ob-poc holds only `form_ref` strings. Form.io's own revision system (each publish stored as a numbered revision) governs schema evolution. ob-poc is a consumer, not an owner.
+
+This is the same "who owns this authority" boundary test that put dmn-lite outside the workspace. It bears directly on the EOP paper's data-governance-as-first-class stance: if form schemas govern what data a user can submit in a regulated workflow, they may be subject to the same change-control discipline as attribute definitions. That is not a small call — it determines whether form schemas get the full changeset/publish lifecycle or live outside the SemOS governance plane.

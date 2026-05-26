@@ -1,0 +1,36 @@
+{
+  "title": "KYC Review Summary",
+  "display": "form",
+  "components": [
+    {
+      "type": "panel",
+      "title": "Customer Information",
+      "components": [
+        {
+          "type": "textfield",
+          "key": "entityName",
+          "label": "Entity Name",
+          "disabled": true
+        },
+        {
+          "type": "textfield",
+          "key": "riskTier",
+          "label": "Risk Tier",
+          "disabled": true
+        },
+        {
+          "type": "textfield",
+          "key": "kycStatus",
+          "label": "KYC Status",
+          "disabled": true
+        }
+      ]
+    },
+    {
+      "type": "button",
+      "action": "submit",
+      "label": "Continue",
+      "theme": "primary"
+    }
+  ]
+}

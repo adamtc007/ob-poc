@@ -84,8 +84,7 @@ pub(crate) async fn start(config: BusRuntimeConfig) -> anyhow::Result<BusRuntime
     let adapter = ObPocVerbAdapter {
         executor: config.verb_executor,
     };
-    let handler = ObPocBusHandler::new(adapter)
-        .with_catalogue_version(config.catalogue_version);
+    let handler = ObPocBusHandler::new(adapter).with_catalogue_version(config.catalogue_version);
 
     // A3 §3.5 — ob-poc declares all three federated services.
     // InvocationService is real (Submit + stubbed Validate);
@@ -216,12 +215,8 @@ fn bindings_to_json(inputs: &[ResolvedBinding]) -> Result<serde_json::Value, Str
             return Err(format!("binding '{}' missing value", binding.name));
         };
         let json = match value.value.as_ref() {
-            Some(ProtoTypedValueKind::StringValue(s)) => {
-                serde_json::Value::String(s.clone())
-            }
-            Some(ProtoTypedValueKind::IntValue(n)) => {
-                serde_json::Value::Number((*n).into())
-            }
+            Some(ProtoTypedValueKind::StringValue(s)) => serde_json::Value::String(s.clone()),
+            Some(ProtoTypedValueKind::IntValue(n)) => serde_json::Value::Number((*n).into()),
             Some(ProtoTypedValueKind::DoubleValue(d)) => serde_json::Number::from_f64(*d)
                 .map(serde_json::Value::Number)
                 .unwrap_or(serde_json::Value::Null),
@@ -230,7 +225,9 @@ fn bindings_to_json(inputs: &[ResolvedBinding]) -> Result<serde_json::Value, Str
                 .map(|u| serde_json::Value::String(u.to_string()))
                 .ok_or_else(|| format!("binding '{}' has malformed uuid bytes", binding.name))?,
             Some(ProtoTypedValueKind::BlobValue(b)) => serde_json::Value::Array(
-                b.iter().map(|byte| serde_json::Value::from(*byte)).collect(),
+                b.iter()
+                    .map(|byte| serde_json::Value::from(*byte))
+                    .collect(),
             ),
             Some(ProtoTypedValueKind::NullValue(_)) | None => serde_json::Value::Null,
         };

@@ -30,6 +30,7 @@
 //! println!("status: {:?}", engine.get_instance_status(id).await?);
 //! ```
 
+pub mod builtins;
 pub mod event_loop;
 pub mod metrics;
 pub mod processor;
@@ -54,6 +55,7 @@ pub use types::{
     ActiveToken, EventEnvelope, EventId, EventKind, InstanceId, InstanceStatus, TokenId,
     WorkflowInstance, WriteLogEntry,
 };
+pub use builtins::{register_builtins, DslFormHandler};
 pub use verb::{VerbContext, VerbEffect, VerbError, VerbHandler, VerbOutput, VerbRegistry};
 
 #[cfg(feature = "postgres")]

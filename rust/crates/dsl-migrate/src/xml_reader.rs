@@ -66,6 +66,8 @@ pub struct BpmnTask {
     pub implementation: Option<String>,
     /// For user tasks: assignee expression.
     pub assignee: Option<String>,
+    /// Camunda 8 form key (e.g. `camunda-forms:embedded:…`, `deployment:foo.json`, plain key).
+    pub form_key: Option<String>,
     /// `camunda:property` / extension name→value pairs.
     pub camunda_props: HashMap<String, String>,
 }
@@ -208,6 +210,7 @@ fn parse_container(
                             task_type: tk,
                             implementation,
                             assignee: attr_str(e, b"assignee"),
+                            form_key: attr_str(e, b"formKey"),
                             camunda_props: std::collections::HashMap::new(),
                         }));
                     }
@@ -458,6 +461,7 @@ fn parse_task_body(
     let id = attr_str(attrs_elem, b"id").unwrap_or_default();
     let name = attr_str(attrs_elem, b"name");
     let assignee = attr_str(attrs_elem, b"assignee");
+    let form_key = attr_str(attrs_elem, b"formKey");
 
     // Grab top-level camunda attributes for implementation hint
     let mut implementation = attr_str(attrs_elem, b"topic")
@@ -506,6 +510,7 @@ fn parse_task_body(
         task_type,
         implementation,
         assignee,
+        form_key,
         camunda_props,
     })
 }

@@ -142,6 +142,45 @@ fn complex_feel_out_of_scope_becomes_human_resolve() {
 }
 
 #[test]
+fn user_task_form_key_mapping() {
+    let xml = include_str!("corpus/user_task_with_form.bpmn");
+    let process = dsl_migrate::parse_bpmn_xml(xml).unwrap();
+    let result = dsl_migrate::emit(&process);
+    let dsl = &result.dsl_source;
+
+    // Plain key passthrough
+    assert!(
+        dsl.contains(r#":verb dsl.form :form-ref "kyc.review-summary""#),
+        "plain key should pass through:\n{}",
+        dsl
+    );
+    // embedded: prefix stripped
+    assert!(
+        dsl.contains(r#":verb dsl.form :form-ref "embedded/onboarding-review""#),
+        "embedded prefix should be stripped:\n{}",
+        dsl
+    );
+    // deployment: prefix stripped
+    assert!(
+        dsl.contains(r#":verb dsl.form :form-ref "deployment/checklist.json""#),
+        "deployment prefix should be stripped:\n{}",
+        dsl
+    );
+    // classpath: → HUMAN-RESOLVE
+    assert!(
+        dsl.contains("HUMAN-RESOLVE"),
+        "classpath formKey should produce HUMAN-RESOLVE:\n{}",
+        dsl
+    );
+    // No formKey → plain user-task, no dsl.form
+    assert!(
+        dsl.contains("(node task-no-form :kind user-task)"),
+        "missing formKey should emit plain user-task:\n{}",
+        dsl
+    );
+}
+
+#[test]
 fn complex_gateway_is_rejected() {
     let xml = r#"<?xml version="1.0"?>
 <bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL" id="d1">

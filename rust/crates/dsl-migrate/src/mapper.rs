@@ -1,6 +1,7 @@
 //! IR → bpmn-lite DSL atoms.
 
 use crate::feel_parser::{feel_normalise, FeelNormaliseResult};
+use crate::form_key::{normalise_form_key, FormKeyNormalised};
 use crate::reporter::MigrationElement;
 use crate::xml_reader::{
     BpmnBoundaryEvent, BpmnElement, BpmnGateway, BpmnProcess, EventType, GatewayType, SequenceFlow,
@@ -125,6 +126,43 @@ fn map_element(element: &BpmnElement) -> (Option<String>, MigrationElement) {
         }
         BpmnElement::Task(t) => {
             let node_kind = task_kind(&t.task_type);
+
+            // User tasks with formKey → dsl.form verb emission
+            if matches!(t.task_type, TaskType::User) {
+                match normalise_form_key(t.form_key.as_deref()) {
+                    FormKeyNormalised::Resolved(form_ref) => {
+                        let line = format!(
+                            r#"(node {} :kind user-task :verb dsl.form :form-ref "{}")"#,
+                            safe_id(&t.id),
+                            form_ref,
+                        );
+                        return (
+                            Some(line),
+                            MigrationElement::clean(&t.id, t.name.as_deref(), "user-task"),
+                        );
+                    }
+                    FormKeyNormalised::NeedsReview { raw, reason } => {
+                        let line = format!(
+                            "; [HUMAN-RESOLVE] formKey: {} ({})\n(node {} :kind user-task)",
+                            raw,
+                            reason,
+                            safe_id(&t.id),
+                        );
+                        return (
+                            Some(line),
+                            MigrationElement::human_resolve(
+                                &t.id,
+                                t.name.as_deref(),
+                                "user-task",
+                                &format!("unsupported formKey prefix: {}", raw),
+                            ),
+                        );
+                    }
+                    FormKeyNormalised::Absent => {
+                        // Fall through to standard user-task emission below
+                    }
+                }
+            }
 
             // Try verb resolution for service / business-rule tasks
             let verb_ref = if matches!(t.task_type, TaskType::Service | TaskType::BusinessRule) {
