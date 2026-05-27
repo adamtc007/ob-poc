@@ -85,11 +85,21 @@ async fn handle_verb_completion(ctx: &RuntimeContext<'_>, event: &EventEnvelope)
         .cloned()
         .unwrap_or(serde_json::Value::Object(Default::default()));
 
+    let token_opt = ctx
+        .store
+        .get_tokens_for_instance(event.instance_id)
+        .await?
+        .into_iter()
+        .find(|t| t.id == token_id);
+    let in_branch = token_opt.is_some_and(|t| !t.branch_lineage.is_empty());
+
     if let Some(obj) = output.as_object() {
         for (k, v) in obj {
-            ctx.store
-                .write_instance_data(event.instance_id, k, v.clone())
-                .await?;
+            if !in_branch {
+                ctx.store
+                    .write_instance_data(event.instance_id, k, v.clone())
+                    .await?;
+            }
             ctx.store
                 .append_to_write_log(
                     token_id,
@@ -290,6 +300,57 @@ async fn handle_decision_gateway(
 
     match ctx.switch_adaptor.handle(request).await {
         Ok(reply) => {
+            let targets = reply.selected_targets;
+
+            // C4: Gateway Multiplicity Policy Check
+            match node.kind.as_str() {
+                "exclusive" | "event-based"
+                    if targets.len() != 1 => {
+                        tracing::error!(%instance_id, gateway = %node.name, kind = %node.kind, "gateway expected exactly 1 target, got {}", targets.len());
+                        ctx.store
+                            .append_journey_log(JourneyLogEntry {
+                                instance_id,
+                                token_id: Some(token_id),
+                                event_kind: "gateway_dead_end".to_string(),
+                                from_node: Some(node.name.clone()),
+                                to_node: None,
+                                data_delta: Some(serde_json::json!({"error": format!("expected exactly 1 target, got {}", targets.len())})),
+                            })
+                            .await?;
+                        ctx.store
+                            .update_instance_status(
+                                instance_id,
+                                InstanceStatus::Failed,
+                                Some(chrono::Utc::now()),
+                            )
+                            .await?;
+                        return Ok(());
+                    }
+                "parallel-event-based"
+                    if targets.is_empty() => {
+                        tracing::error!(%instance_id, gateway = %node.name, kind = %node.kind, "gateway expected at least 1 target, got 0");
+                        ctx.store
+                            .append_journey_log(JourneyLogEntry {
+                                instance_id,
+                                token_id: Some(token_id),
+                                event_kind: "gateway_dead_end".to_string(),
+                                from_node: Some(node.name.clone()),
+                                to_node: None,
+                                data_delta: Some(serde_json::json!({"error": "expected at least 1 target, got 0"})),
+                            })
+                            .await?;
+                        ctx.store
+                            .update_instance_status(
+                                instance_id,
+                                InstanceStatus::Failed,
+                                Some(chrono::Utc::now()),
+                            )
+                            .await?;
+                        return Ok(());
+                    }
+                _ => {}
+            }
+
             RuntimeMetrics::increment(&ctx.metrics.gateway_decisions);
             ctx.store
                 .append_journey_log(JourneyLogEntry {
@@ -297,12 +358,11 @@ async fn handle_decision_gateway(
                     token_id: Some(token_id),
                     event_kind: "gateway_decided".to_string(),
                     from_node: Some(node.name.clone()),
-                    to_node: Some(reply.selected_targets.join(",")),
+                    to_node: Some(targets.join(",")),
                     data_delta: None,
                 })
                 .await?;
 
-            let targets = reply.selected_targets;
             for (i, target) in targets.iter().enumerate() {
                 if i == 0 {
                     // Reuse the existing token for the first target.
@@ -709,10 +769,20 @@ async fn invoke_verb_for_task(
         };
         match handler.invoke(verb_ctx).await {
             Ok(output) => {
+                let token_opt = ctx
+                    .store
+                    .get_tokens_for_instance(instance_id)
+                    .await?
+                    .into_iter()
+                    .find(|t| t.id == token_id);
+                let in_branch = token_opt.is_some_and(|t| !t.branch_lineage.is_empty());
+
                 for (k, v) in &output.data {
-                    ctx.store
-                        .write_instance_data(instance_id, k, v.clone())
-                        .await?;
+                    if !in_branch {
+                        ctx.store
+                            .write_instance_data(instance_id, k, v.clone())
+                            .await?;
+                    }
                     ctx.store
                         .append_to_write_log(
                             token_id,
@@ -826,7 +896,7 @@ async fn complete_task(
 // ---------------------------------------------------------------------------
 
 /// Result of applying the merge protocol to arriving branch tokens.
-enum MergeResult {
+pub enum MergeResult {
     /// All conflicts were resolved; map contains the final values to write.
     Ok(HashMap<String, serde_json::Value>),
     /// An unresolvable conflict was detected (no merge clause, different values).
@@ -839,43 +909,43 @@ enum MergeResult {
 /// Collect write-logs from all branch tokens and resolve conflicts using the
 /// join's merge clauses. Returns `MergeResult::Conflict` on the first
 /// unresolvable conflict.
-fn apply_merge_protocol(
+pub fn apply_merge_protocol(
     tokens: &[ActiveToken],
     join_spec: Option<&JourneyParallelJoin>,
 ) -> MergeResult {
-    // Collect all writes grouped by location.
+    // Collect the latest write from each token grouped by location.
     let mut writes_by_location: HashMap<String, Vec<serde_json::Value>> = HashMap::new();
     for token in tokens {
+        // Find the last write to each location by this token
+        let mut token_latest: HashMap<String, serde_json::Value> = HashMap::new();
         for entry in &token.write_log {
-            writes_by_location
-                .entry(entry.location.clone())
-                .or_default()
-                .push(entry.value.clone());
+            token_latest.insert(entry.location.clone(), entry.value.clone());
+        }
+        for (location, value) in token_latest {
+            writes_by_location.entry(location).or_default().push(value);
         }
     }
 
     let mut merged: HashMap<String, serde_json::Value> = HashMap::new();
 
     for (location, values) in writes_by_location {
-        if values.len() == 1 {
-            merged.insert(location, values.into_iter().next().unwrap());
-        } else {
-            // Check if all values are identical.
-            let all_same = values.windows(2).all(|w| w[0] == w[1]);
-            if all_same {
-                merged.insert(location, values.into_iter().next().unwrap());
-            } else {
-                // Look for a merge clause.
-                let merge_op =
-                    join_spec.and_then(|j| j.merge.iter().find(|m| m.location == location));
-                match merge_op {
-                    Some(clause) => {
-                        let v = apply_merge_operator(&clause.operator, values);
-                        merged.insert(location, v);
-                    }
-                    None => {
-                        return MergeResult::Conflict { location, values };
-                    }
+        let merge_op = join_spec.and_then(|j| j.merge.iter().find(|m| m.location == location));
+        match merge_op {
+            Some(clause) => match apply_merge_operator(&clause.operator, values.clone()) {
+                Ok(v) => {
+                    merged.insert(location, v);
+                }
+                Err(_) => {
+                    return MergeResult::Conflict { location, values };
+                }
+            },
+            None => {
+                // If there's no merge operator, require all values to be exactly the same
+                // or just one branch wrote it.
+                if values.len() == 1 || values.windows(2).all(|w| w[0] == w[1]) {
+                    merged.insert(location, values.into_iter().next().unwrap());
+                } else {
+                    return MergeResult::Conflict { location, values };
                 }
             }
         }
@@ -883,42 +953,75 @@ fn apply_merge_protocol(
     MergeResult::Ok(merged)
 }
 
-fn apply_merge_operator(operator: &str, values: Vec<serde_json::Value>) -> serde_json::Value {
+fn apply_merge_operator(
+    operator: &str,
+    values: Vec<serde_json::Value>,
+) -> Result<serde_json::Value, ()> {
+    if values.is_empty() {
+        return Ok(serde_json::Value::Null);
+    }
     match operator {
-        "latest" => values.into_iter().last().unwrap_or(serde_json::Value::Null),
+        "latest" => Ok(values.into_iter().last().unwrap_or(serde_json::Value::Null)),
         "union" => {
-            let strings: Vec<serde_json::Value> = values
-                .into_iter()
-                .filter_map(|v| v.as_str().map(|s| serde_json::Value::String(s.to_string())))
-                .collect();
-            serde_json::Value::Array(strings)
+            let mut strings = Vec::new();
+            for v in values {
+                if let Some(s) = v.as_str() {
+                    strings.push(serde_json::Value::String(s.to_string()));
+                } else {
+                    return Err(()); // Type mismatch
+                }
+            }
+            Ok(serde_json::Value::Array(strings))
         }
         "max" => {
-            let max = values
-                .iter()
-                .filter_map(|v| v.as_f64())
-                .fold(f64::NEG_INFINITY, f64::max);
-            serde_json::json!(max)
+            let mut max = f64::NEG_INFINITY;
+            for v in values {
+                if let Some(f) = v.as_f64() {
+                    if f > max {
+                        max = f;
+                    }
+                } else {
+                    return Err(());
+                }
+            }
+            Ok(serde_json::json!(max))
         }
         "min" => {
-            let min = values
-                .iter()
-                .filter_map(|v| v.as_f64())
-                .fold(f64::INFINITY, f64::min);
-            serde_json::json!(min)
+            let mut min = f64::INFINITY;
+            for v in values {
+                if let Some(f) = v.as_f64() {
+                    if f < min {
+                        min = f;
+                    }
+                } else {
+                    return Err(());
+                }
+            }
+            Ok(serde_json::json!(min))
         }
         "sum" => {
-            let sum: f64 = values.iter().filter_map(|v| v.as_f64()).sum();
-            serde_json::json!(sum)
+            let mut sum: f64 = 0.0;
+            for v in values {
+                if let Some(f) = v.as_f64() {
+                    sum += f;
+                } else {
+                    return Err(()); // Type mismatch
+                }
+            }
+            Ok(serde_json::json!(sum))
         }
         "concat" => {
-            let parts: Vec<String> = values
-                .into_iter()
-                .filter_map(|v| v.as_str().map(String::from))
-                .collect();
-            serde_json::Value::String(parts.join(""))
+            let mut parts = Vec::new();
+            for v in values {
+                if let Some(s) = v.as_str() {
+                    parts.push(s.to_string());
+                } else {
+                    return Err(());
+                }
+            }
+            Ok(serde_json::Value::String(parts.join("")))
         }
-        _ => values.into_iter().last().unwrap_or(serde_json::Value::Null),
+        _ => Ok(values.into_iter().last().unwrap_or(serde_json::Value::Null)),
     }
 }
 

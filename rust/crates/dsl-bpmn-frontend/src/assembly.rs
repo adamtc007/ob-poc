@@ -7,8 +7,8 @@
 
 use std::collections::{HashMap, HashSet, VecDeque};
 
-use dsl_atoms::StructuralKind;
 use dsl_ast::AtomBag;
+use dsl_atoms::StructuralKind;
 use dsl_diagnostics::{Diagnostic, DiagnosticBag, UNDECLARED_MERGE, UNRESOLVED_NAME_REF};
 use dsl_parser::raw_ast::RawValue;
 
@@ -189,11 +189,8 @@ fn index_gateways(bag: &AtomBag, graph: &mut RailwayGraph, diagnostics: &mut Dia
             Some(s) => s,
             None => {
                 diagnostics.push(
-                    Diagnostic::error(format!(
-                        "Gateway '{}' missing required ':kind' slot",
-                        name
-                    ))
-                    .with_code(dsl_diagnostics::MISSING_REQUIRED_SLOT),
+                    Diagnostic::error(format!("Gateway '{}' missing required ':kind' slot", name))
+                        .with_code(dsl_diagnostics::MISSING_REQUIRED_SLOT),
                 );
                 continue;
             }
@@ -219,7 +216,9 @@ fn index_gateways(bag: &AtomBag, graph: &mut RailwayGraph, diagnostics: &mut Dia
             continue;
         }
 
-        graph.gateways.insert(name.clone(), RailwayGateway { name, kind });
+        graph
+            .gateways
+            .insert(name.clone(), RailwayGateway { name, kind });
     }
 }
 
@@ -464,8 +463,7 @@ fn find_start_node(graph: &mut RailwayGraph, diagnostics: &mut DiagnosticBag) {
             diagnostics.push(Diagnostic::warning(format!(
                 "Process has {} start event nodes; only one is expected. \
                  Using '{}' as the primary start node.",
-                n,
-                sorted[0]
+                n, sorted[0]
             )));
             graph.start_node = Some(sorted.into_iter().next().unwrap());
         }
@@ -498,7 +496,11 @@ fn validate_reachability(graph: &RailwayGraph, diagnostics: &mut DiagnosticBag) 
             }
         }
         // Boundary event targets are also reachable
-        for ba in graph.boundary_attachments.iter().filter(|ba| ba.host_node == current) {
+        for ba in graph
+            .boundary_attachments
+            .iter()
+            .filter(|ba| ba.host_node == current)
+        {
             if !reachable.contains(&ba.event_name) {
                 reachable.insert(ba.event_name.clone());
                 queue.push_back(ba.event_name.clone());
@@ -518,8 +520,11 @@ fn validate_reachability(graph: &RailwayGraph, diagnostics: &mut DiagnosticBag) 
     for name in graph.gateways.keys() {
         if !reachable.contains(name.as_str()) {
             diagnostics.push(
-                Diagnostic::error(format!("Gateway '{}' is unreachable from start event", name))
-                    .with_code(UNREACHABLE_NODE),
+                Diagnostic::error(format!(
+                    "Gateway '{}' is unreachable from start event",
+                    name
+                ))
+                .with_code(UNREACHABLE_NODE),
             );
         }
     }
@@ -548,19 +553,23 @@ fn validate_termination(graph: &RailwayGraph, diagnostics: &mut DiagnosticBag) {
     // Build outgoing adjacency
     let mut outgoing: HashMap<&str, Vec<&str>> = HashMap::new();
     for edge in &graph.edges {
-        outgoing.entry(edge.source.as_str()).or_default().push(edge.target.as_str());
+        outgoing
+            .entry(edge.source.as_str())
+            .or_default()
+            .push(edge.target.as_str());
     }
     // Boundary events contribute outgoing edges
     for ba in &graph.boundary_attachments {
-        outgoing
-            .entry(ba.event_name.as_str())
-            .or_default();
+        outgoing.entry(ba.event_name.as_str()).or_default();
         // The boundary event itself may have outgoing flows in the edges list
     }
 
     // Find nodes that have no outgoing edges and are not end events
     for (name, node) in &graph.nodes {
-        let has_outgoing = outgoing.get(name.as_str()).map(|v| !v.is_empty()).unwrap_or(false);
+        let has_outgoing = outgoing
+            .get(name.as_str())
+            .map(|v| !v.is_empty())
+            .unwrap_or(false);
         if !has_outgoing && !node.kind.is_end_event() {
             diagnostics.push(
                 Diagnostic::error(format!(
@@ -574,7 +583,10 @@ fn validate_termination(graph: &RailwayGraph, diagnostics: &mut DiagnosticBag) {
     }
     // Gateways and parallel-joins without outgoing are also dead-ends
     for name in graph.gateways.keys() {
-        let has_outgoing = outgoing.get(name.as_str()).map(|v| !v.is_empty()).unwrap_or(false);
+        let has_outgoing = outgoing
+            .get(name.as_str())
+            .map(|v| !v.is_empty())
+            .unwrap_or(false);
         if !has_outgoing {
             diagnostics.push(
                 Diagnostic::error(format!(
@@ -586,11 +598,29 @@ fn validate_termination(graph: &RailwayGraph, diagnostics: &mut DiagnosticBag) {
         }
     }
     for name in graph.parallel_joins.keys() {
-        let has_outgoing = outgoing.get(name.as_str()).map(|v| !v.is_empty()).unwrap_or(false);
+        let has_outgoing = outgoing
+            .get(name.as_str())
+            .map(|v| !v.is_empty())
+            .unwrap_or(false);
         if !has_outgoing {
             diagnostics.push(
                 Diagnostic::error(format!(
                     "parallel-join '{}' has no outgoing flows — unterminated path",
+                    name
+                ))
+                .with_code(UNTERMINATED_PATH),
+            );
+        }
+    }
+    for name in &graph.boundary_event_names {
+        let has_outgoing = outgoing
+            .get(name.as_str())
+            .map(|v| !v.is_empty())
+            .unwrap_or(false);
+        if !has_outgoing {
+            diagnostics.push(
+                Diagnostic::error(format!(
+                    "Boundary event '{}' has no outgoing flows — unterminated path",
                     name
                 ))
                 .with_code(UNTERMINATED_PATH),
@@ -628,27 +658,25 @@ fn validate_gateway_fanout(graph: &RailwayGraph, diagnostics: &mut DiagnosticBag
                     );
                 }
             }
-            GatewayKind::Parallel
-                if outgoing.len() < 2 => {
-                    diagnostics.push(
-                        Diagnostic::warning(format!(
-                            "Parallel gateway '{}' should have ≥2 outgoing flows (has {})",
-                            name,
-                            outgoing.len()
-                        ))
-                        .with_code(GATEWAY_FAN_OUT_ERROR),
-                    );
-                }
-            GatewayKind::Inclusive
-                if outgoing.is_empty() => {
-                    diagnostics.push(
-                        Diagnostic::warning(format!(
-                            "Inclusive gateway '{}' has no outgoing flows",
-                            name
-                        ))
-                        .with_code(GATEWAY_FAN_OUT_ERROR),
-                    );
-                }
+            GatewayKind::Parallel if outgoing.len() < 2 => {
+                diagnostics.push(
+                    Diagnostic::warning(format!(
+                        "Parallel gateway '{}' should have ≥2 outgoing flows (has {})",
+                        name,
+                        outgoing.len()
+                    ))
+                    .with_code(GATEWAY_FAN_OUT_ERROR),
+                );
+            }
+            GatewayKind::Inclusive if outgoing.is_empty() => {
+                diagnostics.push(
+                    Diagnostic::warning(format!(
+                        "Inclusive gateway '{}' has no outgoing flows",
+                        name
+                    ))
+                    .with_code(GATEWAY_FAN_OUT_ERROR),
+                );
+            }
             _ => {}
         }
     }
@@ -828,7 +856,11 @@ fn raw_value_to_string(v: &RawValue) -> String {
                 format!("({} {} {})", a.kind, name_part, slots.join(" "))
             }
         }
-        RawValue::ForEach { var, list_param, body } => {
+        RawValue::ForEach {
+            var,
+            list_param,
+            body,
+        } => {
             // Render the for-each form back to surface syntax.
             let body_str: Vec<String> = body.iter().map(raw_value_to_string).collect();
             format!(
