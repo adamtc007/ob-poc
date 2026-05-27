@@ -193,6 +193,7 @@ mod request_ops;
 // `attribute_id: Uuid` (caller fetches the trait), the ob-poc surface
 // reduces to zero. Registration flows through inventory.
 pub mod rule_evaluator;
+mod workflow_ops;
 // Phase 5d — screening_ops relocated to `dsl-runtime::domain_ops::screening_ops`
 // Phase 5a composite-blocker #7 — sem_os_audit_ops relocated to
 // `dsl-runtime::domain_ops::sem_os_audit_ops`. Clean lift on the existing
@@ -644,6 +645,10 @@ pub fn extend_registry(registry: &mut sem_os_postgres::ops::SemOsVerbOpRegistry)
     // registration keeps `test_plugin_verb_coverage` green so the
     // pre-commit gate doesn't trip on unrelated PRs.
     stub_op::register_stub_ops(registry);
+
+    // BPMN session integration: workflow.start-process verb (Pattern B —
+    // bridges to ProcessRegistryService via ServiceRegistry).
+    registry.register(Arc::new(workflow_ops::WorkflowStartProcess));
 }
 
 /// Return the sorted list of plugin-verb FQNs declared in YAML (via

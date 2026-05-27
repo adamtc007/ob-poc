@@ -183,7 +183,7 @@ impl RuntimeEngine {
     // --- Internal ---
 
     /// Drain the event queue for `instance_id` until it is empty.
-    pub(crate) async fn run_to_quiescence(&self, instance_id: InstanceId) -> Result<()> {
+    pub async fn run_to_quiescence(&self, instance_id: InstanceId) -> Result<()> {
         loop {
             let events = self.store.dequeue_events(10).await?;
             if events.is_empty() {

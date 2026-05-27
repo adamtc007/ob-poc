@@ -29,6 +29,12 @@ pub mod postgres {
         pub fn new(pool: PgPool) -> Self {
             Self { pool }
         }
+
+        /// Expose the underlying pool for callers that need direct queries
+        /// (e.g. `ProcessRegistry` lookups that aren't part of the store trait).
+        pub fn pool(&self) -> &PgPool {
+            &self.pool
+        }
     }
 
     #[async_trait]
@@ -332,6 +338,7 @@ pub mod postgres {
 
         // --- Pending waits ---
 
+        #[allow(clippy::too_many_arguments)]
         async fn create_pending_wait(
             &self,
             instance_id: InstanceId,
@@ -340,11 +347,12 @@ pub mod postgres {
             node_name: &str,
             correlation_key: Option<String>,
             timeout_at: Option<DateTime<Utc>>,
+            payload: Option<serde_json::Value>,
         ) -> Result<Uuid> {
             let row = sqlx::query(
                 "INSERT INTO dsl_pending_wait \
-                 (instance_id, token_id, wait_kind, node_name, correlation_key, timeout_at) \
-                 VALUES ($1, $2, $3, $4, $5, $6) \
+                 (instance_id, token_id, wait_kind, node_name, correlation_key, timeout_at, payload) \
+                 VALUES ($1, $2, $3, $4, $5, $6, $7) \
                  RETURNING id",
             )
             .bind(instance_id)
@@ -353,6 +361,7 @@ pub mod postgres {
             .bind(node_name)
             .bind(correlation_key)
             .bind(timeout_at)
+            .bind(payload)
             .fetch_one(&self.pool)
             .await?;
             Ok(row.try_get("id")?)
@@ -364,7 +373,7 @@ pub mod postgres {
             correlation_key: &str,
         ) -> Result<Option<PendingWaitInfo>> {
             let row = sqlx::query(
-                "SELECT id, instance_id, token_id, node_name \
+                "SELECT id, instance_id, token_id, node_name, payload \
                  FROM dsl_pending_wait \
                  WHERE wait_kind = $1 AND correlation_key = $2 \
                  LIMIT 1",
@@ -379,6 +388,7 @@ pub mod postgres {
                 instance_id: r.try_get("instance_id").unwrap(),
                 token_id: r.try_get("token_id").unwrap(),
                 node_name: r.try_get("node_name").unwrap(),
+                payload: r.try_get("payload").unwrap_or(None),
             }))
         }
 

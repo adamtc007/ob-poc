@@ -41,6 +41,8 @@ pub struct PendingWaitInfo {
     pub instance_id: InstanceId,
     pub token_id: TokenId,
     pub node_name: String,
+    /// Wait-kind-specific payload (e.g. form_data for human_task waits).
+    pub payload: Option<serde_json::Value>,
 }
 
 // ---------------------------------------------------------------------------
@@ -121,6 +123,7 @@ pub trait JourneyStore: Send + Sync {
 
     // --- Pending waits ---
 
+    #[allow(clippy::too_many_arguments)]
     async fn create_pending_wait(
         &self,
         instance_id: InstanceId,
@@ -129,6 +132,7 @@ pub trait JourneyStore: Send + Sync {
         node_name: &str,
         correlation_key: Option<String>,
         timeout_at: Option<DateTime<Utc>>,
+        payload: Option<serde_json::Value>,
     ) -> Result<Uuid>;
 
     async fn find_pending_wait_by_correlation(
@@ -215,6 +219,16 @@ pub trait JourneyStore: Send + Sync {
 // InMemoryJourneyStore
 // ---------------------------------------------------------------------------
 
+struct InMemoryPendingWait {
+    id: Uuid,
+    instance_id: InstanceId,
+    token_id: TokenId,
+    wait_kind: String,
+    node_name: String,
+    correlation_key: Option<String>,
+    payload: Option<serde_json::Value>,
+}
+
 #[derive(Default)]
 struct InMemoryState {
     instances: HashMap<InstanceId, WorkflowInstance>,
@@ -223,8 +237,7 @@ struct InMemoryState {
     events: Vec<EventEnvelope>,
     instance_data: HashMap<(InstanceId, String), serde_json::Value>,
     journey_log: Vec<JourneyLogEntry>,
-    /// (id, instance_id, token_id, wait_kind, node_name, correlation_key)
-    pending_waits: Vec<(Uuid, InstanceId, TokenId, String, String, Option<String>)>,
+    pending_waits: Vec<InMemoryPendingWait>,
     /// (join_name, instance_id) → set of arrived token IDs
     join_arrivals: HashMap<(String, InstanceId), Vec<TokenId>>,
     /// (join_name, instance_id) → dynamic expected count (inclusive gateway case)
@@ -408,6 +421,7 @@ impl JourneyStore for InMemoryJourneyStore {
         Ok(())
     }
 
+    #[allow(clippy::too_many_arguments)]
     async fn create_pending_wait(
         &self,
         instance_id: InstanceId,
@@ -416,16 +430,18 @@ impl JourneyStore for InMemoryJourneyStore {
         node_name: &str,
         correlation_key: Option<String>,
         _timeout_at: Option<DateTime<Utc>>,
+        payload: Option<serde_json::Value>,
     ) -> Result<Uuid> {
         let id = Uuid::new_v4();
-        self.state.lock().unwrap().pending_waits.push((
+        self.state.lock().unwrap().pending_waits.push(InMemoryPendingWait {
             id,
             instance_id,
             token_id,
-            wait_kind.to_string(),
-            node_name.to_string(),
+            wait_kind: wait_kind.to_string(),
+            node_name: node_name.to_string(),
             correlation_key,
-        ));
+            payload,
+        });
         Ok(id)
     }
 
@@ -435,13 +451,14 @@ impl JourneyStore for InMemoryJourneyStore {
         correlation_key: &str,
     ) -> Result<Option<PendingWaitInfo>> {
         let s = self.state.lock().unwrap();
-        for (id, inst_id, tok_id, kind, node, corr) in &s.pending_waits {
-            if kind == wait_kind && corr.as_deref() == Some(correlation_key) {
+        for w in &s.pending_waits {
+            if w.wait_kind == wait_kind && w.correlation_key.as_deref() == Some(correlation_key) {
                 return Ok(Some(PendingWaitInfo {
-                    id: *id,
-                    instance_id: *inst_id,
-                    token_id: *tok_id,
-                    node_name: node.clone(),
+                    id: w.id,
+                    instance_id: w.instance_id,
+                    token_id: w.token_id,
+                    node_name: w.node_name.clone(),
+                    payload: w.payload.clone(),
                 }));
             }
         }

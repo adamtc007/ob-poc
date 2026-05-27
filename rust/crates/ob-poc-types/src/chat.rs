@@ -388,6 +388,26 @@ pub struct ChatResponse {
     /// utterance can be followed from stage 1 → stage 9b with one grep.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub trace_id: Option<uuid::Uuid>,
+
+    /// Present when a dsl.form verb parked a BPMN fiber — surfaces a Form.io
+    /// form for the user to fill before the process can advance.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub bpmn_form: Option<BpmnFormPending>,
+}
+
+/// Payload surfaced when a dsl.form verb parks the BPMN fiber.
+/// Mirrors the TypeScript `BpmnFormPending` interface in
+/// `ob-poc-ui-react/src/types/chat.ts`.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct BpmnFormPending {
+    /// Form.io schema ref key — resolved by GET /api/forms/:ref
+    pub form_ref: String,
+    /// Token ID of the parked bpmn-runtime fiber (UUID as string)
+    pub token_id: String,
+    /// Interaction mode: display (read-only + ack) or capture (editable)
+    pub mode: String,
+    /// Process context data for prefilling the form
+    pub prefill_data: serde_json::Value,
 }
 
 /// User-facing Sage explanation payload.

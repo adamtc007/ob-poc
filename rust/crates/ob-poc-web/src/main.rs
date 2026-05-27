@@ -4,9 +4,11 @@
 //! for DSL generation, entity search, attributes, and DSL viewer.
 
 mod bus_runtime;
+mod process_registry;
 mod routes;
 use routes::forms::create_forms_router;
 mod state;
+use process_registry::ProcessRegistry;
 
 use axum::{routing::get, Router};
 use http::header::{HeaderValue, CACHE_CONTROL};
@@ -834,8 +836,29 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let gateway_client = EntityGatewayClient::new(gateway_channel);
     let gateway_resolver = GatewayRefResolver::new(gateway_client);
 
+    // Initialise ProcessRegistry — loads all enabled process definitions from DB,
+    // compiles each to JourneySpec, and creates a RuntimeEngine per definition.
+    // Definitions that fail to compile are logged and skipped; server starts with
+    // a partial registry rather than failing hard.
+    let process_registry = Arc::new(
+        ProcessRegistry::load_all(pool.clone())
+            .await
+            .unwrap_or_else(|e| {
+                tracing::warn!(error = %e, "ProcessRegistry::load_all failed, starting with empty registry");
+                ProcessRegistry::empty(pool.clone())
+            }),
+    );
+
+    // Register ProcessRegistry as a platform service so workflow.start-process
+    // verb ops can access it via ctx.service::<dyn ProcessRegistryService>().
+    {
+        // service_registry is built later in this function; we store the Arc here
+        // and pass it in when building the registry below.
+        // (See service_registry builder block ~line 920.)
+    }
+
     // Create shared state for CBU/graph endpoints
-    let state = AppState::new(pool.clone());
+    let state = AppState::new(pool.clone(), Arc::clone(&process_registry));
 
     // Static file serving - point to our static directory
     // Use manifest dir at compile time, or STATIC_DIR env var at runtime
@@ -1093,6 +1116,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         ));
         tracing::info!(
             "ServiceRegistry: registered dyn AttributeService (sem_reg::* + attribute_identity_service)"
+        );
+
+        // dyn ProcessRegistryService — allows workflow.start-process verb op
+        // to start BPMN process instances via the registry.
+        builder.register::<dyn dsl_runtime::service_traits::ProcessRegistryService>(
+            Arc::clone(&process_registry) as Arc<dyn dsl_runtime::service_traits::ProcessRegistryService>,
+        );
+        tracing::info!(
+            "ServiceRegistry: registered dyn ProcessRegistryService (bpmn-runtime ProcessRegistry)"
         );
 
         Arc::new(builder.build())
@@ -1845,7 +1877,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             ob_poc::api::catalogue_routes::create_catalogue_router(pool.clone()),
         )
         // Form.io verb integration — form schema serving + submission delivery
-        .merge(create_forms_router(pool.clone()));
+        .merge(create_forms_router(pool.clone(), Arc::clone(&process_registry)));
 
     // React dist directory - serve assets from React build
     let react_dist_dir = std::env::var("REACT_DIST_DIR").unwrap_or_else(|_| {

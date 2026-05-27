@@ -70,6 +70,10 @@ anyhow = "1"
 # seed pipeline.
 dsl-analysis = { path = "../dsl-analysis" }
 
+# BPMN runtime (unified DSL v0.1) — process registry + human-task integration.
+bpmn-runtime = { path = "../bpmn-runtime", features = ["postgres"] }
+dsl-migrate-verify = { path = "../dsl-migrate-verify" }
+
 [features]
 default = []
 

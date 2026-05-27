@@ -678,6 +678,7 @@ async fn create_session_v2(
         narration: None,
         trace_id: None,
         acp_dag_semantic: None,
+        bpmn_form: None,
     };
 
     Ok(Json(CreateSessionResponseV2 {

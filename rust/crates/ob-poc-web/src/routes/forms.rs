@@ -4,15 +4,16 @@
 //! bpmn-runtime's HumanTaskComplete event:
 //!
 //!   GET  /api/forms/:ref          — serve form schema JSON from form_schemas table
-//!   POST /api/forms/:token_id/submit — accept submission, enqueue HumanTaskComplete
+//!   POST /api/forms/:token_id/submit — accept submission, drain engine, return 200
 //!
 //! The Rust verb (DslFormHandler) is form.io-agnostic: it emits {form_ref, mode,
 //! prefill_data} and parks the fiber with correlation_key = token_id.to_string().
 //! These endpoints complete the JS→Rust return path.
 //!
-//! Submit wiring: rather than coupling to a RuntimeEngine instance, the endpoint
-//! writes directly to dsl_event_queue. The runtime's next tick drains the queue
-//! and advances the parked token.
+//! Submit wiring: enqueue HumanTaskComplete into dsl_event_queue, then call
+//! ProcessRegistry::run_instance to drain synchronously before returning 200.
+//! Returns 200 (not 202) because the drain is inline and the caller knows the
+//! engine has quiesced when the response arrives.
 
 use axum::{
     extract::{Path, State},
@@ -22,29 +23,39 @@ use axum::{
     Json, Router,
 };
 use serde_json::Value;
-use sqlx::PgPool;
-use uuid::Uuid;
 
-/// Build the forms router, sharing the application PgPool.
-pub(crate) fn create_forms_router(pool: PgPool) -> Router {
+use crate::process_registry::ProcessRegistry;
+
+/// State for the forms router — pool + process registry.
+#[derive(Clone)]
+pub(crate) struct FormsState {
+    pool: sqlx::PgPool,
+    process_registry: std::sync::Arc<ProcessRegistry>,
+}
+
+/// Build the forms router.
+pub(crate) fn create_forms_router(
+    pool: sqlx::PgPool,
+    process_registry: std::sync::Arc<ProcessRegistry>,
+) -> Router {
     Router::new()
         .route("/api/forms/:form_ref", get(get_form_schema))
         .route("/api/forms/:token_id/submit", post(submit_form))
-        .with_state(pool)
+        .with_state(FormsState { pool, process_registry })
 }
 
 /// `GET /api/forms/:form_ref`
 ///
 /// Queries form_schemas table by ref slug. Returns 404 if not found.
 async fn get_form_schema(
-    State(pool): State<PgPool>,
+    State(state): State<FormsState>,
     Path(form_ref): Path<String>,
 ) -> impl IntoResponse {
     let row = sqlx::query_scalar!(
         "SELECT schema FROM form_schemas WHERE ref = $1",
         form_ref
     )
-    .fetch_optional(&pool)
+    .fetch_optional(&state.pool)
     .await;
 
     match row {
@@ -65,10 +76,15 @@ async fn get_form_schema(
 /// `POST /api/forms/:token_id/submit`
 ///
 /// Accepts a form submission from the React FormioForm component.
-/// Looks up the parked fiber by correlation_key = token_id, then enqueues
-/// a HumanTaskComplete event into dsl_event_queue for the runtime to drain.
+/// Looks up the parked fiber by correlation_key = token_id, enqueues
+/// HumanTaskComplete, then drains the engine synchronously (returns 200
+/// once the engine has quiesced, not 202).
+///
+/// Response body: `{ accepted, token_id, instance_id, next_form? }`
+/// where `next_form` is populated if the engine immediately re-parks at
+/// another human task (chained form flow).
 async fn submit_form(
-    State(pool): State<PgPool>,
+    State(state): State<FormsState>,
     Path(token_id): Path<String>,
     Json(payload): Json<Value>,
 ) -> impl IntoResponse {
@@ -80,7 +96,7 @@ async fn submit_form(
            LIMIT 1"#,
         token_id
     )
-    .fetch_optional(&pool)
+    .fetch_optional(&state.pool)
     .await;
 
     let wait = match wait {
@@ -102,7 +118,6 @@ async fn submit_form(
     };
 
     // Enqueue HumanTaskComplete into dsl_event_queue.
-    // The bpmn-runtime drains this on its next tick.
     let event_payload = serde_json::json!({
         "node_name":   wait.node_name,
         "token_id":    token_id,
@@ -115,39 +130,48 @@ async fn submit_form(
         wait.instance_id,
         event_payload
     )
-    .execute(&pool)
+    .execute(&state.pool)
     .await;
 
-    match enqueue {
-        Ok(_) => {
-            tracing::info!(
-                token_id = %token_id,
-                instance_id = %wait.instance_id,
-                node_name = %wait.node_name,
-                "HumanTaskComplete enqueued for parked fiber"
-            );
-            Json(serde_json::json!({
-                "accepted":    true,
-                "token_id":    token_id,
-                "instance_id": wait.instance_id,
-            }))
-            .into_response()
-        }
-        Err(e) => (
+    if let Err(e) = enqueue {
+        return (
             StatusCode::INTERNAL_SERVER_ERROR,
             format!("failed to enqueue HumanTaskComplete: {}", e),
         )
-            .into_response(),
+            .into_response();
     }
-}
 
-/// Parse a token_id string to UUID, returning a 400 response on failure.
-#[allow(dead_code)]
-fn parse_token_id(s: &str) -> Result<Uuid, impl IntoResponse> {
-    Uuid::parse_str(s).map_err(|_| {
-        (
-            StatusCode::BAD_REQUEST,
-            format!("token_id is not a valid UUID: {}", s),
-        )
-    })
+    // Drain the engine synchronously — run forward until quiesced.
+    // Returns the next pending human task if the process re-parks.
+    let next_form = match state
+        .process_registry
+        .run_instance(wait.instance_id)
+        .await
+    {
+        Ok(pending) => pending,
+        Err(e) => {
+            tracing::warn!(
+                instance_id = %wait.instance_id,
+                error = %e,
+                "ProcessRegistry::run_instance failed after HumanTaskComplete"
+            );
+            None
+        }
+    };
+
+    tracing::info!(
+        token_id = %token_id,
+        instance_id = %wait.instance_id,
+        node_name = %wait.node_name,
+        has_next_form = next_form.is_some(),
+        "HumanTaskComplete processed, engine quiesced"
+    );
+
+    Json(serde_json::json!({
+        "accepted":    true,
+        "token_id":    token_id,
+        "instance_id": wait.instance_id,
+        "next_form":   next_form,
+    }))
+    .into_response()
 }

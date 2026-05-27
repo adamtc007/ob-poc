@@ -1,0 +1,18 @@
+- name: workflow.start-process
+  description: |
+    Start a named BPMN process instance and run it to quiescence.
+    If the process immediately parks at a dsl.form human task, the
+    response contains a bpmn_form payload for the cockpit to render.
+  behavior: plugin
+  governance_tier: governed
+  args:
+    process_name:
+      type: string
+      required: true
+      description: Name of the process definition (matches process_definitions.name)
+    initial_data:
+      type: object
+      required: false
+      description: Initial data to inject into the process instance
+  returns:
+    type: record

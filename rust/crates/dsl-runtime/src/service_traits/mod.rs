@@ -22,6 +22,7 @@ pub mod service_pipeline_service;
 pub mod session_service;
 pub mod stewardship;
 pub mod trading_profile_document;
+pub mod process_registry;
 pub mod view_service;
 
 pub use attribute_identity::AttributeIdentityService;
@@ -38,4 +39,5 @@ pub use service_pipeline_service::ServicePipelineService;
 pub use session_service::SessionService;
 pub use stewardship::{StewardshipDispatch, StewardshipOutcome};
 pub use trading_profile_document::TradingProfileDocument;
+pub use process_registry::ProcessRegistryService;
 pub use view_service::ViewService;

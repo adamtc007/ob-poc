@@ -75,6 +75,11 @@ pub struct ReplResponseV2 {
     /// `acp_chat_trace_summary_typed` into `ChatResponse.acp_trace`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub acp_dag_semantic: Option<crate::acp_dag_semantic::AcpDagSemanticResolution>,
+
+    /// Present when a dsl.form verb parked a BPMN fiber during this turn.
+    /// Forwarded by the response adapter to ChatResponse.bpmn_form.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub bpmn_form: Option<ob_poc_types::chat::BpmnFormPending>,
 }
 
 // ---------------------------------------------------------------------------
@@ -233,6 +238,7 @@ mod tests {
             narration: None,
             trace_id: None,
             acp_dag_semantic: None,
+                bpmn_form: None,
         };
 
         let json = serde_json::to_string(&response).unwrap();
@@ -256,6 +262,7 @@ mod tests {
             narration: None,
             trace_id: None,
             acp_dag_semantic: None,
+                bpmn_form: None,
         };
 
         let json = serde_json::to_string(&response).unwrap();
@@ -289,6 +296,7 @@ mod tests {
             narration: None,
             trace_id: None,
             acp_dag_semantic: None,
+                bpmn_form: None,
         };
 
         let json = serde_json::to_string(&response).unwrap();
@@ -319,6 +327,7 @@ mod tests {
             narration: None,
             trace_id: None,
             acp_dag_semantic: None,
+                bpmn_form: None,
         };
 
         let json = serde_json::to_string(&response).unwrap();

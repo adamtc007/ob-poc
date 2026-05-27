@@ -845,6 +845,7 @@ async fn dispatch_to_v2_repl(
                     narration: None,
                     trace_id: None,
                     acp_dag_semantic: None,
+                    bpmn_form: None,
                 });
             }
         }

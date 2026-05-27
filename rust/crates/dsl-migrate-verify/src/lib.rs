@@ -111,6 +111,31 @@ pub async fn verify_dsl_source(source: &str, process_name: &str) -> VerifyResult
     }
 }
 
+/// Compile DSL source to a [`JourneySpec`] without starting an engine instance.
+///
+/// Returns `Err` if parsing, assembly, or lowering fails. Useful for
+/// `ProcessRegistry::load_all` which compiles definitions at startup.
+pub fn compile_to_spec(source: &str, process_name: &str) -> anyhow::Result<JourneySpec> {
+    let (source_file, parse_diag) = dsl_parser::parse(source);
+    let mut diag = DiagnosticBag::new();
+    for d in &parse_diag.diagnostics {
+        diag.push(d.clone());
+    }
+    if diag.has_errors() {
+        let msgs: Vec<_> = diag.errors().map(|e| e.message.as_str()).collect();
+        anyhow::bail!("parse errors: {}", msgs.join("; "));
+    }
+
+    let bag = dsl_ast::AtomBag::from_source_file(source_file, &mut diag);
+    let graph = dsl_bpmn_frontend::assemble(&bag, &mut diag);
+    if diag.has_errors() {
+        let msgs: Vec<_> = diag.errors().map(|e| e.message.as_str()).collect();
+        anyhow::bail!("assembly errors: {}", msgs.join("; "));
+    }
+
+    Ok(dsl_lowering::lower(&graph, process_name))
+}
+
 /// Convenience wrapper: run the verifier synchronously in a new Tokio runtime.
 ///
 /// Used by the CLI `--verify` flag which already owns a main thread.

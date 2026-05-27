@@ -728,6 +728,8 @@ async fn invoke_verb_for_task(
                 let mut human_task_parked = false;
                 for effect in &output.effects {
                     if let VerbEffect::RequestHumanTask { role: _, form_data } = effect {
+                        // Clone payload before form_data is moved into the log entry below.
+                        let payload = Some(form_data.clone());
                         // correlation_key = token_id so HumanTaskComplete can address it
                         ctx.store
                             .create_pending_wait(
@@ -737,6 +739,7 @@ async fn invoke_verb_for_task(
                                 &node.name,
                                 Some(token_id.to_string()),
                                 None,
+                                payload,
                             )
                             .await?;
                         ctx.store
@@ -777,7 +780,7 @@ async fn invoke_verb_for_task(
     } else {
         // Verb not registered: leave token waiting for an external VerbCompletion event.
         ctx.store
-            .create_pending_wait(instance_id, token_id, "verb", &node.name, None, None)
+            .create_pending_wait(instance_id, token_id, "verb", &node.name, None, None, None)
             .await?;
         ctx.store
             .append_journey_log(JourneyLogEntry {

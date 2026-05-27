@@ -55,6 +55,7 @@ pub fn repl_to_chat_response(resp: ReplResponseV2, session_id: Uuid) -> ChatResp
             .map(crate::acp_dag_semantic::acp_chat_trace_summary_typed),
         // Phase A.2 (F5 follow-on): forward the turn-level correlation id.
         trace_id: resp.trace_id,
+        bpmn_form: resp.bpmn_form.clone(),
     };
 
     match resp.kind {
@@ -195,8 +196,23 @@ pub fn repl_to_chat_response(resp: ReplResponseV2, session_id: Uuid) -> ChatResp
             }
         }
 
-        ReplResponseKindV2::Executed { .. }
-        | ReplResponseKindV2::RunbookSummary { .. }
+        ReplResponseKindV2::Executed { ref results } => {
+            // If a verb outcome carries a bpmn_form key (workflow.start-process
+            // pattern), surface it as ChatMessage.bpmn_form for the React cockpit.
+            if chat.bpmn_form.is_none() {
+                for step in results {
+                    if let Some(result) = &step.result {
+                        if let Some(form_val) = result.get("bpmn_form").filter(|v| !v.is_null()) {
+                            chat.bpmn_form =
+                                serde_json::from_value(form_val.clone()).ok();
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+
+        ReplResponseKindV2::RunbookSummary { .. }
         | ReplResponseKindV2::Parked { .. }
         | ReplResponseKindV2::Question { .. }
         | ReplResponseKindV2::Info { .. }
@@ -310,6 +326,7 @@ mod tests {
             narration: None,
             trace_id: None,
             acp_dag_semantic: None,
+            bpmn_form: None,
         };
         let chat = repl_to_chat_response(resp, Uuid::nil());
         assert!(chat.decision.is_some());
@@ -343,6 +360,7 @@ mod tests {
             narration: None,
             trace_id: None,
             acp_dag_semantic: None,
+            bpmn_form: None,
         };
         let chat = repl_to_chat_response(resp, Uuid::nil());
         assert!(chat.decision.is_some());
@@ -372,6 +390,7 @@ mod tests {
             narration: None,
             trace_id: None,
             acp_dag_semantic: None,
+            bpmn_form: None,
         };
         let chat = repl_to_chat_response(resp, Uuid::nil());
         let decision = chat.decision.expect("constellation map decision");
@@ -402,6 +421,7 @@ mod tests {
             narration: None,
             trace_id: None,
             acp_dag_semantic: None,
+            bpmn_form: None,
         };
         let chat = repl_to_chat_response(resp, Uuid::nil());
         let d = chat.decision.unwrap();
@@ -430,6 +450,7 @@ mod tests {
             narration: None,
             trace_id: None,
             acp_dag_semantic: None,
+            bpmn_form: None,
         };
         let chat = repl_to_chat_response(resp, Uuid::nil());
         assert!(chat.drafter_proposal.is_some());
@@ -453,6 +474,7 @@ mod tests {
             narration: None,
             trace_id: None,
             acp_dag_semantic: None,
+            bpmn_form: None,
         };
         let chat = repl_to_chat_response(resp, Uuid::nil());
         assert!(chat.message.contains("Could not find"));
