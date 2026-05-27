@@ -97,12 +97,40 @@ forms route:
     1. Look up dsl_pending_wait by correlation_key = token_id
     2. Insert HumanTaskComplete into dsl_event_queue
     3. ProcessRegistry::run_to_quiescence(instance_id)   ← NEW: drain inline
-    4. Return 202
+    4. Return 200 with { accepted, next_form }           ← synchronous result; 202 would be wrong
 ```
 
 ---
 
 ## 5. Component Design
+
+### 5.0 Prerequisite: pending-wait payload storage
+
+**This must land before Phase 2 can ship.** The plan assumes a parked `dsl.form` payload is recoverable from the `dsl_pending_wait` row. It is not today.
+
+`create_pending_wait` (trait signature, `store.rs` ~line 124) takes:
+```
+(instance_id, token_id, wait_kind, node_name, correlation_key, timeout_at)
+```
+— no payload. The `form_data` (`{form_ref, mode, prefill_data}`) emitted by `DslFormHandler` is written only to the journey log's `data_delta` (`processor.rs` ~line 733), never onto the wait row. `PendingWaitInfo` has four fields (`id`, `instance_id`, `token_id`, `node_name`) — none carry form state.
+
+Reconstructing `BpmnFormPending` from the log would require replaying the append-only journey log to find the last `human_task_pending` entry — event-sourcing semantics applied to what should be a point read. The wait row IS the current-state projection for waits; form payload belongs on it, the same as `token_id` does. This corrects a normalisation slip (wait-kind state leaked into the event log), not adds a feature.
+
+**Six steps — all must complete before the Phase 2 integration test can pass:**
+
+1. **Migration**: add `payload JSONB` to `dsl_pending_wait`. The column is untyped and wait-kind-specific; future timer/message waits share this slot. This is a deliberate config-over-code choice over typed-columns-per-wait-kind.
+
+2. **Trait + impls**: append `payload: Option<serde_json::Value>` to `create_pending_wait` — in the `JourneyStore` trait and both implementations (`InMemoryJourneyStore`, `PostgresJourneyStore`). Strictly additive; appended last, no resequencing of existing args.
+
+3. **`processor.rs` ~line 733**: pass `Some(form_data.clone())` as the new payload arg. Note: `form_data` is moved into the journal log entry on the next line — the clone must precede that move or it fails the borrow checker.
+
+4. **`PendingWaitInfo`**: add `payload: Option<serde_json::Value>` field.
+
+5. **`BpmnFormPending` Rust struct**: net-new, defined in `ob-poc-types`. Mirrors the TypeScript interface already in `ob-poc-ui-react/src/types/chat.ts`.
+
+6. **`ProcessRegistry::start_instance`**: after `run_to_quiescence`, query `dsl_pending_wait WHERE instance_id = ? AND wait_kind = 'human_task'`, read `payload`, deserialise into `BpmnFormPending`.
+
+**Required conformance test (non-negotiable):** The trait change looks trivially correct in both impls — which is exactly why the one bug it introduces ships undetected. `InMemoryJourneyStore` round-trips a `Value` through a `HashMap` with no transformation; `PostgresJourneyStore` round-trips through JSONB, which reorders object keys and normalises numbers — not byte-identical. Any downstream structural or string comparison then diverges between impls. Write a cross-impl test: write payload via `create_pending_wait`, read back via `PendingWaitInfo.payload`, assert **semantic** equality (not byte equality), run against both store impls. Cheapest test in the plan; only one that catches this class of bug.
 
 ### 5.1 `ProcessRegistry`
 
@@ -217,20 +245,22 @@ The orchestrator sets `resp.bpmn_form` from the verb execution outcome if the re
 
 ### 5.5 Forms submit — inline drain
 
-`POST /api/forms/:token_id/submit` currently enqueues the event and returns. Add a drain call after:
+`POST /api/forms/:token_id/submit` currently enqueues the event and returns. Add a drain call after, and return **200** (not 202 — the drain runs synchronously before the response is sent):
 
 ```rust
 // After enqueue:
 let registry = state.process_registry.clone();
 let pending = registry.run_instance(wait.instance_id).await?;
-// pending = Some(BpmnFormPending) if the process immediately hits another human task
-// Return the pending form ref in the response so React can chain to the next form
-Json(json!({
+// pending = Some(BpmnFormPending) if the process immediately parks at another human task
+// Return 200 with the synchronous result; caller knows the engine has quiesced
+(StatusCode::OK, Json(json!({
     "accepted": true,
     "token_id": token_id,
     "next_form": pending,   // null if process advanced past all human tasks
-}))
+})))
 ```
+
+202 Accepted would mean processing happens out-of-band later — that is false here. The drain completes before the handler returns.
 
 ### 5.6 App state wiring
 
@@ -292,6 +322,8 @@ let state = AppState::new(pool.clone())
 - No verb, no route change — just infrastructure
 
 ### Phase 2 — Start verb + response injection
+- **§5.0 prerequisite first**: migration + `create_pending_wait` trait change + both impls + `PendingWaitInfo.payload` + `BpmnFormPending` struct
+- **Cross-impl conformance test** (non-negotiable, see §5.0): write payload, read back, assert semantic equality against both `InMemoryJourneyStore` and `PostgresJourneyStore`
 - `workflow.start-process` verb (YAML + op)
 - `ReplResponseV2.bpmn_form` field + orchestrator extraction
 - `response_adapter` mapping
@@ -324,7 +356,7 @@ A process could park at multiple sequential human tasks. The submit response car
 `WorkflowStartProcess` needs `ProcessRegistryService` via `ctx.service::<dyn ProcessRegistryService>()`. The `ServiceRegistry` pattern exists (see `dyn SemanticStateService`). `ProcessRegistryService` is a new trait — needs to be defined in `sem_os_core` or `ob-poc-types`, not `ob-poc-web`, to avoid a dep inversion. Alternatively the verb lives in `rust/src/domain_ops/` (Pattern B) where it can reach app state directly.
 
 **Q5 — Concurrent instance access**  
-`RuntimeEngine::run_to_quiescence` is not re-entrant per instance — if two requests race (unlikely in PoC but possible), the event queue provides the serialisation. The `FOR UPDATE SKIP LOCKED` in `dequeue_events` means only one caller drains at a time. The second caller returns immediately with no events — which is correct. No additional locking needed for v1.
+`RuntimeEngine::run_to_quiescence` is not re-entrant per instance — if two requests race (unlikely in PoC but possible), the event queue provides the serialisation. The `FOR UPDATE SKIP LOCKED` in `dequeue_events` means only one caller drains at a time. The second caller returns immediately with no events. **This is correct only under the single-user assumption.** The event queue serialises *work*, not *observation*: a second caller can read the queue empty (rows locked by the first) and report the instance quiesced while it is still advancing. Acceptable for single-user PoC; explicitly not multi-user safe.
 
 **Q6 — Instance → engine lookup**  
 `ProcessRegistry::engine_for_instance` needs to map `instance_id → process_name`. The `dsl_workflow_instance.journey_name` column holds this. Query: `SELECT journey_name FROM dsl_workflow_instance WHERE id = $1`. No schema change required.
@@ -339,6 +371,7 @@ A process could park at multiple sequential human tasks. The submit response car
 | DSL compilation fails at startup for a malformed process definition | Medium | `load_all` logs and skips failed definitions; server starts with partial registry |
 | Form submission races with session turn reading instance state | Low | Event queue serialises; worst case: stale status until next turn |
 | `bpmn_form` field in `ReplResponseV2` not rendered by older React build | Low | Build required after backend change; no backwards compat needed |
+| Submit latency proportional to service-task chain between human tasks | Low (PoC) | Inline drain runs the fiber through every service task before returning 200. Acceptable single-user; first thing to break under concurrent load — flag for async drain path if multi-user ever required |
 
 ---
 
@@ -347,7 +380,9 @@ A process could park at multiple sequential human tasks. The submit response car
 | Phase | Scope | Effort |
 |-------|-------|--------|
 | 1 — Foundation | Migration + ProcessRegistry + store wiring | 0.5 day |
-| 2 — Start verb + response injection | Verb + adapter + integration test | 1 day |
+| 2 — Start verb + response injection | §5.0 prerequisite (store trait + both impls + conformance test) + `BpmnFormPending` struct + verb + adapter + integration test | 1.5–2 days |
 | 3 — Submit drain + full cycle | Drain + next_form + E2E session test | 0.5 day |
 | 4 — Process seeding + browser smoke | Seed DSL + manual test | 0.5 day |
-| **Total** | | **~2.5 days** |
+| **Total** | | **~3–3.5 days** |
+
+> **Note:** The prior 1-day figure for Phase 2 assumed `BpmnFormPending` already existed in a shared crate and no store-layer change was needed. Both assumptions were false. The store trait change (`create_pending_wait` + both impls + `PendingWaitInfo`) and the required cross-impl conformance test account for the additional 0.5–1 day.
