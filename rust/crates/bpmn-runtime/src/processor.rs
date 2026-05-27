@@ -290,6 +290,10 @@ async fn handle_decision_gateway(
         })
         .collect();
 
+    // INVARIANT (C1): Gateway evaluation currently receives an empty context `json!({})`.
+    // If this ever changes to include `instance_data`, the C1 parallel state isolation fix
+    // (deferring branch writes to `write_log` instead of global state) MUST be updated to Variant B
+    // (overlaying the branch's write_log over global state) so gateways can read in-flight branch writes.
     let request = SwitchRequest {
         instance_id,
         gateway_name: node.name.clone(),
@@ -303,52 +307,37 @@ async fn handle_decision_gateway(
             let targets = reply.selected_targets;
 
             // C4: Gateway Multiplicity Policy Check
-            match node.kind.as_str() {
-                "exclusive" | "event-based"
-                    if targets.len() != 1 => {
-                        tracing::error!(%instance_id, gateway = %node.name, kind = %node.kind, "gateway expected exactly 1 target, got {}", targets.len());
-                        ctx.store
-                            .append_journey_log(JourneyLogEntry {
-                                instance_id,
-                                token_id: Some(token_id),
-                                event_kind: "gateway_dead_end".to_string(),
-                                from_node: Some(node.name.clone()),
-                                to_node: None,
-                                data_delta: Some(serde_json::json!({"error": format!("expected exactly 1 target, got {}", targets.len())})),
-                            })
-                            .await?;
-                        ctx.store
-                            .update_instance_status(
-                                instance_id,
-                                InstanceStatus::Failed,
-                                Some(chrono::Utc::now()),
-                            )
-                            .await?;
-                        return Ok(());
+            if let Err(violation) = check_gateway_multiplicity(&node.kind, targets.len()) {
+                let error_msg = match violation {
+                    GatewayViolation::ExpectedExactlyOne(got) => {
+                        format!("expected exactly 1 target, got {}", got)
                     }
-                "parallel-event-based"
-                    if targets.is_empty() => {
-                        tracing::error!(%instance_id, gateway = %node.name, kind = %node.kind, "gateway expected at least 1 target, got 0");
-                        ctx.store
-                            .append_journey_log(JourneyLogEntry {
-                                instance_id,
-                                token_id: Some(token_id),
-                                event_kind: "gateway_dead_end".to_string(),
-                                from_node: Some(node.name.clone()),
-                                to_node: None,
-                                data_delta: Some(serde_json::json!({"error": "expected at least 1 target, got 0"})),
-                            })
-                            .await?;
-                        ctx.store
-                            .update_instance_status(
-                                instance_id,
-                                InstanceStatus::Failed,
-                                Some(chrono::Utc::now()),
-                            )
-                            .await?;
-                        return Ok(());
+                    GatewayViolation::ExpectedAtLeastOne => {
+                        "expected at least 1 target, got 0".to_string()
                     }
-                _ => {}
+                    GatewayViolation::UnknownKind(k) => {
+                        format!("unknown or unsupported gateway kind '{}'", k)
+                    }
+                };
+                tracing::error!(%instance_id, gateway = %node.name, kind = %node.kind, "gateway {}", error_msg);
+                ctx.store
+                    .append_journey_log(JourneyLogEntry {
+                        instance_id,
+                        token_id: Some(token_id),
+                        event_kind: "gateway_dead_end".to_string(),
+                        from_node: Some(node.name.clone()),
+                        to_node: None,
+                        data_delta: Some(serde_json::json!({"error": error_msg})),
+                    })
+                    .await?;
+                ctx.store
+                    .update_instance_status(
+                        instance_id,
+                        InstanceStatus::Failed,
+                        Some(chrono::Utc::now()),
+                    )
+                    .await?;
+                return Ok(());
             }
 
             RuntimeMetrics::increment(&ctx.metrics.gateway_decisions);
@@ -1077,4 +1066,91 @@ fn is_intermediate_event(k: &str) -> bool {
 
 fn is_end_event(k: &str) -> bool {
     k == "end-event" || k.starts_with("end-event-")
+}
+
+// ---------------------------------------------------------------------------
+// Gateway Multiplicity Policy
+// ---------------------------------------------------------------------------
+
+pub enum GatewayViolation {
+    ExpectedExactlyOne(usize),
+    ExpectedAtLeastOne,
+    UnknownKind(String),
+}
+
+pub fn check_gateway_multiplicity(kind: &str, target_count: usize) -> Result<(), GatewayViolation> {
+    match kind {
+        "exclusive" | "event-based" => {
+            if target_count != 1 {
+                Err(GatewayViolation::ExpectedExactlyOne(target_count))
+            } else {
+                Ok(())
+            }
+        }
+        "parallel-event-based" => {
+            if target_count == 0 {
+                Err(GatewayViolation::ExpectedAtLeastOne)
+            } else {
+                Ok(())
+            }
+        }
+        _ => Err(GatewayViolation::UnknownKind(kind.to_string())),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_c4_gateway_multiplicity_policy() {
+        // exclusive
+        assert!(matches!(
+            check_gateway_multiplicity("exclusive", 0),
+            Err(GatewayViolation::ExpectedExactlyOne(0))
+        ));
+        assert!(matches!(check_gateway_multiplicity("exclusive", 1), Ok(())));
+        assert!(matches!(
+            check_gateway_multiplicity("exclusive", 2),
+            Err(GatewayViolation::ExpectedExactlyOne(2))
+        ));
+
+        // event-based
+        assert!(matches!(
+            check_gateway_multiplicity("event-based", 0),
+            Err(GatewayViolation::ExpectedExactlyOne(0))
+        ));
+        assert!(matches!(
+            check_gateway_multiplicity("event-based", 1),
+            Ok(())
+        ));
+        assert!(matches!(
+            check_gateway_multiplicity("event-based", 2),
+            Err(GatewayViolation::ExpectedExactlyOne(2))
+        ));
+
+        // parallel-event-based
+        assert!(matches!(
+            check_gateway_multiplicity("parallel-event-based", 0),
+            Err(GatewayViolation::ExpectedAtLeastOne)
+        ));
+        assert!(matches!(
+            check_gateway_multiplicity("parallel-event-based", 1),
+            Ok(())
+        ));
+        assert!(matches!(
+            check_gateway_multiplicity("parallel-event-based", 2),
+            Ok(())
+        ));
+
+        // unknown/unsupported gateway kind (fail closed)
+        assert!(matches!(
+            check_gateway_multiplicity("unknown-future-gateway", 0),
+            Err(GatewayViolation::UnknownKind(_))
+        ));
+        assert!(matches!(
+            check_gateway_multiplicity("unknown-future-gateway", 5),
+            Err(GatewayViolation::UnknownKind(_))
+        ));
+    }
 }
