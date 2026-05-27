@@ -417,6 +417,7 @@ mod tests {
             narration: None,
             trace_id: None,
             acp_dag_semantic: None,
+            bpmn_form: None,
         };
 
         let session = ReplSessionV2::new();
@@ -480,6 +481,7 @@ mod tests {
             narration: None,
             trace_id: None,
             acp_dag_semantic: None,
+            bpmn_form: None,
         };
 
         let payload = build_phase5_repl_payload(&session, &response);
@@ -511,6 +513,7 @@ mod tests {
             narration: None,
             trace_id: None,
             acp_dag_semantic: None,
+            bpmn_form: None,
         };
 
         let evaluation = evaluate_phase5_repl(&session, &response);

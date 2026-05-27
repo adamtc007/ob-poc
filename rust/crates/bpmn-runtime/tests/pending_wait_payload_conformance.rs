@@ -11,7 +11,6 @@
 use bpmn_runtime::{InMemoryJourneyStore, JourneyStore};
 use serde_json::json;
 use std::sync::Arc;
-use uuid::Uuid;
 
 /// Write a pending wait with a payload, read it back, assert semantic equality.
 async fn roundtrip_payload_on(store: Arc<dyn JourneyStore>) {
