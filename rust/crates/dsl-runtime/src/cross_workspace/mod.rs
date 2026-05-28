@@ -186,7 +186,7 @@ pub use repository::{
 pub use slot_state::{
     resolve_slot_table, set_slot_state_table, PostgresSlotStateProvider, SlotStateProvider,
 };
-pub use sql_predicate_resolver::SqlPredicateResolver;
+pub use sql_predicate_resolver::{set_table_pk_overrides, SqlPredicateResolver};
 pub use types::{
     LifecycleTransitionResult, RegisterSharedAtomInput, SharedAtomDef, SharedAtomLifecycle,
     SharedAtomSummary, SharedAtomValidation,

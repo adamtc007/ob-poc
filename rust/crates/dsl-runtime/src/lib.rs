@@ -79,6 +79,7 @@ pub use cross_workspace::{
     list_for_provider, list_for_remediation, list_open, list_shared_atoms, list_stale_refs,
     mark_deferred, mark_resolved, mark_stale, record_call, record_compensation, record_if_active,
     resolve_slot_table, revoke_deferral, set_atom_path_table_map, set_slot_state_table,
+    set_table_pk_overrides,
  supersede_call, transition_lifecycle,
     upsert_from_seed, upsert_ref, AtomPathTableMap, CascadeAction, CascadePlanner,
     ChildEntityResolver, ClauseKind, CompensationOutcome, CompensationRecordRow,

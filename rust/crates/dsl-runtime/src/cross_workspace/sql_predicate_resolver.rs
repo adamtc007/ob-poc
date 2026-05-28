@@ -65,8 +65,7 @@ static TABLE_PK_OVERRIDES: OnceLock<HashMap<String, String>> = OnceLock::new();
 /// Loaded from `config/table_pk_overrides.yaml` via
 /// `ConfigLoader::load_table_pk_overrides()`. Subsequent calls are ignored
 /// (OnceLock semantics).
-#[allow(dead_code)]
-pub(crate) fn set_table_pk_overrides(overrides: HashMap<String, String>) {
+pub fn set_table_pk_overrides(overrides: HashMap<String, String>) {
     let _ = TABLE_PK_OVERRIDES.set(overrides);
 }
 
