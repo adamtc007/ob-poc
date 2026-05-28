@@ -5,7 +5,7 @@ mod tests {
     use chrono::Utc;
     use uuid::Uuid;
 
-    use {
+    use dsl_runtime::{
         diagnose_slot, load_builtin_state_machine, reduce_slot, EvalScope, FieldValue, OverlayRow,
         SlotOverlayData, StateOverride,
     };

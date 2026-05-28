@@ -1,7 +1,7 @@
 #[cfg(feature = "database")]
 mod tests {
     use anyhow::Result;
-    use {handle_state_derive, load_builtin_state_machine};
+    use dsl_runtime::{handle_state_derive, load_builtin_state_machine};
     use sqlx::PgPool;
     use uuid::Uuid;
 

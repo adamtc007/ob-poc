@@ -1,1 +1,1 @@
-pub mod semtaxonomy_seed;
+pub(crate) mod semtaxonomy_seed;

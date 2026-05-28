@@ -2,7 +2,7 @@
 mod tests {
     use std::collections::HashMap;
 
-    use {
+    use dsl_runtime::{
         evaluate_rules, parse_condition_body, ConditionEvaluator, FieldValue, OverlayRow, RuleDef,
         ScopeData, SlotOverlayData, SlotRecord,
     };

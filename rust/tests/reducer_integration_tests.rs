@@ -4,9 +4,9 @@ mod tests {
 
     use uuid::Uuid;
 
-    use {
+    use dsl_runtime::{
         load_builtin_state_machine, load_state_machine, reduce_slot, EvalScope, FieldValue,
-        OverlayRow, SlotOverlayData, SlotRecord,
+        OverlayRow, SlotOverlayData, SlotRecord, ValidatedStateMachine,
     };
 
     const CASE_LIFECYCLE_YAML: &str = r#"

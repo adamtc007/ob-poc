@@ -138,10 +138,10 @@ pub use state_reducer::{
     parse_value, reduce_slot, revoke_override, validate_state_machine, AggFn, AggResult,
     BlockReason, BlockedVerb, BlockedWhyResult, CompareOp, ConditionBody, ConditionEvaluation,
     ConditionEvaluator, ConsistencyWarning, CreateOverrideRequest, DerivationTrace, EvalScope,
-    Expr, FieldValue, Literal, OverlayRow, OverlaySourceDef, OverrideInfo, Predicate, ReducerDef,
-    ReducerError, ReducerResult, RuleDef, RuleEvaluation, ScopeData, SlotField, SlotOverlayData,
-    SlotPredicate, SlotRecord, SlotReduceResult, StateMachineDefinition, StateOverride,
-    TransitionDef, ValidatedStateMachine, Value,
+    ConditionDef, ConsistencyCheckDef, Expr, FieldValue, Literal, OverlayRow, OverlaySourceDef,
+    OverrideInfo, Predicate, ReducerDef, ReducerError, ReducerResult, RuleDef, RuleEvaluation,
+    ScopeData, SlotField, SlotOverlayData, SlotPredicate, SlotRecord, SlotReduceResult,
+    StateMachineDefinition, StateOverride, TransitionDef, ValidatedStateMachine, Value,
 };
 pub use tx::TransactionScope;
 

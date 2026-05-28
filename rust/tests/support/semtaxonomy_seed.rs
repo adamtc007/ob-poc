@@ -3,15 +3,15 @@ use sqlx::PgPool;
 use uuid::Uuid;
 
 #[derive(Debug)]
-pub struct SeedState {
-    pub prefix: String,
-    pub client_group_id: Uuid,
-    pub entity_id: Uuid,
-    pub cbu_id: Uuid,
-    pub deal_id: Uuid,
-    pub case_id: Uuid,
-    pub workstream_id: Uuid,
-    pub doc_id: Uuid,
+pub(crate) struct SeedState {
+    pub(crate) prefix: String,
+    pub(crate) client_group_id: Uuid,
+    pub(crate) entity_id: Uuid,
+    pub(crate) cbu_id: Uuid,
+    pub(crate) deal_id: Uuid,
+    pub(crate) case_id: Uuid,
+    pub(crate) workstream_id: Uuid,
+    pub(crate) doc_id: Uuid,
 }
 
 /// Connect to the configured test database.
@@ -21,7 +21,7 @@ pub struct SeedState {
 /// ```ignore
 /// let pool = semtaxonomy_seed::get_pool().await?;
 /// ```
-pub async fn get_pool() -> Result<PgPool> {
+pub(crate) async fn get_pool() -> Result<PgPool> {
     let url =
         std::env::var("DATABASE_URL").unwrap_or_else(|_| "postgresql:///data_designer".to_string());
     Ok(PgPool::connect(&url).await?)
@@ -68,7 +68,7 @@ async fn ensure_entity_type_id(pool: &PgPool, type_code: &str) -> Result<Uuid> {
 /// ```ignore
 /// let state = semtaxonomy_seed::seed_state(&pool).await?;
 /// ```
-pub async fn seed_state(pool: &PgPool) -> Result<SeedState> {
+pub(crate) async fn seed_state(pool: &PgPool) -> Result<SeedState> {
     let prefix = format!("SeedCap-{}", &Uuid::new_v4().simple().to_string()[..8]);
     let client_group_id = Uuid::new_v4();
     let entity_id = Uuid::new_v4();
@@ -242,7 +242,7 @@ pub async fn seed_state(pool: &PgPool) -> Result<SeedState> {
 /// ```ignore
 /// semtaxonomy_seed::cleanup_state(&pool, &state).await;
 /// ```
-pub async fn cleanup_state(pool: &PgPool, state: &SeedState) {
+pub(crate) async fn cleanup_state(pool: &PgPool, state: &SeedState) {
     let _ = sqlx::query(r#"DELETE FROM "ob-poc".deal_documents WHERE deal_id = $1"#)
         .bind(state.deal_id)
         .execute(pool)

@@ -1,6 +1,6 @@
 #[cfg(feature = "database")]
 mod tests {
-    use {
+    use dsl_runtime::{
         parse_condition_body, AggFn, CompareOp, ConditionBody, Expr, Literal, Predicate,
         SlotPredicate, Value,
     };

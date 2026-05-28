@@ -32,7 +32,7 @@ use super::error::ReducerResult;
 use super::validate::validate_state_machine;
 
 pub use sem_os_ontology::state_machine_def::{
-    OverlaySourceDef, ReducerDef, RuleDef, TransitionDef,
+    ConditionDef, ConsistencyCheckDef, OverlaySourceDef, ReducerDef, RuleDef, TransitionDef,
 };
 
 /// State machine definition loaded from YAML.

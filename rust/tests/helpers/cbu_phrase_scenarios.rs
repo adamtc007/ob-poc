@@ -12,7 +12,7 @@
 use crate::{ExpectedOutcome, TestScenario};
 
 /// CBU role assignment scenarios - adding parties to CBUs
-pub fn cbu_assign_role_scenarios() -> Vec<TestScenario> {
+pub(crate) fn cbu_assign_role_scenarios() -> Vec<TestScenario> {
     vec![
         // Generic role
         TestScenario::matched("assign role", "assign role to cbu", "cbu.assign-role")
@@ -142,7 +142,7 @@ pub fn cbu_assign_role_scenarios() -> Vec<TestScenario> {
 }
 
 /// CBU remove role scenarios
-pub fn cbu_remove_role_scenarios() -> Vec<TestScenario> {
+pub(crate) fn cbu_remove_role_scenarios() -> Vec<TestScenario> {
     vec![
         TestScenario::matched("remove role", "remove role from cbu", "cbu.remove-role")
             .with_category("role_remove"),
@@ -184,7 +184,7 @@ pub fn cbu_remove_role_scenarios() -> Vec<TestScenario> {
 }
 
 /// CBU parties scenarios - listing who is on a fund
-pub fn cbu_parties_scenarios() -> Vec<TestScenario> {
+pub(crate) fn cbu_parties_scenarios() -> Vec<TestScenario> {
     vec![
         TestScenario::matched("show parties", "show fund parties", "cbu.parties")
             .with_category("cbu_parties"),
@@ -228,7 +228,7 @@ pub fn cbu_parties_scenarios() -> Vec<TestScenario> {
 }
 
 /// CBU delete scenarios (safety-critical - use safety_first)
-pub fn cbu_delete_scenarios() -> Vec<TestScenario> {
+pub(crate) fn cbu_delete_scenarios() -> Vec<TestScenario> {
     vec![
         // Regular delete - safety first (ambiguity with cascade is acceptable)
         TestScenario::safety_first("delete cbu", "delete cbu", "cbu.delete")
@@ -266,7 +266,7 @@ pub fn cbu_delete_scenarios() -> Vec<TestScenario> {
 }
 
 /// CBU product scenarios
-pub fn cbu_product_scenarios() -> Vec<TestScenario> {
+pub(crate) fn cbu_product_scenarios() -> Vec<TestScenario> {
     vec![
         TestScenario::matched("add product", "add product to fund", "cbu.add-product")
             .with_category("cbu_product"),
@@ -315,7 +315,7 @@ pub fn cbu_product_scenarios() -> Vec<TestScenario> {
 }
 
 /// CBU bulk creation scenarios
-pub fn cbu_bulk_create_scenarios() -> Vec<TestScenario> {
+pub(crate) fn cbu_bulk_create_scenarios() -> Vec<TestScenario> {
     vec![
         TestScenario::matched(
             "create from client group",
@@ -363,7 +363,7 @@ pub fn cbu_bulk_create_scenarios() -> Vec<TestScenario> {
 }
 
 /// All CBU scenarios combined
-pub fn all_cbu_scenarios() -> Vec<TestScenario> {
+pub(crate) fn all_cbu_scenarios() -> Vec<TestScenario> {
     let mut all = Vec::new();
     all.extend(cbu_assign_role_scenarios());
     all.extend(cbu_remove_role_scenarios());

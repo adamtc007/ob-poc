@@ -299,6 +299,7 @@ mod cross_step_tests {
     #[tokio::test]
     #[ignore] // Requires database
     async fn test_in_scope_rollback_delivers_cross_step_atomicity() -> Result<()> {
+        use dsl_runtime::TransactionScope;
         use ob_poc::runbook::{execute_runbook_in_scope, CompiledRunbookStatus};
         use ob_poc::sequencer_tx::PgTransactionScope;
 
@@ -365,6 +366,7 @@ mod cross_step_tests {
     #[tokio::test]
     #[ignore] // Requires database
     async fn test_in_scope_commit_persists_writes() -> Result<()> {
+        use dsl_runtime::TransactionScope;
         use ob_poc::runbook::{execute_runbook_in_scope, CompiledRunbookStatus};
         use ob_poc::sequencer_tx::PgTransactionScope;
 

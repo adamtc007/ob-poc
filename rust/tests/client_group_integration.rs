@@ -29,7 +29,7 @@ mod tests {
     static SHARED_POOL: OnceCell<PgPool> = OnceCell::const_new();
     static SHARED_EMBEDDER: OnceCell<Arc<CandleEmbedder>> = OnceCell::const_new();
 
-    pub async fn get_pool() -> &'static PgPool {
+    pub(crate) async fn get_pool() -> &'static PgPool {
         SHARED_POOL
             .get_or_init(|| async {
                 let url = std::env::var("DATABASE_URL")
@@ -41,7 +41,7 @@ mod tests {
             .await
     }
 
-    pub async fn get_embedder() -> &'static Arc<CandleEmbedder> {
+    pub(crate) async fn get_embedder() -> &'static Arc<CandleEmbedder> {
         SHARED_EMBEDDER
             .get_or_init(|| async {
                 let embedder = tokio::task::spawn_blocking(|| {
@@ -55,7 +55,7 @@ mod tests {
     }
 
     /// Wrapper to make CandleEmbedder implement the ob_semantic_matcher::client_group_resolver::Embedder trait
-    pub struct EmbedderAdapter(pub Arc<CandleEmbedder>);
+    pub(crate) struct EmbedderAdapter(pub(crate) Arc<CandleEmbedder>);
 
     #[async_trait::async_trait]
     impl ob_semantic_matcher::client_group_resolver::Embedder for EmbedderAdapter {
@@ -79,7 +79,7 @@ mod tests {
         }
     }
 
-    pub async fn get_resolver() -> PgClientGroupResolver<EmbedderAdapter> {
+    pub(crate) async fn get_resolver() -> PgClientGroupResolver<EmbedderAdapter> {
         let pool = get_pool().await.clone();
         let embedder = get_embedder().await.clone();
         let adapter = EmbedderAdapter(embedder);
