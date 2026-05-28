@@ -58,11 +58,6 @@ pub mod visualization_repository;
 // Re-export for convenience
 pub use attribute_values_service::{AttributeValueRow, AttributeValuesService};
 pub use bods_service::BodsService;
-pub use ob_poc_bods::{
-    BodsEntityType, BodsInterestType, EntityIdentifier, EntityWithLei, GleifHierarchyEntry,
-    GleifRelationship, NewEntityIdentifier, NewGleifRelationship, NewPersonPepStatus,
-    PersonPepStatus, UboInterest,
-};
 pub use cbu_entity_roles_service::{CbuEntityRoleExpanded, CbuEntityRolesService, RoleRow};
 pub use cbu_service::{CbuRow, CbuService, NewCbuFields};
 pub use crud_service::{AssetType, CrudOperation, CrudService, OperationType};
@@ -74,6 +69,11 @@ pub use entity_service::{
     CbuEntityRoleRow, EntityRow, EntityService, LimitedCompanyRow, NewEntityFields,
     NewLimitedCompanyFields, NewPartnershipFields, NewProperPersonFields, NewTrustFields,
     PartnershipRow, TrustRow,
+};
+pub use ob_poc_bods::{
+    BodsEntityType, BodsInterestType, EntityIdentifier, EntityWithLei, GleifHierarchyEntry,
+    GleifRelationship, NewEntityIdentifier, NewGleifRelationship, NewPersonPepStatus,
+    PersonPepStatus, UboInterest,
 };
 
 pub use generation_log_repository::{

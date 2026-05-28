@@ -14,10 +14,8 @@ use sem_os_postgres::ops::SemOsVerbOp;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
-use dsl_runtime::{
-    json_extract_string, json_extract_string_opt, json_get_required_uuid,
-};
 use dsl_runtime::TransactionScope;
+use dsl_runtime::{json_extract_string, json_extract_string_opt, json_get_required_uuid};
 use dsl_runtime::{VerbExecutionContext, VerbExecutionOutcome};
 
 // =============================================================================

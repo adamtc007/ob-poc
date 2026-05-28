@@ -13,8 +13,8 @@ use serde_json::{json, Value};
 use sqlx::{PgPool, Row};
 use uuid::Uuid;
 
-use dsl_runtime::VerbExecutionOutcome;
 use dsl_runtime::ServicePipelineService;
+use dsl_runtime::VerbExecutionOutcome;
 
 use crate::service_resources::{
     load_and_sync_srdefs, load_srdefs_from_config, run_discovery_pipeline,

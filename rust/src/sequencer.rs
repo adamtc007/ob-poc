@@ -984,7 +984,7 @@ impl ReplOrchestratorV2 {
                     narration: None,
                     trace_id: None,
                     acp_dag_semantic: None,
-            bpmn_form: None,
+                    bpmn_form: None,
                 };
                 failed_response = Some(response);
             }
@@ -1289,7 +1289,7 @@ impl ReplOrchestratorV2 {
                             narration: None,
                             trace_id: None,
                             acp_dag_semantic: None,
-            bpmn_form: None,
+                            bpmn_form: None,
                         }
                     } else {
                         ReplResponseV2 {
@@ -1305,7 +1305,7 @@ impl ReplOrchestratorV2 {
                             narration: None,
                             trace_id: None,
                             acp_dag_semantic: None,
-            bpmn_form: None,
+                            bpmn_form: None,
                         }
                     }
                 }
@@ -1943,7 +1943,7 @@ impl ReplOrchestratorV2 {
                     narration: None,
                     trace_id: None,
                     acp_dag_semantic: None,
-            bpmn_form: None,
+                    bpmn_form: None,
                 }
             }
             _ => self.invalid_input(session, "Please select a scope first."),
@@ -2016,7 +2016,7 @@ impl ReplOrchestratorV2 {
                 narration: None,
                 trace_id: None,
                 acp_dag_semantic: None,
-            bpmn_form: None,
+                bpmn_form: None,
             };
         }
 
@@ -2181,7 +2181,7 @@ impl ReplOrchestratorV2 {
                 narration: None,
                 trace_id: None,
                 acp_dag_semantic: None,
-            bpmn_form: None,
+                bpmn_form: None,
             };
         };
 
@@ -2541,7 +2541,7 @@ impl ReplOrchestratorV2 {
                             narration: None,
                             trace_id: None,
                             acp_dag_semantic: None,
-            bpmn_form: None,
+                            bpmn_form: None,
                         }
                     }
                     PackRouteOutcome::NoMatch => {
@@ -2655,7 +2655,7 @@ impl ReplOrchestratorV2 {
                             narration: None,
                             trace_id: None,
                             acp_dag_semantic: None,
-            bpmn_form: None,
+                            bpmn_form: None,
                         };
                     }
 
@@ -2698,7 +2698,7 @@ impl ReplOrchestratorV2 {
                             narration: None,
                             trace_id: None,
                             acp_dag_semantic: None,
-            bpmn_form: None,
+                            bpmn_form: None,
                         }
                     } else {
                         self.invalid_input(session, "Step not found.")
@@ -2720,7 +2720,7 @@ impl ReplOrchestratorV2 {
                         narration: None,
                         trace_id: None,
                         acp_dag_semantic: None,
-            bpmn_form: None,
+                        bpmn_form: None,
                     }
                 }
                 ReplCommandV2::Disable(id) => self.handle_disable(session, id),
@@ -2764,7 +2764,7 @@ impl ReplOrchestratorV2 {
                     narration: None,
                     trace_id: None,
                     acp_dag_semantic: None,
-            bpmn_form: None,
+                    bpmn_form: None,
                 }
             }
             UserInputV2::Command {
@@ -2830,7 +2830,7 @@ impl ReplOrchestratorV2 {
                         narration: None,
                         trace_id: None,
                         acp_dag_semantic: None,
-            bpmn_form: None,
+                        bpmn_form: None,
                     }
                 } else {
                     self.invalid_input(session, "No sentence to confirm.")
@@ -2862,7 +2862,7 @@ impl ReplOrchestratorV2 {
                     narration: None,
                     trace_id: None,
                     acp_dag_semantic: None,
-            bpmn_form: None,
+                    bpmn_form: None,
                 }
             }
             _ => self.invalid_input(session, "Please confirm or reject the proposed step."),
@@ -2904,7 +2904,7 @@ impl ReplOrchestratorV2 {
                             narration: None,
                             trace_id: None,
                             acp_dag_semantic: None,
-            bpmn_form: None,
+                            bpmn_form: None,
                         }
                     } else {
                         self.invalid_input(session, "Step not found.")
@@ -2926,7 +2926,7 @@ impl ReplOrchestratorV2 {
                         narration: None,
                         trace_id: None,
                         acp_dag_semantic: None,
-            bpmn_form: None,
+                        bpmn_form: None,
                     }
                 }
                 ReplCommandV2::Disable(id) => self.handle_disable(session, id),
@@ -3519,7 +3519,7 @@ impl ReplOrchestratorV2 {
                 narration: None,
                 trace_id: None,
                 acp_dag_semantic: None,
-            bpmn_form: None,
+                bpmn_form: None,
             });
         }
 
@@ -3587,7 +3587,7 @@ impl ReplOrchestratorV2 {
                 narration: None,
                 trace_id: None,
                 acp_dag_semantic: None,
-            bpmn_form: None,
+                bpmn_form: None,
             });
         }
 
@@ -3775,7 +3775,7 @@ impl ReplOrchestratorV2 {
                     narration: None,
                     trace_id: None,
                     acp_dag_semantic: None,
-            bpmn_form: None,
+                    bpmn_form: None,
                 }
             }
 
@@ -3831,7 +3831,7 @@ impl ReplOrchestratorV2 {
                     narration: None,
                     trace_id: None,
                     acp_dag_semantic: None,
-            bpmn_form: None,
+                    bpmn_form: None,
                 }
             }
 
@@ -4050,7 +4050,7 @@ impl ReplOrchestratorV2 {
                 narration: None,
                 trace_id: None,
                 acp_dag_semantic: None,
-            bpmn_form: None,
+                bpmn_form: None,
             }
         } else {
             ReplResponseV2 {
@@ -4067,7 +4067,7 @@ impl ReplOrchestratorV2 {
                 narration: None,
                 trace_id: None,
                 acp_dag_semantic: None,
-            bpmn_form: None,
+                bpmn_form: None,
             }
         }
     }
@@ -4189,7 +4189,7 @@ impl ReplOrchestratorV2 {
                     narration: None,
                     trace_id: None,
                     acp_dag_semantic: None,
-            bpmn_form: None,
+                    bpmn_form: None,
                 }
             }
             FastCommand::DropStep(n) => {
@@ -4216,7 +4216,7 @@ impl ReplOrchestratorV2 {
                                 narration: None,
                                 trace_id: None,
                                 acp_dag_semantic: None,
-            bpmn_form: None,
+                                bpmn_form: None,
                             }
                         } else {
                             self.invalid_input(session, &format!("Could not remove step {}.", n))
@@ -4253,7 +4253,7 @@ impl ReplOrchestratorV2 {
                     narration: None,
                     trace_id: None,
                     acp_dag_semantic: None,
-            bpmn_form: None,
+                    bpmn_form: None,
                 }
             }
             FastCommand::Options => {
@@ -4274,7 +4274,7 @@ impl ReplOrchestratorV2 {
                     narration: None,
                     trace_id: None,
                     acp_dag_semantic: None,
-            bpmn_form: None,
+                    bpmn_form: None,
                 }
             }
             FastCommand::SwitchJourney => {
@@ -4293,7 +4293,7 @@ impl ReplOrchestratorV2 {
                     narration: None,
                     trace_id: None,
                     acp_dag_semantic: None,
-            bpmn_form: None,
+                    bpmn_form: None,
                 }
             }
             FastCommand::Cancel => self.handle_cancel(session),
@@ -4321,7 +4321,7 @@ impl ReplOrchestratorV2 {
                     narration: None,
                     trace_id: None,
                     acp_dag_semantic: None,
-            bpmn_form: None,
+                    bpmn_form: None,
                 }
             }
             FastCommand::Help => self.handle_help(session),
@@ -4573,7 +4573,7 @@ impl ReplOrchestratorV2 {
                     narration: None,
                     trace_id: None,
                     acp_dag_semantic: None,
-            bpmn_form: None,
+                    bpmn_form: None,
                 };
             }
 
@@ -4603,7 +4603,7 @@ impl ReplOrchestratorV2 {
                 narration: None,
                 trace_id: None,
                 acp_dag_semantic: None,
-            bpmn_form: None,
+                bpmn_form: None,
             };
         }
 
@@ -4679,7 +4679,7 @@ impl ReplOrchestratorV2 {
                     narration: None,
                     trace_id: None,
                     acp_dag_semantic: None,
-            bpmn_form: None,
+                    bpmn_form: None,
                 }
             }
             None => self.invalid_input(session, "Proposal not found. Please try again."),
@@ -5148,7 +5148,7 @@ impl ReplOrchestratorV2 {
                             narration: None,
                             trace_id: None,
                             acp_dag_semantic: None,
-            bpmn_form: None,
+                            bpmn_form: None,
                         };
                     }
                     ClarificationOutcome::Complete => {
@@ -5223,7 +5223,7 @@ impl ReplOrchestratorV2 {
                         narration: None,
                         trace_id: None,
                         acp_dag_semantic: None,
-            bpmn_form: None,
+                        bpmn_form: None,
                     };
                 }
 
@@ -5245,7 +5245,7 @@ impl ReplOrchestratorV2 {
                     narration: None,
                     trace_id: None,
                     acp_dag_semantic: None,
-            bpmn_form: None,
+                    bpmn_form: None,
                 }
             }
 
@@ -5332,7 +5332,7 @@ impl ReplOrchestratorV2 {
                     narration: None,
                     trace_id: None,
                     acp_dag_semantic: None,
-            bpmn_form: None,
+                    bpmn_form: None,
                 }
             }
 
@@ -5400,7 +5400,7 @@ impl ReplOrchestratorV2 {
                     narration: None,
                     trace_id: None,
                     acp_dag_semantic: None,
-            bpmn_form: None,
+                    bpmn_form: None,
                 }
             }
 
@@ -5546,7 +5546,7 @@ impl ReplOrchestratorV2 {
                         narration: None,
                         trace_id: None,
                         acp_dag_semantic: None,
-            bpmn_form: None,
+                        bpmn_form: None,
                     };
                 }
 
@@ -5568,7 +5568,7 @@ impl ReplOrchestratorV2 {
                     narration: None,
                     trace_id: None,
                     acp_dag_semantic: None,
-            bpmn_form: None,
+                    bpmn_form: None,
                 }
             }
 
@@ -5618,7 +5618,7 @@ impl ReplOrchestratorV2 {
                     narration: None,
                     trace_id: None,
                     acp_dag_semantic: None,
-            bpmn_form: None,
+                    bpmn_form: None,
                 }
             }
 
@@ -5654,7 +5654,7 @@ impl ReplOrchestratorV2 {
                     narration: None,
                     trace_id: None,
                     acp_dag_semantic: None,
-            bpmn_form: None,
+                    bpmn_form: None,
                 }
             }
 
@@ -5745,7 +5745,7 @@ impl ReplOrchestratorV2 {
                     narration: None,
                     trace_id: None,
                     acp_dag_semantic: None,
-            bpmn_form: None,
+                    bpmn_form: None,
                 };
             }
         };
@@ -5837,7 +5837,7 @@ impl ReplOrchestratorV2 {
                     narration: None,
                     trace_id: None,
                     acp_dag_semantic: None,
-            bpmn_form: None,
+                    bpmn_form: None,
                 }
             }
             Err(e) => ReplResponseV2 {
@@ -5853,7 +5853,7 @@ impl ReplOrchestratorV2 {
                 narration: None,
                 trace_id: None,
                 acp_dag_semantic: None,
-            bpmn_form: None,
+                bpmn_form: None,
             },
         }
     }
@@ -5997,7 +5997,7 @@ impl ReplOrchestratorV2 {
                 narration: None,
                 trace_id: None,
                 acp_dag_semantic: None,
-            bpmn_form: None,
+                bpmn_form: None,
             }
         } else {
             self.invalid_input(session, "Nothing to undo.")
@@ -6023,7 +6023,7 @@ impl ReplOrchestratorV2 {
                 narration: None,
                 trace_id: None,
                 acp_dag_semantic: None,
-            bpmn_form: None,
+                bpmn_form: None,
             }
         } else {
             self.invalid_input(session, "Nothing to redo.")
@@ -6147,7 +6147,7 @@ impl ReplOrchestratorV2 {
                 narration: None,
                 trace_id: None,
                 acp_dag_semantic: None,
-            bpmn_form: None,
+                bpmn_form: None,
             }
         } else {
             self.invalid_input(session, "Step not found or already disabled.")
@@ -6171,7 +6171,7 @@ impl ReplOrchestratorV2 {
                 narration: None,
                 trace_id: None,
                 acp_dag_semantic: None,
-            bpmn_form: None,
+                bpmn_form: None,
             }
         } else {
             self.invalid_input(session, "Step not found or not disabled.")
@@ -6201,7 +6201,7 @@ impl ReplOrchestratorV2 {
                     narration: None,
                     trace_id: None,
                     acp_dag_semantic: None,
-            bpmn_form: None,
+                    bpmn_form: None,
                 }
             }
             None => self.invalid_input(session, "Step not found."),
@@ -6252,7 +6252,7 @@ impl ReplOrchestratorV2 {
                     narration: None,
                     trace_id: None,
                     acp_dag_semantic: None,
-            bpmn_form: None,
+                    bpmn_form: None,
                 };
             }
         }
@@ -6316,7 +6316,7 @@ impl ReplOrchestratorV2 {
                             narration: None,
                             trace_id: None,
                             acp_dag_semantic: None,
-            bpmn_form: None,
+                            bpmn_form: None,
                         };
                     }
                     Ok(Ok(s)) => Some(s),
@@ -6415,7 +6415,7 @@ impl ReplOrchestratorV2 {
                             narration: None,
                             trace_id: None,
                             acp_dag_semantic: None,
-            bpmn_form: None,
+                            bpmn_form: None,
                         };
                     }
                 }
@@ -6551,9 +6551,8 @@ impl ReplOrchestratorV2 {
                     // Route through execution gate (INV-3).
                     let entry_snapshot = session.runbook.entries[idx].clone();
                     // B.2b-ζ: route through the outer scope when available.
-                    let scope_for_entry = outer_scope
-                        .as_mut()
-                        .map(|s| s as &mut dyn TransactionScope);
+                    let scope_for_entry =
+                        outer_scope.as_mut().map(|s| s as &mut dyn TransactionScope);
                     let gate_outcome = match tokio::time::timeout(
                         self.runbook_step_timeout,
                         self.execute_entry_via_gate_impl(
@@ -6715,9 +6714,8 @@ impl ReplOrchestratorV2 {
                     entry.status = EntryStatus::Executing;
 
                     // B.2b-ζ: route through the outer scope when available.
-                    let scope_for_entry = outer_scope
-                        .as_mut()
-                        .map(|s| s as &mut dyn TransactionScope);
+                    let scope_for_entry =
+                        outer_scope.as_mut().map(|s| s as &mut dyn TransactionScope);
                     let gate_outcome = match tokio::time::timeout(
                         self.runbook_step_timeout,
                         self.execute_entry_via_gate_impl(
@@ -6976,7 +6974,7 @@ impl ReplOrchestratorV2 {
                 narration: None,
                 trace_id: None,
                 acp_dag_semantic: None,
-            bpmn_form: None,
+                bpmn_form: None,
             }
         } else {
             // All entries processed — back to editing.
@@ -7077,7 +7075,7 @@ impl ReplOrchestratorV2 {
                 narration: None,
                 trace_id: None,
                 acp_dag_semantic: None,
-            bpmn_form: None,
+                bpmn_form: None,
             }
         }
     }
@@ -7777,7 +7775,7 @@ impl ReplOrchestratorV2 {
                 narration: None,
                 trace_id: None,
                 acp_dag_semantic: None,
-            bpmn_form: None,
+                bpmn_form: None,
             }),
             crate::runbook::OrchestratorResponse::ConstraintViolation(v) => {
                 let msg = format!("Pack constraint violation: {}", v.explanation,);
@@ -7794,7 +7792,7 @@ impl ReplOrchestratorV2 {
                     narration: None,
                     trace_id: None,
                     acp_dag_semantic: None,
-            bpmn_form: None,
+                    bpmn_form: None,
                 })
             }
             crate::runbook::OrchestratorResponse::CompilationError(e) => {
@@ -7812,7 +7810,7 @@ impl ReplOrchestratorV2 {
                     narration: None,
                     trace_id: None,
                     acp_dag_semantic: None,
-            bpmn_form: None,
+                    bpmn_form: None,
                 })
             }
         }

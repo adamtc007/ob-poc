@@ -17,9 +17,7 @@ use std::sync::Arc;
 
 use uuid::Uuid;
 
-use dsl_runtime::{
-    CascadeAction, CascadePlanner, GateChecker, TransactionScope,
-};
+use dsl_runtime::{CascadeAction, CascadePlanner, GateChecker, TransactionScope};
 
 use super::executor::StepOutcome;
 use super::types::CompiledStep;

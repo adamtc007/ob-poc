@@ -41,9 +41,7 @@ use super::runtime_registry::{runtime_registry, RuntimeBehavior};
 #[cfg(feature = "database")]
 use super::submission::{DslSubmission, SubmissionError, SubmissionLimits};
 #[cfg(feature = "database")]
-use dsl_runtime::{
-    SemOsChildDispatcher, ServicePipelineService, TransactionScope,
-};
+use dsl_runtime::{SemOsChildDispatcher, ServicePipelineService, TransactionScope};
 #[cfg(feature = "database")]
 use sem_os_postgres::ops::SemOsVerbOpRegistry;
 

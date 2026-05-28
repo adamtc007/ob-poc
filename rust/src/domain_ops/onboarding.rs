@@ -15,10 +15,10 @@ use async_trait::async_trait;
 use sem_os_postgres::ops::SemOsVerbOp;
 use uuid::Uuid;
 
+use dsl_runtime::TransactionScope;
 use dsl_runtime::{
     json_extract_bool_opt, json_extract_int_opt, json_extract_string_opt, json_extract_uuid,
 };
-use dsl_runtime::TransactionScope;
 use dsl_runtime::{VerbExecutionContext, VerbExecutionOutcome};
 
 // =============================================================================

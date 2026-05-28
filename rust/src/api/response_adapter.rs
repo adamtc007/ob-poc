@@ -203,8 +203,7 @@ pub fn repl_to_chat_response(resp: ReplResponseV2, session_id: Uuid) -> ChatResp
                 for step in results {
                     if let Some(result) = &step.result {
                         if let Some(form_val) = result.get("bpmn_form").filter(|v| !v.is_null()) {
-                            chat.bpmn_form =
-                                serde_json::from_value(form_val.clone()).ok();
+                            chat.bpmn_form = serde_json::from_value(form_val.clone()).ok();
                             break;
                         }
                     }

@@ -376,7 +376,9 @@ mod tests {
     use uuid::Uuid;
 
     use super::CalibrationFixtures;
-    use crate::calibration::types::{CalibrationExecutionShape, CalibrationScenario, GovernanceStatus};
+    use crate::calibration::types::{
+        CalibrationExecutionShape, CalibrationScenario, GovernanceStatus,
+    };
     use crate::session::UnifiedSession;
     use crate::traceability::{SurfaceVersions, TraceKind, TraceOutcome, UtteranceTraceRecord};
 

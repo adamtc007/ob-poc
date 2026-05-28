@@ -14,11 +14,11 @@ use anyhow::Result;
 use async_trait::async_trait;
 use sem_os_postgres::ops::SemOsVerbOp;
 
+use dsl_runtime::TransactionScope;
 use dsl_runtime::{
     json_extract_bool_opt, json_extract_int_opt, json_extract_string_opt, json_extract_uuid_opt,
     json_get_required_uuid,
 };
-use dsl_runtime::TransactionScope;
 use dsl_runtime::{VerbExecutionContext, VerbExecutionOutcome};
 
 #[allow(unused_imports)]
@@ -30,8 +30,8 @@ use {
     crate::dsl_v2::executor::ExecutionContext,
     crate::gleif::{
         client::TreeFetchOptions, types::ChainLink, types::DiscoveredEntity, types::FundListResult,
-        GleifClient, GleifEnrichmentService, types::LeiRecord, types::OwnershipChain,
-        types::SuccessorResult, types::UboStatus,
+        types::LeiRecord, types::OwnershipChain, types::SuccessorResult, types::UboStatus,
+        GleifClient, GleifEnrichmentService,
     },
     sqlx::PgPool,
     std::collections::HashMap,

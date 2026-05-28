@@ -27,10 +27,10 @@ use uuid::Uuid;
 use crate::api::observatory_routes::ReplSessionStore;
 use crate::api::SessionStore;
 use crate::database::{LayoutOverrideView, PgGraphRepository, VisualizationRepository};
-use crate::graph::{ConfigDrivenGraphBuilder, LayoutEngineV2};
 use crate::graph::types::{
     CbuGraph, CbuSummary, EntityGraph, GraphScope, LayoutOverride, NodeOffset, NodeSizeOverride,
 };
+use crate::graph::{ConfigDrivenGraphBuilder, LayoutEngineV2};
 use inspector_projection::{
     generator::cbu::generate_from_cbu_graph, InspectorProjection, RenderPolicy,
 };

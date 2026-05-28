@@ -1005,7 +1005,11 @@ mod taxonomy_types {
     }
 
     impl ServiceTaxonomyNode {
-        pub(super) fn new(id: Vec<String>, node_type: ServiceTaxonomyNodeType, label: String) -> Self {
+        pub(super) fn new(
+            id: Vec<String>,
+            node_type: ServiceTaxonomyNodeType,
+            label: String,
+        ) -> Self {
             Self {
                 id,
                 node_type,

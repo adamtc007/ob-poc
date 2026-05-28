@@ -238,7 +238,7 @@ mod tests {
             narration: None,
             trace_id: None,
             acp_dag_semantic: None,
-                bpmn_form: None,
+            bpmn_form: None,
         };
 
         let json = serde_json::to_string(&response).unwrap();
@@ -262,7 +262,7 @@ mod tests {
             narration: None,
             trace_id: None,
             acp_dag_semantic: None,
-                bpmn_form: None,
+            bpmn_form: None,
         };
 
         let json = serde_json::to_string(&response).unwrap();
@@ -296,7 +296,7 @@ mod tests {
             narration: None,
             trace_id: None,
             acp_dag_semantic: None,
-                bpmn_form: None,
+            bpmn_form: None,
         };
 
         let json = serde_json::to_string(&response).unwrap();
@@ -327,7 +327,7 @@ mod tests {
             narration: None,
             trace_id: None,
             acp_dag_semantic: None,
-                bpmn_form: None,
+            bpmn_form: None,
         };
 
         let json = serde_json::to_string(&response).unwrap();

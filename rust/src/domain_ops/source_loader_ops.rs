@@ -16,10 +16,10 @@ use anyhow::Result;
 use async_trait::async_trait;
 use sem_os_postgres::ops::SemOsVerbOp;
 
+use dsl_runtime::TransactionScope;
 use dsl_runtime::{
     json_extract_bool_opt, json_extract_int_opt, json_extract_string_opt, json_extract_uuid_opt,
 };
-use dsl_runtime::TransactionScope;
 use dsl_runtime::{VerbExecutionContext, VerbExecutionOutcome};
 
 #[cfg(feature = "database")]
