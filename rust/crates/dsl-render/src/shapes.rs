@@ -27,8 +27,7 @@ pub struct NodeLayout {
 // complications with hex color codes containing `"#` sequences).
 // ---------------------------------------------------------------------------
 
-pub const ARROWHEAD_DEF: &str =
-    "  <marker id=\"arrowhead\" markerWidth=\"10\" markerHeight=\"7\" \
+pub const ARROWHEAD_DEF: &str = "  <marker id=\"arrowhead\" markerWidth=\"10\" markerHeight=\"7\" \
 refX=\"9\" refY=\"3.5\" orient=\"auto\">\n    \
 <polygon points=\"0 0, 10 3.5, 0 7\" fill=\"#555\" />\n  \
 </marker>\n  \
@@ -70,23 +69,18 @@ pub fn render_node_shape(
             circle(cx, cy, 20.0, "#16a34a", "#166534", 2.0),
             "start-event",
         ),
-        NodeKind::EndEvent => (
-            circle(cx, cy, 20.0, "#ef4444", "#7f1d1d", 4.0),
-            "end-event",
-        ),
-        NodeKind::EndEventTerminate => (
-            circle(cx, cy, 20.0, "#991b1b", "#7f1d1d", 4.0),
-            "end-event",
-        ),
+        NodeKind::EndEvent => (circle(cx, cy, 20.0, "#ef4444", "#7f1d1d", 4.0), "end-event"),
+        NodeKind::EndEventTerminate => {
+            (circle(cx, cy, 20.0, "#991b1b", "#7f1d1d", 4.0), "end-event")
+        }
         NodeKind::EndEventError
         | NodeKind::EndEventMessage
         | NodeKind::EndEventSignal
         | NodeKind::EndEventCancel
         | NodeKind::EndEventEscalation
-        | NodeKind::EndEventCompensation => (
-            circle(cx, cy, 20.0, "#dc2626", "#7f1d1d", 4.0),
-            "end-event",
-        ),
+        | NodeKind::EndEventCompensation => {
+            (circle(cx, cy, 20.0, "#dc2626", "#7f1d1d", 4.0), "end-event")
+        }
         NodeKind::IntermediateCatchMessage
         | NodeKind::IntermediateCatchTimer
         | NodeKind::IntermediateCatchSignal
@@ -106,10 +100,9 @@ pub fn render_node_shape(
             rect_rounded(x, y, w, h, "#dbeafe", "#1d4ed8"),
             "service-task",
         ),
-        NodeKind::UserTask | NodeKind::ManualTask => (
-            rect_rounded(x, y, w, h, "#ede9fe", "#5b21b6"),
-            "user-task",
-        ),
+        NodeKind::UserTask | NodeKind::ManualTask => {
+            (rect_rounded(x, y, w, h, "#ede9fe", "#5b21b6"), "user-task")
+        }
         NodeKind::BusinessRuleTask => (
             rect_rounded(x, y, w, h, "#e0e7ff", "#3730a3"),
             "business-rule-task",
@@ -117,10 +110,7 @@ pub fn render_node_shape(
         NodeKind::Subprocess
         | NodeKind::EventSubprocess
         | NodeKind::TransactionSubprocess
-        | NodeKind::CallActivity => (
-            rect_rounded(x, y, w, h, "#f3f4f6", "#6b7280"),
-            "subprocess",
-        ),
+        | NodeKind::CallActivity => (rect_rounded(x, y, w, h, "#f3f4f6", "#6b7280"), "subprocess"),
     };
 
     let label_svg = if include_labels {
@@ -262,7 +252,11 @@ pub fn render_edge(
         x1, y1, mx, y1, mx, y2, x2, y2
     );
 
-    let stroke = if edge.is_default { "#9ca3af" } else { "#4b5563" };
+    let stroke = if edge.is_default {
+        "#9ca3af"
+    } else {
+        "#4b5563"
+    };
     let dash = if edge.is_default {
         " stroke-dasharray=\"5,3\""
     } else {
@@ -356,7 +350,10 @@ pub fn render_parallel_join(layout: &NodeLayout, label: &str) -> String {
     let text = text_centered(cx, cy, label, 10.0, "#0f766e");
     let title = format!("<title>{}</title>", escape_xml(label));
 
-    format!("<g class=\"parallel-join\">{}{}{}</g>\n", title, shape, text)
+    format!(
+        "<g class=\"parallel-join\">{}{}{}</g>\n",
+        title, shape, text
+    )
 }
 
 // ---------------------------------------------------------------------------

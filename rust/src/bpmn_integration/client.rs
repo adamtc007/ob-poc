@@ -10,7 +10,7 @@ use tonic::transport::Channel;
 use uuid::Uuid;
 
 /// Re-export generated proto types (internal use only)
-#[allow(clippy::enum_variant_names)]
+#[allow(clippy::enum_variant_names, unreachable_pub)]
 pub(crate) mod proto {
     tonic::include_proto!("bpmn_lite.v1");
 }

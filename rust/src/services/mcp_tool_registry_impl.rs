@@ -1,4 +1,4 @@
-//! ob-poc impl of [`dsl_runtime::service_traits::McpToolRegistry`].
+//! ob-poc impl of [`McpToolRegistry`].
 //!
 //! Bridges the trait to `crate::sem_reg::agent::mcp_tools::all_tool_specs()`.
 //! Projects the internal `SemRegToolSpec` to the plane-crossing
@@ -6,7 +6,7 @@
 
 use async_trait::async_trait;
 
-use dsl_runtime::service_traits::{McpToolRegistry, McpToolSpec};
+use dsl_runtime::{McpToolRegistry, McpToolSpec};
 
 use crate::sem_reg::agent::mcp_tools::all_tool_specs;
 

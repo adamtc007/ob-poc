@@ -12,8 +12,8 @@
 use anyhow::Result;
 use async_trait::async_trait;
 
-use dsl_runtime::service_traits::AttributeService;
-use dsl_runtime::tx::TransactionScope;
+use dsl_runtime::AttributeService;
+use dsl_runtime::TransactionScope;
 use dsl_runtime::{VerbExecutionContext, VerbExecutionOutcome};
 
 use super::SemOsVerbOp;

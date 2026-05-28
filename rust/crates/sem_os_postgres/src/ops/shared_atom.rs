@@ -5,7 +5,7 @@
 //! Manages the shared atom registry — cross-workspace attribute
 //! declarations with lifecycle governance
 //! (Draft → Active → Deprecated → Retired). Delegates to the
-//! `dsl_runtime::cross_workspace::{repository, fact_refs,
+//! `dsl_runtime::{repository, fact_refs,
 //! fact_versions, replay, types}` helpers (same transitional
 //! `scope.pool()` pattern as slice #13).
 
@@ -14,16 +14,13 @@ use async_trait::async_trait;
 use chrono::Utc;
 use serde_json::Value;
 
-use dsl_runtime::cross_workspace::{
-    fact_refs, fact_versions,
-    replay::{RebuildContext, ReplayOutcome, ReplayResult, ReplayTrigger},
-    repository,
-    types::{RegisterSharedAtomInput, SharedAtomLifecycle},
+use dsl_runtime::TransactionScope;
+use dsl_runtime::{
+    advance_to_current, check_staleness_for_entity, current_version_number, get_atom_by_path,
+    insert_shared_atom, list_shared_atoms, transition_lifecycle, RebuildContext,
+    RegisterSharedAtomInput, ReplayOutcome, ReplayResult, ReplayTrigger, SharedAtomLifecycle,
 };
-use dsl_runtime::domain_ops::helpers::{
-    json_extract_string, json_extract_string_opt, json_extract_uuid,
-};
-use dsl_runtime::tx::TransactionScope;
+use dsl_runtime::{json_extract_string, json_extract_string_opt, json_extract_uuid};
 use dsl_runtime::{VerbExecutionContext, VerbExecutionOutcome};
 
 use super::SemOsVerbOp;
@@ -46,10 +43,10 @@ async fn transition_atom(
     target: SharedAtomLifecycle,
 ) -> Result<VerbExecutionOutcome> {
     let atom_path = json_extract_string(args, "atom-path")?;
-    let atom = repository::get_by_path(scope.pool(), &atom_path)
+    let atom = get_atom_by_path(scope.pool(), &atom_path)
         .await?
         .ok_or_else(|| anyhow!("Shared atom '{}' not found", atom_path))?;
-    let result = repository::transition_lifecycle(scope.pool(), atom.id, target).await?;
+    let result = transition_lifecycle(scope.pool(), atom.id, target).await?;
     Ok(VerbExecutionOutcome::Record(serde_json::to_value(result)?))
 }
 
@@ -75,7 +72,7 @@ impl SemOsVerbOp for Register {
             owner_constellation_family: json_extract_string(args, "owner-constellation-family")?,
             validation_rule: None,
         };
-        let def = repository::insert_shared_atom(scope.pool(), &input).await?;
+        let def = insert_shared_atom(scope.pool(), &input).await?;
         Ok(VerbExecutionOutcome::Record(serde_json::to_value(def)?))
     }
 }
@@ -149,7 +146,7 @@ impl SemOsVerbOp for List {
         scope: &mut dyn TransactionScope,
     ) -> Result<VerbExecutionOutcome> {
         let status_filter = parse_lifecycle_filter(json_extract_string_opt(args, "status"))?;
-        let atoms = repository::list_shared_atoms(scope.pool(), status_filter).await?;
+        let atoms = list_shared_atoms(scope.pool(), status_filter).await?;
         let records: Vec<Value> = atoms
             .into_iter()
             .map(serde_json::to_value)
@@ -198,15 +195,13 @@ impl SemOsVerbOp for ReplayConstellation {
         let constellation_family = json_extract_string(args, "constellation-family")?;
         let atom_path = json_extract_string(args, "atom-path")?;
 
-        let atom = repository::get_by_path(scope.pool(), &atom_path)
+        let atom = get_atom_by_path(scope.pool(), &atom_path)
             .await?
             .ok_or_else(|| anyhow!("Shared atom '{}' not found", atom_path))?;
 
-        let current_version =
-            fact_versions::current_version_number(scope.pool(), atom.id, entity_id).await?;
+        let current_version = current_version_number(scope.pool(), atom.id, entity_id).await?;
         let stale_refs =
-            fact_refs::check_staleness_for_entity(scope.pool(), &constellation_family, entity_id)
-                .await?;
+            check_staleness_for_entity(scope.pool(), &constellation_family, entity_id).await?;
 
         let held_version = stale_refs
             .iter()
@@ -228,7 +223,7 @@ impl SemOsVerbOp for ReplayConstellation {
             remediation_id: None,
         };
 
-        fact_refs::advance_to_current(
+        advance_to_current(
             scope.pool(),
             atom.id,
             entity_id,
@@ -269,12 +264,11 @@ impl SemOsVerbOp for AcknowledgeSharedUpdate {
         let entity_id = json_extract_uuid(args, ctx, "entity-id")?;
         let atom_path = json_extract_string(args, "atom-path")?;
 
-        let atom = repository::get_by_path(scope.pool(), &atom_path)
+        let atom = get_atom_by_path(scope.pool(), &atom_path)
             .await?
             .ok_or_else(|| anyhow!("Shared atom '{}' not found", atom_path))?;
 
-        let current_version =
-            fact_versions::current_version_number(scope.pool(), atom.id, entity_id).await?;
+        let current_version = current_version_number(scope.pool(), atom.id, entity_id).await?;
 
         if current_version == 0 {
             return Err(anyhow!(

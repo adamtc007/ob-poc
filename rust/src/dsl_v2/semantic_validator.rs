@@ -29,7 +29,7 @@ use std::collections::{HashMap, HashSet};
 use uuid::Uuid;
 
 /// Cache type for batch-resolved refs: (RefType, value) → ResolveResult
-pub type RefCache = HashMap<(RefType, String), ResolveResult>;
+pub(crate) type RefCache = HashMap<(RefType, String), ResolveResult>;
 
 /// Semantic validator that checks AST against live database
 pub struct SemanticValidator {
@@ -1194,7 +1194,7 @@ fn get_fuzzy_checks(full_verb: &str) -> Vec<FuzzyCheckInfo> {
 }
 
 /// Map entity_type string from YAML to RefType
-pub fn entity_type_to_ref_type(entity_type: &str) -> RefType {
+pub(crate) fn entity_type_to_ref_type(entity_type: &str) -> RefType {
     match entity_type {
         "cbu" => RefType::Cbu,
         "entity" => RefType::Entity,

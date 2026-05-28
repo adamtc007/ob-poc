@@ -42,7 +42,7 @@ use super::consumer::AsyncOutboxConsumer;
 /// drainer-internal concern; the orchestrator writer side and this
 /// consumer side both live in ob-poc.
 #[derive(Debug, Clone, Deserialize)]
-pub struct NarratePayload {
+pub(super) struct NarratePayload {
     /// Session that owns this narration; future WebSocket push will
     /// look up the open subscriber by this id.
     pub session_id: Uuid,

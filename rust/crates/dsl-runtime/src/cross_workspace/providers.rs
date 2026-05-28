@@ -12,7 +12,7 @@ use super::idempotency::ProviderCapability;
 
 /// A provider capability row.
 #[derive(Debug, Clone, FromRow, Serialize, Deserialize)]
-pub struct ProviderCapabilityRow {
+pub(crate) struct ProviderCapabilityRow {
     pub id: Uuid,
     pub provider: String,
     pub operation: String,
@@ -31,6 +31,7 @@ pub struct ProviderCapabilitySummary {
 }
 
 /// List all provider capabilities.
+#[allow(dead_code)]
 pub async fn list_all(pool: &PgPool) -> Result<Vec<ProviderCapabilitySummary>> {
     let rows = sqlx::query_as::<_, ProviderCapabilityRow>(
         r#"
@@ -84,7 +85,8 @@ pub async fn list_for_provider(
 }
 
 /// Get capability for a specific provider + operation.
-pub async fn get_capability(
+#[allow(dead_code)]
+pub(crate) async fn get_capability(
     pool: &PgPool,
     provider: &str,
     operation: &str,

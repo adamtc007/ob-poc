@@ -8,7 +8,7 @@
 //! Requires the migration at `rust/migrations/20260521_dsl_journey_runtime.sql`.
 
 #[cfg(feature = "postgres")]
-pub mod postgres {
+pub(crate) mod postgres {
     use crate::{
         retention::RetentionPolicy,
         store::{JourneyLogEntry, JourneyStore, PendingWaitInfo},

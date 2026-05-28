@@ -2,7 +2,7 @@
 mod tests {
     use std::collections::HashMap;
 
-    use dsl_runtime::state_reducer::{
+    use {
         validate_state_machine, ConditionDef, ConsistencyCheckDef, OverlaySourceDef, ReducerDef,
         RuleDef, StateMachineDefinition,
     };

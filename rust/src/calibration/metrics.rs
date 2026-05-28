@@ -132,7 +132,7 @@ fn ratio(numerator: usize, denominator: usize) -> f32 {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::calibration::{
+    use crate::calibration::types::{
         CalibrationOutcome, ExpectedHaltReason, ExpectedOutcome, NegativeType,
     };
     use uuid::Uuid;

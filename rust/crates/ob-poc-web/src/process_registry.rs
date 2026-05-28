@@ -16,7 +16,7 @@ use anyhow::{anyhow, Result};
 use async_trait::async_trait;
 use bpmn_runtime::{register_builtins, JourneyStore, PostgresJourneyStore, RuntimeEngine, ScriptedAdaptor, VerbRegistry};
 use dsl_migrate_verify::compile_to_spec;
-use dsl_runtime::service_traits::ProcessRegistryService;
+use dsl_runtime::ProcessRegistryService;
 use ob_poc_types::chat::BpmnFormPending;
 use sqlx::PgPool;
 use std::{collections::HashMap, sync::Arc};

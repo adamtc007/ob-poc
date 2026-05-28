@@ -17,11 +17,11 @@ use async_trait::async_trait;
 use serde_json::{json, Value};
 use uuid::Uuid;
 
-use dsl_runtime::domain_ops::helpers::{
+use dsl_runtime::{
     json_extract_string, json_extract_string_opt, json_extract_uuid, json_extract_uuid_opt,
 };
-use dsl_runtime::placeholder::{PlaceholderResolver, ResolvePlaceholderRequest};
-use dsl_runtime::tx::TransactionScope;
+use dsl_runtime::{PlaceholderResolver, ResolvePlaceholderRequest};
+use dsl_runtime::TransactionScope;
 use dsl_runtime::{VerbExecutionContext, VerbExecutionOutcome};
 
 use super::SemOsVerbOp;
@@ -113,7 +113,7 @@ impl SemOsVerbOp for Ghost {
         // via the shared `emit_pending_state_advance` helper. Only on
         // genuine creation — the idempotent early-return at line 66
         // bypasses this code.
-        dsl_runtime::domain_ops::helpers::emit_pending_state_advance(
+        dsl_runtime::emit_pending_state_advance(
             ctx,
             entity_id,
             "entity:ghost",
@@ -218,7 +218,7 @@ impl SemOsVerbOp for Identify {
         // Phase C.3 rollout: GHOST → IDENTIFIED state transition. The
         // precondition check at line 156 guarantees we only reach here
         // on a genuine advance.
-        dsl_runtime::domain_ops::helpers::emit_pending_state_advance(
+        dsl_runtime::emit_pending_state_advance(
             ctx,
             entity_id,
             "entity:identified",
@@ -262,7 +262,7 @@ impl SemOsVerbOp for Deactivate {
         .rows_affected();
 
         if affected > 0 {
-            dsl_runtime::domain_ops::helpers::emit_pending_state_advance(
+            dsl_runtime::emit_pending_state_advance(
                 ctx,
                 entity_id,
                 "entity:deactivated",
@@ -304,7 +304,7 @@ impl SemOsVerbOp for EnsureOrPlaceholder {
         // created (is_placeholder=true). The idempotent "found existing
         // entity" case is not a state advance.
         if is_placeholder {
-            dsl_runtime::domain_ops::helpers::emit_pending_state_advance(
+            dsl_runtime::emit_pending_state_advance(
                 ctx,
                 entity_id,
                 "entity:placeholder",
@@ -353,7 +353,7 @@ impl SemOsVerbOp for ResolvePlaceholder {
         // Phase C.3 rollout: placeholder → resolved entity. Terminal
         // state transition for the placeholder (it's effectively
         // consumed by the resolved entity).
-        dsl_runtime::domain_ops::helpers::emit_pending_state_advance(
+        dsl_runtime::emit_pending_state_advance(
             ctx,
             placeholder_id,
             "entity:resolved",

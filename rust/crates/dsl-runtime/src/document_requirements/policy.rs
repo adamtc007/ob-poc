@@ -78,6 +78,7 @@ impl DocumentPolicyService {
     /// ```ignore
     /// let pool = service.pool();
     /// ```
+    #[allow(dead_code)]
     pub fn pool(&self) -> &PgPool {
         &self.pool
     }
@@ -127,6 +128,7 @@ impl DocumentPolicyService {
     /// ```ignore
     /// let obligations = service.list_active_proof_obligations().await?;
     /// ```
+    #[allow(dead_code)]
     pub async fn list_active_proof_obligations(&self) -> Result<Vec<PublishedProofObligation>> {
         let Some(snapshot_set_id) = self.get_active_snapshot_set_id().await? else {
             return Ok(Vec::new());
@@ -143,6 +145,7 @@ impl DocumentPolicyService {
     /// ```ignore
     /// let strategies = service.list_active_evidence_strategies().await?;
     /// ```
+    #[allow(dead_code)]
     pub async fn list_active_evidence_strategies(&self) -> Result<Vec<PublishedEvidenceStrategy>> {
         let Some(snapshot_set_id) = self.get_active_snapshot_set_id().await? else {
             return Ok(Vec::new());

@@ -1,3 +1,4 @@
+#![allow(unreachable_pub)]
 //! Core types for the compiled runbook execution model.
 //!
 //! A `CompiledRunbook` is the **sole executable artifact** — no raw DSL may be

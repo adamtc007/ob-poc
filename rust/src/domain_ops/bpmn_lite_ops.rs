@@ -14,10 +14,10 @@ use sem_os_postgres::ops::SemOsVerbOp;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
-use dsl_runtime::domain_ops::helpers::{
+use dsl_runtime::{
     json_extract_string, json_extract_string_opt, json_get_required_uuid,
 };
-use dsl_runtime::tx::TransactionScope;
+use dsl_runtime::TransactionScope;
 use dsl_runtime::{VerbExecutionContext, VerbExecutionOutcome};
 
 // =============================================================================
@@ -25,21 +25,21 @@ use dsl_runtime::{VerbExecutionContext, VerbExecutionOutcome};
 // =============================================================================
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct BpmnCompileResult {
+pub(super) struct BpmnCompileResult {
     pub bytecode_version_hex: String,
     pub diagnostic_count: usize,
     pub diagnostics: Vec<BpmnDiagnosticResult>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct BpmnDiagnosticResult {
+pub(super) struct BpmnDiagnosticResult {
     pub severity: String,
     pub message: String,
     pub element_id: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct BpmnInspectResult {
+pub(super) struct BpmnInspectResult {
     pub state: String,
     pub fiber_count: usize,
     pub wait_count: usize,
@@ -55,7 +55,7 @@ fn get_bpmn_client() -> Result<crate::bpmn_integration::client::BpmnLiteConnecti
 // bpmn.compile
 // =============================================================================
 
-pub struct BpmnCompile;
+pub(super) struct BpmnCompile;
 
 #[async_trait]
 impl SemOsVerbOp for BpmnCompile {
@@ -115,7 +115,7 @@ impl SemOsVerbOp for BpmnCompile {
 // bpmn.start
 // =============================================================================
 
-pub struct BpmnStart;
+pub(super) struct BpmnStart;
 
 #[async_trait]
 impl SemOsVerbOp for BpmnStart {
@@ -207,7 +207,7 @@ impl SemOsVerbOp for BpmnStart {
 // bpmn.signal
 // =============================================================================
 
-pub struct BpmnSignal;
+pub(super) struct BpmnSignal;
 
 #[async_trait]
 impl SemOsVerbOp for BpmnSignal {
@@ -307,7 +307,7 @@ impl SemOsVerbOp for BpmnSignal {
 // bpmn.cancel
 // =============================================================================
 
-pub struct BpmnCancel;
+pub(super) struct BpmnCancel;
 
 #[async_trait]
 impl SemOsVerbOp for BpmnCancel {
@@ -382,7 +382,7 @@ impl SemOsVerbOp for BpmnCancel {
 // with no I/O of its own.
 // =============================================================================
 
-pub struct BpmnInspect;
+pub(super) struct BpmnInspect;
 
 #[async_trait]
 impl SemOsVerbOp for BpmnInspect {

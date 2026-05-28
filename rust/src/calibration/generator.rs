@@ -81,7 +81,7 @@ pub fn parse_generated_utterances(raw: &str) -> Result<Vec<GeneratedUtterance>> 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::calibration::{
+    use crate::calibration::types::{
         CalibrationExecutionShape, CalibrationScenario, ConfusionRisk, GovernanceStatus,
         NearNeighbourVerb,
     };

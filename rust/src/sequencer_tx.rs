@@ -1,5 +1,5 @@
 //! `PgTransactionScope` — ob-poc's concrete impl of
-//! [`dsl_runtime::tx::TransactionScope`] wrapping a `sqlx::Transaction`.
+//! [`TransactionScope`] wrapping a `sqlx::Transaction`.
 //!
 //! The Sequencer opens a `sqlx::Transaction` at stage 8, wraps it in a
 //! [`PgTransactionScope`], and passes the scope as
@@ -29,7 +29,7 @@
 //! but architecturally the txn-opener is a composition-plane concern
 //! (the Sequencer), not a runtime-plane concern.
 
-use dsl_runtime::tx::TransactionScope;
+use dsl_runtime::TransactionScope;
 use ob_poc_types::TransactionScopeId;
 use sqlx::{PgPool, Postgres, Transaction};
 use std::time::Duration;

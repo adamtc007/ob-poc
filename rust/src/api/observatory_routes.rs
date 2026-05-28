@@ -472,8 +472,8 @@ async fn get_graph_scene(
     State(state): State<ObservatoryState>,
     Path(session_id): Path<Uuid>,
 ) -> impl IntoResponse {
-    use ob_poc_types::galaxy::ViewLevel;
     use crate::api::graph_scene_projection;
+    use ob_poc_types::galaxy::ViewLevel;
 
     // 1. Try to read from REPL session's TOS hydrated constellation (canonical DAG)
     if let Some(ref repl_sessions) = state.repl_sessions {
@@ -788,9 +788,7 @@ async fn navigate(
     Path(session_id): Path<Uuid>,
     Json(request): Json<NavigateRequest>,
 ) -> impl IntoResponse {
-    use crate::api::graph_scene_projection::{
-        self, GraphEdgeProjection, SlotProjection,
-    };
+    use crate::api::graph_scene_projection::{self, GraphEdgeProjection, SlotProjection};
 
     // 1. Validate session exists and extract scope
     let sessions = state.sessions.read().await;

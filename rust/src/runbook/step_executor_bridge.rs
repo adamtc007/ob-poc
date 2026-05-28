@@ -1,3 +1,4 @@
+#![allow(unreachable_pub)]
 //! Bridge adapters from REPL executor traits to `StepExecutor`.
 //!
 //! Two bridges are provided:
@@ -15,6 +16,10 @@
 use std::sync::Arc;
 
 use uuid::Uuid;
+
+use dsl_runtime::{
+    CascadeAction, CascadePlanner, GateChecker, TransactionScope,
+};
 
 use super::executor::StepOutcome;
 use super::types::CompiledStep;
@@ -52,7 +57,7 @@ impl super::executor::StepExecutor for DslStepExecutor {
     async fn execute_step_in_scope(
         &self,
         step: &CompiledStep,
-        scope: &mut dyn dsl_runtime::tx::TransactionScope,
+        scope: &mut dyn TransactionScope,
     ) -> StepOutcome {
         match self.executor.execute_in_scope(&step.dsl, scope).await {
             Ok(result) => StepOutcome::Completed { result },
@@ -158,13 +163,13 @@ pub struct VerbExecutionPortStepExecutor {
 #[derive(Clone)]
 pub struct GatePipeline {
     pub registry: Arc<dsl_core::config::DagRegistry>,
-    pub gate_checker: Arc<dsl_runtime::cross_workspace::GateChecker>,
+    pub gate_checker: Arc<GateChecker>,
     pub verb_metadata: Arc<dyn VerbTransitionLookup>,
     pub pool: Arc<sqlx::PgPool>,
     /// V1.3-3 cascade planner. Optional — when set, post-dispatch
     /// hook plans + executes single-level cascades (e.g. parent CBU
     /// suspended → all child CBUs suspended).
-    pub cascade_planner: Option<Arc<dsl_runtime::cross_workspace::CascadePlanner>>,
+    pub cascade_planner: Option<Arc<CascadePlanner>>,
 }
 
 /// Resolves a verb FQN to its v1.3 `transition_args` metadata. Caller
@@ -412,10 +417,10 @@ impl VerbExecutionPortStepExecutor {
 /// further cascades. This is a deliberate scope limit; full recursive
 /// dispatch is a follow-up.
 async fn apply_cascade_state_write(
-    action: &dsl_runtime::cross_workspace::CascadeAction,
+    action: &CascadeAction,
     pool: &sqlx::PgPool,
 ) -> anyhow::Result<()> {
-    use dsl_runtime::cross_workspace::slot_state::resolve_slot_table;
+    use dsl_runtime::resolve_slot_table;
     let (table, col, pk) = resolve_slot_table(&action.child_workspace, &action.child_slot)?;
     let sql = format!(
         r#"UPDATE "ob-poc".{tbl} SET {col} = $1 WHERE {pk} = $2"#,
@@ -437,7 +442,7 @@ trait CascadeActionExt {
     fn constraint_id_or_unspecified(&self) -> &str;
 }
 
-impl CascadeActionExt for dsl_runtime::cross_workspace::CascadeAction {
+impl CascadeActionExt for CascadeAction {
     fn constraint_id_or_unspecified(&self) -> &str {
         // CascadeAction carries rule_parent_state which uniquely keys
         // the rule; surface it as a constraint identifier proxy.

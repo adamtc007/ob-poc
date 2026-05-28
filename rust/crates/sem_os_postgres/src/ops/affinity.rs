@@ -1,7 +1,7 @@
 //! Affinity navigation verbs — SemOS-side YAML-first re-implementation.
 //!
 //! Six `registry.*` verbs querying the active `AffinityGraph` (loaded
-//! via `dsl_runtime::domain_ops::affinity_graph_cache`): verbs-for-table,
+//! via `dsl_runtime::affinity_graph_cache`): verbs-for-table,
 //! verbs-for-attribute, data-for-verb, adjacent-verbs, governance-gaps,
 //! discover-dsl. The discover-dsl op additionally resolves CCIR scope
 //! via [`SemOsContextResolver`]. YAML contracts in
@@ -27,12 +27,12 @@ use sem_os_policy::context_resolution::{
     ContextResolutionRequest, DiscoveryContext, EvidenceMode, SubjectRef,
 };
 
-use dsl_runtime::domain_ops::affinity_graph_cache::load_affinity_graph_cached;
-use dsl_runtime::domain_ops::helpers::{
+use dsl_runtime::load_affinity_graph_cached;
+use dsl_runtime::{
     json_extract_bool_opt, json_extract_int_opt, json_extract_string, json_extract_string_opt,
 };
-use dsl_runtime::service_traits::SemOsContextResolver;
-use dsl_runtime::tx::TransactionScope;
+use dsl_runtime::SemOsContextResolver;
+use dsl_runtime::TransactionScope;
 use dsl_runtime::{VerbExecutionContext, VerbExecutionOutcome};
 
 use super::SemOsVerbOp;

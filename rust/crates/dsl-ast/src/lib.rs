@@ -5,6 +5,6 @@
 //!
 //! Full per-kind slot extraction and type checking are Tranche 5 work.
 
-pub mod atom_bag;
+pub(crate) mod atom_bag;
 
 pub use atom_bag::{AtomBag, AtomIndex, TypedAtom};

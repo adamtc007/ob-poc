@@ -28,6 +28,7 @@ pub mod types;
 pub mod view_model;
 pub mod viewport;
 
+pub use types::*;
 #[cfg(feature = "database")]
 pub use config_driven_builder::{ConfigDrivenGraphBuilder, EdgeLayoutHints, NodeRenderingHints};
 #[cfg(feature = "database")]
@@ -41,7 +42,7 @@ pub use investor_register::{
 pub use layout_v2::{EdgeLayoutConfig, LayoutConfigV2, LayoutEngineV2};
 #[cfg(feature = "database")]
 pub use query_engine::GraphQueryEngine;
-pub use types::*;
+pub use dsl_runtime::*;
 pub use view_model::*;
 pub use viewport::{
     Breakpoint, DisplayConfig, LayoutHint, OffScreenSummary, PanDirection, ViewportContext,

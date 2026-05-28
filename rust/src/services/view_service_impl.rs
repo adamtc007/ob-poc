@@ -1,4 +1,4 @@
-//! ob-poc impl of [`dsl_runtime::service_traits::ViewService`].
+//! ob-poc impl of [`ViewService`].
 //!
 //! Single-method trait that dispatches all 15 `view.*` verbs from
 //! `config/verbs/view.yaml`. Lives entirely in ob-poc because it
@@ -18,7 +18,7 @@ use serde_json::{json, Map, Value};
 use sqlx::PgPool;
 use uuid::Uuid;
 
-use dsl_runtime::service_traits::ViewService;
+use dsl_runtime::ViewService;
 
 use crate::session::{Refinement, ViewState};
 use crate::taxonomy::{Filter, Metaphor, Status, TaxonomyBuilder, TaxonomyContext};

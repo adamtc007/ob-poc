@@ -21,8 +21,8 @@ use async_trait::async_trait;
 use serde_json::Value;
 use uuid::Uuid;
 
-use dsl_runtime::domain_ops::helpers::{json_extract_string_opt, json_extract_uuid};
-use dsl_runtime::tx::TransactionScope;
+use dsl_runtime::{json_extract_string_opt, json_extract_uuid};
+use dsl_runtime::TransactionScope;
 use dsl_runtime::{VerbExecutionContext, VerbExecutionOutcome};
 
 use super::SemOsVerbOp;
@@ -88,7 +88,7 @@ async fn enqueue_workstream_screening(
         screening_type.to_lowercase(),
         workstream_id
     );
-    dsl_runtime::domain_ops::helpers::emit_pending_state_advance(
+    dsl_runtime::emit_pending_state_advance(
         ctx,
         screening_id,
         &format!("screening:{}:pending", screening_type.to_lowercase()),

@@ -1,4 +1,4 @@
-//! ob-poc impl of [`dsl_runtime::service_traits::AttributeService`].
+//! ob-poc impl of [`AttributeService`].
 //!
 //! Single-method dispatch for the 16 attribute / document / derivation
 //! verbs that operate on the SemOS-first attribute lifecycle. Bridge
@@ -21,8 +21,8 @@ use serde_json::{json, Value};
 use sqlx::{PgPool, Postgres, Row, Transaction};
 use uuid::Uuid;
 
-use dsl_runtime::execution::VerbExecutionOutcome;
-use dsl_runtime::service_traits::{AttributeDispatchOutcome, AttributeService};
+use dsl_runtime::VerbExecutionOutcome;
+use dsl_runtime::{AttributeDispatchOutcome, AttributeService};
 
 use crate::sem_reg::derivation_spec::{
     DerivationExpression, DerivationInput, DerivationSpecBody, FreshnessRule, NullSemantics,

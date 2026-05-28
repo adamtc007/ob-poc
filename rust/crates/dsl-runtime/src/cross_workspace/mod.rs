@@ -50,7 +50,7 @@
 //! ```ignore
 //! use std::sync::Arc;
 //! use dsl_core::config::ConfigLoader;
-//! use dsl_runtime::cross_workspace::{
+//! use dsl_runtime::{
 //!     GateChecker, PostgresSlotStateProvider, SqlPredicateResolver,
 //! };
 //!
@@ -77,7 +77,7 @@
 //! ## Wiring Mode B aggregate (CBU operationally_active tollgate)
 //!
 //! ```ignore
-//! use dsl_runtime::cross_workspace::DerivedStateEvaluator;
+//! use dsl_runtime::DerivedStateEvaluator;
 //!
 //! let derived_eval = DerivedStateEvaluator::new(slot_state, predicate);
 //! for d in registry.derived_states_for_slot("cbu", "cbu") {
@@ -90,7 +90,7 @@
 //! ## Wiring Mode C cascade (parent CBU SUSPENDED → children SUSPENDED)
 //!
 //! ```ignore
-//! use dsl_runtime::cross_workspace::{CascadePlanner, ChildEntityResolver};
+//! use dsl_runtime::{CascadePlanner, ChildEntityResolver};
 //!
 //! let child_resolver: Arc<dyn ChildEntityResolver> = Arc::new(MyResolver);
 //! let planner = CascadePlanner::new(registry, child_resolver);
@@ -125,34 +125,69 @@
 //! so the `#[cfg(feature = "database")]` gates around DB-backed
 //! submodules (legacy from ob-poc's conditional feature) are dropped.
 
-pub mod compensation;
-pub mod derived_state;
-pub mod derived_state_projector;
-pub mod fact_refs;
-pub mod fact_versions;
-pub mod gate_checker;
-pub mod hierarchy_cascade;
-pub mod idempotency;
-pub mod platform_dag;
-pub mod postgres_child_resolver;
-pub mod providers;
-pub mod remediation;
-pub mod replay;
-pub mod repository;
-pub mod slot_state;
-pub mod sql_predicate_resolver;
+mod compensation;
+mod derived_state;
+mod derived_state_projector;
+mod fact_refs;
+mod fact_versions;
+mod gate_checker;
+mod hierarchy_cascade;
+mod idempotency;
+pub(crate) mod platform_dag;
+mod postgres_child_resolver;
+mod providers;
+mod remediation;
+mod replay;
+mod repository;
+mod slot_state;
+mod sql_predicate_resolver;
 #[cfg(any(test, feature = "harness"))]
 pub mod test_harness;
-pub mod types;
+mod types;
 
+pub use compensation::{
+    confirm_compensation, list_for_remediation, record_compensation, CompensationOutcome,
+    CompensationRecordRow, CompensationSummary, CorrectionType, RecordCompensationInput,
+};
 pub use derived_state::{ClauseKind, ConditionResult, DerivedStateEvaluator, DerivedStateValue};
 pub use derived_state_projector::{DerivedStateProjection, DerivedStateProjector};
-pub use gate_checker::{GateChecker, GateViolation, PredicateResolver, SameEntityResolver};
+pub use fact_refs::{
+    advance_to_current, check_staleness_for_entity, list_stale_refs, mark_deferred, mark_stale,
+    upsert_ref, ConsumerRefStatus, StaleSharedFactRef, WorkspaceFactRefRow,
+};
+pub use fact_versions::{
+    current_version_number, get_current_version, get_propagation_result, get_version_history,
+    insert_version, record_if_active, PropagationResult, SharedFactVersionRow,
+    SharedFactVersionSummary, StaleConsumerRef,
+};
+pub use gate_checker::{GateChecker, PredicateResolver, SameEntityResolver};
 pub use hierarchy_cascade::{
     CascadeAction, CascadePlanner, ChildEntityResolver, NoChildrenResolver,
 };
-pub use platform_dag::set_atom_path_table_map;
+pub use idempotency::{
+    check_idempotency, record_call, supersede_call, ExternalCallRow, IdempotencyAction,
+    ProviderCapability, RecordCallInput,
+};
+pub use platform_dag::{
+    derive_platform_dag, set_atom_path_table_map, AtomPathTableMap, PlatformDag, PlatformEdge,
+};
 pub use postgres_child_resolver::PostgresChildEntityResolver;
-pub use slot_state::set_slot_state_table;
-pub use slot_state::{PostgresSlotStateProvider, SlotStateProvider};
-pub use sql_predicate_resolver::{set_table_pk_overrides, SqlPredicateResolver};
+pub use providers::{list_all, list_for_provider, ProviderCapabilitySummary};
+pub use remediation::{
+    begin_replay, create_remediation_event, defer, escalate, get_by_id, list_open, mark_resolved,
+    revoke_deferral, CreateRemediationInput, RemediationEventRow, RemediationEventSummary,
+    RemediationStatus,
+};
+pub use replay::{RebuildContext, ReplayOutcome, ReplayResult, ReplayTrigger};
+pub use repository::{
+    get_by_id as get_atom_by_id, get_by_path, insert_shared_atom, list_active, list_shared_atoms,
+    transition_lifecycle, upsert_from_seed,
+};
+pub use slot_state::{
+    resolve_slot_table, set_slot_state_table, PostgresSlotStateProvider, SlotStateProvider,
+};
+pub use sql_predicate_resolver::SqlPredicateResolver;
+pub use types::{
+    LifecycleTransitionResult, RegisterSharedAtomInput, SharedAtomDef, SharedAtomLifecycle,
+    SharedAtomSummary, SharedAtomValidation,
+};

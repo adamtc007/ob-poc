@@ -12,6 +12,8 @@ use serde_json::json;
 use sqlx::PgPool;
 use uuid::Uuid;
 
+use dsl_runtime::TransactionScope;
+
 use crate::dsl_v2::execution::{ExecutionContext, ExecutionResult};
 use crate::dsl_v2::planning::compile;
 use crate::dsl_v2::syntax::parse_program;
@@ -145,7 +147,7 @@ impl DslExecutor for RealDslExecutor {
     async fn execute_in_scope(
         &self,
         dsl: &str,
-        scope: &mut dyn dsl_runtime::tx::TransactionScope,
+        scope: &mut dyn TransactionScope,
     ) -> Result<serde_json::Value, String> {
         let program = parse_program(dsl).map_err(|e| format!("Parse error: {}", e))?;
         let plan = compile(&program).map_err(|e| format!("Compile error: {:?}", e))?;

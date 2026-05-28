@@ -56,11 +56,11 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use uuid::Uuid;
 
-use dsl_runtime::domain_ops::helpers::{
+use dsl_runtime::{
     json_extract_bool_opt, json_extract_string, json_extract_string_opt, json_extract_uuid,
     json_extract_uuid_opt,
 };
-use dsl_runtime::tx::TransactionScope;
+use dsl_runtime::TransactionScope;
 use dsl_runtime::{VerbExecutionContext, VerbExecutionOutcome};
 
 use super::SemOsVerbOp;
@@ -251,7 +251,7 @@ impl SemOsVerbOp for Create {
         .await?;
 
         // Phase C.3 rollout: new deal enters at PROSPECT state.
-        dsl_runtime::domain_ops::helpers::emit_pending_state_advance(
+        dsl_runtime::emit_pending_state_advance(
             ctx,
             deal_id,
             "deal:prospect",
@@ -475,7 +475,7 @@ impl SemOsVerbOp for UpdateStatus {
         // genuine state advance by the time we reach this line.
         let to_node = format!("deal:{}", new_status.to_lowercase());
         let reason = format!("deal.update-status — {} → {}", current_status, new_status);
-        dsl_runtime::domain_ops::helpers::emit_pending_state_advance(
+        dsl_runtime::emit_pending_state_advance(
             ctx,
             deal_id,
             &to_node,
@@ -561,7 +561,7 @@ impl SemOsVerbOp for SubmitForBac {
         .execute(scope.executor())
         .await?;
 
-        dsl_runtime::domain_ops::helpers::emit_pending_state_advance(
+        dsl_runtime::emit_pending_state_advance(
             ctx,
             deal_id,
             "deal:in_clearance",
@@ -697,7 +697,7 @@ async fn update_bac_status(
     .await?;
 
     let advance_reason = format!("deal BAC substate -> {target}");
-    dsl_runtime::domain_ops::helpers::emit_pending_state_advance(
+    dsl_runtime::emit_pending_state_advance(
         ctx,
         deal_id,
         "deal:in_clearance",
@@ -770,7 +770,7 @@ impl SemOsVerbOp for Cancel {
         // advance. Reason string captures the operator-supplied reason
         // so narration can surface it downstream.
         let advance_reason = format!("deal.cancel — {} → CANCELLED ({})", current_status, reason);
-        dsl_runtime::domain_ops::helpers::emit_pending_state_advance(
+        dsl_runtime::emit_pending_state_advance(
             ctx,
             deal_id,
             "deal:cancelled",
@@ -2405,7 +2405,7 @@ async fn update_kyc_clearance_status(
     .await?;
 
     let advance_reason = format!("deal KYC clearance substate -> {target}");
-    dsl_runtime::domain_ops::helpers::emit_pending_state_advance(
+    dsl_runtime::emit_pending_state_advance(
         ctx,
         deal_id,
         "deal:in_clearance",

@@ -15,10 +15,10 @@ use async_trait::async_trait;
 use sem_os_postgres::ops::SemOsVerbOp;
 use uuid::Uuid;
 
-use dsl_runtime::domain_ops::helpers::{
+use dsl_runtime::{
     json_extract_bool_opt, json_extract_int_opt, json_extract_string_opt, json_extract_uuid,
 };
-use dsl_runtime::tx::TransactionScope;
+use dsl_runtime::TransactionScope;
 use dsl_runtime::{VerbExecutionContext, VerbExecutionOutcome};
 
 // =============================================================================
@@ -27,7 +27,7 @@ use dsl_runtime::{VerbExecutionContext, VerbExecutionOutcome};
 
 /// Result of a single auto-complete step.
 #[derive(Debug, Clone, serde::Serialize)]
-pub struct AutoCompleteStep {
+pub(super) struct AutoCompleteStep {
     pub entity_type: String,
     pub stage: String,
     pub dsl: String,
@@ -39,7 +39,7 @@ pub struct AutoCompleteStep {
 
 /// Result of the auto-complete operation.
 #[derive(Debug, Clone, serde::Serialize)]
-pub struct AutoCompleteResult {
+pub(super) struct AutoCompleteResult {
     pub steps_executed: usize,
     pub steps_succeeded: usize,
     pub steps_failed: usize,
@@ -53,7 +53,7 @@ pub struct AutoCompleteResult {
 // Op
 // =============================================================================
 
-pub struct OnboardingAutoComplete;
+pub(super) struct OnboardingAutoComplete;
 
 #[async_trait]
 impl SemOsVerbOp for OnboardingAutoComplete {

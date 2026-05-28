@@ -3,7 +3,7 @@
 //! `rust/config/verbs/state.yaml`.
 //!
 //! Every op loads a built-in state machine via
-//! `dsl_runtime::state_reducer::load_builtin_state_machine` then
+//! `dsl_runtime::load_builtin_state_machine` then
 //! dispatches to the matching `handle_state_*` helper. The
 //! reducer helpers still take `&PgPool` — transitional
 //! `scope.pool().clone()` pattern (same as slice #13). They
@@ -15,15 +15,15 @@ use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 use serde_json::{json, Value};
 
-use dsl_runtime::domain_ops::helpers::{
+use dsl_runtime::{
     json_extract_string, json_extract_string_opt, json_extract_uuid, json_extract_uuid_opt,
 };
-use dsl_runtime::state_reducer::{
+use dsl_runtime::{
     handle_state_blocked_why, handle_state_check_consistency, handle_state_derive,
     handle_state_derive_all, handle_state_diagnose, handle_state_list_overrides,
     handle_state_override, handle_state_revoke_override, load_builtin_state_machine,
 };
-use dsl_runtime::tx::TransactionScope;
+use dsl_runtime::TransactionScope;
 use dsl_runtime::{VerbExecutionContext, VerbExecutionOutcome};
 
 use super::SemOsVerbOp;
@@ -38,7 +38,7 @@ fn parse_optional_datetime(value: Option<String>) -> Result<Option<DateTime<Utc>
 fn load_machine(
     args: &Value,
     default: &str,
-) -> Result<dsl_runtime::state_reducer::ValidatedStateMachine> {
+) -> Result<dsl_runtime::ValidatedStateMachine> {
     let name =
         json_extract_string_opt(args, "state-machine").unwrap_or_else(|| default.to_string());
     load_builtin_state_machine(&name).map_err(|err| anyhow!(err.to_string()))

@@ -44,12 +44,10 @@
 //! let requirements = service.apply_bundle(cbu_id, "docs.bundle.hedge-baseline", context).await?;
 //! ```
 
-pub mod registry;
-pub mod service;
-pub mod types;
+mod registry;
+mod service;
+mod types;
 
 pub use registry::DocsBundleRegistry;
 pub use service::DocsBundleService;
-pub use types::{
-    AppliedBundle, BundleContext, BundleDocumentDef, DocsBundleDef, ResolvedBundleDocument,
-};
+pub use types::{BundleContext, DocsBundleDef};

@@ -327,7 +327,7 @@ impl JobWorker {
 /// → `(kyc.create-case :entity-id "abc")`
 ///
 /// Falls back to raw JSON embedding if the payload isn't a flat JSON object.
-pub fn build_dsl_from_payload(verb_fqn: &str, domain_payload_json: &str) -> String {
+pub(crate) fn build_dsl_from_payload(verb_fqn: &str, domain_payload_json: &str) -> String {
     match serde_json::from_str(domain_payload_json) {
         Ok(serde_json::Value::Object(map)) => {
             if map.is_empty() {

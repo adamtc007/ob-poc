@@ -1,3 +1,4 @@
+#![allow(unreachable_pub)]
 //! Verb Classifier
 //!
 //! Classifies a verb name as Primitive, Macro, or Unknown by checking

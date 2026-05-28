@@ -32,7 +32,7 @@ use super::error::ReducerResult;
 use super::validate::validate_state_machine;
 
 pub use sem_os_ontology::state_machine_def::{
-    ConditionDef, ConsistencyCheckDef, OverlaySourceDef, ReducerDef, RuleDef, TransitionDef,
+    OverlaySourceDef, ReducerDef, RuleDef, TransitionDef,
 };
 
 /// State machine definition loaded from YAML.
@@ -64,7 +64,7 @@ pub struct ValidatedStateMachine {
 ///
 /// # Examples
 /// ```rust
-/// use dsl_runtime::state_reducer::load_state_machine;
+/// use dsl_runtime::load_state_machine;
 ///
 /// let yaml = r#"
 /// state_machine: demo
@@ -93,11 +93,11 @@ pub fn load_state_machine(yaml: &str) -> ReducerResult<ValidatedStateMachine> {
 ///
 /// # Examples
 /// ```rust
-/// use dsl_runtime::state_reducer::compute_reducer_revision;
+/// use dsl_runtime::compute_reducer_revision;
 ///
 /// assert_eq!(compute_reducer_revision("demo").len(), 16);
 /// ```
-pub fn compute_reducer_revision(state_machine_yaml: &str) -> String {
+pub(crate) fn compute_reducer_revision(state_machine_yaml: &str) -> String {
     let hash = Sha256::digest(state_machine_yaml.as_bytes());
     hex::encode(&hash[..8])
 }

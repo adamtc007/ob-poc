@@ -12,9 +12,9 @@ use std::path::Path;
 ///   → parent → parent → rust/
 fn workspace_root() -> std::path::PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR"))
-        .parent()  // crates/
+        .parent() // crates/
         .unwrap()
-        .parent()  // rust/
+        .parent() // rust/
         .unwrap()
         .to_path_buf()
 }
@@ -25,7 +25,10 @@ fn dsl_dir() -> std::path::PathBuf {
 
 fn yaml_config() -> dsl_core::config::types::VerbsConfig {
     let loader = dsl_core::config::loader::ConfigLoader::new(
-        workspace_root().join("config").to_string_lossy().to_string()
+        workspace_root()
+            .join("config")
+            .to_string_lossy()
+            .to_string(),
     );
     loader.load_verbs().expect("YAML loader should succeed")
 }
@@ -47,7 +50,11 @@ fn all_domains_load_without_errors() {
     assert!(
         errors.is_empty(),
         "DSL load errors:\n{}",
-        errors.iter().map(|d| format!("  {}", d.message)).collect::<Vec<_>>().join("\n")
+        errors
+            .iter()
+            .map(|d| format!("  {}", d.message))
+            .collect::<Vec<_>>()
+            .join("\n")
     );
 
     // Should have loaded all domains
@@ -59,15 +66,12 @@ fn all_domains_load_without_errors() {
 
     // Count total verbs
     let total: usize = config.domains.values().map(|d| d.verbs.len()).sum();
-    assert!(
-        total >= 1000,
-        "expected >= 1000 verbs, got {}",
-        total
-    );
+    assert!(total >= 1000, "expected >= 1000 verbs, got {}", total);
 
     eprintln!(
         "Loaded {} domains, {} verbs from DSL",
-        config.domains.len(), total
+        config.domains.len(),
+        total
     );
 }
 
@@ -81,7 +85,9 @@ fn cbu_domain_round_trip() {
 
     // Load via YAML (old path)
     let yaml_config = yaml_config();
-    let yaml_cbu = yaml_config.domains.get("cbu")
+    let yaml_cbu = yaml_config
+        .domains
+        .get("cbu")
         .expect("YAML config should have 'cbu' domain");
 
     // Load via DSL (new path)
@@ -89,9 +95,15 @@ fn cbu_domain_round_trip() {
     let dsl_config = load_verbs_from_dsl_dir(&dir, &mut diag);
 
     let errors: Vec<_> = diag.errors().collect();
-    assert!(errors.is_empty(), "DSL load errors for cbu: {:?}", errors.iter().map(|e| &e.message).collect::<Vec<_>>());
+    assert!(
+        errors.is_empty(),
+        "DSL load errors for cbu: {:?}",
+        errors.iter().map(|e| &e.message).collect::<Vec<_>>()
+    );
 
-    let dsl_cbu = dsl_config.domains.get("cbu")
+    let dsl_cbu = dsl_config
+        .domains
+        .get("cbu")
         .expect("DSL config should have 'cbu' domain");
 
     // Verb counts must match
@@ -105,36 +117,50 @@ fn cbu_domain_round_trip() {
 
     // Compare each verb's key fields
     for (name, yaml_verb) in &yaml_cbu.verbs {
-        let dsl_verb = dsl_cbu.verbs.get(name)
+        let dsl_verb = dsl_cbu
+            .verbs
+            .get(name)
             .unwrap_or_else(|| panic!("verb 'cbu.{}' missing from DSL config", name));
 
         assert_eq!(
             yaml_verb.description, dsl_verb.description,
-            "cbu.{} description mismatch", name
+            "cbu.{} description mismatch",
+            name
         );
         assert_eq!(
-            yaml_verb.args.len(), dsl_verb.args.len(),
-            "cbu.{} args count mismatch", name
+            yaml_verb.args.len(),
+            dsl_verb.args.len(),
+            "cbu.{} args count mismatch",
+            name
         );
         assert_eq!(
             yaml_verb.effect_class, dsl_verb.effect_class,
-            "cbu.{} effect_class mismatch", name
+            "cbu.{} effect_class mismatch",
+            name
         );
         assert_eq!(
             yaml_verb.behavior, dsl_verb.behavior,
-            "cbu.{} behavior mismatch", name
+            "cbu.{} behavior mismatch",
+            name
         );
         assert_eq!(
-            yaml_verb.three_axis.is_some(), dsl_verb.three_axis.is_some(),
-            "cbu.{} three_axis presence mismatch", name
+            yaml_verb.three_axis.is_some(),
+            dsl_verb.three_axis.is_some(),
+            "cbu.{} three_axis presence mismatch",
+            name
         );
         assert_eq!(
-            yaml_verb.transition_args.is_some(), dsl_verb.transition_args.is_some(),
-            "cbu.{} transition_args presence mismatch", name
+            yaml_verb.transition_args.is_some(),
+            dsl_verb.transition_args.is_some(),
+            "cbu.{} transition_args presence mismatch",
+            name
         );
     }
 
-    eprintln!("cbu domain: {} verbs verified (YAML == DSL)", yaml_cbu.verbs.len());
+    eprintln!(
+        "cbu domain: {} verbs verified (YAML == DSL)",
+        yaml_cbu.verbs.len()
+    );
 }
 
 #[test]
@@ -157,7 +183,11 @@ fn tranche1_snapshots_unaffected() {
     let dsl_config = load_verbs_from_dsl_dir(&dir, &mut diag);
 
     let errors: Vec<_> = diag.errors().collect();
-    assert!(errors.is_empty(), "DSL load produced {} errors", errors.len());
+    assert!(
+        errors.is_empty(),
+        "DSL load produced {} errors",
+        errors.len()
+    );
 
     // Compare total verb counts across all domains
     let yaml_total: usize = yaml_config.domains.values().map(|d| d.verbs.len()).sum();
@@ -168,7 +198,8 @@ fn tranche1_snapshots_unaffected() {
     assert!(
         dsl_total >= yaml_total,
         "DSL total verbs ({}) < YAML total verbs ({})",
-        dsl_total, yaml_total
+        dsl_total,
+        yaml_total
     );
 
     eprintln!(
@@ -187,14 +218,20 @@ fn tranche1_snapshots_unaffected() {
         let d_domain = dsl_config.domains.get(*domain);
 
         if let (Some(y_d), Some(d_d)) = (y_domain, d_domain) {
-            if let (Some(y_verb), Some(d_verb)) = (y_d.verbs.get(*verb_name), d_d.verbs.get(*verb_name)) {
+            if let (Some(y_verb), Some(d_verb)) =
+                (y_d.verbs.get(*verb_name), d_d.verbs.get(*verb_name))
+            {
                 assert_eq!(
                     y_verb.description, d_verb.description,
-                    "{}.{} description mismatch", domain, verb_name
+                    "{}.{} description mismatch",
+                    domain, verb_name
                 );
                 assert_eq!(
-                    y_verb.args.len(), d_verb.args.len(),
-                    "{}.{} args count mismatch", domain, verb_name
+                    y_verb.args.len(),
+                    d_verb.args.len(),
+                    "{}.{} args count mismatch",
+                    domain,
+                    verb_name
                 );
                 eprintln!("  {}.{}: OK", domain, verb_name);
             }
@@ -216,33 +253,62 @@ fn arg_config_round_trip_spot_check() {
     let dsl_config = load_verbs_from_dsl_dir(&dir, &mut diag);
 
     let errors: Vec<_> = diag.errors().collect();
-    assert!(errors.is_empty(), "DSL load errors: {:?}", errors.iter().map(|e| &e.message).collect::<Vec<_>>());
+    assert!(
+        errors.is_empty(),
+        "DSL load errors: {:?}",
+        errors.iter().map(|e| &e.message).collect::<Vec<_>>()
+    );
 
     // cbu.create has args with lookup config — verify round-trip
-    let yaml_verb = yaml_config.domains.get("cbu")
+    let yaml_verb = yaml_config
+        .domains
+        .get("cbu")
         .and_then(|d| d.verbs.get("create"))
         .expect("cbu.create should exist in YAML config");
 
-    let dsl_verb = dsl_config.domains.get("cbu")
+    let dsl_verb = dsl_config
+        .domains
+        .get("cbu")
         .and_then(|d| d.verbs.get("create"))
         .expect("cbu.create should exist in DSL config");
 
-    assert_eq!(yaml_verb.args.len(), dsl_verb.args.len(), "cbu.create args count");
+    assert_eq!(
+        yaml_verb.args.len(),
+        dsl_verb.args.len(),
+        "cbu.create args count"
+    );
 
     for (yaml_arg, dsl_arg) in yaml_verb.args.iter().zip(dsl_verb.args.iter()) {
         assert_eq!(yaml_arg.name, dsl_arg.name, "arg name mismatch");
-        assert_eq!(yaml_arg.required, dsl_arg.required, "arg {} required mismatch", yaml_arg.name);
         assert_eq!(
-            yaml_arg.lookup.is_some(), dsl_arg.lookup.is_some(),
-            "arg {} lookup presence mismatch", yaml_arg.name
+            yaml_arg.required, dsl_arg.required,
+            "arg {} required mismatch",
+            yaml_arg.name
+        );
+        assert_eq!(
+            yaml_arg.lookup.is_some(),
+            dsl_arg.lookup.is_some(),
+            "arg {} lookup presence mismatch",
+            yaml_arg.name
         );
         if let (Some(y_lookup), Some(d_lookup)) = (&yaml_arg.lookup, &dsl_arg.lookup) {
-            assert_eq!(y_lookup.table, d_lookup.table, "arg {} lookup.table mismatch", yaml_arg.name);
-            assert_eq!(y_lookup.primary_key, d_lookup.primary_key, "arg {} lookup.primary_key mismatch", yaml_arg.name);
+            assert_eq!(
+                y_lookup.table, d_lookup.table,
+                "arg {} lookup.table mismatch",
+                yaml_arg.name
+            );
+            assert_eq!(
+                y_lookup.primary_key, d_lookup.primary_key,
+                "arg {} lookup.primary_key mismatch",
+                yaml_arg.name
+            );
         }
     }
 
-    eprintln!("cbu.create arg round-trip: {} args verified", yaml_verb.args.len());
+    eprintln!(
+        "cbu.create arg round-trip: {} args verified",
+        yaml_verb.args.len()
+    );
 }
 
 #[test]
@@ -263,27 +329,33 @@ fn three_axis_round_trip() {
     for (domain_name, domain) in &yaml_config.domains {
         for (verb_name, yaml_verb) in &domain.verbs {
             if let Some(yaml_three) = &yaml_verb.three_axis {
-                let dsl_three = dsl_config.domains
+                let dsl_three = dsl_config
+                    .domains
                     .get(domain_name)
                     .and_then(|d| d.verbs.get(verb_name))
                     .and_then(|v| v.three_axis.as_ref());
 
-                let dsl_three = dsl_three.unwrap_or_else(|| panic!(
-                    "{}.{} has three_axis in YAML but not in DSL", domain_name, verb_name
-                ));
+                let dsl_three = dsl_three.unwrap_or_else(|| {
+                    panic!(
+                        "{}.{} has three_axis in YAML but not in DSL",
+                        domain_name, verb_name
+                    )
+                });
 
                 assert_eq!(
                     yaml_three.state_effect, dsl_three.state_effect,
-                    "{}.{} three_axis.state_effect mismatch", domain_name, verb_name
+                    "{}.{} three_axis.state_effect mismatch",
+                    domain_name, verb_name
                 );
                 assert_eq!(
                     yaml_three.consequence.baseline, dsl_three.consequence.baseline,
-                    "{}.{} three_axis.consequence.baseline mismatch", domain_name, verb_name
+                    "{}.{} three_axis.consequence.baseline mismatch",
+                    domain_name, verb_name
                 );
 
                 checked += 1;
                 if checked >= 20 {
-                    break;  // spot check 20 verbs is sufficient
+                    break; // spot check 20 verbs is sufficient
                 }
             }
         }
@@ -312,22 +384,28 @@ fn transition_args_round_trip() {
     for (domain_name, domain) in &yaml_config.domains {
         for (verb_name, yaml_verb) in &domain.verbs {
             if let Some(yaml_ta) = &yaml_verb.transition_args {
-                let dsl_ta = dsl_config.domains
+                let dsl_ta = dsl_config
+                    .domains
                     .get(domain_name)
                     .and_then(|d| d.verbs.get(verb_name))
                     .and_then(|v| v.transition_args.as_ref());
 
-                let dsl_ta = dsl_ta.unwrap_or_else(|| panic!(
-                    "{}.{} has transition_args in YAML but not in DSL", domain_name, verb_name
-                ));
+                let dsl_ta = dsl_ta.unwrap_or_else(|| {
+                    panic!(
+                        "{}.{} has transition_args in YAML but not in DSL",
+                        domain_name, verb_name
+                    )
+                });
 
                 assert_eq!(
                     yaml_ta.entity_id_arg, dsl_ta.entity_id_arg,
-                    "{}.{} transition_args.entity_id_arg mismatch", domain_name, verb_name
+                    "{}.{} transition_args.entity_id_arg mismatch",
+                    domain_name, verb_name
                 );
                 assert_eq!(
                     yaml_ta.target_state_arg, dsl_ta.target_state_arg,
-                    "{}.{} transition_args.target_state_arg mismatch", domain_name, verb_name
+                    "{}.{} transition_args.target_state_arg mismatch",
+                    domain_name, verb_name
                 );
 
                 checked += 1;
@@ -335,6 +413,12 @@ fn transition_args_round_trip() {
         }
     }
 
-    assert!(checked > 0, "expected at least 1 Pattern D verb (transition_args)");
-    eprintln!("Pattern D (transition_args) round-trip: {} verbs verified", checked);
+    assert!(
+        checked > 0,
+        "expected at least 1 Pattern D verb (transition_args)"
+    );
+    eprintln!(
+        "Pattern D (transition_args) round-trip: {} verbs verified",
+        checked
+    );
 }

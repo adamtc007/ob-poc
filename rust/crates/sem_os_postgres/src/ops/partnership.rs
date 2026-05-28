@@ -12,10 +12,10 @@ use async_trait::async_trait;
 use serde_json::{json, Value};
 use uuid::Uuid;
 
-use dsl_runtime::domain_ops::helpers::{
+use dsl_runtime::{
     self, json_extract_string, json_extract_string_opt, json_extract_uuid,
 };
-use dsl_runtime::tx::TransactionScope;
+use dsl_runtime::TransactionScope;
 use dsl_runtime::{VerbExecutionContext, VerbExecutionOutcome};
 
 use super::SemOsVerbOp;
@@ -98,7 +98,7 @@ impl SemOsVerbOp for RecordContribution {
         .execute(scope.executor())
         .await?;
 
-        helpers::emit_pending_state_advance(
+        dsl_runtime::emit_pending_state_advance(
             ctx,
             partner_id,
             "partnership:capital_contributed",
@@ -178,7 +178,7 @@ impl SemOsVerbOp for RecordDistribution {
         .execute(scope.executor())
         .await?;
 
-        helpers::emit_pending_state_advance(
+        dsl_runtime::emit_pending_state_advance(
             ctx,
             partner_id,
             "partnership:capital_distributed",

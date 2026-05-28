@@ -13,10 +13,13 @@
 //! - `railway` — typed graph types (`RailwayGraph`, `RailwayNode`, etc.)
 //! - `assembly` — the assembly pass implementation
 
-pub mod assembly;
-pub mod railway;
+pub(crate) mod assembly;
+pub(crate) mod railway;
 
-pub use assembly::assemble;
+pub use assembly::{
+    assemble, DUPLICATE_NAME, GATEWAY_FAN_OUT_ERROR, INVALID_BOUNDARY_TARGET, UNREACHABLE_NODE,
+    UNTERMINATED_PATH,
+};
 pub use railway::{
     BoundaryAttachmentEntry, GatewayKind, MergeClause, MergeOperator, NodeKind, ParallelJoinEntry,
     RailwayEdge, RailwayGateway, RailwayGraph, RailwayNode,

@@ -1,3 +1,4 @@
+#![allow(unreachable_pub)]
 //! Compilation pipeline — transforms a classified verb + args into a CompiledRunbook.
 //!
 //! ## Pipeline

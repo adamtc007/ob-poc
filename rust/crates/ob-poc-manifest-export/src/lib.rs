@@ -90,9 +90,8 @@ pub struct Allowlist {
 
 impl Allowlist {
     pub fn from_path(path: impl AsRef<Path>) -> Result<Self> {
-        let text = std::fs::read_to_string(path.as_ref()).with_context(|| {
-            format!("read allowlist at {}", path.as_ref().display())
-        })?;
+        let text = std::fs::read_to_string(path.as_ref())
+            .with_context(|| format!("read allowlist at {}", path.as_ref().display()))?;
         let allow: Allowlist = serde_yaml::from_str(&text).context("parse allowlist")?;
         Ok(allow)
     }
@@ -144,7 +143,11 @@ fn naive_utc_from_unix(mut secs: i64) -> (i64, u32, u32, u32, u32, u32) {
     // Days since 1970-01-01 → Y/M/D via simple Civil-from-days conversion
     // (Howard Hinnant's algorithm).
     days += 719_468;
-    let era = if days >= 0 { days / 146_097 } else { (days - 146_096) / 146_097 };
+    let era = if days >= 0 {
+        days / 146_097
+    } else {
+        (days - 146_096) / 146_097
+    };
     let doe = days - era * 146_097;
     let yoe = (doe - doe / 1460 + doe / 36524 - doe / 146_096) / 365;
     let y = yoe + era * 400;
@@ -176,8 +179,8 @@ fn load_source_catalogue(verbs_dir: &Path) -> Result<BTreeMap<String, SourceVerb
         if stem.starts_with('_') {
             continue;
         }
-        let text = std::fs::read_to_string(&path)
-            .with_context(|| format!("read {}", path.display()))?;
+        let text =
+            std::fs::read_to_string(&path).with_context(|| format!("read {}", path.display()))?;
         let parsed: SourceVerbsConfig = match serde_yaml::from_str(&text) {
             Ok(p) => p,
             Err(err) => {
@@ -277,10 +280,7 @@ fn convert_verb(id: &str, src: &SourceVerbConfig) -> VerbEntry {
             Some(ResourceDependency {
                 kind: kind.to_owned(),
                 from_input: a.name.clone(),
-                entity_type: lookup
-                    .entity_type
-                    .as_deref()
-                    .map(manifest_type_name),
+                entity_type: lookup.entity_type.as_deref().map(manifest_type_name),
             })
         })
         .collect();
@@ -557,8 +557,7 @@ pub fn export_to_path(
     let cfg = ExporterConfig::new(domain, catalogue_version);
     let yaml = export_to_yaml(verbs_dir, &allow, &cfg)?;
     if let Some(parent) = output_path.parent() {
-        std::fs::create_dir_all(parent)
-            .with_context(|| format!("create {}", parent.display()))?;
+        std::fs::create_dir_all(parent).with_context(|| format!("create {}", parent.display()))?;
     }
     std::fs::write(output_path, &yaml)
         .with_context(|| format!("write {}", output_path.display()))?;

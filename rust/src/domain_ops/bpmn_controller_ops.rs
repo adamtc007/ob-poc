@@ -21,7 +21,7 @@ use sem_os_postgres::ops::SemOsVerbOp;
 use std::sync::OnceLock;
 use uuid::Uuid;
 
-use dsl_runtime::tx::TransactionScope;
+use dsl_runtime::TransactionScope;
 use dsl_runtime::{VerbExecutionContext, VerbExecutionOutcome};
 
 // ── Shared bpmn-lite DB pool ──────────────────────────────────────────────────
@@ -113,7 +113,7 @@ fn extract_tenants(args: &serde_json::Value) -> Vec<String> {
 
 // ── loader.provision-pool ─────────────────────────────────────────────────────
 
-pub struct LoaderProvisionPool;
+pub(super) struct LoaderProvisionPool;
 
 #[async_trait]
 impl SemOsVerbOp for LoaderProvisionPool {
@@ -153,7 +153,7 @@ impl SemOsVerbOp for LoaderProvisionPool {
 
 // ── loader.deprovision-pool ───────────────────────────────────────────────────
 
-pub struct LoaderDeprovisionPool;
+pub(super) struct LoaderDeprovisionPool;
 
 #[async_trait]
 impl SemOsVerbOp for LoaderDeprovisionPool {
@@ -189,7 +189,7 @@ impl SemOsVerbOp for LoaderDeprovisionPool {
 
 // ── loader.pool-status ────────────────────────────────────────────────────────
 
-pub struct LoaderPoolStatus;
+pub(super) struct LoaderPoolStatus;
 
 #[async_trait]
 impl SemOsVerbOp for LoaderPoolStatus {
@@ -232,7 +232,7 @@ impl SemOsVerbOp for LoaderPoolStatus {
 
 // ── loader.list-pools ─────────────────────────────────────────────────────────
 
-pub struct LoaderListPools;
+pub(super) struct LoaderListPools;
 
 #[async_trait]
 impl SemOsVerbOp for LoaderListPools {
@@ -272,7 +272,7 @@ impl SemOsVerbOp for LoaderListPools {
 
 // ── bpmn-controller.start-instance ───────────────────────────────────────────
 
-pub struct BpmnControllerStartInstance;
+pub(super) struct BpmnControllerStartInstance;
 
 #[async_trait]
 impl SemOsVerbOp for BpmnControllerStartInstance {
@@ -321,7 +321,7 @@ impl SemOsVerbOp for BpmnControllerStartInstance {
 
 // ── bpmn-controller.instance-status ──────────────────────────────────────────
 
-pub struct BpmnControllerInstanceStatus;
+pub(super) struct BpmnControllerInstanceStatus;
 
 #[async_trait]
 impl SemOsVerbOp for BpmnControllerInstanceStatus {
@@ -361,7 +361,7 @@ impl SemOsVerbOp for BpmnControllerInstanceStatus {
 
 // ── bpmn-controller.list-instances ───────────────────────────────────────────
 
-pub struct BpmnControllerListInstances;
+pub(super) struct BpmnControllerListInstances;
 
 #[async_trait]
 impl SemOsVerbOp for BpmnControllerListInstances {

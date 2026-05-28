@@ -3,13 +3,13 @@
 
 use anyhow::Result;
 use async_trait::async_trait;
-use dsl_runtime::service_traits::ProcessRegistryService;
-use dsl_runtime::tx::TransactionScope;
+use dsl_runtime::ProcessRegistryService;
+use dsl_runtime::TransactionScope;
 use dsl_runtime::{VerbExecutionContext, VerbExecutionOutcome};
 use sem_os_postgres::ops::SemOsVerbOp;
 
 /// Start a named BPMN process and surface its initial pending human task (if any).
-pub struct WorkflowStartProcess;
+pub(super) struct WorkflowStartProcess;
 
 #[async_trait]
 impl SemOsVerbOp for WorkflowStartProcess {

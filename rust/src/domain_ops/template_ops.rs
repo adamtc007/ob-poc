@@ -19,10 +19,10 @@ use sem_os_postgres::ops::SemOsVerbOp;
 use std::collections::HashMap;
 use uuid::Uuid;
 
-use dsl_runtime::domain_ops::helpers::{
+use dsl_runtime::{
     json_extract_int_opt, json_extract_string, json_extract_string_opt,
 };
-use dsl_runtime::tx::TransactionScope;
+use dsl_runtime::TransactionScope;
 use dsl_runtime::{VerbExecutionContext, VerbExecutionOutcome};
 
 use crate::dsl_v2::execution::DslExecutor;

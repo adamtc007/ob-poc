@@ -12,7 +12,9 @@
 use uuid::Uuid;
 
 use super::commands::{NavCommand, ZoomLevel};
-use crate::graph::{EntityGraph, EntityType, GraphFilters, GraphNode, GraphScope, RoleAssignment};
+use crate::graph::types::{
+    EntityGraph, EntityType, GraphFilters, GraphNode, GraphScope, RoleAssignment,
+};
 
 // =============================================================================
 // NAVIGATION RESULT

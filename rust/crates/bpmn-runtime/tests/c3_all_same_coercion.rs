@@ -1,6 +1,5 @@
-use bpmn_runtime::processor::{apply_merge_protocol, MergeResult};
-use bpmn_runtime::types::{ActiveToken, WriteLogEntry};
-use dsl_lowering::bpmn::{JourneyMergeClause, JourneyParallelJoin};
+use bpmn_runtime::{apply_merge_protocol, ActiveToken, MergeResult, WriteLogEntry};
+use dsl_lowering::{JourneyMergeClause, JourneyParallelJoin};
 use serde_json::json;
 use uuid::Uuid;
 

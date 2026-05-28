@@ -299,7 +299,7 @@ fn extract_per_phase_latency(_trace: &UtteranceTraceRecord) -> Option<Vec<(u8, i
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::calibration::{CalibrationExecutionShape, CalibrationScenario, GovernanceStatus};
+    use crate::calibration::types::{CalibrationExecutionShape, CalibrationScenario, GovernanceStatus};
     use crate::traceability::{SurfaceVersions, TraceKind};
     use chrono::Utc;
 

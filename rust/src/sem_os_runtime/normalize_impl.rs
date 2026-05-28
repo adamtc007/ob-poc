@@ -24,7 +24,7 @@ use crate::sem_os_runtime::constellation_runtime::{
 /// );
 /// assert_eq!(normalized.constellation, "struct.lux.ucits.sicav");
 /// ```
-pub fn normalize_slots(
+pub(crate) fn normalize_slots(
     map: &ValidatedConstellationMap,
     cbu_id: Uuid,
     case_id: Option<Uuid>,

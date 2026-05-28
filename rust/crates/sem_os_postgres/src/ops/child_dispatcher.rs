@@ -3,8 +3,8 @@
 use crate::ops::SemOsVerbOpRegistry;
 use anyhow::{anyhow, Result};
 use async_trait::async_trait;
-use dsl_runtime::service_traits::SemOsChildDispatcher;
-use dsl_runtime::tx::TransactionScope;
+use dsl_runtime::SemOsChildDispatcher;
+use dsl_runtime::TransactionScope;
 use dsl_runtime::{VerbExecutionContext, VerbExecutionOutcome};
 use serde_json::Value;
 use std::sync::Arc;
@@ -66,7 +66,7 @@ mod tests {
     use super::*;
     use crate::ops::SemOsVerbOp;
     use async_trait::async_trait;
-    use dsl_runtime::tx::TransactionScope;
+    use dsl_runtime::TransactionScope;
     use ob_poc_types::TransactionScopeId;
     use sqlx::{PgPool, Postgres, Transaction};
     use uuid::Uuid;

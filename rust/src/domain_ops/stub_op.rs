@@ -14,15 +14,15 @@ use anyhow::{anyhow, Result};
 use async_trait::async_trait;
 use sem_os_postgres::ops::SemOsVerbOp;
 
-use dsl_runtime::tx::TransactionScope;
+use dsl_runtime::TransactionScope;
 use dsl_runtime::{VerbExecutionContext, VerbExecutionOutcome};
 
-pub struct StubOp {
+pub(super) struct StubOp {
     fqn: &'static str,
 }
 
 impl StubOp {
-    pub const fn new(fqn: &'static str) -> Self {
+    pub(super) const fn new(fqn: &'static str) -> Self {
         Self { fqn }
     }
 }
@@ -49,7 +49,7 @@ impl SemOsVerbOp for StubOp {
 
 /// FQNs registered as stubs. Each entry should track a real follow-on
 /// task that replaces the stub with a working impl.
-pub const STUB_VERBS: &[&str] = &[
+pub(super) const STUB_VERBS: &[&str] = &[
     // ── catalogue.* — Tranche 3 Phase 3.B (2026-04-26) ───────────────
     // The 4 authorship verbs are now REAL implementations in
     // `crate::domain_ops::catalogue_ops`, not stubs. They drive the
@@ -78,7 +78,7 @@ pub const STUB_VERBS: &[&str] = &[
     "trading-profile.lift-restriction",
 ];
 
-pub fn register_stub_ops(registry: &mut sem_os_postgres::ops::SemOsVerbOpRegistry) {
+pub(super) fn register_stub_ops(registry: &mut sem_os_postgres::ops::SemOsVerbOpRegistry) {
     use std::sync::Arc;
     for fqn in STUB_VERBS {
         registry.register(Arc::new(StubOp::new(fqn)));

@@ -12,7 +12,7 @@ pub mod types;
 pub mod uuid_constants;
 
 // Re-export key types for convenience
-pub use types::{
+pub use dsl_runtime::{
     AttributeCategory, AttributeMetadata, AttributeType, DataType, TypedAttributeRef,
     ValidationError as TypeValidationError, ValidationErrorType, ValidationRules,
 };
@@ -21,7 +21,7 @@ pub use types::{
 pub use resolver::{AttributeResolver, ResolutionError, ResolutionResult};
 
 // Re-export execution context (Phase 3)
-pub use execution_context::{ExecutionContext, ValueSource};
+pub use dsl_runtime_context::{ExecutionContext, ValueSource};
 
 // Re-export builder
 pub use builder::{DslBuilder, DslValue};

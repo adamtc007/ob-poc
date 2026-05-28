@@ -18,12 +18,12 @@ use serde_json::{json, Value};
 use sqlx::types::BigDecimal;
 use uuid::Uuid;
 
-use dsl_runtime::domain_ops::helpers::{
+use dsl_runtime::{
     json_extract_bool_opt, json_extract_string, json_extract_string_opt, json_extract_uuid,
     json_extract_uuid_opt,
 };
-use dsl_runtime::service_traits::SemOsChildDispatcher;
-use dsl_runtime::tx::TransactionScope;
+use dsl_runtime::SemOsChildDispatcher;
+use dsl_runtime::TransactionScope;
 use dsl_runtime::{VerbExecutionContext, VerbExecutionOutcome};
 
 use super::SemOsVerbOp;
@@ -130,7 +130,7 @@ impl SemOsVerbOp for AssignOwnership {
         ctx.bind("cbu_entity_role", role_result);
         // Phase C.3 rollout: ownership edge recorded. Subject is the
         // CBU whose structure changed.
-        dsl_runtime::domain_ops::helpers::emit_pending_state_advance(
+        dsl_runtime::emit_pending_state_advance(
             ctx,
             cbu_id,
             "cbu-role:ownership-assigned",
@@ -205,7 +205,7 @@ impl SemOsVerbOp for AssignControl {
         let rel_result = upsert_entity_relationship(self.fqn(), &rel_args, ctx, scope).await?;
 
         ctx.bind("cbu_entity_role", role_result);
-        dsl_runtime::domain_ops::helpers::emit_pending_state_advance(
+        dsl_runtime::emit_pending_state_advance(
             ctx,
             cbu_id,
             "cbu-role:control-assigned",
@@ -294,7 +294,7 @@ impl SemOsVerbOp for AssignTrustRole {
         let rel_result = upsert_entity_relationship(self.fqn(), &rel_args, ctx, scope).await?;
 
         ctx.bind("cbu_entity_role", role_result);
-        dsl_runtime::domain_ops::helpers::emit_pending_state_advance(
+        dsl_runtime::emit_pending_state_advance(
             ctx,
             cbu_id,
             "cbu-role:trust-role-assigned",
@@ -384,7 +384,7 @@ impl SemOsVerbOp for AssignFundRole {
         };
 
         ctx.bind("cbu_entity_role", role_result);
-        dsl_runtime::domain_ops::helpers::emit_pending_state_advance(
+        dsl_runtime::emit_pending_state_advance(
             ctx,
             cbu_id,
             "cbu-role:fund-role-assigned",
@@ -445,7 +445,7 @@ impl SemOsVerbOp for AssignServiceProvider {
         .await?;
 
         ctx.bind("cbu_entity_role", role_result);
-        dsl_runtime::domain_ops::helpers::emit_pending_state_advance(
+        dsl_runtime::emit_pending_state_advance(
             ctx,
             cbu_id,
             "cbu-role:service-provider-assigned",
@@ -517,7 +517,7 @@ impl SemOsVerbOp for AssignSignatory {
         .await?;
 
         ctx.bind("cbu_entity_role", role_result);
-        dsl_runtime::domain_ops::helpers::emit_pending_state_advance(
+        dsl_runtime::emit_pending_state_advance(
             ctx,
             cbu_id,
             "cbu-role:signatory-assigned",
@@ -581,7 +581,7 @@ impl SemOsVerbOp for Terminate {
         };
 
         if affected > 0 {
-            dsl_runtime::domain_ops::helpers::emit_pending_state_advance(
+            dsl_runtime::emit_pending_state_advance(
                 ctx,
                 cbu_id,
                 "cbu-role:terminated",

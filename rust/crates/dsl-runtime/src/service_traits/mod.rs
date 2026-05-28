@@ -8,22 +8,22 @@
 //! Traits here are object-safe and `Send + Sync + 'static` — required for
 //! trait-object storage in the registry.
 
-pub mod attribute_identity;
-pub mod attribute_service;
-pub mod constellation_runtime;
-pub mod lifecycle_catalog;
-pub mod mcp_tool_registry;
-pub mod phrase_service;
-pub mod schema_introspection;
-pub mod sem_os_child_dispatcher;
-pub mod sem_os_context_resolver;
-pub mod semantic_state;
-pub mod service_pipeline_service;
-pub mod session_service;
-pub mod stewardship;
-pub mod trading_profile_document;
-pub mod process_registry;
-pub mod view_service;
+mod attribute_identity;
+mod attribute_service;
+mod constellation_runtime;
+mod lifecycle_catalog;
+mod mcp_tool_registry;
+mod phrase_service;
+mod schema_introspection;
+mod sem_os_child_dispatcher;
+mod sem_os_context_resolver;
+mod semantic_state;
+mod service_pipeline_service;
+mod session_service;
+mod stewardship;
+mod trading_profile_document;
+mod process_registry;
+mod view_service;
 
 pub use attribute_identity::AttributeIdentityService;
 pub use attribute_service::{AttributeDispatchOutcome, AttributeService};

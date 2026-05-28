@@ -46,9 +46,7 @@ async fn setup_pool() -> PgPool {
     let pool = PgPool::connect(&url).await.expect("connect");
     // Use the migrator exported by dsl-bus-storage — the migrations ship
     // inside the published crate, not at a fixed relative path on disk.
-    dsl_bus_storage::migrate(&pool)
-        .await
-        .expect("migrations");
+    dsl_bus_storage::migrate(&pool).await.expect("migrations");
     pool
 }
 
@@ -68,7 +66,12 @@ struct RecordingExecutor {
 impl RecordingExecutor {
     fn new() -> (Self, Arc<AtomicU32>) {
         let calls = Arc::new(AtomicU32::new(0));
-        (Self { calls: calls.clone() }, calls)
+        (
+            Self {
+                calls: calls.clone(),
+            },
+            calls,
+        )
     }
 }
 
@@ -93,11 +96,7 @@ impl VerbExecutor for RecordingExecutor {
 async fn spawn_server(
     pool: PgPool,
     catalogue_version: &str,
-) -> (
-    dsl_bus_server::ServerHandle,
-    Arc<AtomicU32>,
-    BusClient,
-) {
+) -> (dsl_bus_server::ServerHandle, Arc<AtomicU32>, BusClient) {
     let (executor, calls) = RecordingExecutor::new();
     let handler = ObPocBusHandler::new(executor).with_catalogue_version(catalogue_version);
     let addr = ephemeral_addr();

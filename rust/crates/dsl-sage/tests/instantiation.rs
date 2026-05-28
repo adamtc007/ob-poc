@@ -56,8 +56,14 @@ fn conjunctive_gate_instantiates_and_compiles() {
     let registry = load_test_registry();
     let context = SageContext::empty();
     let params: HashMap<String, serde_json::Value> = [
-        ("gate-name".to_string(), serde_json::json!("kyc-eligibility-gate")),
-        ("enhanced-path".to_string(), serde_json::json!("activate-end")),
+        (
+            "gate-name".to_string(),
+            serde_json::json!("kyc-eligibility-gate"),
+        ),
+        (
+            "enhanced-path".to_string(),
+            serde_json::json!("activate-end"),
+        ),
         ("standard-path".to_string(), serde_json::json!("review-end")),
     ]
     .into_iter()
@@ -74,7 +80,10 @@ fn conjunctive_gate_instantiates_and_compiles() {
     .expect("instantiation failed");
 
     // Structural DSL is non-empty
-    assert!(!result.structural_dsl.is_empty(), "structural_dsl should not be empty");
+    assert!(
+        !result.structural_dsl.is_empty(),
+        "structural_dsl should not be empty"
+    );
 
     // Full source includes provenance atom
     assert!(
@@ -92,14 +101,16 @@ fn conjunctive_gate_instantiates_and_compiles() {
         "atom_names should not be empty"
     );
     assert!(
-        result.atom_names.contains(&"kyc-eligibility-gate".to_string()),
+        result
+            .atom_names
+            .contains(&"kyc-eligibility-gate".to_string()),
         "gate name should be in atom_names, got: {:?}",
         result.atom_names
     );
 
     // Validate structural DSL compiles
-    let summary = validate_instantiation(&result.structural_dsl)
-        .expect("validate_instantiation failed");
+    let summary =
+        validate_instantiation(&result.structural_dsl).expect("validate_instantiation failed");
     assert!(
         !summary.has_errors,
         "Compile errors for conjunctive-gate: {:?}",
@@ -242,7 +253,14 @@ fn all_12_packs_instantiate_without_panic() {
             .map(|(k, v)| (k.clone(), v.clone()))
             .collect();
 
-        let result = instantiate(pack_name, "1.0.0", &param_map, Some("start-node"), &context, &registry);
+        let result = instantiate(
+            pack_name,
+            "1.0.0",
+            &param_map,
+            Some("start-node"),
+            &context,
+            &registry,
+        );
         assert!(
             result.is_ok(),
             "pack '{}' instantiation failed: {:?}",
@@ -274,14 +292,27 @@ fn provenance_atom_covers_generated_atoms() {
     let context = SageContext::empty();
     let params: HashMap<String, serde_json::Value> = [
         ("gate-name".to_string(), serde_json::json!("test-gate")),
-        ("enhanced-path".to_string(), serde_json::json!("enhanced-end")),
-        ("standard-path".to_string(), serde_json::json!("standard-end")),
+        (
+            "enhanced-path".to_string(),
+            serde_json::json!("enhanced-end"),
+        ),
+        (
+            "standard-path".to_string(),
+            serde_json::json!("standard-end"),
+        ),
     ]
     .into_iter()
     .collect();
 
-    let result =
-        instantiate("conjunctive-gate", "1.0.0", &params, None, &context, &registry).unwrap();
+    let result = instantiate(
+        "conjunctive-gate",
+        "1.0.0",
+        &params,
+        None,
+        &context,
+        &registry,
+    )
+    .unwrap();
 
     // The gate name should appear in the DSL
     assert!(
@@ -313,7 +344,14 @@ fn unknown_pack_returns_error() {
     let context = SageContext::empty();
     let params: HashMap<String, serde_json::Value> = HashMap::new();
 
-    let result = instantiate("nonexistent-pack", "1.0.0", &params, None, &context, &registry);
+    let result = instantiate(
+        "nonexistent-pack",
+        "1.0.0",
+        &params,
+        None,
+        &context,
+        &registry,
+    );
     assert!(result.is_err(), "expected Err for unknown pack");
 }
 
@@ -392,8 +430,7 @@ fn all_12_packs_structural_dsl_compile_clean() {
         assert!(
             !summary.has_errors,
             "pack '{}' structural DSL has compile errors: {:?}",
-            pack_name,
-            summary.diagnostics
+            pack_name, summary.diagnostics
         );
         assert!(
             summary.node_count > 0,

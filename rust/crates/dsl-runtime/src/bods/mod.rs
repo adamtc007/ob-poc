@@ -3,10 +3,10 @@
 //! Provides types and services for working with beneficial ownership data
 //! from Open Ownership registers (UK PSC, Denmark CVR, etc.)
 
-pub mod repository;
-pub mod types;
-pub mod ubo_discovery;
+mod repository;
+mod types;
+mod ubo_discovery;
 
 pub use repository::BodsRepository;
-pub use types::*;
+pub use types::{DiscoveredUbo, UboDiscoveryResult, UboType};
 pub use ubo_discovery::UboDiscoveryService;

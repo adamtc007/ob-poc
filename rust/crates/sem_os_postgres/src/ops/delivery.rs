@@ -2,10 +2,10 @@
 
 use anyhow::{anyhow, Result};
 use async_trait::async_trait;
-use dsl_runtime::domain_ops::helpers::{
+use dsl_runtime::{
     json_extract_string_opt, json_extract_uuid, json_extract_uuid_opt,
 };
-use dsl_runtime::tx::TransactionScope;
+use dsl_runtime::TransactionScope;
 use dsl_runtime::{VerbExecutionContext, VerbExecutionOutcome};
 use serde_json::{json, Value};
 use uuid::Uuid;
@@ -94,7 +94,7 @@ impl SemOsVerbOp for Record {
         .fetch_one(scope.executor())
         .await?;
 
-        dsl_runtime::domain_ops::helpers::emit_pending_state_advance(
+        dsl_runtime::emit_pending_state_advance(
             ctx,
             cbu_id,
             "delivery:pending",

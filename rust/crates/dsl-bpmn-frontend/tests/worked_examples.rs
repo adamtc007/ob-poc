@@ -71,7 +71,12 @@ fn example_1_linear_sequence() {
     );
 
     // No gateways, no forks, 4 edges
-    assert_eq!(spec.edges.len(), 4, "expected 4 edges, got {}", spec.edges.len());
+    assert_eq!(
+        spec.edges.len(),
+        4,
+        "expected 4 edges, got {}",
+        spec.edges.len()
+    );
     assert!(spec.parallel_joins.is_empty(), "expected no parallel joins");
 }
 
@@ -106,7 +111,10 @@ fn example_2_exclusive_gateway_pattern_a() {
 
     // There should be a node with kind "exclusive"
     let has_exclusive = spec.nodes.iter().any(|n| n.kind.contains("exclusive"));
-    assert!(has_exclusive, "expected at least one exclusive gateway node");
+    assert!(
+        has_exclusive,
+        "expected at least one exclusive gateway node"
+    );
 }
 
 // ---------------------------------------------------------------------------
@@ -144,7 +152,11 @@ fn example_3_linked_switch_chain_pattern_b() {
 
     // Should have exactly 3 exclusive gateways
     let exclusive_count = spec.nodes.iter().filter(|n| n.kind == "exclusive").count();
-    assert_eq!(exclusive_count, 3, "expected 3 exclusive gateways, got {}", exclusive_count);
+    assert_eq!(
+        exclusive_count, 3,
+        "expected 3 exclusive gateways, got {}",
+        exclusive_count
+    );
 }
 
 // ---------------------------------------------------------------------------
@@ -189,7 +201,10 @@ fn example_4_inclusive_gateway_dynamic_fanout() {
 
     // Should have an inclusive gateway
     let has_inclusive = spec.nodes.iter().any(|n| n.kind.contains("inclusive"));
-    assert!(has_inclusive, "expected at least one inclusive gateway node");
+    assert!(
+        has_inclusive,
+        "expected at least one inclusive gateway node"
+    );
 
     // Should have a parallel join
     assert_eq!(spec.parallel_joins.len(), 1, "expected 1 parallel join");
@@ -292,7 +307,9 @@ fn example_6_undeclared_write_conflict_warning() {
     assert!(
         has_undeclared_merge,
         "expected UNDECLARED_MERGE warning, warnings were: {:?}",
-        diag.warnings().map(|w| format!("{:?}: {}", w.code, w.message)).collect::<Vec<_>>()
+        diag.warnings()
+            .map(|w| format!("{:?}: {}", w.code, w.message))
+            .collect::<Vec<_>>()
     );
 
     // Should still produce a valid JourneySpec
@@ -364,7 +381,10 @@ fn example_8_interrupting_error_boundary() {
     );
 
     // The boundary attachment should be interrupting and of kind "error"
-    let ba = spec.boundary_attachments.iter().find(|ba| ba.event_kind == "error")
+    let ba = spec
+        .boundary_attachments
+        .iter()
+        .find(|ba| ba.event_kind == "error")
         .expect("expected an error boundary attachment");
     assert!(ba.interrupting, "expected interrupting=true");
 }
@@ -411,7 +431,10 @@ fn example_9_non_interrupting_timer_boundary() {
     assert!(timer_ba.is_some(), "expected a timer boundary attachment");
 
     let ba = timer_ba.unwrap();
-    assert!(!ba.interrupting, "expected interrupting=false for timer boundary");
+    assert!(
+        !ba.interrupting,
+        "expected interrupting=false for timer boundary"
+    );
 }
 
 // ---------------------------------------------------------------------------
@@ -535,7 +558,10 @@ fn example_11_complex_kyc_onboarding() {
     // Should have multiple nodes, gateways, a join, and boundary attachments
     assert!(spec.nodes.len() >= 8, "expected ≥8 nodes");
     assert!(!spec.parallel_joins.is_empty(), "expected ≥1 parallel join");
-    assert!(spec.boundary_attachments.len() >= 2, "expected ≥2 boundary attachments");
+    assert!(
+        spec.boundary_attachments.len() >= 2,
+        "expected ≥2 boundary attachments"
+    );
 }
 
 // ---------------------------------------------------------------------------
@@ -583,21 +609,30 @@ fn example_12_pack_authored_with_provenance() {
         .nodes
         .iter()
         .any(|n| n.name == "activation-eligibility-gate");
-    assert!(has_gate, "expected activation-eligibility-gate node in spec");
+    assert!(
+        has_gate,
+        "expected activation-eligibility-gate node in spec"
+    );
 
     // The provenance atom should NOT appear in the JourneySpec (it's declarative)
     let has_provenance = spec
         .nodes
         .iter()
         .any(|n| n.name.contains("prov") || n.kind == "provenance");
-    assert!(!has_provenance, "provenance atom must not appear in JourneySpec");
+    assert!(
+        !has_provenance,
+        "provenance atom must not appear in JourneySpec"
+    );
 
     // Should have the conditional flow (three-condition `and` expression)
     let conditional_edge = spec
         .edges
         .iter()
         .find(|e| e.source == "activation-eligibility-gate" && !e.is_default);
-    assert!(conditional_edge.is_some(), "expected conditional flow from gate");
+    assert!(
+        conditional_edge.is_some(),
+        "expected conditional flow from gate"
+    );
     let edge = conditional_edge.unwrap();
     assert!(
         edge.condition.is_some(),

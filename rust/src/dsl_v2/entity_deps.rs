@@ -442,7 +442,7 @@ pub fn entity_deps() -> &'static EntityDependencyRegistry {
 /// Initialize the global entity dependency registry from database
 #[cfg(feature = "database")]
 #[allow(dead_code)]
-pub async fn init_entity_deps(pool: &PgPool) -> Result<(), sqlx::Error> {
+pub(crate) async fn init_entity_deps(pool: &PgPool) -> Result<(), sqlx::Error> {
     let registry = EntityDependencyRegistry::load(pool).await?;
     let _ = ENTITY_DEPS_REGISTRY.set(registry);
     Ok(())

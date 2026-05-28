@@ -488,7 +488,7 @@ fn parse_dependency_state(msg: &str) -> Option<(String, String, String)> {
 /// Called by the orchestrator when building the response, to merge
 /// cross-workspace staleness blockers into the narration payload.
 pub fn blockers_from_stale_shared_facts(
-    stale_facts: &[dsl_runtime::cross_workspace::fact_refs::StaleSharedFactRef],
+    stale_facts: &[dsl_runtime::StaleSharedFactRef],
 ) -> Vec<NarrationBlocker> {
     stale_facts
         .iter()

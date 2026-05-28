@@ -1,4 +1,4 @@
-//! ob-poc implementation of [`dsl_runtime::service_traits::SemanticStateService`].
+//! ob-poc implementation of [`SemanticStateService`].
 //!
 //! Wraps the existing `database::derive_semantic_state` function with the
 //! ontology stage registry (loaded from YAML at startup). Registered into
@@ -12,7 +12,7 @@ use ob_poc_types::semantic_stage::{SemanticState, StageDefinition};
 use sqlx::PgPool;
 use uuid::Uuid;
 
-use dsl_runtime::service_traits::SemanticStateService;
+use dsl_runtime::SemanticStateService;
 
 use crate::database::derive_semantic_state;
 use crate::ontology::SemanticStageRegistry;

@@ -15,7 +15,7 @@ const UBO_EPISTEMIC_LIFECYCLE_YAML: &str =
 ///
 /// # Examples
 /// ```rust
-/// use dsl_runtime::state_reducer::load_builtin_state_machine;
+/// use dsl_runtime::load_builtin_state_machine;
 ///
 /// let machine = load_builtin_state_machine("entity_kyc_lifecycle").unwrap();
 /// assert_eq!(machine.name, "entity_kyc_lifecycle");

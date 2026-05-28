@@ -34,11 +34,11 @@ use serde_json::{json, Value};
 use sqlx::Row;
 use uuid::Uuid;
 
-use dsl_runtime::document_requirements::GovernedDocumentRequirementsService;
-use dsl_runtime::domain_ops::helpers::{
+use dsl_runtime::GovernedDocumentRequirementsService;
+use dsl_runtime::{
     json_extract_string, json_extract_uuid, json_extract_uuid_opt,
 };
-use dsl_runtime::tx::TransactionScope;
+use dsl_runtime::TransactionScope;
 use dsl_runtime::{VerbExecutionContext, VerbExecutionOutcome};
 
 use super::SemOsVerbOp;
@@ -287,7 +287,7 @@ impl SemOsVerbOp for Verify {
             return Err(anyhow!("Version not found or not in verifiable state"));
         }
         // Phase C.3 rollout: document version → verified.
-        dsl_runtime::domain_ops::helpers::emit_pending_state_advance(
+        dsl_runtime::emit_pending_state_advance(
             ctx,
             version_id,
             "document-version:verified",
@@ -356,7 +356,7 @@ impl SemOsVerbOp for Reject {
             return Err(anyhow!("Version not found or not in rejectable state"));
         }
         // Phase C.3 rollout: document version → rejected.
-        dsl_runtime::domain_ops::helpers::emit_pending_state_advance(
+        dsl_runtime::emit_pending_state_advance(
             ctx,
             version_id,
             "document-version:rejected",

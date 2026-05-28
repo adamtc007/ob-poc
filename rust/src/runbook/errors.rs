@@ -1,3 +1,4 @@
+#![allow(unreachable_pub)]
 //! Typed compilation error model (INV-7).
 //!
 //! Every compilation failure maps to exactly one `CompilationErrorKind` variant.

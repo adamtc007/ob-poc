@@ -76,4 +76,4 @@ pub use scope_resolution::{
     EntityMatch, ScopeCandidate, ScopeContext, ScopeResolutionOutcome, ScopeResolver,
 };
 pub use server::McpServer;
-pub use types::*;
+pub use dsl_runtime::*;

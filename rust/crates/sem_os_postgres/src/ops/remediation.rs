@@ -2,7 +2,7 @@
 //!
 //! Four `remediation.*` verbs tracking resolution of cross-workspace
 //! state drift from shared attribute supersession. All delegate to
-//! `dsl-runtime::cross_workspace::remediation::*` helpers which
+//! `dsl-runtime::cross_workspace::*` helpers which
 //! currently take `&PgPool` — `scope.pool()` is forwarded
 //! transitionally.
 
@@ -11,11 +11,11 @@ use async_trait::async_trait;
 use serde::Serialize;
 use uuid::Uuid;
 
-use dsl_runtime::cross_workspace::remediation;
-use dsl_runtime::domain_ops::helpers::{
+use dsl_runtime::TransactionScope;
+use dsl_runtime::{
     self, json_extract_string, json_extract_string_opt, json_extract_uuid, json_extract_uuid_opt,
 };
-use dsl_runtime::tx::TransactionScope;
+use dsl_runtime::{defer, list_open, mark_resolved, revoke_deferral};
 use dsl_runtime::{VerbExecutionContext, VerbExecutionOutcome};
 
 use super::SemOsVerbOp;
@@ -36,7 +36,7 @@ impl SemOsVerbOp for ListOpen {
     ) -> Result<VerbExecutionOutcome> {
         let entity_id = json_extract_uuid_opt(args, ctx, "entity-id");
         let workspace = json_extract_string_opt(args, "workspace");
-        let events = remediation::list_open(scope.pool(), entity_id, workspace.as_deref()).await?;
+        let events = list_open(scope.pool(), entity_id, workspace.as_deref()).await?;
         let value = serde_json::to_value(events)?;
         match value {
             serde_json::Value::Array(items) => Ok(VerbExecutionOutcome::RecordSet(items)),
@@ -68,8 +68,8 @@ impl SemOsVerbOp for Defer {
     ) -> Result<VerbExecutionOutcome> {
         let remediation_id = json_extract_uuid(args, ctx, "remediation-id")?;
         let reason = json_extract_string(args, "reason")?;
-        remediation::defer(scope.pool(), remediation_id, &reason, None).await?;
-        helpers::emit_pending_state_advance(
+        defer(scope.pool(), remediation_id, &reason, None).await?;
+        dsl_runtime::emit_pending_state_advance(
             ctx,
             remediation_id,
             "remediation:deferred",
@@ -107,8 +107,8 @@ impl SemOsVerbOp for RevokeDeferral {
         scope: &mut dyn TransactionScope,
     ) -> Result<VerbExecutionOutcome> {
         let remediation_id = json_extract_uuid(args, ctx, "remediation-id")?;
-        remediation::revoke_deferral(scope.pool(), remediation_id).await?;
-        helpers::emit_pending_state_advance(
+        revoke_deferral(scope.pool(), remediation_id).await?;
+        dsl_runtime::emit_pending_state_advance(
             ctx,
             remediation_id,
             "remediation:detection_active",
@@ -147,8 +147,8 @@ impl SemOsVerbOp for ConfirmExternalCorrection {
     ) -> Result<VerbExecutionOutcome> {
         let remediation_id = json_extract_uuid(args, ctx, "remediation-id")?;
         let provider_ref = json_extract_string(args, "provider-ref")?;
-        remediation::mark_resolved(scope.pool(), remediation_id, None).await?;
-        helpers::emit_pending_state_advance(
+        mark_resolved(scope.pool(), remediation_id, None).await?;
+        dsl_runtime::emit_pending_state_advance(
             ctx,
             remediation_id,
             "remediation:resolved",

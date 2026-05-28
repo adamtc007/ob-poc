@@ -1,3 +1,4 @@
+#![allow(unreachable_pub)]
 //! Write-set derivation — identifies entity UUIDs that a verb invocation will mutate.
 //!
 //! Two strategies (INV-8):

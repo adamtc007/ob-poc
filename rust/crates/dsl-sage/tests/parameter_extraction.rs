@@ -201,7 +201,10 @@ async fn async_extract_with_no_llm() {
     );
     assert_eq!(result.pack_name, "conjunctive-gate");
     assert_eq!(result.pack_version, "1.0.0");
-    assert!(!result.preview_dsl.is_empty(), "preview DSL should not be empty");
+    assert!(
+        !result.preview_dsl.is_empty(),
+        "preview DSL should not be empty"
+    );
 }
 
 #[tokio::test]

@@ -57,7 +57,7 @@ fn graph_edges_from_postgres(edges: Vec<pg_hydration::HydrationGraphEdge>) -> Ve
 /// # Ok(())
 /// # }
 /// ```
-pub async fn hydrate_constellation(
+pub(crate) async fn hydrate_constellation(
     pool: &PgPool,
     cbu_id: Uuid,
     case_id: Option<Uuid>,
@@ -225,7 +225,7 @@ async fn hydrate_slot_overlays_tx(
 /// # Ok(())
 /// # }
 /// ```
-pub async fn hydrate_constellation_summary(
+pub(crate) async fn hydrate_constellation_summary(
     pool: &PgPool,
     cbu_id: Uuid,
     case_id: Option<Uuid>,
@@ -254,7 +254,7 @@ pub async fn hydrate_constellation_summary(
 /// # Ok(())
 /// # }
 /// ```
-pub async fn discover_state_machine_slot_contexts(
+pub(crate) async fn discover_state_machine_slot_contexts(
     pool: &PgPool,
     cbu_id: Uuid,
     case_id: Option<Uuid>,

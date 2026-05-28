@@ -1,6 +1,6 @@
 #[cfg(feature = "database")]
 mod tests {
-    use dsl_runtime::state_reducer::{
+    use {
         parse_condition_body, AggFn, CompareOp, ConditionBody, Expr, Literal, Predicate,
         SlotPredicate, Value,
     };

@@ -12,9 +12,10 @@
 //! }
 //! ```
 
-pub mod lexer;
-pub mod parser;
-pub mod raw_ast;
+pub(crate) mod lexer;
+pub(crate) mod parser;
+pub(crate) mod raw_ast;
 
+pub use lexer::{lex, Token};
 pub use parser::parse;
 pub use raw_ast::{RawAtom, RawValue, SourceFile};

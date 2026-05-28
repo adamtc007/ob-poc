@@ -12,8 +12,8 @@ use async_trait::async_trait;
 use serde_json::{json, Value};
 use uuid::Uuid;
 
-use dsl_runtime::domain_ops::helpers::{json_extract_string, json_extract_uuid};
-use dsl_runtime::tx::TransactionScope;
+use dsl_runtime::{json_extract_string, json_extract_uuid};
+use dsl_runtime::TransactionScope;
 use dsl_runtime::{VerbExecutionContext, VerbExecutionOutcome};
 
 use super::SemOsVerbOp;
@@ -93,7 +93,7 @@ impl SemOsVerbOp for Escalate {
             "red-flag.escalate — {} → UNDER_REVIEW (workstream_escalated={})",
             current_status, workstream_escalated
         );
-        dsl_runtime::domain_ops::helpers::emit_pending_state_advance(
+        dsl_runtime::emit_pending_state_advance(
             ctx,
             red_flag_id,
             to_node,

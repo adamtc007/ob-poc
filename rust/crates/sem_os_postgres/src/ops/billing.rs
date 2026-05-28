@@ -14,11 +14,11 @@ use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use uuid::Uuid;
 
-use dsl_runtime::domain_ops::helpers::{
+use dsl_runtime::{
     json_extract_bool_opt, json_extract_string, json_extract_string_opt, json_extract_uuid,
     json_extract_uuid_opt,
 };
-use dsl_runtime::tx::TransactionScope;
+use dsl_runtime::TransactionScope;
 use dsl_runtime::{VerbExecutionContext, VerbExecutionOutcome};
 
 use super::SemOsVerbOp;
@@ -169,7 +169,7 @@ impl SemOsVerbOp for ActivateProfile {
         .await?;
 
         // Phase C.3 rollout: billing profile activated (DRAFT → ACTIVE).
-        dsl_runtime::domain_ops::helpers::emit_pending_state_advance(
+        dsl_runtime::emit_pending_state_advance(
             ctx,
             profile_id,
             "billing-profile:active",
@@ -226,7 +226,7 @@ impl SemOsVerbOp for SuspendProfile {
         .await?;
 
         // Phase C.3 rollout: billing profile suspended.
-        dsl_runtime::domain_ops::helpers::emit_pending_state_advance(
+        dsl_runtime::emit_pending_state_advance(
             ctx,
             profile_id,
             "billing-profile:suspended",
@@ -270,7 +270,7 @@ impl SemOsVerbOp for CloseProfile {
 
         // Phase C.3 rollout: billing profile closed (terminal).
         if result.rows_affected() > 0 {
-            dsl_runtime::domain_ops::helpers::emit_pending_state_advance(
+            dsl_runtime::emit_pending_state_advance(
                 ctx,
                 profile_id,
                 "billing-profile:closed",
@@ -560,7 +560,7 @@ impl SemOsVerbOp for CalculatePeriod {
         .await?;
 
         // Phase C.3 rollout: billing period calculated.
-        dsl_runtime::domain_ops::helpers::emit_pending_state_advance(
+        dsl_runtime::emit_pending_state_advance(
             ctx,
             period_id,
             "billing-period:calculated",
@@ -610,7 +610,7 @@ impl SemOsVerbOp for ReviewPeriod {
         .await?;
 
         // Phase C.3 rollout: period CALCULATED → REVIEWED.
-        dsl_runtime::domain_ops::helpers::emit_pending_state_advance(
+        dsl_runtime::emit_pending_state_advance(
             ctx,
             period_id,
             "billing-period:reviewed",
@@ -650,7 +650,7 @@ impl SemOsVerbOp for ApprovePeriod {
         .await?;
 
         // Phase C.3 rollout: period REVIEWED → APPROVED (gate before invoice).
-        dsl_runtime::domain_ops::helpers::emit_pending_state_advance(
+        dsl_runtime::emit_pending_state_advance(
             ctx,
             period_id,
             "billing-period:approved",
@@ -725,7 +725,7 @@ impl SemOsVerbOp for GenerateInvoice {
 
         // Phase C.3 rollout: period APPROVED → INVOICED (terminal for the
         // period's lifecycle; invoice is a separate downstream entity).
-        dsl_runtime::domain_ops::helpers::emit_pending_state_advance(
+        dsl_runtime::emit_pending_state_advance(
             ctx,
             period_id,
             "billing-period:invoiced",
@@ -785,7 +785,7 @@ impl SemOsVerbOp for DisputePeriod {
 
         // Phase C.3 rollout: period transitions to DISPUTED (reason captures
         // the dispute cause for operator review).
-        dsl_runtime::domain_ops::helpers::emit_pending_state_advance(
+        dsl_runtime::emit_pending_state_advance(
             ctx,
             period_id,
             "billing-period:disputed",

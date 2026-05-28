@@ -1,3 +1,4 @@
+#![allow(unreachable_pub)]
 //! Execution gate for compiled runbooks.
 //!
 //! `execute_runbook()` is the **sole entry point** for running compiled DSL.
@@ -1123,7 +1124,7 @@ pub async fn execute_runbook_with_pool(
 ///   responsible for rolling back the scope. Other concurrent sessions
 ///   holding the locks are identified via the store when possible.
 pub async fn acquire_advisory_locks_on_scope(
-    scope: &mut dyn dsl_runtime::tx::TransactionScope,
+    scope: &mut dyn dsl_runtime::TransactionScope,
     write_set: &BTreeSet<Uuid>,
     store: &dyn RunbookStoreBackend,
 ) -> Result<LockStats, ExecutionError> {
@@ -1214,7 +1215,7 @@ pub async fn execute_runbook_in_scope(
     runbook_id: CompiledRunbookId,
     cursor: Option<StepCursor>,
     executor: &dyn StepExecutor,
-    scope: &mut dyn dsl_runtime::tx::TransactionScope,
+    scope: &mut dyn dsl_runtime::TransactionScope,
 ) -> Result<RunbookExecutionResult, ExecutionError> {
     let start = std::time::Instant::now();
 
@@ -1428,7 +1429,7 @@ pub trait StepExecutor: Send + Sync {
     async fn execute_step_in_scope(
         &self,
         step: &CompiledStep,
-        _scope: &mut dyn dsl_runtime::tx::TransactionScope,
+        _scope: &mut dyn dsl_runtime::TransactionScope,
     ) -> StepOutcome {
         self.execute_step(step).await
     }

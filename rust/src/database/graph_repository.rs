@@ -15,7 +15,7 @@ use sqlx::PgPool;
 use std::collections::{HashMap, HashSet};
 use uuid::Uuid;
 
-use crate::graph::{
+use crate::graph::types::{
     CbuNode, ControlEdge, ControlType, EntityGraph, FundEdge, GraphNode, GraphScope, OwnershipEdge,
     OwnershipType, RoleAssignment,
 };

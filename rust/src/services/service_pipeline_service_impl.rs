@@ -1,4 +1,4 @@
-//! ob-poc impl of [`dsl_runtime::service_traits::ServicePipelineService`].
+//! ob-poc impl of [`ServicePipelineService`].
 //!
 //! Single-method dispatch for all 16 verbs across the
 //! intent → discovery → attribute → provisioning → readiness pipeline.
@@ -13,8 +13,8 @@ use serde_json::{json, Value};
 use sqlx::{PgPool, Row};
 use uuid::Uuid;
 
-use dsl_runtime::execution::VerbExecutionOutcome;
-use dsl_runtime::service_traits::ServicePipelineService;
+use dsl_runtime::VerbExecutionOutcome;
+use dsl_runtime::ServicePipelineService;
 
 use crate::service_resources::{
     load_and_sync_srdefs, load_srdefs_from_config, run_discovery_pipeline,

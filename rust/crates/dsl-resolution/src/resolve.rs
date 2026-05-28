@@ -11,7 +11,7 @@ use dsl_diagnostics::{
     Diagnostic, DiagnosticBag, INVALID_PARAMETER_NAME, UNKNOWN_LOOP_VARIABLE,
     UNKNOWN_PACK_REFERENCE, UNKNOWN_TEMPLATE_PARAMETER, UNRESOLVED_NAME_REF,
 };
-use dsl_parser::raw_ast::RawValue;
+use dsl_parser::RawValue;
 
 use crate::pack_registry::{DecisionPack, PackParam, PackRegistry};
 
@@ -26,11 +26,7 @@ use crate::pack_registry::{DecisionPack, PackParam, PackRegistry};
 /// 2. `(provenance ...)` atoms have their `:covers` name-refs checked and their
 ///    `:source-id` looked up in `registry`.
 /// 3. `(governance-status ...)` atoms have their `:atom` name-ref checked.
-pub fn resolve(
-    bag: &AtomBag,
-    registry: &mut PackRegistry,
-    diagnostics: &mut DiagnosticBag,
-) {
+pub fn resolve(bag: &AtomBag, registry: &mut PackRegistry, diagnostics: &mut DiagnosticBag) {
     // 1. Decision-pack atoms
     for atom in bag.atoms_of_structural_kind(StructuralKind::DecisionPack) {
         resolve_decision_pack(atom, registry, diagnostics);
@@ -57,21 +53,24 @@ pub fn resolve(
 
 /// Return the string value of the first slot named `key` in `raw.slots`,
 /// or `None` if absent or not a string/symbol/bool/int.
-pub(crate) fn get_slot_str(raw: &dsl_parser::raw_ast::RawAtom, key: &str) -> Option<String> {
-    raw.slots.iter().find(|(k, _)| k == key).and_then(|(_, v)| match v {
-        RawValue::StringLit(s) => Some(s.clone()),
-        RawValue::Symbol(s) => Some(s.clone()),
-        RawValue::BoolLit(b) => Some(b.to_string()),
-        RawValue::IntLit(i) => Some(i.to_string()),
-        RawValue::FloatLit(f) => Some(f.to_string()),
-        _ => None,
-    })
+pub(crate) fn get_slot_str(raw: &dsl_parser::RawAtom, key: &str) -> Option<String> {
+    raw.slots
+        .iter()
+        .find(|(k, _)| k == key)
+        .and_then(|(_, v)| match v {
+            RawValue::StringLit(s) => Some(s.clone()),
+            RawValue::Symbol(s) => Some(s.clone()),
+            RawValue::BoolLit(b) => Some(b.to_string()),
+            RawValue::IntLit(i) => Some(i.to_string()),
+            RawValue::FloatLit(f) => Some(f.to_string()),
+            _ => None,
+        })
 }
 
 /// Return the items of a list-valued slot named `key` as strings.
 /// Returns an empty `Vec` if the slot is absent, not a list, or items are
 /// non-string.
-pub(crate) fn extract_string_list(raw: &dsl_parser::raw_ast::RawAtom, key: &str) -> Vec<String> {
+pub(crate) fn extract_string_list(raw: &dsl_parser::RawAtom, key: &str) -> Vec<String> {
     let Some((_, val)) = raw.slots.iter().find(|(k, _)| k == key) else {
         return Vec::new();
     };
@@ -131,10 +130,7 @@ fn resolve_decision_pack(
 /// The `:parameters` slot is a list of maps of the form
 /// `[{:name N :type T :required bool ...} ...]`.
 /// Malformed entries produce warnings and are skipped.
-fn extract_params(
-    raw: &dsl_parser::raw_ast::RawAtom,
-    diagnostics: &mut DiagnosticBag,
-) -> Vec<PackParam> {
+fn extract_params(raw: &dsl_parser::RawAtom, diagnostics: &mut DiagnosticBag) -> Vec<PackParam> {
     let Some((_, params_val)) = raw.slots.iter().find(|(k, _)| k == "parameters") else {
         return Vec::new();
     };
@@ -150,12 +146,15 @@ fn extract_params(
         match item {
             RawValue::Map(pairs) => {
                 let get = |key: &str| -> Option<String> {
-                    pairs.iter().find(|(k, _)| k == key).and_then(|(_, v)| match v {
-                        RawValue::StringLit(s) => Some(s.clone()),
-                        RawValue::Symbol(s) => Some(s.clone()),
-                        RawValue::BoolLit(b) => Some(b.to_string()),
-                        _ => None,
-                    })
+                    pairs
+                        .iter()
+                        .find(|(k, _)| k == key)
+                        .and_then(|(_, v)| match v {
+                            RawValue::StringLit(s) => Some(s.clone()),
+                            RawValue::Symbol(s) => Some(s.clone()),
+                            RawValue::BoolLit(b) => Some(b.to_string()),
+                            _ => None,
+                        })
                 };
                 let Some(name) = get("name") else {
                     diagnostics.push(Diagnostic::warning(
@@ -174,16 +173,14 @@ fn extract_params(
                 // Dots in parameter names are reserved for the for-each
                 // loop-variable accessor syntax (`,var.field`).
                 if name.contains('.') {
-                    diagnostics.push(
-                        Diagnostic::error_with_code(
-                            format!(
-                                "Parameter name '{}' contains '.'; dots are reserved \
+                    diagnostics.push(Diagnostic::error_with_code(
+                        format!(
+                            "Parameter name '{}' contains '.'; dots are reserved \
                                  for for-each accessor syntax (,var.field)",
-                                name
-                            ),
-                            INVALID_PARAMETER_NAME,
+                            name
                         ),
-                    );
+                        INVALID_PARAMETER_NAME,
+                    ));
                 }
                 result.push(PackParam {
                     name,
@@ -206,7 +203,7 @@ fn extract_params(
 /// Walk every `RawValue` in the `:template` slot and check that all
 /// `TemplateSubst` and `TemplateSplice` forms reference a declared parameter.
 fn validate_template(
-    raw: &dsl_parser::raw_ast::RawAtom,
+    raw: &dsl_parser::RawAtom,
     param_names: &HashSet<String>,
     diagnostics: &mut DiagnosticBag,
 ) {
@@ -241,46 +238,41 @@ fn walk_value(
                     }
                 }
                 // Dot outside a for-each context, or var doesn't match.
-                diagnostics.push(
-                    Diagnostic::error_with_code(
-                        format!(
-                            "Template substitution ',{}' uses dot accessor but '{}' is not \
+                diagnostics.push(Diagnostic::error_with_code(
+                    format!(
+                        "Template substitution ',{}' uses dot accessor but '{}' is not \
                              the active loop variable",
-                            name, var_part
-                        ),
-                        UNKNOWN_LOOP_VARIABLE,
+                        name, var_part
                     ),
-                );
+                    UNKNOWN_LOOP_VARIABLE,
+                ));
             } else if !param_names.contains(name) {
-                diagnostics.push(
-                    Diagnostic::error_with_code(
-                        format!("Unknown template parameter ',{}'", name),
-                        UNKNOWN_TEMPLATE_PARAMETER,
-                    ),
-                );
+                diagnostics.push(Diagnostic::error_with_code(
+                    format!("Unknown template parameter ',{}'", name),
+                    UNKNOWN_TEMPLATE_PARAMETER,
+                ));
             }
         }
-        RawValue::TemplateSplice(name)
-            if !param_names.contains(name) => {
-                diagnostics.push(
-                    Diagnostic::error_with_code(
-                        format!("Unknown template splice ',@{}'", name),
-                        UNKNOWN_TEMPLATE_PARAMETER,
-                    ),
-                );
-            }
-        RawValue::ForEach { var, list_param, body } => {
+        RawValue::TemplateSplice(name) if !param_names.contains(name) => {
+            diagnostics.push(Diagnostic::error_with_code(
+                format!("Unknown template splice ',@{}'", name),
+                UNKNOWN_TEMPLATE_PARAMETER,
+            ));
+        }
+        RawValue::ForEach {
+            var,
+            list_param,
+            body,
+        } => {
             // Validate that :in references a declared list-typed parameter.
             if !param_names.contains(list_param.as_str()) {
-                diagnostics.push(
-                    Diagnostic::error_with_code(
-                        format!(
-                            "for-each :in '{}' does not reference a declared parameter",
-                            list_param
-                        ),
-                        UNKNOWN_TEMPLATE_PARAMETER,
+                diagnostics.push(Diagnostic::error_with_code(
+                    format!(
+                        "for-each :in '{}' does not reference a declared parameter",
+                        list_param
                     ),
-                );
+                    UNKNOWN_TEMPLATE_PARAMETER,
+                ));
             }
             // Walk body with the loop variable in scope.
             for item in body {
@@ -351,11 +343,7 @@ fn resolve_provenance(
 // Governance-status resolution
 // ---------------------------------------------------------------------------
 
-fn resolve_governance_status(
-    atom: &TypedAtom,
-    bag: &AtomBag,
-    diagnostics: &mut DiagnosticBag,
-) {
+fn resolve_governance_status(atom: &TypedAtom, bag: &AtomBag, diagnostics: &mut DiagnosticBag) {
     let raw = &atom.raw;
     // :atom — name-ref to the governed structural atom.
     if let Some(atom_ref) = get_slot_str(raw, "atom") {
@@ -442,8 +430,13 @@ mod tests {
   ])
 "#;
         let (_, diag) = parse_and_resolve(src);
-        assert!(diag.has_errors(), "expected error for unknown template param");
-        let has_code = diag.errors().any(|d| d.code.as_deref() == Some(UNKNOWN_TEMPLATE_PARAMETER));
+        assert!(
+            diag.has_errors(),
+            "expected error for unknown template param"
+        );
+        let has_code = diag
+            .errors()
+            .any(|d| d.code.as_deref() == Some(UNKNOWN_TEMPLATE_PARAMETER));
         assert!(has_code, "expected UNKNOWN_TEMPLATE_PARAMETER code");
     }
 

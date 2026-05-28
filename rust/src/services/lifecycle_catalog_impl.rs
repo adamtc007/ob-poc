@@ -1,11 +1,11 @@
-//! ob-poc impl of [`dsl_runtime::service_traits::LifecycleCatalog`].
+//! ob-poc impl of [`LifecycleCatalog`].
 //!
 //! Bridges the trait to the global taxonomy-loaded `OntologyService`,
 //! preserving the fallback semantics the in-crate helpers used to have:
 //! missing entity type → transition rejected / state non-terminal /
 //! empty next-state set.
 
-use dsl_runtime::service_traits::LifecycleCatalog;
+use dsl_runtime::LifecycleCatalog;
 
 use crate::ontology::{is_terminal_state, is_valid_transition, ontology};
 

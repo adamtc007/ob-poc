@@ -1,3 +1,4 @@
+#![allow(unreachable_pub)]
 //! Effect narration for runbook plan execution.
 //!
 //! Generates human-readable narration per step and aggregate summaries

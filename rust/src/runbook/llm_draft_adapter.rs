@@ -1,3 +1,4 @@
+#![allow(unreachable_pub)]
 //! LLM draft adapter for KYC update-status workbook drafts.
 //!
 //! The adapter is deliberately not an authority path. It asks an LLM for one

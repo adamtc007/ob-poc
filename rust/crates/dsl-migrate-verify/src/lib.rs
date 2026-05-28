@@ -7,9 +7,11 @@
 //! flow atoms are opaque to the local runtime (ScriptedAdaptor ignores them);
 //! condition executability is the external dmn-lite peer's responsibility.
 
-use bpmn_runtime::{InMemoryJourneyStore, JourneyStore, RuntimeEngine, ScriptedAdaptor, VerbRegistry};
+use bpmn_runtime::{
+    InMemoryJourneyStore, JourneyStore, RuntimeEngine, ScriptedAdaptor, VerbRegistry,
+};
 use dsl_diagnostics::DiagnosticBag;
-use dsl_lowering::bpmn::JourneySpec;
+use dsl_lowering::JourneySpec;
 use std::sync::Arc;
 
 /// Verification result for one DSL source string.

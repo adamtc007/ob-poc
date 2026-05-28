@@ -22,12 +22,12 @@
 // Bring dsl-resolution into scope so instantiate_pack can call validate_bpmn.
 pub use dsl_resolution;
 
-pub use bpmn_runtime::{VerbEffect, VerbError, VerbHandler, VerbOutput};
 use bpmn_runtime::{
     InMemoryJourneyStore, InstanceId, InstanceStatus, JourneyStore, RuntimeEngine, ScriptedAdaptor,
     SwitchAdaptor, VerbRegistry,
 };
-use dsl_lowering::bpmn::JourneySpec;
+pub use bpmn_runtime::{VerbEffect, VerbError, VerbHandler, VerbOutput};
+use dsl_lowering::JourneySpec;
 use std::{collections::HashMap, sync::Arc};
 
 // ---------------------------------------------------------------------------

@@ -14,11 +14,11 @@ use anyhow::Result;
 use async_trait::async_trait;
 use sem_os_postgres::ops::SemOsVerbOp;
 
-use dsl_runtime::domain_ops::helpers::{
+use dsl_runtime::{
     json_extract_bool_opt, json_extract_int_opt, json_extract_string_opt, json_extract_uuid_opt,
     json_get_required_uuid,
 };
-use dsl_runtime::tx::TransactionScope;
+use dsl_runtime::TransactionScope;
 use dsl_runtime::{VerbExecutionContext, VerbExecutionOutcome};
 
 #[allow(unused_imports)]
@@ -29,8 +29,9 @@ use {
     crate::dsl_v2::execution::DslExecutor,
     crate::dsl_v2::executor::ExecutionContext,
     crate::gleif::{
-        client::TreeFetchOptions, ChainLink, DiscoveredEntity, FundListResult, GleifClient,
-        GleifEnrichmentService, LeiRecord, OwnershipChain, SuccessorResult, UboStatus,
+        client::TreeFetchOptions, types::ChainLink, types::DiscoveredEntity, types::FundListResult,
+        GleifClient, GleifEnrichmentService, types::LeiRecord, types::OwnershipChain,
+        types::SuccessorResult, types::UboStatus,
     },
     sqlx::PgPool,
     std::collections::HashMap,
@@ -43,7 +44,7 @@ use {
 // ═══════════════════════════════════════════════════════════════════════════════
 
 /// Enrich entity from GLEIF by LEI
-pub struct GleifEnrich;
+pub(super) struct GleifEnrich;
 
 #[async_trait]
 impl SemOsVerbOp for GleifEnrich {
@@ -206,7 +207,7 @@ impl SemOsVerbOp for GleifEnrich {
 // ═══════════════════════════════════════════════════════════════════════════════
 
 /// Search GLEIF for entities
-pub struct GleifSearch;
+pub(super) struct GleifSearch;
 
 #[async_trait]
 impl SemOsVerbOp for GleifSearch {
@@ -270,7 +271,7 @@ impl SemOsVerbOp for GleifSearch {
 // ═══════════════════════════════════════════════════════════════════════════════
 
 /// Import corporate tree from GLEIF
-pub struct GleifImportTree;
+pub(super) struct GleifImportTree;
 
 #[async_trait]
 impl SemOsVerbOp for GleifImportTree {
@@ -364,7 +365,7 @@ impl SemOsVerbOp for GleifImportTree {
 // ═══════════════════════════════════════════════════════════════════════════════
 
 /// Refresh stale GLEIF data
-pub struct GleifRefresh;
+pub(super) struct GleifRefresh;
 
 #[async_trait]
 impl SemOsVerbOp for GleifRefresh {
@@ -558,7 +559,7 @@ impl SemOsVerbOp for GleifRefresh {
 // ═══════════════════════════════════════════════════════════════════════════════
 
 /// Get raw GLEIF record (does not persist)
-pub struct GleifGetRecord;
+pub(super) struct GleifGetRecord;
 
 #[async_trait]
 impl SemOsVerbOp for GleifGetRecord {
@@ -612,7 +613,7 @@ impl SemOsVerbOp for GleifGetRecord {
 // ═══════════════════════════════════════════════════════════════════════════════
 
 /// Get direct parent from GLEIF
-pub struct GleifGetParent;
+pub(super) struct GleifGetParent;
 
 #[async_trait]
 impl SemOsVerbOp for GleifGetParent {
@@ -667,7 +668,7 @@ impl SemOsVerbOp for GleifGetParent {
 // ═══════════════════════════════════════════════════════════════════════════════
 
 /// Import managed funds from GLEIF with full CBU structure
-pub struct GleifImportManagedFunds;
+pub(super) struct GleifImportManagedFunds;
 
 #[async_trait]
 impl SemOsVerbOp for GleifImportManagedFunds {
@@ -1144,7 +1145,7 @@ async fn assign_role(pool: &PgPool, cbu_id: Uuid, entity_id: Uuid, role_name: &s
 // ═══════════════════════════════════════════════════════════════════════════════
 
 /// Get direct children from GLEIF
-pub struct GleifGetChildren;
+pub(super) struct GleifGetChildren;
 
 #[async_trait]
 impl SemOsVerbOp for GleifGetChildren {
@@ -1203,7 +1204,7 @@ impl SemOsVerbOp for GleifGetChildren {
 // ═══════════════════════════════════════════════════════════════════════════════
 
 /// Trace ownership chain to UBO terminus
-pub struct GleifTraceOwnership;
+pub(super) struct GleifTraceOwnership;
 
 #[async_trait]
 impl SemOsVerbOp for GleifTraceOwnership {
@@ -1294,7 +1295,7 @@ impl SemOsVerbOp for GleifTraceOwnership {
 // ═══════════════════════════════════════════════════════════════════════════════
 
 /// Get all funds managed by an investment manager
-pub struct GleifGetManagedFunds;
+pub(super) struct GleifGetManagedFunds;
 
 #[async_trait]
 impl SemOsVerbOp for GleifGetManagedFunds {
@@ -1373,7 +1374,7 @@ impl SemOsVerbOp for GleifGetManagedFunds {
 // ═══════════════════════════════════════════════════════════════════════════════
 
 /// Resolve merged/inactive LEI to current successor
-pub struct GleifResolveSuccessor;
+pub(super) struct GleifResolveSuccessor;
 
 #[async_trait]
 impl SemOsVerbOp for GleifResolveSuccessor {
@@ -1464,7 +1465,7 @@ impl SemOsVerbOp for GleifResolveSuccessor {
 ///
 /// Single deterministic lookup - returns the umbrella fund that a sub-fund belongs to.
 /// SICAVs are self-governed and have no umbrella - use get-manager to find ManCo instead.
-pub struct GleifGetUmbrella;
+pub(super) struct GleifGetUmbrella;
 
 #[async_trait]
 impl SemOsVerbOp for GleifGetUmbrella {
@@ -1478,7 +1479,7 @@ impl SemOsVerbOp for GleifGetUmbrella {
         ctx: &mut VerbExecutionContext,
         pool: &sqlx::PgPool,
     ) -> Result<Option<serde_json::Value>> {
-        use crate::gleif::{UmbrellaEntity, UmbrellaResult};
+        use crate::gleif::types::{UmbrellaEntity, UmbrellaResult};
 
         let lei = match json_extract_string_opt(args, "lei") {
             Some(l) => l,
@@ -1537,7 +1538,7 @@ impl SemOsVerbOp for GleifGetUmbrella {
 ///
 /// Single deterministic lookup - returns the ManCo/AIFM/IM that manages the fund.
 /// This is the correct starting point for SICAVs which have no umbrella above them.
-pub struct GleifGetManager;
+pub(super) struct GleifGetManager;
 
 #[async_trait]
 impl SemOsVerbOp for GleifGetManager {
@@ -1551,7 +1552,7 @@ impl SemOsVerbOp for GleifGetManager {
         ctx: &mut VerbExecutionContext,
         pool: &sqlx::PgPool,
     ) -> Result<Option<serde_json::Value>> {
-        use crate::gleif::{ManagerEntity, ManagerResult};
+        use crate::gleif::types::{ManagerEntity, ManagerResult};
 
         let lei = match json_extract_string_opt(args, "lei") {
             Some(l) => l,
@@ -1610,7 +1611,7 @@ impl SemOsVerbOp for GleifGetManager {
 /// Get master fund for a feeder fund (IS_FEEDER_TO relationship)
 ///
 /// Single deterministic lookup - returns the master fund that a feeder invests in.
-pub struct GleifGetMasterFund;
+pub(super) struct GleifGetMasterFund;
 
 #[async_trait]
 impl SemOsVerbOp for GleifGetMasterFund {
@@ -1624,7 +1625,7 @@ impl SemOsVerbOp for GleifGetMasterFund {
         ctx: &mut VerbExecutionContext,
         pool: &sqlx::PgPool,
     ) -> Result<Option<serde_json::Value>> {
-        use crate::gleif::{MasterEntity, MasterFundResult};
+        use crate::gleif::types::{MasterEntity, MasterFundResult};
 
         let lei = match json_extract_string_opt(args, "lei") {
             Some(l) => l,
@@ -1682,7 +1683,7 @@ impl SemOsVerbOp for GleifGetMasterFund {
 /// Look up entity LEI by ISIN
 ///
 /// Single deterministic lookup - given an ISIN, returns the issuing entity's LEI.
-pub struct GleifLookupByIsin;
+pub(super) struct GleifLookupByIsin;
 
 #[async_trait]
 impl SemOsVerbOp for GleifLookupByIsin {
@@ -1696,7 +1697,7 @@ impl SemOsVerbOp for GleifLookupByIsin {
         _ctx: &mut VerbExecutionContext,
         _pool: &sqlx::PgPool,
     ) -> Result<Option<serde_json::Value>> {
-        use crate::gleif::IsinLookupResult;
+        use crate::gleif::types::IsinLookupResult;
 
         let isin = json_extract_string_opt(args, "isin")
             .ok_or_else(|| anyhow::anyhow!(":isin required"))?;
@@ -1804,7 +1805,7 @@ fn escape_dsl_string(s: &str) -> String {
 /// 4. Auto-tags entities with roles based on GLEIF category/relationships
 /// 5. Creates client_group_relationship edges
 /// 6. Records source provenance
-pub struct GleifImportToClientGroup;
+pub(super) struct GleifImportToClientGroup;
 
 #[async_trait]
 impl SemOsVerbOp for GleifImportToClientGroup {
@@ -2292,7 +2293,7 @@ impl SemOsVerbOp for GleifImportToClientGroup {
 /// get-manager, get-managed-funds, get-master-fund, get-umbrella, lookup-by-isin.
 ///
 /// The `target-type` arg selects which lookup to perform.
-pub struct GleifLookup;
+pub(super) struct GleifLookup;
 
 #[async_trait]
 impl SemOsVerbOp for GleifLookup {

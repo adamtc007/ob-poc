@@ -10,7 +10,7 @@
 //! # Quick example (rust pseudocode)
 //!
 //! ```ignore
-//! use dsl_runtime::cross_workspace::test_harness::ScenarioRunner;
+//! use dsl_runtime::ScenarioRunner;
 //!
 //! let report = ScenarioRunner::run_scenario_file(
 //!     "tests/fixtures/cross_workspace_dag/deal_contracted_compound_tollgate.yaml"

@@ -2,8 +2,8 @@
 
 use anyhow::Result;
 use async_trait::async_trait;
-use dsl_runtime::domain_ops::helpers::{json_extract_bool_opt, json_extract_uuid};
-use dsl_runtime::tx::TransactionScope;
+use dsl_runtime::{json_extract_bool_opt, json_extract_uuid};
+use dsl_runtime::TransactionScope;
 use dsl_runtime::{VerbExecutionContext, VerbExecutionOutcome};
 use serde_json::Value;
 
@@ -55,7 +55,7 @@ impl SemOsVerbOp for RemoveMember {
         };
 
         if affected > 0 {
-            dsl_runtime::domain_ops::helpers::emit_pending_state_advance(
+            dsl_runtime::emit_pending_state_advance(
                 ctx,
                 cbu_id,
                 "cbu-group-member:removed",

@@ -98,7 +98,11 @@ pub fn validate_bpmn(
 
     let has_errors = diag.has_errors();
     ValidateResponse {
-        diagnostics: diag.diagnostics.iter().map(DiagnosticSummary::from).collect(),
+        diagnostics: diag
+            .diagnostics
+            .iter()
+            .map(DiagnosticSummary::from)
+            .collect(),
         provenance_summary,
         has_errors,
     }

@@ -22,7 +22,7 @@ use nom::{
 };
 
 use super::commands::{Direction, NavCommand, ZoomLevel};
-use crate::graph::ProngFilter;
+use crate::graph::types::ProngFilter;
 
 // =============================================================================
 // MAIN PARSER ENTRY POINT

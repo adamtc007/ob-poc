@@ -10,9 +10,9 @@ use anyhow::{anyhow, Result};
 use async_trait::async_trait;
 use serde_json::{json, Value};
 
-use dsl_runtime::domain_ops::helpers::json_extract_string_opt;
-use dsl_runtime::service_traits::SchemaIntrospectionAccess;
-use dsl_runtime::tx::TransactionScope;
+use dsl_runtime::json_extract_string_opt;
+use dsl_runtime::SchemaIntrospectionAccess;
+use dsl_runtime::TransactionScope;
 use dsl_runtime::{VerbExecutionContext, VerbExecutionOutcome};
 
 use crate::ops::SemOsVerbOp;

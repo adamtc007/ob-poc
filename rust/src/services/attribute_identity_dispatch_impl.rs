@@ -1,4 +1,4 @@
-//! ob-poc impl of [`dsl_runtime::service_traits::AttributeIdentityService`].
+//! ob-poc impl of [`AttributeIdentityService`].
 //!
 //! Bridges the plane-crossing trait (defined in `dsl-runtime`) to the
 //! existing in-crate
@@ -17,7 +17,7 @@ use async_trait::async_trait;
 use sqlx::PgPool;
 use uuid::Uuid;
 
-use dsl_runtime::service_traits::AttributeIdentityService;
+use dsl_runtime::AttributeIdentityService;
 
 use crate::services::attribute_identity_service::AttributeIdentityService as InternalService;
 

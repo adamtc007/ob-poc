@@ -10,7 +10,7 @@
 //! (§5.6.2 of `docs/design/v0.1/session2-compiler-and-runtime.md`).
 //! All `Vec` fields are sorted by name for deterministic output.
 
-use dsl_bpmn_frontend::railway::{RailwayGraph, RailwayNode, RailwayGateway};
+use dsl_bpmn_frontend::{RailwayGateway, RailwayGraph, RailwayNode};
 use serde::{Deserialize, Serialize};
 
 // ---------------------------------------------------------------------------
@@ -111,11 +111,15 @@ pub fn lower(graph: &RailwayGraph, process_name: &str) -> JourneySpec {
         .collect();
 
     // --- Nodes: gateways (merged into the same flat list) ---
-    for gw in graph.gateways.values().map(|g: &RailwayGateway| JourneyNode {
-        name: g.name.clone(),
-        kind: g.kind.as_str().to_owned(),
-        verb_ref: None,
-    }) {
+    for gw in graph
+        .gateways
+        .values()
+        .map(|g: &RailwayGateway| JourneyNode {
+            name: g.name.clone(),
+            kind: g.kind.as_str().to_owned(),
+            verb_ref: None,
+        })
+    {
         nodes.push(gw);
     }
 
@@ -155,8 +159,11 @@ pub fn lower(graph: &RailwayGraph, process_name: &str) -> JourneySpec {
             interrupting: ba.interrupting,
         })
         .collect();
-    boundary_attachments
-        .sort_by(|a, b| a.host_node.cmp(&b.host_node).then(a.event_name.cmp(&b.event_name)));
+    boundary_attachments.sort_by(|a, b| {
+        a.host_node
+            .cmp(&b.host_node)
+            .then(a.event_name.cmp(&b.event_name))
+    });
 
     // --- Parallel joins ---
     let mut parallel_joins: Vec<JourneyParallelJoin> = graph

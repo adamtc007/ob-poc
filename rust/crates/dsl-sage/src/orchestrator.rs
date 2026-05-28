@@ -21,7 +21,9 @@ use crate::{
     confirmation::{ConfirmationSession, ConfirmationState},
     extractor::{extract_parameters, LlmExtractor},
     instantiator::{instantiate, validate_instantiation, InstantiationResult, ValidationSummary},
-    matcher::{match_packs, match_packs_embedding_only, BagOfWordsEmbedder, LlmClient, PackEmbedder},
+    matcher::{
+        match_packs, match_packs_embedding_only, BagOfWordsEmbedder, LlmClient, PackEmbedder,
+    },
     types::{ConfirmationResponse, RankedCandidate, SageContext},
 };
 use dsl_resolution::PackRegistry;
@@ -250,15 +252,20 @@ impl<'a> SageOrchestrator<'a> {
             // ----------------------------------------------------------------
             // Confirming — drives the confirmation sub-state machine
             // ----------------------------------------------------------------
-            (SageState::Confirming { session: conf_session }, SageInput::Confirm(response)) => {
+            (
+                SageState::Confirming {
+                    session: conf_session,
+                },
+                SageInput::Confirm(response),
+            ) => {
                 let mut conf_session = conf_session.clone();
                 let new_conf_state = conf_session.apply_response(response.clone());
 
                 match new_conf_state {
                     ConfirmationState::Accepted => {
-                        let params = conf_session.confirmed_parameters().expect(
-                            "confirmed_parameters must be Some when state is Accepted",
-                        );
+                        let params = conf_session
+                            .confirmed_parameters()
+                            .expect("confirmed_parameters must be Some when state is Accepted");
                         let pack_name = conf_session.request.pack_name.clone();
                         let pack_version = conf_session.request.pack_version.clone();
 

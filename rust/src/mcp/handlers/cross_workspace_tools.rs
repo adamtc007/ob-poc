@@ -3,6 +3,11 @@
 //! Read-only diagnostic/query tools. Write operations go through DSL verbs.
 
 use anyhow::{anyhow, Result};
+use dsl_runtime::{
+    check_staleness_for_entity, get_atom_by_path, get_remediation_by_id, get_version_history,
+    list_all, list_for_provider, list_open, list_shared_atoms, list_stale_refs,
+    SharedAtomLifecycle,
+};
 use serde_json::{json, Value};
 
 use super::core::ToolHandlers;
@@ -14,11 +19,10 @@ impl ToolHandlers {
         let status_filter = args["status"].as_str();
 
         let lifecycle = status_filter
-            .map(dsl_runtime::cross_workspace::types::SharedAtomLifecycle::try_from_str)
+            .map(SharedAtomLifecycle::try_from_str)
             .transpose()?;
 
-        let atoms =
-            dsl_runtime::cross_workspace::repository::list_shared_atoms(pool, lifecycle).await?;
+        let atoms = list_shared_atoms(pool, lifecycle).await?;
 
         Ok(json!({
             "atoms": atoms,
@@ -33,7 +37,7 @@ impl ToolHandlers {
             .as_str()
             .ok_or_else(|| anyhow!("atom_path required"))?;
 
-        let atom = dsl_runtime::cross_workspace::repository::get_by_path(pool, atom_path)
+        let atom = get_atom_by_path(pool, atom_path)
             .await?
             .ok_or_else(|| anyhow!("Shared atom '{}' not found", atom_path))?;
 
@@ -62,15 +66,9 @@ impl ToolHandlers {
             .and_then(|s| s.parse::<uuid::Uuid>().ok());
 
         let stale_refs = if let Some(eid) = entity_id {
-            dsl_runtime::cross_workspace::fact_refs::check_staleness_for_entity(
-                pool,
-                consumer_workspace,
-                eid,
-            )
-            .await?
+            check_staleness_for_entity(pool, consumer_workspace, eid).await?
         } else {
-            dsl_runtime::cross_workspace::fact_refs::list_stale_refs(pool, consumer_workspace)
-                .await?
+            list_stale_refs(pool, consumer_workspace).await?
         };
 
         Ok(json!({
@@ -88,9 +86,7 @@ impl ToolHandlers {
             .and_then(|s| s.parse::<uuid::Uuid>().ok());
         let workspace = args["workspace"].as_str();
 
-        let events =
-            dsl_runtime::cross_workspace::remediation::list_open(pool, entity_id, workspace)
-                .await?;
+        let events = list_open(pool, entity_id, workspace).await?;
 
         Ok(json!({
             "open_count": events.len(),
@@ -106,7 +102,7 @@ impl ToolHandlers {
             .ok_or_else(|| anyhow!("remediation_id required"))?;
         let id: uuid::Uuid = id_str.parse().map_err(|_| anyhow!("Invalid UUID"))?;
 
-        let event = dsl_runtime::cross_workspace::remediation::get_by_id(pool, id)
+        let event = get_remediation_by_id(pool, id)
             .await?
             .ok_or_else(|| anyhow!("Remediation event {} not found", id))?;
 
@@ -133,9 +129,9 @@ impl ToolHandlers {
         let provider_filter = args["provider"].as_str();
 
         let caps = if let Some(provider) = provider_filter {
-            dsl_runtime::cross_workspace::providers::list_for_provider(pool, provider).await?
+            list_for_provider(pool, provider).await?
         } else {
-            dsl_runtime::cross_workspace::providers::list_all(pool).await?
+            list_all(pool).await?
         };
 
         Ok(json!({
@@ -152,8 +148,7 @@ impl ToolHandlers {
             .ok_or_else(|| anyhow!("remediation_id required"))?;
         let id: uuid::Uuid = id_str.parse().map_err(|_| anyhow!("Invalid UUID"))?;
 
-        let records =
-            dsl_runtime::cross_workspace::compensation::list_for_remediation(pool, id).await?;
+        let records = dsl_runtime::list_for_remediation(pool, id).await?;
 
         Ok(json!({
             "remediation_id": id,
@@ -176,14 +171,11 @@ impl ToolHandlers {
             .map_err(|_| anyhow!("Invalid entity_id UUID"))?;
 
         // Resolve atom
-        let atom = dsl_runtime::cross_workspace::repository::get_by_path(pool, atom_path)
+        let atom = get_atom_by_path(pool, atom_path)
             .await?
             .ok_or_else(|| anyhow!("Shared atom '{}' not found", atom_path))?;
 
-        let versions = dsl_runtime::cross_workspace::fact_versions::get_version_history(
-            pool, atom.id, entity_id,
-        )
-        .await?;
+        let versions = get_version_history(pool, atom.id, entity_id).await?;
 
         let version_summaries: Vec<Value> = versions
             .iter()

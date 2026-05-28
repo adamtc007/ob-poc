@@ -8,8 +8,8 @@ use async_trait::async_trait;
 use serde_json::{json, Value};
 use uuid::Uuid;
 
-use dsl_runtime::domain_ops::helpers::{json_extract_string_opt, json_extract_uuid};
-use dsl_runtime::tx::TransactionScope;
+use dsl_runtime::{json_extract_string_opt, json_extract_uuid};
+use dsl_runtime::TransactionScope;
 use dsl_runtime::{VerbExecutionContext, VerbExecutionOutcome};
 use sem_os_postgres::ops::SemOsVerbOp;
 
@@ -33,7 +33,7 @@ fn arg_payload(args: &Value) -> Value {
 }
 
 /// Compile the onboarding service-resource data request.
-pub struct CompileDataRequest;
+pub(super) struct CompileDataRequest;
 
 #[async_trait]
 impl SemOsVerbOp for CompileDataRequest {
@@ -56,7 +56,7 @@ impl SemOsVerbOp for CompileDataRequest {
 }
 
 /// Dispatch all currently ready slices for a data request.
-pub struct DispatchReadySlices;
+pub(super) struct DispatchReadySlices;
 
 #[async_trait]
 impl SemOsVerbOp for DispatchReadySlices {
@@ -78,7 +78,7 @@ impl SemOsVerbOp for DispatchReadySlices {
 }
 
 /// Confirm the owner-returned provisioning result.
-pub struct ConfirmProvisioningResult;
+pub(super) struct ConfirmProvisioningResult;
 
 #[async_trait]
 impl SemOsVerbOp for ConfirmProvisioningResult {
@@ -104,7 +104,7 @@ impl SemOsVerbOp for ConfirmProvisioningResult {
 }
 
 /// Cancel all open slices for a data request.
-pub struct CancelDataRequest;
+pub(super) struct CancelDataRequest;
 
 #[async_trait]
 impl SemOsVerbOp for CancelDataRequest {
@@ -126,7 +126,7 @@ impl SemOsVerbOp for CancelDataRequest {
 }
 
 /// Cancel one open data-request slice.
-pub struct CancelSlice;
+pub(super) struct CancelSlice;
 
 #[async_trait]
 impl SemOsVerbOp for CancelSlice {
@@ -148,7 +148,7 @@ impl SemOsVerbOp for CancelSlice {
 }
 
 /// Read one data request.
-pub struct GetDataRequest;
+pub(super) struct GetDataRequest;
 
 #[async_trait]
 impl SemOsVerbOp for GetDataRequest {
@@ -193,7 +193,7 @@ impl SemOsVerbOp for GetDataRequest {
 }
 
 /// List data requests by optional CBU and status filters.
-pub struct ListDataRequests;
+pub(super) struct ListDataRequests;
 
 #[async_trait]
 impl SemOsVerbOp for ListDataRequests {
@@ -242,7 +242,7 @@ impl SemOsVerbOp for ListDataRequests {
 }
 
 /// List slices for a data request.
-pub struct ListSlices;
+pub(super) struct ListSlices;
 
 #[async_trait]
 impl SemOsVerbOp for ListSlices {
@@ -291,7 +291,7 @@ impl SemOsVerbOp for ListSlices {
 }
 
 /// Read one slice.
-pub struct GetSlice;
+pub(super) struct GetSlice;
 
 #[async_trait]
 impl SemOsVerbOp for GetSlice {
@@ -339,7 +339,7 @@ impl SemOsVerbOp for GetSlice {
 }
 
 /// Read provisioning and resource-instance status for one data-request slice.
-pub struct GetProvisioningStatus;
+pub(super) struct GetProvisioningStatus;
 
 #[async_trait]
 impl SemOsVerbOp for GetProvisioningStatus {
@@ -427,7 +427,7 @@ impl SemOsVerbOp for GetProvisioningStatus {
 }
 
 /// List attributes for a slice.
-pub struct GetSliceAttrs;
+pub(super) struct GetSliceAttrs;
 
 #[async_trait]
 impl SemOsVerbOp for GetSliceAttrs {

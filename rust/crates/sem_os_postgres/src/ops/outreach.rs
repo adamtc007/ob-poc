@@ -15,11 +15,11 @@ use serde_json::{json, Value};
 use sqlx::Row;
 use uuid::Uuid;
 
-use dsl_runtime::domain_ops::helpers::{
+use dsl_runtime::{
     self, json_extract_int_opt, json_extract_string, json_extract_string_opt, json_extract_uuid,
     json_extract_uuid_opt,
 };
-use dsl_runtime::tx::TransactionScope;
+use dsl_runtime::TransactionScope;
 use dsl_runtime::{VerbExecutionContext, VerbExecutionOutcome};
 
 use super::SemOsVerbOp;
@@ -66,7 +66,7 @@ impl SemOsVerbOp for RecordResponse {
         .await?;
 
         let target_entity_id: Uuid = row.get("target_entity_id");
-        helpers::emit_pending_state_advance(
+        dsl_runtime::emit_pending_state_advance(
             ctx,
             target_entity_id,
             "research:outreach_responded",

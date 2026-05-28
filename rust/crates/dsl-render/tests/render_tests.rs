@@ -10,10 +10,18 @@ fn linear_sequence_renders_to_svg() {
 (flow task-1 -> end-1)
 "#;
     let svg = dsl_render::render(dsl).unwrap();
-    assert!(svg.starts_with("<svg"), "should produce SVG, got: {}", &svg[..svg.len().min(200)]);
+    assert!(
+        svg.starts_with("<svg"),
+        "should produce SVG, got: {}",
+        &svg[..svg.len().min(200)]
+    );
     assert!(svg.contains("</svg>"), "should close SVG");
     assert!(svg.contains("circle"), "start event should be a circle");
-    assert!(svg.len() > 200, "SVG should have content (len={})", svg.len());
+    assert!(
+        svg.len() > 200,
+        "SVG should have content (len={})",
+        svg.len()
+    );
 }
 
 #[test]
@@ -119,7 +127,12 @@ fn render_all_v01_examples() {
     ];
     for (i, dsl) in examples.iter().enumerate() {
         let result = dsl_render::render(dsl);
-        assert!(result.is_ok(), "example {} failed: {:?}", i + 1, result.err());
+        assert!(
+            result.is_ok(),
+            "example {} failed: {:?}",
+            i + 1,
+            result.err()
+        );
         let svg = result.unwrap();
         assert!(
             svg.starts_with("<svg"),
@@ -153,15 +166,31 @@ fn render_options_no_labels() {
 fn all_node_kinds_render() {
     // Exercise every NodeKind variant
     let kinds = [
-        "start-event", "start-event-message", "start-event-timer",
-        "start-event-signal", "start-event-error", "start-event-escalation",
+        "start-event",
+        "start-event-message",
+        "start-event-timer",
+        "start-event-signal",
+        "start-event-error",
+        "start-event-escalation",
         "start-event-compensation",
-        "end-event", "end-event-terminate", "end-event-error",
-        "end-event-message", "end-event-signal", "end-event-cancel",
-        "end-event-escalation", "end-event-compensation",
-        "service-task", "user-task", "send-task", "receive-task",
-        "manual-task", "business-rule-task", "script-task",
-        "subprocess", "event-subprocess", "transaction-subprocess",
+        "end-event",
+        "end-event-terminate",
+        "end-event-error",
+        "end-event-message",
+        "end-event-signal",
+        "end-event-cancel",
+        "end-event-escalation",
+        "end-event-compensation",
+        "service-task",
+        "user-task",
+        "send-task",
+        "receive-task",
+        "manual-task",
+        "business-rule-task",
+        "script-task",
+        "subprocess",
+        "event-subprocess",
+        "transaction-subprocess",
         "call-activity",
     ];
 
@@ -181,7 +210,11 @@ fn all_node_kinds_render() {
             result.err()
         );
         let svg = result.unwrap();
-        assert!(svg.starts_with("<svg"), "kind '{}' did not produce SVG", kind);
+        assert!(
+            svg.starts_with("<svg"),
+            "kind '{}' did not produce SVG",
+            kind
+        );
     }
 }
 

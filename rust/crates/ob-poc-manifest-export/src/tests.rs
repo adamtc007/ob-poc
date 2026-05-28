@@ -123,7 +123,10 @@ fn export_add_product_records_entity_uuid_resource_dependency() {
     assert_eq!(v.resource_dependencies.len(), 1);
     assert_eq!(v.resource_dependencies[0].kind, "EntityUuid");
     assert_eq!(v.resource_dependencies[0].from_input, "cbu-id");
-    assert_eq!(v.resource_dependencies[0].entity_type.as_deref(), Some("CBU"));
+    assert_eq!(
+        v.resource_dependencies[0].entity_type.as_deref(),
+        Some("CBU")
+    );
 }
 
 #[test]
@@ -170,7 +173,8 @@ fn decisions_in_allowlist_are_rejected_for_ob_poc() {
     let cfg = ExporterConfig::new("ob-poc", "v1.0.0");
     let err = export_to_yaml(tmp.path(), &allow, &cfg).unwrap_err();
     assert!(
-        err.to_string().contains("ob-poc does not own DMN decisions"),
+        err.to_string()
+            .contains("ob-poc does not own DMN decisions"),
         "got: {err}"
     );
 }
@@ -185,10 +189,7 @@ fn empty_allowlist_is_rejected() {
     };
     let cfg = ExporterConfig::new("ob-poc", "v1.0.0");
     let err = export_to_yaml(tmp.path(), &allow, &cfg).unwrap_err();
-    assert!(
-        err.to_string().contains("nothing to export"),
-        "got: {err}"
-    );
+    assert!(err.to_string().contains("nothing to export"), "got: {err}");
 }
 
 #[test]

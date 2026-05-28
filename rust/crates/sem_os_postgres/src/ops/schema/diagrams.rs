@@ -8,7 +8,7 @@
 //! invocation phrases → intent matches → mermaid discovery map.
 //!
 //! The `AffinityGraph` is loaded via the shared
-//! `dsl-runtime::domain_ops::affinity_graph_cache::load_affinity_graph_cached`
+//! `dsl-runtime::domain_ops::load_affinity_graph_cached`
 //! (same reuse pattern as slice #9). The `information_schema`
 //! queries and `sem_reg.snapshots` read run on `scope.executor()` so
 //! they participate in the Sequencer-owned txn.
@@ -27,11 +27,11 @@ use sem_os_policy::diagram::{
     render_discovery_map, render_erd, render_verb_flow, sanitize_id,
 };
 
-use dsl_runtime::domain_ops::affinity_graph_cache::load_affinity_graph_cached;
-use dsl_runtime::domain_ops::helpers::{
+use dsl_runtime::load_affinity_graph_cached;
+use dsl_runtime::{
     json_extract_bool_opt, json_extract_int_opt, json_extract_string, json_extract_string_opt,
 };
-use dsl_runtime::tx::TransactionScope;
+use dsl_runtime::TransactionScope;
 use dsl_runtime::{VerbExecutionContext, VerbExecutionOutcome};
 
 use crate::ops::SemOsVerbOp;

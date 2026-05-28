@@ -31,7 +31,7 @@ use anyhow::{anyhow, Result};
 use async_trait::async_trait;
 use serde::Serialize;
 
-use dsl_runtime::tx::TransactionScope;
+use dsl_runtime::TransactionScope;
 use dsl_runtime::{VerbExecutionContext, VerbExecutionOutcome};
 
 use super::SemOsVerbOp;

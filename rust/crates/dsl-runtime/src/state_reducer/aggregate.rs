@@ -5,7 +5,7 @@ use super::ast::{AggFn, AggResult, CompareOp, FieldValue, Literal, OverlayRow, P
 /// # Examples
 /// ```rust
 /// use std::collections::HashMap;
-/// use dsl_runtime::state_reducer::{
+/// use dsl_runtime::{
 ///     evaluate_aggregate, AggFn, AggResult, FieldValue, OverlayRow
 /// };
 ///

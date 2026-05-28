@@ -37,17 +37,17 @@ use serde_json::json;
 use sqlx::Row;
 use uuid::Uuid;
 
-use dsl_runtime::domain_ops::helpers::{
+use dsl_runtime::{
     json_extract_string, json_extract_string_opt, json_extract_uuid,
 };
-use dsl_runtime::tx::TransactionScope;
+use dsl_runtime::TransactionScope;
 use dsl_runtime::{VerbExecutionContext, VerbExecutionOutcome};
 
 // ---------------------------------------------------------------------------
 // catalogue.propose-verb-declaration
 // ---------------------------------------------------------------------------
 
-pub struct CataloguePropose;
+pub(super) struct CataloguePropose;
 
 #[async_trait]
 impl SemOsVerbOp for CataloguePropose {
@@ -91,7 +91,7 @@ impl SemOsVerbOp for CataloguePropose {
 // catalogue.commit-verb-declaration
 // ---------------------------------------------------------------------------
 
-pub struct CatalogueCommit;
+pub(super) struct CatalogueCommit;
 
 #[async_trait]
 impl SemOsVerbOp for CatalogueCommit {
@@ -188,7 +188,7 @@ impl SemOsVerbOp for CatalogueCommit {
 // catalogue.rollback-verb-declaration
 // ---------------------------------------------------------------------------
 
-pub struct CatalogueRollback;
+pub(super) struct CatalogueRollback;
 
 #[async_trait]
 impl SemOsVerbOp for CatalogueRollback {
@@ -246,7 +246,7 @@ impl SemOsVerbOp for CatalogueRollback {
 // catalogue.list-proposals
 // ---------------------------------------------------------------------------
 
-pub struct CatalogueListProposals;
+pub(super) struct CatalogueListProposals;
 
 #[async_trait]
 impl SemOsVerbOp for CatalogueListProposals {

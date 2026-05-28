@@ -1,4 +1,4 @@
-//! ob-poc impl of [`dsl_runtime::service_traits::PhraseService`].
+//! ob-poc impl of [`PhraseService`].
 //!
 //! Single-method dispatch for the 9 governed-phrase-authoring verbs.
 //! Bridge stays in ob-poc because every snapshot write goes through
@@ -14,7 +14,7 @@ use serde_json::{json, Value};
 use sqlx::{PgPool, Postgres, Transaction};
 use uuid::Uuid;
 
-use dsl_runtime::service_traits::PhraseService;
+use dsl_runtime::PhraseService;
 
 use crate::sem_reg::store::SnapshotStore;
 use crate::sem_reg::types::{ChangeType, ObjectType, SnapshotMeta, SnapshotRow, SnapshotStatus};

@@ -12,7 +12,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use uuid::Uuid;
 
-use crate::graph::{EntityGraph, GraphScope};
+use crate::graph::types::{EntityGraph, GraphScope};
 
 /// Session scope with stats and windowing info
 #[derive(Debug, Clone, Serialize, Deserialize)]

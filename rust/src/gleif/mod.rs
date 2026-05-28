@@ -74,6 +74,6 @@ pub mod repository;
 pub mod types;
 
 pub use client::GleifClient;
+pub use dsl_runtime::*;
 pub use enrichment::GleifEnrichmentService;
 pub use repository::GleifRepository;
-pub use types::*;

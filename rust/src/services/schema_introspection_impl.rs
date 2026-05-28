@@ -1,4 +1,4 @@
-//! ob-poc impl of [`dsl_runtime::service_traits::SchemaIntrospectionAccess`].
+//! ob-poc impl of [`SchemaIntrospectionAccess`].
 //!
 //! Bridges the trait to:
 //!  - `crate::ontology::ontology()` for entity defs / lifecycles / taxonomy
@@ -14,7 +14,7 @@ use async_trait::async_trait;
 use serde_json::json;
 use sqlx::PgPool;
 
-use dsl_runtime::service_traits::SchemaIntrospectionAccess;
+use dsl_runtime::SchemaIntrospectionAccess;
 
 use crate::dsl_v2::verb_registry::registry;
 use crate::ontology::{ontology, SearchKeyDef};

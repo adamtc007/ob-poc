@@ -4,10 +4,13 @@
 //! well-known diagnostic code constants used across the parsing and lowering
 //! pipeline.
 
-pub mod diagnostic;
+mod diagnostic;
 
 pub use diagnostic::{
-    Diagnostic, DiagnosticBag, DiagnosticSeverity, Span,
+    Diagnostic,
+    DiagnosticBag,
+    DiagnosticSeverity,
+    Span,
     // Well-known diagnostic codes
     DEPRECATED_PACK_VERSION,
     INVALID_PARAMETER_NAME,

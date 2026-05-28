@@ -101,17 +101,17 @@ pub struct PersonStatement {
 #[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub enum PersonType {
-    KnownPerson,
-    AnonymousPerson,
-    UnknownPerson,
+    Known,
+    Anonymous,
+    Unknown,
 }
 
 impl PersonType {
     pub fn as_str(&self) -> &'static str {
         match self {
-            PersonType::KnownPerson => "knownPerson",
-            PersonType::AnonymousPerson => "anonymousPerson",
-            PersonType::UnknownPerson => "unknownPerson",
+            PersonType::Known => "knownPerson",
+            PersonType::Anonymous => "anonymousPerson",
+            PersonType::Unknown => "unknownPerson",
         }
     }
 }

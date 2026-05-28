@@ -102,17 +102,38 @@ mod tests {
 
     #[test]
     fn classify_structural_kinds() {
-        assert_eq!(classify("verb"), AtomKindClass::Structural(StructuralKind::Verb));
-        assert_eq!(classify("gateway"), AtomKindClass::Structural(StructuralKind::Gateway));
-        assert_eq!(classify("boundary-attachment"), AtomKindClass::Structural(StructuralKind::BoundaryAttachment));
-        assert_eq!(classify("decision-pack"), AtomKindClass::Structural(StructuralKind::DecisionPack));
+        assert_eq!(
+            classify("verb"),
+            AtomKindClass::Structural(StructuralKind::Verb)
+        );
+        assert_eq!(
+            classify("gateway"),
+            AtomKindClass::Structural(StructuralKind::Gateway)
+        );
+        assert_eq!(
+            classify("boundary-attachment"),
+            AtomKindClass::Structural(StructuralKind::BoundaryAttachment)
+        );
+        assert_eq!(
+            classify("decision-pack"),
+            AtomKindClass::Structural(StructuralKind::DecisionPack)
+        );
     }
 
     #[test]
     fn classify_declarative_kinds() {
-        assert_eq!(classify("provenance"), AtomKindClass::Declarative(DeclarativeKind::Provenance));
-        assert_eq!(classify("governance-status"), AtomKindClass::Declarative(DeclarativeKind::GovernanceStatus));
-        assert_eq!(classify("jurisdiction-tag"), AtomKindClass::Declarative(DeclarativeKind::JurisdictionTag));
+        assert_eq!(
+            classify("provenance"),
+            AtomKindClass::Declarative(DeclarativeKind::Provenance)
+        );
+        assert_eq!(
+            classify("governance-status"),
+            AtomKindClass::Declarative(DeclarativeKind::GovernanceStatus)
+        );
+        assert_eq!(
+            classify("jurisdiction-tag"),
+            AtomKindClass::Declarative(DeclarativeKind::JurisdictionTag)
+        );
     }
 
     #[test]

@@ -13,7 +13,7 @@ use sqlx::PgPool;
 use super::config::types::GraphQueryOperation;
 use super::runtime_registry::{RuntimeGraphQueryConfig, RuntimeVerb};
 use crate::graph::view_model::{GraphFilter, GraphViewModel};
-use crate::graph::{EdgeType, LayerType, NodeType};
+use crate::graph::types::{EdgeType, LayerType, NodeType};
 
 #[cfg(feature = "database")]
 use crate::graph::query_engine::GraphQueryEngine;

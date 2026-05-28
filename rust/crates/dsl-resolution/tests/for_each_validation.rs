@@ -147,7 +147,10 @@ fn parameter_name_with_dot_is_error() {
   :example-utterances ["dot param test"])
 "#;
     let (_, diag) = parse_and_resolve(src);
-    assert!(diag.has_errors(), "expected error for dotted parameter name");
+    assert!(
+        diag.has_errors(),
+        "expected error for dotted parameter name"
+    );
     let has_code = diag
         .errors()
         .any(|d| d.code.as_deref() == Some(INVALID_PARAMETER_NAME));

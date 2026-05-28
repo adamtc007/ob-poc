@@ -9,7 +9,7 @@ use std::collections::HashMap;
 
 use dsl_atoms::{classify, AtomKindClass, StructuralKind};
 use dsl_diagnostics::{Diagnostic, DiagnosticBag, UNKNOWN_ATOM_KIND};
-use dsl_parser::raw_ast::{RawAtom, SourceFile};
+use dsl_parser::{RawAtom, SourceFile};
 use serde::{Deserialize, Serialize};
 
 // ---------------------------------------------------------------------------
@@ -115,16 +115,16 @@ impl AtomBag {
 
     /// Iterate over all structural atoms (excludes declarative and unknown kinds).
     pub fn structural_atoms(&self) -> impl Iterator<Item = &TypedAtom> {
-        self.atoms.iter().filter(|a| {
-            matches!(a.kind_class, AtomKindClass::Structural(_))
-        })
+        self.atoms
+            .iter()
+            .filter(|a| matches!(a.kind_class, AtomKindClass::Structural(_)))
     }
 
     /// Iterate over all declarative atoms.
     pub fn declarative_atoms(&self) -> impl Iterator<Item = &TypedAtom> {
-        self.atoms.iter().filter(|a| {
-            matches!(a.kind_class, AtomKindClass::Declarative(_))
-        })
+        self.atoms
+            .iter()
+            .filter(|a| matches!(a.kind_class, AtomKindClass::Declarative(_)))
     }
 
     /// Return all atoms with a specific structural kind.
@@ -168,7 +168,11 @@ mod tests {
         let bag = AtomBag::from_source_file(sf, &mut diag);
 
         assert_eq!(bag.len(), 2);
-        assert!(!diag.has_errors(), "unexpected errors: {:?}", diag.diagnostics);
+        assert!(
+            !diag.has_errors(),
+            "unexpected errors: {:?}",
+            diag.diagnostics
+        );
 
         let structural: Vec<_> = bag.structural_atoms().collect();
         assert_eq!(structural.len(), 1);
@@ -215,14 +219,17 @@ mod tests {
         // Both atoms should be in the bag
         assert_eq!(bag.len(), 2);
         // But a warning should have been emitted
-        assert!(!diag.has_errors(), "duplicate name should be a warning, not an error");
+        assert!(
+            !diag.has_errors(),
+            "duplicate name should be a warning, not an error"
+        );
         assert_eq!(diag.warnings().count(), 1);
         // The name index points to the first occurrence
         let idx = bag.find("foo").unwrap();
         assert_eq!(bag.get(idx).raw.slots[0].0, "x");
         // Both atoms have slot x, first has value 1
         match &bag.get(idx).raw.slots[0].1 {
-            dsl_parser::raw_ast::RawValue::IntLit(v) => assert_eq!(*v, 1),
+            dsl_parser::RawValue::IntLit(v) => assert_eq!(*v, 1),
             other => panic!("expected IntLit(1), got {:?}", other),
         }
     }
@@ -255,6 +262,8 @@ mod tests {
         assert!(!diag.has_errors());
         let decl: Vec<_> = bag.declarative_atoms().collect();
         assert_eq!(decl.len(), 4);
-        assert!(decl.iter().any(|a| a.kind_class == AtomKindClass::Declarative(DeclarativeKind::JurisdictionTag)));
+        assert!(decl
+            .iter()
+            .any(|a| a.kind_class == AtomKindClass::Declarative(DeclarativeKind::JurisdictionTag)));
     }
 }

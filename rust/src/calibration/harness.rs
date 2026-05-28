@@ -7,7 +7,7 @@ use uuid::Uuid;
 
 use crate::api::agent_service::AgentService;
 use crate::api::session::BoundEntity as ApiBoundEntity;
-use crate::calibration::{CalibrationScenario, FixtureStateSnapshot};
+use crate::calibration::types::{CalibrationScenario, FixtureStateSnapshot};
 use crate::dsl_v2::runtime_registry::runtime_registry;
 use crate::sem_reg::abac::ActorContext;
 use crate::session::{BoundEntity, UnifiedSession};
@@ -376,7 +376,7 @@ mod tests {
     use uuid::Uuid;
 
     use super::CalibrationFixtures;
-    use crate::calibration::{CalibrationExecutionShape, CalibrationScenario, GovernanceStatus};
+    use crate::calibration::types::{CalibrationExecutionShape, CalibrationScenario, GovernanceStatus};
     use crate::session::UnifiedSession;
     use crate::traceability::{SurfaceVersions, TraceKind, TraceOutcome, UtteranceTraceRecord};
 

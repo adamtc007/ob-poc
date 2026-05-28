@@ -158,7 +158,7 @@ impl VerbExecutionPort for ObPocVerbExecutor {
         if let Some(ref ops) = self.sem_os_ops {
             if let Some(op) = ops.get(verb_fqn) {
                 use crate::sequencer_tx::PgTransactionScope;
-                use dsl_runtime::tx::TransactionScope;
+                use dsl_runtime::TransactionScope;
 
                 ctx.services = self.executor.service_registry();
 

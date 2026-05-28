@@ -199,7 +199,7 @@ mod tests {
     use uuid::Uuid;
 
     use super::{generate_proposed_gaps, generate_suggested_clarifications};
-    use crate::calibration::{
+    use crate::calibration::types::{
         CalibrationExecutionShape, CalibrationMode, CalibrationOutcome, CalibrationScenario,
         CalibrationVerdict, ConfusionRisk, ExpectedOutcome, GovernanceStatus, NearNeighbourVerb,
     };

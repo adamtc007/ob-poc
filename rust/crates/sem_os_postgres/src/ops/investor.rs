@@ -15,10 +15,10 @@ use async_trait::async_trait;
 use serde_json::Value;
 use uuid::Uuid;
 
-use dsl_runtime::domain_ops::helpers::{
+use dsl_runtime::{
     json_extract_string, json_extract_string_opt, json_extract_uuid, json_extract_uuid_opt,
 };
-use dsl_runtime::tx::TransactionScope;
+use dsl_runtime::TransactionScope;
 use dsl_runtime::{VerbExecutionContext, VerbExecutionOutcome};
 
 use super::SemOsVerbOp;
@@ -86,7 +86,7 @@ impl SemOsVerbOp for StartKyc {
         .fetch_one(scope.executor())
         .await?;
         // Phase C.3 rollout: investor KYC lifecycle advance.
-        dsl_runtime::domain_ops::helpers::emit_pending_state_advance(
+        dsl_runtime::emit_pending_state_advance(
             ctx,
             investor_id,
             "investor:kyc-in-progress",
@@ -130,7 +130,7 @@ impl SemOsVerbOp for ApproveKyc {
         .bind(&notes)
         .fetch_one(scope.executor())
         .await?;
-        dsl_runtime::domain_ops::helpers::emit_pending_state_advance(
+        dsl_runtime::emit_pending_state_advance(
             ctx,
             investor_id,
             "investor:kyc-approved",
@@ -173,7 +173,7 @@ impl SemOsVerbOp for RejectKyc {
         .bind(&notes)
         .fetch_one(scope.executor())
         .await?;
-        dsl_runtime::domain_ops::helpers::emit_pending_state_advance(
+        dsl_runtime::emit_pending_state_advance(
             ctx,
             investor_id,
             "investor:rejected",
@@ -215,7 +215,7 @@ impl SemOsVerbOp for MarkEligible {
         .bind(&notes)
         .fetch_one(scope.executor())
         .await?;
-        dsl_runtime::domain_ops::helpers::emit_pending_state_advance(
+        dsl_runtime::emit_pending_state_advance(
             ctx,
             investor_id,
             "investor:eligible-to-subscribe",
@@ -264,7 +264,7 @@ impl SemOsVerbOp for RecordSubscription {
                 .execute(scope.executor())
                 .await?;
         }
-        dsl_runtime::domain_ops::helpers::emit_pending_state_advance(
+        dsl_runtime::emit_pending_state_advance(
             ctx,
             investor_id,
             "investor:subscribed",
@@ -303,7 +303,7 @@ impl SemOsVerbOp for Activate {
         .bind(&notes)
         .fetch_one(scope.executor())
         .await?;
-        dsl_runtime::domain_ops::helpers::emit_pending_state_advance(
+        dsl_runtime::emit_pending_state_advance(
             ctx,
             investor_id,
             "investor:active-holder",
@@ -345,7 +345,7 @@ impl SemOsVerbOp for StartRedemption {
         .bind(&notes)
         .fetch_one(scope.executor())
         .await?;
-        dsl_runtime::domain_ops::helpers::emit_pending_state_advance(
+        dsl_runtime::emit_pending_state_advance(
             ctx,
             investor_id,
             "investor:redeeming",
@@ -393,7 +393,7 @@ impl SemOsVerbOp for CompleteRedemption {
         .bind(investor_id)
         .execute(scope.executor())
         .await?;
-        dsl_runtime::domain_ops::helpers::emit_pending_state_advance(
+        dsl_runtime::emit_pending_state_advance(
             ctx,
             investor_id,
             "investor:offboarded",
@@ -443,7 +443,7 @@ impl SemOsVerbOp for Offboard {
         .bind(investor_id)
         .execute(scope.executor())
         .await?;
-        dsl_runtime::domain_ops::helpers::emit_pending_state_advance(
+        dsl_runtime::emit_pending_state_advance(
             ctx,
             investor_id,
             "investor:offboarded",
@@ -497,7 +497,7 @@ impl SemOsVerbOp for Suspend {
         .bind(&notes)
         .fetch_one(scope.executor())
         .await?;
-        dsl_runtime::domain_ops::helpers::emit_pending_state_advance(
+        dsl_runtime::emit_pending_state_advance(
             ctx,
             investor_id,
             "investor:suspended",
@@ -553,7 +553,7 @@ impl SemOsVerbOp for Reinstate {
         .fetch_one(scope.executor())
         .await?;
         let to_node = format!("investor:{}", pre_state.to_lowercase().replace('_', "-"));
-        dsl_runtime::domain_ops::helpers::emit_pending_state_advance(
+        dsl_runtime::emit_pending_state_advance(
             ctx,
             investor_id,
             &to_node,

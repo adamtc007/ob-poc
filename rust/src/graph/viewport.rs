@@ -14,7 +14,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 use uuid::Uuid;
 
-use super::EntityGraph;
+use crate::graph::types::EntityGraph;
 
 // =============================================================================
 // RESPONSIVE BREAKPOINTS

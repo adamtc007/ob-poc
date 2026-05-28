@@ -31,11 +31,11 @@ use sqlx::Row;
 use std::collections::HashMap;
 use uuid::Uuid;
 
-use dsl_runtime::domain_ops::helpers::{
+use dsl_runtime::{
     self, json_extract_int, json_extract_string, json_extract_string_opt, json_extract_uuid,
     json_extract_uuid_opt, json_get_required_uuid,
 };
-use dsl_runtime::tx::TransactionScope;
+use dsl_runtime::TransactionScope;
 use dsl_runtime::{VerbExecutionContext, VerbExecutionOutcome};
 
 use super::SemOsVerbOp;
@@ -200,16 +200,16 @@ impl SemOsVerbOp for Transfer {
         .fetch_one(scope.executor())
         .await?;
 
-        helpers::emit_pending_state_advance_batch(
+        dsl_runtime::emit_pending_state_advance_batch(
             ctx,
             &[
-                helpers::StateTransitionInput {
+                dsl_runtime::StateTransitionInput {
                     entity_id: from_entity_id,
                     to_node: "capital:transferred_out",
                     slot_path: "capital/holdings",
                     reason: "capital.transfer (source)",
                 },
-                helpers::StateTransitionInput {
+                dsl_runtime::StateTransitionInput {
                     entity_id: to_entity_id,
                     to_node: "capital:transferred_in",
                     slot_path: "capital/holdings",
@@ -478,7 +478,7 @@ impl SemOsVerbOp for IssueShares {
         .execute(scope.executor())
         .await?;
 
-        helpers::emit_pending_state_advance(
+        dsl_runtime::emit_pending_state_advance(
             ctx,
             share_class_id,
             "capital:issued",
@@ -555,7 +555,7 @@ impl SemOsVerbOp for CancelShares {
         .execute(scope.executor())
         .await?;
 
-        helpers::emit_pending_state_advance(
+        dsl_runtime::emit_pending_state_advance(
             ctx,
             share_class_id,
             "capital:cancelled",
@@ -663,7 +663,7 @@ impl SemOsVerbOp for ShareClassCreate {
         .execute(scope.executor())
         .await?;
 
-        helpers::emit_pending_state_advance(
+        dsl_runtime::emit_pending_state_advance(
             ctx,
             issuer_entity_id,
             "capital:share_class_created",
@@ -815,7 +815,7 @@ impl SemOsVerbOp for IssueInitial {
             .execute(scope.executor())
             .await?;
 
-        helpers::emit_pending_state_advance(
+        dsl_runtime::emit_pending_state_advance(
             ctx,
             issuer_entity_id,
             "capital:issue_initial",
@@ -913,7 +913,7 @@ impl SemOsVerbOp for IssueNew {
         .execute(scope.executor())
         .await?;
 
-        helpers::emit_pending_state_advance(
+        dsl_runtime::emit_pending_state_advance(
             ctx,
             issuer_entity_id,
             "capital:issue_new",
@@ -1089,7 +1089,7 @@ impl SemOsVerbOp for Split {
         .execute(scope.executor())
         .await?;
 
-        helpers::emit_pending_state_advance(
+        dsl_runtime::emit_pending_state_advance(
             ctx,
             issuer_entity_id,
             "capital:split_executed",
@@ -1175,7 +1175,7 @@ impl SemOsVerbOp for Buyback {
         .execute(scope.executor())
         .await?;
 
-        helpers::emit_pending_state_advance(
+        dsl_runtime::emit_pending_state_advance(
             ctx,
             issuer_entity_id,
             "capital:treasury_acquired",
@@ -1256,7 +1256,7 @@ impl SemOsVerbOp for Cancel {
         .execute(scope.executor())
         .await?;
 
-        helpers::emit_pending_state_advance(
+        dsl_runtime::emit_pending_state_advance(
             ctx,
             issuer_entity_id,
             "capital:issued_cancelled",

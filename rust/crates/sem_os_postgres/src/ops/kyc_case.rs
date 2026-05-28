@@ -27,11 +27,11 @@ use serde_json::{json, Value};
 use sqlx::types::BigDecimal;
 use uuid::Uuid;
 
-use dsl_runtime::domain_ops::helpers::{
+use dsl_runtime::{
     json_extract_string, json_extract_string_opt, json_extract_uuid, json_extract_uuid_opt,
 };
-use dsl_runtime::service_traits::LifecycleCatalog;
-use dsl_runtime::tx::TransactionScope;
+use dsl_runtime::LifecycleCatalog;
+use dsl_runtime::TransactionScope;
 use dsl_runtime::{VerbExecutionContext, VerbExecutionOutcome};
 
 use super::SemOsVerbOp;
@@ -162,7 +162,7 @@ impl SemOsVerbOp for Create {
         // kyc-case.create is not idempotent (every call creates a
         // fresh case_id), so every successful execution is a genuine
         // state transition.
-        dsl_runtime::domain_ops::helpers::emit_pending_state_advance(
+        dsl_runtime::emit_pending_state_advance(
             ctx,
             case_id,
             "kyc-case:intake",
@@ -266,7 +266,7 @@ impl SemOsVerbOp for UpdateStatus {
             "kyc-case.update-status — {} → {}",
             current_status, requested_status
         );
-        dsl_runtime::domain_ops::helpers::emit_pending_state_advance(
+        dsl_runtime::emit_pending_state_advance(
             ctx,
             case_id,
             &to_node,
@@ -374,7 +374,7 @@ impl SemOsVerbOp for Close {
             "kyc-case.close — REVIEW → {} (deal_gate_updated={})",
             status, deal_gate_updated
         );
-        dsl_runtime::domain_ops::helpers::emit_pending_state_advance(
+        dsl_runtime::emit_pending_state_advance(
             ctx,
             case_id,
             &to_node,
@@ -479,7 +479,7 @@ async fn close_with_status(
         "{} — REVIEW → {} (deal_gate_updated={})",
         fqn, target_status, deal_gate_updated
     );
-    dsl_runtime::domain_ops::helpers::emit_pending_state_advance(
+    dsl_runtime::emit_pending_state_advance(
         ctx,
         case_id,
         &to_node,
@@ -610,7 +610,7 @@ impl SemOsVerbOp for Escalate {
             return Err(anyhow!("KYC case not found: {}", case_id));
         }
 
-        dsl_runtime::domain_ops::helpers::emit_pending_state_advance(
+        dsl_runtime::emit_pending_state_advance(
             ctx,
             case_id,
             "kyc-case:escalated",

@@ -299,11 +299,17 @@ fn eval_top1_accuracy_embedding_only() {
     let mut results: Vec<(&str, &str, String, bool, bool)> = Vec::new();
 
     for case in EVAL_SET {
-        let candidates =
-            match_packs_embedding_only(case.utterance, &context, &registry, &embedder);
+        let candidates = match_packs_embedding_only(case.utterance, &context, &registry, &embedder);
 
-        let top1_name = candidates.first().map(|c| c.pack_name.as_str()).unwrap_or("");
-        let top3_names: Vec<&str> = candidates.iter().take(3).map(|c| c.pack_name.as_str()).collect();
+        let top1_name = candidates
+            .first()
+            .map(|c| c.pack_name.as_str())
+            .unwrap_or("");
+        let top3_names: Vec<&str> = candidates
+            .iter()
+            .take(3)
+            .map(|c| c.pack_name.as_str())
+            .collect();
 
         let hit1 = top1_name == case.expected_pack;
         let hit3 = top3_names.contains(&case.expected_pack);
@@ -314,7 +320,13 @@ fn eval_top1_accuracy_embedding_only() {
         if hit3 {
             top3_correct += 1;
         }
-        results.push((case.utterance, case.expected_pack, top1_name.to_string(), hit1, hit3));
+        results.push((
+            case.utterance,
+            case.expected_pack,
+            top1_name.to_string(),
+            hit1,
+            hit3,
+        ));
     }
 
     let n = EVAL_SET.len();
@@ -324,7 +336,13 @@ fn eval_top1_accuracy_embedding_only() {
     // Print report
     println!("\n=== Pack Matching Evaluation (embedding-only, BagOfWords) ===");
     for (utt, expected, got, hit1, hit3) in &results {
-        let marker = if *hit1 { "T1+" } else if *hit3 { "T3+" } else { " ✗ " };
+        let marker = if *hit1 {
+            "T1+"
+        } else if *hit3 {
+            "T3+"
+        } else {
+            " ✗ "
+        };
         let preview = &utt[..60.min(utt.len())];
         println!(
             "  {} | expected={:<36} | got={:<36} | {}",
@@ -343,12 +361,8 @@ fn eval_top1_accuracy_embedding_only() {
         n,
         top3_acc * 100.0
     );
-    println!(
-        "\nNote: BagOfWords baseline target is ≥ 50% top-1 / ≥ 70% top-3."
-    );
-    println!(
-        "      BGE-small-en-v1.5 embeddings will push this to ≥ 80% / ≥ 95% per §1.7."
-    );
+    println!("\nNote: BagOfWords baseline target is ≥ 50% top-1 / ≥ 70% top-3.");
+    println!("      BGE-small-en-v1.5 embeddings will push this to ≥ 80% / ≥ 95% per §1.7.");
 
     assert!(
         top1_acc >= 0.50,
@@ -390,9 +404,16 @@ async fn async_match_packs_with_mock_llm() {
 
     // conjunctive-gate should rank highly for this utterance
     assert!(
-        result.iter().take(3).any(|c| c.pack_name == "conjunctive-gate"),
+        result
+            .iter()
+            .take(3)
+            .any(|c| c.pack_name == "conjunctive-gate"),
         "conjunctive-gate should be in top-3, got: {:?}",
-        result.iter().take(3).map(|c| &c.pack_name).collect::<Vec<_>>()
+        result
+            .iter()
+            .take(3)
+            .map(|c| &c.pack_name)
+            .collect::<Vec<_>>()
     );
 
     // All candidates have valid confidence in [0, 1]
@@ -432,9 +453,16 @@ async fn async_match_packs_no_llm() {
 
     // parallel-evaluation-with-veto should appear in top-3
     assert!(
-        result.iter().take(3).any(|c| c.pack_name == "parallel-evaluation-with-veto"),
+        result
+            .iter()
+            .take(3)
+            .any(|c| c.pack_name == "parallel-evaluation-with-veto"),
         "parallel-evaluation-with-veto should be in top-3, got: {:?}",
-        result.iter().take(3).map(|c| &c.pack_name).collect::<Vec<_>>()
+        result
+            .iter()
+            .take(3)
+            .map(|c| &c.pack_name)
+            .collect::<Vec<_>>()
     );
 }
 

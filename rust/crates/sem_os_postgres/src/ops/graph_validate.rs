@@ -24,8 +24,8 @@ use serde_json::Value;
 use std::collections::{HashMap, HashSet};
 use uuid::Uuid;
 
-use dsl_runtime::domain_ops::helpers::json_extract_uuid_opt;
-use dsl_runtime::tx::TransactionScope;
+use dsl_runtime::json_extract_uuid_opt;
+use dsl_runtime::TransactionScope;
 use dsl_runtime::{VerbExecutionContext, VerbExecutionOutcome};
 
 use super::SemOsVerbOp;

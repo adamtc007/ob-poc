@@ -15,11 +15,11 @@ use sem_os_postgres::ops::SemOsVerbOp;
 use serde_json::json;
 use uuid::Uuid;
 
-use dsl_runtime::domain_ops::helpers::{
+use dsl_runtime::{
     json_extract_bool_opt, json_extract_int_opt, json_extract_string, json_extract_string_opt,
     json_extract_uuid, json_extract_uuid_opt,
 };
-use dsl_runtime::tx::TransactionScope;
+use dsl_runtime::TransactionScope;
 use dsl_runtime::{VerbExecutionContext, VerbExecutionOutcome};
 
 #[cfg(feature = "database")]
@@ -31,7 +31,7 @@ use sqlx::PgPool;
 
 /// Linked IDs derived from a subject
 #[derive(Debug, Default)]
-pub struct LinkedIds {
+pub(super) struct LinkedIds {
     pub workstream_id: Option<Uuid>,
     pub case_id: Option<Uuid>,
     pub cbu_id: Option<Uuid>,
@@ -43,7 +43,7 @@ pub struct LinkedIds {
 // ═══════════════════════════════════════════════════════════════════════════════
 
 /// Create an outstanding request (generic)
-pub struct RequestCreate;
+pub(super) struct RequestCreate;
 
 #[async_trait]
 impl SemOsVerbOp for RequestCreate {
@@ -227,7 +227,7 @@ impl SemOsVerbOp for RequestCreate {
 // ═══════════════════════════════════════════════════════════════════════════════
 
 /// List overdue requests
-pub struct RequestOverdue;
+pub(super) struct RequestOverdue;
 
 #[async_trait]
 impl SemOsVerbOp for RequestOverdue {
@@ -321,7 +321,7 @@ impl SemOsVerbOp for RequestOverdue {
 // ═══════════════════════════════════════════════════════════════════════════════
 
 /// Mark request as fulfilled
-pub struct RequestFulfill;
+pub(super) struct RequestFulfill;
 
 #[async_trait]
 impl SemOsVerbOp for RequestFulfill {
@@ -396,7 +396,7 @@ impl SemOsVerbOp for RequestFulfill {
 // ═══════════════════════════════════════════════════════════════════════════════
 
 /// Cancel a pending request
-pub struct RequestCancel;
+pub(super) struct RequestCancel;
 
 #[async_trait]
 impl SemOsVerbOp for RequestCancel {
@@ -464,7 +464,7 @@ impl SemOsVerbOp for RequestCancel {
 // ═══════════════════════════════════════════════════════════════════════════════
 
 /// Extend request due date
-pub struct RequestExtend;
+pub(super) struct RequestExtend;
 
 #[async_trait]
 impl SemOsVerbOp for RequestExtend {
@@ -580,7 +580,7 @@ impl SemOsVerbOp for RequestExtend {
 // ═══════════════════════════════════════════════════════════════════════════════
 
 /// Send reminder for pending request
-pub struct RequestRemind;
+pub(super) struct RequestRemind;
 
 #[async_trait]
 impl SemOsVerbOp for RequestRemind {
@@ -666,7 +666,7 @@ impl SemOsVerbOp for RequestRemind {
 // ═══════════════════════════════════════════════════════════════════════════════
 
 /// Escalate overdue request
-pub struct RequestEscalate;
+pub(super) struct RequestEscalate;
 
 #[async_trait]
 impl SemOsVerbOp for RequestEscalate {
@@ -742,7 +742,7 @@ impl SemOsVerbOp for RequestEscalate {
 // ═══════════════════════════════════════════════════════════════════════════════
 
 /// Waive a request requirement
-pub struct RequestWaive;
+pub(super) struct RequestWaive;
 
 #[async_trait]
 impl SemOsVerbOp for RequestWaive {

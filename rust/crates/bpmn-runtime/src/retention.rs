@@ -31,7 +31,8 @@ impl Default for RetentionPolicy {
 
 /// Instances and entry counts identified as archivable under a given policy.
 #[derive(Debug, Clone)]
-pub struct RetentionCandidates {
+#[allow(dead_code)]
+pub(crate) struct RetentionCandidates {
     /// Instance IDs eligible for archival.
     pub instance_ids: Vec<InstanceId>,
     /// Total number of log entries across all candidate instances.

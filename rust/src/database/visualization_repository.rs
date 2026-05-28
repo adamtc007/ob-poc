@@ -5,7 +5,7 @@
 //!
 //! This enables database portability (e.g., Postgres → Oracle migration).
 
-use crate::graph::{NodeOffset, NodeSizeOverride};
+use crate::graph::types::{NodeOffset, NodeSizeOverride};
 use anyhow::Result;
 use sqlx::types::Json;
 use sqlx::PgPool;

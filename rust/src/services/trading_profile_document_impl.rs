@@ -1,4 +1,4 @@
-//! ob-poc impl of [`dsl_runtime::service_traits::TradingProfileDocument`].
+//! ob-poc impl of [`TradingProfileDocument`].
 //!
 //! Bridges the plane-crossing trait (defined in `dsl-runtime`) to
 //! [`crate::trading_profile::ast_db`]'s `load_document` /
@@ -12,7 +12,7 @@ use ob_poc_types::trading_matrix::TradingMatrixDocument;
 use sqlx::PgPool;
 use uuid::Uuid;
 
-use dsl_runtime::service_traits::TradingProfileDocument;
+use dsl_runtime::TradingProfileDocument;
 
 use crate::trading_profile::ast_db;
 

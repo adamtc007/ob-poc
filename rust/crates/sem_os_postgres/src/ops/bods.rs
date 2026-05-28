@@ -3,7 +3,7 @@
 //! plugin subset of `rust/config/verbs/bods.yaml`.
 //!
 //! - `discover-ubos` / `sync-from-gleif` — delegate to
-//!   `dsl_runtime::bods::UboDiscoveryService` (transitional
+//!   `dsl_runtime::UboDiscoveryService` (transitional
 //!   `Arc<PgPool>` clone; service still takes a pool).
 //! - `get-statement` / `find-by-lei` / `list-ownership` —
 //!   direct sqlx against the 3 BODS statement tables.
@@ -17,12 +17,12 @@ use async_trait::async_trait;
 use serde_json::{json, Value};
 use uuid::Uuid;
 
-use dsl_runtime::bods::UboDiscoveryService;
-use dsl_runtime::domain_ops::helpers::{
+use dsl_runtime::UboDiscoveryService;
+use dsl_runtime::{
     json_extract_bool_opt, json_extract_int_opt, json_extract_string, json_extract_string_opt,
     json_extract_uuid, json_extract_uuid_opt,
 };
-use dsl_runtime::tx::TransactionScope;
+use dsl_runtime::TransactionScope;
 use dsl_runtime::{VerbExecutionContext, VerbExecutionOutcome};
 
 use super::SemOsVerbOp;

@@ -11,7 +11,7 @@
 //!
 //! Run: cargo test -p dsl-runtime --features harness --test cross_workspace_dag_live_scenarios
 
-use dsl_runtime::cross_workspace::test_harness::LiveScenarioRunner;
+use dsl_runtime::LiveScenarioRunner;
 use sqlx::PgPool;
 
 macro_rules! live_scenario_test {

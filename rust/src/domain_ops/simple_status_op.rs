@@ -27,22 +27,22 @@ use sem_os_postgres::ops::SemOsVerbOp;
 use sqlx::types::chrono::Utc;
 use uuid::Uuid;
 
-use dsl_runtime::domain_ops::helpers::json_extract_uuid;
-use dsl_runtime::tx::TransactionScope;
+use dsl_runtime::json_extract_uuid;
+use dsl_runtime::TransactionScope;
 use dsl_runtime::{VerbExecutionContext, VerbExecutionOutcome};
 
 /// Optional companion column (timestamp) to set alongside the status.
 /// Most state-machines have a `<state>_at` column tracking when the
 /// transition occurred (e.g. `suspended_at`, `approved_at`).
 #[derive(Debug, Clone)]
-pub struct TimestampColumn {
+pub(super) struct TimestampColumn {
     /// Column name to set to `now()`.
     pub column: &'static str,
 }
 
 /// Configuration for a single status-flip verb.
 #[derive(Debug, Clone)]
-pub struct SimpleStatusConfig {
+pub(super) struct SimpleStatusConfig {
     /// Verb FQN, e.g. `"cbu.suspend"`.
     pub fqn: &'static str,
     /// Table name (no schema prefix; the engine adds `"ob-poc"`).
@@ -60,12 +60,12 @@ pub struct SimpleStatusConfig {
 }
 
 /// Generic SemOsVerbOp that performs a status flip per [`SimpleStatusConfig`].
-pub struct SimpleStatusOp {
+pub(super) struct SimpleStatusOp {
     cfg: SimpleStatusConfig,
 }
 
 impl SimpleStatusOp {
-    pub fn new(cfg: SimpleStatusConfig) -> Self {
+    pub(super) fn new(cfg: SimpleStatusConfig) -> Self {
         Self { cfg }
     }
 }
@@ -120,7 +120,7 @@ impl SemOsVerbOp for SimpleStatusOp {
 /// Registration table — one row per status-flip verb. Add new verbs by
 /// appending to `STATUS_FLIP_VERBS`; the registration helper at the
 /// bottom registers all of them automatically.
-pub const STATUS_FLIP_VERBS: &[SimpleStatusConfig] = &[
+pub(super) const STATUS_FLIP_VERBS: &[SimpleStatusConfig] = &[
     // ── cbu.* ────────────────────────────────────────────────────────────────
     SimpleStatusConfig {
         fqn: "cbu.suspend",
@@ -1048,7 +1048,7 @@ pub const STATUS_FLIP_VERBS: &[SimpleStatusConfig] = &[
 ///
 /// Called from `domain_ops::extend_registry` so it's part of the
 /// startup wiring.
-pub fn register_simple_status_ops(registry: &mut sem_os_postgres::ops::SemOsVerbOpRegistry) {
+pub(super) fn register_simple_status_ops(registry: &mut sem_os_postgres::ops::SemOsVerbOpRegistry) {
     use std::sync::Arc;
     for cfg in STATUS_FLIP_VERBS {
         registry.register(Arc::new(SimpleStatusOp::new(cfg.clone())));

@@ -327,28 +327,13 @@ pub use crate::dsl_v2::executor::{ExecutionContext, ExecutionResult};
 // Phase 5c — lifecycle_ops relocated to `dsl-runtime::domain_ops::lifecycle_ops`.
 // Registration flows through inventory automatically; external ob-poc code doesn't
 // import these types directly.
-pub use onboarding::OnboardingAutoComplete;
+
 // Phase 5c — refdata_loader relocated. Types accessed via dsl_runtime::domain_ops::refdata_loader.
 // Phase 5c — refdata_ops relocated. Types accessed via dsl_runtime::domain_ops::refdata_ops.
-pub use request_ops::{
-    RequestCancel, RequestCreate, RequestEscalate, RequestExtend, RequestFulfill, RequestOverdue,
-    RequestRemind, RequestWaive,
-};
 
 // Phase 5a — semantic_ops relocated to dsl-runtime. Inventory registration
 // automatic; external ob-poc code does not import these types directly.
-pub use template_ops::{TemplateBatch, TemplateBatchResult, TemplateInvoke, TemplateInvokeResult};
 
-pub use trading_profile::{
-    TradingProfileActivate, TradingProfileAddComponent, TradingProfileAddInstrumentClass,
-    TradingProfileAddMarket, TradingProfileApprove, TradingProfileArchive, TradingProfileCloneTo,
-    TradingProfileCreateDraft, TradingProfileCreateNewVersion, TradingProfileDiff,
-    TradingProfileGetActive, TradingProfileImportVerb, TradingProfileLinkCsaSsi,
-    TradingProfileMaterialize, TradingProfileReject, TradingProfileRemoveComponent,
-    TradingProfileRemoveInstrumentClass, TradingProfileRemoveMarket, TradingProfileSetBaseCurrency,
-    TradingProfileSubmit, TradingProfileUpdateImScope, TradingProfileValidateCoverage,
-    TradingProfileValidateGoLiveReady,
-};
 // Phase 5a composite-blocker #11 — trading_profile_ca_ops re-exports removed; see relocation comment above.
 // Phase 5e — ubo_analysis relocated. Types accessed via dsl_runtime::domain_ops::ubo_analysis.
 // Phase 5e — ubo_compute_ops relocated. Types accessed via dsl_runtime::domain_ops::ubo_compute_ops.
@@ -400,10 +385,6 @@ pub use trading_profile::{
 // Phase 5a composite-blocker #28 — service_pipeline_ops re-exports removed; see relocation comment above.
 
 // GLEIF operations (LEI data enrichment)
-pub use gleif_ops::{
-    GleifEnrich, GleifImportManagedFunds, GleifImportToClientGroup, GleifImportTree, GleifLookup,
-    GleifRefresh, GleifResolveSuccessor, GleifSearch, GleifTraceOwnership,
-};
 
 // =============================================================================
 // YAML ↔ OP SANITY CHECK

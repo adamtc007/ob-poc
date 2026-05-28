@@ -340,7 +340,11 @@ pub async fn match_packs(
         }
 
         // Sort by confidence descending
-        result.sort_by(|a, b| b.confidence.partial_cmp(&a.confidence).unwrap_or(std::cmp::Ordering::Equal));
+        result.sort_by(|a, b| {
+            b.confidence
+                .partial_cmp(&a.confidence)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
         result
     } else {
         // Pure embedding path

@@ -1,3 +1,4 @@
+#![allow(unreachable_pub)]
 //! Multi-workspace runbook plan types.
 //!
 //! A `RunbookPlan` sequences work across multiple workspaces, each step

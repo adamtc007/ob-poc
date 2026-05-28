@@ -58,7 +58,7 @@ pub mod visualization_repository;
 // Re-export for convenience
 pub use attribute_values_service::{AttributeValueRow, AttributeValuesService};
 pub use bods_service::BodsService;
-pub use bods_types::{
+pub use ob_poc_bods::{
     BodsEntityType, BodsInterestType, EntityIdentifier, EntityWithLei, GleifHierarchyEntry,
     GleifRelationship, NewEntityIdentifier, NewGleifRelationship, NewPersonPepStatus,
     PersonPepStatus, UboInterest,

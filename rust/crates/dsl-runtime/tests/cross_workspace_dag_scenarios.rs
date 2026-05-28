@@ -7,7 +7,7 @@
 //! Run all: `cargo test -p dsl-runtime --features harness --test cross_workspace_dag_scenarios`
 //! Run one: `cargo test -p dsl-runtime --features harness --test cross_workspace_dag_scenarios deal_contracted`
 
-use dsl_runtime::cross_workspace::test_harness::ScenarioRunner;
+use dsl_runtime::ScenarioRunner;
 
 macro_rules! scenario_test {
     ($name:ident, $path:literal) => {

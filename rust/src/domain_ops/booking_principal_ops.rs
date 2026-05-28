@@ -23,12 +23,11 @@ use sem_os_postgres::ops::SemOsVerbOp;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
-use dsl_runtime::domain_ops::helpers::{
+use dsl_runtime::{
     json_extract_bool_opt, json_extract_int_opt, json_extract_string, json_extract_string_opt,
-    json_extract_uuid, json_extract_uuid_opt,
+    json_extract_uuid, json_extract_uuid_opt, TransactionScope, VerbExecutionContext,
+    VerbExecutionOutcome,
 };
-use dsl_runtime::tx::TransactionScope;
-use dsl_runtime::{VerbExecutionContext, VerbExecutionOutcome};
 
 use crate::api::booking_principal_types::*;
 
@@ -42,71 +41,71 @@ use crate::domain_ops::rule_evaluator;
 // =============================================================================
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct LegalEntityCreateResult {
+pub(super) struct LegalEntityCreateResult {
     pub legal_entity_id: Uuid,
     pub name: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct BookingLocationCreateResult {
+pub(super) struct BookingLocationCreateResult {
     pub booking_location_id: Uuid,
     pub country_code: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct BookingPrincipalCreateResult {
+pub(super) struct BookingPrincipalCreateResult {
     pub booking_principal_id: Uuid,
     pub principal_code: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct BookingPrincipalRetireResult {
+pub(super) struct BookingPrincipalRetireResult {
     pub booking_principal_id: Uuid,
     pub active_relationships: i64,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ServiceAvailabilitySetResult {
+pub(super) struct ServiceAvailabilitySetResult {
     pub service_availability_id: Uuid,
     pub booking_principal_id: Uuid,
     pub service_id: Uuid,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct RelationshipRecordResult {
+pub(super) struct RelationshipRecordResult {
     pub relationship_id: Uuid,
     pub client_group_id: Uuid,
     pub booking_principal_id: Uuid,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct RulesetCreateResult {
+pub(super) struct RulesetCreateResult {
     pub ruleset_id: Uuid,
     pub name: String,
     pub status: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct RuleAddResult {
+pub(super) struct RuleAddResult {
     pub rule_id: Uuid,
     pub ruleset_id: Uuid,
     pub name: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ContractPackCreateResult {
+pub(super) struct ContractPackCreateResult {
     pub contract_pack_id: Uuid,
     pub code: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ContractTemplateAddResult {
+pub(super) struct ContractTemplateAddResult {
     pub contract_template_id: Uuid,
     pub contract_pack_id: Uuid,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct CrossSellResult {
+pub(super) struct CrossSellResult {
     pub client_group_id: Uuid,
     pub existing_offerings: Vec<String>,
     pub potential_offerings: Vec<String>,
@@ -118,7 +117,7 @@ pub struct CrossSellResult {
 // =============================================================================
 
 /// Create a new BNY legal entity
-pub struct LegalEntityCreate;
+pub(super) struct LegalEntityCreate;
 
 #[async_trait]
 impl SemOsVerbOp for LegalEntityCreate {
@@ -155,7 +154,7 @@ impl SemOsVerbOp for LegalEntityCreate {
 }
 
 /// Update an existing legal entity
-pub struct LegalEntityUpdate;
+pub(super) struct LegalEntityUpdate;
 
 #[async_trait]
 impl SemOsVerbOp for LegalEntityUpdate {
@@ -217,7 +216,7 @@ impl SemOsVerbOp for LegalEntityUpdate {
 }
 
 /// List active legal entities
-pub struct LegalEntityList;
+pub(super) struct LegalEntityList;
 
 #[async_trait]
 impl SemOsVerbOp for LegalEntityList {
@@ -245,7 +244,7 @@ impl SemOsVerbOp for LegalEntityList {
 // =============================================================================
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct RuleFieldRegisterResult {
+pub(super) struct RuleFieldRegisterResult {
     pub field_key: String,
     pub field_type: String,
     pub description: Option<String>,
@@ -253,7 +252,7 @@ pub struct RuleFieldRegisterResult {
 }
 
 /// Register a new field in the rule field dictionary
-pub struct RuleFieldRegister;
+pub(super) struct RuleFieldRegister;
 
 #[async_trait]
 impl SemOsVerbOp for RuleFieldRegister {
@@ -302,7 +301,7 @@ impl SemOsVerbOp for RuleFieldRegister {
 }
 
 /// List all registered fields in the rule field dictionary
-pub struct RuleFieldList;
+pub(super) struct RuleFieldList;
 
 #[async_trait]
 impl SemOsVerbOp for RuleFieldList {
@@ -330,7 +329,7 @@ impl SemOsVerbOp for RuleFieldList {
 // =============================================================================
 
 /// Create a new booking location
-pub struct BookingLocationCreate;
+pub(super) struct BookingLocationCreate;
 
 #[async_trait]
 impl SemOsVerbOp for BookingLocationCreate {
@@ -376,7 +375,7 @@ impl SemOsVerbOp for BookingLocationCreate {
 }
 
 /// Update a booking location
-pub struct BookingLocationUpdate;
+pub(super) struct BookingLocationUpdate;
 
 #[async_trait]
 impl SemOsVerbOp for BookingLocationUpdate {
@@ -419,7 +418,7 @@ impl SemOsVerbOp for BookingLocationUpdate {
 }
 
 /// List booking locations
-pub struct BookingLocationList;
+pub(super) struct BookingLocationList;
 
 #[async_trait]
 impl SemOsVerbOp for BookingLocationList {
@@ -472,7 +471,7 @@ impl SemOsVerbOp for BookingLocationList {
 // =============================================================================
 
 /// Create a new booking principal (LE + location envelope)
-pub struct BookingPrincipalCreate;
+pub(super) struct BookingPrincipalCreate;
 
 #[async_trait]
 impl SemOsVerbOp for BookingPrincipalCreate {
@@ -509,7 +508,7 @@ impl SemOsVerbOp for BookingPrincipalCreate {
 }
 
 /// Update a booking principal
-pub struct BookingPrincipalUpdate;
+pub(super) struct BookingPrincipalUpdate;
 
 #[async_trait]
 impl SemOsVerbOp for BookingPrincipalUpdate {
@@ -552,7 +551,7 @@ impl SemOsVerbOp for BookingPrincipalUpdate {
 }
 
 /// Retire a booking principal (with active relationship check)
-pub struct BookingPrincipalRetire;
+pub(super) struct BookingPrincipalRetire;
 
 #[async_trait]
 impl SemOsVerbOp for BookingPrincipalRetire {
@@ -591,7 +590,7 @@ impl SemOsVerbOp for BookingPrincipalRetire {
 // =============================================================================
 
 /// Primary eligibility evaluation pipeline
-pub struct BookingPrincipalEvaluate;
+pub(super) struct BookingPrincipalEvaluate;
 
 #[async_trait]
 impl SemOsVerbOp for BookingPrincipalEvaluate {
@@ -874,7 +873,7 @@ impl SemOsVerbOp for BookingPrincipalEvaluate {
 }
 
 /// Record selection of a principal from an evaluation
-pub struct BookingPrincipalSelect;
+pub(super) struct BookingPrincipalSelect;
 
 #[async_trait]
 impl SemOsVerbOp for BookingPrincipalSelect {
@@ -917,7 +916,7 @@ impl SemOsVerbOp for BookingPrincipalSelect {
 }
 
 /// Retrieve full explain payload for an evaluation
-pub struct BookingPrincipalExplain;
+pub(super) struct BookingPrincipalExplain;
 
 #[async_trait]
 impl SemOsVerbOp for BookingPrincipalExplain {
@@ -946,7 +945,7 @@ impl SemOsVerbOp for BookingPrincipalExplain {
 // =============================================================================
 
 /// Record a new client-principal-offering relationship
-pub struct ClientPrincipalRelationshipRecord;
+pub(super) struct ClientPrincipalRelationshipRecord;
 
 #[async_trait]
 impl SemOsVerbOp for ClientPrincipalRelationshipRecord {
@@ -984,7 +983,7 @@ impl SemOsVerbOp for ClientPrincipalRelationshipRecord {
 }
 
 /// Terminate a client-principal relationship
-pub struct ClientPrincipalRelationshipTerminate;
+pub(super) struct ClientPrincipalRelationshipTerminate;
 
 #[async_trait]
 impl SemOsVerbOp for ClientPrincipalRelationshipTerminate {
@@ -1008,7 +1007,7 @@ impl SemOsVerbOp for ClientPrincipalRelationshipTerminate {
 }
 
 /// List relationships for a client group
-pub struct ClientPrincipalRelationshipList;
+pub(super) struct ClientPrincipalRelationshipList;
 
 #[async_trait]
 impl SemOsVerbOp for ClientPrincipalRelationshipList {
@@ -1042,7 +1041,7 @@ impl SemOsVerbOp for ClientPrincipalRelationshipList {
 }
 
 /// Cross-sell check: what other offerings could this client use?
-pub struct ClientPrincipalRelationshipCrossSellCheck;
+pub(super) struct ClientPrincipalRelationshipCrossSellCheck;
 
 #[async_trait]
 impl SemOsVerbOp for ClientPrincipalRelationshipCrossSellCheck {
@@ -1102,7 +1101,7 @@ impl SemOsVerbOp for ClientPrincipalRelationshipCrossSellCheck {
 // =============================================================================
 
 /// Set three-lane service availability for a principal x service
-pub struct ServiceAvailabilitySet;
+pub(super) struct ServiceAvailabilitySet;
 
 #[async_trait]
 impl SemOsVerbOp for ServiceAvailabilitySet {
@@ -1149,7 +1148,7 @@ impl SemOsVerbOp for ServiceAvailabilitySet {
 }
 
 /// List service availability for a booking principal
-pub struct ServiceAvailabilityList;
+pub(super) struct ServiceAvailabilityList;
 
 #[async_trait]
 impl SemOsVerbOp for ServiceAvailabilityList {
@@ -1181,7 +1180,7 @@ impl SemOsVerbOp for ServiceAvailabilityList {
 }
 
 /// List service availability by principal (alias for list)
-pub struct ServiceAvailabilityListByPrincipal;
+pub(super) struct ServiceAvailabilityListByPrincipal;
 
 #[async_trait]
 impl SemOsVerbOp for ServiceAvailabilityListByPrincipal {
@@ -1217,7 +1216,7 @@ impl SemOsVerbOp for ServiceAvailabilityListByPrincipal {
 // =============================================================================
 
 /// Create a new ruleset (starts in draft status)
-pub struct RulesetCreate;
+pub(super) struct RulesetCreate;
 
 #[async_trait]
 impl SemOsVerbOp for RulesetCreate {
@@ -1273,7 +1272,7 @@ impl SemOsVerbOp for RulesetCreate {
 }
 
 /// Publish a ruleset (draft → active, with field dictionary validation)
-pub struct RulesetPublish;
+pub(super) struct RulesetPublish;
 
 #[async_trait]
 impl SemOsVerbOp for RulesetPublish {
@@ -1348,7 +1347,7 @@ impl SemOsVerbOp for RulesetPublish {
 }
 
 /// Retire an active ruleset
-pub struct RulesetRetire;
+pub(super) struct RulesetRetire;
 
 #[async_trait]
 impl SemOsVerbOp for RulesetRetire {
@@ -1379,7 +1378,7 @@ impl SemOsVerbOp for RulesetRetire {
 // =============================================================================
 
 /// Add a rule to a ruleset
-pub struct RuleAdd;
+pub(super) struct RuleAdd;
 
 #[async_trait]
 impl SemOsVerbOp for RuleAdd {
@@ -1437,7 +1436,7 @@ impl SemOsVerbOp for RuleAdd {
 }
 
 /// Update an existing rule
-pub struct RuleUpdate;
+pub(super) struct RuleUpdate;
 
 #[async_trait]
 impl SemOsVerbOp for RuleUpdate {
@@ -1526,7 +1525,7 @@ impl SemOsVerbOp for RuleUpdate {
 }
 
 /// Disable a rule (soft delete)
-pub struct RuleDisable;
+pub(super) struct RuleDisable;
 
 #[async_trait]
 impl SemOsVerbOp for RuleDisable {
@@ -1562,7 +1561,7 @@ impl SemOsVerbOp for RuleDisable {
 // =============================================================================
 
 /// Create a new contract pack
-pub struct ContractPackCreate;
+pub(super) struct ContractPackCreate;
 
 #[async_trait]
 impl SemOsVerbOp for ContractPackCreate {
@@ -1597,7 +1596,7 @@ impl SemOsVerbOp for ContractPackCreate {
 }
 
 /// Add a template to a contract pack
-pub struct ContractPackAddTemplate;
+pub(super) struct ContractPackAddTemplate;
 
 #[async_trait]
 impl SemOsVerbOp for ContractPackAddTemplate {
@@ -1636,7 +1635,7 @@ impl SemOsVerbOp for ContractPackAddTemplate {
 // =============================================================================
 
 /// Generate coverage matrix: segments x jurisdictions x principals
-pub struct BookingPrincipalCoverageMatrix;
+pub(super) struct BookingPrincipalCoverageMatrix;
 
 #[async_trait]
 impl SemOsVerbOp for BookingPrincipalCoverageMatrix {
@@ -1700,7 +1699,7 @@ impl SemOsVerbOp for BookingPrincipalCoverageMatrix {
 }
 
 /// Generate gap report across all three boundaries
-pub struct BookingPrincipalGapReport;
+pub(super) struct BookingPrincipalGapReport;
 
 #[async_trait]
 impl SemOsVerbOp for BookingPrincipalGapReport {
@@ -1736,7 +1735,7 @@ impl SemOsVerbOp for BookingPrincipalGapReport {
 }
 
 /// Impact analysis for principal retirement
-pub struct BookingPrincipalImpactAnalysis;
+pub(super) struct BookingPrincipalImpactAnalysis;
 
 #[async_trait]
 impl SemOsVerbOp for BookingPrincipalImpactAnalysis {

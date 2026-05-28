@@ -28,6 +28,6 @@ mod engine;
 mod types;
 
 #[allow(unused_imports)]
-pub use engine::{expand_templates, expand_templates_simple};
+pub use self::types::{BatchPolicy, ExpansionReport, LockAccess, LockKey, LockMode};
 #[allow(unused_imports)]
-pub use types::{BatchPolicy, ExpansionReport, LockAccess, LockKey, LockMode};
+pub use engine::{expand_templates, expand_templates_simple};

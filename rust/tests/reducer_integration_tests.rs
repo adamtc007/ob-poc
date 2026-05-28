@@ -4,7 +4,7 @@ mod tests {
 
     use uuid::Uuid;
 
-    use dsl_runtime::state_reducer::{
+    use {
         load_builtin_state_machine, load_state_machine, reduce_slot, EvalScope, FieldValue,
         OverlayRow, SlotOverlayData, SlotRecord,
     };
@@ -158,15 +158,15 @@ reducer:
         available_verbs: Vec<String>,
     }
 
-    fn load_entity_kyc_sm() -> dsl_runtime::state_reducer::ValidatedStateMachine {
+    fn load_entity_kyc_sm() -> ValidatedStateMachine {
         load_builtin_state_machine("entity_kyc_lifecycle").unwrap()
     }
 
-    fn load_ubo_sm() -> dsl_runtime::state_reducer::ValidatedStateMachine {
+    fn load_ubo_sm() -> ValidatedStateMachine {
         load_builtin_state_machine("ubo_epistemic_lifecycle").unwrap()
     }
 
-    fn load_case_sm() -> dsl_runtime::state_reducer::ValidatedStateMachine {
+    fn load_case_sm() -> ValidatedStateMachine {
         load_state_machine(CASE_LIFECYCLE_YAML).unwrap()
     }
 
@@ -178,7 +178,7 @@ reducer:
     }
 
     fn reduce(
-        sm: &dsl_runtime::state_reducer::ValidatedStateMachine,
+        sm: &ValidatedStateMachine,
         mut overlays: SlotOverlayData,
         scope: EvalScope,
     ) -> ReduceResult {

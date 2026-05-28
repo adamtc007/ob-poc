@@ -5,7 +5,7 @@ use std::collections::HashMap;
 use dsl_ast::AtomBag;
 use dsl_atoms::{AtomKindClass, DeclarativeKind};
 use dsl_bpmn_frontend::RailwayGraph;
-use dsl_parser::raw_ast::RawValue;
+use dsl_parser::RawValue;
 
 use crate::layout::compute_layout;
 use crate::shapes::{
@@ -99,9 +99,7 @@ pub fn render_graph(
 
     // Draw edges first (so nodes render on top)
     for edge in &graph.edges {
-        if let (Some(src), Some(tgt)) =
-            (layout.get(&edge.source), layout.get(&edge.target))
-        {
+        if let (Some(src), Some(tgt)) = (layout.get(&edge.source), layout.get(&edge.target)) {
             svg.push_str(&render_edge(src, tgt, edge, opts.include_labels));
         }
     }
@@ -137,13 +135,8 @@ pub fn render_graph(
     for (id, gw) in &graph.gateways {
         if let Some(gw_layout) = layout.get(id) {
             let badge = provenance_coverage.get(id);
-            let svg_shape = render_gateway_shape(
-                gw_layout,
-                &gw.kind,
-                &gw.name,
-                badge,
-                opts.include_labels,
-            );
+            let svg_shape =
+                render_gateway_shape(gw_layout, &gw.kind, &gw.name, badge, opts.include_labels);
             svg.push_str(&svg_shape);
         }
     }

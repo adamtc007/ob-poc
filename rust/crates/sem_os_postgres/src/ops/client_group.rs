@@ -39,11 +39,11 @@ use serde_json::{json, Value};
 use sqlx::Row;
 use uuid::Uuid;
 
-use dsl_runtime::domain_ops::helpers::{
+use dsl_runtime::{
     json_extract_bool_opt, json_extract_int_opt, json_extract_string, json_extract_string_list_opt,
     json_extract_string_opt, json_extract_uuid, json_extract_uuid_opt,
 };
-use dsl_runtime::tx::TransactionScope;
+use dsl_runtime::TransactionScope;
 use dsl_runtime::{VerbExecutionContext, VerbExecutionOutcome};
 
 use super::SemOsVerbOp;
@@ -202,7 +202,7 @@ impl SemOsVerbOp for EntityAdd {
             "client-group.entity-add — entity {} now '{}' in group {}",
             entity_id, membership_type, group_id
         );
-        dsl_runtime::domain_ops::helpers::emit_pending_state_advance(
+        dsl_runtime::emit_pending_state_advance(
             ctx,
             entity_id,
             &to_node,
@@ -251,7 +251,7 @@ impl SemOsVerbOp for LinkCbu {
         .rows_affected();
 
         if affected > 0 {
-            dsl_runtime::domain_ops::helpers::emit_pending_state_advance(
+            dsl_runtime::emit_pending_state_advance(
                 ctx,
                 entity_id,
                 "client-group-membership:cbu-linked",
@@ -299,7 +299,7 @@ impl SemOsVerbOp for UnlinkCbu {
         .rows_affected();
 
         if affected > 0 {
-            dsl_runtime::domain_ops::helpers::emit_pending_state_advance(
+            dsl_runtime::emit_pending_state_advance(
                 ctx,
                 cbu_id,
                 "client-group-membership:cbu-unlinked",
@@ -375,7 +375,7 @@ impl SemOsVerbOp for EntityRemove {
                     ),
                 )
             };
-            dsl_runtime::domain_ops::helpers::emit_pending_state_advance(
+            dsl_runtime::emit_pending_state_advance(
                 ctx,
                 entity_id,
                 &to_node,

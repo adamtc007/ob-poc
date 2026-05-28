@@ -1,4 +1,4 @@
-//! ob-poc impl of [`dsl_runtime::service_traits::StewardshipDispatch`].
+//! ob-poc impl of [`StewardshipDispatch`].
 //!
 //! Bridges the plane-crossing `StewardshipDispatch` trait (defined in
 //! `dsl-runtime`) to the concrete `dispatch_phase0_tool` +
@@ -13,7 +13,7 @@ use async_trait::async_trait;
 use sem_os_core::principal::Principal;
 use sqlx::PgPool;
 
-use dsl_runtime::service_traits::{StewardshipDispatch, StewardshipOutcome};
+use dsl_runtime::{StewardshipDispatch, StewardshipOutcome};
 
 use crate::sem_reg::abac::ActorContext;
 use crate::sem_reg::agent::mcp_tools::{dispatch_tool, SemRegToolContext, SemRegToolResult};

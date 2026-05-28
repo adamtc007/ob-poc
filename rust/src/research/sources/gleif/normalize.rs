@@ -9,7 +9,7 @@ use crate::research::sources::normalized::{
 };
 
 /// Normalize a GLEIF LEI record to a NormalizedEntity
-pub fn normalize_lei_record(record: &LeiRecord, include_raw: bool) -> NormalizedEntity {
+pub(super) fn normalize_lei_record(record: &LeiRecord, include_raw: bool) -> NormalizedEntity {
     let entity = &record.attributes.entity;
 
     NormalizedEntity {
@@ -83,7 +83,7 @@ fn normalize_address(addr: &Address) -> NormalizedAddress {
 }
 
 /// Normalize a GLEIF relationship record to NormalizedRelationship
-pub fn normalize_relationship(
+pub(super) fn normalize_relationship(
     rel: &RelationshipRecord,
     child_name: &str,
     parent_name: &str,

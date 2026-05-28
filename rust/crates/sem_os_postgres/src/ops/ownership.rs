@@ -27,10 +27,10 @@ use sqlx::Row;
 use std::collections::HashMap;
 use uuid::Uuid;
 
-use dsl_runtime::domain_ops::helpers::{
+use dsl_runtime::{
     self, json_extract_int_opt, json_extract_string_opt, json_extract_uuid,
 };
-use dsl_runtime::tx::TransactionScope;
+use dsl_runtime::TransactionScope;
 use dsl_runtime::{VerbExecutionContext, VerbExecutionOutcome};
 
 use super::SemOsVerbOp;
@@ -64,7 +64,7 @@ impl SemOsVerbOp for Compute {
                 .fetch_one(scope.executor())
                 .await?;
         if count > 0 {
-            helpers::emit_pending_state_advance(
+            dsl_runtime::emit_pending_state_advance(
                 ctx,
                 issuer_entity_id,
                 "ownership:snapshots_derived",
@@ -479,7 +479,7 @@ impl SemOsVerbOp for Reconcile {
         .await?;
 
         ctx.bind("ownership_reconciliation_run", run_id);
-        helpers::emit_pending_state_advance(
+        dsl_runtime::emit_pending_state_advance(
             ctx,
             issuer_entity_id,
             "ownership:reconciled",

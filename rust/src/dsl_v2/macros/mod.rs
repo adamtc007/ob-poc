@@ -47,21 +47,26 @@ mod expander;
 // Re-export the relocated registry surface so existing
 // `crate::dsl_v2::macros::*` callers keep working.
 #[cfg(test)]
+#[allow(unreachable_pub)]
 pub use dsl_analysis::macros::schema::MacroTier;
 #[cfg(test)]
+#[allow(unreachable_pub)]
 pub use dsl_analysis::macros::schema::{
     ArgStyle, MacroArg, MacroArgType, MacroArgs, MacroExpansionStep, MacroKind, MacroRouting,
     MacroTarget, MacroUi, SetState, VerbCallStep,
 };
+#[allow(unreachable_pub)]
 pub use dsl_analysis::macros::{
     conditions, load_macro_registry, load_macro_registry_from_dir, registry, schema, variable,
     MacroRegistry,
 };
+#[allow(unreachable_pub)]
 pub use expander::{
     expand_macro, expand_macro_fixpoint, ExpansionLimits, MacroExpansionError,
     MacroExpansionOutput, EXPANSION_LIMITS,
 };
 // ACP visibility parity types (v0.5 §7.2 / §7.7).
-#[allow(unused_imports)]
+#[allow(unused_imports, unreachable_pub)]
 pub use dsl_analysis::macros::schema::{MacroLifecycleState, MacroPlanKind, MacroSideEffect};
+#[allow(unreachable_pub)]
 pub use dsl_analysis::macros::schema::{MacroPrereq, MacroSchema};

@@ -17,11 +17,11 @@ use anyhow::Result;
 use async_trait::async_trait;
 use std::path::Path;
 
-use dsl_runtime::document_bundles::{BundleContext, DocsBundleRegistry, DocsBundleService};
-use dsl_runtime::domain_ops::helpers::{
+use dsl_runtime::{BundleContext, DocsBundleRegistry, DocsBundleService};
+use dsl_runtime::{
     json_extract_bool_opt, json_extract_string_opt, json_extract_uuid,
 };
-use dsl_runtime::tx::TransactionScope;
+use dsl_runtime::TransactionScope;
 use dsl_runtime::{VerbExecutionContext, VerbExecutionOutcome};
 
 use super::SemOsVerbOp;

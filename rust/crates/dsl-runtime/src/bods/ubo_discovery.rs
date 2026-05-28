@@ -15,25 +15,6 @@ pub struct UboDiscoveryService {
     bods_repo: BodsRepository,
 }
 
-/// Result of UBO discovery
-#[derive(Debug, Clone)]
-pub enum UboResult {
-    /// Natural person(s) identified as UBO
-    NaturalPersons(Vec<DiscoveredUbo>),
-
-    /// Publicly traded / widely held - no single UBO
-    PublicFloat {
-        terminal_lei: String,
-        terminal_name: String,
-    },
-
-    /// State-owned entity
-    StateOwned { state_name: String },
-
-    /// Unknown - needs manual investigation
-    Unknown { reason: String },
-}
-
 impl UboDiscoveryService {
     pub fn new(pool: Arc<PgPool>) -> Self {
         Self {

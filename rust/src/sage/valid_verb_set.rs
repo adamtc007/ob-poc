@@ -138,8 +138,7 @@ fn cached_resolver_inputs() -> Result<ResolverInputs> {
             // can't reach it via its own CARGO_MANIFEST_DIR anymore. Pass
             // ob-poc's config dir explicitly.
             let config_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("config");
-            ResolverInputs::from_workspace_config_dir(config_dir)
-                .map_err(|error| error.to_string())
+            ResolverInputs::from_workspace_config_dir(config_dir).map_err(|error| error.to_string())
         })
         .as_ref()
         .cloned()

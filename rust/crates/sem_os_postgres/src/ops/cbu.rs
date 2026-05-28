@@ -24,12 +24,12 @@ use serde_json::{json, Map, Value};
 use std::collections::HashMap;
 use uuid::Uuid;
 
-use dsl_runtime::domain_ops::helpers::{
+use dsl_runtime::{
     json_extract_bool_opt, json_extract_int_opt, json_extract_string, json_extract_string_opt,
     json_extract_uuid, json_extract_uuid_opt,
 };
-use dsl_runtime::service_traits::SemOsChildDispatcher;
-use dsl_runtime::tx::TransactionScope;
+use dsl_runtime::SemOsChildDispatcher;
+use dsl_runtime::TransactionScope;
 use dsl_runtime::{VerbExecutionContext, VerbExecutionOutcome};
 
 use super::SemOsVerbOp;
@@ -297,7 +297,7 @@ impl SemOsVerbOp for Create {
         // (is_new=true); idempotent skips must not produce a
         // state-advance signal.
         if is_new {
-            dsl_runtime::domain_ops::helpers::emit_pending_state_advance(
+            dsl_runtime::emit_pending_state_advance(
                 ctx,
                 cbu_id,
                 "cbu:onboarded",

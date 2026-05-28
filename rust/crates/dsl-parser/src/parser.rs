@@ -116,7 +116,8 @@ impl<'src> Parser<'src> {
                 Some(Err(())) => {
                     // Lex error — skip and continue
                     self.stream.next();
-                    self.diagnostics.push(Diagnostic::error("Unexpected character"));
+                    self.diagnostics
+                        .push(Diagnostic::error("Unexpected character"));
                 }
                 Some(Ok(Token::OpenParen)) => {
                     match self.parse_atom() {
@@ -198,7 +199,10 @@ impl<'src> Parser<'src> {
             FlowParseState::ExpectingSource
         } else if is_flow {
             // Name was consumed as source
-            slots.push(("source".to_owned(), RawValue::Symbol(name.as_ref().unwrap().clone())));
+            slots.push((
+                "source".to_owned(),
+                RawValue::Symbol(name.as_ref().unwrap().clone()),
+            ));
             FlowParseState::ExpectingArrowOrTarget
         } else {
             FlowParseState::NotFlow
@@ -303,18 +307,16 @@ impl<'src> Parser<'src> {
     fn parse_for_each_body(&mut self) -> Option<RawValue> {
         // :var VAR
         let var = match self.stream.next() {
-            Some(Ok(Token::Keyword(k))) if k == "var" => {
-                match self.stream.next() {
-                    Some(Ok(Token::Symbol(s))) => s,
-                    other => {
-                        self.diagnostics.push(Diagnostic::error(format!(
-                            "for-each: expected symbol after :var, got {:?}",
-                            other
-                        )));
-                        return None;
-                    }
+            Some(Ok(Token::Keyword(k))) if k == "var" => match self.stream.next() {
+                Some(Ok(Token::Symbol(s))) => s,
+                other => {
+                    self.diagnostics.push(Diagnostic::error(format!(
+                        "for-each: expected symbol after :var, got {:?}",
+                        other
+                    )));
+                    return None;
                 }
-            }
+            },
             other => {
                 self.diagnostics.push(Diagnostic::error(format!(
                     "for-each: expected :var keyword, got {:?}",
@@ -326,18 +328,16 @@ impl<'src> Parser<'src> {
 
         // :in LIST_PARAM
         let list_param = match self.stream.next() {
-            Some(Ok(Token::Keyword(k))) if k == "in" => {
-                match self.stream.next() {
-                    Some(Ok(Token::Symbol(s))) => s,
-                    other => {
-                        self.diagnostics.push(Diagnostic::error(format!(
-                            "for-each: expected symbol after :in, got {:?}",
-                            other
-                        )));
-                        return None;
-                    }
+            Some(Ok(Token::Keyword(k))) if k == "in" => match self.stream.next() {
+                Some(Ok(Token::Symbol(s))) => s,
+                other => {
+                    self.diagnostics.push(Diagnostic::error(format!(
+                        "for-each: expected symbol after :in, got {:?}",
+                        other
+                    )));
+                    return None;
                 }
-            }
+            },
             other => {
                 self.diagnostics.push(Diagnostic::error(format!(
                     "for-each: expected :in keyword, got {:?}",
@@ -734,7 +734,11 @@ mod tests {
     fn parse_nested_atom_as_value() {
         let src = "(node outer :child (node inner :x 1))";
         let sf = parse_ok(src);
-        let child_slot = sf.atoms[0].slots.iter().find(|(k, _)| k == "child").unwrap();
+        let child_slot = sf.atoms[0]
+            .slots
+            .iter()
+            .find(|(k, _)| k == "child")
+            .unwrap();
         match &child_slot.1 {
             RawValue::Atom(inner) => {
                 assert_eq!(inner.kind, "node");
@@ -747,8 +751,16 @@ mod tests {
     #[test]
     fn parse_bool_and_int_literals() {
         let sf = parse_ok("(node n :active true :count 42)");
-        let active = sf.atoms[0].slots.iter().find(|(k, _)| k == "active").unwrap();
-        let count = sf.atoms[0].slots.iter().find(|(k, _)| k == "count").unwrap();
+        let active = sf.atoms[0]
+            .slots
+            .iter()
+            .find(|(k, _)| k == "active")
+            .unwrap();
+        let count = sf.atoms[0]
+            .slots
+            .iter()
+            .find(|(k, _)| k == "count")
+            .unwrap();
         assert_eq!(active.1, RawValue::BoolLit(true));
         assert_eq!(count.1, RawValue::IntLit(42));
     }
@@ -773,7 +785,9 @@ mod tests {
         assert!(
             !diag.has_errors(),
             "unexpected parse errors: {:?}",
-            diag.errors().map(|d| d.message.as_str()).collect::<Vec<_>>()
+            diag.errors()
+                .map(|d| d.message.as_str())
+                .collect::<Vec<_>>()
         );
         assert_eq!(sf.atoms.len(), 1);
         let pack = &sf.atoms[0];
@@ -785,7 +799,11 @@ mod tests {
         // items[0] is the flow atom, items[1] is the for-each
         assert_eq!(items.len(), 2);
         match &items[1] {
-            RawValue::ForEach { var, list_param, body } => {
+            RawValue::ForEach {
+                var,
+                list_param,
+                body,
+            } => {
                 assert_eq!(var, "band");
                 assert_eq!(list_param, "bands");
                 assert_eq!(body.len(), 1);

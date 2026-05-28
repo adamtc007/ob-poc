@@ -1,7 +1,7 @@
 # Cross-workspace DAG scenario fixtures
 
 YAML scenarios consumed by `tests/cross_workspace_dag_scenarios.rs` via
-`dsl_runtime::cross_workspace::test_harness::ScenarioRunner`.
+`dsl_runtime::test_harness::ScenarioRunner`.
 
 Each fixture loads the **real** DAG taxonomy YAMLs from
 `rust/config/sem_os_seeds/dag_taxonomies/` — only state lookups,

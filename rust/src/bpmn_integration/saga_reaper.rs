@@ -49,7 +49,7 @@ use uuid::Uuid;
 // ---------------------------------------------------------------------------
 
 #[derive(Debug, Clone)]
-pub struct SagaReaperConfig {
+pub(crate) struct SagaReaperConfig {
     /// Minimum age before an instance is eligible for classification.
     /// MUST exceed the longest plausible commit latency + drainer poll.
     pub reaper_grace: Duration,
@@ -80,7 +80,7 @@ impl Default for SagaReaperConfig {
 /// Minimum evidence the reaper needs per candidate instance. Populated
 /// from bpmn-server's `process_instances` row.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct InstanceSnapshot {
+pub(crate) struct InstanceSnapshot {
     pub instance_id: Uuid,
     pub correlation_id: String,
     /// Seconds since bpmn-server last touched the row. Used as the "staleness"
@@ -89,7 +89,7 @@ pub struct InstanceSnapshot {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum Classification {
+pub(crate) enum Classification {
     /// Outbox marker exists AND is `done`. Safe; outer tx committed.
     Committed,
     /// Outbox marker exists AND is `pending`. Drainer hasn't caught up,
@@ -107,19 +107,19 @@ pub enum Classification {
 
 /// Reads stale candidates from bpmn-server's `process_instances`.
 #[async_trait::async_trait]
-pub trait InstanceSource: Send + Sync {
+pub(crate) trait InstanceSource: Send + Sync {
     async fn fetch_stale(&self, grace: Duration, limit: usize) -> Result<Vec<InstanceSnapshot>>;
 }
 
 /// Classifies a candidate by looking up the outbox marker on the ob-poc side.
 #[async_trait::async_trait]
-pub trait MarkerLookup: Send + Sync {
+pub(crate) trait MarkerLookup: Send + Sync {
     async fn classify(&self, inst: &InstanceSnapshot) -> Result<Classification>;
 }
 
 /// Cancels an instance + writes a forensic audit row on success.
 #[async_trait::async_trait]
-pub trait InstanceCanceller: Send + Sync {
+pub(crate) trait InstanceCanceller: Send + Sync {
     async fn cancel_and_log(&self, inst: &InstanceSnapshot, reason: String) -> Result<()>;
 }
 
@@ -127,7 +127,7 @@ pub trait InstanceCanceller: Send + Sync {
 // Reaper — pure logic, port-driven
 // ---------------------------------------------------------------------------
 
-pub struct SagaReaper {
+pub(crate) struct SagaReaper {
     pub source: Arc<dyn InstanceSource>,
     pub markers: Arc<dyn MarkerLookup>,
     pub canceller: Arc<dyn InstanceCanceller>,
@@ -136,7 +136,7 @@ pub struct SagaReaper {
 }
 
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
-pub struct ReaperCycleStats {
+pub(crate) struct ReaperCycleStats {
     pub inspected: usize,
     pub cancelled: usize,
     pub committed: usize,
@@ -146,7 +146,7 @@ pub struct ReaperCycleStats {
 
 impl SagaReaper {
     /// Background loop — one cycle per `cycle_interval` until shutdown.
-    pub async fn run(self) {
+    pub(crate) async fn run(self) {
         let mut ticker = tokio::time::interval(self.cfg.cycle_interval);
         loop {
             tokio::select! {
@@ -165,7 +165,7 @@ impl SagaReaper {
     }
 
     /// One cycle — public for tests + on-demand trigger.
-    pub async fn run_once(&self) -> Result<ReaperCycleStats> {
+    pub(crate) async fn run_once(&self) -> Result<ReaperCycleStats> {
         let candidates = self
             .source
             .fetch_stale(self.cfg.reaper_grace, self.cfg.max_cancels_per_cycle * 4)

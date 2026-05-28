@@ -12,12 +12,12 @@ use async_trait::async_trait;
 use serde_json::{json, Value};
 use uuid::Uuid;
 
-use dsl_runtime::domain_ops::helpers::{
+use dsl_runtime::{
     self, json_extract_bool_opt, json_extract_int, json_extract_int_opt, json_extract_string,
     json_extract_string_list, json_extract_string_opt, json_extract_uuid,
 };
-use dsl_runtime::service_traits::TradingProfileDocument;
-use dsl_runtime::tx::TransactionScope;
+use dsl_runtime::TradingProfileDocument;
+use dsl_runtime::TransactionScope;
 use dsl_runtime::{VerbExecutionContext, VerbExecutionOutcome};
 use ob_poc_types::trading_matrix::{
     CaCutoffRule, CaDefaultOption, CaElectionPolicy, CaElector, CaNotificationPolicy,
@@ -45,7 +45,7 @@ async fn save_ca_section(
 ) -> Result<TradingMatrixDocument> {
     doc.corporate_actions = Some(ca);
     docs.save_document(profile_id, &doc).await?;
-    helpers::emit_pending_state_advance(
+    dsl_runtime::emit_pending_state_advance(
         ctx,
         profile_id,
         "trading:profile_ca_updated",

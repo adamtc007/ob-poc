@@ -86,9 +86,10 @@ impl HeuristicExtractor {
     /// `pack`.  Always returns exactly `pack.parameters.len()` proposals.
     pub fn extract(utterance: &str, pack: &DecisionPack) -> Vec<ParameterProposal> {
         let lower = utterance.to_lowercase();
-        pack.parameters.iter().map(|param| {
-            Self::extract_one(&lower, utterance, param)
-        }).collect()
+        pack.parameters
+            .iter()
+            .map(|param| Self::extract_one(&lower, utterance, param))
+            .collect()
     }
 
     fn extract_one(lower: &str, original: &str, param: &PackParam) -> ParameterProposal {
@@ -107,8 +108,8 @@ impl HeuristicExtractor {
             "list-of-condition-expr" => {
                 // Extract non-trivial words from the utterance as condition stubs.
                 let stop_words = [
-                    "must", "should", "when", "then", "and", "all", "the", "for",
-                    "are", "is", "to", "be", "in", "of", "a", "an", "this", "that",
+                    "must", "should", "when", "then", "and", "all", "the", "for", "are", "is",
+                    "to", "be", "in", "of", "a", "an", "this", "that",
                 ];
                 let terms: Vec<String> = lower
                     .split_whitespace()
@@ -152,7 +153,11 @@ impl HeuristicExtractor {
                 // Look for the first integer token in the utterance.
                 let num = lower
                     .split_whitespace()
-                    .find_map(|w| w.trim_matches(|c: char| !c.is_ascii_digit()).parse::<i64>().ok())
+                    .find_map(|w| {
+                        w.trim_matches(|c: char| !c.is_ascii_digit())
+                            .parse::<i64>()
+                            .ok()
+                    })
                     .unwrap_or(12);
                 (
                     serde_json::Value::Number(serde_json::Number::from(num)),
@@ -177,7 +182,10 @@ impl HeuristicExtractor {
                 (
                     serde_json::Value::Null,
                     0.1,
-                    format!("Unable to extract unknown parameter type '{}'", param.param_type),
+                    format!(
+                        "Unable to extract unknown parameter type '{}'",
+                        param.param_type
+                    ),
                     None,
                 )
             }
@@ -233,9 +241,13 @@ pub async fn extract_parameters(
     registry: &PackRegistry,
     llm_client: Option<&dyn LlmExtractor>,
 ) -> Result<ConfirmationRequest> {
-    let pack = registry
-        .lookup(pack_name, pack_version)
-        .ok_or_else(|| anyhow!("Pack '{}@{}' not found in registry", pack_name, pack_version))?;
+    let pack = registry.lookup(pack_name, pack_version).ok_or_else(|| {
+        anyhow!(
+            "Pack '{}@{}' not found in registry",
+            pack_name,
+            pack_version
+        )
+    })?;
 
     let proposals = if let Some(client) = llm_client {
         let summary = PackSummaryWithParams {

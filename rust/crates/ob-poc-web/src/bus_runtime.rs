@@ -30,8 +30,8 @@ use dsl_bus_protocol::v1::{
     TypedValue as ProtoTypedValue, Uuid as ProtoUuid,
 };
 use dsl_bus_server::{BusServer, ServerHandle};
-use dsl_runtime::execution::{VerbExecutionContext, VerbExecutionOutcome};
-use dsl_runtime::port::VerbExecutionPort;
+use dsl_runtime::{VerbExecutionContext, VerbExecutionOutcome};
+use dsl_runtime::VerbExecutionPort;
 use ob_poc::sem_os_runtime::verb_executor_adapter::ObPocVerbExecutor;
 use ob_poc_bus_handler::{
     NoopResultDispatcher, ObPocBusHandler, VerbExecutor, VerbExecutorError, VerbOutcome,
@@ -164,7 +164,7 @@ fn map_executor_error(err: sem_os_core::error::SemOsError) -> VerbExecutorError 
 }
 
 fn translate_result(
-    result: dsl_runtime::execution::VerbExecutionResult,
+    result: dsl_runtime::VerbExecutionResult,
     execution_id: Uuid,
 ) -> VerbOutcome {
     let mut bindings = Vec::new();

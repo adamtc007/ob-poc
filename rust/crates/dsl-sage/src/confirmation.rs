@@ -258,8 +258,14 @@ mod tests {
         assert_eq!(state, ConfirmationState::Pending);
         assert!(!session.is_terminal());
         assert_eq!(session.edit_history.len(), 1);
-        assert_eq!(session.edit_history[0].old_value, serde_json::json!("initial-gate"));
-        assert_eq!(session.edit_history[0].new_value, serde_json::json!("my-custom-gate"));
+        assert_eq!(
+            session.edit_history[0].old_value,
+            serde_json::json!("initial-gate")
+        );
+        assert_eq!(
+            session.edit_history[0].new_value,
+            serde_json::json!("my-custom-gate")
+        );
     }
 
     #[test]

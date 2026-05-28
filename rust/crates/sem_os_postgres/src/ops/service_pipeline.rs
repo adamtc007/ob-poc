@@ -12,8 +12,8 @@ use async_trait::async_trait;
 use serde_json::Value;
 use uuid::Uuid;
 
-use dsl_runtime::service_traits::ServicePipelineService;
-use dsl_runtime::tx::TransactionScope;
+use dsl_runtime::ServicePipelineService;
+use dsl_runtime::TransactionScope;
 use dsl_runtime::{VerbExecutionContext, VerbExecutionOutcome};
 
 use super::SemOsVerbOp;
@@ -113,7 +113,7 @@ async fn set_cbu_discovery_state(
     }
 
     let to_node = format!("cbu_discovery_state:{}", state.to_ascii_lowercase());
-    dsl_runtime::domain_ops::helpers::emit_pending_state_advance(
+    dsl_runtime::emit_pending_state_advance(
         ctx,
         cbu_id,
         &to_node,

@@ -29,7 +29,7 @@ use uuid::Uuid;
 // ---------------------------------------------------------------------------
 
 /// Key: `"workspace.slot"`, Value: `(table, status_column, pk_column)`.
-pub type SlotStateTable = HashMap<String, (String, String, String)>;
+pub(crate) type SlotStateTable = HashMap<String, (String, String, String)>;
 
 static SLOT_STATE_TABLE: OnceLock<SlotStateTable> = OnceLock::new();
 

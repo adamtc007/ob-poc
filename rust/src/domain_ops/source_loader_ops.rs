@@ -16,10 +16,10 @@ use anyhow::Result;
 use async_trait::async_trait;
 use sem_os_postgres::ops::SemOsVerbOp;
 
-use dsl_runtime::domain_ops::helpers::{
+use dsl_runtime::{
     json_extract_bool_opt, json_extract_int_opt, json_extract_string_opt, json_extract_uuid_opt,
 };
-use dsl_runtime::tx::TransactionScope;
+use dsl_runtime::TransactionScope;
 use dsl_runtime::{VerbExecutionContext, VerbExecutionOutcome};
 
 #[cfg(feature = "database")]
@@ -42,7 +42,7 @@ use {
 // =============================================================================
 
 /// List all available research sources
-pub struct SourcesList;
+pub(super) struct SourcesList;
 
 #[async_trait]
 impl SemOsVerbOp for SourcesList {
@@ -76,7 +76,7 @@ impl SemOsVerbOp for SourcesList {
 }
 
 /// Get information about a specific research source
-pub struct SourcesInfo;
+pub(super) struct SourcesInfo;
 
 #[async_trait]
 impl SemOsVerbOp for SourcesInfo {
@@ -111,7 +111,7 @@ impl SemOsVerbOp for SourcesInfo {
 }
 
 /// Search a specific source for entities
-pub struct SourcesSearch;
+pub(super) struct SourcesSearch;
 
 #[async_trait]
 impl SemOsVerbOp for SourcesSearch {
@@ -192,7 +192,7 @@ impl SemOsVerbOp for SourcesSearch {
 }
 
 /// Fetch entity data from a source by key
-pub struct SourcesFetch;
+pub(super) struct SourcesFetch;
 
 #[async_trait]
 impl SemOsVerbOp for SourcesFetch {
@@ -281,7 +281,7 @@ impl SemOsVerbOp for SourcesFetch {
 }
 
 /// Find the best source for a jurisdiction and data type
-pub struct SourcesFindForJurisdiction;
+pub(super) struct SourcesFindForJurisdiction;
 
 #[async_trait]
 impl SemOsVerbOp for SourcesFindForJurisdiction {
@@ -334,7 +334,7 @@ impl SemOsVerbOp for SourcesFindForJurisdiction {
 // =============================================================================
 
 /// Search Companies House for UK companies
-pub struct CompaniesHouseSearch;
+pub(super) struct CompaniesHouseSearch;
 
 #[async_trait]
 impl SemOsVerbOp for CompaniesHouseSearch {
@@ -405,7 +405,7 @@ impl SemOsVerbOp for CompaniesHouseSearch {
 }
 
 /// Fetch company profile from Companies House
-pub struct CompaniesHouseFetchCompany;
+pub(super) struct CompaniesHouseFetchCompany;
 
 #[async_trait]
 impl SemOsVerbOp for CompaniesHouseFetchCompany {
@@ -471,7 +471,7 @@ impl SemOsVerbOp for CompaniesHouseFetchCompany {
 }
 
 /// Fetch PSC (Persons with Significant Control) from Companies House
-pub struct CompaniesHouseFetchPsc;
+pub(super) struct CompaniesHouseFetchPsc;
 
 #[async_trait]
 impl SemOsVerbOp for CompaniesHouseFetchPsc {
@@ -561,7 +561,7 @@ impl SemOsVerbOp for CompaniesHouseFetchPsc {
 }
 
 /// Fetch officers (directors, secretaries) from Companies House
-pub struct CompaniesHouseFetchOfficers;
+pub(super) struct CompaniesHouseFetchOfficers;
 
 #[async_trait]
 impl SemOsVerbOp for CompaniesHouseFetchOfficers {
@@ -629,7 +629,7 @@ impl SemOsVerbOp for CompaniesHouseFetchOfficers {
 }
 
 /// Import company (and optionally PSC/officers) from Companies House to database
-pub struct CompaniesHouseImportCompany;
+pub(super) struct CompaniesHouseImportCompany;
 
 #[async_trait]
 impl SemOsVerbOp for CompaniesHouseImportCompany {
@@ -748,7 +748,7 @@ impl SemOsVerbOp for CompaniesHouseImportCompany {
 // =============================================================================
 
 /// Search SEC EDGAR for US public companies
-pub struct SecEdgarSearch;
+pub(super) struct SecEdgarSearch;
 
 #[async_trait]
 impl SemOsVerbOp for SecEdgarSearch {
@@ -811,7 +811,7 @@ impl SemOsVerbOp for SecEdgarSearch {
 }
 
 /// Fetch company from SEC EDGAR
-pub struct SecEdgarFetchCompany;
+pub(super) struct SecEdgarFetchCompany;
 
 #[async_trait]
 impl SemOsVerbOp for SecEdgarFetchCompany {
@@ -866,7 +866,7 @@ impl SemOsVerbOp for SecEdgarFetchCompany {
 }
 
 /// Fetch 13D/13G beneficial ownership filings from SEC EDGAR
-pub struct SecEdgarFetchBeneficialOwners;
+pub(super) struct SecEdgarFetchBeneficialOwners;
 
 #[async_trait]
 impl SemOsVerbOp for SecEdgarFetchBeneficialOwners {
@@ -950,7 +950,7 @@ impl SemOsVerbOp for SecEdgarFetchBeneficialOwners {
 }
 
 /// Fetch recent SEC filings
-pub struct SecEdgarFetchFilings;
+pub(super) struct SecEdgarFetchFilings;
 
 #[async_trait]
 impl SemOsVerbOp for SecEdgarFetchFilings {
@@ -1003,7 +1003,7 @@ impl SemOsVerbOp for SecEdgarFetchFilings {
 }
 
 /// Import SEC company to database
-pub struct SecEdgarImportCompany;
+pub(super) struct SecEdgarImportCompany;
 
 #[async_trait]
 impl SemOsVerbOp for SecEdgarImportCompany {

@@ -4,7 +4,7 @@
 //! - `bpmn` — lowers a `RailwayGraph` to a `JourneySpec` (bpmn-lite)
 //! - SemOS lowering (Tranche 6+, not yet implemented)
 
-pub mod bpmn;
+mod bpmn;
 
 pub use bpmn::{
     lower, JourneyBoundaryAttachment, JourneyEdge, JourneyMergeClause, JourneyNode,

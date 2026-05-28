@@ -940,41 +940,41 @@ mod taxonomy_types {
     use uuid::Uuid;
 
     #[derive(Debug, Clone, Serialize, Deserialize)]
-    pub struct ServiceTaxonomyResponse {
-        pub root: ServiceTaxonomyNode,
-        pub cbu_id: Uuid,
-        pub cbu_name: String,
-        pub stats: ServiceTaxonomyStats,
+    pub(super) struct ServiceTaxonomyResponse {
+        pub(super) root: ServiceTaxonomyNode,
+        pub(super) cbu_id: Uuid,
+        pub(super) cbu_name: String,
+        pub(super) stats: ServiceTaxonomyStats,
     }
 
     #[derive(Debug, Clone, Default, Serialize, Deserialize)]
-    pub struct ServiceTaxonomyStats {
-        pub product_count: usize,
-        pub service_count: usize,
-        pub intent_count: usize,
-        pub resource_count: usize,
-        pub attribute_progress: (usize, usize),
-        pub services_ready: usize,
-        pub services_partial: usize,
-        pub services_blocked: usize,
+    pub(super) struct ServiceTaxonomyStats {
+        pub(super) product_count: usize,
+        pub(super) service_count: usize,
+        pub(super) intent_count: usize,
+        pub(super) resource_count: usize,
+        pub(super) attribute_progress: (usize, usize),
+        pub(super) services_ready: usize,
+        pub(super) services_partial: usize,
+        pub(super) services_blocked: usize,
     }
 
     #[derive(Debug, Clone, Serialize, Deserialize)]
-    pub struct ServiceTaxonomyNode {
-        pub id: Vec<String>,
-        pub node_type: ServiceTaxonomyNodeType,
-        pub label: String,
-        pub sublabel: Option<String>,
-        pub status: String,
-        pub children: Vec<ServiceTaxonomyNode>,
-        pub leaf_count: usize,
-        pub blocking_reasons: Vec<String>,
-        pub attr_progress: Option<(usize, usize)>,
+    pub(super) struct ServiceTaxonomyNode {
+        pub(super) id: Vec<String>,
+        pub(super) node_type: ServiceTaxonomyNodeType,
+        pub(super) label: String,
+        pub(super) sublabel: Option<String>,
+        pub(super) status: String,
+        pub(super) children: Vec<ServiceTaxonomyNode>,
+        pub(super) leaf_count: usize,
+        pub(super) blocking_reasons: Vec<String>,
+        pub(super) attr_progress: Option<(usize, usize)>,
     }
 
     #[derive(Debug, Clone, Serialize, Deserialize)]
     #[serde(tag = "type", rename_all = "snake_case")]
-    pub enum ServiceTaxonomyNodeType {
+    pub(super) enum ServiceTaxonomyNodeType {
         Root {
             cbu_id: Uuid,
         },
@@ -1005,7 +1005,7 @@ mod taxonomy_types {
     }
 
     impl ServiceTaxonomyNode {
-        pub fn new(id: Vec<String>, node_type: ServiceTaxonomyNodeType, label: String) -> Self {
+        pub(super) fn new(id: Vec<String>, node_type: ServiceTaxonomyNodeType, label: String) -> Self {
             Self {
                 id,
                 node_type,
@@ -1019,7 +1019,7 @@ mod taxonomy_types {
             }
         }
 
-        pub fn compute_leaf_counts(&mut self) -> usize {
+        pub(super) fn compute_leaf_counts(&mut self) -> usize {
             if self.children.is_empty() {
                 self.leaf_count = 1;
             } else {

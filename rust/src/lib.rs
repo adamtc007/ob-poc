@@ -138,9 +138,10 @@ pub use ob_poc_derived_attributes::derived_attributes;
 
 // Phase 5a composite #2 — `cross_workspace` relocated to
 // `dsl-runtime::cross_workspace`. External callers reach it via
-// `dsl_runtime::cross_workspace::*` now. `WorkspaceKind` dep was
+// `dsl_runtime::*` now. `WorkspaceKind` dep was
 // narrowed to `String` (same snake_case serde repr) to keep the
 // module plane-neutral.
+pub use dsl_runtime::*;
 
 // Loopback calibration harness
 #[cfg(feature = "database")]

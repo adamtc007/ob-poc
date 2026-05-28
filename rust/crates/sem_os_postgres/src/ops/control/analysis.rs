@@ -17,8 +17,8 @@ use async_trait::async_trait;
 use serde_json::{json, Value};
 use uuid::Uuid;
 
-use dsl_runtime::domain_ops::helpers::json_extract_uuid;
-use dsl_runtime::tx::TransactionScope;
+use dsl_runtime::json_extract_uuid;
+use dsl_runtime::TransactionScope;
 use dsl_runtime::{VerbExecutionContext, VerbExecutionOutcome};
 
 use crate::ops::SemOsVerbOp;

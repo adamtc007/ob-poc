@@ -10,7 +10,7 @@
 use anyhow::Result;
 use async_trait::async_trait;
 
-use dsl_runtime::tx::TransactionScope;
+use dsl_runtime::TransactionScope;
 use dsl_runtime::{VerbExecutionContext, VerbExecutionOutcome};
 
 use super::stewardship_helper::dispatch_stewardship_tool;

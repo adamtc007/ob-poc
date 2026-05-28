@@ -1,3 +1,4 @@
+#![allow(unreachable_pub)]
 //! Multi-workspace runbook plan executor.
 //!
 //! Cursor-driven execution loop with workspace transitions (Sage/REPL ping-pong).

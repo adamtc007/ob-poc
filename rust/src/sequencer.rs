@@ -30,6 +30,8 @@ use serde::{Deserialize, Serialize};
 use tokio::sync::RwLock;
 use uuid::Uuid;
 
+use dsl_runtime::TransactionScope;
+
 const CBU_STRUCTURE_UNSELECTED_MAP: &str = "cbu.structure.unselected";
 
 use crate::dsl_v2::macros::MacroRegistry;
@@ -114,7 +116,7 @@ pub trait DslExecutor: Send + Sync {
     async fn execute_in_scope(
         &self,
         dsl: &str,
-        _scope: &mut dyn dsl_runtime::tx::TransactionScope,
+        _scope: &mut dyn TransactionScope,
     ) -> Result<serde_json::Value, String> {
         self.execute(dsl).await
     }
@@ -444,7 +446,7 @@ impl ReplOrchestratorV2 {
     /// ```ignore
     /// use std::sync::Arc;
     /// use dsl_core::config::ConfigLoader;
-    /// use dsl_runtime::cross_workspace::{
+    /// use {
     ///     GateChecker, PostgresSlotStateProvider, SqlPredicateResolver,
     /// };
     /// use ob_poc::runbook::step_executor_bridge::{
@@ -6551,7 +6553,7 @@ impl ReplOrchestratorV2 {
                     // B.2b-ζ: route through the outer scope when available.
                     let scope_for_entry = outer_scope
                         .as_mut()
-                        .map(|s| s as &mut dyn dsl_runtime::tx::TransactionScope);
+                        .map(|s| s as &mut dyn TransactionScope);
                     let gate_outcome = match tokio::time::timeout(
                         self.runbook_step_timeout,
                         self.execute_entry_via_gate_impl(
@@ -6715,7 +6717,7 @@ impl ReplOrchestratorV2 {
                     // B.2b-ζ: route through the outer scope when available.
                     let scope_for_entry = outer_scope
                         .as_mut()
-                        .map(|s| s as &mut dyn dsl_runtime::tx::TransactionScope);
+                        .map(|s| s as &mut dyn TransactionScope);
                     let gate_outcome = match tokio::time::timeout(
                         self.runbook_step_timeout,
                         self.execute_entry_via_gate_impl(
@@ -7284,7 +7286,7 @@ impl ReplOrchestratorV2 {
         runbook_id: Uuid,
         fallback_version: u64,
         session_stack: Option<ob_poc_types::session_stack::SessionStackState>,
-        scope: Option<&mut dyn dsl_runtime::tx::TransactionScope>,
+        scope: Option<&mut dyn TransactionScope>,
     ) -> StepOutcome {
         // Construct the store backend: Postgres when pool available, in-memory fallback.
         // This ensures lock events, status events, and holder lookups fire in production
@@ -7354,7 +7356,7 @@ impl ReplOrchestratorV2 {
             store: &dyn RunbookStoreBackend,
             compiled_id: CompiledRunbookId,
             bridge: &dyn crate::runbook::StepExecutor,
-            scope: Option<&mut dyn dsl_runtime::tx::TransactionScope>,
+            scope: Option<&mut dyn TransactionScope>,
             pool: Option<&sqlx::PgPool>,
         ) -> Result<crate::runbook::executor::RunbookExecutionResult, crate::runbook::ExecutionError>
         {

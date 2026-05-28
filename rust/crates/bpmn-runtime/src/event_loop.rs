@@ -13,7 +13,7 @@ use crate::{
     verb::VerbRegistry,
 };
 use anyhow::Result;
-use dsl_lowering::bpmn::JourneySpec;
+use dsl_lowering::JourneySpec;
 use std::sync::Arc;
 use uuid::Uuid;
 

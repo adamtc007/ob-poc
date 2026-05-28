@@ -12,15 +12,17 @@
 //! - [`affinity_graph_cache`] — in-process affinity graph cache still
 //!   consumed by sem_os_postgres affinity ops.
 
-pub mod helpers;
+mod affinity_graph_cache;
+mod helpers;
 
-// Phase 5c-migrate Phase B slice #44: access_review_ops → `sem_os_postgres::ops::access_review`.
-// Phase 5c-migrate Phase B slice #64: agent_ops → `sem_os_postgres::ops::agent`.
-// Phase 5c-migrate Phase B slice #5 (2026-04-21): attribute_ops relocated
-// to `sem_os_postgres::ops::attribute::*`.
-// Phase 5c-migrate Phase B slice #71: batch_control_ops → `sem_os_postgres::ops::batch_control`.
-// BatchControlResult relocated to `ob-poc-types::batch_control`.
-pub mod affinity_graph_cache;
+pub use affinity_graph_cache::load_affinity_graph_cached;
+pub use helpers::{
+    emit_pending_state_advance, emit_pending_state_advance_batch, json_extract_bool,
+    json_extract_bool_opt, json_extract_int, json_extract_int_opt, json_extract_string,
+    json_extract_string_list, json_extract_string_list_opt, json_extract_string_opt,
+    json_extract_uuid, json_extract_uuid_aliased, json_extract_uuid_opt, json_get_required_uuid,
+    peek_pending_state_advance, take_pending_state_advance, StateTransitionInput,
+};
 // Phase 5c-migrate Phase B slice #9: affinity_ops → `sem_os_postgres::ops::affinity`.
 // Phase 5c-migrate Phase B slice #60: billing_ops → `sem_os_postgres::ops::billing`.
 // Phase 5c-migrate Phase B slice #17: board_ops → `sem_os_postgres::ops::board`.

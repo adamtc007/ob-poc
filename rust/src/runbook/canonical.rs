@@ -1,3 +1,4 @@
+#![allow(unreachable_pub)]
 //! Canonical serialization for content-addressed runbook IDs (INV-2).
 //!
 //! All compiled runbook types use `bincode` for deterministic binary

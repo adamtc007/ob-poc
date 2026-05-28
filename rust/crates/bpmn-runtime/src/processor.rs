@@ -12,11 +12,11 @@ use crate::{
     verb::{VerbContext, VerbEffect, VerbError, VerbRegistry},
 };
 use anyhow::Result;
-use dsl_lowering::bpmn::{JourneyEdge, JourneyNode, JourneyParallelJoin, JourneySpec};
+use dsl_lowering::{JourneyEdge, JourneyNode, JourneyParallelJoin, JourneySpec};
 use std::collections::{BTreeMap, HashMap};
 
 /// Everything the processor needs to handle one event.
-pub struct RuntimeContext<'a> {
+pub(crate) struct RuntimeContext<'a> {
     pub store: &'a dyn JourneyStore,
     pub spec: &'a JourneySpec,
     pub verb_registry: &'a VerbRegistry,
@@ -26,7 +26,7 @@ pub struct RuntimeContext<'a> {
 }
 
 /// Dispatch one event. This is the only public entry point.
-pub async fn process_event(ctx: &RuntimeContext<'_>, event: &EventEnvelope) -> Result<()> {
+pub(crate) async fn process_event(ctx: &RuntimeContext<'_>, event: &EventEnvelope) -> Result<()> {
     match &event.event_kind {
         EventKind::InstanceStart => handle_instance_start(ctx, event).await,
         EventKind::VerbCompletion => handle_verb_completion(ctx, event).await,
@@ -1072,13 +1072,16 @@ fn is_end_event(k: &str) -> bool {
 // Gateway Multiplicity Policy
 // ---------------------------------------------------------------------------
 
-pub enum GatewayViolation {
+pub(crate) enum GatewayViolation {
     ExpectedExactlyOne(usize),
     ExpectedAtLeastOne,
     UnknownKind(String),
 }
 
-pub fn check_gateway_multiplicity(kind: &str, target_count: usize) -> Result<(), GatewayViolation> {
+pub(crate) fn check_gateway_multiplicity(
+    kind: &str,
+    target_count: usize,
+) -> Result<(), GatewayViolation> {
     match kind {
         "exclusive" | "event-based" => {
             if target_count != 1 {

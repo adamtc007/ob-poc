@@ -19,7 +19,7 @@
 use chrono::NaiveDate;
 use serde::{Deserialize, Serialize};
 
-use crate::graph::ProngFilter;
+use crate::graph::types::ProngFilter;
 
 // =============================================================================
 // NAVIGATION COMMAND ENUM

@@ -9,13 +9,11 @@
 //! (both services are self-contained — they only depend on sem_os_core
 //! plus sqlx/chrono/uuid/serde).
 
-pub mod governed;
-pub mod policy;
+mod governed;
+mod policy;
 
 pub use governed::{
-    EntityPolicyContext, GovernedComponentStatus, GovernedDocumentGap,
-    GovernedDocumentRequirements, GovernedDocumentRequirementsService, GovernedObligationCategory,
-    GovernedObligationStatus, GovernedRequirementMatrix, GovernedStrategyStatus,
+    GovernedDocumentRequirements, GovernedDocumentRequirementsService, GovernedRequirementMatrix,
 };
 pub use policy::{
     ActiveDocumentPolicyBundle, DocumentPolicyService, PublishedEvidenceStrategy,

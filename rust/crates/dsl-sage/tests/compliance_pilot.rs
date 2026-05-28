@@ -184,21 +184,21 @@ async fn run_pilot_scenario(
         .expect("confirm step failed");
 
     // ── Steps 4+5: DSL emission + compile validation ──────────────────────────
-    let (dsl_source, atom_names, compile_passed, node_count, provenance_pack) =
-        match &session.state {
-            SageState::Instantiated { result, validation } => (
-                result.dsl_source.clone(),
-                result.atom_names.clone(),
-                !validation.has_errors,
-                validation.node_count,
-                result.pack_name.clone(),
-            ),
-            s => panic!(
-                "scenario {}: expected Instantiated state, got {:?}",
-                scenario_id,
-                std::mem::discriminant(s)
-            ),
-        };
+    let (dsl_source, atom_names, compile_passed, node_count, provenance_pack) = match &session.state
+    {
+        SageState::Instantiated { result, validation } => (
+            result.dsl_source.clone(),
+            result.atom_names.clone(),
+            !validation.has_errors,
+            validation.node_count,
+            result.pack_name.clone(),
+        ),
+        s => panic!(
+            "scenario {}: expected Instantiated state, got {:?}",
+            scenario_id,
+            std::mem::discriminant(s)
+        ),
+    };
 
     // ── Step 6: SVG rendering ─────────────────────────────────────────────────
     // Render from the structural DSL (without the provenance atom, which is
@@ -252,8 +252,7 @@ async fn compliance_pilot_all_5_scenarios() {
     let mut results = Vec::new();
 
     for (scenario_id, expected_pack, utterance) in PILOT_SCENARIOS {
-        let result =
-            run_pilot_scenario(scenario_id, expected_pack, utterance, &registry).await;
+        let result = run_pilot_scenario(scenario_id, expected_pack, utterance, &registry).await;
 
         // ── Box 1: pack match ─────────────────────────────────────────────────
         assert!(
@@ -364,10 +363,7 @@ async fn compliance_pilot_all_5_scenarios() {
             r.node_count,
             r.svg_length
         );
-        println!(
-            "  Audit:      {} transition entries",
-            r.audit_entries
-        );
+        println!("  Audit:      {} transition entries", r.audit_entries);
         println!();
     }
 
@@ -436,10 +432,12 @@ async fn pilot_audit_trail_content() {
     );
 
     // At least one entry should reference the utterance or matching.
-    let has_match_entry = result
-        .transition_log
-        .iter()
-        .any(|e| e.contains("Matched") || e.contains("candidate") || e.contains("utterance") || e.contains("Received"));
+    let has_match_entry = result.transition_log.iter().any(|e| {
+        e.contains("Matched")
+            || e.contains("candidate")
+            || e.contains("utterance")
+            || e.contains("Received")
+    });
     assert!(
         has_match_entry,
         "audit trail must include a matching entry; log: {:?}",
@@ -464,14 +462,12 @@ async fn pilot_compile_clean_for_all_scenarios() {
     let registry = load_test_registry();
 
     for (scenario_id, expected_pack, utterance) in PILOT_SCENARIOS {
-        let result =
-            run_pilot_scenario(scenario_id, expected_pack, utterance, &registry).await;
+        let result = run_pilot_scenario(scenario_id, expected_pack, utterance, &registry).await;
 
         assert!(
             result.compile_passed,
             "scenario {} (pack {}): compile must pass, but has_errors=true",
-            scenario_id,
-            expected_pack
+            scenario_id, expected_pack
         );
     }
 }

@@ -1,4 +1,4 @@
-//! ob-poc impl of [`dsl_runtime::service_traits::ConstellationRuntime`].
+//! ob-poc impl of [`ConstellationRuntime`].
 //!
 //! Bridges the plane-crossing `ConstellationRuntime` trait (defined in
 //! `dsl-runtime`) to the in-crate
@@ -14,7 +14,7 @@ use async_trait::async_trait;
 use sqlx::PgPool;
 use uuid::Uuid;
 
-use dsl_runtime::service_traits::ConstellationRuntime;
+use dsl_runtime::ConstellationRuntime;
 
 use crate::sem_os_runtime::constellation_runtime::{
     handle_constellation_hydrate, handle_constellation_summary,

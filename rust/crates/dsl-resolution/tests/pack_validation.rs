@@ -2,8 +2,8 @@
 //! provenance tracking.
 
 use dsl_diagnostics::DiagnosticBag;
-use dsl_resolution::{validate_bpmn, PackRegistry};
 use dsl_resolution::pack_registry::load_packs_from_dir;
+use dsl_resolution::{validate_bpmn, PackRegistry};
 
 // ---------------------------------------------------------------------------
 // Test 1: conjunctive-gate parses and validates cleanly
@@ -48,9 +48,9 @@ fn conjunctive_gate_parses_and_validates() {
 #[test]
 fn all_12_packs_load() {
     let packs_dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-        .parent()  // crates/dsl-resolution -> crates/
+        .parent() // crates/dsl-resolution -> crates/
         .unwrap()
-        .parent()  // crates/ -> rust/
+        .parent() // crates/ -> rust/
         .unwrap()
         .join("dsl-source/packs");
 
@@ -213,8 +213,8 @@ fn load_single_pack(filename: &str) -> PackRegistry {
         .unwrap()
         .join("dsl-source/packs");
     let path = packs_dir.join(filename);
-    let source = std::fs::read_to_string(&path)
-        .unwrap_or_else(|e| panic!("failed to read {filename}: {e}"));
+    let source =
+        std::fs::read_to_string(&path).unwrap_or_else(|e| panic!("failed to read {filename}: {e}"));
     let (sf, parse_diag) = dsl_parser::parse(&source);
     let mut diag = DiagnosticBag::new();
     for d in parse_diag.diagnostics {
@@ -368,30 +368,34 @@ fn pack_registry_queries() {
 
 fn pack_source(pack_name: &str) -> &'static str {
     match pack_name {
-        "conjunctive-gate" =>
-            include_str!("../../../dsl-source/packs/conjunctive-gate.dsl"),
-        "disjunctive-gate" =>
-            include_str!("../../../dsl-source/packs/disjunctive-gate.dsl"),
-        "sanction-hit-escalation" =>
-            include_str!("../../../dsl-source/packs/sanction-hit-escalation.dsl"),
-        "periodic-refresh-trigger" =>
-            include_str!("../../../dsl-source/packs/periodic-refresh-trigger.dsl"),
-        "manual-override-checkpoint" =>
-            include_str!("../../../dsl-source/packs/manual-override-checkpoint.dsl"),
-        "threshold-band-routing" =>
-            include_str!("../../../dsl-source/packs/threshold-band-routing.dsl"),
-        "multi-jurisdiction-overlay" =>
-            include_str!("../../../dsl-source/packs/multi-jurisdiction-overlay.dsl"),
-        "linked-switch-chain" =>
-            include_str!("../../../dsl-source/packs/linked-switch-chain.dsl"),
-        "parallel-evaluation-with-veto" =>
-            include_str!("../../../dsl-source/packs/parallel-evaluation-with-veto.dsl"),
-        "cascading-decision" =>
-            include_str!("../../../dsl-source/packs/cascading-decision.dsl"),
-        "decision-table-classification" =>
-            include_str!("../../../dsl-source/packs/decision-table-classification.dsl"),
-        "required-evidence-checklist" =>
-            include_str!("../../../dsl-source/packs/required-evidence-checklist.dsl"),
+        "conjunctive-gate" => include_str!("../../../dsl-source/packs/conjunctive-gate.dsl"),
+        "disjunctive-gate" => include_str!("../../../dsl-source/packs/disjunctive-gate.dsl"),
+        "sanction-hit-escalation" => {
+            include_str!("../../../dsl-source/packs/sanction-hit-escalation.dsl")
+        }
+        "periodic-refresh-trigger" => {
+            include_str!("../../../dsl-source/packs/periodic-refresh-trigger.dsl")
+        }
+        "manual-override-checkpoint" => {
+            include_str!("../../../dsl-source/packs/manual-override-checkpoint.dsl")
+        }
+        "threshold-band-routing" => {
+            include_str!("../../../dsl-source/packs/threshold-band-routing.dsl")
+        }
+        "multi-jurisdiction-overlay" => {
+            include_str!("../../../dsl-source/packs/multi-jurisdiction-overlay.dsl")
+        }
+        "linked-switch-chain" => include_str!("../../../dsl-source/packs/linked-switch-chain.dsl"),
+        "parallel-evaluation-with-veto" => {
+            include_str!("../../../dsl-source/packs/parallel-evaluation-with-veto.dsl")
+        }
+        "cascading-decision" => include_str!("../../../dsl-source/packs/cascading-decision.dsl"),
+        "decision-table-classification" => {
+            include_str!("../../../dsl-source/packs/decision-table-classification.dsl")
+        }
+        "required-evidence-checklist" => {
+            include_str!("../../../dsl-source/packs/required-evidence-checklist.dsl")
+        }
         _ => panic!("unknown pack: {pack_name}"),
     }
 }

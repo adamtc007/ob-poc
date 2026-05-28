@@ -30,22 +30,24 @@
 //! println!("status: {:?}", engine.get_instance_status(id).await?);
 //! ```
 
-pub mod builtins;
-pub mod event_loop;
-pub mod metrics;
-pub mod processor;
-pub mod retention;
-pub mod store;
-pub mod switch;
-pub mod types;
-pub mod verb;
+mod builtins;
+mod event_loop;
+mod metrics;
+mod processor;
+mod retention;
+mod store;
+mod switch;
+mod types;
+mod verb;
 
 #[cfg(feature = "postgres")]
-pub mod store_postgres;
+mod store_postgres;
 
 // Re-export the most commonly used items.
+pub use builtins::{register_builtins, DslFormHandler};
 pub use event_loop::RuntimeEngine;
 pub use metrics::{MetricsSnapshot, RuntimeMetrics};
+pub use processor::{apply_merge_protocol, MergeResult};
 pub use retention::RetentionPolicy;
 pub use store::{InMemoryJourneyStore, JourneyLogEntry, JourneyStore, PendingWaitInfo};
 pub use switch::{
@@ -55,7 +57,6 @@ pub use types::{
     ActiveToken, EventEnvelope, EventId, EventKind, InstanceId, InstanceStatus, TokenId,
     WorkflowInstance, WriteLogEntry,
 };
-pub use builtins::{register_builtins, DslFormHandler};
 pub use verb::{VerbContext, VerbEffect, VerbError, VerbHandler, VerbOutput, VerbRegistry};
 
 #[cfg(feature = "postgres")]

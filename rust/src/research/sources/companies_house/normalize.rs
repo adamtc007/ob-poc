@@ -10,7 +10,7 @@ use crate::research::sources::normalized::{
 use chrono::NaiveDate;
 
 /// Normalize a Companies House company profile
-pub fn normalize_company(company: &ChCompanyProfile, include_raw: bool) -> NormalizedEntity {
+pub(super) fn normalize_company(company: &ChCompanyProfile, include_raw: bool) -> NormalizedEntity {
     NormalizedEntity {
         source_key: company.company_number.clone(),
         source_name: "Companies House".to_string(),
@@ -39,7 +39,7 @@ pub fn normalize_company(company: &ChCompanyProfile, include_raw: bool) -> Norma
 }
 
 /// Normalize a PSC record to a control holder
-pub fn normalize_psc(psc: &ChPscRecord) -> NormalizedControlHolder {
+pub(super) fn normalize_psc(psc: &ChPscRecord) -> NormalizedControlHolder {
     let (pct_low, pct_high) = psc.ownership_range();
     let (voting_low, voting_high) = psc.voting_range();
 
@@ -80,7 +80,7 @@ pub fn normalize_psc(psc: &ChPscRecord) -> NormalizedControlHolder {
 }
 
 /// Normalize an officer record
-pub fn normalize_officer(officer: &ChOfficer) -> NormalizedOfficer {
+pub(super) fn normalize_officer(officer: &ChOfficer) -> NormalizedOfficer {
     NormalizedOfficer {
         name: officer.name.clone(),
         role: officer.role(),
@@ -97,7 +97,7 @@ pub fn normalize_officer(officer: &ChOfficer) -> NormalizedOfficer {
 }
 
 /// Normalize a CH address
-pub fn normalize_address(addr: &ChAddress) -> NormalizedAddress {
+pub(super) fn normalize_address(addr: &ChAddress) -> NormalizedAddress {
     let mut lines = Vec::new();
 
     if let Some(ref care_of) = addr.care_of {

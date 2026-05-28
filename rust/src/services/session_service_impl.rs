@@ -1,4 +1,4 @@
-//! ob-poc impl of [`dsl_runtime::service_traits::SessionService`].
+//! ob-poc impl of [`SessionService`].
 //!
 //! Single-method dispatcher for the 19 `session.*` verbs from
 //! `config/verbs/session.yaml`. The bridge holds the full ob-poc
@@ -13,7 +13,7 @@ use serde_json::{json, Map, Value};
 use sqlx::PgPool;
 use uuid::Uuid;
 
-use dsl_runtime::service_traits::SessionService;
+use dsl_runtime::SessionService;
 
 use crate::session::unified::StructureType;
 use crate::session::UnifiedSession;

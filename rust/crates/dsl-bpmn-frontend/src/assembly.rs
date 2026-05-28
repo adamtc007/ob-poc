@@ -10,7 +10,7 @@ use std::collections::{HashMap, HashSet, VecDeque};
 use dsl_ast::AtomBag;
 use dsl_atoms::StructuralKind;
 use dsl_diagnostics::{Diagnostic, DiagnosticBag, UNDECLARED_MERGE, UNRESOLVED_NAME_REF};
-use dsl_parser::raw_ast::RawValue;
+use dsl_parser::RawValue;
 
 use crate::railway::{
     BoundaryAttachmentEntry, GatewayKind, MergeClause, MergeOperator, NodeKind, ParallelJoinEntry,

@@ -55,7 +55,10 @@ fn parse_args() -> Args {
         }
     }
 
-    Args { verbs_dir, output_dir }
+    Args {
+        verbs_dir,
+        output_dir,
+    }
 }
 
 // ── Entry point ──────────────────────────────────────────────────────────────
@@ -129,7 +132,11 @@ fn main() -> Result<()> {
             yaml_path.display(),
             out_path.display(),
             n_verbs,
-            if n_pd > 0 { format!(", {} Pattern D", n_pd) } else { String::new() }
+            if n_pd > 0 {
+                format!(", {} Pattern D", n_pd)
+            } else {
+                String::new()
+            }
         );
         total_files += 1;
     }
@@ -155,14 +162,17 @@ fn collect_yaml_files(dir: &Path, files: &mut Vec<PathBuf>) -> Result<()> {
     if !dir.exists() {
         return Ok(());
     }
-    for entry in std::fs::read_dir(dir)
-        .with_context(|| format!("reading dir {}", dir.display()))?
-    {
+    for entry in std::fs::read_dir(dir).with_context(|| format!("reading dir {}", dir.display()))? {
         let entry = entry?;
         let path = entry.path();
         if path.is_dir() {
             collect_yaml_files(&path, files)?;
-        } else if path.extension().and_then(|e| e.to_str()).map(|e| e == "yaml" || e == "yml").unwrap_or(false) {
+        } else if path
+            .extension()
+            .and_then(|e| e.to_str())
+            .map(|e| e == "yaml" || e == "yml")
+            .unwrap_or(false)
+        {
             files.push(path);
         }
     }
@@ -209,7 +219,10 @@ fn generate_dsl_for_file(source_path: &Path, config: &VerbsConfig) -> (String, u
             let is_pattern_d = verb.transition_args.is_some();
             if is_pattern_d {
                 pattern_d += 1;
-                let _ = writeln!(out, "; Pattern D: transition_args present — see docs/verb-redesigns/");
+                let _ = writeln!(
+                    out,
+                    "; Pattern D: transition_args present — see docs/verb-redesigns/"
+                );
             }
 
             emit_verb_atom(&mut out, &fqn, verb);
@@ -231,7 +244,9 @@ fn generate_dsl_for_file(source_path: &Path, config: &VerbsConfig) -> (String, u
 fn emit_utterance_binding_domain(out: &mut String, domain: &str, hints: &[String]) {
     let _ = write!(out, "(utterance-binding {} :invocation-hints [", domain);
     for (i, hint) in hints.iter().enumerate() {
-        if i > 0 { let _ = write!(out, " "); }
+        if i > 0 {
+            let _ = write!(out, " ");
+        }
         let _ = write!(out, "{}", dsl_string(hint));
     }
     let _ = writeln!(out, "])\n");
@@ -240,7 +255,9 @@ fn emit_utterance_binding_domain(out: &mut String, domain: &str, hints: &[String
 fn emit_utterance_binding_verb(out: &mut String, fqn: &str, phrases: &[String]) {
     let _ = write!(out, "(utterance-binding {} :phrases [", fqn);
     for (i, p) in phrases.iter().enumerate() {
-        if i > 0 { let _ = write!(out, " "); }
+        if i > 0 {
+            let _ = write!(out, " ");
+        }
         let _ = write!(out, "{}", dsl_string(p));
     }
     let _ = writeln!(out, "] :verb {})\n", fqn);
@@ -258,7 +275,11 @@ fn emit_verb_atom(out: &mut String, fqn: &str, verb: &VerbConfig) {
         let _ = writeln!(out, "  :handler {}", dsl_string(handler));
     }
     if let Some(ec) = &verb.effect_class {
-        let _ = writeln!(out, "  :effect-class {}", dsl_string(&format!("{:?}", ec).to_snake_case_str()));
+        let _ = writeln!(
+            out,
+            "  :effect-class {}",
+            dsl_string(&format!("{:?}", ec).to_snake_case_str())
+        );
     }
     if let Some(flavour) = &verb.flavour {
         let _ = writeln!(out, "  :flavour {}", dsl_string(flavour_str(*flavour)));
@@ -271,7 +292,11 @@ fn emit_verb_atom(out: &mut String, fqn: &str, verb: &VerbConfig) {
         let _ = writeln!(out, "  :audit-class {}", dsl_string(ac));
     }
     if let Some(cp) = &verb.confirm_policy {
-        let _ = writeln!(out, "  :confirm-policy {}", dsl_string(confirm_policy_str(*cp)));
+        let _ = writeln!(
+            out,
+            "  :confirm-policy {}",
+            dsl_string(confirm_policy_str(*cp))
+        );
     }
 
     // Metadata (JSON)

@@ -4,8 +4,8 @@
 //! the `classify` function for kind string mapping, and slot parameter type
 //! descriptors used by the type-checker (Tranche 5+).
 
-pub mod kinds;
-pub mod param_type;
+mod kinds;
+mod param_type;
 
 pub use kinds::{classify, AtomKindClass, DeclarativeKind, StructuralKind};
 pub use param_type::ParamType;

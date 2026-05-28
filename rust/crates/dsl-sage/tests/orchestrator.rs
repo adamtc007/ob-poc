@@ -54,19 +54,14 @@ async fn end_to_end_conjunctive_gate() {
     orchestrator
         .step(
             &mut session,
-            SageInput::Utterance(
-                "all three checks must pass: KYC, screening, and UBO".to_string(),
-            ),
+            SageInput::Utterance("all three checks must pass: KYC, screening, and UBO".to_string()),
         )
         .await
         .unwrap();
 
     let candidates = match &session.state {
         SageState::Matching { candidates } => candidates.clone(),
-        s => panic!(
-            "expected Matching, got {:?}",
-            std::mem::discriminant(s)
-        ),
+        s => panic!("expected Matching, got {:?}", std::mem::discriminant(s)),
     };
     assert!(!candidates.is_empty(), "should have at least one candidate");
 
@@ -97,7 +92,10 @@ async fn end_to_end_conjunctive_gate() {
 
     match &session.state {
         SageState::Instantiated { result, validation } => {
-            assert!(!result.dsl_source.is_empty(), "DSL source must not be empty");
+            assert!(
+                !result.dsl_source.is_empty(),
+                "DSL source must not be empty"
+            );
             assert!(
                 result.dsl_source.contains("provenance"),
                 "DSL source must contain a provenance atom"
@@ -110,10 +108,7 @@ async fn end_to_end_conjunctive_gate() {
             );
             let _ = validation; // validated by the instantiator
         }
-        s => panic!(
-            "expected Instantiated, got {:?}",
-            std::mem::discriminant(s)
-        ),
+        s => panic!("expected Instantiated, got {:?}", std::mem::discriminant(s)),
     }
 
     // Transition log should have at least 3 entries (one per step).
@@ -306,9 +301,6 @@ async fn full_deploy_cycle() {
                 workflow_id
             );
         }
-        s => panic!(
-            "expected Deployed, got {:?}",
-            std::mem::discriminant(s)
-        ),
+        s => panic!("expected Deployed, got {:?}", std::mem::discriminant(s)),
     }
 }

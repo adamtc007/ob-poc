@@ -37,7 +37,8 @@ use std::collections::HashMap;
 use uuid::Uuid;
 
 use crate::dsl_v2::execution::ExecutionContext;
-use crate::graph::{EntityGraph, GraphFilters, ViewportContext};
+use crate::graph::types::{EntityGraph, GraphFilters};
+use crate::graph::ViewportContext;
 use crate::navigation::{NavCommand, NavExecutor, NavResult};
 
 pub use crate::research::ApprovedResearch;

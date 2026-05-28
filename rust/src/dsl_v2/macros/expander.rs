@@ -1,3 +1,4 @@
+#![allow(unreachable_pub)]
 //! Macro Expander
 //!
 //! Expands operator macros into primitive DSL statements.

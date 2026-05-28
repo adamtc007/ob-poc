@@ -22,10 +22,10 @@ use dsl_core::config::types::{
     ArgConfig, ConfirmPolicyConfig, CrudConfig, DomainConfig, DurableConfig, GraphQueryConfig,
     PolicyConfig, ReturnsConfig, ThreeAxisDeclaration, TransitionArgs, VerbBehavior, VerbConfig,
     VerbConsumes, VerbFlavour, VerbLifecycle, VerbMetadata, VerbOutputConfig, VerbProduces,
-    VerbSentences, VerbsConfig, VerbWriteConfig,
+    VerbSentences, VerbWriteConfig, VerbsConfig,
 };
 use dsl_diagnostics::{Diagnostic, DiagnosticBag};
-use dsl_parser::raw_ast::RawValue;
+use dsl_parser::RawValue;
 
 // ── Public entry points ───────────────────────────────────────────────────────
 
@@ -40,8 +40,15 @@ pub fn load_verbs_from_dsl_dir(dir: &Path, diagnostics: &mut DiagnosticBag) -> V
     let dsl_files = match find_dsl_files(dir) {
         Ok(f) => f,
         Err(e) => {
-            diagnostics.push(Diagnostic::error(format!("Failed to scan {}: {}", dir.display(), e)));
-            return VerbsConfig { version: "2.0".to_string(), domains };
+            diagnostics.push(Diagnostic::error(format!(
+                "Failed to scan {}: {}",
+                dir.display(),
+                e
+            )));
+            return VerbsConfig {
+                version: "2.0".to_string(),
+                domains,
+            };
         }
     };
 
@@ -50,7 +57,9 @@ pub fn load_verbs_from_dsl_dir(dir: &Path, diagnostics: &mut DiagnosticBag) -> V
             Ok(s) => s,
             Err(e) => {
                 diagnostics.push(Diagnostic::error(format!(
-                    "Failed to read {}: {}", path.display(), e
+                    "Failed to read {}: {}",
+                    path.display(),
+                    e
                 )));
                 continue;
             }
@@ -72,7 +81,10 @@ pub fn load_verbs_from_dsl_dir(dir: &Path, diagnostics: &mut DiagnosticBag) -> V
         extract_domains_from_bag(&bag, &mut domains, diagnostics);
     }
 
-    VerbsConfig { version: "2.0".to_string(), domains }
+    VerbsConfig {
+        version: "2.0".to_string(),
+        domains,
+    }
 }
 
 // ── File discovery ─────────────────────────────────────────────────────────────
@@ -139,7 +151,8 @@ fn extract_verb_atom(
         Some(pair) => pair,
         None => {
             diagnostics.push(Diagnostic::error(format!(
-                "verb atom has non-FQN name '{}' (expected 'domain.verb')", fqn
+                "verb atom has non-FQN name '{}' (expected 'domain.verb')",
+                fqn
             )));
             return;
         }
@@ -183,7 +196,8 @@ fn extract_verb_atom(
         match serde_json::from_str::<VerbMetadata>(&json) {
             Ok(m) => verb.metadata = Some(m),
             Err(e) => diagnostics.push(Diagnostic::error(format!(
-                "{} :metadata-json parse error: {}", fqn, e
+                "{} :metadata-json parse error: {}",
+                fqn, e
             ))),
         }
     }
@@ -192,7 +206,8 @@ fn extract_verb_atom(
         match serde_json::from_str::<ThreeAxisDeclaration>(&json) {
             Ok(t) => verb.three_axis = Some(t),
             Err(e) => diagnostics.push(Diagnostic::error(format!(
-                "{} :three-axis-json parse error: {}", fqn, e
+                "{} :three-axis-json parse error: {}",
+                fqn, e
             ))),
         }
     }
@@ -201,7 +216,8 @@ fn extract_verb_atom(
         match serde_json::from_str::<TransitionArgs>(&json) {
             Ok(ta) => verb.transition_args = Some(ta),
             Err(e) => diagnostics.push(Diagnostic::error(format!(
-                "{} :transition-args-json parse error: {}", fqn, e
+                "{} :transition-args-json parse error: {}",
+                fqn, e
             ))),
         }
     }
@@ -210,7 +226,8 @@ fn extract_verb_atom(
         match serde_json::from_str::<VerbProduces>(&json) {
             Ok(p) => verb.produces = Some(p),
             Err(e) => diagnostics.push(Diagnostic::error(format!(
-                "{} :produces-json parse error: {}", fqn, e
+                "{} :produces-json parse error: {}",
+                fqn, e
             ))),
         }
     }
@@ -219,7 +236,8 @@ fn extract_verb_atom(
         match serde_json::from_str::<Vec<VerbConsumes>>(&json) {
             Ok(c) => verb.consumes = c,
             Err(e) => diagnostics.push(Diagnostic::error(format!(
-                "{} :consumes-json parse error: {}", fqn, e
+                "{} :consumes-json parse error: {}",
+                fqn, e
             ))),
         }
     }
@@ -228,7 +246,8 @@ fn extract_verb_atom(
         match serde_json::from_str::<VerbLifecycle>(&json) {
             Ok(lc) => verb.lifecycle = Some(lc),
             Err(e) => diagnostics.push(Diagnostic::error(format!(
-                "{} :lifecycle-json parse error: {}", fqn, e
+                "{} :lifecycle-json parse error: {}",
+                fqn, e
             ))),
         }
     }
@@ -237,7 +256,8 @@ fn extract_verb_atom(
         match serde_json::from_str::<PolicyConfig>(&json) {
             Ok(p) => verb.policy = Some(p),
             Err(e) => diagnostics.push(Diagnostic::error(format!(
-                "{} :policy-json parse error: {}", fqn, e
+                "{} :policy-json parse error: {}",
+                fqn, e
             ))),
         }
     }
@@ -246,7 +266,8 @@ fn extract_verb_atom(
         match serde_json::from_str::<VerbSentences>(&json) {
             Ok(s) => verb.sentences = Some(s),
             Err(e) => diagnostics.push(Diagnostic::error(format!(
-                "{} :sentences-json parse error: {}", fqn, e
+                "{} :sentences-json parse error: {}",
+                fqn, e
             ))),
         }
     }
@@ -255,7 +276,8 @@ fn extract_verb_atom(
         match serde_json::from_str::<ReturnsConfig>(&json) {
             Ok(r) => verb.returns = Some(r),
             Err(e) => diagnostics.push(Diagnostic::error(format!(
-                "{} :returns-json parse error: {}", fqn, e
+                "{} :returns-json parse error: {}",
+                fqn, e
             ))),
         }
     }
@@ -264,7 +286,8 @@ fn extract_verb_atom(
         match serde_json::from_str::<Vec<VerbOutputConfig>>(&json) {
             Ok(o) => verb.outputs = o,
             Err(e) => diagnostics.push(Diagnostic::error(format!(
-                "{} :outputs-json parse error: {}", fqn, e
+                "{} :outputs-json parse error: {}",
+                fqn, e
             ))),
         }
     }
@@ -273,7 +296,8 @@ fn extract_verb_atom(
         match serde_json::from_str::<Vec<VerbWriteConfig>>(&json) {
             Ok(w) => verb.writes = w,
             Err(e) => diagnostics.push(Diagnostic::error(format!(
-                "{} :writes-json parse error: {}", fqn, e
+                "{} :writes-json parse error: {}",
+                fqn, e
             ))),
         }
     }
@@ -282,7 +306,8 @@ fn extract_verb_atom(
         match serde_json::from_str::<Vec<ArgConfig>>(&json) {
             Ok(a) => verb.args = a,
             Err(e) => diagnostics.push(Diagnostic::error(format!(
-                "{} :args-json parse error: {}", fqn, e
+                "{} :args-json parse error: {}",
+                fqn, e
             ))),
         }
     }
@@ -291,7 +316,8 @@ fn extract_verb_atom(
         match serde_json::from_str::<CrudConfig>(&json) {
             Ok(c) => verb.crud = Some(c),
             Err(e) => diagnostics.push(Diagnostic::error(format!(
-                "{} :crud-json parse error: {}", fqn, e
+                "{} :crud-json parse error: {}",
+                fqn, e
             ))),
         }
     }
@@ -300,7 +326,8 @@ fn extract_verb_atom(
         match serde_json::from_str::<DurableConfig>(&json) {
             Ok(d) => verb.durable = Some(d),
             Err(e) => diagnostics.push(Diagnostic::error(format!(
-                "{} :durable-json parse error: {}", fqn, e
+                "{} :durable-json parse error: {}",
+                fqn, e
             ))),
         }
     }
@@ -309,7 +336,8 @@ fn extract_verb_atom(
         match serde_json::from_str::<GraphQueryConfig>(&json) {
             Ok(g) => verb.graph_query = Some(g),
             Err(e) => diagnostics.push(Diagnostic::error(format!(
-                "{} :graph-query-json parse error: {}", fqn, e
+                "{} :graph-query-json parse error: {}",
+                fqn, e
             ))),
         }
     }
@@ -340,14 +368,12 @@ fn extract_utterance_binding(atom: &TypedAtom, domains: &mut HashMap<String, Dom
     if let Some(hints) = get_slot_list(raw, "invocation-hints") {
         // domain-level hints — name is the domain name (no dot)
         if !name.contains('.') {
-            let domain_entry = domains
-                .entry(name.clone())
-                .or_insert_with(|| DomainConfig {
-                    description: name.clone(),
-                    verbs: HashMap::new(),
-                    dynamic_verbs: Vec::new(),
-                    invocation_hints: Vec::new(),
-                });
+            let domain_entry = domains.entry(name.clone()).or_insert_with(|| DomainConfig {
+                description: name.clone(),
+                verbs: HashMap::new(),
+                dynamic_verbs: Vec::new(),
+                invocation_hints: Vec::new(),
+            });
             // Merge — avoid duplicates
             for hint in hints {
                 if !domain_entry.invocation_hints.contains(&hint) {
@@ -378,7 +404,7 @@ fn extract_utterance_binding(atom: &TypedAtom, domains: &mut HashMap<String, Dom
 
 /// Extract a string value from a slot. Returns `None` if the slot is absent
 /// or has a non-string value.
-fn get_slot_str(raw: &dsl_parser::raw_ast::RawAtom, slot_name: &str) -> Option<String> {
+fn get_slot_str(raw: &dsl_parser::RawAtom, slot_name: &str) -> Option<String> {
     for (key, val) in &raw.slots {
         if key == slot_name {
             return match val {
@@ -392,7 +418,7 @@ fn get_slot_str(raw: &dsl_parser::raw_ast::RawAtom, slot_name: &str) -> Option<S
 }
 
 /// Extract a list of strings from a slot. Returns `None` if slot is absent.
-fn get_slot_list(raw: &dsl_parser::raw_ast::RawAtom, slot_name: &str) -> Option<Vec<String>> {
+fn get_slot_list(raw: &dsl_parser::RawAtom, slot_name: &str) -> Option<Vec<String>> {
     for (key, val) in &raw.slots {
         if key == slot_name {
             return match val {

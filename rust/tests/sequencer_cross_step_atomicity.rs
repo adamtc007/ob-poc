@@ -327,7 +327,7 @@ mod cross_step_tests {
         // Open outer scope. Run runbook. Caller (this test) owns commit/rollback.
         let mut scope = PgTransactionScope::begin(&db.pool).await?;
         let result = {
-            let scope_dyn: &mut dyn dsl_runtime::tx::TransactionScope = &mut scope;
+            let scope_dyn: &mut dyn TransactionScope = &mut scope;
             execute_runbook_in_scope(&store, id, None, &step_exec, scope_dyn).await?
         };
 
@@ -389,7 +389,7 @@ mod cross_step_tests {
 
         let mut scope = PgTransactionScope::begin(&db.pool).await?;
         let result = {
-            let scope_dyn: &mut dyn dsl_runtime::tx::TransactionScope = &mut scope;
+            let scope_dyn: &mut dyn TransactionScope = &mut scope;
             execute_runbook_in_scope(&store, id, None, &step_exec, scope_dyn).await?
         };
 

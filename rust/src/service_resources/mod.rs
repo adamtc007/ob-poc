@@ -89,7 +89,6 @@ pub use types::{
     RequirementStrength,
     ResultExplanation,
 
-    // Core types
     ServiceIntent,
     // API response types
     ServiceIntentResponse,

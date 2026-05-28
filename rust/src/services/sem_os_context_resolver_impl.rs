@@ -1,4 +1,4 @@
-//! ob-poc impl of [`dsl_runtime::service_traits::SemOsContextResolver`].
+//! ob-poc impl of [`SemOsContextResolver`].
 //!
 //! Bridges the plane-crossing trait to
 //! `crate::sem_reg::agent::mcp_tools::build_sem_os_service`, which
@@ -12,7 +12,7 @@ use sem_os_core::principal::Principal;
 use sem_os_policy::context_resolution::{ContextResolutionRequest, ContextResolutionResponse};
 use sqlx::PgPool;
 
-use dsl_runtime::service_traits::SemOsContextResolver;
+use dsl_runtime::SemOsContextResolver;
 
 use crate::sem_reg::agent::mcp_tools::build_sem_os_service;
 

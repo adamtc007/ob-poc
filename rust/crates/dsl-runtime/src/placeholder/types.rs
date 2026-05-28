@@ -46,7 +46,8 @@ impl std::str::FromStr for PlaceholderStatus {
 /// Kind of placeholder entity (maps to expected role/function).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
-pub struct PlaceholderKind {
+#[allow(dead_code)]
+pub(crate) struct PlaceholderKind {
     /// Unique code for this kind (e.g., "depositary", "auditor")
     pub code: String,
     /// Human-readable label

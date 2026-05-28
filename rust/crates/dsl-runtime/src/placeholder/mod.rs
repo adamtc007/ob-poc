@@ -18,7 +18,7 @@
 //! ## Usage
 //!
 //! ```rust,ignore
-//! use dsl_runtime::placeholder::{PlaceholderResolver, CreatePlaceholderRequest};
+//! use dsl_runtime::{PlaceholderResolver, CreatePlaceholderRequest};
 //!
 //! let resolver = PlaceholderResolver::new(pool);
 //!
@@ -38,8 +38,8 @@
 //! }).await?;
 //! ```
 
-pub mod resolver;
-pub mod types;
+mod resolver;
+mod types;
 
 pub use resolver::PlaceholderResolver;
 pub use types::{

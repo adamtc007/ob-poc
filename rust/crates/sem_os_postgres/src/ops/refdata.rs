@@ -12,7 +12,7 @@ use async_trait::async_trait;
 use serde_json::Value as JsonValue;
 use sqlx::{Postgres, QueryBuilder};
 
-use dsl_runtime::tx::TransactionScope;
+use dsl_runtime::TransactionScope;
 use dsl_runtime::{VerbExecutionContext, VerbExecutionOutcome};
 
 use super::SemOsVerbOp;

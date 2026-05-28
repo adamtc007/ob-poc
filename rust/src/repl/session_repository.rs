@@ -54,13 +54,11 @@ impl SessionRepositoryV2 {
 
     /// Check the current DB version for a session (for stale-write detection).
     pub async fn current_version(&self, session_id: Uuid) -> Result<Option<i64>> {
-        sqlx::query_scalar(
-            r#"SELECT version FROM "ob-poc".repl_sessions_v2 WHERE session_id = $1"#,
-        )
-        .bind(session_id)
-        .fetch_optional(&self.pool)
-        .await
-        .context("Failed to read session version")
+        sqlx::query_scalar(r#"SELECT version FROM "ob-poc".repl_sessions_v2 WHERE session_id = $1"#)
+            .bind(session_id)
+            .fetch_optional(&self.pool)
+            .await
+            .context("Failed to read session version")
     }
 
     /// Compatibility wrapper for older held-lock call sites.

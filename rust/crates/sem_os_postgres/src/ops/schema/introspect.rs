@@ -10,8 +10,8 @@ use anyhow::{anyhow, Result};
 use async_trait::async_trait;
 use serde_json::Value;
 
-use dsl_runtime::service_traits::StewardshipDispatch;
-use dsl_runtime::tx::TransactionScope;
+use dsl_runtime::StewardshipDispatch;
+use dsl_runtime::TransactionScope;
 use dsl_runtime::{VerbExecutionContext, VerbExecutionOutcome};
 
 use crate::ops::SemOsVerbOp;

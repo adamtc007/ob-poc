@@ -208,8 +208,7 @@ fn emit_provenance(
         let id = uuid::Uuid::new_v4().to_string().replace('-', "");
         format!("sess-{}", &id[..12])
     };
-    let now = chrono::Utc::now()
-        .to_rfc3339_opts(chrono::SecondsFormat::Secs, true);
+    let now = chrono::Utc::now().to_rfc3339_opts(chrono::SecondsFormat::Secs, true);
     let covers = atom_names.join(" ");
     let params_str = serde_json::to_string(parameters).unwrap_or_else(|_| "{}".to_string());
 
@@ -251,10 +250,7 @@ fn extract_atom_names(dsl: &str) -> Vec<String> {
                         .chars()
                         .take_while(|c| c.is_alphanumeric() || *c == '-' || *c == '_')
                         .collect();
-                    if !clean.is_empty()
-                        && !clean.starts_with('$')
-                        && !clean.starts_with(',')
-                    {
+                    if !clean.is_empty() && !clean.starts_with('$') && !clean.starts_with(',') {
                         names.push(clean);
                     }
                 }
@@ -319,11 +315,12 @@ fn expand_for_each(template: &str, var_name: &str, elements: &[serde_json::Value
 // Per-pack expansion functions (structural atoms only — no provenance)
 // ---------------------------------------------------------------------------
 
-fn str_param<'a>(params: &'a HashMap<String, serde_json::Value>, key: &str, default: &'a str) -> &'a str {
-    params
-        .get(key)
-        .and_then(|v| v.as_str())
-        .unwrap_or(default)
+fn str_param<'a>(
+    params: &'a HashMap<String, serde_json::Value>,
+    key: &str,
+    default: &'a str,
+) -> &'a str {
+    params.get(key).and_then(|v| v.as_str()).unwrap_or(default)
 }
 
 fn expand_conjunctive_gate(params: &HashMap<String, serde_json::Value>) -> String {
@@ -969,7 +966,10 @@ mod tests {
                 "tasks".to_string(),
                 serde_json::json!([{"name": "id-check"}, {"name": "address-check"}]),
             ),
-            ("checklist-gate-name".to_string(), serde_json::json!("ev-gate")),
+            (
+                "checklist-gate-name".to_string(),
+                serde_json::json!("ev-gate"),
+            ),
             ("approval-path".to_string(), serde_json::json!("approved")),
             ("rejection-path".to_string(), serde_json::json!("rejected")),
         ]

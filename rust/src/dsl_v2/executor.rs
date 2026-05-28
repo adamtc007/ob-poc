@@ -24,7 +24,7 @@ use ob_poc_types::ViewportState;
 
 // Import GraphScope for pending_scope_change field
 // This enables session.set-* operations to communicate scope changes back to the session layer
-use crate::graph::GraphScope;
+use crate::graph::types::GraphScope;
 
 // Import UnifiedSession for pending session state
 // This enables session.load-*/unload-*/undo/redo to communicate session state back
@@ -40,6 +40,10 @@ use super::generic_executor::{GenericCrudExecutor, GenericExecutionResult};
 use super::runtime_registry::{runtime_registry, RuntimeBehavior};
 #[cfg(feature = "database")]
 use super::submission::{DslSubmission, SubmissionError, SubmissionLimits};
+#[cfg(feature = "database")]
+use dsl_runtime::{
+    SemOsChildDispatcher, ServicePipelineService, TransactionScope,
+};
 #[cfg(feature = "database")]
 use sem_os_postgres::ops::SemOsVerbOpRegistry;
 
@@ -83,7 +87,7 @@ use super::expansion::{ExpansionReport, LockKey, LockMode};
 /// Unresolved reference info for error reporting
 #[cfg(feature = "database")]
 #[derive(Debug, Clone)]
-pub struct UnresolvedRef {
+pub(crate) struct UnresolvedRef {
     /// Stable location identifier from AST: "{stmt_index}:{span.start}-{span.end}"
     pub ref_id: Option<String>,
     /// The unresolved value (e.g., "Allianz Global Investors")
@@ -1275,14 +1279,12 @@ impl DslExecutor {
     pub fn with_sem_os_ops(mut self, ops: std::sync::Arc<SemOsVerbOpRegistry>) -> Self {
         if self.service_registry.is_empty() {
             let mut services = dsl_runtime::ServiceRegistryBuilder::new();
-            services.register::<dyn dsl_runtime::service_traits::SemOsChildDispatcher>(
-                std::sync::Arc::new(sem_os_postgres::ops::RegistryChildDispatcher::new(
-                    ops.clone(),
-                )),
-            );
-            services.register::<dyn dsl_runtime::service_traits::ServicePipelineService>(
-                std::sync::Arc::new(crate::services::ObPocServicePipelineService::new()),
-            );
+            services.register::<dyn SemOsChildDispatcher>(std::sync::Arc::new(
+                sem_os_postgres::ops::RegistryChildDispatcher::new(ops.clone()),
+            ));
+            services.register::<dyn ServicePipelineService>(std::sync::Arc::new(
+                crate::services::ObPocServicePipelineService::new(),
+            ));
             self.service_registry = std::sync::Arc::new(services.build());
         }
         self.sem_os_ops = Some(ops);
@@ -1402,7 +1404,7 @@ impl DslExecutor {
             })?;
 
         let outcome = {
-            let scope_dyn: &mut dyn dsl_runtime::tx::TransactionScope = &mut scope;
+            let scope_dyn: &mut dyn TransactionScope = &mut scope;
             self.execute_verb_in_scope(vc, ctx, scope_dyn).await
         };
 
@@ -1547,7 +1549,7 @@ async fn dispatch_plugin_via_sem_os_op_in_scope(
     vc: &VerbCall,
     ctx: &mut ExecutionContext,
     services: &std::sync::Arc<dsl_runtime::ServiceRegistry>,
-    scope: &mut dyn dsl_runtime::tx::TransactionScope,
+    scope: &mut dyn TransactionScope,
 ) -> Result<ExecutionResult> {
     use crate::sem_os_runtime::verb_executor_adapter as adapter;
     use sem_os_core::principal::Principal;
@@ -1651,7 +1653,7 @@ async fn dispatch_plugin_via_sem_os_op_in_scope(
     // apply path lands (blocked on B.2b.f follow-ups around
     // apply-via-SemOS-in-txn), it will consume the resolved ids to
     // construct a typed `PendingStateAdvance` for persistence.
-    if let Some(advance) = dsl_runtime::domain_ops::helpers::peek_pending_state_advance(&sem_ctx) {
+    if let Some(advance) = dsl_runtime::peek_pending_state_advance(&sem_ctx) {
         let resolved = ob_poc_types::resolve_pending_state_advance(advance);
         tracing::debug!(
             fqn,
@@ -1915,7 +1917,7 @@ impl DslExecutor {
         &self,
         vc: &VerbCall,
         ctx: &mut ExecutionContext,
-        scope: &mut dyn dsl_runtime::tx::TransactionScope,
+        scope: &mut dyn TransactionScope,
     ) -> Result<ExecutionResult> {
         tracing::debug!("execute_verb_in_scope: ENTER {}.{}", vc.domain, vc.verb);
 
@@ -2024,7 +2026,7 @@ impl DslExecutor {
         ctx: &mut ExecutionContext,
     ) -> Result<Vec<ExecutionResult>> {
         use crate::sequencer_tx::PgTransactionScope;
-        use dsl_runtime::tx::TransactionScope as _;
+        use dsl_runtime::TransactionScope as _;
 
         // PRE-FLIGHT: Ensure all EntityRefs have been resolved before execution
         validate_all_resolved(plan)?;
@@ -2104,7 +2106,7 @@ impl DslExecutor {
                     })?;
 
             let verb_result = {
-                let scope_dyn: &mut dyn dsl_runtime::tx::TransactionScope = &mut step_scope;
+                let scope_dyn: &mut dyn TransactionScope = &mut step_scope;
                 self.execute_verb_in_scope(&vc, ctx, scope_dyn).await
             };
 
@@ -2289,7 +2291,7 @@ impl DslExecutor {
             PgTransactionScope::begin_timeout(&self.pool, pool_acquire_timeout()).await?;
 
         let outcome = {
-            let scope_dyn: &mut dyn dsl_runtime::tx::TransactionScope = &mut scope;
+            let scope_dyn: &mut dyn TransactionScope = &mut scope;
             self.execute_plan_atomic_in_scope(plan, ctx, scope_dyn)
                 .await
         };
@@ -2352,7 +2354,7 @@ impl DslExecutor {
         &self,
         plan: &super::execution_plan::ExecutionPlan,
         ctx: &mut ExecutionContext,
-        scope: &mut dyn dsl_runtime::tx::TransactionScope,
+        scope: &mut dyn TransactionScope,
     ) -> Result<Vec<ExecutionResult>> {
         validate_all_resolved(plan)?;
 

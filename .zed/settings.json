@@ -72,6 +72,9 @@
     "DSL": {
       "language_servers": ["dsl-lsp"],
     },
+    "Rust": {
+      "language_servers": ["!rust-analyzer"],
+    },
     "JavaScript": {
       "language_servers": ["eslint", "vtsls", "!biome", "..."],
       "code_actions_on_format": {

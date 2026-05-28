@@ -10,7 +10,7 @@
 
 use anyhow::{anyhow, Result};
 
-use dsl_runtime::service_traits::StewardshipDispatch;
+use dsl_runtime::StewardshipDispatch;
 use dsl_runtime::{VerbExecutionContext, VerbExecutionOutcome};
 
 /// Dispatch `tool_name` to [`StewardshipDispatch`] and convert the outcome.

@@ -26,12 +26,12 @@ use serde_json::json;
 use std::collections::HashMap;
 use uuid::Uuid;
 
-use dsl_runtime::domain_ops::helpers::{
+use dsl_runtime::{
     json_extract_bool_opt, json_extract_int, json_extract_int_opt, json_extract_string,
     json_extract_string_list_opt, json_extract_string_opt, json_extract_uuid,
     json_extract_uuid_opt,
 };
-use dsl_runtime::tx::TransactionScope;
+use dsl_runtime::TransactionScope;
 use dsl_runtime::{VerbExecutionContext, VerbExecutionOutcome};
 
 use crate::trading_profile::{
@@ -73,7 +73,7 @@ fn forward_component_args(args: &serde_json::Value, strip_key: &str) -> serde_js
 /// Named `TradingProfileImportVerb` (not `TradingProfileImport`) because the
 /// module path `crate::trading_profile::TradingProfileImport` already names a
 /// YAML-deserializable import-document type, and we want to avoid shadowing.
-pub struct TradingProfileImportVerb;
+pub(super) struct TradingProfileImportVerb;
 
 #[async_trait]
 impl SemOsVerbOp for TradingProfileImportVerb {
@@ -157,7 +157,7 @@ impl SemOsVerbOp for TradingProfileImportVerb {
 // =============================================================================
 
 /// Get the active trading profile for a CBU
-pub struct TradingProfileGetActive;
+pub(super) struct TradingProfileGetActive;
 
 #[async_trait]
 impl SemOsVerbOp for TradingProfileGetActive {
@@ -204,7 +204,7 @@ impl SemOsVerbOp for TradingProfileGetActive {
 // =============================================================================
 
 /// Activate a trading profile (sets status to ACTIVE, supersedes previous)
-pub struct TradingProfileActivate;
+pub(super) struct TradingProfileActivate;
 
 #[async_trait]
 impl SemOsVerbOp for TradingProfileActivate {
@@ -275,7 +275,7 @@ impl SemOsVerbOp for TradingProfileActivate {
 /// - "ob-poc".ssi_booking_rules (CRITICAL: specificity_score is GENERATED ALWAYS)
 /// - "ob-poc".isda_agreements
 /// - "ob-poc".csa_agreements
-pub struct TradingProfileMaterialize;
+pub(super) struct TradingProfileMaterialize;
 
 #[async_trait]
 impl SemOsVerbOp for TradingProfileMaterialize {
@@ -1371,7 +1371,7 @@ async fn materialize_corporate_actions(
 // =============================================================================
 
 /// Create a new draft trading profile for a CBU
-pub struct TradingProfileCreateDraft;
+pub(super) struct TradingProfileCreateDraft;
 
 #[async_trait]
 impl SemOsVerbOp for TradingProfileCreateDraft {
@@ -1446,7 +1446,7 @@ impl SemOsVerbOp for TradingProfileCreateDraft {
 // COMPONENT DISPATCH OPERATIONS
 // =============================================================================
 
-pub struct TradingProfileAddComponent;
+pub(super) struct TradingProfileAddComponent;
 
 #[async_trait]
 impl SemOsVerbOp for TradingProfileAddComponent {
@@ -1517,7 +1517,7 @@ impl SemOsVerbOp for TradingProfileAddComponent {
     }
 }
 
-pub struct TradingProfileRemoveComponent;
+pub(super) struct TradingProfileRemoveComponent;
 
 #[async_trait]
 impl SemOsVerbOp for TradingProfileRemoveComponent {
@@ -1578,7 +1578,7 @@ impl SemOsVerbOp for TradingProfileRemoveComponent {
 }
 
 /// Add instrument class to trading profile universe
-pub struct TradingProfileAddInstrumentClass;
+pub(super) struct TradingProfileAddInstrumentClass;
 
 #[async_trait]
 impl SemOsVerbOp for TradingProfileAddInstrumentClass {
@@ -1628,7 +1628,7 @@ impl SemOsVerbOp for TradingProfileAddInstrumentClass {
 }
 
 /// Remove instrument class from trading profile universe
-pub struct TradingProfileRemoveInstrumentClass;
+pub(super) struct TradingProfileRemoveInstrumentClass;
 
 #[async_trait]
 impl SemOsVerbOp for TradingProfileRemoveInstrumentClass {
@@ -1664,7 +1664,7 @@ impl SemOsVerbOp for TradingProfileRemoveInstrumentClass {
 }
 
 /// Add market to trading profile universe under an instrument class
-pub struct TradingProfileAddMarket;
+pub(super) struct TradingProfileAddMarket;
 
 #[async_trait]
 impl SemOsVerbOp for TradingProfileAddMarket {
@@ -1738,7 +1738,7 @@ impl SemOsVerbOp for TradingProfileAddMarket {
 }
 
 /// Remove market from trading profile universe
-pub struct TradingProfileRemoveMarket;
+pub(super) struct TradingProfileRemoveMarket;
 
 #[async_trait]
 impl SemOsVerbOp for TradingProfileRemoveMarket {
@@ -1779,7 +1779,7 @@ impl SemOsVerbOp for TradingProfileRemoveMarket {
 }
 
 /// Add standing instruction to trading profile
-pub struct TradingProfileAddSsi;
+pub(super) struct TradingProfileAddSsi;
 
 #[async_trait]
 impl SemOsVerbOp for TradingProfileAddSsi {
@@ -1843,7 +1843,7 @@ impl SemOsVerbOp for TradingProfileAddSsi {
 }
 
 /// Remove standing instruction from trading profile
-pub struct TradingProfileRemoveSsi;
+pub(super) struct TradingProfileRemoveSsi;
 
 #[async_trait]
 impl SemOsVerbOp for TradingProfileRemoveSsi {
@@ -1879,7 +1879,7 @@ impl SemOsVerbOp for TradingProfileRemoveSsi {
 }
 
 /// Add booking rule to trading profile
-pub struct TradingProfileAddBookingRule;
+pub(super) struct TradingProfileAddBookingRule;
 
 #[async_trait]
 impl SemOsVerbOp for TradingProfileAddBookingRule {
@@ -1941,7 +1941,7 @@ impl SemOsVerbOp for TradingProfileAddBookingRule {
 }
 
 /// Remove booking rule from trading profile
-pub struct TradingProfileRemoveBookingRule;
+pub(super) struct TradingProfileRemoveBookingRule;
 
 #[async_trait]
 impl SemOsVerbOp for TradingProfileRemoveBookingRule {
@@ -1986,7 +1986,7 @@ impl SemOsVerbOp for TradingProfileRemoveBookingRule {
 // =============================================================================
 
 /// Add ISDA configuration to a trading profile document
-pub struct TradingProfileAddIsdaConfig;
+pub(super) struct TradingProfileAddIsdaConfig;
 
 #[async_trait]
 impl SemOsVerbOp for TradingProfileAddIsdaConfig {
@@ -2042,7 +2042,7 @@ impl SemOsVerbOp for TradingProfileAddIsdaConfig {
 }
 
 /// Add product coverage to an ISDA agreement
-pub struct TradingProfileAddIsdaCoverage;
+pub(super) struct TradingProfileAddIsdaCoverage;
 
 #[async_trait]
 impl SemOsVerbOp for TradingProfileAddIsdaCoverage {
@@ -2092,7 +2092,7 @@ impl SemOsVerbOp for TradingProfileAddIsdaCoverage {
 }
 
 /// Add CSA configuration to an ISDA agreement
-pub struct TradingProfileAddCsaConfig;
+pub(super) struct TradingProfileAddCsaConfig;
 
 #[async_trait]
 impl SemOsVerbOp for TradingProfileAddCsaConfig {
@@ -2171,7 +2171,7 @@ impl SemOsVerbOp for TradingProfileAddCsaConfig {
 }
 
 /// Add eligible collateral to a CSA
-pub struct TradingProfileAddCsaCollateral;
+pub(super) struct TradingProfileAddCsaCollateral;
 
 #[async_trait]
 impl SemOsVerbOp for TradingProfileAddCsaCollateral {
@@ -2252,7 +2252,7 @@ impl SemOsVerbOp for TradingProfileAddCsaCollateral {
 }
 
 /// Link CSA to collateral SSI
-pub struct TradingProfileLinkCsaSsi;
+pub(super) struct TradingProfileLinkCsaSsi;
 
 #[async_trait]
 impl SemOsVerbOp for TradingProfileLinkCsaSsi {
@@ -2301,7 +2301,7 @@ impl SemOsVerbOp for TradingProfileLinkCsaSsi {
 }
 
 /// Remove ISDA configuration from trading profile
-pub struct TradingProfileRemoveIsdaConfig;
+pub(super) struct TradingProfileRemoveIsdaConfig;
 
 #[async_trait]
 impl SemOsVerbOp for TradingProfileRemoveIsdaConfig {
@@ -2341,7 +2341,7 @@ impl SemOsVerbOp for TradingProfileRemoveIsdaConfig {
 }
 
 /// Remove CSA configuration from trading profile
-pub struct TradingProfileRemoveCsaConfig;
+pub(super) struct TradingProfileRemoveCsaConfig;
 
 #[async_trait]
 impl SemOsVerbOp for TradingProfileRemoveCsaConfig {
@@ -2389,7 +2389,7 @@ impl SemOsVerbOp for TradingProfileRemoveCsaConfig {
 // =============================================================================
 
 /// Add Investment Manager mandate to trading profile
-pub struct TradingProfileAddImMandate;
+pub(super) struct TradingProfileAddImMandate;
 
 #[async_trait]
 impl SemOsVerbOp for TradingProfileAddImMandate {
@@ -2498,7 +2498,7 @@ impl SemOsVerbOp for TradingProfileAddImMandate {
 }
 
 /// Update Investment Manager scope
-pub struct TradingProfileUpdateImScope;
+pub(super) struct TradingProfileUpdateImScope;
 
 #[async_trait]
 impl SemOsVerbOp for TradingProfileUpdateImScope {
@@ -2547,7 +2547,7 @@ impl SemOsVerbOp for TradingProfileUpdateImScope {
 }
 
 /// Remove Investment Manager mandate
-pub struct TradingProfileRemoveImMandate;
+pub(super) struct TradingProfileRemoveImMandate;
 
 #[async_trait]
 impl SemOsVerbOp for TradingProfileRemoveImMandate {
@@ -2589,7 +2589,7 @@ impl SemOsVerbOp for TradingProfileRemoveImMandate {
 
 /// Set base currency for the trading profile
 /// Verb: trading-profile.set-base-currency
-pub struct TradingProfileSetBaseCurrency;
+pub(super) struct TradingProfileSetBaseCurrency;
 
 #[async_trait]
 impl SemOsVerbOp for TradingProfileSetBaseCurrency {
@@ -2628,7 +2628,7 @@ impl SemOsVerbOp for TradingProfileSetBaseCurrency {
 }
 
 /// Add allowed currency to the trading profile.
-pub struct TradingProfileAddAllowedCurrency;
+pub(super) struct TradingProfileAddAllowedCurrency;
 
 #[async_trait]
 impl SemOsVerbOp for TradingProfileAddAllowedCurrency {
@@ -2672,7 +2672,7 @@ impl SemOsVerbOp for TradingProfileAddAllowedCurrency {
 
 /// Compare document with operational tables to show differences
 /// Verb: trading-profile.diff
-pub struct TradingProfileDiff;
+pub(super) struct TradingProfileDiff;
 
 #[async_trait]
 impl SemOsVerbOp for TradingProfileDiff {
@@ -2701,7 +2701,7 @@ impl SemOsVerbOp for TradingProfileDiff {
 // =============================================================================
 
 /// Validate that booking rules cover all universe combinations
-pub struct TradingProfileValidateCoverage;
+pub(super) struct TradingProfileValidateCoverage;
 
 #[async_trait]
 impl SemOsVerbOp for TradingProfileValidateCoverage {
@@ -2725,7 +2725,7 @@ impl SemOsVerbOp for TradingProfileValidateCoverage {
 }
 
 /// Validate that a profile is ready for go-live
-pub struct TradingProfileValidateGoLiveReady;
+pub(super) struct TradingProfileValidateGoLiveReady;
 
 #[async_trait]
 impl SemOsVerbOp for TradingProfileValidateGoLiveReady {
@@ -2754,7 +2754,7 @@ impl SemOsVerbOp for TradingProfileValidateGoLiveReady {
 
 /// Submit a draft profile for review
 /// Transitions: Draft → PendingReview
-pub struct TradingProfileSubmit;
+pub(super) struct TradingProfileSubmit;
 
 #[async_trait]
 impl SemOsVerbOp for TradingProfileSubmit {
@@ -2784,7 +2784,7 @@ impl SemOsVerbOp for TradingProfileSubmit {
 
 /// Approve a profile pending review
 /// Transitions: PendingReview → Active
-pub struct TradingProfileApprove;
+pub(super) struct TradingProfileApprove;
 
 #[async_trait]
 impl SemOsVerbOp for TradingProfileApprove {
@@ -2872,7 +2872,7 @@ impl SemOsVerbOp for TradingProfileApprove {
 
 /// Reject a profile pending review
 /// Transitions: PendingReview → Draft
-pub struct TradingProfileReject;
+pub(super) struct TradingProfileReject;
 
 #[async_trait]
 impl SemOsVerbOp for TradingProfileReject {
@@ -2903,7 +2903,7 @@ impl SemOsVerbOp for TradingProfileReject {
 
 /// Archive an active or superseded profile
 /// Transitions: Active|Superseded → Archived
-pub struct TradingProfileArchive;
+pub(super) struct TradingProfileArchive;
 
 #[async_trait]
 impl SemOsVerbOp for TradingProfileArchive {
@@ -2943,7 +2943,7 @@ impl SemOsVerbOp for TradingProfileArchive {
 /// - Migrating config during fund family restructuring
 ///
 /// DSL: (trading-profile.clone-to :profile-id @source :target-cbu-id @target-cbu)
-pub struct TradingProfileCloneTo;
+pub(super) struct TradingProfileCloneTo;
 
 #[async_trait]
 impl SemOsVerbOp for TradingProfileCloneTo {
@@ -2995,7 +2995,7 @@ impl SemOsVerbOp for TradingProfileCloneTo {
 
 /// Create a new draft version from the current ACTIVE profile
 /// Used when modifications are needed to a live trading matrix
-pub struct TradingProfileCreateNewVersion;
+pub(super) struct TradingProfileCreateNewVersion;
 
 #[async_trait]
 impl SemOsVerbOp for TradingProfileCreateNewVersion {
@@ -3035,7 +3035,7 @@ impl SemOsVerbOp for TradingProfileCreateNewVersion {
 /// matrix. Creates a DRAFT trading profile if one does not already exist,
 /// then returns `{ trading_profile_id, created }`. Safe to call multiple
 /// times; subsequent calls return the existing profile without mutation.
-pub struct InstrumentMatrixAttachOp;
+pub(super) struct InstrumentMatrixAttachOp;
 
 #[async_trait]
 impl SemOsVerbOp for InstrumentMatrixAttachOp {

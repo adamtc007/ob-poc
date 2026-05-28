@@ -52,7 +52,6 @@ pub enum Token {
     // -----------------------------------------------------------------------
     // Template / insertion forms  (must come before Symbol to win priority)
     // -----------------------------------------------------------------------
-
     /// `,@symbol` — splice: expands a list-valued template parameter in-place.
     #[regex(r",@[a-zA-Z_][a-zA-Z0-9_\-]*", |lex| lex.slice()[2..].to_owned())]
     TemplateSplice(String),
@@ -78,7 +77,6 @@ pub enum Token {
     // -----------------------------------------------------------------------
     // Literals
     // -----------------------------------------------------------------------
-
     /// `true` or `false` boolean literals (must be before Symbol rule).
     #[token("true", |_| true)]
     #[token("false", |_| false)]
@@ -108,7 +106,6 @@ pub enum Token {
     // -----------------------------------------------------------------------
     // Skipped forms
     // -----------------------------------------------------------------------
-
     /// Line comment starting with `;`.
     #[regex(r";[^\n]*", logos::skip)]
     Comment,
@@ -159,9 +156,7 @@ mod tests {
     use super::*;
 
     fn tokens(src: &str) -> Vec<Token> {
-        Token::lexer(src)
-            .filter_map(|t| t.ok())
-            .collect()
+        Token::lexer(src).filter_map(|t| t.ok()).collect()
     }
 
     #[test]
@@ -263,7 +258,14 @@ mod tests {
     #[test]
     fn lex_comment_skipped() {
         let toks = tokens("; this is a comment\n(foo)");
-        assert_eq!(toks, vec![Token::OpenParen, Token::Symbol("foo".to_owned()), Token::CloseParen]);
+        assert_eq!(
+            toks,
+            vec![
+                Token::OpenParen,
+                Token::Symbol("foo".to_owned()),
+                Token::CloseParen
+            ]
+        );
     }
 
     #[test]

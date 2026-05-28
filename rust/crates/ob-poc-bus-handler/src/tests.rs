@@ -92,13 +92,14 @@ async fn version_incompatible_maps_through() {
             cat: &str,
             _i: Vec<ResolvedBinding>,
         ) -> Result<VerbOutcome, VerbExecutorError> {
-            Err(VerbExecutorError::VersionIncompatible(format!(
-                "got {cat}"
-            )))
+            Err(VerbExecutorError::VersionIncompatible(format!("got {cat}")))
         }
     }
     let handler = ObPocBusHandler::new(V);
-    let err = handler.dispatch(ctx("cbu.create"), vec![]).await.unwrap_err();
+    let err = handler
+        .dispatch(ctx("cbu.create"), vec![])
+        .await
+        .unwrap_err();
     assert!(matches!(err, BusServerError::VersionIncompatible(_)));
 }
 
@@ -117,7 +118,10 @@ async fn malformed_input_maps_through() {
         }
     }
     let handler = ObPocBusHandler::new(M);
-    let err = handler.dispatch(ctx("cbu.create"), vec![]).await.unwrap_err();
+    let err = handler
+        .dispatch(ctx("cbu.create"), vec![])
+        .await
+        .unwrap_err();
     assert!(matches!(err, BusServerError::Malformed(_)));
 }
 

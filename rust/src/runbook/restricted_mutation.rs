@@ -1,3 +1,4 @@
+#![allow(unreachable_pub)]
 //! Restricted mutation compilation.
 //!
 //! This module turns an approved mutation preflight into the existing immutable

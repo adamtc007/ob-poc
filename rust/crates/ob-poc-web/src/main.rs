@@ -437,7 +437,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     match config_loader.load_table_pk_overrides() {
         Ok(overrides) => {
             tracing::info!("Table PK overrides loaded: {} entries", overrides.len());
-            dsl_runtime::cross_workspace::set_table_pk_overrides(overrides);
+            dsl_runtime::set_table_pk_overrides(overrides);
         }
         Err(e) => {
             tracing::warn!(
@@ -450,7 +450,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     match config_loader.load_slot_state_table() {
         Ok(table) => {
             tracing::info!("Slot state table loaded: {} entries", table.len());
-            dsl_runtime::cross_workspace::set_slot_state_table(table);
+            dsl_runtime::set_slot_state_table(table);
         }
         Err(e) => {
             tracing::warn!(
@@ -464,7 +464,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     match config_loader.load_atom_path_table_map() {
         Ok(map) => {
             tracing::info!("Atom-path table map loaded: {} entries", map.len());
-            dsl_runtime::cross_workspace::set_atom_path_table_map(map);
+            dsl_runtime::set_atom_path_table_map(map);
         }
         Err(e) => {
             tracing::warn!(
@@ -951,7 +951,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         // dyn SemanticStateService — ontology-backed onboarding stage derivation.
         match ob_poc::services::ObPocSemanticStateService::new(pool.clone()) {
             Ok(svc) => {
-                builder.register::<dyn dsl_runtime::service_traits::SemanticStateService>(
+                builder.register::<dyn dsl_runtime::SemanticStateService>(
                     Arc::new(svc),
                 );
                 tracing::info!(
@@ -971,7 +971,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         // `sem_reg::stewardship::dispatch_phase{0,1}_tool`. Registers
         // unconditionally — stewardship is entirely in-process, no
         // fallible construction step.
-        builder.register::<dyn dsl_runtime::service_traits::StewardshipDispatch>(Arc::new(
+        builder.register::<dyn dsl_runtime::StewardshipDispatch>(Arc::new(
             ob_poc::services::ObPocStewardshipDispatch::new(pool.clone()),
         ));
         tracing::info!(
@@ -981,7 +981,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         // dyn McpToolRegistry — used by `agent.read-mcp-tools` to
         // enumerate the SemReg MCP tool surface. Zero construction
         // deps; projects `SemRegToolSpec` → `McpToolSpec`.
-        builder.register::<dyn dsl_runtime::service_traits::McpToolRegistry>(Arc::new(
+        builder.register::<dyn dsl_runtime::McpToolRegistry>(Arc::new(
             ob_poc::services::ObPocMcpToolRegistry::new(),
         ));
         tracing::info!(
@@ -991,7 +991,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         // dyn LifecycleCatalog — used by relocated kyc_case_ops to
         // check state-machine transitions against ob-poc's ontology
         // (entity taxonomy singleton). Zero construction deps.
-        builder.register::<dyn dsl_runtime::service_traits::LifecycleCatalog>(Arc::new(
+        builder.register::<dyn dsl_runtime::LifecycleCatalog>(Arc::new(
             ob_poc::services::ObPocLifecycleCatalog::new(),
         ));
         tracing::info!("ServiceRegistry: registered dyn LifecycleCatalog (ontology taxonomy)");
@@ -1000,7 +1000,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         // (and later attribute_ops) to resolve attribute references across
         // the legacy dictionary, operational `attribute_registry`, and
         // SemOS-governed attribute defs.
-        builder.register::<dyn dsl_runtime::service_traits::AttributeIdentityService>(Arc::new(
+        builder.register::<dyn dsl_runtime::AttributeIdentityService>(Arc::new(
             ob_poc::services::ObPocAttributeIdentityService::new(pool.clone()),
         ));
         tracing::info!(
@@ -1010,7 +1010,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         // dyn ConstellationRuntime — used by relocated constellation_ops to
         // hydrate / summarise SemOS constellation maps. Bridge resolves
         // built-in maps and walks them against persisted CBU / case state.
-        builder.register::<dyn dsl_runtime::service_traits::ConstellationRuntime>(Arc::new(
+        builder.register::<dyn dsl_runtime::ConstellationRuntime>(Arc::new(
             ob_poc::services::ObPocConstellationRuntime::new(pool.clone()),
         ));
         tracing::info!(
@@ -1020,7 +1020,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         // dyn TradingProfileDocument — used by relocated trading_profile_ca_ops
         // to load / save the matrix JSONB document on cbu_trading_profiles.
         // Bridge delegates to `crate::trading_profile::ast_db::{load,save}_document`.
-        builder.register::<dyn dsl_runtime::service_traits::TradingProfileDocument>(Arc::new(
+        builder.register::<dyn dsl_runtime::TradingProfileDocument>(Arc::new(
             ob_poc::services::ObPocTradingProfileDocument::new(pool.clone()),
         ));
         tracing::info!(
@@ -1030,7 +1030,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         // dyn SemOsContextResolver — used by relocated affinity_ops to call
         // the 12-step SemOS context resolution pipeline. Bridge delegates to
         // `build_sem_os_service(pool).resolve_context(...)`.
-        builder.register::<dyn dsl_runtime::service_traits::SemOsContextResolver>(Arc::new(
+        builder.register::<dyn dsl_runtime::SemOsContextResolver>(Arc::new(
             ob_poc::services::ObPocSemOsContextResolver::new(pool.clone()),
         ));
         tracing::info!(
@@ -1042,7 +1042,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         // entity.list-fields/relationships/verbs). Bridge reads from
         // `crate::ontology`, `crate::dsl_v2::verb_registry`, and
         // `crate::sem_reg::store::SnapshotStore`. Zero construction deps.
-        builder.register::<dyn dsl_runtime::service_traits::SchemaIntrospectionAccess>(Arc::new(
+        builder.register::<dyn dsl_runtime::SchemaIntrospectionAccess>(Arc::new(
             ob_poc::services::ObPocSchemaIntrospectionAccess::new(),
         ));
         tracing::info!(
@@ -1053,7 +1053,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         // 15 `view.*` verbs. Bridge wraps `crate::session::ViewState` +
         // `crate::taxonomy::*` (multi-consumer mega-modules that stay
         // in ob-poc). Zero construction deps.
-        builder.register::<dyn dsl_runtime::service_traits::ViewService>(Arc::new(
+        builder.register::<dyn dsl_runtime::ViewService>(Arc::new(
             ob_poc::services::ObPocViewService::new(),
         ));
         tracing::info!(
@@ -1065,7 +1065,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         // (the 10934 LOC multi-consumer session mega-module that stays in
         // ob-poc). Pending session state crosses turns through
         // `ctx.extensions["_pending_session"]`. Zero construction deps.
-        builder.register::<dyn dsl_runtime::service_traits::SessionService>(Arc::new(
+        builder.register::<dyn dsl_runtime::SessionService>(Arc::new(
             ob_poc::services::ObPocSessionService::new(),
         ));
         tracing::info!("ServiceRegistry: registered dyn SessionService (session::UnifiedSession)");
@@ -1075,7 +1075,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         // → readiness verbs. Bridge wraps `crate::service_resources::*`
         // (engines, orchestrators, SRDEF registry loader) which stay in
         // ob-poc. Zero construction deps.
-        builder.register::<dyn dsl_runtime::service_traits::ServicePipelineService>(Arc::new(
+        builder.register::<dyn dsl_runtime::ServicePipelineService>(Arc::new(
             ob_poc::services::ObPocServicePipelineService::new(),
         ));
         tracing::info!(
@@ -1085,7 +1085,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         // dyn SemOsChildDispatcher — lets composite SemOS ops invoke their
         // child DSL atomics through the same canonical op registry and
         // transaction scope.
-        builder.register::<dyn dsl_runtime::service_traits::SemOsChildDispatcher>(Arc::new(
+        builder.register::<dyn dsl_runtime::SemOsChildDispatcher>(Arc::new(
             sem_os_postgres::ops::RegistryChildDispatcher::new(sem_os_ops.clone()),
         ));
         tracing::info!(
@@ -1097,7 +1097,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         // `crate::sem_reg::store::SnapshotStore` + types/ids and the
         // embedding-similarity SQL on `verb_pattern_embeddings` /
         // `phrase_bank` / `session_traces`. Zero construction deps.
-        builder.register::<dyn dsl_runtime::service_traits::PhraseService>(Arc::new(
+        builder.register::<dyn dsl_runtime::PhraseService>(Arc::new(
             ob_poc::services::ObPocPhraseService::new(),
         ));
         tracing::info!(
@@ -1111,7 +1111,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         // Returns `AttributeDispatchOutcome { outcome, bindings }` so the
         // wrapper can apply `@attribute` bindings via `ctx.bind` for the
         // 3 `define*` verbs. Zero construction deps.
-        builder.register::<dyn dsl_runtime::service_traits::AttributeService>(Arc::new(
+        builder.register::<dyn dsl_runtime::AttributeService>(Arc::new(
             ob_poc::services::ObPocAttributeService::new(),
         ));
         tracing::info!(
@@ -1120,8 +1120,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
         // dyn ProcessRegistryService — allows workflow.start-process verb op
         // to start BPMN process instances via the registry.
-        builder.register::<dyn dsl_runtime::service_traits::ProcessRegistryService>(
-            Arc::clone(&process_registry) as Arc<dyn dsl_runtime::service_traits::ProcessRegistryService>,
+        builder.register::<dyn dsl_runtime::ProcessRegistryService>(
+            Arc::clone(&process_registry) as Arc<dyn dsl_runtime::ProcessRegistryService>,
         );
         tracing::info!(
             "ServiceRegistry: registered dyn ProcessRegistryService (bpmn-runtime ProcessRegistry)"
@@ -1411,7 +1411,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         // (better than refusing to start; the pre-DB-pool catalogue load
         // gate at P.1.g already failed earlier if the catalogue was bad).
         {
-            use dsl_runtime::cross_workspace::{
+            use dsl_runtime::{
                 GateChecker, PostgresSlotStateProvider, SqlPredicateResolver,
             };
             use ob_poc::dsl_v2::ConfigLoader;
