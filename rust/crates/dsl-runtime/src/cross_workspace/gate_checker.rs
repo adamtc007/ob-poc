@@ -37,8 +37,8 @@
 
 use anyhow::Result;
 use async_trait::async_trait;
-use dsl_core::config::dag::{CrossWorkspaceConstraint, StateSelector};
-use dsl_core::config::DagRegistry;
+use dsl_types::{CrossWorkspaceConstraint, StateSelector};
+use crate::cross_workspace::DagRegistry;
 use sqlx::PgPool;
 use std::sync::Arc;
 use uuid::Uuid;
@@ -273,12 +273,11 @@ fn required_states(c: &CrossWorkspaceConstraint) -> Vec<String> {
     }
 }
 
-fn severity_str(s: &dsl_core::config::dag::Severity) -> String {
-    use dsl_core::config::dag::Severity::*;
+fn severity_str(s: &dsl_core::DagSeverity) -> String {
     match s {
-        Error => "error",
-        Warning => "warning",
-        Informational => "informational",
+        dsl_core::DagSeverity::Error => "error",
+        dsl_core::DagSeverity::Warning => "warning",
+        dsl_core::DagSeverity::Informational => "informational",
     }
     .to_string()
 }
@@ -290,7 +289,7 @@ fn severity_str(s: &dsl_core::config::dag::Severity) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use dsl_core::config::dag::{Dag, LoadedDag};
+    use dsl_types::{Dag, LoadedDag};
     use std::collections::BTreeMap;
     use std::path::PathBuf;
     use std::sync::Mutex;

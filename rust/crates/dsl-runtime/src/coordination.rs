@@ -18,7 +18,7 @@
 //! 5. `PessimisticResourceLock` — advisory lock on UUID, transaction-scoped
 //! 6. `ExclusiveScopeLock` — scope-level lock (admin, migration)
 
-use dsl_core::executable_plan::EffectClass;
+use dsl_core::EffectClass;
 
 // =============================================================================
 // ConcurrencyPolicy (v0.5 §5.3)

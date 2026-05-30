@@ -11,7 +11,7 @@
 //! See `tests/cross_workspace_dag_live_scenarios.rs` for the entry point.
 
 use anyhow::{anyhow, Context, Result};
-use dsl_core::config::DagRegistry;
+use crate::cross_workspace::DagRegistry;
 use serde_json::Value as JsonValue;
 use sqlx::PgPool;
 use std::collections::HashMap;

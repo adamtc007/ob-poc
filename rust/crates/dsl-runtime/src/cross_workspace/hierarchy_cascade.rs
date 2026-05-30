@@ -28,8 +28,8 @@
 
 use anyhow::Result;
 use async_trait::async_trait;
-use dsl_core::config::dag::CascadeRule;
-use dsl_core::config::DagRegistry;
+use dsl_types::CascadeRule;
+use crate::cross_workspace::DagRegistry;
 use sqlx::PgPool;
 use std::sync::Arc;
 use uuid::Uuid;
@@ -204,12 +204,11 @@ impl CascadePlanner {
     }
 }
 
-fn severity_str(s: &dsl_core::config::dag::Severity) -> String {
-    use dsl_core::config::dag::Severity::*;
+fn severity_str(s: &dsl_core::DagSeverity) -> String {
     match s {
-        Error => "error",
-        Warning => "warning",
-        Informational => "informational",
+        dsl_core::DagSeverity::Error => "error",
+        dsl_core::DagSeverity::Warning => "warning",
+        dsl_core::DagSeverity::Informational => "informational",
     }
     .to_string()
 }
@@ -227,7 +226,7 @@ fn _silence_unused(_: &CascadeRule) {}
 mod tests {
     use super::*;
     use async_trait::async_trait;
-    use dsl_core::config::dag::{Dag, LoadedDag};
+    use dsl_types::{Dag, LoadedDag};
     use std::collections::BTreeMap;
     use std::path::PathBuf;
     use std::sync::Mutex;

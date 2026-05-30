@@ -21,7 +21,7 @@
 //! itself is stateless and just executes one evaluation pass.
 
 use anyhow::Result;
-use dsl_core::config::dag::{DerivationCondition, DerivedCrossWorkspaceState, StateSelector};
+use dsl_types::{DerivationCondition, DerivedCrossWorkspaceState, StateSelector};
 use sqlx::PgPool;
 use std::sync::Arc;
 use uuid::Uuid;

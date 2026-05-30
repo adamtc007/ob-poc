@@ -27,7 +27,7 @@
 
 use anyhow::{anyhow, Result};
 use async_trait::async_trait;
-use dsl_core::config::DagRegistry;
+use crate::cross_workspace::DagRegistry;
 use sqlx::PgPool;
 use std::sync::Arc;
 use uuid::Uuid;
@@ -158,7 +158,7 @@ fn is_safe_ident(s: &str) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use dsl_core::config::dag::{Dag, LoadedDag};
+    use dsl_types::{Dag, LoadedDag};
     use std::collections::BTreeMap;
     use std::path::PathBuf;
 

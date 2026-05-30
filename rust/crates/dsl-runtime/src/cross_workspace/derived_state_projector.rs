@@ -16,7 +16,7 @@
 //! verb-touched slots).
 
 use anyhow::Result;
-use dsl_core::config::DagRegistry;
+use crate::cross_workspace::DagRegistry;
 use sqlx::PgPool;
 use std::sync::Arc;
 use uuid::Uuid;
@@ -106,7 +106,7 @@ mod tests {
     use crate::cross_workspace::SameEntityResolver;
     use crate::cross_workspace::SlotStateProvider;
     use async_trait::async_trait;
-    use dsl_core::config::dag::{Dag, LoadedDag};
+    use dsl_types::{Dag, LoadedDag};
     use std::collections::BTreeMap;
     use std::path::PathBuf;
     use std::sync::Mutex;

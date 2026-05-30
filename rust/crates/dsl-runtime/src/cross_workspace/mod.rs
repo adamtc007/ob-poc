@@ -126,9 +126,12 @@
 //! submodules (legacy from ob-poc's conditional feature) are dropped.
 
 mod compensation;
+mod dag_registry;
 mod derived_state;
 mod derived_state_projector;
 mod fact_refs;
+
+pub(crate) use dag_registry::DagRegistry;
 mod fact_versions;
 mod gate_checker;
 mod hierarchy_cascade;

@@ -3,7 +3,7 @@
 //! Loads scenario YAMLs that declare initial state, predicate truth tables,
 //! and a sequence of operations (`check_transition`, `evaluate_derived`,
 //! `plan_cascade`, `mutate`). The runner constructs the real
-//! [`DagRegistry`](dsl_core::config::DagRegistry) from the workspace's
+//! [`DagRegistry`](crate::cross_workspace::DagRegistry) from the workspace's
 //! DAG taxonomy YAMLs, wires in-memory mock providers, fires each
 //! operation, and asserts on outcomes.
 //!
