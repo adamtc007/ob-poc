@@ -1708,6 +1708,7 @@ dependencies = [
  "bigdecimal",
  "chrono",
  "dsl-core",
+ "dsl_types",
  "futures",
  "hex",
  "nom",

@@ -28,6 +28,7 @@ ob-poc-types = { path = "../ob-poc-types" }
 # Phase 5a composite-blocker #23 — domain_ops still uses dsl_core::config
 # loader/types for verb metadata loading.
 dsl-core.workspace = true
+dsl_types.workspace = true
 # dsl-runtime-split v1 Phase 10 (2026-05-14): the following deps were
 # removed after the analyser-tier modules consuming them moved to
 # `dsl-analysis`:
