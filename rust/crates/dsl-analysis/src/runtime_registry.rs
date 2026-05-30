@@ -20,7 +20,13 @@ use sqlx::PgPool;
 use crate::entity_kind::{
     canonicalize as canonicalize_entity_kind, subject_kind_for_domain, subject_kind_from_hint,
 };
-use dsl_core::config::types::*;
+use dsl_core::config::types::{
+    ArgConfig, ArgType, BatchPolicyConfig, CrudConfig, CrudOperation, DomainConfig, DurableConfig,
+    DurableRuntime, DynamicVerbConfig, FuzzyCheckConfig, GraphQueryOperation, HarmClass,
+    LockAccessConfig, LockModeConfig, LookupConfig, PolicyConfig, ReturnTypeConfig, ReturnsConfig,
+    SearchKeyConfig, VerbBehavior, VerbConfig, VerbConsumes, VerbLifecycle, VerbProduces,
+    VerbsConfig,
+};
 use ob_templates::{TemplateDefinition, TemplateRegistry};
 
 // =============================================================================
@@ -194,7 +200,7 @@ pub struct RuntimeDurableConfig {
     pub escalation: Option<String>,
 }
 
-use dsl_core::config::types::{DurableRuntime, GraphQueryOperation};
+
 
 #[derive(Debug, Clone)]
 pub struct RuntimeArg {

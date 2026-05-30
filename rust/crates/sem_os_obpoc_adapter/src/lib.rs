@@ -151,7 +151,9 @@ pub fn build_seed_bundle_with_metadata(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use dsl_core::config::types::*;
+    use dsl_core::config::types::{
+        ArgConfig, ArgType, DomainConfig, VerbBehavior, VerbConfig, VerbProduces, VerbsConfig,
+    };
     use std::collections::HashMap;
 
     fn minimal_verbs_config() -> VerbsConfig {

@@ -455,7 +455,10 @@ pub async fn run_onboarding_scan(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use dsl_core::config::types::*;
+    use dsl_core::config::types::{
+        ArgConfig, ArgType, DomainConfig, LookupConfig, SearchKeyConfig, VerbBehavior, VerbConfig,
+        VerbProduces, VerbsConfig,
+    };
     use std::collections::HashMap;
 
     fn sample_verb_config() -> VerbConfig {

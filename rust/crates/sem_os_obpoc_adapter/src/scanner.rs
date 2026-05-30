@@ -972,7 +972,11 @@ pub fn arg_type_to_attribute_type(arg: &ArgConfig) -> AttributeDataType {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use dsl_core::config::types::*;
+    use dsl_core::config::types::{
+        ActionClass, ArgConfig, ArgType, CrudConfig, CrudOperation, DomainConfig, HarmClass,
+        LookupConfig, SearchKeyConfig, VerbBehavior, VerbConfig, VerbConsumes, VerbLifecycle,
+        VerbMetadata, VerbProduces, VerbsConfig,
+    };
     use std::collections::HashMap;
 
     fn sample_verb_config() -> VerbConfig {
