@@ -20,7 +20,7 @@
 //! schemas into a single dispatch-option surface without a translation
 //! table. See `todo/acp-pack-context-parity-gate-a/r1-schema-parity-adr.md`.
 
-use dsl_core::config::{StateEffect, TransitionArgs};
+use dsl_core::{StateEffect, TransitionArgs};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 

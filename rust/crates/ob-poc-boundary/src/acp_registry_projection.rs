@@ -5,9 +5,8 @@
 //! stops short of envelope v2 construction, signing, or runtime gating.
 
 use anyhow::{Context, Result};
-use dsl_core::config::loader::ConfigLoader;
-use dsl_core::config::types::{
-    ArgConfig, ArgType, ConsequenceTier, CrudOperation, ExternalEffect, LookupConfig,
+use dsl_core::{
+    ConfigLoader, ArgConfig, ArgType, ConsequenceTier, CrudOperation, ExternalEffect, LookupConfig,
     ResolutionMode, ReturnTypeConfig, StateEffect, VerbBehavior, VerbConfig,
 };
 use serde::Serialize;

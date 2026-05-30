@@ -51,7 +51,7 @@ impl AgentValidator {
         };
 
         // Phase 2: Op-free compilation — emits CompileSteps from all VerbCalls.
-        use dsl_core::compiler::compile_to_steps;
+        use dsl_core::compile_to_steps;
         let compiled = compile_to_steps(&program);
 
         if compiled.steps.is_empty() && !program.statements.is_empty() {
@@ -69,7 +69,7 @@ impl AgentValidator {
         // Phase 3: Verb existence check against the loaded verb catalogue.
         // The Op-free compiler emits all VerbCalls without checking existence;
         // this phase catches unknown verbs before execution.
-        use dsl_core::config::ConfigLoader;
+        use dsl_core::ConfigLoader;
         let verbs_config = ConfigLoader::from_env().load_verbs().ok();
         let mut errors: Vec<ValidationError> = Vec::new();
 

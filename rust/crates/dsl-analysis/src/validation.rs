@@ -223,7 +223,7 @@ pub struct ValidatedProgram {
 
     /// Resolved AST with LookupRef.primary_key populated
     /// This is the canonical representation for serialization/persistence
-    pub resolved_ast: dsl_core::ast::Program,
+    pub resolved_ast: dsl_core::Program,
 }
 
 /// A validated statement

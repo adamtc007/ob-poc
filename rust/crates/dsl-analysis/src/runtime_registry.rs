@@ -20,7 +20,7 @@ use sqlx::PgPool;
 use crate::entity_kind::{
     canonicalize as canonicalize_entity_kind, subject_kind_for_domain, subject_kind_from_hint,
 };
-use dsl_core::config::types::{
+use dsl_core::{
     ArgConfig, ArgType, BatchPolicyConfig, CrudConfig, CrudOperation, DomainConfig, DurableConfig,
     DurableRuntime, DynamicVerbConfig, FuzzyCheckConfig, GraphQueryOperation, HarmClass,
     LockAccessConfig, LockModeConfig, LookupConfig, PolicyConfig, ReturnTypeConfig, ReturnsConfig,
@@ -953,7 +953,7 @@ static RUNTIME_REGISTRY: OnceLock<RuntimeVerbRegistry> = OnceLock::new();
 /// Returns an empty registry if loading fails (with warning logged).
 pub fn runtime_registry() -> &'static RuntimeVerbRegistry {
     RUNTIME_REGISTRY.get_or_init(|| {
-        use dsl_core::config::ConfigLoader;
+        use dsl_core::ConfigLoader;
 
         let loader = ConfigLoader::from_env();
         match loader.load_verbs() {
@@ -993,7 +993,7 @@ static RUNTIME_REGISTRY_ARC: OnceLock<Arc<RuntimeVerbRegistry>> = OnceLock::new(
 pub fn runtime_registry_arc() -> Arc<RuntimeVerbRegistry> {
     RUNTIME_REGISTRY_ARC
         .get_or_init(|| {
-            use dsl_core::config::ConfigLoader;
+            use dsl_core::ConfigLoader;
 
             let loader = ConfigLoader::from_env();
             match loader.load_verbs() {
@@ -1248,7 +1248,7 @@ mod tests {
 
     #[test]
     fn test_durable_verb_maps_to_runtime_durable() {
-        use dsl_core::config::types::{DurableConfig, DurableRuntime};
+        use dsl_core::{DurableConfig, DurableRuntime};
         use std::collections::BTreeMap;
 
         let mut domains = HashMap::new();

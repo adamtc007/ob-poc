@@ -18,7 +18,7 @@ use std::path::Path;
 
 use dsl_ast::{AtomBag, TypedAtom};
 use dsl_atoms::{AtomKindClass, StructuralKind};
-use dsl_core::config::types::{
+use dsl_core::{
     ArgConfig, ConfirmPolicyConfig, CrudConfig, DomainConfig, DurableConfig, GraphQueryConfig,
     PolicyConfig, ReturnsConfig, ThreeAxisDeclaration, TransitionArgs, VerbBehavior, VerbConfig,
     VerbConsumes, VerbFlavour, VerbLifecycle, VerbMetadata, VerbOutputConfig, VerbProduces,
@@ -470,8 +470,8 @@ fn parse_confirm_policy(s: &str) -> ConfirmPolicyConfig {
     }
 }
 
-fn parse_effect_class(s: &str) -> Option<dsl_core::executable_plan::EffectClass> {
-    use dsl_core::executable_plan::EffectClass;
+fn parse_effect_class(s: &str) -> Option<dsl_core::EffectClass> {
+    use dsl_core::EffectClass;
     match s.trim_matches('"') {
         "pure" => Some(EffectClass::Pure),
         "read_snapshot" | "read-snapshot" => Some(EffectClass::ReadSnapshot),

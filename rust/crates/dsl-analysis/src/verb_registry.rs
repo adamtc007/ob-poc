@@ -19,7 +19,7 @@ use std::collections::HashMap;
 use std::sync::OnceLock;
 
 use crate::runtime_registry::{runtime_registry, RuntimeBehavior};
-use dsl_core::config::types::{LookupConfig, VerbConsumes, VerbProduces};
+use dsl_core::{LookupConfig, VerbConsumes, VerbProduces};
 
 // =============================================================================
 // TYPES
@@ -243,7 +243,7 @@ impl UnifiedVerbRegistry {
         &self,
         domain: &str,
         verb: &str,
-    ) -> Option<&dsl_core::config::types::VerbProduces> {
+    ) -> Option<&dsl_core::VerbProduces> {
         runtime_registry().get_produces(domain, verb)
     }
 

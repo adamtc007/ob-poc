@@ -13,7 +13,7 @@ mod pipeline_seeds;
 pub mod scanner;
 pub mod seeds;
 
-use dsl_core::config::types::VerbsConfig;
+use dsl_core::VerbsConfig;
 use metadata::DomainMetadata;
 use sem_os_core::seeds::{
     AttributeSeed, DerivationSpecSeed, EntityTypeSeed, PolicySeed, SeedBundle, TaxonomySeed,

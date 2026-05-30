@@ -10,11 +10,10 @@
 use std::sync::Arc;
 
 use crate::runtime_registry::RuntimeVerbRegistry;
-use dsl_core::ast::{AstNode, Program, Span, VerbCall};
-use dsl_core::binding_context::BindingContext;
-use dsl_core::compiler::{compile_to_steps, CompileStep};
-use dsl_core::diagnostics::{Diagnostic, DiagnosticCode, SourceSpan};
-use dsl_core::parser::parse_program;
+use dsl_core::{
+    AstNode, BindingContext, CompileStep, Diagnostic, DiagnosticCode, Program, SourceSpan, Span,
+    VerbCall, compile_to_steps, parse_program,
+};
 
 /// Context for implicit create behavior
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Default)]
@@ -330,7 +329,7 @@ fn collect_symbol_refs_from_node(node: &AstNode, refs: &mut Vec<(String, Span)>)
 #[cfg(test)]
 mod tests {
     use super::*;
-    use dsl_core::config::loader::ConfigLoader;
+    use dsl_core::ConfigLoader;
 
     fn test_registry() -> Arc<RuntimeVerbRegistry> {
         let loader = ConfigLoader::from_env();

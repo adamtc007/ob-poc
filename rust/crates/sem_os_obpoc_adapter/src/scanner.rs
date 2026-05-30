@@ -7,7 +7,7 @@
 
 use std::collections::BTreeMap;
 
-use dsl_core::config::types::{
+use dsl_core::{
     ActionClass as DslActionClass, ArgConfig, CrudOperation, HarmClass as DslHarmClass, VerbConfig,
     VerbMetadata, VerbsConfig,
 };
@@ -42,8 +42,8 @@ pub fn verb_config_to_contract(
             description: a.description.clone(),
             lookup: a.lookup.as_ref().map(|l| {
                 let search_key_str = match &l.search_key {
-                    dsl_core::config::types::SearchKeyConfig::Simple(s) => Some(s.clone()),
-                    dsl_core::config::types::SearchKeyConfig::Composite(c) => {
+                    dsl_core::SearchKeyConfig::Simple(s) => Some(s.clone()),
+                    dsl_core::SearchKeyConfig::Composite(c) => {
                         Some(c.primary.clone())
                     }
                 };
@@ -377,8 +377,8 @@ pub fn infer_entity_types_from_verbs(verbs_config: &VerbsConfig) -> Vec<EntityTy
                     let key = format!("{}.{}", domain, entity_type_str);
                     seen.entry(key.clone()).or_insert_with(|| {
                         let search_key_str = match &lookup.search_key {
-                            dsl_core::config::types::SearchKeyConfig::Simple(s) => s.clone(),
-                            dsl_core::config::types::SearchKeyConfig::Composite(c) => {
+                            dsl_core::SearchKeyConfig::Simple(s) => s.clone(),
+                            dsl_core::SearchKeyConfig::Composite(c) => {
                                 c.primary.clone()
                             }
                         };

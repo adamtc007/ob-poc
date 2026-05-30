@@ -38,7 +38,7 @@
 //! architecturally impossible — the catalogue has no other write path.
 
 use anyhow::{anyhow, Context, Result};
-use dsl_core::config::types::{DomainConfig, VerbConfig, VerbsConfig};
+use dsl_core::{DomainConfig, VerbConfig, VerbsConfig};
 use serde_json::Value;
 use sqlx::{PgPool, Row};
 use std::collections::HashMap;

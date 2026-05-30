@@ -4,8 +4,7 @@
 //! structured, bounded interpretation for non task-specific DAG utterances so
 //! they do not fall back to prose-only acknowledgements.
 
-use dsl_core::config::loader::ConfigLoader;
-use dsl_core::config::types::{HarmClass, VerbConfig};
+use dsl_core::{ConfigLoader, HarmClass, VerbConfig};
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::Path;
