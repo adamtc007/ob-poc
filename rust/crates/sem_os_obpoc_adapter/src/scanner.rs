@@ -972,7 +972,7 @@ pub fn arg_type_to_attribute_type(arg: &ArgConfig) -> AttributeDataType {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use dsl_core::config::types::{
+    use dsl_core::{
         ActionClass, ArgConfig, ArgType, CrudConfig, CrudOperation, DomainConfig, HarmClass,
         LookupConfig, SearchKeyConfig, VerbBehavior, VerbConfig, VerbConsumes, VerbLifecycle,
         VerbMetadata, VerbProduces, VerbsConfig,
@@ -1273,12 +1273,12 @@ mod tests {
         config.crud = None;
         config.args.clear();
         config.consumes = vec![
-            dsl_core::config::types::VerbConsumes {
+            dsl_core::VerbConsumes {
                 arg: "entity-id".into(),
                 consumed_type: "entity".into(),
                 required: true,
             },
-            dsl_core::config::types::VerbConsumes {
+            dsl_core::VerbConsumes {
                 arg: "mandate-id".into(),
                 consumed_type: "mandate".into(),
                 required: true,
@@ -1323,7 +1323,7 @@ mod tests {
             slot_type: None,
             preferred_roles: vec![],
         }];
-        config.lifecycle = Some(dsl_core::config::types::VerbLifecycle {
+        config.lifecycle = Some(dsl_core::VerbLifecycle {
             entity_arg: Some("contract-id".into()),
             ..Default::default()
         });

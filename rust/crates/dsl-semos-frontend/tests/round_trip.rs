@@ -23,8 +23,8 @@ fn dsl_dir() -> std::path::PathBuf {
     workspace_root().join("dsl-source/verbs")
 }
 
-fn yaml_config() -> dsl_core::config::types::VerbsConfig {
-    let loader = dsl_core::config::loader::ConfigLoader::new(
+fn yaml_config() -> dsl_core::VerbsConfig {
+    let loader = dsl_core::ConfigLoader::new(
         workspace_root()
             .join("config")
             .to_string_lossy()

@@ -477,7 +477,7 @@ structure.setup:
     #[test]
     fn test_slice1_macros_declare_plan_kind_and_lifecycle_state() {
         use super::super::schema::{MacroLifecycleState, MacroPlanKind, MacroSideEffect};
-        use dsl_core::config::StateEffect;
+        use dsl_core::StateEffect;
 
         let slice1_fqns: &[&str] = &[
             "struct.lux.ucits.sicav",
