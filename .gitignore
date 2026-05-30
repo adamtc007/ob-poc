@@ -410,3 +410,12 @@ artifacts/peer_review/
 # Package lock files (npm)
 **/package-lock.json
 dmn-lite/
+
+# Verification and check files
+current_unreachable_pub.txt
+ob_poc_unreachable_pub.txt
+ob_poc_unreachable_pub_v2.txt
+patch.rs
+rust/check.txt
+rust/check_after.txt
+
