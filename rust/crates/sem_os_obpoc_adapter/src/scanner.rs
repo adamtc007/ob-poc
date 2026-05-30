@@ -498,7 +498,7 @@ pub fn infer_attributes_from_verbs(
 /// # Examples
 ///
 /// ```
-/// use dsl_core::config::types::{DomainConfig, VerbsConfig};
+/// use dsl_core::{DomainConfig, VerbsConfig};
 /// use sem_os_obpoc_adapter::scanner::generate_seed_domain_macro_calls;
 /// use std::collections::HashMap;
 ///
