@@ -252,7 +252,7 @@ impl ResolutionSubSession {
         context_line: &str,
         verb: &str,
         arg_name: &str,
-        lookup_config: Option<&dsl_core::config::types::LookupConfig>,
+        lookup_config: Option<&dsl_core::LookupConfig>,
         out: &mut Vec<UnresolvedRefInfo>,
     ) {
         use crate::dsl_v2::ast::AstNode;
@@ -343,7 +343,7 @@ impl ResolutionSubSession {
 
     /// Extract search keys and discriminators from LookupConfig
     fn extract_search_config(
-        lookup_config: Option<&dsl_core::config::types::LookupConfig>,
+        lookup_config: Option<&dsl_core::LookupConfig>,
         search_value: &str,
     ) -> (
         Vec<SearchKeyField>,
@@ -388,10 +388,10 @@ impl ResolutionSubSession {
 
         // Determine resolution mode from config
         let resolution_mode = match config.resolution_mode {
-            Some(dsl_core::config::types::ResolutionMode::Entity) => {
+            Some(dsl_core::ResolutionMode::Entity) => {
                 ResolutionModeHint::SearchModal
             }
-            Some(dsl_core::config::types::ResolutionMode::Reference) => {
+            Some(dsl_core::ResolutionMode::Reference) => {
                 ResolutionModeHint::Dropdown
             }
             None => ResolutionModeHint::SearchModal, // Default to modal

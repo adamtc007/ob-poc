@@ -671,11 +671,11 @@ pub fn find_missing_plugin_ops(
 /// a `DslExecutor` for the rehydration test (CR DoD).
 pub struct RehydrateResult {
     /// Flat verb manifest built from the current YAML packs.
-    pub manifest: dsl_core::config::VerbManifest,
+    pub manifest: dsl_core::VerbManifest,
     /// Fresh op registry built from the canonical builder functions.
     pub registry: sem_os_postgres::ops::SemOsVerbOpRegistry,
     /// Wiring check: declaration ↔ implementation mismatches.
-    pub wiring: dsl_core::config::WiringReport,
+    pub wiring: dsl_core::WiringReport,
 }
 
 /// Rehydrate the verb catalogue from YAML and Rust registration.
@@ -691,7 +691,7 @@ pub struct RehydrateResult {
 ///
 /// The returned `wiring` report has zero mismatches when Phase 3 is complete.
 pub fn rehydrate() -> RehydrateResult {
-    use dsl_core::config::{wiring_check, ConfigLoader};
+    use dsl_core::{wiring_check, ConfigLoader};
 
     let manifest = ConfigLoader::from_env().load_verb_manifest();
 

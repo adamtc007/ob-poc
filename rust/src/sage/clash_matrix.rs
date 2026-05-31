@@ -3,7 +3,7 @@
 use std::fmt::Write;
 
 use anyhow::Result;
-use dsl_core::config::types::HarmClass;
+use dsl_core::HarmClass;
 
 use super::verb_index::{VerbMeta, VerbMetadataIndex};
 
@@ -250,7 +250,7 @@ fn csv_escape(value: &str) -> String {
 mod tests {
     use super::*;
     use crate::sage::{IntentPolarity, ObservationPlane, VerbMeta};
-    use dsl_core::config::types::ActionClass;
+    use dsl_core::ActionClass;
 
     fn sample_meta(fqn: &str, action_tags: &[&str], required_params: &[&str]) -> VerbMeta {
         let (domain, verb_name) = fqn.split_once('.').unwrap();

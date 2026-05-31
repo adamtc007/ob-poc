@@ -683,7 +683,7 @@ mod tests {
 
     #[test]
     fn test_register_from_durable_stores_correlation_field() {
-        use dsl_core::config::types::{DurableConfig, DurableRuntime};
+        use dsl_core::{DurableConfig, DurableRuntime};
         use std::collections::BTreeMap;
 
         let mut index = WorkflowConfigIndex::from_config(&super::super::config::WorkflowConfig {

@@ -6,7 +6,7 @@
 
 use std::collections::HashSet;
 
-use dsl_core::config::types::ActionClass;
+use dsl_core::ActionClass;
 
 use dsl_analysis::entity_kind::matches as entity_kind_matches;
 
@@ -564,7 +564,7 @@ mod tests {
     use super::*;
     use std::collections::HashMap;
 
-    use dsl_core::config::types::{ActionClass, HarmClass};
+    use dsl_core::{ActionClass, HarmClass};
 
     use crate::sage::verb_index::VerbMeta;
     use crate::sage::{

@@ -501,7 +501,7 @@ fn output_field_name_for(produced_type: &str) -> String {
 fn load_plan_verb_outputs() -> anyhow::Result<
     std::collections::BTreeMap<String, Vec<sem_os_ontology::verb_contract::VerbOutput>>,
 > {
-    let verbs_config = dsl_core::config::loader::ConfigLoader::from_env().load_verbs()?;
+    let verbs_config = dsl_core::ConfigLoader::from_env().load_verbs()?;
     let mut outputs =
         std::collections::BTreeMap::<String, Vec<sem_os_ontology::verb_contract::VerbOutput>>::new(
         );

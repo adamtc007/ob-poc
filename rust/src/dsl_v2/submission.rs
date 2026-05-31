@@ -12,7 +12,7 @@ use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
-use dsl_core::ast::{Argument, AstNode, Literal, Span, Statement, VerbCall};
+use dsl_core::{Argument, AstNode, Literal, Span, Statement, VerbCall};
 
 // ============================================================================
 // Part 2: SymbolBinding
@@ -590,7 +590,7 @@ fn substitute_node(node: &AstNode, bindings: &HashMap<String, Uuid>) -> AstNode 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use dsl_core::ast::Span;
+    use dsl_core::Span;
 
     #[test]
     fn test_symbol_binding_unresolved() {

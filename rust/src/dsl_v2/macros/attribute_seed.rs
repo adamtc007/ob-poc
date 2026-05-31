@@ -1,7 +1,7 @@
 use std::collections::BTreeMap;
 
 use anyhow::{anyhow, Context, Result};
-use dsl_core::config::loader::ConfigLoader;
+use dsl_core::ConfigLoader;
 use sem_os_obpoc_adapter::{
     scanner::generate_seed_domain_macro_calls, seeds::core_derivation_specs,
 };

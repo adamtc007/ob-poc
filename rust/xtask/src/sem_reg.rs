@@ -1002,7 +1002,7 @@ pub(crate) async fn onboard_scan(verbose: bool) -> Result<()> {
 
     // Step 1: Extract verb signatures from DSL YAML
     println!("Step 1/5: Extracting verb signatures from YAML...");
-    let loader = dsl_core::config::loader::ConfigLoader::from_env();
+    let loader = dsl_core::ConfigLoader::from_env();
     let verbs_config = loader
         .load_verbs()
         .context("Failed to load verb configuration from YAML")?;

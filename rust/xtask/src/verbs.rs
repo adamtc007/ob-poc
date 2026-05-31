@@ -8,8 +8,8 @@ use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 use std::fmt::Write;
 use std::path::PathBuf;
 
-use dsl_core::config::types::{DurableConfig, SourceOfTruth, VerbBehavior, VerbScope, VerbTier};
-use dsl_core::config::ConfigLoader;
+use dsl_core::{DurableConfig, SourceOfTruth, VerbBehavior, VerbScope, VerbTier};
+use dsl_core::ConfigLoader;
 use ob_poc::dsl_v2::execution::RuntimeVerbRegistry;
 use ob_poc::session::verb_contract::VerbDiagnostics;
 use ob_poc::session::verb_sync::VerbSyncService;
@@ -24,7 +24,7 @@ use ob_poc::session::verb_tiering_linter;
 /// This is the CI-appropriate counterpart to `verbs_compile`; the full sync
 /// is a deploy-time operation that writes to `"ob-poc".dsl_verbs`.
 pub(crate) async fn verbs_compile_validate_only(_verbose: bool) -> Result<()> {
-    use dsl_core::config::{validate_verbs_config, ValidationContext};
+    use dsl_core::{validate_verbs_config, ValidationContext};
     use std::collections::HashSet;
 
     println!("===========================================");
@@ -558,7 +558,7 @@ pub(crate) async fn verbs_lint(errors_only: bool, verbose: bool, tier: &str) -> 
     // per-workspace. Pack-hygiene check is ALWAYS on.
     // =========================================================================
     {
-        use dsl_core::config::{
+        use dsl_core::{
             collect_declared_fqns, flatten_pack_entries, load_packs_from_dir, validate_pack_fqns,
             validate_verbs_config, ValidationContext,
         };
@@ -2140,7 +2140,7 @@ pub(crate) fn verbs_lint_durable(errors_only: bool, verbose: bool) -> Result<()>
 fn lint_durable_config(
     fqn: &str,
     durable: &DurableConfig,
-    verb_config: &dsl_core::config::types::VerbConfig,
+    verb_config: &dsl_core::VerbConfig,
     all_verb_fqns: &HashSet<String>,
     findings: &mut Vec<DurableFinding>,
 ) {

@@ -22,7 +22,7 @@ use dsl_runtime::{
 use sem_os_core::error::SemOsError;
 
 use crate::dsl_v2::executor::{DslExecutor, ExecutionContext, ExecutionResult};
-use dsl_core::ast::{Argument, AstNode, Literal, Span, VerbCall};
+use dsl_core::{Argument, AstNode, Literal, Span, VerbCall};
 
 /// Adapter implementing the SemOS execution port over ob-poc's DslExecutor.
 ///
@@ -355,16 +355,16 @@ fn runtime_verb_to_contract(
         subject_kinds: rv.subject_kinds.clone(),
         phase_tags: vec![],
         harm_class: rv.harm_class.map(|h| match h {
-            dsl_core::config::types::HarmClass::ReadOnly => {
+            dsl_core::HarmClass::ReadOnly => {
                 sem_os_ontology::verb_contract::HarmClass::ReadOnly
             }
-            dsl_core::config::types::HarmClass::Reversible => {
+            dsl_core::HarmClass::Reversible => {
                 sem_os_ontology::verb_contract::HarmClass::Reversible
             }
-            dsl_core::config::types::HarmClass::Irreversible => {
+            dsl_core::HarmClass::Irreversible => {
                 sem_os_ontology::verb_contract::HarmClass::Irreversible
             }
-            dsl_core::config::types::HarmClass::Destructive => {
+            dsl_core::HarmClass::Destructive => {
                 sem_os_ontology::verb_contract::HarmClass::Destructive
             }
         }),

@@ -53,7 +53,7 @@ use tracing::{debug, info, warn};
 use uuid::Uuid;
 
 use crate::dsl_v2::execution::{RuntimeBehavior, RuntimeVerb, RuntimeVerbRegistry};
-use dsl_core::config::types::VerbsConfig;
+use dsl_core::VerbsConfig;
 
 use super::canonical_hash::canonical_json_hash;
 use super::verb_contract::{codes, VerbDiagnostics};

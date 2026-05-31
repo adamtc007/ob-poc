@@ -51,7 +51,7 @@ use std::sync::Arc;
 use async_trait::async_trait;
 use uuid::Uuid;
 
-use dsl_core::config::types::VerbsConfig;
+use dsl_core::VerbsConfig;
 use ob_poc::journey::pack::{load_pack_from_bytes, PackManifest};
 use ob_poc::journey::router::PackRouter;
 use ob_poc::repl::intent_matcher::IntentMatcher;

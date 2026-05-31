@@ -4,7 +4,7 @@
 //! a verb should be executed directly or dispatched through bpmn-lite.
 
 use anyhow::{Context, Result};
-use dsl_core::config::DurableConfig;
+use dsl_core::DurableConfig;
 use std::collections::HashMap;
 use std::path::Path;
 
@@ -312,7 +312,7 @@ mod tests {
 
     #[test]
     fn test_register_from_durable_config() {
-        use dsl_core::config::types::{DurableConfig, DurableRuntime};
+        use dsl_core::{DurableConfig, DurableRuntime};
         use std::collections::BTreeMap;
 
         let mut index = WorkflowConfigIndex::from_config(&WorkflowConfig { workflows: vec![] });
@@ -363,7 +363,7 @@ mod tests {
 
     #[test]
     fn test_register_from_durable_config_does_not_overwrite() {
-        use dsl_core::config::types::{DurableConfig, DurableRuntime};
+        use dsl_core::{DurableConfig, DurableRuntime};
         use std::collections::BTreeMap;
 
         // Pre-register kyc-case.create via workflows.yaml

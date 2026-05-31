@@ -26,9 +26,9 @@ use std::collections::{BTreeMap, HashMap};
 
 use uuid::Uuid;
 
-use dsl_core::ast::{Argument, AstNode, Literal, Program, Span, Statement, VerbCall};
+use dsl_core::{Argument, AstNode, Literal, Program, Span, Statement, VerbCall};
 use dsl_core::compiler::compile_to_steps;
-use dsl_core::parser::parse_program;
+use dsl_core::parse_program;
 
 use crate::dsl_v2::execution::{runtime_registry_arc, RuntimeVerbRegistry};
 use crate::dsl_v2::macros::{

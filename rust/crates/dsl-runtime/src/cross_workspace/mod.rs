@@ -49,7 +49,7 @@
 //!
 //! ```ignore
 //! use std::sync::Arc;
-//! use dsl_core::config::ConfigLoader;
+//! use dsl_core::ConfigLoader;
 //! use dsl_runtime::{
 //!     GateChecker, PostgresSlotStateProvider, SqlPredicateResolver,
 //! };

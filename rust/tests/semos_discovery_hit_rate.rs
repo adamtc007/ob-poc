@@ -10,7 +10,7 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 use chrono::Utc;
-use dsl_core::config::loader::ConfigLoader;
+use dsl_core::ConfigLoader;
 use sem_os_core::error::SemOsError;
 use sem_os_core::ids::object_id_for;
 use sem_os_core::ports::{

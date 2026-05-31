@@ -29,28 +29,23 @@
 // =============================================================================
 
 // AST types
-pub use dsl_core::ast;
-pub use dsl_core::ast::{
+pub use dsl_core::{
     count_entity_refs, Argument, AstNode, EntityRefStats, Literal, Program, Span, Statement,
     VerbCall,
 };
 
 // Parser
-pub use dsl_core::parser;
-pub use dsl_core::parser::{parse_program, parse_single_verb};
+pub use dsl_core::{parse_program, parse_single_verb};
 
 // Binding context
-pub use dsl_core::binding_context;
-pub use dsl_core::binding_context::{BindingContext, BindingInfo};
+pub use dsl_core::{BindingContext, BindingInfo};
 
 // Config types
-pub use dsl_core::config;
-pub use dsl_core::config::types::LookupConfig;
-pub use dsl_core::config::{set_phrase_gen_nouns, ConfigLoader, PhraseGenNouns};
+pub use dsl_core::LookupConfig;
+pub use dsl_core::{set_phrase_gen_nouns, ConfigLoader, PhraseGenNouns};
 
 // Diagnostics
-pub use dsl_core::diagnostics;
-pub use dsl_core::diagnostics::{
+pub use dsl_core::{
     cycle_error, implicit_create_hint, missing_arg_error, undefined_symbol_error,
     unknown_verb_error, Diagnostic, DiagnosticCode, RelatedInfo, Severity, SourceSpan,
     SuggestedFix,

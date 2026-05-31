@@ -33,7 +33,7 @@ use super::ast::{Argument, AstNode, Program, Span, Statement, VerbCall};
 use super::runtime_registry::runtime_registry;
 use super::verb_registry::{registry, VerbBehavior};
 use crate::ontology::ontology;
-use dsl_core::config::resource_dependency::ResolvedResourceDependency;
+use dsl_core::ResolvedResourceDependency;
 use dsl_core::execution_dag::{BindingSlotId, DagEdge, NodeId, PopulatedExecutionDag};
 use std::collections::{HashMap, HashSet};
 

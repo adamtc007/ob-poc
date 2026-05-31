@@ -1,7 +1,7 @@
 //! Argument assembly from `OutcomeStep` into DSL-ready structured intents.
 
 use anyhow::{anyhow, Result};
-use dsl_core::config::types::{ArgType, VerbConfig};
+use dsl_core::{ArgType, VerbConfig};
 
 use crate::mcp::intent_pipeline::{
     assemble_dsl_string, IntentArgValue, IntentArgument, StructuredIntent,
@@ -13,7 +13,7 @@ use super::outcome::OutcomeStep;
 ///
 /// # Examples
 /// ```ignore
-/// use dsl_core::config::loader::ConfigLoader;
+/// use dsl_core::ConfigLoader;
 /// use ob_poc::sage::{OutcomeAction, OutcomeStep};
 /// use ob_poc::sage::arg_assembly::assemble_args_from_step;
 /// use std::collections::HashMap;
@@ -46,7 +46,7 @@ pub fn assemble_args_from_step(
 ///
 /// # Examples
 /// ```ignore
-/// use dsl_core::config::loader::ConfigLoader;
+/// use dsl_core::ConfigLoader;
 /// use ob_poc::sage::{OutcomeAction, OutcomeStep};
 /// use ob_poc::sage::arg_assembly::structured_intent_from_step;
 /// use std::collections::HashMap;
@@ -163,7 +163,7 @@ fn coerce_arg_value(raw: &str, arg_type: ArgType, has_lookup: bool) -> Result<In
 mod tests {
     use std::collections::HashMap;
 
-    use dsl_core::config::types::{ArgConfig, VerbBehavior};
+    use dsl_core::{ArgConfig, VerbBehavior};
 
     use super::*;
     use crate::sage::OutcomeAction;

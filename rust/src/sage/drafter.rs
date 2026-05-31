@@ -13,8 +13,8 @@
 //! used by agent::orchestrator and others.
 
 use anyhow::{anyhow, Result};
-use dsl_core::config::loader::ConfigLoader;
-use dsl_core::config::types::{HarmClass, VerbConfig, VerbsConfig};
+use dsl_core::ConfigLoader;
+use dsl_core::{HarmClass, VerbConfig, VerbsConfig};
 
 use crate::mcp::intent_pipeline::IntentArgValue;
 
@@ -42,7 +42,7 @@ impl DrafterEngine {
     ///
     /// # Examples
     /// ```ignore
-    /// use dsl_core::config::loader::ConfigLoader;
+    /// use dsl_core::ConfigLoader;
     /// use ob_poc::sage::drafter::DrafterEngine;
     ///
     /// let config = ConfigLoader::from_env().load_verbs()?;
@@ -373,7 +373,7 @@ fn acceptance_threshold(step: &OutcomeStep) -> f32 {
 mod tests {
     use std::collections::HashMap;
 
-    use dsl_core::config::types::{
+    use dsl_core::{
         ActionClass, ArgConfig, ArgType, DomainConfig, HarmClass, VerbBehavior, VerbMetadata,
     };
 

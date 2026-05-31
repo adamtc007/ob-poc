@@ -64,13 +64,13 @@ pub struct MacroSchema {
     pub precondition_checks: Vec<String>,
 
     /// Whether this macro transitions DAG state or preserves it. Reused
-    /// directly from `dsl_core::config::StateEffect` so macros and verbs
+    /// directly from `dsl_core::StateEffect` so macros and verbs
     /// share one enum.
     #[serde(default)]
     pub state_effect: Option<StateEffect>,
 
     /// Runtime gate-hook metadata. Reused directly from
-    /// `dsl_core::config::TransitionArgs` so the envelope projection
+    /// `dsl_core::TransitionArgs` so the envelope projection
     /// doesn't need a translation table.
     #[serde(default)]
     pub transition_args: Option<TransitionArgs>,

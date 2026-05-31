@@ -44,7 +44,7 @@ impl SentenceGenerator {
         //    the single base "{action} {domain}" combo). Otherwise fall through to
         //    the description-based fallback which is more readable.
         let (domain, action) = Self::split_verb(verb);
-        let generated = dsl_core::config::phrase_gen::generate_phrases(domain, action, &[]);
+        let generated = dsl_core::generate_phrases(domain, action, &[]);
         if generated.len() > 1 {
             if let Some(sentence) = Self::best_phrase_template(&generated, args) {
                 return sentence;

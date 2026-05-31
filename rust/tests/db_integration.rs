@@ -290,7 +290,7 @@ mod db_tests {
         let config_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("config");
         std::env::set_var("DSL_CONFIG_DIR", &config_dir);
 
-        let loader = dsl_core::config::loader::ConfigLoader::from_env();
+        let loader = dsl_core::ConfigLoader::from_env();
         let config = loader
             .load_verbs()
             .expect("ConfigLoader should load verb YAML for db_integration");

@@ -7,8 +7,8 @@
 use std::collections::HashMap;
 
 use anyhow::Result;
-use dsl_core::config::loader::ConfigLoader;
-use dsl_core::config::types::{
+use dsl_core::ConfigLoader;
+use dsl_core::{
     ActionClass, CrudOperation, HarmClass, VerbConfig, VerbMetadata, VerbTier, VerbsConfig,
 };
 
@@ -47,7 +47,7 @@ impl VerbMetadataIndex {
     ///
     /// # Examples
     /// ```ignore
-    /// use dsl_core::config::loader::ConfigLoader;
+    /// use dsl_core::ConfigLoader;
     /// use ob_poc::sage::verb_index::VerbMetadataIndex;
     ///
     /// let config = ConfigLoader::from_env().load_verbs()?;
@@ -132,7 +132,7 @@ impl VerbMetadataIndex {
     ///
     /// # Examples
     /// ```ignore
-    /// use dsl_core::config::types::HarmClass;
+    /// use dsl_core::HarmClass;
     /// use ob_poc::sage::verb_index::VerbMetadataIndex;
     ///
     /// let index = VerbMetadataIndex::load()?;
@@ -163,7 +163,7 @@ impl VerbMetadataIndex {
     ///
     /// # Examples
     /// ```ignore
-    /// use dsl_core::config::types::HarmClass;
+    /// use dsl_core::HarmClass;
     /// use ob_poc::sage::verb_index::VerbMetadataIndex;
     ///
     /// let index = VerbMetadataIndex::load()?;
@@ -619,7 +619,7 @@ pub fn runtime_registry_parity() -> Result<(usize, usize)> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use dsl_core::config::types::{ArgConfig, ArgType, DomainConfig, VerbBehavior};
+    use dsl_core::{ArgConfig, ArgType, DomainConfig, VerbBehavior};
 
     fn sample_config() -> VerbsConfig {
         let mut domains = HashMap::new();
@@ -629,7 +629,7 @@ mod tests {
             VerbConfig {
                 description: "List CBUs".to_string(),
                 behavior: VerbBehavior::Crud,
-                crud: Some(dsl_core::config::types::CrudConfig {
+                crud: Some(dsl_core::CrudConfig {
                     operation: CrudOperation::Select,
                     table: Some("cbus".to_string()),
                     schema: Some("ob-poc".to_string()),

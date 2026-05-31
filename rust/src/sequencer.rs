@@ -445,7 +445,7 @@ impl ReplOrchestratorV2 {
     /// Construction at startup:
     /// ```ignore
     /// use std::sync::Arc;
-    /// use dsl_core::config::ConfigLoader;
+    /// use dsl_core::ConfigLoader;
     /// use {
     ///     GateChecker, PostgresSlotStateProvider, SqlPredicateResolver,
     /// };

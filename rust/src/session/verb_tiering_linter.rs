@@ -34,7 +34,7 @@
 //! - `document` - Document catalog
 //! - `operational` - Derived/projected tables
 
-use dsl_core::config::types::{CrudOperation, SourceOfTruth, VerbBehavior, VerbConfig, VerbTier};
+use dsl_core::{CrudOperation, SourceOfTruth, VerbBehavior, VerbConfig, VerbTier};
 use serde::{Deserialize, Serialize};
 
 use super::verb_contract::{codes, VerbDiagnostics};
@@ -335,7 +335,7 @@ fn check_minimal_rules(
     // M006: deprecated verbs must have replaced_by
     if matches!(
         metadata.status,
-        dsl_core::config::types::VerbStatus::Deprecated
+        dsl_core::VerbStatus::Deprecated
     ) && metadata.replaced_by.is_none()
     {
         diagnostics.add_warning_with_path(
@@ -352,7 +352,7 @@ fn check_basic_rules(
     domain: &str,
     verb_name: &str,
     config: &VerbConfig,
-    metadata: &dsl_core::config::types::VerbMetadata,
+    metadata: &dsl_core::VerbMetadata,
     diagnostics: &mut VerbDiagnostics,
 ) {
     let full_name = format!("{}.{}", domain, verb_name);
@@ -446,7 +446,7 @@ fn check_basic_rules(
 
 /// STANDARD tier single-verb rules (cross-verb rules checked in lint_all_verbs)
 fn check_standard_single_verb_rules(
-    metadata: &dsl_core::config::types::VerbMetadata,
+    metadata: &dsl_core::VerbMetadata,
     _is_write_behavior: bool,
     diagnostics: &mut VerbDiagnostics,
 ) {
@@ -481,7 +481,7 @@ fn check_standard_single_verb_rules(
 
 /// Legacy rules for backward compatibility (always run regardless of tier)
 fn check_legacy_rules(
-    metadata: &dsl_core::config::types::VerbMetadata,
+    metadata: &dsl_core::VerbMetadata,
     is_write_behavior: bool,
     diagnostics: &mut VerbDiagnostics,
 ) {
@@ -561,14 +561,14 @@ fn check_legacy_rules(
 
 /// Lint all verbs from a domain configuration map (uses default LintConfig)
 pub fn lint_all_verbs(
-    domains: &std::collections::HashMap<String, dsl_core::config::types::DomainConfig>,
+    domains: &std::collections::HashMap<String, dsl_core::DomainConfig>,
 ) -> LintReport {
     lint_all_verbs_with_config(domains, &LintConfig::default())
 }
 
 /// Lint all verbs with explicit configuration
 pub fn lint_all_verbs_with_config(
-    domains: &std::collections::HashMap<String, dsl_core::config::types::DomainConfig>,
+    domains: &std::collections::HashMap<String, dsl_core::DomainConfig>,
     config: &LintConfig,
 ) -> LintReport {
     let mut report = LintReport::default();
@@ -604,7 +604,7 @@ pub fn lint_all_verbs_with_config(
 
 /// Check STANDARD tier rules that require cross-verb analysis
 fn check_cross_verb_standard_rules(
-    domains: &std::collections::HashMap<String, dsl_core::config::types::DomainConfig>,
+    domains: &std::collections::HashMap<String, dsl_core::DomainConfig>,
     report: &mut LintReport,
 ) {
     use std::collections::HashMap;
@@ -678,7 +678,7 @@ fn check_cross_verb_standard_rules(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use dsl_core::config::types::{CrudConfig, VerbMetadata};
+    use dsl_core::{CrudConfig, VerbMetadata};
 
     fn make_crud_insert_config() -> VerbConfig {
         VerbConfig {

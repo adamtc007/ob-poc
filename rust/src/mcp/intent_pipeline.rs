@@ -1469,7 +1469,7 @@ mod tests {
         use crate::dsl_v2::ast::find_unresolved_ref_locations;
         use crate::dsl_v2::enrich_program;
         use crate::dsl_v2::execution::runtime_registry_arc;
-        use dsl_core::ast::{Argument, AstNode, Literal, Program, Span, Statement, VerbCall};
+        use dsl_core::{Argument, AstNode, Literal, Program, Span, Statement, VerbCall};
         // HashSet used in commented-out TODO assertion for unique ref_ids
         #[allow(unused_imports)]
         use std::collections::HashSet;
@@ -1606,7 +1606,7 @@ mod tests {
         use crate::dsl_v2::ast::{find_unresolved_ref_locations, Statement};
         use crate::dsl_v2::enrich_program;
         use crate::dsl_v2::execution::runtime_registry_arc;
-        use dsl_core::ast::{Argument, AstNode, Literal, Program, Span, VerbCall};
+        use dsl_core::{Argument, AstNode, Literal, Program, Span, VerbCall};
         use std::collections::HashSet;
 
         // Step 1: Construct raw AST with list of strings (enrichment converts to EntityRefs)
@@ -1746,11 +1746,11 @@ mod tests {
 
     /// Helper to commit resolution by ref_id (Issue K - handles lists/maps correctly)
     fn commit_entity_ref_by_ref_id(
-        program: &mut dsl_core::ast::Program,
+        program: &mut dsl_core::Program,
         target_ref_id: &str,
         resolved_key: &str,
     ) -> bool {
-        use dsl_core::ast::Statement;
+        use dsl_core::Statement;
         for stmt in &mut program.statements {
             if let Statement::VerbCall(vc) = stmt {
                 for arg in &mut vc.arguments {
@@ -1764,11 +1764,11 @@ mod tests {
     }
 
     fn commit_node_by_ref_id(
-        node: &mut dsl_core::ast::AstNode,
+        node: &mut dsl_core::AstNode,
         target_ref_id: &str,
         resolved_key: &str,
     ) -> bool {
-        use dsl_core::ast::AstNode;
+        use dsl_core::AstNode;
 
         match node {
             AstNode::EntityRef {

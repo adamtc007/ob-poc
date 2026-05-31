@@ -101,7 +101,7 @@ pub enum ExecutionMode {
 /// Extract verb signatures from loaded VerbsConfig.
 ///
 /// Iterates all domains and verbs, producing a flat list of `VerbExtract` records.
-pub fn extract_verbs(verbs_config: &dsl_core::config::types::VerbsConfig) -> Vec<VerbExtract> {
+pub fn extract_verbs(verbs_config: &dsl_core::VerbsConfig) -> Vec<VerbExtract> {
     let mut extracts = Vec::new();
 
     for (domain_name, domain_config) in &verbs_config.domains {
@@ -109,10 +109,10 @@ pub fn extract_verbs(verbs_config: &dsl_core::config::types::VerbsConfig) -> Vec
             let fqn = format!("{}.{}", domain_name, verb_name);
 
             let behavior = match verb_config.behavior {
-                dsl_core::config::types::VerbBehavior::Crud => VerbBehaviorKind::Crud,
-                dsl_core::config::types::VerbBehavior::Plugin => VerbBehaviorKind::Plugin,
-                dsl_core::config::types::VerbBehavior::GraphQuery => VerbBehaviorKind::GraphQuery,
-                dsl_core::config::types::VerbBehavior::Durable => VerbBehaviorKind::Durable,
+                dsl_core::VerbBehavior::Crud => VerbBehaviorKind::Crud,
+                dsl_core::VerbBehavior::Plugin => VerbBehaviorKind::Plugin,
+                dsl_core::VerbBehavior::GraphQuery => VerbBehaviorKind::GraphQuery,
+                dsl_core::VerbBehavior::Durable => VerbBehaviorKind::Durable,
             };
 
             let inputs = extract_inputs(&verb_config.args);
@@ -148,7 +148,7 @@ pub fn extract_verbs(verbs_config: &dsl_core::config::types::VerbsConfig) -> Vec
     extracts
 }
 
-fn extract_inputs(args: &[dsl_core::config::types::ArgConfig]) -> Vec<VerbInput> {
+fn extract_inputs(args: &[dsl_core::ArgConfig]) -> Vec<VerbInput> {
     args.iter()
         .map(|arg| {
             let arg_type = format!("{:?}", arg.arg_type).to_lowercase();
@@ -170,34 +170,34 @@ fn extract_inputs(args: &[dsl_core::config::types::ArgConfig]) -> Vec<VerbInput>
         .collect()
 }
 
-fn extract_output(produces: &Option<dsl_core::config::types::VerbProduces>) -> Option<VerbOutput> {
+fn extract_output(produces: &Option<dsl_core::VerbProduces>) -> Option<VerbOutput> {
     produces.as_ref().map(|p| VerbOutput {
         produced_type: p.produced_type.clone(),
         initial_state: p.initial_state.clone(),
     })
 }
 
-fn extract_side_effects(verb_config: &dsl_core::config::types::VerbConfig) -> Vec<SideEffect> {
+fn extract_side_effects(verb_config: &dsl_core::VerbConfig) -> Vec<SideEffect> {
     let mut effects = Vec::new();
 
     // From CRUD config — table + operation
     if let Some(ref crud) = verb_config.crud {
         if let Some(ref table) = crud.table {
             let op = match crud.operation {
-                dsl_core::config::types::CrudOperation::Insert => SideEffectOp::Insert,
-                dsl_core::config::types::CrudOperation::Select
-                | dsl_core::config::types::CrudOperation::SelectWithJoin
-                | dsl_core::config::types::CrudOperation::ListByFk
-                | dsl_core::config::types::CrudOperation::ListParties => SideEffectOp::Read,
-                dsl_core::config::types::CrudOperation::Update => SideEffectOp::Update,
-                dsl_core::config::types::CrudOperation::Delete => SideEffectOp::Delete,
-                dsl_core::config::types::CrudOperation::Upsert
-                | dsl_core::config::types::CrudOperation::EntityUpsert => SideEffectOp::Upsert,
-                dsl_core::config::types::CrudOperation::Link
-                | dsl_core::config::types::CrudOperation::RoleLink => SideEffectOp::Insert,
-                dsl_core::config::types::CrudOperation::Unlink
-                | dsl_core::config::types::CrudOperation::RoleUnlink => SideEffectOp::Delete,
-                dsl_core::config::types::CrudOperation::EntityCreate => SideEffectOp::Insert,
+                dsl_core::CrudOperation::Insert => SideEffectOp::Insert,
+                dsl_core::CrudOperation::Select
+                | dsl_core::CrudOperation::SelectWithJoin
+                | dsl_core::CrudOperation::ListByFk
+                | dsl_core::CrudOperation::ListParties => SideEffectOp::Read,
+                dsl_core::CrudOperation::Update => SideEffectOp::Update,
+                dsl_core::CrudOperation::Delete => SideEffectOp::Delete,
+                dsl_core::CrudOperation::Upsert
+                | dsl_core::CrudOperation::EntityUpsert => SideEffectOp::Upsert,
+                dsl_core::CrudOperation::Link
+                | dsl_core::CrudOperation::RoleLink => SideEffectOp::Insert,
+                dsl_core::CrudOperation::Unlink
+                | dsl_core::CrudOperation::RoleUnlink => SideEffectOp::Delete,
+                dsl_core::CrudOperation::EntityCreate => SideEffectOp::Insert,
             };
             effects.push(SideEffect {
                 schema: crud.schema.clone(),
@@ -209,10 +209,10 @@ fn extract_side_effects(verb_config: &dsl_core::config::types::VerbConfig) -> Ve
         // Junction tables for link/unlink operations
         if let Some(ref junction) = crud.junction {
             let op = match crud.operation {
-                dsl_core::config::types::CrudOperation::Link
-                | dsl_core::config::types::CrudOperation::RoleLink => SideEffectOp::Insert,
-                dsl_core::config::types::CrudOperation::Unlink
-                | dsl_core::config::types::CrudOperation::RoleUnlink => SideEffectOp::Delete,
+                dsl_core::CrudOperation::Link
+                | dsl_core::CrudOperation::RoleLink => SideEffectOp::Insert,
+                dsl_core::CrudOperation::Unlink
+                | dsl_core::CrudOperation::RoleUnlink => SideEffectOp::Delete,
                 _ => SideEffectOp::Write,
             };
             effects.push(SideEffect {
@@ -306,7 +306,7 @@ mod tests {
     #[test]
     fn test_extract_verbs_from_config() {
         // Load actual config to verify extraction works
-        let loader = dsl_core::config::loader::ConfigLoader::from_env();
+        let loader = dsl_core::ConfigLoader::from_env();
         if let Ok(verbs_config) = loader.load_verbs() {
             let extracts = extract_verbs(&verbs_config);
             assert!(!extracts.is_empty(), "Should extract at least one verb");

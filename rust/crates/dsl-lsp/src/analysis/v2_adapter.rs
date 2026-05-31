@@ -28,8 +28,8 @@
 //! | `Map` | `Map` |
 //! | `Nested` | `Call` |
 
-use dsl_core::ast::{Argument, AstNode, Literal, Program, Span as V2Span, Statement, VerbCall};
-use dsl_core::parser::parse_program;
+use dsl_core::{Argument, AstNode, Literal, Program, Span as V2Span, Statement, VerbCall};
+use dsl_core::parse_program;
 use tower_lsp::lsp_types::{Diagnostic, DiagnosticSeverity, NumberOrString, Range};
 
 use super::document::{DocumentState, ExprKind, ParsedArg, ParsedExpr, SymbolDef, SymbolRef};
@@ -305,7 +305,7 @@ fn extract_symbols_from_expr(
 /// This aligns with the REPL's BindingContext and uses the same source of truth.
 fn infer_id_type(verb_name: &str) -> String {
     use dsl_analysis::runtime_registry::RuntimeVerbRegistry;
-    use dsl_core::config::ConfigLoader;
+    use dsl_core::ConfigLoader;
 
     // Try to load from registry (cached after first load)
     static REGISTRY: std::sync::OnceLock<Option<RuntimeVerbRegistry>> = std::sync::OnceLock::new();

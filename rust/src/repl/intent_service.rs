@@ -23,7 +23,7 @@ use super::runbook::ConfirmPolicy;
 use super::sentence_gen::SentenceGenerator;
 use super::types::{IntentMatchResult, MatchContext, MatchOutcome};
 use super::verb_config_index::VerbConfigIndex;
-use dsl_core::config::types::VerbSentences;
+use dsl_core::VerbSentences;
 
 // ============================================================================
 // Outcome Types
@@ -343,7 +343,7 @@ mod tests {
     use super::super::types::VerbCandidate;
     use super::*;
     use async_trait::async_trait;
-    use dsl_core::config::types::{ArgConfig, ArgType};
+    use dsl_core::{ArgConfig, ArgType};
     use uuid::Uuid;
 
     /// Stub IntentMatcher for testing IntentService without real verb search.
@@ -444,7 +444,7 @@ mod tests {
     }
 
     fn make_test_index_with_sentences() -> VerbConfigIndex {
-        use dsl_core::config::types::{DomainConfig, VerbBehavior, VerbConfig, VerbsConfig};
+        use dsl_core::{DomainConfig, VerbBehavior, VerbConfig, VerbsConfig};
 
         let mut domains = HashMap::new();
         let mut cbu_verbs = HashMap::new();

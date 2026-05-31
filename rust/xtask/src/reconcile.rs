@@ -16,8 +16,8 @@
 
 use anyhow::{Context, Result};
 use clap::Subcommand;
-use dsl_core::config::dag::{EntryVia, SlotStateMachine};
-use dsl_core::config::{
+use dsl_core::{EntryVia, SlotStateMachine};
+use dsl_core::{
     collect_declared_fqns, entity_kinds_from_taxonomy_yaml, flatten_pack_entries,
     load_dags_from_dir, load_packs_from_dir, validate_dags_with_context, validate_pack_fqns,
     validate_verbs_config, ConfigLoader, DagValidationContext, LoadedPack, ValidationContext,
@@ -136,7 +136,7 @@ async fn validate(strict_warnings: bool) -> Result<()> {
     let dag_report = if let Some(loaded) = &dags_loaded {
         validate_dags_with_context(loaded, &load_dag_validation_context()?)
     } else {
-        dsl_core::config::DagValidationReport::default()
+        dsl_core::DagValidationReport::default()
     };
 
     // Populate known_slots from loaded DAGs for v1.3 transition_args
@@ -376,7 +376,7 @@ async fn hygiene_report() -> Result<()> {
             declared.contains(*fqn)
                 && !registered.contains(*fqn)
                 && verb_behavior(&cfg, fqn).is_some_and(|behavior| {
-                    matches!(behavior, dsl_core::config::VerbBehavior::Plugin)
+                    matches!(behavior, dsl_core::VerbBehavior::Plugin)
                 })
         })
         .cloned()
@@ -387,7 +387,7 @@ async fn hygiene_report() -> Result<()> {
     let mut plugin_missing = Vec::new();
     for (domain, dblock) in &cfg.domains {
         for (verb, vblock) in &dblock.verbs {
-            if matches!(vblock.behavior, dsl_core::config::VerbBehavior::Plugin) {
+            if matches!(vblock.behavior, dsl_core::VerbBehavior::Plugin) {
                 let fqn = format!("{domain}.{verb}");
                 if !registered.contains(&fqn) {
                     plugin_missing.push(fqn);
@@ -499,7 +499,7 @@ fn hygiene_failure_summary() -> Result<Vec<String>> {
         declared.contains(*fqn)
             && !registered.contains(*fqn)
             && verb_behavior(&cfg, fqn)
-                .is_some_and(|behavior| matches!(behavior, dsl_core::config::VerbBehavior::Plugin))
+                .is_some_and(|behavior| matches!(behavior, dsl_core::VerbBehavior::Plugin))
     }) {
         failures.push(format!(
             "{fqn}: DAG references plugin verb without registered SemOs op"
@@ -508,7 +508,7 @@ fn hygiene_failure_summary() -> Result<Vec<String>> {
 
     for (domain, dblock) in &cfg.domains {
         for (verb, vblock) in &dblock.verbs {
-            if matches!(vblock.behavior, dsl_core::config::VerbBehavior::Plugin) {
+            if matches!(vblock.behavior, dsl_core::VerbBehavior::Plugin) {
                 let fqn = format!("{domain}.{verb}");
                 if !registered.contains(&fqn) {
                     failures.push(format!(
@@ -736,7 +736,7 @@ fn scan_forbidden_mutations(section: &str, parent_fqn: &str, tables: &[&str]) ->
 fn verb_behavior<'a>(
     cfg: &'a VerbsConfig,
     fqn: &str,
-) -> Option<&'a dsl_core::config::VerbBehavior> {
+) -> Option<&'a dsl_core::VerbBehavior> {
     let (domain, verb) = fqn.rsplit_once('.')?;
     cfg.domains
         .get(domain)
@@ -996,12 +996,12 @@ async fn status() -> Result<()> {
                 *d += 1;
                 escalation_rules += ta.consequence.escalation.len();
                 let tier_name = match ta.consequence.baseline {
-                    dsl_core::config::ConsequenceTier::Benign => "benign",
-                    dsl_core::config::ConsequenceTier::Reviewable => "reviewable",
-                    dsl_core::config::ConsequenceTier::RequiresConfirmation => {
+                    dsl_core::ConsequenceTier::Benign => "benign",
+                    dsl_core::ConsequenceTier::Reviewable => "reviewable",
+                    dsl_core::ConsequenceTier::RequiresConfirmation => {
                         "requires_confirmation"
                     }
-                    dsl_core::config::ConsequenceTier::RequiresExplicitAuthorisation => {
+                    dsl_core::ConsequenceTier::RequiresExplicitAuthorisation => {
                         "requires_explicit_authorisation"
                     }
                 };

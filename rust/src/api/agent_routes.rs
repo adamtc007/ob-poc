@@ -1892,7 +1892,7 @@ async fn execute_session_dsl_raw(
         // Note: UnifiedSession.RunSheetEntry doesn't store pre-compiled plan/ast
         // Always run full pipeline. In the future, we could add optional caching.
         let plan: Option<crate::dsl_v2::planning::ExecutionPlan> = None;
-        let ast: Option<Vec<dsl_core::ast::Statement>> = None;
+        let ast: Option<Vec<dsl_core::Statement>> = None;
         tracing::debug!("[EXEC] Running full pipeline (UnifiedSession doesn't cache plans)");
 
         (dsl_source, plan, ast)

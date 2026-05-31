@@ -104,7 +104,7 @@ pub mod graph;
 
 // Phase 5a composite-blocker #23 — stategraph relocated to dsl-runtime
 // (alongside discovery_ops which is its sole consumer). Pure data + file-loading
-// module with only `dsl_core::config::loader::ConfigLoader` as a non-std dep —
+// module with only `dsl_core::ConfigLoader` as a non-std dep —
 // dsl_core is already a dsl-runtime dependency.
 
 // Navigation module - Nom-based parser for graph navigation commands

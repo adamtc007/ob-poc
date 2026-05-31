@@ -18,7 +18,7 @@
 
 use std::collections::HashMap;
 
-use dsl_core::config::types::{ConfirmPolicyConfig, VerbSentences, VerbsConfig};
+use dsl_core::{ConfirmPolicyConfig, VerbSentences, VerbsConfig};
 
 use super::runbook::ConfirmPolicy;
 
@@ -395,7 +395,7 @@ pub fn pack_verb_confirm_policies() -> HashMap<String, ConfirmPolicy> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use dsl_core::config::types::{ArgConfig, ArgType, DomainConfig, VerbBehavior, VerbConfig};
+    use dsl_core::{ArgConfig, ArgType, DomainConfig, VerbBehavior, VerbConfig};
 
     fn make_test_config() -> VerbsConfig {
         let mut domains = HashMap::new();

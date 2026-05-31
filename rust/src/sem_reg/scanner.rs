@@ -13,7 +13,7 @@ use anyhow::Result;
 use sqlx::PgPool;
 use uuid::Uuid;
 
-use dsl_core::config::loader::ConfigLoader;
+use dsl_core::ConfigLoader;
 
 use super::{
     ids::{definition_hash, object_id_for},
@@ -455,7 +455,7 @@ pub async fn run_onboarding_scan(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use dsl_core::config::types::{
+    use dsl_core::{
         ArgConfig, ArgType, DomainConfig, LookupConfig, SearchKeyConfig, VerbBehavior, VerbConfig,
         VerbProduces, VerbsConfig,
     };

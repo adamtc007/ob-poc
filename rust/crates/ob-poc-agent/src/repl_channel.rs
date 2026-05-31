@@ -289,7 +289,7 @@ impl ReplChannelClient for LocalRunbookChannel {
 }
 
 fn parse_into_outcome(source: &str) -> ValidationOutcome {
-    match dsl_core::parser::parse_program(source) {
+    match dsl_core::parse_program(source) {
         Ok(_) => ValidationOutcome {
             source: source.to_string(),
             diagnostics: Vec::new(),
@@ -350,7 +350,7 @@ mod tests {
     fn minimal_source_shape_matches_dsl_syntax() {
         let source = minimal_source_for_verb("cbu.create");
         assert_eq!(source, "(cbu.create)");
-        assert!(dsl_core::parser::parse_program(&source).is_ok());
+        assert!(dsl_core::parse_program(&source).is_ok());
     }
 
     // Phase 4.4 — LocalRunbookChannel lifecycle tests.

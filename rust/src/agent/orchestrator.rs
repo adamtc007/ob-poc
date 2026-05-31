@@ -2285,7 +2285,7 @@ fn build_sage_fast_path_result(
     outcome: &crate::sage::OutcomeIntent,
     drafter_result: &DraftResult,
 ) -> anyhow::Result<PipelineResult> {
-    let config = dsl_core::config::loader::ConfigLoader::from_env().load_verbs()?;
+    let config = dsl_core::ConfigLoader::from_env().load_verbs()?;
     let (domain, verb_name) = drafter_result
         .verb_fqn
         .split_once('.')
@@ -4622,7 +4622,7 @@ mod tests {
     #[test]
     fn test_ast_verb_extraction_from_dsl() {
         // Verify that parse_program + VerbCall::full_name() correctly extracts verbs
-        use dsl_core::ast::Statement;
+        use dsl_core::Statement;
         let dsl = "(entity.create :name \"Acme\")\n(kyc-case.create :entity \"Acme\")";
         let program = parse_program(dsl).expect("valid DSL");
         let verbs: Vec<String> = program
@@ -4643,7 +4643,7 @@ mod tests {
 
     #[test]
     fn test_ast_verb_extraction_single_verb() {
-        use dsl_core::ast::Statement;
+        use dsl_core::Statement;
         let dsl = "(deal.create :name \"Test\")";
         let program = parse_program(dsl).expect("valid DSL");
         let verbs: Vec<String> = program

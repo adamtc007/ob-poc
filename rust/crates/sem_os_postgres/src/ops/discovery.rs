@@ -37,8 +37,8 @@ use uuid::Uuid;
 
 use dsl_analysis::entity_kind::matches as entity_kind_matches;
 use dsl_analysis::stategraph::{load_state_graphs, validate_graphs, walk_graph};
-use dsl_core::config::loader::ConfigLoader;
-use dsl_core::config::types::{ArgConfig, DomainConfig, VerbConfig, VerbMetadata};
+use dsl_core::ConfigLoader;
+use dsl_core::{ArgConfig, DomainConfig, VerbConfig, VerbMetadata};
 use dsl_runtime::{
     GovernedDocumentRequirementsService, GovernedRequirementMatrix,
 };
@@ -278,7 +278,7 @@ fn compute_relevance(domain_name: &str, config: &VerbConfig, entity_state: &Valu
 }
 
 fn find_verb_config<'a>(
-    verbs: &'a dsl_core::config::types::VerbsConfig,
+    verbs: &'a dsl_core::VerbsConfig,
     verb_id: &'a str,
 ) -> Option<(&'a str, &'a VerbConfig)> {
     let (domain_name, verb_name) = verb_id.split_once('.')?;

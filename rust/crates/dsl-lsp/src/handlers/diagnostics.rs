@@ -20,7 +20,7 @@ use dsl_analysis::runtime_registry::RuntimeVerbRegistry;
 use dsl_analysis::validation::{
     Diagnostic as SemanticDiagnostic, Severity, SourceSpan, ValidationContext,
 };
-use dsl_core::config::ConfigLoader;
+use dsl_core::ConfigLoader;
 
 /// Create a planning registry from config
 /// This is cached after first call via lazy_static pattern
@@ -191,10 +191,10 @@ fn convert_diagnostic(diag: &SemanticDiagnostic, source: &str) -> Diagnostic {
 
 /// Convert planning facade Diagnostic to LSP Diagnostic format
 fn convert_planning_diagnostic(
-    diag: &dsl_core::diagnostics::Diagnostic,
+    diag: &dsl_core::Diagnostic,
     _source: &str,
 ) -> Diagnostic {
-    use dsl_core::diagnostics::Severity as PlanningSeverity;
+    use dsl_core::Severity as PlanningSeverity;
 
     // Convert span to LSP Range
     let range = if let Some(ref span) = diag.span {
