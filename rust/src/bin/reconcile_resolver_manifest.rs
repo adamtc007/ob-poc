@@ -1,5 +1,5 @@
 use anyhow::{bail, Context, Result};
-use dsl_core::resolver::{ManifestOptions, ResolverManifest};
+use dsl_core::{ManifestOptions, ResolverManifest};
 use sem_os_core::resolver::{resolve_template, ResolverInputs};
 use std::path::PathBuf;
 

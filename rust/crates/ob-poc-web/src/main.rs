@@ -1412,13 +1412,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         // gate at P.1.g already failed earlier if the catalogue was bad).
         {
             use dsl_runtime::{
-                GateChecker, PostgresSlotStateProvider, SqlPredicateResolver,
+                cross_workspace::DagRegistry, GateChecker, PostgresSlotStateProvider,
+                SqlPredicateResolver,
             };
             use ob_poc::dsl_v2::ConfigLoader;
             use ob_poc::runbook::{GatePipeline, HashMapVerbTransitionLookup};
 
             let cfg_loader = ConfigLoader::from_env();
-            match (cfg_loader.load_verbs(), cfg_loader.load_dag_registry()) {
+            let dag_path = cfg_loader.config_dir().join("sem_os_seeds/dag_taxonomies");
+            match (cfg_loader.load_verbs(), DagRegistry::from_dir(&dag_path)) {
                 (Ok(verbs_cfg), Ok(registry)) => {
                     let registry = Arc::new(registry);
                     let provider = Arc::new(PostgresSlotStateProvider);

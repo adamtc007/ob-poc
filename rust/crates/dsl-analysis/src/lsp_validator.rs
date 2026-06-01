@@ -649,6 +649,7 @@ fn resolve_verb_call(
         domain: verb_call.domain.clone(),
         verb: verb_call.verb.clone(),
         arguments: resolved_args,
+        lens_override: verb_call.lens_override.clone(),
         binding: verb_call.binding.clone(),
         span: verb_call.span,
     }

@@ -8640,6 +8640,7 @@ dependencies = [
  "clap",
  "csv",
  "dsl-core",
+ "dsl-runtime",
  "glob",
  "ob-agentic",
  "ob-poc",

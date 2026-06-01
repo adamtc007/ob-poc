@@ -548,6 +548,7 @@ fn build_verb_call(domain: &str, verb: &str, args: &serde_json::Value) -> VerbCa
         domain: domain.to_string(),
         verb: verb.to_string(),
         arguments,
+        lens_override: None,
         binding: None,
         span: Span::default(),
     }

@@ -34,15 +34,26 @@ pub use dsl_core::{
     VerbCall,
 };
 
+pub mod ast {
+    pub use dsl_core::{
+        AstNode, Argument, Literal, Program, Span, Statement, VerbCall,
+        UnresolvedRefLocation, find_unresolved_ref_locations,
+    };
+}
+
 // Parser
 pub use dsl_core::{parse_program, parse_single_verb};
+
+pub mod parser {
+    pub use dsl_core::parse_program;
+}
 
 // Binding context
 pub use dsl_core::{BindingContext, BindingInfo};
 
-// Config types
-pub use dsl_core::LookupConfig;
-pub use dsl_core::{set_phrase_gen_nouns, ConfigLoader, PhraseGenNouns};
+pub mod binding_context {
+    pub use dsl_core::{BindingContext, BindingInfo};
+}
 
 // Diagnostics
 pub use dsl_core::{
@@ -51,10 +62,41 @@ pub use dsl_core::{
     SuggestedFix,
 };
 
+pub mod diagnostics {
+    pub use dsl_core::{Diagnostic, DiagnosticCode, Severity, SourceSpan};
+}
+
+// Config types
+pub use dsl_core::LookupConfig;
+pub use dsl_core::{set_phrase_gen_nouns, ConfigLoader, PhraseGenNouns};
+
+pub mod config {
+    pub use dsl_core::{
+        ConfigLoader, ValidationContext, collect_declared_fqns,
+        flatten_pack_entries, load_packs_from_dir, validate_pack_fqns,
+        validate_verbs_config, wiring_check, StructuralError, DagWarning,
+    };
+    pub mod types {
+        pub use dsl_core::{
+            ArgConfig, ArgType, CrudConfig, CrudOperation, DomainConfig,
+            DurableConfig, GraphQueryOperation, HarmClass, LookupConfig,
+            ResolutionMode, ReturnTypeConfig, SearchKeyConfig, VerbBehavior,
+            VerbConfig, VerbsConfig,
+        };
+    }
+    pub mod loader {
+        pub use dsl_core::ConfigLoader;
+    }
+}
+
 // Compiler — Op-free path (Phase 3 CR A4; Op enum, DAG, and VerbHandler removed)
-pub use dsl_core::compiler;
-pub use dsl_core::compiler::{
-    compile_to_steps, CompileError as OpCompileError, CompileStep, CompiledSteps,
+pub mod compiler {
+    pub use dsl_core::{
+        compile_to_steps, CompileError as OpCompileError, CompileStep, CompiledSteps,
+    };
+}
+pub use compiler::{
+    compile_to_steps, OpCompileError, CompileStep, CompiledSteps,
 };
 
 // =============================================================================

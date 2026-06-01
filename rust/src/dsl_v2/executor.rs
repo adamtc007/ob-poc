@@ -2517,7 +2517,7 @@ impl DslExecutor {
         // T09b will move this to a direct registry lookup once UnifiedVerbDef
         // exposes effect_class; for now we load from YAML at plan-check time
         // (once per plan, not once per step — loader is cached via OnceLock).
-        let step_effect_classes: Vec<Option<dsl_core::executable_plan::EffectClass>> = {
+        let step_effect_classes: Vec<Option<dsl_core::EffectClass>> = {
             use dsl_core::ConfigLoader;
             let verbs_opt = ConfigLoader::from_env().load_verbs().ok();
             plan.steps

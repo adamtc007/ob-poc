@@ -156,7 +156,6 @@ fn run_envelope_cli(workspace_root: &std::path::Path, config: &str) -> Result<St
     let output = Command::new("cargo")
         .arg("run")
         .arg("--quiet")
-        .arg("--release")
         .arg("--bin")
         .arg("acp_pack_context_envelope_v2")
         .arg("--")

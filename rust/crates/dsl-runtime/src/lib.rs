@@ -55,7 +55,7 @@
 // `dsl-analysis`. See docs/todo/dsl-runtime-split-v1.md.
 mod bods;
 pub mod coordination;
-mod cross_workspace;
+pub mod cross_workspace;
 mod crud_executor;
 mod document_bundles;
 mod document_requirements;
@@ -146,7 +146,7 @@ pub use state_reducer::{
 pub use tx::TransactionScope;
 
 #[cfg(any(test, feature = "harness"))]
-pub use cross_workspace::test_harness;
+pub use cross_workspace::test_harness::{self, LiveScenarioRunner, ScenarioRunner};
 
 #[cfg(test)]
 pub use port::test_support;

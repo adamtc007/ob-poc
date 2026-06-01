@@ -131,7 +131,7 @@ mod derived_state;
 mod derived_state_projector;
 mod fact_refs;
 
-pub(crate) use dag_registry::DagRegistry;
+pub use dag_registry::{DagRegistry, TransitionRef};
 mod fact_versions;
 mod gate_checker;
 mod hierarchy_cascade;

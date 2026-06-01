@@ -973,8 +973,8 @@ pub fn arg_type_to_attribute_type(arg: &ArgConfig) -> AttributeDataType {
 mod tests {
     use super::*;
     use dsl_core::{
-        ActionClass, ArgConfig, ArgType, CrudConfig, CrudOperation, DomainConfig, HarmClass,
-        LookupConfig, SearchKeyConfig, VerbBehavior, VerbConfig, VerbConsumes, VerbLifecycle,
+        ArgConfig, ArgType, CrudConfig, CrudOperation, DomainConfig,
+        LookupConfig, SearchKeyConfig, VerbBehavior, VerbConfig, VerbLifecycle,
         VerbMetadata, VerbProduces, VerbsConfig,
     };
     use std::collections::HashMap;

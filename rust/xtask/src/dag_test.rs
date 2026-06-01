@@ -92,7 +92,7 @@ pub(crate) fn run(
 /// state, and cascade rule across all DAG taxonomies, cross-reference
 /// against fixtures, report gaps.
 pub(crate) fn coverage(workspace_filter: Option<String>, json: bool) -> Result<()> {
-    use dsl_core::config::DagRegistry;
+    use dsl_runtime::cross_workspace::DagRegistry;
 
     let dag_path = repo_root().join(DAG_TAXONOMIES_DIR);
     let registry = DagRegistry::from_dir(&dag_path)

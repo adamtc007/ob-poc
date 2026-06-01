@@ -21,12 +21,15 @@ use crate::entity_kind::{
     canonicalize as canonicalize_entity_kind, subject_kind_for_domain, subject_kind_from_hint,
 };
 use dsl_core::{
-    ArgConfig, ArgType, BatchPolicyConfig, CrudConfig, CrudOperation, DomainConfig, DurableConfig,
+    ArgConfig, ArgType, BatchPolicyConfig, CrudOperation,
     DurableRuntime, DynamicVerbConfig, FuzzyCheckConfig, GraphQueryOperation, HarmClass,
-    LockAccessConfig, LockModeConfig, LookupConfig, PolicyConfig, ReturnTypeConfig, ReturnsConfig,
-    SearchKeyConfig, VerbBehavior, VerbConfig, VerbConsumes, VerbLifecycle, VerbProduces,
+    LockAccessConfig, LockModeConfig, LookupConfig, PolicyConfig, ReturnTypeConfig,
+    VerbBehavior, VerbConfig, VerbConsumes, VerbLifecycle, VerbProduces,
     VerbsConfig,
 };
+
+#[cfg(test)]
+use dsl_core::{CrudConfig, DomainConfig, ReturnsConfig};
 use ob_templates::{TemplateDefinition, TemplateRegistry};
 
 // =============================================================================

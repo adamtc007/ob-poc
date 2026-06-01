@@ -533,6 +533,7 @@ fn substitute_statement(stmt: &Statement, bindings: &HashMap<String, Uuid>) -> S
                     span: arg.span,
                 })
                 .collect(),
+            lens_override: vc.lens_override.clone(),
             binding: vc.binding.clone(),
             span: vc.span,
         }),
@@ -576,6 +577,7 @@ fn substitute_node(node: &AstNode, bindings: &HashMap<String, Uuid>) -> AstNode 
                     span: arg.span,
                 })
                 .collect(),
+            lens_override: vc.lens_override.clone(),
             binding: vc.binding.clone(),
             span: vc.span,
         })),
@@ -652,6 +654,7 @@ mod tests {
                 },
                 span: Span::default(),
             }],
+            lens_override: None,
             binding: None,
             span: Span::default(),
         });
@@ -679,6 +682,7 @@ mod tests {
                 },
                 span: Span::default(),
             }],
+            lens_override: None,
             binding: None,
             span: Span::default(),
         });
@@ -701,6 +705,7 @@ mod tests {
                 },
                 span: Span::default(),
             }],
+            lens_override: None,
             binding: None,
             span: Span::default(),
         });
@@ -730,6 +735,7 @@ mod tests {
             domain: "cbu".to_string(),
             verb: "test".to_string(),
             arguments: vec![],
+            lens_override: None,
             binding: None,
             span: Span::default(),
         });
@@ -764,6 +770,7 @@ mod tests {
                     span: Span::default(),
                 },
             ],
+            lens_override: None,
             binding: None,
             span: Span::default(),
         });

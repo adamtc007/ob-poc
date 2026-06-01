@@ -34,7 +34,7 @@ use super::runtime_registry::runtime_registry;
 use super::verb_registry::{registry, VerbBehavior};
 use crate::ontology::ontology;
 use dsl_core::ResolvedResourceDependency;
-use dsl_core::execution_dag::{BindingSlotId, DagEdge, NodeId, PopulatedExecutionDag};
+use dsl_core::{BindingSlotId, DagEdge, NodeId, PopulatedExecutionDag};
 use std::collections::{HashMap, HashSet};
 
 /// A compiled execution plan — dependency-sorted sequence of steps.
@@ -68,9 +68,9 @@ impl ExecutionPlan {
     /// Each step that declares `bind_as` with a known `produces_entity_type`
     /// contributes a typed `BindingSlot`. Steps that produce bindings without
     /// a declared entity type contribute an untyped slot (entity_type: None).
-    pub fn binding_frame_schema(&self) -> dsl_core::executable_plan::BindingFrameSchema {
-        use dsl_core::executable_plan::{BindingFrameSchema, BindingSlot};
-        use dsl_core::execution_dag::BindingSlotId;
+    pub fn binding_frame_schema(&self) -> dsl_core::BindingFrameSchema {
+        use dsl_core::{BindingFrameSchema, BindingSlot};
+        use dsl_core::BindingSlotId;
         let slots = self
             .steps
             .iter()
@@ -826,6 +826,7 @@ fn create_synthetic_verb_call(creator_verb: &str, binding: &str) -> VerbCall {
         domain: domain.to_string(),
         verb: verb.to_string(),
         arguments: vec![], // Minimal - user must fill in required args
+        lens_override: None,
         binding: Some(binding.to_string()),
         span: Span::synthetic(),
     }
@@ -1146,6 +1147,7 @@ fn extract_nested_children(vc: &VerbCall) -> (VerbCall, Vec<VerbCall>) {
         domain: vc.domain.clone(),
         verb: vc.verb.clone(),
         arguments: flat_args,
+        lens_override: vc.lens_override.clone(),
         binding: vc.binding.clone(),
         span: vc.span,
     };
@@ -1231,6 +1233,7 @@ mod tests {
                     span: Span::default(),
                 })
                 .collect(),
+            lens_override: None,
             binding: None,
             span: Span::default(),
         }
@@ -1323,6 +1326,7 @@ mod tests {
                     span: Span::default(),
                 },
             ],
+            lens_override: None,
             binding: None,
             span: Span::default(),
         };
@@ -1416,6 +1420,7 @@ mod tests {
                     span: Span::default(),
                 })
                 .collect(),
+            lens_override: None,
             binding: binding.map(String::from),
             span: Span::default(),
         }

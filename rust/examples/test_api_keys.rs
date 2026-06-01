@@ -168,11 +168,11 @@ fn validate_openai_key_format(key: &str) -> bool {
 
 /// Basic Gemini API key format validation
 fn validate_gemini_key_format(key: &str) -> bool {
-    // Gemini keys are typically 39 characters long and alphanumeric
+    // Gemini keys are typically 39 characters long and alphanumeric, but new formats can start with AQ. and contain dots.
     key.len() >= 20
         && key
             .chars()
-            .all(|c| c.is_alphanumeric() || c == '-' || c == '_')
+            .all(|c| c.is_alphanumeric() || c == '-' || c == '_' || c == '.')
 }
 
 #[cfg(test)]
@@ -205,6 +205,9 @@ mod tests {
         ));
         assert!(validate_gemini_key_format(
             "1234567890abcdefghijklmnopqrstuv123456789"
+        ));
+        assert!(validate_gemini_key_format(
+            "AQ-Ab8RN6KfgOaTQC9llX184JIHQ7z9wWsiCu8qpnda9JJoa2hVow"
         ));
         assert!(!validate_gemini_key_format("short"));
         assert!(!validate_gemini_key_format("key with spaces"));

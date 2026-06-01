@@ -160,7 +160,7 @@ pub struct VerbExecutionPortStepExecutor {
 ///     planned.
 #[derive(Clone)]
 pub struct GatePipeline {
-    pub registry: Arc<dsl_core::config::DagRegistry>,
+    pub registry: Arc<dsl_runtime::cross_workspace::DagRegistry>,
     pub gate_checker: Arc<GateChecker>,
     pub verb_metadata: Arc<dyn VerbTransitionLookup>,
     pub pool: Arc<sqlx::PgPool>,
@@ -174,7 +174,7 @@ pub struct GatePipeline {
 /// implements this via a HashMap pre-populated from VerbsConfig at
 /// startup.
 pub trait VerbTransitionLookup: Send + Sync {
-    fn lookup(&self, verb_fqn: &str) -> Option<dsl_core::config::types::TransitionArgs>;
+    fn lookup(&self, verb_fqn: &str) -> Option<dsl_core::TransitionArgs>;
 }
 
 impl VerbExecutionPortStepExecutor {
@@ -251,7 +251,7 @@ impl VerbExecutionPortStepExecutor {
         //   * Any matching from→to pair otherwise (fail-conservative
         //     by checking each)
         let transitions = pipe.registry.transitions_for_verb(&step.verb);
-        let candidates: Vec<&dsl_core::config::dag_registry::TransitionRef> =
+        let candidates: Vec<&dsl_runtime::cross_workspace::TransitionRef> =
             if let Some(ts) = target_state_opt {
                 transitions
                     .iter()
@@ -517,7 +517,7 @@ impl super::executor::StepExecutor for VerbExecutionPortStepExecutor {
 /// using [`HashMapVerbTransitionLookup::from_verbs_config`], wrap in
 /// `Arc`, share into the `GatePipeline`.
 pub struct HashMapVerbTransitionLookup {
-    map: std::collections::HashMap<String, dsl_core::config::types::TransitionArgs>,
+    map: std::collections::HashMap<String, dsl_core::TransitionArgs>,
 }
 
 impl HashMapVerbTransitionLookup {
@@ -527,7 +527,7 @@ impl HashMapVerbTransitionLookup {
         }
     }
 
-    pub fn from_verbs_config(cfg: &dsl_core::config::types::VerbsConfig) -> Self {
+    pub fn from_verbs_config(cfg: &dsl_core::VerbsConfig) -> Self {
         let mut map = std::collections::HashMap::new();
         for (domain_name, domain) in &cfg.domains {
             for (verb_name, verb) in &domain.verbs {
@@ -547,7 +547,7 @@ impl Default for HashMapVerbTransitionLookup {
 }
 
 impl VerbTransitionLookup for HashMapVerbTransitionLookup {
-    fn lookup(&self, verb_fqn: &str) -> Option<dsl_core::config::types::TransitionArgs> {
+    fn lookup(&self, verb_fqn: &str) -> Option<dsl_core::TransitionArgs> {
         self.map.get(verb_fqn).cloned()
     }
 }
@@ -587,7 +587,7 @@ mod tests {
     // loading real YAML files.
     #[test]
     fn hashmap_verb_transition_lookup_construction() {
-        use dsl_core::config::types::{
+        use dsl_core::{
             DomainConfig, TransitionArgs, VerbBehavior, VerbConfig, VerbsConfig,
         };
         use std::collections::HashMap;
