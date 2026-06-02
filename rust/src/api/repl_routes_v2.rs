@@ -1327,7 +1327,7 @@ fn build_live_acp_projection(
             "agent_mode": repl_session.agent_mode,
             "conversation_mode": repl_session.conversation_mode,
             "workspace_stack": repl_session.workspace_stack,
-            "session_stack": repl_session.session_stack,
+            "session_stack": repl_session.build_session_stack_state(),
             "bindings": repl_session.bindings,
             "entity_resolution": repl_session.last_entity_resolution,
             "runbook_plan_cursor": repl_session.runbook_plan_cursor,
@@ -1347,7 +1347,7 @@ fn build_live_acp_projection(
         AcpProjectionKind::GraphScene => serde_json::json!({
             "status": "live",
             "source": "session_stack",
-            "session_stack": repl_session.session_stack,
+            "session_stack": repl_session.build_session_stack_state(),
             "workspace_frame_count": repl_session.workspace_stack.len(),
         }),
         AcpProjectionKind::VerbSurface => serde_json::json!({
@@ -1401,7 +1401,7 @@ fn build_live_acp_projection(
             "status": "live",
             "trace_sequence": repl_session.trace_sequence,
             "trace": repl_session.trace,
-            "session_stack": repl_session.session_stack,
+            "session_stack": repl_session.build_session_stack_state(),
             "entity_resolution": repl_session.last_entity_resolution,
         }),
         AcpProjectionKind::EvidenceSchema => serde_json::json!({
@@ -3362,10 +3362,18 @@ async fn compile_kyc_restricted_mutation_runbook(
     Path(session_id): Path<Uuid>,
     Json(req): Json<KycRestrictedMutationCompileRunbookRequest>,
 ) -> Result<Json<serde_json::Value>, (StatusCode, Json<ErrorResponseV2>)> {
-    let runbook_version = {
-        let sessions = state.orchestrator.sessions_for_test();
-        let mut sessions_write = sessions.write().await;
-        let session = sessions_write.get_mut(&session_id).ok_or_else(|| {
+    #[cfg(feature = "database")]
+    let turn_lock = state
+        .orchestrator
+        .acquire_session_turn_record_lock(session_id)
+        .await
+        .map_err(anyhow_json_error)?;
+
+    let _session = state
+        .orchestrator
+        .get_session(session_id)
+        .await
+        .ok_or_else(|| {
             (
                 StatusCode::NOT_FOUND,
                 Json(ErrorResponseV2 {
@@ -3374,12 +3382,29 @@ async fn compile_kyc_restricted_mutation_runbook(
                 }),
             )
         })?;
-        session.allocate_runbook_version()
+
+    let (runbook_version, active_pack_id) = {
+        let sessions = state.orchestrator.sessions_for_test();
+        let mut sessions_write = sessions.write().await;
+        let s = sessions_write.get_mut(&session_id).ok_or_else(|| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(ErrorResponseV2 {
+                    error: "Session disappeared from memory map".to_string(),
+                    recoverable: false,
+                }),
+            )
+        })?;
+        (s.allocate_runbook_version(), s.active_pack_id())
     };
 
-    let compilation =
-        compile_kyc_restricted_mutation_runbook_value(session_id, runbook_version, req)
-            .map_err(compilation_json_error)?;
+    let compilation = compile_kyc_restricted_mutation_runbook_value(
+        session_id,
+        runbook_version,
+        active_pack_id,
+        req,
+    )
+    .map_err(compilation_json_error)?;
 
     let compiled_runbook: crate::runbook::CompiledRunbook = serde_json::from_value(
         compilation["compilation"]["compiled_runbook"].clone(),
@@ -3409,6 +3434,17 @@ async fn compile_kyc_restricted_mutation_runbook(
         )
     })?;
 
+    state
+        .orchestrator
+        .persist_session_checkpoint_with_record_lock(session_id)
+        .await
+        .map_err(anyhow_json_error)?;
+
+    #[cfg(feature = "database")]
+    if let Some(lock) = turn_lock {
+        lock.release().await.map_err(anyhow_json_error)?;
+    }
+
     Ok(Json(compilation))
 }
 
@@ -3416,11 +3452,13 @@ async fn compile_kyc_restricted_mutation_runbook(
 fn compile_kyc_restricted_mutation_runbook_value(
     session_id: Uuid,
     runbook_version: u64,
+    pack_id: Option<String>,
     req: KycRestrictedMutationCompileRunbookRequest,
 ) -> Result<serde_json::Value, crate::runbook::RestrictedMutationRunbookCompilationError> {
     let compilation = crate::runbook::compile_restricted_mutation_preflight(
         session_id,
         runbook_version,
+        pack_id,
         &req.preflight,
     )?;
 
@@ -6205,6 +6243,7 @@ mod tests {
         let value = compile_kyc_restricted_mutation_runbook_value(
             test_session_id(),
             3,
+            Some("ob-poc.kyc".to_string()),
             KycRestrictedMutationCompileRunbookRequest { preflight },
         )
         .expect("compiled runbook");
@@ -6255,6 +6294,7 @@ mod tests {
         let compilation_value = compile_kyc_restricted_mutation_runbook_value(
             test_session_id(),
             3,
+            Some("ob-poc.kyc".to_string()),
             KycRestrictedMutationCompileRunbookRequest {
                 preflight: preflight.clone(),
             },
@@ -6316,6 +6356,7 @@ mod tests {
                 compile_kyc_restricted_mutation_runbook_value(
                     test_session_id(),
                     3,
+                    Some("ob-poc.kyc".to_string()),
                     KycRestrictedMutationCompileRunbookRequest {
                         preflight: preflight.clone(),
                     },

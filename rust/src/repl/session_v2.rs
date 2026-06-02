@@ -94,9 +94,6 @@ pub struct ReplSessionV2 {
     /// Results of executed plan steps.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub execution_log: Vec<crate::runbook::plan_types::StepResult>,
-    /// Canonical stack/context value shared with BPMN-lite by copy.
-    #[serde(default)]
-    pub session_stack: ob_poc_types::session_stack::SessionStackState,
     /// Symbol table for @reference resolution (`:as @myEntity` bindings).
     /// Session-scoped — persists across workspace switches.
     /// Synced from ExecutionContext.pending_session.bindings after verb execution.
@@ -172,10 +169,6 @@ impl ReplSessionV2 {
             runbook_plan: None,
             runbook_plan_cursor: None,
             execution_log: Vec::new(),
-            session_stack: ob_poc_types::session_stack::SessionStackState {
-                session_id: id,
-                ..Default::default()
-            },
             bindings: std::collections::HashMap::new(),
             cbu_ids: Vec::new(),
             name: None,
@@ -266,7 +259,6 @@ impl ReplSessionV2 {
             timestamp: Utc::now(),
         });
         self.last_active_at = Utc::now();
-        self.sync_session_stack_state();
     }
 
     /// Transition to a new state.
@@ -286,7 +278,6 @@ impl ReplSessionV2 {
         self.state = new_state;
         self.append_trace(super::session_trace::TraceOp::StateTransition { from, to });
         self.last_active_at = Utc::now();
-        self.sync_session_stack_state();
     }
 
     /// Set the client scope (client group id).
@@ -303,7 +294,6 @@ impl ReplSessionV2 {
     pub fn set_client_scope(&mut self, client_group_id: Uuid) {
         self.runbook.client_group_id = Some(client_group_id);
         self.last_active_at = Utc::now();
-        self.sync_session_stack_state();
     }
 
     /// Set the active workspace and replace the stack with a root frame.
@@ -327,7 +317,6 @@ impl ReplSessionV2 {
                 .push(WorkspaceFrame::new(workspace, scope));
         }
         self.last_active_at = Utc::now();
-        self.sync_session_stack_state();
     }
 
     /// Alias for setting the root workspace frame.
@@ -365,12 +354,10 @@ impl ReplSessionV2 {
 
         let Some(entity) = result.dominant_entity.as_ref() else {
             self.last_active_at = Utc::now();
-            self.sync_session_stack_state();
             return false;
         };
         if entity.entity_id.is_nil() {
             self.last_active_at = Utc::now();
-            self.sync_session_stack_state();
             return false;
         }
 
@@ -418,7 +405,6 @@ impl ReplSessionV2 {
         }
 
         self.last_active_at = Utc::now();
-        self.sync_session_stack_state();
         subject_changed
     }
 
@@ -502,7 +488,6 @@ impl ReplSessionV2 {
         if let Some(tos) = self.workspace_stack.last_mut() {
             tos.writes_since_push += 1;
         }
-        self.sync_session_stack_state();
     }
 
     /// Build a lightweight snapshot of the current workspace stack for trace entries.
@@ -628,7 +613,6 @@ impl ReplSessionV2 {
         self.workspace_stack.push(frame);
         self.append_trace(super::session_trace::TraceOp::StackPush { workspace: ws });
         self.last_active_at = Utc::now();
-        self.sync_session_stack_state();
         Ok(())
     }
 
@@ -651,7 +635,6 @@ impl ReplSessionV2 {
             self.active_workspace = Some(tos.workspace.clone());
         }
         self.last_active_at = Utc::now();
-        self.sync_session_stack_state();
     }
 
     // ── Viewport state accessors (observation frame, NOT resource truth) ──
@@ -669,7 +652,6 @@ impl ReplSessionV2 {
         if let Some(tos) = self.workspace_stack.last_mut() {
             tos.view_level = level;
         }
-        self.sync_session_stack_state();
     }
 
     /// Current focus slot path from TOS.
@@ -684,7 +666,6 @@ impl ReplSessionV2 {
         if let Some(tos) = self.workspace_stack.last_mut() {
             tos.focus_slot_path = path;
         }
-        self.sync_session_stack_state();
     }
 
     /// Push a viewport snapshot to TOS navigation history (for back/forward).
@@ -713,7 +694,6 @@ impl ReplSessionV2 {
                 let snap = &tos.nav_snapshots[tos.nav_cursor];
                 tos.view_level = snap.view_level;
                 tos.focus_slot_path = snap.focus_slot_path.clone();
-                self.sync_session_stack_state();
                 return true;
             }
         }
@@ -728,7 +708,6 @@ impl ReplSessionV2 {
                 let snap = &tos.nav_snapshots[tos.nav_cursor];
                 tos.view_level = snap.view_level;
                 tos.focus_slot_path = snap.focus_slot_path.clone();
-                self.sync_session_stack_state();
                 return true;
             }
         }
@@ -766,7 +745,6 @@ impl ReplSessionV2 {
             self.active_workspace = Some(tos.workspace.clone());
         }
         self.last_active_at = Utc::now();
-        self.sync_session_stack_state();
         popped
     }
 
@@ -797,7 +775,6 @@ impl ReplSessionV2 {
             self.append_trace(super::session_trace::TraceOp::StackCommit);
         }
         self.last_active_at = Utc::now();
-        self.sync_session_stack_state();
     }
 
     /// Build session feedback from the current top-of-stack state.
@@ -952,9 +929,8 @@ impl ReplSessionV2 {
     ///
     /// assert!(!ReplSessionV2::new().has_active_pack());
     /// ```
-    #[allow(deprecated)]
     pub fn has_active_pack(&self) -> bool {
-        self.staged_pack.is_some() || self.journey_context.is_some()
+        self.active_pack_id().is_some()
     }
 
     /// Get the active pack ID.
@@ -966,7 +942,10 @@ impl ReplSessionV2 {
     /// assert!(ReplSessionV2::new().active_pack_id().is_none());
     /// ```
     pub fn active_pack_id(&self) -> Option<String> {
-        self.staged_pack.as_ref().map(|p| p.id.clone())
+        self.staged_pack
+            .as_ref()
+            .map(|p| p.id.clone())
+            .or_else(|| self.runbook.pack_id.clone())
     }
 
     /// Rehydrate transient fields after loading from database.
@@ -987,12 +966,6 @@ impl ReplSessionV2 {
             }
         }
         self.runbook.rebuild_invocation_index();
-        self.sync_session_stack_state();
-    }
-
-    /// Rebuild the canonical session-stack value from the interactive REPL state.
-    pub fn sync_session_stack_state(&mut self) {
-        self.session_stack = self.build_session_stack_state();
     }
 
     /// Build the canonical stack/context value shared with BPMN-lite.
@@ -1441,7 +1414,7 @@ required_context:
             Some(entity_id)
         );
         assert_eq!(
-            session.session_stack.workspace_stack[0].subject_id,
+            session.build_session_stack_state().workspace_stack[0].subject_id,
             Some(entity_id)
         );
     }
@@ -1534,22 +1507,19 @@ required_context:
         session.set_tos_view_level(ViewLevel::Surface);
         session.set_tos_focus_slot(Some("overview.summary".to_string()));
 
-        assert_eq!(session.session_stack.session_id, session.id);
+        let stack = session.build_session_stack_state();
+        assert_eq!(stack.session_id, session.id);
         assert_eq!(
-            session
-                .session_stack
-                .scope
-                .as_ref()
-                .map(|scope| scope.client_group_id),
+            stack.scope.as_ref().map(|scope| scope.client_group_id),
             Some(client_group_id)
         );
         assert_eq!(
-            session.session_stack.active_workspace,
+            stack.active_workspace,
             Some(ob_poc_types::session_stack::SessionWorkspaceKind::Cbu)
         );
-        assert_eq!(session.session_stack.workspace_stack.len(), 1);
+        assert_eq!(stack.workspace_stack.len(), 1);
 
-        let frame = &session.session_stack.workspace_stack[0];
+        let frame = &stack.workspace_stack[0];
         assert_eq!(
             frame.workspace,
             ob_poc_types::session_stack::SessionWorkspaceKind::Cbu

@@ -191,17 +191,21 @@ fn run_workflow_validity_case(
         }
     };
 
-    let compilation =
-        match compile_restricted_mutation_preflight(SESSION_ID, runbook_version, &preflight) {
-            Ok(compilation) => {
-                row.compiled_runbook_valid = true;
-                compilation
-            }
-            Err(error) => {
-                row.failure = Some(format!("compiled runbook failed: {error:?}"));
-                return row;
-            }
-        };
+    let compilation = match compile_restricted_mutation_preflight(
+        SESSION_ID,
+        runbook_version,
+        Some(output.workbook.core.pack_id.clone()),
+        &preflight,
+    ) {
+        Ok(compilation) => {
+            row.compiled_runbook_valid = true;
+            compilation
+        }
+        Err(error) => {
+            row.failure = Some(format!("compiled runbook failed: {error:?}"));
+            return row;
+        }
+    };
 
     match record_restricted_mutation_execution_receipt(
         &compilation,

@@ -65,10 +65,25 @@ pub enum RestrictedMutationRunbookCompilationError {
     },
 }
 
+/// Compile a restricted mutation preflight.
+///
+/// # Examples
+/// ```rust,ignore
+/// use uuid::Uuid;
+/// use ob_poc::runbook::restricted_mutation::compile_restricted_mutation_preflight;
+///
+/// let compilation = compile_restricted_mutation_preflight(
+///     Uuid::new_v4(),
+///     1,
+///     Some("kyc-case".to_string()),
+///     &preflight,
+/// ).unwrap();
+/// ```
 #[allow(clippy::result_large_err)]
 pub fn compile_restricted_mutation_preflight(
     session_id: Uuid,
     runbook_version: u64,
+    pack_id: Option<String>,
     preflight: &RestrictedMutationPreflight,
 ) -> Result<RestrictedMutationRunbookCompilation, RestrictedMutationRunbookCompilationError> {
     if preflight.executor != MutationExecutor::ExistingRunbookGateOnly {
@@ -89,6 +104,12 @@ pub fn compile_restricted_mutation_preflight(
         return Err(RestrictedMutationRunbookCompilationError::AlreadyExecuted {
             actual_diff: actual_diff.clone(),
         });
+    }
+
+    let expected_pack_id = preflight.runbook_args.get("pack-id").cloned();
+    if expected_pack_id.is_some() || pack_id.is_some() {
+        let pid = pack_id.as_deref().unwrap_or("");
+        require_arg(preflight, "pack-id", pid)?;
     }
 
     require_arg(
@@ -304,6 +325,7 @@ mod tests {
             "approval-token-id".to_string(),
             approval_token_id.to_string(),
         );
+        runbook_args.insert("pack-id".to_string(), "kyc-case".to_string());
 
         RestrictedMutationPreflight {
             workbook_id: workbook_id.clone(),
@@ -353,7 +375,13 @@ mod tests {
 
     #[test]
     fn compiles_preflight_to_existing_runbook_gate_artifact() {
-        let compiled = compile_restricted_mutation_preflight(SESSION_ID, 7, &preflight()).unwrap();
+        let compiled = compile_restricted_mutation_preflight(
+            SESSION_ID,
+            7,
+            Some("kyc-case".to_string()),
+            &preflight(),
+        )
+        .unwrap();
 
         assert_eq!(compiled.compiled_runbook.session_id, SESSION_ID);
         assert_eq!(compiled.compiled_runbook.version, 7);
@@ -381,7 +409,13 @@ mod tests {
             .runbook_args
             .insert("status".to_string(), "APPROVED".to_string());
 
-        let err = compile_restricted_mutation_preflight(SESSION_ID, 7, &preflight).unwrap_err();
+        let err = compile_restricted_mutation_preflight(
+            SESSION_ID,
+            7,
+            Some("kyc-case".to_string()),
+            &preflight,
+        )
+        .unwrap_err();
 
         assert!(matches!(
             err,
@@ -395,7 +429,13 @@ mod tests {
         let mut preflight = preflight();
         preflight.actual_diff = Some(preflight.intended_diff.clone());
 
-        let err = compile_restricted_mutation_preflight(SESSION_ID, 7, &preflight).unwrap_err();
+        let err = compile_restricted_mutation_preflight(
+            SESSION_ID,
+            7,
+            Some("kyc-case".to_string()),
+            &preflight,
+        )
+        .unwrap_err();
 
         assert!(matches!(
             err,
@@ -406,7 +446,13 @@ mod tests {
     #[test]
     fn records_execution_receipt_when_actual_diff_matches_intended_and_predicted() {
         let preflight = preflight();
-        let compilation = compile_restricted_mutation_preflight(SESSION_ID, 7, &preflight).unwrap();
+        let compilation = compile_restricted_mutation_preflight(
+            SESSION_ID,
+            7,
+            Some("kyc-case".to_string()),
+            &preflight,
+        )
+        .unwrap();
 
         let receipt = record_restricted_mutation_execution_receipt(
             &compilation,
@@ -430,7 +476,13 @@ mod tests {
     #[test]
     fn refuses_execution_receipt_when_actual_diff_does_not_match_expected_diff() {
         let preflight = preflight();
-        let compilation = compile_restricted_mutation_preflight(SESSION_ID, 7, &preflight).unwrap();
+        let compilation = compile_restricted_mutation_preflight(
+            SESSION_ID,
+            7,
+            Some("kyc-case".to_string()),
+            &preflight,
+        )
+        .unwrap();
         let mut actual_diff = preflight.intended_diff.clone();
         actual_diff.after = "APPROVED".to_string();
 

@@ -118,6 +118,7 @@ pub fn prepare_restricted_mutation_preflight(
         "approval-token-id".to_string(),
         approval.approval_token_id.to_string(),
     );
+    runbook_args.insert("pack-id".to_string(), workbook.core.pack_id.clone());
 
     Ok(RestrictedMutationPreflight {
         workbook_id: workbook.id.clone(),
