@@ -113,13 +113,7 @@ async fn set_cbu_discovery_state(
     }
 
     let to_node = format!("cbu_discovery_state:{}", state.to_ascii_lowercase());
-    dsl_runtime::emit_pending_state_advance(
-        ctx,
-        cbu_id,
-        &to_node,
-        "cbu/discovery-state",
-        reason,
-    );
+    dsl_runtime::emit_pending_state_advance(ctx, cbu_id, &to_node, "cbu/discovery-state", reason);
     Ok(())
 }
 

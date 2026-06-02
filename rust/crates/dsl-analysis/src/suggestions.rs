@@ -1,6 +1,6 @@
 use crate::runtime_registry::RuntimeVerbRegistry;
 use crate::verb_registry::registry;
-use dsl_core::{Program, BindingContext};
+use dsl_core::{BindingContext, Program};
 
 /// A suggested next step (verb)
 #[derive(Debug, Clone)]

@@ -8,8 +8,8 @@ use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 use std::fmt::Write;
 use std::path::PathBuf;
 
-use dsl_core::{DurableConfig, SourceOfTruth, VerbBehavior, VerbScope, VerbTier};
 use dsl_core::ConfigLoader;
+use dsl_core::{DurableConfig, SourceOfTruth, VerbBehavior, VerbScope, VerbTier};
 use ob_poc::dsl_v2::execution::RuntimeVerbRegistry;
 use ob_poc::session::verb_contract::VerbDiagnostics;
 use ob_poc::session::verb_sync::VerbSyncService;

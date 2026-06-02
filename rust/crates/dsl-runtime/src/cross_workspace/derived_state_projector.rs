@@ -15,8 +15,8 @@
 //! caller's concern (per OQ-2: session-scope cache invalidated on
 //! verb-touched slots).
 
-use anyhow::Result;
 use crate::cross_workspace::DagRegistry;
+use anyhow::Result;
 use sqlx::PgPool;
 use std::sync::Arc;
 use uuid::Uuid;

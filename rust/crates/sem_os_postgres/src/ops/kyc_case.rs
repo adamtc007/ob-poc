@@ -27,11 +27,11 @@ use serde_json::{json, Value};
 use sqlx::types::BigDecimal;
 use uuid::Uuid;
 
+use dsl_runtime::LifecycleCatalog;
+use dsl_runtime::TransactionScope;
 use dsl_runtime::{
     json_extract_string, json_extract_string_opt, json_extract_uuid, json_extract_uuid_opt,
 };
-use dsl_runtime::LifecycleCatalog;
-use dsl_runtime::TransactionScope;
 use dsl_runtime::{VerbExecutionContext, VerbExecutionOutcome};
 
 use super::SemOsVerbOp;
@@ -479,13 +479,7 @@ async fn close_with_status(
         "{} — REVIEW → {} (deal_gate_updated={})",
         fqn, target_status, deal_gate_updated
     );
-    dsl_runtime::emit_pending_state_advance(
-        ctx,
-        case_id,
-        &to_node,
-        "kyc-case/workstream",
-        &reason,
-    );
+    dsl_runtime::emit_pending_state_advance(ctx, case_id, &to_node, "kyc-case/workstream", &reason);
 
     let result = KycCaseCloseResult {
         case_id,

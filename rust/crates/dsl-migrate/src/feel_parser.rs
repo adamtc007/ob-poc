@@ -37,9 +37,7 @@ pub fn feel_normalise(raw: &str) -> FeelNormaliseResult {
 
 fn strip_wrappers(s: &str) -> String {
     // Juel: ${expr} or #{expr}
-    if (s.starts_with("${") && s.ends_with('}'))
-        || (s.starts_with("#{") && s.ends_with('}'))
-    {
+    if (s.starts_with("${") && s.ends_with('}')) || (s.starts_with("#{") && s.ends_with('}')) {
         return s[2..s.len() - 1].trim().to_owned();
     }
     // FEEL unary-test: leading `=` followed by whitespace or expression
@@ -84,9 +82,7 @@ impl<'a> Parser<'a> {
     }
 
     fn skip_ws(&mut self) {
-        while self.pos < self.input.len()
-            && self.input.as_bytes()[self.pos].is_ascii_whitespace()
-        {
+        while self.pos < self.input.len() && self.input.as_bytes()[self.pos].is_ascii_whitespace() {
             self.pos += 1;
         }
     }
@@ -225,7 +221,9 @@ impl<'a> Parser<'a> {
         for kw in &["true", "false", "null"] {
             if self.input[self.pos..].starts_with(kw) {
                 let end = self.pos + kw.len();
-                let after_ok = self.input.get(end..)
+                let after_ok = self
+                    .input
+                    .get(end..)
                     .map(|s| s.is_empty() || !s.as_bytes()[0].is_ascii_alphanumeric())
                     .unwrap_or(true);
                 if after_ok {
@@ -264,7 +262,10 @@ impl<'a> Parser<'a> {
         }
 
         let snippet = &self.input[self.pos..];
-        Err(format!("unrecognised token: '{}'", &snippet[..snippet.len().min(20)]))
+        Err(format!(
+            "unrecognised token: '{}'",
+            &snippet[..snippet.len().min(20)]
+        ))
     }
 
     fn parse_list(&mut self) -> Result<(), String> {
@@ -362,7 +363,10 @@ mod tests {
         match feel_normalise(s) {
             FeelNormaliseResult::Clean(v) => v,
             FeelNormaliseResult::NeedsReview { stripped, reason } => {
-                panic!("expected Clean for {:?}, got NeedsReview: {} (stripped: {})", s, reason, stripped)
+                panic!(
+                    "expected Clean for {:?}, got NeedsReview: {} (stripped: {})",
+                    s, reason, stripped
+                )
             }
         }
     }
@@ -429,12 +433,18 @@ mod tests {
 
     #[test]
     fn logical_and() {
-        assert_eq!(clean("score > 500 and risk = \"LOW\""), "score > 500 and risk = \"LOW\"");
+        assert_eq!(
+            clean("score > 500 and risk = \"LOW\""),
+            "score > 500 and risk = \"LOW\""
+        );
     }
 
     #[test]
     fn logical_or() {
-        assert_eq!(clean("status = \"A\" or status = \"B\""), "status = \"A\" or status = \"B\"");
+        assert_eq!(
+            clean("status = \"A\" or status = \"B\""),
+            "status = \"A\" or status = \"B\""
+        );
     }
 
     // ── Negation ─────────────────────────────────────────────────────────────
@@ -448,7 +458,10 @@ mod tests {
 
     #[test]
     fn arithmetic_multiply() {
-        assert_eq!(clean("amount * rate > threshold"), "amount * rate > threshold");
+        assert_eq!(
+            clean("amount * rate > threshold"),
+            "amount * rate > threshold"
+        );
     }
 
     // ── In operator ──────────────────────────────────────────────────────────

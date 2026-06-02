@@ -23,11 +23,9 @@
 use anyhow::Result;
 use async_trait::async_trait;
 
-use dsl_runtime::{
-    json_extract_string, json_extract_uuid, json_extract_uuid_opt,
-};
 use dsl_runtime::ConstellationRuntime;
 use dsl_runtime::TransactionScope;
+use dsl_runtime::{json_extract_string, json_extract_uuid, json_extract_uuid_opt};
 use dsl_runtime::{VerbExecutionContext, VerbExecutionOutcome};
 
 use super::SemOsVerbOp;

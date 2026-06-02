@@ -190,10 +190,7 @@ fn convert_diagnostic(diag: &SemanticDiagnostic, source: &str) -> Diagnostic {
 }
 
 /// Convert planning facade Diagnostic to LSP Diagnostic format
-fn convert_planning_diagnostic(
-    diag: &dsl_core::Diagnostic,
-    _source: &str,
-) -> Diagnostic {
+fn convert_planning_diagnostic(diag: &dsl_core::Diagnostic, _source: &str) -> Diagnostic {
     use dsl_core::Severity as PlanningSeverity;
 
     // Convert span to LSP Range

@@ -36,8 +36,8 @@ pub use dsl_core::{
 
 pub mod ast {
     pub use dsl_core::{
-        AstNode, Argument, Literal, Program, Span, Statement, VerbCall,
-        UnresolvedRefLocation, find_unresolved_ref_locations,
+        find_unresolved_ref_locations, Argument, AstNode, Literal, Program, Span, Statement,
+        UnresolvedRefLocation, VerbCall,
     };
 }
 
@@ -72,16 +72,15 @@ pub use dsl_core::{set_phrase_gen_nouns, ConfigLoader, PhraseGenNouns};
 
 pub mod config {
     pub use dsl_core::{
-        ConfigLoader, ValidationContext, collect_declared_fqns,
-        flatten_pack_entries, load_packs_from_dir, validate_pack_fqns,
-        validate_verbs_config, wiring_check, StructuralError, DagWarning,
+        collect_declared_fqns, flatten_pack_entries, load_packs_from_dir, validate_pack_fqns,
+        validate_verbs_config, wiring_check, ConfigLoader, DagWarning, StructuralError,
+        ValidationContext,
     };
     pub mod types {
         pub use dsl_core::{
-            ArgConfig, ArgType, CrudConfig, CrudOperation, DomainConfig,
-            DurableConfig, GraphQueryOperation, HarmClass, LookupConfig,
-            ResolutionMode, ReturnTypeConfig, SearchKeyConfig, VerbBehavior,
-            VerbConfig, VerbsConfig,
+            ArgConfig, ArgType, CrudConfig, CrudOperation, DomainConfig, DurableConfig,
+            GraphQueryOperation, HarmClass, LookupConfig, ResolutionMode, ReturnTypeConfig,
+            SearchKeyConfig, VerbBehavior, VerbConfig, VerbsConfig,
         };
     }
     pub mod loader {
@@ -95,9 +94,7 @@ pub mod compiler {
         compile_to_steps, CompileError as OpCompileError, CompileStep, CompiledSteps,
     };
 }
-pub use compiler::{
-    compile_to_steps, OpCompileError, CompileStep, CompiledSteps,
-};
+pub use compiler::{compile_to_steps, CompileStep, CompiledSteps, OpCompileError};
 
 // =============================================================================
 // Local modules (require database or other dependencies not in dsl-core)

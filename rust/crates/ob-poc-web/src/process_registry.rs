@@ -14,7 +14,10 @@
 
 use anyhow::{anyhow, Result};
 use async_trait::async_trait;
-use bpmn_runtime::{register_builtins, JourneyStore, PostgresJourneyStore, RuntimeEngine, ScriptedAdaptor, VerbRegistry};
+use bpmn_runtime::{
+    register_builtins, JourneyStore, PostgresJourneyStore, RuntimeEngine, ScriptedAdaptor,
+    VerbRegistry,
+};
 use dsl_migrate_verify::compile_to_spec;
 use dsl_runtime::ProcessRegistryService;
 use ob_poc_types::chat::BpmnFormPending;
@@ -36,11 +39,10 @@ impl ProcessRegistry {
     pub(crate) async fn load_all(pool: PgPool) -> Result<Self> {
         let store = Arc::new(PostgresJourneyStore::new(pool.clone()));
 
-        let rows = sqlx::query!(
-            "SELECT name, dsl_source FROM process_definitions WHERE enabled = TRUE"
-        )
-        .fetch_all(&pool)
-        .await?;
+        let rows =
+            sqlx::query!("SELECT name, dsl_source FROM process_definitions WHERE enabled = TRUE")
+                .fetch_all(&pool)
+                .await?;
 
         let mut engines = HashMap::new();
 
@@ -64,7 +66,11 @@ impl ProcessRegistry {
             }
         }
 
-        tracing::info!(count = engines.len(), "ProcessRegistry: loaded {} process definition(s)", engines.len());
+        tracing::info!(
+            count = engines.len(),
+            "ProcessRegistry: loaded {} process definition(s)",
+            engines.len()
+        );
         Ok(Self { engines, store })
     }
 
@@ -133,7 +139,9 @@ impl ProcessRegistry {
         .await?;
 
         let Some(row) = row else { return Ok(None) };
-        let Some(payload) = row.payload else { return Ok(None) };
+        let Some(payload) = row.payload else {
+            return Ok(None);
+        };
 
         // payload = { form_ref, mode, prefill_data } as stored by DslFormHandler
         let form = BpmnFormPending {

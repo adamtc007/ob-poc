@@ -2156,7 +2156,11 @@ fn check(sh: &Shell, db: bool) -> Result<()> {
     if db {
         cmd!(sh, "cargo clippy --workspace --all-targets -- -D warnings").run()?;
     } else {
-        cmd!(sh, "cargo clippy --workspace --lib --bins --examples -- -D warnings").run()?;
+        cmd!(
+            sh,
+            "cargo clippy --workspace --lib --bins --examples -- -D warnings"
+        )
+        .run()?;
     }
 
     // Tests
@@ -2169,7 +2173,11 @@ fn check(sh: &Shell, db: bool) -> Result<()> {
         println!("  Running cross-workspace DAG harness (mock + live)...");
         dag_test::run(sh, dag_test::DagTestMode::Both, false, None)?;
     } else {
-        cmd!(sh, "cargo test --lib --features database -- --skip session_repository --skip sequencer").run()?;
+        cmd!(
+            sh,
+            "cargo test --lib --features database -- --skip session_repository --skip sequencer"
+        )
+        .run()?;
 
         // DAG harness mock-only path is fast and DB-free.
         println!("  Running cross-workspace DAG harness (mock-only)...");
@@ -2350,7 +2358,11 @@ fn ci(sh: &Shell) -> Result<()> {
     byok_conformance::run("stub")?;
 
     println!("\n=== Clippy (workspace) ===");
-    cmd!(sh, "cargo clippy --workspace --lib --bins --examples -- -D warnings").run()?;
+    cmd!(
+        sh,
+        "cargo clippy --workspace --lib --bins --examples -- -D warnings"
+    )
+    .run()?;
 
     println!("\n=== Clippy (per-feature) ===");
     clippy(sh, false)?;
@@ -2404,10 +2416,18 @@ fn pre_commit(sh: &Shell) -> Result<()> {
     byok_conformance::run("stub")?;
 
     println!("\n=== Clippy (workspace) ===");
-    cmd!(sh, "cargo clippy --workspace --lib --bins --examples -- -D warnings").run()?;
+    cmd!(
+        sh,
+        "cargo clippy --workspace --lib --bins --examples -- -D warnings"
+    )
+    .run()?;
 
     println!("\n=== Unit Tests ===");
-    cmd!(sh, "cargo test --lib --features database -- --skip session_repository --skip sequencer").run()?;
+    cmd!(
+        sh,
+        "cargo test --lib --features database -- --skip session_repository --skip sequencer"
+    )
+    .run()?;
 
     println!("\n=== Adapter Tests (constellation/state machine coverage) ===");
     cmd!(sh, "cargo test -p sem_os_obpoc_adapter").run()?;

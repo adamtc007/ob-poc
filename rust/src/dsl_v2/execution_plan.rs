@@ -69,8 +69,8 @@ impl ExecutionPlan {
     /// contributes a typed `BindingSlot`. Steps that produce bindings without
     /// a declared entity type contribute an untyped slot (entity_type: None).
     pub fn binding_frame_schema(&self) -> dsl_core::BindingFrameSchema {
-        use dsl_core::{BindingFrameSchema, BindingSlot};
         use dsl_core::BindingSlotId;
+        use dsl_core::{BindingFrameSchema, BindingSlot};
         let slots = self
             .steps
             .iter()

@@ -6,7 +6,7 @@
 
 use anyhow::{Context, Result};
 use dsl_core::{
-    ConfigLoader, ArgConfig, ArgType, ConsequenceTier, CrudOperation, ExternalEffect, LookupConfig,
+    ArgConfig, ArgType, ConfigLoader, ConsequenceTier, CrudOperation, ExternalEffect, LookupConfig,
     ResolutionMode, ReturnTypeConfig, StateEffect, VerbBehavior, VerbConfig,
 };
 use serde::Serialize;

@@ -191,12 +191,15 @@ fn extract_side_effects(verb_config: &dsl_core::VerbConfig) -> Vec<SideEffect> {
                 | dsl_core::CrudOperation::ListParties => SideEffectOp::Read,
                 dsl_core::CrudOperation::Update => SideEffectOp::Update,
                 dsl_core::CrudOperation::Delete => SideEffectOp::Delete,
-                dsl_core::CrudOperation::Upsert
-                | dsl_core::CrudOperation::EntityUpsert => SideEffectOp::Upsert,
-                dsl_core::CrudOperation::Link
-                | dsl_core::CrudOperation::RoleLink => SideEffectOp::Insert,
-                dsl_core::CrudOperation::Unlink
-                | dsl_core::CrudOperation::RoleUnlink => SideEffectOp::Delete,
+                dsl_core::CrudOperation::Upsert | dsl_core::CrudOperation::EntityUpsert => {
+                    SideEffectOp::Upsert
+                }
+                dsl_core::CrudOperation::Link | dsl_core::CrudOperation::RoleLink => {
+                    SideEffectOp::Insert
+                }
+                dsl_core::CrudOperation::Unlink | dsl_core::CrudOperation::RoleUnlink => {
+                    SideEffectOp::Delete
+                }
                 dsl_core::CrudOperation::EntityCreate => SideEffectOp::Insert,
             };
             effects.push(SideEffect {
@@ -209,10 +212,12 @@ fn extract_side_effects(verb_config: &dsl_core::VerbConfig) -> Vec<SideEffect> {
         // Junction tables for link/unlink operations
         if let Some(ref junction) = crud.junction {
             let op = match crud.operation {
-                dsl_core::CrudOperation::Link
-                | dsl_core::CrudOperation::RoleLink => SideEffectOp::Insert,
-                dsl_core::CrudOperation::Unlink
-                | dsl_core::CrudOperation::RoleUnlink => SideEffectOp::Delete,
+                dsl_core::CrudOperation::Link | dsl_core::CrudOperation::RoleLink => {
+                    SideEffectOp::Insert
+                }
+                dsl_core::CrudOperation::Unlink | dsl_core::CrudOperation::RoleUnlink => {
+                    SideEffectOp::Delete
+                }
                 _ => SideEffectOp::Write,
             };
             effects.push(SideEffect {

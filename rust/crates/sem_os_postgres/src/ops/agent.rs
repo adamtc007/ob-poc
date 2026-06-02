@@ -22,12 +22,12 @@ use chrono::{DateTime, Utc};
 use serde_json::{json, Value};
 use uuid::Uuid;
 
+use dsl_runtime::McpToolRegistry;
+use dsl_runtime::TransactionScope;
 use dsl_runtime::{
     json_extract_bool_opt, json_extract_int_opt, json_extract_string, json_extract_string_opt,
     json_extract_uuid_opt,
 };
-use dsl_runtime::McpToolRegistry;
-use dsl_runtime::TransactionScope;
 use dsl_runtime::{VerbExecutionContext, VerbExecutionOutcome};
 
 use super::SemOsVerbOp;

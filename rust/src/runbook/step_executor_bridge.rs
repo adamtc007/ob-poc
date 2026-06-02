@@ -587,9 +587,7 @@ mod tests {
     // loading real YAML files.
     #[test]
     fn hashmap_verb_transition_lookup_construction() {
-        use dsl_core::{
-            DomainConfig, TransitionArgs, VerbBehavior, VerbConfig, VerbsConfig,
-        };
+        use dsl_core::{DomainConfig, TransitionArgs, VerbBehavior, VerbConfig, VerbsConfig};
         use std::collections::HashMap;
 
         let mut domain = DomainConfig {

@@ -8,8 +8,8 @@
 //! - Symbol references (`@name`) are `SymbolRef`
 //! - Entity references are NOT identified yet (that's the enrichment pass)
 
-use dsl_core::{AstNode, Literal, Statement};
 use dsl_core::parse_program;
+use dsl_core::{AstNode, Literal, Statement};
 use rust_decimal::Decimal;
 
 const VALID_INPUTS: &[&str] = &[

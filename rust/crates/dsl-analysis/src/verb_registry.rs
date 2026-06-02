@@ -239,11 +239,7 @@ impl UnifiedVerbRegistry {
 
     /// Get what a verb produces (delegates to RuntimeVerbRegistry)
     /// Returns the entity type and optional subtype from verb YAML config
-    pub fn get_produces(
-        &self,
-        domain: &str,
-        verb: &str,
-    ) -> Option<&dsl_core::VerbProduces> {
+    pub fn get_produces(&self, domain: &str, verb: &str) -> Option<&dsl_core::VerbProduces> {
         runtime_registry().get_produces(domain, verb)
     }
 

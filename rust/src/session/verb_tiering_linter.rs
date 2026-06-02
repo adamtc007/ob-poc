@@ -333,10 +333,7 @@ fn check_minimal_rules(
     }
 
     // M006: deprecated verbs must have replaced_by
-    if matches!(
-        metadata.status,
-        dsl_core::VerbStatus::Deprecated
-    ) && metadata.replaced_by.is_none()
+    if matches!(metadata.status, dsl_core::VerbStatus::Deprecated) && metadata.replaced_by.is_none()
     {
         diagnostics.add_warning_with_path(
             codes::M006_DEPRECATED_NO_REPLACEMENT,

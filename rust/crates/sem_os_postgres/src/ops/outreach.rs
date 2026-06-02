@@ -15,11 +15,11 @@ use serde_json::{json, Value};
 use sqlx::Row;
 use uuid::Uuid;
 
+use dsl_runtime::TransactionScope;
 use dsl_runtime::{
     self, json_extract_int_opt, json_extract_string, json_extract_string_opt, json_extract_uuid,
     json_extract_uuid_opt,
 };
-use dsl_runtime::TransactionScope;
 use dsl_runtime::{VerbExecutionContext, VerbExecutionOutcome};
 
 use super::SemOsVerbOp;

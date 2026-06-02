@@ -11,8 +11,8 @@ use std::sync::Arc;
 
 use crate::runtime_registry::RuntimeVerbRegistry;
 use dsl_core::{
-    AstNode, BindingContext, CompileStep, Diagnostic, DiagnosticCode, Program, SourceSpan, Span,
-    VerbCall, compile_to_steps, parse_program,
+    compile_to_steps, parse_program, AstNode, BindingContext, CompileStep, Diagnostic,
+    DiagnosticCode, Program, SourceSpan, Span, VerbCall,
 };
 
 /// Context for implicit create behavior

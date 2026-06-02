@@ -39,15 +39,13 @@ use dsl_analysis::entity_kind::matches as entity_kind_matches;
 use dsl_analysis::stategraph::{load_state_graphs, validate_graphs, walk_graph};
 use dsl_core::ConfigLoader;
 use dsl_core::{ArgConfig, DomainConfig, VerbConfig, VerbMetadata};
-use dsl_runtime::{
-    GovernedDocumentRequirementsService, GovernedRequirementMatrix,
-};
+use dsl_runtime::StewardshipDispatch;
+use dsl_runtime::TransactionScope;
 use dsl_runtime::{
     json_extract_bool_opt, json_extract_int_opt, json_extract_string, json_extract_string_list_opt,
     json_extract_string_opt, json_extract_uuid,
 };
-use dsl_runtime::StewardshipDispatch;
-use dsl_runtime::TransactionScope;
+use dsl_runtime::{GovernedDocumentRequirementsService, GovernedRequirementMatrix};
 use dsl_runtime::{VerbExecutionContext, VerbExecutionOutcome};
 
 use entity_gateway::proto::ob::gateway::v1::{

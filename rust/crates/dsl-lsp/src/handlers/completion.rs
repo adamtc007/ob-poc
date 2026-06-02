@@ -10,8 +10,8 @@ use dsl_analysis::macros::load_macro_registry;
 use dsl_analysis::runtime_registry::runtime_registry;
 use dsl_analysis::suggestions::predict_next_steps;
 use dsl_analysis::verb_registry::{find_unified_verb, registry};
-use dsl_core::{BindingContext, BindingInfo};
 use dsl_core::parse_program;
+use dsl_core::{BindingContext, BindingInfo};
 
 /// Generate completions based on cursor position.
 pub(crate) async fn get_completions(

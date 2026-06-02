@@ -9,9 +9,7 @@
 //!   6. Deliver a HumanTaskComplete event with submission data
 //!   7. Assert the process completes
 
-use bpmn_runtime::{
-    register_builtins, InstanceStatus, JourneyStore, VerbRegistry,
-};
+use bpmn_runtime::{register_builtins, InstanceStatus, JourneyStore, VerbRegistry};
 use bpmn_test_harness::compile_dsl;
 use dsl_migrate::parse_bpmn_xml;
 use dsl_migrate_verify::verify_dsl_source;
@@ -145,5 +143,9 @@ async fn e2e_camunda_to_running_process_with_form_task() {
     let still_at_form = post_form_tokens
         .iter()
         .any(|t| t.current_node == "review-task");
-    assert!(!still_at_form, "token should have advanced past form task after submission; status={:?}", final_status);
+    assert!(
+        !still_at_form,
+        "token should have advanced past form task after submission; status={:?}",
+        final_status
+    );
 }

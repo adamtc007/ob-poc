@@ -19,8 +19,8 @@ use ob_poc_types::entity_query::EntityQueryResult;
 use serde_json::{json, Value};
 use uuid::Uuid;
 
-use dsl_runtime::{json_extract_int_opt, json_extract_string_opt};
 use dsl_runtime::TransactionScope;
+use dsl_runtime::{json_extract_int_opt, json_extract_string_opt};
 use dsl_runtime::{VerbExecutionContext, VerbExecutionOutcome};
 
 use super::SemOsVerbOp;

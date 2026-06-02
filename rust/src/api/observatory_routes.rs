@@ -568,7 +568,7 @@ async fn get_session_stack_graph(
         return ObservatoryError::not_found("REPL session not found").into_response();
     };
 
-    let stack = &repl_session.session_stack;
+    let stack = repl_session.build_session_stack_state();
     let mut nodes = Vec::with_capacity(stack.workspace_stack.len() + 1);
     let mut edges = Vec::with_capacity(stack.workspace_stack.len());
 

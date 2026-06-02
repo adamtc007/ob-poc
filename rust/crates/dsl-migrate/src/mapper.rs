@@ -73,8 +73,7 @@ pub fn map_process(process: &BpmnProcess) -> MappedDsl {
     if !process.sequence_flows.is_empty() {
         lines.push(String::new());
         for flow in &process.sequence_flows {
-            let (line, maybe_status) =
-                map_sequence_flow_with_status(flow, &boundary_id_to_dsl);
+            let (line, maybe_status) = map_sequence_flow_with_status(flow, &boundary_id_to_dsl);
             lines.push(line);
             if let Some(status) = maybe_status {
                 statuses.push(status);
@@ -355,4 +354,3 @@ fn task_kind(tt: &TaskType) -> &'static str {
 fn safe_id(id: &str) -> String {
     id.replace(['_', ' '], "-").to_lowercase()
 }
-

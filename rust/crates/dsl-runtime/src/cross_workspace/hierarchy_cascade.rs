@@ -26,10 +26,10 @@
 //! trait — the planner doesn't know about cbu_entity_relationships
 //! tables, FK joins, etc.
 
+use crate::cross_workspace::DagRegistry;
 use anyhow::Result;
 use async_trait::async_trait;
 use dsl_types::CascadeRule;
-use crate::cross_workspace::DagRegistry;
 use sqlx::PgPool;
 use std::sync::Arc;
 use uuid::Uuid;

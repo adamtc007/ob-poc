@@ -388,12 +388,8 @@ impl ResolutionSubSession {
 
         // Determine resolution mode from config
         let resolution_mode = match config.resolution_mode {
-            Some(dsl_core::ResolutionMode::Entity) => {
-                ResolutionModeHint::SearchModal
-            }
-            Some(dsl_core::ResolutionMode::Reference) => {
-                ResolutionModeHint::Dropdown
-            }
+            Some(dsl_core::ResolutionMode::Entity) => ResolutionModeHint::SearchModal,
+            Some(dsl_core::ResolutionMode::Reference) => ResolutionModeHint::Dropdown,
             None => ResolutionModeHint::SearchModal, // Default to modal
         };
 

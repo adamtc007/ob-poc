@@ -1,7 +1,7 @@
 //! Scenario runner — loads YAML, wires mocks, executes steps, captures outcomes.
 
-use anyhow::{anyhow, bail, Context, Result};
 use crate::cross_workspace::DagRegistry;
+use anyhow::{anyhow, bail, Context, Result};
 use sqlx::postgres::PgPoolOptions;
 use sqlx::PgPool;
 use std::collections::HashMap;

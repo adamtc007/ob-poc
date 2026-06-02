@@ -21,9 +21,7 @@ use std::fmt::Write as FmtWrite;
 use std::path::{Path, PathBuf};
 
 use anyhow::{Context, Result};
-use dsl_core::{
-    ConfirmPolicyConfig, VerbBehavior, VerbConfig, VerbFlavour, VerbsConfig,
-};
+use dsl_core::{ConfirmPolicyConfig, VerbBehavior, VerbConfig, VerbFlavour, VerbsConfig};
 
 // ── CLI ──────────────────────────────────────────────────────────────────────
 

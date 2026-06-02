@@ -33,8 +33,8 @@ use serde_json::{json, Value};
 use std::collections::{HashMap, HashSet};
 use uuid::Uuid;
 
-use dsl_runtime::{json_extract_string_opt, json_extract_uuid};
 use dsl_runtime::TransactionScope;
+use dsl_runtime::{json_extract_string_opt, json_extract_uuid};
 use dsl_runtime::{VerbExecutionContext, VerbExecutionOutcome};
 
 use super::SemOsVerbOp;

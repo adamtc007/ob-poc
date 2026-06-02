@@ -27,10 +27,8 @@ use sqlx::Row;
 use std::collections::HashMap;
 use uuid::Uuid;
 
-use dsl_runtime::{
-    self, json_extract_int_opt, json_extract_string_opt, json_extract_uuid,
-};
 use dsl_runtime::TransactionScope;
+use dsl_runtime::{self, json_extract_int_opt, json_extract_string_opt, json_extract_uuid};
 use dsl_runtime::{VerbExecutionContext, VerbExecutionOutcome};
 
 use super::SemOsVerbOp;

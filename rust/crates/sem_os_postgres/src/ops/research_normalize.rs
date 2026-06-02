@@ -11,8 +11,8 @@ use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use uuid::Uuid;
 
-use dsl_runtime::{json_extract_string, json_extract_string_opt};
 use dsl_runtime::TransactionScope;
+use dsl_runtime::{json_extract_string, json_extract_string_opt};
 use dsl_runtime::{VerbExecutionContext, VerbExecutionOutcome};
 
 use super::SemOsVerbOp;

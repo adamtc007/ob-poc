@@ -22,7 +22,7 @@ use crate::validation::{
     ValidatedStatement, ValidationContext,
 };
 use crate::verb_registry::registry;
-use dsl_core::{Argument, AstNode, Literal, Program, Span, Statement, VerbCall, parse_program};
+use dsl_core::{parse_program, Argument, AstNode, Literal, Program, Span, Statement, VerbCall};
 use std::collections::HashMap;
 use uuid::Uuid;
 

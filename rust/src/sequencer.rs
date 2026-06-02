@@ -3128,7 +3128,7 @@ impl ReplOrchestratorV2 {
                 is_durable,
                 runbook_id,
                 fallback_version,
-                Some(session.session_stack.clone()),
+                Some(session.build_session_stack_state()),
             )
             .await;
 
@@ -3348,7 +3348,7 @@ impl ReplOrchestratorV2 {
                 false,
                 session.runbook.id,
                 fallback_version,
-                Some(session.session_stack.clone()),
+                Some(session.build_session_stack_state()),
             )
             .await;
 
@@ -6561,7 +6561,7 @@ impl ReplOrchestratorV2 {
                             true, // is_durable
                             runbook_id,
                             fallback_version,
-                            Some(session.session_stack.clone()),
+                            Some(session.build_session_stack_state()),
                             scope_for_entry,
                         ),
                     )
@@ -6724,7 +6724,7 @@ impl ReplOrchestratorV2 {
                             false, // not durable
                             runbook_id,
                             fallback_version,
-                            Some(session.session_stack.clone()),
+                            Some(session.build_session_stack_state()),
                             scope_for_entry,
                         ),
                     )

@@ -35,10 +35,10 @@
 //!   `severity` on each violation and decides.
 //! - Cache source-state reads (per-call; caching is OQ-2 V1.3-2 territory).
 
+use crate::cross_workspace::DagRegistry;
 use anyhow::Result;
 use async_trait::async_trait;
 use dsl_types::{CrossWorkspaceConstraint, StateSelector};
-use crate::cross_workspace::DagRegistry;
 use sqlx::PgPool;
 use std::sync::Arc;
 use uuid::Uuid;

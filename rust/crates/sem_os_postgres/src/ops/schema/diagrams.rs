@@ -28,10 +28,10 @@ use sem_os_policy::diagram::{
 };
 
 use dsl_runtime::load_affinity_graph_cached;
+use dsl_runtime::TransactionScope;
 use dsl_runtime::{
     json_extract_bool_opt, json_extract_int_opt, json_extract_string, json_extract_string_opt,
 };
-use dsl_runtime::TransactionScope;
 use dsl_runtime::{VerbExecutionContext, VerbExecutionOutcome};
 
 use crate::ops::SemOsVerbOp;

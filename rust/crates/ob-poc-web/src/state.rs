@@ -21,6 +21,9 @@ pub(crate) struct AppState {
 
 impl AppState {
     pub(crate) fn new(pool: PgPool, process_registry: Arc<ProcessRegistry>) -> Self {
-        Self { pool, process_registry }
+        Self {
+            pool,
+            process_registry,
+        }
     }
 }

@@ -21,11 +21,10 @@ use crate::entity_kind::{
     canonicalize as canonicalize_entity_kind, subject_kind_for_domain, subject_kind_from_hint,
 };
 use dsl_core::{
-    ArgConfig, ArgType, BatchPolicyConfig, CrudOperation,
-    DurableRuntime, DynamicVerbConfig, FuzzyCheckConfig, GraphQueryOperation, HarmClass,
-    LockAccessConfig, LockModeConfig, LookupConfig, PolicyConfig, ReturnTypeConfig,
-    VerbBehavior, VerbConfig, VerbConsumes, VerbLifecycle, VerbProduces,
-    VerbsConfig,
+    ArgConfig, ArgType, BatchPolicyConfig, CrudOperation, DurableRuntime, DynamicVerbConfig,
+    FuzzyCheckConfig, GraphQueryOperation, HarmClass, LockAccessConfig, LockModeConfig,
+    LookupConfig, PolicyConfig, ReturnTypeConfig, VerbBehavior, VerbConfig, VerbConsumes,
+    VerbLifecycle, VerbProduces, VerbsConfig,
 };
 
 #[cfg(test)]
@@ -202,8 +201,6 @@ pub struct RuntimeDurableConfig {
     /// Escalation action when timeout expires
     pub escalation: Option<String>,
 }
-
-
 
 #[derive(Debug, Clone)]
 pub struct RuntimeArg {

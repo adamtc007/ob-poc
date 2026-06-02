@@ -95,7 +95,8 @@ fn feel_expressions_normalise_cleanly() {
 
     // ${score >= 700} and ${score < 700} are within the supported subset — no HUMAN-RESOLVE
     assert_eq!(
-        result.coverage.human_resolve, 0,
+        result.coverage.human_resolve,
+        0,
         "no human-resolve expected; got: {:?}",
         result
             .coverage

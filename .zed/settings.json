@@ -73,7 +73,7 @@
       "language_servers": ["dsl-lsp"],
     },
     "Rust": {
-      "language_servers": ["!rust-analyzer"],
+      "enable_language_server": false
     },
     "JavaScript": {
       "language_servers": ["eslint", "vtsls", "!biome", "..."],

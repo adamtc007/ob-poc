@@ -433,15 +433,19 @@ impl JourneyStore for InMemoryJourneyStore {
         payload: Option<serde_json::Value>,
     ) -> Result<Uuid> {
         let id = Uuid::new_v4();
-        self.state.lock().unwrap().pending_waits.push(InMemoryPendingWait {
-            id,
-            instance_id,
-            token_id,
-            wait_kind: wait_kind.to_string(),
-            node_name: node_name.to_string(),
-            correlation_key,
-            payload,
-        });
+        self.state
+            .lock()
+            .unwrap()
+            .pending_waits
+            .push(InMemoryPendingWait {
+                id,
+                instance_id,
+                token_id,
+                wait_kind: wait_kind.to_string(),
+                node_name: node_name.to_string(),
+                correlation_key,
+                payload,
+            });
         Ok(id)
     }
 

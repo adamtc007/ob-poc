@@ -56,11 +56,11 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use uuid::Uuid;
 
+use dsl_runtime::TransactionScope;
 use dsl_runtime::{
     json_extract_bool_opt, json_extract_string, json_extract_string_opt, json_extract_uuid,
     json_extract_uuid_opt,
 };
-use dsl_runtime::TransactionScope;
 use dsl_runtime::{VerbExecutionContext, VerbExecutionOutcome};
 
 use super::SemOsVerbOp;
@@ -475,13 +475,7 @@ impl SemOsVerbOp for UpdateStatus {
         // genuine state advance by the time we reach this line.
         let to_node = format!("deal:{}", new_status.to_lowercase());
         let reason = format!("deal.update-status — {} → {}", current_status, new_status);
-        dsl_runtime::emit_pending_state_advance(
-            ctx,
-            deal_id,
-            &to_node,
-            "deal/lifecycle",
-            &reason,
-        );
+        dsl_runtime::emit_pending_state_advance(ctx, deal_id, &to_node, "deal/lifecycle", &reason);
 
         let result = DealStatusUpdateResult {
             deal_id,

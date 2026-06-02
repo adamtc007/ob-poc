@@ -29,7 +29,7 @@ pub use overrides::{
 };
 pub use parser::{parse_condition_body, parse_literal, parse_value};
 pub use state_machine::{
-    ConditionDef, ConsistencyCheckDef, load_state_machine, OverlaySourceDef, ReducerDef, RuleDef,
+    load_state_machine, ConditionDef, ConsistencyCheckDef, OverlaySourceDef, ReducerDef, RuleDef,
     StateMachineDefinition, TransitionDef, ValidatedStateMachine,
 };
 pub use validate::validate_state_machine;

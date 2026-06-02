@@ -30,9 +30,12 @@ fn test_boundary_event_no_outflow_fails_validation() {
         println!("ERROR: {:?}", e);
     }
 
-    let has_unterminated_error = diag.errors().any(|d| {
-        d.code.as_deref() == Some("E1002") && d.message.contains("worker-boundary")
-    });
+    let has_unterminated_error = diag
+        .errors()
+        .any(|d| d.code.as_deref() == Some("E1002") && d.message.contains("worker-boundary"));
 
-    assert!(has_unterminated_error, "Expected UNTERMINATED_PATH error for isolated boundary event (worker-boundary)");
+    assert!(
+        has_unterminated_error,
+        "Expected UNTERMINATED_PATH error for isolated boundary event (worker-boundary)"
+    );
 }

@@ -28,8 +28,8 @@
 //! | `Map` | `Map` |
 //! | `Nested` | `Call` |
 
-use dsl_core::{Argument, AstNode, Literal, Program, Span as V2Span, Statement, VerbCall};
 use dsl_core::parse_program;
+use dsl_core::{Argument, AstNode, Literal, Program, Span as V2Span, Statement, VerbCall};
 use tower_lsp::lsp_types::{Diagnostic, DiagnosticSeverity, NumberOrString, Range};
 
 use super::document::{DocumentState, ExprKind, ParsedArg, ParsedExpr, SymbolDef, SymbolRef};

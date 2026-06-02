@@ -118,12 +118,7 @@ async fn human_task_complete_with_empty_submission_advances_token() {
     // Deliver empty submission (display-only mode — just an ack)
     result
         .engine
-        .human_task_complete(
-            result.instance_id,
-            "collect-data",
-            token.id,
-            json!({}),
-        )
+        .human_task_complete(result.instance_id, "collect-data", token.id, json!({}))
         .await
         .expect("human_task_complete failed");
 

@@ -16,13 +16,13 @@
 
 use anyhow::{Context, Result};
 use clap::Subcommand;
-use dsl_core::{EntryVia, SlotStateMachine};
 use dsl_core::{
     collect_declared_fqns, entity_kinds_from_taxonomy_yaml, flatten_pack_entries,
     load_dags_from_dir, load_packs_from_dir, validate_dags_with_context, validate_pack_fqns,
     validate_verbs_config, ConfigLoader, DagValidationContext, LoadedPack, ValidationContext,
     VerbsConfig,
 };
+use dsl_core::{EntryVia, SlotStateMachine};
 use std::collections::BTreeMap;
 use std::collections::HashSet;
 use std::path::PathBuf;
@@ -375,9 +375,8 @@ async fn hygiene_report() -> Result<()> {
         .filter(|fqn| {
             declared.contains(*fqn)
                 && !registered.contains(*fqn)
-                && verb_behavior(&cfg, fqn).is_some_and(|behavior| {
-                    matches!(behavior, dsl_core::VerbBehavior::Plugin)
-                })
+                && verb_behavior(&cfg, fqn)
+                    .is_some_and(|behavior| matches!(behavior, dsl_core::VerbBehavior::Plugin))
         })
         .cloned()
         .collect();
@@ -733,10 +732,7 @@ fn scan_forbidden_mutations(section: &str, parent_fqn: &str, tables: &[&str]) ->
     failures
 }
 
-fn verb_behavior<'a>(
-    cfg: &'a VerbsConfig,
-    fqn: &str,
-) -> Option<&'a dsl_core::VerbBehavior> {
+fn verb_behavior<'a>(cfg: &'a VerbsConfig, fqn: &str) -> Option<&'a dsl_core::VerbBehavior> {
     let (domain, verb) = fqn.rsplit_once('.')?;
     cfg.domains
         .get(domain)
@@ -998,9 +994,7 @@ async fn status() -> Result<()> {
                 let tier_name = match ta.consequence.baseline {
                     dsl_core::ConsequenceTier::Benign => "benign",
                     dsl_core::ConsequenceTier::Reviewable => "reviewable",
-                    dsl_core::ConsequenceTier::RequiresConfirmation => {
-                        "requires_confirmation"
-                    }
+                    dsl_core::ConsequenceTier::RequiresConfirmation => "requires_confirmation",
                     dsl_core::ConsequenceTier::RequiresExplicitAuthorisation => {
                         "requires_explicit_authorisation"
                     }

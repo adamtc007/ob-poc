@@ -2,10 +2,8 @@
 
 use anyhow::{anyhow, Result};
 use async_trait::async_trait;
-use dsl_runtime::{
-    json_extract_string_opt, json_extract_uuid, json_extract_uuid_opt,
-};
 use dsl_runtime::TransactionScope;
+use dsl_runtime::{json_extract_string_opt, json_extract_uuid, json_extract_uuid_opt};
 use dsl_runtime::{VerbExecutionContext, VerbExecutionOutcome};
 use serde_json::{json, Value};
 use uuid::Uuid;

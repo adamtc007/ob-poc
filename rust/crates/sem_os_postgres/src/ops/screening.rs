@@ -21,8 +21,8 @@ use async_trait::async_trait;
 use serde_json::Value;
 use uuid::Uuid;
 
-use dsl_runtime::{json_extract_string_opt, json_extract_uuid};
 use dsl_runtime::TransactionScope;
+use dsl_runtime::{json_extract_string_opt, json_extract_uuid};
 use dsl_runtime::{VerbExecutionContext, VerbExecutionOutcome};
 
 use super::SemOsVerbOp;

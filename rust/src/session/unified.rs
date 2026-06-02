@@ -52,9 +52,6 @@ pub struct UnifiedSession {
     // === Run Sheet (DSL ledger) ===
     pub run_sheet: RunSheet,
 
-    // === State Stack (navigation history) ===
-    pub state_stack: StateStack,
-
     // === View State (for viewport sync) ===
     pub view_state: ViewState,
 
@@ -521,118 +518,6 @@ impl EntryStatus {
 
     pub fn is_failure(&self) -> bool {
         matches!(self, EntryStatus::Failed | EntryStatus::Skipped)
-    }
-}
-
-/// State stack for navigation
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct StateStack {
-    snapshots: Vec<StateSnapshot>,
-    position: usize,
-    max_size: usize,
-}
-
-impl Default for StateStack {
-    fn default() -> Self {
-        Self::new(100)
-    }
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct StateSnapshot {
-    pub id: Uuid,
-    pub timestamp: DateTime<Utc>,
-    pub entity_scope: EntityScope,
-    pub run_sheet_cursor: usize,
-    pub action_label: String,
-}
-
-impl StateStack {
-    pub fn new(max_size: usize) -> Self {
-        Self {
-            snapshots: Vec::new(),
-            position: 0,
-            max_size: if max_size == 0 { 100 } else { max_size },
-        }
-    }
-
-    pub fn push(&mut self, scope: EntityScope, cursor: usize, label: String) {
-        // Truncate forward history
-        if self.position + 1 < self.snapshots.len() {
-            self.snapshots.truncate(self.position + 1);
-        }
-
-        self.snapshots.push(StateSnapshot {
-            id: Uuid::new_v4(),
-            timestamp: Utc::now(),
-            entity_scope: scope,
-            run_sheet_cursor: cursor,
-            action_label: label,
-        });
-
-        // Enforce max size
-        while self.snapshots.len() > self.max_size {
-            self.snapshots.remove(0);
-        }
-
-        self.position = self.snapshots.len().saturating_sub(1);
-    }
-
-    pub fn back(&mut self, n: usize) -> Option<&StateSnapshot> {
-        if n == 0 || self.position == 0 {
-            return None;
-        }
-        self.position = self.position.saturating_sub(n);
-        self.snapshots.get(self.position)
-    }
-
-    pub fn forward(&mut self, n: usize) -> Option<&StateSnapshot> {
-        let target = self.position + n;
-        if target >= self.snapshots.len() {
-            return None;
-        }
-        self.position = target;
-        self.snapshots.get(self.position)
-    }
-
-    pub fn go_to_start(&mut self) -> Option<&StateSnapshot> {
-        if self.snapshots.is_empty() {
-            return None;
-        }
-        self.position = 0;
-        self.snapshots.first()
-    }
-
-    pub fn go_to_last(&mut self) -> Option<&StateSnapshot> {
-        if self.snapshots.is_empty() {
-            return None;
-        }
-        self.position = self.snapshots.len() - 1;
-        self.snapshots.last()
-    }
-
-    pub fn current(&self) -> Option<&StateSnapshot> {
-        self.snapshots.get(self.position)
-    }
-
-    pub fn can_go_back(&self) -> bool {
-        self.position > 0
-    }
-
-    pub fn can_go_forward(&self) -> bool {
-        self.position + 1 < self.snapshots.len()
-    }
-
-    pub fn len(&self) -> usize {
-        self.snapshots.len()
-    }
-
-    pub fn is_empty(&self) -> bool {
-        self.snapshots.is_empty()
-    }
-
-    pub fn position(&self) -> usize {
-        self.position
     }
 }
 
@@ -1630,7 +1515,6 @@ impl UnifiedSession {
             target_universe: None,
             entity_scope: EntityScope::default(),
             run_sheet: RunSheet::default(),
-            state_stack: StateStack::new(100),
             view_state: ViewState::default(),
             resolution: None,
             pending_verb_disambiguation: None,
@@ -2787,30 +2671,6 @@ mod tests {
         let cbu_id = Uuid::new_v4();
         session.add_cbu(cbu_id);
         assert!(session.entity_scope.cbu_ids.contains(&cbu_id));
-    }
-
-    #[test]
-    fn test_state_stack_navigation() {
-        let mut stack = StateStack::new(10);
-
-        // Push some states
-        stack.push(EntityScope::default(), 0, "State 1".to_string());
-        stack.push(EntityScope::default(), 1, "State 2".to_string());
-        stack.push(EntityScope::default(), 2, "State 3".to_string());
-
-        assert_eq!(stack.len(), 3);
-        assert_eq!(stack.position(), 2);
-        assert!(stack.can_go_back());
-        assert!(!stack.can_go_forward());
-
-        // Go back
-        let snapshot = stack.back(1).unwrap();
-        assert_eq!(snapshot.action_label, "State 2");
-        assert!(stack.can_go_forward());
-
-        // Go forward
-        let snapshot = stack.forward(1).unwrap();
-        assert_eq!(snapshot.action_label, "State 3");
     }
 
     #[test]

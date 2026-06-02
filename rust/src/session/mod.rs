@@ -136,8 +136,6 @@ pub use unified::{
     SessionState,
     SheetExecutionResult as UnifiedSheetExecutionResult,
     SheetStatus as UnifiedSheetStatus,
-    StateSnapshot,
-    StateStack,
     StructureRef,
     StructureType,
     // Sub-session types

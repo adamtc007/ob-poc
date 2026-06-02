@@ -355,9 +355,7 @@ fn runtime_verb_to_contract(
         subject_kinds: rv.subject_kinds.clone(),
         phase_tags: vec![],
         harm_class: rv.harm_class.map(|h| match h {
-            dsl_core::HarmClass::ReadOnly => {
-                sem_os_ontology::verb_contract::HarmClass::ReadOnly
-            }
+            dsl_core::HarmClass::ReadOnly => sem_os_ontology::verb_contract::HarmClass::ReadOnly,
             dsl_core::HarmClass::Reversible => {
                 sem_os_ontology::verb_contract::HarmClass::Reversible
             }

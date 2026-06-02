@@ -102,7 +102,7 @@ impl SessionRepositoryV2 {
             "runbook_plan": session.runbook_plan,
             "runbook_plan_cursor": session.runbook_plan_cursor,
             "execution_log": session.execution_log,
-            "session_stack": session.session_stack,
+            "session_stack": session.build_session_stack_state(),
             "bindings": session.bindings,
             "cbu_ids": session.cbu_ids,
             "name": session.name,
@@ -374,17 +374,6 @@ impl SessionRepositoryV2 {
                             .unwrap_or_else(|| serde_json::json!([])),
                     )
                     .context("Failed to deserialize execution_log")?,
-                    session_stack: serde_json::from_value(
-                        extended_state
-                            .get("session_stack")
-                            .cloned()
-                            .unwrap_or_else(|| {
-                                serde_json::json!({
-                                    "session_id": session_id,
-                                })
-                            }),
-                    )
-                    .context("Failed to deserialize session_stack")?,
                     bindings: serde_json::from_value(
                         extended_state
                             .get("bindings")
@@ -608,40 +597,40 @@ mod tests {
         let original_scope_id = Uuid::new_v4();
         let mutated_scope_id = Uuid::new_v4();
 
-        session.session_stack.scope = Some(ob_poc_types::session_stack::SessionScopeState {
-            client_group_id: original_scope_id,
-            client_group_name: Some("Original".into()),
-        });
-        session.session_stack.active_workspace =
-            Some(ob_poc_types::session_stack::SessionWorkspaceKind::Cbu);
-        session.session_stack.trace_sequence = 12;
+        session.set_client_scope(original_scope_id);
+        session
+            .push_workspace_frame(crate::repl::types_v2::WorkspaceFrame::new(
+                crate::repl::types_v2::WorkspaceKind::Cbu,
+                crate::repl::types_v2::SessionScope {
+                    client_group_id: original_scope_id,
+                    client_group_name: Some("Original".into()),
+                },
+            ))
+            .unwrap();
 
         let version = repo.save_session(&session, 0).await.unwrap();
         assert_eq!(version, 1);
 
-        session.session_stack.scope = Some(ob_poc_types::session_stack::SessionScopeState {
-            client_group_id: mutated_scope_id,
-            client_group_name: Some("Mutated".into()),
-        });
-        session.session_stack.active_workspace =
-            Some(ob_poc_types::session_stack::SessionWorkspaceKind::Deal);
-        session.session_stack.trace_sequence = 99;
+        session.set_client_scope(mutated_scope_id);
+        if let Some(tos) = session.workspace_stack.last_mut() {
+            tos.workspace = crate::repl::types_v2::WorkspaceKind::Deal;
+        }
 
         let (loaded, loaded_version) = repo.load_session(session.id).await.unwrap().unwrap();
         assert_eq!(loaded_version, 1);
+
+        let loaded_stack = loaded.build_session_stack_state();
         assert_eq!(
-            loaded
-                .session_stack
+            loaded_stack
                 .scope
                 .as_ref()
                 .map(|scope| scope.client_group_id),
             Some(original_scope_id)
         );
         assert_eq!(
-            loaded.session_stack.active_workspace,
+            loaded_stack.active_workspace,
             Some(ob_poc_types::session_stack::SessionWorkspaceKind::Cbu)
         );
-        assert_eq!(loaded.session_stack.trace_sequence, 12);
     }
 
     #[sqlx::test(migrations = "./test-migrations/session_repository")]
@@ -717,7 +706,7 @@ mod tests {
             Some(entity_id)
         );
         assert_eq!(
-            loaded.session_stack.workspace_stack[0].subject_id,
+            loaded.build_session_stack_state().workspace_stack[0].subject_id,
             Some(entity_id)
         );
     }

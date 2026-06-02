@@ -41,7 +41,10 @@ pub(crate) fn create_forms_router(
     Router::new()
         .route("/api/forms/:form_ref", get(get_form_schema))
         .route("/api/forms/:token_id/submit", post(submit_form))
-        .with_state(FormsState { pool, process_registry })
+        .with_state(FormsState {
+            pool,
+            process_registry,
+        })
 }
 
 /// `GET /api/forms/:form_ref`
@@ -51,12 +54,9 @@ async fn get_form_schema(
     State(state): State<FormsState>,
     Path(form_ref): Path<String>,
 ) -> impl IntoResponse {
-    let row = sqlx::query_scalar!(
-        "SELECT schema FROM form_schemas WHERE ref = $1",
-        form_ref
-    )
-    .fetch_optional(&state.pool)
-    .await;
+    let row = sqlx::query_scalar!("SELECT schema FROM form_schemas WHERE ref = $1", form_ref)
+        .fetch_optional(&state.pool)
+        .await;
 
     match row {
         Ok(Some(schema)) => Json(schema).into_response(),
@@ -143,11 +143,7 @@ async fn submit_form(
 
     // Drain the engine synchronously — run forward until quiesced.
     // Returns the next pending human task if the process re-parks.
-    let next_form = match state
-        .process_registry
-        .run_instance(wait.instance_id)
-        .await
-    {
+    let next_form = match state.process_registry.run_instance(wait.instance_id).await {
         Ok(pending) => pending,
         Err(e) => {
             tracing::warn!(

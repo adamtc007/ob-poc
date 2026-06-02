@@ -15,7 +15,10 @@ fn main() {
         std::process::exit(1);
     }
     let input = &args[1];
-    let process_name = args.get(2).map(String::as_str).unwrap_or("migrated-process");
+    let process_name = args
+        .get(2)
+        .map(String::as_str)
+        .unwrap_or("migrated-process");
 
     let xml = std::fs::read_to_string(input).unwrap_or_else(|e| {
         eprintln!("Error reading {}: {}", input, e);
@@ -39,11 +42,16 @@ fn main() {
         std::process::exit(3);
     }
 
-    eprintln!("Round-trip: OK (parsed={} validated={} lowered={} started={})",
-        verify.parsed, verify.validated, verify.lowered, verify.started);
+    eprintln!(
+        "Round-trip: OK (parsed={} validated={} lowered={} started={})",
+        verify.parsed, verify.validated, verify.lowered, verify.started
+    );
 
     if result.coverage.human_resolve > 0 {
-        eprintln!("{} element(s) require human resolution", result.coverage.human_resolve);
+        eprintln!(
+            "{} element(s) require human resolution",
+            result.coverage.human_resolve
+        );
         std::process::exit(2);
     }
 }

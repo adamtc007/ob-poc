@@ -25,9 +25,9 @@
 //! Identifier hygiene: all values come from the YAML schema and are
 //! validator-checked (alphanumeric + underscore). Safe to interpolate.
 
+use crate::cross_workspace::DagRegistry;
 use anyhow::{anyhow, Result};
 use async_trait::async_trait;
-use crate::cross_workspace::DagRegistry;
 use sqlx::PgPool;
 use std::sync::Arc;
 use uuid::Uuid;

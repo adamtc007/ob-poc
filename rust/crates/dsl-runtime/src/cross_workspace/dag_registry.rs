@@ -25,8 +25,8 @@
 
 use dsl_core::load_dags_from_dir;
 use dsl_types::{
-    CrossWorkspaceConstraint, Dag, DerivedCrossWorkspaceState, LoadedDag,
-    ParentSlot, SlotStateMachine, StateDependency, TransitionDef,
+    CrossWorkspaceConstraint, Dag, DerivedCrossWorkspaceState, LoadedDag, ParentSlot,
+    SlotStateMachine, StateDependency, TransitionDef,
 };
 
 #[cfg(test)]
@@ -327,7 +327,11 @@ impl DagRegistry {
     /// Look up a child slot's `state_dependency` block, if declared.
     /// Returns the cascade rules that govern how the child reacts to
     /// parent state changes.
-    pub(crate) fn state_dependency_for(&self, workspace: &str, slot: &str) -> Option<&StateDependency> {
+    pub(crate) fn state_dependency_for(
+        &self,
+        workspace: &str,
+        slot: &str,
+    ) -> Option<&StateDependency> {
         let dag = self.dags.get(workspace)?;
         dag.slots
             .iter()

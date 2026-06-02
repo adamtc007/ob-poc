@@ -43,9 +43,7 @@ pub fn verb_config_to_contract(
             lookup: a.lookup.as_ref().map(|l| {
                 let search_key_str = match &l.search_key {
                     dsl_core::SearchKeyConfig::Simple(s) => Some(s.clone()),
-                    dsl_core::SearchKeyConfig::Composite(c) => {
-                        Some(c.primary.clone())
-                    }
+                    dsl_core::SearchKeyConfig::Composite(c) => Some(c.primary.clone()),
                 };
                 VerbArgLookup {
                     table: l.table.clone(),
@@ -378,9 +376,7 @@ pub fn infer_entity_types_from_verbs(verbs_config: &VerbsConfig) -> Vec<EntityTy
                     seen.entry(key.clone()).or_insert_with(|| {
                         let search_key_str = match &lookup.search_key {
                             dsl_core::SearchKeyConfig::Simple(s) => s.clone(),
-                            dsl_core::SearchKeyConfig::Composite(c) => {
-                                c.primary.clone()
-                            }
+                            dsl_core::SearchKeyConfig::Composite(c) => c.primary.clone(),
                         };
                         EntityTypeDefBody {
                             fqn: key,
@@ -973,9 +969,8 @@ pub fn arg_type_to_attribute_type(arg: &ArgConfig) -> AttributeDataType {
 mod tests {
     use super::*;
     use dsl_core::{
-        ArgConfig, ArgType, CrudConfig, CrudOperation, DomainConfig,
-        LookupConfig, SearchKeyConfig, VerbBehavior, VerbConfig, VerbLifecycle,
-        VerbMetadata, VerbProduces, VerbsConfig,
+        ArgConfig, ArgType, CrudConfig, CrudOperation, DomainConfig, LookupConfig, SearchKeyConfig,
+        VerbBehavior, VerbConfig, VerbLifecycle, VerbMetadata, VerbProduces, VerbsConfig,
     };
     use std::collections::HashMap;
 

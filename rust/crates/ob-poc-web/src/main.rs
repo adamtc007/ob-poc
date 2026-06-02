@@ -951,9 +951,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         // dyn SemanticStateService — ontology-backed onboarding stage derivation.
         match ob_poc::services::ObPocSemanticStateService::new(pool.clone()) {
             Ok(svc) => {
-                builder.register::<dyn dsl_runtime::SemanticStateService>(
-                    Arc::new(svc),
-                );
+                builder.register::<dyn dsl_runtime::SemanticStateService>(Arc::new(svc));
                 tracing::info!(
                     "ServiceRegistry: registered dyn SemanticStateService (ontology-backed)"
                 );
@@ -1121,7 +1119,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         // dyn ProcessRegistryService — allows workflow.start-process verb op
         // to start BPMN process instances via the registry.
         builder.register::<dyn dsl_runtime::ProcessRegistryService>(
-            Arc::clone(&process_registry) as Arc<dyn dsl_runtime::ProcessRegistryService>,
+            Arc::clone(&process_registry) as Arc<dyn dsl_runtime::ProcessRegistryService>
         );
         tracing::info!(
             "ServiceRegistry: registered dyn ProcessRegistryService (bpmn-runtime ProcessRegistry)"
@@ -1879,7 +1877,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             ob_poc::api::catalogue_routes::create_catalogue_router(pool.clone()),
         )
         // Form.io verb integration — form schema serving + submission delivery
-        .merge(create_forms_router(pool.clone(), Arc::clone(&process_registry)));
+        .merge(create_forms_router(
+            pool.clone(),
+            Arc::clone(&process_registry),
+        ));
 
     // React dist directory - serve assets from React build
     let react_dist_dir = std::env::var("REACT_DIST_DIR").unwrap_or_else(|_| {
