@@ -170,3 +170,111 @@ domains:
             - observational
           consequence:
             baseline: benign
+      timer-wait:
+        flavour: attribute_mutating
+        description: "Timer Wait Event"
+        behavior: plugin
+        effect_class: read_snapshot
+        metadata:
+          tier: composite
+          source_of_truth: external
+          subject_kinds: [workflow]
+          phase_tags: [monitoring]
+          side_effects: facts_only
+        args:
+          - name: duration
+            type: string
+            required: true
+            description: "Duration string (e.g. PT15M)"
+        returns:
+          type: void
+        three_axis:
+          state_effect: preserving
+          external_effects:
+            - observational
+          consequence:
+            baseline: benign
+      message-wait:
+        flavour: attribute_mutating
+        description: "Message Wait Event"
+        behavior: plugin
+        effect_class: read_snapshot
+        metadata:
+          tier: composite
+          source_of_truth: external
+          subject_kinds: [workflow]
+          phase_tags: [monitoring]
+          side_effects: facts_only
+        args:
+          - name: message-name
+            type: string
+            required: true
+            description: "Message name"
+        returns:
+          type: void
+        three_axis:
+          state_effect: preserving
+          external_effects:
+            - observational
+          consequence:
+            baseline: benign
+      boundary-timer:
+        flavour: attribute_mutating
+        description: "Boundary Timer Event"
+        behavior: plugin
+        effect_class: read_snapshot
+        metadata:
+          tier: composite
+          source_of_truth: external
+          subject_kinds: [workflow]
+          phase_tags: [monitoring]
+          side_effects: facts_only
+        args:
+          - name: attached-to
+            type: string
+            required: true
+            description: "Task ID host"
+          - name: duration
+            type: string
+            required: true
+            description: "Duration string (e.g. PT1H)"
+          - name: interrupting
+            type: boolean
+            required: true
+            description: "Whether timer cancels host activity"
+        returns:
+          type: void
+        three_axis:
+          state_effect: preserving
+          external_effects:
+            - observational
+          consequence:
+            baseline: benign
+      boundary-error:
+        flavour: attribute_mutating
+        description: "Boundary Error Event"
+        behavior: plugin
+        effect_class: read_snapshot
+        metadata:
+          tier: composite
+          source_of_truth: external
+          subject_kinds: [workflow]
+          phase_tags: [monitoring]
+          side_effects: facts_only
+        args:
+          - name: attached-to
+            type: string
+            required: true
+            description: "Task ID host"
+          - name: error-code
+            type: string
+            required: false
+            description: "Error code identifier"
+        returns:
+          type: void
+        three_axis:
+          state_effect: preserving
+          external_effects:
+            - observational
+          consequence:
+            baseline: benign

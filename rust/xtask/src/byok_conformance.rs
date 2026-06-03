@@ -287,6 +287,7 @@ fn parse_workspace(label: &str) -> Result<WorkspaceKind> {
         }
         "onboarding" | "onboarding_request" => Ok(WorkspaceKind::OnBoarding),
         "catalogue" => Ok(WorkspaceKind::Catalogue),
+        "bpmn" | "bpmn_maintenance" | "workflow" | "orchestration" => Ok(WorkspaceKind::Bpmn),
         other => Err(anyhow!("unknown workspace label '{other}' in corpus")),
     }
 }

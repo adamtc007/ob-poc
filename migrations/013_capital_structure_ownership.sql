@@ -930,6 +930,7 @@ CREATE OR REPLACE FUNCTION kyc.fn_derive_ownership_snapshots(
 RETURNS INTEGER AS $$
 DECLARE
     v_count INTEGER := 0;
+    v_temp INTEGER := 0;
 BEGIN
     -- Supersede existing register-derived snapshots for this issuer/date
     UPDATE kyc.ownership_snapshots
@@ -987,7 +988,8 @@ BEGIN
     FROM kyc.fn_holder_control_position(p_issuer_entity_id, p_as_of, 'ECONOMIC') hcp
     WHERE hcp.holder_economic > 0;
 
-    GET DIAGNOSTICS v_count = v_count + ROW_COUNT;
+    GET DIAGNOSTICS v_temp = ROW_COUNT;
+    v_count := v_count + v_temp;
 
     RETURN v_count;
 END;

@@ -129,7 +129,7 @@ SELECT
     LOWER(TRIM(REGEXP_REPLACE(ea.alias, '[^a-zA-Z0-9 ]', ' ', 'g'))) as alias_norm,
     COALESCE(ea.confidence, 1.0)::REAL as weight,
     'agent_aliases' as source
-FROM agent.entity_aliases ea
+FROM "ob-poc".entity_aliases ea
 WHERE ea.entity_id IS NOT NULL;
 
 COMMENT ON VIEW "ob-poc".v_entity_aliases IS 'Unified view of all entity aliases for linking';
@@ -142,7 +142,7 @@ CREATE OR REPLACE VIEW "ob-poc".v_entity_linking_stats AS
 SELECT
     (SELECT COUNT(*) FROM "ob-poc".entities) as total_entities,
     (SELECT COUNT(*) FROM "ob-poc".entity_names) as total_names,
-    (SELECT COUNT(*) FROM agent.entity_aliases WHERE entity_id IS NOT NULL) as total_agent_aliases,
+    (SELECT COUNT(*) FROM "ob-poc".entity_aliases WHERE entity_id IS NOT NULL) as total_agent_aliases,
     (SELECT COUNT(*) FROM "ob-poc".entity_concept_link) as total_concept_links,
     (SELECT COUNT(*) FROM "ob-poc".entity_feature) as total_features,
     (SELECT COUNT(DISTINCT entity_id) FROM "ob-poc".entity_concept_link) as entities_with_concepts,

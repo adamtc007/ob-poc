@@ -47,6 +47,7 @@ pub enum SessionWorkspaceKind {
     SemOsMaintenance,
     LifecycleResources,
     BookingPrincipal,
+    Bpmn,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]

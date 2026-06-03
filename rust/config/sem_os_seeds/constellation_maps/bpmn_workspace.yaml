@@ -1,0 +1,19 @@
+constellation: bpmn.workspace
+description: >
+  BPMN workflows workspace — managing BPMN worker pools, process compilation,
+  and process instances.
+jurisdiction: ALL
+slots:
+  workspace_root:
+    type: cbu
+    entity_kinds: [bpmn_dag]
+    table: bpmn_dags
+    pk: id
+    cardinality: root
+    verbs:
+      bpmn_compile: { verb: bpmn.compile, when: [empty, filled] }
+      bpmn_start: { verb: bpmn.start, when: filled }
+      bpmn_signal: { verb: bpmn.signal, when: filled }
+      bpmn_cancel: { verb: bpmn.cancel, when: filled }
+      bpmn_inspect: { verb: bpmn.inspect, when: filled }
+      workflow_start_process: { verb: workflow.start-process, when: filled }

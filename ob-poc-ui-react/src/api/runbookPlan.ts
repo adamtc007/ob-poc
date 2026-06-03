@@ -19,7 +19,8 @@ export type WorkspaceKind =
   | "cbu"
   | "kyc"
   | "instrument_matrix"
-  | "on_boarding";
+  | "on_boarding"
+  | "bpmn";
 
 export type SubjectKind =
   | "client_group"

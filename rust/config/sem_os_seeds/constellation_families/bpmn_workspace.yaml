@@ -1,0 +1,21 @@
+fqn: family.bpmn_workspace
+family_id: bpmn_workspace
+label: BPMN Workflows
+description: Dedicated workspace for BPMN workflow processes, worker pools, and runtime orchestration.
+domain_id: bpmn
+selection_rules:
+  - condition: "true"
+    target_constellation: bpmn.workspace
+    priority: 70
+constellation_refs:
+  - constellation_id: bpmn.workspace
+    label: BPMN Workflows
+    jurisdiction: ALL
+    entity_kind: bpmn_dag
+    triggers: [bpmn, workflow, orchestration, process, engine]
+candidate_jurisdictions: [ALL]
+candidate_entity_kinds: [bpmn_dag]
+grounding_threshold:
+  required_input_keys: []
+  requires_entity_instance: false
+  allows_draft_instance: true

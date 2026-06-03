@@ -7,6 +7,7 @@ INSERT INTO "ob-poc".cbu_trading_profiles (
     version,
     status,
     document,
+    document_hash,
     created_by,
     created_at
 ) VALUES (
@@ -301,6 +302,7 @@ INSERT INTO "ob-poc".cbu_trading_profiles (
             "notes": "Sample trading matrix for visualization testing"
         }
     }'::jsonb,
+    'manual_seed_hash',
     'system',
     NOW()
 )

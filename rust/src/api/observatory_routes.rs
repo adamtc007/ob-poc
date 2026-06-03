@@ -243,6 +243,7 @@ fn derive_focus_from_tos(
             crate::repl::types_v2::WorkspaceKind::Kyc => FocusKind::Case,
             crate::repl::types_v2::WorkspaceKind::Deal => FocusKind::Other("deal".into()),
             crate::repl::types_v2::WorkspaceKind::SemOsMaintenance => FocusKind::Constellation,
+            crate::repl::types_v2::WorkspaceKind::Bpmn => FocusKind::Constellation,
             _ => FocusKind::Constellation,
         };
 

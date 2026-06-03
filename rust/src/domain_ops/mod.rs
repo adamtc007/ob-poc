@@ -439,6 +439,10 @@ pub fn extend_registry(registry: &mut sem_os_postgres::ops::SemOsVerbOpRegistry)
     registry.register(Arc::new(bpmn_lite_ops::BpmnSignal));
     registry.register(Arc::new(bpmn_lite_ops::BpmnCancel));
     registry.register(Arc::new(bpmn_lite_ops::BpmnInspect));
+    registry.register(Arc::new(bpmn_lite_ops::BpmnTimerWait));
+    registry.register(Arc::new(bpmn_lite_ops::BpmnMessageWait));
+    registry.register(Arc::new(bpmn_lite_ops::BpmnBoundaryTimer));
+    registry.register(Arc::new(bpmn_lite_ops::BpmnBoundaryError));
 
     // L6 — bpmn-controller verbs: pool lifecycle + instance kick-off.
     // Shape 1 (Pattern B) — direct calls to the bpmn-controller crate

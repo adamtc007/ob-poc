@@ -25,10 +25,11 @@ CREATE TABLE IF NOT EXISTS agent.phrase_blocklist (
     source TEXT DEFAULT 'explicit_feedback',
     user_id UUID,  -- NULL = global, set = user-specific
     created_at TIMESTAMPTZ DEFAULT now(),
-    expires_at TIMESTAMPTZ,  -- Optional expiry
-
-    UNIQUE(phrase, blocked_verb, COALESCE(user_id, '00000000-0000-0000-0000-000000000000'::uuid))
+    expires_at TIMESTAMPTZ  -- Optional expiry
 );
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_phrase_blocklist_phrase_verb_user 
+    ON agent.phrase_blocklist (phrase, blocked_verb, COALESCE(user_id, '00000000-0000-0000-0000-000000000000'::uuid));
 
 -- User-specific learned phrases (separate from global)
 CREATE TABLE IF NOT EXISTS agent.user_learned_phrases (

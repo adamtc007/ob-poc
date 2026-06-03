@@ -33,5 +33,9 @@ workspaces:
   SemOsMaintenance:
     families:
       - registry_governance
+  Bpmn:
+    families:
+      - bpmn_workspace
+      - platform
   "*":
     families: []

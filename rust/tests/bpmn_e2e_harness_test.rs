@@ -1564,6 +1564,8 @@ async fn e2e_11_payload_integrity_corrupt_hash_rejected() {
             domain_payload: r#"{"result":"test"}"#.to_string(),
             domain_payload_hash: corrupt_hash,
             orch_flags: std::collections::HashMap::new(),
+            worker_id: job.worker_id.clone(),
+            claim_token: job.claim_token.clone(),
         })
         .await;
 

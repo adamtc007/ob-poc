@@ -31,7 +31,7 @@ impl JobFrameStore {
     /// insert is a no-op and returns false. The worker should then check
     /// `find_by_job_key` to see if it was already completed.
     pub async fn upsert(&self, frame: &JobFrame) -> Result<bool> {
-        let result = sqlx::query!(
+        let row = sqlx::query!(
             r#"
             INSERT INTO "ob-poc".bpmn_job_frames
                 (job_key, process_instance_id, task_type, worker_id,
@@ -39,6 +39,7 @@ impl JobFrameStore {
             VALUES ($1, $2, $3, $4, $5, $6, $7)
             ON CONFLICT (job_key) DO UPDATE
                 SET attempts = "ob-poc".bpmn_job_frames.attempts + 1
+            RETURNING attempts
             "#,
             frame.job_key,
             frame.process_instance_id,
@@ -48,13 +49,11 @@ impl JobFrameStore {
             frame.activated_at,
             frame.attempts,
         )
-        .execute(&self.pool)
+        .fetch_one(&self.pool)
         .await
         .context("Failed to upsert bpmn_job_frame")?;
 
-        // If inserted, rows_affected is 1. If conflict updated attempts, also 1.
-        // We distinguish new vs existing by checking the current status.
-        Ok(result.rows_affected() > 0)
+        Ok(row.attempts == 1)
     }
 
     /// Find a job frame by its key.

@@ -2121,6 +2121,12 @@ impl ReplOrchestratorV2 {
         if lower.contains("booking principal") || lower.contains("bp clearance") {
             return Some(WorkspaceKind::BookingPrincipal);
         }
+        if lower.contains("bpmn")
+            || lower.contains("workflow")
+            || lower.contains("orchestration")
+        {
+            return Some(WorkspaceKind::Bpmn);
+        }
         if lower.contains("instrument") || lower.contains("matrix") || lower.contains("trading") {
             return Some(WorkspaceKind::InstrumentMatrix);
         }
@@ -3683,6 +3689,11 @@ impl ReplOrchestratorV2 {
                 label: WorkspaceKind::BookingPrincipal.label().to_string(),
                 description: "Booking principal clearance governance".to_string(),
             },
+            WorkspaceOption {
+                workspace: WorkspaceKind::Bpmn,
+                label: WorkspaceKind::Bpmn.label().to_string(),
+                description: "Manage BPMN worker pools, process compilation, and workflow instances".to_string(),
+            },
         ]
     }
 
@@ -3734,6 +3745,11 @@ impl ReplOrchestratorV2 {
                 label: WorkspaceKind::SemOsMaintenance.label().to_string(),
                 description: "Manage SemOS registry governance — changesets, attributes, verbs, schemas"
                     .to_string(),
+            },
+            WorkspaceOption {
+                workspace: WorkspaceKind::Bpmn,
+                label: WorkspaceKind::Bpmn.label().to_string(),
+                description: "Manage BPMN worker pools, process compilation, and workflow instances".to_string(),
             },
         ]
     }

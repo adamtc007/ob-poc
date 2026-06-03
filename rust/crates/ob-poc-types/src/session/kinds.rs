@@ -30,6 +30,7 @@ pub enum WorkspaceKind {
     SemOsMaintenance,
     LifecycleResources,
     BookingPrincipal,
+    Bpmn,
 }
 
 impl WorkspaceKind {
@@ -46,6 +47,7 @@ impl WorkspaceKind {
             Self::SemOsMaintenance => "SemOS Maintenance",
             Self::LifecycleResources => "Lifecycle Resources",
             Self::BookingPrincipal => "Booking Principal",
+            Self::Bpmn => "BPMN",
         }
     }
 
@@ -186,6 +188,16 @@ impl WorkspaceKind {
                 default_constellation_map: "deal.booking_principal",
                 supports_handoff_mode: false,
             },
+            Self::Bpmn => WorkspaceRegistryEntry {
+                workspace_id: self.clone(),
+                display_name: self.label(),
+                constellation_families: vec!["bpmn_workspace", "platform"],
+                subject_kinds: vec![],
+                subject_required: false,
+                default_constellation_family: "bpmn_workspace",
+                default_constellation_map: "bpmn.workspace",
+                supports_handoff_mode: false,
+            },
         }
     }
 
@@ -202,6 +214,7 @@ impl WorkspaceKind {
             Self::SemOsMaintenance,
             Self::LifecycleResources,
             Self::BookingPrincipal,
+            Self::Bpmn,
         ]
     }
 
@@ -255,6 +268,12 @@ impl WorkspaceKind {
         }
         if msg.contains("booking principal") || msg.contains("bp clearance") {
             return Some(Self::BookingPrincipal);
+        }
+        if msg.contains("bpmn")
+            || msg.contains("workflow")
+            || msg.contains("orchestration")
+        {
+            return Some(Self::Bpmn);
         }
         None
     }

@@ -163,6 +163,26 @@ impl VerbExecutionPort for ObPocVerbExecutor {
                 ctx.services = self.executor.service_registry();
 
                 let pool = self.executor.pool();
+
+                let mut args = args;
+                if let Some(pre_fetched) = op
+                    .pre_fetch(&args, ctx, pool)
+                    .await
+                    .map_err(|e| SemOsError::Internal(anyhow::anyhow!(
+                        "sem_os_ops({}) pre_fetch failed: {}",
+                        verb_fqn,
+                        e
+                    )))?
+                {
+                    if let (Some(existing_obj), serde_json::Value::Object(pf_obj)) =
+                        (args.as_object_mut(), pre_fetched)
+                    {
+                        for (k, v) in pf_obj {
+                            existing_obj.insert(k, v);
+                        }
+                    }
+                }
+
                 let mut scope = PgTransactionScope::begin(pool).await.map_err(|e| {
                     SemOsError::Internal(anyhow::anyhow!(
                         "sem_os_ops({}): begin txn failed: {}",

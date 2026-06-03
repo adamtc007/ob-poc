@@ -36,7 +36,7 @@ pub(crate) mod signal_relay;
 pub(crate) mod types;
 pub(crate) mod worker;
 
-pub use canonical::{canonical_json_with_hash, sha256_bytes, validate_payload_hash};
+pub use canonical::{blake3_bytes, canonical_json_with_hash, validate_payload_hash};
 pub use client::{
     BpmnLifecycleEvent, BpmnLiteConnection, CompileDiagnostic, CompileResult, CompleteJobRequest,
     FiberSnapshot, JobActivation, OrchestratorFlag, ProcessInspection, StartProcessRequest,

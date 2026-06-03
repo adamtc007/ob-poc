@@ -104,6 +104,9 @@ pub fn is_infrastructure_intent(input: &str) -> bool {
         || lower.contains("sem os")
         || lower.contains("registry governance")
         || lower.contains("stewardship")
+        || lower.contains("bpmn")
+        || lower.contains("workflow")
+        || lower.contains("orchestration")
 }
 
 // ---------------------------------------------------------------------------

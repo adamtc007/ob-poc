@@ -1,0 +1,65 @@
+id: bpmn-ops
+name: BPMN Operations
+version: "1.0"
+description: >
+  Manage BPMN worker pools, process compilation, and workflow instances.
+
+invocation_phrases:
+  - "bpmn operations"
+  - "manage bpmn"
+  - "workflow management"
+  - "bpmn pool setup"
+  - "bpmn instance query"
+
+required_context: []
+optional_context: []
+
+workspaces:
+  - lifecycle_resources
+  - bpmn
+
+allowed_verbs:
+  - bpmn.compile
+  - bpmn.start
+  - bpmn.signal
+  - bpmn.cancel
+  - bpmn.inspect
+  - bpmn.timer-wait
+  - bpmn.message-wait
+  - bpmn.boundary-timer
+  - bpmn.boundary-error
+  - workflow.start-process
+  - loader.provision-pool
+  - loader.deprovision-pool
+  - loader.pool-status
+  - loader.list-pools
+  - bpmn-controller.start-instance
+  - bpmn-controller.instance-status
+  - bpmn-controller.list-instances
+
+forbidden_verbs: []
+
+risk_policy:
+  require_confirm_before_execute: true
+  max_steps_without_confirm: 5
+
+section_layout:
+  - title: "BPMN Compiled Models"
+    verb_prefixes:
+      - "bpmn."
+  - title: "Worker Pools"
+    verb_prefixes:
+      - "loader."
+  - title: "Process Instances"
+    verb_prefixes:
+      - "bpmn-controller."
+
+definition_of_done:
+  - "BPMN process instances managed successfully"
+  - "Worker pool state healthy"
+
+progress_signals:
+  - signal: pools_provisioned
+    description: "Worker pools provisioned"
+  - signal: processes_running
+    description: "BPMN process instances active"

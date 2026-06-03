@@ -1,16 +1,16 @@
-//! Canonical JSON serialization and SHA-256 hashing.
+//! Canonical JSON serialization and BLAKE3 hashing.
 //!
-//! Provides deterministic JSON output (sorted keys) and SHA-256 hashing
+//! Provides deterministic JSON output (sorted keys) and BLAKE3 hashing
 //! for domain payload integrity verification across the gRPC boundary.
 //!
 //! The BPMN-Lite protocol requires that `domain_payload_hash` matches
-//! `SHA-256(domain_payload_bytes)` at every crossing. These helpers
+//! `BLAKE3(domain_payload_bytes)` at every crossing. These helpers
 //! ensure canonical byte representation for hash stability.
 
-use sha2::{Digest, Sha256};
+use blake3;
 
 /// Serialize a `serde_json::Value` with deterministic key ordering and return
-/// the canonical JSON string along with its SHA-256 hash.
+/// the canonical JSON string along with its BLAKE3 hash.
 ///
 /// `serde_json::Value` uses `BTreeMap` internally (sorted keys), so
 /// `serde_json::to_string` already produces canonical output for values
@@ -19,20 +19,18 @@ use sha2::{Digest, Sha256};
 pub fn canonical_json_with_hash(value: &serde_json::Value) -> (String, Vec<u8>) {
     let normalized = normalize_key_order(value);
     let json = serde_json::to_string(&normalized).expect("canonical_json: serialization failed");
-    let hash = sha256_bytes(&json);
+    let hash = blake3_bytes(&json);
     (json, hash)
 }
 
-/// Compute SHA-256 hash of a string, returning the 32-byte digest.
-pub fn sha256_bytes(input: &str) -> Vec<u8> {
-    let mut hasher = Sha256::new();
-    hasher.update(input.as_bytes());
-    hasher.finalize().to_vec()
+/// Compute BLAKE3 hash of a string, returning the 32-byte digest.
+pub fn blake3_bytes(input: &str) -> Vec<u8> {
+    blake3::hash(input.as_bytes()).as_bytes().to_vec()
 }
 
-/// Validate that a domain payload's SHA-256 hash matches the expected hash.
+/// Validate that a domain payload's BLAKE3 hash matches the expected hash.
 pub fn validate_payload_hash(payload: &str, expected_hash: &[u8]) -> bool {
-    sha256_bytes(payload) == expected_hash
+    blake3_bytes(payload) == expected_hash
 }
 
 /// Recursively normalize JSON key ordering to ensure canonical output.
@@ -118,14 +116,14 @@ mod tests {
     #[test]
     fn test_validate_payload_hash_accepts_matching() {
         let payload = r#"{"case_id":"KYC-001"}"#;
-        let hash = sha256_bytes(payload);
+        let hash = blake3_bytes(payload);
         assert!(validate_payload_hash(payload, &hash));
     }
 
     #[test]
     fn test_validate_payload_hash_rejects_mismatching() {
         let payload = r#"{"case_id":"KYC-001"}"#;
-        let wrong_hash = sha256_bytes("different payload");
+        let wrong_hash = blake3_bytes("different payload");
         assert!(!validate_payload_hash(payload, &wrong_hash));
     }
 

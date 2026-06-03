@@ -502,9 +502,19 @@ name = "bpmn-lite-bus-handler"
 version = "0.1.0"
 dependencies = [
  "async-trait",
+ "blake3",
+ "bpmn-lite-compiler",
+ "bpmn-lite-engine",
+ "bpmn-lite-store",
+ "bpmn-lite-types",
  "dsl-bus-protocol",
  "dsl-bus-server",
+ "dsl-manifest",
+ "hex",
+ "serde_json",
+ "sqlx",
  "thiserror 2.0.18",
+ "tokio",
  "uuid",
 ]
 
@@ -521,6 +531,7 @@ dependencies = [
  "quick-xml 0.36.2",
  "serde",
  "serde_json",
+ "serde_yaml",
  "uuid",
 ]
 
@@ -542,6 +553,8 @@ dependencies = [
  "dsl-manifest",
  "ffi-dispatcher",
  "ffi-types",
+ "futures-executor",
+ "hex",
  "prost",
  "serde",
  "serde_json",

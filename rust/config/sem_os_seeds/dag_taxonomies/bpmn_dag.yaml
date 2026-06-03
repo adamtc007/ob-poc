@@ -1,0 +1,29 @@
+# BPMN Workspace — DAG Taxonomy (2026-06-03)
+#
+# Governs orchestration of BPMN worker pools and process flows.
+
+version: "1.0"
+workspace: bpmn
+dag_id: bpmn_dag
+
+dsl_verb_reconciliation:
+  bpmn_surface:
+    - bpmn.compile
+    - bpmn.start
+    - bpmn.signal
+    - bpmn.cancel
+    - bpmn.inspect
+    - bpmn.timer-wait
+    - bpmn.message-wait
+    - bpmn.boundary-timer
+    - bpmn.boundary-error
+  loader_surface:
+    - loader.provision-pool
+    - loader.deprovision-pool
+    - loader.pool-status
+    - loader.list-pools
+  controller_surface:
+    - bpmn-controller.start-instance
+    - bpmn-controller.instance-status
+    - bpmn-controller.list-instances
+    - workflow.start-process

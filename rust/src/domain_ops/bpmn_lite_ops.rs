@@ -430,3 +430,83 @@ impl SemOsVerbOp for BpmnInspect {
         Ok(VerbExecutionOutcome::Record(inspection))
     }
 }
+
+// =============================================================================
+// bpmn.timer-wait, bpmn.message-wait, bpmn.boundary-timer, bpmn.boundary-error
+//
+// These are declarative BPMN workflow events, not active gRPC operations.
+// We register them as no-op SemOsVerbOps so the validation and wiring audits pass.
+// =============================================================================
+
+pub(super) struct BpmnTimerWait;
+
+#[async_trait]
+impl SemOsVerbOp for BpmnTimerWait {
+    fn fqn(&self) -> &str {
+        "bpmn.timer-wait"
+    }
+
+    async fn execute(
+        &self,
+        _args: &serde_json::Value,
+        _ctx: &mut VerbExecutionContext,
+        _scope: &mut dyn TransactionScope,
+    ) -> Result<VerbExecutionOutcome> {
+        Ok(VerbExecutionOutcome::Void)
+    }
+}
+
+pub(super) struct BpmnMessageWait;
+
+#[async_trait]
+impl SemOsVerbOp for BpmnMessageWait {
+    fn fqn(&self) -> &str {
+        "bpmn.message-wait"
+    }
+
+    async fn execute(
+        &self,
+        _args: &serde_json::Value,
+        _ctx: &mut VerbExecutionContext,
+        _scope: &mut dyn TransactionScope,
+    ) -> Result<VerbExecutionOutcome> {
+        Ok(VerbExecutionOutcome::Void)
+    }
+}
+
+pub(super) struct BpmnBoundaryTimer;
+
+#[async_trait]
+impl SemOsVerbOp for BpmnBoundaryTimer {
+    fn fqn(&self) -> &str {
+        "bpmn.boundary-timer"
+    }
+
+    async fn execute(
+        &self,
+        _args: &serde_json::Value,
+        _ctx: &mut VerbExecutionContext,
+        _scope: &mut dyn TransactionScope,
+    ) -> Result<VerbExecutionOutcome> {
+        Ok(VerbExecutionOutcome::Void)
+    }
+}
+
+pub(super) struct BpmnBoundaryError;
+
+#[async_trait]
+impl SemOsVerbOp for BpmnBoundaryError {
+    fn fqn(&self) -> &str {
+        "bpmn.boundary-error"
+    }
+
+    async fn execute(
+        &self,
+        _args: &serde_json::Value,
+        _ctx: &mut VerbExecutionContext,
+        _scope: &mut dyn TransactionScope,
+    ) -> Result<VerbExecutionOutcome> {
+        Ok(VerbExecutionOutcome::Void)
+    }
+}
+

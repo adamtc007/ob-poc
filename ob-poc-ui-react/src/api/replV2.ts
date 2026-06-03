@@ -72,7 +72,8 @@ export type WorkspaceKind =
   | "cbu"
   | "kyc"
   | "instrument_matrix"
-  | "on_boarding";
+  | "on_boarding"
+  | "bpmn";
 
 export interface WorkspaceOption {
   workspace: WorkspaceKind;

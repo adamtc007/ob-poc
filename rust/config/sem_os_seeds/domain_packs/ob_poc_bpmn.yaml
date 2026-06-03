@@ -1,0 +1,42 @@
+pack_id: ob-poc.bpmn-ops
+name: ob-poc BPMN Operations Domain Pack
+version: 0.1.0
+implementation_mode: native_compiled
+compatibility_tier: dry_run_only
+owned_dags: []
+owned_packs: [bpmn-ops]
+owned_state_machines: []
+owned_constellation_maps: []
+owned_constellation_families: []
+owned_universes: []
+owned_verb_prefixes:
+  - bpmn.
+  - loader.
+  - bpmn-controller.
+owned_entity_kinds: []
+business_crates: []
+owned_constellations:
+  - bpmn.workspace
+allowed_transitions:
+  - transition_ref: bpmn.compile-started
+    entity_type: bpmn_dag
+    state_machine: attribute_def_lifecycle
+    verb: bpmn.compile
+    from_state: draft
+    to_state: active
+    dry_run_enabled: true
+    mutation_enabled: false
+    hitl_required: false
+discovery_probes: []
+projection_catalog: []
+mention_namespaces: []
+declared_modes: []
+workflow_phases: []
+acp_personas: []
+resource_uri_schemes: []
+external_mcp_transports: []
+typed_extension_points: []
+classification_policy:
+  max_prompt_classification: internal
+  allow_external_llm: false
+  required_redactions: []

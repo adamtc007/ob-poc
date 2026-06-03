@@ -366,8 +366,8 @@ SELECT
     COALESCE(hs.total_value, 0) AS total_value,
 
     -- Identifiers
-    lei.id AS lei,
-    tax_id.id AS tax_id,
+    lei.identifier_value AS lei,
+    tax_id.identifier_value AS tax_id,
 
     -- Provider
     i.provider,
@@ -384,9 +384,9 @@ JOIN "ob-poc".entity_types et ON e.entity_type_id = et.entity_type_id
 LEFT JOIN "ob-poc".entity_proper_persons pp ON e.entity_id = pp.entity_id
 LEFT JOIN "ob-poc".cbus c ON i.owning_cbu_id = c.cbu_id
 LEFT JOIN "ob-poc".entity_identifiers lei
-    ON e.entity_id = lei.entity_id AND lei.scheme = 'LEI'
+    ON e.entity_id = lei.entity_id AND lei.identifier_type = 'LEI'
 LEFT JOIN "ob-poc".entity_identifiers tax_id
-    ON e.entity_id = tax_id.entity_id AND tax_id.scheme = 'tax_id'
+    ON e.entity_id = tax_id.entity_id AND tax_id.identifier_type = 'tax_id'
 LEFT JOIN LATERAL (
     SELECT
         COUNT(*) AS holding_count,
@@ -445,7 +445,7 @@ SELECT
     END AS ubo_determination,
 
     -- LEI for corporate tracing
-    lei.id AS owner_lei
+    lei.identifier_value AS owner_lei
 
 FROM kyc.holdings h
 JOIN kyc.share_classes sc ON h.share_class_id = sc.id
@@ -455,7 +455,7 @@ JOIN "ob-poc".entity_types et ON e.entity_type_id = et.entity_type_id
 LEFT JOIN "ob-poc".entity_proper_persons pp ON e.entity_id = pp.entity_id
 LEFT JOIN "ob-poc".entity_limited_companies lc ON e.entity_id = lc.entity_id
 LEFT JOIN "ob-poc".entity_identifiers lei
-    ON e.entity_id = lei.entity_id AND lei.scheme = 'LEI'
+    ON e.entity_id = lei.entity_id AND lei.identifier_type = 'LEI'
 CROSS JOIN LATERAL (
     SELECT COALESCE(SUM(h2.units), 0) AS total_units
     FROM kyc.holdings h2
@@ -511,8 +511,8 @@ SELECT
     ROUND((h.units / NULLIF(total.total_units, 0)) * 100, 4) AS ownership_percentage,
 
     -- Identifiers
-    lei.id AS investor_lei,
-    clr.id AS clearstream_ref,
+    lei.identifier_value AS investor_lei,
+    clr.identifier_value AS clearstream_ref,
 
     -- Provider tracking
     COALESCE(h.provider, 'MANUAL') AS provider,
@@ -532,9 +532,9 @@ LEFT JOIN "ob-poc".entity_proper_persons pp ON e.entity_id = pp.entity_id
 LEFT JOIN "ob-poc".entity_limited_companies lc ON e.entity_id = lc.entity_id
 LEFT JOIN kyc.investors i ON h.investor_id = i.investor_id
 LEFT JOIN "ob-poc".entity_identifiers lei
-    ON e.entity_id = lei.entity_id AND lei.scheme = 'LEI'
+    ON e.entity_id = lei.entity_id AND lei.identifier_type = 'LEI'
 LEFT JOIN "ob-poc".entity_identifiers clr
-    ON e.entity_id = clr.entity_id AND clr.scheme = 'CLEARSTREAM_KV'
+    ON e.entity_id = clr.entity_id AND clr.identifier_type = 'CLEARSTREAM_KV'
 CROSS JOIN LATERAL (
     SELECT COALESCE(SUM(h2.units), 0) AS total_units
     FROM kyc.holdings h2
@@ -588,8 +588,8 @@ SELECT
     e.name AS investor_name,
     i.investor_id,
     i.lifecycle_state,
-    clr_id.id AS clearstream_reference,
-    lei.id AS investor_lei,
+    clr_id.identifier_value AS clearstream_reference,
+    lei.identifier_value AS investor_lei,
 
     -- Timestamps
     m.created_at,
@@ -605,12 +605,12 @@ LEFT JOIN kyc.investors i ON h.investor_id = i.investor_id
 -- Clearstream KV reference
 LEFT JOIN "ob-poc".entity_identifiers clr_id
     ON e.entity_id = clr_id.entity_id
-    AND clr_id.scheme = 'CLEARSTREAM_KV'
+    AND clr_id.identifier_type = 'CLEARSTREAM_KV'
 
 -- LEI
 LEFT JOIN "ob-poc".entity_identifiers lei
     ON e.entity_id = lei.entity_id
-    AND lei.scheme = 'LEI';
+    AND lei.identifier_type = 'LEI';
 
 COMMENT ON VIEW kyc.v_movements IS
 'Movement/transaction log with investor and fund context (provider-agnostic)';
@@ -701,8 +701,8 @@ SELECT
     i.kyc_risk_rating,
 
     -- Identifiers
-    lei.id AS investor_lei,
-    clr_id.id AS clearstream_reference,
+    lei.identifier_value AS investor_lei,
+    clr_id.identifier_value AS clearstream_reference,
 
     -- Holding
     h.id AS holding_id,
@@ -750,12 +750,12 @@ LEFT JOIN kyc.investors i ON h.investor_id = i.investor_id
 -- LEI
 LEFT JOIN "ob-poc".entity_identifiers lei
     ON e.entity_id = lei.entity_id
-    AND lei.scheme = 'LEI'
+    AND lei.identifier_type = 'LEI'
 
 -- Clearstream reference
 LEFT JOIN "ob-poc".entity_identifiers clr_id
     ON e.entity_id = clr_id.entity_id
-    AND clr_id.scheme = 'CLEARSTREAM_KV'
+    AND clr_id.identifier_type = 'CLEARSTREAM_KV'
 
 WHERE COALESCE(h.holding_status, h.status) = 'active';
 
@@ -773,14 +773,14 @@ SELECT
     COALESCE(pp.nationality, lc.jurisdiction) AS country_code,
 
     -- Pivot common identifier schemes
-    MAX(CASE WHEN ei.scheme = 'LEI' THEN ei.id END) AS lei,
-    MAX(CASE WHEN ei.scheme = 'LEI' THEN ei.lei_status END) AS lei_status,
-    MAX(CASE WHEN ei.scheme = 'CLEARSTREAM_KV' THEN ei.id END) AS clearstream_kv,
-    MAX(CASE WHEN ei.scheme = 'CLEARSTREAM_ACCT' THEN ei.id END) AS clearstream_account,
-    MAX(CASE WHEN ei.scheme = 'EUROCLEAR' THEN ei.id END) AS euroclear_id,
-    MAX(CASE WHEN ei.scheme = 'company_register' THEN ei.id END) AS company_register_id,
-    MAX(CASE WHEN ei.scheme = 'tax_id' THEN ei.id END) AS tax_id,
-    MAX(CASE WHEN ei.scheme = 'ISIN' THEN ei.id END) AS isin,
+    MAX(CASE WHEN ei.identifier_type = 'LEI' THEN ei.identifier_value END) AS lei,
+    MAX(CASE WHEN ei.identifier_type = 'LEI' THEN ei.lei_status END) AS lei_status,
+    MAX(CASE WHEN ei.identifier_type = 'CLEARSTREAM_KV' THEN ei.identifier_value END) AS clearstream_kv,
+    MAX(CASE WHEN ei.identifier_type = 'CLEARSTREAM_ACCT' THEN ei.identifier_value END) AS clearstream_account,
+    MAX(CASE WHEN ei.identifier_type = 'EUROCLEAR' THEN ei.identifier_value END) AS euroclear_id,
+    MAX(CASE WHEN ei.identifier_type = 'company_register' THEN ei.identifier_value END) AS company_register_id,
+    MAX(CASE WHEN ei.identifier_type = 'tax_id' THEN ei.identifier_value END) AS tax_id,
+    MAX(CASE WHEN ei.identifier_type = 'ISIN' THEN ei.identifier_value END) AS isin,
 
     -- Count of all identifiers
     COUNT(ei.identifier_id) AS identifier_count,
@@ -835,7 +835,7 @@ SELECT
     NULL AS subject_identifier,
     subject_e.name AS subject_name,
     owner_e.name AS interested_party_name,
-    owner_lei.id AS interested_party_lei,
+    owner_lei.identifier_value AS interested_party_lei,
     COALESCE(er.interest_type, 'shareholding') AS interest_type,
     COALESCE(er.direct_or_indirect, 'direct') AS interest_directness,
     NULL::NUMERIC AS share_exact,
@@ -850,7 +850,7 @@ FROM "ob-poc".entity_relationships er
 JOIN "ob-poc".entities owner_e ON er.from_entity_id = owner_e.entity_id
 JOIN "ob-poc".entities subject_e ON er.to_entity_id = subject_e.entity_id
 LEFT JOIN "ob-poc".entity_identifiers owner_lei
-    ON owner_e.entity_id = owner_lei.entity_id AND owner_lei.scheme = 'LEI'
+    ON owner_e.entity_id = owner_lei.entity_id AND owner_lei.identifier_type = 'LEI'
 WHERE er.relationship_type = 'ownership'
   AND er.source != 'INVESTOR_REGISTER'  -- Avoid double-count with holdings
   AND (er.effective_to IS NULL OR er.effective_to > CURRENT_DATE);

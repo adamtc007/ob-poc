@@ -113,7 +113,7 @@ async fn b3_01_compile_kyc_model() {
 #[ignore]
 async fn b3_02_start_process_instance() {
     let client = bpmn_client().await;
-    let _bytecode = compile_model(&client).await;
+    let bytecode = compile_model(&client).await;
 
     let payload = serde_json::json!({ "entity_id": Uuid::new_v4().to_string() });
     let (canonical, hash) = canonical_json_with_hash(&payload);
@@ -121,7 +121,7 @@ async fn b3_02_start_process_instance() {
     let instance_id = client
         .start_process(StartProcessRequest {
             process_key: "kyc_open_case".to_string(),
-            bytecode_version: Vec::new(),
+            bytecode_version: bytecode,
             domain_payload: canonical,
             domain_payload_hash: hash,
             orch_flags: HashMap::new(),
@@ -138,7 +138,7 @@ async fn b3_02_start_process_instance() {
 
     // Inspect should show Running state.
     let inspection = client.inspect(instance_id).await.expect("Inspect failed");
-    assert_eq!(inspection.state, "Running", "Process should be Running");
+    assert_eq!(inspection.state, "RUNNING", "Process should be Running");
     eprintln!("Process state: {}", inspection.state);
 }
 
@@ -150,7 +150,7 @@ async fn b3_02_start_process_instance() {
 #[ignore]
 async fn b3_03_full_happy_path() {
     let client = bpmn_client().await;
-    let _bytecode = compile_model(&client).await;
+    let bytecode = compile_model(&client).await;
 
     let entity_id = Uuid::new_v4();
     let payload = serde_json::json!({ "entity_id": entity_id.to_string() });
@@ -160,7 +160,7 @@ async fn b3_03_full_happy_path() {
     let instance_id = client
         .start_process(StartProcessRequest {
             process_key: "kyc_open_case".to_string(),
-            bytecode_version: Vec::new(),
+            bytecode_version: bytecode,
             domain_payload: canonical,
             domain_payload_hash: hash,
             orch_flags: HashMap::new(),
@@ -180,14 +180,17 @@ async fn b3_03_full_happy_path() {
     assert_eq!(jobs.len(), 1, "Expected 1 create_case_record job");
     assert_eq!(jobs[0].task_type, "create_case_record");
 
-    let result = serde_json::json!({ "case_id": Uuid::new_v4().to_string() });
+    let case_id = Uuid::new_v4().to_string();
+    let result = serde_json::json!({ "case_id": case_id });
     let (res_canonical, res_hash) = canonical_json_with_hash(&result);
     client
         .complete_job(CompleteJobRequest {
             job_key: jobs[0].job_key.clone(),
             domain_payload: res_canonical,
-            domain_payload_hash: res_hash,
+            domain_payload_hash: jobs[0].domain_payload_hash.clone(),
             orch_flags: HashMap::new(),
+            worker_id: jobs[0].worker_id.clone(),
+            claim_token: jobs[0].claim_token.clone(),
         })
         .await
         .expect("CompleteJob failed for create_case_record");
@@ -199,13 +202,15 @@ async fn b3_03_full_happy_path() {
         .expect("ActivateJobs failed");
     assert_eq!(jobs.len(), 1, "Expected 1 request_documents job");
 
-    let (res_canonical, res_hash) = canonical_json_with_hash(&serde_json::json!({}));
+    let (res_canonical, res_hash) = canonical_json_with_hash(&serde_json::json!({ "case_id": case_id }));
     client
         .complete_job(CompleteJobRequest {
             job_key: jobs[0].job_key.clone(),
             domain_payload: res_canonical,
-            domain_payload_hash: res_hash,
+            domain_payload_hash: jobs[0].domain_payload_hash.clone(),
             orch_flags: HashMap::new(),
+            worker_id: jobs[0].worker_id.clone(),
+            claim_token: jobs[0].claim_token.clone(),
         })
         .await
         .expect("CompleteJob failed for request_documents");
@@ -213,7 +218,7 @@ async fn b3_03_full_happy_path() {
     // --- Wait: docs_received (message) ---
     // Process should be waiting for message.
     let inspection = client.inspect(instance_id).await.expect("Inspect failed");
-    assert_eq!(inspection.state, "Running");
+    assert_eq!(inspection.state, "RUNNING");
     assert!(
         !inspection.waits.is_empty(),
         "Expected at least 1 wait (message wait)"
@@ -238,8 +243,10 @@ async fn b3_03_full_happy_path() {
         .complete_job(CompleteJobRequest {
             job_key: jobs[0].job_key.clone(),
             domain_payload: res_canonical,
-            domain_payload_hash: res_hash,
+            domain_payload_hash: jobs[0].domain_payload_hash.clone(),
             orch_flags: HashMap::new(),
+            worker_id: jobs[0].worker_id.clone(),
+            claim_token: jobs[0].claim_token.clone(),
         })
         .await
         .expect("CompleteJob failed for reviewer_decision");
@@ -256,8 +263,10 @@ async fn b3_03_full_happy_path() {
         .complete_job(CompleteJobRequest {
             job_key: jobs[0].job_key.clone(),
             domain_payload: res_canonical,
-            domain_payload_hash: res_hash,
+            domain_payload_hash: jobs[0].domain_payload_hash.clone(),
             orch_flags: HashMap::new(),
+            worker_id: jobs[0].worker_id.clone(),
+            claim_token: jobs[0].claim_token.clone(),
         })
         .await
         .expect("CompleteJob failed for record_decision");
@@ -265,7 +274,7 @@ async fn b3_03_full_happy_path() {
     // Process should be Completed.
     let inspection = client.inspect(instance_id).await.expect("Inspect failed");
     assert_eq!(
-        inspection.state, "Completed",
+        inspection.state, "COMPLETED",
         "Process should be Completed after all jobs done"
     );
     eprintln!("Full happy path completed for instance {}", instance_id);
@@ -366,7 +375,7 @@ async fn b3_05_payload_hash_integrity() {
 #[ignore]
 async fn b3_06_cancellation() {
     let client = bpmn_client().await;
-    let _bytecode = compile_model(&client).await;
+    let bytecode = compile_model(&client).await;
 
     let payload = serde_json::json!({ "entity_id": Uuid::new_v4().to_string() });
     let (canonical, hash) = canonical_json_with_hash(&payload);
@@ -374,7 +383,7 @@ async fn b3_06_cancellation() {
     let instance_id = client
         .start_process(StartProcessRequest {
             process_key: "kyc_open_case".to_string(),
-            bytecode_version: Vec::new(),
+            bytecode_version: bytecode,
             domain_payload: canonical,
             domain_payload_hash: hash,
             orch_flags: HashMap::new(),
@@ -394,7 +403,7 @@ async fn b3_06_cancellation() {
 
     // Inspect should show Cancelled.
     let inspection = client.inspect(instance_id).await.expect("Inspect failed");
-    assert_eq!(inspection.state, "Cancelled", "Process should be Cancelled");
+    assert_eq!(inspection.state, "CANCELLED", "Process should be Cancelled");
 
     // No jobs should be activatable after cancellation.
     let jobs = client
@@ -426,7 +435,7 @@ async fn b3_07_crash_recovery() {
     // was checkpointed to persistent store).
 
     let client = bpmn_client().await;
-    let _bytecode = compile_model(&client).await;
+    let bytecode = compile_model(&client).await;
 
     let payload = serde_json::json!({ "entity_id": Uuid::new_v4().to_string() });
     let (canonical, hash) = canonical_json_with_hash(&payload);
@@ -434,7 +443,7 @@ async fn b3_07_crash_recovery() {
     let instance_id = client
         .start_process(StartProcessRequest {
             process_key: "kyc_open_case".to_string(),
-            bytecode_version: Vec::new(),
+            bytecode_version: bytecode,
             domain_payload: canonical,
             domain_payload_hash: hash,
             orch_flags: HashMap::new(),
@@ -459,8 +468,10 @@ async fn b3_07_crash_recovery() {
         .complete_job(CompleteJobRequest {
             job_key: jobs[0].job_key.clone(),
             domain_payload: res_canonical,
-            domain_payload_hash: res_hash,
+            domain_payload_hash: jobs[0].domain_payload_hash.clone(),
             orch_flags: HashMap::new(),
+            worker_id: jobs[0].worker_id.clone(),
+            claim_token: jobs[0].claim_token.clone(),
         })
         .await
         .expect("CompleteJob failed");
@@ -468,7 +479,7 @@ async fn b3_07_crash_recovery() {
     // Verify process is still Running (not lost).
     let inspection = client.inspect(instance_id).await.expect("Inspect failed");
     assert_eq!(
-        inspection.state, "Running",
+        inspection.state, "RUNNING",
         "Process should still be Running after first job"
     );
 
@@ -518,7 +529,7 @@ async fn b3_08_runtime_switch_equivalence() {
         "kyc-case.create should have a workflow binding"
     );
     let wb = binding.unwrap();
-    assert_eq!(wb.process_key.as_deref(), Some("kyc_open_case"));
+    assert_eq!(wb.process_key.as_deref(), Some("kyc-open-case"));
 
     // Verify all task_types in the binding are resolvable.
     for tb in &wb.task_bindings {
@@ -618,7 +629,7 @@ async fn b3_10_stream_disconnect_redeliver() {
     // without completing them.
 
     let client = bpmn_client().await;
-    let _bytecode = compile_model(&client).await;
+    let bytecode = compile_model(&client).await;
 
     let payload = serde_json::json!({ "entity_id": Uuid::new_v4().to_string() });
     let (canonical, hash) = canonical_json_with_hash(&payload);
@@ -626,7 +637,7 @@ async fn b3_10_stream_disconnect_redeliver() {
     let instance_id = client
         .start_process(StartProcessRequest {
             process_key: "kyc_open_case".to_string(),
-            bytecode_version: Vec::new(),
+            bytecode_version: bytecode,
             domain_payload: canonical,
             domain_payload_hash: hash,
             orch_flags: HashMap::new(),
@@ -653,7 +664,14 @@ async fn b3_10_stream_disconnect_redeliver() {
 
     // Fail the job to force redelivery.
     client
-        .fail_job(&orphan_key, "WORKER_CRASH", "Simulated crash", 0)
+        .fail_job(
+            &orphan_key,
+            "TRANSIENT",
+            "Simulated crash",
+            0,
+            &jobs[0].worker_id,
+            &jobs[0].claim_token,
+        )
         .await
         .expect("FailJob failed");
 
@@ -682,8 +700,10 @@ async fn b3_10_stream_disconnect_redeliver() {
         .complete_job(CompleteJobRequest {
             job_key: jobs[0].job_key.clone(),
             domain_payload: res_canonical,
-            domain_payload_hash: res_hash,
+            domain_payload_hash: jobs[0].domain_payload_hash.clone(),
             orch_flags: HashMap::new(),
+            worker_id: jobs[0].worker_id.clone(),
+            claim_token: jobs[0].claim_token.clone(),
         })
         .await;
     let _ = client.cancel(instance_id, "test cleanup").await;
@@ -697,7 +717,7 @@ async fn b3_10_stream_disconnect_redeliver() {
 #[ignore]
 async fn b3_11_early_signal() {
     let client = bpmn_client().await;
-    let _bytecode = compile_model(&client).await;
+    let bytecode = compile_model(&client).await;
 
     let payload = serde_json::json!({ "entity_id": Uuid::new_v4().to_string() });
     let (canonical, hash) = canonical_json_with_hash(&payload);
@@ -705,7 +725,7 @@ async fn b3_11_early_signal() {
     let instance_id = client
         .start_process(StartProcessRequest {
             process_key: "kyc_open_case".to_string(),
-            bytecode_version: Vec::new(),
+            bytecode_version: bytecode,
             domain_payload: canonical,
             domain_payload_hash: hash,
             orch_flags: HashMap::new(),
@@ -729,7 +749,7 @@ async fn b3_11_early_signal() {
     // Process should still be Running (not corrupted).
     let inspection = client.inspect(instance_id).await.expect("Inspect failed");
     assert_eq!(
-        inspection.state, "Running",
+        inspection.state, "RUNNING",
         "Process should survive early signal"
     );
 
@@ -849,16 +869,27 @@ async fn b3_13_signal_resume_parked_entry() {
         .await
         .expect("Resolve token failed");
 
-    // Verify token is now Resolved.
-    let found = parked_token_store
-        .find_by_correlation_key(&correlation_key)
-        .await
-        .expect("Find token failed");
-    assert!(found.is_some());
-    let resolved = found.unwrap();
-    assert_eq!(resolved.status, ParkedTokenStatus::Resolved);
-    assert!(resolved.resolved_at.is_some());
-    assert_eq!(resolved.result_payload, Some(result_payload));
+    // Verify token is now Resolved by querying the database directly.
+    use sqlx::Row;
+    let row = sqlx::query(
+        r#"
+        SELECT status, resolved_at, result_payload
+        FROM "ob-poc".bpmn_parked_tokens
+        WHERE correlation_key = $1
+        "#,
+    )
+    .bind(&correlation_key)
+    .fetch_one(&pool)
+    .await
+    .expect("Query token from DB failed");
+
+    let row_status: String = row.get("status");
+    let row_resolved_at: Option<chrono::DateTime<chrono::Utc>> = row.get("resolved_at");
+    let row_result_payload: Option<serde_json::Value> = row.get("result_payload");
+
+    assert_eq!(row_status, "resolved");
+    assert!(row_resolved_at.is_some());
+    assert_eq!(row_result_payload, Some(result_payload));
 
     // Update correlation to Completed.
     correlation_store

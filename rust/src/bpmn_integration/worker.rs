@@ -201,7 +201,7 @@ impl JobWorker {
             None => {
                 tracing::error!(job_key, task_type, "No task binding found, failing job");
                 self.fail_job_rpc(
-                    job_key,
+                    &job,
                     "UNKNOWN_TASK_TYPE",
                     &format!("No task binding for task_type '{}'", task_type),
                 )
@@ -239,6 +239,8 @@ impl JobWorker {
                         // payload snapshot, not the new completion payload.
                         domain_payload_hash: job.domain_payload_hash.clone(),
                         orch_flags: std::collections::HashMap::new(),
+                        worker_id: job.worker_id.clone(),
+                        claim_token: job.claim_token.clone(),
                     })
                     .await
                 {
@@ -250,7 +252,7 @@ impl JobWorker {
             }
             crate::sequencer::DslExecutionOutcome::Failed(err) => {
                 // 5b. Failure — fail the job via gRPC.
-                self.fail_job_rpc(job_key, "VERB_EXECUTION_ERROR", &err)
+                self.fail_job_rpc(&job, "VERB_EXECUTION_ERROR", &err)
                     .await;
 
                 // Check if this job has exceeded the maximum retry count.
@@ -302,10 +304,18 @@ impl JobWorker {
     }
 
     /// Fail a job via gRPC.
-    async fn fail_job_rpc(&self, job_key: &str, error_class: &str, message: &str) {
+    async fn fail_job_rpc(&self, job: &JobActivation, error_class: &str, message: &str) {
+        let job_key = &job.job_key;
         if let Err(e) = self
             .bpmn_client
-            .fail_job(job_key, error_class, message, 0)
+            .fail_job(
+                job_key,
+                error_class,
+                message,
+                0,
+                &job.worker_id,
+                &job.claim_token,
+            )
             .await
         {
             tracing::error!(

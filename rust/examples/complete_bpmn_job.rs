@@ -29,6 +29,8 @@ async fn main() -> Result<()> {
             domain_payload: completion_payload,
             domain_payload_hash: expected_hash,
             orch_flags: HashMap::new(),
+            worker_id: String::new(),
+            claim_token: String::new(),
         })
         .await?;
 

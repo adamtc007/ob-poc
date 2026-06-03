@@ -104,6 +104,8 @@ pub struct JobActivation {
     pub retries_remaining: i32,
     pub entry_id: Uuid,
     pub runbook_id: Uuid,
+    pub worker_id: String,
+    pub claim_token: String,
 }
 
 /// Request to complete a job.
@@ -113,6 +115,8 @@ pub struct CompleteJobRequest {
     pub domain_payload: String,
     pub domain_payload_hash: Vec<u8>,
     pub orch_flags: HashMap<String, OrchestratorFlag>,
+    pub worker_id: String,
+    pub claim_token: String,
 }
 
 /// A lifecycle event from the event stream.
@@ -229,6 +233,7 @@ impl BpmnLiteConnection {
                 correlation_id: req.correlation_id.to_string(),
                 entry_id: req.entry_id.to_string(),
                 runbook_id: req.runbook_id.to_string(),
+                tenant_id: String::new(),
             })
             .await
             .context("StartProcess RPC failed")?
@@ -253,9 +258,35 @@ impl BpmnLiteConnection {
                 correlation_key: None,
                 payload: payload.unwrap_or_default().to_vec(),
                 msg_id: Uuid::new_v4().to_string(),
+                tenant_id: String::new(),
             })
             .await
             .context("Signal RPC failed")?;
+        Ok(())
+    }
+
+    /// Send a signal (message) to a process instance with a correlation key.
+    pub async fn signal_with_correlation(
+        &self,
+        instance_id: Uuid,
+        message_name: &str,
+        correlation_key: Option<String>,
+        payload: Option<&[u8]>,
+    ) -> Result<()> {
+        let mut client = self.client.clone();
+        client
+            .signal(proto::SignalRequest {
+                process_instance_id: instance_id.to_string(),
+                message_name: message_name.to_string(),
+                correlation_key: correlation_key.map(|key| proto::ProtoValue {
+                    kind: Some(proto::proto_value::Kind::StrValue(key)),
+                }),
+                payload: payload.unwrap_or_default().to_vec(),
+                msg_id: Uuid::new_v4().to_string(),
+                tenant_id: String::new(),
+            })
+            .await
+            .context("Signal with correlation RPC failed")?;
         Ok(())
     }
 
@@ -266,6 +297,7 @@ impl BpmnLiteConnection {
             .cancel(proto::CancelRequest {
                 process_instance_id: instance_id.to_string(),
                 reason: reason.to_string(),
+                tenant_id: String::new(),
             })
             .await
             .context("Cancel RPC failed")?;
@@ -278,6 +310,7 @@ impl BpmnLiteConnection {
         let resp = client
             .inspect(proto::InspectRequest {
                 process_instance_id: instance_id.to_string(),
+                tenant_id: String::new(),
             })
             .await
             .context("Inspect RPC failed")?
@@ -330,6 +363,7 @@ impl BpmnLiteConnection {
                 max_jobs,
                 timeout_ms,
                 worker_id: worker_id.to_string(),
+                tenant_id: String::new(),
             })
             .await
             .context("ActivateJobs RPC failed")?;
@@ -358,6 +392,8 @@ impl BpmnLiteConnection {
                     .context("Invalid entry_id in JobActivationMsg")?,
                 runbook_id: Uuid::parse_str(&msg.runbook_id)
                     .context("Invalid runbook_id in JobActivationMsg")?,
+                worker_id: msg.worker_id,
+                claim_token: msg.claim_token,
             });
         }
 
@@ -373,6 +409,9 @@ impl BpmnLiteConnection {
                 domain_payload: req.domain_payload,
                 domain_payload_hash: req.domain_payload_hash,
                 orch_flags: to_proto_flags(&req.orch_flags),
+                worker_id: req.worker_id,
+                claim_token: req.claim_token,
+                tenant_id: String::new(),
             })
             .await
             .context("CompleteJob RPC failed")?;
@@ -386,6 +425,8 @@ impl BpmnLiteConnection {
         error_class: &str,
         message: &str,
         retry_hint_ms: i64,
+        worker_id: &str,
+        claim_token: &str,
     ) -> Result<()> {
         let mut client = self.client.clone();
         client
@@ -394,6 +435,9 @@ impl BpmnLiteConnection {
                 error_class: error_class.to_string(),
                 message: message.to_string(),
                 retry_hint_ms,
+                worker_id: worker_id.to_string(),
+                claim_token: claim_token.to_string(),
+                tenant_id: String::new(),
             })
             .await
             .context("FailJob RPC failed")?;
@@ -416,6 +460,7 @@ impl BpmnLiteConnection {
         let resp = client
             .subscribe_events(proto::SubscribeRequest {
                 process_instance_id: instance_id.to_string(),
+                tenant_id: String::new(),
             })
             .await
             .context("SubscribeEvents RPC failed")?;
