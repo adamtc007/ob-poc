@@ -50,34 +50,13 @@ pub mod dsl_viewer_routes;
 pub mod graph_routes;
 
 #[cfg(feature = "server")]
-pub mod resolution_routes;
-
-#[cfg(feature = "server")]
-pub mod client_routes;
-
-#[cfg(feature = "server")]
-pub mod client_auth;
-
-#[cfg(feature = "server")]
 pub mod trading_matrix_routes;
-
-#[cfg(feature = "server")]
-pub mod taxonomy_routes;
-
-#[cfg(feature = "server")]
-pub mod universe_routes;
 
 #[cfg(feature = "server")]
 pub mod capital_routes;
 
 #[cfg(feature = "server")]
-pub mod control_routes;
-
-#[cfg(feature = "server")]
 pub mod constellation_routes;
-
-#[cfg(feature = "server")]
-pub mod service_resource_routes;
 
 #[cfg(feature = "server")]
 pub mod workflow_routes;
@@ -88,9 +67,6 @@ pub mod workflow_routes;
 // re-export below keeps the same external API surface.
 #[cfg(feature = "server")]
 pub use ob_poc_authoring::display_nouns;
-
-#[cfg(feature = "server")]
-pub mod projection_routes;
 
 // ob-poc-domain split v1 Slice A2 (2026-05-14): deal_types now lives in
 // `ob-poc-deal`. Compat re-export keeps `crate::api::deal_types::*` paths
@@ -107,9 +83,6 @@ pub mod observatory_routes;
 
 #[cfg(feature = "server")]
 pub mod catalogue_routes;
-
-#[cfg(feature = "server")]
-pub mod stewardship_routes;
 
 pub mod acp_dsl_dag_coverage;
 pub mod agent_enrichment;
@@ -144,40 +117,19 @@ pub use session_manager::{SessionManager, SessionSnapshot, SessionWatcher};
 pub use agent_service::{AgentChatResponse, AgentCommand, AgentService, ChatRequest, ClientScope};
 
 #[cfg(feature = "server")]
-pub use resolution_routes::create_resolution_router;
-
-#[cfg(feature = "server")]
-pub use client_routes::{create_client_router, AuthenticatedClient, ClientState};
-
-#[cfg(feature = "server")]
 pub use trading_matrix_routes::create_trading_matrix_router;
-
-#[cfg(feature = "server")]
-pub use taxonomy_routes::create_taxonomy_router;
-
-#[cfg(feature = "server")]
-pub use universe_routes::create_universe_router;
 
 #[cfg(feature = "server")]
 pub use capital_routes::create_capital_router;
 
 #[cfg(feature = "server")]
-pub use control_routes::control_routes;
-
-#[cfg(feature = "server")]
 pub use constellation_routes::create_constellation_router;
-
-#[cfg(feature = "server")]
-pub use service_resource_routes::{service_resource_router, ServiceResourceState};
 
 #[cfg(feature = "server")]
 pub use workflow_routes::{create_workflow_router, WorkflowState};
 
 #[cfg(feature = "server")]
 pub use display_nouns::{translate_json, translate_string, DisplayNounTranslator};
-
-#[cfg(feature = "server")]
-pub use projection_routes::create_projection_router;
 
 #[cfg(feature = "server")]
 pub use deal_types::{
@@ -189,9 +141,6 @@ pub use deal_types::{
 
 #[cfg(feature = "server")]
 pub use deal_routes::{create_deal_router, create_deal_router_simple, DealState};
-
-#[cfg(feature = "server")]
-pub use stewardship_routes::create_stewardship_router;
 
 pub use repl_routes_v2::{
     navigation_router as create_repl_navigation_router, router as create_repl_v2_router,

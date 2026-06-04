@@ -28,12 +28,11 @@ use crate::state::AppState;
 
 // Import API routers from main ob-poc crate
 use ob_poc::api::{
-    control_routes, create_agent_router_with_semantic_and_repl, create_attribute_router,
-    create_client_router, create_constellation_router, create_deal_router,
-    create_dsl_viewer_router, create_entity_router, create_graph_router, create_resolution_router,
-    create_scoped_entity_router, create_session_graph_router, create_session_store,
-    create_stewardship_router, create_taxonomy_router, create_trading_matrix_router,
-    create_universe_router, observatory_routes::create_observatory_router, service_resource_router,
+    create_agent_router_with_semantic_and_repl, create_attribute_router,
+    create_constellation_router, create_deal_router, create_dsl_viewer_router,
+    create_entity_router, create_graph_router, create_session_graph_router,
+    create_session_store, create_trading_matrix_router,
+    observatory_routes::create_observatory_router,
 };
 
 // Import gateway resolver for resolution routes
@@ -834,7 +833,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .expect("valid gateway address")
         .connect_lazy();
     let gateway_client = EntityGatewayClient::new(gateway_channel);
-    let gateway_resolver = GatewayRefResolver::new(gateway_client);
+    let _gateway_resolver = GatewayRefResolver::new(gateway_client);
 
     // Initialise ProcessRegistry — loads all enabled process definitions from DB,
     // compiles each to JourneySpec, and creates a RuntimeEngine per definition.
@@ -875,8 +874,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .allow_methods(Any)
         .allow_headers(Any);
 
-    // Build voice matching router (semantic + phonetic)
-    let voice_router = routes::voice::create_voice_router(pool.clone());
+
 
     // =========================================================================
     // SemOS plugin op registry — canonical home for every plugin verb
@@ -1831,13 +1829,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .merge(create_attribute_router(pool.clone()))
         .merge(create_entity_router())
         .merge(create_dsl_viewer_router(pool.clone()))
-        .merge(create_resolution_router(sessions.clone(), gateway_resolver))
-        // Client portal router (separate auth, scoped access)
-        .merge(create_client_router(pool.clone(), sessions.clone()))
         // Trading matrix router (custody taxonomy browser)
         .merge(create_trading_matrix_router(pool.clone()))
-        // Taxonomy navigation router (fractal drill-down)
-        .merge(create_taxonomy_router(pool.clone(), sessions.clone()))
         // Deal taxonomy router (deal visualization and navigation)
         // Mounted under /api so routes like /api/session/:id/deal-context resolve.
         .nest("/api", create_deal_router(pool.clone(), sessions.clone()))
@@ -1849,19 +1842,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             sessions.clone(),
             Some(repl_session_store.clone()),
         ))
-        // Galaxy navigation - universe view and cluster detail
-        .merge(create_universe_router(pool.clone()))
         // Constellation graph hydration API for UI feedback and debugging
         .merge(create_constellation_router(pool.clone()))
-        // Control/ownership routes (board controller, control sphere)
-        .merge(control_routes(pool.clone()))
-        // Session-scoped entity search (constraint cascade)
-        .merge(create_scoped_entity_router(sessions.clone()))
-        // Service resource pipeline (intents, discovery, readiness)
-        .merge(service_resource_router(pool.clone()))
-        // CBU session management superseded by REPL V2 unified pipeline
-        // Stewardship routes (focus, show loop, SSE, manifests)
-        .merge(create_stewardship_router(pool.clone()))
         // Observatory routes (orientation, show-packet, navigation history)
         // Pass the REPL V2 session store so Observatory reads from the canonical hydrated DAG.
         .nest(
@@ -1945,8 +1927,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .with_state(state)
         // Merge stateless API routes (includes session, agent, entity, dsl viewer)
         .merge(api_router)
-        // Voice matching routes (semantic ML + phonetic) - stateless router
-        .merge(voice_router)
         // Note: REPL V2 router is nested inside api_router via agent_state.rs
         // Layers
         .layer(TraceLayer::new_for_http())
@@ -1970,23 +1950,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     tracing::info!("  /api/cbu/:id/graph    - Get CBU graph");
     tracing::info!("  /api/session          - Session management");
     tracing::info!("  /api/session/:id/input - Unified session input (chat/decision/repl)");
-    tracing::info!("  /api/session/:id/resolution/* - Entity resolution");
     tracing::info!("  /api/agent/*          - DSL generation");
     tracing::info!("  /api/entity/search    - Entity search");
     tracing::info!("  /api/dsl/*            - DSL viewer");
     tracing::info!("  /api/verbs/discover   - Verb discovery (RAG)");
     tracing::info!("  /api/verbs/agent-context - Agent verb context");
-    tracing::info!("  /api/voice/match      - Semantic voice matching");
-    tracing::info!("  /api/voice/health     - Voice matcher health");
     tracing::info!("  /api/repl/v2/session  - REPL V2 session management");
     tracing::info!("  /api/repl/v2/session/:id/input - Legacy (410; use /api/session/:id/input)");
-    tracing::info!("  /api/universe         - Galaxy universe view");
-    tracing::info!("  /api/cluster/:type/:id - Cluster detail view");
-    tracing::info!("");
-    tracing::info!("Client Portal API:");
-    tracing::info!("  /api/client/login     - Client authentication");
-    tracing::info!("  /api/client/status    - Get CBU status");
-    tracing::info!("  /api/client/outstanding - List outstanding requests");
     tracing::info!("  /api/client/chat      - Client chat endpoint");
     tracing::info!("");
     tracing::info!("Service Resource Pipeline:");

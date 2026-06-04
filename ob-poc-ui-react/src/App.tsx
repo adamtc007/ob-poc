@@ -4,7 +4,6 @@ import { queryClient } from "./lib/query";
 import { AppShell, ErrorBoundary } from "./components";
 import { ChatPage } from "./features/chat/ChatPage";
 import { DealPage } from "./features/deal/DealPage";
-import { InspectorPage } from "./features/inspector/InspectorPage";
 import { SettingsPage } from "./features/settings/SettingsPage";
 import { ViewportPage } from "./features/viewport/ViewportPage";
 import { ObservatoryPage } from "./features/observatory/ObservatoryPage";
@@ -77,22 +76,6 @@ function App() {
 
             {/* Secondary views — keep AppShell nav */}
             <Route path="/" element={<AppShell />}>
-              <Route
-                path="inspector"
-                element={
-                  <ErrorBoundary>
-                    <InspectorPage />
-                  </ErrorBoundary>
-                }
-              />
-              <Route
-                path="inspector/:projectionId"
-                element={
-                  <ErrorBoundary>
-                    <InspectorPage />
-                  </ErrorBoundary>
-                }
-              />
               <Route
                 path="settings"
                 element={

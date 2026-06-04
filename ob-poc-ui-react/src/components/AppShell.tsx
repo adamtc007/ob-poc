@@ -8,13 +8,11 @@ import {
   ChevronLeft,
   ChevronRight,
   MessageSquare,
-  Search,
   Settings,
 } from "lucide-react";
 import { cn } from "../lib/utils";
 
 const navItems = [
-  { to: "/inspector", icon: Search, label: "Inspector" },
   { to: "/chat", icon: MessageSquare, label: "Chat" },
   { to: "/settings", icon: Settings, label: "Settings" },
 ];
