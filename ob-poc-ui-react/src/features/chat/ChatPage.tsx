@@ -26,6 +26,7 @@ import { RunbookPlanReview } from "./RunbookPlanReview";
 import { runbookPlanApi } from "../../api/runbookPlan";
 import { DealPanel } from "../deal/components";
 import { ConstellationCanvas } from "../observatory/components/ConstellationCanvas";
+import { BpmnDemoPage } from "../bpmn";
 import type { ObservatoryAction } from "../../types/observatory";
 import type { DecisionReply, DiscoverySelection } from "../../types/chat";
 import type { SessionFeedback, WorkspaceKind } from "../../api/replV2";
@@ -673,11 +674,15 @@ export function ChatPage() {
 
         <div className="flex-1 min-h-0">
           {sessionId ? (
-            <ConstellationCanvas
-              graphScene={graphScene ?? null}
-              viewLevel={orientation?.view_level ?? "system"}
-              onAction={handleCanvasAction}
-            />
+            latestSessionFeedback?.tos?.workspace === "bpmn" ? (
+              <BpmnDemoPage />
+            ) : (
+              <ConstellationCanvas
+                graphScene={graphScene ?? null}
+                viewLevel={orientation?.view_level ?? "system"}
+                onAction={handleCanvasAction}
+              />
+            )
           ) : (
             <div className="flex h-full items-center justify-center bg-[var(--bg-primary)]">
               <div className="text-center">
