@@ -498,6 +498,25 @@ dependencies = [
 ]
 
 [[package]]
+name = "bpmn-lite-authoring"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "blake3",
+ "bpmn-lite-compiler",
+ "bpmn-lite-store",
+ "bpmn-lite-types",
+ "dsl-manifest",
+ "petgraph",
+ "serde",
+ "serde_json",
+ "serde_yaml",
+ "tokio",
+ "uuid",
+]
+
+[[package]]
 name = "bpmn-lite-bus-handler"
 version = "0.1.0"
 dependencies = [
@@ -603,6 +622,7 @@ dependencies = [
  "axum",
  "blake3",
  "bpmn-lite-analysis",
+ "bpmn-lite-authoring",
  "bpmn-lite-bus-handler",
  "bpmn-lite-compiler",
  "bpmn-lite-engine",
@@ -620,6 +640,7 @@ dependencies = [
  "dsl-bus-protocol",
  "dsl-bus-server",
  "dsl-bus-storage",
+ "dsl-manifest",
  "ffi-catalogue",
  "ffi-dispatcher",
  "ffi-types",

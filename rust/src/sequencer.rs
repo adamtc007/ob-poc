@@ -1880,6 +1880,16 @@ impl ReplOrchestratorV2 {
                 self.complete_scope_gate(session, group_id, &group_name)
                     .await
             }
+            UserInputV2::SelectWorkspace { workspace } => {
+                let infra_options = self.infrastructure_workspace_options();
+                if infra_options.iter().any(|opt| opt.workspace == workspace) {
+                    session.set_client_scope(Uuid::nil());
+                    session.name = Some("SemOS Infrastructure".to_string());
+                    self.handle_workspace_selection(session, UserInputV2::SelectWorkspace { workspace }).await
+                } else {
+                    self.invalid_input(session, "Please select a client group first for this workspace.")
+                }
+            }
             UserInputV2::Message { content } => {
                 // Check if we have pending disambiguation candidates.
                 let pending_candidates = match &session.state {
