@@ -165,6 +165,11 @@ SemOS Maintenance workspace (2026-03-28):
 - PACK001 lint rule: workspace-macro bleed detection — checks every macro in a pack's `allowed_verbs` has mode-tags compatible with all pack workspaces; prevents KYC/screening macros from leaking into CBU/InstrumentMatrix contexts; workspace-to-mode-tag compatibility table in `docs/annex-macros.md`
 - `cargo clippy` clean across entire codebase
 
+Infrastructure Workspace Scope Bypass (2026-06-04):
+- Direct selection of infrastructure/maintenance workspaces (BPMN, SemOS Maintenance, etc.) in the initial Universe list bypasses the client ScopeGate.
+- Sets client scope context to nil UUID, sets session name to "SemOS Infrastructure", and transitions directly into the workspace.
+
+
 SemOS domain-pack taxonomy reload (2026-05-14):
 - Sem OS domain packs are the configuration-native ownership boundary for domain-specific YAML shape. Business crates are clients/implementation homes; they do not own Sem OS taxonomy shape.
 - Domain Pack manifests live in `rust/config/sem_os_seeds/domain_packs/*.yaml` and declare owned DAGs, DSL packs, state machines, constellation maps/families, universes, verb prefixes, entity kinds, and informational business-crate links.
