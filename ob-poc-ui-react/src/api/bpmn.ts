@@ -88,6 +88,20 @@ export const bpmnApi = {
   reset: () =>
     fetch(`${BPMN_BASE}/instances`, { method: "DELETE" }).then(() => undefined),
 
+  getGraph: (id: string) =>
+    bpmnFetch<VisualGraphDto>(`/instances/${id}/graph`),
+
+  getStack: (id: string) =>
+    bpmnFetch<CallStackFrameDto[]>(`/instances/${id}/stack`),
+
+  getDmnDecision: (decisionId: string) =>
+    fetch(`/dmn/decisions/${decisionId}`, {
+      headers: { "Content-Type": "application/json" },
+    }).then((res) => {
+      if (!res.ok) throw new Error(`DMN API ${res.status}`);
+      return res.json() as Promise<DmnSchemaDto>;
+    }),
+
   /** Subscribe to SSE lifecycle events for a process instance. */
   subscribeToEvents: (
     instanceId: string,
@@ -106,3 +120,57 @@ export const bpmnApi = {
     return es;
   },
 };
+
+export interface VisualNodeDto {
+  id: string;
+  label: string;
+  kind: "start" | "end" | "task" | "split" | "join" | "loop";
+  plug: string | null;
+  span: {
+    start_offset: number;
+    end_offset: number;
+    start_line: number;
+    start_col: number;
+  } | null;
+}
+
+export interface VisualEdgeDto {
+  from: string;
+  to: string;
+  condition: string | null;
+}
+
+export interface VisualGraphDto {
+  workflow_id: string;
+  nodes: VisualNodeDto[];
+  edges: VisualEdgeDto[];
+}
+
+export interface CallStackFrameDto {
+  instance_id: string;
+  workflow_id: string;
+  node_id: string;
+  plug: string | null;
+  span: VisualNodeDto["span"];
+  status: string;
+}
+
+export interface DmnRuleInputCell {
+  op: string;
+  value: string;
+}
+
+export interface DmnRuleDto {
+  id: string;
+  inputs: DmnRuleInputCell[];
+  outputs: string[];
+}
+
+export interface DmnSchemaDto {
+  decision_name: string;
+  hit_policy: string;
+  inputs: { name: string; type: string }[];
+  outputs: { name: string; type: string }[];
+  rules: DmnRuleDto[];
+}
+
