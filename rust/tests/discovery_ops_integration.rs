@@ -36,6 +36,7 @@ mod integration {
                     span: Span::default(),
                 },
             ],
+            lens_override: None,
             binding: None,
             span: Span::default(),
         }
@@ -50,6 +51,7 @@ mod integration {
                 value: s("mermaid"),
                 span: Span::default(),
             }],
+            lens_override: None,
             binding: None,
             span: Span::default(),
         }
