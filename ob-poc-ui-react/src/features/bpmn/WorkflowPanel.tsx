@@ -3,7 +3,7 @@ import { bpmnApi } from "@/api/bpmn";
 import type { VisualGraphDto, WorkflowInstanceDetail } from "@/api/bpmn";
 import { ConstellationCanvas } from "../observatory/components/ConstellationCanvas";
 import { DmnTableViewer } from "./DmnTableViewer";
-import type { GraphSceneModel, SceneNode, SceneEdge } from "@/types/observatory";
+import type { GraphSceneModel, SceneNode, SceneEdge, ObservatoryAction } from "@/types/observatory";
 
 interface Props {
   instanceId: string;
@@ -67,6 +67,11 @@ export function WorkflowPanel({ instanceId, onRefresh }: Props) {
   const [selectedDmnId, setSelectedDmnId] = useState<string | null>(null);
   const [stepping, setStepping] = useState(false);
 
+  const onRefreshRef = useRef(onRefresh);
+  useEffect(() => {
+    onRefreshRef.current = onRefresh;
+  }, [onRefresh]);
+
   const instanceIdRef = useRef(instanceId);
   useEffect(() => {
     instanceIdRef.current = instanceId;
@@ -98,7 +103,7 @@ export function WorkflowPanel({ instanceId, onRefresh }: Props) {
     const es = bpmnApi.subscribeToEvents(instanceId, () => {
       if (active) {
         refreshData();
-        onRefresh();
+        onRefreshRef.current();
       }
     });
 
@@ -106,7 +111,7 @@ export function WorkflowPanel({ instanceId, onRefresh }: Props) {
       active = false;
       es.close();
     };
-  }, [instanceId, onRefresh]);
+  }, [instanceId]);
 
   const handleNextStep = async () => {
     const targetInstanceId = instanceId;
@@ -120,7 +125,7 @@ export function WorkflowPanel({ instanceId, onRefresh }: Props) {
       if (targetInstanceId === instanceIdRef.current) {
         setDetail(d);
         setVisualGraph(g);
-        onRefresh();
+        onRefreshRef.current();
       }
     } catch (e) {
       console.error(e);
@@ -151,7 +156,7 @@ export function WorkflowPanel({ instanceId, onRefresh }: Props) {
     );
   }, [visualGraph, detail, visitedNodes]);
 
-  const handleCanvasAction = (action: any) => {
+  const handleCanvasAction = (action: ObservatoryAction) => {
     if (action.type === "select_node") {
       const node = visualGraph?.nodes.find((n) => n.id === action.node_id);
       if (node?.kind === "task" && node.plug?.startsWith("dmn-lite:")) {
@@ -159,6 +164,8 @@ export function WorkflowPanel({ instanceId, onRefresh }: Props) {
       } else {
         setSelectedDmnId(null);
       }
+    } else if (action.type === "deselect_node") {
+      setSelectedDmnId(null);
     }
   };
 
@@ -177,7 +184,7 @@ export function WorkflowPanel({ instanceId, onRefresh }: Props) {
       <div className="p-3 border-b border-gray-800 flex items-center justify-between shrink-0">
         <div className="flex items-center gap-3">
           <span
-            className={`text-xs font-mono px-2 py-1 rounded ${
+              className={`text-xs font-mono px-2 py-1 rounded ${
               isComplete
                 ? "bg-green-900 text-green-300"
                 : isFailed
@@ -197,7 +204,7 @@ export function WorkflowPanel({ instanceId, onRefresh }: Props) {
         </div>
 
         {/* Next step controls */}
-        {(isWaiting || (!isComplete && !isFailed)) && !isComplete && (
+        {!isComplete && !isFailed && (
           <button
             onClick={handleNextStep}
             disabled={stepping}

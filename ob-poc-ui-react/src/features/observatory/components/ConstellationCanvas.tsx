@@ -35,66 +35,55 @@ declare global {
 // Module-level WASM state (singleton — canvas is initialized once)
 let wasmModule: ObservatoryWasmModule | null = null;
 let wasmReady = false;
-let wasmLoading = false;
+let wasmLoadPromise: Promise<ObservatoryWasmModule> | null = null;
 let globalActionCallback: ((json: string) => void) | null = null;
 
 /** Load the WASM module via dynamic script injection (bypasses Vite bundler). */
 async function loadWasmModule(): Promise<ObservatoryWasmModule> {
   if (wasmModule) return wasmModule;
-  if (wasmLoading) {
-    // Wait for the in-flight load
-    return new Promise((resolve) => {
-      const check = setInterval(() => {
-        if (wasmModule) {
-          clearInterval(check);
-          resolve(wasmModule);
-        }
-      }, 50);
-    });
-  }
+  if (wasmLoadPromise) return wasmLoadPromise;
 
-  wasmLoading = true;
+  wasmLoadPromise = new Promise<ObservatoryWasmModule>((resolve, reject) => {
+    const script = document.createElement("script");
+    script.type = "module";
+    script.textContent = `
+      import init, * as wasm from '/observatory/pkg/observatory_wasm.js';
+      await init();
+      window.__observatory_wasm = wasm;
+      window.dispatchEvent(new Event('observatory-wasm-ready'));
+    `;
 
-  // Load the JS glue via a module script element so it registers on globalThis
-  const script = document.createElement("script");
-  script.type = "module";
-  script.textContent = `
-    import init, * as wasm from '/observatory/pkg/observatory_wasm.js';
-    await init();
-    window.__observatory_wasm = wasm;
-    window.dispatchEvent(new Event('observatory-wasm-ready'));
-  `;
-
-  return new Promise((resolve, reject) => {
     const onReady = () => {
       if (!window.__observatory_wasm) {
-        wasmLoading = false;
         window.removeEventListener("observatory-wasm-ready", onReady);
         reject(new Error("WASM ready event fired without module"));
+        wasmLoadPromise = null;
         return;
       }
       wasmModule = window.__observatory_wasm;
-      wasmLoading = false;
       window.removeEventListener("observatory-wasm-ready", onReady);
       resolve(wasmModule);
     };
     window.addEventListener("observatory-wasm-ready", onReady);
 
     script.onerror = (e) => {
-      wasmLoading = false;
+      window.removeEventListener("observatory-wasm-ready", onReady);
       reject(new Error(`Failed to load WASM: ${e}`));
+      wasmLoadPromise = null;
     };
 
     document.head.appendChild(script);
 
-    // Timeout after 15s
     setTimeout(() => {
       if (!wasmModule) {
-        wasmLoading = false;
+        window.removeEventListener("observatory-wasm-ready", onReady);
         reject(new Error("WASM load timeout"));
+        wasmLoadPromise = null;
       }
     }, 15000);
   });
+
+  return wasmLoadPromise;
 }
 
 export function ConstellationCanvas({

@@ -72,11 +72,21 @@ export function DmnTableViewer({ decisionId }: { decisionId: string }) {
                 className="border-b border-gray-800 hover:bg-gray-800/30 transition-colors"
               >
                 <td className="p-2 border-r border-gray-800 text-gray-500">{idx + 1}</td>
-                {rule.inputs.map((cell, i) => (
-                  <td key={i} className="p-2 border-r border-gray-800 text-amber-300">
-                    {cell.op} "{cell.value}"
-                  </td>
-                ))}
+                {rule.inputs.map((cell, i) => {
+                  const inputSchema = schema.inputs[i];
+                  const isNumericOrBool =
+                    inputSchema?.type === "integer" ||
+                    inputSchema?.type === "decimal" ||
+                    inputSchema?.type === "bool";
+                  const displayVal = isNumericOrBool ? cell.value : `"${cell.value}"`;
+                  return (
+                    <td key={i} className="p-2 border-r border-gray-800 text-amber-300">
+                      {cell.op === "-" && cell.value === "-"
+                        ? "-"
+                        : `${cell.op} ${displayVal}`}
+                    </td>
+                  );
+                })}
                 {rule.outputs.map((val, i) => (
                   <td key={i} className="p-2 text-green-400 font-semibold">
                     {val}
