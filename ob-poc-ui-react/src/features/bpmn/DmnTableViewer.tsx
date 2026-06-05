@@ -7,15 +7,23 @@ export function DmnTableViewer({ decisionId }: { decisionId: string }) {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    let active = true;
     setSchema(null);
     setError(null);
     bpmnApi
       .getDmnDecision(decisionId)
-      .then(setSchema)
+      .then((data) => {
+        if (active) setSchema(data);
+      })
       .catch((err) => {
-        console.error(err);
-        setError(err.message || "Failed to load DMN decision table");
+        if (active) {
+          console.error(err);
+          setError(err.message || "Failed to load DMN decision table");
+        }
       });
+    return () => {
+      active = false;
+    };
   }, [decisionId]);
 
   if (error) {

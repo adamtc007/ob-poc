@@ -36,6 +36,7 @@ declare global {
 let wasmModule: ObservatoryWasmModule | null = null;
 let wasmReady = false;
 let wasmLoading = false;
+let globalActionCallback: ((json: string) => void) | null = null;
 
 /** Load the WASM module via dynamic script injection (bypasses Vite bundler). */
 async function loadWasmModule(): Promise<ObservatoryWasmModule> {
@@ -102,11 +103,24 @@ export function ConstellationCanvas({
   onAction,
 }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const actionCallbackRef = useRef(onAction);
-  const [ready, setReady] = useState(wasmReady);
+  const [canvasReady, setCanvasReady] = useState(false);
 
+  // Sync current onAction callback to the global callback handler
   useEffect(() => {
-    actionCallbackRef.current = onAction;
+    const handler = (json: string) => {
+      try {
+        const action = JSON.parse(json) as ObservatoryAction;
+        onAction(action);
+      } catch (e) {
+        console.error("Failed to parse canvas action:", e);
+      }
+    };
+    globalActionCallback = handler;
+    return () => {
+      if (globalActionCallback === handler) {
+        globalActionCallback = null;
+      }
+    };
   }, [onAction]);
 
   // Initialize WASM canvas
@@ -114,25 +128,23 @@ export function ConstellationCanvas({
     let cancelled = false;
 
     async function init() {
-      if (wasmReady) {
-        setReady(true);
-        return;
-      }
       try {
         const wasm = await loadWasmModule();
         if (cancelled) return;
 
+        // start_canvas must run for the newly mounted canvas element
         await wasm.start_canvas("observatory_canvas");
-        wasm.on_action((json: string) => {
-          try {
-            const action = JSON.parse(json) as ObservatoryAction;
-            actionCallbackRef.current(action);
-          } catch (e) {
-            console.error("Failed to parse canvas action:", e);
-          }
-        });
-        wasmReady = true;
-        setReady(true);
+        if (cancelled) return;
+
+        if (!wasmReady) {
+          wasm.on_action((json: string) => {
+            if (globalActionCallback) {
+              globalActionCallback(json);
+            }
+          });
+          wasmReady = true;
+        }
+        setCanvasReady(true);
       } catch (e) {
         console.error("Failed to init observatory WASM:", e);
       }
@@ -141,22 +153,23 @@ export function ConstellationCanvas({
     init();
     return () => {
       cancelled = true;
+      setCanvasReady(false);
     };
   }, []);
 
-  // Push scene to WASM when it changes OR when WASM becomes ready
+  // Push scene to WASM when it changes OR when canvas becomes ready
   useEffect(() => {
-    if (ready && wasmModule && graphScene) {
+    if (canvasReady && wasmModule && graphScene) {
       wasmModule.set_scene(JSON.stringify(graphScene));
     }
-  }, [graphScene, ready]);
+  }, [graphScene, canvasReady]);
 
-  // Push view level to WASM when orientation changes OR when WASM becomes ready
+  // Push view level to WASM when orientation changes OR when canvas becomes ready
   useEffect(() => {
-    if (ready && wasmModule) {
+    if (canvasReady && wasmModule) {
       wasmModule.set_view_level(viewLevel);
     }
-  }, [viewLevel, ready]);
+  }, [viewLevel, canvasReady]);
 
   return (
     <canvas

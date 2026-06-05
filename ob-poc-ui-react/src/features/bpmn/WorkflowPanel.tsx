@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState, useMemo, useRef } from "react";
 import { bpmnApi } from "@/api/bpmn";
 import type { VisualGraphDto, WorkflowInstanceDetail } from "@/api/bpmn";
 import { ConstellationCanvas } from "../observatory/components/ConstellationCanvas";
@@ -20,6 +20,9 @@ export function projectVisualGraph(
     generation: Date.now(),
     level: "core",
     layout_strategy: "tree_dag",
+    groups: [],
+    drill_targets: [],
+    max_depth: 0,
     nodes: visualGraph.nodes.map((n): SceneNode => {
       let nodeState: string | undefined = undefined;
 
@@ -64,46 +67,67 @@ export function WorkflowPanel({ instanceId, onRefresh }: Props) {
   const [selectedDmnId, setSelectedDmnId] = useState<string | null>(null);
   const [stepping, setStepping] = useState(false);
 
+  const instanceIdRef = useRef(instanceId);
   useEffect(() => {
+    instanceIdRef.current = instanceId;
+  }, [instanceId]);
+
+  useEffect(() => {
+    let active = true;
+
     const refreshData = () => {
       Promise.all([
         bpmnApi.getInstance(instanceId),
         bpmnApi.getGraph(instanceId)
       ])
         .then(([d, g]) => {
-          setDetail(d);
-          setVisualGraph(g);
+          if (active) {
+            setDetail(d);
+            setVisualGraph(g);
+          }
         })
-        .catch(console.error);
+        .catch((err) => {
+          if (active) {
+            console.error(err);
+          }
+        });
     };
 
     refreshData();
 
     const es = bpmnApi.subscribeToEvents(instanceId, () => {
-      refreshData();
-      onRefresh();
+      if (active) {
+        refreshData();
+        onRefresh();
+      }
     });
 
     return () => {
+      active = false;
       es.close();
     };
   }, [instanceId, onRefresh]);
 
   const handleNextStep = async () => {
+    const targetInstanceId = instanceId;
     setStepping(true);
     try {
-      await bpmnApi.nextStep(instanceId);
+      await bpmnApi.nextStep(targetInstanceId);
       const [d, g] = await Promise.all([
-        bpmnApi.getInstance(instanceId),
-        bpmnApi.getGraph(instanceId)
+        bpmnApi.getInstance(targetInstanceId),
+        bpmnApi.getGraph(targetInstanceId)
       ]);
-      setDetail(d);
-      setVisualGraph(g);
-      onRefresh();
+      if (targetInstanceId === instanceIdRef.current) {
+        setDetail(d);
+        setVisualGraph(g);
+        onRefresh();
+      }
     } catch (e) {
       console.error(e);
     } finally {
-      setStepping(false);
+      if (targetInstanceId === instanceIdRef.current) {
+        setStepping(false);
+      }
     }
   };
 
@@ -130,7 +154,7 @@ export function WorkflowPanel({ instanceId, onRefresh }: Props) {
   const handleCanvasAction = (action: any) => {
     if (action.type === "select_node") {
       const node = visualGraph?.nodes.find((n) => n.id === action.node_id);
-      if (node?.kind === "business_rule_task" && node.plug?.startsWith("dmn-lite:")) {
+      if (node?.kind === "task" && node.plug?.startsWith("dmn-lite:")) {
         setSelectedDmnId(node.plug.replace("dmn-lite:", ""));
       } else {
         setSelectedDmnId(null);
