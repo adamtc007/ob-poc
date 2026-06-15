@@ -141,7 +141,6 @@ fn render_system_prompt(index: &SessionIndex) -> String {
             ob_poc_types::session::kinds::WorkspaceKind::ProductMaintenance => "product",
             ob_poc_types::session::kinds::WorkspaceKind::InstrumentMatrix => "instrument",
             ob_poc_types::session::kinds::WorkspaceKind::Catalogue => "catalogue",
-            ob_poc_types::session::kinds::WorkspaceKind::BookingPrincipal => "booking_principal",
             ob_poc_types::session::kinds::WorkspaceKind::LifecycleResources => "lifecycle",
             ob_poc_types::session::kinds::WorkspaceKind::OnBoarding => "onboarding",
             ob_poc_types::session::kinds::WorkspaceKind::SemOsMaintenance => "semos_maintenance",

@@ -10797,7 +10797,7 @@ CREATE TABLE "ob-poc".deal_slas (
     deal_id uuid NOT NULL,
     contract_id uuid,
     product_id uuid,
-    service_id uuid,
+    service_attribute_id uuid,
     sla_name character varying(255) NOT NULL,
     sla_type character varying(50),
     metric_name character varying(100) NOT NULL,
@@ -10904,7 +10904,6 @@ CREATE TABLE "ob-poc".deals (
     updated_at timestamp with time zone DEFAULT now(),
     sponsor_entity_id uuid,
     rm_entity_id uuid,
-    coverage_banker_entity_id uuid,
     parent_deal_id uuid,
     operational_status text,
     bac_status text,
@@ -10945,10 +10944,7 @@ COMMENT ON COLUMN "ob-poc".deals.rm_entity_id IS 'Relationship manager — owns 
 
 
 --
--- Name: COLUMN deals.coverage_banker_entity_id; Type: COMMENT; Schema: ob-poc; Owner: -
---
 
-COMMENT ON COLUMN "ob-poc".deals.coverage_banker_entity_id IS 'Coverage banker — cross-sell owner. R-5 G-8.';
 
 
 --
@@ -36225,11 +36221,11 @@ ALTER TABLE ONLY "ob-poc".deal_slas
 
 
 --
--- Name: deal_slas deal_slas_service_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: deal_slas deal_slas_service_attribute_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
 --
 
 ALTER TABLE ONLY "ob-poc".deal_slas
-    ADD CONSTRAINT deal_slas_service_id_fkey FOREIGN KEY (service_id) REFERENCES "ob-poc".services(service_id);
+    ADD CONSTRAINT deal_slas_service_attribute_id_fkey FOREIGN KEY (service_attribute_id) REFERENCES "ob-poc".attribute_registry(uuid);
 
 
 --

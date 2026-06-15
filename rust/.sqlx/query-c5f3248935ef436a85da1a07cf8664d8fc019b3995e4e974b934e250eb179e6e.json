@@ -1,0 +1,22 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT compartment_count\n        FROM \"ob-poc\".v_fund_vehicle_summary\n        WHERE fund_entity_id = $1\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "compartment_count",
+        "type_info": "Int8"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      true
+    ]
+  },
+  "hash": "c5f3248935ef436a85da1a07cf8664d8fc019b3995e4e974b934e250eb179e6e"
+}

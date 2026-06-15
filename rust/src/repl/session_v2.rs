@@ -1108,7 +1108,6 @@ fn workspace_kind_to_shared(
         WorkspaceKind::OnBoarding => SessionWorkspaceKind::OnBoarding,
         WorkspaceKind::SemOsMaintenance => SessionWorkspaceKind::SemOsMaintenance,
         WorkspaceKind::LifecycleResources => SessionWorkspaceKind::LifecycleResources,
-        WorkspaceKind::BookingPrincipal => SessionWorkspaceKind::BookingPrincipal,
         WorkspaceKind::Bpmn => SessionWorkspaceKind::Bpmn,
     }
 }

@@ -1,0 +1,32 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT band_code, min_score, max_score FROM \"ob-poc\".risk_bands ORDER BY min_score",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "band_code",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 1,
+        "name": "min_score",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 2,
+        "name": "max_score",
+        "type_info": "Int4"
+      }
+    ],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": [
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "71985de9190924b10a794a07400ba2a970a2572f7be630dc3ff4a1c369f7e4a3"
+}

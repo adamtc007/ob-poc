@@ -35,6 +35,7 @@ workspaces:
 
 allowed_verbs:
   - cbu.create
+  - cbu.create-from-client-group
   - cbu.ensure
   - cbu.read
   - cbu.list

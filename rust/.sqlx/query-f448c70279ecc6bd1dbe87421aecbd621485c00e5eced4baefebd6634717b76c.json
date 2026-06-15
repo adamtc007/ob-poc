@@ -1,0 +1,23 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO \"ob-poc\".entity_workstreams (case_id, entity_id, status)\n           VALUES ($1, $2, 'COLLECT')\n           RETURNING workstream_id",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "workstream_id",
+        "type_info": "Uuid"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "f448c70279ecc6bd1dbe87421aecbd621485c00e5eced4baefebd6634717b76c"
+}

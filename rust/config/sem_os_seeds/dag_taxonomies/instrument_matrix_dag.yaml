@@ -811,25 +811,7 @@ slots:
       - cbu-custody.lookup-ssi
       - cbu-custody.setup-ssi
 
-  - id: booking_principal
-    constellation: trading.streetside
-    stateless: true
-    rationale: |
-      Booking principal is a rule-evaluation entity — evaluates client
-      / CBU / product to select the IM-side booking branch. Not a
-      stateful lifecycle entity per Adam Q8. `retire` verb is more
-      'remove-rule' than 'transition-to-retired-state'.
-    source_entity: '"ob-poc".booking_principal'
-    verbs:
-      - booking-principal.create
-      - booking-principal.update
-      - booking-principal.retire
-      - booking-principal.evaluate
-      - booking-principal.select
-      - booking-principal.explain
-      - booking-principal.coverage-matrix
-      - booking-principal.gap-report
-      - booking-principal.impact-analysis
+
 
   - id: cash_sweep
     constellation: trading.streetside
@@ -1322,8 +1304,6 @@ product_module_gates:
       activated_by: [product.custody]
     - slot: trade_gateway
       activated_by: [product.middle_office, product.markets_fx]
-    - slot: booking_principal
-      activated_by: [product.middle_office]
     - slot: cash_sweep
       activated_by: [product.custody]  # cash mgmt is a sub-service of custody today
     - slot: isda_framework

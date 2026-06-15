@@ -54,6 +54,9 @@ fn agent_messages(outgoing: &[JsonRpcOutgoing]) -> String {
 
 #[test]
 fn acp_session_prompt_routes_all_cbu_phrase_scenarios_to_structured_dag_semantic() {
+    std::env::set_var("OBPOC_PACKS_DIR", "config/packs");
+    ob_poc::journey::providers::register_pack_providers();
+
     let scenarios = cbu_phrase_scenarios();
     assert_eq!(scenarios.len(), 80, "CBU fixture count changed");
 
@@ -102,8 +105,8 @@ fn acp_session_prompt_routes_all_cbu_phrase_scenarios_to_structured_dag_semantic
             .as_array()
             .expect("top candidates");
         let expected_or_safe_delete = candidates.iter().any(|candidate| {
-            candidate["verb"] == *expected_verb
-                || (expected_verb.starts_with("cbu.delete") && candidate["verb"] == "cbu.delete")
+            candidate["fqn"] == *expected_verb
+                || (expected_verb.starts_with("cbu.delete") && candidate["fqn"] == "cbu.delete")
         });
         if expected_or_safe_delete {
             expected_candidate_hits += 1;
@@ -112,7 +115,7 @@ fn acp_session_prompt_routes_all_cbu_phrase_scenarios_to_structured_dag_semantic
                 "expected {expected_verb} in ACP candidates for {phrase:?}, got {:?}",
                 candidates
                     .iter()
-                    .map(|candidate| candidate["verb"].clone())
+                    .map(|candidate| candidate["fqn"].clone())
                     .collect::<Vec<_>>()
             );
         }

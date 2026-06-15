@@ -27,7 +27,6 @@ slots:
       entity_placeholder_summary: entity.placeholder-summary
       # ── CBU extras ──────────────────────────────────────────────────
       cbu_set_category: { verb: cbu.set-category, when: filled }
-      legal_entity_update: { verb: legal-entity.update, when: filled }
       edge_upsert: { verb: edge.upsert, when: filled }
       # ── Investor lifecycle ──────────────────────────────────────────
       investor_create: { verb: investor.create, when: [empty, filled] }

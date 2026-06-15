@@ -279,7 +279,6 @@ fn parse_workspace(label: &str) -> Result<WorkspaceKind> {
         "kyc" => Ok(WorkspaceKind::Kyc),
         "deal" => Ok(WorkspaceKind::Deal),
         "instrument_matrix" | "instrument-matrix" => Ok(WorkspaceKind::InstrumentMatrix),
-        "booking_principal" | "booking-principal" => Ok(WorkspaceKind::BookingPrincipal),
         "lifecycle_resources" | "lifecycle-resources" => Ok(WorkspaceKind::LifecycleResources),
         "product_maintenance" | "product-maintenance" => Ok(WorkspaceKind::ProductMaintenance),
         "semos_maintenance" | "sem-os-maintenance" | "semos-maintenance" => {

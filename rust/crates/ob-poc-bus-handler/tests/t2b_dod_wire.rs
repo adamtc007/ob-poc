@@ -182,7 +182,7 @@ async fn dod_43_idempotency_same_key_submitted_twice_executes_verb_once() {
     let req = sample_request(key, TEST_CATALOGUE_VERSION);
 
     let (first_key, first_outcome) = client
-        .submit_invocation("ob-poc", req.clone())
+        .submit_invocation("ob-poc", req.clone(), "test-authority".to_string())
         .await
         .expect("first submit");
     assert_eq!(first_key, key);
@@ -207,7 +207,7 @@ async fn dod_43_idempotency_same_key_submitted_twice_executes_verb_once() {
     // Second submit with same key — the outbox UNIQUE constraint
     // surfaces Duplicate, no second row is enqueued.
     let (second_key, second_outcome) = client
-        .submit_invocation("ob-poc", req)
+        .submit_invocation("ob-poc", req, "test-authority".to_string())
         .await
         .expect("second submit");
     assert_eq!(second_key, key);
@@ -248,7 +248,7 @@ async fn dod_46_version_mismatch_rejects_with_rejected_version_incompatible() {
     let req = sample_request(key, "v999.0.0");
 
     let (_returned_key, outcome) = client
-        .submit_invocation("ob-poc", req)
+        .submit_invocation("ob-poc", req, "test-authority".to_string())
         .await
         .expect("submit accepted into outbox");
     assert_eq!(outcome, InsertOutcome::Inserted);

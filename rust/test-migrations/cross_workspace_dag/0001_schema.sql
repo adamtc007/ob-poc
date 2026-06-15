@@ -94,33 +94,7 @@ CREATE TABLE IF NOT EXISTS "ob-poc".deals (
     )
 );
 
--- ─────────────────────────────────────────────────────────────────
--- booking_principal_clearances  (booking_principal workspace, slot=clearance)
--- state column = clearance_status
--- ─────────────────────────────────────────────────────────────────
-CREATE TABLE IF NOT EXISTS "ob-poc".booking_principal_clearances (
-    id uuid PRIMARY KEY,
-    booking_principal_id uuid NOT NULL,
-    deal_id uuid,
-    cbu_id uuid,
-    clearance_status varchar(20) DEFAULT 'PENDING' NOT NULL,
-    screening_started_at timestamp with time zone,
-    approved_at timestamp with time zone,
-    rejected_at timestamp with time zone,
-    rejection_reason text,
-    activated_at timestamp with time zone,
-    suspended_at timestamp with time zone,
-    revoked_at timestamp with time zone,
-    notes text,
-    created_at timestamp with time zone DEFAULT now(),
-    updated_at timestamp with time zone DEFAULT now(),
-    CONSTRAINT booking_principal_clearances_status_check CHECK (
-        clearance_status IN (
-            'PENDING','SCREENING','APPROVED','REJECTED',
-            'ACTIVE','SUSPENDED','REVOKED'
-        )
-    )
-);
+
 
 -- ─────────────────────────────────────────────────────────────────
 -- Phase 2 additions (2026-04-26)

@@ -1,0 +1,24 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO \"ob-poc\".cbu_ssi\n               (cbu_id, ssi_name, ssi_type, market_id, safekeeping_account, safekeeping_bic,\n                cash_account, cash_account_bic, cash_currency, status, effective_date)\n               VALUES ($1, $2, 'SECURITIES', $3, 'SAFE-001', 'IRVTUS3N',\n                       'CASH-001', 'IRVTUS3N', 'USD', 'ACTIVE', CURRENT_DATE)\n               RETURNING ssi_id",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "ssi_id",
+        "type_info": "Uuid"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Varchar",
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "7ad1aeeef1fd6b007ab6588f4e1f4228096d71925a136fbb32e7ca4d6a8af528"
+}

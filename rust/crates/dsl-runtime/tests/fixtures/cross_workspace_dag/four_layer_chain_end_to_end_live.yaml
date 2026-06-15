@@ -11,7 +11,6 @@ mode: live
 entity_aliases:
   deal-1:           "33333333-0000-0000-0000-000000000001"
   case-1:           "33333333-0000-0000-0000-000000000002"
-  bpc-1:            "33333333-0000-0000-0000-000000000003"
   cbu-1:            "33333333-0000-0000-0000-000000000004"
   client-group-1:   "33333333-0000-0000-0000-000000000005"
   consume-1:        "33333333-0000-0000-0000-000000000006"
@@ -20,7 +19,7 @@ entity_aliases:
   binding-1:        "33333333-0000-0000-0000-000000000009"
 
 initial_state:
-  # L1: Deal already CONTRACTED + KYC + BP green (test starts post-L1)
+  # L1: Deal already CONTRACTED + KYC green (test starts post-L1)
   - workspace: deal
     slot: deal
     entity: "deal-1"
@@ -35,13 +34,6 @@ initial_state:
     attrs:
       cbu_id: "alias:cbu-1"
       client_group_id: "alias:client-group-1"
-
-  - workspace: booking_principal
-    slot: clearance
-    entity: "bpc-1"
-    state: "ACTIVE"
-    attrs:
-      deal_id: "alias:deal-1"
 
   - workspace: cbu
     slot: cbu

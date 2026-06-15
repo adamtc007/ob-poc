@@ -52,9 +52,6 @@
 // Python script: 14 legacy execute blocks deleted, all cfg gates
 // stripped. Registration flows through inventory.
 // Phase 5e — board_ops relocated to `dsl-runtime::domain_ops::board_ops`
-// Phase 4 Slice B Group 3 — bods_ops relocated to `dsl-runtime::domain_ops::bods_ops`
-// alongside the `bods/` module it consumes.
-mod booking_principal_ops;
 mod bpmn_controller_ops;
 mod bpmn_lite_ops;
 mod catalogue_ops;
@@ -192,7 +189,6 @@ mod request_ops;
 // and refactoring `resource_set_attr_impl` to take a pre-resolved
 // `attribute_id: Uuid` (caller fetches the trait), the ob-poc surface
 // reduces to zero. Registration flows through inventory.
-pub mod rule_evaluator;
 mod workflow_ops;
 // Phase 5d — screening_ops relocated to `dsl-runtime::domain_ops::screening_ops`
 // Phase 5a composite-blocker #7 — sem_os_audit_ops relocated to
@@ -518,60 +514,6 @@ pub fn extend_registry(registry: &mut sem_os_postgres::ops::SemOsVerbOpRegistry)
     registry.register(Arc::new(gleif_ops::GleifResolveSuccessor));
     registry.register(Arc::new(gleif_ops::GleifImportToClientGroup));
     registry.register(Arc::new(gleif_ops::GleifLookup));
-
-    // Phase B Pattern B slice #78: booking_principal_ops (32 verbs —
-    // legal-entity / rule-field / booking-location / booking-principal
-    // / client-principal-relationship / service-availability / ruleset
-    // / rule / contract-pack). Bridges to
-    // crate::database::booking_principal_repository +
-    // crate::domain_ops::rule_evaluator; ob-poc API DTOs in
-    // crate::api::booking_principal_types stay in ob-poc.
-    registry.register(Arc::new(booking_principal_ops::LegalEntityCreate));
-    registry.register(Arc::new(booking_principal_ops::LegalEntityUpdate));
-    registry.register(Arc::new(booking_principal_ops::LegalEntityList));
-    registry.register(Arc::new(booking_principal_ops::RuleFieldRegister));
-    registry.register(Arc::new(booking_principal_ops::RuleFieldList));
-    registry.register(Arc::new(booking_principal_ops::BookingLocationCreate));
-    registry.register(Arc::new(booking_principal_ops::BookingLocationUpdate));
-    registry.register(Arc::new(booking_principal_ops::BookingLocationList));
-    registry.register(Arc::new(booking_principal_ops::BookingPrincipalCreate));
-    registry.register(Arc::new(booking_principal_ops::BookingPrincipalUpdate));
-    registry.register(Arc::new(booking_principal_ops::BookingPrincipalRetire));
-    registry.register(Arc::new(booking_principal_ops::BookingPrincipalEvaluate));
-    registry.register(Arc::new(booking_principal_ops::BookingPrincipalSelect));
-    registry.register(Arc::new(booking_principal_ops::BookingPrincipalExplain));
-    registry.register(Arc::new(
-        booking_principal_ops::BookingPrincipalCoverageMatrix,
-    ));
-    registry.register(Arc::new(booking_principal_ops::BookingPrincipalGapReport));
-    registry.register(Arc::new(
-        booking_principal_ops::BookingPrincipalImpactAnalysis,
-    ));
-    registry.register(Arc::new(
-        booking_principal_ops::ClientPrincipalRelationshipRecord,
-    ));
-    registry.register(Arc::new(
-        booking_principal_ops::ClientPrincipalRelationshipTerminate,
-    ));
-    registry.register(Arc::new(
-        booking_principal_ops::ClientPrincipalRelationshipList,
-    ));
-    registry.register(Arc::new(
-        booking_principal_ops::ClientPrincipalRelationshipCrossSellCheck,
-    ));
-    registry.register(Arc::new(booking_principal_ops::ServiceAvailabilitySet));
-    registry.register(Arc::new(booking_principal_ops::ServiceAvailabilityList));
-    registry.register(Arc::new(
-        booking_principal_ops::ServiceAvailabilityListByPrincipal,
-    ));
-    registry.register(Arc::new(booking_principal_ops::RulesetCreate));
-    registry.register(Arc::new(booking_principal_ops::RulesetPublish));
-    registry.register(Arc::new(booking_principal_ops::RulesetRetire));
-    registry.register(Arc::new(booking_principal_ops::RuleAdd));
-    registry.register(Arc::new(booking_principal_ops::RuleUpdate));
-    registry.register(Arc::new(booking_principal_ops::RuleDisable));
-    registry.register(Arc::new(booking_principal_ops::ContractPackCreate));
-    registry.register(Arc::new(booking_principal_ops::ContractPackAddTemplate));
 
     // Phase B Pattern B slice #79: trading-profile.* (36 verbs — full
     // draft→submit→approve→activate→materialize→archive lifecycle,

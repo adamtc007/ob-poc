@@ -5,7 +5,7 @@ description: |
 
     Phase 1 — Deal record created (PROSPECT entry)
     Phase 2 — Products added to deal (deal_product PROPOSED → AGREED)
-    Phase 3 — Deal progresses to CONTRACTED (KYC + BP gates)
+    Phase 3 — Deal progresses to CONTRACTED (KYC gate)
     Phase 4 — CBU created and validated (KYC gate)
     Phase 5 — CBU subscribes to deal's contracted products
               (service_consumption per (cbu, service))
@@ -18,9 +18,8 @@ description: |
   Each phase mutates state to advance the world, then check_transitions
   to verify the cross-workspace gates fire (or pass) as expected.
 
-  Walks 5 cross-workspace constraints:
+  Walks 4 cross-workspace constraints:
     - deal_contracted_requires_kyc_approved      (L1)
-    - deal_contracted_requires_bp_approved        (L1)
     - cbu_validated_requires_kyc_case_approved    (L2)
     - service_consumption_requires_deal_contracted (L2→L1, R4)
     - service_consumption_requires_active_service (L2→L3, R2)
@@ -30,7 +29,6 @@ entity_aliases:
   # Phase 1+3: deal + tollgate sources
   deal-1:    "11111111-0000-0000-0000-000000000001"
   case-1:    "11111111-0000-0000-0000-000000000002"
-  bpc-1:     "11111111-0000-0000-0000-000000000003"
   # Phase 2: products on the deal
   product-custody:   "11111111-0000-0000-0000-000000000010"
   product-fa:        "11111111-0000-0000-0000-000000000011"
@@ -54,8 +52,6 @@ predicates:
   # L1: Deal CONTRACTED gates
   "cases.client_group_id = this_deal.primary_client_group_id":
     - { target: "deal-1", source: "case-1" }
-  "booking_principal_clearances.deal_id = this_deal.deal_id":
-    - { target: "deal-1", source: "bpc-1" }
   # L2: CBU VALIDATED gate (cases.sponsor_cbu_id OR cases.client_group_id)
   "cases.sponsor_cbu_id = this_cbu.cbu_id OR cases.client_group_id = this_cbu.primary_client_group_id":
     - { target: "cbu-1", source: "case-1" }
@@ -77,9 +73,8 @@ predicates:
 # ---------------------------------------------------------------------------
 initial_state:
   - { workspace: deal,              slot: deal,      entity: "deal-1", state: "PROSPECT" }
-  # KYC + BP exist but not yet APPROVED
+  # KYC exists but not yet APPROVED
   - { workspace: kyc,               slot: kyc_case,  entity: "case-1", state: "INTAKE" }
-  - { workspace: booking_principal, slot: clearance, entity: "bpc-1",  state: "PENDING" }
 
 steps:
   # ────────────────────────────────────────────────────────────────────────
@@ -112,9 +107,9 @@ steps:
       - { workspace: deal, slot: deal, entity: "deal-1", state: "IN_CLEARANCE" }
 
   # ────────────────────────────────────────────────────────────────────────
-  # PHASE 3: Deal CONTRACTED — compound BAC+KYC+BP tollgate fires.
+  # PHASE 3: Deal CONTRACTED — compound BAC+KYC tollgate fires.
   # ────────────────────────────────────────────────────────────────────────
-  - name: "P3: deal CONTRACTED BLOCKED — KYC + BP both pending"
+  - name: "P3: deal CONTRACTED BLOCKED — KYC pending"
     check_transition:
       workspace: deal
       slot: deal
@@ -124,13 +119,11 @@ steps:
     expect:
       violations:
         - { constraint_id: "deal_contracted_requires_kyc_approved",  severity: "error" }
-        - { constraint_id: "deal_contracted_requires_bp_approved",   severity: "error" }
 
   - mutate:
       - { workspace: kyc,               slot: kyc_case,  entity: "case-1", state: "APPROVED" }
-      - { workspace: booking_principal, slot: clearance, entity: "bpc-1",  state: "ACTIVE"  }
 
-  - name: "P3: deal CONTRACTED GREEN — both tollgates satisfied"
+  - name: "P3: deal CONTRACTED GREEN — tollgate satisfied"
     check_transition:
       workspace: deal
       slot: deal

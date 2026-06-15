@@ -121,8 +121,6 @@ slots:
       tax_deactivate_reclaim: { verb: tax-config.deactivate-reclaim, when: filled }
       tax_reporting: { verb: tax-config.set-reporting, when: filled }
       tax_list_reporting: tax-config.list-reporting
-      # Booking
-      booking_loc_update: { verb: booking-location.update, when: filled }
       # CBU custody
       custody_setup_ssi: { verb: cbu-custody.setup-ssi, when: [empty, filled] }
       custody_lookup_ssi: cbu-custody.lookup-ssi

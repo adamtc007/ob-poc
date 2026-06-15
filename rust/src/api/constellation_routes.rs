@@ -598,7 +598,6 @@ fn build_action_hints(workspace: &WorkspaceKind, verbs: &[VerbRef]) -> Vec<Actio
             WorkspaceKind::OnBoarding => "Review onboarding handoff",
             WorkspaceKind::SemOsMaintenance => "Review registry governance",
             WorkspaceKind::LifecycleResources => "Review lifecycle resources",
-            WorkspaceKind::BookingPrincipal => "Review booking principal clearances",
             WorkspaceKind::Bpmn => "Review BPMN workflows",
         };
         hints.push(ActionHint {

@@ -46,7 +46,6 @@ pub enum SessionWorkspaceKind {
     #[serde(rename = "semos_maintenance")]
     SemOsMaintenance,
     LifecycleResources,
-    BookingPrincipal,
     Bpmn,
 }
 

@@ -35,7 +35,6 @@ ob-poc-journey = { path = "crates/ob-poc-journey" }     # Pack-guided workflows 
 # original ob-poc-domain crate was deleted in Slice D (2026-05-14).
 ob-poc-bods = { path = "crates/ob-poc-bods" }
 ob-poc-deal = { path = "crates/ob-poc-deal" }
-ob-poc-booking-principal = { path = "crates/ob-poc-booking-principal" }
 ob-poc-semtaxonomy = { path = "crates/ob-poc-semtaxonomy" }
 ob-poc-ontology = { path = "crates/ob-poc-ontology" }
 ob-poc-entity-linking = { path = "crates/ob-poc-entity-linking" }
@@ -298,7 +297,6 @@ members = [
     # the original ob-poc-domain crate (which was deleted 2026-05-14).
     "crates/ob-poc-bods",
     "crates/ob-poc-deal",
-    "crates/ob-poc-booking-principal",
     "crates/ob-poc-semtaxonomy",
     "crates/ob-poc-ontology",
     "crates/ob-poc-entity-linking",

@@ -182,7 +182,7 @@ async fn b3_03_full_happy_path() {
 
     let case_id = Uuid::new_v4().to_string();
     let result = serde_json::json!({ "case_id": case_id });
-    let (res_canonical, res_hash) = canonical_json_with_hash(&result);
+    let (res_canonical, _res_hash) = canonical_json_with_hash(&result);
     client
         .complete_job(CompleteJobRequest {
             job_key: jobs[0].job_key.clone(),
@@ -202,7 +202,8 @@ async fn b3_03_full_happy_path() {
         .expect("ActivateJobs failed");
     assert_eq!(jobs.len(), 1, "Expected 1 request_documents job");
 
-    let (res_canonical, res_hash) = canonical_json_with_hash(&serde_json::json!({ "case_id": case_id }));
+    let (res_canonical, _res_hash) =
+        canonical_json_with_hash(&serde_json::json!({ "case_id": case_id }));
     client
         .complete_job(CompleteJobRequest {
             job_key: jobs[0].job_key.clone(),
@@ -237,7 +238,7 @@ async fn b3_03_full_happy_path() {
         .expect("ActivateJobs failed");
     assert_eq!(jobs.len(), 1, "Expected 1 reviewer_decision job");
 
-    let (res_canonical, res_hash) =
+    let (res_canonical, _res_hash) =
         canonical_json_with_hash(&serde_json::json!({ "decision": "approved" }));
     client
         .complete_job(CompleteJobRequest {
@@ -258,7 +259,7 @@ async fn b3_03_full_happy_path() {
         .expect("ActivateJobs failed");
     assert_eq!(jobs.len(), 1, "Expected 1 record_decision job");
 
-    let (res_canonical, res_hash) = canonical_json_with_hash(&serde_json::json!({}));
+    let (res_canonical, _res_hash) = canonical_json_with_hash(&serde_json::json!({}));
     client
         .complete_job(CompleteJobRequest {
             job_key: jobs[0].job_key.clone(),
@@ -462,7 +463,7 @@ async fn b3_07_crash_recovery() {
         .expect("ActivateJobs failed");
     assert_eq!(jobs.len(), 1);
 
-    let (res_canonical, res_hash) =
+    let (res_canonical, _res_hash) =
         canonical_json_with_hash(&serde_json::json!({ "case_id": "test-case" }));
     client
         .complete_job(CompleteJobRequest {
@@ -695,7 +696,7 @@ async fn b3_10_stream_disconnect_redeliver() {
     );
 
     // Cleanup: complete and cancel.
-    let (res_canonical, res_hash) = canonical_json_with_hash(&serde_json::json!({}));
+    let (res_canonical, _res_hash) = canonical_json_with_hash(&serde_json::json!({}));
     let _ = client
         .complete_job(CompleteJobRequest {
             job_key: jobs[0].job_key.clone(),

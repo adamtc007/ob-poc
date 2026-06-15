@@ -252,8 +252,7 @@ impl JobWorker {
             }
             crate::sequencer::DslExecutionOutcome::Failed(err) => {
                 // 5b. Failure — fail the job via gRPC.
-                self.fail_job_rpc(&job, "VERB_EXECUTION_ERROR", &err)
-                    .await;
+                self.fail_job_rpc(&job, "VERB_EXECUTION_ERROR", &err).await;
 
                 // Check if this job has exceeded the maximum retry count.
                 // If so, promote to dead-letter queue instead of just marking failed.

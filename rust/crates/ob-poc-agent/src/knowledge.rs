@@ -179,7 +179,6 @@ fn workspace_label(workspace: &ob_poc_types::session::kinds::WorkspaceKind) -> S
         WorkspaceKind::Kyc => "kyc".to_string(),
         WorkspaceKind::Deal => "deal".to_string(),
         WorkspaceKind::InstrumentMatrix => "instrument-matrix".to_string(),
-        WorkspaceKind::BookingPrincipal => "booking-principal".to_string(),
         WorkspaceKind::LifecycleResources => "lifecycle-resources".to_string(),
         WorkspaceKind::ProductMaintenance => "product-maintenance".to_string(),
         WorkspaceKind::SemOsMaintenance => "sem-os-maintenance".to_string(),

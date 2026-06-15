@@ -1483,10 +1483,10 @@ domains:
             type: uuid
             required: false
             maps_to: product_id
-          - name: service-id
+          - name: service-attribute-id
             type: uuid
             required: false
-            maps_to: service_id
+            maps_to: service_attribute_id
           - name: sla-name
             type: string
             required: true

@@ -1,7 +1,7 @@
 constellation: deal.workspace
 description: >
   Deal workspace root — cross-cutting deal verbs and domains not hosted
-  on deal_lifecycle slots (pricing config, client-principal relationships).
+  on deal_lifecycle slots (pricing config).
 jurisdiction: ALL
 slots:
   workspace_root:
@@ -22,13 +22,6 @@ slots:
       pricing_valuation: pricing-config.list-valuation-schedules
       pricing_stale_list: pricing-config.list-stale-policies
       pricing_stale_set: { verb: pricing-config.set-stale-policy, when: filled }
-      # Client-principal relationships
-      cpr_record: { verb: client-principal-relationship.record, when: [empty, filled] }
-      cpr_list: client-principal-relationship.list
-      cpr_terminate: { verb: client-principal-relationship.terminate, when: filled }
-      cpr_cross_sell: client-principal-relationship.cross-sell-check
-      # Contract pack
-      contract_pack_add: { verb: contract-pack.add-template, when: filled }
       onboarding_compile_data_request: { verb: onboarding.compile-data-request, when: filled }
       onboarding_list_data_requests: onboarding.list-data-requests
       onboarding_get_data_request: onboarding.get-data-request

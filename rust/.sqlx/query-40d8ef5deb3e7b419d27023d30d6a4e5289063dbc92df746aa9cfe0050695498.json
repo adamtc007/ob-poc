@@ -1,0 +1,28 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            SELECT right_type, notes\n            FROM \"ob-poc\".special_rights\n            WHERE share_class_id = $1\n            ORDER BY right_type\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "right_type",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 1,
+        "name": "notes",
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      true
+    ]
+  },
+  "hash": "40d8ef5deb3e7b419d27023d30d6a4e5289063dbc92df746aa9cfe0050695498"
+}

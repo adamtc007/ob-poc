@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "DELETE FROM \"ob-poc\".holdings WHERE share_class_id = $1",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "b2580c9fb2f85fac7b3ab8cc8214a2b75b7251d7a357bc120106a121cebcf9b9"
+}

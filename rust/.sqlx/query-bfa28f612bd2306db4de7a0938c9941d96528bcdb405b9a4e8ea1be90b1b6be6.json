@@ -1,0 +1,34 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            SELECT event_type, units_delta, notes\n            FROM \"ob-poc\".issuance_events\n            WHERE share_class_id = $1\n            ORDER BY effective_date, created_at\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "event_type",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 1,
+        "name": "units_delta",
+        "type_info": "Numeric"
+      },
+      {
+        "ordinal": 2,
+        "name": "notes",
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      true
+    ]
+  },
+  "hash": "bfa28f612bd2306db4de7a0938c9941d96528bcdb405b9a4e8ea1be90b1b6be6"
+}

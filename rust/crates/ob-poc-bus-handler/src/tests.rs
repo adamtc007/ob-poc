@@ -41,6 +41,8 @@ fn ctx(verb: &str) -> InvocationContext {
         catalogue_version: "v1.0.0".into(),
         local_verb_id: verb.into(),
         result_callback_endpoint: "http://bpmn-lite/result".into(),
+        authority: None,
+        tenant_id: "test-tenant".into(),
     }
 }
 

@@ -18,7 +18,7 @@
 #   G-5  SUSPENDED state on deal (V1.3-4 universal)
 #   G-7  deal_sla promoted from stateless to stateful
 #   G-8  Internal accountability attributes on deal (sponsor_entity_id,
-#        rm_entity_id, coverage_banker_entity_id) — documented here;
+#        rm_entity_id) — documented here;
 #        schema migration deferred to Tranche 3
 #   G-10 Commercial-vs-operational dual_lifecycle documented via the
 #        deal.dual_lifecycle chain (primary = commercial, secondary =
@@ -38,7 +38,7 @@
 #   - Expand deal_rate_cards_status_check with PENDING_INTERNAL_APPROVAL,
 #     APPROVED_INTERNALLY
 #   - Add deal_slas.sla_status column + CHECK
-#   - Add deals.sponsor_entity_id / rm_entity_id / coverage_banker_entity_id
+#   - Add deals.sponsor_entity_id / rm_entity_id
 #
 # ============================================================================
 # WORKSPACE IDENTITY (v1.3 spec §5.1 framing):
@@ -272,11 +272,10 @@ slots:
       review_scope: full
     # G-8: Internal accountability documented at DAG level. Schema
     # migration deferred (Tranche 3) — adds deals.sponsor_entity_id,
-    # rm_entity_id, coverage_banker_entity_id columns.
+    # rm_entity_id columns.
     internal_accountability:
       sponsor: "deals.sponsor_entity_id (FK → entities; commercial owner on our side)"
       relationship_manager: "deals.rm_entity_id (FK → entities; owns client relationship)"
-      coverage_banker: "deals.coverage_banker_entity_id (FK → entities; cross-sell owner)"
     state_machine:
       id: deal_commercial_lifecycle
       owner: "sales+BAC"                 # V1.3-5 governance artefact
@@ -313,13 +312,6 @@ slots:
         - entity: kyc_case
           source_kind: dag_entity
           scope: parent kyc_case
-        - entity: booking_principal_clearance
-          source_kind: dag_entity
-          source_entity: booking_principal_clearance
-          scope: attached_to this deal
-          required_universe:
-            source_kind: dag_entity
-            source_entity: booking_principal_clearance_requirement
         - entity: deal_contract
           source_kind: dag_entity
           scope: attached_to this deal
@@ -358,8 +350,6 @@ slots:
             AND deal.kyc_clearance_status = approved
             AND parent kyc_case exists
             AND parent kyc_case.state = APPROVED
-            AND every booking_principal_clearance exists
-            AND every booking_principal_clearance.state in {APPROVED, ACTIVE}
             AND deal_contract exists
             AND deal_contract.state in {DRAFT, EXECUTED}
             AND every deal_rate_card exists
@@ -940,12 +930,7 @@ slots:
       jurisdiction). Changes are create/update/deactivate; no multi-state
       lifecycle beyond active/deactivated flag.
 
-  - id: client_principal_relationship
-    stateless: true
-    rationale: |
-      Cross-reference between clients and principals for sales-ops
-      reporting. Reference data; record/terminate/cross-sell-check.
-      No lifecycle.
+
 
   - id: contract_template
     stateless: true
@@ -1107,25 +1092,7 @@ cross_workspace_constraints:
   # See cross_slot_constraints above.
 
   # R3.5 (2026-04-26): compound BAC+KYC+BP gate — third leg.
-  # Deal cannot progress IN_CLEARANCE → CONTRACTED unless every
-  # booking-principal clearance attached to this deal is APPROVED or
-  # ACTIVE. BP was hoisted into its own workspace (booking_principal_dag)
-  # specifically so this gate can be expressed inter-workspace and
-  # dispatched by GateChecker at runtime.
-  - id: deal_contracted_requires_bp_approved
-    description: |
-      Deal → CONTRACTED requires every booking-principal clearance
-      attached to this deal to be in APPROVED or ACTIVE state. Third
-      leg of Adam's deal tollgate triad (BAC + KYC + BP).
-      Q4/Q21 (b) (2026-04-29, D-004): retargeted to IN_CLEARANCE.
-    source_workspace: booking_principal
-    source_slot: clearance
-    source_state: [APPROVED, ACTIVE]
-    source_predicate: "booking_principal_clearances.deal_id = this_deal.deal_id"
-    target_workspace: deal
-    target_slot: deal
-    target_transition: "IN_CLEARANCE -> CONTRACTED"
-    severity: error
+
 
 
 # =============================================================================
@@ -1147,7 +1114,6 @@ product_module_gates:
     - deal_onboarding_request
     - deal_document
     - deal_ubo_assessment
-    # booking_principal_clearance hoisted to booking_principal workspace (R3.5)
     - deal_participant
     - deal_contract
     - deal_sla
@@ -1155,7 +1121,6 @@ product_module_gates:
     - billing_period
     - billing_account_target
     - pricing_config
-    - client_principal_relationship
     - contract_template
     - client_group
     - group_kyc_clearance

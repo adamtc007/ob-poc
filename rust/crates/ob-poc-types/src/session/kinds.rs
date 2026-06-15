@@ -29,7 +29,6 @@ pub enum WorkspaceKind {
     #[serde(rename = "semos_maintenance")]
     SemOsMaintenance,
     LifecycleResources,
-    BookingPrincipal,
     Bpmn,
 }
 
@@ -46,7 +45,6 @@ impl WorkspaceKind {
             Self::OnBoarding => "OnBoarding",
             Self::SemOsMaintenance => "SemOS Maintenance",
             Self::LifecycleResources => "Lifecycle Resources",
-            Self::BookingPrincipal => "Booking Principal",
             Self::Bpmn => "BPMN",
         }
     }
@@ -178,16 +176,6 @@ impl WorkspaceKind {
                 default_constellation_map: "lifecycle.resources",
                 supports_handoff_mode: false,
             },
-            Self::BookingPrincipal => WorkspaceRegistryEntry {
-                workspace_id: self.clone(),
-                display_name: self.label(),
-                constellation_families: vec!["booking_principal_workspace", "deal_governance"],
-                subject_kinds: vec![],
-                subject_required: false,
-                default_constellation_family: "deal_governance",
-                default_constellation_map: "deal.booking_principal",
-                supports_handoff_mode: false,
-            },
             Self::Bpmn => WorkspaceRegistryEntry {
                 workspace_id: self.clone(),
                 display_name: self.label(),
@@ -213,7 +201,6 @@ impl WorkspaceKind {
             Self::OnBoarding,
             Self::SemOsMaintenance,
             Self::LifecycleResources,
-            Self::BookingPrincipal,
             Self::Bpmn,
         ]
     }
@@ -266,13 +253,7 @@ impl WorkspaceKind {
         {
             return Some(Self::LifecycleResources);
         }
-        if msg.contains("booking principal") || msg.contains("bp clearance") {
-            return Some(Self::BookingPrincipal);
-        }
-        if msg.contains("bpmn")
-            || msg.contains("workflow")
-            || msg.contains("orchestration")
-        {
+        if msg.contains("bpmn") || msg.contains("workflow") || msg.contains("orchestration") {
             return Some(Self::Bpmn);
         }
         None

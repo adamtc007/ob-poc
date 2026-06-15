@@ -1885,9 +1885,16 @@ impl ReplOrchestratorV2 {
                 if infra_options.iter().any(|opt| opt.workspace == workspace) {
                     session.set_client_scope(Uuid::nil());
                     session.name = Some("SemOS Infrastructure".to_string());
-                    self.handle_workspace_selection(session, UserInputV2::SelectWorkspace { workspace }).await
+                    self.handle_workspace_selection(
+                        session,
+                        UserInputV2::SelectWorkspace { workspace },
+                    )
+                    .await
                 } else {
-                    self.invalid_input(session, "Please select a client group first for this workspace.")
+                    self.invalid_input(
+                        session,
+                        "Please select a client group first for this workspace.",
+                    )
                 }
             }
             UserInputV2::Message { content } => {
@@ -2128,13 +2135,7 @@ impl ReplOrchestratorV2 {
         {
             return Some(WorkspaceKind::LifecycleResources);
         }
-        if lower.contains("booking principal") || lower.contains("bp clearance") {
-            return Some(WorkspaceKind::BookingPrincipal);
-        }
-        if lower.contains("bpmn")
-            || lower.contains("workflow")
-            || lower.contains("orchestration")
-        {
+        if lower.contains("bpmn") || lower.contains("workflow") || lower.contains("orchestration") {
             return Some(WorkspaceKind::Bpmn);
         }
         if lower.contains("instrument") || lower.contains("matrix") || lower.contains("trading") {
@@ -3693,11 +3694,6 @@ impl ReplOrchestratorV2 {
                 label: WorkspaceKind::LifecycleResources.label().to_string(),
                 description: "Platform resources, application instances, and capability bindings"
                     .to_string(),
-            },
-            WorkspaceOption {
-                workspace: WorkspaceKind::BookingPrincipal,
-                label: WorkspaceKind::BookingPrincipal.label().to_string(),
-                description: "Booking principal clearance governance".to_string(),
             },
             WorkspaceOption {
                 workspace: WorkspaceKind::Bpmn,

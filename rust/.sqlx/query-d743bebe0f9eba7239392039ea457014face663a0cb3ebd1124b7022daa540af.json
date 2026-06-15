@@ -1,0 +1,34 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            SELECT scheme_code, identifier_value, is_primary\n            FROM \"ob-poc\".share_class_identifiers\n            WHERE share_class_id = $1\n            ORDER BY is_primary DESC, scheme_code\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "scheme_code",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 1,
+        "name": "identifier_value",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 2,
+        "name": "is_primary",
+        "type_info": "Bool"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      true
+    ]
+  },
+  "hash": "d743bebe0f9eba7239392039ea457014face663a0cb3ebd1124b7022daa540af"
+}

@@ -1,0 +1,23 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        INSERT INTO \"ob-poc\".ssi_booking_rules (\n            cbu_id, ssi_id, rule_name, priority\n        )\n        VALUES ($1, $2, 'Catch-All Rule', 100)\n        RETURNING rule_id\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "rule_id",
+        "type_info": "Uuid"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "f33ad06883b665a5787284b73e16bf08b4195f0e3ceedc1ed587a5441e6199a4"
+}

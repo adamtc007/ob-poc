@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "DELETE FROM \"ob-poc\".cbu_entity_roles WHERE cbu_id = $1",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "448d2039f891679a2d0bcf01dc66c7bed91ad84a9a21747470e6c462590effb6"
+}

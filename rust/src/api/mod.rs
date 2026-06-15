@@ -6,13 +6,6 @@
 #[cfg(feature = "server")]
 pub mod attribute_routes;
 
-// ob-poc-domain split v1 Slice A3 (2026-05-14): booking_principal_types now
-// lives in `ob-poc-booking-principal`. Compat re-export keeps
-// `crate::api::booking_principal_types::*` working for the 4 ob-poc
-// consumers (booking_principal_repository, rule_evaluator,
-// booking_principal_ops, plus this module).
-pub use ob_poc_booking_principal as booking_principal_types;
-
 #[cfg(feature = "server")]
 pub mod agent_types;
 

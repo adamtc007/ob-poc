@@ -1,0 +1,38 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT r.ssi_id, r.rule_name, s.ssi_name\n        FROM \"ob-poc\".ssi_booking_rules r\n        JOIN \"ob-poc\".cbu_ssi s ON s.ssi_id = r.ssi_id\n        WHERE r.cbu_id = $1\n          AND r.is_active = true\n          AND s.status = 'ACTIVE'\n          AND (r.instrument_class_id IS NULL OR r.instrument_class_id = $2)\n          AND (r.market_id IS NULL OR r.market_id = $3)\n          AND (r.currency IS NULL OR r.currency = $4)\n          AND (r.settlement_type IS NULL OR r.settlement_type = $5)\n        ORDER BY r.priority ASC, r.specificity_score DESC\n        LIMIT 1\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "ssi_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "rule_name",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 2,
+        "name": "ssi_name",
+        "type_info": "Varchar"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Uuid",
+        "Text",
+        "Text"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "a061fec94298aea95c65b666f873a2201cb48aa539ab45731b1fd3c39baa1cd7"
+}

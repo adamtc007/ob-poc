@@ -1658,7 +1658,7 @@ impl SemOsVerbOp for AddSla {
         let deal_id = json_extract_uuid(args, ctx, "deal-id")?;
         let contract_id = json_extract_uuid_opt(args, ctx, "contract-id");
         let product_id = json_extract_uuid_opt(args, ctx, "product-id");
-        let service_id = json_extract_uuid_opt(args, ctx, "service-id");
+        let service_attribute_id = json_extract_uuid_opt(args, ctx, "service-attribute-id");
         let sla_name = json_extract_string(args, "sla-name")?;
         let sla_type = json_extract_string_opt(args, "sla-type");
         let metric_name = json_extract_string(args, "metric-name")?;
@@ -1671,7 +1671,7 @@ impl SemOsVerbOp for AddSla {
         let sla_id: Uuid = sqlx::query_scalar(
             r#"
             INSERT INTO "ob-poc".deal_slas (
-                deal_id, contract_id, product_id, service_id,
+                deal_id, contract_id, product_id, service_attribute_id,
                 sla_name, sla_type, metric_name, target_value, measurement_unit,
                 penalty_type, penalty_value, effective_from
             )
@@ -1682,7 +1682,7 @@ impl SemOsVerbOp for AddSla {
         .bind(deal_id)
         .bind(contract_id)
         .bind(product_id)
-        .bind(service_id)
+        .bind(service_attribute_id)
         .bind(&sla_name)
         .bind(&sla_type)
         .bind(&metric_name)

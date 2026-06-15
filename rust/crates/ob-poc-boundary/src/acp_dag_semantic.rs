@@ -1661,10 +1661,18 @@ fn score_rows(
     pack: Option<&ScoredPack>,
 ) -> Vec<ScoredRow> {
     let pack_allowed_verbs = pack.map(|pack| &pack.row.projection.indexing.allowed_verbs);
+    let pack_forbidden_verbs = pack.map(|pack| &pack.row.projection.context.forbidden_verbs);
     let mut scored = index
         .rows
         .iter()
-        .filter_map(|row| score_row(row, utterance, pack_allowed_verbs))
+        .filter_map(|row| {
+            score_row(
+                row,
+                utterance,
+                pack_allowed_verbs,
+                pack_forbidden_verbs.map(|v| v.as_slice()),
+            )
+        })
         .filter(|row| row.score >= MATCH_THRESHOLD)
         .collect::<Vec<_>>();
     scored.sort_by(|left, right| {
@@ -2015,6 +2023,7 @@ fn score_row(
     row: &AcpDagVerbRow,
     utterance: &str,
     pack_allowed_verbs: Option<&BTreeSet<String>>,
+    pack_forbidden_verbs: Option<&[String]>,
 ) -> Option<ScoredRow> {
     let normalized_utterance = normalize_text(utterance);
     let utterance_tokens = tokens(&normalized_utterance);
@@ -2053,7 +2062,15 @@ fn score_row(
     best_score += onboarding_data_request_boost(row, &utterance_tokens, &normalized_utterance);
     best_score += product_service_taxonomy_boost(row, &utterance_tokens, &normalized_utterance);
     if let Some(allowed_verbs) = pack_allowed_verbs {
-        if allowed_verbs.contains(&row.fqn) {
+        let is_allowed = allowed_verbs.contains(&row.fqn);
+        let is_forbidden = pack_forbidden_verbs
+            .map(|forbidden| {
+                forbidden.iter().any(|v| {
+                    v == &row.fqn || (v == "cbu.delete" && row.fqn.starts_with("cbu.delete"))
+                })
+            })
+            .unwrap_or(false);
+        if is_allowed || is_forbidden {
             best_score += 0.55;
         } else {
             best_score *= 0.35;

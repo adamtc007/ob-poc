@@ -1,0 +1,24 @@
+# Cargo configuration for Docker builds inside /build
+# Uses local directories for path dependencies rather than trying to fetch from GitHub.
+
+[patch."https://github.com/adamtc007/dsl"]
+dsl_types       = { path = "/build/dsl/crates/dsl_types" }
+dsl-core        = { path = "/build/dsl/crates/dsl-core" }
+sem_os_types    = { path = "/build/dsl/crates/sem_os_types" }
+sem_os_core     = { path = "/build/dsl/crates/sem_os_core" }
+sem_os_ontology = { path = "/build/dsl/crates/sem_os_ontology" }
+sem_os_policy   = { path = "/build/dsl/crates/sem_os_policy" }
+
+[patch."https://github.com/adamtc007/bpmn-lite"]
+bpmn-lite-engine   = { path = "/build/bpmn-lite/bpmn-lite-engine" }
+bpmn-lite-store    = { path = "/build/bpmn-lite/bpmn-lite-store" }
+bpmn-lite-server   = { path = "/build/bpmn-lite/bpmn-lite-server" }
+bpmn-lite-ffi-http = { path = "/build/bpmn-lite/bpmn-lite-ffi-http" }
+bpmn-lite-ffi-grpc = { path = "/build/bpmn-lite/bpmn-lite-ffi-grpc" }
+ffi-catalogue      = { path = "/build/bpmn-lite/ffi-catalogue" }
+dmn-lite-bridge    = { path = "/build/bpmn-lite/dmn-lite-bridge" }
+dsl-bus-client     = { path = "/build/bpmn-lite/dsl-bus-client" }
+dsl-bus-server     = { path = "/build/bpmn-lite/dsl-bus-server" }
+dsl-bus-storage    = { path = "/build/bpmn-lite/dsl-bus-storage" }
+dsl-bus-protocol   = { path = "/build/bpmn-lite/dsl-bus-protocol" }
+dsl-manifest       = { path = "/build/bpmn-lite/dsl-manifest" }

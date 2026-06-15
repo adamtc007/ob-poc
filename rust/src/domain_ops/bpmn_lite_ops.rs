@@ -509,4 +509,3 @@ impl SemOsVerbOp for BpmnBoundaryError {
         Ok(VerbExecutionOutcome::Void)
     }
 }
-

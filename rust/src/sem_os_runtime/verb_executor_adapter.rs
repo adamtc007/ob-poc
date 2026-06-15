@@ -165,15 +165,13 @@ impl VerbExecutionPort for ObPocVerbExecutor {
                 let pool = self.executor.pool();
 
                 let mut args = args;
-                if let Some(pre_fetched) = op
-                    .pre_fetch(&args, ctx, pool)
-                    .await
-                    .map_err(|e| SemOsError::Internal(anyhow::anyhow!(
+                if let Some(pre_fetched) = op.pre_fetch(&args, ctx, pool).await.map_err(|e| {
+                    SemOsError::Internal(anyhow::anyhow!(
                         "sem_os_ops({}) pre_fetch failed: {}",
                         verb_fqn,
                         e
-                    )))?
-                {
+                    ))
+                })? {
                     if let (Some(existing_obj), serde_json::Value::Object(pf_obj)) =
                         (args.as_object_mut(), pre_fetched)
                     {

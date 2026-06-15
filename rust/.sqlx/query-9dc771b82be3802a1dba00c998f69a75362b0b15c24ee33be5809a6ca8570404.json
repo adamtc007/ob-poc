@@ -1,0 +1,40 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT s.ssi_id, s.ssi_name, s.market_id, m.mic\n               FROM \"ob-poc\".cbu_ssi s\n               LEFT JOIN \"ob-poc\".markets m ON s.market_id = m.market_id\n               WHERE s.ssi_id = $1",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "ssi_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "ssi_name",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 2,
+        "name": "market_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 3,
+        "name": "mic",
+        "type_info": "Varchar"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      true,
+      false
+    ]
+  },
+  "hash": "9dc771b82be3802a1dba00c998f69a75362b0b15c24ee33be5809a6ca8570404"
+}

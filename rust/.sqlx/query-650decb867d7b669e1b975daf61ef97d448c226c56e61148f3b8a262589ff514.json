@@ -1,0 +1,24 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            INSERT INTO \"ob-poc\".dilution_instruments (\n                issuer_entity_id, converts_to_share_class_id, instrument_type,\n                holder_entity_id, units_granted, exercise_price, exercise_currency,\n                vesting_start_date, vesting_end_date, vesting_cliff_months,\n                expiration_date, plan_name, status\n            ) VALUES (\n                $1, $2, 'STOCK_OPTION',\n                $3, 10000, 1.50, 'USD',\n                CURRENT_DATE, CURRENT_DATE + INTERVAL '4 years', 12,\n                CURRENT_DATE + INTERVAL '10 years', 'Employee Option Plan 2024', 'ACTIVE'\n            )\n            RETURNING instrument_id\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "instrument_id",
+        "type_info": "Uuid"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "650decb867d7b669e1b975daf61ef97d448c226c56e61148f3b8a262589ff514"
+}

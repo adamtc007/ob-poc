@@ -30,9 +30,8 @@ use crate::state::AppState;
 use ob_poc::api::{
     create_agent_router_with_semantic_and_repl, create_attribute_router,
     create_constellation_router, create_deal_router, create_dsl_viewer_router,
-    create_entity_router, create_graph_router, create_session_graph_router,
-    create_session_store, create_trading_matrix_router,
-    observatory_routes::create_observatory_router,
+    create_entity_router, create_graph_router, create_session_graph_router, create_session_store,
+    create_trading_matrix_router, observatory_routes::create_observatory_router,
 };
 
 // Import gateway resolver for resolution routes
@@ -873,8 +872,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .allow_origin(Any)
         .allow_methods(Any)
         .allow_headers(Any);
-
-
 
     // =========================================================================
     // SemOS plugin op registry — canonical home for every plugin verb

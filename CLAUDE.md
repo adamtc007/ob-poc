@@ -316,6 +316,23 @@ Session = Set<CBU>
   Clusters/galaxies are DERIVED from these edges, not stored
 ```
 
+### Three Investment Registers & Share Nomenclature
+
+A single share structure underpins three distinct analytical projections (Registers) depending on the context:
+
+1. **`control_interest`** $\rightarrow$ UBO / Controller KYC
+   * *Question:* Who controls the Asset Owner (AO)?
+   * *Basis:* Projected with `basis = 'VOTES'`.
+   * *Key components:* `control_edges`, `cbu_board_controller`, `entity_ubos` (triggers KYC/UBO flow at $\ge$ 25%).
+2. **`economic_participant`** $\rightarrow$ Investor AML / Source of Funds / Eligibility
+   * *Question:* Who participates economically in the AO?
+   * *Basis:* Projected with `basis = 'ECONOMIC'`.
+   * *Key components:* `kyc.investors` (lifecycle), `kyc.holdings` (`usage_type = 'TA'`), `kyc.movements` (transaction ledger).
+3. **`portfolio_holding`** $\rightarrow$ Asset Eligibility / Sanctions / Market / Custody / Look-Through Policy
+   * *Question:* What does the AO hold?
+   * *Key components:* `kyc.fund_vehicles`, `kyc.fund_compartments`, `kyc.investor_role_profiles` (look-through policy).
+   * *Computation:* Bounded recursive CTE `kyc.fn_compute_economic_exposure()`.
+
 - **ViewMode:** Unit struct — always TRADING. Use `view.cbu :mode ubo` for KYC/UBO.
 - **GraphScope:** `Empty | SingleCbu | Book | Jurisdiction | EntityNeighborhood | Custom`
 - **Session = Run Sheet = Viewport Scope:** Session is single source of truth. `entity_scope.cbu_ids` drives the viewport. Run sheet tracks per-statement `DslStatus`: Draft → Ready → Executing → Executed → Failed → Cancelled.

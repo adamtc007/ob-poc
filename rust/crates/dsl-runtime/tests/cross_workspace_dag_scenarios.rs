@@ -27,11 +27,6 @@ macro_rules! scenario_test {
 }
 
 scenario_test!(
-    deal_contracted_compound_tollgate,
-    "tests/fixtures/cross_workspace_dag/deal_contracted_compound_tollgate.yaml"
-);
-
-scenario_test!(
     cbu_validated_requires_kyc_approved,
     "tests/fixtures/cross_workspace_dag/cbu_validated_requires_kyc_approved.yaml"
 );

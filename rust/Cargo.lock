@@ -4144,7 +4144,6 @@ dependencies = [
  "ob-agentic",
  "ob-poc-authoring",
  "ob-poc-bods",
- "ob-poc-booking-principal",
  "ob-poc-boundary",
  "ob-poc-compiler",
  "ob-poc-deal",
@@ -4266,16 +4265,6 @@ dependencies = [
  "serde",
  "serde_json",
  "sqlx",
- "uuid",
-]
-
-[[package]]
-name = "ob-poc-booking-principal"
-version = "0.1.0"
-dependencies = [
- "chrono",
- "serde",
- "serde_json",
  "uuid",
 ]
 

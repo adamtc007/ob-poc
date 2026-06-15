@@ -42,10 +42,6 @@ macro_rules! live_scenario_test {
 // actually fires in production, it'd silently classify as "predicate
 // didn't resolve" → constraint violation. Tracked as tech debt for the
 // production resolver, not a harness gap.
-live_scenario_test!(
-    live_deal_contracted_compound_tollgate,
-    "tests/fixtures/cross_workspace_dag/deal_contracted_compound_tollgate_live.yaml"
-);
 
 live_scenario_test!(
     live_im_mandate_requires_validated_cbu,

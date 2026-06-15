@@ -443,10 +443,6 @@ fn resolve_slot_table(
         (("cbu", "cbu"), ("cbus", "status", "cbu_id")),
         (("kyc", "kyc_case"), ("cases", "status", "case_id")),
         (("deal", "deal"), ("deals", "deal_status", "deal_id")),
-        (
-            ("booking_principal", "clearance"),
-            ("booking_principal_clearances", "clearance_status", "id"),
-        ),
         // Phase 2
         (
             ("instrument_matrix", "trading_profile"),
@@ -511,9 +507,6 @@ fn table_minimum_columns_owned(table: &str) -> Vec<(&'static str, JsonValue)> {
             ("cbu_id", JsonValue::String(SENTINEL.into())),
             ("case_ref", JsonValue::String("TEST-CASE".into())),
         ],
-        "booking_principal_clearances" => {
-            vec![("booking_principal_id", JsonValue::String(SENTINEL.into()))]
-        }
         // Phase 2 tables
         "cbu_trading_profiles" => vec![],
         "cbu_service_consumption" => vec![("cbu_id", JsonValue::String(SENTINEL.into()))],

@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "DELETE FROM \"ob-poc\".client_group_alias WHERE alias_norm = $1",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "44651687efbc41baaf45825f75465df03b9a237f3883fed989c3e257f15f14bd"
+}

@@ -202,6 +202,5 @@ slots:
     join: { via: contract_packs, parent_fk: contract_id, child_fk: pack_id }
     cardinality: optional
     depends_on: [contract]
-    verbs:
-      create: { verb: contract-pack.create, when: empty }
-      read: { verb: contract-pack.read, when: filled }
+    verbs: {}
+

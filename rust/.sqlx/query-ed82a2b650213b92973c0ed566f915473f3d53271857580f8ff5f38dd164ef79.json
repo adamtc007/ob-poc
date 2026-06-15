@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        INSERT INTO \"ob-poc\".ssi_booking_rules (\n            cbu_id, ssi_id, rule_name, priority\n        )\n        VALUES ($1, $2, 'Catch-All Fallback', 100)\n        ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "ed82a2b650213b92973c0ed566f915473f3d53271857580f8ff5f38dd164ef79"
+}

@@ -66,16 +66,6 @@ slots:
       registration_verify: { verb: regulatory.registration.verify, when: filled }
       registration_remove: { verb: regulatory.registration.remove, when: filled }
       status_check: regulatory.status.check
-  ruleset:
-    type: entity
-    entity_kinds: [entity]
-    join: { via: rulesets, parent_fk: group_id, child_fk: ruleset_id }
-    cardinality: optional
-    depends_on: [group]
-    verbs:
-      create: { verb: ruleset.create, when: empty }
-      publish: { verb: ruleset.publish, when: filled }
-      retire: { verb: ruleset.retire, when: filled }
   delegation:
     type: entity
     entity_kinds: [entity]
@@ -109,22 +99,3 @@ slots:
       update_member: { verb: team.update-member, when: filled }
       verify_governance: team.verify-governance-access
       archive: { verb: team.archive, when: filled }
-  rule:
-    type: entity
-    entity_kinds: [entity]
-    join: { via: rules, parent_fk: ruleset_id, child_fk: rule_id }
-    cardinality: optional
-    depends_on: [ruleset]
-    verbs:
-      add: { verb: rule.add, when: [empty, filled] }
-      update: { verb: rule.update, when: filled }
-      disable: { verb: rule.disable, when: filled }
-  rule_field:
-    type: entity
-    entity_kinds: [entity]
-    join: { via: rule_fields, parent_fk: field_id, child_fk: field_id }
-    cardinality: optional
-    depends_on: [ruleset]
-    verbs:
-      list: { verb: rule-field.list, when: [empty, filled] }
-      register: { verb: rule-field.register, when: [empty, filled] }

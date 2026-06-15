@@ -2671,7 +2671,6 @@ fn workspace_id(workspace: &WorkspaceKind) -> String {
         WorkspaceKind::OnBoarding => "onboarding_request",
         WorkspaceKind::SemOsMaintenance => "semos_maintenance",
         WorkspaceKind::LifecycleResources => "lifecycle_resources",
-        WorkspaceKind::BookingPrincipal => "booking_principal",
         WorkspaceKind::Bpmn => "bpmn",
     }
     .to_string()
