@@ -29,6 +29,8 @@
 "deal.billing_profile": [fee_billing_profiles, status, profile_id]
 "deal.billing_period": [fee_billing_periods, calc_status, period_id]
 "deal.deal_sla": [deal_slas, sla_status, sla_id]
+"deal.onboarding_compliance": [deal_onboarding_request_compliance, status, request_id]
+"deal.deal_compliance": [deal_contracting_compliance, status, deal_id]
 
 # Booking Principal workspace
 "booking_principal.clearance": [booking_principal_clearances, clearance_status, id]

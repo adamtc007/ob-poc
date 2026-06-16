@@ -832,6 +832,18 @@ slots:
   # 2.4 Stateless (compositional / reference / rule-entity)
   # ---------------------------------------------------------------------------
 
+  - id: onboarding_compliance
+    stateless: true
+    source_entity: '"ob-poc".deal_onboarding_request_compliance'
+    state_column: status
+    scope: per_onboarding_request
+
+  - id: deal_compliance
+    stateless: true
+    source_entity: '"ob-poc".deal_contracting_compliance'
+    state_column: status
+    scope: per_deal
+
   - id: workspace_root
     stateless: true
     rationale: "Aggregation root over Deal domains."
@@ -1063,6 +1075,26 @@ cross_slot_constraints:
         → deal_rate_cards.status transitions to 'COUNTER_PROPOSED'
     severity: informational
 
+  - id: deal_contracted_requires_primary_clearance
+    description: |
+      The deal cannot transition to CONTRACTED unless the primary signing entity 
+      holds an active KYC clearance token for the contracting role and product.
+    rule: |
+      deals.deal_status = 'CONTRACTED'
+        → deal_compliance WHERE deal_id = this.deal_id
+            .status = 'CLEARED'
+    severity: error
+
+  - id: onboarding_request_requires_kyc_clearance
+    description: |
+      An onboarding request for a CBU cannot complete unless that CBU holds 
+      an active KYC clearance token for its role and product.
+    rule: |
+      deal_onboarding_requests.request_status = 'COMPLETED'
+        → onboarding_compliance WHERE request_id = this.request_id
+            .status = 'CLEARED'
+    severity: error
+
 # =============================================================================
 # 4. CROSS-WORKSPACE CONSTRAINTS (V1.3-1 — Mode A blocking)
 # =============================================================================
@@ -1070,21 +1102,7 @@ cross_slot_constraints:
 # from cross_slot_constraints as part of R-5 (were marked
 # v1_3_candidate: true in v1.2 authoring).
 
-cross_workspace_constraints:
-
-  - id: deal_contracted_requires_kyc_approved
-    description: |
-      Deal cannot progress IN_CLEARANCE → CONTRACTED unless the
-      client-group KYC case is APPROVED in the KYC workspace.
-      Q4/Q21 (b) (2026-04-29, D-004): retargeted to IN_CLEARANCE.
-    source_workspace: kyc
-    source_slot: kyc_case
-    source_state: APPROVED
-    source_predicate: "cases.client_group_id = this_deal.primary_client_group_id"
-    target_workspace: deal
-    target_slot: deal
-    target_transition: "IN_CLEARANCE -> CONTRACTED"
-    severity: error
+cross_workspace_constraints: []
 
   # Q21 (b) (2026-04-29, D-004): the intra-deal BAC substate gate
   # lives in §3 cross_slot_constraints (deal_contracted_requires_bac_approved)
@@ -1127,6 +1145,8 @@ product_module_gates:
     - kyc_case
     - cbu
     - contract
+    - onboarding_compliance
+    - deal_compliance
 
   conditionally_on: []
 
