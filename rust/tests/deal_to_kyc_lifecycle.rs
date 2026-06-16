@@ -55,12 +55,19 @@ mod deal_to_kyc_lifecycle {
         /// Create a test entity.
         async fn create_entity(&self, name: &str) -> Uuid {
             let id = Uuid::new_v4();
+            let type_id: (Uuid,) =
+                sqlx::query_as(r#"SELECT entity_type_id FROM "ob-poc".entity_types LIMIT 1"#)
+                    .fetch_one(&self.pool)
+                    .await
+                    .expect("fetch entity type");
+
             sqlx::query(
-                r#"INSERT INTO "ob-poc".entities (entity_id, name, entity_type)
-                   VALUES ($1, $2, 'ORGANIZATION')"#,
+                r#"INSERT INTO "ob-poc".entities (entity_id, name, entity_type_id)
+                   VALUES ($1, $2, $3)"#,
             )
             .bind(id)
             .bind(name)
+            .bind(type_id.0)
             .execute(&self.pool)
             .await
             .expect("create entity");
@@ -71,8 +78,8 @@ mod deal_to_kyc_lifecycle {
         async fn create_cbu(&self, name: &str) -> Uuid {
             let id = Uuid::new_v4();
             sqlx::query(
-                r#"INSERT INTO "ob-poc".cbus (cbu_id, cbu_name, status)
-                   VALUES ($1, $2, 'ACTIVE')"#,
+                r#"INSERT INTO "ob-poc".cbus (cbu_id, name, status)
+                   VALUES ($1, $2, 'DISCOVERED')"#,
             )
             .bind(id)
             .bind(name)
@@ -86,7 +93,7 @@ mod deal_to_kyc_lifecycle {
         async fn create_client_group(&self, name: &str) -> Uuid {
             let id = Uuid::new_v4();
             sqlx::query(
-                r#"INSERT INTO "ob-poc".client_group (group_id, canonical_name)
+                r#"INSERT INTO "ob-poc".client_group (id, canonical_name)
                    VALUES ($1, $2)"#,
             )
             .bind(id)
@@ -323,7 +330,7 @@ mod deal_to_kyc_lifecycle {
             // KYC cases
             sqlx::query(
                 r#"DELETE FROM "ob-poc".cases WHERE cbu_id IN
-                   (SELECT cbu_id FROM "ob-poc".cbus WHERE cbu_name LIKE $1)"#,
+                   (SELECT cbu_id FROM "ob-poc".cbus WHERE name LIKE $1)"#,
             )
             .bind(&pattern)
             .execute(&self.pool)
@@ -338,7 +345,7 @@ mod deal_to_kyc_lifecycle {
                 .ok();
 
             // CBUs, entities, client groups
-            sqlx::query(r#"DELETE FROM "ob-poc".cbus WHERE cbu_name LIKE $1"#)
+            sqlx::query(r#"DELETE FROM "ob-poc".cbus WHERE name LIKE $1"#)
                 .bind(&pattern)
                 .execute(&self.pool)
                 .await
@@ -376,7 +383,7 @@ mod deal_to_kyc_lifecycle {
             let cbu_id = db.create_cbu(&db.name("fund")).await;
             let entity_id = db.create_entity(&db.name("entity")).await;
             let deal_id = db
-                .create_deal(&db.name("deal"), group_id, "KYC_CLEARANCE")
+                .create_deal(&db.name("deal"), group_id, "IN_CLEARANCE")
                 .await;
 
             // Verify deal creation event
@@ -629,7 +636,7 @@ mod deal_to_kyc_lifecycle {
             let cbu_id = db.create_cbu(&db.name("rej_fund")).await;
             let entity_id = db.create_entity(&db.name("rej_entity")).await;
             let deal_id = db
-                .create_deal(&db.name("rej_deal"), group_id, "KYC_CLEARANCE")
+                .create_deal(&db.name("rej_deal"), group_id, "IN_CLEARANCE")
                 .await;
             let case_id = db.create_case_with_deal(cbu_id, deal_id, group_id).await;
             let _assessment_id = db.link_case_to_deal(deal_id, entity_id, case_id).await;
@@ -689,8 +696,8 @@ mod deal_to_kyc_lifecycle {
                     .await
                     .unwrap();
             assert_eq!(
-                deal_status.0, "KYC_CLEARANCE",
-                "Deal should remain KYC_CLEARANCE — KYC gate not cleared"
+                deal_status.0, "IN_CLEARANCE",
+                "Deal should remain IN_CLEARANCE — KYC gate not cleared"
             );
 
             db.cleanup().await;

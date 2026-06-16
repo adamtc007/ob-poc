@@ -52,12 +52,19 @@ mod kyc_full_lifecycle {
         /// Create a test entity, returning its entity_id.
         async fn create_entity(&self, name: &str) -> Uuid {
             let id = Uuid::new_v4();
+            let type_id: (Uuid,) =
+                sqlx::query_as(r#"SELECT entity_type_id FROM "ob-poc".entity_types LIMIT 1"#)
+                    .fetch_one(&self.pool)
+                    .await
+                    .expect("fetch entity type");
+
             sqlx::query(
-                r#"INSERT INTO "ob-poc".entities (entity_id, name, entity_type)
-                   VALUES ($1, $2, 'ORGANIZATION')"#,
+                r#"INSERT INTO "ob-poc".entities (entity_id, name, entity_type_id)
+                   VALUES ($1, $2, $3)"#,
             )
             .bind(id)
             .bind(name)
+            .bind(type_id.0)
             .execute(&self.pool)
             .await
             .expect("create entity");
@@ -68,8 +75,8 @@ mod kyc_full_lifecycle {
         async fn create_cbu(&self, name: &str) -> Uuid {
             let id = Uuid::new_v4();
             sqlx::query(
-                r#"INSERT INTO "ob-poc".cbus (cbu_id, cbu_name, status)
-                   VALUES ($1, $2, 'ACTIVE')"#,
+                r#"INSERT INTO "ob-poc".cbus (cbu_id, name, status)
+                   VALUES ($1, $2, 'DISCOVERED')"#,
             )
             .bind(id)
             .bind(name)
@@ -290,7 +297,7 @@ mod kyc_full_lifecycle {
                 r#"DELETE FROM "ob-poc".ubo_evidence WHERE ubo_id IN
                    (SELECT ubo_id FROM "ob-poc".ubo_registry WHERE case_id IN
                      (SELECT case_id FROM "ob-poc".cases WHERE cbu_id IN
-                       (SELECT cbu_id FROM "ob-poc".cbus WHERE cbu_name LIKE $1)))"#,
+                       (SELECT cbu_id FROM "ob-poc".cbus WHERE name LIKE $1)))"#,
             )
             .bind(&pattern)
             .execute(&self.pool)
@@ -302,7 +309,7 @@ mod kyc_full_lifecycle {
                 r#"DELETE FROM "ob-poc".screenings WHERE workstream_id IN
                    (SELECT workstream_id FROM "ob-poc".entity_workstreams WHERE case_id IN
                      (SELECT case_id FROM "ob-poc".cases WHERE cbu_id IN
-                       (SELECT cbu_id FROM "ob-poc".cbus WHERE cbu_name LIKE $1)))"#,
+                       (SELECT cbu_id FROM "ob-poc".cbus WHERE name LIKE $1)))"#,
             )
             .bind(&pattern)
             .execute(&self.pool)
@@ -313,7 +320,7 @@ mod kyc_full_lifecycle {
             sqlx::query(
                 r#"DELETE FROM "ob-poc".tollgate_evaluations WHERE case_id IN
                    (SELECT case_id FROM "ob-poc".cases WHERE cbu_id IN
-                     (SELECT cbu_id FROM "ob-poc".cbus WHERE cbu_name LIKE $1))"#,
+                     (SELECT cbu_id FROM "ob-poc".cbus WHERE name LIKE $1))"#,
             )
             .bind(&pattern)
             .execute(&self.pool)
@@ -325,7 +332,7 @@ mod kyc_full_lifecycle {
                 r#"DELETE FROM "ob-poc".outreach_items WHERE plan_id IN
                    (SELECT plan_id FROM "ob-poc".outreach_plans WHERE case_id IN
                      (SELECT case_id FROM "ob-poc".cases WHERE cbu_id IN
-                       (SELECT cbu_id FROM "ob-poc".cbus WHERE cbu_name LIKE $1)))"#,
+                       (SELECT cbu_id FROM "ob-poc".cbus WHERE name LIKE $1)))"#,
             )
             .bind(&pattern)
             .execute(&self.pool)
@@ -335,7 +342,7 @@ mod kyc_full_lifecycle {
             sqlx::query(
                 r#"DELETE FROM "ob-poc".outreach_plans WHERE case_id IN
                    (SELECT case_id FROM "ob-poc".cases WHERE cbu_id IN
-                     (SELECT cbu_id FROM "ob-poc".cbus WHERE cbu_name LIKE $1))"#,
+                     (SELECT cbu_id FROM "ob-poc".cbus WHERE name LIKE $1))"#,
             )
             .bind(&pattern)
             .execute(&self.pool)
@@ -346,7 +353,7 @@ mod kyc_full_lifecycle {
             sqlx::query(
                 r#"DELETE FROM "ob-poc".ubo_determination_runs WHERE case_id IN
                    (SELECT case_id FROM "ob-poc".cases WHERE cbu_id IN
-                     (SELECT cbu_id FROM "ob-poc".cbus WHERE cbu_name LIKE $1))"#,
+                     (SELECT cbu_id FROM "ob-poc".cbus WHERE name LIKE $1))"#,
             )
             .bind(&pattern)
             .execute(&self.pool)
@@ -358,7 +365,7 @@ mod kyc_full_lifecycle {
                 r#"DELETE FROM "ob-poc".research_anomalies WHERE action_id IN
                    (SELECT action_id FROM "ob-poc".research_actions WHERE case_id IN
                      (SELECT case_id FROM "ob-poc".cases WHERE cbu_id IN
-                       (SELECT cbu_id FROM "ob-poc".cbus WHERE cbu_name LIKE $1)))"#,
+                       (SELECT cbu_id FROM "ob-poc".cbus WHERE name LIKE $1)))"#,
             )
             .bind(&pattern)
             .execute(&self.pool)
@@ -368,7 +375,7 @@ mod kyc_full_lifecycle {
             sqlx::query(
                 r#"DELETE FROM "ob-poc".research_actions WHERE case_id IN
                    (SELECT case_id FROM "ob-poc".cases WHERE cbu_id IN
-                     (SELECT cbu_id FROM "ob-poc".cbus WHERE cbu_name LIKE $1))"#,
+                     (SELECT cbu_id FROM "ob-poc".cbus WHERE name LIKE $1))"#,
             )
             .bind(&pattern)
             .execute(&self.pool)
@@ -379,7 +386,7 @@ mod kyc_full_lifecycle {
             sqlx::query(
                 r#"DELETE FROM "ob-poc".ubo_registry WHERE case_id IN
                    (SELECT case_id FROM "ob-poc".cases WHERE cbu_id IN
-                     (SELECT cbu_id FROM "ob-poc".cbus WHERE cbu_name LIKE $1))"#,
+                     (SELECT cbu_id FROM "ob-poc".cbus WHERE name LIKE $1))"#,
             )
             .bind(&pattern)
             .execute(&self.pool)
@@ -390,7 +397,7 @@ mod kyc_full_lifecycle {
             sqlx::query(
                 r#"DELETE FROM "ob-poc".entity_workstreams WHERE case_id IN
                    (SELECT case_id FROM "ob-poc".cases WHERE cbu_id IN
-                     (SELECT cbu_id FROM "ob-poc".cbus WHERE cbu_name LIKE $1))"#,
+                     (SELECT cbu_id FROM "ob-poc".cbus WHERE name LIKE $1))"#,
             )
             .bind(&pattern)
             .execute(&self.pool)
@@ -400,7 +407,7 @@ mod kyc_full_lifecycle {
             // Cases
             sqlx::query(
                 r#"DELETE FROM "ob-poc".cases WHERE cbu_id IN
-                   (SELECT cbu_id FROM "ob-poc".cbus WHERE cbu_name LIKE $1)"#,
+                   (SELECT cbu_id FROM "ob-poc".cbus WHERE name LIKE $1)"#,
             )
             .bind(&pattern)
             .execute(&self.pool)
@@ -421,7 +428,7 @@ mod kyc_full_lifecycle {
             .ok();
 
             // CBUs and entities
-            sqlx::query(r#"DELETE FROM "ob-poc".cbus WHERE cbu_name LIKE $1"#)
+            sqlx::query(r#"DELETE FROM "ob-poc".cbus WHERE name LIKE $1"#)
                 .bind(&pattern)
                 .execute(&self.pool)
                 .await
