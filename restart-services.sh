@@ -30,7 +30,7 @@ cd ..
 
 echo "=== Starting ob-poc-web (port 3000) ==="
 cd rust
-DATABASE_URL="postgresql:///data_designer" ./target/debug/ob-poc-web > /tmp/ob-poc-web.log 2>&1 &
+RUST_LOG=debug DATABASE_URL="postgresql:///data_designer" ./target/debug/ob-poc-web > /tmp/ob-poc-web.log 2>&1 &
 WEB_PID=$!
 cd ..
 sleep 2

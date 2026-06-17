@@ -180,6 +180,95 @@ pub enum VerbSearchSource {
     ScenarioIndex,
 }
 
+/// Ordinal search tier in priority order (Scenario > Macro > ExactLearned > Constellation > Semantic > Phonetic).
+/// Default PartialOrd/Ord derived uses declaration order, so phonetic (lowest) goes first, Scenario (highest) last.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+pub enum Tier {
+    Phonetic = 0,
+    Semantic = 1,
+    Constellation = 2,
+    ExactLearned = 3,
+    Macro = 4,
+    Scenario = 5,
+}
+
+impl VerbSearchResult {
+    /// Retrieve the ordinal Tier for the search result based on its source and score context.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use ob_poc::mcp::verb_search::{VerbSearchResult, VerbSearchSource, Tier};
+    /// let r = VerbSearchResult {
+    ///     verb: "foo".to_string(),
+    ///     score: 1.0,
+    ///     source: VerbSearchSource::ScenarioIndex,
+    ///     matched_phrase: "".to_string(),
+    ///     description: None,
+    ///     journey: None,
+    /// };
+    /// assert_eq!(r.tier(), Tier::Scenario);
+    /// ```
+    pub fn tier(&self) -> Tier {
+        match self.source {
+            VerbSearchSource::ScenarioIndex => Tier::Scenario,
+            VerbSearchSource::MacroIndex | VerbSearchSource::Macro => Tier::Macro,
+            VerbSearchSource::UserLearnedExact
+            | VerbSearchSource::LearnedExact
+            | VerbSearchSource::LexiconExact
+            | VerbSearchSource::LexiconToken => Tier::ExactLearned,
+            VerbSearchSource::ConstellationIndex => Tier::Constellation,
+            VerbSearchSource::UserLearnedSemantic | VerbSearchSource::PatternEmbedding => {
+                Tier::Semantic
+            }
+            VerbSearchSource::Phonetic => Tier::Phonetic,
+            VerbSearchSource::GlobalLearned => {
+                // If it's an exact match (score 1.0), it's Exact/Learned.
+                // Otherwise it's Semantic.
+                if (self.score - 1.0).abs() < f32::EPSILON {
+                    Tier::ExactLearned
+                } else {
+                    Tier::Semantic
+                }
+            }
+        }
+    }
+}
+
+const COMBINE_LAMBDA: f32 = 0.5;
+
+/// Bounded combination of independent confidence signals for ONE verb.
+/// Strongest signal full weight; secondaries damped by lambda. Result in [0,1].
+///
+/// # Examples
+///
+/// ```
+/// // Noisy-OR evidence combination
+/// ```
+fn combine(mut conf: Vec<f32>, lambda: f32) -> f32 {
+    conf.sort_by(|a, b| b.partial_cmp(a).unwrap_or(std::cmp::Ordering::Equal));
+    conf.iter().enumerate().fold(0.0_f32, |acc, (i, &s)| {
+        let s = (if i == 0 { s } else { lambda * s }).clamp(0.0, 1.0);
+        acc + (1.0 - acc) * s
+    })
+}
+
+/// Helper function to apply context boosts to confidence in logit space.
+/// Ensures score remains strictly bounded within [0, 1].
+///
+/// # Examples
+///
+/// ```
+/// // Logit boosting helper
+/// ```
+fn apply_logit_boost(p: f32, boost: f32) -> f32 {
+    let p_clamped = p.clamp(0.0001, 0.9999);
+    let logit = (p_clamped / (1.0 - p_clamped)).ln();
+    let new_logit = logit + boost;
+    let new_p = 1.0 / (1.0 + (-new_logit).exp());
+    new_p.clamp(0.0, 1.0)
+}
+
 // ============================================================================
 // Ambiguity Detection (Issue D/J)
 // ============================================================================
@@ -267,14 +356,20 @@ pub fn check_ambiguity_with_fallback(
                 VerbSearchOutcome::Matched(top.clone())
             }
             Some(runner_up) => {
-                let margin = top.score - runner_up.score;
-                if margin < AMBIGUITY_MARGIN {
-                    VerbSearchOutcome::Ambiguous {
-                        top: top.clone(),
-                        runner_up: Box::new(runner_up.clone()),
-                        margin,
+                // Ambiguity margin is within-tier, on confidence
+                if top.tier() == runner_up.tier() {
+                    let margin = top.score - runner_up.score;
+                    if margin < AMBIGUITY_MARGIN {
+                        VerbSearchOutcome::Ambiguous {
+                            top: top.clone(),
+                            runner_up: Box::new(runner_up.clone()),
+                            margin,
+                        }
+                    } else {
+                        VerbSearchOutcome::Matched(top.clone())
                     }
                 } else {
+                    // Cross-tier closeness is not ambiguity - higher tier wins outright
                     VerbSearchOutcome::Matched(top.clone())
                 }
             }
@@ -293,30 +388,84 @@ pub fn check_ambiguity_with_fallback(
 pub fn normalize_candidates(
     mut results: Vec<VerbSearchResult>,
     limit: usize,
+    query: Option<&str>,
 ) -> Vec<VerbSearchResult> {
     use std::collections::HashMap;
 
-    // Deduplicate by verb (keep highest score; preserve best metadata)
-    let mut by_verb: HashMap<String, VerbSearchResult> = HashMap::new();
+    // Group candidates by verb
+    let mut by_verb: HashMap<String, Vec<VerbSearchResult>> = HashMap::new();
     for r in results.drain(..) {
-        by_verb
-            .entry(r.verb.clone())
-            .and_modify(|existing| {
-                if r.score > existing.score {
-                    *existing = r.clone();
-                }
-            })
-            .or_insert(r);
+        by_verb.entry(r.verb.clone()).or_default().push(r);
     }
 
-    let mut v: Vec<VerbSearchResult> = by_verb.into_values().collect();
-    v.sort_by(|a, b| {
-        b.score
+    let mut combined_results = Vec::new();
+    for (verb, mut matches) in by_verb {
+        if matches.is_empty() {
+            continue;
+        }
+
+        // Sort matches by (tier, score) descending to find the best match to copy metadata from
+        matches.sort_by(|a, b| match b.tier().cmp(&a.tier()) {
+            std::cmp::Ordering::Equal => b
+                .score
+                .partial_cmp(&a.score)
+                .unwrap_or(std::cmp::Ordering::Equal),
+            ord => ord,
+        });
+
+        let best_match = &matches[0];
+        let final_source = best_match.source.clone();
+        let final_matched_phrase = best_match.matched_phrase.clone();
+        let final_description = best_match.description.clone();
+        let final_journey = best_match.journey.clone();
+
+        // Extract all scores to combine using combine() noisy-OR
+        let scores: Vec<f32> = matches.iter().map(|m| m.score).collect();
+        let final_score = combine(scores, COMBINE_LAMBDA);
+
+        combined_results.push(VerbSearchResult {
+            verb,
+            score: final_score,
+            source: final_source,
+            matched_phrase: final_matched_phrase,
+            description: final_description,
+            journey: final_journey,
+        });
+    }
+
+    // Sort combined results by (tier, score) descending
+    combined_results.sort_by(|a, b| match b.tier().cmp(&a.tier()) {
+        std::cmp::Ordering::Equal => b
+            .score
             .partial_cmp(&a.score)
-            .unwrap_or(std::cmp::Ordering::Equal)
+            .unwrap_or(std::cmp::Ordering::Equal),
+        ord => ord,
     });
-    v.truncate(limit);
-    v
+
+    combined_results.truncate(limit);
+
+    // Defensive clamping and assertion
+    for r in &mut combined_results {
+        debug_assert!(
+            r.score <= 1.0 + f32::EPSILON,
+            "Score {} exceeds 1.0 limit for verb {}",
+            r.score,
+            r.verb
+        );
+        r.score = r.score.min(1.0);
+
+        // Certainty (1.0) only applies when the utterance is the dsl.verb itself.
+        let is_verb_itself = if let Some(q) = query {
+            q == r.verb
+        } else {
+            false
+        };
+        if !is_verb_itself {
+            r.score = r.score.min(0.99);
+        }
+    }
+
+    combined_results
 }
 
 /// Apply narration boost to search results.
@@ -334,7 +483,7 @@ pub fn apply_narration_boost(results: &mut [VerbSearchResult], hot_verbs: &[Stri
     }
     for result in results.iter_mut() {
         if hot_verbs.iter().any(|hv| hv == &result.verb) {
-            result.score += NARRATION_BOOST;
+            result.score = apply_logit_boost(result.score, NARRATION_BOOST);
             tracing::debug!(
                 verb = %result.verb,
                 new_score = result.score,
@@ -343,11 +492,13 @@ pub fn apply_narration_boost(results: &mut [VerbSearchResult], hot_verbs: &[Stri
             );
         }
     }
-    // Re-sort after boost to maintain descending score order
-    results.sort_by(|a, b| {
-        b.score
+    // Re-sort after boost to maintain lexicographical order
+    results.sort_by(|a, b| match b.tier().cmp(&a.tier()) {
+        std::cmp::Ordering::Equal => b
+            .score
             .partial_cmp(&a.score)
-            .unwrap_or(std::cmp::Ordering::Equal)
+            .unwrap_or(std::cmp::Ordering::Equal),
+        ord => ord,
     });
 }
 
@@ -649,7 +800,7 @@ impl HybridVerbSearcher {
                                 // Constellation-scoped macros are the preferred path.
                                 results.push(VerbSearchResult {
                                     verb: fqn,
-                                    score: 1.05,
+                                    score: 1.0,
                                     source: VerbSearchSource::ScenarioIndex,
                                     matched_phrase: m.title.clone(),
                                     description: Some(m.title.clone()),
@@ -659,7 +810,7 @@ impl HybridVerbSearcher {
                                         route: JourneyRoute::from(&m.route),
                                     }),
                                 });
-                                return Ok(normalize_candidates(results, limit));
+                                return Ok(normalize_candidates(results, limit, Some(&normalized)));
                             }
                         } else {
                             // NeedsSelection — return as ambiguous for DecisionPacket
@@ -706,7 +857,7 @@ impl HybridVerbSearcher {
                             }
                         }
                         if !results.is_empty() {
-                            return Ok(normalize_candidates(results, limit));
+                            return Ok(normalize_candidates(results, limit, Some(&normalized)));
                         }
                     }
                     ScenarioResolveOutcome::NoMatch => {
@@ -748,7 +899,7 @@ impl HybridVerbSearcher {
                         }) || m.score >= 8;
 
                         let score = if is_high_confidence {
-                            1.04
+                            1.0
                         } else {
                             0.70 + (m.score as f32) * 0.02
                         };
@@ -770,7 +921,7 @@ impl HybridVerbSearcher {
 
                         if is_high_confidence {
                             // High-confidence MacroIndex match — return early
-                            return Ok(normalize_candidates(results, limit));
+                            return Ok(normalize_candidates(results, limit, Some(&normalized)));
                         }
                     }
                 }
@@ -802,7 +953,7 @@ impl HybridVerbSearcher {
                             }
 
                             let score = if is_high {
-                                1.04
+                                1.0
                             } else {
                                 0.70 + (m.score as f32) * 0.02
                             };
@@ -824,7 +975,7 @@ impl HybridVerbSearcher {
                         }
                     }
                     if has_high_confidence && !results.is_empty() {
-                        return Ok(normalize_candidates(results, limit));
+                        return Ok(normalize_candidates(results, limit, Some(&normalized)));
                     }
                 }
                 MacroResolveOutcome::NoMatch => {
@@ -856,7 +1007,7 @@ impl HybridVerbSearcher {
                     verb = %results[0].verb,
                     "VerbSearch: returning early with exact legacy macro match"
                 );
-                return Ok(results);
+                return Ok(normalize_candidates(results, limit, Some(&normalized)));
             }
         }
 
@@ -909,7 +1060,7 @@ impl HybridVerbSearcher {
                 );
                 seen_verbs.insert(cvi_matches[0].verb.clone());
                 results.push(cvi_matches.remove(0));
-                return Ok(normalize_candidates(results, limit));
+                return Ok(normalize_candidates(results, limit, Some(&normalized)));
             }
 
             // Multiple constellation matches — add as high-confidence candidates
@@ -1278,7 +1429,7 @@ impl HybridVerbSearcher {
                 // E.g., stem "create" matches "cbu.create", "entity.create-placeholder"
                 let action_part = result.verb.split('.').next_back().unwrap_or("");
                 if action_part == stem.as_str() || action_part.starts_with(&format!("{}-", stem)) {
-                    result.score += boost;
+                    result.score = apply_logit_boost(result.score, boost);
                     boosted_count += 1;
                 }
             }
@@ -1319,32 +1470,32 @@ impl HybridVerbSearcher {
         for result in &mut results {
             if has_list_show_get && has_cbu_cbus {
                 if result.verb == "cbu.list" {
-                    result.score += 0.20;
-                    tracing::debug!(verb = %result.verb, score = result.score, "Applied query boost +0.20");
+                    result.score = apply_logit_boost(result.score, 0.20);
+                    tracing::debug!(verb = %result.verb, score = result.score, "Applied query boost +0.20 in logit space");
                 } else if result.verb == "session.load-cluster"
                     || result.verb == "session.load-galaxy"
                 {
-                    result.score -= 0.20;
-                    tracing::debug!(verb = %result.verb, score = result.score, "Applied query penalty -0.20");
+                    result.score = apply_logit_boost(result.score, -0.20);
+                    tracing::debug!(verb = %result.verb, score = result.score, "Applied query penalty -0.20 in logit space");
                 }
             }
             if has_create_new_open && (has_cbu_cbus || has_fund) && !has_group {
                 if result.verb == "cbu.create" {
-                    result.score += 0.15;
-                    tracing::debug!(verb = %result.verb, score = result.score, "Applied query boost +0.15");
+                    result.score = apply_logit_boost(result.score, 0.15);
+                    tracing::debug!(verb = %result.verb, score = result.score, "Applied query boost +0.15 in logit space");
                 } else if result.verb == "cbu.create-from-client-group" {
-                    result.score -= 0.15;
-                    tracing::debug!(verb = %result.verb, score = result.score, "Applied query penalty -0.15");
+                    result.score = apply_logit_boost(result.score, -0.15);
+                    tracing::debug!(verb = %result.verb, score = result.score, "Applied query penalty -0.15 in logit space");
                 }
             }
             if has_remove && has_role_term && result.verb == "cbu.remove-role" {
-                result.score += 0.20;
-                tracing::debug!(verb = %result.verb, score = result.score, "Applied query boost +0.20");
+                result.score = apply_logit_boost(result.score, 0.20);
+                tracing::debug!(verb = %result.verb, score = result.score, "Applied query boost +0.20 in logit space");
             }
         }
 
         // Dedupe by verb, sort by score descending, truncate (Issue J/D fix)
-        let mut results = normalize_candidates(results, limit);
+        let mut results = normalize_candidates(results, limit, Some(&normalized));
 
         // Pre-constrained filter: remove verbs not in the SemReg allowed set (Phase 3 CCIR)
         // This runs after normalize_candidates to avoid interfering with per-tier logic.
@@ -2038,14 +2189,14 @@ mod tests {
             },
         ];
 
-        let normalized = normalize_candidates(candidates, 5);
+        let normalized = normalize_candidates(candidates, 5, None);
 
         // Should have 2 unique verbs
         assert_eq!(normalized.len(), 2);
 
-        // First should be deal.create with the HIGHER score (0.91)
+        // First should be deal.create with the combined score (0.9469)
         assert_eq!(normalized[0].verb, "deal.create");
-        assert!((normalized[0].score - 0.91).abs() < 0.001);
+        assert!((normalized[0].score - 0.9469).abs() < 0.001);
         assert!(matches!(
             normalized[0].source,
             VerbSearchSource::PatternEmbedding
@@ -2162,7 +2313,7 @@ mod tests {
         // Candidate below BOTH thresholds should be NoMatch
         let candidates = vec![VerbSearchResult {
             verb: "deal.create".to_string(),
-            score: 0.50, // below fallback threshold (0.55)
+            score: 0.40, // below fallback threshold (0.45)
             source: VerbSearchSource::PatternEmbedding,
             matched_phrase: "create deal".to_string(),
             description: None,
@@ -2351,7 +2502,7 @@ scenarios:
     }
 
     /// Scenario matches, and its target FQN is in `allowed_verbs`.
-    /// Expect the verb to be returned with `ScenarioIndex` source and score 1.05.
+    /// Expect the verb to be returned with `ScenarioIndex` source and score 0.99 (since query is not the exact dsl.verb).
     #[tokio::test]
     async fn test_f14_scenario_matched_verb_in_allowed_set_passes() {
         let searcher = f14_searcher();
@@ -2376,7 +2527,8 @@ scenarios:
         assert_eq!(results.len(), 1, "expected single scenario match");
         assert_eq!(results[0].verb, "struct.lux.ucits.sicav");
         assert!(matches!(results[0].source, VerbSearchSource::ScenarioIndex));
-        assert!((results[0].score - 1.05).abs() < 0.001);
+        assert_eq!(results[0].tier(), Tier::Scenario);
+        assert!((results[0].score - 0.99).abs() < 0.001);
     }
 
     /// Scenario matches, but its target FQN is NOT in `allowed_verbs`.

@@ -1,27 +1,13 @@
 {
-  "timestamp": "2026-06-16T12:46:14.377148+00:00",
+  "timestamp": "2026-06-17T19:42:51.633832+00:00",
   "total_tests": 80,
-  "passed": 70,
-  "failed": 9,
-  "pass_rate": 87.5,
+  "passed": 69,
+  "failed": 11,
+  "pass_rate": 86.25,
   "confidently_wrong": 0,
   "semantic_threshold": 0.65,
   "ambiguity_margin": 0.05,
   "mismatches": [
-    {
-      "name": "assign role",
-      "query": "assign role to cbu",
-      "expected_outcome": "Matched",
-      "expected_verb": "cbu.assign-role",
-      "allowed_verbs": [
-        "cbu.assign-role"
-      ],
-      "actual_outcome": "Error: pool timed out while waiting for an open connection",
-      "actual_verb": null,
-      "top_candidates": [],
-      "category": "role_assign",
-      "is_hard_negative": false
-    },
     {
       "name": "add role",
       "query": "add role to entity",
@@ -30,20 +16,20 @@
       "allowed_verbs": [
         "cbu.assign-role"
       ],
-      "actual_outcome": "Ambiguous(cbu.assign-role vs cbu.role.assign)",
+      "actual_outcome": "Ambiguous(cbu.role.assign vs cbu.assign-role)",
       "actual_verb": null,
       "top_candidates": [
         {
           "rank": 1,
-          "verb": "cbu.assign-role",
-          "score": 1.0,
+          "verb": "cbu.role.assign",
+          "score": 0.99,
           "source": "GlobalLearned",
           "matched_phrase": "add role to entity"
         },
         {
           "rank": 2,
-          "verb": "cbu.role.assign",
-          "score": 1.0,
+          "verb": "cbu.assign-role",
+          "score": 0.99,
           "source": "GlobalLearned",
           "matched_phrase": "add role to entity"
         },
@@ -66,20 +52,20 @@
       "allowed_verbs": [
         "cbu.assign-role"
       ],
-      "actual_outcome": "Ambiguous(cbu.role.assign vs cbu.assign-role)",
+      "actual_outcome": "Ambiguous(cbu.assign-role vs cbu.role.assign)",
       "actual_verb": null,
       "top_candidates": [
         {
           "rank": 1,
-          "verb": "cbu.role.assign",
-          "score": 1.0,
+          "verb": "cbu.assign-role",
+          "score": 0.99,
           "source": "GlobalLearned",
           "matched_phrase": "appoint director"
         },
         {
           "rank": 2,
-          "verb": "cbu.assign-role",
-          "score": 1.0,
+          "verb": "cbu.role.assign",
+          "score": 0.99,
           "source": "GlobalLearned",
           "matched_phrase": "appoint director"
         },
@@ -102,22 +88,29 @@
       "allowed_verbs": [
         "cbu.assign-role"
       ],
-      "actual_outcome": "Ambiguous(ubo.add-ownership vs cbu.assign-role)",
+      "actual_outcome": "Ambiguous(cbu.assign-role vs ubo.add-ownership)",
       "actual_verb": null,
       "top_candidates": [
         {
           "rank": 1,
-          "verb": "ubo.add-ownership",
-          "score": 1.05,
+          "verb": "cbu.assign-role",
+          "score": 0.99,
           "source": "GlobalLearned",
           "matched_phrase": "add beneficial owner"
         },
         {
           "rank": 2,
-          "verb": "cbu.assign-role",
-          "score": 1.0,
+          "verb": "ubo.add-ownership",
+          "score": 0.99,
           "source": "GlobalLearned",
           "matched_phrase": "add beneficial owner"
+        },
+        {
+          "rank": 3,
+          "verb": "investor-role.mark-as-end-investor",
+          "score": 0.89614207,
+          "source": "PatternEmbedding",
+          "matched_phrase": "beneficial owner"
         }
       ],
       "category": "role_assign",
@@ -137,15 +130,22 @@
         {
           "rank": 1,
           "verb": "cbu.assign-role",
-          "score": 1.05,
+          "score": 0.99,
           "source": "GlobalLearned",
           "matched_phrase": "assign signatory"
         },
         {
           "rank": 2,
           "verb": "cbu.assign-signatory",
-          "score": 1.05,
+          "score": 0.99,
           "source": "GlobalLearned",
+          "matched_phrase": "assign signatory"
+        },
+        {
+          "rank": 3,
+          "verb": "cbu.role.assign-signatory",
+          "score": 0.84236115,
+          "source": "PatternEmbedding",
           "matched_phrase": "assign signatory"
         }
       ],
@@ -166,14 +166,14 @@
         {
           "rank": 1,
           "verb": "cbu.assign-signatory",
-          "score": 1.0,
+          "score": 0.99,
           "source": "GlobalLearned",
           "matched_phrase": "add authorized signatory"
         },
         {
           "rank": 2,
           "verb": "cbu.assign-role",
-          "score": 1.0,
+          "score": 0.99,
           "source": "GlobalLearned",
           "matched_phrase": "add authorized signatory"
         },
@@ -196,27 +196,27 @@
       "allowed_verbs": [
         "cbu.assign-role"
       ],
-      "actual_outcome": "Ambiguous(cbu.role.assign-service-provider vs cbu.assign-service-provider)",
+      "actual_outcome": "Ambiguous(cbu.assign-role vs cbu.assign-service-provider)",
       "actual_verb": null,
       "top_candidates": [
         {
           "rank": 1,
-          "verb": "cbu.role.assign-service-provider",
-          "score": 1.0,
+          "verb": "cbu.assign-role",
+          "score": 0.99,
           "source": "GlobalLearned",
           "matched_phrase": "add transfer agent"
         },
         {
           "rank": 2,
           "verb": "cbu.assign-service-provider",
-          "score": 1.0,
+          "score": 0.99,
           "source": "GlobalLearned",
           "matched_phrase": "add transfer agent"
         },
         {
           "rank": 3,
-          "verb": "cbu.assign-role",
-          "score": 1.0,
+          "verb": "cbu.role.assign-service-provider",
+          "score": 0.99,
           "source": "GlobalLearned",
           "matched_phrase": "add transfer agent"
         }
@@ -255,6 +255,20 @@
           "score": 0.8272997,
           "source": "PatternEmbedding",
           "matched_phrase": "convert entities to cbus"
+        },
+        {
+          "rank": 4,
+          "verb": "cbu.create",
+          "score": 0.7834688,
+          "source": "PatternEmbedding",
+          "matched_phrase": "establish CBU"
+        },
+        {
+          "rank": 5,
+          "verb": "cbu.ensure",
+          "score": 0.775598,
+          "source": "PatternEmbedding",
+          "matched_phrase": "get or create cbu"
         }
       ],
       "category": "role_assign",
@@ -268,20 +282,20 @@
       "allowed_verbs": [
         "cbu.parties"
       ],
-      "actual_outcome": "Ambiguous(cbu.parties vs ubo.list-ubos)",
+      "actual_outcome": "Ambiguous(ubo.list-ubos vs cbu.parties)",
       "actual_verb": null,
       "top_candidates": [
         {
           "rank": 1,
-          "verb": "cbu.parties",
-          "score": 1.0,
+          "verb": "ubo.list-ubos",
+          "score": 0.99,
           "source": "GlobalLearned",
           "matched_phrase": "who are the ubos"
         },
         {
           "rank": 2,
-          "verb": "ubo.list-ubos",
-          "score": 1.0,
+          "verb": "cbu.parties",
+          "score": 0.99,
           "source": "GlobalLearned",
           "matched_phrase": "who are the ubos"
         },
@@ -311,25 +325,132 @@
       "allowed_verbs": [
         "cbu.add-product"
       ],
-      "actual_outcome": "Ambiguous(cbu.add-product vs product-subscription.subscribe)",
+      "actual_outcome": "Ambiguous(product-subscription.subscribe vs cbu.add-product)",
       "actual_verb": null,
       "top_candidates": [
         {
           "rank": 1,
-          "verb": "cbu.add-product",
-          "score": 1.05,
+          "verb": "product-subscription.subscribe",
+          "score": 0.99,
           "source": "GlobalLearned",
           "matched_phrase": "add product to fund"
         },
         {
           "rank": 2,
-          "verb": "product-subscription.subscribe",
-          "score": 1.0,
+          "verb": "cbu.add-product",
+          "score": 0.99,
           "source": "GlobalLearned",
           "matched_phrase": "add product to fund"
+        },
+        {
+          "rank": 3,
+          "verb": "fund.add-investment",
+          "score": 0.82583916,
+          "source": "PatternEmbedding",
+          "matched_phrase": "add fund investment"
         }
       ],
       "category": "cbu_product",
+      "is_hard_negative": false
+    },
+    {
+      "name": "bulk create",
+      "query": "bulk create cbus for allianz",
+      "expected_outcome": "Matched",
+      "expected_verb": "cbu.create-from-client-group",
+      "allowed_verbs": [
+        "cbu.create-from-client-group"
+      ],
+      "actual_outcome": "Ambiguous(cbu.create-from-client-group vs cbu.create)",
+      "actual_verb": null,
+      "top_candidates": [
+        {
+          "rank": 1,
+          "verb": "cbu.create-from-client-group",
+          "score": 0.88498104,
+          "source": "PatternEmbedding",
+          "matched_phrase": "create cbus for allianz"
+        },
+        {
+          "rank": 2,
+          "verb": "cbu.create",
+          "score": 0.8757385,
+          "source": "PatternEmbedding",
+          "matched_phrase": "create a new CBU for Allianz"
+        },
+        {
+          "rank": 3,
+          "verb": "session.load-cluster",
+          "score": 0.75343996,
+          "source": "PatternEmbedding",
+          "matched_phrase": "allianz cbus"
+        },
+        {
+          "rank": 4,
+          "verb": "batch.add-products",
+          "score": 0.7339196,
+          "source": "PatternEmbedding",
+          "matched_phrase": "bulk add products to CBUs"
+        },
+        {
+          "rank": 5,
+          "verb": "cbu.list",
+          "score": 0.7103947,
+          "source": "PatternEmbedding",
+          "matched_phrase": "get all cbus"
+        }
+      ],
+      "category": "cbu_bulk",
+      "is_hard_negative": false
+    },
+    {
+      "name": "onboard from research",
+      "query": "onboard entities from research",
+      "expected_outcome": "Matched",
+      "expected_verb": "cbu.create-from-client-group",
+      "allowed_verbs": [
+        "cbu.create-from-client-group"
+      ],
+      "actual_outcome": "Ambiguous(cbu.create-from-client-group vs cbu.create)",
+      "actual_verb": null,
+      "top_candidates": [
+        {
+          "rank": 1,
+          "verb": "cbu.create-from-client-group",
+          "score": 0.72081304,
+          "source": "PatternEmbedding",
+          "matched_phrase": "onboard entities as CBUs"
+        },
+        {
+          "rank": 2,
+          "verb": "cbu.create",
+          "score": 0.68535423,
+          "source": "PatternEmbedding",
+          "matched_phrase": "onboard a new entity"
+        },
+        {
+          "rank": 3,
+          "verb": "client-group.entity-add",
+          "score": 0.6677247,
+          "source": "PatternEmbedding",
+          "matched_phrase": "onboard entity into group"
+        },
+        {
+          "rank": 4,
+          "verb": "team.add-member",
+          "score": 0.63328433,
+          "source": "PatternEmbedding",
+          "matched_phrase": "onboard analyst to the team"
+        },
+        {
+          "rank": 5,
+          "verb": "gleif.import-to-client-group",
+          "score": 0.6224286,
+          "source": "PatternEmbedding",
+          "matched_phrase": "research group from GLEIF"
+        }
+      ],
+      "category": "cbu_bulk",
       "is_hard_negative": false
     }
   ]

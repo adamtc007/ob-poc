@@ -1,13 +1,56 @@
 {
-  "timestamp": "2026-06-16T12:46:13.025503+00:00",
+  "timestamp": "2026-06-17T19:42:41.397936+00:00",
   "total_tests": 46,
-  "passed": 39,
-  "failed": 7,
-  "pass_rate": 84.78260869565217,
-  "confidently_wrong": 2,
+  "passed": 38,
+  "failed": 8,
+  "pass_rate": 82.6086956521739,
+  "confidently_wrong": 1,
   "semantic_threshold": 0.65,
   "ambiguity_margin": 0.05,
   "mismatches": [
+    {
+      "name": "find the ultimate beneficial owners (taught)",
+      "query": "find the ultimate beneficial owners",
+      "expected_outcome": "Matched",
+      "expected_verb": "control.identify-ubos",
+      "allowed_verbs": [
+        "control.identify-ubos"
+      ],
+      "actual_outcome": "Ambiguous(control.identify-ubos vs ubo.list-ubos)",
+      "actual_verb": null,
+      "top_candidates": [
+        {
+          "rank": 1,
+          "verb": "control.identify-ubos",
+          "score": 0.99,
+          "source": "LearnedExact",
+          "matched_phrase": "find the ultimate beneficial owners"
+        },
+        {
+          "rank": 2,
+          "verb": "ubo.list-ubos",
+          "score": 0.94073033,
+          "source": "PatternEmbedding",
+          "matched_phrase": "list the ultimate beneficial owners"
+        },
+        {
+          "rank": 3,
+          "verb": "trust.identify-ubos",
+          "score": 0.9282802,
+          "source": "PatternEmbedding",
+          "matched_phrase": "identify ultimate beneficial owners"
+        },
+        {
+          "rank": 4,
+          "verb": "bods.discover-ubos",
+          "score": 0.86829394,
+          "source": "PatternEmbedding",
+          "matched_phrase": "find beneficial owners"
+        }
+      ],
+      "category": "taught",
+      "is_hard_negative": false
+    },
     {
       "name": "create company",
       "query": "create a limited company",
@@ -22,23 +65,37 @@
         {
           "rank": 1,
           "verb": "entity.create-limited-company",
-          "score": 0.9109156,
+          "score": 0.86679524,
           "source": "PatternEmbedding",
           "matched_phrase": "create limited company"
         },
         {
           "rank": 2,
           "verb": "entity.create",
-          "score": 0.889319,
+          "score": 0.8459482,
           "source": "PatternEmbedding",
           "matched_phrase": "create a limited partnership"
         },
         {
           "rank": 3,
           "verb": "entity.create-limited-company-unlimited",
-          "score": 0.8669474,
+          "score": 0.8243064,
           "source": "PatternEmbedding",
           "matched_phrase": "create limited company unlimited"
+        },
+        {
+          "rank": 4,
+          "verb": "entity.create-limited-company-private",
+          "score": 0.8126633,
+          "source": "PatternEmbedding",
+          "matched_phrase": "create limited company private"
+        },
+        {
+          "rank": 5,
+          "verb": "entity.create-limited-company-public",
+          "score": 0.7786512,
+          "source": "PatternEmbedding",
+          "matched_phrase": "create limited company public"
         }
       ],
       "category": "entity",
@@ -52,29 +109,43 @@
       "allowed_verbs": [
         "entity.create"
       ],
-      "actual_outcome": "Matched",
-      "actual_verb": "entity.ghost",
+      "actual_outcome": "Ambiguous(entity.create-proper-person-natural vs entity.ensure-proper-person)",
+      "actual_verb": null,
       "top_candidates": [
         {
           "rank": 1,
-          "verb": "entity.ghost",
-          "score": 0.66275615,
+          "verb": "entity.create-proper-person-natural",
+          "score": 0.7299709,
           "source": "PatternEmbedding",
-          "matched_phrase": "add unverified person"
+          "matched_phrase": "create proper person natural"
         },
         {
           "rank": 2,
-          "verb": "session.set-persona",
-          "score": 0.6402097,
+          "verb": "entity.ensure-proper-person",
+          "score": 0.7269565,
           "source": "PatternEmbedding",
-          "matched_phrase": "set persona"
+          "matched_phrase": "ensure natural person"
         },
         {
           "rank": 3,
-          "verb": "entity.create",
-          "score": 0.5945688,
+          "verb": "entity.create-proper-person",
+          "score": 0.70334077,
           "source": "PatternEmbedding",
-          "matched_phrase": "set up a new legal entity"
+          "matched_phrase": "register natural person"
+        },
+        {
+          "rank": 4,
+          "verb": "entity.create",
+          "score": 0.7024058,
+          "source": "PatternEmbedding",
+          "matched_phrase": "create person"
+        },
+        {
+          "rank": 5,
+          "verb": "client-group.entity-add",
+          "score": 0.6777214,
+          "source": "PatternEmbedding",
+          "matched_phrase": "entity add"
         }
       ],
       "category": "entity",
@@ -88,43 +159,43 @@
       "allowed_verbs": [
         "entity.query"
       ],
-      "actual_outcome": "NoMatch",
+      "actual_outcome": "Ambiguous(session.load-cluster vs investor-role.list-by-holder)",
       "actual_verb": null,
       "top_candidates": [
         {
           "rank": 1,
+          "verb": "session.load-cluster",
+          "score": 0.8118876,
+          "source": "PatternEmbedding",
+          "matched_phrase": "blackrock"
+        },
+        {
+          "rank": 2,
+          "verb": "investor-role.list-by-holder",
+          "score": 0.77694505,
+          "source": "PatternEmbedding",
+          "matched_phrase": "BlackRock classifications"
+        },
+        {
+          "rank": 3,
+          "verb": "session.set-client",
+          "score": 0.69961965,
+          "source": "PatternEmbedding",
+          "matched_phrase": "work with BlackRock"
+        },
+        {
+          "rank": 4,
+          "verb": "gleif.get-managed-funds",
+          "score": 0.6508861,
+          "source": "PatternEmbedding",
+          "matched_phrase": "blackrock fund list"
+        },
+        {
+          "rank": 5,
           "verb": "bods.link-entity",
           "score": 0.5985688,
           "source": "PatternEmbedding",
           "matched_phrase": "link-entity bods"
-        },
-        {
-          "rank": 2,
-          "verb": "bods.list-by-entity",
-          "score": 0.5876267,
-          "source": "PatternEmbedding",
-          "matched_phrase": "find BODS data for this entity"
-        },
-        {
-          "rank": 3,
-          "verb": "discovery.search-entities",
-          "score": 0.57842356,
-          "source": "PatternEmbedding",
-          "matched_phrase": "find entity"
-        },
-        {
-          "rank": 4,
-          "verb": "entity.identify",
-          "score": 0.57488376,
-          "source": "PatternEmbedding",
-          "matched_phrase": "identify entity"
-        },
-        {
-          "rank": 5,
-          "verb": "client-group.discover-entities",
-          "score": 0.5,
-          "source": "Phonetic",
-          "matched_phrase": "find all entities for"
         }
       ],
       "category": "entity",
@@ -138,22 +209,22 @@
       "allowed_verbs": [
         "entity.read"
       ],
-      "actual_outcome": "Ambiguous(entity.list vs entity.read)",
+      "actual_outcome": "Ambiguous(entity.read vs entity.list)",
       "actual_verb": null,
       "top_candidates": [
         {
           "rank": 1,
-          "verb": "entity.list",
-          "score": 0.9149857,
-          "source": "PatternEmbedding",
-          "matched_phrase": "view entity list"
-        },
-        {
-          "rank": 2,
           "verb": "entity.read",
           "score": 0.8962966,
           "source": "PatternEmbedding",
           "matched_phrase": "show entity information"
+        },
+        {
+          "rank": 2,
+          "verb": "entity.list",
+          "score": 0.87071913,
+          "source": "PatternEmbedding",
+          "matched_phrase": "view entity list"
         },
         {
           "rank": 3,
@@ -161,6 +232,20 @@
           "score": 0.8600746,
           "source": "PatternEmbedding",
           "matched_phrase": "show entity history"
+        },
+        {
+          "rank": 4,
+          "verb": "entity.query",
+          "score": 0.8414706,
+          "source": "PatternEmbedding",
+          "matched_phrase": "entity lookup"
+        },
+        {
+          "rank": 5,
+          "verb": "discovery.entity-relationships",
+          "score": 0.84089416,
+          "source": "PatternEmbedding",
+          "matched_phrase": "show entity relationships"
         }
       ],
       "category": "entity",
@@ -204,6 +289,13 @@
           "score": 0.83439523,
           "source": "PatternEmbedding",
           "matched_phrase": "find beneficial owners"
+        },
+        {
+          "rank": 5,
+          "verb": "entity-workstream.set-ubo",
+          "score": 0.8206419,
+          "source": "PatternEmbedding",
+          "matched_phrase": "identify as beneficial owner"
         }
       ],
       "category": "kyc",
@@ -217,21 +309,21 @@
       "allowed_verbs": [
         "control.identify-ubos"
       ],
-      "actual_outcome": "Ambiguous(control.identify-ubos vs ubo.list-owners)",
+      "actual_outcome": "Ambiguous(ubo.list-owners vs control.identify-ubos)",
       "actual_verb": null,
       "top_candidates": [
         {
           "rank": 1,
-          "verb": "control.identify-ubos",
-          "score": 1.0,
-          "source": "LearnedExact",
+          "verb": "ubo.list-owners",
+          "score": 0.99,
+          "source": "GlobalLearned",
           "matched_phrase": "who owns this company"
         },
         {
           "rank": 2,
-          "verb": "ubo.list-owners",
-          "score": 1.0,
-          "source": "GlobalLearned",
+          "verb": "control.identify-ubos",
+          "score": 0.99,
+          "source": "LearnedExact",
           "matched_phrase": "who owns this company"
         },
         {
@@ -266,7 +358,7 @@
         {
           "rank": 1,
           "verb": "ubo.list-owners",
-          "score": 1.05,
+          "score": 0.99,
           "source": "GlobalLearned",
           "matched_phrase": "show the ownership chain"
         },
@@ -283,6 +375,20 @@
           "score": 0.892117,
           "source": "PatternEmbedding",
           "matched_phrase": "examine ownership chain"
+        },
+        {
+          "rank": 4,
+          "verb": "graph.ancestors",
+          "score": 0.8600616,
+          "source": "PatternEmbedding",
+          "matched_phrase": "show ownership chain above"
+        },
+        {
+          "rank": 5,
+          "verb": "ownership.trace-chain",
+          "score": 0.82105654,
+          "source": "PatternEmbedding",
+          "matched_phrase": "show ownership link"
         }
       ],
       "category": "kyc",

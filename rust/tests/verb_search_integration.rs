@@ -239,7 +239,7 @@ impl VerbSearchTestHarness {
             .await?;
         // Belt & braces: normalize candidates explicitly so sweep logic stays correct
         // even if searcher internals change
-        let candidates = normalize_candidates(results, 5);
+        let candidates = normalize_candidates(results, 5, Some(query));
         let outcome = check_ambiguity_with_margin(&candidates, semantic_threshold, margin);
         Ok((outcome, candidates))
     }
@@ -1654,11 +1654,11 @@ fn test_normalize_candidates() {
         },
     ];
 
-    let normalized = normalize_candidates(candidates, 10);
+    let normalized = normalize_candidates(candidates, 10, None);
 
     assert_eq!(normalized.len(), 2);
     assert_eq!(normalized[0].verb, "deal.create");
-    assert!((normalized[0].score - 0.95).abs() < 0.001);
+    assert!((normalized[0].score - 0.97).abs() < 0.001);
 }
 
 // =============================================================================
@@ -1913,4 +1913,46 @@ async fn test_dump_mismatches() {
     println!("\n============================================================");
     println!("  Report written to: {}", output_path.display());
     println!("============================================================");
+}
+
+#[derive(Debug, Deserialize)]
+struct CicCorpusEntry {
+    utterance: String,
+}
+
+#[cfg(feature = "database")]
+#[tokio::test]
+#[ignore]
+async fn test_unconstrained_scores_bound() {
+    let harness = VerbSearchTestHarness::new()
+        .await
+        .expect("Failed to create harness");
+
+    let corpus_content = std::fs::read_to_string("assets/cic_labeled_corpus.json")
+        .expect("Failed to read assets/cic_labeled_corpus.json");
+
+    let corpus: Vec<CicCorpusEntry> =
+        serde_json::from_str(&corpus_content).expect("Failed to parse corpus JSON");
+
+    println!(
+        "Running test_unconstrained_scores_bound over {} cases...",
+        corpus.len()
+    );
+    for entry in &corpus {
+        let results = harness
+            .searcher
+            .search(&entry.utterance, None, None, None, 5, None, None, None)
+            .await
+            .expect("Failed to search");
+
+        for r in &results {
+            assert!(
+                r.score >= 0.0 && r.score <= 1.0,
+                "Score {} for verb {} in utterance '{}' is out of bounds [0, 1]!",
+                r.score,
+                r.verb,
+                entry.utterance
+            );
+        }
+    }
 }
