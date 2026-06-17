@@ -248,9 +248,9 @@ impl SemOsVerbOp for AddProducts {
                     Ok(Some(product_id)) => {
                         let insert_result = sqlx::query(
                             r#"
-                            INSERT INTO "ob-poc".cbu_products (cbu_id, product_id)
-                            VALUES ($1, $2)
-                            ON CONFLICT (cbu_id, product_id) DO NOTHING
+                            INSERT INTO "ob-poc".cbu_product_subscriptions (cbu_id, product_id, status)
+                            VALUES ($1, $2, 'ACTIVE')
+                            ON CONFLICT (cbu_id, product_id) DO UPDATE SET status = 'ACTIVE'
                             "#,
                         )
                         .bind(cbu_id)

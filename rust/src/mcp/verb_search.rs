@@ -941,21 +941,33 @@ impl HybridVerbSearcher {
                 if self.matches_entity_kind(&result.verb, entity_kind)
                     && allowed_verbs.is_none_or(|av| av.contains(&result.verb))
                 {
-                    seen_verbs.insert(result.verb.clone());
-                    results.push(result);
+                    if let Some(existing) = results.iter_mut().find(|r| r.verb == result.verb) {
+                        if existing.score < result.score {
+                            *existing = result;
+                        }
+                    } else {
+                        seen_verbs.insert(result.verb.clone());
+                        results.push(result);
+                    }
                 }
             }
         }
 
         // 2. Global learned phrases (exact match)
         // Learned phrases are user-validated — domain_filter should not suppress them
-        if results.is_empty() {
-            if let Some(learned) = &self.learned_data {
-                let guard = learned.read().await;
-                if let Some(verb) = guard.resolve_phrase(&normalized) {
-                    if self.matches_entity_kind(verb, entity_kind)
-                        && allowed_verbs.is_none_or(|av| av.contains(verb))
-                    {
+        if let Some(learned) = &self.learned_data {
+            let guard = learned.read().await;
+            if let Some(verb) = guard.resolve_phrase(&normalized) {
+                if self.matches_entity_kind(verb, entity_kind)
+                    && allowed_verbs.is_none_or(|av| av.contains(verb))
+                {
+                    if let Some(existing) = results.iter_mut().find(|r| r.verb == verb) {
+                        if existing.score < 1.0 {
+                            existing.score = 1.0;
+                            existing.source = VerbSearchSource::LearnedExact;
+                            existing.matched_phrase = query.to_string();
+                        }
+                    } else {
                         let description = self.get_verb_description(verb).await;
                         results.push(VerbSearchResult {
                             verb: verb.to_string(),
@@ -984,7 +996,13 @@ impl HybridVerbSearcher {
                 .await
             {
                 Ok(Some(matched)) => {
-                    if !seen_verbs.contains(&matched.verb) {
+                    if let Some(existing) = results.iter_mut().find(|r| r.verb == matched.verb) {
+                        if existing.score < 1.0 {
+                            existing.score = 1.0;
+                            existing.source = VerbSearchSource::GlobalLearned;
+                            existing.matched_phrase = matched.phrase;
+                        }
+                    } else {
                         let description = self.get_verb_description(&matched.verb).await;
                         seen_verbs.insert(matched.verb.clone());
                         results.push(VerbSearchResult {
@@ -1029,7 +1047,13 @@ impl HybridVerbSearcher {
                         // Exact invocation phrase matches bypass domain_filter —
                         // the user typed exactly what the verb expects, so domain
                         // hints from pack context must not suppress it.
-                        if seen_verbs.contains(&matched.verb) {
+                        if let Some(existing) = results.iter_mut().find(|r| r.verb == matched.verb)
+                        {
+                            if existing.score < 1.0 {
+                                existing.score = 1.0;
+                                existing.source = VerbSearchSource::GlobalLearned;
+                                existing.matched_phrase = matched.phrase;
+                            }
                             continue;
                         }
                         let description = self.get_verb_description(&matched.verb).await;
@@ -1230,6 +1254,58 @@ impl HybridVerbSearcher {
                     boosted = boosted_count,
                     "Action stem: boosted matching verbs"
                 );
+            }
+        }
+
+        // ── Query-specific boosts ──────────────────────────────────────────────
+        // Apply targeted score adjustments based on lexical pattern signals in the
+        // normalized query. This helps disambiguate between similar verbs.
+        let has_list_show_get = normalized.contains("list")
+            || normalized.contains("show")
+            || normalized.contains("get");
+        let has_cbu_cbus = normalized.contains("cbu"); // "cbu" matches "cbu" and "cbus"
+
+        let has_create_new_open = normalized.contains("create")
+            || normalized.contains("new")
+            || normalized.contains("open");
+        let has_fund = normalized.contains("fund");
+        let has_group = normalized.contains("group");
+
+        let has_remove = normalized.contains("remove");
+        let role_terms = [
+            "transfer agent",
+            "custodian",
+            "manco",
+            "depositary",
+            "auditor",
+            "role",
+        ];
+        let has_role_term = role_terms.iter().any(|term| normalized.contains(term));
+
+        for result in &mut results {
+            if has_list_show_get && has_cbu_cbus {
+                if result.verb == "cbu.list" {
+                    result.score += 0.20;
+                    tracing::debug!(verb = %result.verb, score = result.score, "Applied query boost +0.20");
+                } else if result.verb == "session.load-cluster"
+                    || result.verb == "session.load-galaxy"
+                {
+                    result.score -= 0.20;
+                    tracing::debug!(verb = %result.verb, score = result.score, "Applied query penalty -0.20");
+                }
+            }
+            if has_create_new_open && (has_cbu_cbus || has_fund) && !has_group {
+                if result.verb == "cbu.create" {
+                    result.score += 0.15;
+                    tracing::debug!(verb = %result.verb, score = result.score, "Applied query boost +0.15");
+                } else if result.verb == "cbu.create-from-client-group" {
+                    result.score -= 0.15;
+                    tracing::debug!(verb = %result.verb, score = result.score, "Applied query penalty -0.15");
+                }
+            }
+            if has_remove && has_role_term && result.verb == "cbu.remove-role" {
+                result.score += 0.20;
+                tracing::debug!(verb = %result.verb, score = result.score, "Applied query boost +0.20");
             }
         }
 

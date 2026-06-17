@@ -137,6 +137,16 @@ async fn acp_prompt_deal_update_status_state_anchor_provider_outcome(
         "selected",
     );
 
+    if acp_prompt_has_read_only_deal_state_anchor(prompt) {
+        report.status = "prompt_anchor_present";
+        report.state_anchor_source = Some("prompt_read_only_discovery_probe");
+        report.subject_id = acp_prompt_deal_id_from_prompt(prompt);
+        return AcpPromptStateAnchorProviderOutcome::Continue {
+            outgoing: Vec::new(),
+            report,
+        };
+    }
+
     let deal_id = match acp_prompt_deal_id_from_prompt(prompt) {
         Some(deal_id) => Some(deal_id),
         None => acp_prompt_session_deal_id(state, session_id).await,
@@ -144,24 +154,10 @@ async fn acp_prompt_deal_update_status_state_anchor_provider_outcome(
     let Some(deal_id) = deal_id else {
         report.status = "missing_subject";
         report.needed = vec!["deal_uuid"];
-        let result = acp_state_anchor_pending_question_value(
-            "deal_update_status_prompt_incomplete",
-            vec![
-                "deal_uuid",
-                "current_state",
-                "requested_state",
-                "evidence_digest",
-            ],
-            elapsed_us(started_at),
-        );
-        let outgoing = acp_state_anchor_structured_outgoing(
-            session_id,
-            response_id,
-            "Deal update-status language loop",
-            result,
-            "I need the deal UUID before I can bind a dry-run workbook. No mutation has run.",
-        );
-        return AcpPromptStateAnchorProviderOutcome::Complete { outgoing, report };
+        return AcpPromptStateAnchorProviderOutcome::Continue {
+            outgoing: Vec::new(),
+            report,
+        };
     };
     report.subject_id = Some(deal_id);
 
@@ -620,11 +616,47 @@ pub(crate) fn acp_prompt_blocks_from_params(
         .map(|request| request.prompt)
 }
 
+/// Helper to check if `text` contains `word` as a standalone word.
+///
+/// A word boundary is defined by the start/end of the string or non-alphanumeric characters.
+fn contains_word(text: &str, word: &str) -> bool {
+    if word.is_empty() {
+        return false;
+    }
+    let word_bytes = word.as_bytes();
+    let first_is_alphanumeric = word_bytes[0].is_ascii_alphanumeric();
+    let last_is_alphanumeric = word_bytes[word_bytes.len() - 1].is_ascii_alphanumeric();
+
+    let mut start = 0;
+    while let Some(pos) = text[start..].find(word) {
+        let abs_pos = start + pos;
+
+        let before_ok = if first_is_alphanumeric {
+            abs_pos == 0 || !text.as_bytes()[abs_pos - 1].is_ascii_alphanumeric()
+        } else {
+            true
+        };
+
+        let end_pos = abs_pos + word.len();
+        let after_ok = if last_is_alphanumeric {
+            end_pos == text.len() || !text.as_bytes()[end_pos].is_ascii_alphanumeric()
+        } else {
+            true
+        };
+
+        if before_ok && after_ok {
+            return true;
+        }
+        start = abs_pos + 1;
+    }
+    false
+}
+
 fn acp_prompt_looks_like_kyc_update_status(
     prompt: &[crate::acp_protocol::AcpContentBlock],
 ) -> bool {
     let lower = acp_prompt_text(prompt).to_ascii_lowercase();
-    (lower.contains("kyc") || lower.contains("kyc-case.update-status"))
+    (contains_word(&lower, "kyc") || lower.contains("kyc-case.update-status"))
         && acp_prompt_has_state_transition_intent(&lower)
 }
 
@@ -632,7 +664,7 @@ fn acp_prompt_looks_like_deal_update_status(
     prompt: &[crate::acp_protocol::AcpContentBlock],
 ) -> bool {
     let lower = acp_prompt_text(prompt).to_ascii_lowercase();
-    (lower.contains("deal") || lower.contains(DEAL_UPDATE_STATUS_TASK))
+    (contains_word(&lower, "deal") || lower.contains(DEAL_UPDATE_STATUS_TASK))
         && acp_prompt_has_state_transition_intent(&lower)
 }
 
@@ -640,23 +672,23 @@ fn acp_prompt_looks_like_stateful_transition_request(
     prompt: &[crate::acp_protocol::AcpContentBlock],
 ) -> bool {
     let lower = acp_prompt_text(prompt).to_ascii_lowercase();
-    let has_state_subject = lower.contains("case")
-        || lower.contains("workflow")
-        || lower.contains("dag")
-        || lower.contains("state")
-        || lower.contains("status")
-        || lower.contains("deal");
+    let has_state_subject = contains_word(&lower, "case")
+        || contains_word(&lower, "workflow")
+        || contains_word(&lower, "dag")
+        || contains_word(&lower, "state")
+        || contains_word(&lower, "status")
+        || contains_word(&lower, "deal");
     has_state_subject && acp_prompt_has_state_transition_intent(&lower)
 }
 
 fn acp_prompt_has_state_transition_intent(lower: &str) -> bool {
-    lower.contains("update-status")
-        || lower.contains("update status")
-        || lower.contains("advance")
-        || lower.contains("transition")
-        || lower.contains("move")
-        || lower.contains("change status")
-        || lower.contains("set status")
+    contains_word(lower, "update-status")
+        || contains_word(lower, "update status")
+        || contains_word(lower, "advance")
+        || contains_word(lower, "transition")
+        || contains_word(lower, "move")
+        || contains_word(lower, "change status")
+        || contains_word(lower, "set status")
 }
 
 fn acp_prompt_has_read_only_case_state_anchor(
@@ -672,6 +704,26 @@ fn acp_prompt_has_read_only_case_state_anchor(
                     .or_else(|| value.get("probeId"))
                     .and_then(|probe_id| probe_id.as_str())
                     == Some("kyc-case.read-state")
+            })
+            .unwrap_or(false),
+        crate::acp_protocol::AcpContentBlock::Text { .. }
+        | crate::acp_protocol::AcpContentBlock::ResourceLink { .. } => false,
+    })
+}
+
+fn acp_prompt_has_read_only_deal_state_anchor(
+    prompt: &[crate::acp_protocol::AcpContentBlock],
+) -> bool {
+    prompt.iter().any(|block| match block {
+        crate::acp_protocol::AcpContentBlock::EmbeddedResource { text, .. } => text
+            .as_deref()
+            .and_then(|text| serde_json::from_str::<Value>(text).ok())
+            .map(|value| {
+                value
+                    .get("probe_id")
+                    .or_else(|| value.get("probeId"))
+                    .and_then(|probe_id| probe_id.as_str())
+                    == Some("deal.read-state")
             })
             .unwrap_or(false),
         crate::acp_protocol::AcpContentBlock::Text { .. }

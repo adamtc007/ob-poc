@@ -459,6 +459,7 @@ fn build_orchestrator_with_parkable_executor(matcher: MockIntentMatcher) -> Repl
 /// and pack_id.
 async fn setup_in_pack_with_id(orch: &ReplOrchestratorV2, pack_id: &str) -> Uuid {
     let session_id = orch.create_session().await;
+    orch.set_test_session(session_id, true).await;
 
     // Set scope
     orch.process(

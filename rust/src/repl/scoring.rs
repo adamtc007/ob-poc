@@ -54,6 +54,28 @@ pub const STRONG_THRESHOLD: f32 = 0.70;
 ///
 /// If no pack is active, candidates are returned unchanged (except for
 /// floor filtering).
+///
+/// # Examples
+///
+/// ```rust,ignore
+/// use ob_poc::repl::scoring::apply_pack_scoring;
+/// use ob_poc::repl::types::VerbCandidate;
+/// use ob_poc::repl::context_stack::ContextStack;
+/// use ob_poc::repl::runbook::Runbook;
+///
+/// let mut candidates = vec![
+///     VerbCandidate {
+///         verb_fqn: "cbu.list".to_string(),
+///         description: "List CBUs".to_string(),
+///         score: 0.8,
+///         example: None,
+///         domain: None,
+///     }
+/// ];
+/// let runbook = Runbook::default();
+/// let context = ContextStack::from_runbook(&runbook, None, 0);
+/// apply_pack_scoring(&mut candidates, &context);
+/// ```
 pub fn apply_pack_scoring(candidates: &mut Vec<VerbCandidate>, context: &ContextStack) {
     let pack = context.active_pack();
 
@@ -95,6 +117,14 @@ pub fn apply_pack_scoring(candidates: &mut Vec<VerbCandidate>, context: &Context
                     }
                 }
             }
+        }
+
+        // If client group scope is already set, exclude scope-setting verbs (except in test sessions)
+        if !context.is_test_session
+            && context.derived_scope.client_group_id.is_some()
+            && (c.verb_fqn == "session.load-cluster" || c.verb_fqn == "session.load-galaxy")
+        {
+            return false;
         }
 
         // Exclusion filtering

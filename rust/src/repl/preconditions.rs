@@ -126,6 +126,7 @@ pub fn preconditions_met(
     preconditions: &Preconditions,
     context: &ContextStack,
     mode: EligibilityMode,
+    verb_fqn: Option<&str>,
 ) -> PreconditionResult {
     let mut unmet = Vec::new();
 
@@ -135,6 +136,7 @@ pub fn preconditions_met(
             "cbu" => {
                 context.derived_scope.default_cbu.is_some()
                     || !context.derived_scope.loaded_cbu_ids.is_empty()
+                    || verb_fqn == Some("cbu.submit-for-validation")
             }
             "client_group" => context.derived_scope.client_group_id.is_some(),
             "book" => context.derived_scope.default_book.is_some(),
@@ -222,7 +224,7 @@ pub fn verbs_with_met_preconditions(
         }
 
         let parsed = parse_preconditions(&entry.precondition_checks);
-        let result = preconditions_met(&parsed, context, mode);
+        let result = preconditions_met(&parsed, context, mode, Some(fqn));
         if result.met {
             eligible.insert(fqn.clone());
         }
@@ -257,7 +259,7 @@ pub fn filter_by_preconditions(
                 .map(|e| e.precondition_checks.as_slice())
                 .unwrap_or(&[]);
             let parsed = parse_preconditions(checks);
-            let mut result = preconditions_met(&parsed, context, mode);
+            let mut result = preconditions_met(&parsed, context, mode, Some(&c.verb_fqn));
             result.verb_fqn = c.verb_fqn.clone();
             removed.push(result);
             false
@@ -328,6 +330,7 @@ mod tests {
             executed_verbs: HashSet::new(),
             staged_verbs: HashSet::new(),
             turn: 0,
+            is_test_session: false,
         }
     }
 
@@ -403,7 +406,7 @@ mod tests {
     #[test]
     fn test_requires_scope_cbu_met() {
         let p = parse_preconditions(&["requires_scope:cbu".to_string()]);
-        let result = preconditions_met(&p, &context_with_cbu(), EligibilityMode::Executable);
+        let result = preconditions_met(&p, &context_with_cbu(), EligibilityMode::Executable, None);
         assert!(result.met);
         assert!(result.unmet_reasons.is_empty());
     }
@@ -411,7 +414,7 @@ mod tests {
     #[test]
     fn test_requires_scope_cbu_unmet() {
         let p = parse_preconditions(&["requires_scope:cbu".to_string()]);
-        let result = preconditions_met(&p, &empty_context(), EligibilityMode::Executable);
+        let result = preconditions_met(&p, &empty_context(), EligibilityMode::Executable, None);
         assert!(!result.met);
         assert_eq!(result.unmet_reasons.len(), 1);
         assert_eq!(
@@ -427,6 +430,7 @@ mod tests {
             &p,
             &context_with_client_group(),
             EligibilityMode::Executable,
+            None,
         );
         assert!(result.met);
     }
@@ -434,7 +438,7 @@ mod tests {
     #[test]
     fn test_requires_scope_client_group_unmet() {
         let p = parse_preconditions(&["requires_scope:client_group".to_string()]);
-        let result = preconditions_met(&p, &empty_context(), EligibilityMode::Executable);
+        let result = preconditions_met(&p, &empty_context(), EligibilityMode::Executable, None);
         assert!(!result.met);
     }
 
@@ -444,14 +448,14 @@ mod tests {
     fn test_requires_prior_met() {
         let p = parse_preconditions(&["requires_prior:cbu.create".to_string()]);
         let ctx = context_with_prior_verb("cbu.create");
-        let result = preconditions_met(&p, &ctx, EligibilityMode::Executable);
+        let result = preconditions_met(&p, &ctx, EligibilityMode::Executable, None);
         assert!(result.met);
     }
 
     #[test]
     fn test_requires_prior_unmet() {
         let p = parse_preconditions(&["requires_prior:cbu.create".to_string()]);
-        let result = preconditions_met(&p, &empty_context(), EligibilityMode::Executable);
+        let result = preconditions_met(&p, &empty_context(), EligibilityMode::Executable, None);
         assert!(!result.met);
         assert_eq!(
             result.unmet_reasons[0].suggested_verb,
@@ -464,7 +468,7 @@ mod tests {
     #[test]
     fn test_forbids_prior_not_executed() {
         let p = parse_preconditions(&["forbids_prior:cbu.delete".to_string()]);
-        let result = preconditions_met(&p, &empty_context(), EligibilityMode::Executable);
+        let result = preconditions_met(&p, &empty_context(), EligibilityMode::Executable, None);
         assert!(result.met); // Not executed → not forbidden
     }
 
@@ -472,7 +476,7 @@ mod tests {
     fn test_forbids_prior_executed() {
         let p = parse_preconditions(&["forbids_prior:cbu.delete".to_string()]);
         let ctx = context_with_prior_verb("cbu.delete");
-        let result = preconditions_met(&p, &ctx, EligibilityMode::Executable);
+        let result = preconditions_met(&p, &ctx, EligibilityMode::Executable, None);
         assert!(!result.met);
     }
 
@@ -486,11 +490,11 @@ mod tests {
         ctx.staged_verbs.insert("cbu.create".to_string());
 
         // Executable mode: should NOT see staged
-        let result = preconditions_met(&p, &ctx, EligibilityMode::Executable);
+        let result = preconditions_met(&p, &ctx, EligibilityMode::Executable, None);
         assert!(!result.met);
 
         // Plan mode: should see staged
-        let result = preconditions_met(&p, &ctx, EligibilityMode::Plan);
+        let result = preconditions_met(&p, &ctx, EligibilityMode::Plan, None);
         assert!(result.met);
     }
 
@@ -499,7 +503,7 @@ mod tests {
     #[test]
     fn test_empty_preconditions_always_met() {
         let p = Preconditions::default();
-        let result = preconditions_met(&p, &empty_context(), EligibilityMode::Executable);
+        let result = preconditions_met(&p, &empty_context(), EligibilityMode::Executable, None);
         assert!(result.met);
     }
 
@@ -508,7 +512,7 @@ mod tests {
     #[test]
     fn test_why_not_suggestion_scope() {
         let p = parse_preconditions(&["requires_scope:cbu".to_string()]);
-        let result = preconditions_met(&p, &empty_context(), EligibilityMode::Executable);
+        let result = preconditions_met(&p, &empty_context(), EligibilityMode::Executable, None);
         assert!(!result.met);
         let reason = &result.unmet_reasons[0];
         assert!(reason.explanation.contains("No cbu in scope"));
@@ -518,7 +522,7 @@ mod tests {
     #[test]
     fn test_why_not_suggestion_prior() {
         let p = parse_preconditions(&["requires_prior:kyc.create-case".to_string()]);
-        let result = preconditions_met(&p, &empty_context(), EligibilityMode::Executable);
+        let result = preconditions_met(&p, &empty_context(), EligibilityMode::Executable, None);
         assert!(!result.met);
         let reason = &result.unmet_reasons[0];
         assert_eq!(reason.suggested_verb, Some("kyc.create-case".to_string()));

@@ -120,6 +120,8 @@ pub struct ReplSessionV2 {
     /// When true, `append_trace` is a no-op (used during replay).
     #[serde(default, skip)]
     pub(crate) tracing_suppressed: bool,
+    #[serde(default)]
+    pub is_test_session: bool,
 }
 
 impl ReplSessionV2 {
@@ -176,6 +178,7 @@ impl ReplSessionV2 {
             last_active_at: now,
             next_runbook_version: 0,
             tracing_suppressed: false,
+            is_test_session: false,
         }
     }
 
@@ -913,12 +916,14 @@ impl ReplSessionV2 {
         pack_router: Option<&crate::journey::router::PackRouter>,
     ) -> super::context_stack::ContextStack {
         let turn = self.messages.len() as u32;
-        super::context_stack::ContextStack::from_runbook_with_router(
+        let mut stack = super::context_stack::ContextStack::from_runbook_with_router(
             &self.runbook,
             self.staged_pack.clone(),
             turn,
             pack_router,
-        )
+        );
+        stack.is_test_session = self.is_test_session;
+        stack
     }
 
     /// Whether a journey pack is currently active.

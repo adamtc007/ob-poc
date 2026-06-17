@@ -59,7 +59,7 @@ mod template_batch_tests {
 
             // Clean up CBU products
             sqlx::query(
-                r#"DELETE FROM "ob-poc".cbu_products WHERE cbu_id IN
+                r#"DELETE FROM "ob-poc".cbu_product_subscriptions WHERE cbu_id IN
                    (SELECT cbu_id FROM "ob-poc".cbus WHERE name LIKE $1)"#,
             )
             .bind(&pattern)
@@ -506,12 +506,13 @@ mod template_batch_tests {
         let results = executor.execute_dsl(&dsl, &mut ctx).await;
 
         // Check if products were added
-        let product_count: i64 =
-            sqlx::query_scalar(r#"SELECT COUNT(*) FROM "ob-poc".cbu_products WHERE cbu_id = $1"#)
-                .bind(cbu_id)
-                .fetch_one(&db.pool)
-                .await
-                .unwrap_or(0);
+        let product_count: i64 = sqlx::query_scalar(
+            r#"SELECT COUNT(*) FROM "ob-poc".cbu_product_subscriptions WHERE cbu_id = $1"#,
+        )
+        .bind(cbu_id)
+        .fetch_one(&db.pool)
+        .await
+        .unwrap_or(0);
 
         db.cleanup().await?;
 

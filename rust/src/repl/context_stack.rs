@@ -76,6 +76,9 @@ pub struct ContextStack {
 
     /// Current turn number (for exclusion decay).
     pub turn: u32,
+
+    /// Whether this context stack belongs to a test session.
+    pub is_test_session: bool,
 }
 
 impl ContextStack {
@@ -132,6 +135,7 @@ impl ContextStack {
             executed_verbs,
             staged_verbs,
             turn,
+            is_test_session: false,
         }
     }
 
