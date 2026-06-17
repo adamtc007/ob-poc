@@ -235,6 +235,8 @@ pub struct ToolHandlers {
     /// inside `dsl_execute` / `dsl_execute_submission` fail with the
     /// actionable "no SemOsVerbOp registered" error.
     pub(super) sem_os_ops: Option<Arc<sem_os_postgres::ops::SemOsVerbOpRegistry>>,
+    /// Optional REPL V2 Orchestrator for dry-run/intent-only processing.
+    pub(super) orchestrator: Option<Arc<crate::sequencer::ReplOrchestratorV2>>,
 }
 
 impl ToolHandlers {
@@ -260,7 +262,17 @@ impl ToolHandlers {
             sem_os_service: None,
             agent_mode: sem_os_types::agent_mode::AgentMode::default(),
             sem_os_ops: None,
+            orchestrator: None,
         }
+    }
+
+    /// Set the REPL V2 Orchestrator.
+    pub fn with_orchestrator(
+        mut self,
+        orchestrator: Arc<crate::sequencer::ReplOrchestratorV2>,
+    ) -> Self {
+        self.orchestrator = Some(orchestrator);
+        self
     }
 
     /// Set the authoring pipeline mode (Research vs Governed).
@@ -786,10 +798,27 @@ impl ToolHandlers {
         if let Some(ref client) = self.sem_os_client {
             use dsl_core::Statement;
             let actor = crate::policy::ActorResolver::from_env();
+            let mut constellation_family = None;
+            let mut constellation_map = None;
+            if let (Some(sid), Some(ref sessions)) = (session_id, &self.sessions) {
+                let store = sessions.read().await;
+                if let Some(session) = store.get(&sid) {
+                    if let Some(ref dom) = session.domain_hint {
+                        if let Some(ws) = crate::repl::types_v2::WorkspaceKind::from_hint(dom) {
+                            let entry = ws.registry_entry();
+                            constellation_family =
+                                Some(entry.default_constellation_family.to_string());
+                            constellation_map = Some(entry.default_constellation_map.to_string());
+                        }
+                    }
+                }
+            }
             let envelope = crate::agent::orchestrator::resolve_allowed_verbs(
                 client.as_ref(),
                 &actor,
                 session_id,
+                constellation_family,
+                constellation_map,
             )
             .await;
             let phase2 =
@@ -1500,12 +1529,31 @@ impl ToolHandlers {
         // Get or create verb searcher
         let searcher = self.get_verb_searcher().await?;
 
+        let (constellation_family, constellation_map) = if let Some(dom) = domain {
+            if let Some(ws) = crate::repl::types_v2::WorkspaceKind::from_hint(dom) {
+                let entry = ws.registry_entry();
+                (
+                    Some(entry.default_constellation_family.to_string()),
+                    Some(entry.default_constellation_map.to_string()),
+                )
+            } else {
+                (None, None)
+            }
+        } else {
+            (None, None)
+        };
+
         // Resolve SemReg allowed verbs BEFORE search (Phase 3: pre-constrained)
         let envelope = if let Some(ref client) = self.sem_os_client {
             let actor = crate::policy::ActorResolver::from_env();
-            let env =
-                crate::agent::orchestrator::resolve_allowed_verbs(client.as_ref(), &actor, None)
-                    .await;
+            let env = crate::agent::orchestrator::resolve_allowed_verbs(
+                client.as_ref(),
+                &actor,
+                None,
+                constellation_family,
+                constellation_map,
+            )
+            .await;
             Some(env)
         } else {
             None
@@ -1602,39 +1650,34 @@ impl ToolHandlers {
             .as_str()
             .and_then(|s| uuid::Uuid::parse_str(s).ok());
 
-        // Route through unified orchestrator
-        let searcher = self.get_verb_searcher().await?;
-        let actor = crate::policy::ActorResolver::from_env();
-        let policy_gate = std::sync::Arc::new(crate::policy::PolicyGate::from_env());
-        let orch_ctx = crate::agent::orchestrator::OrchestratorContext {
-            actor,
-            session_id,
-            case_id: None,
-            dominant_entity_id: None,
-            scope: None,
-            pool: self.pool.clone(),
-            verb_searcher: std::sync::Arc::new(searcher),
-            lookup_service: None,
-            policy_gate,
-            source: crate::agent::orchestrator::UtteranceSource::Mcp,
-            sem_os_client: self.sem_os_client.clone(),
-            agent_mode: self.agent_mode,
-            goals: vec![],
-            stage_focus: None,
-            sage_engine: None,
-            pre_sage_entity_kind: None,
-            pre_sage_entity_name: None,
-            pre_sage_entity_confidence: None,
-            recent_sage_intents: vec![],
-            nlci_compiler: Some(crate::semtaxonomy_v2::build_minimal_cbu_compiler()),
-            discovery_selected_domain: None,
-            discovery_selected_family: None,
-            discovery_selected_constellation: None,
-            discovery_answers: std::collections::HashMap::new(),
-            session_cbu_ids: None,
+        // Route through unified orchestrator process_intent_only
+        let result = if let Some(ref orch) = self.orchestrator {
+            orch.process_intent_only(session_id, instruction)
+                .await
+                .map_err(|e| anyhow::anyhow!("Orchestrator failed: {}", e))?
+        } else {
+            let searcher = self.get_verb_searcher().await?;
+            let mut orchestrator = crate::sequencer::ReplOrchestratorV2::new(
+                crate::journey::router::PackRouter::new(vec![]),
+                Arc::new(crate::sequencer::StubExecutor),
+            )
+            .with_verb_searcher(std::sync::Arc::new(searcher))
+            .with_nlci_compiler(crate::semtaxonomy_v2::build_minimal_cbu_compiler());
+
+            #[cfg(feature = "database")]
+            {
+                orchestrator = orchestrator.with_pool(self.pool.clone());
+            }
+
+            if let Some(ref client) = self.sem_os_client {
+                orchestrator = orchestrator.with_sem_os_client(client.clone());
+            }
+
+            orchestrator
+                .process_intent_only(session_id, instruction)
+                .await
+                .map_err(|e| anyhow::anyhow!("Transient orchestrator failed: {}", e))?
         };
-        let outcome = crate::agent::orchestrator::handle_utterance(&orch_ctx, instruction).await?;
-        let result = outcome.pipeline_result;
 
         // Capture feedback for learning loop
         let _feedback_id = if let Some(ref feedback_svc) = self.feedback_service {

@@ -64,6 +64,15 @@ impl McpServer {
         self
     }
 
+    /// Set the REPL V2 Orchestrator.
+    pub fn with_orchestrator(
+        mut self,
+        orchestrator: Arc<crate::sequencer::ReplOrchestratorV2>,
+    ) -> Self {
+        self.handlers = self.handlers.with_orchestrator(orchestrator);
+        self
+    }
+
     /// Run the server, reading from stdin and writing to stdout
     pub async fn run(&self) -> anyhow::Result<()> {
         let stdin = std::io::stdin();

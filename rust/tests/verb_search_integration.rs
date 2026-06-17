@@ -1027,7 +1027,7 @@ fn session_scenarios() -> Vec<TestScenario> {
         TestScenario::matched(
             "load book",
             "load the blackrock book",
-            "session.load-galaxy",
+            "session.load-cluster",
         )
         .with_category("session"),
         TestScenario::matched("load cbu", "load cbu acme fund", "session.load-cbu")

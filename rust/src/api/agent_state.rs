@@ -49,7 +49,7 @@ pub struct AgentState {
 }
 
 impl AgentState {
-    fn build_sage_engine() -> Arc<dyn SageEngine> {
+    pub fn build_sage_engine() -> Arc<dyn SageEngine> {
         if std::env::var("SAGE_LLM").ok().as_deref() == Some("1") {
             match ob_agentic::client_factory::create_llm_client() {
                 Ok(client) => {

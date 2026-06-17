@@ -107,6 +107,7 @@ impl SessionRepositoryV2 {
             "cbu_ids": session.cbu_ids,
             "name": session.name,
             "last_entity_resolution": session.last_entity_resolution,
+            "is_test_session": session.is_test_session,
         });
         let snapshot_id = Uuid::now_v7();
         let workbook_snapshot = serde_json::json!({
@@ -281,6 +282,13 @@ impl SessionRepositoryV2 {
                     state,
                     client_context,
                     journey_context,
+                    is_test_session: serde_json::from_value(
+                        extended_state
+                            .get("is_test_session")
+                            .cloned()
+                            .unwrap_or(serde_json::Value::Bool(false)),
+                    )
+                    .unwrap_or(false),
                     staged_pack: None,
                     staged_pack_hash: None,
                     runbook,

@@ -86,6 +86,7 @@ struct LoadUniverseResult {
 #[derive(Debug, Clone, Serialize)]
 struct LoadGalaxyResult {
     jurisdiction: String,
+    cbu_ids: Vec<Uuid>,
     count_added: usize,
     total_loaded: usize,
 }
@@ -95,6 +96,7 @@ struct LoadClusterResult {
     manco_name: String,
     manco_entity_id: Uuid,
     jurisdiction: Option<String>,
+    cbu_ids: Vec<Uuid>,
     count_added: usize,
     total_loaded: usize,
 }
@@ -277,11 +279,12 @@ async fn session_load_galaxy(pool: &PgPool, args: &Value, extensions: &mut Value
     .fetch_all(pool)
     .await?;
     let mut session = take_or_create_session(extensions);
-    let count_added = session.load_cbus(cbu_ids);
+    let count_added = session.load_cbus(cbu_ids.clone());
     let total_loaded = session.cbu_count();
     set_session(extensions, session);
     Ok(json!(LoadGalaxyResult {
         jurisdiction,
+        cbu_ids,
         count_added,
         total_loaded,
     }))
@@ -362,7 +365,7 @@ async fn session_load_cluster(
 
     let mut session = take_or_create_session(extensions);
     session.name = Some(format!("{apex_name} Book"));
-    let count_added = session.load_cbus(cbu_ids);
+    let count_added = session.load_cbus(cbu_ids.clone());
     let total_loaded = session.cbu_count();
     set_session(extensions, session);
 
@@ -370,6 +373,7 @@ async fn session_load_cluster(
         manco_name: apex_name,
         manco_entity_id: apex_entity_id,
         jurisdiction,
+        cbu_ids,
         count_added,
         total_loaded,
     }))

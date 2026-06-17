@@ -1076,7 +1076,7 @@ fn apply_sage_trace_fields(
 }
 
 #[cfg(feature = "database")]
-pub async fn handle_utterance(
+pub(crate) async fn handle_utterance(
     ctx: &OrchestratorContext,
     utterance: &str,
 ) -> anyhow::Result<OrchestratorOutcome> {
@@ -1508,7 +1508,7 @@ fn agent_halt_phase(outcome: &OrchestratorOutcome) -> Option<i16> {
 
 #[cfg(feature = "database")]
 #[allow(deprecated)]
-pub async fn legacy_handle_utterance(
+pub(crate) async fn legacy_handle_utterance(
     ctx: &OrchestratorContext,
     utterance: &str,
 ) -> anyhow::Result<OrchestratorOutcome> {
@@ -3218,6 +3218,34 @@ pub(crate) async fn resolve_sem_reg_verbs(
     }
 }
 
+/// Unified internal helper for context resolution against SemOsClient.
+#[cfg(feature = "database")]
+pub(crate) async fn resolve_context_internal(
+    client: &dyn SemOsClient,
+    actor: &ActorContext,
+    request: sem_os_policy::context_resolution::ContextResolutionRequest,
+) -> SemOsContextEnvelope {
+    let principal =
+        sem_os_core::principal::Principal::in_process(&actor.actor_id, actor.roles.clone());
+
+    match client.resolve_context(&principal, request).await {
+        Ok(response) => {
+            let envelope = SemOsContextEnvelope::from_resolution(&response);
+            tracing::debug!(
+                allowed_count = envelope.allowed_verbs.len(),
+                pruned_count = envelope.pruned_count(),
+                fingerprint = %envelope.fingerprint_str(),
+                "SemReg context resolution completed"
+            );
+            envelope
+        }
+        Err(e) => {
+            tracing::warn!(error = %e, source = "sem_reg", "SemReg context resolution failed");
+            SemOsContextEnvelope::unavailable()
+        }
+    }
+}
+
 /// Resolve verbs via SemOsClient DI boundary (in-process or HTTP).
 async fn resolve_via_client(
     client: &dyn SemOsClient,
@@ -3275,36 +3303,32 @@ async fn resolve_via_client(
             known_inputs: ctx.discovery_answers.clone(),
         },
     };
-    let principal =
-        sem_os_core::principal::Principal::in_process(&ctx.actor.actor_id, ctx.actor.roles.clone());
-
-    match client.resolve_context(&principal, request).await {
-        Ok(response) => {
-            let envelope = SemOsContextEnvelope::from_resolution(&response);
-            tracing::debug!(
-                allowed_count = envelope.allowed_verbs.len(),
-                pruned_count = envelope.pruned_count(),
-                fingerprint = %envelope.fingerprint_str(),
-                "SemReg context resolution completed (client)"
-            );
-            envelope
-        }
-        Err(e) => {
-            tracing::warn!(error = %e, source = "sem_reg", "SemReg context resolution failed (client)");
-            SemOsContextEnvelope::unavailable()
-        }
-    }
+    resolve_context_internal(client, &ctx.actor, request).await
 }
 
 /// Resolve the SemReg allowed verb set using only a SemOsClient + actor context.
 ///
 /// This is a lightweight entry point for MCP tools (verb_search, dsl_execute) that
 /// don't have a full OrchestratorContext. Returns a `SemOsContextEnvelope`.
+///
+/// # Examples
+///
+/// ```ignore
+/// let envelope = resolve_allowed_verbs(
+///     client,
+///     actor,
+///     Some(session_id),
+///     Some("ownership".to_string()),
+///     Some("group.ownership".to_string()),
+/// ).await;
+/// ```
 #[cfg(feature = "database")]
 pub async fn resolve_allowed_verbs(
     client: &dyn SemOsClient,
     actor: &ActorContext,
     session_id: Option<Uuid>,
+    constellation_family: Option<String>,
+    constellation_map: Option<String>,
 ) -> SemOsContextEnvelope {
     use sem_os_policy::context_resolution::{EvidenceMode, SubjectRef};
 
@@ -3327,27 +3351,14 @@ pub async fn resolve_allowed_verbs(
         point_in_time: None,
         entity_kind: None,
         entity_confidence: None,
-        discovery: Default::default(),
+        discovery: sem_os_policy::context_resolution::DiscoveryContext {
+            selected_domain_id: None,
+            selected_family_id: constellation_family,
+            selected_constellation_id: constellation_map,
+            known_inputs: Default::default(),
+        },
     };
-    let principal =
-        sem_os_core::principal::Principal::in_process(&actor.actor_id, actor.roles.clone());
-
-    match client.resolve_context(&principal, request).await {
-        Ok(response) => {
-            let envelope = SemOsContextEnvelope::from_resolution(&response);
-            tracing::debug!(
-                allowed_count = envelope.allowed_verbs.len(),
-                pruned_count = envelope.pruned_count(),
-                fingerprint = %envelope.fingerprint_str(),
-                "SemReg lightweight resolve completed"
-            );
-            envelope
-        }
-        Err(e) => {
-            tracing::warn!(error = %e, source = "sem_reg", "SemReg lightweight resolve failed");
-            SemOsContextEnvelope::unavailable()
-        }
-    }
+    resolve_context_internal(client, actor, request).await
 }
 
 // -- Tests --

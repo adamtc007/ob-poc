@@ -1703,7 +1703,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                         .with_intent_matcher(intent_matcher)
                         .with_intent_service(intent_service)
                         .with_macro_registry(macro_reg_for_orchestrator)
-                        .with_lookup_service(lookup_service);
+                        .with_lookup_service(lookup_service)
+                        .with_verb_searcher(searcher.clone());
 
                     tracing::info!(
                         "V2 REPL IntentService wired in {}ms (semantic verb search enabled)",
@@ -1733,6 +1734,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             orchestrator = orchestrator.with_sem_os_client(client.clone());
             tracing::info!("REPL V2: SemOS client wired for context-constrained verb search");
         }
+
+        // Wire Sage Engine & NLCI Compiler for intent/disposition pre-classification
+        let sage_engine = ob_poc::api::AgentState::build_sage_engine();
+        let nlci_compiler = ob_poc::semtaxonomy_v2::build_minimal_cbu_compiler();
+        orchestrator = orchestrator
+            .with_sage_engine(sage_engine)
+            .with_nlci_compiler(nlci_compiler);
 
         let repl_v2_orchestrator = Arc::new(orchestrator);
         if let Some(ref dispatcher) = bpmn_dispatcher {

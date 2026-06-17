@@ -25,6 +25,10 @@
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 
+use crate::mcp::verb_search::HybridVerbSearcher;
+use crate::sage::SageEngine;
+use crate::semtaxonomy_v2::IntentCompiler;
+
 use anyhow::Context as _;
 use serde::{Deserialize, Serialize};
 use tokio::sync::RwLock;
@@ -269,6 +273,12 @@ pub struct ReplOrchestratorV2 {
     /// bridge before the REPL marks it failed and returns control to the
     /// caller. This protects `/run` from indefinitely-held HTTP requests.
     runbook_step_timeout: std::time::Duration,
+    /// Optional Sage engine used for Stage 1.5/3 pre-classification.
+    sage_engine: Option<Arc<dyn SageEngine>>,
+    /// Optional NLCI compiler hook for the deterministic replacement pipeline.
+    nlci_compiler: Option<Arc<dyn IntentCompiler>>,
+    /// Optional verb searcher for dsl_generate / process_intent_only pipeline.
+    verb_searcher: Option<Arc<HybridVerbSearcher>>,
 }
 
 impl ReplOrchestratorV2 {
@@ -302,6 +312,9 @@ impl ReplOrchestratorV2 {
             acp_session_input_draft_mode:
                 crate::acp_session_input_draft_mode::AcpSessionInputDraftMode::Deterministic,
             runbook_step_timeout: std::time::Duration::from_secs(5),
+            sage_engine: None,
+            nlci_compiler: None,
+            verb_searcher: None,
         }
     }
 
@@ -365,6 +378,48 @@ impl ReplOrchestratorV2 {
     /// The proposal engine returns ranked alternatives with evidence.
     pub fn with_proposal_engine(mut self, engine: Arc<ProposalEngine>) -> Self {
         self.proposal_engine = Some(engine);
+        self
+    }
+
+    /// Attach a SageEngine for pre-classification (Stage 1.5).
+    ///
+    /// # Examples
+    ///
+    /// ```ignore
+    /// let engine = Arc::new(DeterministicSage);
+    /// let orchestrator = ReplOrchestratorV2::new(pack_router, executor)
+    ///     .with_sage_engine(engine);
+    /// ```
+    pub fn with_sage_engine(mut self, engine: Arc<dyn SageEngine>) -> Self {
+        self.sage_engine = Some(engine);
+        self
+    }
+
+    /// Attach an IntentCompiler for the deterministic replacement pipeline.
+    ///
+    /// # Examples
+    ///
+    /// ```ignore
+    /// let compiler = Arc::new(build_minimal_cbu_compiler());
+    /// let orchestrator = ReplOrchestratorV2::new(pack_router, executor)
+    ///     .with_nlci_compiler(compiler);
+    /// ```
+    pub fn with_nlci_compiler(mut self, compiler: Arc<dyn IntentCompiler>) -> Self {
+        self.nlci_compiler = Some(compiler);
+        self
+    }
+
+    /// Attach a HybridVerbSearcher.
+    ///
+    /// # Examples
+    ///
+    /// ```ignore
+    /// let searcher = Arc::new(HybridVerbSearcher::new(embedder));
+    /// let orchestrator = ReplOrchestratorV2::new(pack_router, executor)
+    ///     .with_verb_searcher(searcher);
+    /// ```
+    pub fn with_verb_searcher(mut self, searcher: Arc<HybridVerbSearcher>) -> Self {
+        self.verb_searcher = Some(searcher);
         self
     }
 
@@ -1144,6 +1199,67 @@ impl ReplOrchestratorV2 {
         self.process(session_id, input).await
     }
 
+    /// Runs intent pre-classification and matching without mutating the session state machine.
+    /// Used by MCP tools (e.g. `dsl_generate`) to perform dry-run matching.
+    ///
+    /// # Examples
+    ///
+    /// ```ignore
+    /// let result = orchestrator.process_intent_only(Some(session_id), "show Allianz").await;
+    /// ```
+    pub async fn process_intent_only(
+        &self,
+        session_id: Option<Uuid>,
+        input: &str,
+    ) -> Result<crate::mcp::intent_pipeline::PipelineResult, OrchestratorError> {
+        let actor = crate::policy::ActorResolver::from_env();
+        let policy_gate = Arc::new(crate::policy::PolicyGate::from_env());
+
+        let searcher = self.verb_searcher.clone().ok_or_else(|| {
+            OrchestratorError::Configuration("verb_searcher is not configured".to_string())
+        })?;
+
+        #[cfg(feature = "database")]
+        let pool = self.pool.clone().ok_or_else(|| {
+            OrchestratorError::Configuration("database pool is not configured".to_string())
+        })?;
+
+        let orch_ctx = crate::agent::orchestrator::OrchestratorContext {
+            actor,
+            session_id,
+            case_id: None,
+            dominant_entity_id: None,
+            scope: None,
+            #[cfg(feature = "database")]
+            pool,
+            verb_searcher: searcher,
+            lookup_service: self.lookup_service.clone(),
+            policy_gate,
+            source: crate::agent::orchestrator::UtteranceSource::Mcp,
+            sem_os_client: self.sem_os_client.clone(),
+            agent_mode: sem_os_types::agent_mode::AgentMode::Governed,
+            goals: vec![],
+            stage_focus: None,
+            sage_engine: self.sage_engine.clone(),
+            pre_sage_entity_kind: None,
+            pre_sage_entity_name: None,
+            pre_sage_entity_confidence: None,
+            recent_sage_intents: vec![],
+            nlci_compiler: self.nlci_compiler.clone(),
+            discovery_selected_domain: None,
+            discovery_selected_family: None,
+            discovery_selected_constellation: None,
+            discovery_answers: std::collections::HashMap::new(),
+            session_cbu_ids: None,
+        };
+
+        let outcome = crate::agent::orchestrator::handle_utterance(&orch_ctx, input)
+            .await
+            .map_err(|e| OrchestratorError::ExecutionFailed(e.to_string()))?;
+
+        Ok(outcome.pipeline_result)
+    }
+
     pub async fn process(
         &self,
         session_id: Uuid,
@@ -1251,6 +1367,42 @@ impl ReplOrchestratorV2 {
                 if let Some(narration_resp) = self.handle_contextual_query(session, content) {
                     drop(sessions);
                     return Ok(narration_resp);
+                }
+            }
+
+            // Run Sage pre-classification (Stage 1.5) if engine is present
+            if let Some(ref sage) = self.sage_engine {
+                let current_cbu_id = session
+                    .workspace_stack
+                    .last()
+                    .and_then(|frame| frame.subject_id);
+
+                let sage_ctx = crate::sage::SageContext {
+                    session_id: Some(session.id),
+                    stage_focus: None,
+                    goals: vec![],
+                    entity_kind: current_cbu_id.map(|_| "cbu".to_string()),
+                    dominant_entity_name: None,
+                    last_intents: vec![],
+                };
+
+                match sage.classify(content, &sage_ctx).await {
+                    Ok(intent) => {
+                        tracing::info!(
+                            session_id = %session.id,
+                            sage_plane = ?intent.plane,
+                            sage_polarity = ?intent.polarity,
+                            sage_domain = %intent.domain_concept,
+                            "Stage 1.5: Sage pre-classification completed in REPL V2 process"
+                        );
+                    }
+                    Err(e) => {
+                        tracing::warn!(
+                            session_id = %session.id,
+                            error = %e,
+                            "Stage 1.5: Sage pre-classification failed in REPL V2 process (non-fatal)"
+                        );
+                    }
                 }
             }
         }
@@ -8868,6 +9020,10 @@ pub enum OrchestratorError {
     PersistenceFailed(String),
     /// A persistence-requiring operation was attempted but no repository is configured.
     NoPersistenceConfigured,
+    /// An orchestrator execution failed.
+    ExecutionFailed(String),
+    /// Orchestrator is misconfigured.
+    Configuration(String),
 }
 
 impl std::fmt::Display for OrchestratorError {
@@ -8881,6 +9037,8 @@ impl std::fmt::Display for OrchestratorError {
                     "Session persistence required but no repository configured"
                 )
             }
+            Self::ExecutionFailed(msg) => write!(f, "Execution failed: {}", msg),
+            Self::Configuration(msg) => write!(f, "Configuration error: {}", msg),
         }
     }
 }

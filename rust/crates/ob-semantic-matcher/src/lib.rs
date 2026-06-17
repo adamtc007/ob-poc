@@ -40,7 +40,6 @@ pub mod centroid;
 pub mod client_group_resolver;
 pub mod embedder;
 pub mod feedback;
-pub mod matcher;
 pub mod phonetic;
 pub mod types;
 
@@ -49,7 +48,6 @@ pub use client_group_resolver::{
     ClientGroupAnchorResolver, ClientGroupResolver, PgClientGroupResolver, ResolutionConfig,
 };
 pub use embedder::Embedder;
-pub use matcher::SemanticMatcher;
 pub use phonetic::PhoneticMatcher;
 pub use types::{MatchMethod, MatchResult, MatcherConfig, MatcherError, VerbPattern};
 

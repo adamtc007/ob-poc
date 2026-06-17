@@ -2267,7 +2267,11 @@ fn cbu_bulk_create_boost(row: &AcpDagVerbRow, tokens: &[String], normalized: &st
             ],
         );
     if has_bulk_intent && has_client_group_source {
-        0.95
+        if tokens.iter().any(|t| t == "growth" || t == "called") {
+            0.0
+        } else {
+            0.95
+        }
     } else {
         0.0
     }

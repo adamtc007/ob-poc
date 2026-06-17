@@ -57,6 +57,7 @@ pub struct DominantEntity {
 }
 
 /// Unified lookup service combining verb search and entity linking
+#[derive(Clone)]
 pub struct LookupService {
     /// Entity linking for mention extraction and resolution
     entity_linker: Arc<dyn EntityLinkingService>,
