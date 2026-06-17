@@ -46,6 +46,8 @@ allowed_verbs:
   - deal.request-onboarding
   - deal.request-onboarding-batch
   - cbu.read
+  - semantic.next-actionable
+  - onboarding.status
   # Post-handoff service-resource data dictionary lifecycle (Tranche 4 / v0.5)
   # These operate on the deal_onboarding_request created by deal.request-onboarding
   # and walk the compile → dispatch → confirm → status chain.

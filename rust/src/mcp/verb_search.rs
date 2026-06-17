@@ -34,7 +34,7 @@
 //! - Asymmetric (query→target): scores 0.5-0.8 (instruction-prefixed query vs raw target)
 //!
 //! Thresholds for BGE asymmetric mode:
-//! - fallback_threshold: 0.55 (retrieval cutoff - must retrieve candidates)
+//! - fallback_threshold: 0.45 (retrieval cutoff - must retrieve candidates)
 //! - semantic_threshold: 0.65 (decision gate - accepting a match)
 //! - blocklist_threshold: 0.80 (collision detection)
 
@@ -223,7 +223,7 @@ pub fn check_ambiguity(candidates: &[VerbSearchResult], threshold: f32) -> VerbS
 }
 
 /// Default fallback threshold for suggestions
-const DEFAULT_FALLBACK_THRESHOLD: f32 = 0.55;
+const DEFAULT_FALLBACK_THRESHOLD: f32 = 0.45;
 
 /// Check for ambiguity with explicit fallback threshold for suggestions
 ///
@@ -398,7 +398,7 @@ impl HybridVerbSearcher {
     /// BGE asymmetric mode: query embeddings use instruction prefix, targets don't.
     /// This produces LOWER similarity scores than symmetric (target-to-target) mode.
     /// Thresholds must be set accordingly:
-    /// - fallback_threshold: 0.55 (retrieval cutoff - must be low enough to retrieve candidates)
+    /// - fallback_threshold: 0.45 (retrieval cutoff - must be low enough to retrieve candidates)
     /// - semantic_threshold: 0.65 (decision gate - accepting a match)
     pub fn new(verb_service: Arc<VerbService>, learned_data: Option<SharedLearnedData>) -> Self {
         Self {
@@ -411,7 +411,7 @@ impl HybridVerbSearcher {
             scenario_index: None, // Scenario index added separately via with_scenario_index
             // BGE asymmetric mode thresholds (query→target is lower than target→target)
             semantic_threshold: 0.65,  // Decision gate for accepting match
-            fallback_threshold: 0.55,  // Retrieval cutoff for DB queries
+            fallback_threshold: 0.45,  // Retrieval cutoff for DB queries
             blocklist_threshold: 0.80, // Collision detection
         }
     }
@@ -428,7 +428,7 @@ impl HybridVerbSearcher {
             scenario_index: None,
             // BGE asymmetric mode thresholds
             semantic_threshold: 0.65,
-            fallback_threshold: 0.55,
+            fallback_threshold: 0.45,
             blocklist_threshold: 0.80,
         }
     }
@@ -740,9 +740,22 @@ impl HybridVerbSearcher {
                         seen_verbs.insert(m.fqn.clone());
                         let entry = macro_idx.get_entry(&m.fqn);
                         let macro_fqn_clone = m.fqn.clone();
+
+                        let is_high_confidence = m.explain.matched_signals.iter().any(|s| {
+                            s.signal == "exact_fqn"
+                                || s.signal == "exact_label"
+                                || s.signal == "alias_match"
+                        }) || m.score >= 8;
+
+                        let score = if is_high_confidence {
+                            1.04
+                        } else {
+                            0.70 + (m.score as f32) * 0.02
+                        };
+
                         results.push(VerbSearchResult {
                             verb: m.fqn,
-                            score: 1.04,
+                            score,
                             source: VerbSearchSource::MacroIndex,
                             matched_phrase: entry.map(|e| e.label.clone()).unwrap_or_default(),
                             description: entry.map(|e| e.description.clone()),
@@ -754,8 +767,11 @@ impl HybridVerbSearcher {
                                 },
                             }),
                         });
-                        // MacroIndex match at 0.96 — return early
-                        return Ok(normalize_candidates(results, limit));
+
+                        if is_high_confidence {
+                            // High-confidence MacroIndex match — return early
+                            return Ok(normalize_candidates(results, limit));
+                        }
                     }
                 }
                 MacroResolveOutcome::Ambiguous(candidates) => {
@@ -764,6 +780,7 @@ impl HybridVerbSearcher {
                         tier = "Tier2B_MacroIndex",
                         "MacroIndex: ambiguous, returning multiple candidates"
                     );
+                    let mut has_high_confidence = false;
                     for m in candidates {
                         // Macros bypass domain_filter — pack scoring handles relevance
                         if self.matches_entity_kind(&m.fqn, entity_kind)
@@ -773,9 +790,26 @@ impl HybridVerbSearcher {
                             seen_verbs.insert(m.fqn.clone());
                             let entry = macro_idx.get_entry(&m.fqn);
                             let macro_fqn_clone = m.fqn.clone();
+
+                            let is_high = m.explain.matched_signals.iter().any(|s| {
+                                s.signal == "exact_fqn"
+                                    || s.signal == "exact_label"
+                                    || s.signal == "alias_match"
+                            }) || m.score >= 8;
+
+                            if is_high {
+                                has_high_confidence = true;
+                            }
+
+                            let score = if is_high {
+                                1.04
+                            } else {
+                                0.70 + (m.score as f32) * 0.02
+                            };
+
                             results.push(VerbSearchResult {
                                 verb: m.fqn,
-                                score: 1.04,
+                                score,
                                 source: VerbSearchSource::MacroIndex,
                                 matched_phrase: entry.map(|e| e.label.clone()).unwrap_or_default(),
                                 description: entry.map(|e| e.description.clone()),
@@ -789,7 +823,7 @@ impl HybridVerbSearcher {
                             });
                         }
                     }
-                    if !results.is_empty() {
+                    if has_high_confidence && !results.is_empty() {
                         return Ok(normalize_candidates(results, limit));
                     }
                 }
@@ -1542,10 +1576,7 @@ impl HybridVerbSearcher {
                     )
                     .await?;
 
-                let has_good_result = constrained_results
-                    .iter()
-                    .any(|r| r.score >= self.semantic_threshold);
-                if has_good_result {
+                if !constrained_results.is_empty() {
                     tracing::info!(
                         allowed_count = allowed.len(),
                         results = constrained_results.len(),
@@ -1556,7 +1587,7 @@ impl HybridVerbSearcher {
                 }
                 tracing::debug!(
                     allowed_count = allowed.len(),
-                    "VerbSearch: SemOS-constrained search found nothing above threshold, falling back to full space"
+                    "VerbSearch: SemOS-constrained search found nothing, falling back to full space"
                 );
             }
         }
@@ -1583,11 +1614,13 @@ impl HybridVerbSearcher {
     ) -> Result<Vec<VerbSearchResult>> {
         use std::collections::HashMap;
 
+        let db_limit = (limit * 5).max(50);
+
         let learned_matches = verb_service
             .find_global_learned_semantic_topk_constrained(
                 query_embedding,
                 fallback_threshold,
-                limit,
+                db_limit,
                 verb_fqns,
             )
             .await
@@ -1596,7 +1629,7 @@ impl HybridVerbSearcher {
         let pattern_matches = verb_service
             .search_verb_patterns_semantic_constrained(
                 query_embedding,
-                limit,
+                db_limit,
                 fallback_threshold,
                 verb_fqns,
             )
@@ -1661,12 +1694,14 @@ impl HybridVerbSearcher {
     ) -> Result<Vec<VerbSearchResult>> {
         use std::collections::HashMap;
 
+        let db_limit = (limit * 5).max(50);
+
         // Fetch top-k from BOTH sources, optionally scoped to domain
         let learned_matches = verb_service
             .find_global_learned_semantic_topk_scoped(
                 query_embedding,
                 fallback_threshold,
-                limit,
+                db_limit,
                 domain_prefix,
             )
             .await
@@ -1675,7 +1710,7 @@ impl HybridVerbSearcher {
         let pattern_matches = verb_service
             .search_verb_patterns_semantic_scoped(
                 query_embedding,
-                limit,
+                db_limit,
                 fallback_threshold,
                 domain_prefix,
             )

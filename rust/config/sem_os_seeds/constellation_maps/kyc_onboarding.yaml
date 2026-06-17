@@ -11,6 +11,7 @@ slots:
     # KYC reads the CBU after it has inherited the group's baseline clearance.
     verbs:
       inspect: { verb: cbu.inspect, when: filled }
+      products: { verb: cbu.products, when: [empty, filled] }
   client_group:
     type: cbu
     table: client_group
@@ -31,6 +32,8 @@ slots:
     verbs:
       read: { verb: kyc-case.read, when: filled }
       state: { verb: kyc-case.summarize, when: filled }
+      case_status: { verb: kyc.case-status, when: [empty, filled] }
+      list_missing_items: { verb: kyc.list-missing-items, when: [empty, filled] }
   kyc_case:
     type: case
     table: cases
@@ -51,6 +54,8 @@ slots:
       close: { verb: kyc-case.close, when: filled }
       reopen: { verb: kyc-case.reopen, when: filled }
       escalate: { verb: kyc-case.escalate, when: filled }
+      case_status: { verb: kyc.case-status, when: [empty, filled] }
+      list_missing_items: { verb: kyc.list-missing-items, when: [empty, filled] }
       # Case audit trail
       event_log: { verb: case-event.log, when: filled }
       event_list: case-event.list-by-case
@@ -270,6 +275,7 @@ slots:
         }
       doc_read: document.get
       doc_list: document.for-entity
+      doc_list_all: { verb: document.list, when: [empty, filled] }
       doc_compute_reqs:
         {
           verb: document.compute-requirements,
@@ -280,6 +286,7 @@ slots:
           verb: document.missing-for-entity,
           when: [documents_requested, screening_complete, evidence_collected],
         }
+      doc_list_missing: { verb: document.list-missing, when: [empty, filled] }
       # Document QA/version verbs (Layer B-D)
       doc_catalog:
         { verb: document.catalog, when: [documents_requested, evidence_collected] }

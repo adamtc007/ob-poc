@@ -24,6 +24,7 @@ slots:
         { verb: deal.list-rate-card-history, when: filled }
       update: { verb: deal.update, when: filled }
       update_status: { verb: deal.update-status, when: filled }
+      set_stage: { verb: deal.set-stage, when: filled }
       add_document: { verb: deal.add-document, when: filled }
       update_document_status:
         { verb: deal.update-document-status, when: filled }

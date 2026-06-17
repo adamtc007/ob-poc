@@ -122,15 +122,69 @@ domains:
           name: relationship_id
           capture: true
 
-      # =========================================================================
-      # UBO Snapshot Capture + Diff (Phase 3.2)
-      # =========================================================================
-
         three_axis:
           state_effect: preserving
           external_effects: []
           consequence:
             baseline: reviewable
+
+      list-controllers:
+        flavour: attribute_mutating
+        description: List who controls an entity
+        effect_class: read_snapshot
+        invocation_phrases:
+          - "show me the controlling persons for this entity"
+          - "list controllers"
+          - "show controllers"
+          - "find controllers"
+          - "list who controls"
+          - "view control relationships"
+          - "show controlling parties"
+          - "list control sources"
+          - "which entities have voting control"
+          - "display corporate governance controllers"
+          - "controlling persons for this entity"
+        metadata:
+          tier: reference
+          source_of_truth: workflow
+          scope: cbu
+          noun: control
+          tags: [data-management]
+          phase_tags: [kyc]
+          side_effects: facts_only
+        behavior: crud
+        crud:
+          operation: list_by_fk
+          table: entity_relationships_current
+          schema: ob-poc
+          fk_col: to_entity_id
+          filter:
+            relationship_type: CONTROL
+        args:
+          - name: entity-id
+            type: uuid
+            required: true
+            maps_to: to_entity_id
+            lookup:
+              table: entities
+              entity_type: entity
+              schema: ob-poc
+              search_key: name
+              primary_key: entity_id
+        returns:
+          type: record_set
+
+        three_axis:
+          state_effect: preserving
+          external_effects:
+            - observational
+          consequence:
+            baseline: benign
+
+      # =========================================================================
+      # UBO Snapshot Capture + Diff (Phase 3.2)
+      # =========================================================================
+
       snapshot.capture:
         flavour: attribute_mutating
         description: |

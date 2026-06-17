@@ -1,0 +1,5977 @@
+[
+  {
+    "utterance": "assign Goldman Sachs as custodian for this CBU",
+    "expected_verb": "cbu.assign-role",
+    "domain": "CBU",
+    "category": "natural",
+    "difficulty": "medium",
+    "alt_verbs": [],
+    "entity_context": null,
+    "id": "cic-0001"
+  },
+  {
+    "utterance": "make State Street the transfer agent",
+    "expected_verb": "cbu.assign-role",
+    "domain": "CBU",
+    "category": "natural",
+    "difficulty": "hard",
+    "alt_verbs": [],
+    "entity_context": null,
+    "id": "cic-0002"
+  },
+  {
+    "utterance": "who are the parties on this CBU?",
+    "expected_verb": "cbu.parties",
+    "domain": "CBU",
+    "category": "natural",
+    "difficulty": "medium",
+    "alt_verbs": [],
+    "entity_context": null,
+    "id": "cic-0003"
+  },
+  {
+    "utterance": "add custody services to this client",
+    "expected_verb": "cbu.add-product",
+    "domain": "CBU",
+    "category": "natural",
+    "difficulty": "medium",
+    "alt_verbs": [],
+    "entity_context": null,
+    "id": "cic-0004"
+  },
+  {
+    "utterance": "delete the test CBU I just created",
+    "expected_verb": "cbu.delete",
+    "domain": "CBU",
+    "category": "direct",
+    "difficulty": "easy",
+    "alt_verbs": [],
+    "entity_context": null,
+    "id": "cic-0005"
+  },
+  {
+    "utterance": "nuke everything under this CBU including all roles",
+    "expected_verb": "cbu.delete-cascade",
+    "domain": "CBU",
+    "category": "natural",
+    "difficulty": "hard",
+    "alt_verbs": [],
+    "entity_context": null,
+    "id": "cic-0006"
+  },
+  {
+    "utterance": "create a legal entity for HSBC Holdings plc",
+    "expected_verb": "entity.create",
+    "domain": "Entity",
+    "category": "direct",
+    "difficulty": "easy",
+    "alt_verbs": [],
+    "entity_context": null,
+    "id": "cic-0007"
+  },
+  {
+    "utterance": "add a new company",
+    "expected_verb": "entity.create",
+    "domain": "Entity",
+    "category": "natural",
+    "difficulty": "medium",
+    "alt_verbs": [
+      "party.add-company",
+      "party.add"
+    ],
+    "entity_context": null,
+    "id": "cic-0008"
+  },
+  {
+    "utterance": "register John Smith as a person",
+    "expected_verb": "entity.create",
+    "domain": "Entity",
+    "category": "natural",
+    "difficulty": "medium",
+    "alt_verbs": [],
+    "entity_context": null,
+    "id": "cic-0009"
+  },
+  {
+    "utterance": "I need to add a trust -- Cayman Islands discretionary trust",
+    "expected_verb": "entity.create-trust-discretionary",
+    "domain": "Entity",
+    "category": "natural",
+    "difficulty": "hard",
+    "alt_verbs": [
+      "entity.create"
+    ],
+    "entity_context": null,
+    "id": "cic-0010"
+  },
+  {
+    "utterance": "add a limited partnership for the GP structure",
+    "expected_verb": "entity.create-partnership-limited",
+    "domain": "Entity",
+    "category": "natural",
+    "difficulty": "hard",
+    "alt_verbs": [
+      "entity.create"
+    ],
+    "entity_context": null,
+    "id": "cic-0011"
+  },
+  {
+    "utterance": "show me all entities",
+    "expected_verb": "entity.list",
+    "domain": "Entity",
+    "category": "direct",
+    "difficulty": "easy",
+    "alt_verbs": [],
+    "entity_context": null,
+    "id": "cic-0012"
+  },
+  {
+    "utterance": "which entities haven't been verified yet?",
+    "expected_verb": "entity.list-placeholders",
+    "domain": "Entity",
+    "category": "indirect",
+    "difficulty": "hard",
+    "alt_verbs": [
+      "entity.list-ghosts"
+    ],
+    "entity_context": null,
+    "id": "cic-0013"
+  },
+  {
+    "utterance": "update the registered address for this entity",
+    "expected_verb": "entity.update",
+    "domain": "Entity",
+    "category": "direct",
+    "difficulty": "easy",
+    "alt_verbs": [],
+    "entity_context": null,
+    "id": "cic-0014"
+  },
+  {
+    "utterance": "resolve this placeholder to the real entity",
+    "expected_verb": "entity.resolve-placeholder",
+    "domain": "Entity",
+    "category": "direct",
+    "difficulty": "medium",
+    "alt_verbs": [],
+    "entity_context": null,
+    "id": "cic-0015"
+  },
+  {
+    "utterance": "run sanctions screening on this entity",
+    "expected_verb": "screening.sanctions",
+    "domain": "KYC",
+    "category": "direct",
+    "difficulty": "easy",
+    "alt_verbs": [],
+    "entity_context": null,
+    "id": "cic-0016"
+  },
+  {
+    "utterance": "check if they're on any sanctions lists",
+    "expected_verb": "screening.sanctions",
+    "domain": "KYC",
+    "category": "natural",
+    "difficulty": "medium",
+    "alt_verbs": [
+      "screening.sanctions"
+    ],
+    "entity_context": null,
+    "id": "cic-0017"
+  },
+  {
+    "utterance": "is this person a PEP?",
+    "expected_verb": "screening.pep",
+    "domain": "KYC",
+    "category": "natural",
+    "difficulty": "medium",
+    "alt_verbs": [],
+    "entity_context": null,
+    "id": "cic-0018"
+  },
+  {
+    "utterance": "check for politically exposed persons",
+    "expected_verb": "screening.pep",
+    "domain": "KYC",
+    "category": "natural",
+    "difficulty": "medium",
+    "alt_verbs": [],
+    "entity_context": null,
+    "id": "cic-0019"
+  },
+  {
+    "utterance": "run a full screening -- sanctions, PEP, and adverse media",
+    "expected_verb": "screening.full",
+    "domain": "KYC",
+    "category": "multi_intent",
+    "difficulty": "hard",
+    "alt_verbs": [
+      "screening.sanctions",
+      "screening.pep",
+      "screening.adverse-media",
+      "screening.run"
+    ],
+    "entity_context": null,
+    "id": "cic-0020"
+  },
+  {
+    "utterance": "any negative news about this company?",
+    "expected_verb": "screening.adverse-media",
+    "domain": "KYC",
+    "category": "natural",
+    "difficulty": "medium",
+    "alt_verbs": [],
+    "entity_context": null,
+    "id": "cic-0021"
+  },
+  {
+    "utterance": "do the AML checks",
+    "expected_verb": "screening.sanctions",
+    "domain": "KYC",
+    "category": "natural",
+    "difficulty": "hard",
+    "alt_verbs": [
+      "screening.pep",
+      "screening.adverse-media",
+      "screening.run"
+    ],
+    "entity_context": null,
+    "id": "cic-0022"
+  },
+  {
+    "utterance": "screen them",
+    "expected_verb": "screening.sanctions",
+    "domain": "KYC",
+    "category": "natural",
+    "difficulty": "hard",
+    "alt_verbs": [
+      "screening.run",
+      "screening.pep",
+      "screening.adverse-media"
+    ],
+    "entity_context": null,
+    "id": "cic-0023"
+  },
+  {
+    "utterance": "has anyone flagged this entity before?",
+    "expected_verb": "screening.adverse-media",
+    "domain": "KYC",
+    "category": "indirect",
+    "difficulty": "expert",
+    "alt_verbs": [
+      "red-flag.list-by-case",
+      "red-flag.list-by-entity",
+      "screening.sanctions"
+    ],
+    "entity_context": null,
+    "id": "cic-0024"
+  },
+  {
+    "utterance": "who are the beneficial owners?",
+    "expected_verb": "ubo.list-ubos",
+    "domain": "KYC",
+    "category": "natural",
+    "difficulty": "medium",
+    "alt_verbs": [
+      "control.identify-ubos",
+      "ubo.list-owners"
+    ],
+    "entity_context": null,
+    "id": "cic-0025"
+  },
+  {
+    "utterance": "show me the ownership structure",
+    "expected_verb": "ubo.list-ubos",
+    "domain": "KYC",
+    "category": "natural",
+    "difficulty": "medium",
+    "alt_verbs": [
+      "ubo.list-owners",
+      "control.build-graph",
+      "ownership.trace-chain",
+      "ownership.compute"
+    ],
+    "entity_context": null,
+    "id": "cic-0026"
+  },
+  {
+    "utterance": "add an ownership stake -- Vanguard holds 25% of this entity",
+    "expected_verb": "ubo.add-ownership",
+    "domain": "KYC",
+    "category": "natural",
+    "difficulty": "medium",
+    "alt_verbs": [],
+    "entity_context": null,
+    "id": "cic-0027"
+  },
+  {
+    "utterance": "who controls this company?",
+    "expected_verb": "ubo.list-ubos",
+    "domain": "KYC",
+    "category": "natural",
+    "difficulty": "hard",
+    "alt_verbs": [
+      "ownership.find-controller",
+      "control.list-controllers",
+      "control.identify-ubos",
+      "control.compute-controllers",
+      "control.build-graph"
+    ],
+    "entity_context": null,
+    "id": "cic-0028"
+  },
+  {
+    "utterance": "add a control relationship -- board appointment",
+    "expected_verb": "control.add",
+    "domain": "KYC",
+    "category": "natural",
+    "difficulty": "medium",
+    "alt_verbs": [
+      "control.add"
+    ],
+    "entity_context": null,
+    "id": "cic-0029"
+  },
+  {
+    "utterance": "calculate the UBOs for this CBU",
+    "expected_verb": "ubo.compute-chains",
+    "domain": "KYC",
+    "category": "direct",
+    "difficulty": "easy",
+    "alt_verbs": [
+      "ubo.list-ubos"
+    ],
+    "entity_context": null,
+    "id": "cic-0030"
+  },
+  {
+    "utterance": "trace the ownership chain from the top entity down",
+    "expected_verb": "ubo.trace-chains",
+    "domain": "KYC",
+    "category": "natural",
+    "difficulty": "medium",
+    "alt_verbs": [
+      "ownership.trace-chain"
+    ],
+    "entity_context": null,
+    "id": "cic-0031"
+  },
+  {
+    "utterance": "this person died last month",
+    "expected_verb": "ubo.mark-deceased",
+    "domain": "KYC",
+    "category": "indirect",
+    "difficulty": "expert",
+    "alt_verbs": [],
+    "entity_context": null,
+    "id": "cic-0032"
+  },
+  {
+    "utterance": "the settlor appointed a new trustee",
+    "expected_verb": "ubo.add-trust-role",
+    "domain": "KYC",
+    "category": "indirect",
+    "difficulty": "expert",
+    "alt_verbs": [],
+    "entity_context": null,
+    "id": "cic-0033"
+  },
+  {
+    "utterance": "waive the ownership verification -- low risk client",
+    "expected_verb": "ubo.waive-verification",
+    "domain": "KYC",
+    "category": "natural",
+    "difficulty": "medium",
+    "alt_verbs": [],
+    "entity_context": null,
+    "id": "cic-0034"
+  },
+  {
+    "utterance": "ownership was transferred from Parent Co to New Holdco",
+    "expected_verb": "ubo.update-ownership",
+    "domain": "KYC",
+    "category": "indirect",
+    "difficulty": "hard",
+    "alt_verbs": [
+      "ubo.convergence-supersede"
+    ],
+    "entity_context": null,
+    "id": "cic-0035"
+  },
+  {
+    "utterance": "create an umbrella fund -- UCITS, Luxembourg domiciled",
+    "expected_verb": "fund.create",
+    "domain": "Custody",
+    "category": "direct",
+    "difficulty": "easy",
+    "alt_verbs": [
+      "fund.create"
+    ],
+    "entity_context": null,
+    "id": "cic-0036"
+  },
+  {
+    "utterance": "set up a new subfund under the umbrella",
+    "expected_verb": "fund.create",
+    "domain": "Custody",
+    "category": "natural",
+    "difficulty": "medium",
+    "alt_verbs": [
+      "fund.create"
+    ],
+    "entity_context": null,
+    "id": "cic-0037"
+  },
+  {
+    "utterance": "add a share class -- accumulating, EUR denominated",
+    "expected_verb": "share-class.create",
+    "domain": "Custody",
+    "category": "natural",
+    "difficulty": "medium",
+    "alt_verbs": [
+      "fund.create-share-class",
+      "fund.create"
+    ],
+    "entity_context": null,
+    "id": "cic-0038"
+  },
+  {
+    "utterance": "create a master-feeder structure",
+    "expected_verb": "fund.create",
+    "domain": "Custody",
+    "category": "natural",
+    "difficulty": "hard",
+    "alt_verbs": [
+      "fund.create-master",
+      "fund.create",
+      "fund.link-feeder"
+    ],
+    "entity_context": null,
+    "id": "cic-0039"
+  },
+  {
+    "utterance": "link the Cayman feeder to the Irish master",
+    "expected_verb": "fund.link-feeder",
+    "domain": "Custody",
+    "category": "natural",
+    "difficulty": "medium",
+    "alt_verbs": [],
+    "entity_context": null,
+    "id": "cic-0040"
+  },
+  {
+    "utterance": "what subfunds are in this umbrella?",
+    "expected_verb": "fund.list-subfunds",
+    "domain": "Custody",
+    "category": "natural",
+    "difficulty": "easy",
+    "alt_verbs": [],
+    "entity_context": null,
+    "id": "cic-0041"
+  },
+  {
+    "utterance": "show me all the share classes",
+    "expected_verb": "share-class.list",
+    "domain": "Custody",
+    "category": "natural",
+    "difficulty": "easy",
+    "alt_verbs": [
+      "fund.list-share-classes"
+    ],
+    "entity_context": null,
+    "id": "cic-0042"
+  },
+  {
+    "utterance": "BlackRock fund invests 30% NAV in the Vanguard fund",
+    "expected_verb": "fund.add-investment",
+    "domain": "Custody",
+    "category": "indirect",
+    "difficulty": "expert",
+    "alt_verbs": [
+      "fund.list-investors"
+    ],
+    "entity_context": null,
+    "id": "cic-0043"
+  },
+  {
+    "utterance": "who invests in this fund?",
+    "expected_verb": "fund.list-investors",
+    "domain": "Custody",
+    "category": "natural",
+    "difficulty": "medium",
+    "alt_verbs": [],
+    "entity_context": null,
+    "id": "cic-0044"
+  },
+  {
+    "utterance": "create a standalone fund -- AIF, Jersey",
+    "expected_verb": "fund.create",
+    "domain": "Custody",
+    "category": "direct",
+    "difficulty": "medium",
+    "alt_verbs": [
+      "fund.create-standalone",
+      "fund.create"
+    ],
+    "entity_context": null,
+    "id": "cic-0045"
+  },
+  {
+    "utterance": "what documents do we still need from this entity?",
+    "expected_verb": "document.missing-for-entity",
+    "domain": "Document",
+    "category": "natural",
+    "difficulty": "medium",
+    "alt_verbs": [],
+    "entity_context": null,
+    "id": "cic-0046"
+  },
+  {
+    "utterance": "request the certificate of incorporation",
+    "expected_verb": "document.solicit",
+    "domain": "Document",
+    "category": "natural",
+    "difficulty": "medium",
+    "alt_verbs": [
+      "doc-request.create",
+      "document.request"
+    ],
+    "entity_context": null,
+    "id": "cic-0047"
+  },
+  {
+    "utterance": "upload the passport for John Smith",
+    "expected_verb": "document.upload-version",
+    "domain": "Document",
+    "category": "direct",
+    "difficulty": "easy",
+    "alt_verbs": [
+      "document.solicit"
+    ],
+    "entity_context": null,
+    "id": "cic-0048"
+  },
+  {
+    "utterance": "verify this document",
+    "expected_verb": "document.verify",
+    "domain": "Document",
+    "category": "direct",
+    "difficulty": "easy",
+    "alt_verbs": [],
+    "entity_context": null,
+    "id": "cic-0049"
+  },
+  {
+    "utterance": "reject the articles of association -- wrong entity name",
+    "expected_verb": "document.reject",
+    "domain": "Document",
+    "category": "natural",
+    "difficulty": "medium",
+    "alt_verbs": [],
+    "entity_context": null,
+    "id": "cic-0050"
+  },
+  {
+    "utterance": "extract the data from this uploaded document",
+    "expected_verb": "document.extract",
+    "domain": "Document",
+    "category": "direct",
+    "difficulty": "easy",
+    "alt_verbs": [],
+    "entity_context": null,
+    "id": "cic-0051"
+  },
+  {
+    "utterance": "what type of documents do we collect for limited companies?",
+    "expected_verb": "document.catalog",
+    "domain": "Document",
+    "category": "indirect",
+    "difficulty": "hard",
+    "alt_verbs": [
+      "kyc.collect-documents",
+      "document.list-types"
+    ],
+    "entity_context": null,
+    "id": "cic-0052"
+  },
+  {
+    "utterance": "send out the whole doc pack for this entity",
+    "expected_verb": "document.solicit-batch",
+    "domain": "Document",
+    "category": "natural",
+    "difficulty": "hard",
+    "alt_verbs": [],
+    "entity_context": null,
+    "id": "cic-0053"
+  },
+  {
+    "utterance": "create a new deal for Allianz",
+    "expected_verb": "deal.create",
+    "domain": "Custody",
+    "category": "direct",
+    "difficulty": "easy",
+    "alt_verbs": [],
+    "entity_context": null,
+    "id": "cic-0054"
+  },
+  {
+    "utterance": "add BlackRock as a participant on this deal",
+    "expected_verb": "deal.add-participant",
+    "domain": "Custody",
+    "category": "direct",
+    "difficulty": "easy",
+    "alt_verbs": [],
+    "entity_context": null,
+    "id": "cic-0055"
+  },
+  {
+    "utterance": "what's the status of the deal?",
+    "expected_verb": "deal.read",
+    "domain": "Custody",
+    "category": "natural",
+    "difficulty": "medium",
+    "alt_verbs": [
+      "deal.read-summary"
+    ],
+    "entity_context": null,
+    "id": "cic-0056"
+  },
+  {
+    "utterance": "show me the deal timeline",
+    "expected_verb": "deal.read-timeline",
+    "domain": "Custody",
+    "category": "direct",
+    "difficulty": "easy",
+    "alt_verbs": [],
+    "entity_context": null,
+    "id": "cic-0057"
+  },
+  {
+    "utterance": "set up the rate card for custody services",
+    "expected_verb": "deal.create-rate-card",
+    "domain": "Custody",
+    "category": "natural",
+    "difficulty": "medium",
+    "alt_verbs": [],
+    "entity_context": null,
+    "id": "cic-0058"
+  },
+  {
+    "utterance": "add a fee line -- 2bps on AUM, quarterly",
+    "expected_verb": "deal.add-rate-card-line",
+    "domain": "Custody",
+    "category": "natural",
+    "difficulty": "hard",
+    "alt_verbs": [],
+    "entity_context": null,
+    "id": "cic-0059"
+  },
+  {
+    "utterance": "propose the rate card to the client",
+    "expected_verb": "deal.propose-rate-card",
+    "domain": "Custody",
+    "category": "natural",
+    "difficulty": "medium",
+    "alt_verbs": [],
+    "entity_context": null,
+    "id": "cic-0060"
+  },
+  {
+    "utterance": "the client wants to counter our pricing",
+    "expected_verb": "deal.counter-rate-card",
+    "domain": "Custody",
+    "category": "indirect",
+    "difficulty": "hard",
+    "alt_verbs": [],
+    "entity_context": null,
+    "id": "cic-0061"
+  },
+  {
+    "utterance": "move the deal to approved",
+    "expected_verb": "deal.update-status",
+    "domain": "Custody",
+    "category": "natural",
+    "difficulty": "medium",
+    "alt_verbs": [],
+    "entity_context": null,
+    "id": "cic-0062"
+  },
+  {
+    "utterance": "kick off onboarding for this deal's products",
+    "expected_verb": "deal.request-onboarding",
+    "domain": "Custody",
+    "category": "natural",
+    "difficulty": "hard",
+    "alt_verbs": [],
+    "entity_context": null,
+    "id": "cic-0063"
+  },
+  {
+    "utterance": "cancel this deal -- client withdrew",
+    "expected_verb": "deal.cancel",
+    "domain": "Custody",
+    "category": "direct",
+    "difficulty": "easy",
+    "alt_verbs": [],
+    "entity_context": null,
+    "id": "cic-0064"
+  },
+  {
+    "utterance": "look up the LEI for HSBC",
+    "expected_verb": "gleif.search",
+    "domain": "Onboarding",
+    "category": "natural",
+    "difficulty": "medium",
+    "alt_verbs": [],
+    "entity_context": null,
+    "id": "cic-0065"
+  },
+  {
+    "utterance": "import the corporate hierarchy from GLEIF",
+    "expected_verb": "gleif.import-tree",
+    "domain": "Onboarding",
+    "category": "natural",
+    "difficulty": "medium",
+    "alt_verbs": [],
+    "entity_context": null,
+    "id": "cic-0066"
+  },
+  {
+    "utterance": "who is the parent company according to GLEIF?",
+    "expected_verb": "gleif.lookup",
+    "domain": "Onboarding",
+    "category": "natural",
+    "difficulty": "medium",
+    "alt_verbs": [
+      "gleif.trace-ownership",
+      "gleif.search"
+    ],
+    "entity_context": null,
+    "id": "cic-0067"
+  },
+  {
+    "utterance": "import all the managed funds for this asset manager",
+    "expected_verb": "gleif.import-managed-funds",
+    "domain": "Onboarding",
+    "category": "natural",
+    "difficulty": "medium",
+    "alt_verbs": [],
+    "entity_context": null,
+    "id": "cic-0068"
+  },
+  {
+    "utterance": "enrich the entity data from GLEIF",
+    "expected_verb": "gleif.enrich",
+    "domain": "Onboarding",
+    "category": "direct",
+    "difficulty": "easy",
+    "alt_verbs": [],
+    "entity_context": null,
+    "id": "cic-0069"
+  },
+  {
+    "utterance": "pull in the LEI hierarchy for this client group",
+    "expected_verb": "gleif.import-to-client-group",
+    "domain": "Onboarding",
+    "category": "natural",
+    "difficulty": "hard",
+    "alt_verbs": [],
+    "entity_context": null,
+    "id": "cic-0070"
+  },
+  {
+    "utterance": "compute the ownership waterfall",
+    "expected_verb": "ownership.compute",
+    "domain": "CBU",
+    "category": "natural",
+    "difficulty": "medium",
+    "alt_verbs": [],
+    "entity_context": null,
+    "id": "cic-0071"
+  },
+  {
+    "utterance": "who ultimately controls this entity?",
+    "expected_verb": "ownership.find-controller",
+    "domain": "CBU",
+    "category": "natural",
+    "difficulty": "medium",
+    "alt_verbs": [
+      "control.build-graph",
+      "control.compute-controllers",
+      "control.identify-ubos",
+      "ubo.list-ubos",
+      "control.list-controllers"
+    ],
+    "entity_context": null,
+    "id": "cic-0072"
+  },
+  {
+    "utterance": "reconcile the ownership percentages",
+    "expected_verb": "ownership.reconcile",
+    "domain": "CBU",
+    "category": "direct",
+    "difficulty": "easy",
+    "alt_verbs": [
+      "ownership.reconcile"
+    ],
+    "entity_context": null,
+    "id": "cic-0073"
+  },
+  {
+    "utterance": "trace the chain from Vanguard down to the subfund",
+    "expected_verb": "ownership.trace-chain",
+    "domain": "CBU",
+    "category": "natural",
+    "difficulty": "medium",
+    "alt_verbs": [
+      "ubo.trace-chains"
+    ],
+    "entity_context": null,
+    "id": "cic-0074"
+  },
+  {
+    "utterance": "are there any gaps in the ownership structure?",
+    "expected_verb": "ownership.analyze-gaps",
+    "domain": "CBU",
+    "category": "natural",
+    "difficulty": "medium",
+    "alt_verbs": [
+      "ubo.trace-chains"
+    ],
+    "entity_context": null,
+    "id": "cic-0075"
+  },
+  {
+    "utterance": "who is the board-appointed controller?",
+    "expected_verb": "control.show-board-controller",
+    "domain": "KYC",
+    "category": "natural",
+    "difficulty": "hard",
+    "alt_verbs": [],
+    "entity_context": null,
+    "id": "cic-0076"
+  },
+  {
+    "utterance": "import the PSC register data",
+    "expected_verb": "control.import-psc-register",
+    "domain": "KYC",
+    "category": "natural",
+    "difficulty": "medium",
+    "alt_verbs": [],
+    "entity_context": null,
+    "id": "cic-0077"
+  },
+  {
+    "utterance": "show me everything",
+    "expected_verb": "view.universe",
+    "domain": "CBU",
+    "category": "natural",
+    "difficulty": "easy",
+    "alt_verbs": [],
+    "entity_context": null,
+    "id": "cic-0078"
+  },
+  {
+    "utterance": "load the Allianz book",
+    "expected_verb": "session.load-cluster",
+    "domain": "CBU",
+    "category": "direct",
+    "difficulty": "easy",
+    "alt_verbs": [
+      "view.book",
+      "session.load-galaxy"
+    ],
+    "entity_context": null,
+    "id": "cic-0079"
+  },
+  {
+    "utterance": "zoom into this node",
+    "expected_verb": "view.zoom-in",
+    "domain": "CBU",
+    "category": "direct",
+    "difficulty": "easy",
+    "alt_verbs": [
+      "graph.focus",
+      "view.drill"
+    ],
+    "entity_context": null,
+    "id": "cic-0080"
+  },
+  {
+    "utterance": "go back",
+    "expected_verb": "view.navigate-back-to",
+    "domain": "CBU",
+    "category": "natural",
+    "difficulty": "easy",
+    "alt_verbs": [
+      "view.zoom-out",
+      "view.surface",
+      "session.undo"
+    ],
+    "entity_context": null,
+    "id": "cic-0081"
+  },
+  {
+    "utterance": "load the Allianz cluster",
+    "expected_verb": "session.load-cluster",
+    "domain": "CBU",
+    "category": "direct",
+    "difficulty": "easy",
+    "alt_verbs": [],
+    "entity_context": null,
+    "id": "cic-0082"
+  },
+  {
+    "utterance": "switch to the BlackRock client",
+    "expected_verb": "session.set-client",
+    "domain": "CBU",
+    "category": "natural",
+    "difficulty": "medium",
+    "alt_verbs": [],
+    "entity_context": null,
+    "id": "cic-0083"
+  },
+  {
+    "utterance": "filter to UK entities only",
+    "expected_verb": "session.filter-jurisdiction",
+    "domain": "CBU",
+    "category": "natural",
+    "difficulty": "medium",
+    "alt_verbs": [
+      "graph.filter",
+      "view.refine"
+    ],
+    "entity_context": null,
+    "id": "cic-0084"
+  },
+  {
+    "utterance": "load the deal",
+    "expected_verb": "session.load-deal",
+    "domain": "Custody",
+    "category": "direct",
+    "difficulty": "easy",
+    "alt_verbs": [],
+    "entity_context": null,
+    "id": "cic-0085"
+  },
+  {
+    "utterance": "show me the galaxy for Germany",
+    "expected_verb": "session.load-galaxy",
+    "domain": "CBU",
+    "category": "direct",
+    "difficulty": "easy",
+    "alt_verbs": [],
+    "entity_context": null,
+    "id": "cic-0086"
+  },
+  {
+    "utterance": "I want to work as a compliance officer",
+    "expected_verb": "session.set-persona",
+    "domain": "CBU",
+    "category": "indirect",
+    "difficulty": "hard",
+    "alt_verbs": [],
+    "entity_context": null,
+    "id": "cic-0087"
+  },
+  {
+    "utterance": "discover the entities in this client group",
+    "expected_verb": "client-group.discover-entities",
+    "domain": "CBU",
+    "category": "direct",
+    "difficulty": "easy",
+    "alt_verbs": [],
+    "entity_context": null,
+    "id": "cic-0088"
+  },
+  {
+    "utterance": "start the discovery process for this group",
+    "expected_verb": "client-group.start-discovery",
+    "domain": "CBU",
+    "category": "natural",
+    "difficulty": "medium",
+    "alt_verbs": [],
+    "entity_context": null,
+    "id": "cic-0089"
+  },
+  {
+    "utterance": "confirm this entity belongs to the group",
+    "expected_verb": "client-group.confirm-entity",
+    "domain": "CBU",
+    "category": "natural",
+    "difficulty": "medium",
+    "alt_verbs": [],
+    "entity_context": null,
+    "id": "cic-0090"
+  },
+  {
+    "utterance": "show me the relationships in this group",
+    "expected_verb": "client-group.list-relationships",
+    "domain": "CBU",
+    "category": "natural",
+    "difficulty": "easy",
+    "alt_verbs": [],
+    "entity_context": null,
+    "id": "cic-0091"
+  },
+  {
+    "utterance": "who are the parties in this group?",
+    "expected_verb": "client-group.list-parties",
+    "domain": "CBU",
+    "category": "natural",
+    "difficulty": "medium",
+    "alt_verbs": [
+      "cbu.parties"
+    ],
+    "entity_context": null,
+    "id": "cic-0092"
+  },
+  {
+    "utterance": "search for entities matching 'Vanguard' in this group",
+    "expected_verb": "client-group.search-entities",
+    "domain": "CBU",
+    "category": "natural",
+    "difficulty": "medium",
+    "alt_verbs": [],
+    "entity_context": null,
+    "id": "cic-0093"
+  },
+  {
+    "utterance": "list the roles",
+    "expected_verb": "cbu.parties",
+    "domain": "CBU",
+    "category": "adversarial",
+    "difficulty": "hard",
+    "alt_verbs": [
+      "client-group.list-roles"
+    ],
+    "entity_context": null,
+    "id": "cic-0094"
+  },
+  {
+    "utterance": "add a relationship",
+    "expected_verb": "client-group.add-relationship",
+    "domain": "CBU",
+    "category": "adversarial",
+    "difficulty": "hard",
+    "alt_verbs": [
+      "ubo.add-ownership",
+      "control.add"
+    ],
+    "entity_context": null,
+    "id": "cic-0095"
+  },
+  {
+    "utterance": "verify it",
+    "expected_verb": "document.verify",
+    "domain": "Document",
+    "category": "adversarial",
+    "difficulty": "expert",
+    "alt_verbs": [
+      "entity.verify",
+      "ownership.reconcile",
+      "cbu.verify-evidence"
+    ],
+    "entity_context": null,
+    "id": "cic-0096"
+  },
+  {
+    "utterance": "run the check",
+    "expected_verb": "screening.run",
+    "domain": "KYC",
+    "category": "adversarial",
+    "difficulty": "expert",
+    "alt_verbs": [
+      "screening.sanctions",
+      "screening.pep",
+      "ownership.reconcile",
+      "cbu.parties"
+    ],
+    "entity_context": null,
+    "id": "cic-0097"
+  },
+  {
+    "utterance": "show the structure",
+    "expected_verb": "ubo.list-owners",
+    "domain": "KYC",
+    "category": "adversarial",
+    "difficulty": "hard",
+    "alt_verbs": [
+      "fund.list-subfunds",
+      "client-group.list-relationships",
+      "ownership.compute",
+      "graph.view",
+      "cbu.inspect",
+      "control.build-graph"
+    ],
+    "entity_context": null,
+    "id": "cic-0098"
+  },
+  {
+    "utterance": "import the data",
+    "expected_verb": "gleif.import-tree",
+    "domain": "Onboarding",
+    "category": "adversarial",
+    "difficulty": "expert",
+    "alt_verbs": [
+      "gleif.enrich",
+      "control.import-psc-register",
+      "bods.sync-from-gleif",
+      "research.sources.fetch",
+      "bods.import"
+    ],
+    "entity_context": null,
+    "id": "cic-0099"
+  },
+  {
+    "utterance": "pull the BODS data for this LEI",
+    "expected_verb": "bods.find-by-lei",
+    "domain": "CBU",
+    "category": "natural",
+    "difficulty": "expert",
+    "alt_verbs": [],
+    "entity_context": null,
+    "id": "cic-0100"
+  },
+  {
+    "utterance": "run the RBA assessment",
+    "expected_verb": "screening.sanctions",
+    "domain": "KYC",
+    "category": "indirect",
+    "difficulty": "expert",
+    "alt_verbs": [
+      "screening.run"
+    ],
+    "entity_context": null,
+    "id": "cic-0101"
+  },
+  {
+    "utterance": "check the PSC register",
+    "expected_verb": "control.import-psc-register",
+    "domain": "KYC",
+    "category": "natural",
+    "difficulty": "expert",
+    "alt_verbs": [],
+    "entity_context": null,
+    "id": "cic-0102"
+  },
+  {
+    "utterance": "set up the NAV calc service",
+    "expected_verb": "cbu.add-product",
+    "domain": "CBU",
+    "category": "indirect",
+    "difficulty": "expert",
+    "alt_verbs": [],
+    "entity_context": null,
+    "id": "cic-0103"
+  },
+  {
+    "utterance": "add the TA and fund accounting",
+    "expected_verb": "cbu.add-product",
+    "domain": "CBU",
+    "category": "indirect",
+    "difficulty": "expert",
+    "alt_verbs": [],
+    "entity_context": null,
+    "id": "cic-0104"
+  },
+  {
+    "utterance": "compute the 25% threshold test",
+    "expected_verb": "ubo.compute-chains",
+    "domain": "KYC",
+    "category": "indirect",
+    "difficulty": "expert",
+    "alt_verbs": [
+      "ubo.calculate",
+      "control.identify-ubos"
+    ],
+    "entity_context": null,
+    "id": "cic-0105"
+  },
+  {
+    "utterance": "flag the circular ownership",
+    "expected_verb": "ownership.reconcile",
+    "domain": "CBU",
+    "category": "indirect",
+    "difficulty": "expert",
+    "alt_verbs": [
+      "ubo.trace-chains",
+      "ownership.analyze-gaps"
+    ],
+    "entity_context": null,
+    "id": "cic-0106"
+  },
+  {
+    "utterance": "check for OFAC hits",
+    "expected_verb": "screening.sanctions",
+    "domain": "KYC",
+    "category": "natural",
+    "difficulty": "expert",
+    "alt_verbs": [],
+    "entity_context": null,
+    "id": "cic-0107"
+  },
+  {
+    "utterance": "KYC refresh for this entity",
+    "expected_verb": "screening.sanctions",
+    "domain": "KYC",
+    "category": "indirect",
+    "difficulty": "expert",
+    "alt_verbs": [
+      "screening.pep",
+      "screening.adverse-media",
+      "document.missing-for-entity",
+      "kyc-case.reopen",
+      "fund-investor.update-kyc-status"
+    ],
+    "entity_context": null,
+    "id": "cic-0108"
+  },
+  {
+    "utterance": "nominee structure -- need to pierce the veil",
+    "expected_verb": "ubo.trace-chains",
+    "domain": "KYC",
+    "category": "indirect",
+    "difficulty": "expert",
+    "alt_verbs": [],
+    "entity_context": null,
+    "id": "cic-0109"
+  },
+  {
+    "utterance": "where's the CDD pack for this client?",
+    "expected_verb": "document.for-entity",
+    "domain": "Document",
+    "category": "indirect",
+    "difficulty": "expert",
+    "alt_verbs": [],
+    "entity_context": null,
+    "id": "cic-0110"
+  },
+  {
+    "utterance": "teach the system that 'spin up' means create CBU",
+    "expected_verb": "agent.teach",
+    "domain": "CBU",
+    "category": "direct",
+    "difficulty": "easy",
+    "alt_verbs": [],
+    "entity_context": null,
+    "id": "cic-0111"
+  },
+  {
+    "utterance": "undo",
+    "expected_verb": "session.undo",
+    "domain": "CBU",
+    "category": "direct",
+    "difficulty": "easy",
+    "alt_verbs": [],
+    "entity_context": null,
+    "id": "cic-0112"
+  },
+  {
+    "utterance": "what tools do you have?",
+    "expected_verb": "agent.list-tools",
+    "domain": "CBU",
+    "category": "natural",
+    "difficulty": "easy",
+    "alt_verbs": [],
+    "entity_context": null,
+    "id": "cic-0113"
+  },
+  {
+    "utterance": "switch to research mode",
+    "expected_verb": "agent.set-authoring-mode",
+    "domain": "CBU",
+    "category": "natural",
+    "difficulty": "medium",
+    "alt_verbs": [
+      "agent.set-execution-mode"
+    ],
+    "entity_context": null,
+    "id": "cic-0114"
+  },
+  {
+    "utterance": "confirm",
+    "expected_verb": "agent.confirm",
+    "domain": "CBU",
+    "category": "direct",
+    "difficulty": "easy",
+    "alt_verbs": [
+      "agent.confirm-decision"
+    ],
+    "entity_context": null,
+    "id": "cic-0115"
+  },
+  {
+    "utterance": "no, go back",
+    "expected_verb": "agent.reject-decision",
+    "domain": "CBU",
+    "category": "natural",
+    "difficulty": "medium",
+    "alt_verbs": [
+      "view.surface",
+      "view.navigate-back-to",
+      "view.zoom-out",
+      "session.undo"
+    ],
+    "entity_context": null,
+    "id": "cic-0116"
+  },
+  {
+    "utterance": "create a master services agreement",
+    "expected_verb": "contract.create",
+    "domain": "CBU",
+    "category": "natural",
+    "difficulty": "medium",
+    "alt_verbs": [],
+    "entity_context": null,
+    "id": "cic-0117"
+  },
+  {
+    "utterance": "add a billing schedule -- monthly in arrears",
+    "expected_verb": "billing.create-period",
+    "domain": "CBU",
+    "category": "natural",
+    "difficulty": "medium",
+    "alt_verbs": [],
+    "entity_context": null,
+    "id": "cic-0118"
+  },
+  {
+    "utterance": "what's the fee for custody on this product?",
+    "expected_verb": "deal.list-rate-card-lines",
+    "domain": "Custody",
+    "category": "indirect",
+    "difficulty": "hard",
+    "alt_verbs": [],
+    "entity_context": null,
+    "id": "cic-0119"
+  },
+  {
+    "utterance": "set up a booking principal for this deal",
+    "expected_verb": "booking-principal.create",
+    "domain": "CBU",
+    "category": "direct",
+    "difficulty": "medium",
+    "alt_verbs": [],
+    "entity_context": null,
+    "id": "cic-0120"
+  },
+  {
+    "utterance": "which booking entity handles custody for Ireland?",
+    "expected_verb": "booking-principal.coverage-matrix",
+    "domain": "CBU",
+    "category": "natural",
+    "difficulty": "hard",
+    "alt_verbs": [],
+    "entity_context": null,
+    "id": "cic-0121"
+  },
+  {
+    "utterance": "Onboard a Luxembourg SICAV",
+    "expected_verb": "struct.lux.ucits.sicav",
+    "domain": "CBU",
+    "category": "scenario",
+    "difficulty": "medium",
+    "alt_verbs": [],
+    "entity_context": null,
+    "id": "cic-0122"
+  },
+  {
+    "utterance": "Onboard this Luxembourg SICAV with three sub-funds",
+    "expected_verb": "struct.lux.ucits.sicav",
+    "domain": "CBU",
+    "category": "scenario",
+    "difficulty": "medium",
+    "alt_verbs": [],
+    "entity_context": null,
+    "id": "cic-0123"
+  },
+  {
+    "utterance": "Set up an Irish ICAV fund",
+    "expected_verb": "struct.ie.ucits.icav",
+    "domain": "CBU",
+    "category": "scenario",
+    "difficulty": "medium",
+    "alt_verbs": [],
+    "entity_context": null,
+    "id": "cic-0124"
+  },
+  {
+    "utterance": "Establish a UK OEIC structure",
+    "expected_verb": "struct.uk.authorised.oeic",
+    "domain": "CBU",
+    "category": "scenario",
+    "difficulty": "medium",
+    "alt_verbs": [],
+    "entity_context": null,
+    "id": "cic-0125"
+  },
+  {
+    "utterance": "Set up a US 40-Act fund",
+    "expected_verb": "struct.us.40act.open-end",
+    "domain": "CBU",
+    "category": "scenario",
+    "difficulty": "medium",
+    "alt_verbs": [],
+    "entity_context": null,
+    "id": "cic-0126"
+  },
+  {
+    "utterance": "Set up a Luxembourg PE structure",
+    "expected_verb": "struct.lux.pe.scsp",
+    "domain": "CBU",
+    "category": "scenario",
+    "difficulty": "medium",
+    "alt_verbs": [],
+    "entity_context": null,
+    "id": "cic-0127"
+  },
+  {
+    "utterance": "Onboard a Luxembourg RAIF",
+    "expected_verb": "struct.lux.aif.raif",
+    "domain": "CBU",
+    "category": "scenario",
+    "difficulty": "medium",
+    "alt_verbs": [],
+    "entity_context": null,
+    "id": "cic-0128"
+  },
+  {
+    "utterance": "Run full screening on this entity",
+    "expected_verb": "screening.full",
+    "domain": "KYC",
+    "category": "scenario",
+    "difficulty": "medium",
+    "alt_verbs": [],
+    "entity_context": null,
+    "id": "cic-0129"
+  },
+  {
+    "utterance": "Screen this party for PEP, sanctions, and adverse media",
+    "expected_verb": "screening.full",
+    "domain": "KYC",
+    "category": "scenario",
+    "difficulty": "medium",
+    "alt_verbs": [
+      "screening.run"
+    ],
+    "entity_context": null,
+    "id": "cic-0130"
+  },
+  {
+    "utterance": "Do the complete KYC review on this party",
+    "expected_verb": "kyc.full-review",
+    "domain": "KYC",
+    "category": "scenario",
+    "difficulty": "medium",
+    "alt_verbs": [
+      "kyc-case.close",
+      "kyc-case.create"
+    ],
+    "entity_context": null,
+    "id": "cic-0131"
+  },
+  {
+    "utterance": "Run KYC screening and collect all documents",
+    "expected_verb": "kyc.full-review",
+    "domain": "KYC",
+    "category": "scenario",
+    "difficulty": "hard",
+    "alt_verbs": [
+      "kyc.collect-documents",
+      "screening.full"
+    ],
+    "entity_context": null,
+    "id": "cic-0132"
+  },
+  {
+    "utterance": "Collect KYC documents from this party",
+    "expected_verb": "kyc.collect-documents",
+    "domain": "KYC",
+    "category": "scenario",
+    "difficulty": "medium",
+    "alt_verbs": [],
+    "entity_context": null,
+    "id": "cic-0133"
+  },
+  {
+    "utterance": "Request identity documents for due diligence",
+    "expected_verb": "kyc.collect-documents",
+    "domain": "KYC",
+    "category": "scenario",
+    "difficulty": "hard",
+    "alt_verbs": [
+      "document.solicit-batch",
+      "document.solicit"
+    ],
+    "entity_context": null,
+    "id": "cic-0134"
+  },
+  {
+    "utterance": "Set up a cross-border hedge fund",
+    "expected_verb": "struct.hedge.cross-border",
+    "domain": "CBU",
+    "category": "scenario",
+    "difficulty": "medium",
+    "alt_verbs": [],
+    "entity_context": null,
+    "id": "cic-0135"
+  },
+  {
+    "utterance": "Launch a cross-border PE fund structure",
+    "expected_verb": "struct.pe.cross-border",
+    "domain": "CBU",
+    "category": "scenario",
+    "difficulty": "medium",
+    "alt_verbs": [],
+    "entity_context": null,
+    "id": "cic-0136"
+  },
+  {
+    "utterance": "I need to onboard a new fund in Ireland",
+    "expected_verb": "struct.ie.ucits.icav",
+    "domain": "CBU",
+    "category": "scenario",
+    "difficulty": "hard",
+    "alt_verbs": [],
+    "entity_context": null,
+    "id": "cic-0137"
+  },
+  {
+    "utterance": "Can you help me set up a Lux UCITS SICAV structure?",
+    "expected_verb": "struct.lux.ucits.sicav",
+    "domain": "CBU",
+    "category": "scenario",
+    "difficulty": "hard",
+    "alt_verbs": [],
+    "entity_context": null,
+    "id": "cic-0138"
+  },
+  {
+    "utterance": "Set up Lux SICAV structure",
+    "expected_verb": "struct.lux.ucits.sicav",
+    "domain": "CBU",
+    "category": "macro_match",
+    "difficulty": "easy",
+    "alt_verbs": [],
+    "entity_context": null,
+    "id": "cic-0139"
+  },
+  {
+    "utterance": "Create an Irish ICAV",
+    "expected_verb": "struct.ie.ucits.icav",
+    "domain": "CBU",
+    "category": "macro_match",
+    "difficulty": "easy",
+    "alt_verbs": [],
+    "entity_context": null,
+    "id": "cic-0140"
+  },
+  {
+    "utterance": "Open a new KYC case",
+    "expected_verb": "kyc-case.create",
+    "domain": "KYC",
+    "category": "macro_match",
+    "difficulty": "easy",
+    "alt_verbs": [
+      "kyc-case.create",
+      "case.open"
+    ],
+    "entity_context": null,
+    "id": "cic-0141"
+  },
+  {
+    "utterance": "Create a trading mandate",
+    "expected_verb": "mandate.create",
+    "domain": "CBU",
+    "category": "macro_match",
+    "difficulty": "easy",
+    "alt_verbs": [],
+    "entity_context": null,
+    "id": "cic-0142"
+  },
+  {
+    "utterance": "Add a new party",
+    "expected_verb": "party.add",
+    "domain": "Entity",
+    "category": "macro_match",
+    "difficulty": "easy",
+    "alt_verbs": [],
+    "entity_context": null,
+    "id": "cic-0143"
+  },
+  {
+    "utterance": "Lux RAIF setup",
+    "expected_verb": "struct.lux.aif.raif",
+    "domain": "CBU",
+    "category": "macro_match",
+    "difficulty": "easy",
+    "alt_verbs": [],
+    "entity_context": null,
+    "id": "cic-0144"
+  },
+  {
+    "utterance": "UK OEIC structure",
+    "expected_verb": "struct.uk.authorised.oeic",
+    "domain": "CBU",
+    "category": "macro_match",
+    "difficulty": "easy",
+    "alt_verbs": [
+      "ubo.trace-chains"
+    ],
+    "entity_context": null,
+    "id": "cic-0145"
+  },
+  {
+    "utterance": "Run full screening",
+    "expected_verb": "screening.full",
+    "domain": "KYC",
+    "category": "macro_match",
+    "difficulty": "easy",
+    "alt_verbs": [],
+    "entity_context": null,
+    "id": "cic-0146"
+  },
+  {
+    "utterance": "PEP check",
+    "expected_verb": "screening.pep",
+    "domain": "KYC",
+    "category": "macro_match",
+    "difficulty": "easy",
+    "alt_verbs": [
+      "screening.pep"
+    ],
+    "entity_context": null,
+    "id": "cic-0147"
+  },
+  {
+    "utterance": "Sanctions check",
+    "expected_verb": "screening.sanctions",
+    "domain": "KYC",
+    "category": "macro_match",
+    "difficulty": "easy",
+    "alt_verbs": [
+      "screening.sanctions"
+    ],
+    "entity_context": null,
+    "id": "cic-0148"
+  },
+  {
+    "utterance": "Adverse media check",
+    "expected_verb": "screening.adverse-media",
+    "domain": "KYC",
+    "category": "macro_match",
+    "difficulty": "easy",
+    "alt_verbs": [
+      "screening.adverse-media"
+    ],
+    "entity_context": null,
+    "id": "cic-0149"
+  },
+  {
+    "utterance": "Collect documents for KYC",
+    "expected_verb": "kyc.collect-documents",
+    "domain": "KYC",
+    "category": "macro_match",
+    "difficulty": "easy",
+    "alt_verbs": [],
+    "entity_context": null,
+    "id": "cic-0150"
+  },
+  {
+    "utterance": "Full KYC review",
+    "expected_verb": "kyc.full-review",
+    "domain": "KYC",
+    "category": "macro_match",
+    "difficulty": "easy",
+    "alt_verbs": [],
+    "entity_context": null,
+    "id": "cic-0151"
+  },
+  {
+    "utterance": "Check case readiness",
+    "expected_verb": "kyc.check-readiness",
+    "domain": "KYC",
+    "category": "macro_match",
+    "difficulty": "easy",
+    "alt_verbs": [],
+    "entity_context": null,
+    "id": "cic-0152"
+  },
+  {
+    "utterance": "Create an umbrella fund",
+    "expected_verb": "fund.create",
+    "domain": "Custody",
+    "category": "tier2_blocker",
+    "difficulty": "medium",
+    "alt_verbs": [
+      "fund.create"
+    ],
+    "entity_context": null,
+    "id": "cic-0153"
+  },
+  {
+    "utterance": "Run sanctions screening",
+    "expected_verb": "screening.sanctions",
+    "domain": "KYC",
+    "category": "tier2_blocker",
+    "difficulty": "easy",
+    "alt_verbs": [
+      "case-screening.run",
+      "screening.sanctions"
+    ],
+    "entity_context": null,
+    "id": "cic-0154"
+  },
+  {
+    "utterance": "Add a role to this entity",
+    "expected_verb": "cbu.assign-role",
+    "domain": "CBU",
+    "category": "tier2_blocker",
+    "difficulty": "medium",
+    "alt_verbs": [],
+    "entity_context": null,
+    "id": "cic-0155"
+  },
+  {
+    "utterance": "Check KYC case status",
+    "expected_verb": "kyc-case.read",
+    "domain": "KYC",
+    "category": "tier2_blocker",
+    "difficulty": "easy",
+    "alt_verbs": [
+      "kyc-case.summarize",
+      "kyc-case.update-status"
+    ],
+    "entity_context": null,
+    "id": "cic-0156"
+  },
+  {
+    "utterance": "Run the full KYC onboarding process with screening and documents",
+    "expected_verb": "screening.full",
+    "domain": "CBU",
+    "category": "scenario",
+    "difficulty": "hard",
+    "alt_verbs": [
+      "kyc-case.create",
+      "kyc.full-review",
+      "case.open"
+    ],
+    "entity_context": null,
+    "id": "cic-0157"
+  },
+  {
+    "utterance": "Complete the KYC process including case screening and document collection",
+    "expected_verb": "kyc-case.create",
+    "domain": "KYC",
+    "category": "scenario",
+    "difficulty": "hard",
+    "alt_verbs": [
+      "kyc-case.create",
+      "kyc-case.close",
+      "screening.full",
+      "kyc.full-review",
+      "case.open"
+    ],
+    "entity_context": null,
+    "id": "cic-0158"
+  },
+  {
+    "utterance": "Do the full KYC onboarding for this client",
+    "expected_verb": "kyc-case.create",
+    "domain": "KYC",
+    "category": "scenario",
+    "difficulty": "hard",
+    "alt_verbs": [
+      "kyc-case.create",
+      "kyc-agreement.create",
+      "kyc.full-review",
+      "case.open"
+    ],
+    "entity_context": null,
+    "id": "cic-0159"
+  },
+  {
+    "utterance": "Open a KYC case and run full screening",
+    "expected_verb": "screening.full",
+    "domain": "CBU",
+    "category": "scenario",
+    "difficulty": "medium",
+    "alt_verbs": [
+      "kyc-case.create"
+    ],
+    "entity_context": null,
+    "id": "cic-0160"
+  },
+  {
+    "utterance": "Create a new KYC case with screening for this party",
+    "expected_verb": "kyc-case.create",
+    "domain": "KYC",
+    "category": "scenario",
+    "difficulty": "medium",
+    "alt_verbs": [
+      "kyc-case.create",
+      "screening.full"
+    ],
+    "entity_context": null,
+    "id": "cic-0161"
+  },
+  {
+    "utterance": "Open a case and collect the KYC documents",
+    "expected_verb": "kyc-case.create",
+    "domain": "KYC",
+    "category": "scenario",
+    "difficulty": "medium",
+    "alt_verbs": [
+      "kyc-case.create",
+      "kyc.collect-documents",
+      "case.open"
+    ],
+    "entity_context": null,
+    "id": "cic-0162"
+  },
+  {
+    "utterance": "Set up a new case and request identity documents",
+    "expected_verb": "kyc-case.create",
+    "domain": "KYC",
+    "category": "scenario",
+    "difficulty": "medium",
+    "alt_verbs": [
+      "kyc-case.create",
+      "kyc.collect-documents",
+      "case.open"
+    ],
+    "entity_context": null,
+    "id": "cic-0163"
+  },
+  {
+    "utterance": "check attribute gaps",
+    "expected_verb": "service-resource.check-attribute-gaps",
+    "domain": "CBU",
+    "category": "direct",
+    "difficulty": "easy",
+    "alt_verbs": [],
+    "entity_context": null,
+    "id": "cic-0164"
+  },
+  {
+    "utterance": "what attributes are missing from SRDEFs",
+    "expected_verb": "service-resource.check-attribute-gaps",
+    "domain": "CBU",
+    "category": "natural",
+    "difficulty": "medium",
+    "alt_verbs": [],
+    "entity_context": null,
+    "id": "cic-0165"
+  },
+  {
+    "utterance": "sync service resource definitions",
+    "expected_verb": "service-resource.sync-definitions",
+    "domain": "CBU",
+    "category": "direct",
+    "difficulty": "easy",
+    "alt_verbs": [],
+    "entity_context": null,
+    "id": "cic-0166"
+  },
+  {
+    "utterance": "reload SRDEF configuration",
+    "expected_verb": "service-resource.sync-definitions",
+    "domain": "CBU",
+    "category": "natural",
+    "difficulty": "medium",
+    "alt_verbs": [],
+    "entity_context": null,
+    "id": "cic-0167"
+  },
+  {
+    "utterance": "bridge ungoverned attributes to semos",
+    "expected_verb": "attribute.bridge-to-semos",
+    "domain": "CBU",
+    "category": "direct",
+    "difficulty": "easy",
+    "alt_verbs": [],
+    "entity_context": null,
+    "id": "cic-0168"
+  },
+  {
+    "utterance": "govern existing attributes in semantic os",
+    "expected_verb": "attribute.bridge-to-semos",
+    "domain": "CBU",
+    "category": "natural",
+    "difficulty": "medium",
+    "alt_verbs": [],
+    "entity_context": null,
+    "id": "cic-0169"
+  },
+  {
+    "utterance": "recompute stale derived values",
+    "expected_verb": "derivation.recompute-stale",
+    "domain": "CBU",
+    "category": "direct",
+    "difficulty": "easy",
+    "alt_verbs": [],
+    "entity_context": null,
+    "id": "cic-0170"
+  },
+  {
+    "utterance": "refresh derived attributes",
+    "expected_verb": "derivation.recompute-stale",
+    "domain": "CBU",
+    "category": "natural",
+    "difficulty": "medium",
+    "alt_verbs": [],
+    "entity_context": null,
+    "id": "cic-0171"
+  },
+  {
+    "utterance": "define a new attribute for KYC risk",
+    "expected_verb": "attribute.define",
+    "domain": "CBU",
+    "category": "natural",
+    "difficulty": "medium",
+    "alt_verbs": [],
+    "entity_context": null,
+    "id": "cic-0172"
+  },
+  {
+    "utterance": "record typed attribute value",
+    "expected_verb": "typed-attribute.record",
+    "domain": "CBU",
+    "category": "direct",
+    "difficulty": "easy",
+    "alt_verbs": [],
+    "entity_context": null,
+    "id": "cic-0173"
+  },
+  {
+    "utterance": "list typed attributes for entity",
+    "expected_verb": "typed-attribute.list-for-entity",
+    "domain": "CBU",
+    "category": "direct",
+    "difficulty": "easy",
+    "alt_verbs": [],
+    "entity_context": null,
+    "id": "cic-0174"
+  },
+  {
+    "utterance": "compose a changeset",
+    "expected_verb": "changeset.compose",
+    "domain": "CBU",
+    "category": "direct",
+    "difficulty": "easy",
+    "alt_verbs": [],
+    "entity_context": null,
+    "id": "cic-0175"
+  },
+  {
+    "utterance": "publish registry changes",
+    "expected_verb": "governance.publish",
+    "domain": "CBU",
+    "category": "natural",
+    "difficulty": "medium",
+    "alt_verbs": [],
+    "entity_context": null,
+    "id": "cic-0176"
+  },
+  {
+    "utterance": "dry run the changeset",
+    "expected_verb": "governance.dry-run",
+    "domain": "CBU",
+    "category": "natural",
+    "difficulty": "medium",
+    "alt_verbs": [],
+    "entity_context": null,
+    "id": "cic-0177"
+  },
+  {
+    "utterance": "inspect attribute definition",
+    "expected_verb": "attribute.inspect",
+    "domain": "CBU",
+    "category": "direct",
+    "difficulty": "easy",
+    "alt_verbs": [],
+    "entity_context": null,
+    "id": "cic-0178"
+  },
+  {
+    "utterance": "create system flag attribute",
+    "expected_verb": "attribute.define-internal",
+    "domain": "CBU",
+    "category": "direct",
+    "difficulty": "easy",
+    "alt_verbs": [],
+    "entity_context": null,
+    "id": "cic-0179"
+  },
+  {
+    "utterance": "add a system processing flag for routing",
+    "expected_verb": "attribute.define-internal",
+    "domain": "CBU",
+    "category": "natural",
+    "difficulty": "medium",
+    "alt_verbs": [],
+    "entity_context": null,
+    "id": "cic-0180"
+  },
+  {
+    "utterance": "register an internal system attribute for operations",
+    "expected_verb": "attribute.define-internal",
+    "domain": "CBU",
+    "category": "natural",
+    "difficulty": "medium",
+    "alt_verbs": [],
+    "entity_context": null,
+    "id": "cic-0181"
+  },
+  {
+    "utterance": "provision internal processing marker",
+    "expected_verb": "attribute.define-internal",
+    "domain": "CBU",
+    "category": "direct",
+    "difficulty": "easy",
+    "alt_verbs": [],
+    "entity_context": null,
+    "id": "cic-0182"
+  },
+  {
+    "utterance": "new internal attribute for system use",
+    "expected_verb": "attribute.define-internal",
+    "domain": "CBU",
+    "category": "direct",
+    "difficulty": "easy",
+    "alt_verbs": [],
+    "entity_context": null,
+    "id": "cic-0183"
+  },
+  {
+    "utterance": "define an operational system marker attribute",
+    "expected_verb": "attribute.define-internal",
+    "domain": "CBU",
+    "category": "natural",
+    "difficulty": "medium",
+    "alt_verbs": [],
+    "entity_context": null,
+    "id": "cic-0184"
+  },
+  {
+    "utterance": "patch system flag rules",
+    "expected_verb": "attribute.update-internal",
+    "domain": "CBU",
+    "category": "direct",
+    "difficulty": "easy",
+    "alt_verbs": [],
+    "entity_context": null,
+    "id": "cic-0185"
+  },
+  {
+    "utterance": "change the system flag requirements",
+    "expected_verb": "attribute.update-internal",
+    "domain": "CBU",
+    "category": "natural",
+    "difficulty": "medium",
+    "alt_verbs": [],
+    "entity_context": null,
+    "id": "cic-0186"
+  },
+  {
+    "utterance": "modify internal attribute constraints",
+    "expected_verb": "attribute.update-internal",
+    "domain": "CBU",
+    "category": "direct",
+    "difficulty": "easy",
+    "alt_verbs": [],
+    "entity_context": null,
+    "id": "cic-0187"
+  },
+  {
+    "utterance": "adjust internal system attribute settings",
+    "expected_verb": "attribute.update-internal",
+    "domain": "CBU",
+    "category": "natural",
+    "difficulty": "medium",
+    "alt_verbs": [],
+    "entity_context": null,
+    "id": "cic-0188"
+  },
+  {
+    "utterance": "create a new deal",
+    "expected_verb": "deal.create",
+    "domain": "Custody",
+    "category": "direct",
+    "difficulty": "easy",
+    "alt_verbs": [],
+    "entity_context": null,
+    "id": "cic-0189"
+  },
+  {
+    "utterance": "start a commercial deal for BlackRock",
+    "expected_verb": "deal.create",
+    "domain": "Custody",
+    "category": "natural",
+    "difficulty": "medium",
+    "alt_verbs": [
+      "session.load-cluster"
+    ],
+    "entity_context": null,
+    "id": "cic-0190"
+  },
+  {
+    "utterance": "show deal status",
+    "expected_verb": "deal.read",
+    "domain": "Custody",
+    "category": "natural",
+    "difficulty": "easy",
+    "alt_verbs": [
+      "deal.list"
+    ],
+    "entity_context": null,
+    "id": "cic-0191"
+  },
+  {
+    "utterance": "list all active deals",
+    "expected_verb": "deal.list",
+    "domain": "Custody",
+    "category": "direct",
+    "difficulty": "easy",
+    "alt_verbs": [],
+    "entity_context": null,
+    "id": "cic-0192"
+  },
+  {
+    "utterance": "create rate card for this deal",
+    "expected_verb": "deal.create-rate-card",
+    "domain": "Custody",
+    "category": "natural",
+    "difficulty": "medium",
+    "alt_verbs": [],
+    "entity_context": null,
+    "id": "cic-0193"
+  },
+  {
+    "utterance": "add a contract to the deal",
+    "expected_verb": "deal.add-contract",
+    "domain": "Custody",
+    "category": "natural",
+    "difficulty": "medium",
+    "alt_verbs": [
+      "contract.create"
+    ],
+    "entity_context": null,
+    "id": "cic-0194"
+  },
+  {
+    "utterance": "negotiate rate card line",
+    "expected_verb": "deal.update-rate-card-line",
+    "domain": "Custody",
+    "category": "natural",
+    "difficulty": "hard",
+    "alt_verbs": [
+      "deal.add-rate-card-line"
+    ],
+    "entity_context": null,
+    "id": "cic-0195"
+  },
+  {
+    "utterance": "activate this deal",
+    "expected_verb": "deal.update-status",
+    "domain": "Custody",
+    "category": "direct",
+    "difficulty": "easy",
+    "alt_verbs": [
+      "deal.create",
+      "session.load-deal"
+    ],
+    "entity_context": null,
+    "id": "cic-0196"
+  },
+  {
+    "utterance": "request onboarding for this deal",
+    "expected_verb": "deal.request-onboarding",
+    "domain": "Custody",
+    "category": "natural",
+    "difficulty": "medium",
+    "alt_verbs": [],
+    "entity_context": null,
+    "id": "cic-0197"
+  },
+  {
+    "utterance": "create billing profile",
+    "expected_verb": "billing.create-profile",
+    "domain": "CBU",
+    "category": "natural",
+    "difficulty": "medium",
+    "alt_verbs": [],
+    "entity_context": null,
+    "id": "cic-0198"
+  },
+  {
+    "utterance": "show contract details",
+    "expected_verb": "contract.get",
+    "domain": "CBU",
+    "category": "natural",
+    "difficulty": "easy",
+    "alt_verbs": [
+      "contract.list"
+    ],
+    "entity_context": null,
+    "id": "cic-0199"
+  },
+  {
+    "utterance": "cancel the deal",
+    "expected_verb": "deal.cancel",
+    "domain": "Custody",
+    "category": "direct",
+    "difficulty": "easy",
+    "alt_verbs": [],
+    "entity_context": null,
+    "id": "cic-0200"
+  },
+  {
+    "utterance": "create a new CBU",
+    "expected_verb": "cbu.create",
+    "domain": "CBU",
+    "category": "direct",
+    "difficulty": "easy",
+    "alt_verbs": [],
+    "entity_context": null,
+    "id": "cic-0201"
+  },
+  {
+    "utterance": "set up a Luxembourg SICAV",
+    "expected_verb": "cbu.create",
+    "domain": "CBU",
+    "category": "natural",
+    "difficulty": "medium",
+    "alt_verbs": [
+      "fund.create",
+      "struct.lux.ucits.sicav"
+    ],
+    "entity_context": null,
+    "id": "cic-0202"
+  },
+  {
+    "utterance": "list all CBUs",
+    "expected_verb": "cbu.list",
+    "domain": "CBU",
+    "category": "direct",
+    "difficulty": "easy",
+    "alt_verbs": [],
+    "entity_context": null,
+    "id": "cic-0203"
+  },
+  {
+    "utterance": "read CBU details",
+    "expected_verb": "cbu.read",
+    "domain": "CBU",
+    "category": "direct",
+    "difficulty": "easy",
+    "alt_verbs": [
+      "cbu.list"
+    ],
+    "entity_context": null,
+    "id": "cic-0204"
+  },
+  {
+    "utterance": "suspend this CBU",
+    "expected_verb": "cbu.suspend",
+    "domain": "CBU",
+    "category": "direct",
+    "difficulty": "easy",
+    "alt_verbs": [
+      "cbu.delete"
+    ],
+    "entity_context": null,
+    "id": "cic-0205"
+  },
+  {
+    "utterance": "assign custody product to CBU",
+    "expected_verb": "cbu.add-product",
+    "domain": "CBU",
+    "category": "natural",
+    "difficulty": "medium",
+    "alt_verbs": [
+      "product.list",
+      "cbu.add-product"
+    ],
+    "entity_context": null,
+    "id": "cic-0206"
+  },
+  {
+    "utterance": "add depositary role to entity",
+    "expected_verb": "cbu.assign-role",
+    "domain": "CBU",
+    "category": "natural",
+    "difficulty": "hard",
+    "alt_verbs": [
+      "entity.assign-role"
+    ],
+    "entity_context": null,
+    "id": "cic-0207"
+  },
+  {
+    "utterance": "create sub-fund",
+    "expected_verb": "cbu.create",
+    "domain": "CBU",
+    "category": "natural",
+    "difficulty": "medium",
+    "alt_verbs": [
+      "fund.create"
+    ],
+    "entity_context": null,
+    "id": "cic-0208"
+  },
+  {
+    "utterance": "create share class for this fund",
+    "expected_verb": "share-class.create",
+    "domain": "Custody",
+    "category": "natural",
+    "difficulty": "medium",
+    "alt_verbs": [
+      "share-class.create"
+    ],
+    "entity_context": null,
+    "id": "cic-0209"
+  },
+  {
+    "utterance": "show entity details",
+    "expected_verb": "entity.read",
+    "domain": "Entity",
+    "category": "natural",
+    "difficulty": "easy",
+    "alt_verbs": [
+      "entity.list"
+    ],
+    "entity_context": null,
+    "id": "cic-0210"
+  },
+  {
+    "utterance": "create a trading profile",
+    "expected_verb": "trading-profile.create-draft",
+    "domain": "CBU",
+    "category": "natural",
+    "difficulty": "medium",
+    "alt_verbs": [],
+    "entity_context": null,
+    "id": "cic-0211"
+  },
+  {
+    "utterance": "rename the CBU",
+    "expected_verb": "cbu.rename",
+    "domain": "CBU",
+    "category": "direct",
+    "difficulty": "easy",
+    "alt_verbs": [
+      "cbu.update"
+    ],
+    "entity_context": null,
+    "id": "cic-0212"
+  },
+  {
+    "utterance": "open a KYC case",
+    "expected_verb": "kyc-case.create",
+    "domain": "KYC",
+    "category": "direct",
+    "difficulty": "easy",
+    "alt_verbs": [
+      "kyc.create-case",
+      "case.open"
+    ],
+    "entity_context": null,
+    "id": "cic-0213"
+  },
+  {
+    "utterance": "start KYC review for new client",
+    "expected_verb": "kyc-case.create",
+    "domain": "KYC",
+    "category": "natural",
+    "difficulty": "medium",
+    "alt_verbs": [
+      "kyc.create-case"
+    ],
+    "entity_context": null,
+    "id": "cic-0214"
+  },
+  {
+    "utterance": "check for PEP status",
+    "expected_verb": "screening.pep",
+    "domain": "KYC",
+    "category": "natural",
+    "difficulty": "medium",
+    "alt_verbs": [
+      "screening.pep"
+    ],
+    "entity_context": null,
+    "id": "cic-0215"
+  },
+  {
+    "utterance": "solicit passport document",
+    "expected_verb": "document.solicit",
+    "domain": "Document",
+    "category": "natural",
+    "difficulty": "medium",
+    "alt_verbs": [],
+    "entity_context": null,
+    "id": "cic-0216"
+  },
+  {
+    "utterance": "discover UBO structure",
+    "expected_verb": "ubo.calculate",
+    "domain": "KYC",
+    "category": "natural",
+    "difficulty": "medium",
+    "alt_verbs": [
+      "ubo.compute-chains"
+    ],
+    "entity_context": null,
+    "id": "cic-0217"
+  },
+  {
+    "utterance": "set risk rating to high",
+    "expected_verb": "kyc-case.set-risk-rating",
+    "domain": "KYC",
+    "category": "natural",
+    "difficulty": "medium",
+    "alt_verbs": [
+      "kyc.set-risk"
+    ],
+    "entity_context": null,
+    "id": "cic-0218"
+  },
+  {
+    "utterance": "approve KYC case",
+    "expected_verb": "kyc-case.close",
+    "domain": "KYC",
+    "category": "natural",
+    "difficulty": "medium",
+    "alt_verbs": [
+      "kyc.approve-case",
+      "kyc-case.approve",
+      "case.approve"
+    ],
+    "entity_context": null,
+    "id": "cic-0219"
+  },
+  {
+    "utterance": "list outstanding KYC requirements",
+    "expected_verb": "requirement.list-outstanding",
+    "domain": "CBU",
+    "category": "natural",
+    "difficulty": "hard",
+    "alt_verbs": [
+      "requirement.list"
+    ],
+    "entity_context": null,
+    "id": "cic-0220"
+  },
+  {
+    "utterance": "create entity workstream",
+    "expected_verb": "entity-workstream.create",
+    "domain": "CBU",
+    "category": "natural",
+    "difficulty": "medium",
+    "alt_verbs": [],
+    "entity_context": null,
+    "id": "cic-0221"
+  },
+  {
+    "utterance": "add identifier to entity",
+    "expected_verb": "identifier.add",
+    "domain": "CBU",
+    "category": "natural",
+    "difficulty": "medium",
+    "alt_verbs": [
+      "party.assign-identifier"
+    ],
+    "entity_context": null,
+    "id": "cic-0222"
+  },
+  {
+    "utterance": "evaluate tollgate readiness",
+    "expected_verb": "tollgate.evaluate",
+    "domain": "CBU",
+    "category": "natural",
+    "difficulty": "hard",
+    "alt_verbs": [
+      "tollgate.get-decision-readiness"
+    ],
+    "entity_context": null,
+    "id": "cic-0223"
+  },
+  {
+    "utterance": "list all products",
+    "expected_verb": "product.list",
+    "domain": "CBU",
+    "category": "direct",
+    "difficulty": "easy",
+    "alt_verbs": [],
+    "entity_context": null,
+    "id": "cic-0224"
+  },
+  {
+    "utterance": "show product details",
+    "expected_verb": "product.read",
+    "domain": "CBU",
+    "category": "direct",
+    "difficulty": "easy",
+    "alt_verbs": [],
+    "entity_context": null,
+    "id": "cic-0225"
+  },
+  {
+    "utterance": "list services for this product",
+    "expected_verb": "service.list-by-product",
+    "domain": "CBU",
+    "category": "natural",
+    "difficulty": "medium",
+    "alt_verbs": [],
+    "entity_context": null,
+    "id": "cic-0226"
+  },
+  {
+    "utterance": "browse service resources",
+    "expected_verb": "service-resource.list",
+    "domain": "CBU",
+    "category": "natural",
+    "difficulty": "medium",
+    "alt_verbs": [],
+    "entity_context": null,
+    "id": "cic-0227"
+  },
+  {
+    "utterance": "show resource attributes",
+    "expected_verb": "service-resource.list-attributes",
+    "domain": "CBU",
+    "category": "natural",
+    "difficulty": "medium",
+    "alt_verbs": [],
+    "entity_context": null,
+    "id": "cic-0228"
+  },
+  {
+    "utterance": "what services does custody provide",
+    "expected_verb": "service.list-by-product",
+    "domain": "CBU",
+    "category": "natural",
+    "difficulty": "hard",
+    "alt_verbs": [
+      "service.list"
+    ],
+    "entity_context": null,
+    "id": "cic-0229"
+  },
+  {
+    "utterance": "check resource attribute requirements",
+    "expected_verb": "service-resource.validate-attrs",
+    "domain": "CBU",
+    "category": "natural",
+    "difficulty": "hard",
+    "alt_verbs": [],
+    "entity_context": null,
+    "id": "cic-0230"
+  },
+  {
+    "utterance": "list all service types",
+    "expected_verb": "service.list",
+    "domain": "CBU",
+    "category": "direct",
+    "difficulty": "easy",
+    "alt_verbs": [],
+    "entity_context": null,
+    "id": "cic-0231"
+  },
+  {
+    "utterance": "request onboarding",
+    "expected_verb": "deal.request-onboarding",
+    "domain": "Custody",
+    "category": "direct",
+    "difficulty": "easy",
+    "alt_verbs": [],
+    "entity_context": null,
+    "id": "cic-0232"
+  },
+  {
+    "utterance": "submit onboarding handoff",
+    "expected_verb": "deal.request-onboarding",
+    "domain": "Custody",
+    "category": "natural",
+    "difficulty": "medium",
+    "alt_verbs": [
+      "deal.request-onboarding-batch"
+    ],
+    "entity_context": null,
+    "id": "cic-0233"
+  },
+  {
+    "utterance": "set up a Luxembourg fund book",
+    "expected_verb": "cbu.create",
+    "domain": "CBU",
+    "category": "natural",
+    "difficulty": "medium",
+    "alt_verbs": [
+      "fund.create",
+      "struct.lux.ucits.sicav"
+    ],
+    "entity_context": null,
+    "id": "cic-0234"
+  },
+  {
+    "utterance": "configure UCITS SICAV structure",
+    "expected_verb": "cbu.create",
+    "domain": "CBU",
+    "category": "natural",
+    "difficulty": "hard",
+    "alt_verbs": [
+      "fund.create",
+      "struct.lux.ucits.sicav"
+    ],
+    "entity_context": null,
+    "id": "cic-0235"
+  },
+  {
+    "utterance": "onboard a cross-border hedge fund",
+    "expected_verb": "cbu.create",
+    "domain": "CBU",
+    "category": "natural",
+    "difficulty": "hard",
+    "alt_verbs": [
+      "fund.create",
+      "struct.hedge.cross-border"
+    ],
+    "entity_context": null,
+    "id": "cic-0236"
+  },
+  {
+    "utterance": "handoff deal to operations",
+    "expected_verb": "deal.request-onboarding",
+    "domain": "Custody",
+    "category": "natural",
+    "difficulty": "medium",
+    "alt_verbs": [],
+    "entity_context": null,
+    "id": "cic-0237"
+  },
+  {
+    "utterance": "open a new client KYC case",
+    "expected_verb": "kyc-case.create",
+    "domain": "KYC",
+    "category": "natural",
+    "difficulty": "medium",
+    "alt_verbs": [
+      "kyc.create-case",
+      "case.open"
+    ],
+    "entity_context": null,
+    "id": "cic-0238"
+  },
+  {
+    "utterance": "show trading matrix",
+    "expected_verb": "trading-profile.read",
+    "domain": "CBU",
+    "category": "natural",
+    "difficulty": "medium",
+    "alt_verbs": [
+      "trading-profile.list"
+    ],
+    "entity_context": null,
+    "id": "cic-0239"
+  },
+  {
+    "utterance": "import trading profile",
+    "expected_verb": "trading-profile.import",
+    "domain": "CBU",
+    "category": "direct",
+    "difficulty": "easy",
+    "alt_verbs": [],
+    "entity_context": null,
+    "id": "cic-0240"
+  },
+  {
+    "utterance": "configure counterparty limits",
+    "expected_verb": "trading-profile.add-component",
+    "domain": "CBU",
+    "category": "natural",
+    "difficulty": "hard",
+    "alt_verbs": [
+      "trading-profile.add-isda-config",
+      "trading-profile.add-csa-config"
+    ],
+    "entity_context": null,
+    "id": "cic-0241"
+  },
+  {
+    "utterance": "list instrument classes",
+    "expected_verb": "instrument-class.list",
+    "domain": "CBU",
+    "category": "direct",
+    "difficulty": "easy",
+    "alt_verbs": [],
+    "entity_context": null,
+    "id": "cic-0242"
+  },
+  {
+    "utterance": "validate go-live readiness",
+    "expected_verb": "trading-profile.validate-go-live-ready",
+    "domain": "CBU",
+    "category": "natural",
+    "difficulty": "hard",
+    "alt_verbs": [],
+    "entity_context": null,
+    "id": "cic-0243"
+  },
+  {
+    "utterance": "set CA policy for this CBU",
+    "expected_verb": "trading-profile.ca.set-election-policy",
+    "domain": "CBU",
+    "category": "natural",
+    "difficulty": "hard",
+    "alt_verbs": [
+      "trading-profile.ca.set-notification-policy",
+      "trading-profile.ca.enable-event-types"
+    ],
+    "entity_context": null,
+    "id": "cic-0244"
+  },
+  {
+    "utterance": "spin up a new fund",
+    "expected_verb": "cbu.create",
+    "domain": "CBU",
+    "category": "natural",
+    "difficulty": "medium",
+    "alt_verbs": [
+      "fund.create"
+    ],
+    "entity_context": null,
+    "id": "cic-0245"
+  },
+  {
+    "utterance": "who owns this thing?",
+    "expected_verb": "ubo.list-ubos",
+    "domain": "KYC",
+    "category": "natural",
+    "difficulty": "hard",
+    "alt_verbs": [
+      "ubo.calculate",
+      "ownership.list-owners",
+      "ownership.find-controller",
+      "ubo.add-ownership"
+    ],
+    "entity_context": null,
+    "id": "cic-0246"
+  },
+  {
+    "utterance": "are we good to go?",
+    "expected_verb": "readiness.compute",
+    "domain": "CBU",
+    "category": "natural",
+    "difficulty": "hard",
+    "alt_verbs": [
+      "trading-profile.validate-go-live-ready"
+    ],
+    "entity_context": null,
+    "id": "cic-0247"
+  },
+  {
+    "utterance": "close it out",
+    "expected_verb": "kyc-case.close",
+    "domain": "KYC",
+    "category": "natural",
+    "difficulty": "hard",
+    "alt_verbs": [
+      "deal.cancel"
+    ],
+    "entity_context": null,
+    "id": "cic-0248"
+  },
+  {
+    "utterance": "kill this deal",
+    "expected_verb": "deal.cancel",
+    "domain": "Custody",
+    "category": "natural",
+    "difficulty": "medium",
+    "alt_verbs": [],
+    "entity_context": null,
+    "id": "cic-0249"
+  },
+  {
+    "utterance": "chase the passport",
+    "expected_verb": "document.solicit",
+    "domain": "Document",
+    "category": "natural",
+    "difficulty": "hard",
+    "alt_verbs": [
+      "document.chase"
+    ],
+    "entity_context": null,
+    "id": "cic-0250"
+  },
+  {
+    "utterance": "run EDD",
+    "expected_verb": "screening.run",
+    "domain": "KYC",
+    "category": "natural",
+    "difficulty": "hard",
+    "alt_verbs": [
+      "screening.sanctions",
+      "screening.pep"
+    ],
+    "entity_context": null,
+    "id": "cic-0251"
+  },
+  {
+    "utterance": "pull the cap table",
+    "expected_verb": "capital.list-shareholders",
+    "domain": "CBU",
+    "category": "natural",
+    "difficulty": "medium",
+    "alt_verbs": [
+      "capital.cap-table"
+    ],
+    "entity_context": null,
+    "id": "cic-0252"
+  },
+  {
+    "utterance": "what's the LEI?",
+    "expected_verb": "gleif.search",
+    "domain": "Onboarding",
+    "category": "natural",
+    "difficulty": "medium",
+    "alt_verbs": [
+      "gleif.enrich",
+      "gleif.lookup-lei"
+    ],
+    "entity_context": null,
+    "id": "cic-0253"
+  },
+  {
+    "utterance": "any sanctions hits?",
+    "expected_verb": "screening.sanctions",
+    "domain": "KYC",
+    "category": "natural",
+    "difficulty": "medium",
+    "alt_verbs": [
+      "screening.review-hit"
+    ],
+    "entity_context": null,
+    "id": "cic-0254"
+  },
+  {
+    "utterance": "sign the IMA",
+    "expected_verb": "contract.create",
+    "domain": "CBU",
+    "category": "natural",
+    "difficulty": "hard",
+    "alt_verbs": [
+      "contract.subscribe",
+      "deal.add-contract"
+    ],
+    "entity_context": null,
+    "id": "cic-0255"
+  },
+  {
+    "utterance": "set up the SSIs",
+    "expected_verb": "trading-profile.add-component",
+    "domain": "CBU",
+    "category": "natural",
+    "difficulty": "hard",
+    "alt_verbs": [
+      "trading-profile.add-standing-instruction",
+      "cbu-custody.create-ssi",
+      "cbu-custody.setup-ssi"
+    ],
+    "entity_context": null,
+    "id": "cic-0256"
+  },
+  {
+    "utterance": "ISDA terms for this counterparty",
+    "expected_verb": "trading-profile.add-component",
+    "domain": "CBU",
+    "category": "natural",
+    "difficulty": "hard",
+    "alt_verbs": [
+      "trading-profile.add-isda-config",
+      "trading-profile.add-isda-coverage"
+    ],
+    "entity_context": null,
+    "id": "cic-0257"
+  },
+  {
+    "utterance": "what's still outstanding?",
+    "expected_verb": "requirement.list-outstanding",
+    "domain": "CBU",
+    "category": "natural",
+    "difficulty": "hard",
+    "alt_verbs": [
+      "attributes.gaps"
+    ],
+    "entity_context": null,
+    "id": "cic-0258"
+  },
+  {
+    "utterance": "who's reviewing this case?",
+    "expected_verb": "kyc-case.read",
+    "domain": "KYC",
+    "category": "natural",
+    "difficulty": "hard",
+    "alt_verbs": [
+      "kyc-case.assign"
+    ],
+    "entity_context": null,
+    "id": "cic-0259"
+  },
+  {
+    "utterance": "what documents do we need?",
+    "expected_verb": "document.missing-for-entity",
+    "domain": "Document",
+    "category": "natural",
+    "difficulty": "medium",
+    "alt_verbs": [
+      "requirement.list-outstanding",
+      "document.compute-requirements"
+    ],
+    "entity_context": null,
+    "id": "cic-0260"
+  },
+  {
+    "utterance": "how many shareholders are there?",
+    "expected_verb": "capital.list-shareholders",
+    "domain": "CBU",
+    "category": "natural",
+    "difficulty": "medium",
+    "alt_verbs": [
+      "investor.list"
+    ],
+    "entity_context": null,
+    "id": "cic-0261"
+  },
+  {
+    "utterance": "what's the ownership structure?",
+    "expected_verb": "ubo.calculate",
+    "domain": "KYC",
+    "category": "natural",
+    "difficulty": "medium",
+    "alt_verbs": [
+      "ownership.list-owners",
+      "ubo.trace-chains"
+    ],
+    "entity_context": null,
+    "id": "cic-0262"
+  },
+  {
+    "utterance": "sanctions scan",
+    "expected_verb": "screening.sanctions",
+    "domain": "KYC",
+    "category": "direct",
+    "difficulty": "easy",
+    "alt_verbs": [
+      "screening.sanctions"
+    ],
+    "entity_context": null,
+    "id": "cic-0263"
+  },
+  {
+    "utterance": "KYC check",
+    "expected_verb": "kyc-case.create",
+    "domain": "KYC",
+    "category": "natural",
+    "difficulty": "medium",
+    "alt_verbs": [
+      "kyc.create-case"
+    ],
+    "entity_context": null,
+    "id": "cic-0264"
+  },
+  {
+    "utterance": "doc collection",
+    "expected_verb": "document.solicit",
+    "domain": "Document",
+    "category": "natural",
+    "difficulty": "hard",
+    "alt_verbs": [
+      "document.compute-requirements"
+    ],
+    "entity_context": null,
+    "id": "cic-0265"
+  },
+  {
+    "utterance": "LEI lookup",
+    "expected_verb": "gleif.search",
+    "domain": "Onboarding",
+    "category": "direct",
+    "difficulty": "easy",
+    "alt_verbs": [
+      "gleif.enrich"
+    ],
+    "entity_context": null,
+    "id": "cic-0266"
+  },
+  {
+    "utterance": "cap table",
+    "expected_verb": "capital.list-shareholders",
+    "domain": "CBU",
+    "category": "direct",
+    "difficulty": "easy",
+    "alt_verbs": [
+      "capital.cap-table"
+    ],
+    "entity_context": null,
+    "id": "cic-0267"
+  },
+  {
+    "utterance": "fee schedule",
+    "expected_verb": "billing.create-profile",
+    "domain": "CBU",
+    "category": "natural",
+    "difficulty": "hard",
+    "alt_verbs": [
+      "billing.get-profile",
+      "deal.create-rate-card"
+    ],
+    "entity_context": null,
+    "id": "cic-0268"
+  },
+  {
+    "utterance": "onboard BlackRock as a new client",
+    "expected_verb": "deal.create",
+    "domain": "Custody",
+    "category": "contextual",
+    "difficulty": "hard",
+    "alt_verbs": [
+      "client-group.create",
+      "kyc-case.create",
+      "deal.request-onboarding"
+    ],
+    "entity_context": null,
+    "id": "cic-0269"
+  },
+  {
+    "utterance": "set up custody for this fund",
+    "expected_verb": "cbu.add-product",
+    "domain": "CBU",
+    "category": "natural",
+    "difficulty": "hard",
+    "alt_verbs": [
+      "service-intent.create",
+      "fund.create"
+    ],
+    "entity_context": null,
+    "id": "cic-0270"
+  },
+  {
+    "utterance": "process a redemption",
+    "expected_verb": "capital.buyback",
+    "domain": "CBU",
+    "category": "natural",
+    "difficulty": "medium",
+    "alt_verbs": [
+      "investor.redeem",
+      "movement.redeem",
+      "investor.start-redemption"
+    ],
+    "entity_context": null,
+    "id": "cic-0271"
+  },
+  {
+    "utterance": "new compartment for the SICAV",
+    "expected_verb": "cbu.create",
+    "domain": "CBU",
+    "category": "natural",
+    "difficulty": "medium",
+    "alt_verbs": [
+      "cbu.create",
+      "fund.upsert-compartment"
+    ],
+    "entity_context": null,
+    "id": "cic-0272"
+  },
+  {
+    "utterance": "amend the contract terms",
+    "expected_verb": "contract.update",
+    "domain": "CBU",
+    "category": "natural",
+    "difficulty": "medium",
+    "alt_verbs": [
+      "contract.amend"
+    ],
+    "entity_context": null,
+    "id": "cic-0273"
+  },
+  {
+    "utterance": "waive the requirement",
+    "expected_verb": "requirement.waive",
+    "domain": "CBU",
+    "category": "direct",
+    "difficulty": "easy",
+    "alt_verbs": [],
+    "entity_context": null,
+    "id": "cic-0274"
+  },
+  {
+    "utterance": "block this entity from onboarding",
+    "expected_verb": "entity-workstream.block",
+    "domain": "CBU",
+    "category": "natural",
+    "difficulty": "medium",
+    "alt_verbs": [
+      "entity-workstream.update-status"
+    ],
+    "entity_context": null,
+    "id": "cic-0275"
+  },
+  {
+    "utterance": "trace the ownership chain",
+    "expected_verb": "ubo.trace-chains",
+    "domain": "KYC",
+    "category": "direct",
+    "difficulty": "easy",
+    "alt_verbs": [
+      "ownership.trace"
+    ],
+    "entity_context": null,
+    "id": "cic-0276"
+  },
+  {
+    "utterance": "import the GLEIF hierarchy",
+    "expected_verb": "gleif.import-tree",
+    "domain": "Onboarding",
+    "category": "direct",
+    "difficulty": "easy",
+    "alt_verbs": [],
+    "entity_context": null,
+    "id": "cic-0277"
+  },
+  {
+    "utterance": "issue new shares",
+    "expected_verb": "capital.issue-shares",
+    "domain": "CBU",
+    "category": "direct",
+    "difficulty": "easy",
+    "alt_verbs": [
+      "capital.issue",
+      "capital.issue.new"
+    ],
+    "entity_context": null,
+    "id": "cic-0278"
+  },
+  {
+    "utterance": "dividend distribution",
+    "expected_verb": "movement.distribute",
+    "domain": "CBU",
+    "category": "natural",
+    "difficulty": "medium",
+    "alt_verbs": [
+      "capital.distribute",
+      "capital.distribute-dividend"
+    ],
+    "entity_context": null,
+    "id": "cic-0279"
+  },
+  {
+    "utterance": "Set up a UK unit trust",
+    "expected_verb": "struct.uk.authorised.aut",
+    "domain": "CBU",
+    "category": "macro_match",
+    "difficulty": "easy",
+    "alt_verbs": [
+      "cbu.create"
+    ],
+    "entity_context": null,
+    "id": "cic-0280"
+  },
+  {
+    "utterance": "Create a UK contractual scheme",
+    "expected_verb": "struct.uk.authorised.acs",
+    "domain": "CBU",
+    "category": "macro_match",
+    "difficulty": "medium",
+    "alt_verbs": [
+      "cbu.create",
+      "contract.create"
+    ],
+    "entity_context": null,
+    "id": "cic-0281"
+  },
+  {
+    "utterance": "Set up a UK long-term asset fund",
+    "expected_verb": "struct.uk.authorised.ltaf",
+    "domain": "CBU",
+    "category": "macro_match",
+    "difficulty": "medium",
+    "alt_verbs": [
+      "cbu.create",
+      "struct.uk.authorised.oeic"
+    ],
+    "entity_context": null,
+    "id": "cic-0282"
+  },
+  {
+    "utterance": "Create a UK manager LLP",
+    "expected_verb": "struct.uk.manager.llp",
+    "domain": "CBU",
+    "category": "macro_match",
+    "difficulty": "medium",
+    "alt_verbs": [
+      "cbu.create"
+    ],
+    "entity_context": null,
+    "id": "cic-0283"
+  },
+  {
+    "utterance": "Set up a UK private equity LP",
+    "expected_verb": "struct.uk.private-equity.lp",
+    "domain": "CBU",
+    "category": "macro_match",
+    "difficulty": "medium",
+    "alt_verbs": [
+      "cbu.create"
+    ],
+    "entity_context": null,
+    "id": "cic-0284"
+  },
+  {
+    "utterance": "Create a US closed-end fund",
+    "expected_verb": "struct.us.40act.closed-end",
+    "domain": "CBU",
+    "category": "macro_match",
+    "difficulty": "medium",
+    "alt_verbs": [
+      "cbu.create",
+      "fund.create"
+    ],
+    "entity_context": null,
+    "id": "cic-0285"
+  },
+  {
+    "utterance": "Set up a US ETF",
+    "expected_verb": "struct.us.etf.40act",
+    "domain": "CBU",
+    "category": "macro_match",
+    "difficulty": "easy",
+    "alt_verbs": [
+      "cbu.create",
+      "fund.create"
+    ],
+    "entity_context": null,
+    "id": "cic-0286"
+  },
+  {
+    "utterance": "Create a Delaware LP private fund",
+    "expected_verb": "struct.us.private-fund.delaware-lp",
+    "domain": "CBU",
+    "category": "macro_match",
+    "difficulty": "medium",
+    "alt_verbs": [
+      "cbu.create",
+      "fund.create-standalone",
+      "fund.create"
+    ],
+    "entity_context": null,
+    "id": "cic-0287"
+  },
+  {
+    "utterance": "Set up an Irish AIF ICAV",
+    "expected_verb": "struct.ie.aif.icav",
+    "domain": "CBU",
+    "category": "macro_match",
+    "difficulty": "medium",
+    "alt_verbs": [
+      "cbu.create",
+      "struct.ie.ucits.icav",
+      "struct.ie.hedge.icav"
+    ],
+    "entity_context": null,
+    "id": "cic-0288"
+  },
+  {
+    "utterance": "Create an Irish hedge fund ICAV",
+    "expected_verb": "struct.ie.hedge.icav",
+    "domain": "CBU",
+    "category": "macro_match",
+    "difficulty": "medium",
+    "alt_verbs": [
+      "cbu.create"
+    ],
+    "entity_context": null,
+    "id": "cic-0289"
+  },
+  {
+    "utterance": "List all structures",
+    "expected_verb": "cbu.list",
+    "domain": "CBU",
+    "category": "macro_match",
+    "difficulty": "easy",
+    "alt_verbs": [
+      "structure.list"
+    ],
+    "entity_context": null,
+    "id": "cic-0290"
+  },
+  {
+    "utterance": "Select a structure to work on",
+    "expected_verb": "structure.select",
+    "domain": "CBU",
+    "category": "macro_match",
+    "difficulty": "medium",
+    "alt_verbs": [
+      "session.set-structure"
+    ],
+    "entity_context": null,
+    "id": "cic-0291"
+  },
+  {
+    "utterance": "Show roles for this structure",
+    "expected_verb": "cbu.parties",
+    "domain": "CBU",
+    "category": "macro_match",
+    "difficulty": "medium",
+    "alt_verbs": [
+      "structure.roles"
+    ],
+    "entity_context": null,
+    "id": "cic-0292"
+  },
+  {
+    "utterance": "Assign a role to the structure",
+    "expected_verb": "cbu.assign-role",
+    "domain": "CBU",
+    "category": "macro_match",
+    "difficulty": "medium",
+    "alt_verbs": [
+      "structure.assign-role"
+    ],
+    "entity_context": null,
+    "id": "cic-0293"
+  },
+  {
+    "utterance": "Add standard product suite custody FA TA",
+    "expected_verb": "structure.product-suite-custody-fa-ta",
+    "domain": "CBU",
+    "category": "macro_match",
+    "difficulty": "medium",
+    "alt_verbs": [
+      "cbu.add-product"
+    ],
+    "entity_context": null,
+    "id": "cic-0294"
+  },
+  {
+    "utterance": "Add the full product suite",
+    "expected_verb": "structure.product-suite-full",
+    "domain": "CBU",
+    "category": "macro_match",
+    "difficulty": "medium",
+    "alt_verbs": [
+      "cbu.add-product"
+    ],
+    "entity_context": null,
+    "id": "cic-0295"
+  },
+  {
+    "utterance": "Remove all products from the CBU",
+    "expected_verb": "structure.remove-all-products",
+    "domain": "CBU",
+    "category": "macro_match",
+    "difficulty": "medium",
+    "alt_verbs": [
+      "cbu.remove-product"
+    ],
+    "entity_context": null,
+    "id": "cic-0296"
+  },
+  {
+    "utterance": "Add a party to the case",
+    "expected_verb": "entity-workstream.create",
+    "domain": "CBU",
+    "category": "macro_match",
+    "difficulty": "easy",
+    "alt_verbs": [
+      "case.add-party"
+    ],
+    "entity_context": null,
+    "id": "cic-0297"
+  },
+  {
+    "utterance": "Request a document from the party",
+    "expected_verb": "document.solicit",
+    "domain": "Document",
+    "category": "macro_match",
+    "difficulty": "medium",
+    "alt_verbs": [
+      "case.solicit-document"
+    ],
+    "entity_context": null,
+    "id": "cic-0298"
+  },
+  {
+    "utterance": "Submit the case for review",
+    "expected_verb": "kyc-case.update-status",
+    "domain": "KYC",
+    "category": "macro_match",
+    "difficulty": "easy",
+    "alt_verbs": [
+      "case.submit"
+    ],
+    "entity_context": null,
+    "id": "cic-0299"
+  },
+  {
+    "utterance": "Approve the KYC case",
+    "expected_verb": "kyc-case.update-status",
+    "domain": "KYC",
+    "category": "macro_match",
+    "difficulty": "easy",
+    "alt_verbs": [
+      "case.approve",
+      "kyc-case.close"
+    ],
+    "entity_context": null,
+    "id": "cic-0300"
+  },
+  {
+    "utterance": "Reject the case",
+    "expected_verb": "kyc-case.update-status",
+    "domain": "KYC",
+    "category": "macro_match",
+    "difficulty": "easy",
+    "alt_verbs": [
+      "case.reject"
+    ],
+    "entity_context": null,
+    "id": "cic-0301"
+  },
+  {
+    "utterance": "Request more information on the case",
+    "expected_verb": "kyc-case.update-status",
+    "domain": "KYC",
+    "category": "macro_match",
+    "difficulty": "medium",
+    "alt_verbs": [
+      "case.request-info"
+    ],
+    "entity_context": null,
+    "id": "cic-0302"
+  },
+  {
+    "utterance": "List KYC cases",
+    "expected_verb": "kyc-case.list-by-cbu",
+    "domain": "KYC",
+    "category": "macro_match",
+    "difficulty": "easy",
+    "alt_verbs": [
+      "case.list",
+      "kyc-case.list"
+    ],
+    "entity_context": null,
+    "id": "cic-0303"
+  },
+  {
+    "utterance": "Select a case to work on",
+    "expected_verb": "case.select",
+    "domain": "CBU",
+    "category": "macro_match",
+    "difficulty": "medium",
+    "alt_verbs": [
+      "session.set-case"
+    ],
+    "entity_context": null,
+    "id": "cic-0304"
+  },
+  {
+    "utterance": "Add a workstream for the party",
+    "expected_verb": "entity-workstream.create",
+    "domain": "CBU",
+    "category": "macro_match",
+    "difficulty": "medium",
+    "alt_verbs": [
+      "kyc-workstream.add"
+    ],
+    "entity_context": null,
+    "id": "cic-0305"
+  },
+  {
+    "utterance": "Update workstream status",
+    "expected_verb": "entity-workstream.update-status",
+    "domain": "CBU",
+    "category": "macro_match",
+    "difficulty": "medium",
+    "alt_verbs": [
+      "kyc-workstream.update-status"
+    ],
+    "entity_context": null,
+    "id": "cic-0306"
+  },
+  {
+    "utterance": "Close the workstream",
+    "expected_verb": "entity-workstream.complete",
+    "domain": "CBU",
+    "category": "macro_match",
+    "difficulty": "easy",
+    "alt_verbs": [
+      "kyc-workstream.close"
+    ],
+    "entity_context": null,
+    "id": "cic-0307"
+  },
+  {
+    "utterance": "Run workstream screening",
+    "expected_verb": "screening.run",
+    "domain": "KYC",
+    "category": "macro_match",
+    "difficulty": "medium",
+    "alt_verbs": [
+      "screening-ops.run"
+    ],
+    "entity_context": null,
+    "id": "cic-0308"
+  },
+  {
+    "utterance": "Review the screening hit",
+    "expected_verb": "screening.review-hit",
+    "domain": "KYC",
+    "category": "macro_match",
+    "difficulty": "medium",
+    "alt_verbs": [
+      "screening-ops.review-hit"
+    ],
+    "entity_context": null,
+    "id": "cic-0309"
+  },
+  {
+    "utterance": "Bulk refresh all screenings",
+    "expected_verb": "screening.bulk-refresh",
+    "domain": "KYC",
+    "category": "macro_match",
+    "difficulty": "medium",
+    "alt_verbs": [
+      "screening-ops.bulk-refresh"
+    ],
+    "entity_context": null,
+    "id": "cic-0310"
+  },
+  {
+    "utterance": "Expire the beneficial ownership allegation",
+    "expected_verb": "ubo.registry.expire",
+    "domain": "KYC",
+    "category": "macro_match",
+    "difficulty": "hard",
+    "alt_verbs": [
+      "ubo.end-ownership",
+      "ubo.end-ownership",
+      "ubo.waive-verification"
+    ],
+    "entity_context": null,
+    "id": "cic-0311"
+  },
+  {
+    "utterance": "Require evidence for the ownership allegation",
+    "expected_verb": "evidence.create-requirement",
+    "domain": "CBU",
+    "category": "macro_match",
+    "difficulty": "medium",
+    "alt_verbs": [
+      "evidence.require"
+    ],
+    "entity_context": null,
+    "id": "cic-0312"
+  },
+  {
+    "utterance": "Link a document to the evidence requirement",
+    "expected_verb": "evidence.attach-document",
+    "domain": "Document",
+    "category": "macro_match",
+    "difficulty": "medium",
+    "alt_verbs": [
+      "evidence.link"
+    ],
+    "entity_context": null,
+    "id": "cic-0313"
+  },
+  {
+    "utterance": "Verify the evidence",
+    "expected_verb": "evidence.mark-verified",
+    "domain": "CBU",
+    "category": "macro_match",
+    "difficulty": "easy",
+    "alt_verbs": [
+      "evidence.verify"
+    ],
+    "entity_context": null,
+    "id": "cic-0314"
+  },
+  {
+    "utterance": "Reject the evidence item",
+    "expected_verb": "evidence.mark-rejected",
+    "domain": "CBU",
+    "category": "macro_match",
+    "difficulty": "easy",
+    "alt_verbs": [
+      "evidence.reject"
+    ],
+    "entity_context": null,
+    "id": "cic-0315"
+  },
+  {
+    "utterance": "Waive the evidence requirement",
+    "expected_verb": "evidence.mark-waived",
+    "domain": "CBU",
+    "category": "macro_match",
+    "difficulty": "medium",
+    "alt_verbs": [
+      "evidence.waive"
+    ],
+    "entity_context": null,
+    "id": "cic-0316"
+  },
+  {
+    "utterance": "Create a document request for the workstream",
+    "expected_verb": "document.create-request",
+    "domain": "Document",
+    "category": "macro_match",
+    "difficulty": "medium",
+    "alt_verbs": [
+      "doc-request.create",
+      "document.create"
+    ],
+    "entity_context": null,
+    "id": "cic-0317"
+  },
+  {
+    "utterance": "Send the document request",
+    "expected_verb": "document.mark-requested",
+    "domain": "Document",
+    "category": "macro_match",
+    "difficulty": "medium",
+    "alt_verbs": [
+      "doc-request.send",
+      "case.solicit-document",
+      "document.solicit"
+    ],
+    "entity_context": null,
+    "id": "cic-0318"
+  },
+  {
+    "utterance": "Record a document response",
+    "expected_verb": "document.mark-received",
+    "domain": "Document",
+    "category": "macro_match",
+    "difficulty": "medium",
+    "alt_verbs": [
+      "doc-request.respond",
+      "observation.record-from-document"
+    ],
+    "entity_context": null,
+    "id": "cic-0319"
+  },
+  {
+    "utterance": "Verify the document request",
+    "expected_verb": "document.verify-request",
+    "domain": "Document",
+    "category": "macro_match",
+    "difficulty": "medium",
+    "alt_verbs": [
+      "doc-request.verify",
+      "case.solicit-document"
+    ],
+    "entity_context": null,
+    "id": "cic-0320"
+  },
+  {
+    "utterance": "Reject the submitted document",
+    "expected_verb": "document.reject-request",
+    "domain": "Document",
+    "category": "macro_match",
+    "difficulty": "medium",
+    "alt_verbs": [
+      "doc-request.reject"
+    ],
+    "entity_context": null,
+    "id": "cic-0321"
+  },
+  {
+    "utterance": "Raise a risk flag",
+    "expected_verb": "red-flag.raise",
+    "domain": "KYC",
+    "category": "macro_match",
+    "difficulty": "easy",
+    "alt_verbs": [
+      "red-flag.raise"
+    ],
+    "entity_context": null,
+    "id": "cic-0322"
+  },
+  {
+    "utterance": "Resolve the risk flag",
+    "expected_verb": "red-flag.close",
+    "domain": "KYC",
+    "category": "macro_match",
+    "difficulty": "medium",
+    "alt_verbs": [
+      "red-flag.resolve",
+      "red-flag.mitigate",
+      "red-flag.waive"
+    ],
+    "entity_context": null,
+    "id": "cic-0323"
+  },
+  {
+    "utterance": "Escalate the risk flag",
+    "expected_verb": "red-flag.set-blocking",
+    "domain": "KYC",
+    "category": "macro_match",
+    "difficulty": "medium",
+    "alt_verbs": [
+      "red-flag.escalate",
+      "red-flag.raise",
+      "kyc-case.escalate"
+    ],
+    "entity_context": null,
+    "id": "cic-0324"
+  },
+  {
+    "utterance": "Evaluate the approval gate",
+    "expected_verb": "tollgate.evaluate",
+    "domain": "CBU",
+    "category": "macro_match",
+    "difficulty": "medium",
+    "alt_verbs": [
+      "tollgate.evaluate"
+    ],
+    "entity_context": null,
+    "id": "cic-0325"
+  },
+  {
+    "utterance": "Override the tollgate decision",
+    "expected_verb": "tollgate.override",
+    "domain": "CBU",
+    "category": "macro_match",
+    "difficulty": "medium",
+    "alt_verbs": [
+      "tollgate.override"
+    ],
+    "entity_context": null,
+    "id": "cic-0326"
+  },
+  {
+    "utterance": "Add a new person",
+    "expected_verb": "entity.create",
+    "domain": "Entity",
+    "category": "macro_match",
+    "difficulty": "easy",
+    "alt_verbs": [
+      "party.add-person"
+    ],
+    "entity_context": null,
+    "id": "cic-0327"
+  },
+  {
+    "utterance": "Add a company",
+    "expected_verb": "entity.create",
+    "domain": "Entity",
+    "category": "macro_match",
+    "difficulty": "easy",
+    "alt_verbs": [
+      "party.add-company"
+    ],
+    "entity_context": null,
+    "id": "cic-0328"
+  },
+  {
+    "utterance": "View party details",
+    "expected_verb": "entity.read",
+    "domain": "Entity",
+    "category": "macro_match",
+    "difficulty": "easy",
+    "alt_verbs": [
+      "party.details",
+      "entity.query",
+      "view.read-status"
+    ],
+    "entity_context": null,
+    "id": "cic-0329"
+  },
+  {
+    "utterance": "Update the party information",
+    "expected_verb": "entity.update",
+    "domain": "Entity",
+    "category": "macro_match",
+    "difficulty": "easy",
+    "alt_verbs": [
+      "party.update"
+    ],
+    "entity_context": null,
+    "id": "cic-0330"
+  },
+  {
+    "utterance": "List all parties",
+    "expected_verb": "entity.list",
+    "domain": "Entity",
+    "category": "macro_match",
+    "difficulty": "easy",
+    "alt_verbs": [
+      "party.list"
+    ],
+    "entity_context": null,
+    "id": "cic-0331"
+  },
+  {
+    "utterance": "Add an identifier to the party",
+    "expected_verb": "identifier.attach",
+    "domain": "CBU",
+    "category": "macro_match",
+    "difficulty": "medium",
+    "alt_verbs": [
+      "party.assign-identifier"
+    ],
+    "entity_context": null,
+    "id": "cic-0332"
+  },
+  {
+    "utterance": "Set the party address",
+    "expected_verb": "entity.update",
+    "domain": "Entity",
+    "category": "macro_match",
+    "difficulty": "medium",
+    "alt_verbs": [
+      "party.set-address"
+    ],
+    "entity_context": null,
+    "id": "cic-0333"
+  },
+  {
+    "utterance": "Add a product to the mandate",
+    "expected_verb": "trading-profile.add-component",
+    "domain": "CBU",
+    "category": "macro_match",
+    "difficulty": "medium",
+    "alt_verbs": [
+      "mandate.add-product",
+      "cbu.add-product"
+    ],
+    "entity_context": null,
+    "id": "cic-0334"
+  },
+  {
+    "utterance": "Set permitted instruments for the mandate",
+    "expected_verb": "trading-profile.add-component",
+    "domain": "CBU",
+    "category": "macro_match",
+    "difficulty": "medium",
+    "alt_verbs": [
+      "mandate.set-instruments"
+    ],
+    "entity_context": null,
+    "id": "cic-0335"
+  },
+  {
+    "utterance": "Set permitted markets for the mandate",
+    "expected_verb": "trading-profile.add-component",
+    "domain": "CBU",
+    "category": "macro_match",
+    "difficulty": "medium",
+    "alt_verbs": [
+      "mandate.set-markets"
+    ],
+    "entity_context": null,
+    "id": "cic-0336"
+  },
+  {
+    "utterance": "List mandates for this structure",
+    "expected_verb": "trading-profile.list-versions",
+    "domain": "CBU",
+    "category": "macro_match",
+    "difficulty": "easy",
+    "alt_verbs": [
+      "mandate.list"
+    ],
+    "entity_context": null,
+    "id": "cic-0337"
+  },
+  {
+    "utterance": "Select a mandate",
+    "expected_verb": "structure.select",
+    "domain": "CBU",
+    "category": "macro_match",
+    "difficulty": "easy",
+    "alt_verbs": [
+      "session.set-mandate"
+    ],
+    "entity_context": null,
+    "id": "cic-0338"
+  },
+  {
+    "utterance": "Show mandate details",
+    "expected_verb": "trading-profile.read",
+    "domain": "CBU",
+    "category": "macro_match",
+    "difficulty": "easy",
+    "alt_verbs": [
+      "mandate.details"
+    ],
+    "entity_context": null,
+    "id": "cic-0339"
+  },
+  {
+    "utterance": "Bootstrap the attribute registry",
+    "expected_verb": "governance.bootstrap-attribute-registry",
+    "domain": "CBU",
+    "category": "macro_match",
+    "difficulty": "medium",
+    "alt_verbs": [
+      "attribute.bridge-to-semos",
+      "attribute.list",
+      "attribute.define"
+    ],
+    "entity_context": null,
+    "id": "cic-0340"
+  },
+  {
+    "utterance": "Define the service resource dictionary",
+    "expected_verb": "governance.define-service-dictionary",
+    "domain": "CBU",
+    "category": "macro_match",
+    "difficulty": "hard",
+    "alt_verbs": [
+      "service-resource.check-attribute-gaps",
+      "service-resource.read",
+      "service-resource.list"
+    ],
+    "entity_context": null,
+    "id": "cic-0341"
+  },
+  {
+    "utterance": "Run the full publish pipeline",
+    "expected_verb": "governance.full-publish-pipeline",
+    "domain": "CBU",
+    "category": "macro_match",
+    "difficulty": "medium",
+    "alt_verbs": [
+      "governance.publish",
+      "governance.publish-batch"
+    ],
+    "entity_context": null,
+    "id": "cic-0342"
+  },
+  {
+    "utterance": "Reconcile the registry",
+    "expected_verb": "governance.reconcile-registry",
+    "domain": "CBU",
+    "category": "macro_match",
+    "difficulty": "medium",
+    "alt_verbs": [
+      "attribute.bridge-to-semos",
+      "control.reconcile-ownership",
+      "ownership.reconcile",
+      "discrepancy.resolve"
+    ],
+    "entity_context": null,
+    "id": "cic-0343"
+  },
+  {
+    "utterance": "Seed attributes for a domain",
+    "expected_verb": "attribute.seed-domain",
+    "domain": "CBU",
+    "category": "macro_match",
+    "difficulty": "hard",
+    "alt_verbs": [
+      "attribute.list"
+    ],
+    "entity_context": null,
+    "id": "cic-0344"
+  },
+  {
+    "utterance": "Seed derived attributes",
+    "expected_verb": "attribute.list",
+    "domain": "CBU",
+    "category": "macro_match",
+    "difficulty": "hard",
+    "alt_verbs": [
+      "attribute.seed-derived"
+    ],
+    "entity_context": null,
+    "id": "cic-0345"
+  },
+  {
+    "utterance": "what's next",
+    "expected_verb": "narration.query",
+    "domain": "CBU",
+    "category": "contextual_query",
+    "difficulty": "easy",
+    "alt_verbs": [
+      "semantic.get-state",
+      "semantic.next-actions",
+      "readiness.compute"
+    ],
+    "entity_context": null,
+    "id": "cic-0346"
+  },
+  {
+    "utterance": "what's missing",
+    "expected_verb": "narration.query",
+    "domain": "CBU",
+    "category": "contextual_query",
+    "difficulty": "easy",
+    "alt_verbs": [
+      "document.missing-for-entity",
+      "semantic.missing-entities",
+      "requirement.list-outstanding"
+    ],
+    "entity_context": null,
+    "id": "cic-0347"
+  },
+  {
+    "utterance": "where are we",
+    "expected_verb": "narration.query",
+    "domain": "CBU",
+    "category": "contextual_query",
+    "difficulty": "easy",
+    "alt_verbs": [
+      "semantic.get-state",
+      "readiness.compute"
+    ],
+    "entity_context": null,
+    "id": "cic-0348"
+  },
+  {
+    "utterance": "show me the progress",
+    "expected_verb": "narration.query",
+    "domain": "CBU",
+    "category": "contextual_query",
+    "difficulty": "easy",
+    "alt_verbs": [
+      "semantic.get-state",
+      "provisioning.status",
+      "readiness.compute"
+    ],
+    "entity_context": null,
+    "id": "cic-0349"
+  },
+  {
+    "utterance": "any blockers",
+    "expected_verb": "narration.query",
+    "domain": "CBU",
+    "category": "contextual_query",
+    "difficulty": "easy",
+    "alt_verbs": [
+      "semantic.get-state",
+      "tollgate.get-decision-readiness",
+      "readiness.compute"
+    ],
+    "entity_context": null,
+    "id": "cic-0350"
+  },
+  {
+    "utterance": "what do I need to do next",
+    "expected_verb": "narration.query",
+    "domain": "CBU",
+    "category": "contextual_query",
+    "difficulty": "medium",
+    "alt_verbs": [
+      "semantic.get-state",
+      "semantic.next-actions",
+      "readiness.compute"
+    ],
+    "entity_context": null,
+    "id": "cic-0351"
+  },
+  {
+    "utterance": "what's outstanding on this case",
+    "expected_verb": "narration.query",
+    "domain": "CBU",
+    "category": "contextual_query",
+    "difficulty": "medium",
+    "alt_verbs": [
+      "kyc-case.summarize",
+      "requirement.list-outstanding"
+    ],
+    "entity_context": null,
+    "id": "cic-0352"
+  },
+  {
+    "utterance": "are we done",
+    "expected_verb": "narration.query",
+    "domain": "CBU",
+    "category": "contextual_query",
+    "difficulty": "easy",
+    "alt_verbs": [
+      "readiness.compute",
+      "semantic.get-state"
+    ],
+    "entity_context": null,
+    "id": "cic-0353"
+  },
+  {
+    "utterance": "next steps",
+    "expected_verb": "narration.query",
+    "domain": "CBU",
+    "category": "contextual_query",
+    "difficulty": "easy",
+    "alt_verbs": [
+      "semantic.get-state",
+      "semantic.next-actions",
+      "readiness.compute"
+    ],
+    "entity_context": null,
+    "id": "cic-0354"
+  },
+  {
+    "utterance": "remaining steps",
+    "expected_verb": "narration.query",
+    "domain": "CBU",
+    "category": "contextual_query",
+    "difficulty": "medium",
+    "alt_verbs": [
+      "semantic.get-state",
+      "semantic.next-actions",
+      "readiness.compute"
+    ],
+    "entity_context": null,
+    "id": "cic-0355"
+  },
+  {
+    "utterance": "show gaps",
+    "expected_verb": "narration.query",
+    "domain": "CBU",
+    "category": "contextual_query",
+    "difficulty": "medium",
+    "alt_verbs": [
+      "semantic.get-state",
+      "ownership.analyze-gaps",
+      "matrix-overlay.unified-gaps"
+    ],
+    "entity_context": null,
+    "id": "cic-0356"
+  },
+  {
+    "utterance": "status update",
+    "expected_verb": "narration.query",
+    "domain": "CBU",
+    "category": "contextual_query",
+    "difficulty": "easy",
+    "alt_verbs": [
+      "semantic.get-state",
+      "kyc-case.update-status",
+      "kyc-case.summarize"
+    ],
+    "entity_context": null,
+    "id": "cic-0357"
+  },
+  {
+    "utterance": "what's left to do",
+    "expected_verb": "narration.query",
+    "domain": "CBU",
+    "category": "contextual_query",
+    "difficulty": "easy",
+    "alt_verbs": [
+      "semantic.get-state",
+      "semantic.next-actions",
+      "readiness.compute"
+    ],
+    "entity_context": null,
+    "id": "cic-0358"
+  },
+  {
+    "utterance": "how far along are we",
+    "expected_verb": "narration.query",
+    "domain": "CBU",
+    "category": "contextual_query",
+    "difficulty": "medium",
+    "alt_verbs": [
+      "semantic.get-state",
+      "readiness.compute"
+    ],
+    "entity_context": null,
+    "id": "cic-0359"
+  },
+  {
+    "utterance": "progress report",
+    "expected_verb": "narration.query",
+    "domain": "CBU",
+    "category": "contextual_query",
+    "difficulty": "easy",
+    "alt_verbs": [
+      "semantic.get-state",
+      "readiness.compute"
+    ],
+    "entity_context": null,
+    "id": "cic-0360"
+  },
+  {
+    "utterance": "what's still needed",
+    "expected_verb": "narration.query",
+    "domain": "CBU",
+    "category": "contextual_query",
+    "difficulty": "medium",
+    "alt_verbs": [
+      "semantic.get-state",
+      "requirement.list-outstanding"
+    ],
+    "entity_context": null,
+    "id": "cic-0361"
+  },
+  {
+    "utterance": "allege this person is a beneficial owner",
+    "expected_verb": "ubo.add-ownership",
+    "domain": "KYC",
+    "category": "natural",
+    "difficulty": "medium",
+    "alt_verbs": [
+      "ubo.registry.create",
+      "allegation.record",
+      "ubo.add-ownership"
+    ],
+    "entity_context": null,
+    "id": "cic-0362"
+  },
+  {
+    "utterance": "record a beneficial ownership allegation for the director",
+    "expected_verb": "ubo.add-ownership",
+    "domain": "KYC",
+    "category": "natural",
+    "difficulty": "hard",
+    "alt_verbs": [
+      "allegation.record",
+      "ubo.registry.create"
+    ],
+    "entity_context": null,
+    "id": "cic-0363"
+  },
+  {
+    "utterance": "verify the UBO evidence is sufficient",
+    "expected_verb": "ubo.calculate",
+    "domain": "KYC",
+    "category": "natural",
+    "difficulty": "medium",
+    "alt_verbs": [
+      "ubo.registry.promote",
+      "evidence.mark-verified",
+      "ubo.compute-chains"
+    ],
+    "entity_context": null,
+    "id": "cic-0364"
+  },
+  {
+    "utterance": "promote the UBO candidate to identified status",
+    "expected_verb": "ubo.registry.promote",
+    "domain": "KYC",
+    "category": "direct",
+    "difficulty": "medium",
+    "alt_verbs": [
+      "ubo.registry.advance"
+    ],
+    "entity_context": null,
+    "id": "cic-0365"
+  },
+  {
+    "utterance": "approve the beneficial ownership determination",
+    "expected_verb": "ubo.registry.promote",
+    "domain": "KYC",
+    "category": "natural",
+    "difficulty": "medium",
+    "alt_verbs": [
+      "ubo.registry.advance",
+      "ubo.add-ownership"
+    ],
+    "entity_context": null,
+    "id": "cic-0366"
+  },
+  {
+    "utterance": "reject this UBO allegation as unsubstantiated",
+    "expected_verb": "ubo.end-ownership",
+    "domain": "KYC",
+    "category": "natural",
+    "difficulty": "medium",
+    "alt_verbs": [
+      "ubo.registry.reject"
+    ],
+    "entity_context": null,
+    "id": "cic-0367"
+  },
+  {
+    "utterance": "expire the UBO entry that has not been renewed",
+    "expected_verb": "ubo.end-ownership",
+    "domain": "KYC",
+    "category": "natural",
+    "difficulty": "hard",
+    "alt_verbs": [
+      "ubo.registry.expire"
+    ],
+    "entity_context": null,
+    "id": "cic-0368"
+  },
+  {
+    "utterance": "waive verification for this beneficial owner",
+    "expected_verb": "ubo.waive-verification",
+    "domain": "KYC",
+    "category": "direct",
+    "difficulty": "medium",
+    "alt_verbs": [
+      "ubo.registry.waive"
+    ],
+    "entity_context": null,
+    "id": "cic-0369"
+  },
+  {
+    "utterance": "identify the UBOs from the trust structure",
+    "expected_verb": "trust.identify-ubos",
+    "domain": "KYC",
+    "category": "natural",
+    "difficulty": "hard",
+    "alt_verbs": [
+      "ubo.calculate",
+      "control.identify-ubos"
+    ],
+    "entity_context": null,
+    "id": "cic-0370"
+  },
+  {
+    "utterance": "analyze who controls the trust",
+    "expected_verb": "trust.analyze-control",
+    "domain": "CBU",
+    "category": "natural",
+    "difficulty": "hard",
+    "alt_verbs": [
+      "control.analyze",
+      "board.analyze-control"
+    ],
+    "entity_context": null,
+    "id": "cic-0371"
+  },
+  {
+    "utterance": "capture a snapshot of the current UBO state",
+    "expected_verb": "ubo.snapshot.capture",
+    "domain": "KYC",
+    "category": "natural",
+    "difficulty": "hard",
+    "alt_verbs": [
+      "ownership.snapshot.get"
+    ],
+    "entity_context": null,
+    "id": "cic-0372"
+  },
+  {
+    "utterance": "compare the UBO determination with the previous snapshot",
+    "expected_verb": "ubo.snapshot.diff",
+    "domain": "KYC",
+    "category": "natural",
+    "difficulty": "expert",
+    "alt_verbs": [
+      "ownership.reconcile"
+    ],
+    "entity_context": null,
+    "id": "cic-0373"
+  },
+  {
+    "utterance": "record a client allegation about who owns the shares",
+    "expected_verb": "allegation.record",
+    "domain": "CBU",
+    "category": "natural",
+    "difficulty": "hard",
+    "alt_verbs": [
+      "ubo.add-ownership",
+      "ubo.add-ownership"
+    ],
+    "entity_context": null,
+    "id": "cic-0374"
+  },
+  {
+    "utterance": "classify this as a discretionary trust",
+    "expected_verb": "trust.classify",
+    "domain": "CBU",
+    "category": "direct",
+    "difficulty": "medium",
+    "alt_verbs": [],
+    "entity_context": null,
+    "id": "cic-0375"
+  },
+  {
+    "utterance": "add a partnership capital contribution for this LP",
+    "expected_verb": "partnership.record-contribution",
+    "domain": "CBU",
+    "category": "natural",
+    "difficulty": "hard",
+    "alt_verbs": [
+      "partnership.add-partner"
+    ],
+    "entity_context": null,
+    "id": "cic-0376"
+  },
+  {
+    "utterance": "compile onboarding data request",
+    "expected_verb": "onboarding.compile-data-request",
+    "domain": "Onboarding",
+    "category": "direct",
+    "difficulty": "easy",
+    "alt_verbs": [],
+    "entity_context": null,
+    "id": "cic-0377"
+  },
+  {
+    "utterance": "build the service resource data dictionary",
+    "expected_verb": "onboarding.compile-data-request",
+    "domain": "Onboarding",
+    "category": "natural",
+    "difficulty": "medium",
+    "alt_verbs": [],
+    "entity_context": null,
+    "id": "cic-0378"
+  },
+  {
+    "utterance": "freeze onboarding resource requirements for this handoff",
+    "expected_verb": "onboarding.compile-data-request",
+    "domain": "Onboarding",
+    "category": "natural",
+    "difficulty": "medium",
+    "alt_verbs": [],
+    "entity_context": null,
+    "id": "cic-0379"
+  },
+  {
+    "utterance": "dispatch ready onboarding slices to resource owners",
+    "expected_verb": "onboarding.dispatch-ready-slices",
+    "domain": "Onboarding",
+    "category": "direct",
+    "difficulty": "easy",
+    "alt_verbs": [],
+    "entity_context": null,
+    "id": "cic-0380"
+  },
+  {
+    "utterance": "send the ready resource owner requests",
+    "expected_verb": "onboarding.dispatch-ready-slices",
+    "domain": "Onboarding",
+    "category": "natural",
+    "difficulty": "medium",
+    "alt_verbs": [],
+    "entity_context": null,
+    "id": "cic-0381"
+  },
+  {
+    "utterance": "list onboarding data requests",
+    "expected_verb": "onboarding.list-data-requests",
+    "domain": "Onboarding",
+    "category": "direct",
+    "difficulty": "easy",
+    "alt_verbs": [],
+    "entity_context": null,
+    "id": "cic-0382"
+  },
+  {
+    "utterance": "show resource owner data requests",
+    "expected_verb": "onboarding.list-data-requests",
+    "domain": "Onboarding",
+    "category": "natural",
+    "difficulty": "medium",
+    "alt_verbs": [],
+    "entity_context": null,
+    "id": "cic-0383"
+  },
+  {
+    "utterance": "list onboarding data request slices",
+    "expected_verb": "onboarding.list-slices",
+    "domain": "Onboarding",
+    "category": "direct",
+    "difficulty": "easy",
+    "alt_verbs": [],
+    "entity_context": null,
+    "id": "cic-0384"
+  },
+  {
+    "utterance": "show resource owner slices",
+    "expected_verb": "onboarding.list-slices",
+    "domain": "Onboarding",
+    "category": "natural",
+    "difficulty": "medium",
+    "alt_verbs": [],
+    "entity_context": null,
+    "id": "cic-0385"
+  },
+  {
+    "utterance": "get onboarding data request",
+    "expected_verb": "onboarding.get-data-request",
+    "domain": "Onboarding",
+    "category": "direct",
+    "difficulty": "easy",
+    "alt_verbs": [],
+    "entity_context": null,
+    "id": "cic-0386"
+  },
+  {
+    "utterance": "read one onboarding data request slice",
+    "expected_verb": "onboarding.get-slice",
+    "domain": "Onboarding",
+    "category": "direct",
+    "difficulty": "easy",
+    "alt_verbs": [],
+    "entity_context": null,
+    "id": "cic-0387"
+  },
+  {
+    "utterance": "cancel onboarding data request",
+    "expected_verb": "onboarding.cancel-data-request",
+    "domain": "Onboarding",
+    "category": "direct",
+    "difficulty": "easy",
+    "alt_verbs": [],
+    "entity_context": null,
+    "id": "cic-0388"
+  },
+  {
+    "utterance": "stand down all resource owner requests",
+    "expected_verb": "onboarding.cancel-data-request",
+    "domain": "Onboarding",
+    "category": "natural",
+    "difficulty": "medium",
+    "alt_verbs": [],
+    "entity_context": null,
+    "id": "cic-0389"
+  },
+  {
+    "utterance": "cancel onboarding data request slice",
+    "expected_verb": "onboarding.cancel-slice",
+    "domain": "Onboarding",
+    "category": "direct",
+    "difficulty": "easy",
+    "alt_verbs": [],
+    "entity_context": null,
+    "id": "cic-0390"
+  },
+  {
+    "utterance": "stand down this resource owner request",
+    "expected_verb": "onboarding.cancel-slice",
+    "domain": "Onboarding",
+    "category": "natural",
+    "difficulty": "medium",
+    "alt_verbs": [],
+    "entity_context": null,
+    "id": "cic-0391"
+  },
+  {
+    "utterance": "confirm provisioning result",
+    "expected_verb": "service-resource.confirm-provisioning-result",
+    "domain": "CBU",
+    "category": "direct",
+    "difficulty": "easy",
+    "alt_verbs": [],
+    "entity_context": null,
+    "id": "cic-0392"
+  },
+  {
+    "utterance": "record the resource owner result",
+    "expected_verb": "service-resource.confirm-provisioning-result",
+    "domain": "CBU",
+    "category": "natural",
+    "difficulty": "medium",
+    "alt_verbs": [],
+    "entity_context": null,
+    "id": "cic-0393"
+  },
+  {
+    "utterance": "confirm resource activation",
+    "expected_verb": "service-resource.confirm-provisioning-result",
+    "domain": "CBU",
+    "category": "natural",
+    "difficulty": "medium",
+    "alt_verbs": [],
+    "entity_context": null,
+    "id": "cic-0394"
+  },
+  {
+    "utterance": "get provisioning status for this slice",
+    "expected_verb": "service-resource.get-provisioning-status",
+    "domain": "CBU",
+    "category": "direct",
+    "difficulty": "easy",
+    "alt_verbs": [],
+    "entity_context": null,
+    "id": "cic-0395"
+  },
+  {
+    "utterance": "show resource provisioning status",
+    "expected_verb": "service-resource.get-provisioning-status",
+    "domain": "CBU",
+    "category": "natural",
+    "difficulty": "medium",
+    "alt_verbs": [],
+    "entity_context": null,
+    "id": "cic-0396"
+  },
+  {
+    "utterance": "check activation status for this slice",
+    "expected_verb": "service-resource.get-provisioning-status",
+    "domain": "CBU",
+    "category": "natural",
+    "difficulty": "medium",
+    "alt_verbs": [],
+    "entity_context": null,
+    "id": "cic-0397"
+  },
+  {
+    "utterance": "can you terminate this client business unit?",
+    "expected_verb": "cbu.delete",
+    "domain": "CBU",
+    "category": "natural",
+    "difficulty": "medium",
+    "alt_verbs": [],
+    "entity_context": null,
+    "id": "cic-0398"
+  },
+  {
+    "utterance": "suspend operations for the Goldman CBU immediately",
+    "expected_verb": "cbu.suspend",
+    "domain": "CBU",
+    "category": "natural",
+    "difficulty": "easy",
+    "alt_verbs": [],
+    "entity_context": null,
+    "id": "cic-0399"
+  },
+  {
+    "utterance": "who is authorized to modify this client group unit?",
+    "expected_verb": "cbu.read",
+    "domain": "CBU",
+    "category": "natural",
+    "difficulty": "medium",
+    "alt_verbs": [
+      "cbu.update"
+    ],
+    "entity_context": null,
+    "id": "cic-0400"
+  },
+  {
+    "utterance": "change the primary contact on the HSBC CBU",
+    "expected_verb": "cbu.update",
+    "domain": "CBU",
+    "category": "natural",
+    "difficulty": "easy",
+    "alt_verbs": [],
+    "entity_context": null,
+    "id": "cic-0401"
+  },
+  {
+    "utterance": "retrieve the active roles for this unit",
+    "expected_verb": "cbu.parties",
+    "domain": "CBU",
+    "category": "direct",
+    "difficulty": "easy",
+    "alt_verbs": [],
+    "entity_context": null,
+    "id": "cic-0402"
+  },
+  {
+    "utterance": "add a sub-unit to the existing client profile",
+    "expected_verb": "cbu.create",
+    "domain": "CBU",
+    "category": "natural",
+    "difficulty": "medium",
+    "alt_verbs": [
+      "cbu.add-product"
+    ],
+    "entity_context": null,
+    "id": "cic-0403"
+  },
+  {
+    "utterance": "merge the two CBUs into a single unit",
+    "expected_verb": "cbu.update",
+    "domain": "CBU",
+    "category": "natural",
+    "difficulty": "hard",
+    "alt_verbs": [],
+    "entity_context": null,
+    "id": "cic-0404"
+  },
+  {
+    "utterance": "archive the inactive CBU record",
+    "expected_verb": "cbu.delete",
+    "domain": "CBU",
+    "category": "direct",
+    "difficulty": "easy",
+    "alt_verbs": [
+      "cbu.update"
+    ],
+    "entity_context": null,
+    "id": "cic-0405"
+  },
+  {
+    "utterance": "generate a compliance report for the client unit",
+    "expected_verb": "cbu.inspect",
+    "domain": "CBU",
+    "category": "natural",
+    "difficulty": "medium",
+    "alt_verbs": [
+      "cbu.create"
+    ],
+    "entity_context": null,
+    "id": "cic-0406"
+  },
+  {
+    "utterance": "list all accounts linked to this CBU",
+    "expected_verb": "cbu.parties",
+    "domain": "CBU",
+    "category": "direct",
+    "difficulty": "easy",
+    "alt_verbs": [],
+    "entity_context": null,
+    "id": "cic-0407"
+  },
+  {
+    "utterance": "unlink the account from this client business unit",
+    "expected_verb": "cbu.unlink-structure",
+    "domain": "CBU",
+    "category": "natural",
+    "difficulty": "medium",
+    "alt_verbs": [],
+    "entity_context": null,
+    "id": "cic-0408"
+  },
+  {
+    "utterance": "verify compliance status of this unit",
+    "expected_verb": "cbu.verify-evidence",
+    "domain": "CBU",
+    "category": "natural",
+    "difficulty": "hard",
+    "alt_verbs": [],
+    "entity_context": null,
+    "id": "cic-0409"
+  },
+  {
+    "utterance": "retrieve configuration parameters for the CBU",
+    "expected_verb": "cbu.read",
+    "domain": "CBU",
+    "category": "direct",
+    "difficulty": "easy",
+    "alt_verbs": [
+      "cbu.update"
+    ],
+    "entity_context": null,
+    "id": "cic-0410"
+  },
+  {
+    "utterance": "update the governance policy on this client unit",
+    "expected_verb": "cbu.update",
+    "domain": "CBU",
+    "category": "natural",
+    "difficulty": "hard",
+    "alt_verbs": [],
+    "entity_context": null,
+    "id": "cic-0411"
+  },
+  {
+    "utterance": "assign risk rating to this business unit",
+    "expected_verb": "cbu.restrict",
+    "domain": "CBU",
+    "category": "natural",
+    "difficulty": "medium",
+    "alt_verbs": [
+      "cbu.assign-role"
+    ],
+    "entity_context": null,
+    "id": "cic-0412"
+  },
+  {
+    "utterance": "perform PEP check on HSBC representatives",
+    "expected_verb": "screening.pep",
+    "domain": "KYC",
+    "category": "direct",
+    "difficulty": "easy",
+    "alt_verbs": [],
+    "entity_context": null,
+    "id": "cic-0413"
+  },
+  {
+    "utterance": "is the ultimate beneficial owner on a sanctions list?",
+    "expected_verb": "screening.sanctions",
+    "domain": "KYC",
+    "category": "natural",
+    "difficulty": "medium",
+    "alt_verbs": [
+      "ubo.list-ubos"
+    ],
+    "entity_context": null,
+    "id": "cic-0414"
+  },
+  {
+    "utterance": "identify major shareholders holding more than 10 percent",
+    "expected_verb": "ubo.list-ubos",
+    "domain": "KYC",
+    "category": "natural",
+    "difficulty": "medium",
+    "alt_verbs": [
+      "ubo.add-ownership"
+    ],
+    "entity_context": null,
+    "id": "cic-0415"
+  },
+  {
+    "utterance": "verify the date of birth for the primary beneficiary",
+    "expected_verb": "ubo.calculate",
+    "domain": "KYC",
+    "category": "natural",
+    "difficulty": "medium",
+    "alt_verbs": [
+      "ubo.waive-verification"
+    ],
+    "entity_context": null,
+    "id": "cic-0416"
+  },
+  {
+    "utterance": "request UBO declaration from the relationship manager",
+    "expected_verb": "request.create",
+    "domain": "KYC",
+    "category": "natural",
+    "difficulty": "easy",
+    "alt_verbs": [],
+    "entity_context": null,
+    "id": "cic-0417"
+  },
+  {
+    "utterance": "mark this AML red flag as a false positive",
+    "expected_verb": "red-flag.dismiss",
+    "domain": "KYC",
+    "category": "natural",
+    "difficulty": "easy",
+    "alt_verbs": [],
+    "entity_context": null,
+    "id": "cic-0418"
+  },
+  {
+    "utterance": "escalate this sanctions match to compliance committee",
+    "expected_verb": "red-flag.escalate",
+    "domain": "KYC",
+    "category": "natural",
+    "difficulty": "hard",
+    "alt_verbs": [],
+    "entity_context": null,
+    "id": "cic-0419"
+  },
+  {
+    "utterance": "check adverse media for the new director",
+    "expected_verb": "screening.adverse-media",
+    "domain": "KYC",
+    "category": "direct",
+    "difficulty": "easy",
+    "alt_verbs": [],
+    "entity_context": null,
+    "id": "cic-0420"
+  },
+  {
+    "utterance": "did the screening return any PEP matches?",
+    "expected_verb": "screening.pep",
+    "domain": "KYC",
+    "category": "natural",
+    "difficulty": "medium",
+    "alt_verbs": [],
+    "entity_context": null,
+    "id": "cic-0421"
+  },
+  {
+    "utterance": "link this individual to the corporate structure tree",
+    "expected_verb": "ubo.add-ownership",
+    "domain": "KYC",
+    "category": "natural",
+    "difficulty": "hard",
+    "alt_verbs": [
+      "ubo.trace-chains"
+    ],
+    "entity_context": null,
+    "id": "cic-0422"
+  },
+  {
+    "utterance": "flag this transaction for high risk",
+    "expected_verb": "red-flag.raise",
+    "domain": "KYC",
+    "category": "natural",
+    "difficulty": "medium",
+    "alt_verbs": [],
+    "entity_context": null,
+    "id": "cic-0423"
+  },
+  {
+    "utterance": "override the automatic risk scoring",
+    "expected_verb": "red-flag.dismiss",
+    "domain": "KYC",
+    "category": "natural",
+    "difficulty": "hard",
+    "alt_verbs": [
+      "screening.sanctions"
+    ],
+    "entity_context": null,
+    "id": "cic-0424"
+  },
+  {
+    "utterance": "validate the tax residency certificate for this partner",
+    "expected_verb": "document.verify",
+    "domain": "KYC",
+    "category": "natural",
+    "difficulty": "medium",
+    "alt_verbs": [
+      "document.solicit"
+    ],
+    "entity_context": null,
+    "id": "cic-0425"
+  },
+  {
+    "utterance": "is the company registered in a FATF blacklist country?",
+    "expected_verb": "screening.sanctions",
+    "domain": "KYC",
+    "category": "natural",
+    "difficulty": "hard",
+    "alt_verbs": [],
+    "entity_context": null,
+    "id": "cic-0426"
+  },
+  {
+    "utterance": "re-verify the identity of the managing director",
+    "expected_verb": "document.verify",
+    "domain": "KYC",
+    "category": "natural",
+    "difficulty": "medium",
+    "alt_verbs": [
+      "document.reject"
+    ],
+    "entity_context": null,
+    "id": "cic-0427"
+  },
+  {
+    "utterance": "download the KYC compliance certificate",
+    "expected_verb": "kyc.case-status",
+    "domain": "KYC",
+    "category": "direct",
+    "difficulty": "easy",
+    "alt_verbs": [],
+    "entity_context": null,
+    "id": "cic-0428"
+  },
+  {
+    "utterance": "list all open red flags for Allianz",
+    "expected_verb": "red-flag.list-by-case",
+    "domain": "KYC",
+    "category": "direct",
+    "difficulty": "easy",
+    "alt_verbs": [],
+    "entity_context": null,
+    "id": "cic-0429"
+  },
+  {
+    "utterance": "start the onboarding process for the Allianz fund",
+    "expected_verb": "onboarding.status",
+    "domain": "Onboarding",
+    "category": "natural",
+    "difficulty": "easy",
+    "alt_verbs": [],
+    "entity_context": null,
+    "id": "cic-0430"
+  },
+  {
+    "utterance": "check onboarding stage of the investment vehicle",
+    "expected_verb": "onboarding.status",
+    "domain": "Onboarding",
+    "category": "natural",
+    "difficulty": "easy",
+    "alt_verbs": [],
+    "entity_context": null,
+    "id": "cic-0431"
+  },
+  {
+    "utterance": "lookup HSBC Holdings on GLEIF database",
+    "expected_verb": "gleif.search",
+    "domain": "Onboarding",
+    "category": "direct",
+    "difficulty": "easy",
+    "alt_verbs": [],
+    "entity_context": null,
+    "id": "cic-0432"
+  },
+  {
+    "utterance": "verify the legal entity identifier status",
+    "expected_verb": "gleif.enrich",
+    "domain": "Onboarding",
+    "category": "natural",
+    "difficulty": "medium",
+    "alt_verbs": [
+      "gleif.search"
+    ],
+    "entity_context": null,
+    "id": "cic-0433"
+  },
+  {
+    "utterance": "onboard Jersey domiciled private equity fund",
+    "expected_verb": "onboarding.status",
+    "domain": "Onboarding",
+    "category": "natural",
+    "difficulty": "medium",
+    "alt_verbs": [],
+    "entity_context": null,
+    "id": "cic-0434"
+  },
+  {
+    "utterance": "has the client submitted the onboarding form?",
+    "expected_verb": "onboarding.status",
+    "domain": "Onboarding",
+    "category": "natural",
+    "difficulty": "medium",
+    "alt_verbs": [],
+    "entity_context": null,
+    "id": "cic-0435"
+  },
+  {
+    "utterance": "assign onboarding team lead to this case",
+    "expected_verb": "onboarding.status",
+    "domain": "Onboarding",
+    "category": "direct",
+    "difficulty": "easy",
+    "alt_verbs": [],
+    "entity_context": null,
+    "id": "cic-0436"
+  },
+  {
+    "utterance": "generate onboarding runsheet report",
+    "expected_verb": "onboarding.status",
+    "domain": "Onboarding",
+    "category": "direct",
+    "difficulty": "medium",
+    "alt_verbs": [],
+    "entity_context": null,
+    "id": "cic-0437"
+  },
+  {
+    "utterance": "is the onboarding documentation complete?",
+    "expected_verb": "onboarding.status",
+    "domain": "Onboarding",
+    "category": "natural",
+    "difficulty": "hard",
+    "alt_verbs": [],
+    "entity_context": null,
+    "id": "cic-0438"
+  },
+  {
+    "utterance": "resume paused onboarding workflow for Apex",
+    "expected_verb": "onboarding.status",
+    "domain": "Onboarding",
+    "category": "natural",
+    "difficulty": "easy",
+    "alt_verbs": [],
+    "entity_context": null,
+    "id": "cic-0439"
+  },
+  {
+    "utterance": "pause onboarding due to missing information",
+    "expected_verb": "onboarding.status",
+    "domain": "Onboarding",
+    "category": "natural",
+    "difficulty": "easy",
+    "alt_verbs": [],
+    "entity_context": null,
+    "id": "cic-0440"
+  },
+  {
+    "utterance": "check if LEI registration is active",
+    "expected_verb": "gleif.search",
+    "domain": "Onboarding",
+    "category": "natural",
+    "difficulty": "medium",
+    "alt_verbs": [],
+    "entity_context": null,
+    "id": "cic-0441"
+  },
+  {
+    "utterance": "import GLEIF parent relation tree",
+    "expected_verb": "gleif.import-tree",
+    "domain": "Onboarding",
+    "category": "direct",
+    "difficulty": "medium",
+    "alt_verbs": [],
+    "entity_context": null,
+    "id": "cic-0442"
+  },
+  {
+    "utterance": "override onboarding gate restrictions",
+    "expected_verb": "onboarding.status",
+    "domain": "Onboarding",
+    "category": "natural",
+    "difficulty": "hard",
+    "alt_verbs": [],
+    "entity_context": null,
+    "id": "cic-0443"
+  },
+  {
+    "utterance": "send onboarding welcome package to client",
+    "expected_verb": "onboarding.status",
+    "domain": "Onboarding",
+    "category": "natural",
+    "difficulty": "easy",
+    "alt_verbs": [],
+    "entity_context": null,
+    "id": "cic-0444"
+  },
+  {
+    "utterance": "check if the onboarding runsheet is blocked",
+    "expected_verb": "onboarding.status",
+    "domain": "Onboarding",
+    "category": "natural",
+    "difficulty": "medium",
+    "alt_verbs": [],
+    "entity_context": null,
+    "id": "cic-0445"
+  },
+  {
+    "utterance": "what is the current onboarding status for Vanguard?",
+    "expected_verb": "onboarding.status",
+    "domain": "Onboarding",
+    "category": "natural",
+    "difficulty": "easy",
+    "alt_verbs": [],
+    "entity_context": null,
+    "id": "cic-0446"
+  },
+  {
+    "utterance": "verify the LEI number of this new client",
+    "expected_verb": "gleif.enrich",
+    "domain": "Onboarding",
+    "category": "natural",
+    "difficulty": "easy",
+    "alt_verbs": [
+      "gleif.search"
+    ],
+    "entity_context": null,
+    "id": "cic-0447"
+  },
+  {
+    "utterance": "assign compliance officer to this onboarding ticket",
+    "expected_verb": "onboarding.status",
+    "domain": "Onboarding",
+    "category": "direct",
+    "difficulty": "easy",
+    "alt_verbs": [],
+    "entity_context": null,
+    "id": "cic-0448"
+  },
+  {
+    "utterance": "generate the onboarding checklist",
+    "expected_verb": "onboarding.status",
+    "domain": "Onboarding",
+    "category": "direct",
+    "difficulty": "easy",
+    "alt_verbs": [],
+    "entity_context": null,
+    "id": "cic-0449"
+  },
+  {
+    "utterance": "complete the pre-onboarding gate checks",
+    "expected_verb": "onboarding.status",
+    "domain": "Onboarding",
+    "category": "natural",
+    "difficulty": "hard",
+    "alt_verbs": [],
+    "entity_context": null,
+    "id": "cic-0450"
+  },
+  {
+    "utterance": "onboard this subfund under the active umbrella",
+    "expected_verb": "onboarding.status",
+    "domain": "Onboarding",
+    "category": "natural",
+    "difficulty": "medium",
+    "alt_verbs": [],
+    "entity_context": null,
+    "id": "cic-0451"
+  },
+  {
+    "utterance": "send onboarding reminder to relationship manager",
+    "expected_verb": "onboarding.status",
+    "domain": "Onboarding",
+    "category": "natural",
+    "difficulty": "easy",
+    "alt_verbs": [],
+    "entity_context": null,
+    "id": "cic-0452"
+  },
+  {
+    "utterance": "export the onboarding report to CSV",
+    "expected_verb": "onboarding.status",
+    "domain": "Onboarding",
+    "category": "direct",
+    "difficulty": "easy",
+    "alt_verbs": [],
+    "entity_context": null,
+    "id": "cic-0453"
+  },
+  {
+    "utterance": "add a new legal entity for Vanguard Inc",
+    "expected_verb": "entity.create",
+    "domain": "Entity",
+    "category": "direct",
+    "difficulty": "easy",
+    "alt_verbs": [],
+    "entity_context": null,
+    "id": "cic-0454"
+  },
+  {
+    "utterance": "update registered office of Apex Group",
+    "expected_verb": "entity.update",
+    "domain": "Entity",
+    "category": "natural",
+    "difficulty": "easy",
+    "alt_verbs": [],
+    "entity_context": null,
+    "id": "cic-0455"
+  },
+  {
+    "utterance": "verify legal name against official register",
+    "expected_verb": "entity.update",
+    "domain": "Entity",
+    "category": "natural",
+    "difficulty": "medium",
+    "alt_verbs": [],
+    "entity_context": null,
+    "id": "cic-0456"
+  },
+  {
+    "utterance": "is this entity a limited liability company?",
+    "expected_verb": "entity.read",
+    "domain": "Entity",
+    "category": "natural",
+    "difficulty": "medium",
+    "alt_verbs": [
+      "entity.create"
+    ],
+    "entity_context": null,
+    "id": "cic-0457"
+  },
+  {
+    "utterance": "get registration number for Allianz Global Investors",
+    "expected_verb": "entity.read",
+    "domain": "Entity",
+    "category": "natural",
+    "difficulty": "easy",
+    "alt_verbs": [
+      "entity.update"
+    ],
+    "entity_context": null,
+    "id": "cic-0458"
+  },
+  {
+    "utterance": "add parent entity link for HSBC UK",
+    "expected_verb": "entity.update",
+    "domain": "Entity",
+    "category": "direct",
+    "difficulty": "easy",
+    "alt_verbs": [
+      "entity.create"
+    ],
+    "entity_context": null,
+    "id": "cic-0459"
+  },
+  {
+    "utterance": "list all entity placeholders in this workspace",
+    "expected_verb": "entity.list-placeholders",
+    "domain": "Entity",
+    "category": "direct",
+    "difficulty": "medium",
+    "alt_verbs": [],
+    "entity_context": null,
+    "id": "cic-0460"
+  },
+  {
+    "utterance": "resolve the placeholder for Vanguard",
+    "expected_verb": "entity.resolve-placeholder",
+    "domain": "Entity",
+    "category": "direct",
+    "difficulty": "medium",
+    "alt_verbs": [],
+    "entity_context": null,
+    "id": "cic-0461"
+  },
+  {
+    "utterance": "retrieve structural details for this trust",
+    "expected_verb": "entity.read",
+    "domain": "Entity",
+    "category": "natural",
+    "difficulty": "medium",
+    "alt_verbs": [
+      "entity.create"
+    ],
+    "entity_context": null,
+    "id": "cic-0462"
+  },
+  {
+    "utterance": "has this corporate partner been dissolved?",
+    "expected_verb": "entity.read",
+    "domain": "Entity",
+    "category": "natural",
+    "difficulty": "hard",
+    "alt_verbs": [
+      "entity.delete"
+    ],
+    "entity_context": null,
+    "id": "cic-0463"
+  },
+  {
+    "utterance": "change legal status of this firm",
+    "expected_verb": "entity.update",
+    "domain": "Entity",
+    "category": "natural",
+    "difficulty": "hard",
+    "alt_verbs": [],
+    "entity_context": null,
+    "id": "cic-0464"
+  },
+  {
+    "utterance": "extract details from company house record",
+    "expected_verb": "entity.update",
+    "domain": "Entity",
+    "category": "natural",
+    "difficulty": "medium",
+    "alt_verbs": [
+      "entity.read"
+    ],
+    "entity_context": null,
+    "id": "cic-0465"
+  },
+  {
+    "utterance": "verify director list of HSBC",
+    "expected_verb": "entity.update",
+    "domain": "Entity",
+    "category": "natural",
+    "difficulty": "hard",
+    "alt_verbs": [
+      "entity.create"
+    ],
+    "entity_context": null,
+    "id": "cic-0466"
+  },
+  {
+    "utterance": "remove inactive legal entity placeholder",
+    "expected_verb": "entity.delete",
+    "domain": "Entity",
+    "category": "direct",
+    "difficulty": "easy",
+    "alt_verbs": [
+      "entity.resolve-placeholder"
+    ],
+    "entity_context": null,
+    "id": "cic-0467"
+  },
+  {
+    "utterance": "mark this entity as an active trading counterparty",
+    "expected_verb": "entity.update",
+    "domain": "Entity",
+    "category": "natural",
+    "difficulty": "medium",
+    "alt_verbs": [
+      "entity.create"
+    ],
+    "entity_context": null,
+    "id": "cic-0468"
+  },
+  {
+    "utterance": "add a joint venture entity",
+    "expected_verb": "entity.create",
+    "domain": "Entity",
+    "category": "natural",
+    "difficulty": "medium",
+    "alt_verbs": [],
+    "entity_context": null,
+    "id": "cic-0469"
+  },
+  {
+    "utterance": "register the foreign trust branch",
+    "expected_verb": "entity.create",
+    "domain": "Entity",
+    "category": "natural",
+    "difficulty": "medium",
+    "alt_verbs": [],
+    "entity_context": null,
+    "id": "cic-0470"
+  },
+  {
+    "utterance": "what is the legal form of Apex?",
+    "expected_verb": "entity.read",
+    "domain": "Entity",
+    "category": "natural",
+    "difficulty": "easy",
+    "alt_verbs": [
+      "entity.create"
+    ],
+    "entity_context": null,
+    "id": "cic-0471"
+  },
+  {
+    "utterance": "who is the general partner of this LP?",
+    "expected_verb": "entity.read",
+    "domain": "Entity",
+    "category": "natural",
+    "difficulty": "medium",
+    "alt_verbs": [
+      "entity.create"
+    ],
+    "entity_context": null,
+    "id": "cic-0472"
+  },
+  {
+    "utterance": "verify this firm's tax number",
+    "expected_verb": "entity.update",
+    "domain": "Entity",
+    "category": "natural",
+    "difficulty": "medium",
+    "alt_verbs": [
+      "entity.read"
+    ],
+    "entity_context": null,
+    "id": "cic-0473"
+  },
+  {
+    "utterance": "update the entity name in registry",
+    "expected_verb": "entity.update",
+    "domain": "Entity",
+    "category": "direct",
+    "difficulty": "easy",
+    "alt_verbs": [],
+    "entity_context": null,
+    "id": "cic-0474"
+  },
+  {
+    "utterance": "remove this corporate entity placeholder",
+    "expected_verb": "entity.delete",
+    "domain": "Entity",
+    "category": "direct",
+    "difficulty": "easy",
+    "alt_verbs": [],
+    "entity_context": null,
+    "id": "cic-0475"
+  },
+  {
+    "utterance": "list all subsidiaries of HSBC",
+    "expected_verb": "entity.read",
+    "domain": "Entity",
+    "category": "natural",
+    "difficulty": "medium",
+    "alt_verbs": [
+      "entity.create"
+    ],
+    "entity_context": null,
+    "id": "cic-0476"
+  },
+  {
+    "utterance": "show me the company secretary details",
+    "expected_verb": "entity.read",
+    "domain": "Entity",
+    "category": "natural",
+    "difficulty": "easy",
+    "alt_verbs": [],
+    "entity_context": null,
+    "id": "cic-0477"
+  },
+  {
+    "utterance": "add a legal representative for the firm",
+    "expected_verb": "entity.update",
+    "domain": "Entity",
+    "category": "direct",
+    "difficulty": "easy",
+    "alt_verbs": [
+      "entity.create"
+    ],
+    "entity_context": null,
+    "id": "cic-0478"
+  },
+  {
+    "utterance": "is this entity a regulated fund manager?",
+    "expected_verb": "entity.read",
+    "domain": "Entity",
+    "category": "natural",
+    "difficulty": "hard",
+    "alt_verbs": [
+      "entity.create"
+    ],
+    "entity_context": null,
+    "id": "cic-0479"
+  },
+  {
+    "utterance": "verify the registration country of Allianz",
+    "expected_verb": "entity.update",
+    "domain": "Entity",
+    "category": "natural",
+    "difficulty": "medium",
+    "alt_verbs": [
+      "entity.create"
+    ],
+    "entity_context": null,
+    "id": "cic-0480"
+  },
+  {
+    "utterance": "request certificate of incumbency from Allianz",
+    "expected_verb": "document.solicit",
+    "domain": "Document",
+    "category": "natural",
+    "difficulty": "medium",
+    "alt_verbs": [],
+    "entity_context": null,
+    "id": "cic-0481"
+  },
+  {
+    "utterance": "upload latest articles of association PDF",
+    "expected_verb": "document.upload-version",
+    "domain": "Document",
+    "category": "direct",
+    "difficulty": "easy",
+    "alt_verbs": [
+      "document.solicit"
+    ],
+    "entity_context": null,
+    "id": "cic-0482"
+  },
+  {
+    "utterance": "verify signature on the trust deed",
+    "expected_verb": "document.verify",
+    "domain": "Document",
+    "category": "natural",
+    "difficulty": "medium",
+    "alt_verbs": [],
+    "entity_context": null,
+    "id": "cic-0483"
+  },
+  {
+    "utterance": "has the passport copy expired?",
+    "expected_verb": "document.verify",
+    "domain": "Document",
+    "category": "natural",
+    "difficulty": "easy",
+    "alt_verbs": [
+      "document.reject"
+    ],
+    "entity_context": null,
+    "id": "cic-0484"
+  },
+  {
+    "utterance": "reject incorporation doc due to poor quality",
+    "expected_verb": "document.reject",
+    "domain": "Document",
+    "category": "natural",
+    "difficulty": "easy",
+    "alt_verbs": [],
+    "entity_context": null,
+    "id": "cic-0485"
+  },
+  {
+    "utterance": "extract name and DOB from uploaded passport",
+    "expected_verb": "document.extract",
+    "domain": "Document",
+    "category": "direct",
+    "difficulty": "easy",
+    "alt_verbs": [],
+    "entity_context": null,
+    "id": "cic-0486"
+  },
+  {
+    "utterance": "send batch document request to HSBC",
+    "expected_verb": "document.solicit-batch",
+    "domain": "Document",
+    "category": "direct",
+    "difficulty": "medium",
+    "alt_verbs": [],
+    "entity_context": null,
+    "id": "cic-0487"
+  },
+  {
+    "utterance": "list all pending document requests for Apex",
+    "expected_verb": "document.list-requests-by-workstream",
+    "domain": "Document",
+    "category": "direct",
+    "difficulty": "easy",
+    "alt_verbs": [],
+    "entity_context": null,
+    "id": "cic-0488"
+  },
+  {
+    "utterance": "approve the utility bill as address proof",
+    "expected_verb": "document.verify",
+    "domain": "Document",
+    "category": "natural",
+    "difficulty": "easy",
+    "alt_verbs": [
+      "document.solicit"
+    ],
+    "entity_context": null,
+    "id": "cic-0489"
+  },
+  {
+    "utterance": "is the signature on the contract valid?",
+    "expected_verb": "document.verify",
+    "domain": "Document",
+    "category": "natural",
+    "difficulty": "medium",
+    "alt_verbs": [],
+    "entity_context": null,
+    "id": "cic-0490"
+  },
+  {
+    "utterance": "request certified translation of tax form",
+    "expected_verb": "document.solicit",
+    "domain": "Document",
+    "category": "natural",
+    "difficulty": "hard",
+    "alt_verbs": [],
+    "entity_context": null,
+    "id": "cic-0491"
+  },
+  {
+    "utterance": "archive all verified documents",
+    "expected_verb": "document.verify",
+    "domain": "Document",
+    "category": "direct",
+    "difficulty": "easy",
+    "alt_verbs": [],
+    "entity_context": null,
+    "id": "cic-0492"
+  },
+  {
+    "utterance": "retrieve historical versions of the fund prospectus",
+    "expected_verb": "document.list-versions",
+    "domain": "Document",
+    "category": "direct",
+    "difficulty": "medium",
+    "alt_verbs": [],
+    "entity_context": null,
+    "id": "cic-0493"
+  },
+  {
+    "utterance": "download the tax residency declaration",
+    "expected_verb": "document.get",
+    "domain": "Document",
+    "category": "direct",
+    "difficulty": "easy",
+    "alt_verbs": [
+      "document.solicit-batch"
+    ],
+    "entity_context": null,
+    "id": "cic-0494"
+  },
+  {
+    "utterance": "has the client uploaded their tax certificate?",
+    "expected_verb": "document.verify",
+    "domain": "Document",
+    "category": "natural",
+    "difficulty": "easy",
+    "alt_verbs": [
+      "document.solicit"
+    ],
+    "entity_context": null,
+    "id": "cic-0495"
+  },
+  {
+    "utterance": "request the utility bill for address proof",
+    "expected_verb": "document.solicit",
+    "domain": "Document",
+    "category": "natural",
+    "difficulty": "easy",
+    "alt_verbs": [],
+    "entity_context": null,
+    "id": "cic-0496"
+  },
+  {
+    "utterance": "upload the partnership agreement document",
+    "expected_verb": "document.upload-version",
+    "domain": "Document",
+    "category": "direct",
+    "difficulty": "easy",
+    "alt_verbs": [],
+    "entity_context": null,
+    "id": "cic-0497"
+  },
+  {
+    "utterance": "verify the signature on this board resolution",
+    "expected_verb": "document.verify",
+    "domain": "Document",
+    "category": "natural",
+    "difficulty": "medium",
+    "alt_verbs": [],
+    "entity_context": null,
+    "id": "cic-0498"
+  },
+  {
+    "utterance": "check if the certificate of incumbency is expired",
+    "expected_verb": "document.verify",
+    "domain": "Document",
+    "category": "natural",
+    "difficulty": "medium",
+    "alt_verbs": [
+      "document.reject"
+    ],
+    "entity_context": null,
+    "id": "cic-0499"
+  },
+  {
+    "utterance": "reject the trust deed due to missing page",
+    "expected_verb": "document.reject",
+    "domain": "Document",
+    "category": "natural",
+    "difficulty": "easy",
+    "alt_verbs": [],
+    "entity_context": null,
+    "id": "cic-0500"
+  },
+  {
+    "utterance": "extract the passport number from this file",
+    "expected_verb": "document.extract",
+    "domain": "Document",
+    "category": "direct",
+    "difficulty": "easy",
+    "alt_verbs": [],
+    "entity_context": null,
+    "id": "cic-0501"
+  },
+  {
+    "utterance": "send a request for the register of members",
+    "expected_verb": "document.solicit",
+    "domain": "Document",
+    "category": "natural",
+    "difficulty": "medium",
+    "alt_verbs": [],
+    "entity_context": null,
+    "id": "cic-0502"
+  },
+  {
+    "utterance": "what documents are required for an Irish trust?",
+    "expected_verb": "document.compute-requirements",
+    "domain": "Document",
+    "category": "natural",
+    "difficulty": "hard",
+    "alt_verbs": [],
+    "entity_context": null,
+    "id": "cic-0503"
+  },
+  {
+    "utterance": "has the client submitted their tax residency document?",
+    "expected_verb": "document.verify",
+    "domain": "Document",
+    "category": "natural",
+    "difficulty": "easy",
+    "alt_verbs": [
+      "document.solicit"
+    ],
+    "entity_context": null,
+    "id": "cic-0504"
+  },
+  {
+    "utterance": "download the memorandum of association",
+    "expected_verb": "document.get",
+    "domain": "Document",
+    "category": "direct",
+    "difficulty": "easy",
+    "alt_verbs": [
+      "document.solicit"
+    ],
+    "entity_context": null,
+    "id": "cic-0505"
+  },
+  {
+    "utterance": "approve the certificate of incorporation",
+    "expected_verb": "document.verify",
+    "domain": "Document",
+    "category": "natural",
+    "difficulty": "easy",
+    "alt_verbs": [
+      "document.solicit"
+    ],
+    "entity_context": null,
+    "id": "cic-0506"
+  },
+  {
+    "utterance": "audit all documents for the CBU",
+    "expected_verb": "document.list",
+    "domain": "Document",
+    "category": "direct",
+    "difficulty": "medium",
+    "alt_verbs": [
+      "document.solicit-batch"
+    ],
+    "entity_context": null,
+    "id": "cic-0507"
+  },
+  {
+    "utterance": "set up rate card for sub-custody services",
+    "expected_verb": "deal.create-rate-card",
+    "domain": "Custody",
+    "category": "natural",
+    "difficulty": "medium",
+    "alt_verbs": [],
+    "entity_context": null,
+    "id": "cic-0508"
+  },
+  {
+    "utterance": "apply 3bps custody fee to this fund",
+    "expected_verb": "deal.add-rate-card-line",
+    "domain": "Custody",
+    "category": "natural",
+    "difficulty": "medium",
+    "alt_verbs": [
+      "deal.create-rate-card"
+    ],
+    "entity_context": null,
+    "id": "cic-0509"
+  },
+  {
+    "utterance": "submit the counter rate card proposal",
+    "expected_verb": "deal.counter-rate-card",
+    "domain": "Custody",
+    "category": "natural",
+    "difficulty": "medium",
+    "alt_verbs": [
+      "deal.propose-rate-card"
+    ],
+    "entity_context": null,
+    "id": "cic-0510"
+  },
+  {
+    "utterance": "propose standard rate card to Vanguard",
+    "expected_verb": "deal.propose-rate-card",
+    "domain": "Custody",
+    "category": "natural",
+    "difficulty": "easy",
+    "alt_verbs": [],
+    "entity_context": null,
+    "id": "cic-0511"
+  },
+  {
+    "utterance": "is the deal status updated to approved?",
+    "expected_verb": "deal.read",
+    "domain": "Custody",
+    "category": "natural",
+    "difficulty": "easy",
+    "alt_verbs": [
+      "deal.update-status"
+    ],
+    "entity_context": null,
+    "id": "cic-0512"
+  },
+  {
+    "utterance": "assign State Street as sub-custodian",
+    "expected_verb": "deal.update",
+    "domain": "Custody",
+    "category": "direct",
+    "difficulty": "easy",
+    "alt_verbs": [],
+    "entity_context": null,
+    "id": "cic-0513"
+  },
+  {
+    "utterance": "verify settlement instructions for the new deal",
+    "expected_verb": "deal.update",
+    "domain": "Custody",
+    "category": "natural",
+    "difficulty": "hard",
+    "alt_verbs": [
+      "deal.create"
+    ],
+    "entity_context": null,
+    "id": "cic-0514"
+  },
+  {
+    "utterance": "create share class under Luxembourg umbrella",
+    "expected_verb": "share-class.create",
+    "domain": "Custody",
+    "category": "direct",
+    "difficulty": "easy",
+    "alt_verbs": [],
+    "entity_context": null,
+    "id": "cic-0515"
+  },
+  {
+    "utterance": "link this feeder fund to the master fund",
+    "expected_verb": "fund.link-feeder",
+    "domain": "Custody",
+    "category": "direct",
+    "difficulty": "easy",
+    "alt_verbs": [],
+    "entity_context": null,
+    "id": "cic-0516"
+  },
+  {
+    "utterance": "list all investors in the Allianz SICAV",
+    "expected_verb": "fund.list-investors",
+    "domain": "Custody",
+    "category": "direct",
+    "difficulty": "easy",
+    "alt_verbs": [],
+    "entity_context": null,
+    "id": "cic-0517"
+  },
+  {
+    "utterance": "add Vanguard fund investment allocation",
+    "expected_verb": "fund.add-investment",
+    "domain": "Custody",
+    "category": "natural",
+    "difficulty": "medium",
+    "alt_verbs": [],
+    "entity_context": null,
+    "id": "cic-0518"
+  },
+  {
+    "utterance": "update pricing schedule on the deal profile",
+    "expected_verb": "deal.update",
+    "domain": "Custody",
+    "category": "natural",
+    "difficulty": "medium",
+    "alt_verbs": [
+      "deal.update-status"
+    ],
+    "entity_context": null,
+    "id": "cic-0519"
+  },
+  {
+    "utterance": "approve the custody agreement draft",
+    "expected_verb": "deal.update-status",
+    "domain": "Custody",
+    "category": "natural",
+    "difficulty": "hard",
+    "alt_verbs": [
+      "deal.create"
+    ],
+    "entity_context": null,
+    "id": "cic-0520"
+  },
+  {
+    "utterance": "what are the settlement cycles for this asset class?",
+    "expected_verb": "settlement-type.read",
+    "domain": "Custody",
+    "category": "natural",
+    "difficulty": "medium",
+    "alt_verbs": [],
+    "entity_context": null,
+    "id": "cic-0521"
+  },
+  {
+    "utterance": "has the custody account been opened at DTCC?",
+    "expected_verb": "deal.read",
+    "domain": "Custody",
+    "category": "natural",
+    "difficulty": "hard",
+    "alt_verbs": [
+      "deal.create"
+    ],
+    "entity_context": null,
+    "id": "cic-0522"
+  },
+  {
+    "utterance": "activate share class trading gates",
+    "expected_verb": "cbu.update",
+    "domain": "Custody",
+    "category": "direct",
+    "difficulty": "easy",
+    "alt_verbs": [],
+    "entity_context": null,
+    "id": "cic-0523"
+  },
+  {
+    "utterance": "link custody client to the clearing house",
+    "expected_verb": "deal.read",
+    "domain": "Custody",
+    "category": "natural",
+    "difficulty": "hard",
+    "alt_verbs": [
+      "deal.create"
+    ],
+    "entity_context": null,
+    "id": "cic-0524"
+  }
+]

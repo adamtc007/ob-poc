@@ -89,6 +89,7 @@
   :effect-class "read_snapshot"
   :flavour "attribute_mutating"
   :metadata-json "{\"tier\":\"diagnostics\",\"source_of_truth\":\"operational\",\"scope\":\"cbu\",\"writes_operational\":false,\"side_effects\":\"facts_only\",\"harm_class\":null,\"action_class\":null,\"noun\":\"onboarding_data_request\",\"internal\":false,\"tags\":[],\"replaces\":null,\"status\":\"active\",\"replaced_by\":null,\"since_version\":null,\"removal_version\":null,\"dangerous\":false,\"subject_kinds\":[],\"phase_tags\":[],\"requires_subject\":true,\"produces_focus\":false}"
+  :three-axis-json "{\"state_effect\":\"preserving\",\"external_effects\":[],\"consequence\":{\"baseline\":\"benign\",\"escalation\":[]}}"
   :returns-json "{\"type\":\"record\",\"name\":null,\"capture\":null}"
   :args-json "[{\"name\":\"data-request-id\",\"type\":\"uuid\",\"required\":true,\"maps_to\":null,\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":null,\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]}]"
 )
@@ -102,6 +103,7 @@
   :effect-class "read_snapshot"
   :flavour "attribute_mutating"
   :metadata-json "{\"tier\":\"diagnostics\",\"source_of_truth\":\"operational\",\"scope\":\"cbu\",\"writes_operational\":false,\"side_effects\":\"facts_only\",\"harm_class\":null,\"action_class\":null,\"noun\":\"onboarding_data_request_slice\",\"internal\":false,\"tags\":[],\"replaces\":null,\"status\":\"active\",\"replaced_by\":null,\"since_version\":null,\"removal_version\":null,\"dangerous\":false,\"subject_kinds\":[],\"phase_tags\":[],\"requires_subject\":true,\"produces_focus\":false}"
+  :three-axis-json "{\"state_effect\":\"preserving\",\"external_effects\":[],\"consequence\":{\"baseline\":\"benign\",\"escalation\":[]}}"
   :returns-json "{\"type\":\"record\",\"name\":null,\"capture\":null}"
   :args-json "[{\"name\":\"slice-id\",\"type\":\"uuid\",\"required\":true,\"maps_to\":null,\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":null,\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]}]"
 )
@@ -115,6 +117,7 @@
   :effect-class "read_snapshot"
   :flavour "attribute_mutating"
   :metadata-json "{\"tier\":\"diagnostics\",\"source_of_truth\":\"operational\",\"scope\":\"cbu\",\"writes_operational\":false,\"side_effects\":\"facts_only\",\"harm_class\":null,\"action_class\":null,\"noun\":\"onboarding_data_request_attr\",\"internal\":false,\"tags\":[],\"replaces\":null,\"status\":\"active\",\"replaced_by\":null,\"since_version\":null,\"removal_version\":null,\"dangerous\":false,\"subject_kinds\":[],\"phase_tags\":[],\"requires_subject\":true,\"produces_focus\":false}"
+  :three-axis-json "{\"state_effect\":\"preserving\",\"external_effects\":[],\"consequence\":{\"baseline\":\"benign\",\"escalation\":[]}}"
   :returns-json "{\"type\":\"record_set\",\"name\":null,\"capture\":null}"
   :args-json "[{\"name\":\"slice-id\",\"type\":\"uuid\",\"required\":true,\"maps_to\":null,\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":null,\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]}]"
 )
@@ -128,6 +131,7 @@
   :effect-class "read_snapshot"
   :flavour "attribute_mutating"
   :metadata-json "{\"tier\":\"diagnostics\",\"source_of_truth\":\"operational\",\"scope\":\"cbu\",\"writes_operational\":false,\"side_effects\":\"facts_only\",\"harm_class\":null,\"action_class\":null,\"noun\":\"onboarding_data_request\",\"internal\":false,\"tags\":[],\"replaces\":null,\"status\":\"active\",\"replaced_by\":null,\"since_version\":null,\"removal_version\":null,\"dangerous\":false,\"subject_kinds\":[],\"phase_tags\":[],\"requires_subject\":true,\"produces_focus\":false}"
+  :three-axis-json "{\"state_effect\":\"preserving\",\"external_effects\":[],\"consequence\":{\"baseline\":\"benign\",\"escalation\":[]}}"
   :returns-json "{\"type\":\"record_set\",\"name\":null,\"capture\":null}"
   :args-json "[{\"name\":\"cbu-id\",\"type\":\"uuid\",\"required\":false,\"maps_to\":null,\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":null,\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]},{\"name\":\"status\",\"type\":\"string\",\"required\":false,\"maps_to\":null,\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":null,\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]}]"
 )
@@ -141,9 +145,24 @@
   :effect-class "read_snapshot"
   :flavour "attribute_mutating"
   :metadata-json "{\"tier\":\"diagnostics\",\"source_of_truth\":\"operational\",\"scope\":\"cbu\",\"writes_operational\":false,\"side_effects\":\"facts_only\",\"harm_class\":null,\"action_class\":null,\"noun\":\"onboarding_data_request_slice\",\"internal\":false,\"tags\":[],\"replaces\":null,\"status\":\"active\",\"replaced_by\":null,\"since_version\":null,\"removal_version\":null,\"dangerous\":false,\"subject_kinds\":[],\"phase_tags\":[],\"requires_subject\":true,\"produces_focus\":false}"
+  :three-axis-json "{\"state_effect\":\"preserving\",\"external_effects\":[],\"consequence\":{\"baseline\":\"benign\",\"escalation\":[]}}"
   :returns-json "{\"type\":\"record_set\",\"name\":null,\"capture\":null}"
   :args-json "[{\"name\":\"data-request-id\",\"type\":\"uuid\",\"required\":true,\"maps_to\":null,\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":null,\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]}]"
 )
 
 (utterance-binding onboarding.list-slices :phrases ["list onboarding data request slices" "show resource owner slices"] :verb onboarding.list-slices)
+
+(verb onboarding.status
+  :description "Check the status of the onboarding journey for a client"
+  :behavior "crud"
+  :effect-class "read_snapshot"
+  :flavour "attribute_mutating"
+  :metadata-json "{\"tier\":\"intent\",\"source_of_truth\":\"workflow\",\"scope\":\"cbu\",\"writes_operational\":false,\"side_effects\":\"facts_only\",\"harm_class\":null,\"action_class\":null,\"noun\":\"onboarding\",\"internal\":false,\"tags\":[\"onboarding\"],\"replaces\":null,\"status\":\"active\",\"replaced_by\":null,\"since_version\":null,\"removal_version\":null,\"dangerous\":false,\"subject_kinds\":[],\"phase_tags\":[\"onboarding\"],\"requires_subject\":true,\"produces_focus\":false}"
+  :three-axis-json "{\"state_effect\":\"preserving\",\"external_effects\":[],\"consequence\":{\"baseline\":\"benign\",\"escalation\":[]}}"
+  :returns-json "{\"type\":\"record_set\",\"name\":null,\"capture\":null}"
+  :args-json "[{\"name\":\"cbu-id\",\"type\":\"uuid\",\"required\":false,\"maps_to\":\"cbu_id\",\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":null,\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]}]"
+  :crud-json "{\"operation\":\"select\",\"table\":\"cbus\",\"schema\":\"ob-poc\",\"key\":null,\"returning\":null,\"conflict_keys\":null,\"conflict_constraint\":null,\"junction\":null,\"from_col\":null,\"to_col\":null,\"role_table\":null,\"role_col\":null,\"fk_col\":null,\"filter_col\":null,\"primary_table\":null,\"join_table\":null,\"join_col\":null,\"base_table\":null,\"extension_table\":null,\"extension_table_column\":null,\"type_id_column\":null,\"type_code\":null,\"order_by\":null,\"set_values\":null}"
+)
+
+(utterance-binding onboarding.status :phrases ["where are we in the onboarding journey for this client?" "onboarding status" "where are we in the onboarding journey" "show onboarding status" "check onboarding progress"] :verb onboarding.status)
 

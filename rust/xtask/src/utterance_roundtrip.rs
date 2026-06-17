@@ -40,6 +40,14 @@ struct ChatEnvelope {
 }
 
 #[derive(Debug, Deserialize, Default, Clone)]
+struct DslState {
+    #[serde(default)]
+    source: Option<String>,
+    #[serde(default)]
+    can_execute: bool,
+}
+
+#[derive(Debug, Deserialize, Default, Clone)]
 struct ChatPayload {
     #[serde(default)]
     message: Option<String>,
@@ -49,6 +57,10 @@ struct ChatPayload {
     discovery_bootstrap: Option<DiscoveryBootstrap>,
     #[serde(default)]
     sage_explain: Option<SageExplain>,
+    #[serde(default)]
+    dsl: Option<DslState>,
+    #[serde(default)]
+    acp_trace: Option<serde_json::Value>,
 }
 
 #[derive(Debug, Deserialize, Default, Clone)]
@@ -217,7 +229,7 @@ pub(crate) async fn run(
             }
         }
 
-        let session_id = create_session(&client, base_url, &case.name).await?;
+        let session_id = create_session(&client, base_url, &case.name, &case.domain).await?;
         for turn in &case.bootstrap {
             let _ = post_utterance(&client, base_url, &session_id, turn).await?;
         }
@@ -266,13 +278,21 @@ fn matches_filter(case: &FixtureCase, filter: Option<&str>) -> bool {
     haystack.contains(filter)
 }
 
-async fn create_session(client: &Client, base_url: &str, name: &str) -> Result<String> {
+async fn create_session(
+    client: &Client,
+    base_url: &str,
+    name: &str,
+    domain: &str,
+) -> Result<String> {
     let response = client
         .post(format!("{base_url}/api/session"))
         .header("content-type", "application/json")
         .header("x-obpoc-actor-id", "xtask-utterance-roundtrip")
         .header("x-obpoc-roles", "admin")
-        .json(&json!({ "name": format!("utterance-roundtrip-{name}") }))
+        .json(&json!({
+            "name": format!("utterance-roundtrip-{name}"),
+            "domain_hint": domain
+        }))
         .send()
         .await?
         .error_for_status()?;
@@ -309,17 +329,42 @@ async fn post_utterance(
 fn build_row(case: FixtureCase, payload: ChatPayload) -> Row {
     let coder = payload.drafter_proposal.clone().unwrap_or_default();
     let discovery = payload.discovery_bootstrap.clone().unwrap_or_default();
-    let predicted_verb = coder.verb_fqn.clone();
+    let acp_trace = payload.acp_trace.as_ref();
+
+    let predicted_verb = coder.verb_fqn.clone().or_else(|| {
+        acp_trace
+            .and_then(|t| t.get("selected_verb"))
+            .and_then(|v| v.as_str())
+            .map(|s| s.to_string())
+    });
+
+    let predicted_dsl = coder
+        .dsl
+        .clone()
+        .or_else(|| payload.dsl.as_ref().and_then(|d| d.source.clone()));
+
+    let ready_to_execute = coder.ready_to_execute
+        || acp_trace
+            .and_then(|t| t.get("dry_run_valid"))
+            .and_then(|v| v.as_bool())
+            .unwrap_or(false);
+
+    let requires_confirmation =
+        coder.requires_confirmation || (acp_trace.is_some() && predicted_dsl.is_some());
+
     let pass = predicted_verb.as_deref().is_some_and(|verb| {
         verb == case.expected_verb || case.alt_verbs.iter().any(|alt| alt == verb)
     });
+
     let root_cause = classify_root_cause(
         &case.expected_verb,
         predicted_verb.as_deref(),
         &coder,
         &discovery,
         payload.message.as_deref(),
+        acp_trace,
     );
+
     let likely_metadata_gap = matches!(
         root_cause.as_str(),
         "sem_os_discovery_gap"
@@ -328,38 +373,54 @@ fn build_row(case: FixtureCase, payload: ChatPayload) -> Row {
             | "missing_grounding_input"
     );
 
-    Row {
-        name: case.name,
-        domain: case.domain,
-        utterance: case.utterance,
-        expected_verb: case.expected_verb,
-        predicted_verb,
-        predicted_dsl: coder.dsl,
-        ready_to_execute: coder.ready_to_execute,
-        requires_confirmation: coder.requires_confirmation,
-        pass,
-        root_cause,
-        likely_metadata_gap,
-        grounding_readiness: discovery.grounding_readiness.clone(),
-        top_discovery_domain: discovery.matched_domains.first().map(|domain| {
+    let grounding_readiness = discovery.grounding_readiness.clone().or_else(|| {
+        acp_trace
+            .and_then(|t| t.get("status"))
+            .and_then(|v| v.as_str())
+            .map(|s| s.to_string())
+    });
+
+    let top_discovery_domain = discovery
+        .matched_domains
+        .first()
+        .map(|domain| {
             format!(
                 "{}:{} ({:.2})",
                 domain.domain_id, domain.label, domain.score
             )
-        }),
-        top_discovery_family: discovery.matched_families.first().map(|family| {
+        })
+        .or_else(|| {
+            acp_trace
+                .and_then(|t| t.get("selected_dispatch_kind"))
+                .and_then(|v| v.as_str())
+                .map(|s| s.to_string())
+        });
+
+    let top_discovery_family = discovery
+        .matched_families
+        .first()
+        .map(|family| {
             format!(
                 "{}:{} [{}] ({:.2})",
                 family.family_id, family.label, family.domain_id, family.score
             )
-        }),
-        top_discovery_constellation: discovery.matched_constellations.first().map(|item| {
-            format!(
-                "{}:{} ({:.2})",
-                item.constellation_id, item.label, item.score
-            )
-        }),
-        missing_inputs: discovery
+        })
+        .or_else(|| {
+            acp_trace
+                .and_then(|t| t.get("pack_ref"))
+                .and_then(|v| v.as_str())
+                .map(|s| s.to_string())
+        });
+
+    let top_discovery_constellation = discovery.matched_constellations.first().map(|item| {
+        format!(
+            "{}:{} ({:.2})",
+            item.constellation_id, item.label, item.score
+        )
+    });
+
+    let missing_inputs = if !discovery.missing_inputs.is_empty() {
+        discovery
             .missing_inputs
             .iter()
             .map(|item| {
@@ -368,16 +429,65 @@ fn build_row(case: FixtureCase, payload: ChatPayload) -> Row {
                     item.key, item.label, item.required, item.input_type
                 )
             })
-            .collect(),
-        entry_question: discovery.entry_questions.first().map(|question| {
+            .collect()
+    } else {
+        acp_trace
+            .and_then(|t| t.get("needed_from_user"))
+            .and_then(|v| v.as_array())
+            .map(|arr| {
+                arr.iter()
+                    .filter_map(|val| val.as_str())
+                    .map(|s| s.to_string())
+                    .collect()
+            })
+            .unwrap_or_default()
+    };
+
+    let entry_question = discovery
+        .entry_questions
+        .first()
+        .map(|question| {
             format!(
                 "{}:{}:{}:{}",
                 question.question_id, question.prompt, question.maps_to, question.priority
             )
-        }),
-        scope_summary: payload
-            .sage_explain
-            .and_then(|explain| explain.scope_summary),
+        })
+        .or_else(|| {
+            acp_trace
+                .and_then(|t| t.get("pending_question_code"))
+                .and_then(|v| v.as_str())
+                .map(|s| s.to_string())
+        });
+
+    let scope_summary = payload
+        .sage_explain
+        .and_then(|explain| explain.scope_summary)
+        .or_else(|| {
+            acp_trace
+                .and_then(|t| t.get("human_summary"))
+                .and_then(|v| v.as_str())
+                .map(|s| s.to_string())
+        });
+
+    Row {
+        name: case.name,
+        domain: case.domain,
+        utterance: case.utterance,
+        expected_verb: case.expected_verb,
+        predicted_verb,
+        predicted_dsl,
+        ready_to_execute,
+        requires_confirmation,
+        pass,
+        root_cause,
+        likely_metadata_gap,
+        grounding_readiness,
+        top_discovery_domain,
+        top_discovery_family,
+        top_discovery_constellation,
+        missing_inputs,
+        entry_question,
+        scope_summary,
         message: payload.message,
         notes: case.notes,
     }
@@ -389,13 +499,22 @@ fn classify_root_cause(
     coder: &DraftProposal,
     discovery: &DiscoveryBootstrap,
     message: Option<&str>,
+    acp_trace: Option<&serde_json::Value>,
 ) -> String {
     let expected_domain = expected_verb.split('.').next().unwrap_or_default();
     let message = message.unwrap_or_default();
 
     if let Some(predicted) = predicted_verb {
         if predicted == expected_verb {
-            if coder.ready_to_execute || coder.requires_confirmation || coder.dsl.is_some() {
+            let has_dsl = coder.dsl.is_some()
+                || acp_trace
+                    .and_then(|t| t.get("dry_run_valid").and_then(|v| v.as_bool()))
+                    .unwrap_or(false);
+            let ready = coder.ready_to_execute
+                || acp_trace
+                    .and_then(|t| t.get("dry_run_valid").and_then(|v| v.as_bool()))
+                    .unwrap_or(false);
+            if ready || coder.requires_confirmation || has_dsl {
                 return "pass".to_string();
             }
             return "matched_but_not_executable".to_string();
@@ -409,6 +528,22 @@ fn classify_root_cause(
             return "sem_os_metadata_gap".to_string();
         }
         return "domain_routing_gap".to_string();
+    }
+
+    if let Some(trace) = acp_trace {
+        if let Some(status) = trace.get("status").and_then(|v| v.as_str()) {
+            if status == "pending_question" {
+                if let Some(needed) = trace.get("needed_from_user").and_then(|v| v.as_array()) {
+                    if !needed.is_empty() {
+                        return "missing_grounding_input".to_string();
+                    }
+                }
+                return "sem_os_discovery_gap".to_string();
+            }
+            if status == "structured_refusal" {
+                return "sem_os_metadata_gap".to_string();
+            }
+        }
     }
 
     if !discovery.entry_questions.is_empty() || !discovery.missing_inputs.is_empty() {

@@ -39,6 +39,19 @@
 
 (utterance-binding semantic.missing-entities :phrases ["what entities are missing" "missing roles for stage" "which parties need to be added" "gaps in entity setup" "incomplete entity requirements" "entities needed to proceed" "what is missing for completion" "show missing structure members"] :verb semantic.missing-entities)
 
+(verb semantic.next-actionable
+  :description "Get the next actionable stages for a CBU (unblocked, incomplete stages)"
+  :behavior "plugin"
+  :effect-class "read_snapshot"
+  :flavour "attribute_mutating"
+  :metadata-json "{\"tier\":\"intent\",\"source_of_truth\":\"catalog\",\"scope\":\"global\",\"writes_operational\":false,\"side_effects\":\"state_write\",\"harm_class\":null,\"action_class\":null,\"noun\":\"semantic\",\"internal\":false,\"tags\":[],\"replaces\":null,\"status\":\"active\",\"replaced_by\":null,\"since_version\":null,\"removal_version\":null,\"dangerous\":false,\"subject_kinds\":[],\"phase_tags\":[\"stewardship\"],\"requires_subject\":true,\"produces_focus\":false}"
+  :three-axis-json "{\"state_effect\":\"preserving\",\"external_effects\":[\"observational\"],\"consequence\":{\"baseline\":\"benign\",\"escalation\":[]}}"
+  :returns-json "{\"type\":\"record_set\",\"name\":null,\"capture\":true}"
+  :args-json "[{\"name\":\"cbu-id\",\"type\":\"uuid\",\"required\":true,\"maps_to\":null,\"lookup\":{\"table\":\"cbus\",\"schema\":\"ob-poc\",\"entity_type\":\"cbu\",\"search_key\":\"name\",\"primary_key\":\"cbu_id\",\"resolution_mode\":\"entity\",\"scope_key\":null,\"role_filter\":null},\"valid_values\":null,\"default\":null,\"description\":\"CBU to analyze\",\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]}]"
+)
+
+(utterance-binding semantic.next-actionable :phrases ["what is the next actionable onboarding stage for this CBU?" "what is the next actionable onboarding stage" "next actionable" "next actionable stage"] :verb semantic.next-actionable)
+
 (verb semantic.next-actions
   :description "Get the next actionable stages for a CBU (unblocked, incomplete stages)"
   :behavior "plugin"

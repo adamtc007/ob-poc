@@ -62,6 +62,42 @@ domains:
           consequence:
             baseline: reviewable
 
+      status:
+        flavour: attribute_mutating
+        description: "Check the status of the onboarding journey for a client"
+        effect_class: read_snapshot
+        metadata:
+          tier: intent
+          source_of_truth: workflow
+          scope: cbu
+          noun: onboarding
+          tags: [onboarding]
+          phase_tags: [onboarding]
+          side_effects: facts_only
+        invocation_phrases:
+          - "where are we in the onboarding journey for this client?"
+          - "onboarding status"
+          - "where are we in the onboarding journey"
+          - "show onboarding status"
+          - "check onboarding progress"
+        behavior: crud
+        crud:
+          operation: select
+          table: cbus
+          schema: ob-poc
+        args:
+          - name: cbu-id
+            type: uuid
+            required: false
+            maps_to: cbu_id
+        returns:
+          type: record_set
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: benign
+
       compile-data-request:
         flavour: instance_adding
         description: "Compile a frozen service-resource data dictionary for a deal onboarding request"

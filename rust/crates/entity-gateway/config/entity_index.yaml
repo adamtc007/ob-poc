@@ -172,7 +172,7 @@ entities:
   role:
     nickname: "ROLE"
     source_table: '"ob-poc".roles'
-    return_key: "name"
+    return_key: "role_id"
     display_template: "{name}"
     index_mode: exact # Short code list, prefix match is fine
     search_keys:

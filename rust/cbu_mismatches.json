@@ -1,0 +1,336 @@
+{
+  "timestamp": "2026-06-16T12:46:14.377148+00:00",
+  "total_tests": 80,
+  "passed": 70,
+  "failed": 9,
+  "pass_rate": 87.5,
+  "confidently_wrong": 0,
+  "semantic_threshold": 0.65,
+  "ambiguity_margin": 0.05,
+  "mismatches": [
+    {
+      "name": "assign role",
+      "query": "assign role to cbu",
+      "expected_outcome": "Matched",
+      "expected_verb": "cbu.assign-role",
+      "allowed_verbs": [
+        "cbu.assign-role"
+      ],
+      "actual_outcome": "Error: pool timed out while waiting for an open connection",
+      "actual_verb": null,
+      "top_candidates": [],
+      "category": "role_assign",
+      "is_hard_negative": false
+    },
+    {
+      "name": "add role",
+      "query": "add role to entity",
+      "expected_outcome": "Matched",
+      "expected_verb": "cbu.assign-role",
+      "allowed_verbs": [
+        "cbu.assign-role"
+      ],
+      "actual_outcome": "Ambiguous(cbu.assign-role vs cbu.role.assign)",
+      "actual_verb": null,
+      "top_candidates": [
+        {
+          "rank": 1,
+          "verb": "cbu.assign-role",
+          "score": 1.0,
+          "source": "GlobalLearned",
+          "matched_phrase": "add role to entity"
+        },
+        {
+          "rank": 2,
+          "verb": "cbu.role.assign",
+          "score": 1.0,
+          "source": "GlobalLearned",
+          "matched_phrase": "add role to entity"
+        },
+        {
+          "rank": 3,
+          "verb": "role.ensure",
+          "score": 0.9246199,
+          "source": "PatternEmbedding",
+          "matched_phrase": "add a new entity role"
+        }
+      ],
+      "category": "role_assign",
+      "is_hard_negative": false
+    },
+    {
+      "name": "appoint director",
+      "query": "appoint director",
+      "expected_outcome": "Matched",
+      "expected_verb": "cbu.assign-role",
+      "allowed_verbs": [
+        "cbu.assign-role"
+      ],
+      "actual_outcome": "Ambiguous(cbu.role.assign vs cbu.assign-role)",
+      "actual_verb": null,
+      "top_candidates": [
+        {
+          "rank": 1,
+          "verb": "cbu.role.assign",
+          "score": 1.0,
+          "source": "GlobalLearned",
+          "matched_phrase": "appoint director"
+        },
+        {
+          "rank": 2,
+          "verb": "cbu.assign-role",
+          "score": 1.0,
+          "source": "GlobalLearned",
+          "matched_phrase": "appoint director"
+        },
+        {
+          "rank": 3,
+          "verb": "board.appoint",
+          "score": 0.8862515,
+          "source": "PatternEmbedding",
+          "matched_phrase": "appoint director to board"
+        }
+      ],
+      "category": "role_assign",
+      "is_hard_negative": false
+    },
+    {
+      "name": "add beneficial owner",
+      "query": "add beneficial owner",
+      "expected_outcome": "Matched",
+      "expected_verb": "cbu.assign-role",
+      "allowed_verbs": [
+        "cbu.assign-role"
+      ],
+      "actual_outcome": "Ambiguous(ubo.add-ownership vs cbu.assign-role)",
+      "actual_verb": null,
+      "top_candidates": [
+        {
+          "rank": 1,
+          "verb": "ubo.add-ownership",
+          "score": 1.05,
+          "source": "GlobalLearned",
+          "matched_phrase": "add beneficial owner"
+        },
+        {
+          "rank": 2,
+          "verb": "cbu.assign-role",
+          "score": 1.0,
+          "source": "GlobalLearned",
+          "matched_phrase": "add beneficial owner"
+        }
+      ],
+      "category": "role_assign",
+      "is_hard_negative": false
+    },
+    {
+      "name": "assign signatory",
+      "query": "assign signatory",
+      "expected_outcome": "Matched",
+      "expected_verb": "cbu.assign-role",
+      "allowed_verbs": [
+        "cbu.assign-role"
+      ],
+      "actual_outcome": "Ambiguous(cbu.assign-role vs cbu.assign-signatory)",
+      "actual_verb": null,
+      "top_candidates": [
+        {
+          "rank": 1,
+          "verb": "cbu.assign-role",
+          "score": 1.05,
+          "source": "GlobalLearned",
+          "matched_phrase": "assign signatory"
+        },
+        {
+          "rank": 2,
+          "verb": "cbu.assign-signatory",
+          "score": 1.05,
+          "source": "GlobalLearned",
+          "matched_phrase": "assign signatory"
+        }
+      ],
+      "category": "role_assign",
+      "is_hard_negative": false
+    },
+    {
+      "name": "add authorized signatory",
+      "query": "add authorized signatory",
+      "expected_outcome": "Matched",
+      "expected_verb": "cbu.assign-role",
+      "allowed_verbs": [
+        "cbu.assign-role"
+      ],
+      "actual_outcome": "Ambiguous(cbu.assign-signatory vs cbu.assign-role)",
+      "actual_verb": null,
+      "top_candidates": [
+        {
+          "rank": 1,
+          "verb": "cbu.assign-signatory",
+          "score": 1.0,
+          "source": "GlobalLearned",
+          "matched_phrase": "add authorized signatory"
+        },
+        {
+          "rank": 2,
+          "verb": "cbu.assign-role",
+          "score": 1.0,
+          "source": "GlobalLearned",
+          "matched_phrase": "add authorized signatory"
+        },
+        {
+          "rank": 3,
+          "verb": "cbu.role.assign-signatory",
+          "score": 0.872819,
+          "source": "PatternEmbedding",
+          "matched_phrase": "add authorized signatory"
+        }
+      ],
+      "category": "role_assign",
+      "is_hard_negative": false
+    },
+    {
+      "name": "add transfer agent",
+      "query": "add transfer agent",
+      "expected_outcome": "Matched",
+      "expected_verb": "cbu.assign-role",
+      "allowed_verbs": [
+        "cbu.assign-role"
+      ],
+      "actual_outcome": "Ambiguous(cbu.role.assign-service-provider vs cbu.assign-service-provider)",
+      "actual_verb": null,
+      "top_candidates": [
+        {
+          "rank": 1,
+          "verb": "cbu.role.assign-service-provider",
+          "score": 1.0,
+          "source": "GlobalLearned",
+          "matched_phrase": "add transfer agent"
+        },
+        {
+          "rank": 2,
+          "verb": "cbu.assign-service-provider",
+          "score": 1.0,
+          "source": "GlobalLearned",
+          "matched_phrase": "add transfer agent"
+        },
+        {
+          "rank": 3,
+          "verb": "cbu.assign-role",
+          "score": 1.0,
+          "source": "GlobalLearned",
+          "matched_phrase": "add transfer agent"
+        }
+      ],
+      "category": "role_assign",
+      "is_hard_negative": false
+    },
+    {
+      "name": "connect entity",
+      "query": "connect entity to cbu",
+      "expected_outcome": "Matched",
+      "expected_verb": "cbu.assign-role",
+      "allowed_verbs": [
+        "cbu.assign-role"
+      ],
+      "actual_outcome": "Ambiguous(cbu.assign-role vs client-group.link-cbu)",
+      "actual_verb": null,
+      "top_candidates": [
+        {
+          "rank": 1,
+          "verb": "cbu.assign-role",
+          "score": 0.8915746,
+          "source": "PatternEmbedding",
+          "matched_phrase": "link entity to cbu"
+        },
+        {
+          "rank": 2,
+          "verb": "client-group.link-cbu",
+          "score": 0.8752094,
+          "source": "PatternEmbedding",
+          "matched_phrase": "link entity membership to cbu"
+        },
+        {
+          "rank": 3,
+          "verb": "cbu.create-from-client-group",
+          "score": 0.8272997,
+          "source": "PatternEmbedding",
+          "matched_phrase": "convert entities to cbus"
+        }
+      ],
+      "category": "role_assign",
+      "is_hard_negative": false
+    },
+    {
+      "name": "who are the ubos",
+      "query": "who are the ubos",
+      "expected_outcome": "Matched",
+      "expected_verb": "cbu.parties",
+      "allowed_verbs": [
+        "cbu.parties"
+      ],
+      "actual_outcome": "Ambiguous(cbu.parties vs ubo.list-ubos)",
+      "actual_verb": null,
+      "top_candidates": [
+        {
+          "rank": 1,
+          "verb": "cbu.parties",
+          "score": 1.0,
+          "source": "GlobalLearned",
+          "matched_phrase": "who are the ubos"
+        },
+        {
+          "rank": 2,
+          "verb": "ubo.list-ubos",
+          "score": 1.0,
+          "source": "GlobalLearned",
+          "matched_phrase": "who are the ubos"
+        },
+        {
+          "rank": 3,
+          "verb": "bods.discover-ubos",
+          "score": 0.9004265,
+          "source": "PatternEmbedding",
+          "matched_phrase": "who are the UBOs"
+        },
+        {
+          "rank": 4,
+          "verb": "ubo.calculate",
+          "score": 0.9004265,
+          "source": "PatternEmbedding",
+          "matched_phrase": "who are the ubos"
+        }
+      ],
+      "category": "cbu_parties",
+      "is_hard_negative": false
+    },
+    {
+      "name": "add product",
+      "query": "add product to fund",
+      "expected_outcome": "Matched",
+      "expected_verb": "cbu.add-product",
+      "allowed_verbs": [
+        "cbu.add-product"
+      ],
+      "actual_outcome": "Ambiguous(cbu.add-product vs product-subscription.subscribe)",
+      "actual_verb": null,
+      "top_candidates": [
+        {
+          "rank": 1,
+          "verb": "cbu.add-product",
+          "score": 1.05,
+          "source": "GlobalLearned",
+          "matched_phrase": "add product to fund"
+        },
+        {
+          "rank": 2,
+          "verb": "product-subscription.subscribe",
+          "score": 1.0,
+          "source": "GlobalLearned",
+          "matched_phrase": "add product to fund"
+        }
+      ],
+      "category": "cbu_product",
+      "is_hard_negative": false
+    }
+  ]
+}

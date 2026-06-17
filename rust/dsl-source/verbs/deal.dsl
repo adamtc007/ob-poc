@@ -269,7 +269,7 @@
   :crud-json "{\"operation\":\"select\",\"table\":\"v_deal_summary\",\"schema\":\"ob-poc\",\"key\":null,\"returning\":null,\"conflict_keys\":null,\"conflict_constraint\":null,\"junction\":null,\"from_col\":null,\"to_col\":null,\"role_table\":null,\"role_col\":null,\"fk_col\":null,\"filter_col\":null,\"primary_table\":null,\"join_table\":null,\"join_col\":null,\"base_table\":null,\"extension_table\":null,\"extension_table_column\":null,\"type_id_column\":null,\"type_code\":null,\"order_by\":null,\"set_values\":null}"
 )
 
-(utterance-binding deal.list :phrases ["list deals" "show deals" "show me deals" "show me deal records" "show me deal record" "show me deal pipeline" "all deals" "deals for client" "my deals" "show me the deal pipeline" "what deals do we have" "list all active deals" "show the sales pipeline" "what's in the pipeline"] :verb deal.list)
+(utterance-binding deal.list :phrases ["what deals does Allianz Global Investors have?" "what deals does" "deals for Allianz" "show me deals for" "list deals" "show deals" "show me deals" "show me deal records" "show me deal record" "show me deal pipeline" "all deals" "deals for client" "my deals" "show me the deal pipeline" "what deals do we have" "list all active deals" "show the sales pipeline" "what's in the pipeline"] :verb deal.list)
 
 (verb deal.list-active-rate-cards
   :description "List only the currently AGREED rate cards for a deal"
@@ -692,6 +692,21 @@
 )
 
 (utterance-binding deal.search :phrases ["search deals" "find deal" "lookup deal"] :verb deal.search)
+
+; Pattern D: transition_args present — see docs/verb-redesigns/
+(verb deal.set-stage
+  :description "Transition deal status with lifecycle validation, including pre-contract KYC clearance"
+  :behavior "plugin"
+  :effect-class "read_modify_write"
+  :flavour "attribute_mutating"
+  :metadata-json "{\"tier\":\"intent\",\"source_of_truth\":\"operational\",\"scope\":\"global\",\"writes_operational\":false,\"side_effects\":\"state_write\",\"harm_class\":\"reversible\",\"action_class\":null,\"noun\":\"deal\",\"internal\":false,\"tags\":[],\"replaces\":null,\"status\":\"active\",\"replaced_by\":null,\"since_version\":null,\"removal_version\":null,\"dangerous\":false,\"subject_kinds\":[\"deal\"],\"phase_tags\":[\"deal\"],\"requires_subject\":true,\"produces_focus\":false}"
+  :three-axis-json "{\"state_effect\":\"transition\",\"external_effects\":[],\"consequence\":{\"baseline\":\"reviewable\",\"escalation\":[]}}"
+  :transition-args-json "{\"entity_id_arg\":\"deal-id\",\"target_state_arg\":\"new-status\",\"target_workspace\":\"deal\",\"target_slot\":\"deal\"}"
+  :returns-json "{\"type\":\"affected\",\"name\":null,\"capture\":null}"
+  :args-json "[{\"name\":\"deal-id\",\"type\":\"uuid\",\"required\":true,\"maps_to\":\"deal_id\",\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":null,\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]},{\"name\":\"new-status\",\"type\":\"string\",\"required\":true,\"maps_to\":\"deal_status\",\"lookup\":null,\"valid_values\":[\"PROSPECT\",\"QUALIFYING\",\"NEGOTIATING\",\"KYC_CLEARANCE\",\"CONTRACTED\",\"ONBOARDING\",\"ACTIVE\",\"WINDING_DOWN\",\"OFFBOARDED\",\"CANCELLED\"],\"default\":null,\"description\":null,\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]}]"
+)
+
+(utterance-binding deal.set-stage :phrases ["move this deal to" "move this deal to mandate negotiation" "move deal to" "set deal stage" "set deal stage to" "change deal stage" "move deal stage" "update deal status" "change deal status"] :verb deal.set-stage)
 
 ; Pattern D: transition_args present — see docs/verb-redesigns/
 (verb deal.start-sla-remediation

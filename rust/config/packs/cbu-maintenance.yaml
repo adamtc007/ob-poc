@@ -34,6 +34,7 @@ workspaces:
   - cbu
 
 allowed_verbs:
+  - cbu.submit-for-validation
   - cbu.create
   - cbu.create-from-client-group
   - cbu.ensure

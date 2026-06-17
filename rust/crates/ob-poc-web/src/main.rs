@@ -1690,7 +1690,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
                     // 7. Wrap in IntentMatcher → IntentService
                     let intent_matcher: Arc<dyn ob_poc::repl::IntentMatcher> =
-                        Arc::new(VerbSearchIntentMatcher::new(searcher));
+                        Arc::new(VerbSearchIntentMatcher::new(searcher.clone()));
 
                     let intent_service = Arc::new(IntentService::new(
                         intent_matcher.clone(),

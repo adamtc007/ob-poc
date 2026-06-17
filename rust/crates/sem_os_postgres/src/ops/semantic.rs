@@ -147,6 +147,25 @@ impl SemOsVerbOp for MissingEntities {
 
 pub struct NextActions;
 
+/// Wrapper to support next-actionable as an alias for next-actions.
+pub struct NextActionable;
+
+#[async_trait]
+impl SemOsVerbOp for NextActionable {
+    fn fqn(&self) -> &str {
+        "semantic.next-actionable"
+    }
+
+    async fn execute(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut VerbExecutionContext,
+        scope: &mut dyn TransactionScope,
+    ) -> Result<VerbExecutionOutcome> {
+        NextActions.execute(args, ctx, scope).await
+    }
+}
+
 #[async_trait]
 impl SemOsVerbOp for NextActions {
     fn fqn(&self) -> &str {

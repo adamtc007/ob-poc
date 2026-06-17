@@ -38,6 +38,8 @@ domains:
           - "launch a new sub-fund"
           - "set up a new fund"
           - "spin up a fund"
+          - "create a fund called Alpha Growth"
+          - "spin up a new fund called Alpha"
           - "SICAV setup"
           - "ICAV launch"
           - "OEIC creation"

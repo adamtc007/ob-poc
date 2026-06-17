@@ -13,6 +13,10 @@ domains:
         description: Create a new Client Business Unit (idempotent by fund-entity-id if provided)
         effect_class: read_modify_write
         invocation_phrases:
+          - "create a new CBU for"
+          - "create a new CBU for Allianz"
+          - "create a new CBU for Allianz Growth Fund"
+          - "spin up a new fund for Allianz"
           - "create CBU"
           - "new CBU"
           - "add commercial business unit"
@@ -30,6 +34,7 @@ domains:
           - "configure fund structure"
           - "create fund book"
           - "spin up a new fund"
+          - "spin up a new fund called Alpha"
           - "register a new client"
           - "set up a new custody client"
           - "onboard a new entity"
@@ -551,6 +556,9 @@ domains:
         description: List CBUs with optional filters
         effect_class: read_snapshot
         invocation_phrases:
+          - "show me the CBUs for"
+          - "show all CBUs for"
+          - "all cbus for"
           - "list CBUs"
           - "show all CBUs"
           - "show me cbu"
@@ -699,6 +707,7 @@ domains:
         description: Move a CBU into validation review
         effect_class: read_modify_write
         invocation_phrases:
+          - "submit this CBU for validation"
           - "submit CBU for validation"
           - "submit fund for validation"
           - "start validation"
@@ -1374,6 +1383,52 @@ domains:
           external_effects: []
           consequence:
             baseline: requires_confirmation
+
+      products:
+        flavour: attribute_mutating
+        description: List products currently subscribed on a CBU.
+        effect_class: read_snapshot
+        invocation_phrases:
+          - "which products are active on this client setup?"
+          - "what products is cbu subscribed to"
+          - "list products for CBU"
+          - "show CBU subscriptions"
+          - "which products are enabled on this CBU"
+        behavior: crud
+        metadata:
+          tier: reference
+          source_of_truth: operational
+          scope: global
+          noun: cbu
+          tags: [read, product, onboarding]
+          phase_tags: [onboarding]
+          side_effects: facts_only
+        crud:
+          operation: select
+          table: v_cbu_subscriptions
+          schema: ob-poc
+        args:
+          - name: cbu-id
+            type: uuid
+            required: true
+            maps_to: cbu_id
+            lookup:
+              table: cbus
+              entity_type: cbu
+              schema: ob-poc
+              search_key: name
+              primary_key: cbu_id
+          - name: product
+            type: string
+            required: false
+            maps_to: product_code
+        returns:
+          type: record_set
+        three_axis:
+          state_effect: preserving
+          external_effects: [observational]
+          consequence:
+            baseline: benign
 
       list-subscriptions:
         flavour: attribute_mutating

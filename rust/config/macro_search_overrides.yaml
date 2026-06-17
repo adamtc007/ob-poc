@@ -557,11 +557,15 @@ ubo.promote:
   aliases:
     - "promote beneficial owner"
     - "advance ubo status"
+    - "promote the UBO candidate to identified status"
+    - "promote ubo candidate"
 
 ubo.approve:
   aliases:
     - "approve beneficial owner"
     - "approve ubo"
+    - "approve the beneficial ownership determination"
+    - "approve beneficial ownership determination"
 
 ubo.reject:
   aliases:

@@ -1185,6 +1185,101 @@ domains:
           consequence:
             baseline: benign
 
+      list:
+        flavour: attribute_mutating
+        description: List all documents for an entity
+        behavior: crud
+        effect_class: read_snapshot
+        invocation_phrases:
+          - "show me the KYB documents for this client"
+          - "list documents"
+          - "show documents"
+          - "show me documents"
+          - "documents"
+          - "list entity documents"
+          - "what documents does entity have"
+          - "list all documents for this entity"
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: cbu
+          noun: entity_documents
+          tags: [read, query]
+          phase_tags: [kyc]
+          side_effects: facts_only
+        crud:
+          operation: select
+          table: v_documents_with_status
+          schema: ob-poc
+        args:
+          - name: entity-id
+            type: uuid
+            required: true
+            maps_to: subject_entity_id
+            lookup:
+              table: entities
+              entity_type: entity
+              schema: ob-poc
+              search_key: name
+              primary_key: entity_id
+        returns:
+          type: record_set
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
+
+      list-missing:
+        flavour: attribute_mutating
+        description: List missing document requirements for an entity
+        behavior: plugin
+        effect_class: read_modify_write
+        invocation_phrases:
+          - "what documents are still missing for onboarding?"
+          - "what documents are missing"
+          - "missing documents for entity"
+          - "outstanding documents"
+          - "incomplete document collection"
+          - "what documents do we still need"
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: cbu
+          noun: missing_documents
+          tags: [read, query, workflow]
+          phase_tags: [kyc]
+          side_effects: state_write
+        args:
+          - name: entity-id
+            type: uuid
+            required: true
+            description: Entity to check requirements for
+            lookup:
+              table: entities
+              entity_type: entity
+              schema: ob-poc
+              search_key: name
+              primary_key: entity_id
+          - name: workflow-instance-id
+            type: uuid
+            required: false
+            description: Filter by workflow instance
+        returns:
+          type: record_set
+          fields:
+            requirement_id: uuid
+            doc_type: string
+            status: string
+            required_state: string
+            attempt_count: integer
+            last_rejection_code: string
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
+
       for-entity:
         flavour: attribute_mutating
         description: List all documents for an entity

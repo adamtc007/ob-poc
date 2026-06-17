@@ -157,6 +157,50 @@ domains:
             - observational
           consequence:
             baseline: benign
+
+      next-actionable:
+        flavour: attribute_mutating
+        description: "Get the next actionable stages for a CBU (unblocked, incomplete stages)"
+        effect_class: read_snapshot
+        metadata:
+          tier: intent
+          source_of_truth: catalog
+          scope: global
+          noun: semantic
+          subject_kinds: []
+          phase_tags: [stewardship]
+          side_effects: state_write
+        invocation_phrases:
+          - "what is the next actionable onboarding stage for this CBU?"
+          - "what is the next actionable onboarding stage"
+          - "next actionable"
+          - "next actionable stage"
+        behavior: plugin
+        plugin:
+          handler: SemanticNextActionsOp
+        args:
+          - name: cbu-id
+            type: uuid
+            required: true
+            description: "CBU to analyze"
+            lookup:
+              table: cbus
+              schema: ob-poc
+              entity_type: cbu
+              search_key: name
+              primary_key: cbu_id
+              resolution_mode: entity
+        returns:
+          type: record_set
+          capture: true
+          description: "List of actionable stages with suggested verbs"
+        three_axis:
+          state_effect: preserving
+          external_effects:
+            - observational
+          consequence:
+            baseline: benign
+
       next-actions:
         flavour: attribute_mutating
         description: "Get the next actionable stages for a CBU (unblocked, incomplete stages)"

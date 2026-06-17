@@ -10,4 +10,117 @@ domains:
   kyc:
     description: "Orchestrated KYC workflows backed by BPMN-Lite"
 
-    verbs: {}
+    verbs:
+      case-status:
+        flavour: attribute_mutating
+        description: Check the status of a KYC case
+        effect_class: read_snapshot
+        invocation_phrases:
+          - "what is the KYC status for this client?"
+          - "check KYC status"
+          - "what is the KYC status"
+          - "KYC status for client"
+          - "show KYC status"
+          - "what is the KYC status for this CBU"
+        metadata:
+          tier: intent
+          source_of_truth: workflow
+          scope: cbu
+          noun: kyc_case
+          tags: [kyc]
+          phase_tags: [kyc]
+          side_effects: facts_only
+        behavior: crud
+        crud:
+          operation: select
+          table: cases
+          schema: kyc
+        args:
+          - name: case-id
+            type: uuid
+            required: false
+            maps_to: case_id
+            lookup:
+              table: cases
+              entity_type: kyc_case
+              schema: kyc
+              search_key: case_id
+              primary_key: case_id
+        returns:
+          type: record_set
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: benign
+
+      read-case:
+        flavour: attribute_mutating
+        description: Read case details
+        effect_class: read_snapshot
+        invocation_phrases:
+          - "read case"
+          - "get case details"
+          - "show case"
+          - "view case"
+        metadata:
+          tier: reference
+          source_of_truth: workflow
+          scope: cbu
+          noun: kyc_case
+          tags: [kyc]
+          phase_tags: [kyc]
+          side_effects: facts_only
+        behavior: crud
+        crud:
+          operation: select
+          table: cases
+          schema: kyc
+        args:
+          - name: case-id
+            type: uuid
+            required: false
+            maps_to: case_id
+        returns:
+          type: record_set
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: benign
+
+      list-missing-items:
+        flavour: attribute_mutating
+        description: List missing information before KYC sign-off
+        effect_class: read_snapshot
+        invocation_phrases:
+          - "what information is still missing before KYC sign-off?"
+          - "missing kyc information"
+          - "information missing before sign-off"
+          - "what is still missing before KYC sign-off"
+          - "missing kyc items"
+        metadata:
+          tier: intent
+          source_of_truth: workflow
+          scope: cbu
+          noun: missing_documents
+          tags: [read, query, workflow]
+          phase_tags: [kyc]
+          side_effects: facts_only
+        behavior: crud
+        crud:
+          operation: select
+          table: v_documents_with_status
+          schema: ob-poc
+        args:
+          - name: entity-id
+            type: uuid
+            required: false
+            maps_to: subject_entity_id
+        returns:
+          type: record_set
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: benign

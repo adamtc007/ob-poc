@@ -34,6 +34,7 @@ workspaces:
   - cbu
 
 allowed_verbs:
+  - mandate.instrument-matrix
   # Instrument macros (Tier 1-3)
   - instrument.setup-equity
   - instrument.setup-fixed-income

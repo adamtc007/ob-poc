@@ -250,3 +250,61 @@ pub(crate) fn bench(snapshot_path: Option<&Path>, iterations: usize) -> Result<(
 
     Ok(())
 }
+
+/// Train/Fine-tune the BGE sentence embedding model on BNY jargon patterns.
+pub(crate) fn train() -> Result<()> {
+    use xshell::{cmd, Shell};
+
+    println!("===========================================");
+    println!("  BGE Embedding Model Fine-Tuning");
+    println!("===========================================\n");
+
+    let sh = Shell::new()?;
+    let root = super::project_root()?;
+    sh.change_dir(&root);
+
+    let venv_dir = root.join(".venv");
+    let python_path = if cfg!(windows) {
+        venv_dir.join("Scripts").join("python.exe")
+    } else {
+        venv_dir.join("bin").join("python")
+    };
+    let pip_path = if cfg!(windows) {
+        venv_dir.join("Scripts").join("pip.exe")
+    } else {
+        venv_dir.join("bin").join("pip")
+    };
+
+    if !venv_dir.exists() {
+        println!(
+            "Creating Python virtual environment at {}...",
+            venv_dir.display()
+        );
+        cmd!(sh, "python3 -m venv .venv")
+            .run()
+            .context("Failed to create virtual environment. Ensure python3 is installed.")?;
+    }
+
+    println!("Ensuring required packages are installed (sentence-transformers, pyyaml, torch, datasets, accelerate)...");
+    let pip_str = pip_path.to_string_lossy().to_string();
+    cmd!(
+        sh,
+        "{pip_str} install sentence-transformers pyyaml torch datasets accelerate"
+    )
+    .run()
+    .context("Failed to install package dependencies inside virtual environment.")?;
+
+    println!("Running fine-tuning script...");
+    let python_str = python_path.to_string_lossy().to_string();
+    let script_path = root.join("scratch/train_bge_lexicon.py");
+    let script_str = script_path.to_string_lossy().to_string();
+    cmd!(sh, "{python_str} {script_str}")
+        .run()
+        .context("Fine-tuning script execution failed.")?;
+
+    println!("\n===========================================");
+    println!("  Fine-tuning complete");
+    println!("===========================================");
+
+    Ok(())
+}

@@ -16,3 +16,17 @@
 
 (utterance-binding instrument-matrix.attach :phrases ["attach instrument matrix to CBU" "initialise instrument matrix" "bootstrap instrument matrix" "set up instrument matrix for CBU" "create instrument matrix" "wire instrument matrix to structure" "attach IM to CBU" "initialise trading profile structure" "create trading profile for CBU" "bootstrap the instrument matrix" "set up IM for onboarding" "prepare instrument matrix" "attach matrix to onboarding unit"] :verb instrument-matrix.attach)
 
+(verb mandate.instrument-matrix
+  :description "Show permitted instrument matrix for a mandate"
+  :behavior "crud"
+  :effect-class "read_snapshot"
+  :flavour "attribute_mutating"
+  :metadata-json "{\"tier\":\"intent\",\"source_of_truth\":\"operational\",\"scope\":\"cbu\",\"writes_operational\":false,\"side_effects\":\"facts_only\",\"harm_class\":null,\"action_class\":null,\"noun\":\"instrument_matrix\",\"internal\":false,\"tags\":[\"read\",\"query\",\"limit\"],\"replaces\":null,\"status\":\"active\",\"replaced_by\":null,\"since_version\":null,\"removal_version\":null,\"dangerous\":false,\"subject_kinds\":[],\"phase_tags\":[\"onboarding\",\"configuring\"],\"requires_subject\":true,\"produces_focus\":false}"
+  :three-axis-json "{\"state_effect\":\"preserving\",\"external_effects\":[],\"consequence\":{\"baseline\":\"benign\",\"escalation\":[]}}"
+  :returns-json "{\"type\":\"record_set\",\"name\":null,\"capture\":null}"
+  :args-json "[{\"name\":\"mandate-id\",\"type\":\"uuid\",\"required\":false,\"maps_to\":\"profile_id\",\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":null,\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]}]"
+  :crud-json "{\"operation\":\"select\",\"table\":\"v_permitted_instruments\",\"schema\":\"ob-poc\",\"key\":null,\"returning\":null,\"conflict_keys\":null,\"conflict_constraint\":null,\"junction\":null,\"from_col\":null,\"to_col\":null,\"role_table\":null,\"role_col\":null,\"fk_col\":null,\"filter_col\":null,\"primary_table\":null,\"join_table\":null,\"join_col\":null,\"base_table\":null,\"extension_table\":null,\"extension_table_column\":null,\"type_id_column\":null,\"type_code\":null,\"order_by\":null,\"set_values\":null}"
+)
+
+(utterance-binding mandate.instrument-matrix :phrases ["show me the permitted instrument matrix for this mandate" "can this mandate trade listed futures?" "permitted instrument matrix" "what instruments can this mandate trade" "show mandate instrument matrix"] :verb mandate.instrument-matrix)
+

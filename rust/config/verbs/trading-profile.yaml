@@ -579,6 +579,8 @@ domains:
           - "add component to trading profile"
           - "add equity component"
           - "add equity"
+          - "add equity instruments"
+          - "add instrument"
           - "add fixed income component"
           - "add fixed income"
           - "add FI component"
@@ -808,6 +810,8 @@ domains:
           - "remove ISDA configuration"
           - "remove CSA configuration"
           - "remove IM mandate"
+          - "remove equity instruments"
+          - "remove instrument"
         behavior: plugin
         handler: TradingProfileRemoveComponentOp
         metadata:

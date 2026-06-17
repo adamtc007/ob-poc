@@ -175,6 +175,7 @@ slots:
       end: { verb: control.end, when: filled }
       analyze: { verb: control.analyze, when: filled }
       list_controllers: { verb: control.list-controllers, when: filled }
+      list_controllers_ubo: { verb: ubo.list-controllers, when: [empty, filled] }
       list_controlled: { verb: control.list-controlled, when: filled }
       trace_chain: { verb: ownership.trace-chain, when: filled }
       compute_controllers: { verb: control.compute-controllers, when: filled }
@@ -227,6 +228,8 @@ slots:
       state: { verb: kyc-case.summarize, when: filled }
       update_status: { verb: kyc-case.update-status, when: filled }
       close: { verb: kyc-case.close, when: filled }
+      case_status: { verb: kyc.case-status, when: [empty, filled] }
+      list_missing_items: { verb: kyc.list-missing-items, when: [empty, filled] }
   cbu_identification:
     type: cbu
     table: cbus
@@ -240,7 +243,7 @@ slots:
       create_from_group: { verb: cbu.create-from-client-group, when: empty }
       ensure: { verb: cbu.ensure, when: [empty, filled] }
       read: { verb: cbu.read, when: filled }
-      list: { verb: cbu.list, when: filled }
+      list: { verb: cbu.list, when: [empty, filled] }
       list_subscriptions: { verb: cbu.list-subscriptions, when: filled }
       list_evidence: { verb: cbu.list-evidence, when: filled }
       list_structure_links: { verb: cbu.list-structure-links, when: filled }
@@ -252,6 +255,7 @@ slots:
       set_commercial_client: { verb: cbu.set-commercial-client, when: filled }
       add_product: { verb: cbu.add-product, when: filled }
       remove_product: { verb: cbu.remove-product, when: filled }
+      products: { verb: cbu.products, when: [empty, filled] }
       assign_control: { verb: cbu.assign-control, when: filled }
       assign_ownership: { verb: cbu.assign-ownership, when: filled }
       assign_fund_role: { verb: cbu.assign-fund-role, when: filled }

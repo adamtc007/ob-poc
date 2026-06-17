@@ -54,6 +54,17 @@ impl Embedder {
     /// The model is cached in the HuggingFace cache directory (~/.cache/huggingface).
     /// First download is ~130MB.
     pub fn new() -> Result<Self> {
+        let paths = [
+            "assets/bge-small-en-v1.5-finetuned",
+            "../assets/bge-small-en-v1.5-finetuned",
+            "rust/assets/bge-small-en-v1.5-finetuned",
+        ];
+        for path in &paths {
+            if std::path::Path::new(path).is_dir() {
+                info!("Found local fine-tuned model at {}, loading...", path);
+                return Self::with_model(path);
+            }
+        }
         Self::with_model(MODEL_REPO)
     }
 
@@ -74,28 +85,36 @@ impl Embedder {
 
         let device = Device::Cpu; // Use CPU for portability; GPU can be added later
 
-        // Download model files from HuggingFace Hub with pinned revision
-        let api = Api::new().context("Failed to create HuggingFace API client")?;
-        let repo = api.repo(Repo::with_revision(
-            model_name.to_string(),
-            RepoType::Model,
-            revision.to_string(),
-        ));
+        let (config_path, tokenizer_path, weights_path) =
+            if std::path::Path::new(model_name).is_dir() {
+                let dir = std::path::Path::new(model_name);
+                (
+                    dir.join("config.json"),
+                    dir.join("tokenizer.json"),
+                    dir.join("model.safetensors"),
+                )
+            } else {
+                // Download model files from HuggingFace Hub with pinned revision
+                let api = Api::new().context("Failed to create HuggingFace API client")?;
+                let repo = api.repo(Repo::with_revision(
+                    model_name.to_string(),
+                    RepoType::Model,
+                    revision.to_string(),
+                ));
 
-        let config_path = repo
-            .get("config.json")
-            .context("Failed to download config.json")?;
-        let tokenizer_path = repo
-            .get("tokenizer.json")
-            .context("Failed to download tokenizer.json")?;
-        let weights_path = repo
-            .get("model.safetensors")
-            .context("Failed to download model.safetensors")?;
+                let config_path = repo
+                    .get("config.json")
+                    .context("Failed to download config.json")?;
+                let tokenizer_path = repo
+                    .get("tokenizer.json")
+                    .context("Failed to download tokenizer.json")?;
+                let weights_path = repo
+                    .get("model.safetensors")
+                    .context("Failed to download model.safetensors")?;
+                (config_path, tokenizer_path, weights_path)
+            };
 
-        debug!(
-            "Model files resolved from cache in {}ms",
-            start.elapsed().as_millis()
-        );
+        debug!("Model files resolved in {}ms", start.elapsed().as_millis());
 
         // Load config
         let config: Config = serde_json::from_str(

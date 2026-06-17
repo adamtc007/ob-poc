@@ -67,3 +67,42 @@ domains:
           entity_id_arg: cbu-id
           target_workspace: instrument_matrix
           target_slot: cbu
+
+  mandate:
+    description: "Mandate and permitted instrument limits management"
+    verbs:
+      instrument-matrix:
+        flavour: attribute_mutating
+        description: "Show permitted instrument matrix for a mandate"
+        effect_class: read_snapshot
+        invocation_phrases:
+          - "show me the permitted instrument matrix for this mandate"
+          - "can this mandate trade listed futures?"
+          - "permitted instrument matrix"
+          - "what instruments can this mandate trade"
+          - "show mandate instrument matrix"
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: cbu
+          noun: instrument_matrix
+          tags: [read, query, limit]
+          phase_tags: [onboarding, configuring]
+          side_effects: facts_only
+        behavior: crud
+        crud:
+          operation: select
+          table: v_permitted_instruments
+          schema: ob-poc
+        args:
+          - name: mandate-id
+            type: uuid
+            required: false
+            maps_to: profile_id
+        returns:
+          type: record_set
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: benign

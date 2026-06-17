@@ -187,17 +187,11 @@ domains:
         - "switch to"
         - "load book for"
         - "load all funds under"
-        - "show all CBUs for"
         - "load group"
         - "load cluster"
         - "load book"
-        - "show book"
           # Group-level triggers
-        - "show cbu book"
         - "cbu book"
-        - "show funds for"
-        - "all cbus for"
-        - "show cbu universe"
         - "cbu universe"
         - "load manco"
           # Bare client names - direct scope selection (triggers entity resolution)

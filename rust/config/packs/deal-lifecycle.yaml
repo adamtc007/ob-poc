@@ -33,6 +33,8 @@ allowed_verbs:
   - deal.create
   - deal.read
   - deal.list-contracts
+  - deal.set-stage
+  - deal.list
   - contract.create
   - billing.create-profile
   # R3.5 (2026-04-26): Booking Principal verbs hoisted to booking-principal pack.

@@ -18,7 +18,7 @@ find the ultimate beneficial owners -> control.identify-ubos
 # =============================================================================
 
 load the allianz galaxy -> session.load-galaxy
-load the blackrock book -> session.load-galaxy
+load the blackrock book -> session.load-cluster
 load cbu acme fund -> session.load-cbu
 load all luxembourg cbus -> session.load-jurisdiction
 clear the session -> session.clear

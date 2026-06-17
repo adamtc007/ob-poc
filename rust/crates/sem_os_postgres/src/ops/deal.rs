@@ -371,6 +371,25 @@ impl SemOsVerbOp for Update {
 /// Transition deal status with lifecycle validation.
 pub struct UpdateStatus;
 
+/// Wrapper to support set-stage as an alias for update-status.
+pub struct SetStage;
+
+#[async_trait]
+impl SemOsVerbOp for SetStage {
+    fn fqn(&self) -> &str {
+        "deal.set-stage"
+    }
+
+    async fn execute(
+        &self,
+        args: &Value,
+        ctx: &mut VerbExecutionContext,
+        scope: &mut dyn TransactionScope,
+    ) -> Result<VerbExecutionOutcome> {
+        UpdateStatus.execute(args, ctx, scope).await
+    }
+}
+
 #[async_trait]
 impl SemOsVerbOp for UpdateStatus {
     fn fqn(&self) -> &str {

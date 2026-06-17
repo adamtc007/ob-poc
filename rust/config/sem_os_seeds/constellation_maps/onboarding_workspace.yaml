@@ -12,6 +12,7 @@ slots:
     cardinality: root
     verbs:
       auto_complete: { verb: onboarding.auto-complete, when: filled }
+      onboarding_status: { verb: onboarding.status, when: [empty, filled] }
       compile_data_request: { verb: onboarding.compile-data-request, when: filled }
       dispatch_ready_slices: { verb: onboarding.dispatch-ready-slices, when: filled }
       cancel_data_request: { verb: onboarding.cancel-data-request, when: filled }

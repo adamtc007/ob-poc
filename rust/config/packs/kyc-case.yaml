@@ -35,6 +35,14 @@ allowed_verbs:
   - cbu.list
   - cbu.assign-role
   - cbu.parties
+  - cbu.products
+  - cbu.remove-role
+  - kyc.case-status
+  - kyc.list-missing-items
+  - ubo.list-controllers
+  - document.list-missing
+  - document.list
+  - onboarding.status
   - kyc-case.create
   - kyc-case.list-by-cbu
   - kyc-case.update-status

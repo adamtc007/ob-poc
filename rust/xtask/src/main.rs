@@ -1035,6 +1035,9 @@ enum LexiconAction {
         #[arg(long, short = 'n', default_value = "10000")]
         iterations: usize,
     },
+
+    /// Fine-tune the BGE sentence embedding model on local jargon
+    Train,
 }
 
 #[derive(Subcommand)]
@@ -1579,6 +1582,7 @@ fn main() -> Result<()> {
                 snapshot,
                 iterations,
             } => lexicon::bench(snapshot.as_deref(), iterations),
+            LexiconAction::Train => lexicon::train(),
         },
         Command::Calibration { action } => {
             let rt = tokio::runtime::Runtime::new()?;

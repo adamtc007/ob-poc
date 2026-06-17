@@ -39,8 +39,8 @@ allowed_transitions:
     from_state: dormant
     to_state: configuring
     dry_run_enabled: true
-    mutation_enabled: true
-    hitl_required: false
+    mutation_enabled: false
+    hitl_required: true
   - transition_ref: instrument-matrix.profile-created
     entity_type: cbu
     state_machine: trading_profile_lifecycle

@@ -1,0 +1,1626 @@
+{
+  "accuracy": 0.694656491279602,
+  "confusion_matrix": {
+    "genuine-ambiguity": {
+      "count": 0,
+      "percentage": 0.0
+    },
+    "oov": {
+      "count": 35,
+      "percentage": 0.21875
+    },
+    "set-too-large": {
+      "count": 125,
+      "percentage": 0.78125
+    },
+    "sub-threshold": {
+      "count": 0,
+      "percentage": 0.0
+    }
+  },
+  "failure_details": [
+    {
+      "case_id": "cic-0001",
+      "expected": "cbu.assign-role",
+      "expected_index": 1,
+      "expected_score": 0.7449797987937927,
+      "fault": "set-too-large",
+      "top_candidate": "cbu.assign-fund-role",
+      "top_score": 0.7573583126068115,
+      "utterance": "assign Goldman Sachs as custodian for this CBU"
+    },
+    {
+      "case_id": "cic-0003",
+      "expected": "cbu.parties",
+      "expected_index": null,
+      "expected_score": null,
+      "fault": "oov",
+      "top_candidate": "party.list",
+      "top_score": 1.0399999618530273,
+      "utterance": "who are the parties on this CBU?"
+    },
+    {
+      "case_id": "cic-0016",
+      "expected": "screening.sanctions",
+      "expected_index": null,
+      "expected_score": null,
+      "fault": "oov",
+      "top_candidate": "screening.sanctions-check",
+      "top_score": 1.0399999618530273,
+      "utterance": "run sanctions screening on this entity"
+    },
+    {
+      "case_id": "cic-0018",
+      "expected": "screening.pep",
+      "expected_index": null,
+      "expected_score": null,
+      "fault": "oov",
+      "top_candidate": "screening.pep-check",
+      "top_score": 1.0399999618530273,
+      "utterance": "is this person a PEP?"
+    },
+    {
+      "case_id": "cic-0025",
+      "expected": "ubo.list-owners",
+      "expected_index": 1,
+      "expected_score": 0.8551811575889587,
+      "fault": "set-too-large",
+      "top_candidate": "ubo.list-ubos",
+      "top_score": 0.8676794767379761,
+      "utterance": "who are the beneficial owners?"
+    },
+    {
+      "case_id": "cic-0026",
+      "expected": "ubo.list-owners",
+      "expected_index": null,
+      "expected_score": null,
+      "fault": "oov",
+      "top_candidate": "ubo.list-ubos",
+      "top_score": 1.0499999523162842,
+      "utterance": "show me the ownership structure"
+    },
+    {
+      "case_id": "cic-0030",
+      "expected": "ubo.compute-chains",
+      "expected_index": 1,
+      "expected_score": 0.8229280114173889,
+      "fault": "set-too-large",
+      "top_candidate": "ubo.list-ubos",
+      "top_score": 0.8781014680862427,
+      "utterance": "calculate the UBOs for this CBU"
+    },
+    {
+      "case_id": "cic-0031",
+      "expected": "ubo.trace-chains",
+      "expected_index": 1,
+      "expected_score": 0.7873620986938477,
+      "fault": "set-too-large",
+      "top_candidate": "control.analyze",
+      "top_score": 0.7980131506919861,
+      "utterance": "trace the ownership chain from the top entity down"
+    },
+    {
+      "case_id": "cic-0033",
+      "expected": "ubo.add-trust-role",
+      "expected_index": 1,
+      "expected_score": 0.7093688249588013,
+      "fault": "set-too-large",
+      "top_candidate": "cbu.assign-trust-role",
+      "top_score": 0.7220585346221924,
+      "utterance": "the settlor appointed a new trustee"
+    },
+    {
+      "case_id": "cic-0036",
+      "expected": "fund.create",
+      "expected_index": 1,
+      "expected_score": 0.8115211129188538,
+      "fault": "set-too-large",
+      "top_candidate": "cbu.create",
+      "top_score": 0.9499123096466064,
+      "utterance": "create an umbrella fund -- UCITS, Luxembourg domiciled"
+    },
+    {
+      "case_id": "cic-0038",
+      "expected": "share-class.create",
+      "expected_index": 4,
+      "expected_score": 0.7231907248497009,
+      "fault": "set-too-large",
+      "top_candidate": "fund.add-share-class",
+      "top_score": 0.7876914143562317,
+      "utterance": "add a share class -- accumulating, EUR denominated"
+    },
+    {
+      "case_id": "cic-0039",
+      "expected": "fund.create",
+      "expected_index": 2,
+      "expected_score": 0.7844332456588745,
+      "fault": "set-too-large",
+      "top_candidate": "investor-role.mark-as-master-pool",
+      "top_score": 0.8826574087142944,
+      "utterance": "create a master-feeder structure"
+    },
+    {
+      "case_id": "cic-0043",
+      "expected": "fund.add-investment",
+      "expected_index": 14,
+      "expected_score": 0.5723535418510437,
+      "fault": "set-too-large",
+      "top_candidate": "cbu.create",
+      "top_score": 0.7308125495910645,
+      "utterance": "BlackRock fund invests 30% NAV in the Vanguard fund"
+    },
+    {
+      "case_id": "cic-0045",
+      "expected": "fund.create",
+      "expected_index": 1,
+      "expected_score": 0.8804300427436829,
+      "fault": "set-too-large",
+      "top_candidate": "cbu.create",
+      "top_score": 0.9033894538879395,
+      "utterance": "create a standalone fund -- AIF, Jersey"
+    },
+    {
+      "case_id": "cic-0048",
+      "expected": "document.upload-version",
+      "expected_index": 26,
+      "expected_score": 0.47988224029541016,
+      "fault": "set-too-large",
+      "top_candidate": "entity.create",
+      "top_score": 0.7380703687667847,
+      "utterance": "upload the passport for John Smith"
+    },
+    {
+      "case_id": "cic-0054",
+      "expected": "deal.create",
+      "expected_index": 2,
+      "expected_score": 0.774489164352417,
+      "fault": "set-too-large",
+      "top_candidate": "cbu.create",
+      "top_score": 0.8395639061927795,
+      "utterance": "create a new deal for Allianz"
+    },
+    {
+      "case_id": "cic-0055",
+      "expected": "deal.add-participant",
+      "expected_index": 2,
+      "expected_score": 0.710763156414032,
+      "fault": "set-too-large",
+      "top_candidate": "session.set-client",
+      "top_score": 0.7540260553359985,
+      "utterance": "add BlackRock as a participant on this deal"
+    },
+    {
+      "case_id": "cic-0061",
+      "expected": "deal.counter-rate-card",
+      "expected_index": 1,
+      "expected_score": 0.7359688878059387,
+      "fault": "set-too-large",
+      "top_candidate": "deal.pricing-reject",
+      "top_score": 0.7431596517562866,
+      "utterance": "the client wants to counter our pricing"
+    },
+    {
+      "case_id": "cic-0064",
+      "expected": "deal.cancel",
+      "expected_index": 1,
+      "expected_score": 0.8834380507469177,
+      "fault": "set-too-large",
+      "top_candidate": "deal.mark-withdrawn",
+      "top_score": 0.9013393521308899,
+      "utterance": "cancel this deal -- client withdrew"
+    },
+    {
+      "case_id": "cic-0065",
+      "expected": "gleif.search",
+      "expected_index": 2,
+      "expected_score": 0.7267699837684631,
+      "fault": "set-too-large",
+      "top_candidate": "bods.find-by-lei",
+      "top_score": 0.7834014296531677,
+      "utterance": "look up the LEI for HSBC"
+    },
+    {
+      "case_id": "cic-0067",
+      "expected": "gleif.lookup",
+      "expected_index": 5,
+      "expected_score": 0.7604051828384399,
+      "fault": "set-too-large",
+      "top_candidate": "gleif.get-parent",
+      "top_score": 0.8143967986106873,
+      "utterance": "who is the parent company according to GLEIF?"
+    },
+    {
+      "case_id": "cic-0073",
+      "expected": "ownership.reconcile",
+      "expected_index": 3,
+      "expected_score": 0.8089820146560669,
+      "fault": "set-too-large",
+      "top_candidate": "control.reconcile-ownership",
+      "top_score": 0.9117270112037659,
+      "utterance": "reconcile the ownership percentages"
+    },
+    {
+      "case_id": "cic-0084",
+      "expected": "session.filter-jurisdiction",
+      "expected_index": 3,
+      "expected_score": 0.6583893895149231,
+      "fault": "set-too-large",
+      "top_candidate": "entity.query",
+      "top_score": 0.689744770526886,
+      "utterance": "filter to UK entities only"
+    },
+    {
+      "case_id": "cic-0092",
+      "expected": "client-group.list-parties",
+      "expected_index": null,
+      "expected_score": null,
+      "fault": "oov",
+      "top_candidate": "party.list",
+      "top_score": 1.0399999618530273,
+      "utterance": "who are the parties in this group?"
+    },
+    {
+      "case_id": "cic-0096",
+      "expected": "document.verify",
+      "expected_index": 1,
+      "expected_score": 0.818454384803772,
+      "fault": "set-too-large",
+      "top_candidate": "allegation.verify",
+      "top_score": 0.818454384803772,
+      "utterance": "verify it"
+    },
+    {
+      "case_id": "cic-0098",
+      "expected": "ubo.list-owners",
+      "expected_index": 3,
+      "expected_score": 0.8441694378852844,
+      "fault": "set-too-large",
+      "top_candidate": "cbu.list-structure-links",
+      "top_score": 0.8806361556053162,
+      "utterance": "show the structure"
+    },
+    {
+      "case_id": "cic-0155",
+      "expected": "cbu.assign-role",
+      "expected_index": null,
+      "expected_score": null,
+      "fault": "oov",
+      "top_candidate": "structure.assign-role",
+      "top_score": 1.0399999618530273,
+      "utterance": "Add a role to this entity"
+    },
+    {
+      "case_id": "cic-0156",
+      "expected": "kyc-case.read",
+      "expected_index": 1,
+      "expected_score": 0.8861612677574158,
+      "fault": "set-too-large",
+      "top_candidate": "kyc.case-status",
+      "top_score": 0.9087013006210327,
+      "utterance": "Check KYC case status"
+    },
+    {
+      "case_id": "cic-0176",
+      "expected": "governance.publish",
+      "expected_index": 1,
+      "expected_score": 0.7304556369781494,
+      "fault": "set-too-large",
+      "top_candidate": "application.update",
+      "top_score": 0.7306047081947327,
+      "utterance": "publish registry changes"
+    },
+    {
+      "case_id": "cic-0190",
+      "expected": "deal.create",
+      "expected_index": 2,
+      "expected_score": 0.7667083144187927,
+      "fault": "set-too-large",
+      "top_candidate": "session.set-client",
+      "top_score": 0.7777625322341919,
+      "utterance": "start a commercial deal for BlackRock"
+    },
+    {
+      "case_id": "cic-0195",
+      "expected": "deal.update-rate-card-line",
+      "expected_index": 1,
+      "expected_score": 0.8160407543182373,
+      "fault": "set-too-large",
+      "top_candidate": "deal.add-rate-card-line",
+      "top_score": 0.8238254189491272,
+      "utterance": "negotiate rate card line"
+    },
+    {
+      "case_id": "cic-0217",
+      "expected": "ubo.calculate",
+      "expected_index": null,
+      "expected_score": null,
+      "fault": "oov",
+      "top_candidate": "ubo.discover",
+      "top_score": 1.0399999618530273,
+      "utterance": "discover UBO structure"
+    },
+    {
+      "case_id": "cic-0224",
+      "expected": "product.list",
+      "expected_index": null,
+      "expected_score": null,
+      "fault": "oov",
+      "top_candidate": "structure.product-suite-full",
+      "top_score": 1.0399999618530273,
+      "utterance": "list all products"
+    },
+    {
+      "case_id": "cic-0261",
+      "expected": "capital.list-shareholders",
+      "expected_index": 3,
+      "expected_score": 0.7681111097335815,
+      "fault": "set-too-large",
+      "top_candidate": "cbu.parties",
+      "top_score": 0.8045265674591064,
+      "utterance": "how many shareholders are there?"
+    },
+    {
+      "case_id": "cic-0262",
+      "expected": "ubo.calculate",
+      "expected_index": 1,
+      "expected_score": 0.8039751052856445,
+      "fault": "set-too-large",
+      "top_candidate": "client-group.list-relationships",
+      "top_score": 0.8887476921081543,
+      "utterance": "what's the ownership structure?"
+    },
+    {
+      "case_id": "cic-0266",
+      "expected": "gleif.search",
+      "expected_index": 1,
+      "expected_score": 0.8773059844970703,
+      "fault": "set-too-large",
+      "top_candidate": "gleif.lookup",
+      "top_score": 0.9276001453399658,
+      "utterance": "LEI lookup"
+    },
+    {
+      "case_id": "cic-0269",
+      "expected": "deal.create",
+      "expected_index": 19,
+      "expected_score": 0.5766482949256897,
+      "fault": "set-too-large",
+      "top_candidate": "session.load-cluster",
+      "top_score": 0.8122152090072632,
+      "utterance": "onboard BlackRock as a new client"
+    },
+    {
+      "case_id": "cic-0272",
+      "expected": "cbu.create",
+      "expected_index": 1,
+      "expected_score": 0.7807366847991943,
+      "fault": "set-too-large",
+      "top_candidate": "fund-vehicle.list-by-umbrella",
+      "top_score": 0.8046017289161682,
+      "utterance": "new compartment for the SICAV"
+    },
+    {
+      "case_id": "cic-0275",
+      "expected": "entity-workstream.block",
+      "expected_index": 10,
+      "expected_score": 0.6908351182937622,
+      "fault": "set-too-large",
+      "top_candidate": "red-flag.set-blocking",
+      "top_score": 0.7553929686546326,
+      "utterance": "block this entity from onboarding"
+    },
+    {
+      "case_id": "cic-0276",
+      "expected": "ubo.trace-chains",
+      "expected_index": 3,
+      "expected_score": 0.864956796169281,
+      "fault": "set-too-large",
+      "top_candidate": "control.analyze",
+      "top_score": 0.9053414463996887,
+      "utterance": "trace the ownership chain"
+    },
+    {
+      "case_id": "cic-0300",
+      "expected": "kyc-case.update-status",
+      "expected_index": 1,
+      "expected_score": 1.0,
+      "fault": "set-too-large",
+      "top_candidate": "kyc-case.approve",
+      "top_score": 1.005001187324524,
+      "utterance": "Approve the KYC case"
+    },
+    {
+      "case_id": "cic-0305",
+      "expected": "entity-workstream.create",
+      "expected_index": 1,
+      "expected_score": 0.8012055158615112,
+      "fault": "set-too-large",
+      "top_candidate": "party.add",
+      "top_score": 0.8700000047683716,
+      "utterance": "Add a workstream for the party"
+    },
+    {
+      "case_id": "cic-0311",
+      "expected": "ubo.registry.expire",
+      "expected_index": null,
+      "expected_score": null,
+      "fault": "oov",
+      "top_candidate": "ubo.expire",
+      "top_score": 1.0399999618530273,
+      "utterance": "Expire the beneficial ownership allegation"
+    },
+    {
+      "case_id": "cic-0314",
+      "expected": "evidence.mark-verified",
+      "expected_index": 1,
+      "expected_score": 0.890689492225647,
+      "fault": "set-too-large",
+      "top_candidate": "cbu.verify-evidence",
+      "top_score": 0.9406895041465759,
+      "utterance": "Verify the evidence"
+    },
+    {
+      "case_id": "cic-0318",
+      "expected": "document.mark-requested",
+      "expected_index": 2,
+      "expected_score": 0.8700000047683716,
+      "fault": "set-too-large",
+      "top_candidate": "document.solicit",
+      "top_score": 0.9644333124160767,
+      "utterance": "Send the document request"
+    },
+    {
+      "case_id": "cic-0330",
+      "expected": "entity.update",
+      "expected_index": 1,
+      "expected_score": 0.8199999928474426,
+      "fault": "set-too-large",
+      "top_candidate": "party.details",
+      "top_score": 1.0399999618530273,
+      "utterance": "Update the party information"
+    },
+    {
+      "case_id": "cic-0338",
+      "expected": "structure.select",
+      "expected_index": null,
+      "expected_score": null,
+      "fault": "oov",
+      "top_candidate": "mandate.select",
+      "top_score": 1.0399999618530273,
+      "utterance": "Select a mandate"
+    },
+    {
+      "case_id": "cic-0346",
+      "expected": "narration.query",
+      "expected_index": 3,
+      "expected_score": 0.760386049747467,
+      "fault": "set-too-large",
+      "top_candidate": "nav.history-forward",
+      "top_score": 0.7839622497558594,
+      "utterance": "what's next"
+    },
+    {
+      "case_id": "cic-0350",
+      "expected": "narration.query",
+      "expected_index": 3,
+      "expected_score": 0.6838521361351013,
+      "fault": "set-too-large",
+      "top_candidate": "semantic.next-actions",
+      "top_score": 0.7836093902587891,
+      "utterance": "any blockers"
+    },
+    {
+      "case_id": "cic-0352",
+      "expected": "narration.query",
+      "expected_index": 1,
+      "expected_score": 1.0,
+      "fault": "set-too-large",
+      "top_candidate": "kyc-case.state",
+      "top_score": 1.0,
+      "utterance": "what's outstanding on this case"
+    },
+    {
+      "case_id": "cic-0358",
+      "expected": "narration.query",
+      "expected_index": 1,
+      "expected_score": 0.7877047061920166,
+      "fault": "set-too-large",
+      "top_candidate": "discovery.valid-transitions",
+      "top_score": 0.808839738368988,
+      "utterance": "what's left to do"
+    },
+    {
+      "case_id": "cic-0360",
+      "expected": "narration.query",
+      "expected_index": 3,
+      "expected_score": 0.754284679889679,
+      "fault": "set-too-large",
+      "top_candidate": "agent.read-status",
+      "top_score": 0.8170825839042664,
+      "utterance": "progress report"
+    },
+    {
+      "case_id": "cic-0361",
+      "expected": "narration.query",
+      "expected_index": 6,
+      "expected_score": 0.7308897376060486,
+      "fault": "set-too-large",
+      "top_candidate": "cbu-custody.derive-required-coverage",
+      "top_score": 0.755175769329071,
+      "utterance": "what's still needed"
+    },
+    {
+      "case_id": "cic-0362",
+      "expected": "ubo.add-ownership",
+      "expected_index": 2,
+      "expected_score": 0.7836099863052368,
+      "fault": "set-too-large",
+      "top_candidate": "investor-role.mark-as-end-investor",
+      "top_score": 0.797170877456665,
+      "utterance": "allege this person is a beneficial owner"
+    },
+    {
+      "case_id": "cic-0364",
+      "expected": "ubo.calculate",
+      "expected_index": 13,
+      "expected_score": 0.7167651653289795,
+      "fault": "set-too-large",
+      "top_candidate": "evidence.verify",
+      "top_score": 0.8700000047683716,
+      "utterance": "verify the UBO evidence is sufficient"
+    },
+    {
+      "case_id": "cic-0365",
+      "expected": "ubo.promote",
+      "expected_index": 13,
+      "expected_score": 0.7509048581123352,
+      "fault": "set-too-large",
+      "top_candidate": "ubo.registry.promote",
+      "top_score": 0.8913049697875977,
+      "utterance": "promote the UBO candidate to identified status"
+    },
+    {
+      "case_id": "cic-0366",
+      "expected": "ubo.approve",
+      "expected_index": 195,
+      "expected_score": 0.5684494972229004,
+      "fault": "set-too-large",
+      "top_candidate": "ubo.register-ubo",
+      "top_score": 0.7950063347816467,
+      "utterance": "approve the beneficial ownership determination"
+    },
+    {
+      "case_id": "cic-0396",
+      "expected": "service-resource.get-provisioning-status",
+      "expected_index": 1,
+      "expected_score": 0.9061123132705688,
+      "fault": "set-too-large",
+      "top_candidate": "provisioning.status",
+      "top_score": 0.93504399061203,
+      "utterance": "show resource provisioning status"
+    },
+    {
+      "case_id": "cic-0400",
+      "expected": "cbu.read",
+      "expected_index": 96,
+      "expected_score": 0.5912719368934631,
+      "fault": "set-too-large",
+      "top_candidate": "client-group.update",
+      "top_score": 0.8040767312049866,
+      "utterance": "who is authorized to modify this client group unit?"
+    },
+    {
+      "case_id": "cic-0402",
+      "expected": "cbu.parties",
+      "expected_index": 5,
+      "expected_score": 0.7210023999214172,
+      "fault": "set-too-large",
+      "top_candidate": "admin.role-types.list",
+      "top_score": 0.760720431804657,
+      "utterance": "retrieve the active roles for this unit"
+    },
+    {
+      "case_id": "cic-0403",
+      "expected": "cbu.create",
+      "expected_index": 9,
+      "expected_score": 0.7282285094261169,
+      "fault": "set-too-large",
+      "top_candidate": "cbu.set-client-type",
+      "top_score": 0.7589643597602844,
+      "utterance": "add a sub-unit to the existing client profile"
+    },
+    {
+      "case_id": "cic-0405",
+      "expected": "cbu.delete",
+      "expected_index": 26,
+      "expected_score": 0.6479514837265015,
+      "fault": "set-too-large",
+      "top_candidate": "cbu.soft-delete",
+      "top_score": 0.8329675197601318,
+      "utterance": "archive the inactive CBU record"
+    },
+    {
+      "case_id": "cic-0406",
+      "expected": "cbu.inspect",
+      "expected_index": 61,
+      "expected_score": 0.5935105085372925,
+      "fault": "set-too-large",
+      "top_candidate": "access-review.audit-report",
+      "top_score": 0.6914785504341125,
+      "utterance": "generate a compliance report for the client unit"
+    },
+    {
+      "case_id": "cic-0407",
+      "expected": "cbu.parties",
+      "expected_index": 3,
+      "expected_score": 0.8345746994018555,
+      "fault": "set-too-large",
+      "top_candidate": "cbu.list",
+      "top_score": 1.0410104990005493,
+      "utterance": "list all accounts linked to this CBU"
+    },
+    {
+      "case_id": "cic-0408",
+      "expected": "cbu.unlink-structure",
+      "expected_index": 1,
+      "expected_score": 0.8365532159805298,
+      "fault": "set-too-large",
+      "top_candidate": "cbu.remove-role",
+      "top_score": 0.8421031832695007,
+      "utterance": "unlink the account from this client business unit"
+    },
+    {
+      "case_id": "cic-0409",
+      "expected": "cbu.verify-evidence",
+      "expected_index": 1,
+      "expected_score": 0.7487356662750244,
+      "fault": "set-too-large",
+      "top_candidate": "regulatory.status.check",
+      "top_score": 0.7578861117362976,
+      "utterance": "verify compliance status of this unit"
+    },
+    {
+      "case_id": "cic-0410",
+      "expected": "cbu.read",
+      "expected_index": 20,
+      "expected_score": 0.741564154624939,
+      "fault": "set-too-large",
+      "top_candidate": "manco.group.for-cbu",
+      "top_score": 0.7990489602088928,
+      "utterance": "retrieve configuration parameters for the CBU"
+    },
+    {
+      "case_id": "cic-0412",
+      "expected": "cbu.restrict",
+      "expected_index": 73,
+      "expected_score": 0.5384867191314697,
+      "fault": "set-too-large",
+      "top_candidate": "kyc-case.set-risk-rating",
+      "top_score": 0.7787901759147644,
+      "utterance": "assign risk rating to this business unit"
+    },
+    {
+      "case_id": "cic-0413",
+      "expected": "screening.pep",
+      "expected_index": null,
+      "expected_score": null,
+      "fault": "oov",
+      "top_candidate": "screening.pep-check",
+      "top_score": 1.0399999618530273,
+      "utterance": "perform PEP check on HSBC representatives"
+    },
+    {
+      "case_id": "cic-0414",
+      "expected": "screening.sanctions",
+      "expected_index": 52,
+      "expected_score": 0.6014981269836426,
+      "fault": "set-too-large",
+      "top_candidate": "ubo.list-owned",
+      "top_score": 0.8267651796340942,
+      "utterance": "is the ultimate beneficial owner on a sanctions list?"
+    },
+    {
+      "case_id": "cic-0415",
+      "expected": "ubo.list-owners",
+      "expected_index": 1,
+      "expected_score": 0.7594026327133179,
+      "fault": "set-too-large",
+      "top_candidate": "economic-exposure.summary",
+      "top_score": 0.777338445186615,
+      "utterance": "identify major shareholders holding more than 10 percent"
+    },
+    {
+      "case_id": "cic-0416",
+      "expected": "ubo.calculate",
+      "expected_index": 106,
+      "expected_score": 0.5392199158668518,
+      "fault": "set-too-large",
+      "top_candidate": "doc-request.verify",
+      "top_score": 0.6448666453361511,
+      "utterance": "verify the date of birth for the primary beneficiary"
+    },
+    {
+      "case_id": "cic-0417",
+      "expected": "request.create",
+      "expected_index": 108,
+      "expected_score": 0.542570173740387,
+      "fault": "set-too-large",
+      "top_candidate": "cbu.assign-role",
+      "top_score": 0.7964060306549072,
+      "utterance": "request UBO declaration from the relationship manager"
+    },
+    {
+      "case_id": "cic-0418",
+      "expected": "red-flag.dismiss",
+      "expected_index": 1,
+      "expected_score": 0.7726747989654541,
+      "fault": "set-too-large",
+      "top_candidate": "red-flag.mitigate",
+      "top_score": 0.79566890001297,
+      "utterance": "mark this AML red flag as a false positive"
+    },
+    {
+      "case_id": "cic-0419",
+      "expected": "red-flag.escalate",
+      "expected_index": 3,
+      "expected_score": 0.7565051913261414,
+      "fault": "set-too-large",
+      "top_candidate": "verify.escalate",
+      "top_score": 0.7913670539855957,
+      "utterance": "escalate this sanctions match to compliance committee"
+    },
+    {
+      "case_id": "cic-0420",
+      "expected": "screening.adverse-media",
+      "expected_index": 2,
+      "expected_score": 0.6856563687324524,
+      "fault": "set-too-large",
+      "top_candidate": "screening.media-check",
+      "top_score": 0.8199999928474426,
+      "utterance": "check adverse media for the new director"
+    },
+    {
+      "case_id": "cic-0421",
+      "expected": "screening.pep-check",
+      "expected_index": null,
+      "expected_score": null,
+      "fault": "oov",
+      "top_candidate": "screening.pep",
+      "top_score": 0.7438570857048035,
+      "utterance": "did the screening return any PEP matches?"
+    },
+    {
+      "case_id": "cic-0422",
+      "expected": "ubo.add-ownership",
+      "expected_index": 24,
+      "expected_score": 0.6134259104728699,
+      "fault": "set-too-large",
+      "top_candidate": "gleif.trace-ownership",
+      "top_score": 0.734433650970459,
+      "utterance": "link this individual to the corporate structure tree"
+    },
+    {
+      "case_id": "cic-0423",
+      "expected": "red-flag.create",
+      "expected_index": null,
+      "expected_score": null,
+      "fault": "oov",
+      "top_candidate": "kyc-case.set-risk-rating",
+      "top_score": 0.8143752217292786,
+      "utterance": "flag this transaction for high risk"
+    },
+    {
+      "case_id": "cic-0424",
+      "expected": "red-flag.dismiss",
+      "expected_index": 47,
+      "expected_score": 0.5905551910400391,
+      "fault": "set-too-large",
+      "top_candidate": "kyc-case.set-risk-rating",
+      "top_score": 0.7567315697669983,
+      "utterance": "override the automatic risk scoring"
+    },
+    {
+      "case_id": "cic-0425",
+      "expected": "document.verify",
+      "expected_index": 23,
+      "expected_score": 0.5752720236778259,
+      "fault": "set-too-large",
+      "top_candidate": "tax-config.validate-tax-config",
+      "top_score": 0.6799167990684509,
+      "utterance": "validate the tax residency certificate for this partner"
+    },
+    {
+      "case_id": "cic-0427",
+      "expected": "document.verify",
+      "expected_index": 196,
+      "expected_score": 0.5117636322975159,
+      "fault": "set-too-large",
+      "top_candidate": "cbu.assign-control",
+      "top_score": 0.6638015508651733,
+      "utterance": "re-verify the identity of the managing director"
+    },
+    {
+      "case_id": "cic-0428",
+      "expected": "kyc.download-cert",
+      "expected_index": null,
+      "expected_score": null,
+      "fault": "oov",
+      "top_candidate": "document.verify-request",
+      "top_score": 0.7727166414260864,
+      "utterance": "download the KYC compliance certificate"
+    },
+    {
+      "case_id": "cic-0429",
+      "expected": "red-flag.list",
+      "expected_index": null,
+      "expected_score": null,
+      "fault": "oov",
+      "top_candidate": "red-flag.list-by-case",
+      "top_score": 0.759391725063324,
+      "utterance": "list all open red flags for Allianz"
+    },
+    {
+      "case_id": "cic-0430",
+      "expected": "onboarding.start",
+      "expected_index": null,
+      "expected_score": null,
+      "fault": "oov",
+      "top_candidate": "cbu.create-from-client-group",
+      "top_score": 0.8731117248535156,
+      "utterance": "start the onboarding process for the Allianz fund"
+    },
+    {
+      "case_id": "cic-0431",
+      "expected": "onboarding.status",
+      "expected_index": 9,
+      "expected_score": 0.6650550961494446,
+      "fault": "set-too-large",
+      "top_candidate": "investor.get-lifecycle-history",
+      "top_score": 0.7543575167655945,
+      "utterance": "check onboarding stage of the investment vehicle"
+    },
+    {
+      "case_id": "cic-0432",
+      "expected": "gleif.search",
+      "expected_index": 1,
+      "expected_score": 0.7474727630615234,
+      "fault": "set-too-large",
+      "top_candidate": "gleif.lookup",
+      "top_score": 0.762604832649231,
+      "utterance": "lookup HSBC Holdings on GLEIF database"
+    },
+    {
+      "case_id": "cic-0433",
+      "expected": "gleif.enrich",
+      "expected_index": 4,
+      "expected_score": 0.8046510219573975,
+      "fault": "set-too-large",
+      "top_candidate": "gleif.search",
+      "top_score": 0.852840781211853,
+      "utterance": "verify the legal entity identifier status"
+    },
+    {
+      "case_id": "cic-0434",
+      "expected": "onboarding.start",
+      "expected_index": null,
+      "expected_score": null,
+      "fault": "oov",
+      "top_candidate": "cbu.create",
+      "top_score": 0.6681323647499084,
+      "utterance": "onboard Jersey domiciled private equity fund"
+    },
+    {
+      "case_id": "cic-0436",
+      "expected": "onboarding.status",
+      "expected_index": 20,
+      "expected_score": 0.6192613840103149,
+      "fault": "set-too-large",
+      "top_candidate": "team.create",
+      "top_score": 0.7131450176239014,
+      "utterance": "assign onboarding team lead to this case"
+    },
+    {
+      "case_id": "cic-0437",
+      "expected": "onboarding.runsheet",
+      "expected_index": null,
+      "expected_score": null,
+      "fault": "oov",
+      "top_candidate": "onboarding.compile-data-request",
+      "top_score": 0.7514497637748718,
+      "utterance": "generate onboarding runsheet report"
+    },
+    {
+      "case_id": "cic-0438",
+      "expected": "onboarding.check-readiness",
+      "expected_index": null,
+      "expected_score": null,
+      "fault": "oov",
+      "top_candidate": "service-resource.check-lifecycle-readiness",
+      "top_score": 0.8076329827308655,
+      "utterance": "is the onboarding documentation complete?"
+    },
+    {
+      "case_id": "cic-0439",
+      "expected": "onboarding.resume",
+      "expected_index": null,
+      "expected_score": null,
+      "fault": "oov",
+      "top_candidate": "bpmn.signal",
+      "top_score": 0.7748628854751587,
+      "utterance": "resume paused onboarding workflow for Apex"
+    },
+    {
+      "case_id": "cic-0440",
+      "expected": "onboarding.pause",
+      "expected_index": null,
+      "expected_score": null,
+      "fault": "oov",
+      "top_candidate": "service-resource.analyze-lifecycle-gaps",
+      "top_score": 0.7721243500709534,
+      "utterance": "pause onboarding due to missing information"
+    },
+    {
+      "case_id": "cic-0441",
+      "expected": "gleif.check-active",
+      "expected_index": null,
+      "expected_score": null,
+      "fault": "oov",
+      "top_candidate": "identifier.validate",
+      "top_score": 0.7618497610092163,
+      "utterance": "check if LEI registration is active"
+    },
+    {
+      "case_id": "cic-0443",
+      "expected": "onboarding.status",
+      "expected_index": 257,
+      "expected_score": 0.5631835460662842,
+      "fault": "set-too-large",
+      "top_candidate": "control.clear-board-controller-override",
+      "top_score": 0.7361248135566711,
+      "utterance": "override onboarding gate restrictions"
+    },
+    {
+      "case_id": "cic-0444",
+      "expected": "onboarding.send-welcome",
+      "expected_index": null,
+      "expected_score": null,
+      "fault": "oov",
+      "top_candidate": "deal.request-onboarding",
+      "top_score": 0.7980300188064575,
+      "utterance": "send onboarding welcome package to client"
+    },
+    {
+      "case_id": "cic-0446",
+      "expected": "onboarding.status",
+      "expected_index": 2,
+      "expected_score": 0.7269293069839478,
+      "fault": "set-too-large",
+      "top_candidate": "semantic.get-state",
+      "top_score": 0.7806467413902283,
+      "utterance": "what is the current onboarding status for Vanguard?"
+    },
+    {
+      "case_id": "cic-0447",
+      "expected": "gleif.enrich",
+      "expected_index": 9,
+      "expected_score": 0.6740429997444153,
+      "fault": "set-too-large",
+      "top_candidate": "gleif.search",
+      "top_score": 0.7841082215309143,
+      "utterance": "verify the LEI number of this new client"
+    },
+    {
+      "case_id": "cic-0448",
+      "expected": "onboarding.status",
+      "expected_index": 20,
+      "expected_score": 0.6211242079734802,
+      "fault": "set-too-large",
+      "top_candidate": "session.set-persona",
+      "top_score": 0.7610161900520325,
+      "utterance": "assign compliance officer to this onboarding ticket"
+    },
+    {
+      "case_id": "cic-0449",
+      "expected": "onboarding.status",
+      "expected_index": 2,
+      "expected_score": 0.7773457169532776,
+      "fault": "set-too-large",
+      "top_candidate": "deal.list-onboarding-requests",
+      "top_score": 0.8021597862243652,
+      "utterance": "generate the onboarding checklist"
+    },
+    {
+      "case_id": "cic-0450",
+      "expected": "onboarding.status",
+      "expected_index": 13,
+      "expected_score": 0.6655926704406738,
+      "fault": "set-too-large",
+      "top_candidate": "governance.gate-precheck",
+      "top_score": 0.8000020384788513,
+      "utterance": "complete the pre-onboarding gate checks"
+    },
+    {
+      "case_id": "cic-0451",
+      "expected": "onboarding.status",
+      "expected_index": 422,
+      "expected_score": 0.4674711227416992,
+      "fault": "set-too-large",
+      "top_candidate": "fund.create",
+      "top_score": 0.7688144445419312,
+      "utterance": "onboard this subfund under the active umbrella"
+    },
+    {
+      "case_id": "cic-0452",
+      "expected": "onboarding.status",
+      "expected_index": 6,
+      "expected_score": 0.6817724704742432,
+      "fault": "set-too-large",
+      "top_candidate": "deal.request-onboarding",
+      "top_score": 0.7588137984275818,
+      "utterance": "send onboarding reminder to relationship manager"
+    },
+    {
+      "case_id": "cic-0453",
+      "expected": "onboarding.status",
+      "expected_index": 6,
+      "expected_score": 0.6838548183441162,
+      "fault": "set-too-large",
+      "top_candidate": "onboarding.compile-data-request",
+      "top_score": 0.746731162071228,
+      "utterance": "export the onboarding report to CSV"
+    },
+    {
+      "case_id": "cic-0455",
+      "expected": "entity.update",
+      "expected_index": 5,
+      "expected_score": 0.6311588287353516,
+      "fault": "set-too-large",
+      "top_candidate": "admin.regulators.update",
+      "top_score": 0.6796257495880127,
+      "utterance": "update registered office of Apex Group"
+    },
+    {
+      "case_id": "cic-0456",
+      "expected": "entity.update",
+      "expected_index": 31,
+      "expected_score": 0.6077589988708496,
+      "fault": "set-too-large",
+      "top_candidate": "verify.verify-against-registry",
+      "top_score": 0.7576178312301636,
+      "utterance": "verify legal name against official register"
+    },
+    {
+      "case_id": "cic-0457",
+      "expected": "entity.read",
+      "expected_index": 36,
+      "expected_score": 0.5731846690177917,
+      "fault": "set-too-large",
+      "top_candidate": "entity.create-limited-company",
+      "top_score": 0.681750476360321,
+      "utterance": "is this entity a limited liability company?"
+    },
+    {
+      "case_id": "cic-0458",
+      "expected": "entity.read",
+      "expected_index": null,
+      "expected_score": null,
+      "fault": "oov",
+      "top_candidate": "session.load-cluster",
+      "top_score": 0.7420080900192261,
+      "utterance": "get registration number for Allianz Global Investors"
+    },
+    {
+      "case_id": "cic-0459",
+      "expected": "entity.update",
+      "expected_index": 51,
+      "expected_score": 0.583397626876831,
+      "fault": "set-too-large",
+      "top_candidate": "ubo.add-ownership",
+      "top_score": 0.7070119380950928,
+      "utterance": "add parent entity link for HSBC UK"
+    },
+    {
+      "case_id": "cic-0462",
+      "expected": "entity.read",
+      "expected_index": 132,
+      "expected_score": 0.5470452904701233,
+      "fault": "set-too-large",
+      "top_candidate": "trust.classify",
+      "top_score": 0.7647668123245239,
+      "utterance": "retrieve structural details for this trust"
+    },
+    {
+      "case_id": "cic-0463",
+      "expected": "entity.read",
+      "expected_index": 146,
+      "expected_score": 0.5021555423736572,
+      "fault": "set-too-large",
+      "top_candidate": "gleif.resolve-successor",
+      "top_score": 0.70249342918396,
+      "utterance": "has this corporate partner been dissolved?"
+    },
+    {
+      "case_id": "cic-0464",
+      "expected": "entity.update",
+      "expected_index": 2,
+      "expected_score": 0.748147189617157,
+      "fault": "set-too-large",
+      "top_candidate": "contract.update",
+      "top_score": 0.7923768758773804,
+      "utterance": "change legal status of this firm"
+    },
+    {
+      "case_id": "cic-0465",
+      "expected": "entity.update",
+      "expected_index": 117,
+      "expected_score": 0.5798683762550354,
+      "fault": "set-too-large",
+      "top_candidate": "verify.verify-against-registry",
+      "top_score": 0.8092725276947021,
+      "utterance": "extract details from company house record"
+    },
+    {
+      "case_id": "cic-0466",
+      "expected": "entity.update",
+      "expected_index": null,
+      "expected_score": null,
+      "fault": "oov",
+      "top_candidate": "board.list-by-entity",
+      "top_score": 0.728744626045227,
+      "utterance": "verify director list of HSBC"
+    },
+    {
+      "case_id": "cic-0467",
+      "expected": "entity.delete",
+      "expected_index": 11,
+      "expected_score": 0.6995642781257629,
+      "fault": "set-too-large",
+      "top_candidate": "cbu.remove-role",
+      "top_score": 0.7593486309051514,
+      "utterance": "remove inactive legal entity placeholder"
+    },
+    {
+      "case_id": "cic-0468",
+      "expected": "entity.update",
+      "expected_index": 380,
+      "expected_score": 0.5437920093536377,
+      "fault": "set-too-large",
+      "top_candidate": "trading-profile.add-counterparty-type",
+      "top_score": 0.7518762350082397,
+      "utterance": "mark this entity as an active trading counterparty"
+    },
+    {
+      "case_id": "cic-0470",
+      "expected": "entity.create",
+      "expected_index": 1,
+      "expected_score": 0.7094689011573792,
+      "fault": "set-too-large",
+      "top_candidate": "cbu.assign-trust-role",
+      "top_score": 0.7114658355712891,
+      "utterance": "register the foreign trust branch"
+    },
+    {
+      "case_id": "cic-0471",
+      "expected": "entity.read",
+      "expected_index": 434,
+      "expected_score": 0.45991092920303345,
+      "fault": "set-too-large",
+      "top_candidate": "entity.create",
+      "top_score": 0.519335925579071,
+      "utterance": "what is the legal form of Apex?"
+    },
+    {
+      "case_id": "cic-0472",
+      "expected": "entity.read",
+      "expected_index": null,
+      "expected_score": null,
+      "fault": "oov",
+      "top_candidate": "entity.create-partnership-limited",
+      "top_score": 0.6507879495620728,
+      "utterance": "who is the general partner of this LP?"
+    },
+    {
+      "case_id": "cic-0473",
+      "expected": "entity.update",
+      "expected_index": 153,
+      "expected_score": 0.5203137397766113,
+      "fault": "set-too-large",
+      "top_candidate": "entity.verify",
+      "top_score": 0.7243065237998962,
+      "utterance": "verify this firm's tax number"
+    },
+    {
+      "case_id": "cic-0475",
+      "expected": "entity.delete",
+      "expected_index": 8,
+      "expected_score": 0.7258073687553406,
+      "fault": "set-too-large",
+      "top_candidate": "cbu.remove-role",
+      "top_score": 0.8035399317741394,
+      "utterance": "remove this corporate entity placeholder"
+    },
+    {
+      "case_id": "cic-0476",
+      "expected": "entity.read",
+      "expected_index": 179,
+      "expected_score": 0.519251823425293,
+      "fault": "set-too-large",
+      "top_candidate": "ubo.list-owned",
+      "top_score": 0.7436049580574036,
+      "utterance": "list all subsidiaries of HSBC"
+    },
+    {
+      "case_id": "cic-0477",
+      "expected": "entity.read",
+      "expected_index": 18,
+      "expected_score": 0.6298220753669739,
+      "fault": "set-too-large",
+      "top_candidate": "cbu.assign-control",
+      "top_score": 0.8532881736755371,
+      "utterance": "show me the company secretary details"
+    },
+    {
+      "case_id": "cic-0478",
+      "expected": "entity.update",
+      "expected_index": 42,
+      "expected_score": 0.5732394456863403,
+      "fault": "set-too-large",
+      "top_candidate": "entity.create",
+      "top_score": 0.6980295181274414,
+      "utterance": "add a legal representative for the firm"
+    },
+    {
+      "case_id": "cic-0479",
+      "expected": "entity.read",
+      "expected_index": 264,
+      "expected_score": 0.48805245757102966,
+      "fault": "set-too-large",
+      "top_candidate": "gleif.get-manager",
+      "top_score": 0.7751907110214233,
+      "utterance": "is this entity a regulated fund manager?"
+    },
+    {
+      "case_id": "cic-0480",
+      "expected": "entity.update",
+      "expected_index": null,
+      "expected_score": null,
+      "fault": "oov",
+      "top_candidate": "session.load-cluster",
+      "top_score": 0.7622628808021545,
+      "utterance": "verify the registration country of Allianz"
+    },
+    {
+      "case_id": "cic-0481",
+      "expected": "document.solicit",
+      "expected_index": 2,
+      "expected_score": 0.6580120325088501,
+      "fault": "set-too-large",
+      "top_candidate": "session.load-cluster",
+      "top_score": 0.6836471557617188,
+      "utterance": "request certificate of incumbency from Allianz"
+    },
+    {
+      "case_id": "cic-0482",
+      "expected": "document.upload-version",
+      "expected_index": 3,
+      "expected_score": 0.6257299184799194,
+      "fault": "set-too-large",
+      "top_candidate": "document.solicit",
+      "top_score": 0.6908290982246399,
+      "utterance": "upload latest articles of association PDF"
+    },
+    {
+      "case_id": "cic-0483",
+      "expected": "document.verify",
+      "expected_index": 6,
+      "expected_score": 0.6662275195121765,
+      "fault": "set-too-large",
+      "top_candidate": "entity.create-trust-discretionary",
+      "top_score": 0.7541689872741699,
+      "utterance": "verify signature on the trust deed"
+    },
+    {
+      "case_id": "cic-0484",
+      "expected": "document.verify",
+      "expected_index": 2,
+      "expected_score": 0.668733537197113,
+      "fault": "set-too-large",
+      "top_candidate": "document.reject",
+      "top_score": 0.742286205291748,
+      "utterance": "has the passport copy expired?"
+    },
+    {
+      "case_id": "cic-0487",
+      "expected": "document.solicit-batch",
+      "expected_index": 1,
+      "expected_score": 0.759941041469574,
+      "fault": "set-too-large",
+      "top_candidate": "case.solicit-document",
+      "top_score": 0.8700000047683716,
+      "utterance": "send batch document request to HSBC"
+    },
+    {
+      "case_id": "cic-0488",
+      "expected": "document.list-pending",
+      "expected_index": null,
+      "expected_score": null,
+      "fault": "oov",
+      "top_candidate": "document.list-requests-by-workstream",
+      "top_score": 0.9312069416046143,
+      "utterance": "list all pending document requests for Apex"
+    },
+    {
+      "case_id": "cic-0489",
+      "expected": "document.approve",
+      "expected_index": null,
+      "expected_score": null,
+      "fault": "oov",
+      "top_candidate": "billing.approve-period",
+      "top_score": 0.7135841250419617,
+      "utterance": "approve the utility bill as address proof"
+    },
+    {
+      "case_id": "cic-0490",
+      "expected": "document.verify",
+      "expected_index": 10,
+      "expected_score": 0.6033547520637512,
+      "fault": "set-too-large",
+      "top_candidate": "doc-request.verify",
+      "top_score": 0.6954891681671143,
+      "utterance": "is the signature on the contract valid?"
+    },
+    {
+      "case_id": "cic-0492",
+      "expected": "document.archive",
+      "expected_index": null,
+      "expected_score": null,
+      "fault": "oov",
+      "top_candidate": "doc-request.list-by-workstream",
+      "top_score": 0.782574474811554,
+      "utterance": "archive all verified documents"
+    },
+    {
+      "case_id": "cic-0493",
+      "expected": "document.list-versions",
+      "expected_index": 191,
+      "expected_score": 0.5517823100090027,
+      "fault": "set-too-large",
+      "top_candidate": "fund.read-vehicle",
+      "top_score": 0.7202863097190857,
+      "utterance": "retrieve historical versions of the fund prospectus"
+    },
+    {
+      "case_id": "cic-0494",
+      "expected": "document.get",
+      "expected_index": 29,
+      "expected_score": 0.569915771484375,
+      "fault": "set-too-large",
+      "top_candidate": "tax-config.define-jurisdiction",
+      "top_score": 0.6726231575012207,
+      "utterance": "download the tax residency declaration"
+    },
+    {
+      "case_id": "cic-0495",
+      "expected": "document.verify",
+      "expected_index": 26,
+      "expected_score": 0.5737807154655457,
+      "fault": "set-too-large",
+      "top_candidate": "document.for-entity",
+      "top_score": 0.6706531643867493,
+      "utterance": "has the client uploaded their tax certificate?"
+    },
+    {
+      "case_id": "cic-0497",
+      "expected": "document.upload-version",
+      "expected_index": 1,
+      "expected_score": 0.7068650722503662,
+      "fault": "set-too-large",
+      "top_candidate": "entity.create-partnership-limited",
+      "top_score": 0.7231816649436951,
+      "utterance": "upload the partnership agreement document"
+    },
+    {
+      "case_id": "cic-0498",
+      "expected": "document.verify",
+      "expected_index": 10,
+      "expected_score": 0.6463499069213867,
+      "fault": "set-too-large",
+      "top_candidate": "doc-request.verify",
+      "top_score": 0.7693729400634766,
+      "utterance": "verify the signature on this board resolution"
+    },
+    {
+      "case_id": "cic-0499",
+      "expected": "document.verify",
+      "expected_index": 78,
+      "expected_score": 0.5656635761260986,
+      "fault": "set-too-large",
+      "top_candidate": "requirement.mark-expired",
+      "top_score": 0.7138736248016357,
+      "utterance": "check if the certificate of incumbency is expired"
+    },
+    {
+      "case_id": "cic-0502",
+      "expected": "document.solicit",
+      "expected_index": 10,
+      "expected_score": 0.6641120314598083,
+      "fault": "set-too-large",
+      "top_candidate": "request.create",
+      "top_score": 0.745700478553772,
+      "utterance": "send a request for the register of members"
+    },
+    {
+      "case_id": "cic-0503",
+      "expected": "document.list-requirements",
+      "expected_index": null,
+      "expected_score": null,
+      "fault": "oov",
+      "top_candidate": "trust.list-provisions",
+      "top_score": 0.6890924572944641,
+      "utterance": "what documents are required for an Irish trust?"
+    },
+    {
+      "case_id": "cic-0504",
+      "expected": "document.verify",
+      "expected_index": 17,
+      "expected_score": 0.605906069278717,
+      "fault": "set-too-large",
+      "top_candidate": "doc-request.receive",
+      "top_score": 0.6799376606941223,
+      "utterance": "has the client submitted their tax residency document?"
+    },
+    {
+      "case_id": "cic-0505",
+      "expected": "document.get",
+      "expected_index": 52,
+      "expected_score": 0.5308791995048523,
+      "fault": "set-too-large",
+      "top_candidate": "screening.pep",
+      "top_score": 0.6155471801757812,
+      "utterance": "download the memorandum of association"
+    },
+    {
+      "case_id": "cic-0506",
+      "expected": "document.approve",
+      "expected_index": null,
+      "expected_score": null,
+      "fault": "oov",
+      "top_candidate": "document.solicit",
+      "top_score": 0.8249623775482178,
+      "utterance": "approve the certificate of incorporation"
+    },
+    {
+      "case_id": "cic-0507",
+      "expected": "document.list",
+      "expected_index": 80,
+      "expected_score": 0.6379997134208679,
+      "fault": "set-too-large",
+      "top_candidate": "cbu.list-evidence",
+      "top_score": 0.8181716203689575,
+      "utterance": "audit all documents for the CBU"
+    },
+    {
+      "case_id": "cic-0509",
+      "expected": "deal.add-rate-card-line",
+      "expected_index": 162,
+      "expected_score": 0.5448648929595947,
+      "fault": "set-too-large",
+      "top_candidate": "cbu.add-product",
+      "top_score": 0.7544423341751099,
+      "utterance": "apply 3bps custody fee to this fund"
+    },
+    {
+      "case_id": "cic-0510",
+      "expected": "deal.counter-rate-card",
+      "expected_index": 2,
+      "expected_score": 0.8234888315200806,
+      "fault": "set-too-large",
+      "top_candidate": "deal.submit-for-pricing-approval",
+      "top_score": 0.8332048654556274,
+      "utterance": "submit the counter rate card proposal"
+    },
+    {
+      "case_id": "cic-0512",
+      "expected": "deal.read",
+      "expected_index": 2,
+      "expected_score": 0.8468634486198425,
+      "fault": "set-too-large",
+      "top_candidate": "deal.update-status",
+      "top_score": 0.8510492444038391,
+      "utterance": "is the deal status updated to approved?"
+    },
+    {
+      "case_id": "cic-0513",
+      "expected": "deal.update",
+      "expected_index": 77,
+      "expected_score": 0.5272180438041687,
+      "fault": "set-too-large",
+      "top_candidate": "cbu.assign-role",
+      "top_score": 0.7590541839599609,
+      "utterance": "assign State Street as sub-custodian"
+    },
+    {
+      "case_id": "cic-0514",
+      "expected": "deal.update",
+      "expected_index": 145,
+      "expected_score": 0.5875661969184875,
+      "fault": "set-too-large",
+      "top_candidate": "cbu-custody.validate-booking-coverage",
+      "top_score": 0.7535361647605896,
+      "utterance": "verify settlement instructions for the new deal"
+    },
+    {
+      "case_id": "cic-0515",
+      "expected": "share-class.create",
+      "expected_index": 1,
+      "expected_score": 0.7399987578392029,
+      "fault": "set-too-large",
+      "top_candidate": "capital.share-class.create",
+      "top_score": 0.7570660710334778,
+      "utterance": "create share class under Luxembourg umbrella"
+    },
+    {
+      "case_id": "cic-0519",
+      "expected": "deal.update",
+      "expected_index": 1,
+      "expected_score": 0.8048800230026245,
+      "fault": "set-too-large",
+      "top_candidate": "deal.update-status",
+      "top_score": 0.8370841145515442,
+      "utterance": "update pricing schedule on the deal profile"
+    },
+    {
+      "case_id": "cic-0520",
+      "expected": "deal.update-status",
+      "expected_index": 50,
+      "expected_score": 0.6008929014205933,
+      "fault": "set-too-large",
+      "top_candidate": "contract.create",
+      "top_score": 0.7955808639526367,
+      "utterance": "approve the custody agreement draft"
+    },
+    {
+      "case_id": "cic-0521",
+      "expected": "custody.settlement-cycle",
+      "expected_index": null,
+      "expected_score": null,
+      "fault": "oov",
+      "top_candidate": "investor.read",
+      "top_score": 0.6920362710952759,
+      "utterance": "what are the settlement cycles for this asset class?"
+    },
+    {
+      "case_id": "cic-0522",
+      "expected": "deal.read",
+      "expected_index": null,
+      "expected_score": null,
+      "fault": "oov",
+      "top_candidate": "cbu-custody.create-ssi",
+      "top_score": 0.6614000797271729,
+      "utterance": "has the custody account been opened at DTCC?"
+    },
+    {
+      "case_id": "cic-0523",
+      "expected": "cbu.update",
+      "expected_index": 48,
+      "expected_score": 0.6229903697967529,
+      "fault": "set-too-large",
+      "top_candidate": "holding.create",
+      "top_score": 0.7532729506492615,
+      "utterance": "activate share class trading gates"
+    },
+    {
+      "case_id": "cic-0524",
+      "expected": "deal.read",
+      "expected_index": null,
+      "expected_score": null,
+      "fault": "oov",
+      "top_candidate": "cbu.create",
+      "top_score": 0.7256097793579102,
+      "utterance": "link custody client to the clearing house"
+    }
+  ],
+  "failures": 160,
+  "hits": 364,
+  "total_cases": 524
+}

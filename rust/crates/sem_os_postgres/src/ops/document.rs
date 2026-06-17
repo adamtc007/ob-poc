@@ -374,6 +374,25 @@ impl SemOsVerbOp for Reject {
 
 pub struct MissingForEntity;
 
+/// Wrapper to support list-missing as an alias for missing-for-entity.
+pub struct ListMissing;
+
+#[async_trait]
+impl SemOsVerbOp for ListMissing {
+    fn fqn(&self) -> &str {
+        "document.list-missing"
+    }
+
+    async fn execute(
+        &self,
+        args: &Value,
+        ctx: &mut VerbExecutionContext,
+        scope: &mut dyn TransactionScope,
+    ) -> Result<VerbExecutionOutcome> {
+        MissingForEntity.execute(args, ctx, scope).await
+    }
+}
+
 #[async_trait]
 impl SemOsVerbOp for MissingForEntity {
     fn fqn(&self) -> &str {

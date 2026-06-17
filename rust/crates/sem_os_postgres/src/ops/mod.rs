@@ -312,6 +312,7 @@ pub fn build_registry() -> SemOsVerbOpRegistry {
     registry.register(Arc::new(semantic::StagesForProduct));
     registry.register(Arc::new(semantic::MissingEntities));
     registry.register(Arc::new(semantic::NextActions));
+    registry.register(Arc::new(semantic::NextActionable));
     registry.register(Arc::new(semantic::PromptContext));
 
     // Phase B slice #9: affinity navigation (registry.*-for-* verbs).
@@ -686,6 +687,7 @@ pub fn build_registry() -> SemOsVerbOpRegistry {
     registry.register(Arc::new(deal::Search));
     registry.register(Arc::new(deal::Update));
     registry.register(Arc::new(deal::UpdateStatus));
+    registry.register(Arc::new(deal::SetStage));
     registry.register(Arc::new(deal::SubmitForBac));
     registry.register(Arc::new(deal::BacMarkInReview));
     registry.register(Arc::new(deal::BacApprove));
@@ -854,6 +856,7 @@ pub fn build_registry() -> SemOsVerbOpRegistry {
     registry.register(Arc::new(document::Verify));
     registry.register(Arc::new(document::Reject));
     registry.register(Arc::new(document::MissingForEntity));
+    registry.register(Arc::new(document::ListMissing));
     registry.register(Arc::new(document::ComputeRequirements));
 
     // Phase B slice #60: billing.* (14 plugin verbs — profile + account
