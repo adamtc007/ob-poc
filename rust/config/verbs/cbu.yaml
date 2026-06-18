@@ -761,7 +761,7 @@ domains:
           target_slot: cbu
       assign-role:
         flavour: instance_adding
-        description: Assign a role to an entity within a CBU
+        description: Assign a role to an entity within a CBU (role-type selects the relationship write-path)
         effect_class: read_modify_write
         invocation_phrases:
           - "assign role to entity"
@@ -786,7 +786,55 @@ domains:
           - "assign transfer agent role"
           - "make them the custodian"
           - "make them the auditor"
-        behavior: crud
+          - "assign ownership stake"
+          - "add shareholder to structure"
+          - "record beneficial ownership percentage"
+          - "set LP interest in fund"
+          - "who holds equity in this entity"
+          - "register ownership interest"
+          - "I need to add an owner"
+          - "link shareholder with percentage"
+          - "assign conducting officer"
+          - "add managing director"
+          - "who is the company secretary"
+          - "register board member"
+          - "I need to add a controller"
+          - "set chairman for entity"
+          - "assign controlling person role"
+          - "assign trustee role"
+          - "add settlor to trust"
+          - "register trust beneficiary"
+          - "appoint trust protector"
+          - "who is the trust enforcer"
+          - "add discretionary beneficiary"
+          - "I need to set up trust roles"
+          - "assign appointor to trust structure"
+          - "assign ManCo to fund"
+          - "set investment manager for SICAV"
+          - "add feeder fund relationship"
+          - "link sub-fund to umbrella"
+          - "who is the fund sponsor"
+          - "register fund promoter"
+          - "I need to assign a fund role"
+          - "designate depositary for fund"
+          - "assign custodian to structure"
+          - "add transfer agent"
+          - "set prime broker for fund"
+          - "register auditor for entity"
+          - "who is the TA for this fund"
+          - "appoint paying agent"
+          - "I need to add a service provider"
+          - "assign valuation agent role"
+          - "add authorized signatory"
+          - "register authorized trader"
+          - "grant power of attorney"
+          - "add settlement contact"
+          - "who can sign for this entity"
+          - "assign account operator"
+          - "I need to add a signatory"
+          - "authorize representative for trading"
+        behavior: plugin
+        handler: AssignRole   # dispatches on role-type (I1 fold of the 6 cbu.assign-* specialists)
         metadata:
           tier: intent
           source_of_truth: operational
@@ -799,59 +847,118 @@ domains:
           - arg: cbu-id
             type: cbu
             required: true
-          - arg: entity-id
-            type: entity
-            required: true
-        crud:
-          operation: role_link
-          junction: cbu_entity_roles
-          schema: ob-poc
-          from_col: cbu_id
-          to_col: entity_id
-          role_table: roles
-          role_col: role_id
-          returning: cbu_entity_role_id
         args:
           - name: cbu-id
             type: uuid
             required: true
             maps_to: cbu_id
-            lookup:
-              table: cbus
-              entity_type: cbu
-              schema: ob-poc
-              search_key: name
-              primary_key: cbu_id
-          - name: entity-id
-            type: uuid
-            required: true
-            maps_to: entity_id
-            lookup:
-              table: entities
-              entity_type: entity
-              schema: ob-poc
-              search_key: name
-              primary_key: entity_id
+            lookup: { table: cbus, entity_type: cbu, schema: ob-poc, search_key: name, primary_key: cbu_id }
+          - name: role-type
+            type: string
+            required: false
+            default: "ROLE"
+            description: "Relationship write-path: ROLE | OWNERSHIP | CONTROL | TRUST | FUND | SERVICE_PROVIDER | SIGNATORY"
+            valid_values: [ROLE, OWNERSHIP, CONTROL, TRUST, FUND, SERVICE_PROVIDER, SIGNATORY]
           - name: role
             type: lookup
-            required: true
-            lookup:
-              schema: ob-poc
-              table: roles
-              entity_type: role
-              code_column: name
-              id_column: role_id
-        sentences:
-          step:
-            - "Assign {role} role to {entity-id} on {cbu-id}"
-          summary:
-            - "assigned {role} role"
-          clarify:
-            role: "Which role? (e.g., depositary, management company)"
-            entity-id: "Which party should receive this role?"
+            required: false
+            lookup: { schema: ob-poc, table: roles, entity_type: role, code_column: name, id_column: role_id }
+          - name: owner-entity-id
+            type: uuid
+            required: false
+            lookup: { table: entities, entity_type: entity, schema: ob-poc, search_key: name, primary_key: entity_id }
+          - name: owned-entity-id
+            type: uuid
+            required: false
+            lookup: { table: entities, entity_type: entity, schema: ob-poc, search_key: name, primary_key: entity_id }
+          - name: controller-entity-id
+            type: uuid
+            required: false
+            lookup: { table: entities, entity_type: entity, schema: ob-poc, search_key: name, primary_key: entity_id }
+          - name: controlled-entity-id
+            type: uuid
+            required: false
+            lookup: { table: entities, entity_type: entity, schema: ob-poc, search_key: name, primary_key: entity_id }
+          - name: trust-entity-id
+            type: uuid
+            required: false
+            lookup: { table: entities, entity_type: entity, schema: ob-poc, search_key: name, primary_key: entity_id }
+          - name: participant-entity-id
+            type: uuid
+            required: false
+            lookup: { table: entities, entity_type: entity, schema: ob-poc, search_key: name, primary_key: entity_id }
+          - name: entity-id
+            type: uuid
+            required: false
+            lookup: { table: entities, entity_type: entity, schema: ob-poc, search_key: name, primary_key: entity_id }
+          - name: fund-entity-id
+            type: uuid
+            required: false
+            lookup: { table: entities, entity_type: entity, schema: ob-poc, search_key: name, primary_key: entity_id }
+          - name: provider-entity-id
+            type: uuid
+            required: false
+            lookup: { table: entities, entity_type: entity, schema: ob-poc, search_key: name, primary_key: entity_id }
+          - name: client-entity-id
+            type: uuid
+            required: false
+            lookup: { table: entities, entity_type: entity, schema: ob-poc, search_key: name, primary_key: entity_id }
+          - name: person-entity-id
+            type: uuid
+            required: false
+            lookup: { table: entities, entity_type: entity, schema: ob-poc, search_key: name, primary_key: entity_id }
+          - name: for-entity-id
+            type: uuid
+            required: false
+            lookup: { table: entities, entity_type: entity, schema: ob-poc, search_key: name, primary_key: entity_id }
+          - name: percentage
+            type: string
+            required: false
+          - name: ownership-type
+            type: string
+            required: false
+          - name: effective-from
+            type: string
+            required: false
+          - name: control-type
+            type: string
+            required: false
+          - name: appointment-date
+            type: string
+            required: false
+          - name: interest-percentage
+            type: string
+            required: false
+          - name: interest-type
+            type: string
+            required: false
+          - name: class-description
+            type: string
+            required: false
+          - name: investment-percentage
+            type: string
+            required: false
+          - name: is-regulated
+            type: boolean
+            required: false
+          - name: regulatory-jurisdiction
+            type: string
+            required: false
+          - name: service-agreement-date
+            type: string
+            required: false
+          - name: authority-limit
+            type: string
+            required: false
+          - name: authority-currency
+            type: string
+            required: false
+          - name: requires-co-signatory
+            type: boolean
+            required: false
         returns:
-          type: uuid
-          name: cbu_entity_role_id
+          type: record
+          name: role_id
           capture: false
         three_axis:
           state_effect: preserving
@@ -869,6 +976,9 @@ domains:
           - "attach feeder structure"
           - "link aggregator to fund"
         behavior: plugin
+        lifecycle:
+          requires_states: [DISCOVERED]
+          transitions_to: STRUCTURED
         handler: CbuLinkStructureOp
         metadata:
           tier: intent
@@ -1278,6 +1388,9 @@ domains:
           - "set up fund administration"
           - "add the TA service"
         behavior: plugin
+        lifecycle:
+          requires_states: [VALIDATED]
+          transitions_to: CONFIGURING
         metadata:
           tier: intent
           source_of_truth: operational
@@ -1696,6 +1809,9 @@ domains:
           - "attach screening result"
           - "add verification evidence"
         behavior: crud
+        lifecycle:
+          requires_states: [STRUCTURED]
+          transitions_to: EVIDENCED
         metadata:
           tier: intent
           source_of_truth: operational
@@ -1989,6 +2105,9 @@ domains:
         audit_class: cbu_suspend
         description: "Suspend CBU operational lifecycle (operational hold — regulatory, dispute, client distress)"
         behavior: plugin
+        lifecycle:
+          requires_states: [OPERATIONALLY_ACTIVE]
+          transitions_to: SUSPENDED
         metadata:
           tier: intent
           source_of_truth: operational
@@ -2030,6 +2149,9 @@ domains:
         flavour: attribute_mutating
         description: "Reinstate suspended CBU back to operationally active"
         behavior: plugin
+        lifecycle:
+          requires_states: [SUSPENDED]
+          transitions_to: OPERATIONALLY_ACTIVE
         effect_class: read_modify_write
         metadata:
           tier: intent
@@ -2148,6 +2270,9 @@ domains:
         audit_class: cbu_begin_winding_down
         description: "Begin CBU winding-down — exit intent, no new activity, unwind positions"
         behavior: plugin
+        lifecycle:
+          requires_states: [OPERATIONALLY_ACTIVE, SUSPENDED]
+          transitions_to: WINDING_DOWN
         metadata:
           tier: intent
           source_of_truth: operational
@@ -2192,6 +2317,9 @@ domains:
         audit_class: cbu_complete_offboard
         description: "Complete CBU offboarding — terminal-positive transition to offboarded state"
         behavior: plugin
+        lifecycle:
+          requires_states: [WINDING_DOWN]
+          transitions_to: OFFBOARDED
         metadata:
           tier: intent
           source_of_truth: operational

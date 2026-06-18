@@ -910,3 +910,133 @@ mod db_eval {
         assert!(max_score <= 1.0 + f32::EPSILON, "max_score exceeded 1.0: {}", max_score);
     }
 }
+
+// ════════════════════════════════════════════════════════════════
+// CBU metadata audit (Phase 0) — corpus-blind, registry-backed.
+// Reads ONLY verb metadata (runtime registry + board fixture).
+// Does NOT open the corpus utterances or expected verbs.
+// ════════════════════════════════════════════════════════════════
+
+#[test]
+#[ignore = "CBU audit inventory: run explicitly with --ignored"]
+fn cbu_metadata_audit_inventory() {
+    use ob_poc::dsl_v2::execution::runtime_registry;
+    use std::collections::BTreeMap;
+
+    let reg = runtime_registry();
+
+    // ── CBU-domain verb inventory (authoritative across all 6 cbu-*.yaml files) ──
+    #[derive(Serialize)]
+    struct VerbFacts {
+        full_name: String,
+        action_stem: String,
+        object: String,
+        subject_kinds: Vec<String>,
+        has_lifecycle: bool,
+        requires_states: Vec<String>,
+        transitions_to: Option<String>,
+        required_args: Vec<String>,
+        harm_class: Option<String>,
+    }
+
+    let mut cbu: Vec<VerbFacts> = reg
+        .all_verbs()
+        .filter(|v| v.domain == "cbu")
+        .map(|v| {
+            let (stem, object) = match v.verb.split_once('-') {
+                Some((a, b)) => (a.to_string(), b.to_string()),
+                None => (v.verb.clone(), String::new()),
+            };
+            let lc = v.lifecycle.as_ref();
+            VerbFacts {
+                full_name: v.full_name.clone(),
+                action_stem: stem,
+                object,
+                subject_kinds: v.subject_kinds.clone(),
+                has_lifecycle: lc.is_some(),
+                requires_states: lc.map(|l| l.requires_states.clone()).unwrap_or_default(),
+                transitions_to: lc.and_then(|l| l.transitions_to.clone()),
+                required_args: v.args.iter().filter(|a| a.required).map(|a| a.name.clone()).collect(),
+                harm_class: v.harm_class.map(|h| format!("{:?}", h)),
+            }
+        })
+        .collect();
+    cbu.sort_by(|a, b| a.full_name.cmp(&b.full_name));
+
+    // ── I1: cluster by action stem (candidate collision families) ──
+    let mut by_stem: BTreeMap<String, Vec<String>> = BTreeMap::new();
+    for v in &cbu {
+        by_stem.entry(v.action_stem.clone()).or_default().push(v.full_name.clone());
+    }
+    let stem_clusters: BTreeMap<String, Vec<String>> =
+        by_stem.into_iter().filter(|(_, m)| m.len() > 1).collect();
+    // Exact (stem,object) duplicates — true I1 collisions.
+    let mut by_so: BTreeMap<String, Vec<String>> = BTreeMap::new();
+    for v in &cbu {
+        by_so.entry(format!("{}|{}", v.action_stem, v.object)).or_default().push(v.full_name.clone());
+    }
+    let exact_dups: BTreeMap<String, Vec<String>> =
+        by_so.into_iter().filter(|(_, m)| m.len() > 1).collect();
+
+    // ── I3: lifecycle coverage + observed CBU-referenced states ──
+    let lifecycle_gated: Vec<&VerbFacts> = cbu.iter().filter(|v| v.has_lifecycle).collect();
+    let lifecycle_without_states: Vec<String> = cbu
+        .iter()
+        .filter(|v| v.has_lifecycle && v.requires_states.is_empty())
+        .map(|v| v.full_name.clone())
+        .collect();
+    let mut states_seen: std::collections::BTreeSet<String> = Default::default();
+    for v in &cbu {
+        states_seen.extend(v.requires_states.iter().cloned());
+        if let Some(t) = &v.transitions_to {
+            states_seen.insert(t.clone());
+        }
+    }
+
+    // ── I4: signature gaps ──
+    let missing_subject_kind: Vec<String> =
+        cbu.iter().filter(|v| v.subject_kinds.is_empty()).map(|v| v.full_name.clone()).collect();
+    let missing_args: Vec<String> =
+        cbu.iter().filter(|v| v.required_args.is_empty()).map(|v| v.full_name.clone()).collect();
+
+    // ── I2: board domain composition (load board fixture) ──
+    let board = load_boards()
+        .into_iter()
+        .find(|b| b.board_id == "board-cbu-operational")
+        .expect("board-cbu-operational");
+    let pack: HashSet<&str> = board.pack_domains.iter().map(String::as_str).collect();
+    let mut domain_counts: BTreeMap<String, usize> = BTreeMap::new();
+    for v in reg.all_verbs() {
+        if pack.contains(v.domain.as_str()) {
+            *domain_counts.entry(v.domain.clone()).or_insert(0) += 1;
+        }
+    }
+    let board_total: usize = domain_counts.values().sum();
+
+    let report = serde_json::json!({
+        "note": "CBU metadata audit inventory — corpus-blind, registry-backed. I1=dedup, I2=pack closure, I3=lifecycle, I4=signature, I5=alias (alias checked separately).",
+        "cbu_domain_verb_count": cbu.len(),
+        "board_cbu_operational": {
+            "total_legal_verbs": board_total,
+            "domains": domain_counts.len(),
+            "domain_verb_counts": domain_counts,
+        },
+        "I1_action_stem_clusters": stem_clusters,
+        "I1_exact_stem_object_duplicates": exact_dups,
+        "I3_lifecycle_gated_count": lifecycle_gated.len(),
+        "I3_lifecycle_without_requires_states": lifecycle_without_states,
+        "I3_states_referenced_by_cbu_verbs": states_seen,
+        "I4_missing_subject_kind": missing_subject_kind,
+        "I4_missing_required_args": missing_args,
+        "cbu_verbs": cbu,
+    });
+
+    std::fs::create_dir_all("reports").ok();
+    std::fs::write("reports/cbu_audit_inventory.json", serde_json::to_string_pretty(&report).unwrap())
+        .expect("write cbu_audit_inventory.json");
+    println!("CBU audit inventory -> reports/cbu_audit_inventory.json");
+    println!("  cbu verbs: {} | board legal: {} across {} domains", cbu.len(), board_total, domain_counts.len());
+    println!("  I1 action-stem clusters >1: {} | exact (stem,object) dups: {}", stem_clusters.len(), exact_dups.len());
+    println!("  I3 lifecycle-gated: {} | of which missing requires_states: {}", lifecycle_gated.len(), lifecycle_without_states.len());
+    println!("  I4 missing subject_kind: {} | missing required args: {}", missing_subject_kind.len(), missing_args.len());
+}

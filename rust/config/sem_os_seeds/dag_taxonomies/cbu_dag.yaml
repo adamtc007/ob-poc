@@ -127,15 +127,9 @@ overall_lifecycle:
           - "EXISTS cbu_entity_roles WHERE cbu_id = this.cbu_id"
           - "EXISTS cbu_entity_relationships WHERE cbu_id = this.cbu_id"
       progression_verbs:
-        - cbu.assign-role
+        - cbu.assign-role   # I1 fold: subsumes assign-{ownership,control,trust-role,fund-role,service-provider,signatory} via role-type
         - cbu.link-structure
         - cbu.set-category
-        - cbu.assign-ownership
-        - cbu.assign-control
-        - cbu.assign-trust-role
-        - cbu.assign-fund-role
-        - cbu.assign-service-provider
-        - cbu.assign-signatory
       next_phase: evidenced
 
     - name: evidenced

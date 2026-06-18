@@ -10,6 +10,8 @@ owned_packs:
   - book-setup
   - kyc-case
 owned_state_machines:
+  - cbu_overall_lifecycle      # I3 cleanup (2026-06-18): the entity FSM the
+                               # allowed_transitions reference; was unowned.
   - cbu_evidence_lifecycle
   - cbu_resource_instance_lifecycle
 owned_constellation_maps:
@@ -21,7 +23,8 @@ owned_universes:
   - universe.group_onboarding
 owned_verb_prefixes:
   - cbu.
-  - cbu-custody.
+# cbu-custody. prefix dropped (2026-06-18 CBU cleanup I2): declared ownership with
+# zero registry verbs — dangling. Re-add only when cbu-custody.* verbs are authored.
 owned_entity_kinds:
   - cbu
   - cbu_resource_instance

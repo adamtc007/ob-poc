@@ -62,6 +62,69 @@ async fn upsert_entity_relationship(
     })
 }
 
+/// Single canonical role-assignment verb (`cbu.assign-role`), dispatching on
+/// `role-type` to the specialist write-paths below.
+///
+/// I1 cleanup (2026-06-18): the six `cbu.assign-*` specialist verbs were folded
+/// into ONE discoverable verb with a `role-type` argument. The specialist
+/// structs are RETAINED (unregistered) as dispatch targets so every write-path
+/// — ownership %, control type, trust beneficiary interest, fund LP %, SP
+/// agreement, signatory authority — is preserved exactly. No capability is lost;
+/// only the discoverable surface is deduplicated.
+pub struct AssignRole;
+
+#[async_trait]
+impl SemOsVerbOp for AssignRole {
+    fn fqn(&self) -> &str {
+        "cbu.assign-role"
+    }
+    async fn execute(
+        &self,
+        args: &Value,
+        ctx: &mut VerbExecutionContext,
+        scope: &mut dyn TransactionScope,
+    ) -> Result<VerbExecutionOutcome> {
+        let role_type = json_extract_string_opt(args, "role-type")
+            .map(|s| s.to_uppercase())
+            .unwrap_or_else(|| "ROLE".to_string());
+        match role_type.as_str() {
+            "OWNERSHIP" => AssignOwnership.execute(args, ctx, scope).await,
+            "CONTROL" => AssignControl.execute(args, ctx, scope).await,
+            "TRUST" | "TRUST_ROLE" => AssignTrustRole.execute(args, ctx, scope).await,
+            "FUND" | "FUND_ROLE" => AssignFundRole.execute(args, ctx, scope).await,
+            "SERVICE_PROVIDER" | "SP" => AssignServiceProvider.execute(args, ctx, scope).await,
+            "SIGNATORY" => AssignSignatory.execute(args, ctx, scope).await,
+            // Generic role binding — replicates the former `crud` role_link of
+            // `cbu.assign-role` (cbu_entity_roles junction insert).
+            _ => {
+                let cbu_id = json_extract_uuid(args, ctx, "cbu-id")?;
+                let entity_id = json_extract_uuid(args, ctx, "entity-id")?;
+                let role = json_extract_string_opt(args, "role")
+                    .map(|s| s.to_uppercase())
+                    .ok_or_else(|| anyhow!("cbu.assign-role requires `role` for a generic role assignment"))?;
+                let role_id = get_role_id(scope, &role).await?;
+                let role_result: Uuid = sqlx::query_scalar(
+                    r#"INSERT INTO "ob-poc".cbu_entity_roles
+                       (cbu_id, entity_id, role_id, created_at, updated_at)
+                       VALUES ($1, $2, $3, NOW(), NOW())
+                       ON CONFLICT (cbu_id, entity_id, role_id) DO UPDATE SET updated_at = NOW()
+                       RETURNING cbu_entity_role_id"#,
+                )
+                .bind(cbu_id)
+                .bind(entity_id)
+                .bind(role_id)
+                .fetch_one(scope.executor())
+                .await?;
+                ctx.bind("cbu_entity_role", role_result);
+                Ok(VerbExecutionOutcome::Record(json!({
+                    "role_id": role_result,
+                    "message": format!("Assigned role {} to {} on CBU {}", role, entity_id, cbu_id)
+                })))
+            }
+        }
+    }
+}
+
 pub struct AssignOwnership;
 
 #[async_trait]

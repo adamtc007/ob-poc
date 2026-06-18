@@ -934,14 +934,13 @@ pub fn build_registry() -> SemOsVerbOpRegistry {
     // orphan-entity + anomaly persistence).
     registry.register(Arc::new(graph_validate::Validate));
 
-    // Phase B slice #53: cbu-specialist-roles (7 plugin verbs —
-    // dual-write into cbu_entity_roles + entity_relationships edge).
-    registry.register(Arc::new(cbu_role::AssignOwnership));
-    registry.register(Arc::new(cbu_role::AssignControl));
-    registry.register(Arc::new(cbu_role::AssignTrustRole));
-    registry.register(Arc::new(cbu_role::AssignFundRole));
-    registry.register(Arc::new(cbu_role::AssignServiceProvider));
-    registry.register(Arc::new(cbu_role::AssignSignatory));
+    // Phase B slice #53: cbu-specialist-roles. I1 cleanup (2026-06-18): the six
+    // cbu.assign-* specialists are folded into ONE canonical `cbu.assign-role`
+    // that dispatches on `role-type`. The specialist structs are retained
+    // (unregistered) as dispatch targets — every write-path (ownership %, control,
+    // trust interest, fund LP %, SP, signatory) is preserved; only the
+    // discoverable verb surface is deduplicated.
+    registry.register(Arc::new(cbu_role::AssignRole));
     registry.register(Arc::new(cbu_role::Terminate));
     registry.register(Arc::new(cbu_role::ValidateRoles));
 
