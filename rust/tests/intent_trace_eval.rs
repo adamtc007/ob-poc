@@ -909,6 +909,209 @@ mod db_eval {
 
         assert!(max_score <= 1.0 + f32::EPSILON, "max_score exceeded 1.0: {}", max_score);
     }
+
+    // ── CBU Phase 2: First-hit / Second-hit metric (frozen pack 88eb3699) ──
+    //
+    // Classification only — verbs are resolved, never executed. Uses the SYSTEM's
+    // own commit-vs-ask decision (`check_ambiguity` at semantic_threshold), read
+    // not overridden. No answer injection: the second-prompt check is membership
+    // of the expected verb in the surfaced top-K shortlist, never feeding the
+    // ground truth back as a synthetic utterance.
+    #[tokio::test]
+    #[ignore = "CBU Phase 2 second-hit metric: DATABASE_URL + database feature"]
+    async fn cbu_second_hit_metric() {
+        use ob_poc::mcp::verb_search::{check_ambiguity, VerbSearchOutcome};
+        const FROZEN: &str = "88eb369975f6e266920ff5a30380f768652bf4cc";
+
+        let pool = sqlx::PgPool::connect(&std::env::var("DATABASE_URL").expect("DATABASE_URL"))
+            .await
+            .expect("connect");
+        let searcher = build_searcher(&pool).await;
+        let threshold = searcher.semantic_threshold();
+        let boards = boards_by_id();
+        let macro_scenario = load_macro_scenario_fqns();
+        let board = &boards["board-cbu-operational"];
+        let allowed = board_allowed_set(board, &macro_scenario);
+        let allowed_vec: Vec<String> = allowed.iter().cloned().collect();
+        let state_unreachable: HashSet<String> =
+            observe_state_reachability(&allowed_vec, board.entity_state.as_deref())
+                .into_iter()
+                .filter(|o| !o.state_reachable)
+                .map(|o| o.verb)
+                .collect();
+
+        let corpus = load_corpus();
+        let cbu_cases: Vec<&CorpusEntry> = corpus
+            .iter()
+            .filter(|c| c.board_id == "board-cbu-operational")
+            .collect();
+
+        #[derive(Default)]
+        struct Acc {
+            first: usize,
+            confident_wrong: usize,
+            // ask outcomes carry the expected-verb rank in the shortlist (None = not retrieved)
+            ask_ranks: Vec<(Option<usize>, bool)>, // (rank, expected_in_pack)
+            nomatch_in_pack: usize,
+            nomatch_out_pack: usize,
+            confident_wrong_pairs: Vec<serde_json::Value>,
+            first_in_pack: usize,
+            confident_wrong_in_pack: usize,
+            // state side-metric: shortlist (top-5) contains a state-unreachable verb
+            shortlist_has_state_unreachable: usize,
+        }
+        let mut a = Acc::default();
+        let mut in_pack_total = 0usize;
+
+        let is_hit = |verb: &str, case: &CorpusEntry| {
+            verb == case.expected_verb || case.alt_verbs.iter().any(|x| x == verb)
+        };
+
+        for case in &cbu_cases {
+            let expected_in_pack =
+                allowed.contains(&case.expected_verb) || case.alt_verbs.iter().any(|x| allowed.contains(x));
+            if expected_in_pack {
+                in_pack_total += 1;
+            }
+            let candidates = searcher
+                .search(&case.utterance, None, None, None, 10, Some(&allowed), None, None)
+                .await
+                .unwrap_or_default();
+            if candidates.iter().take(5).any(|c| state_unreachable.contains(&c.verb)) {
+                a.shortlist_has_state_unreachable += 1;
+            }
+            let outcome = check_ambiguity(&candidates, threshold);
+            match outcome {
+                VerbSearchOutcome::Matched(top) => {
+                    if is_hit(&top.verb, case) {
+                        a.first += 1;
+                        if expected_in_pack {
+                            a.first_in_pack += 1;
+                        }
+                    } else {
+                        a.confident_wrong += 1;
+                        if expected_in_pack {
+                            a.confident_wrong_in_pack += 1;
+                        }
+                        a.confident_wrong_pairs.push(serde_json::json!({
+                            "expected": case.expected_verb,
+                            "selected": top.verb,
+                            "in_pack": expected_in_pack,
+                            "kind": if expected_in_pack { "genuine_near_synonym" } else { "coverage_artifact" },
+                        }));
+                    }
+                }
+                VerbSearchOutcome::Ambiguous { .. } | VerbSearchOutcome::Suggest { .. } => {
+                    let rank = candidates.iter().position(|c| is_hit(&c.verb, case));
+                    a.ask_ranks.push((rank, expected_in_pack));
+                }
+                VerbSearchOutcome::NoMatch => {
+                    if expected_in_pack {
+                        a.nomatch_in_pack += 1;
+                    } else {
+                        a.nomatch_out_pack += 1;
+                    }
+                }
+            }
+        }
+
+        let n = cbu_cases.len() as f32;
+        let second_at = |k: usize| a.ask_ranks.iter().filter(|(r, _)| r.map(|r| r < k).unwrap_or(false)).count();
+        let second_at_in_pack = |k: usize| {
+            a.ask_ranks
+                .iter()
+                .filter(|(r, ip)| *ip && r.map(|r| r < k).unwrap_or(false))
+                .count()
+        };
+        let second3 = second_at(3);
+        let second5 = second_at(5);
+        // rank distribution (1-indexed) among ask outcomes where expected is within top-5
+        let mut rank_hist: std::collections::BTreeMap<usize, usize> = std::collections::BTreeMap::new();
+        for (r, _) in &a.ask_ranks {
+            if let Some(r) = r {
+                if *r < 5 {
+                    *rank_hist.entry(r + 1).or_insert(0) += 1;
+                }
+            }
+        }
+        let ask_total = a.ask_ranks.len();
+        let miss3 = cbu_cases.len() - a.first - a.confident_wrong - second3;
+        let miss5 = cbu_cases.len() - a.first - a.confident_wrong - second5;
+
+        // in-pack subset (the honest discovery number — excludes coverage misses)
+        let ip = in_pack_total.max(1) as f32;
+        let s3_ip = second_at_in_pack(3);
+        let s5_ip = second_at_in_pack(5);
+
+        let report = serde_json::json!({
+            "frozen_commit": FROZEN,
+            "note": "CBU first/second-hit. Commit-vs-ask is the system's own check_ambiguity at \
+                     semantic_threshold (read, not overridden). Second hit = expected ∈ surfaced top-K \
+                     (no answer injection). Confident-wrong is NEVER counted as a hit.",
+            "semantic_threshold": threshold,
+            "total_cbu_cases": cbu_cases.len(),
+            "coverage": {
+                "expected_in_frozen_pack": in_pack_total,
+                "out_of_pack": cbu_cases.len() - in_pack_total,
+                "caveat": "Only ~1/4 of CBU-labelled cases expect a verb in the clean cbu+nav pack; \
+                           the rest expect struct/attribute/narration/trading-profile/etc. Out-of-pack \
+                           misses are a COVERAGE gap (corpus 'CBU' label is broader than the domain-model \
+                           cbu pack), not a discovery failure. See in_pack_subset for the discovery number."
+            },
+            "buckets_all_219": {
+                "first_hit": a.first,
+                "confident_wrong": a.confident_wrong,
+                "ask_total": ask_total,
+                "second_hit_at_3": second3,
+                "second_hit_at_5": second5,
+                "miss_at_3": miss3,
+                "miss_at_5": miss5,
+                "miss_breakdown": {
+                    "nomatch_out_of_pack": a.nomatch_out_pack,
+                    "nomatch_in_pack": a.nomatch_in_pack,
+                    "ask_but_expected_not_in_top5": ask_total - second5,
+                },
+                "sum_check_at_3": a.first + a.confident_wrong + second3 + miss3,
+                "sum_check_at_5": a.first + a.confident_wrong + second5 + miss5,
+            },
+            "rates_all_219": {
+                "first_hit_rate": a.first as f32 / n,
+                "second_hit_rate_at_3": second3 as f32 / n,
+                "second_hit_rate_at_5": second5 as f32 / n,
+                "within_2_at_3": (a.first + second3) as f32 / n,
+                "within_2_at_5": (a.first + second5) as f32 / n,
+                "confident_wrong_rate": a.confident_wrong as f32 / n,
+                "miss_rate_at_5": miss5 as f32 / n,
+            },
+            "in_pack_subset": {
+                "n": in_pack_total,
+                "first_hit": a.first_in_pack,
+                "confident_wrong": a.confident_wrong_in_pack,
+                "first_hit_rate": a.first_in_pack as f32 / ip,
+                "within_2_at_3": (a.first_in_pack + s3_ip) as f32 / ip,
+                "within_2_at_5": (a.first_in_pack + s5_ip) as f32 / ip,
+                "confident_wrong_rate": a.confident_wrong_in_pack as f32 / ip,
+            },
+            "second_hit_rank_distribution_1indexed": rank_hist,
+            "confident_wrong_pairs": a.confident_wrong_pairs,
+            "state_gating_side_metric": {
+                "board_entity_state": board.entity_state,
+                "cases_whose_top5_contains_a_state_unreachable_verb": a.shortlist_has_state_unreachable,
+                "note": "How often I3 lifecycle-gating WOULD prune the shown shortlist at OPERATIONALLY_ACTIVE — measurable for the first time now CBU I3 is authored (gated 4→11)."
+            },
+        });
+
+        std::fs::create_dir_all("reports").ok();
+        std::fs::write("reports/cbu_second_hit.json", serde_json::to_string_pretty(&report).unwrap())
+            .expect("write cbu_second_hit.json");
+        println!("\n===== CBU SECOND-HIT METRIC (frozen {}) =====", &FROZEN[..8]);
+        println!("{}", serde_json::to_string_pretty(&report["rates_all_219"]).unwrap());
+        println!("in-pack discovery: {}", serde_json::to_string_pretty(&report["in_pack_subset"]).unwrap());
+        println!("coverage: {}", serde_json::to_string_pretty(&report["coverage"]).unwrap());
+        println!("  -> reports/cbu_second_hit.json");
+        assert_eq!(a.first + a.confident_wrong + second5 + miss5, cbu_cases.len(), "buckets must sum to N");
+    }
+
 }
 
 // ════════════════════════════════════════════════════════════════
