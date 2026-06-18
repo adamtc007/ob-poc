@@ -33,6 +33,12 @@ use crate::traceability::Phase2Service;
 pub struct SessionVerbSurface {
     /// Verbs visible to the user after all governance layers.
     pub verbs: Vec<SurfaceVerb>,
+    /// Macro/scenario FQNs owned by the composed workspace (by mode-tag
+    /// membership, not FQN leading-domain). Empty when no workspace resolves.
+    /// These are admitted into `allowed_fqns()` so the macro/scenario tiers in
+    /// verb search can surface them — the tier filters stay; the set widens by
+    /// membership. See `crate::agent::workspace_mode_tags`.
+    pub owned_macros: Vec<String>,
     /// Verbs excluded with structured, multi-layer reasons.
     pub excluded: Vec<ExcludedVerb>,
     /// SHA-256 fingerprint of the final visible set + filter context.
@@ -548,6 +554,24 @@ pub fn compute_session_verb_surface(ctx: &VerbSurfaceContext<'_>) -> SessionVerb
 
     let final_count = verbs.len();
 
+    // Membership-owned macros for the composed workspace. The allowed set is
+    // atomic verbs of the composed domains UNION macros owned (by mode-tag
+    // membership) by this workspace, so the macro/scenario tiers in verb search
+    // can surface them instead of matching-then-dropping them. Admission is by
+    // membership only — never by the macro FQN's leading-domain token.
+    let owned_macros: Vec<String> = ctx
+        .stage_focus
+        .and_then(crate::agent::workspace_mode_tags::stage_focus_to_workspace)
+        .map(|workspace| {
+            let mut fqns: Vec<String> =
+                crate::agent::workspace_mode_tags::workspace_owned_macro_fqns(workspace)
+                    .into_iter()
+                    .collect();
+            fqns.sort();
+            fqns
+        })
+        .unwrap_or_default();
+
     // Build excluded list
     let excluded: Vec<ExcludedVerb> = exclusions
         .into_iter()
@@ -572,6 +596,7 @@ pub fn compute_session_verb_surface(ctx: &VerbSurfaceContext<'_>) -> SessionVerb
 
     SessionVerbSurface {
         verbs,
+        owned_macros,
         excluded,
         surface_fingerprint,
         semreg_fingerprint,
@@ -717,8 +742,17 @@ fn format_prune_reason(reason: &PruneReason) -> String {
 
 impl SessionVerbSurface {
     /// Get the allowed verb FQNs as a HashSet (for pipeline pre-constraint).
+    ///
+    /// This is atomic verbs of the composed domains UNION the membership-owned
+    /// macro/scenario FQNs (`owned_macros`). Including the macros here is what
+    /// lets the macro/scenario tiers in verb search surface them: those tiers
+    /// match then drop any FQN not in this set, so a workspace macro must be in
+    /// the set to survive. Cross-workspace macros are absent → still dropped.
     pub fn allowed_fqns(&self) -> HashSet<String> {
-        self.verbs.iter().map(|v| v.fqn.clone()).collect()
+        let mut fqns: HashSet<String> =
+            self.verbs.iter().map(|v| v.fqn.clone()).collect();
+        fqns.extend(self.owned_macros.iter().cloned());
+        fqns
     }
 
     /// Filter verbs by domain.
@@ -1154,6 +1188,61 @@ mod tests {
         assert!(
             no_focus.verbs.len() >= with_focus.verbs.len(),
             "No workflow constraint should not restrict verbs"
+        );
+    }
+
+    /// Phase-1 red→green: the composed CBU workspace's allowed set now includes
+    /// the membership-owned macros, and `allowed_fqns()` emits them.
+    ///
+    /// RED (before this fix): `allowed_fqns()` returned atomic `RuntimeVerb`s
+    /// only, so a `struct.*`/`structure.*` macro — though it matched at the macro
+    /// tier — was dropped by the atomic-only `allowed_verbs` filter. A
+    /// cross-workspace stewardship macro was (correctly) absent too, but for the
+    /// wrong reason (everything was absent).
+    ///
+    /// GREEN (after): with `stage_focus = semos-onboarding` (→ workspace `cbu`),
+    /// the CBU-owned macro is present in `allowed_fqns()` and the stewardship
+    /// macro is still correctly absent — admission by membership, not by FQN.
+    #[test]
+    fn test_owned_macros_in_allowed_set() {
+        let envelope = make_unavailable_envelope();
+
+        let cbu_ctx = VerbSurfaceContext {
+            agent_mode: AgentMode::Governed,
+            stage_focus: Some("semos-onboarding"),
+            envelope: &envelope,
+            fail_policy: VerbSurfaceFailPolicy::FailOpen,
+            entity_state: None,
+            has_group_scope: true,
+            is_infrastructure_scope: false,
+            composite_state: None,
+        };
+        let surface = compute_session_verb_surface(&cbu_ctx);
+        let allowed = surface.allowed_fqns();
+
+        // GREEN: the CBU-owned onboarding/structure macro now survives.
+        assert!(
+            allowed.contains("structure.product-suite-full"),
+            "CBU workspace allowed set must include its owned macro \
+             structure.product-suite-full; owned_macros={}",
+            surface.owned_macros.len()
+        );
+        // Still correctly dropped: stewardship macro is owned by a different
+        // workspace, so it is NOT admitted into the CBU allowed set.
+        assert!(
+            !allowed.contains("governance.bootstrap-attribute-registry"),
+            "cross-workspace stewardship macro must NOT leak into the CBU allowed set"
+        );
+
+        // No stage_focus → no workspace → no owned macros (atomic-only set).
+        let no_focus_ctx = VerbSurfaceContext {
+            stage_focus: None,
+            ..cbu_ctx
+        };
+        let no_focus = compute_session_verb_surface(&no_focus_ctx);
+        assert!(
+            no_focus.owned_macros.is_empty(),
+            "no workspace resolved ⇒ no owned macros"
         );
     }
 

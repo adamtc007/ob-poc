@@ -3144,9 +3144,14 @@ fn lint_pack_macro_bleed(root: &std::path::Path) -> Vec<(String, String)> {
 
             for verb_or_macro in &allowed_verbs {
                 if let Some(tags) = macro_mode_tags.get(verb_or_macro.as_str()) {
-                    // This is a macro — check workspace compatibility
+                    // This is a macro — check workspace compatibility.
+                    // Single source of truth: the runtime membership table in
+                    // `ob_poc::agent::workspace_mode_tags` (lifted out of xtask so
+                    // the runtime allowed-set composition can read it too).
                     for ws in &workspaces {
-                        if !workspace_accepts_any_mode_tag(ws, tags) {
+                        if !ob_poc::agent::workspace_mode_tags::workspace_accepts_any_mode_tag(
+                            ws, tags,
+                        ) {
                             diags.push((
                                 "error".to_string(),
                                 format!(
@@ -3168,32 +3173,10 @@ fn lint_pack_macro_bleed(root: &std::path::Path) -> Vec<(String, String)> {
     diags
 }
 
-/// Check if a workspace accepts any of the given mode-tags.
-///
-/// Workspace-to-mode-tag compatibility table:
-///
-/// | Workspace            | Accepted mode-tags                              |
-/// |----------------------|--------------------------------------------------|
-/// | cbu                  | structure, trading, onboarding                   |
-/// | kyc                  | kyc, onboarding                                  |
-/// | deal                 | deal, onboarding                                 |
-/// | on_boarding          | (all) — umbrella workspace                       |
-/// | product_maintenance  | product, trading                                 |
-/// | instrument_matrix    | trading, structure                               |
-/// | sem_os_maintenance   | stewardship, governance                          |
-fn workspace_accepts_any_mode_tag(workspace: &str, tags: &[String]) -> bool {
-    let accepted: &[&str] = match workspace {
-        "cbu" => &["structure", "trading", "onboarding"],
-        "kyc" => &["kyc", "onboarding"],
-        "deal" => &["deal", "onboarding"],
-        "on_boarding" => return true, // Umbrella — accepts all mode-tags
-        "product_maintenance" => &["product", "trading"],
-        "instrument_matrix" => &["trading", "structure"],
-        "sem_os_maintenance" => &["stewardship", "governance"],
-        _ => return false, // Unknown workspace — fail closed, force table update
-    };
-    tags.iter().any(|tag| accepted.contains(&tag.as_str()))
-}
+// The workspace↔mode-tag compatibility table was lifted into the runtime crate
+// as the single source of truth — see
+// `ob_poc::agent::workspace_mode_tags::workspace_accepts_any_mode_tag`. This lint
+// (PACK001) and the runtime allowed-set composition now share that one table.
 
 /// PACK002: Detect pack verbs absent from constellation slots and macro registry.
 ///

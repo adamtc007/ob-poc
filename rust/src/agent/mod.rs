@@ -14,6 +14,7 @@ pub mod orchestrator;
 pub mod sem_os_context_envelope;
 pub mod telemetry;
 pub mod verb_surface;
+pub mod workspace_mode_tags;
 
 pub use learning::{
     spawn_agent_drain_task, AgentEvent, AgentEventEmitter, AgentEventPayload,

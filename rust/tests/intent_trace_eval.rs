@@ -41,6 +41,20 @@ struct Board {
     pack_domains: Vec<String>,
     #[serde(default)]
     entity_state: Option<String>,
+    /// Session workflow focus driving the PRODUCTION board composition
+    /// (`workflow_allowed_domains` → the full workspace domain set + Phase-1
+    /// membership-owned macros). When authored, `board_allowed_set` drives
+    /// `compute_session_verb_surface` instead of the bespoke pack-scoped set.
+    #[serde(default)]
+    stage_focus: Option<String>,
+    #[serde(default = "default_true")]
+    has_group_scope: bool,
+    #[serde(default)]
+    is_infrastructure_scope: bool,
+}
+
+fn default_true() -> bool {
+    true
 }
 
 #[derive(Debug, Deserialize)]
@@ -435,6 +449,19 @@ mod db_eval {
     /// against `allowed_verbs` too — without it, the 27 macro-routed corpus cases
     /// die in search (Phase 0 finding).
     fn board_allowed_set(board: &Board, macro_scenario_fqns: &HashSet<String>) -> HashSet<String> {
+        // PRODUCTION PATH (Phase 2): when the board carries a `stage_focus`, drive
+        // the genuine session surface — `compute_session_verb_surface` with the
+        // workspace's `workflow_allowed_domains` set + the Phase-1 membership-owned
+        // macros (`allowed_fqns()` now unions `owned_macros`). This eliminates the
+        // divergence between what the harness measured and what live composes:
+        // the allowed set IS the production allowed set, by construction.
+        if board.stage_focus.is_some() {
+            return production_allowed_set(board);
+        }
+        // LEGACY FALLBACK — Option-C multi-board receipts whose boards have no
+        // authored stage_focus. Domain-scoped set + leading-domain macro
+        // admission (the pre-Phase-2 behaviour), kept so those receipts are
+        // unchanged by this CBU-scoped fix.
         let domains: HashSet<&str> = board.pack_domains.iter().map(String::as_str).collect();
         let mut set = board_legal_set(&domains);
         for fqn in macro_scenario_fqns {
@@ -445,6 +472,205 @@ mod db_eval {
             }
         }
         set
+    }
+
+    /// The genuine production allowed set for a workspace board: exactly what the
+    /// live pipeline threads into verb search via `with_allowed_verbs`. Drives
+    /// `compute_session_verb_surface` with the board's `stage_focus` so
+    /// `workflow_allowed_domains` resolves the FULL workspace domain set, and
+    /// `allowed_fqns()` emits the Phase-1 membership-owned macros.
+    ///
+    /// `entity_state = None`: Step-5 lifecycle is intentionally skipped at
+    /// composition time (state reachability is observed separately by the
+    /// non-mutating `observe_state_reachability`, preserving the "composition
+    /// must not change ranking" discipline).
+    fn production_allowed_set(board: &Board) -> HashSet<String> {
+        use ob_poc::agent::sem_os_context_envelope::SemOsContextEnvelope;
+        use ob_poc::agent::verb_surface::{
+            compute_session_verb_surface, VerbSurfaceContext, VerbSurfaceFailPolicy,
+        };
+        use sem_os_types::agent_mode::AgentMode;
+
+        let envelope = SemOsContextEnvelope::unavailable();
+        let ctx = VerbSurfaceContext {
+            agent_mode: AgentMode::Governed,
+            stage_focus: board.stage_focus.as_deref(),
+            envelope: &envelope,
+            fail_policy: VerbSurfaceFailPolicy::FailOpen,
+            entity_state: None,
+            has_group_scope: board.has_group_scope,
+            is_infrastructure_scope: board.is_infrastructure_scope,
+            composite_state: None,
+        };
+        compute_session_verb_surface(&ctx).allowed_fqns()
+    }
+
+    /// Phase 2 receipt: the harness CBU allowed set IS the production allowed set
+    /// (no divergence), and it is now the 13-domain workspace composition — not
+    /// the 4-domain pack. No DB needed (`compute_session_verb_surface` reads the
+    /// runtime registry + macro files only).
+    #[test]
+    fn phase2_board_equals_production_surface() {
+        use ob_poc::agent::sem_os_context_envelope::SemOsContextEnvelope;
+        use ob_poc::agent::verb_surface::{
+            compute_session_verb_surface, VerbSurfaceContext, VerbSurfaceFailPolicy,
+        };
+        use sem_os_types::agent_mode::AgentMode;
+
+        let board = boards_by_id()
+            .remove("board-cbu-operational")
+            .expect("cbu board");
+        assert_eq!(
+            board.stage_focus.as_deref(),
+            Some("semos-onboarding"),
+            "Phase 2 requires the CBU board to carry the workspace stage_focus"
+        );
+
+        // The dispatched harness set.
+        let harness = board_allowed_set(&board, &HashSet::new());
+
+        // The genuine live surface, built independently here.
+        let envelope = SemOsContextEnvelope::unavailable();
+        let ctx = VerbSurfaceContext {
+            agent_mode: AgentMode::Governed,
+            stage_focus: Some("semos-onboarding"),
+            envelope: &envelope,
+            fail_policy: VerbSurfaceFailPolicy::FailOpen,
+            entity_state: None,
+            has_group_scope: true,
+            is_infrastructure_scope: false,
+            composite_state: None,
+        };
+        let live = compute_session_verb_surface(&ctx).allowed_fqns();
+
+        // EQUALITY: same membership, same macros — the divergence is gone.
+        assert_eq!(
+            harness, live,
+            "harness CBU allowed set must equal the production surface"
+        );
+
+        // COMPOSITION: it is the 13-domain workspace, not the 4-domain pack.
+        // An atomic verb from a workspace domain OUTSIDE the old pack is present.
+        assert!(
+            live.contains("trading-profile.read"),
+            "13-domain workspace composition must include trading-profile.* atomics \
+             that the old 4-domain pack excluded"
+        );
+        // A CBU-owned macro (Phase-1 membership) is present.
+        assert!(
+            live.contains("structure.product-suite-full"),
+            "production surface must include the CBU-owned macro"
+        );
+        // The OLD 4-domain pack-scoped set did NOT contain it — proves expansion.
+        let old_pack: HashSet<&str> = ["cbu", "session", "view", "agent"].into_iter().collect();
+        let old_set = board_legal_set(&old_pack);
+        assert!(
+            !old_set.contains("trading-profile.read"),
+            "the pre-Phase-2 pack-scoped set excluded trading-profile.* — confirming \
+             the board was under-composed"
+        );
+    }
+
+    /// Tag an out-of-scope expected verb with the workspace that owns it.
+    /// Scoping is by the **workspace membership of the expected verb/macro**, never
+    /// by whether discovery resolves it.
+    fn true_workspace_for(domain: &str) -> &'static str {
+        match domain {
+            // SemOS-maintenance / data governance.
+            "attribute" | "service-resource" | "governance" | "derivation"
+            | "typed-attribute" | "changeset" | "registry" | "schema" | "authoring"
+            | "service" => "sem_os_maintenance",
+            // KYC / UBO.
+            "ownership" | "evidence" | "screening" | "case" | "allegation" | "bods"
+            | "ubo" | "kyc" | "requirement" | "entity-workstream" | "movement" => "kyc",
+            // Pre-workspace scope-gate (selected before a workspace exists).
+            "client-group" => "scope_gate",
+            // System / contextual-query surface (no mutation workspace).
+            "narration" => "system",
+            // Capital / instruments / structuring referenced-entity content not
+            // owned by the onboarding workspace's atomic domains.
+            "capital" | "instrument-class" | "booking-principal" | "partnership"
+            | "trust" | "identifier" | "mandate" | "readiness" | "tollgate"
+            | "product" | "structure" => "other",
+            _ => "unmapped",
+        }
+    }
+
+    /// Phase 3 receipt: partition the 219 CBU-labelled cases into in-scope (the
+    /// expected verb/macro is owned by the onboarding workspace = present in the
+    /// production-composed allowed set) vs out-of-scope (owned by another
+    /// workspace, tagged but NOT deleted). No DB needed.
+    #[test]
+    fn phase3_corpus_scoping_by_membership() {
+        let board = boards_by_id()
+            .remove("board-cbu-operational")
+            .expect("cbu board");
+        // Workspace membership set: 13-domain atomics ∪ CBU-owned macros
+        // (struct.*/structure.* recovered here via Phase-1 mode-tag membership).
+        let allowed = production_allowed_set(&board);
+
+        let corpus = load_corpus();
+        let cbu: Vec<&CorpusEntry> = corpus
+            .iter()
+            .filter(|c| c.board_id == "board-cbu-operational")
+            .collect();
+
+        let mut in_scope: Vec<&str> = Vec::new();
+        let mut out_by_ws: std::collections::BTreeMap<String, Vec<serde_json::Value>> =
+            Default::default();
+
+        for c in &cbu {
+            if allowed.contains(&c.expected_verb) {
+                in_scope.push(&c.expected_verb);
+            } else {
+                let domain = c.expected_verb.split('.').next().unwrap_or("");
+                let ws = true_workspace_for(domain);
+                out_by_ws.entry(ws.to_string()).or_default().push(
+                    serde_json::json!({
+                        "id": c.id,
+                        "expected_verb": c.expected_verb,
+                        "domain": domain,
+                    }),
+                );
+            }
+        }
+
+        let total = cbu.len();
+        let in_n = in_scope.len();
+        let out_n: usize = out_by_ws.values().map(|v| v.len()).sum();
+        assert_eq!(in_n + out_n, total, "every case is scoped exactly once");
+
+        let out_counts: std::collections::BTreeMap<&String, usize> =
+            out_by_ws.iter().map(|(k, v)| (k, v.len())).collect();
+
+        let report = serde_json::json!({
+            "frozen_pack": "88eb3699 + Phase-1 macro membership fix",
+            "scoping_rule": "in-scope = expected verb/macro ∈ production_allowed_set \
+                             (13-domain semos-onboarding atomics ∪ CBU-owned macros). \
+                             Membership only — NOT whether discovery resolves it.",
+            "total_cbu_cases": total,
+            "in_scope": in_n,
+            "out_of_scope": out_n,
+            "out_of_scope_by_workspace": out_counts,
+            "out_of_scope_detail": out_by_ws,
+        });
+        std::fs::write(
+            "reports/cbu_corpus_scoping.json",
+            serde_json::to_string_pretty(&report).unwrap(),
+        )
+        .unwrap();
+
+        eprintln!(
+            "Phase 3 scoping: {in_n}/{total} in-scope, {out_n} out-of-scope {:?}",
+            out_counts
+        );
+        // Sanity: the workspace composition recovers a meaningful in-scope set
+        // (research floor ~78 atomic, ~103 with macros). Assert it is no longer
+        // the 4-domain ~76 and well above it.
+        assert!(
+            in_n >= 78,
+            "workspace composition should lift in-scope to the research floor; got {in_n}"
+        );
     }
 
     /// FQNs the search can reach via macro/scenario tiers (-2B/-2A).
@@ -1112,6 +1338,204 @@ mod db_eval {
         assert_eq!(a.first + a.confident_wrong + second5 + miss5, cbu_cases.len(), "buckets must sum to N");
     }
 
+    /// One arm of the composed metric over a fixed allowed set.
+    struct ArmResult {
+        n: usize,
+        board_size: usize,
+        first: usize,
+        confident_wrong: usize,
+        second3: usize,
+        second5: usize,
+        /// recall@5 — expected verb retrieved within top-5, irrespective of the
+        /// commit-vs-ask decision. The "small-set thesis" test on a larger board.
+        recall5: usize,
+        miss5: usize,
+        ask_total: usize,
+        confident_wrong_pairs: Vec<serde_json::Value>,
+    }
+
+    async fn run_arm(
+        searcher: &HybridVerbSearcher,
+        threshold: f32,
+        cases: &[&CorpusEntry],
+        allowed: &HashSet<String>,
+    ) -> ArmResult {
+        use ob_poc::mcp::verb_search::{check_ambiguity, VerbSearchOutcome};
+        let is_hit = |verb: &str, case: &CorpusEntry| {
+            verb == case.expected_verb || case.alt_verbs.iter().any(|x| x == verb)
+        };
+        let mut r = ArmResult {
+            n: cases.len(),
+            board_size: allowed.len(),
+            first: 0,
+            confident_wrong: 0,
+            second3: 0,
+            second5: 0,
+            recall5: 0,
+            miss5: 0,
+            ask_total: 0,
+            confident_wrong_pairs: Vec::new(),
+        };
+        let mut ask_in_top5 = 0usize;
+        for case in cases {
+            let candidates = searcher
+                .search(&case.utterance, None, None, None, 10, Some(allowed), None, None)
+                .await
+                .unwrap_or_default();
+            let rank = candidates.iter().position(|c| is_hit(&c.verb, case));
+            if rank.map(|x| x < 5).unwrap_or(false) {
+                r.recall5 += 1;
+            }
+            match check_ambiguity(&candidates, threshold) {
+                VerbSearchOutcome::Matched(top) => {
+                    if is_hit(&top.verb, case) {
+                        r.first += 1;
+                    } else {
+                        r.confident_wrong += 1;
+                        r.confident_wrong_pairs.push(serde_json::json!({
+                            "expected": case.expected_verb,
+                            "selected": top.verb,
+                        }));
+                    }
+                }
+                VerbSearchOutcome::Ambiguous { .. } | VerbSearchOutcome::Suggest { .. } => {
+                    r.ask_total += 1;
+                    if let Some(x) = rank {
+                        if x < 3 {
+                            r.second3 += 1;
+                        }
+                        if x < 5 {
+                            r.second5 += 1;
+                            ask_in_top5 += 1;
+                        }
+                    }
+                }
+                VerbSearchOutcome::NoMatch => {}
+            }
+        }
+        let _ = ask_in_top5;
+        r.miss5 = r.n - r.first - r.confident_wrong - r.second5;
+        r
+    }
+
+    /// Phase 4: the HONEST production numbers — first/second-hit over the
+    /// production-composed 13-domain board, on the in-scope CBU subset only
+    /// (Phase-3 membership). Sensitivity arm strips the owned macros to show the
+    /// macro layer's contribution. Receipt: reports/cbu_second_hit_composed.json.
+    #[tokio::test]
+    #[ignore = "Phase 4 receipt: requires DATABASE_URL + database feature"]
+    async fn phase4_cbu_second_hit_composed() {
+        const FROZEN: &str = "88eb3699 + Phase-1 macro membership fix";
+        let pool = sqlx::PgPool::connect(&std::env::var("DATABASE_URL").expect("DATABASE_URL"))
+            .await
+            .expect("connect");
+        let searcher = build_searcher(&pool).await;
+        let threshold = searcher.semantic_threshold();
+
+        let board = boards_by_id()
+            .remove("board-cbu-operational")
+            .expect("cbu board");
+
+        // Composed (production) allowed set: 13-domain atomics ∪ CBU-owned macros.
+        let allowed_full = production_allowed_set(&board);
+        // Sensitivity arm: atomic-only (strip the membership-owned macros).
+        let atomic_domains: HashSet<&str> = [
+            "cbu", "entity", "session", "view", "agent", "contract", "deal", "billing",
+            "trading-profile", "custody", "onboarding", "gleif", "research",
+        ]
+        .into_iter()
+        .collect();
+        let allowed_atomic = board_legal_set(&atomic_domains);
+        let owned_macros = allowed_full.len().saturating_sub(allowed_atomic.len());
+
+        // In-scope subset (Phase-3 membership): expected ∈ composed allowed set.
+        let corpus = load_corpus();
+        let in_scope: Vec<&CorpusEntry> = corpus
+            .iter()
+            .filter(|c| c.board_id == "board-cbu-operational")
+            .filter(|c| {
+                allowed_full.contains(&c.expected_verb)
+                    || c.alt_verbs.iter().any(|x| allowed_full.contains(x))
+            })
+            .collect();
+
+        let full = run_arm(&searcher, threshold, &in_scope, &allowed_full).await;
+        let atomic = run_arm(&searcher, threshold, &in_scope, &allowed_atomic).await;
+
+        let rate = |x: usize, n: usize| x as f32 / n.max(1) as f32;
+        let arm_json = |r: &ArmResult| {
+            serde_json::json!({
+                "denominator": r.n,
+                "board_size": r.board_size,
+                "first_hit": r.first,
+                "confident_wrong": r.confident_wrong,
+                "second_hit_at_3": r.second3,
+                "second_hit_at_5": r.second5,
+                "miss_at_5": r.miss5,
+                "ask_total": r.ask_total,
+                "first_hit_rate": rate(r.first, r.n),
+                "second_hit_rate_at_5": rate(r.second5, r.n),
+                "within_2_at_3": rate(r.first + r.second3, r.n),
+                "within_2_at_5": rate(r.first + r.second5, r.n),
+                "confident_wrong_rate": rate(r.confident_wrong, r.n),
+                "miss_rate_at_5": rate(r.miss5, r.n),
+                "fraction_le_5_recall": rate(r.recall5, r.n),
+                "sum_check": r.first + r.confident_wrong + r.second5 + r.miss5,
+            })
+        };
+
+        assert_eq!(
+            full.first + full.confident_wrong + full.second5 + full.miss5,
+            full.n,
+            "composed buckets must sum to the in-scope denominator"
+        );
+
+        let report = serde_json::json!({
+            "frozen_commit": FROZEN,
+            "note": "HONEST production numbers. Board = 13-domain semos-onboarding workspace \
+                     composition (compute_session_verb_surface, Phase-1 macro membership). \
+                     Denominator = in-scope CBU subset (Phase-3 membership: expected ∈ composed \
+                     allowed set). Commit-vs-ask = system's own check_ambiguity at semantic_threshold \
+                     (read, not overridden). No answer injection. Confident-wrong is NEVER a hit.",
+            "semantic_threshold": threshold,
+            "composed_board": {
+                "atomic_verbs_13_domain": allowed_atomic.len(),
+                "owned_macros": owned_macros,
+                "board_size_total": allowed_full.len(),
+            },
+            "primary_arm_composed": arm_json(&full),
+            "sensitivity_arm_atomic_only": arm_json(&atomic),
+            "macro_layer_contribution": {
+                "within_2_at_5_delta": rate(full.first + full.second5, full.n)
+                    - rate(atomic.first + atomic.second5, atomic.n),
+                "note": "How much the membership-owned macro layer adds to within-2@5 \
+                         vs an atomic-only board (macro-expecting in-scope cases miss without it).",
+            },
+            "confident_wrong_examples": full.confident_wrong_pairs.iter().take(10).collect::<Vec<_>>(),
+            "expectation": "The composed within-2@5 will likely come in BELOW the 89.5% measured \
+                            over the artificial 4-domain board, because the 13-domain board is much \
+                            larger (more distractors). That is the TRUE production number, not a \
+                            regression. fraction_le_5_recall over this larger board is the real test \
+                            of the small-set thesis.",
+        });
+        std::fs::create_dir_all("reports").ok();
+        std::fs::write(
+            "reports/cbu_second_hit_composed.json",
+            serde_json::to_string_pretty(&report).unwrap(),
+        )
+        .unwrap();
+
+        println!("\n===== PHASE 4 — COMPOSED CBU SECOND-HIT (honest production) =====");
+        println!(
+            "board: {} atomic(13-domain) + {} macros = {} | in-scope n={}",
+            allowed_atomic.len(),
+            owned_macros,
+            allowed_full.len(),
+            full.n
+        );
+        println!("{}", serde_json::to_string_pretty(&report["primary_arm_composed"]).unwrap());
+        println!("  -> reports/cbu_second_hit_composed.json");
+    }
 }
 
 // ════════════════════════════════════════════════════════════════

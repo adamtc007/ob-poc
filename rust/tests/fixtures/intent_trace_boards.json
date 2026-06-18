@@ -7,7 +7,7 @@
       "description": "CBU operational workspace \u2014 DOMAIN-MODEL-GROUNDED (I2 clean, 2026-06-18). pack = manifest owned_verb_prefixes [cbu.] + universal nav (session/view/agent); cbu-custody. dropped (0 verbs). NOT corpus-derived. entity_state is the uppercase cbu_overall_lifecycle operational state.",
       "has_group_scope": true,
       "is_infrastructure_scope": false,
-      "stage_focus": null,
+      "stage_focus": "semos-onboarding",
       "entity_state": "OPERATIONALLY_ACTIVE",
       "pack_domains": [
         "cbu",
