@@ -9,9 +9,14 @@ owned_packs:
   - cbu-maintenance
   - book-setup
   - kyc-case
+# `cbu_overall_lifecycle` is owned via `owned_dags: [cbu_dag]` (it is a
+# DAG-taxonomy FSM defined in dag_taxonomies/cbu_dag.yaml, NOT a standalone
+# state_machines/*.yaml seed). The I3 cleanup (2026-06-18) mistakenly also listed
+# it here, but `owned_state_machines` entries are resolved against
+# `state_machines/<name>.yaml` seeds — which this FSM has none of — so the seed
+# loader panicked. `allowed_transitions` below reference it by name, which the DAG
+# ownership satisfies. (Fix 2026-06-18: removed the category-error line.)
 owned_state_machines:
-  - cbu_overall_lifecycle      # I3 cleanup (2026-06-18): the entity FSM the
-                               # allowed_transitions reference; was unowned.
   - cbu_evidence_lifecycle
   - cbu_resource_instance_lifecycle
 owned_constellation_maps:
