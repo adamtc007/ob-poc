@@ -589,6 +589,54 @@ pub fn compute_session_verb_surface(ctx: &VerbSurfaceContext<'_>) -> SessionVerb
     }
 }
 
+// ── State reachability observer (eval mode, read-only) ──────────
+
+/// Observe — but DO NOT filter — Step-5 lifecycle reachability over a candidate
+/// verb set at a given entity state.
+///
+/// Applies the identical predicate `compute_session_verb_surface` uses in Step 5
+/// (`lifecycle.requires_states` vs `entity_state`), but only TAGS each verb. The
+/// candidate order and membership the caller holds are untouched — this is the
+/// non-mutating observer the Option C plan mandates, used to size the
+/// `state_collapse_counterfactual` (Option A prize) and
+/// `post_selection_state_rejection_rate` (Option B cost).
+///
+/// With `entity_state == None`, lifecycle cannot be checked, so every verb is
+/// reported reachable.
+pub fn observe_state_reachability(
+    fqns: &[String],
+    entity_state: Option<&str>,
+) -> Vec<crate::agent::telemetry::StateObservation> {
+    use crate::agent::telemetry::StateObservation;
+    let registry = runtime_registry();
+    fqns
+        .iter()
+        .map(|fqn| {
+            let lifecycle = registry.get_by_name(fqn).and_then(|v| v.lifecycle.as_ref());
+            let (state_reachable, failing_predicate) = match (lifecycle, entity_state) {
+                (Some(lc), Some(state))
+                    if !lc.requires_states.is_empty()
+                        && !lc.requires_states.iter().any(|s| s == state) =>
+                {
+                    (
+                        false,
+                        Some(format!(
+                            "requires_states {:?}, current '{}'",
+                            lc.requires_states, state
+                        )),
+                    )
+                }
+                _ => (true, None),
+            };
+            StateObservation {
+                verb: fqn.clone(),
+                state_reachable,
+                failing_predicate,
+            }
+        })
+        .collect()
+}
+
 // ── Helpers ─────────────────────────────────────────────────────
 
 fn compute_rank_boost(

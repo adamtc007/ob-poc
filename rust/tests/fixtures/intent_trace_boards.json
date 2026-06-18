@@ -1,0 +1,143 @@
+{
+  "note": "Option A representative boards (Phase 0). pack_domains are domain-scoped (constellation pack scope), NOT verb-scoped \u2014 the expected verb is never injected, so survival is a genuine measurement. legal set = runtime_registry verbs whose domain in pack_domains; fed to compute_session_verb_surface via SemOsContextEnvelope::compute(). entity_state is a representative lifecycle state per board; the registry has only 5 verb files (22 blocks) declaring requires_states, so the state observer is expected to prune ~0 candidates for this corpus (a real Option-B-leaning signal, measured in Phase 3).",
+  "boards": [
+    {
+      "board_id": "board-cbu-operational",
+      "corpus_domain": "CBU",
+      "description": "CBU operational workspace \u2014 the money-making apparatus on the street; broad onboarding/structure/attribute/trading surface within a client group.",
+      "has_group_scope": true,
+      "is_infrastructure_scope": false,
+      "stage_focus": null,
+      "entity_state": "ACTIVE",
+      "pack_domains": [
+        "agent",
+        "allegation",
+        "attribute",
+        "billing",
+        "bods",
+        "booking-principal",
+        "capital",
+        "case",
+        "cbu",
+        "changeset",
+        "client-group",
+        "contract",
+        "derivation",
+        "entity-workstream",
+        "evidence",
+        "governance",
+        "identifier",
+        "instrument-class",
+        "mandate",
+        "movement",
+        "narration",
+        "ownership",
+        "partnership",
+        "product",
+        "readiness",
+        "requirement",
+        "screening",
+        "service",
+        "service-resource",
+        "session",
+        "struct",
+        "structure",
+        "tollgate",
+        "trading-profile",
+        "trust",
+        "typed-attribute",
+        "view"
+      ]
+    },
+    {
+      "board_id": "board-kyc-case",
+      "corpus_domain": "KYC",
+      "description": "KYC case workspace \u2014 screening, UBO/control analysis, case lifecycle, red-flag handling within an open case.",
+      "has_group_scope": true,
+      "is_infrastructure_scope": false,
+      "stage_focus": null,
+      "entity_state": "active",
+      "pack_domains": [
+        "agent",
+        "control",
+        "document",
+        "kyc",
+        "kyc-case",
+        "red-flag",
+        "request",
+        "screening",
+        "session",
+        "trust",
+        "ubo",
+        "view"
+      ]
+    },
+    {
+      "board_id": "board-custody-deal",
+      "corpus_domain": "Custody",
+      "description": "Custody/Deal workspace \u2014 deal lifecycle, fund vehicles, share classes, settlement.",
+      "has_group_scope": true,
+      "is_infrastructure_scope": false,
+      "stage_focus": null,
+      "entity_state": "ACTIVE",
+      "pack_domains": [
+        "agent",
+        "cbu",
+        "deal",
+        "fund",
+        "session",
+        "settlement-type",
+        "share-class",
+        "view"
+      ]
+    },
+    {
+      "board_id": "board-onboarding-intake",
+      "corpus_domain": "Onboarding",
+      "description": "Onboarding intake workspace \u2014 onboarding lifecycle + GLEIF enrichment.",
+      "has_group_scope": true,
+      "is_infrastructure_scope": false,
+      "stage_focus": null,
+      "entity_state": "DISCOVERED",
+      "pack_domains": [
+        "agent",
+        "gleif",
+        "onboarding",
+        "session",
+        "view"
+      ]
+    },
+    {
+      "board_id": "board-document-solicitation",
+      "corpus_domain": "Document",
+      "description": "Document solicitation workspace \u2014 document request/verify/extract lifecycle.",
+      "has_group_scope": true,
+      "is_infrastructure_scope": false,
+      "stage_focus": null,
+      "entity_state": "VALIDATION_PENDING",
+      "pack_domains": [
+        "agent",
+        "document",
+        "evidence",
+        "session",
+        "view"
+      ]
+    },
+    {
+      "board_id": "board-entity-management",
+      "corpus_domain": "Entity",
+      "description": "Entity management workspace \u2014 natural/legal person CRUD and structure.",
+      "has_group_scope": true,
+      "is_infrastructure_scope": false,
+      "stage_focus": null,
+      "entity_state": "VALIDATED",
+      "pack_domains": [
+        "agent",
+        "entity",
+        "party",
+        "session",
+        "view"
+      ]
+    }
+  ]
+}

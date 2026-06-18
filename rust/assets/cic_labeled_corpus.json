@@ -7,7 +7,8 @@
     "difficulty": "medium",
     "alt_verbs": [],
     "entity_context": null,
-    "id": "cic-0001"
+    "id": "cic-0001",
+    "board_id": "board-cbu-operational"
   },
   {
     "utterance": "make State Street the transfer agent",
@@ -17,7 +18,8 @@
     "difficulty": "hard",
     "alt_verbs": [],
     "entity_context": null,
-    "id": "cic-0002"
+    "id": "cic-0002",
+    "board_id": "board-cbu-operational"
   },
   {
     "utterance": "who are the parties on this CBU?",
@@ -27,7 +29,8 @@
     "difficulty": "medium",
     "alt_verbs": [],
     "entity_context": null,
-    "id": "cic-0003"
+    "id": "cic-0003",
+    "board_id": "board-cbu-operational"
   },
   {
     "utterance": "add custody services to this client",
@@ -37,7 +40,8 @@
     "difficulty": "medium",
     "alt_verbs": [],
     "entity_context": null,
-    "id": "cic-0004"
+    "id": "cic-0004",
+    "board_id": "board-cbu-operational"
   },
   {
     "utterance": "delete the test CBU I just created",
@@ -47,7 +51,8 @@
     "difficulty": "easy",
     "alt_verbs": [],
     "entity_context": null,
-    "id": "cic-0005"
+    "id": "cic-0005",
+    "board_id": "board-cbu-operational"
   },
   {
     "utterance": "nuke everything under this CBU including all roles",
@@ -57,7 +62,8 @@
     "difficulty": "hard",
     "alt_verbs": [],
     "entity_context": null,
-    "id": "cic-0006"
+    "id": "cic-0006",
+    "board_id": "board-cbu-operational"
   },
   {
     "utterance": "create a legal entity for HSBC Holdings plc",
@@ -67,7 +73,8 @@
     "difficulty": "easy",
     "alt_verbs": [],
     "entity_context": null,
-    "id": "cic-0007"
+    "id": "cic-0007",
+    "board_id": "board-entity-management"
   },
   {
     "utterance": "add a new company",
@@ -80,7 +87,8 @@
       "party.add"
     ],
     "entity_context": null,
-    "id": "cic-0008"
+    "id": "cic-0008",
+    "board_id": "board-entity-management"
   },
   {
     "utterance": "register John Smith as a person",
@@ -90,7 +98,8 @@
     "difficulty": "medium",
     "alt_verbs": [],
     "entity_context": null,
-    "id": "cic-0009"
+    "id": "cic-0009",
+    "board_id": "board-entity-management"
   },
   {
     "utterance": "I need to add a trust -- Cayman Islands discretionary trust",
@@ -102,7 +111,8 @@
       "entity.create"
     ],
     "entity_context": null,
-    "id": "cic-0010"
+    "id": "cic-0010",
+    "board_id": "board-entity-management"
   },
   {
     "utterance": "add a limited partnership for the GP structure",
@@ -114,7 +124,8 @@
       "entity.create"
     ],
     "entity_context": null,
-    "id": "cic-0011"
+    "id": "cic-0011",
+    "board_id": "board-entity-management"
   },
   {
     "utterance": "show me all entities",
@@ -124,7 +135,8 @@
     "difficulty": "easy",
     "alt_verbs": [],
     "entity_context": null,
-    "id": "cic-0012"
+    "id": "cic-0012",
+    "board_id": "board-entity-management"
   },
   {
     "utterance": "which entities haven't been verified yet?",
@@ -136,7 +148,8 @@
       "entity.list-ghosts"
     ],
     "entity_context": null,
-    "id": "cic-0013"
+    "id": "cic-0013",
+    "board_id": "board-entity-management"
   },
   {
     "utterance": "update the registered address for this entity",
@@ -146,7 +159,8 @@
     "difficulty": "easy",
     "alt_verbs": [],
     "entity_context": null,
-    "id": "cic-0014"
+    "id": "cic-0014",
+    "board_id": "board-entity-management"
   },
   {
     "utterance": "resolve this placeholder to the real entity",
@@ -156,7 +170,8 @@
     "difficulty": "medium",
     "alt_verbs": [],
     "entity_context": null,
-    "id": "cic-0015"
+    "id": "cic-0015",
+    "board_id": "board-entity-management"
   },
   {
     "utterance": "run sanctions screening on this entity",
@@ -166,7 +181,8 @@
     "difficulty": "easy",
     "alt_verbs": [],
     "entity_context": null,
-    "id": "cic-0016"
+    "id": "cic-0016",
+    "board_id": "board-kyc-case"
   },
   {
     "utterance": "check if they're on any sanctions lists",
@@ -178,7 +194,8 @@
       "screening.sanctions"
     ],
     "entity_context": null,
-    "id": "cic-0017"
+    "id": "cic-0017",
+    "board_id": "board-kyc-case"
   },
   {
     "utterance": "is this person a PEP?",
@@ -188,7 +205,8 @@
     "difficulty": "medium",
     "alt_verbs": [],
     "entity_context": null,
-    "id": "cic-0018"
+    "id": "cic-0018",
+    "board_id": "board-kyc-case"
   },
   {
     "utterance": "check for politically exposed persons",
@@ -198,7 +216,8 @@
     "difficulty": "medium",
     "alt_verbs": [],
     "entity_context": null,
-    "id": "cic-0019"
+    "id": "cic-0019",
+    "board_id": "board-kyc-case"
   },
   {
     "utterance": "run a full screening -- sanctions, PEP, and adverse media",
@@ -213,7 +232,8 @@
       "screening.run"
     ],
     "entity_context": null,
-    "id": "cic-0020"
+    "id": "cic-0020",
+    "board_id": "board-kyc-case"
   },
   {
     "utterance": "any negative news about this company?",
@@ -223,7 +243,8 @@
     "difficulty": "medium",
     "alt_verbs": [],
     "entity_context": null,
-    "id": "cic-0021"
+    "id": "cic-0021",
+    "board_id": "board-kyc-case"
   },
   {
     "utterance": "do the AML checks",
@@ -237,7 +258,8 @@
       "screening.run"
     ],
     "entity_context": null,
-    "id": "cic-0022"
+    "id": "cic-0022",
+    "board_id": "board-kyc-case"
   },
   {
     "utterance": "screen them",
@@ -251,7 +273,8 @@
       "screening.adverse-media"
     ],
     "entity_context": null,
-    "id": "cic-0023"
+    "id": "cic-0023",
+    "board_id": "board-kyc-case"
   },
   {
     "utterance": "has anyone flagged this entity before?",
@@ -265,7 +288,8 @@
       "screening.sanctions"
     ],
     "entity_context": null,
-    "id": "cic-0024"
+    "id": "cic-0024",
+    "board_id": "board-kyc-case"
   },
   {
     "utterance": "who are the beneficial owners?",
@@ -278,7 +302,8 @@
       "ubo.list-owners"
     ],
     "entity_context": null,
-    "id": "cic-0025"
+    "id": "cic-0025",
+    "board_id": "board-kyc-case"
   },
   {
     "utterance": "show me the ownership structure",
@@ -293,7 +318,8 @@
       "ownership.compute"
     ],
     "entity_context": null,
-    "id": "cic-0026"
+    "id": "cic-0026",
+    "board_id": "board-kyc-case"
   },
   {
     "utterance": "add an ownership stake -- Vanguard holds 25% of this entity",
@@ -303,7 +329,8 @@
     "difficulty": "medium",
     "alt_verbs": [],
     "entity_context": null,
-    "id": "cic-0027"
+    "id": "cic-0027",
+    "board_id": "board-kyc-case"
   },
   {
     "utterance": "who controls this company?",
@@ -319,7 +346,8 @@
       "control.build-graph"
     ],
     "entity_context": null,
-    "id": "cic-0028"
+    "id": "cic-0028",
+    "board_id": "board-kyc-case"
   },
   {
     "utterance": "add a control relationship -- board appointment",
@@ -331,7 +359,8 @@
       "control.add"
     ],
     "entity_context": null,
-    "id": "cic-0029"
+    "id": "cic-0029",
+    "board_id": "board-kyc-case"
   },
   {
     "utterance": "calculate the UBOs for this CBU",
@@ -343,7 +372,8 @@
       "ubo.list-ubos"
     ],
     "entity_context": null,
-    "id": "cic-0030"
+    "id": "cic-0030",
+    "board_id": "board-kyc-case"
   },
   {
     "utterance": "trace the ownership chain from the top entity down",
@@ -355,7 +385,8 @@
       "ownership.trace-chain"
     ],
     "entity_context": null,
-    "id": "cic-0031"
+    "id": "cic-0031",
+    "board_id": "board-kyc-case"
   },
   {
     "utterance": "this person died last month",
@@ -365,7 +396,8 @@
     "difficulty": "expert",
     "alt_verbs": [],
     "entity_context": null,
-    "id": "cic-0032"
+    "id": "cic-0032",
+    "board_id": "board-kyc-case"
   },
   {
     "utterance": "the settlor appointed a new trustee",
@@ -375,7 +407,8 @@
     "difficulty": "expert",
     "alt_verbs": [],
     "entity_context": null,
-    "id": "cic-0033"
+    "id": "cic-0033",
+    "board_id": "board-kyc-case"
   },
   {
     "utterance": "waive the ownership verification -- low risk client",
@@ -385,7 +418,8 @@
     "difficulty": "medium",
     "alt_verbs": [],
     "entity_context": null,
-    "id": "cic-0034"
+    "id": "cic-0034",
+    "board_id": "board-kyc-case"
   },
   {
     "utterance": "ownership was transferred from Parent Co to New Holdco",
@@ -397,7 +431,8 @@
       "ubo.convergence-supersede"
     ],
     "entity_context": null,
-    "id": "cic-0035"
+    "id": "cic-0035",
+    "board_id": "board-kyc-case"
   },
   {
     "utterance": "create an umbrella fund -- UCITS, Luxembourg domiciled",
@@ -409,7 +444,8 @@
       "fund.create"
     ],
     "entity_context": null,
-    "id": "cic-0036"
+    "id": "cic-0036",
+    "board_id": "board-custody-deal"
   },
   {
     "utterance": "set up a new subfund under the umbrella",
@@ -421,7 +457,8 @@
       "fund.create"
     ],
     "entity_context": null,
-    "id": "cic-0037"
+    "id": "cic-0037",
+    "board_id": "board-custody-deal"
   },
   {
     "utterance": "add a share class -- accumulating, EUR denominated",
@@ -434,7 +471,8 @@
       "fund.create"
     ],
     "entity_context": null,
-    "id": "cic-0038"
+    "id": "cic-0038",
+    "board_id": "board-custody-deal"
   },
   {
     "utterance": "create a master-feeder structure",
@@ -448,7 +486,8 @@
       "fund.link-feeder"
     ],
     "entity_context": null,
-    "id": "cic-0039"
+    "id": "cic-0039",
+    "board_id": "board-custody-deal"
   },
   {
     "utterance": "link the Cayman feeder to the Irish master",
@@ -458,7 +497,8 @@
     "difficulty": "medium",
     "alt_verbs": [],
     "entity_context": null,
-    "id": "cic-0040"
+    "id": "cic-0040",
+    "board_id": "board-custody-deal"
   },
   {
     "utterance": "what subfunds are in this umbrella?",
@@ -468,7 +508,8 @@
     "difficulty": "easy",
     "alt_verbs": [],
     "entity_context": null,
-    "id": "cic-0041"
+    "id": "cic-0041",
+    "board_id": "board-custody-deal"
   },
   {
     "utterance": "show me all the share classes",
@@ -480,7 +521,8 @@
       "fund.list-share-classes"
     ],
     "entity_context": null,
-    "id": "cic-0042"
+    "id": "cic-0042",
+    "board_id": "board-custody-deal"
   },
   {
     "utterance": "BlackRock fund invests 30% NAV in the Vanguard fund",
@@ -492,7 +534,8 @@
       "fund.list-investors"
     ],
     "entity_context": null,
-    "id": "cic-0043"
+    "id": "cic-0043",
+    "board_id": "board-custody-deal"
   },
   {
     "utterance": "who invests in this fund?",
@@ -502,7 +545,8 @@
     "difficulty": "medium",
     "alt_verbs": [],
     "entity_context": null,
-    "id": "cic-0044"
+    "id": "cic-0044",
+    "board_id": "board-custody-deal"
   },
   {
     "utterance": "create a standalone fund -- AIF, Jersey",
@@ -515,7 +559,8 @@
       "fund.create"
     ],
     "entity_context": null,
-    "id": "cic-0045"
+    "id": "cic-0045",
+    "board_id": "board-custody-deal"
   },
   {
     "utterance": "what documents do we still need from this entity?",
@@ -525,7 +570,8 @@
     "difficulty": "medium",
     "alt_verbs": [],
     "entity_context": null,
-    "id": "cic-0046"
+    "id": "cic-0046",
+    "board_id": "board-document-solicitation"
   },
   {
     "utterance": "request the certificate of incorporation",
@@ -538,7 +584,8 @@
       "document.request"
     ],
     "entity_context": null,
-    "id": "cic-0047"
+    "id": "cic-0047",
+    "board_id": "board-document-solicitation"
   },
   {
     "utterance": "upload the passport for John Smith",
@@ -550,7 +597,8 @@
       "document.solicit"
     ],
     "entity_context": null,
-    "id": "cic-0048"
+    "id": "cic-0048",
+    "board_id": "board-document-solicitation"
   },
   {
     "utterance": "verify this document",
@@ -560,7 +608,8 @@
     "difficulty": "easy",
     "alt_verbs": [],
     "entity_context": null,
-    "id": "cic-0049"
+    "id": "cic-0049",
+    "board_id": "board-document-solicitation"
   },
   {
     "utterance": "reject the articles of association -- wrong entity name",
@@ -570,7 +619,8 @@
     "difficulty": "medium",
     "alt_verbs": [],
     "entity_context": null,
-    "id": "cic-0050"
+    "id": "cic-0050",
+    "board_id": "board-document-solicitation"
   },
   {
     "utterance": "extract the data from this uploaded document",
@@ -580,7 +630,8 @@
     "difficulty": "easy",
     "alt_verbs": [],
     "entity_context": null,
-    "id": "cic-0051"
+    "id": "cic-0051",
+    "board_id": "board-document-solicitation"
   },
   {
     "utterance": "what type of documents do we collect for limited companies?",
@@ -593,7 +644,8 @@
       "document.list-types"
     ],
     "entity_context": null,
-    "id": "cic-0052"
+    "id": "cic-0052",
+    "board_id": "board-document-solicitation"
   },
   {
     "utterance": "send out the whole doc pack for this entity",
@@ -603,7 +655,8 @@
     "difficulty": "hard",
     "alt_verbs": [],
     "entity_context": null,
-    "id": "cic-0053"
+    "id": "cic-0053",
+    "board_id": "board-document-solicitation"
   },
   {
     "utterance": "create a new deal for Allianz",
@@ -613,7 +666,8 @@
     "difficulty": "easy",
     "alt_verbs": [],
     "entity_context": null,
-    "id": "cic-0054"
+    "id": "cic-0054",
+    "board_id": "board-custody-deal"
   },
   {
     "utterance": "add BlackRock as a participant on this deal",
@@ -623,7 +677,8 @@
     "difficulty": "easy",
     "alt_verbs": [],
     "entity_context": null,
-    "id": "cic-0055"
+    "id": "cic-0055",
+    "board_id": "board-custody-deal"
   },
   {
     "utterance": "what's the status of the deal?",
@@ -635,7 +690,8 @@
       "deal.read-summary"
     ],
     "entity_context": null,
-    "id": "cic-0056"
+    "id": "cic-0056",
+    "board_id": "board-custody-deal"
   },
   {
     "utterance": "show me the deal timeline",
@@ -645,7 +701,8 @@
     "difficulty": "easy",
     "alt_verbs": [],
     "entity_context": null,
-    "id": "cic-0057"
+    "id": "cic-0057",
+    "board_id": "board-custody-deal"
   },
   {
     "utterance": "set up the rate card for custody services",
@@ -655,7 +712,8 @@
     "difficulty": "medium",
     "alt_verbs": [],
     "entity_context": null,
-    "id": "cic-0058"
+    "id": "cic-0058",
+    "board_id": "board-custody-deal"
   },
   {
     "utterance": "add a fee line -- 2bps on AUM, quarterly",
@@ -665,7 +723,8 @@
     "difficulty": "hard",
     "alt_verbs": [],
     "entity_context": null,
-    "id": "cic-0059"
+    "id": "cic-0059",
+    "board_id": "board-custody-deal"
   },
   {
     "utterance": "propose the rate card to the client",
@@ -675,7 +734,8 @@
     "difficulty": "medium",
     "alt_verbs": [],
     "entity_context": null,
-    "id": "cic-0060"
+    "id": "cic-0060",
+    "board_id": "board-custody-deal"
   },
   {
     "utterance": "the client wants to counter our pricing",
@@ -685,7 +745,8 @@
     "difficulty": "hard",
     "alt_verbs": [],
     "entity_context": null,
-    "id": "cic-0061"
+    "id": "cic-0061",
+    "board_id": "board-custody-deal"
   },
   {
     "utterance": "move the deal to approved",
@@ -695,7 +756,8 @@
     "difficulty": "medium",
     "alt_verbs": [],
     "entity_context": null,
-    "id": "cic-0062"
+    "id": "cic-0062",
+    "board_id": "board-custody-deal"
   },
   {
     "utterance": "kick off onboarding for this deal's products",
@@ -705,7 +767,8 @@
     "difficulty": "hard",
     "alt_verbs": [],
     "entity_context": null,
-    "id": "cic-0063"
+    "id": "cic-0063",
+    "board_id": "board-custody-deal"
   },
   {
     "utterance": "cancel this deal -- client withdrew",
@@ -715,7 +778,8 @@
     "difficulty": "easy",
     "alt_verbs": [],
     "entity_context": null,
-    "id": "cic-0064"
+    "id": "cic-0064",
+    "board_id": "board-custody-deal"
   },
   {
     "utterance": "look up the LEI for HSBC",
@@ -725,7 +789,8 @@
     "difficulty": "medium",
     "alt_verbs": [],
     "entity_context": null,
-    "id": "cic-0065"
+    "id": "cic-0065",
+    "board_id": "board-onboarding-intake"
   },
   {
     "utterance": "import the corporate hierarchy from GLEIF",
@@ -735,7 +800,8 @@
     "difficulty": "medium",
     "alt_verbs": [],
     "entity_context": null,
-    "id": "cic-0066"
+    "id": "cic-0066",
+    "board_id": "board-onboarding-intake"
   },
   {
     "utterance": "who is the parent company according to GLEIF?",
@@ -748,7 +814,8 @@
       "gleif.search"
     ],
     "entity_context": null,
-    "id": "cic-0067"
+    "id": "cic-0067",
+    "board_id": "board-onboarding-intake"
   },
   {
     "utterance": "import all the managed funds for this asset manager",
@@ -758,7 +825,8 @@
     "difficulty": "medium",
     "alt_verbs": [],
     "entity_context": null,
-    "id": "cic-0068"
+    "id": "cic-0068",
+    "board_id": "board-onboarding-intake"
   },
   {
     "utterance": "enrich the entity data from GLEIF",
@@ -768,7 +836,8 @@
     "difficulty": "easy",
     "alt_verbs": [],
     "entity_context": null,
-    "id": "cic-0069"
+    "id": "cic-0069",
+    "board_id": "board-onboarding-intake"
   },
   {
     "utterance": "pull in the LEI hierarchy for this client group",
@@ -778,7 +847,8 @@
     "difficulty": "hard",
     "alt_verbs": [],
     "entity_context": null,
-    "id": "cic-0070"
+    "id": "cic-0070",
+    "board_id": "board-onboarding-intake"
   },
   {
     "utterance": "compute the ownership waterfall",
@@ -788,7 +858,8 @@
     "difficulty": "medium",
     "alt_verbs": [],
     "entity_context": null,
-    "id": "cic-0071"
+    "id": "cic-0071",
+    "board_id": "board-cbu-operational"
   },
   {
     "utterance": "who ultimately controls this entity?",
@@ -804,7 +875,8 @@
       "control.list-controllers"
     ],
     "entity_context": null,
-    "id": "cic-0072"
+    "id": "cic-0072",
+    "board_id": "board-cbu-operational"
   },
   {
     "utterance": "reconcile the ownership percentages",
@@ -816,7 +888,8 @@
       "ownership.reconcile"
     ],
     "entity_context": null,
-    "id": "cic-0073"
+    "id": "cic-0073",
+    "board_id": "board-cbu-operational"
   },
   {
     "utterance": "trace the chain from Vanguard down to the subfund",
@@ -828,7 +901,8 @@
       "ubo.trace-chains"
     ],
     "entity_context": null,
-    "id": "cic-0074"
+    "id": "cic-0074",
+    "board_id": "board-cbu-operational"
   },
   {
     "utterance": "are there any gaps in the ownership structure?",
@@ -840,7 +914,8 @@
       "ubo.trace-chains"
     ],
     "entity_context": null,
-    "id": "cic-0075"
+    "id": "cic-0075",
+    "board_id": "board-cbu-operational"
   },
   {
     "utterance": "who is the board-appointed controller?",
@@ -850,7 +925,8 @@
     "difficulty": "hard",
     "alt_verbs": [],
     "entity_context": null,
-    "id": "cic-0076"
+    "id": "cic-0076",
+    "board_id": "board-kyc-case"
   },
   {
     "utterance": "import the PSC register data",
@@ -860,7 +936,8 @@
     "difficulty": "medium",
     "alt_verbs": [],
     "entity_context": null,
-    "id": "cic-0077"
+    "id": "cic-0077",
+    "board_id": "board-kyc-case"
   },
   {
     "utterance": "show me everything",
@@ -870,7 +947,8 @@
     "difficulty": "easy",
     "alt_verbs": [],
     "entity_context": null,
-    "id": "cic-0078"
+    "id": "cic-0078",
+    "board_id": "board-cbu-operational"
   },
   {
     "utterance": "load the Allianz book",
@@ -883,7 +961,8 @@
       "session.load-galaxy"
     ],
     "entity_context": null,
-    "id": "cic-0079"
+    "id": "cic-0079",
+    "board_id": "board-cbu-operational"
   },
   {
     "utterance": "zoom into this node",
@@ -896,7 +975,8 @@
       "view.drill"
     ],
     "entity_context": null,
-    "id": "cic-0080"
+    "id": "cic-0080",
+    "board_id": "board-cbu-operational"
   },
   {
     "utterance": "go back",
@@ -910,7 +990,8 @@
       "session.undo"
     ],
     "entity_context": null,
-    "id": "cic-0081"
+    "id": "cic-0081",
+    "board_id": "board-cbu-operational"
   },
   {
     "utterance": "load the Allianz cluster",
@@ -920,7 +1001,8 @@
     "difficulty": "easy",
     "alt_verbs": [],
     "entity_context": null,
-    "id": "cic-0082"
+    "id": "cic-0082",
+    "board_id": "board-cbu-operational"
   },
   {
     "utterance": "switch to the BlackRock client",
@@ -930,7 +1012,8 @@
     "difficulty": "medium",
     "alt_verbs": [],
     "entity_context": null,
-    "id": "cic-0083"
+    "id": "cic-0083",
+    "board_id": "board-cbu-operational"
   },
   {
     "utterance": "filter to UK entities only",
@@ -943,7 +1026,8 @@
       "view.refine"
     ],
     "entity_context": null,
-    "id": "cic-0084"
+    "id": "cic-0084",
+    "board_id": "board-cbu-operational"
   },
   {
     "utterance": "load the deal",
@@ -953,7 +1037,8 @@
     "difficulty": "easy",
     "alt_verbs": [],
     "entity_context": null,
-    "id": "cic-0085"
+    "id": "cic-0085",
+    "board_id": "board-custody-deal"
   },
   {
     "utterance": "show me the galaxy for Germany",
@@ -963,7 +1048,8 @@
     "difficulty": "easy",
     "alt_verbs": [],
     "entity_context": null,
-    "id": "cic-0086"
+    "id": "cic-0086",
+    "board_id": "board-cbu-operational"
   },
   {
     "utterance": "I want to work as a compliance officer",
@@ -973,7 +1059,8 @@
     "difficulty": "hard",
     "alt_verbs": [],
     "entity_context": null,
-    "id": "cic-0087"
+    "id": "cic-0087",
+    "board_id": "board-cbu-operational"
   },
   {
     "utterance": "discover the entities in this client group",
@@ -983,7 +1070,8 @@
     "difficulty": "easy",
     "alt_verbs": [],
     "entity_context": null,
-    "id": "cic-0088"
+    "id": "cic-0088",
+    "board_id": "board-cbu-operational"
   },
   {
     "utterance": "start the discovery process for this group",
@@ -993,7 +1081,8 @@
     "difficulty": "medium",
     "alt_verbs": [],
     "entity_context": null,
-    "id": "cic-0089"
+    "id": "cic-0089",
+    "board_id": "board-cbu-operational"
   },
   {
     "utterance": "confirm this entity belongs to the group",
@@ -1003,7 +1092,8 @@
     "difficulty": "medium",
     "alt_verbs": [],
     "entity_context": null,
-    "id": "cic-0090"
+    "id": "cic-0090",
+    "board_id": "board-cbu-operational"
   },
   {
     "utterance": "show me the relationships in this group",
@@ -1013,7 +1103,8 @@
     "difficulty": "easy",
     "alt_verbs": [],
     "entity_context": null,
-    "id": "cic-0091"
+    "id": "cic-0091",
+    "board_id": "board-cbu-operational"
   },
   {
     "utterance": "who are the parties in this group?",
@@ -1025,7 +1116,8 @@
       "cbu.parties"
     ],
     "entity_context": null,
-    "id": "cic-0092"
+    "id": "cic-0092",
+    "board_id": "board-cbu-operational"
   },
   {
     "utterance": "search for entities matching 'Vanguard' in this group",
@@ -1035,7 +1127,8 @@
     "difficulty": "medium",
     "alt_verbs": [],
     "entity_context": null,
-    "id": "cic-0093"
+    "id": "cic-0093",
+    "board_id": "board-cbu-operational"
   },
   {
     "utterance": "list the roles",
@@ -1047,7 +1140,8 @@
       "client-group.list-roles"
     ],
     "entity_context": null,
-    "id": "cic-0094"
+    "id": "cic-0094",
+    "board_id": "board-cbu-operational"
   },
   {
     "utterance": "add a relationship",
@@ -1060,7 +1154,8 @@
       "control.add"
     ],
     "entity_context": null,
-    "id": "cic-0095"
+    "id": "cic-0095",
+    "board_id": "board-cbu-operational"
   },
   {
     "utterance": "verify it",
@@ -1074,7 +1169,8 @@
       "cbu.verify-evidence"
     ],
     "entity_context": null,
-    "id": "cic-0096"
+    "id": "cic-0096",
+    "board_id": "board-document-solicitation"
   },
   {
     "utterance": "run the check",
@@ -1089,7 +1185,8 @@
       "cbu.parties"
     ],
     "entity_context": null,
-    "id": "cic-0097"
+    "id": "cic-0097",
+    "board_id": "board-kyc-case"
   },
   {
     "utterance": "show the structure",
@@ -1106,7 +1203,8 @@
       "control.build-graph"
     ],
     "entity_context": null,
-    "id": "cic-0098"
+    "id": "cic-0098",
+    "board_id": "board-kyc-case"
   },
   {
     "utterance": "import the data",
@@ -1122,7 +1220,8 @@
       "bods.import"
     ],
     "entity_context": null,
-    "id": "cic-0099"
+    "id": "cic-0099",
+    "board_id": "board-onboarding-intake"
   },
   {
     "utterance": "pull the BODS data for this LEI",
@@ -1132,7 +1231,8 @@
     "difficulty": "expert",
     "alt_verbs": [],
     "entity_context": null,
-    "id": "cic-0100"
+    "id": "cic-0100",
+    "board_id": "board-cbu-operational"
   },
   {
     "utterance": "run the RBA assessment",
@@ -1144,7 +1244,8 @@
       "screening.run"
     ],
     "entity_context": null,
-    "id": "cic-0101"
+    "id": "cic-0101",
+    "board_id": "board-kyc-case"
   },
   {
     "utterance": "check the PSC register",
@@ -1154,7 +1255,8 @@
     "difficulty": "expert",
     "alt_verbs": [],
     "entity_context": null,
-    "id": "cic-0102"
+    "id": "cic-0102",
+    "board_id": "board-kyc-case"
   },
   {
     "utterance": "set up the NAV calc service",
@@ -1164,7 +1266,8 @@
     "difficulty": "expert",
     "alt_verbs": [],
     "entity_context": null,
-    "id": "cic-0103"
+    "id": "cic-0103",
+    "board_id": "board-cbu-operational"
   },
   {
     "utterance": "add the TA and fund accounting",
@@ -1174,7 +1277,8 @@
     "difficulty": "expert",
     "alt_verbs": [],
     "entity_context": null,
-    "id": "cic-0104"
+    "id": "cic-0104",
+    "board_id": "board-cbu-operational"
   },
   {
     "utterance": "compute the 25% threshold test",
@@ -1187,7 +1291,8 @@
       "control.identify-ubos"
     ],
     "entity_context": null,
-    "id": "cic-0105"
+    "id": "cic-0105",
+    "board_id": "board-kyc-case"
   },
   {
     "utterance": "flag the circular ownership",
@@ -1200,7 +1305,8 @@
       "ownership.analyze-gaps"
     ],
     "entity_context": null,
-    "id": "cic-0106"
+    "id": "cic-0106",
+    "board_id": "board-cbu-operational"
   },
   {
     "utterance": "check for OFAC hits",
@@ -1210,7 +1316,8 @@
     "difficulty": "expert",
     "alt_verbs": [],
     "entity_context": null,
-    "id": "cic-0107"
+    "id": "cic-0107",
+    "board_id": "board-kyc-case"
   },
   {
     "utterance": "KYC refresh for this entity",
@@ -1226,7 +1333,8 @@
       "fund-investor.update-kyc-status"
     ],
     "entity_context": null,
-    "id": "cic-0108"
+    "id": "cic-0108",
+    "board_id": "board-kyc-case"
   },
   {
     "utterance": "nominee structure -- need to pierce the veil",
@@ -1236,7 +1344,8 @@
     "difficulty": "expert",
     "alt_verbs": [],
     "entity_context": null,
-    "id": "cic-0109"
+    "id": "cic-0109",
+    "board_id": "board-kyc-case"
   },
   {
     "utterance": "where's the CDD pack for this client?",
@@ -1246,7 +1355,8 @@
     "difficulty": "expert",
     "alt_verbs": [],
     "entity_context": null,
-    "id": "cic-0110"
+    "id": "cic-0110",
+    "board_id": "board-document-solicitation"
   },
   {
     "utterance": "teach the system that 'spin up' means create CBU",
@@ -1256,7 +1366,8 @@
     "difficulty": "easy",
     "alt_verbs": [],
     "entity_context": null,
-    "id": "cic-0111"
+    "id": "cic-0111",
+    "board_id": "board-cbu-operational"
   },
   {
     "utterance": "undo",
@@ -1266,7 +1377,8 @@
     "difficulty": "easy",
     "alt_verbs": [],
     "entity_context": null,
-    "id": "cic-0112"
+    "id": "cic-0112",
+    "board_id": "board-cbu-operational"
   },
   {
     "utterance": "what tools do you have?",
@@ -1276,7 +1388,8 @@
     "difficulty": "easy",
     "alt_verbs": [],
     "entity_context": null,
-    "id": "cic-0113"
+    "id": "cic-0113",
+    "board_id": "board-cbu-operational"
   },
   {
     "utterance": "switch to research mode",
@@ -1288,7 +1401,8 @@
       "agent.set-execution-mode"
     ],
     "entity_context": null,
-    "id": "cic-0114"
+    "id": "cic-0114",
+    "board_id": "board-cbu-operational"
   },
   {
     "utterance": "confirm",
@@ -1300,7 +1414,8 @@
       "agent.confirm-decision"
     ],
     "entity_context": null,
-    "id": "cic-0115"
+    "id": "cic-0115",
+    "board_id": "board-cbu-operational"
   },
   {
     "utterance": "no, go back",
@@ -1315,7 +1430,8 @@
       "session.undo"
     ],
     "entity_context": null,
-    "id": "cic-0116"
+    "id": "cic-0116",
+    "board_id": "board-cbu-operational"
   },
   {
     "utterance": "create a master services agreement",
@@ -1325,7 +1441,8 @@
     "difficulty": "medium",
     "alt_verbs": [],
     "entity_context": null,
-    "id": "cic-0117"
+    "id": "cic-0117",
+    "board_id": "board-cbu-operational"
   },
   {
     "utterance": "add a billing schedule -- monthly in arrears",
@@ -1335,7 +1452,8 @@
     "difficulty": "medium",
     "alt_verbs": [],
     "entity_context": null,
-    "id": "cic-0118"
+    "id": "cic-0118",
+    "board_id": "board-cbu-operational"
   },
   {
     "utterance": "what's the fee for custody on this product?",
@@ -1345,7 +1463,8 @@
     "difficulty": "hard",
     "alt_verbs": [],
     "entity_context": null,
-    "id": "cic-0119"
+    "id": "cic-0119",
+    "board_id": "board-custody-deal"
   },
   {
     "utterance": "set up a booking principal for this deal",
@@ -1355,7 +1474,8 @@
     "difficulty": "medium",
     "alt_verbs": [],
     "entity_context": null,
-    "id": "cic-0120"
+    "id": "cic-0120",
+    "board_id": "board-cbu-operational"
   },
   {
     "utterance": "which booking entity handles custody for Ireland?",
@@ -1365,7 +1485,8 @@
     "difficulty": "hard",
     "alt_verbs": [],
     "entity_context": null,
-    "id": "cic-0121"
+    "id": "cic-0121",
+    "board_id": "board-cbu-operational"
   },
   {
     "utterance": "Onboard a Luxembourg SICAV",
@@ -1375,7 +1496,8 @@
     "difficulty": "medium",
     "alt_verbs": [],
     "entity_context": null,
-    "id": "cic-0122"
+    "id": "cic-0122",
+    "board_id": "board-cbu-operational"
   },
   {
     "utterance": "Onboard this Luxembourg SICAV with three sub-funds",
@@ -1385,7 +1507,8 @@
     "difficulty": "medium",
     "alt_verbs": [],
     "entity_context": null,
-    "id": "cic-0123"
+    "id": "cic-0123",
+    "board_id": "board-cbu-operational"
   },
   {
     "utterance": "Set up an Irish ICAV fund",
@@ -1395,7 +1518,8 @@
     "difficulty": "medium",
     "alt_verbs": [],
     "entity_context": null,
-    "id": "cic-0124"
+    "id": "cic-0124",
+    "board_id": "board-cbu-operational"
   },
   {
     "utterance": "Establish a UK OEIC structure",
@@ -1405,7 +1529,8 @@
     "difficulty": "medium",
     "alt_verbs": [],
     "entity_context": null,
-    "id": "cic-0125"
+    "id": "cic-0125",
+    "board_id": "board-cbu-operational"
   },
   {
     "utterance": "Set up a US 40-Act fund",
@@ -1415,7 +1540,8 @@
     "difficulty": "medium",
     "alt_verbs": [],
     "entity_context": null,
-    "id": "cic-0126"
+    "id": "cic-0126",
+    "board_id": "board-cbu-operational"
   },
   {
     "utterance": "Set up a Luxembourg PE structure",
@@ -1425,7 +1551,8 @@
     "difficulty": "medium",
     "alt_verbs": [],
     "entity_context": null,
-    "id": "cic-0127"
+    "id": "cic-0127",
+    "board_id": "board-cbu-operational"
   },
   {
     "utterance": "Onboard a Luxembourg RAIF",
@@ -1435,7 +1562,8 @@
     "difficulty": "medium",
     "alt_verbs": [],
     "entity_context": null,
-    "id": "cic-0128"
+    "id": "cic-0128",
+    "board_id": "board-cbu-operational"
   },
   {
     "utterance": "Run full screening on this entity",
@@ -1445,7 +1573,8 @@
     "difficulty": "medium",
     "alt_verbs": [],
     "entity_context": null,
-    "id": "cic-0129"
+    "id": "cic-0129",
+    "board_id": "board-kyc-case"
   },
   {
     "utterance": "Screen this party for PEP, sanctions, and adverse media",
@@ -1457,7 +1586,8 @@
       "screening.run"
     ],
     "entity_context": null,
-    "id": "cic-0130"
+    "id": "cic-0130",
+    "board_id": "board-kyc-case"
   },
   {
     "utterance": "Do the complete KYC review on this party",
@@ -1470,7 +1600,8 @@
       "kyc-case.create"
     ],
     "entity_context": null,
-    "id": "cic-0131"
+    "id": "cic-0131",
+    "board_id": "board-kyc-case"
   },
   {
     "utterance": "Run KYC screening and collect all documents",
@@ -1483,7 +1614,8 @@
       "screening.full"
     ],
     "entity_context": null,
-    "id": "cic-0132"
+    "id": "cic-0132",
+    "board_id": "board-kyc-case"
   },
   {
     "utterance": "Collect KYC documents from this party",
@@ -1493,7 +1625,8 @@
     "difficulty": "medium",
     "alt_verbs": [],
     "entity_context": null,
-    "id": "cic-0133"
+    "id": "cic-0133",
+    "board_id": "board-kyc-case"
   },
   {
     "utterance": "Request identity documents for due diligence",
@@ -1506,7 +1639,8 @@
       "document.solicit"
     ],
     "entity_context": null,
-    "id": "cic-0134"
+    "id": "cic-0134",
+    "board_id": "board-kyc-case"
   },
   {
     "utterance": "Set up a cross-border hedge fund",
@@ -1516,7 +1650,8 @@
     "difficulty": "medium",
     "alt_verbs": [],
     "entity_context": null,
-    "id": "cic-0135"
+    "id": "cic-0135",
+    "board_id": "board-cbu-operational"
   },
   {
     "utterance": "Launch a cross-border PE fund structure",
@@ -1526,7 +1661,8 @@
     "difficulty": "medium",
     "alt_verbs": [],
     "entity_context": null,
-    "id": "cic-0136"
+    "id": "cic-0136",
+    "board_id": "board-cbu-operational"
   },
   {
     "utterance": "I need to onboard a new fund in Ireland",
@@ -1536,7 +1672,8 @@
     "difficulty": "hard",
     "alt_verbs": [],
     "entity_context": null,
-    "id": "cic-0137"
+    "id": "cic-0137",
+    "board_id": "board-cbu-operational"
   },
   {
     "utterance": "Can you help me set up a Lux UCITS SICAV structure?",
@@ -1546,7 +1683,8 @@
     "difficulty": "hard",
     "alt_verbs": [],
     "entity_context": null,
-    "id": "cic-0138"
+    "id": "cic-0138",
+    "board_id": "board-cbu-operational"
   },
   {
     "utterance": "Set up Lux SICAV structure",
@@ -1556,7 +1694,8 @@
     "difficulty": "easy",
     "alt_verbs": [],
     "entity_context": null,
-    "id": "cic-0139"
+    "id": "cic-0139",
+    "board_id": "board-cbu-operational"
   },
   {
     "utterance": "Create an Irish ICAV",
@@ -1566,7 +1705,8 @@
     "difficulty": "easy",
     "alt_verbs": [],
     "entity_context": null,
-    "id": "cic-0140"
+    "id": "cic-0140",
+    "board_id": "board-cbu-operational"
   },
   {
     "utterance": "Open a new KYC case",
@@ -1579,7 +1719,8 @@
       "case.open"
     ],
     "entity_context": null,
-    "id": "cic-0141"
+    "id": "cic-0141",
+    "board_id": "board-kyc-case"
   },
   {
     "utterance": "Create a trading mandate",
@@ -1589,7 +1730,8 @@
     "difficulty": "easy",
     "alt_verbs": [],
     "entity_context": null,
-    "id": "cic-0142"
+    "id": "cic-0142",
+    "board_id": "board-cbu-operational"
   },
   {
     "utterance": "Add a new party",
@@ -1599,7 +1741,8 @@
     "difficulty": "easy",
     "alt_verbs": [],
     "entity_context": null,
-    "id": "cic-0143"
+    "id": "cic-0143",
+    "board_id": "board-entity-management"
   },
   {
     "utterance": "Lux RAIF setup",
@@ -1609,7 +1752,8 @@
     "difficulty": "easy",
     "alt_verbs": [],
     "entity_context": null,
-    "id": "cic-0144"
+    "id": "cic-0144",
+    "board_id": "board-cbu-operational"
   },
   {
     "utterance": "UK OEIC structure",
@@ -1621,7 +1765,8 @@
       "ubo.trace-chains"
     ],
     "entity_context": null,
-    "id": "cic-0145"
+    "id": "cic-0145",
+    "board_id": "board-cbu-operational"
   },
   {
     "utterance": "Run full screening",
@@ -1631,7 +1776,8 @@
     "difficulty": "easy",
     "alt_verbs": [],
     "entity_context": null,
-    "id": "cic-0146"
+    "id": "cic-0146",
+    "board_id": "board-kyc-case"
   },
   {
     "utterance": "PEP check",
@@ -1643,7 +1789,8 @@
       "screening.pep"
     ],
     "entity_context": null,
-    "id": "cic-0147"
+    "id": "cic-0147",
+    "board_id": "board-kyc-case"
   },
   {
     "utterance": "Sanctions check",
@@ -1655,7 +1802,8 @@
       "screening.sanctions"
     ],
     "entity_context": null,
-    "id": "cic-0148"
+    "id": "cic-0148",
+    "board_id": "board-kyc-case"
   },
   {
     "utterance": "Adverse media check",
@@ -1667,7 +1815,8 @@
       "screening.adverse-media"
     ],
     "entity_context": null,
-    "id": "cic-0149"
+    "id": "cic-0149",
+    "board_id": "board-kyc-case"
   },
   {
     "utterance": "Collect documents for KYC",
@@ -1677,7 +1826,8 @@
     "difficulty": "easy",
     "alt_verbs": [],
     "entity_context": null,
-    "id": "cic-0150"
+    "id": "cic-0150",
+    "board_id": "board-kyc-case"
   },
   {
     "utterance": "Full KYC review",
@@ -1687,7 +1837,8 @@
     "difficulty": "easy",
     "alt_verbs": [],
     "entity_context": null,
-    "id": "cic-0151"
+    "id": "cic-0151",
+    "board_id": "board-kyc-case"
   },
   {
     "utterance": "Check case readiness",
@@ -1697,7 +1848,8 @@
     "difficulty": "easy",
     "alt_verbs": [],
     "entity_context": null,
-    "id": "cic-0152"
+    "id": "cic-0152",
+    "board_id": "board-kyc-case"
   },
   {
     "utterance": "Create an umbrella fund",
@@ -1709,7 +1861,8 @@
       "fund.create"
     ],
     "entity_context": null,
-    "id": "cic-0153"
+    "id": "cic-0153",
+    "board_id": "board-custody-deal"
   },
   {
     "utterance": "Run sanctions screening",
@@ -1722,7 +1875,8 @@
       "screening.sanctions"
     ],
     "entity_context": null,
-    "id": "cic-0154"
+    "id": "cic-0154",
+    "board_id": "board-kyc-case"
   },
   {
     "utterance": "Add a role to this entity",
@@ -1732,7 +1886,8 @@
     "difficulty": "medium",
     "alt_verbs": [],
     "entity_context": null,
-    "id": "cic-0155"
+    "id": "cic-0155",
+    "board_id": "board-cbu-operational"
   },
   {
     "utterance": "Check KYC case status",
@@ -1745,7 +1900,8 @@
       "kyc-case.update-status"
     ],
     "entity_context": null,
-    "id": "cic-0156"
+    "id": "cic-0156",
+    "board_id": "board-kyc-case"
   },
   {
     "utterance": "Run the full KYC onboarding process with screening and documents",
@@ -1759,7 +1915,8 @@
       "case.open"
     ],
     "entity_context": null,
-    "id": "cic-0157"
+    "id": "cic-0157",
+    "board_id": "board-cbu-operational"
   },
   {
     "utterance": "Complete the KYC process including case screening and document collection",
@@ -1775,7 +1932,8 @@
       "case.open"
     ],
     "entity_context": null,
-    "id": "cic-0158"
+    "id": "cic-0158",
+    "board_id": "board-kyc-case"
   },
   {
     "utterance": "Do the full KYC onboarding for this client",
@@ -1790,7 +1948,8 @@
       "case.open"
     ],
     "entity_context": null,
-    "id": "cic-0159"
+    "id": "cic-0159",
+    "board_id": "board-kyc-case"
   },
   {
     "utterance": "Open a KYC case and run full screening",
@@ -1802,7 +1961,8 @@
       "kyc-case.create"
     ],
     "entity_context": null,
-    "id": "cic-0160"
+    "id": "cic-0160",
+    "board_id": "board-cbu-operational"
   },
   {
     "utterance": "Create a new KYC case with screening for this party",
@@ -1815,7 +1975,8 @@
       "screening.full"
     ],
     "entity_context": null,
-    "id": "cic-0161"
+    "id": "cic-0161",
+    "board_id": "board-kyc-case"
   },
   {
     "utterance": "Open a case and collect the KYC documents",
@@ -1829,7 +1990,8 @@
       "case.open"
     ],
     "entity_context": null,
-    "id": "cic-0162"
+    "id": "cic-0162",
+    "board_id": "board-kyc-case"
   },
   {
     "utterance": "Set up a new case and request identity documents",
@@ -1843,7 +2005,8 @@
       "case.open"
     ],
     "entity_context": null,
-    "id": "cic-0163"
+    "id": "cic-0163",
+    "board_id": "board-kyc-case"
   },
   {
     "utterance": "check attribute gaps",
@@ -1853,7 +2016,8 @@
     "difficulty": "easy",
     "alt_verbs": [],
     "entity_context": null,
-    "id": "cic-0164"
+    "id": "cic-0164",
+    "board_id": "board-cbu-operational"
   },
   {
     "utterance": "what attributes are missing from SRDEFs",
@@ -1863,7 +2027,8 @@
     "difficulty": "medium",
     "alt_verbs": [],
     "entity_context": null,
-    "id": "cic-0165"
+    "id": "cic-0165",
+    "board_id": "board-cbu-operational"
   },
   {
     "utterance": "sync service resource definitions",
@@ -1873,7 +2038,8 @@
     "difficulty": "easy",
     "alt_verbs": [],
     "entity_context": null,
-    "id": "cic-0166"
+    "id": "cic-0166",
+    "board_id": "board-cbu-operational"
   },
   {
     "utterance": "reload SRDEF configuration",
@@ -1883,7 +2049,8 @@
     "difficulty": "medium",
     "alt_verbs": [],
     "entity_context": null,
-    "id": "cic-0167"
+    "id": "cic-0167",
+    "board_id": "board-cbu-operational"
   },
   {
     "utterance": "bridge ungoverned attributes to semos",
@@ -1893,7 +2060,8 @@
     "difficulty": "easy",
     "alt_verbs": [],
     "entity_context": null,
-    "id": "cic-0168"
+    "id": "cic-0168",
+    "board_id": "board-cbu-operational"
   },
   {
     "utterance": "govern existing attributes in semantic os",
@@ -1903,7 +2071,8 @@
     "difficulty": "medium",
     "alt_verbs": [],
     "entity_context": null,
-    "id": "cic-0169"
+    "id": "cic-0169",
+    "board_id": "board-cbu-operational"
   },
   {
     "utterance": "recompute stale derived values",
@@ -1913,7 +2082,8 @@
     "difficulty": "easy",
     "alt_verbs": [],
     "entity_context": null,
-    "id": "cic-0170"
+    "id": "cic-0170",
+    "board_id": "board-cbu-operational"
   },
   {
     "utterance": "refresh derived attributes",
@@ -1923,7 +2093,8 @@
     "difficulty": "medium",
     "alt_verbs": [],
     "entity_context": null,
-    "id": "cic-0171"
+    "id": "cic-0171",
+    "board_id": "board-cbu-operational"
   },
   {
     "utterance": "define a new attribute for KYC risk",
@@ -1933,7 +2104,8 @@
     "difficulty": "medium",
     "alt_verbs": [],
     "entity_context": null,
-    "id": "cic-0172"
+    "id": "cic-0172",
+    "board_id": "board-cbu-operational"
   },
   {
     "utterance": "record typed attribute value",
@@ -1943,7 +2115,8 @@
     "difficulty": "easy",
     "alt_verbs": [],
     "entity_context": null,
-    "id": "cic-0173"
+    "id": "cic-0173",
+    "board_id": "board-cbu-operational"
   },
   {
     "utterance": "list typed attributes for entity",
@@ -1953,7 +2126,8 @@
     "difficulty": "easy",
     "alt_verbs": [],
     "entity_context": null,
-    "id": "cic-0174"
+    "id": "cic-0174",
+    "board_id": "board-cbu-operational"
   },
   {
     "utterance": "compose a changeset",
@@ -1963,7 +2137,8 @@
     "difficulty": "easy",
     "alt_verbs": [],
     "entity_context": null,
-    "id": "cic-0175"
+    "id": "cic-0175",
+    "board_id": "board-cbu-operational"
   },
   {
     "utterance": "publish registry changes",
@@ -1973,7 +2148,8 @@
     "difficulty": "medium",
     "alt_verbs": [],
     "entity_context": null,
-    "id": "cic-0176"
+    "id": "cic-0176",
+    "board_id": "board-cbu-operational"
   },
   {
     "utterance": "dry run the changeset",
@@ -1983,7 +2159,8 @@
     "difficulty": "medium",
     "alt_verbs": [],
     "entity_context": null,
-    "id": "cic-0177"
+    "id": "cic-0177",
+    "board_id": "board-cbu-operational"
   },
   {
     "utterance": "inspect attribute definition",
@@ -1993,7 +2170,8 @@
     "difficulty": "easy",
     "alt_verbs": [],
     "entity_context": null,
-    "id": "cic-0178"
+    "id": "cic-0178",
+    "board_id": "board-cbu-operational"
   },
   {
     "utterance": "create system flag attribute",
@@ -2003,7 +2181,8 @@
     "difficulty": "easy",
     "alt_verbs": [],
     "entity_context": null,
-    "id": "cic-0179"
+    "id": "cic-0179",
+    "board_id": "board-cbu-operational"
   },
   {
     "utterance": "add a system processing flag for routing",
@@ -2013,7 +2192,8 @@
     "difficulty": "medium",
     "alt_verbs": [],
     "entity_context": null,
-    "id": "cic-0180"
+    "id": "cic-0180",
+    "board_id": "board-cbu-operational"
   },
   {
     "utterance": "register an internal system attribute for operations",
@@ -2023,7 +2203,8 @@
     "difficulty": "medium",
     "alt_verbs": [],
     "entity_context": null,
-    "id": "cic-0181"
+    "id": "cic-0181",
+    "board_id": "board-cbu-operational"
   },
   {
     "utterance": "provision internal processing marker",
@@ -2033,7 +2214,8 @@
     "difficulty": "easy",
     "alt_verbs": [],
     "entity_context": null,
-    "id": "cic-0182"
+    "id": "cic-0182",
+    "board_id": "board-cbu-operational"
   },
   {
     "utterance": "new internal attribute for system use",
@@ -2043,7 +2225,8 @@
     "difficulty": "easy",
     "alt_verbs": [],
     "entity_context": null,
-    "id": "cic-0183"
+    "id": "cic-0183",
+    "board_id": "board-cbu-operational"
   },
   {
     "utterance": "define an operational system marker attribute",
@@ -2053,7 +2236,8 @@
     "difficulty": "medium",
     "alt_verbs": [],
     "entity_context": null,
-    "id": "cic-0184"
+    "id": "cic-0184",
+    "board_id": "board-cbu-operational"
   },
   {
     "utterance": "patch system flag rules",
@@ -2063,7 +2247,8 @@
     "difficulty": "easy",
     "alt_verbs": [],
     "entity_context": null,
-    "id": "cic-0185"
+    "id": "cic-0185",
+    "board_id": "board-cbu-operational"
   },
   {
     "utterance": "change the system flag requirements",
@@ -2073,7 +2258,8 @@
     "difficulty": "medium",
     "alt_verbs": [],
     "entity_context": null,
-    "id": "cic-0186"
+    "id": "cic-0186",
+    "board_id": "board-cbu-operational"
   },
   {
     "utterance": "modify internal attribute constraints",
@@ -2083,7 +2269,8 @@
     "difficulty": "easy",
     "alt_verbs": [],
     "entity_context": null,
-    "id": "cic-0187"
+    "id": "cic-0187",
+    "board_id": "board-cbu-operational"
   },
   {
     "utterance": "adjust internal system attribute settings",
@@ -2093,7 +2280,8 @@
     "difficulty": "medium",
     "alt_verbs": [],
     "entity_context": null,
-    "id": "cic-0188"
+    "id": "cic-0188",
+    "board_id": "board-cbu-operational"
   },
   {
     "utterance": "create a new deal",
@@ -2103,7 +2291,8 @@
     "difficulty": "easy",
     "alt_verbs": [],
     "entity_context": null,
-    "id": "cic-0189"
+    "id": "cic-0189",
+    "board_id": "board-custody-deal"
   },
   {
     "utterance": "start a commercial deal for BlackRock",
@@ -2115,7 +2304,8 @@
       "session.load-cluster"
     ],
     "entity_context": null,
-    "id": "cic-0190"
+    "id": "cic-0190",
+    "board_id": "board-custody-deal"
   },
   {
     "utterance": "show deal status",
@@ -2127,7 +2317,8 @@
       "deal.list"
     ],
     "entity_context": null,
-    "id": "cic-0191"
+    "id": "cic-0191",
+    "board_id": "board-custody-deal"
   },
   {
     "utterance": "list all active deals",
@@ -2137,7 +2328,8 @@
     "difficulty": "easy",
     "alt_verbs": [],
     "entity_context": null,
-    "id": "cic-0192"
+    "id": "cic-0192",
+    "board_id": "board-custody-deal"
   },
   {
     "utterance": "create rate card for this deal",
@@ -2147,7 +2339,8 @@
     "difficulty": "medium",
     "alt_verbs": [],
     "entity_context": null,
-    "id": "cic-0193"
+    "id": "cic-0193",
+    "board_id": "board-custody-deal"
   },
   {
     "utterance": "add a contract to the deal",
@@ -2159,7 +2352,8 @@
       "contract.create"
     ],
     "entity_context": null,
-    "id": "cic-0194"
+    "id": "cic-0194",
+    "board_id": "board-custody-deal"
   },
   {
     "utterance": "negotiate rate card line",
@@ -2171,7 +2365,8 @@
       "deal.add-rate-card-line"
     ],
     "entity_context": null,
-    "id": "cic-0195"
+    "id": "cic-0195",
+    "board_id": "board-custody-deal"
   },
   {
     "utterance": "activate this deal",
@@ -2184,7 +2379,8 @@
       "session.load-deal"
     ],
     "entity_context": null,
-    "id": "cic-0196"
+    "id": "cic-0196",
+    "board_id": "board-custody-deal"
   },
   {
     "utterance": "request onboarding for this deal",
@@ -2194,7 +2390,8 @@
     "difficulty": "medium",
     "alt_verbs": [],
     "entity_context": null,
-    "id": "cic-0197"
+    "id": "cic-0197",
+    "board_id": "board-custody-deal"
   },
   {
     "utterance": "create billing profile",
@@ -2204,7 +2401,8 @@
     "difficulty": "medium",
     "alt_verbs": [],
     "entity_context": null,
-    "id": "cic-0198"
+    "id": "cic-0198",
+    "board_id": "board-cbu-operational"
   },
   {
     "utterance": "show contract details",
@@ -2216,7 +2414,8 @@
       "contract.list"
     ],
     "entity_context": null,
-    "id": "cic-0199"
+    "id": "cic-0199",
+    "board_id": "board-cbu-operational"
   },
   {
     "utterance": "cancel the deal",
@@ -2226,7 +2425,8 @@
     "difficulty": "easy",
     "alt_verbs": [],
     "entity_context": null,
-    "id": "cic-0200"
+    "id": "cic-0200",
+    "board_id": "board-custody-deal"
   },
   {
     "utterance": "create a new CBU",
@@ -2236,7 +2436,8 @@
     "difficulty": "easy",
     "alt_verbs": [],
     "entity_context": null,
-    "id": "cic-0201"
+    "id": "cic-0201",
+    "board_id": "board-cbu-operational"
   },
   {
     "utterance": "set up a Luxembourg SICAV",
@@ -2249,7 +2450,8 @@
       "struct.lux.ucits.sicav"
     ],
     "entity_context": null,
-    "id": "cic-0202"
+    "id": "cic-0202",
+    "board_id": "board-cbu-operational"
   },
   {
     "utterance": "list all CBUs",
@@ -2259,7 +2461,8 @@
     "difficulty": "easy",
     "alt_verbs": [],
     "entity_context": null,
-    "id": "cic-0203"
+    "id": "cic-0203",
+    "board_id": "board-cbu-operational"
   },
   {
     "utterance": "read CBU details",
@@ -2271,7 +2474,8 @@
       "cbu.list"
     ],
     "entity_context": null,
-    "id": "cic-0204"
+    "id": "cic-0204",
+    "board_id": "board-cbu-operational"
   },
   {
     "utterance": "suspend this CBU",
@@ -2283,7 +2487,8 @@
       "cbu.delete"
     ],
     "entity_context": null,
-    "id": "cic-0205"
+    "id": "cic-0205",
+    "board_id": "board-cbu-operational"
   },
   {
     "utterance": "assign custody product to CBU",
@@ -2296,7 +2501,8 @@
       "cbu.add-product"
     ],
     "entity_context": null,
-    "id": "cic-0206"
+    "id": "cic-0206",
+    "board_id": "board-cbu-operational"
   },
   {
     "utterance": "add depositary role to entity",
@@ -2308,7 +2514,8 @@
       "entity.assign-role"
     ],
     "entity_context": null,
-    "id": "cic-0207"
+    "id": "cic-0207",
+    "board_id": "board-cbu-operational"
   },
   {
     "utterance": "create sub-fund",
@@ -2320,7 +2527,8 @@
       "fund.create"
     ],
     "entity_context": null,
-    "id": "cic-0208"
+    "id": "cic-0208",
+    "board_id": "board-cbu-operational"
   },
   {
     "utterance": "create share class for this fund",
@@ -2332,7 +2540,8 @@
       "share-class.create"
     ],
     "entity_context": null,
-    "id": "cic-0209"
+    "id": "cic-0209",
+    "board_id": "board-custody-deal"
   },
   {
     "utterance": "show entity details",
@@ -2344,7 +2553,8 @@
       "entity.list"
     ],
     "entity_context": null,
-    "id": "cic-0210"
+    "id": "cic-0210",
+    "board_id": "board-entity-management"
   },
   {
     "utterance": "create a trading profile",
@@ -2354,7 +2564,8 @@
     "difficulty": "medium",
     "alt_verbs": [],
     "entity_context": null,
-    "id": "cic-0211"
+    "id": "cic-0211",
+    "board_id": "board-cbu-operational"
   },
   {
     "utterance": "rename the CBU",
@@ -2366,7 +2577,8 @@
       "cbu.update"
     ],
     "entity_context": null,
-    "id": "cic-0212"
+    "id": "cic-0212",
+    "board_id": "board-cbu-operational"
   },
   {
     "utterance": "open a KYC case",
@@ -2379,7 +2591,8 @@
       "case.open"
     ],
     "entity_context": null,
-    "id": "cic-0213"
+    "id": "cic-0213",
+    "board_id": "board-kyc-case"
   },
   {
     "utterance": "start KYC review for new client",
@@ -2391,7 +2604,8 @@
       "kyc.create-case"
     ],
     "entity_context": null,
-    "id": "cic-0214"
+    "id": "cic-0214",
+    "board_id": "board-kyc-case"
   },
   {
     "utterance": "check for PEP status",
@@ -2403,7 +2617,8 @@
       "screening.pep"
     ],
     "entity_context": null,
-    "id": "cic-0215"
+    "id": "cic-0215",
+    "board_id": "board-kyc-case"
   },
   {
     "utterance": "solicit passport document",
@@ -2413,7 +2628,8 @@
     "difficulty": "medium",
     "alt_verbs": [],
     "entity_context": null,
-    "id": "cic-0216"
+    "id": "cic-0216",
+    "board_id": "board-document-solicitation"
   },
   {
     "utterance": "discover UBO structure",
@@ -2425,7 +2641,8 @@
       "ubo.compute-chains"
     ],
     "entity_context": null,
-    "id": "cic-0217"
+    "id": "cic-0217",
+    "board_id": "board-kyc-case"
   },
   {
     "utterance": "set risk rating to high",
@@ -2437,7 +2654,8 @@
       "kyc.set-risk"
     ],
     "entity_context": null,
-    "id": "cic-0218"
+    "id": "cic-0218",
+    "board_id": "board-kyc-case"
   },
   {
     "utterance": "approve KYC case",
@@ -2451,7 +2669,8 @@
       "case.approve"
     ],
     "entity_context": null,
-    "id": "cic-0219"
+    "id": "cic-0219",
+    "board_id": "board-kyc-case"
   },
   {
     "utterance": "list outstanding KYC requirements",
@@ -2463,7 +2682,8 @@
       "requirement.list"
     ],
     "entity_context": null,
-    "id": "cic-0220"
+    "id": "cic-0220",
+    "board_id": "board-cbu-operational"
   },
   {
     "utterance": "create entity workstream",
@@ -2473,7 +2693,8 @@
     "difficulty": "medium",
     "alt_verbs": [],
     "entity_context": null,
-    "id": "cic-0221"
+    "id": "cic-0221",
+    "board_id": "board-cbu-operational"
   },
   {
     "utterance": "add identifier to entity",
@@ -2485,7 +2706,8 @@
       "party.assign-identifier"
     ],
     "entity_context": null,
-    "id": "cic-0222"
+    "id": "cic-0222",
+    "board_id": "board-cbu-operational"
   },
   {
     "utterance": "evaluate tollgate readiness",
@@ -2497,7 +2719,8 @@
       "tollgate.get-decision-readiness"
     ],
     "entity_context": null,
-    "id": "cic-0223"
+    "id": "cic-0223",
+    "board_id": "board-cbu-operational"
   },
   {
     "utterance": "list all products",
@@ -2507,7 +2730,8 @@
     "difficulty": "easy",
     "alt_verbs": [],
     "entity_context": null,
-    "id": "cic-0224"
+    "id": "cic-0224",
+    "board_id": "board-cbu-operational"
   },
   {
     "utterance": "show product details",
@@ -2517,7 +2741,8 @@
     "difficulty": "easy",
     "alt_verbs": [],
     "entity_context": null,
-    "id": "cic-0225"
+    "id": "cic-0225",
+    "board_id": "board-cbu-operational"
   },
   {
     "utterance": "list services for this product",
@@ -2527,7 +2752,8 @@
     "difficulty": "medium",
     "alt_verbs": [],
     "entity_context": null,
-    "id": "cic-0226"
+    "id": "cic-0226",
+    "board_id": "board-cbu-operational"
   },
   {
     "utterance": "browse service resources",
@@ -2537,7 +2763,8 @@
     "difficulty": "medium",
     "alt_verbs": [],
     "entity_context": null,
-    "id": "cic-0227"
+    "id": "cic-0227",
+    "board_id": "board-cbu-operational"
   },
   {
     "utterance": "show resource attributes",
@@ -2547,7 +2774,8 @@
     "difficulty": "medium",
     "alt_verbs": [],
     "entity_context": null,
-    "id": "cic-0228"
+    "id": "cic-0228",
+    "board_id": "board-cbu-operational"
   },
   {
     "utterance": "what services does custody provide",
@@ -2559,7 +2787,8 @@
       "service.list"
     ],
     "entity_context": null,
-    "id": "cic-0229"
+    "id": "cic-0229",
+    "board_id": "board-cbu-operational"
   },
   {
     "utterance": "check resource attribute requirements",
@@ -2569,7 +2798,8 @@
     "difficulty": "hard",
     "alt_verbs": [],
     "entity_context": null,
-    "id": "cic-0230"
+    "id": "cic-0230",
+    "board_id": "board-cbu-operational"
   },
   {
     "utterance": "list all service types",
@@ -2579,7 +2809,8 @@
     "difficulty": "easy",
     "alt_verbs": [],
     "entity_context": null,
-    "id": "cic-0231"
+    "id": "cic-0231",
+    "board_id": "board-cbu-operational"
   },
   {
     "utterance": "request onboarding",
@@ -2589,7 +2820,8 @@
     "difficulty": "easy",
     "alt_verbs": [],
     "entity_context": null,
-    "id": "cic-0232"
+    "id": "cic-0232",
+    "board_id": "board-custody-deal"
   },
   {
     "utterance": "submit onboarding handoff",
@@ -2601,7 +2833,8 @@
       "deal.request-onboarding-batch"
     ],
     "entity_context": null,
-    "id": "cic-0233"
+    "id": "cic-0233",
+    "board_id": "board-custody-deal"
   },
   {
     "utterance": "set up a Luxembourg fund book",
@@ -2614,7 +2847,8 @@
       "struct.lux.ucits.sicav"
     ],
     "entity_context": null,
-    "id": "cic-0234"
+    "id": "cic-0234",
+    "board_id": "board-cbu-operational"
   },
   {
     "utterance": "configure UCITS SICAV structure",
@@ -2627,7 +2861,8 @@
       "struct.lux.ucits.sicav"
     ],
     "entity_context": null,
-    "id": "cic-0235"
+    "id": "cic-0235",
+    "board_id": "board-cbu-operational"
   },
   {
     "utterance": "onboard a cross-border hedge fund",
@@ -2640,7 +2875,8 @@
       "struct.hedge.cross-border"
     ],
     "entity_context": null,
-    "id": "cic-0236"
+    "id": "cic-0236",
+    "board_id": "board-cbu-operational"
   },
   {
     "utterance": "handoff deal to operations",
@@ -2650,7 +2886,8 @@
     "difficulty": "medium",
     "alt_verbs": [],
     "entity_context": null,
-    "id": "cic-0237"
+    "id": "cic-0237",
+    "board_id": "board-custody-deal"
   },
   {
     "utterance": "open a new client KYC case",
@@ -2663,7 +2900,8 @@
       "case.open"
     ],
     "entity_context": null,
-    "id": "cic-0238"
+    "id": "cic-0238",
+    "board_id": "board-kyc-case"
   },
   {
     "utterance": "show trading matrix",
@@ -2675,7 +2913,8 @@
       "trading-profile.list"
     ],
     "entity_context": null,
-    "id": "cic-0239"
+    "id": "cic-0239",
+    "board_id": "board-cbu-operational"
   },
   {
     "utterance": "import trading profile",
@@ -2685,7 +2924,8 @@
     "difficulty": "easy",
     "alt_verbs": [],
     "entity_context": null,
-    "id": "cic-0240"
+    "id": "cic-0240",
+    "board_id": "board-cbu-operational"
   },
   {
     "utterance": "configure counterparty limits",
@@ -2698,7 +2938,8 @@
       "trading-profile.add-csa-config"
     ],
     "entity_context": null,
-    "id": "cic-0241"
+    "id": "cic-0241",
+    "board_id": "board-cbu-operational"
   },
   {
     "utterance": "list instrument classes",
@@ -2708,7 +2949,8 @@
     "difficulty": "easy",
     "alt_verbs": [],
     "entity_context": null,
-    "id": "cic-0242"
+    "id": "cic-0242",
+    "board_id": "board-cbu-operational"
   },
   {
     "utterance": "validate go-live readiness",
@@ -2718,7 +2960,8 @@
     "difficulty": "hard",
     "alt_verbs": [],
     "entity_context": null,
-    "id": "cic-0243"
+    "id": "cic-0243",
+    "board_id": "board-cbu-operational"
   },
   {
     "utterance": "set CA policy for this CBU",
@@ -2731,7 +2974,8 @@
       "trading-profile.ca.enable-event-types"
     ],
     "entity_context": null,
-    "id": "cic-0244"
+    "id": "cic-0244",
+    "board_id": "board-cbu-operational"
   },
   {
     "utterance": "spin up a new fund",
@@ -2743,7 +2987,8 @@
       "fund.create"
     ],
     "entity_context": null,
-    "id": "cic-0245"
+    "id": "cic-0245",
+    "board_id": "board-cbu-operational"
   },
   {
     "utterance": "who owns this thing?",
@@ -2758,7 +3003,8 @@
       "ubo.add-ownership"
     ],
     "entity_context": null,
-    "id": "cic-0246"
+    "id": "cic-0246",
+    "board_id": "board-kyc-case"
   },
   {
     "utterance": "are we good to go?",
@@ -2770,7 +3016,8 @@
       "trading-profile.validate-go-live-ready"
     ],
     "entity_context": null,
-    "id": "cic-0247"
+    "id": "cic-0247",
+    "board_id": "board-cbu-operational"
   },
   {
     "utterance": "close it out",
@@ -2782,7 +3029,8 @@
       "deal.cancel"
     ],
     "entity_context": null,
-    "id": "cic-0248"
+    "id": "cic-0248",
+    "board_id": "board-kyc-case"
   },
   {
     "utterance": "kill this deal",
@@ -2792,7 +3040,8 @@
     "difficulty": "medium",
     "alt_verbs": [],
     "entity_context": null,
-    "id": "cic-0249"
+    "id": "cic-0249",
+    "board_id": "board-custody-deal"
   },
   {
     "utterance": "chase the passport",
@@ -2804,7 +3053,8 @@
       "document.chase"
     ],
     "entity_context": null,
-    "id": "cic-0250"
+    "id": "cic-0250",
+    "board_id": "board-document-solicitation"
   },
   {
     "utterance": "run EDD",
@@ -2817,7 +3067,8 @@
       "screening.pep"
     ],
     "entity_context": null,
-    "id": "cic-0251"
+    "id": "cic-0251",
+    "board_id": "board-kyc-case"
   },
   {
     "utterance": "pull the cap table",
@@ -2829,7 +3080,8 @@
       "capital.cap-table"
     ],
     "entity_context": null,
-    "id": "cic-0252"
+    "id": "cic-0252",
+    "board_id": "board-cbu-operational"
   },
   {
     "utterance": "what's the LEI?",
@@ -2842,7 +3094,8 @@
       "gleif.lookup-lei"
     ],
     "entity_context": null,
-    "id": "cic-0253"
+    "id": "cic-0253",
+    "board_id": "board-onboarding-intake"
   },
   {
     "utterance": "any sanctions hits?",
@@ -2854,7 +3107,8 @@
       "screening.review-hit"
     ],
     "entity_context": null,
-    "id": "cic-0254"
+    "id": "cic-0254",
+    "board_id": "board-kyc-case"
   },
   {
     "utterance": "sign the IMA",
@@ -2867,7 +3121,8 @@
       "deal.add-contract"
     ],
     "entity_context": null,
-    "id": "cic-0255"
+    "id": "cic-0255",
+    "board_id": "board-cbu-operational"
   },
   {
     "utterance": "set up the SSIs",
@@ -2881,7 +3136,8 @@
       "cbu-custody.setup-ssi"
     ],
     "entity_context": null,
-    "id": "cic-0256"
+    "id": "cic-0256",
+    "board_id": "board-cbu-operational"
   },
   {
     "utterance": "ISDA terms for this counterparty",
@@ -2894,7 +3150,8 @@
       "trading-profile.add-isda-coverage"
     ],
     "entity_context": null,
-    "id": "cic-0257"
+    "id": "cic-0257",
+    "board_id": "board-cbu-operational"
   },
   {
     "utterance": "what's still outstanding?",
@@ -2906,7 +3163,8 @@
       "attributes.gaps"
     ],
     "entity_context": null,
-    "id": "cic-0258"
+    "id": "cic-0258",
+    "board_id": "board-cbu-operational"
   },
   {
     "utterance": "who's reviewing this case?",
@@ -2918,7 +3176,8 @@
       "kyc-case.assign"
     ],
     "entity_context": null,
-    "id": "cic-0259"
+    "id": "cic-0259",
+    "board_id": "board-kyc-case"
   },
   {
     "utterance": "what documents do we need?",
@@ -2931,7 +3190,8 @@
       "document.compute-requirements"
     ],
     "entity_context": null,
-    "id": "cic-0260"
+    "id": "cic-0260",
+    "board_id": "board-document-solicitation"
   },
   {
     "utterance": "how many shareholders are there?",
@@ -2943,7 +3203,8 @@
       "investor.list"
     ],
     "entity_context": null,
-    "id": "cic-0261"
+    "id": "cic-0261",
+    "board_id": "board-cbu-operational"
   },
   {
     "utterance": "what's the ownership structure?",
@@ -2956,7 +3217,8 @@
       "ubo.trace-chains"
     ],
     "entity_context": null,
-    "id": "cic-0262"
+    "id": "cic-0262",
+    "board_id": "board-kyc-case"
   },
   {
     "utterance": "sanctions scan",
@@ -2968,7 +3230,8 @@
       "screening.sanctions"
     ],
     "entity_context": null,
-    "id": "cic-0263"
+    "id": "cic-0263",
+    "board_id": "board-kyc-case"
   },
   {
     "utterance": "KYC check",
@@ -2980,7 +3243,8 @@
       "kyc.create-case"
     ],
     "entity_context": null,
-    "id": "cic-0264"
+    "id": "cic-0264",
+    "board_id": "board-kyc-case"
   },
   {
     "utterance": "doc collection",
@@ -2992,7 +3256,8 @@
       "document.compute-requirements"
     ],
     "entity_context": null,
-    "id": "cic-0265"
+    "id": "cic-0265",
+    "board_id": "board-document-solicitation"
   },
   {
     "utterance": "LEI lookup",
@@ -3004,7 +3269,8 @@
       "gleif.enrich"
     ],
     "entity_context": null,
-    "id": "cic-0266"
+    "id": "cic-0266",
+    "board_id": "board-onboarding-intake"
   },
   {
     "utterance": "cap table",
@@ -3016,7 +3282,8 @@
       "capital.cap-table"
     ],
     "entity_context": null,
-    "id": "cic-0267"
+    "id": "cic-0267",
+    "board_id": "board-cbu-operational"
   },
   {
     "utterance": "fee schedule",
@@ -3029,7 +3296,8 @@
       "deal.create-rate-card"
     ],
     "entity_context": null,
-    "id": "cic-0268"
+    "id": "cic-0268",
+    "board_id": "board-cbu-operational"
   },
   {
     "utterance": "onboard BlackRock as a new client",
@@ -3043,7 +3311,8 @@
       "deal.request-onboarding"
     ],
     "entity_context": null,
-    "id": "cic-0269"
+    "id": "cic-0269",
+    "board_id": "board-custody-deal"
   },
   {
     "utterance": "set up custody for this fund",
@@ -3056,7 +3325,8 @@
       "fund.create"
     ],
     "entity_context": null,
-    "id": "cic-0270"
+    "id": "cic-0270",
+    "board_id": "board-cbu-operational"
   },
   {
     "utterance": "process a redemption",
@@ -3070,7 +3340,8 @@
       "investor.start-redemption"
     ],
     "entity_context": null,
-    "id": "cic-0271"
+    "id": "cic-0271",
+    "board_id": "board-cbu-operational"
   },
   {
     "utterance": "new compartment for the SICAV",
@@ -3083,7 +3354,8 @@
       "fund.upsert-compartment"
     ],
     "entity_context": null,
-    "id": "cic-0272"
+    "id": "cic-0272",
+    "board_id": "board-cbu-operational"
   },
   {
     "utterance": "amend the contract terms",
@@ -3095,7 +3367,8 @@
       "contract.amend"
     ],
     "entity_context": null,
-    "id": "cic-0273"
+    "id": "cic-0273",
+    "board_id": "board-cbu-operational"
   },
   {
     "utterance": "waive the requirement",
@@ -3105,7 +3378,8 @@
     "difficulty": "easy",
     "alt_verbs": [],
     "entity_context": null,
-    "id": "cic-0274"
+    "id": "cic-0274",
+    "board_id": "board-cbu-operational"
   },
   {
     "utterance": "block this entity from onboarding",
@@ -3117,7 +3391,8 @@
       "entity-workstream.update-status"
     ],
     "entity_context": null,
-    "id": "cic-0275"
+    "id": "cic-0275",
+    "board_id": "board-cbu-operational"
   },
   {
     "utterance": "trace the ownership chain",
@@ -3129,7 +3404,8 @@
       "ownership.trace"
     ],
     "entity_context": null,
-    "id": "cic-0276"
+    "id": "cic-0276",
+    "board_id": "board-kyc-case"
   },
   {
     "utterance": "import the GLEIF hierarchy",
@@ -3139,7 +3415,8 @@
     "difficulty": "easy",
     "alt_verbs": [],
     "entity_context": null,
-    "id": "cic-0277"
+    "id": "cic-0277",
+    "board_id": "board-onboarding-intake"
   },
   {
     "utterance": "issue new shares",
@@ -3152,7 +3429,8 @@
       "capital.issue.new"
     ],
     "entity_context": null,
-    "id": "cic-0278"
+    "id": "cic-0278",
+    "board_id": "board-cbu-operational"
   },
   {
     "utterance": "dividend distribution",
@@ -3165,7 +3443,8 @@
       "capital.distribute-dividend"
     ],
     "entity_context": null,
-    "id": "cic-0279"
+    "id": "cic-0279",
+    "board_id": "board-cbu-operational"
   },
   {
     "utterance": "Set up a UK unit trust",
@@ -3177,7 +3456,8 @@
       "cbu.create"
     ],
     "entity_context": null,
-    "id": "cic-0280"
+    "id": "cic-0280",
+    "board_id": "board-cbu-operational"
   },
   {
     "utterance": "Create a UK contractual scheme",
@@ -3190,7 +3470,8 @@
       "contract.create"
     ],
     "entity_context": null,
-    "id": "cic-0281"
+    "id": "cic-0281",
+    "board_id": "board-cbu-operational"
   },
   {
     "utterance": "Set up a UK long-term asset fund",
@@ -3203,7 +3484,8 @@
       "struct.uk.authorised.oeic"
     ],
     "entity_context": null,
-    "id": "cic-0282"
+    "id": "cic-0282",
+    "board_id": "board-cbu-operational"
   },
   {
     "utterance": "Create a UK manager LLP",
@@ -3215,7 +3497,8 @@
       "cbu.create"
     ],
     "entity_context": null,
-    "id": "cic-0283"
+    "id": "cic-0283",
+    "board_id": "board-cbu-operational"
   },
   {
     "utterance": "Set up a UK private equity LP",
@@ -3227,7 +3510,8 @@
       "cbu.create"
     ],
     "entity_context": null,
-    "id": "cic-0284"
+    "id": "cic-0284",
+    "board_id": "board-cbu-operational"
   },
   {
     "utterance": "Create a US closed-end fund",
@@ -3240,7 +3524,8 @@
       "fund.create"
     ],
     "entity_context": null,
-    "id": "cic-0285"
+    "id": "cic-0285",
+    "board_id": "board-cbu-operational"
   },
   {
     "utterance": "Set up a US ETF",
@@ -3253,7 +3538,8 @@
       "fund.create"
     ],
     "entity_context": null,
-    "id": "cic-0286"
+    "id": "cic-0286",
+    "board_id": "board-cbu-operational"
   },
   {
     "utterance": "Create a Delaware LP private fund",
@@ -3267,7 +3553,8 @@
       "fund.create"
     ],
     "entity_context": null,
-    "id": "cic-0287"
+    "id": "cic-0287",
+    "board_id": "board-cbu-operational"
   },
   {
     "utterance": "Set up an Irish AIF ICAV",
@@ -3281,7 +3568,8 @@
       "struct.ie.hedge.icav"
     ],
     "entity_context": null,
-    "id": "cic-0288"
+    "id": "cic-0288",
+    "board_id": "board-cbu-operational"
   },
   {
     "utterance": "Create an Irish hedge fund ICAV",
@@ -3293,7 +3581,8 @@
       "cbu.create"
     ],
     "entity_context": null,
-    "id": "cic-0289"
+    "id": "cic-0289",
+    "board_id": "board-cbu-operational"
   },
   {
     "utterance": "List all structures",
@@ -3305,7 +3594,8 @@
       "structure.list"
     ],
     "entity_context": null,
-    "id": "cic-0290"
+    "id": "cic-0290",
+    "board_id": "board-cbu-operational"
   },
   {
     "utterance": "Select a structure to work on",
@@ -3317,7 +3607,8 @@
       "session.set-structure"
     ],
     "entity_context": null,
-    "id": "cic-0291"
+    "id": "cic-0291",
+    "board_id": "board-cbu-operational"
   },
   {
     "utterance": "Show roles for this structure",
@@ -3329,7 +3620,8 @@
       "structure.roles"
     ],
     "entity_context": null,
-    "id": "cic-0292"
+    "id": "cic-0292",
+    "board_id": "board-cbu-operational"
   },
   {
     "utterance": "Assign a role to the structure",
@@ -3341,7 +3633,8 @@
       "structure.assign-role"
     ],
     "entity_context": null,
-    "id": "cic-0293"
+    "id": "cic-0293",
+    "board_id": "board-cbu-operational"
   },
   {
     "utterance": "Add standard product suite custody FA TA",
@@ -3353,7 +3646,8 @@
       "cbu.add-product"
     ],
     "entity_context": null,
-    "id": "cic-0294"
+    "id": "cic-0294",
+    "board_id": "board-cbu-operational"
   },
   {
     "utterance": "Add the full product suite",
@@ -3365,7 +3659,8 @@
       "cbu.add-product"
     ],
     "entity_context": null,
-    "id": "cic-0295"
+    "id": "cic-0295",
+    "board_id": "board-cbu-operational"
   },
   {
     "utterance": "Remove all products from the CBU",
@@ -3377,7 +3672,8 @@
       "cbu.remove-product"
     ],
     "entity_context": null,
-    "id": "cic-0296"
+    "id": "cic-0296",
+    "board_id": "board-cbu-operational"
   },
   {
     "utterance": "Add a party to the case",
@@ -3389,7 +3685,8 @@
       "case.add-party"
     ],
     "entity_context": null,
-    "id": "cic-0297"
+    "id": "cic-0297",
+    "board_id": "board-cbu-operational"
   },
   {
     "utterance": "Request a document from the party",
@@ -3401,7 +3698,8 @@
       "case.solicit-document"
     ],
     "entity_context": null,
-    "id": "cic-0298"
+    "id": "cic-0298",
+    "board_id": "board-document-solicitation"
   },
   {
     "utterance": "Submit the case for review",
@@ -3413,7 +3711,8 @@
       "case.submit"
     ],
     "entity_context": null,
-    "id": "cic-0299"
+    "id": "cic-0299",
+    "board_id": "board-kyc-case"
   },
   {
     "utterance": "Approve the KYC case",
@@ -3426,7 +3725,8 @@
       "kyc-case.close"
     ],
     "entity_context": null,
-    "id": "cic-0300"
+    "id": "cic-0300",
+    "board_id": "board-kyc-case"
   },
   {
     "utterance": "Reject the case",
@@ -3438,7 +3738,8 @@
       "case.reject"
     ],
     "entity_context": null,
-    "id": "cic-0301"
+    "id": "cic-0301",
+    "board_id": "board-kyc-case"
   },
   {
     "utterance": "Request more information on the case",
@@ -3450,7 +3751,8 @@
       "case.request-info"
     ],
     "entity_context": null,
-    "id": "cic-0302"
+    "id": "cic-0302",
+    "board_id": "board-kyc-case"
   },
   {
     "utterance": "List KYC cases",
@@ -3463,7 +3765,8 @@
       "kyc-case.list"
     ],
     "entity_context": null,
-    "id": "cic-0303"
+    "id": "cic-0303",
+    "board_id": "board-kyc-case"
   },
   {
     "utterance": "Select a case to work on",
@@ -3475,7 +3778,8 @@
       "session.set-case"
     ],
     "entity_context": null,
-    "id": "cic-0304"
+    "id": "cic-0304",
+    "board_id": "board-cbu-operational"
   },
   {
     "utterance": "Add a workstream for the party",
@@ -3487,7 +3791,8 @@
       "kyc-workstream.add"
     ],
     "entity_context": null,
-    "id": "cic-0305"
+    "id": "cic-0305",
+    "board_id": "board-cbu-operational"
   },
   {
     "utterance": "Update workstream status",
@@ -3499,7 +3804,8 @@
       "kyc-workstream.update-status"
     ],
     "entity_context": null,
-    "id": "cic-0306"
+    "id": "cic-0306",
+    "board_id": "board-cbu-operational"
   },
   {
     "utterance": "Close the workstream",
@@ -3511,7 +3817,8 @@
       "kyc-workstream.close"
     ],
     "entity_context": null,
-    "id": "cic-0307"
+    "id": "cic-0307",
+    "board_id": "board-cbu-operational"
   },
   {
     "utterance": "Run workstream screening",
@@ -3523,7 +3830,8 @@
       "screening-ops.run"
     ],
     "entity_context": null,
-    "id": "cic-0308"
+    "id": "cic-0308",
+    "board_id": "board-kyc-case"
   },
   {
     "utterance": "Review the screening hit",
@@ -3535,7 +3843,8 @@
       "screening-ops.review-hit"
     ],
     "entity_context": null,
-    "id": "cic-0309"
+    "id": "cic-0309",
+    "board_id": "board-kyc-case"
   },
   {
     "utterance": "Bulk refresh all screenings",
@@ -3547,7 +3856,8 @@
       "screening-ops.bulk-refresh"
     ],
     "entity_context": null,
-    "id": "cic-0310"
+    "id": "cic-0310",
+    "board_id": "board-kyc-case"
   },
   {
     "utterance": "Expire the beneficial ownership allegation",
@@ -3561,7 +3871,8 @@
       "ubo.waive-verification"
     ],
     "entity_context": null,
-    "id": "cic-0311"
+    "id": "cic-0311",
+    "board_id": "board-kyc-case"
   },
   {
     "utterance": "Require evidence for the ownership allegation",
@@ -3573,7 +3884,8 @@
       "evidence.require"
     ],
     "entity_context": null,
-    "id": "cic-0312"
+    "id": "cic-0312",
+    "board_id": "board-cbu-operational"
   },
   {
     "utterance": "Link a document to the evidence requirement",
@@ -3585,7 +3897,8 @@
       "evidence.link"
     ],
     "entity_context": null,
-    "id": "cic-0313"
+    "id": "cic-0313",
+    "board_id": "board-document-solicitation"
   },
   {
     "utterance": "Verify the evidence",
@@ -3597,7 +3910,8 @@
       "evidence.verify"
     ],
     "entity_context": null,
-    "id": "cic-0314"
+    "id": "cic-0314",
+    "board_id": "board-cbu-operational"
   },
   {
     "utterance": "Reject the evidence item",
@@ -3609,7 +3923,8 @@
       "evidence.reject"
     ],
     "entity_context": null,
-    "id": "cic-0315"
+    "id": "cic-0315",
+    "board_id": "board-cbu-operational"
   },
   {
     "utterance": "Waive the evidence requirement",
@@ -3621,7 +3936,8 @@
       "evidence.waive"
     ],
     "entity_context": null,
-    "id": "cic-0316"
+    "id": "cic-0316",
+    "board_id": "board-cbu-operational"
   },
   {
     "utterance": "Create a document request for the workstream",
@@ -3634,7 +3950,8 @@
       "document.create"
     ],
     "entity_context": null,
-    "id": "cic-0317"
+    "id": "cic-0317",
+    "board_id": "board-document-solicitation"
   },
   {
     "utterance": "Send the document request",
@@ -3648,7 +3965,8 @@
       "document.solicit"
     ],
     "entity_context": null,
-    "id": "cic-0318"
+    "id": "cic-0318",
+    "board_id": "board-document-solicitation"
   },
   {
     "utterance": "Record a document response",
@@ -3661,7 +3979,8 @@
       "observation.record-from-document"
     ],
     "entity_context": null,
-    "id": "cic-0319"
+    "id": "cic-0319",
+    "board_id": "board-document-solicitation"
   },
   {
     "utterance": "Verify the document request",
@@ -3674,7 +3993,8 @@
       "case.solicit-document"
     ],
     "entity_context": null,
-    "id": "cic-0320"
+    "id": "cic-0320",
+    "board_id": "board-document-solicitation"
   },
   {
     "utterance": "Reject the submitted document",
@@ -3686,7 +4006,8 @@
       "doc-request.reject"
     ],
     "entity_context": null,
-    "id": "cic-0321"
+    "id": "cic-0321",
+    "board_id": "board-document-solicitation"
   },
   {
     "utterance": "Raise a risk flag",
@@ -3698,7 +4019,8 @@
       "red-flag.raise"
     ],
     "entity_context": null,
-    "id": "cic-0322"
+    "id": "cic-0322",
+    "board_id": "board-kyc-case"
   },
   {
     "utterance": "Resolve the risk flag",
@@ -3712,7 +4034,8 @@
       "red-flag.waive"
     ],
     "entity_context": null,
-    "id": "cic-0323"
+    "id": "cic-0323",
+    "board_id": "board-kyc-case"
   },
   {
     "utterance": "Escalate the risk flag",
@@ -3726,7 +4049,8 @@
       "kyc-case.escalate"
     ],
     "entity_context": null,
-    "id": "cic-0324"
+    "id": "cic-0324",
+    "board_id": "board-kyc-case"
   },
   {
     "utterance": "Evaluate the approval gate",
@@ -3738,7 +4062,8 @@
       "tollgate.evaluate"
     ],
     "entity_context": null,
-    "id": "cic-0325"
+    "id": "cic-0325",
+    "board_id": "board-cbu-operational"
   },
   {
     "utterance": "Override the tollgate decision",
@@ -3750,7 +4075,8 @@
       "tollgate.override"
     ],
     "entity_context": null,
-    "id": "cic-0326"
+    "id": "cic-0326",
+    "board_id": "board-cbu-operational"
   },
   {
     "utterance": "Add a new person",
@@ -3762,7 +4088,8 @@
       "party.add-person"
     ],
     "entity_context": null,
-    "id": "cic-0327"
+    "id": "cic-0327",
+    "board_id": "board-entity-management"
   },
   {
     "utterance": "Add a company",
@@ -3774,7 +4101,8 @@
       "party.add-company"
     ],
     "entity_context": null,
-    "id": "cic-0328"
+    "id": "cic-0328",
+    "board_id": "board-entity-management"
   },
   {
     "utterance": "View party details",
@@ -3788,7 +4116,8 @@
       "view.read-status"
     ],
     "entity_context": null,
-    "id": "cic-0329"
+    "id": "cic-0329",
+    "board_id": "board-entity-management"
   },
   {
     "utterance": "Update the party information",
@@ -3800,7 +4129,8 @@
       "party.update"
     ],
     "entity_context": null,
-    "id": "cic-0330"
+    "id": "cic-0330",
+    "board_id": "board-entity-management"
   },
   {
     "utterance": "List all parties",
@@ -3812,7 +4142,8 @@
       "party.list"
     ],
     "entity_context": null,
-    "id": "cic-0331"
+    "id": "cic-0331",
+    "board_id": "board-entity-management"
   },
   {
     "utterance": "Add an identifier to the party",
@@ -3824,7 +4155,8 @@
       "party.assign-identifier"
     ],
     "entity_context": null,
-    "id": "cic-0332"
+    "id": "cic-0332",
+    "board_id": "board-cbu-operational"
   },
   {
     "utterance": "Set the party address",
@@ -3836,7 +4168,8 @@
       "party.set-address"
     ],
     "entity_context": null,
-    "id": "cic-0333"
+    "id": "cic-0333",
+    "board_id": "board-entity-management"
   },
   {
     "utterance": "Add a product to the mandate",
@@ -3849,7 +4182,8 @@
       "cbu.add-product"
     ],
     "entity_context": null,
-    "id": "cic-0334"
+    "id": "cic-0334",
+    "board_id": "board-cbu-operational"
   },
   {
     "utterance": "Set permitted instruments for the mandate",
@@ -3861,7 +4195,8 @@
       "mandate.set-instruments"
     ],
     "entity_context": null,
-    "id": "cic-0335"
+    "id": "cic-0335",
+    "board_id": "board-cbu-operational"
   },
   {
     "utterance": "Set permitted markets for the mandate",
@@ -3873,7 +4208,8 @@
       "mandate.set-markets"
     ],
     "entity_context": null,
-    "id": "cic-0336"
+    "id": "cic-0336",
+    "board_id": "board-cbu-operational"
   },
   {
     "utterance": "List mandates for this structure",
@@ -3885,7 +4221,8 @@
       "mandate.list"
     ],
     "entity_context": null,
-    "id": "cic-0337"
+    "id": "cic-0337",
+    "board_id": "board-cbu-operational"
   },
   {
     "utterance": "Select a mandate",
@@ -3897,7 +4234,8 @@
       "session.set-mandate"
     ],
     "entity_context": null,
-    "id": "cic-0338"
+    "id": "cic-0338",
+    "board_id": "board-cbu-operational"
   },
   {
     "utterance": "Show mandate details",
@@ -3909,7 +4247,8 @@
       "mandate.details"
     ],
     "entity_context": null,
-    "id": "cic-0339"
+    "id": "cic-0339",
+    "board_id": "board-cbu-operational"
   },
   {
     "utterance": "Bootstrap the attribute registry",
@@ -3923,7 +4262,8 @@
       "attribute.define"
     ],
     "entity_context": null,
-    "id": "cic-0340"
+    "id": "cic-0340",
+    "board_id": "board-cbu-operational"
   },
   {
     "utterance": "Define the service resource dictionary",
@@ -3937,7 +4277,8 @@
       "service-resource.list"
     ],
     "entity_context": null,
-    "id": "cic-0341"
+    "id": "cic-0341",
+    "board_id": "board-cbu-operational"
   },
   {
     "utterance": "Run the full publish pipeline",
@@ -3950,7 +4291,8 @@
       "governance.publish-batch"
     ],
     "entity_context": null,
-    "id": "cic-0342"
+    "id": "cic-0342",
+    "board_id": "board-cbu-operational"
   },
   {
     "utterance": "Reconcile the registry",
@@ -3965,7 +4307,8 @@
       "discrepancy.resolve"
     ],
     "entity_context": null,
-    "id": "cic-0343"
+    "id": "cic-0343",
+    "board_id": "board-cbu-operational"
   },
   {
     "utterance": "Seed attributes for a domain",
@@ -3977,7 +4320,8 @@
       "attribute.list"
     ],
     "entity_context": null,
-    "id": "cic-0344"
+    "id": "cic-0344",
+    "board_id": "board-cbu-operational"
   },
   {
     "utterance": "Seed derived attributes",
@@ -3989,7 +4333,8 @@
       "attribute.seed-derived"
     ],
     "entity_context": null,
-    "id": "cic-0345"
+    "id": "cic-0345",
+    "board_id": "board-cbu-operational"
   },
   {
     "utterance": "what's next",
@@ -4003,7 +4348,8 @@
       "readiness.compute"
     ],
     "entity_context": null,
-    "id": "cic-0346"
+    "id": "cic-0346",
+    "board_id": "board-cbu-operational"
   },
   {
     "utterance": "what's missing",
@@ -4017,7 +4363,8 @@
       "requirement.list-outstanding"
     ],
     "entity_context": null,
-    "id": "cic-0347"
+    "id": "cic-0347",
+    "board_id": "board-cbu-operational"
   },
   {
     "utterance": "where are we",
@@ -4030,7 +4377,8 @@
       "readiness.compute"
     ],
     "entity_context": null,
-    "id": "cic-0348"
+    "id": "cic-0348",
+    "board_id": "board-cbu-operational"
   },
   {
     "utterance": "show me the progress",
@@ -4044,7 +4392,8 @@
       "readiness.compute"
     ],
     "entity_context": null,
-    "id": "cic-0349"
+    "id": "cic-0349",
+    "board_id": "board-cbu-operational"
   },
   {
     "utterance": "any blockers",
@@ -4058,7 +4407,8 @@
       "readiness.compute"
     ],
     "entity_context": null,
-    "id": "cic-0350"
+    "id": "cic-0350",
+    "board_id": "board-cbu-operational"
   },
   {
     "utterance": "what do I need to do next",
@@ -4072,7 +4422,8 @@
       "readiness.compute"
     ],
     "entity_context": null,
-    "id": "cic-0351"
+    "id": "cic-0351",
+    "board_id": "board-cbu-operational"
   },
   {
     "utterance": "what's outstanding on this case",
@@ -4085,7 +4436,8 @@
       "requirement.list-outstanding"
     ],
     "entity_context": null,
-    "id": "cic-0352"
+    "id": "cic-0352",
+    "board_id": "board-cbu-operational"
   },
   {
     "utterance": "are we done",
@@ -4098,7 +4450,8 @@
       "semantic.get-state"
     ],
     "entity_context": null,
-    "id": "cic-0353"
+    "id": "cic-0353",
+    "board_id": "board-cbu-operational"
   },
   {
     "utterance": "next steps",
@@ -4112,7 +4465,8 @@
       "readiness.compute"
     ],
     "entity_context": null,
-    "id": "cic-0354"
+    "id": "cic-0354",
+    "board_id": "board-cbu-operational"
   },
   {
     "utterance": "remaining steps",
@@ -4126,7 +4480,8 @@
       "readiness.compute"
     ],
     "entity_context": null,
-    "id": "cic-0355"
+    "id": "cic-0355",
+    "board_id": "board-cbu-operational"
   },
   {
     "utterance": "show gaps",
@@ -4140,7 +4495,8 @@
       "matrix-overlay.unified-gaps"
     ],
     "entity_context": null,
-    "id": "cic-0356"
+    "id": "cic-0356",
+    "board_id": "board-cbu-operational"
   },
   {
     "utterance": "status update",
@@ -4154,7 +4510,8 @@
       "kyc-case.summarize"
     ],
     "entity_context": null,
-    "id": "cic-0357"
+    "id": "cic-0357",
+    "board_id": "board-cbu-operational"
   },
   {
     "utterance": "what's left to do",
@@ -4168,7 +4525,8 @@
       "readiness.compute"
     ],
     "entity_context": null,
-    "id": "cic-0358"
+    "id": "cic-0358",
+    "board_id": "board-cbu-operational"
   },
   {
     "utterance": "how far along are we",
@@ -4181,7 +4539,8 @@
       "readiness.compute"
     ],
     "entity_context": null,
-    "id": "cic-0359"
+    "id": "cic-0359",
+    "board_id": "board-cbu-operational"
   },
   {
     "utterance": "progress report",
@@ -4194,7 +4553,8 @@
       "readiness.compute"
     ],
     "entity_context": null,
-    "id": "cic-0360"
+    "id": "cic-0360",
+    "board_id": "board-cbu-operational"
   },
   {
     "utterance": "what's still needed",
@@ -4207,7 +4567,8 @@
       "requirement.list-outstanding"
     ],
     "entity_context": null,
-    "id": "cic-0361"
+    "id": "cic-0361",
+    "board_id": "board-cbu-operational"
   },
   {
     "utterance": "allege this person is a beneficial owner",
@@ -4221,7 +4582,8 @@
       "ubo.add-ownership"
     ],
     "entity_context": null,
-    "id": "cic-0362"
+    "id": "cic-0362",
+    "board_id": "board-kyc-case"
   },
   {
     "utterance": "record a beneficial ownership allegation for the director",
@@ -4234,7 +4596,8 @@
       "ubo.registry.create"
     ],
     "entity_context": null,
-    "id": "cic-0363"
+    "id": "cic-0363",
+    "board_id": "board-kyc-case"
   },
   {
     "utterance": "verify the UBO evidence is sufficient",
@@ -4248,7 +4611,8 @@
       "ubo.compute-chains"
     ],
     "entity_context": null,
-    "id": "cic-0364"
+    "id": "cic-0364",
+    "board_id": "board-kyc-case"
   },
   {
     "utterance": "promote the UBO candidate to identified status",
@@ -4260,7 +4624,8 @@
       "ubo.registry.advance"
     ],
     "entity_context": null,
-    "id": "cic-0365"
+    "id": "cic-0365",
+    "board_id": "board-kyc-case"
   },
   {
     "utterance": "approve the beneficial ownership determination",
@@ -4273,7 +4638,8 @@
       "ubo.add-ownership"
     ],
     "entity_context": null,
-    "id": "cic-0366"
+    "id": "cic-0366",
+    "board_id": "board-kyc-case"
   },
   {
     "utterance": "reject this UBO allegation as unsubstantiated",
@@ -4285,7 +4651,8 @@
       "ubo.registry.reject"
     ],
     "entity_context": null,
-    "id": "cic-0367"
+    "id": "cic-0367",
+    "board_id": "board-kyc-case"
   },
   {
     "utterance": "expire the UBO entry that has not been renewed",
@@ -4297,7 +4664,8 @@
       "ubo.registry.expire"
     ],
     "entity_context": null,
-    "id": "cic-0368"
+    "id": "cic-0368",
+    "board_id": "board-kyc-case"
   },
   {
     "utterance": "waive verification for this beneficial owner",
@@ -4309,7 +4677,8 @@
       "ubo.registry.waive"
     ],
     "entity_context": null,
-    "id": "cic-0369"
+    "id": "cic-0369",
+    "board_id": "board-kyc-case"
   },
   {
     "utterance": "identify the UBOs from the trust structure",
@@ -4322,7 +4691,8 @@
       "control.identify-ubos"
     ],
     "entity_context": null,
-    "id": "cic-0370"
+    "id": "cic-0370",
+    "board_id": "board-kyc-case"
   },
   {
     "utterance": "analyze who controls the trust",
@@ -4335,7 +4705,8 @@
       "board.analyze-control"
     ],
     "entity_context": null,
-    "id": "cic-0371"
+    "id": "cic-0371",
+    "board_id": "board-cbu-operational"
   },
   {
     "utterance": "capture a snapshot of the current UBO state",
@@ -4347,7 +4718,8 @@
       "ownership.snapshot.get"
     ],
     "entity_context": null,
-    "id": "cic-0372"
+    "id": "cic-0372",
+    "board_id": "board-kyc-case"
   },
   {
     "utterance": "compare the UBO determination with the previous snapshot",
@@ -4359,7 +4731,8 @@
       "ownership.reconcile"
     ],
     "entity_context": null,
-    "id": "cic-0373"
+    "id": "cic-0373",
+    "board_id": "board-kyc-case"
   },
   {
     "utterance": "record a client allegation about who owns the shares",
@@ -4372,7 +4745,8 @@
       "ubo.add-ownership"
     ],
     "entity_context": null,
-    "id": "cic-0374"
+    "id": "cic-0374",
+    "board_id": "board-cbu-operational"
   },
   {
     "utterance": "classify this as a discretionary trust",
@@ -4382,7 +4756,8 @@
     "difficulty": "medium",
     "alt_verbs": [],
     "entity_context": null,
-    "id": "cic-0375"
+    "id": "cic-0375",
+    "board_id": "board-cbu-operational"
   },
   {
     "utterance": "add a partnership capital contribution for this LP",
@@ -4394,7 +4769,8 @@
       "partnership.add-partner"
     ],
     "entity_context": null,
-    "id": "cic-0376"
+    "id": "cic-0376",
+    "board_id": "board-cbu-operational"
   },
   {
     "utterance": "compile onboarding data request",
@@ -4404,7 +4780,8 @@
     "difficulty": "easy",
     "alt_verbs": [],
     "entity_context": null,
-    "id": "cic-0377"
+    "id": "cic-0377",
+    "board_id": "board-onboarding-intake"
   },
   {
     "utterance": "build the service resource data dictionary",
@@ -4414,7 +4791,8 @@
     "difficulty": "medium",
     "alt_verbs": [],
     "entity_context": null,
-    "id": "cic-0378"
+    "id": "cic-0378",
+    "board_id": "board-onboarding-intake"
   },
   {
     "utterance": "freeze onboarding resource requirements for this handoff",
@@ -4424,7 +4802,8 @@
     "difficulty": "medium",
     "alt_verbs": [],
     "entity_context": null,
-    "id": "cic-0379"
+    "id": "cic-0379",
+    "board_id": "board-onboarding-intake"
   },
   {
     "utterance": "dispatch ready onboarding slices to resource owners",
@@ -4434,7 +4813,8 @@
     "difficulty": "easy",
     "alt_verbs": [],
     "entity_context": null,
-    "id": "cic-0380"
+    "id": "cic-0380",
+    "board_id": "board-onboarding-intake"
   },
   {
     "utterance": "send the ready resource owner requests",
@@ -4444,7 +4824,8 @@
     "difficulty": "medium",
     "alt_verbs": [],
     "entity_context": null,
-    "id": "cic-0381"
+    "id": "cic-0381",
+    "board_id": "board-onboarding-intake"
   },
   {
     "utterance": "list onboarding data requests",
@@ -4454,7 +4835,8 @@
     "difficulty": "easy",
     "alt_verbs": [],
     "entity_context": null,
-    "id": "cic-0382"
+    "id": "cic-0382",
+    "board_id": "board-onboarding-intake"
   },
   {
     "utterance": "show resource owner data requests",
@@ -4464,7 +4846,8 @@
     "difficulty": "medium",
     "alt_verbs": [],
     "entity_context": null,
-    "id": "cic-0383"
+    "id": "cic-0383",
+    "board_id": "board-onboarding-intake"
   },
   {
     "utterance": "list onboarding data request slices",
@@ -4474,7 +4857,8 @@
     "difficulty": "easy",
     "alt_verbs": [],
     "entity_context": null,
-    "id": "cic-0384"
+    "id": "cic-0384",
+    "board_id": "board-onboarding-intake"
   },
   {
     "utterance": "show resource owner slices",
@@ -4484,7 +4868,8 @@
     "difficulty": "medium",
     "alt_verbs": [],
     "entity_context": null,
-    "id": "cic-0385"
+    "id": "cic-0385",
+    "board_id": "board-onboarding-intake"
   },
   {
     "utterance": "get onboarding data request",
@@ -4494,7 +4879,8 @@
     "difficulty": "easy",
     "alt_verbs": [],
     "entity_context": null,
-    "id": "cic-0386"
+    "id": "cic-0386",
+    "board_id": "board-onboarding-intake"
   },
   {
     "utterance": "read one onboarding data request slice",
@@ -4504,7 +4890,8 @@
     "difficulty": "easy",
     "alt_verbs": [],
     "entity_context": null,
-    "id": "cic-0387"
+    "id": "cic-0387",
+    "board_id": "board-onboarding-intake"
   },
   {
     "utterance": "cancel onboarding data request",
@@ -4514,7 +4901,8 @@
     "difficulty": "easy",
     "alt_verbs": [],
     "entity_context": null,
-    "id": "cic-0388"
+    "id": "cic-0388",
+    "board_id": "board-onboarding-intake"
   },
   {
     "utterance": "stand down all resource owner requests",
@@ -4524,7 +4912,8 @@
     "difficulty": "medium",
     "alt_verbs": [],
     "entity_context": null,
-    "id": "cic-0389"
+    "id": "cic-0389",
+    "board_id": "board-onboarding-intake"
   },
   {
     "utterance": "cancel onboarding data request slice",
@@ -4534,7 +4923,8 @@
     "difficulty": "easy",
     "alt_verbs": [],
     "entity_context": null,
-    "id": "cic-0390"
+    "id": "cic-0390",
+    "board_id": "board-onboarding-intake"
   },
   {
     "utterance": "stand down this resource owner request",
@@ -4544,7 +4934,8 @@
     "difficulty": "medium",
     "alt_verbs": [],
     "entity_context": null,
-    "id": "cic-0391"
+    "id": "cic-0391",
+    "board_id": "board-onboarding-intake"
   },
   {
     "utterance": "confirm provisioning result",
@@ -4554,7 +4945,8 @@
     "difficulty": "easy",
     "alt_verbs": [],
     "entity_context": null,
-    "id": "cic-0392"
+    "id": "cic-0392",
+    "board_id": "board-cbu-operational"
   },
   {
     "utterance": "record the resource owner result",
@@ -4564,7 +4956,8 @@
     "difficulty": "medium",
     "alt_verbs": [],
     "entity_context": null,
-    "id": "cic-0393"
+    "id": "cic-0393",
+    "board_id": "board-cbu-operational"
   },
   {
     "utterance": "confirm resource activation",
@@ -4574,7 +4967,8 @@
     "difficulty": "medium",
     "alt_verbs": [],
     "entity_context": null,
-    "id": "cic-0394"
+    "id": "cic-0394",
+    "board_id": "board-cbu-operational"
   },
   {
     "utterance": "get provisioning status for this slice",
@@ -4584,7 +4978,8 @@
     "difficulty": "easy",
     "alt_verbs": [],
     "entity_context": null,
-    "id": "cic-0395"
+    "id": "cic-0395",
+    "board_id": "board-cbu-operational"
   },
   {
     "utterance": "show resource provisioning status",
@@ -4594,7 +4989,8 @@
     "difficulty": "medium",
     "alt_verbs": [],
     "entity_context": null,
-    "id": "cic-0396"
+    "id": "cic-0396",
+    "board_id": "board-cbu-operational"
   },
   {
     "utterance": "check activation status for this slice",
@@ -4604,7 +5000,8 @@
     "difficulty": "medium",
     "alt_verbs": [],
     "entity_context": null,
-    "id": "cic-0397"
+    "id": "cic-0397",
+    "board_id": "board-cbu-operational"
   },
   {
     "utterance": "can you terminate this client business unit?",
@@ -4614,7 +5011,8 @@
     "difficulty": "medium",
     "alt_verbs": [],
     "entity_context": null,
-    "id": "cic-0398"
+    "id": "cic-0398",
+    "board_id": "board-cbu-operational"
   },
   {
     "utterance": "suspend operations for the Goldman CBU immediately",
@@ -4624,7 +5022,8 @@
     "difficulty": "easy",
     "alt_verbs": [],
     "entity_context": null,
-    "id": "cic-0399"
+    "id": "cic-0399",
+    "board_id": "board-cbu-operational"
   },
   {
     "utterance": "who is authorized to modify this client group unit?",
@@ -4636,7 +5035,8 @@
       "cbu.update"
     ],
     "entity_context": null,
-    "id": "cic-0400"
+    "id": "cic-0400",
+    "board_id": "board-cbu-operational"
   },
   {
     "utterance": "change the primary contact on the HSBC CBU",
@@ -4646,7 +5046,8 @@
     "difficulty": "easy",
     "alt_verbs": [],
     "entity_context": null,
-    "id": "cic-0401"
+    "id": "cic-0401",
+    "board_id": "board-cbu-operational"
   },
   {
     "utterance": "retrieve the active roles for this unit",
@@ -4656,7 +5057,8 @@
     "difficulty": "easy",
     "alt_verbs": [],
     "entity_context": null,
-    "id": "cic-0402"
+    "id": "cic-0402",
+    "board_id": "board-cbu-operational"
   },
   {
     "utterance": "add a sub-unit to the existing client profile",
@@ -4668,7 +5070,8 @@
       "cbu.add-product"
     ],
     "entity_context": null,
-    "id": "cic-0403"
+    "id": "cic-0403",
+    "board_id": "board-cbu-operational"
   },
   {
     "utterance": "merge the two CBUs into a single unit",
@@ -4678,7 +5081,8 @@
     "difficulty": "hard",
     "alt_verbs": [],
     "entity_context": null,
-    "id": "cic-0404"
+    "id": "cic-0404",
+    "board_id": "board-cbu-operational"
   },
   {
     "utterance": "archive the inactive CBU record",
@@ -4690,7 +5094,8 @@
       "cbu.update"
     ],
     "entity_context": null,
-    "id": "cic-0405"
+    "id": "cic-0405",
+    "board_id": "board-cbu-operational"
   },
   {
     "utterance": "generate a compliance report for the client unit",
@@ -4702,7 +5107,8 @@
       "cbu.create"
     ],
     "entity_context": null,
-    "id": "cic-0406"
+    "id": "cic-0406",
+    "board_id": "board-cbu-operational"
   },
   {
     "utterance": "list all accounts linked to this CBU",
@@ -4712,7 +5118,8 @@
     "difficulty": "easy",
     "alt_verbs": [],
     "entity_context": null,
-    "id": "cic-0407"
+    "id": "cic-0407",
+    "board_id": "board-cbu-operational"
   },
   {
     "utterance": "unlink the account from this client business unit",
@@ -4722,7 +5129,8 @@
     "difficulty": "medium",
     "alt_verbs": [],
     "entity_context": null,
-    "id": "cic-0408"
+    "id": "cic-0408",
+    "board_id": "board-cbu-operational"
   },
   {
     "utterance": "verify compliance status of this unit",
@@ -4732,7 +5140,8 @@
     "difficulty": "hard",
     "alt_verbs": [],
     "entity_context": null,
-    "id": "cic-0409"
+    "id": "cic-0409",
+    "board_id": "board-cbu-operational"
   },
   {
     "utterance": "retrieve configuration parameters for the CBU",
@@ -4744,7 +5153,8 @@
       "cbu.update"
     ],
     "entity_context": null,
-    "id": "cic-0410"
+    "id": "cic-0410",
+    "board_id": "board-cbu-operational"
   },
   {
     "utterance": "update the governance policy on this client unit",
@@ -4754,7 +5164,8 @@
     "difficulty": "hard",
     "alt_verbs": [],
     "entity_context": null,
-    "id": "cic-0411"
+    "id": "cic-0411",
+    "board_id": "board-cbu-operational"
   },
   {
     "utterance": "assign risk rating to this business unit",
@@ -4766,7 +5177,8 @@
       "cbu.assign-role"
     ],
     "entity_context": null,
-    "id": "cic-0412"
+    "id": "cic-0412",
+    "board_id": "board-cbu-operational"
   },
   {
     "utterance": "perform PEP check on HSBC representatives",
@@ -4776,7 +5188,8 @@
     "difficulty": "easy",
     "alt_verbs": [],
     "entity_context": null,
-    "id": "cic-0413"
+    "id": "cic-0413",
+    "board_id": "board-kyc-case"
   },
   {
     "utterance": "is the ultimate beneficial owner on a sanctions list?",
@@ -4788,7 +5201,8 @@
       "ubo.list-ubos"
     ],
     "entity_context": null,
-    "id": "cic-0414"
+    "id": "cic-0414",
+    "board_id": "board-kyc-case"
   },
   {
     "utterance": "identify major shareholders holding more than 10 percent",
@@ -4800,7 +5214,8 @@
       "ubo.add-ownership"
     ],
     "entity_context": null,
-    "id": "cic-0415"
+    "id": "cic-0415",
+    "board_id": "board-kyc-case"
   },
   {
     "utterance": "verify the date of birth for the primary beneficiary",
@@ -4812,7 +5227,8 @@
       "ubo.waive-verification"
     ],
     "entity_context": null,
-    "id": "cic-0416"
+    "id": "cic-0416",
+    "board_id": "board-kyc-case"
   },
   {
     "utterance": "request UBO declaration from the relationship manager",
@@ -4822,7 +5238,8 @@
     "difficulty": "easy",
     "alt_verbs": [],
     "entity_context": null,
-    "id": "cic-0417"
+    "id": "cic-0417",
+    "board_id": "board-kyc-case"
   },
   {
     "utterance": "mark this AML red flag as a false positive",
@@ -4832,7 +5249,8 @@
     "difficulty": "easy",
     "alt_verbs": [],
     "entity_context": null,
-    "id": "cic-0418"
+    "id": "cic-0418",
+    "board_id": "board-kyc-case"
   },
   {
     "utterance": "escalate this sanctions match to compliance committee",
@@ -4842,7 +5260,8 @@
     "difficulty": "hard",
     "alt_verbs": [],
     "entity_context": null,
-    "id": "cic-0419"
+    "id": "cic-0419",
+    "board_id": "board-kyc-case"
   },
   {
     "utterance": "check adverse media for the new director",
@@ -4852,7 +5271,8 @@
     "difficulty": "easy",
     "alt_verbs": [],
     "entity_context": null,
-    "id": "cic-0420"
+    "id": "cic-0420",
+    "board_id": "board-kyc-case"
   },
   {
     "utterance": "did the screening return any PEP matches?",
@@ -4862,7 +5282,8 @@
     "difficulty": "medium",
     "alt_verbs": [],
     "entity_context": null,
-    "id": "cic-0421"
+    "id": "cic-0421",
+    "board_id": "board-kyc-case"
   },
   {
     "utterance": "link this individual to the corporate structure tree",
@@ -4874,7 +5295,8 @@
       "ubo.trace-chains"
     ],
     "entity_context": null,
-    "id": "cic-0422"
+    "id": "cic-0422",
+    "board_id": "board-kyc-case"
   },
   {
     "utterance": "flag this transaction for high risk",
@@ -4884,7 +5306,8 @@
     "difficulty": "medium",
     "alt_verbs": [],
     "entity_context": null,
-    "id": "cic-0423"
+    "id": "cic-0423",
+    "board_id": "board-kyc-case"
   },
   {
     "utterance": "override the automatic risk scoring",
@@ -4896,7 +5319,8 @@
       "screening.sanctions"
     ],
     "entity_context": null,
-    "id": "cic-0424"
+    "id": "cic-0424",
+    "board_id": "board-kyc-case"
   },
   {
     "utterance": "validate the tax residency certificate for this partner",
@@ -4908,7 +5332,8 @@
       "document.solicit"
     ],
     "entity_context": null,
-    "id": "cic-0425"
+    "id": "cic-0425",
+    "board_id": "board-kyc-case"
   },
   {
     "utterance": "is the company registered in a FATF blacklist country?",
@@ -4918,7 +5343,8 @@
     "difficulty": "hard",
     "alt_verbs": [],
     "entity_context": null,
-    "id": "cic-0426"
+    "id": "cic-0426",
+    "board_id": "board-kyc-case"
   },
   {
     "utterance": "re-verify the identity of the managing director",
@@ -4930,7 +5356,8 @@
       "document.reject"
     ],
     "entity_context": null,
-    "id": "cic-0427"
+    "id": "cic-0427",
+    "board_id": "board-kyc-case"
   },
   {
     "utterance": "download the KYC compliance certificate",
@@ -4940,7 +5367,8 @@
     "difficulty": "easy",
     "alt_verbs": [],
     "entity_context": null,
-    "id": "cic-0428"
+    "id": "cic-0428",
+    "board_id": "board-kyc-case"
   },
   {
     "utterance": "list all open red flags for Allianz",
@@ -4950,7 +5378,8 @@
     "difficulty": "easy",
     "alt_verbs": [],
     "entity_context": null,
-    "id": "cic-0429"
+    "id": "cic-0429",
+    "board_id": "board-kyc-case"
   },
   {
     "utterance": "start the onboarding process for the Allianz fund",
@@ -4960,7 +5389,8 @@
     "difficulty": "easy",
     "alt_verbs": [],
     "entity_context": null,
-    "id": "cic-0430"
+    "id": "cic-0430",
+    "board_id": "board-onboarding-intake"
   },
   {
     "utterance": "check onboarding stage of the investment vehicle",
@@ -4970,7 +5400,8 @@
     "difficulty": "easy",
     "alt_verbs": [],
     "entity_context": null,
-    "id": "cic-0431"
+    "id": "cic-0431",
+    "board_id": "board-onboarding-intake"
   },
   {
     "utterance": "lookup HSBC Holdings on GLEIF database",
@@ -4980,7 +5411,8 @@
     "difficulty": "easy",
     "alt_verbs": [],
     "entity_context": null,
-    "id": "cic-0432"
+    "id": "cic-0432",
+    "board_id": "board-onboarding-intake"
   },
   {
     "utterance": "verify the legal entity identifier status",
@@ -4992,7 +5424,8 @@
       "gleif.search"
     ],
     "entity_context": null,
-    "id": "cic-0433"
+    "id": "cic-0433",
+    "board_id": "board-onboarding-intake"
   },
   {
     "utterance": "onboard Jersey domiciled private equity fund",
@@ -5002,7 +5435,8 @@
     "difficulty": "medium",
     "alt_verbs": [],
     "entity_context": null,
-    "id": "cic-0434"
+    "id": "cic-0434",
+    "board_id": "board-onboarding-intake"
   },
   {
     "utterance": "has the client submitted the onboarding form?",
@@ -5012,7 +5446,8 @@
     "difficulty": "medium",
     "alt_verbs": [],
     "entity_context": null,
-    "id": "cic-0435"
+    "id": "cic-0435",
+    "board_id": "board-onboarding-intake"
   },
   {
     "utterance": "assign onboarding team lead to this case",
@@ -5022,7 +5457,8 @@
     "difficulty": "easy",
     "alt_verbs": [],
     "entity_context": null,
-    "id": "cic-0436"
+    "id": "cic-0436",
+    "board_id": "board-onboarding-intake"
   },
   {
     "utterance": "generate onboarding runsheet report",
@@ -5032,7 +5468,8 @@
     "difficulty": "medium",
     "alt_verbs": [],
     "entity_context": null,
-    "id": "cic-0437"
+    "id": "cic-0437",
+    "board_id": "board-onboarding-intake"
   },
   {
     "utterance": "is the onboarding documentation complete?",
@@ -5042,7 +5479,8 @@
     "difficulty": "hard",
     "alt_verbs": [],
     "entity_context": null,
-    "id": "cic-0438"
+    "id": "cic-0438",
+    "board_id": "board-onboarding-intake"
   },
   {
     "utterance": "resume paused onboarding workflow for Apex",
@@ -5052,7 +5490,8 @@
     "difficulty": "easy",
     "alt_verbs": [],
     "entity_context": null,
-    "id": "cic-0439"
+    "id": "cic-0439",
+    "board_id": "board-onboarding-intake"
   },
   {
     "utterance": "pause onboarding due to missing information",
@@ -5062,7 +5501,8 @@
     "difficulty": "easy",
     "alt_verbs": [],
     "entity_context": null,
-    "id": "cic-0440"
+    "id": "cic-0440",
+    "board_id": "board-onboarding-intake"
   },
   {
     "utterance": "check if LEI registration is active",
@@ -5072,7 +5512,8 @@
     "difficulty": "medium",
     "alt_verbs": [],
     "entity_context": null,
-    "id": "cic-0441"
+    "id": "cic-0441",
+    "board_id": "board-onboarding-intake"
   },
   {
     "utterance": "import GLEIF parent relation tree",
@@ -5082,7 +5523,8 @@
     "difficulty": "medium",
     "alt_verbs": [],
     "entity_context": null,
-    "id": "cic-0442"
+    "id": "cic-0442",
+    "board_id": "board-onboarding-intake"
   },
   {
     "utterance": "override onboarding gate restrictions",
@@ -5092,7 +5534,8 @@
     "difficulty": "hard",
     "alt_verbs": [],
     "entity_context": null,
-    "id": "cic-0443"
+    "id": "cic-0443",
+    "board_id": "board-onboarding-intake"
   },
   {
     "utterance": "send onboarding welcome package to client",
@@ -5102,7 +5545,8 @@
     "difficulty": "easy",
     "alt_verbs": [],
     "entity_context": null,
-    "id": "cic-0444"
+    "id": "cic-0444",
+    "board_id": "board-onboarding-intake"
   },
   {
     "utterance": "check if the onboarding runsheet is blocked",
@@ -5112,7 +5556,8 @@
     "difficulty": "medium",
     "alt_verbs": [],
     "entity_context": null,
-    "id": "cic-0445"
+    "id": "cic-0445",
+    "board_id": "board-onboarding-intake"
   },
   {
     "utterance": "what is the current onboarding status for Vanguard?",
@@ -5122,7 +5567,8 @@
     "difficulty": "easy",
     "alt_verbs": [],
     "entity_context": null,
-    "id": "cic-0446"
+    "id": "cic-0446",
+    "board_id": "board-onboarding-intake"
   },
   {
     "utterance": "verify the LEI number of this new client",
@@ -5134,7 +5580,8 @@
       "gleif.search"
     ],
     "entity_context": null,
-    "id": "cic-0447"
+    "id": "cic-0447",
+    "board_id": "board-onboarding-intake"
   },
   {
     "utterance": "assign compliance officer to this onboarding ticket",
@@ -5144,7 +5591,8 @@
     "difficulty": "easy",
     "alt_verbs": [],
     "entity_context": null,
-    "id": "cic-0448"
+    "id": "cic-0448",
+    "board_id": "board-onboarding-intake"
   },
   {
     "utterance": "generate the onboarding checklist",
@@ -5154,7 +5602,8 @@
     "difficulty": "easy",
     "alt_verbs": [],
     "entity_context": null,
-    "id": "cic-0449"
+    "id": "cic-0449",
+    "board_id": "board-onboarding-intake"
   },
   {
     "utterance": "complete the pre-onboarding gate checks",
@@ -5164,7 +5613,8 @@
     "difficulty": "hard",
     "alt_verbs": [],
     "entity_context": null,
-    "id": "cic-0450"
+    "id": "cic-0450",
+    "board_id": "board-onboarding-intake"
   },
   {
     "utterance": "onboard this subfund under the active umbrella",
@@ -5174,7 +5624,8 @@
     "difficulty": "medium",
     "alt_verbs": [],
     "entity_context": null,
-    "id": "cic-0451"
+    "id": "cic-0451",
+    "board_id": "board-onboarding-intake"
   },
   {
     "utterance": "send onboarding reminder to relationship manager",
@@ -5184,7 +5635,8 @@
     "difficulty": "easy",
     "alt_verbs": [],
     "entity_context": null,
-    "id": "cic-0452"
+    "id": "cic-0452",
+    "board_id": "board-onboarding-intake"
   },
   {
     "utterance": "export the onboarding report to CSV",
@@ -5194,7 +5646,8 @@
     "difficulty": "easy",
     "alt_verbs": [],
     "entity_context": null,
-    "id": "cic-0453"
+    "id": "cic-0453",
+    "board_id": "board-onboarding-intake"
   },
   {
     "utterance": "add a new legal entity for Vanguard Inc",
@@ -5204,7 +5657,8 @@
     "difficulty": "easy",
     "alt_verbs": [],
     "entity_context": null,
-    "id": "cic-0454"
+    "id": "cic-0454",
+    "board_id": "board-entity-management"
   },
   {
     "utterance": "update registered office of Apex Group",
@@ -5214,7 +5668,8 @@
     "difficulty": "easy",
     "alt_verbs": [],
     "entity_context": null,
-    "id": "cic-0455"
+    "id": "cic-0455",
+    "board_id": "board-entity-management"
   },
   {
     "utterance": "verify legal name against official register",
@@ -5224,7 +5679,8 @@
     "difficulty": "medium",
     "alt_verbs": [],
     "entity_context": null,
-    "id": "cic-0456"
+    "id": "cic-0456",
+    "board_id": "board-entity-management"
   },
   {
     "utterance": "is this entity a limited liability company?",
@@ -5236,7 +5692,8 @@
       "entity.create"
     ],
     "entity_context": null,
-    "id": "cic-0457"
+    "id": "cic-0457",
+    "board_id": "board-entity-management"
   },
   {
     "utterance": "get registration number for Allianz Global Investors",
@@ -5248,7 +5705,8 @@
       "entity.update"
     ],
     "entity_context": null,
-    "id": "cic-0458"
+    "id": "cic-0458",
+    "board_id": "board-entity-management"
   },
   {
     "utterance": "add parent entity link for HSBC UK",
@@ -5260,7 +5718,8 @@
       "entity.create"
     ],
     "entity_context": null,
-    "id": "cic-0459"
+    "id": "cic-0459",
+    "board_id": "board-entity-management"
   },
   {
     "utterance": "list all entity placeholders in this workspace",
@@ -5270,7 +5729,8 @@
     "difficulty": "medium",
     "alt_verbs": [],
     "entity_context": null,
-    "id": "cic-0460"
+    "id": "cic-0460",
+    "board_id": "board-entity-management"
   },
   {
     "utterance": "resolve the placeholder for Vanguard",
@@ -5280,7 +5740,8 @@
     "difficulty": "medium",
     "alt_verbs": [],
     "entity_context": null,
-    "id": "cic-0461"
+    "id": "cic-0461",
+    "board_id": "board-entity-management"
   },
   {
     "utterance": "retrieve structural details for this trust",
@@ -5292,7 +5753,8 @@
       "entity.create"
     ],
     "entity_context": null,
-    "id": "cic-0462"
+    "id": "cic-0462",
+    "board_id": "board-entity-management"
   },
   {
     "utterance": "has this corporate partner been dissolved?",
@@ -5304,7 +5766,8 @@
       "entity.delete"
     ],
     "entity_context": null,
-    "id": "cic-0463"
+    "id": "cic-0463",
+    "board_id": "board-entity-management"
   },
   {
     "utterance": "change legal status of this firm",
@@ -5314,7 +5777,8 @@
     "difficulty": "hard",
     "alt_verbs": [],
     "entity_context": null,
-    "id": "cic-0464"
+    "id": "cic-0464",
+    "board_id": "board-entity-management"
   },
   {
     "utterance": "extract details from company house record",
@@ -5326,7 +5790,8 @@
       "entity.read"
     ],
     "entity_context": null,
-    "id": "cic-0465"
+    "id": "cic-0465",
+    "board_id": "board-entity-management"
   },
   {
     "utterance": "verify director list of HSBC",
@@ -5338,7 +5803,8 @@
       "entity.create"
     ],
     "entity_context": null,
-    "id": "cic-0466"
+    "id": "cic-0466",
+    "board_id": "board-entity-management"
   },
   {
     "utterance": "remove inactive legal entity placeholder",
@@ -5350,7 +5816,8 @@
       "entity.resolve-placeholder"
     ],
     "entity_context": null,
-    "id": "cic-0467"
+    "id": "cic-0467",
+    "board_id": "board-entity-management"
   },
   {
     "utterance": "mark this entity as an active trading counterparty",
@@ -5362,7 +5829,8 @@
       "entity.create"
     ],
     "entity_context": null,
-    "id": "cic-0468"
+    "id": "cic-0468",
+    "board_id": "board-entity-management"
   },
   {
     "utterance": "add a joint venture entity",
@@ -5372,7 +5840,8 @@
     "difficulty": "medium",
     "alt_verbs": [],
     "entity_context": null,
-    "id": "cic-0469"
+    "id": "cic-0469",
+    "board_id": "board-entity-management"
   },
   {
     "utterance": "register the foreign trust branch",
@@ -5382,7 +5851,8 @@
     "difficulty": "medium",
     "alt_verbs": [],
     "entity_context": null,
-    "id": "cic-0470"
+    "id": "cic-0470",
+    "board_id": "board-entity-management"
   },
   {
     "utterance": "what is the legal form of Apex?",
@@ -5394,7 +5864,8 @@
       "entity.create"
     ],
     "entity_context": null,
-    "id": "cic-0471"
+    "id": "cic-0471",
+    "board_id": "board-entity-management"
   },
   {
     "utterance": "who is the general partner of this LP?",
@@ -5406,7 +5877,8 @@
       "entity.create"
     ],
     "entity_context": null,
-    "id": "cic-0472"
+    "id": "cic-0472",
+    "board_id": "board-entity-management"
   },
   {
     "utterance": "verify this firm's tax number",
@@ -5418,7 +5890,8 @@
       "entity.read"
     ],
     "entity_context": null,
-    "id": "cic-0473"
+    "id": "cic-0473",
+    "board_id": "board-entity-management"
   },
   {
     "utterance": "update the entity name in registry",
@@ -5428,7 +5901,8 @@
     "difficulty": "easy",
     "alt_verbs": [],
     "entity_context": null,
-    "id": "cic-0474"
+    "id": "cic-0474",
+    "board_id": "board-entity-management"
   },
   {
     "utterance": "remove this corporate entity placeholder",
@@ -5438,7 +5912,8 @@
     "difficulty": "easy",
     "alt_verbs": [],
     "entity_context": null,
-    "id": "cic-0475"
+    "id": "cic-0475",
+    "board_id": "board-entity-management"
   },
   {
     "utterance": "list all subsidiaries of HSBC",
@@ -5450,7 +5925,8 @@
       "entity.create"
     ],
     "entity_context": null,
-    "id": "cic-0476"
+    "id": "cic-0476",
+    "board_id": "board-entity-management"
   },
   {
     "utterance": "show me the company secretary details",
@@ -5460,7 +5936,8 @@
     "difficulty": "easy",
     "alt_verbs": [],
     "entity_context": null,
-    "id": "cic-0477"
+    "id": "cic-0477",
+    "board_id": "board-entity-management"
   },
   {
     "utterance": "add a legal representative for the firm",
@@ -5472,7 +5949,8 @@
       "entity.create"
     ],
     "entity_context": null,
-    "id": "cic-0478"
+    "id": "cic-0478",
+    "board_id": "board-entity-management"
   },
   {
     "utterance": "is this entity a regulated fund manager?",
@@ -5484,7 +5962,8 @@
       "entity.create"
     ],
     "entity_context": null,
-    "id": "cic-0479"
+    "id": "cic-0479",
+    "board_id": "board-entity-management"
   },
   {
     "utterance": "verify the registration country of Allianz",
@@ -5496,7 +5975,8 @@
       "entity.create"
     ],
     "entity_context": null,
-    "id": "cic-0480"
+    "id": "cic-0480",
+    "board_id": "board-entity-management"
   },
   {
     "utterance": "request certificate of incumbency from Allianz",
@@ -5506,7 +5986,8 @@
     "difficulty": "medium",
     "alt_verbs": [],
     "entity_context": null,
-    "id": "cic-0481"
+    "id": "cic-0481",
+    "board_id": "board-document-solicitation"
   },
   {
     "utterance": "upload latest articles of association PDF",
@@ -5518,7 +5999,8 @@
       "document.solicit"
     ],
     "entity_context": null,
-    "id": "cic-0482"
+    "id": "cic-0482",
+    "board_id": "board-document-solicitation"
   },
   {
     "utterance": "verify signature on the trust deed",
@@ -5528,7 +6010,8 @@
     "difficulty": "medium",
     "alt_verbs": [],
     "entity_context": null,
-    "id": "cic-0483"
+    "id": "cic-0483",
+    "board_id": "board-document-solicitation"
   },
   {
     "utterance": "has the passport copy expired?",
@@ -5540,7 +6023,8 @@
       "document.reject"
     ],
     "entity_context": null,
-    "id": "cic-0484"
+    "id": "cic-0484",
+    "board_id": "board-document-solicitation"
   },
   {
     "utterance": "reject incorporation doc due to poor quality",
@@ -5550,7 +6034,8 @@
     "difficulty": "easy",
     "alt_verbs": [],
     "entity_context": null,
-    "id": "cic-0485"
+    "id": "cic-0485",
+    "board_id": "board-document-solicitation"
   },
   {
     "utterance": "extract name and DOB from uploaded passport",
@@ -5560,7 +6045,8 @@
     "difficulty": "easy",
     "alt_verbs": [],
     "entity_context": null,
-    "id": "cic-0486"
+    "id": "cic-0486",
+    "board_id": "board-document-solicitation"
   },
   {
     "utterance": "send batch document request to HSBC",
@@ -5570,7 +6056,8 @@
     "difficulty": "medium",
     "alt_verbs": [],
     "entity_context": null,
-    "id": "cic-0487"
+    "id": "cic-0487",
+    "board_id": "board-document-solicitation"
   },
   {
     "utterance": "list all pending document requests for Apex",
@@ -5580,7 +6067,8 @@
     "difficulty": "easy",
     "alt_verbs": [],
     "entity_context": null,
-    "id": "cic-0488"
+    "id": "cic-0488",
+    "board_id": "board-document-solicitation"
   },
   {
     "utterance": "approve the utility bill as address proof",
@@ -5592,7 +6080,8 @@
       "document.solicit"
     ],
     "entity_context": null,
-    "id": "cic-0489"
+    "id": "cic-0489",
+    "board_id": "board-document-solicitation"
   },
   {
     "utterance": "is the signature on the contract valid?",
@@ -5602,7 +6091,8 @@
     "difficulty": "medium",
     "alt_verbs": [],
     "entity_context": null,
-    "id": "cic-0490"
+    "id": "cic-0490",
+    "board_id": "board-document-solicitation"
   },
   {
     "utterance": "request certified translation of tax form",
@@ -5612,7 +6102,8 @@
     "difficulty": "hard",
     "alt_verbs": [],
     "entity_context": null,
-    "id": "cic-0491"
+    "id": "cic-0491",
+    "board_id": "board-document-solicitation"
   },
   {
     "utterance": "archive all verified documents",
@@ -5622,7 +6113,8 @@
     "difficulty": "easy",
     "alt_verbs": [],
     "entity_context": null,
-    "id": "cic-0492"
+    "id": "cic-0492",
+    "board_id": "board-document-solicitation"
   },
   {
     "utterance": "retrieve historical versions of the fund prospectus",
@@ -5632,7 +6124,8 @@
     "difficulty": "medium",
     "alt_verbs": [],
     "entity_context": null,
-    "id": "cic-0493"
+    "id": "cic-0493",
+    "board_id": "board-document-solicitation"
   },
   {
     "utterance": "download the tax residency declaration",
@@ -5644,7 +6137,8 @@
       "document.solicit-batch"
     ],
     "entity_context": null,
-    "id": "cic-0494"
+    "id": "cic-0494",
+    "board_id": "board-document-solicitation"
   },
   {
     "utterance": "has the client uploaded their tax certificate?",
@@ -5656,7 +6150,8 @@
       "document.solicit"
     ],
     "entity_context": null,
-    "id": "cic-0495"
+    "id": "cic-0495",
+    "board_id": "board-document-solicitation"
   },
   {
     "utterance": "request the utility bill for address proof",
@@ -5666,7 +6161,8 @@
     "difficulty": "easy",
     "alt_verbs": [],
     "entity_context": null,
-    "id": "cic-0496"
+    "id": "cic-0496",
+    "board_id": "board-document-solicitation"
   },
   {
     "utterance": "upload the partnership agreement document",
@@ -5676,7 +6172,8 @@
     "difficulty": "easy",
     "alt_verbs": [],
     "entity_context": null,
-    "id": "cic-0497"
+    "id": "cic-0497",
+    "board_id": "board-document-solicitation"
   },
   {
     "utterance": "verify the signature on this board resolution",
@@ -5686,7 +6183,8 @@
     "difficulty": "medium",
     "alt_verbs": [],
     "entity_context": null,
-    "id": "cic-0498"
+    "id": "cic-0498",
+    "board_id": "board-document-solicitation"
   },
   {
     "utterance": "check if the certificate of incumbency is expired",
@@ -5698,7 +6196,8 @@
       "document.reject"
     ],
     "entity_context": null,
-    "id": "cic-0499"
+    "id": "cic-0499",
+    "board_id": "board-document-solicitation"
   },
   {
     "utterance": "reject the trust deed due to missing page",
@@ -5708,7 +6207,8 @@
     "difficulty": "easy",
     "alt_verbs": [],
     "entity_context": null,
-    "id": "cic-0500"
+    "id": "cic-0500",
+    "board_id": "board-document-solicitation"
   },
   {
     "utterance": "extract the passport number from this file",
@@ -5718,7 +6218,8 @@
     "difficulty": "easy",
     "alt_verbs": [],
     "entity_context": null,
-    "id": "cic-0501"
+    "id": "cic-0501",
+    "board_id": "board-document-solicitation"
   },
   {
     "utterance": "send a request for the register of members",
@@ -5728,7 +6229,8 @@
     "difficulty": "medium",
     "alt_verbs": [],
     "entity_context": null,
-    "id": "cic-0502"
+    "id": "cic-0502",
+    "board_id": "board-document-solicitation"
   },
   {
     "utterance": "what documents are required for an Irish trust?",
@@ -5738,7 +6240,8 @@
     "difficulty": "hard",
     "alt_verbs": [],
     "entity_context": null,
-    "id": "cic-0503"
+    "id": "cic-0503",
+    "board_id": "board-document-solicitation"
   },
   {
     "utterance": "has the client submitted their tax residency document?",
@@ -5750,7 +6253,8 @@
       "document.solicit"
     ],
     "entity_context": null,
-    "id": "cic-0504"
+    "id": "cic-0504",
+    "board_id": "board-document-solicitation"
   },
   {
     "utterance": "download the memorandum of association",
@@ -5762,7 +6266,8 @@
       "document.solicit"
     ],
     "entity_context": null,
-    "id": "cic-0505"
+    "id": "cic-0505",
+    "board_id": "board-document-solicitation"
   },
   {
     "utterance": "approve the certificate of incorporation",
@@ -5774,7 +6279,8 @@
       "document.solicit"
     ],
     "entity_context": null,
-    "id": "cic-0506"
+    "id": "cic-0506",
+    "board_id": "board-document-solicitation"
   },
   {
     "utterance": "audit all documents for the CBU",
@@ -5786,7 +6292,8 @@
       "document.solicit-batch"
     ],
     "entity_context": null,
-    "id": "cic-0507"
+    "id": "cic-0507",
+    "board_id": "board-document-solicitation"
   },
   {
     "utterance": "set up rate card for sub-custody services",
@@ -5796,7 +6303,8 @@
     "difficulty": "medium",
     "alt_verbs": [],
     "entity_context": null,
-    "id": "cic-0508"
+    "id": "cic-0508",
+    "board_id": "board-custody-deal"
   },
   {
     "utterance": "apply 3bps custody fee to this fund",
@@ -5808,7 +6316,8 @@
       "deal.create-rate-card"
     ],
     "entity_context": null,
-    "id": "cic-0509"
+    "id": "cic-0509",
+    "board_id": "board-custody-deal"
   },
   {
     "utterance": "submit the counter rate card proposal",
@@ -5820,7 +6329,8 @@
       "deal.propose-rate-card"
     ],
     "entity_context": null,
-    "id": "cic-0510"
+    "id": "cic-0510",
+    "board_id": "board-custody-deal"
   },
   {
     "utterance": "propose standard rate card to Vanguard",
@@ -5830,7 +6340,8 @@
     "difficulty": "easy",
     "alt_verbs": [],
     "entity_context": null,
-    "id": "cic-0511"
+    "id": "cic-0511",
+    "board_id": "board-custody-deal"
   },
   {
     "utterance": "is the deal status updated to approved?",
@@ -5842,7 +6353,8 @@
       "deal.update-status"
     ],
     "entity_context": null,
-    "id": "cic-0512"
+    "id": "cic-0512",
+    "board_id": "board-custody-deal"
   },
   {
     "utterance": "assign State Street as sub-custodian",
@@ -5852,7 +6364,8 @@
     "difficulty": "easy",
     "alt_verbs": [],
     "entity_context": null,
-    "id": "cic-0513"
+    "id": "cic-0513",
+    "board_id": "board-custody-deal"
   },
   {
     "utterance": "verify settlement instructions for the new deal",
@@ -5864,7 +6377,8 @@
       "deal.create"
     ],
     "entity_context": null,
-    "id": "cic-0514"
+    "id": "cic-0514",
+    "board_id": "board-custody-deal"
   },
   {
     "utterance": "create share class under Luxembourg umbrella",
@@ -5874,7 +6388,8 @@
     "difficulty": "easy",
     "alt_verbs": [],
     "entity_context": null,
-    "id": "cic-0515"
+    "id": "cic-0515",
+    "board_id": "board-custody-deal"
   },
   {
     "utterance": "link this feeder fund to the master fund",
@@ -5884,7 +6399,8 @@
     "difficulty": "easy",
     "alt_verbs": [],
     "entity_context": null,
-    "id": "cic-0516"
+    "id": "cic-0516",
+    "board_id": "board-custody-deal"
   },
   {
     "utterance": "list all investors in the Allianz SICAV",
@@ -5894,7 +6410,8 @@
     "difficulty": "easy",
     "alt_verbs": [],
     "entity_context": null,
-    "id": "cic-0517"
+    "id": "cic-0517",
+    "board_id": "board-custody-deal"
   },
   {
     "utterance": "add Vanguard fund investment allocation",
@@ -5904,7 +6421,8 @@
     "difficulty": "medium",
     "alt_verbs": [],
     "entity_context": null,
-    "id": "cic-0518"
+    "id": "cic-0518",
+    "board_id": "board-custody-deal"
   },
   {
     "utterance": "update pricing schedule on the deal profile",
@@ -5916,7 +6434,8 @@
       "deal.update-status"
     ],
     "entity_context": null,
-    "id": "cic-0519"
+    "id": "cic-0519",
+    "board_id": "board-custody-deal"
   },
   {
     "utterance": "approve the custody agreement draft",
@@ -5928,7 +6447,8 @@
       "deal.create"
     ],
     "entity_context": null,
-    "id": "cic-0520"
+    "id": "cic-0520",
+    "board_id": "board-custody-deal"
   },
   {
     "utterance": "what are the settlement cycles for this asset class?",
@@ -5938,7 +6458,8 @@
     "difficulty": "medium",
     "alt_verbs": [],
     "entity_context": null,
-    "id": "cic-0521"
+    "id": "cic-0521",
+    "board_id": "board-custody-deal"
   },
   {
     "utterance": "has the custody account been opened at DTCC?",
@@ -5950,7 +6471,8 @@
       "deal.create"
     ],
     "entity_context": null,
-    "id": "cic-0522"
+    "id": "cic-0522",
+    "board_id": "board-custody-deal"
   },
   {
     "utterance": "activate share class trading gates",
@@ -5960,7 +6482,8 @@
     "difficulty": "easy",
     "alt_verbs": [],
     "entity_context": null,
-    "id": "cic-0523"
+    "id": "cic-0523",
+    "board_id": "board-custody-deal"
   },
   {
     "utterance": "link custody client to the clearing house",
@@ -5972,6 +6495,7 @@
       "deal.create"
     ],
     "entity_context": null,
-    "id": "cic-0524"
+    "id": "cic-0524",
+    "board_id": "board-custody-deal"
   }
 ]

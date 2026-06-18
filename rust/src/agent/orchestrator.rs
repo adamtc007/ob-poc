@@ -737,6 +737,24 @@ pub struct IntentTrace {
     /// Sage shadow domain hints (Stage 1.5, populated when SAGE_SHADOW=1).
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub sage_domain_hints: Vec<String>,
+
+    // ── Intent Trace evidence (Option C) ────────────────────────────
+    /// Verb registry size before pack-scope collapse (FilterSummary.total_registry).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub surface_full_count: Option<usize>,
+    /// Verb count after pack-scope collapse (FilterSummary.after_semreg).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub surface_pack_scoped_count: Option<usize>,
+    /// Candidate flow bucketed by source/tier among the final results (eval mode).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub soft_stage_flow: Option<crate::agent::telemetry::SoftStageFlow>,
+    /// Read-only state-reachability observations over ranked/allowed (eval mode).
+    /// NON-MUTATING — never alters ranking.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub state_observer: Vec<crate::agent::telemetry::StateObservation>,
+    /// Entity/context resolution confidence.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub entity_confidence: Option<f32>,
 }
 
 async fn run_sage_stage(
@@ -2492,6 +2510,11 @@ fn build_trace(
         sage_plane: None,          // Set by caller when SAGE_SHADOW=1
         sage_polarity: None,       // Set by caller when SAGE_SHADOW=1
         sage_domain_hints: vec![], // Set by caller when SAGE_SHADOW=1
+        surface_full_count: None,
+        surface_pack_scoped_count: None,
+        soft_stage_flow: None,
+        state_observer: Vec::new(),
+        entity_confidence: None,
     }
 }
 
@@ -2857,6 +2880,29 @@ async fn emit_telemetry(
         toctou_recheck_performed: trace.toctou_recheck_performed,
         toctou_result: trace.toctou_result.clone(),
         toctou_new_fingerprint: trace.toctou_new_fingerprint.clone(),
+        // ── Intent Trace evidence (Option C) ──
+        // Surface collapse counts from the per-turn SessionVerbSurface, when present.
+        surface_full_count: outcome
+            .surface
+            .as_ref()
+            .map(|s| s.filter_summary.total_registry as i32),
+        surface_pack_scoped_count: outcome
+            .surface
+            .as_ref()
+            .map(|s| s.filter_summary.after_semreg as i32),
+        // soft_stage_flow / state_observer are eval-mode (populated by the eval
+        // harness, which holds the full VerbSearchResult list and board state);
+        // production leaves them None unless the trace carried them.
+        soft_stage_flow: trace
+            .soft_stage_flow
+            .as_ref()
+            .and_then(|f| serde_json::to_value(f).ok()),
+        state_observer: if trace.state_observer.is_empty() {
+            None
+        } else {
+            serde_json::to_value(&trace.state_observer).ok()
+        },
+        entity_confidence: trace.entity_confidence,
     };
 
     let persisted = telemetry::store::insert_intent_event(&ctx.pool, &row).await;
@@ -3019,6 +3065,11 @@ pub async fn handle_utterance_with_forced_verb(
             sage_polarity: None,
             sage_domain_hints: vec![],
             serve_fallback_reason: None,
+            surface_full_count: None,
+            surface_pack_scoped_count: None,
+            soft_stage_flow: None,
+            state_observer: Vec::new(),
+            entity_confidence: None,
         };
 
         let mut outcome = OrchestratorOutcome {
@@ -3102,6 +3153,11 @@ pub async fn handle_utterance_with_forced_verb(
         sage_polarity: None,
         sage_domain_hints: vec![],
         serve_fallback_reason: None,
+        surface_full_count: None,
+        surface_pack_scoped_count: None,
+        soft_stage_flow: None,
+        state_observer: Vec::new(),
+        entity_confidence: None,
     };
 
     tracing::info!(
@@ -3185,6 +3241,11 @@ fn default_trace_for_runtime(
         sage_plane: None,
         sage_polarity: None,
         sage_domain_hints: vec![],
+        surface_full_count: None,
+        surface_pack_scoped_count: None,
+        soft_stage_flow: None,
+        state_observer: Vec::new(),
+        entity_confidence: None,
     }
 }
 
@@ -3436,6 +3497,11 @@ mod tests {
             sage_polarity: None,
             sage_domain_hints: vec![],
             serve_fallback_reason: None,
+            surface_full_count: None,
+            surface_pack_scoped_count: None,
+            soft_stage_flow: None,
+            state_observer: Vec::new(),
+            entity_confidence: None,
         }
     }
 

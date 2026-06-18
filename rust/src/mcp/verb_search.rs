@@ -235,6 +235,26 @@ impl VerbSearchResult {
     }
 }
 
+/// Derive the soft-stage candidate flow from a FINAL search result set.
+///
+/// Read-only observation: buckets surviving candidates by `VerbSearchSource`
+/// and ordinal `Tier`. Does not touch ranking — it is computed from the output
+/// of `search()`, never from inside it. This is how Intent Trace records the
+/// soft-stage flow without instrumenting (and risking) the search body.
+pub fn soft_stage_flow(results: &[VerbSearchResult]) -> crate::agent::telemetry::SoftStageFlow {
+    let mut by_source: std::collections::BTreeMap<String, usize> = std::collections::BTreeMap::new();
+    let mut by_tier: std::collections::BTreeMap<String, usize> = std::collections::BTreeMap::new();
+    for r in results {
+        *by_source.entry(format!("{:?}", r.source)).or_insert(0) += 1;
+        *by_tier.entry(format!("{:?}", r.tier())).or_insert(0) += 1;
+    }
+    crate::agent::telemetry::SoftStageFlow {
+        by_source,
+        by_tier,
+        total: results.len(),
+    }
+}
+
 const COMBINE_LAMBDA: f32 = 0.5;
 
 /// Bounded combination of independent confidence signals for ONE verb.

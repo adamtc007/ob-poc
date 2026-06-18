@@ -8,10 +8,44 @@ pub mod store;
 
 pub use redaction::{normalize_utterance, preview_redacted, utterance_hash};
 
+use serde::{Deserialize, Serialize};
 use serde_json::Value as JsonValue;
+use std::collections::BTreeMap;
 use uuid::Uuid;
 
-/// Row model mirroring `agent.intent_events`.
+/// Read-only state-reachability observation for one candidate verb (eval mode).
+///
+/// Produced by `verb_surface::observe_state_reachability` over the ranked /
+/// allowed set. NON-MUTATING: it never removes a candidate or changes ranking —
+/// it only tags whether Step-5 lifecycle reachability *would* admit the verb at
+/// the current entity state. This is the counterfactual the Option A vs B fork
+/// is decided on.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct StateObservation {
+    pub verb: String,
+    pub state_reachable: bool,
+    /// The lifecycle predicate that fails when `state_reachable == false`
+    /// (e.g. "requires_states [\"open\"], current 'closed'").
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub failing_predicate: Option<String>,
+}
+
+/// Soft-stage candidate flow derived from the FINAL search results — the count
+/// of surviving candidates bucketed by search source and ordinal tier.
+///
+/// Derived from `Vec<VerbSearchResult>` (see `verb_search::soft_stage_flow`),
+/// so it observes search output without instrumenting (and risking) the search
+/// body itself.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Default)]
+pub struct SoftStageFlow {
+    /// Surviving candidate count by `VerbSearchSource` label.
+    pub by_source: BTreeMap<String, usize>,
+    /// Surviving candidate count by ordinal `Tier` label.
+    pub by_tier: BTreeMap<String, usize>,
+    pub total: usize,
+}
+
+/// Row model mirroring `"ob-poc".intent_events`.
 #[derive(Debug, Clone)]
 pub struct IntentEventRow {
     pub event_id: Uuid,
@@ -56,6 +90,18 @@ pub struct IntentEventRow {
     pub toctou_recheck_performed: bool,
     pub toctou_result: Option<String>,
     pub toctou_new_fingerprint: Option<String>,
+
+    // ── Intent Trace evidence (Option C) ───────────────────────────
+    /// Verb registry size before pack-scope collapse (FilterSummary.total_registry).
+    pub surface_full_count: Option<i32>,
+    /// Verb count after pack-scope collapse (FilterSummary.after_semreg).
+    pub surface_pack_scoped_count: Option<i32>,
+    /// Candidate flow bucketed by source/tier among the final results.
+    pub soft_stage_flow: Option<JsonValue>,
+    /// Eval-mode read-only state reachability tags over ranked/allowed.
+    pub state_observer: Option<JsonValue>,
+    /// Entity/context resolution confidence.
+    pub entity_confidence: Option<f32>,
 }
 
 /// Map a PipelineOutcome to its telemetry string label.
