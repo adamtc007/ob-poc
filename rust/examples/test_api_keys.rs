@@ -207,7 +207,7 @@ mod tests {
             "1234567890abcdefghijklmnopqrstuv123456789"
         ));
         assert!(validate_gemini_key_format(
-            "AQ-Ab8RN6KfgOaTQC9llX184JIHQ7z9wWsiCu8qpnda9JJoa2hVow"
+            "AQ-XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX"
         ));
         assert!(!validate_gemini_key_format("short"));
         assert!(!validate_gemini_key_format("key with spaces"));
