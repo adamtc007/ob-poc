@@ -21,8 +21,8 @@ use uuid::Uuid;
 use dsl_runtime::SemOsChildDispatcher;
 use dsl_runtime::TransactionScope;
 use dsl_runtime::{
-    json_extract_bool_opt, json_extract_string, json_extract_string_opt, json_extract_uuid,
-    json_extract_uuid_opt,
+    json_extract_bool_opt, json_extract_int_opt, json_extract_string, json_extract_string_opt,
+    json_extract_uuid, json_extract_uuid_opt,
 };
 use dsl_runtime::{VerbExecutionContext, VerbExecutionOutcome};
 
@@ -60,6 +60,25 @@ async fn upsert_entity_relationship(
     relationship_id.parse::<Uuid>().map_err(|err| {
         anyhow!("entity-relationship.upsert returned invalid relationship_id: {err}")
     })
+}
+
+/// Phase 1 §10.6 CAS carve-out (A1 = `cbu_entity_roles`). A row is the ManCo
+/// designation (Class 2 — maker-checker, KYC-canonical) when its role is
+/// MANAGEMENT_COMPANY / INVESTMENT_MANAGER; those rows BYPASS the version guard
+/// (their authority transition is handled separately, not by symmetric-race CAS).
+/// Every other operator-authored row (Class 1) is version-CAS'd. There is no
+/// Class 3 (recompute) on A1 — `ubo_graph` writes only `entity_relationships`.
+const A1_MANCO_CARVEOUT: &str = r#"("ob-poc".cbu_entity_roles.role_id IN
+    (SELECT role_id FROM "ob-poc".roles WHERE name IN ('MANAGEMENT_COMPANY','INVESTMENT_MANAGER')))"#;
+
+/// Conflict error for a rejected stale compliance write (optimistic-concurrency
+/// mismatch). Returned instead of silently clobbering the regulatory value.
+fn cas_conflict(table: &str, expected: Option<i64>) -> anyhow::Error {
+    anyhow!(
+        "CAS conflict on {table}: concurrent compliance write rejected — expected version {:?} \
+         did not match the current row version (re-read and retry)",
+        expected
+    )
 }
 
 /// Single canonical role-assignment verb (`cbu.assign-role`), dispatching on
@@ -102,19 +121,28 @@ impl SemOsVerbOp for AssignRole {
                 let role = json_extract_string_opt(args, "role")
                     .map(|s| s.to_uppercase())
                     .ok_or_else(|| anyhow!("cbu.assign-role requires `role` for a generic role assignment"))?;
+                let expected_version = json_extract_int_opt(args, "expected-version");
                 let role_id = get_role_id(scope, &role).await?;
-                let role_result: Uuid = sqlx::query_scalar(
+                let role_result: Uuid = sqlx::query_scalar(&format!(
                     r#"INSERT INTO "ob-poc".cbu_entity_roles
                        (cbu_id, entity_id, role_id, created_at, updated_at)
                        VALUES ($1, $2, $3, NOW(), NOW())
-                       ON CONFLICT (cbu_id, entity_id, role_id) DO UPDATE SET updated_at = NOW()
+                       ON CONFLICT (cbu_id, entity_id, role_id) DO UPDATE SET
+                           version = "ob-poc".cbu_entity_roles.version + 1,
+                           updated_at = NOW()
+                       WHERE {carveout}
+                          OR "ob-poc".cbu_entity_roles.version
+                             = COALESCE($4::bigint, "ob-poc".cbu_entity_roles.version)
                        RETURNING cbu_entity_role_id"#,
-                )
+                    carveout = A1_MANCO_CARVEOUT,
+                ))
                 .bind(cbu_id)
                 .bind(entity_id)
                 .bind(role_id)
-                .fetch_one(scope.executor())
-                .await?;
+                .bind(expected_version)
+                .fetch_optional(scope.executor())
+                .await?
+                .ok_or_else(|| cas_conflict("cbu_entity_roles", expected_version))?;
                 ctx.bind("cbu_entity_role", role_result);
                 Ok(VerbExecutionOutcome::Record(json!({
                     "role_id": role_result,
@@ -153,10 +181,11 @@ impl SemOsVerbOp for AssignOwnership {
         let effective_from = json_extract_string_opt(args, "effective-from")
             .as_deref()
             .and_then(|s| NaiveDate::parse_from_str(s, "%Y-%m-%d").ok());
+        let expected_version = json_extract_int_opt(args, "expected-version");
 
         let role_id = get_role_id(scope, &role).await?;
 
-        let role_result: Uuid = sqlx::query_scalar(
+        let role_result: Uuid = sqlx::query_scalar(&format!(
             r#"INSERT INTO "ob-poc".cbu_entity_roles
                (cbu_id, entity_id, role_id, target_entity_id, ownership_percentage,
                 effective_from, created_at, updated_at)
@@ -165,17 +194,24 @@ impl SemOsVerbOp for AssignOwnership {
                    target_entity_id = EXCLUDED.target_entity_id,
                    ownership_percentage = EXCLUDED.ownership_percentage,
                    effective_from = EXCLUDED.effective_from,
+                   version = "ob-poc".cbu_entity_roles.version + 1,
                    updated_at = NOW()
+               WHERE {carveout}
+                  OR "ob-poc".cbu_entity_roles.version
+                     = COALESCE($7::bigint, "ob-poc".cbu_entity_roles.version)
                RETURNING cbu_entity_role_id"#,
-        )
+            carveout = A1_MANCO_CARVEOUT,
+        ))
         .bind(cbu_id)
         .bind(owner_entity_id)
         .bind(role_id)
         .bind(Some(owned_entity_id))
         .bind(Some(&percentage))
         .bind(effective_from)
-        .fetch_one(scope.executor())
-        .await?;
+        .bind(expected_version)
+        .fetch_optional(scope.executor())
+        .await?
+        .ok_or_else(|| cas_conflict("cbu_entity_roles", expected_version))?;
 
         let percentage_display = percentage.to_string();
         let rel_args = json!({
@@ -236,25 +272,33 @@ impl SemOsVerbOp for AssignControl {
             .as_deref()
             .and_then(|s| NaiveDate::parse_from_str(s, "%Y-%m-%d").ok());
 
+        let expected_version = json_extract_int_opt(args, "expected-version");
         let role_id = get_role_id(scope, &role).await?;
 
-        let role_result: Uuid = sqlx::query_scalar(
+        let role_result: Uuid = sqlx::query_scalar(&format!(
             r#"INSERT INTO "ob-poc".cbu_entity_roles
                (cbu_id, entity_id, role_id, target_entity_id, effective_from, created_at, updated_at)
                VALUES ($1, $2, $3, $4, $5, NOW(), NOW())
                ON CONFLICT (cbu_id, entity_id, role_id) DO UPDATE SET
                    target_entity_id = EXCLUDED.target_entity_id,
                    effective_from = EXCLUDED.effective_from,
+                   version = "ob-poc".cbu_entity_roles.version + 1,
                    updated_at = NOW()
+               WHERE {carveout}
+                  OR "ob-poc".cbu_entity_roles.version
+                     = COALESCE($6::bigint, "ob-poc".cbu_entity_roles.version)
                RETURNING cbu_entity_role_id"#,
-        )
+            carveout = A1_MANCO_CARVEOUT,
+        ))
         .bind(cbu_id)
         .bind(controller_entity_id)
         .bind(role_id)
         .bind(Some(controlled_entity_id))
         .bind(appointment_date)
-        .fetch_one(scope.executor())
-        .await?;
+        .bind(expected_version)
+        .fetch_optional(scope.executor())
+        .await?
+        .ok_or_else(|| cas_conflict("cbu_entity_roles", expected_version))?;
 
         let rel_args = json!({
             "from-entity-id": controller_entity_id,
@@ -324,7 +368,8 @@ impl SemOsVerbOp for AssignTrustRole {
             _ => "trust_role",
         };
 
-        let role_result: Uuid = sqlx::query_scalar(
+        let expected_version = json_extract_int_opt(args, "expected-version");
+        let role_result: Uuid = sqlx::query_scalar(&format!(
             r#"INSERT INTO "ob-poc".cbu_entity_roles
                (cbu_id, entity_id, role_id, target_entity_id, ownership_percentage,
                 created_at, updated_at)
@@ -332,16 +377,23 @@ impl SemOsVerbOp for AssignTrustRole {
                ON CONFLICT (cbu_id, entity_id, role_id) DO UPDATE SET
                    target_entity_id = EXCLUDED.target_entity_id,
                    ownership_percentage = EXCLUDED.ownership_percentage,
+                   version = "ob-poc".cbu_entity_roles.version + 1,
                    updated_at = NOW()
+               WHERE {carveout}
+                  OR "ob-poc".cbu_entity_roles.version
+                     = COALESCE($6::bigint, "ob-poc".cbu_entity_roles.version)
                RETURNING cbu_entity_role_id"#,
-        )
+            carveout = A1_MANCO_CARVEOUT,
+        ))
         .bind(cbu_id)
         .bind(participant_entity_id)
         .bind(role_id)
         .bind(Some(trust_entity_id))
         .bind(&interest_percentage)
-        .fetch_one(scope.executor())
-        .await?;
+        .bind(expected_version)
+        .fetch_optional(scope.executor())
+        .await?
+        .ok_or_else(|| cas_conflict("cbu_entity_roles", expected_version))?;
 
         let rel_args = json!({
             "from-entity-id": participant_entity_id,
@@ -402,7 +454,8 @@ impl SemOsVerbOp for AssignFundRole {
 
         let role_id = get_role_id(scope, &role).await?;
 
-        let role_result: Uuid = sqlx::query_scalar(
+        let expected_version = json_extract_int_opt(args, "expected-version");
+        let role_result: Uuid = sqlx::query_scalar(&format!(
             r#"INSERT INTO "ob-poc".cbu_entity_roles
                (cbu_id, entity_id, role_id, target_entity_id, ownership_percentage,
                 created_at, updated_at)
@@ -410,16 +463,23 @@ impl SemOsVerbOp for AssignFundRole {
                ON CONFLICT (cbu_id, entity_id, role_id) DO UPDATE SET
                    target_entity_id = EXCLUDED.target_entity_id,
                    ownership_percentage = EXCLUDED.ownership_percentage,
+                   version = "ob-poc".cbu_entity_roles.version + 1,
                    updated_at = NOW()
+               WHERE {carveout}
+                  OR "ob-poc".cbu_entity_roles.version
+                     = COALESCE($6::bigint, "ob-poc".cbu_entity_roles.version)
                RETURNING cbu_entity_role_id"#,
-        )
+            carveout = A1_MANCO_CARVEOUT,
+        ))
         .bind(cbu_id)
         .bind(entity_id)
         .bind(role_id)
         .bind(fund_entity_id)
         .bind(&investment_percentage)
-        .fetch_one(scope.executor())
-        .await?;
+        .bind(expected_version)
+        .fetch_optional(scope.executor())
+        .await?
+        .ok_or_else(|| cas_conflict("cbu_entity_roles", expected_version))?;
 
         let rel_result: Option<Uuid> = if let Some(fund_id) = fund_entity_id {
             let relationship_type = match role.as_str() {
@@ -488,7 +548,8 @@ impl SemOsVerbOp for AssignServiceProvider {
 
         let role_id = get_role_id(scope, &role).await?;
 
-        let role_result: Uuid = sqlx::query_scalar(
+        let expected_version = json_extract_int_opt(args, "expected-version");
+        let role_result: Uuid = sqlx::query_scalar(&format!(
             r#"INSERT INTO "ob-poc".cbu_entity_roles
                (cbu_id, entity_id, role_id, target_entity_id, effective_from,
                 created_at, updated_at)
@@ -496,16 +557,23 @@ impl SemOsVerbOp for AssignServiceProvider {
                ON CONFLICT (cbu_id, entity_id, role_id) DO UPDATE SET
                    target_entity_id = EXCLUDED.target_entity_id,
                    effective_from = EXCLUDED.effective_from,
+                   version = "ob-poc".cbu_entity_roles.version + 1,
                    updated_at = NOW()
+               WHERE {carveout}
+                  OR "ob-poc".cbu_entity_roles.version
+                     = COALESCE($6::bigint, "ob-poc".cbu_entity_roles.version)
                RETURNING cbu_entity_role_id"#,
-        )
+            carveout = A1_MANCO_CARVEOUT,
+        ))
         .bind(cbu_id)
         .bind(provider_entity_id)
         .bind(role_id)
         .bind(client_entity_id)
         .bind(service_agreement_date)
-        .fetch_one(scope.executor())
-        .await?;
+        .bind(expected_version)
+        .fetch_optional(scope.executor())
+        .await?
+        .ok_or_else(|| cas_conflict("cbu_entity_roles", expected_version))?;
 
         ctx.bind("cbu_entity_role", role_result);
         dsl_runtime::emit_pending_state_advance(
@@ -555,7 +623,8 @@ impl SemOsVerbOp for AssignSignatory {
 
         let role_id = get_role_id(scope, &role).await?;
 
-        let role_result: Uuid = sqlx::query_scalar(
+        let expected_version = json_extract_int_opt(args, "expected-version");
+        let role_result: Uuid = sqlx::query_scalar(&format!(
             r#"INSERT INTO "ob-poc".cbu_entity_roles
                (cbu_id, entity_id, role_id, target_entity_id,
                 authority_limit, authority_currency, requires_co_signatory,
@@ -566,9 +635,14 @@ impl SemOsVerbOp for AssignSignatory {
                    authority_limit = EXCLUDED.authority_limit,
                    authority_currency = EXCLUDED.authority_currency,
                    requires_co_signatory = EXCLUDED.requires_co_signatory,
+                   version = "ob-poc".cbu_entity_roles.version + 1,
                    updated_at = NOW()
+               WHERE {carveout}
+                  OR "ob-poc".cbu_entity_roles.version
+                     = COALESCE($8::bigint, "ob-poc".cbu_entity_roles.version)
                RETURNING cbu_entity_role_id"#,
-        )
+            carveout = A1_MANCO_CARVEOUT,
+        ))
         .bind(cbu_id)
         .bind(person_entity_id)
         .bind(role_id)
@@ -576,8 +650,10 @@ impl SemOsVerbOp for AssignSignatory {
         .bind(&authority_limit)
         .bind(&authority_currency)
         .bind(requires_co_signatory)
-        .fetch_one(scope.executor())
-        .await?;
+        .bind(expected_version)
+        .fetch_optional(scope.executor())
+        .await?
+        .ok_or_else(|| cas_conflict("cbu_entity_roles", expected_version))?;
 
         ctx.bind("cbu_entity_role", role_result);
         dsl_runtime::emit_pending_state_advance(

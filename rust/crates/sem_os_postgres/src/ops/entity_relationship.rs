@@ -8,12 +8,30 @@ use chrono::NaiveDate;
 use dsl_runtime;
 use dsl_runtime::TransactionScope;
 use dsl_runtime::{
-    json_extract_bool_opt, json_extract_string, json_extract_string_opt, json_extract_uuid,
-    json_extract_uuid_opt,
+    json_extract_bool_opt, json_extract_int_opt, json_extract_string, json_extract_string_opt,
+    json_extract_uuid, json_extract_uuid_opt,
 };
 use dsl_runtime::{VerbExecutionContext, VerbExecutionOutcome};
 use serde_json::{json, Value};
 use uuid::Uuid;
+
+/// Phase 1 §10.6 CAS carve-out (A7 = `entity_relationships`). A row BYPASSES the
+/// version guard when it is the ManCo edge (Class 2 — `relationship_type =
+/// 'management'`, maker-checker / KYC-canonical) or a `ubo_graph` recompute
+/// (Class 3 — `source LIKE 'ubo.%'`, derived plane, ratification-exempt). Every
+/// other operator-authored edge (Class 1) is version-CAS'd.
+const A7_CAS_CARVEOUT: &str = r#"("ob-poc".entity_relationships.relationship_type = 'management'
+    OR "ob-poc".entity_relationships.source LIKE 'ubo.%')"#;
+
+/// Conflict error for a rejected stale compliance write (optimistic-concurrency
+/// mismatch on the edge plane).
+fn cas_conflict(expected: Option<i64>) -> anyhow::Error {
+    anyhow!(
+        "CAS conflict on entity_relationships: concurrent compliance write rejected — expected \
+         version {:?} did not match the current edge version (re-read and retry)",
+        expected
+    )
+}
 
 fn parse_date_arg(args: &Value, name: &str) -> Result<Option<NaiveDate>> {
     json_extract_string_opt(args, name)
@@ -75,6 +93,7 @@ impl SemOsVerbOp for Upsert {
             json_extract_string_opt(args, "confidence").unwrap_or_else(|| "HIGH".to_string());
         let notes = json_extract_string_opt(args, "notes");
         let created_by = json_extract_uuid_opt(args, ctx, "created-by");
+        let expected_version = json_extract_int_opt(args, "expected-version");
 
         if relationship_type == "ownership" && percentage.is_none() {
             return Err(anyhow!(
@@ -83,7 +102,7 @@ impl SemOsVerbOp for Upsert {
         }
 
         let relationship_id: Uuid = if effective_from.is_some() {
-            sqlx::query_scalar(
+            sqlx::query_scalar(&format!(
                 r#"
                 INSERT INTO "ob-poc".entity_relationships
                     (from_entity_id, to_entity_id, relationship_type, percentage,
@@ -109,10 +128,15 @@ impl SemOsVerbOp for Upsert {
                     source = EXCLUDED.source,
                     confidence = EXCLUDED.confidence,
                     notes = EXCLUDED.notes,
+                    version = "ob-poc".entity_relationships.version + 1,
                     updated_at = NOW()
+                WHERE {carveout}
+                   OR "ob-poc".entity_relationships.version
+                      = COALESCE($18::bigint, "ob-poc".entity_relationships.version)
                 RETURNING relationship_id
                 "#,
-            )
+                carveout = A7_CAS_CARVEOUT,
+            ))
             .bind(from_entity_id)
             .bind(to_entity_id)
             .bind(&relationship_type)
@@ -130,10 +154,12 @@ impl SemOsVerbOp for Upsert {
             .bind(&confidence)
             .bind(&notes)
             .bind(created_by)
-            .fetch_one(scope.executor())
+            .bind(expected_version)
+            .fetch_optional(scope.executor())
             .await?
+            .ok_or_else(|| cas_conflict(expected_version))?
         } else {
-            sqlx::query_scalar(
+            sqlx::query_scalar(&format!(
                 r#"
                 INSERT INTO "ob-poc".entity_relationships
                     (from_entity_id, to_entity_id, relationship_type, percentage,
@@ -158,10 +184,15 @@ impl SemOsVerbOp for Upsert {
                     source = EXCLUDED.source,
                     confidence = EXCLUDED.confidence,
                     notes = EXCLUDED.notes,
+                    version = "ob-poc".entity_relationships.version + 1,
                     updated_at = NOW()
+                WHERE {carveout}
+                   OR "ob-poc".entity_relationships.version
+                      = COALESCE($17::bigint, "ob-poc".entity_relationships.version)
                 RETURNING relationship_id
                 "#,
-            )
+                carveout = A7_CAS_CARVEOUT,
+            ))
             .bind(from_entity_id)
             .bind(to_entity_id)
             .bind(&relationship_type)
@@ -178,8 +209,10 @@ impl SemOsVerbOp for Upsert {
             .bind(&confidence)
             .bind(&notes)
             .bind(created_by)
-            .fetch_one(scope.executor())
+            .bind(expected_version)
+            .fetch_optional(scope.executor())
             .await?
+            .ok_or_else(|| cas_conflict(expected_version))?
         };
 
         ctx.bind("entity_relationship", relationship_id);
