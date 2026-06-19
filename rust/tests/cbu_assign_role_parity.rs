@@ -190,20 +190,18 @@ async fn assign_role_dispatch_parity_matrix() {
             },
         },
         Case {
-            // NOTE: only fund roles mapping to relationship_type ∈
-            // {ownership,control,trust_role,employment,management} pass
-            // chk_er_relationship_type. MANAGEMENT_COMPANY → "management" (valid).
-            // FUND_INVESTOR/FEEDER_FUND/SUB_FUND/PARALLEL_FUND map to types the
-            // check constraint REJECTS — a pre-existing AssignFundRole issue the
-            // fold preserves identically (parity holds; both paths fail the same).
+            // FUND_INVESTOR → relationship_type "investment". Admitted by
+            // chk_er_relationship_type after migration 20260619 (widened to the
+            // complete AssignFundRole output set). Exercises a real fund-investor
+            // edge write, not the MANAGEMENT_COMPANY → "management" sidestep.
             label: "FUND",
             role_type: Some("FUND"),
             specialist: Arc::new(AssignFundRole),
-            role: "MANAGEMENT_COMPANY",
+            role: "FUND_INVESTOR",
             expects_edge: true,
             build_args: |cbu, entity, fund| {
                 json!({ "cbu-id": cbu, "entity-id": entity, "fund-entity-id": fund,
-                        "role": "MANAGEMENT_COMPANY", "investment-percentage": "7.25" })
+                        "role": "FUND_INVESTOR", "investment-percentage": "7.25" })
             },
         },
         Case {
