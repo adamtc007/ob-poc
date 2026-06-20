@@ -1,6 +1,6 @@
 # CLAUDE.md
 
-> **Last reviewed:** 2026-05-26
+> **Last reviewed:** 2026-06-20
 > **Frontend:** React/TypeScript (`ob-poc-ui-react/`) — Chat UI with scope panel, Inspector, Semantic OS Tab
 > **Backend:** Rust/Axum (`rust/crates/ob-poc-web/`) — Serves React + REST API
 > **Crates:** 51 workspace crates (incl. `ob-poc` application root) — 18 ob-poc-* library (web, types, diagnostics, boundary, sage, journey, authoring, agent, macros · split-v1: bods, deal, booking-principal, semtaxonomy, ontology, entity-linking, trading-profile, derived-attributes, taxonomy) · 11 sem_os_* (core, types, ontology, policy, taxonomy, postgres, server, client, obpoc_adapter, harness, mcp) · 4 dsl-* (dsl-core, dsl-lsp, dsl-runtime, dsl-analysis) · 4 ob-* (ob-agentic, ob-templates, ob-workflow, ob-semantic-matcher) · 4 misc (entity-gateway, xtask, playbook-core, inspector-projection) · 9 unified-dsl-v0.1 (dsl-atoms, dsl-diagnostics, dsl-parser, dsl-ast, dsl-bpmn-frontend, dsl-lowering, dsl-resolution, bpmn-runtime, bpmn-test-harness)
@@ -8,7 +8,8 @@
 > **Macros:** 103 operator macros (22 YAML files, 18 domains, 3 composite), Tier -2B in intent pipeline
 > **MCP Tools:** ~102 tools (DSL, verbs, learning, session, batch, research, taxonomy, sem_reg, stewardship, db_introspect, session_verb_surface)
 > **DAG Taxonomies:** 12 (CBU + KYC + Deal + Catalogue + InstrumentMatrix + BookingPrincipal + LifecycleResources + ProductServiceTaxonomy + SemOsMaintenance + SessionBootstrap + OnboardingRequest + BookSetup) — see `rust/config/sem_os_seeds/dag_taxonomies/`
-> **Latest schema additions:** `rust/migrations/20260503_sem_os_dag_taxonomy_object.sql`, `rust/migrations/20260514_sem_os_domain_pack_object.sql`, `rust/migrations/20260514_domain_pack_reload_index.sql`, `rust/migrations/20260618_intent_trace_evidence.sql` (extends `"ob-poc".intent_events` — idempotent create-if-missing; the live DB had no such table, telemetry was silently no-oping)
+> **Latest schema additions:** `rust/migrations/20260503_sem_os_dag_taxonomy_object.sql`, `rust/migrations/20260514_sem_os_domain_pack_object.sql`, `rust/migrations/20260514_domain_pack_reload_index.sql`, `rust/migrations/20260618_intent_trace_evidence.sql` (extends `"ob-poc".intent_events` — idempotent create-if-missing; the live DB had no such table, telemetry was silently no-oping), `rust/migrations/20260616_add_context_dependent_kyc_ledger.sql` (`kyc_clearance_mandates` + compliance rollup views), `rust/migrations/20260619_widen_chk_er_relationship_type.sql` (entity_relationships relationship_type widened to the full 10-value set), `rust/migrations/20260620_add_cas_version_columns.sql` (Phase-1 CAS: `version bigint DEFAULT 1` on `cbu_entity_roles` (A1) + `entity_relationships` (A7))
+> **Schema export refreshed:** 2026-06-20 — `migrations/master-schema.sql` (canonical) + `schema_export.sql` regenerated from live `data_designer` via `cargo x schema-export` (synced widened chk_er, kyc_clearance_mandates, CAS version columns). NOTE: a second stale copy `rust/migrations/master-schema.sql` is NOT updated by the xtask; the top-level `migrations/master-schema.sql` is the export target.
 > **Workspaces:** 12 (8 domain: CBU, KYC, Deal, Catalogue, InstrumentMatrix, BookingPrincipal, LifecycleResources, ProductServiceTaxonomy) + (4 infrastructure: SemOsMaintenance, SessionBootstrap, OnboardingRequest, BookSetup)
 > **Catalogue spec:** `docs/todo/catalogue-platform-refinement-v1_2.md` (consolidated authoritative spec, 2026-04-26 — supersedes v1.0/v1.1/v1.3). Tranche 1 implementation complete: validator (transition_args + EXISTS predicate), Sage/REPL policies, P-G provisional designation, GatePipeline default-on, CI gate. Tranche 2 (estate reconciliation: 487 verbs to declare, 153 preserving-with-transition_args migration warnings to fix) follows.
 > **Schema Overview:** `migrations/OB_POC_SCHEMA_ENTITY_OVERVIEW.md`
@@ -673,6 +674,20 @@ cargo test --test runbook_e2e_test --test runbook_pipeline_test
 
 # Runbook source-scanning invariant tests (internal, include_str!)
 cargo test -p ob-poc --lib -- runbook::invariant_tests
+
+# §10.2 behavioral idempotency gate (CBU-domain write ops; needs DATABASE_URL)
+# Registry-driven (no hand op-list): filter = fqn.starts_with("cbu") ∪ {edge.upsert,
+# cbu-group.remove-member, batch.add-products}. Per op, in ONE rolled-back txn at
+# REPEATABLE READ: execute → snapshot full CBU-domain table set → execute SAME args →
+# assert row-count + business-state equal (version/*_at/updated* MASKED). Proves
+# retry-safety behaviorally (grep-green ≠ green: link-structure + edge.upsert are
+# idempotent with NO ON CONFLICT). 41 in-filter ops in a named state, 0 UNCLASSIFIED:
+# 33 PROVEN, 4 CLASSIFIED-IDEMPOTENT (SQL-confirmed, fixture-pending), 2 DEFECT
+# (cbu.override-option-binding + cbu-custody.setup-ssi — non-idempotent, fork awaiting
+# ratification), EXCEPTION {cbu.decide} (per-call uuid, no ON CONFLICT — teeth-proven),
+# COVERAGE_GAP {cbu.add-product} (pool-escape children → committed-orphan atomicity defect).
+DATABASE_URL="postgresql:///data_designer" \
+  cargo test --features database --test cbu_idempotency_gate -- --ignored --nocapture
 
 # Full REPL V2 suite (149 tests across 8 files)
 cargo test --test repl_v2_golden_loop --test repl_v2_phase2 --test repl_v2_phase3 \
