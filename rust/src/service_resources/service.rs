@@ -114,24 +114,6 @@ impl ServiceResourcePipelineService {
         .context("Failed to get service intent")
     }
 
-    /// Cancel a service intent
-    #[allow(dead_code)]
-    pub(crate) async fn cancel_service_intent(&self, intent_id: Uuid) -> Result<bool> {
-        let result = sqlx::query(
-            r#"
-            UPDATE "ob-poc".service_intents
-            SET status = 'cancelled', updated_at = NOW()
-            WHERE intent_id = $1 AND status = 'active'
-            "#,
-        )
-        .bind(intent_id)
-        .execute(&self.pool)
-        .await
-        .context("Failed to cancel service intent")?;
-
-        Ok(result.rows_affected() > 0)
-    }
-
     // =========================================================================
     // SRDEF DISCOVERY
     // =========================================================================
@@ -185,13 +167,6 @@ impl ServiceResourcePipelineService {
             discovery_id, input.cbu_id, input.srdef_id
         );
         Ok(discovery_id)
-    }
-
-    /// Record a discovery reason
-    #[allow(dead_code)] // retained pool-based delegator; live path uses `record_discovery_in`
-    pub(crate) async fn record_discovery(&self, input: &NewSrdefDiscovery) -> Result<Uuid> {
-        let mut conn = self.pool.acquire().await?;
-        Self::record_discovery_in(&mut conn, input).await
     }
 
     /// Get active discoveries for a CBU (connection-based).
@@ -267,33 +242,6 @@ impl ServiceResourcePipelineService {
         Ok(())
     }
 
-    /// Upsert a unified attribute requirement
-    #[allow(clippy::too_many_arguments)]
-    #[allow(dead_code)] // retained pool-based delegator; live path uses `_in`
-    pub(crate) async fn upsert_unified_attr_requirement(
-        &self,
-        cbu_id: Uuid,
-        attr_id: Uuid,
-        requirement_strength: &str,
-        merged_constraints: &JsonValue,
-        preferred_source: Option<&str>,
-        required_by_srdefs: &[String],
-        conflict: Option<&JsonValue>,
-    ) -> Result<()> {
-        let mut conn = self.pool.acquire().await?;
-        Self::upsert_unified_attr_requirement_in(
-            &mut conn,
-            cbu_id,
-            attr_id,
-            requirement_strength,
-            merged_constraints,
-            preferred_source,
-            required_by_srdefs,
-            conflict,
-        )
-        .await
-    }
-
     /// Get unified attribute requirements for a CBU (connection-based).
     pub(crate) async fn get_unified_attr_requirements_in(
         conn: &mut PgConnection,
@@ -336,13 +284,6 @@ impl ServiceResourcePipelineService {
                 .context("Failed to clear unified attr requirements")?;
 
         Ok(result.rows_affected())
-    }
-
-    /// Clear unified attr requirements for a CBU (before rebuild)
-    #[allow(dead_code)] // retained pool-based delegator; live path uses `_in`
-    pub(crate) async fn clear_unified_attr_requirements(&self, cbu_id: Uuid) -> Result<u64> {
-        let mut conn = self.pool.acquire().await?;
-        Self::clear_unified_attr_requirements_in(&mut conn, cbu_id).await
     }
 
     // =========================================================================
@@ -571,30 +512,6 @@ impl ServiceResourcePipelineService {
         .context("Failed to get pending requests")
     }
 
-    /// Update provisioning request status
-    #[allow(dead_code)]
-    pub(crate) async fn update_request_status(
-        &self,
-        request_id: Uuid,
-        status: ProvisioningStatus,
-        owner_ticket_id: Option<&str>,
-    ) -> Result<bool> {
-        let result = sqlx::query(
-            r#"
-            UPDATE "ob-poc".provisioning_requests
-            SET status = $1, owner_ticket_id = COALESCE($2, owner_ticket_id)
-            WHERE request_id = $3
-            "#,
-        )
-        .bind(status.to_string())
-        .bind(owner_ticket_id)
-        .bind(request_id)
-        .execute(&self.pool)
-        .await
-        .context("Failed to update request status")?;
-
-        Ok(result.rows_affected() > 0)
-    }
 
     // =========================================================================
     // PROVISIONING EVENTS
@@ -749,18 +666,6 @@ impl ServiceResourcePipelineService {
         .fetch_all(&self.pool)
         .await
         .context("Failed to get stale readiness records")
-    }
-
-    /// Clear readiness for a CBU (before rebuild)
-    #[allow(dead_code)]
-    pub(crate) async fn clear_service_readiness(&self, cbu_id: Uuid) -> Result<u64> {
-        let result = sqlx::query(r#"DELETE FROM "ob-poc".cbu_service_readiness WHERE cbu_id = $1"#)
-            .bind(cbu_id)
-            .execute(&self.pool)
-            .await
-            .context("Failed to clear service readiness")?;
-
-        Ok(result.rows_affected())
     }
 
     // =========================================================================

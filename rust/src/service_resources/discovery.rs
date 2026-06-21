@@ -31,22 +31,14 @@ use dsl_analysis::entity_kind;
 
 /// Engine for discovering required SRDEFs from service intents
 pub struct ResourceDiscoveryEngine<'a> {
-    // Retained for the pool-based static-read bits and the standalone recompute
-    // path; the add-product path now threads a `&mut PgConnection` per method.
-    #[allow(dead_code)]
-    pool: &'a PgPool,
-    #[allow(dead_code)]
-    service: ServiceResourcePipelineService,
+    // The add-product path threads a `&mut PgConnection` per method so every
+    // write joins the ambient transaction; the engine only needs the registry.
     registry: &'a SrdefRegistry,
 }
 
 impl<'a> ResourceDiscoveryEngine<'a> {
-    pub fn new(pool: &'a PgPool, registry: &'a SrdefRegistry) -> Self {
-        Self {
-            pool,
-            service: ServiceResourcePipelineService::new(pool.clone()),
-            registry,
-        }
+    pub fn new(registry: &'a SrdefRegistry) -> Self {
+        Self { registry }
     }
 
     /// Discover required SRDEFs for a CBU based on their service intents
@@ -319,21 +311,12 @@ pub struct DiscoveryResult {
 // =============================================================================
 
 /// Engine for rolling up attribute requirements across discovered SRDEFs
-pub struct AttributeRollupEngine<'a> {
-    // Retained for engine construction parity; the rollup path now threads a
-    // `&mut PgConnection` per method so all writes join the ambient txn.
-    #[allow(dead_code)]
-    pool: &'a PgPool,
-    #[allow(dead_code)]
-    service: ServiceResourcePipelineService,
-}
+#[derive(Default)]
+pub struct AttributeRollupEngine;
 
-impl<'a> AttributeRollupEngine<'a> {
-    pub fn new(pool: &'a PgPool) -> Self {
-        Self {
-            pool,
-            service: ServiceResourcePipelineService::new(pool.clone()),
-        }
+impl AttributeRollupEngine {
+    pub fn new() -> Self {
+        Self
     }
 
     /// Build unified attribute requirements for a CBU
@@ -533,8 +516,6 @@ pub struct PopulationEngine<'a> {
     // populate path threads a `&mut PgConnection` so its writes join the
     // ambient txn.
     pool: &'a PgPool,
-    #[allow(dead_code)]
-    service: ServiceResourcePipelineService,
     identity: AttributeIdentityService,
 }
 
@@ -569,7 +550,6 @@ impl<'a> PopulationEngine<'a> {
     pub fn new(pool: &'a PgPool) -> Self {
         Self {
             pool,
-            service: ServiceResourcePipelineService::new(pool.clone()),
             identity: AttributeIdentityService::new(pool.clone()),
         }
     }
@@ -1445,11 +1425,11 @@ pub async fn run_discovery_pipeline_in(
     cbu_id: Uuid,
 ) -> Result<PipelineResult> {
     // Discovery
-    let discovery_engine = ResourceDiscoveryEngine::new(pool, registry);
+    let discovery_engine = ResourceDiscoveryEngine::new(registry);
     let discovery = discovery_engine.discover_for_cbu(conn, cbu_id).await?;
 
     // Rollup
-    let rollup_engine = AttributeRollupEngine::new(pool);
+    let rollup_engine = AttributeRollupEngine::new();
     let rollup = rollup_engine.rollup_for_cbu(conn, cbu_id).await?;
 
     // Population

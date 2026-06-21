@@ -270,7 +270,7 @@ async fn discovery_explain(pool: &PgPool, args: &Value) -> Result<VerbExecutionO
 
 async fn attribute_rollup(pool: &PgPool, args: &Value) -> Result<VerbExecutionOutcome> {
     let cbu_id = arg_uuid(args, "cbu-id")?;
-    let engine = AttributeRollupEngine::new(pool);
+    let engine = AttributeRollupEngine::new();
     let mut conn = pool.acquire().await?;
     let result = engine.rollup_for_cbu(&mut conn, cbu_id).await?;
     Ok(VerbExecutionOutcome::Record(json!({
