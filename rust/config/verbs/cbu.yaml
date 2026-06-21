@@ -1793,6 +1793,169 @@ domains:
           entity_id_arg: cbu-id
           target_workspace: cbu
           target_slot: cbu
+      confirm:
+        flavour: attribute_mutating
+        description: Confirm a CBU after validation review — transition VALIDATION_PENDING → VALIDATED, opening the trading/operational lifecycle so products and services may be added
+        effect_class: read_modify_write
+        invocation_phrases:
+          - "confirm CBU"
+          - "confirm this CBU"
+          - "confirm the structure"
+          - "mark CBU as validated"
+          - "confirm the onboarding unit"
+          - "sign off the CBU"
+        behavior: crud
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: global
+          noun: cbu
+          tags: [lifecycle, write, confirmation, onboarding]
+          phase_tags: [onboarding]
+          side_effects: state_write
+        lifecycle:
+          entity_arg: cbu-id
+          requires_states:
+            - VALIDATION_PENDING
+          precondition_checks:
+            - "requires_scope:cbu"
+        crud:
+          operation: update
+          table: cbus
+          schema: ob-poc
+          key: cbu_id
+          set_values:
+            status: VALIDATED
+        args:
+          - name: cbu-id
+            type: uuid
+            required: true
+            maps_to: cbu_id
+            lookup:
+              table: cbus
+              entity_type: cbu
+              schema: ob-poc
+              search_key: name
+              primary_key: cbu_id
+        returns:
+          type: affected
+        three_axis:
+          state_effect: transition
+          external_effects: [emitting]
+          consequence:
+            baseline: requires_confirmation
+        transition_args:
+          entity_id_arg: cbu-id
+          target_workspace: cbu
+          target_slot: cbu
+      reject:
+        flavour: attribute_mutating
+        description: Reject a CBU after validation review — transition VALIDATION_PENDING → VALIDATION_FAILED
+        effect_class: read_modify_write
+        invocation_phrases:
+          - "reject CBU"
+          - "reject this CBU"
+          - "fail CBU validation"
+          - "mark CBU validation as failed"
+          - "decline the CBU"
+        behavior: crud
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: global
+          noun: cbu
+          tags: [lifecycle, write, confirmation, onboarding]
+          phase_tags: [onboarding]
+          side_effects: state_write
+        lifecycle:
+          entity_arg: cbu-id
+          requires_states:
+            - VALIDATION_PENDING
+          precondition_checks:
+            - "requires_scope:cbu"
+        crud:
+          operation: update
+          table: cbus
+          schema: ob-poc
+          key: cbu_id
+          set_values:
+            status: VALIDATION_FAILED
+        args:
+          - name: cbu-id
+            type: uuid
+            required: true
+            maps_to: cbu_id
+            lookup:
+              table: cbus
+              entity_type: cbu
+              schema: ob-poc
+              search_key: name
+              primary_key: cbu_id
+        returns:
+          type: affected
+        three_axis:
+          state_effect: transition
+          external_effects: [emitting]
+          consequence:
+            baseline: requires_confirmation
+        transition_args:
+          entity_id_arg: cbu-id
+          target_workspace: cbu
+          target_slot: cbu
+      resubmit-proof:
+        flavour: attribute_mutating
+        description: Resubmit refreshed proof for a CBU pending proof update — transition UPDATE_PENDING_PROOF → VALIDATION_PENDING for re-review
+        effect_class: read_modify_write
+        invocation_phrases:
+          - "resubmit proof"
+          - "resubmit updated proof"
+          - "submit refreshed proof"
+          - "send updated proof for revalidation"
+          - "move back to validation after proof update"
+        behavior: crud
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: global
+          noun: cbu
+          tags: [lifecycle, write, onboarding]
+          phase_tags: [onboarding]
+          side_effects: state_write
+        lifecycle:
+          entity_arg: cbu-id
+          requires_states:
+            - UPDATE_PENDING_PROOF
+          precondition_checks:
+            - "requires_scope:cbu"
+        crud:
+          operation: update
+          table: cbus
+          schema: ob-poc
+          key: cbu_id
+          set_values:
+            status: VALIDATION_PENDING
+        args:
+          - name: cbu-id
+            type: uuid
+            required: true
+            maps_to: cbu_id
+            lookup:
+              table: cbus
+              entity_type: cbu
+              schema: ob-poc
+              search_key: name
+              primary_key: cbu_id
+        returns:
+          type: affected
+        three_axis:
+          state_effect: transition
+          external_effects: [emitting]
+          consequence:
+            baseline: reviewable
+        transition_args:
+          entity_id_arg: cbu-id
+          target_workspace: cbu
+          target_slot: cbu
       attach-evidence:
         flavour: instance_adding
         description: Attach evidence (document or attestation) to CBU

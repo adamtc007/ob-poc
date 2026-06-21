@@ -3129,6 +3129,7 @@ mod tests {
 
         let reg = runtime_registry();
         let decide = reg.get("cbu", "decide").expect("cbu.decide registered");
+        let confirm = reg.get("cbu", "confirm").expect("cbu.confirm registered");
         let submit = reg
             .get("cbu", "submit-for-validation")
             .expect("cbu.submit-for-validation registered");
@@ -3150,6 +3151,18 @@ mod tests {
         assert!(
             msg.contains("VALIDATION_PENDING") && msg.contains("cbu.decide"),
             "block error must name the required state and verb: {msg}"
+        );
+
+        // BLOCK: the dedicated confirm verb (requires VALIDATION_PENDING) on a
+        // DISCOVERED cbu — proves the new confirmation/rework set is C1-enforced.
+        let confirm_blocked =
+            enforce_requires_states_precondition(confirm, &args(discovered), &mut scope).await;
+        let cmsg = confirm_blocked
+            .expect_err("confirm on DISCOVERED must be blocked")
+            .to_string();
+        assert!(
+            cmsg.contains("VALIDATION_PENDING") && cmsg.contains("cbu.confirm"),
+            "confirm block must name the required state and verb: {cmsg}"
         );
 
         // PASS: submit-for-validation (requires DISCOVERED|VALIDATION_FAILED) on a DISCOVERED cbu.
