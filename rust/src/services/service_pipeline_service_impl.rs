@@ -10,16 +10,18 @@
 use anyhow::{anyhow, Result};
 use async_trait::async_trait;
 use serde_json::{json, Value};
-use sqlx::{PgPool, Row};
+use sqlx::{PgConnection, PgPool, Row};
 use uuid::Uuid;
 
 use dsl_runtime::ServicePipelineService;
+use dsl_runtime::TransactionScope;
 use dsl_runtime::VerbExecutionOutcome;
 
 use crate::service_resources::{
     load_and_sync_srdefs, load_srdefs_from_config, run_discovery_pipeline,
-    run_provisioning_pipeline, AttributeRollupEngine, AttributeSource, NewServiceIntent,
-    PopulationEngine, ReadinessEngine, ServiceResourcePipelineService, SetCbuAttrValue,
+    run_discovery_pipeline_in, run_provisioning_pipeline, AttributeRollupEngine, AttributeSource,
+    NewServiceIntent, PopulationEngine, ReadinessEngine, ServiceResourcePipelineService,
+    SetCbuAttrValue,
 };
 
 pub struct ObPocServicePipelineService;
@@ -40,31 +42,40 @@ impl Default for ObPocServicePipelineService {
 impl ServicePipelineService for ObPocServicePipelineService {
     async fn dispatch_service_pipeline_verb(
         &self,
-        pool: &PgPool,
+        scope: &mut dyn TransactionScope,
         domain: &str,
         verb_name: &str,
         args: &Value,
     ) -> Result<VerbExecutionOutcome> {
         match (domain, verb_name) {
-            ("service-intent", "create") => service_intent_create(pool, args).await,
-            ("service-intent", "list") => service_intent_list(pool, args).await,
-            ("service-intent", "supersede") => service_intent_supersede(pool, args).await,
-            ("discovery", "run") => discovery_run(pool, args).await,
-            ("discovery", "explain") => discovery_explain(pool, args).await,
-            ("attributes", "rollup") => attribute_rollup(pool, args).await,
-            ("attributes", "populate") => attribute_populate(pool, args).await,
-            ("attributes", "gaps") => attribute_gaps(pool, args).await,
-            ("attributes", "set") => attribute_set(pool, args).await,
-            ("provisioning", "run") => provisioning_run(pool, args).await,
-            ("provisioning", "status") => provisioning_status(pool, args).await,
-            ("readiness", "compute") => readiness_compute(pool, args).await,
-            ("readiness", "explain") => readiness_explain(pool, args).await,
-            ("pipeline", "full") => pipeline_full(pool, args).await,
+            // Critical write paths — run on the ambient transaction's connection
+            // so a rollback unwinds them (atomicity fix). discovery.run also
+            // needs the pool for static-registry reads inside the engines.
+            ("service-intent", "create") => {
+                service_intent_create(scope.executor(), args).await
+            }
+            ("discovery", "run") => {
+                let pool = scope.pool().clone();
+                discovery_run(scope.executor(), &pool, args).await
+            }
+            // Pool-based arms — unchanged behaviour.
+            ("service-intent", "list") => service_intent_list(scope.pool(), args).await,
+            ("service-intent", "supersede") => service_intent_supersede(scope.pool(), args).await,
+            ("discovery", "explain") => discovery_explain(scope.pool(), args).await,
+            ("attributes", "rollup") => attribute_rollup(scope.pool(), args).await,
+            ("attributes", "populate") => attribute_populate(scope.pool(), args).await,
+            ("attributes", "gaps") => attribute_gaps(scope.pool(), args).await,
+            ("attributes", "set") => attribute_set(scope.pool(), args).await,
+            ("provisioning", "run") => provisioning_run(scope.pool(), args).await,
+            ("provisioning", "status") => provisioning_status(scope.pool(), args).await,
+            ("readiness", "compute") => readiness_compute(scope.pool(), args).await,
+            ("readiness", "explain") => readiness_explain(scope.pool(), args).await,
+            ("pipeline", "full") => pipeline_full(scope.pool(), args).await,
             ("service-resource", "check-attribute-gaps") => {
-                service_resource_check_attribute_gaps(pool).await
+                service_resource_check_attribute_gaps(scope.pool()).await
             }
             ("service-resource", "sync-definitions") => {
-                service_resource_sync_definitions(pool).await
+                service_resource_sync_definitions(scope.pool()).await
             }
             (d, v) => Err(anyhow!("unknown service-pipeline verb: {d}.{v}")),
         }
@@ -101,12 +112,14 @@ fn arg_string_opt(args: &Value, name: &str) -> Option<String> {
 
 // ── service-intent.create ─────────────────────────────────────────────────────
 
-async fn service_intent_create(pool: &PgPool, args: &Value) -> Result<VerbExecutionOutcome> {
+async fn service_intent_create(
+    conn: &mut PgConnection,
+    args: &Value,
+) -> Result<VerbExecutionOutcome> {
     let cbu_id = arg_uuid(args, "cbu-id")?;
     let product_id = arg_uuid(args, "product-id")?;
     let service_id = arg_uuid(args, "service-id")?;
     let options = args.get("options").cloned();
-    let service = ServiceResourcePipelineService::new(pool.clone());
     let input = NewServiceIntent {
         cbu_id,
         product_id,
@@ -114,7 +127,7 @@ async fn service_intent_create(pool: &PgPool, args: &Value) -> Result<VerbExecut
         options,
         created_by: None,
     };
-    let intent_id = service.create_service_intent(&input).await?;
+    let intent_id = ServiceResourcePipelineService::create_service_intent_in(conn, &input).await?;
     Ok(VerbExecutionOutcome::Uuid(intent_id))
 }
 
@@ -186,10 +199,14 @@ async fn service_intent_supersede(pool: &PgPool, args: &Value) -> Result<VerbExe
 
 // ── discovery.run ─────────────────────────────────────────────────────────────
 
-async fn discovery_run(pool: &PgPool, args: &Value) -> Result<VerbExecutionOutcome> {
+async fn discovery_run(
+    conn: &mut PgConnection,
+    pool: &PgPool,
+    args: &Value,
+) -> Result<VerbExecutionOutcome> {
     let cbu_id = arg_uuid(args, "cbu-id")?;
     let registry = load_srdefs_from_config().unwrap_or_default();
-    let result = run_discovery_pipeline(pool, &registry, cbu_id).await?;
+    let result = run_discovery_pipeline_in(conn, pool, &registry, cbu_id).await?;
     Ok(VerbExecutionOutcome::Record(json!({
         "cbu_id": result.cbu_id,
         "srdefs_discovered": result.srdefs_discovered,
@@ -254,7 +271,8 @@ async fn discovery_explain(pool: &PgPool, args: &Value) -> Result<VerbExecutionO
 async fn attribute_rollup(pool: &PgPool, args: &Value) -> Result<VerbExecutionOutcome> {
     let cbu_id = arg_uuid(args, "cbu-id")?;
     let engine = AttributeRollupEngine::new(pool);
-    let result = engine.rollup_for_cbu(cbu_id).await?;
+    let mut conn = pool.acquire().await?;
+    let result = engine.rollup_for_cbu(&mut conn, cbu_id).await?;
     Ok(VerbExecutionOutcome::Record(json!({
         "total_attributes": result.total_attributes,
         "required_count": result.required_count,
@@ -268,7 +286,8 @@ async fn attribute_rollup(pool: &PgPool, args: &Value) -> Result<VerbExecutionOu
 async fn attribute_populate(pool: &PgPool, args: &Value) -> Result<VerbExecutionOutcome> {
     let cbu_id = arg_uuid(args, "cbu-id")?;
     let engine = PopulationEngine::new(pool);
-    let result = engine.populate_for_cbu(cbu_id).await?;
+    let mut conn = pool.acquire().await?;
+    let result = engine.populate_for_cbu(&mut conn, cbu_id).await?;
     Ok(VerbExecutionOutcome::Record(json!({
         "populated": result.populated,
         "already_populated": result.already_populated,

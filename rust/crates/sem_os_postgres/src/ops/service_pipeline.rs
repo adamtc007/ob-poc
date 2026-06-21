@@ -35,7 +35,7 @@ macro_rules! service_pipeline_op {
             ) -> Result<VerbExecutionOutcome> {
                 let service = ctx.service::<dyn ServicePipelineService>()?;
                 service
-                    .dispatch_service_pipeline_verb(scope.pool(), $domain, $verb, args)
+                    .dispatch_service_pipeline_verb(scope, $domain, $verb, args)
                     .await
             }
         }
@@ -51,7 +51,7 @@ async fn dispatch_service_pipeline_verb(
 ) -> Result<VerbExecutionOutcome> {
     let service = ctx.service::<dyn ServicePipelineService>()?;
     service
-        .dispatch_service_pipeline_verb(scope.pool(), domain, verb, args)
+        .dispatch_service_pipeline_verb(scope, domain, verb, args)
         .await
 }
 

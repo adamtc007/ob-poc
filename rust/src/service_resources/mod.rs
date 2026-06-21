@@ -117,8 +117,9 @@ pub use srdef_loader::{
 
 // Re-export discovery engine types
 pub use discovery::{
-    run_discovery_pipeline, AttributeRollupEngine, DiscoveredSrdefInfo, DiscoveryResult,
-    PipelineResult, PopulationEngine, PopulationResult, ResourceDiscoveryEngine, RollupResult,
+    run_discovery_pipeline, run_discovery_pipeline_in, AttributeRollupEngine, DiscoveredSrdefInfo,
+    DiscoveryResult, PipelineResult, PopulationEngine, PopulationResult, ResourceDiscoveryEngine,
+    RollupResult,
 };
 
 // Re-export provisioning types
