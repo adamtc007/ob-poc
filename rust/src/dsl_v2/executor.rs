@@ -3172,4 +3172,87 @@ mod tests {
 
         // scope drops here → rollback; no rows mutated anyway.
     }
+
+    /// Phase 3 C5 — the end-to-end Definition-of-Done: a lifecycle-gated verb is
+    /// DISCOVERABLE (C2: discovery does not prune on lifecycle) AND execution
+    /// returns a NAMED precondition error (C1). Select-then-validate, proven on
+    /// one verb in one test.
+    ///
+    /// `cbu.decide` requires VALIDATION_PENDING; against a DISCOVERED CBU it is
+    /// classifiable (in the surface, tagged ineligible) yet refused at execution
+    /// with an error naming the required state.
+    #[cfg(feature = "database")]
+    #[tokio::test]
+    #[ignore = "requires DATABASE_URL (dev DB)"]
+    async fn c5_discoverable_but_not_executable_dod() {
+        use crate::agent::sem_os_context_envelope::SemOsContextEnvelope;
+        use crate::agent::verb_surface::{
+            compute_session_verb_surface, VerbSurfaceContext, VerbSurfaceFailPolicy,
+        };
+        use sem_os_types::agent_mode::AgentMode;
+
+        // ── Half 1 — DISCOVERABLE (C2). No DB: reads registry + macro files. ──
+        let envelope = SemOsContextEnvelope::unavailable();
+        let ctx = VerbSurfaceContext {
+            agent_mode: AgentMode::Governed,
+            stage_focus: Some("semos-onboarding"),
+            envelope: &envelope,
+            fail_policy: VerbSurfaceFailPolicy::FailOpen,
+            entity_state: Some("DISCOVERED"),
+            has_group_scope: true,
+            is_infrastructure_scope: false,
+            composite_state: None,
+        };
+        let surface = compute_session_verb_surface(&ctx);
+        assert!(
+            surface.contains("cbu.decide"),
+            "DoD: cbu.decide must be DISCOVERABLE at DISCOVERED (no lifecycle prune)"
+        );
+        assert!(
+            !surface.is_lifecycle_eligible("cbu.decide"),
+            "DoD: cbu.decide must be tagged lifecycle-ineligible at DISCOVERED"
+        );
+
+        // ── Half 2 — NOT EXECUTABLE, with a named error (C1). Needs DB. ──
+        let url = std::env::var("DATABASE_URL").expect("DATABASE_URL must be set");
+        let pool = sqlx::PgPool::connect(&url).await.expect("connect");
+        if dsl_runtime::resolve_slot_table("cbu", "cbu").is_err() {
+            let map: std::collections::HashMap<String, (String, String, String)> = [(
+                "cbu.cbu".to_string(),
+                (
+                    "cbus".to_string(),
+                    "status".to_string(),
+                    "cbu_id".to_string(),
+                ),
+            )]
+            .into_iter()
+            .collect();
+            dsl_runtime::set_slot_state_table(map);
+        }
+        let mut scope = crate::sequencer_tx::PgTransactionScope::begin(&pool)
+            .await
+            .expect("begin scope");
+        let discovered: Uuid =
+            sqlx::query_scalar(r#"SELECT cbu_id FROM "ob-poc".cbus WHERE status = 'DISCOVERED' LIMIT 1"#)
+                .fetch_one(scope.executor())
+                .await
+                .expect("a DISCOVERED cbu must exist");
+        let decide = runtime_registry()
+            .get("cbu", "decide")
+            .expect("cbu.decide registered");
+        let args: HashMap<String, JsonValue> = [(
+            "cbu-id".to_string(),
+            JsonValue::String(discovered.to_string()),
+        )]
+        .into_iter()
+        .collect();
+        let err = enforce_requires_states_precondition(decide, &args, &mut scope)
+            .await
+            .expect_err("DoD: execution must return a precondition error");
+        let msg = err.to_string();
+        assert!(
+            msg.contains("VALIDATION_PENDING") && msg.contains("cbu.decide"),
+            "DoD: precondition error must name the required state and verb: {msg}"
+        );
+    }
 }

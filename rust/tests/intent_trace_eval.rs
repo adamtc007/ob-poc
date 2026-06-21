@@ -571,6 +571,94 @@ mod db_eval {
         );
     }
 
+    /// Phase 3 C3 — the convergence invariant, hardened past the degenerate
+    /// `None == None`. The production discovery surface MEMBERSHIP is invariant
+    /// to `entity_state`: discovery no longer prunes on lifecycle (M2), so the
+    /// harness set equals the production surface built with a REAL entity state
+    /// (M4). `entity_state` only flips the per-verb `lifecycle_eligible` TAG
+    /// (the select-then-validate signal), never membership.
+    ///
+    /// Pre-C2 this FAILED: the `Some("DISCOVERED")` surface pruned `cbu.decide`
+    /// (requires VALIDATION_PENDING) and friends, so it was strictly smaller
+    /// than the harness/`None` set. Post-C2 all three are identical.
+    #[test]
+    fn c3_production_surface_membership_state_invariant() {
+        use ob_poc::agent::sem_os_context_envelope::SemOsContextEnvelope;
+        use ob_poc::agent::verb_surface::{
+            compute_session_verb_surface, SessionVerbSurface, VerbSurfaceContext,
+            VerbSurfaceFailPolicy,
+        };
+        use sem_os_types::agent_mode::AgentMode;
+
+        let board = boards_by_id()
+            .remove("board-cbu-operational")
+            .expect("cbu board");
+        let harness = board_allowed_set(&board, &HashSet::new());
+
+        let envelope = SemOsContextEnvelope::unavailable();
+        let surface_for = |state: Option<&str>| -> SessionVerbSurface {
+            let ctx = VerbSurfaceContext {
+                agent_mode: AgentMode::Governed,
+                stage_focus: Some("semos-onboarding"),
+                envelope: &envelope,
+                fail_policy: VerbSurfaceFailPolicy::FailOpen,
+                entity_state: state,
+                has_group_scope: true,
+                is_infrastructure_scope: false,
+                composite_state: None,
+            };
+            compute_session_verb_surface(&ctx)
+        };
+
+        let none_surface = surface_for(None);
+        let discovered_surface = surface_for(Some("DISCOVERED"));
+
+        // M2: membership is invariant to entity_state (no lifecycle prune).
+        assert_eq!(
+            none_surface.allowed_fqns(),
+            discovered_surface.allowed_fqns(),
+            "discovery membership must be invariant to entity_state — discovery must \
+             not prune on lifecycle"
+        );
+        // M4: harness == production surface built with a REAL entity_state
+        // (not the degenerate None == None).
+        assert_eq!(
+            harness,
+            discovered_surface.allowed_fqns(),
+            "harness CBU set must equal the production surface built with a real \
+             entity_state (DISCOVERED)"
+        );
+
+        // The state-ineligible verb stays a classification candidate…
+        assert!(
+            discovered_surface.contains("cbu.decide"),
+            "cbu.decide must remain discoverable at DISCOVERED"
+        );
+        // …yet entity_state still flips its eligibility TAG (read the pub field;
+        // external tests use the public API only).
+        let eligible = |s: &SessionVerbSurface, fqn: &str| -> Option<bool> {
+            s.verbs
+                .iter()
+                .find(|v| v.fqn == fqn)
+                .map(|v| v.lifecycle_eligible)
+        };
+        assert_eq!(
+            eligible(&discovered_surface, "cbu.decide"),
+            Some(false),
+            "cbu.decide (requires VALIDATION_PENDING) tagged ineligible at DISCOVERED"
+        );
+        assert_eq!(
+            eligible(&none_surface, "cbu.decide"),
+            Some(true),
+            "no entity_state ⇒ eligible (cannot check)"
+        );
+        assert_eq!(
+            eligible(&discovered_surface, "cbu.submit-for-validation"),
+            Some(true),
+            "submit-for-validation (requires DISCOVERED) eligible at DISCOVERED"
+        );
+    }
+
     /// Tag an out-of-scope expected verb with the workspace that owns it.
     /// Scoping is by the **workspace membership of the expected verb/macro**, never
     /// by whether discovery resolves it.
