@@ -448,30 +448,18 @@ pub fn compute_session_verb_surface(ctx: &VerbSurfaceContext<'_>) -> SessionVerb
     };
     let after_semreg = after_sr.len();
 
-    // ── Step 5: Lifecycle state filter ──────────────────────────
-    let after_lc: Vec<(&str, &RuntimeVerb)> = after_sr
-        .into_iter()
-        .filter(|(fqn, rv)| {
-            if let (Some(ref lifecycle), Some(entity_state)) = (&rv.lifecycle, ctx.entity_state) {
-                if !lifecycle.requires_states.is_empty()
-                    && !lifecycle.requires_states.iter().any(|s| s == entity_state)
-                {
-                    exclusions
-                        .entry(fqn.to_string())
-                        .or_default()
-                        .push(SurfacePrune {
-                            layer: PruneLayer::LifecycleState,
-                            reason: format!(
-                                "Requires entity state {:?}, current: '{}'",
-                                lifecycle.requires_states, entity_state
-                            ),
-                        });
-                    return false;
-                }
-            }
-            true
-        })
-        .collect();
+    // ── Step 5: Lifecycle eligibility — TAG, never prune (Phase 3 C2) ────
+    // Discovery is membership-scoped: an execution gate (`requires_states`)
+    // must NEVER remove a classification candidate (invariant M2,
+    // "execution gate ≠ discovery filter"). The per-verb `lifecycle_eligible`
+    // flag computed in Step 7 carries the state-eligibility signal; the
+    // site-441 fast-path gate consults it via `is_lifecycle_eligible`, and
+    // executability is validated at execution
+    // (`DslExecutor::execute_verb_in_scope`, Phase 3 C1). This step is now a
+    // pass-through — `ctx.entity_state` still feeds the Step-7 tag + the
+    // fingerprint. (`PruneLayer::LifecycleState` is retained on the enum for
+    // wire/back-compat but is no longer produced.)
+    let after_lc = after_sr;
     let after_lifecycle = after_lc.len();
 
     // ── Step 6: FailPolicy check ────────────────────────────────
@@ -776,6 +764,22 @@ impl SessionVerbSurface {
     /// Check if a specific verb FQN is in the surface.
     pub fn contains(&self, fqn: &str) -> bool {
         self.verbs.iter().any(|v| v.fqn == fqn)
+    }
+
+    /// Whether `fqn` is currently lifecycle-eligible — its `requires_states`
+    /// are satisfied by the current entity state (or it has no lifecycle gate).
+    /// Verbs absent from the surface (e.g. owned macros) default to eligible.
+    ///
+    /// Phase 3 C2: discovery no longer prunes on lifecycle; the site-441
+    /// fast-path execution gate consults this tag instead of raw membership, so
+    /// a state-ineligible verb stays a classification candidate yet is never
+    /// auto-executed.
+    pub(crate) fn is_lifecycle_eligible(&self, fqn: &str) -> bool {
+        self.verbs
+            .iter()
+            .find(|v| v.fqn == fqn)
+            .map(|v| v.lifecycle_eligible)
+            .unwrap_or(true)
     }
 
     /// True if the surface is in safe-harbor mode (FailClosed, SemReg unavailable).
@@ -1273,5 +1277,49 @@ mod tests {
                 v.fqn
             );
         }
+    }
+
+    /// Phase 3 C2: lifecycle is a TAG, not a discovery prune. A verb whose
+    /// `requires_states` the current entity state does not satisfy must remain
+    /// a classification candidate (invariant M2) — but be flagged
+    /// lifecycle-ineligible so the fast-path execution gate refuses it.
+    ///
+    /// RED before C2: Step 5 pruned `cbu.decide` (requires VALIDATION_PENDING)
+    /// at `entity_state = DISCOVERED`, so `contains("cbu.decide")` was false.
+    /// GREEN after C2: it is present, with `is_lifecycle_eligible == false`,
+    /// while an in-state verb (`submit-for-validation`, requires DISCOVERED)
+    /// stays eligible.
+    #[test]
+    fn test_c2_lifecycle_tags_but_does_not_prune() {
+        let envelope = make_unavailable_envelope();
+        let ctx = VerbSurfaceContext {
+            agent_mode: AgentMode::Governed,
+            stage_focus: Some("semos-onboarding"),
+            envelope: &envelope,
+            fail_policy: VerbSurfaceFailPolicy::FailOpen,
+            entity_state: Some("DISCOVERED"),
+            has_group_scope: true,
+            is_infrastructure_scope: false,
+            composite_state: None,
+        };
+        let surface = compute_session_verb_surface(&ctx);
+
+        // M2: the state-ineligible verb is NOT pruned from discovery.
+        assert!(
+            surface.contains("cbu.decide"),
+            "C2: cbu.decide (requires VALIDATION_PENDING) must remain a \
+             classification candidate at DISCOVERED — discovery must not prune \
+             on lifecycle"
+        );
+        // …but it is tagged ineligible for the fast-path execution gate.
+        assert!(
+            !surface.is_lifecycle_eligible("cbu.decide"),
+            "C2: cbu.decide must be tagged lifecycle-ineligible at DISCOVERED"
+        );
+        // An in-state verb stays eligible.
+        assert!(
+            surface.is_lifecycle_eligible("cbu.submit-for-validation"),
+            "C2: submit-for-validation (requires DISCOVERED) must be eligible at DISCOVERED"
+        );
     }
 }
