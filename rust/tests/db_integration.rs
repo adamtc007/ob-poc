@@ -994,6 +994,16 @@ slots:
         let ctx = db.execute_dsl(&dsl).await?;
         let cbu_id = ctx.resolve("cbu").unwrap();
 
+        // Confirm-first: a CBU must be confirmed (VALIDATED) before products can
+        // be added — cbu.add-product requires_states: [VALIDATED], enforced at
+        // execution (Phase 3 C1). create → submit-for-validation → confirm.
+        db.execute_dsl(&format!(
+            r#"(cbu.submit-for-validation :cbu-id "{cbu_id}")"#
+        ))
+        .await?;
+        db.execute_dsl(&format!(r#"(cbu.confirm :cbu-id "{cbu_id}")"#))
+            .await?;
+
         // Verify CBU has no product and no deliveries initially
         assert!(
             get_cbu_product_id(&db.pool, cbu_id).await?.is_none(),
@@ -1059,6 +1069,12 @@ slots:
         let ctx = db.execute_dsl(&dsl).await?;
         let cbu_id = ctx.resolve("cbu").unwrap();
 
+        // Confirm-first: cbu.add-product requires VALIDATED (Phase 3 C1).
+        db.execute_dsl(&format!(r#"(cbu.submit-for-validation :cbu-id "{cbu_id}")"#))
+            .await?;
+        db.execute_dsl(&format!(r#"(cbu.confirm :cbu-id "{cbu_id}")"#))
+            .await?;
+
         // Add product first time
         let add_product_dsl = format!(
             r#"(cbu.add-product :cbu-id "{}" :product "CUSTODY")"#,
@@ -1109,6 +1125,13 @@ slots:
         );
         let ctx = db.execute_dsl(&dsl).await?;
         let cbu_id = ctx.resolve("cbu").unwrap();
+
+        // Confirm-first: reach VALIDATED so add-product gets past the lifecycle
+        // gate to its product validation (Phase 3 C1).
+        db.execute_dsl(&format!(r#"(cbu.submit-for-validation :cbu-id "{cbu_id}")"#))
+            .await?;
+        db.execute_dsl(&format!(r#"(cbu.confirm :cbu-id "{cbu_id}")"#))
+            .await?;
 
         // Try to add non-existent product
         let bad_dsl = format!(
@@ -1163,6 +1186,12 @@ slots:
         let ctx = db.execute_dsl(&dsl).await?;
         let cbu_id = ctx.resolve("cbu").unwrap();
 
+        // Confirm-first: cbu.add-product requires VALIDATED (Phase 3 C1).
+        db.execute_dsl(&format!(r#"(cbu.submit-for-validation :cbu-id "{cbu_id}")"#))
+            .await?;
+        db.execute_dsl(&format!(r#"(cbu.confirm :cbu-id "{cbu_id}")"#))
+            .await?;
+
         let add_dsl = format!(
             r#"(cbu.add-product :cbu-id "{}" :product "CUSTODY")"#,
             cbu_id
@@ -1203,6 +1232,12 @@ slots:
         );
         let ctx = db.execute_dsl(&dsl).await?;
         let cbu_id = ctx.resolve("cbu").unwrap();
+
+        // Confirm-first: cbu.add-product requires VALIDATED (Phase 3 C1).
+        db.execute_dsl(&format!(r#"(cbu.submit-for-validation :cbu-id "{cbu_id}")"#))
+            .await?;
+        db.execute_dsl(&format!(r#"(cbu.confirm :cbu-id "{cbu_id}")"#))
+            .await?;
 
         let add_dsl = format!(
             r#"(cbu.add-product :cbu-id "{}" :product "CUSTODY")"#,

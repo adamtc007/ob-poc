@@ -1389,6 +1389,7 @@ domains:
           - "add the TA service"
         behavior: plugin
         lifecycle:
+          entity_arg: cbu-id
           requires_states: [VALIDATED]
           transitions_to: CONFIGURING
         metadata:
