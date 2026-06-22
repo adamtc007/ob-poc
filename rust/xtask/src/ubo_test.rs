@@ -132,10 +132,24 @@ pub(crate) async fn clean_test_data(pool: &PgPool) -> Result<()> {
         }
     }
 
-    // Also clean any orphaned test entities
-    sqlx::query(r#"DELETE FROM "ob-poc".entities WHERE name LIKE 'UBO Test:%'"#)
-        .execute(pool)
+    // Also clean any orphaned test entities. Run under replica mode (in a tx)
+    // so the delete ignores FK references from ANY table (cbu_groups.manco_entity_id,
+    // entity_relationships, etc.) without a hand-maintained child-table list.
+    let mut tx = pool.begin().await?;
+    sqlx::query("SET LOCAL session_replication_role = replica")
+        .execute(&mut *tx)
         .await?;
+    sqlx::query(
+        r#"DELETE FROM "ob-poc".entity_relationships
+           WHERE from_entity_id IN (SELECT entity_id FROM "ob-poc".entities WHERE name LIKE 'UBO Test:%')
+              OR to_entity_id   IN (SELECT entity_id FROM "ob-poc".entities WHERE name LIKE 'UBO Test:%')"#,
+    )
+    .execute(&mut *tx)
+    .await?;
+    sqlx::query(r#"DELETE FROM "ob-poc".entities WHERE name LIKE 'UBO Test:%'"#)
+        .execute(&mut *tx)
+        .await?;
+    tx.commit().await?;
 
     println!("Clean complete.");
     Ok(())
@@ -145,86 +159,17 @@ pub(crate) async fn clean_test_data(pool: &PgPool) -> Result<()> {
 async fn delete_cbu_cascade(pool: &PgPool, cbu_id: Uuid) -> Result<()> {
     let mut tx = pool.begin().await?;
 
-    // ═══════════════════════════════════════════════════════════════════════
-    // NEW ARCHITECTURE: Delete from cbu_relationship_verification (CBU-scoped)
-    // Note: entity_relationships are structural facts and persist across CBUs
-    // ═══════════════════════════════════════════════════════════════════════
-
-    // Get relationship IDs for this CBU before deleting verification records
-    let relationship_ids: Vec<Uuid> = sqlx::query_scalar(
-        r#"SELECT relationship_id FROM "ob-poc".cbu_relationship_verification WHERE cbu_id = $1"#,
-    )
-    .bind(cbu_id)
-    .fetch_all(&mut *tx)
-    .await?;
-
-    // Delete CBU-scoped verification records
-    sqlx::query(r#"DELETE FROM "ob-poc".cbu_relationship_verification WHERE cbu_id = $1"#)
-        .bind(cbu_id)
+    // Disable FK enforcement for this cleanup transaction so the delete order
+    // across the ~77 FK-children of cbus is irrelevant (test-only; SET LOCAL is
+    // transaction-scoped and auto-resets on commit/rollback). This replaces the
+    // old hand-maintained child-table list, which had drifted ~65 tables behind
+    // the schema and failed on the first uncovered FK (e.g. cbu_resource_instances).
+    sqlx::query("SET LOCAL session_replication_role = replica")
         .execute(&mut *tx)
         .await?;
 
-    // Delete orphaned entity_relationships (those with no remaining CBU verifications)
-    // This is safe for test data since test entities are only used by test CBUs
-    for rel_id in relationship_ids {
-        let count: i64 = sqlx::query_scalar(
-            r#"SELECT COUNT(*) FROM "ob-poc".cbu_relationship_verification WHERE relationship_id = $1"#,
-        )
-        .bind(rel_id)
-        .fetch_one(&mut *tx)
-        .await?;
-
-        if count == 0 {
-            sqlx::query(r#"DELETE FROM "ob-poc".entity_relationships WHERE relationship_id = $1"#)
-                .bind(rel_id)
-                .execute(&mut *tx)
-                .await?;
-        }
-    }
-
-    // Legacy tables (try delete, ignore if not exist)
-    let _ = sqlx::query(r#"DELETE FROM "ob-poc".ubo_assertion_log WHERE cbu_id = $1"#)
-        .bind(cbu_id)
-        .execute(&mut *tx)
-        .await;
-
-    let _ = sqlx::query(r#"DELETE FROM "ob-poc".kyc_decisions WHERE cbu_id = $1"#)
-        .bind(cbu_id)
-        .execute(&mut *tx)
-        .await;
-
-    let _ = sqlx::query(r#"DELETE FROM "ob-poc".proofs WHERE cbu_id = $1"#)
-        .bind(cbu_id)
-        .execute(&mut *tx)
-        .await;
-
-    // KYC schema
-    sqlx::query(r#"DELETE FROM kyc.screenings WHERE workstream_id IN (SELECT workstream_id FROM kyc.entity_workstreams WHERE case_id IN (SELECT case_id FROM kyc.cases WHERE cbu_id = $1))"#)
-        .bind(cbu_id).execute(&mut *tx).await?;
-    sqlx::query(r#"DELETE FROM kyc.doc_requests WHERE workstream_id IN (SELECT workstream_id FROM kyc.entity_workstreams WHERE case_id IN (SELECT case_id FROM kyc.cases WHERE cbu_id = $1))"#)
-        .bind(cbu_id).execute(&mut *tx).await?;
-    sqlx::query(r#"DELETE FROM kyc.case_events WHERE case_id IN (SELECT case_id FROM kyc.cases WHERE cbu_id = $1)"#)
-        .bind(cbu_id).execute(&mut *tx).await?;
-    sqlx::query(r#"DELETE FROM kyc.red_flags WHERE case_id IN (SELECT case_id FROM kyc.cases WHERE cbu_id = $1)"#)
-        .bind(cbu_id).execute(&mut *tx).await?;
-    sqlx::query(r#"DELETE FROM kyc.entity_workstreams WHERE case_id IN (SELECT case_id FROM kyc.cases WHERE cbu_id = $1)"#)
-        .bind(cbu_id).execute(&mut *tx).await?;
-    sqlx::query(r#"DELETE FROM kyc.cases WHERE cbu_id = $1"#)
-        .bind(cbu_id)
-        .execute(&mut *tx)
-        .await?;
-
-    // Core tables
-    sqlx::query(r#"DELETE FROM "ob-poc".cbu_entity_roles WHERE cbu_id = $1"#)
-        .bind(cbu_id)
-        .execute(&mut *tx)
-        .await?;
-    sqlx::query(r#"DELETE FROM "ob-poc".document_catalog WHERE cbu_id = $1"#)
-        .bind(cbu_id)
-        .execute(&mut *tx)
-        .await?;
-
-    // Get entities linked to this CBU before deleting
+    // Capture test entities linked to this CBU before the link rows are deleted.
+    // (entities are NOT FK-children of cbus, so the dynamic sweep won't touch them.)
     let entity_ids: Vec<Uuid> = sqlx::query_scalar(
         r#"SELECT DISTINCT entity_id FROM "ob-poc".cbu_entity_roles WHERE cbu_id = $1"#,
     )
@@ -232,25 +177,58 @@ async fn delete_cbu_cascade(pool: &PgPool, cbu_id: Uuid) -> Result<()> {
     .fetch_all(&mut *tx)
     .await?;
 
+    // Delete the case/workstream subtree explicitly: these FK to cases/workstreams,
+    // NOT directly to cbus, so they are not covered by the direct-child sweep below.
+    for sql in [
+        r#"DELETE FROM "ob-poc".screenings WHERE workstream_id IN (SELECT workstream_id FROM "ob-poc".entity_workstreams WHERE case_id IN (SELECT case_id FROM "ob-poc".cases WHERE cbu_id = $1))"#,
+        r#"DELETE FROM "ob-poc".doc_requests WHERE workstream_id IN (SELECT workstream_id FROM "ob-poc".entity_workstreams WHERE case_id IN (SELECT case_id FROM "ob-poc".cases WHERE cbu_id = $1))"#,
+        r#"DELETE FROM "ob-poc".case_events WHERE case_id IN (SELECT case_id FROM "ob-poc".cases WHERE cbu_id = $1)"#,
+        r#"DELETE FROM "ob-poc".red_flags WHERE case_id IN (SELECT case_id FROM "ob-poc".cases WHERE cbu_id = $1)"#,
+        r#"DELETE FROM "ob-poc".entity_workstreams WHERE case_id IN (SELECT case_id FROM "ob-poc".cases WHERE cbu_id = $1)"#,
+    ] {
+        sqlx::query(sql).bind(cbu_id).execute(&mut *tx).await?;
+    }
+
+    // Dynamically delete every DIRECT FK-child of cbus for this cbu_id, via
+    // whatever column FKs to cbus (cbu_id, sponsor_cbu_id, parent_cbu_id,
+    // child_cbu_id, owning_cbu_id, applies_to_cbu_id). Covers cases,
+    // cbu_resource_instances, service_intents, subscriptions, ubo_* and ~70
+    // others — sourced from the live FK catalogue so it never bit-rots.
+    let children: Vec<(String, String)> = sqlx::query_as(
+        r#"SELECT tc.table_name, kcu.column_name
+           FROM information_schema.table_constraints tc
+           JOIN information_schema.key_column_usage kcu
+             ON tc.constraint_name = kcu.constraint_name
+            AND tc.table_schema = kcu.table_schema
+           JOIN information_schema.constraint_column_usage ccu
+             ON tc.constraint_name = ccu.constraint_name
+            AND tc.table_schema = ccu.table_schema
+           WHERE tc.constraint_type = 'FOREIGN KEY'
+             AND ccu.table_name = 'cbus'
+             AND ccu.table_schema = 'ob-poc'
+             AND tc.table_schema = 'ob-poc'"#,
+    )
+    .fetch_all(&mut *tx)
+    .await?;
+    for (table, col) in children {
+        let sql = format!(r#"DELETE FROM "ob-poc"."{table}" WHERE "{col}" = $1"#);
+        sqlx::query(&sql).bind(cbu_id).execute(&mut *tx).await?;
+    }
+
+    // The CBU itself.
     sqlx::query(r#"DELETE FROM "ob-poc".cbus WHERE cbu_id = $1"#)
         .bind(cbu_id)
         .execute(&mut *tx)
         .await?;
 
-    // Delete test entities (only those with UBO Test: prefix)
-    // First, delete entity_relationships that reference these entities (FK constraint)
+    // Test entities (UBO Test: prefix only) + their structural relationships.
     for entity_id in &entity_ids {
         sqlx::query(
-            r#"DELETE FROM "ob-poc".entity_relationships
-               WHERE from_entity_id = $1 OR to_entity_id = $1"#,
+            r#"DELETE FROM "ob-poc".entity_relationships WHERE from_entity_id = $1 OR to_entity_id = $1"#,
         )
         .bind(entity_id)
         .execute(&mut *tx)
         .await?;
-    }
-
-    // Now delete the entities
-    for entity_id in &entity_ids {
         sqlx::query(
             r#"DELETE FROM "ob-poc".entities WHERE entity_id = $1 AND name LIKE 'UBO Test:%'"#,
         )
@@ -938,7 +916,7 @@ async fn create_ubo_edge(
     role: Option<&str>,
 ) -> Result<Uuid> {
     // ═══════════════════════════════════════════════════════════════════════
-    // NEW ARCHITECTURE: Insert into entity_relationships + cbu_relationship_verification
+    // NEW ARCHITECTURE: Insert into entity_relationships + ubo_relationship_verification
     // ═══════════════════════════════════════════════════════════════════════
 
     // Map edge_type to relationship_type (lowercase per check constraint)
@@ -961,8 +939,8 @@ async fn create_ubo_edge(
     let relationship_id: Uuid = sqlx::query_scalar(
         r#"
         INSERT INTO "ob-poc".entity_relationships
-            (from_entity_id, to_entity_id, relationship_type, percentage, control_type, trust_role, source)
-        VALUES ($1, $2, $3, $4, $5, $6, 'TEST_HARNESS')
+            (from_entity_id, to_entity_id, relationship_type, percentage, control_type, trust_role, source, confidence)
+        VALUES ($1, $2, $3, $4, $5, $6, 'TEST_HARNESS', 'MEDIUM')
         RETURNING relationship_id
         "#,
     )
@@ -979,7 +957,7 @@ async fn create_ubo_edge(
     // Step 2: Create the CBU-scoped verification record with allegation
     sqlx::query(
         r#"
-        INSERT INTO "ob-poc".cbu_relationship_verification
+        INSERT INTO "ob-poc".ubo_relationship_verification
             (cbu_id, relationship_id, alleged_percentage, status, alleged_at)
         VALUES ($1, $2, $3, 'alleged', NOW())
         "#,
@@ -1061,7 +1039,7 @@ async fn get_convergence_status(pool: &PgPool, cbu_id: Uuid) -> Result<Convergen
 }
 
 /// Creates a proof with its backing document
-/// Returns (document_id, proof_id) - document_id is stored in cbu_relationship_verification
+/// Returns (document_id, proof_id) - document_id is stored in ubo_relationship_verification
 async fn create_proof(pool: &PgPool, cbu_id: Uuid, proof_type: &str) -> Result<Uuid> {
     // Step 1: Create backing document in document_catalog
     let document_id: Uuid = sqlx::query_scalar(
@@ -1088,16 +1066,16 @@ async fn create_proof(pool: &PgPool, cbu_id: Uuid, proof_type: &str) -> Result<U
     .await
     .context("Failed to create proof")?;
 
-    // Return document_id - this is what gets stored in cbu_relationship_verification.proof_document_id
+    // Return document_id - this is what gets stored in ubo_relationship_verification.proof_document_id
     Ok(document_id)
 }
 
 async fn get_single_edge(pool: &PgPool, cbu_id: Uuid) -> Result<Uuid> {
     // ═══════════════════════════════════════════════════════════════════════
-    // NEW ARCHITECTURE: Query entity_relationships via cbu_relationship_verification
+    // NEW ARCHITECTURE: Query entity_relationships via ubo_relationship_verification
     // ═══════════════════════════════════════════════════════════════════════
     sqlx::query_scalar::<_, Uuid>(
-        r#"SELECT relationship_id FROM "ob-poc".cbu_relationship_verification WHERE cbu_id = $1 LIMIT 1"#,
+        r#"SELECT relationship_id FROM "ob-poc".ubo_relationship_verification WHERE cbu_id = $1 LIMIT 1"#,
     )
     .bind(cbu_id)
     .fetch_one(pool)
@@ -1115,13 +1093,13 @@ struct UboEdge {
 
 async fn get_all_edges(pool: &PgPool, cbu_id: Uuid) -> Result<Vec<UboEdge>> {
     // ═══════════════════════════════════════════════════════════════════════
-    // NEW ARCHITECTURE: Join entity_relationships + cbu_relationship_verification
+    // NEW ARCHITECTURE: Join entity_relationships + ubo_relationship_verification
     // ═══════════════════════════════════════════════════════════════════════
     let rows = sqlx::query_as::<_, (Uuid, String, Option<f64>, Option<String>, Option<String>)>(
         r#"
         SELECT r.relationship_id, r.relationship_type, v.alleged_percentage::float8, r.control_type, r.trust_role
         FROM "ob-poc".entity_relationships r
-        JOIN "ob-poc".cbu_relationship_verification v ON v.relationship_id = r.relationship_id
+        JOIN "ob-poc".ubo_relationship_verification v ON v.relationship_id = r.relationship_id
         WHERE v.cbu_id = $1
         "#,
     )
@@ -1144,11 +1122,11 @@ async fn get_all_edges(pool: &PgPool, cbu_id: Uuid) -> Result<Vec<UboEdge>> {
 
 async fn link_proof_to_edge(pool: &PgPool, relationship_id: Uuid, document_id: Uuid) -> Result<()> {
     // ═══════════════════════════════════════════════════════════════════════
-    // NEW ARCHITECTURE: Update cbu_relationship_verification.proof_document_id
+    // NEW ARCHITECTURE: Update ubo_relationship_verification.proof_document_id
     // Note: document_id is from document_catalog, not proofs table
     // ═══════════════════════════════════════════════════════════════════════
     sqlx::query(
-        r#"UPDATE "ob-poc".cbu_relationship_verification
+        r#"UPDATE "ob-poc".ubo_relationship_verification
            SET proof_document_id = $1, status = 'pending', updated_at = NOW()
            WHERE relationship_id = $2"#,
     )
@@ -1161,14 +1139,14 @@ async fn link_proof_to_edge(pool: &PgPool, relationship_id: Uuid, document_id: U
 
 async fn verify_edge(pool: &PgPool, edge_id: Uuid, proven_percentage: f64) -> Result<()> {
     // ═══════════════════════════════════════════════════════════════════════
-    // NEW ARCHITECTURE: Update cbu_relationship_verification + entity_relationships
+    // NEW ARCHITECTURE: Update ubo_relationship_verification + entity_relationships
     // Note: edge_id is now relationship_id
     // ═══════════════════════════════════════════════════════════════════════
 
     // Update verification record
     sqlx::query(
         r#"
-        UPDATE "ob-poc".cbu_relationship_verification
+        UPDATE "ob-poc".ubo_relationship_verification
         SET status = 'proven',
             observed_percentage = $1,
             resolved_at = NOW(),
@@ -1199,12 +1177,12 @@ async fn verify_edge(pool: &PgPool, edge_id: Uuid, proven_percentage: f64) -> Re
 
 async fn verify_edge_control(pool: &PgPool, edge_id: Uuid, _role: Option<&str>) -> Result<()> {
     // ═══════════════════════════════════════════════════════════════════════
-    // NEW ARCHITECTURE: Update cbu_relationship_verification for control edges
+    // NEW ARCHITECTURE: Update ubo_relationship_verification for control edges
     // Note: edge_id is now relationship_id
     // ═══════════════════════════════════════════════════════════════════════
     sqlx::query(
         r#"
-        UPDATE "ob-poc".cbu_relationship_verification
+        UPDATE "ob-poc".ubo_relationship_verification
         SET status = 'proven',
             resolved_at = NOW(),
             updated_at = NOW()
@@ -1237,12 +1215,12 @@ struct UboEvaluation {
 
 async fn evaluate_ubo(pool: &PgPool, cbu_id: Uuid) -> Result<UboEvaluation> {
     // Find beneficial owners (>=25% ownership) using new tables
-    // Join entity_relationships (structural) with cbu_relationship_verification (CBU-scoped status)
+    // Join entity_relationships (structural) with ubo_relationship_verification (CBU-scoped status)
     let owners = sqlx::query_as::<_, (String, f64)>(
         r#"
         SELECT e.name, COALESCE(v.observed_percentage, r.percentage)::float8 as proven_percentage
         FROM "ob-poc".entity_relationships r
-        JOIN "ob-poc".cbu_relationship_verification v ON v.relationship_id = r.relationship_id
+        JOIN "ob-poc".ubo_relationship_verification v ON v.relationship_id = r.relationship_id
         JOIN "ob-poc".entities e ON e.entity_id = r.from_entity_id
         WHERE v.cbu_id = $1
           AND r.relationship_type = 'ownership'
@@ -1267,7 +1245,7 @@ async fn evaluate_ubo(pool: &PgPool, cbu_id: Uuid) -> Result<UboEvaluation> {
         r#"
         SELECT e.name, r.trust_role, r.relationship_type
         FROM "ob-poc".entity_relationships r
-        JOIN "ob-poc".cbu_relationship_verification v ON v.relationship_id = r.relationship_id
+        JOIN "ob-poc".ubo_relationship_verification v ON v.relationship_id = r.relationship_id
         JOIN "ob-poc".entities e ON e.entity_id = r.from_entity_id
         WHERE v.cbu_id = $1
           AND r.relationship_type IN ('control', 'trust_role')

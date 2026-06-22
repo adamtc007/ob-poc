@@ -268,7 +268,8 @@ slots:
       unlink_structure: { verb: cbu.unlink-structure, when: filled }
       submit_for_validation: { verb: cbu.submit-for-validation, when: filled }
       reopen_validation: { verb: cbu.reopen-validation, when: filled }
-      decide: { verb: cbu.decide, when: filled }
+      confirm: { verb: cbu.confirm, when: filled }
+      reject: { verb: cbu.reject, when: filled }
       delete: { verb: cbu.delete, when: filled }
       delete_cascade: { verb: cbu.delete-cascade, when: filled }
       # cbu.assign-role is owned by struct_* constellations (role assignment

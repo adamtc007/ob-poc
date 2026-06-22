@@ -1316,7 +1316,7 @@ Mapping tables in `ob_ref`. Deterministic, versioned. Edges carry `bods_interest
 
 1. Create `entity_relationships` table (if not present from Dec 2025 migration).
 2. Migrate data from `ownership_relationships`, `control_relationships`, `ubo_edges`, `control_edges`.
-3. Create `cbu_relationship_verification` junction for CBU-scoped KYC overlay.
+3. Create `ubo_relationship_verification` junction for CBU-scoped KYC overlay.
 4. Deprecate legacy tables (do not drop).
 5. Update DSL verb YAML configs.
 6. Update graph builder, UBO ops, visualization queries.

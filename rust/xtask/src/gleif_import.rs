@@ -1136,7 +1136,7 @@ async fn create_ownership_relationship(
         id
     };
 
-    // Create cbu_relationship_verification records for all CBUs that have the owned entity
+    // Create ubo_relationship_verification records for all CBUs that have the owned entity
     // This links the structural relationship to specific CBU contexts
     let cbu_ids: Vec<(Uuid,)> = sqlx::query_as(
         r#"
@@ -1156,7 +1156,7 @@ async fn create_ownership_relationship(
         let exists: bool = sqlx::query_scalar(
             r#"
             SELECT EXISTS(
-                SELECT 1 FROM "ob-poc".cbu_relationship_verification
+                SELECT 1 FROM "ob-poc".ubo_relationship_verification
                 WHERE cbu_id = $1 AND relationship_id = $2
             )
             "#,
@@ -1169,7 +1169,7 @@ async fn create_ownership_relationship(
         if !exists {
             sqlx::query(
                 r#"
-                INSERT INTO "ob-poc".cbu_relationship_verification (
+                INSERT INTO "ob-poc".ubo_relationship_verification (
                     cbu_id, relationship_id, status, observed_percentage
                 ) VALUES ($1, $2, 'proven', 100.00)
                 "#,

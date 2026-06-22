@@ -294,8 +294,16 @@ fn can_use_sage_structure_fast_path(
         return true;
     }
 
+    // Phase 3 C2: discovery surface is membership-scoped (no lifecycle prune).
+    // The fast-path is an auto-EXECUTE gate, so it must additionally require
+    // the selected verb be lifecycle-eligible — never auto-run a verb whose
+    // `requires_states` the current entity state does not satisfy (select-then-
+    // validate; execution is also backstopped in execute_verb_in_scope).
     Some(&prepared.surface)
-        .map(|surface| surface.allowed_fqns().contains(&drafter_result.verb_fqn))
+        .map(|surface| {
+            surface.allowed_fqns().contains(&drafter_result.verb_fqn)
+                && surface.is_lifecycle_eligible(&drafter_result.verb_fqn)
+        })
         .unwrap_or(false)
 }
 
@@ -470,9 +478,14 @@ fn can_use_coder_for_serve(
     }
 
     // Use the pre-computed surface — no need to re-evaluate Phase2.
+    // Phase 3 C2: membership AND lifecycle-eligibility (see
+    // can_use_sage_structure_fast_path) gate the auto-execute fast path.
     let allowed = prepared.surface.allowed_fqns();
     if !allowed.is_empty() {
-        return allowed.contains(&drafter_result.verb_fqn);
+        return allowed.contains(&drafter_result.verb_fqn)
+            && prepared
+                .surface
+                .is_lifecycle_eligible(&drafter_result.verb_fqn);
     }
 
     false

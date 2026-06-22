@@ -994,6 +994,16 @@ slots:
         let ctx = db.execute_dsl(&dsl).await?;
         let cbu_id = ctx.resolve("cbu").unwrap();
 
+        // Confirm-first: a CBU must be confirmed (VALIDATED) before products can
+        // be added — cbu.add-product requires_states: [VALIDATED], enforced at
+        // execution (Phase 3 C1). create → submit-for-validation → confirm.
+        db.execute_dsl(&format!(
+            r#"(cbu.submit-for-validation :cbu-id "{cbu_id}")"#
+        ))
+        .await?;
+        db.execute_dsl(&format!(r#"(cbu.confirm :cbu-id "{cbu_id}")"#))
+            .await?;
+
         // Verify CBU has no product and no deliveries initially
         assert!(
             get_cbu_product_id(&db.pool, cbu_id).await?.is_none(),
@@ -1059,6 +1069,12 @@ slots:
         let ctx = db.execute_dsl(&dsl).await?;
         let cbu_id = ctx.resolve("cbu").unwrap();
 
+        // Confirm-first: cbu.add-product requires VALIDATED (Phase 3 C1).
+        db.execute_dsl(&format!(r#"(cbu.submit-for-validation :cbu-id "{cbu_id}")"#))
+            .await?;
+        db.execute_dsl(&format!(r#"(cbu.confirm :cbu-id "{cbu_id}")"#))
+            .await?;
+
         // Add product first time
         let add_product_dsl = format!(
             r#"(cbu.add-product :cbu-id "{}" :product "CUSTODY")"#,
@@ -1109,6 +1125,13 @@ slots:
         );
         let ctx = db.execute_dsl(&dsl).await?;
         let cbu_id = ctx.resolve("cbu").unwrap();
+
+        // Confirm-first: reach VALIDATED so add-product gets past the lifecycle
+        // gate to its product validation (Phase 3 C1).
+        db.execute_dsl(&format!(r#"(cbu.submit-for-validation :cbu-id "{cbu_id}")"#))
+            .await?;
+        db.execute_dsl(&format!(r#"(cbu.confirm :cbu-id "{cbu_id}")"#))
+            .await?;
 
         // Try to add non-existent product
         let bad_dsl = format!(
@@ -1163,6 +1186,12 @@ slots:
         let ctx = db.execute_dsl(&dsl).await?;
         let cbu_id = ctx.resolve("cbu").unwrap();
 
+        // Confirm-first: cbu.add-product requires VALIDATED (Phase 3 C1).
+        db.execute_dsl(&format!(r#"(cbu.submit-for-validation :cbu-id "{cbu_id}")"#))
+            .await?;
+        db.execute_dsl(&format!(r#"(cbu.confirm :cbu-id "{cbu_id}")"#))
+            .await?;
+
         let add_dsl = format!(
             r#"(cbu.add-product :cbu-id "{}" :product "CUSTODY")"#,
             cbu_id
@@ -1203,6 +1232,12 @@ slots:
         );
         let ctx = db.execute_dsl(&dsl).await?;
         let cbu_id = ctx.resolve("cbu").unwrap();
+
+        // Confirm-first: cbu.add-product requires VALIDATED (Phase 3 C1).
+        db.execute_dsl(&format!(r#"(cbu.submit-for-validation :cbu-id "{cbu_id}")"#))
+            .await?;
+        db.execute_dsl(&format!(r#"(cbu.confirm :cbu-id "{cbu_id}")"#))
+            .await?;
 
         let add_dsl = format!(
             r#"(cbu.add-product :cbu-id "{}" :product "CUSTODY")"#,
@@ -1251,6 +1286,80 @@ slots:
         assert!(
             market_parameter_count > 0,
             "market-scoped service resources should retain intent options as discovery parameters"
+        );
+
+        db.cleanup().await?;
+        Ok(())
+    }
+
+    /// ATOMICITY teeth: `cbu.add-product`'s child writes must join the PARENT
+    /// transaction, so a rollback unwinds them. Previously the service pipeline
+    /// dispatched children via `scope.pool()` (a fresh out-of-txn connection),
+    /// so a rolled-back add-product left committed-orphan `service_intents` /
+    /// `srdef_discovery_reasons`. After the scope-threading fix, rollback leaves
+    /// ZERO orphans.
+    ///
+    /// Drives add-product through the public `execute_plan_atomic_in_scope`,
+    /// which leaves the scope open; dropping the `PgTransactionScope` without a
+    /// commit rolls the transaction back. The committed add-product tests above
+    /// already prove these children DO get written — so finding none after a
+    /// rollback is the atomicity proof. (Teeth: revert the dispatch's
+    /// `scope.executor()` → `scope.pool()` and this test goes RED.)
+    #[tokio::test]
+    async fn test_cbu_add_product_rolls_back_atomically() -> Result<()> {
+        use ob_poc::sequencer_tx::PgTransactionScope;
+
+        let db = TestDb::new().await?;
+
+        // Arrange: a confirmed (VALIDATED) CBU, committed.
+        let ctx = db
+            .execute_dsl(&format!(
+                r#"(cbu.create :name "{}" :as @cbu)"#,
+                db.name("AtomicRollbackCBU")
+            ))
+            .await?;
+        let cbu_id = ctx.resolve("cbu").unwrap();
+        db.execute_dsl(&format!(r#"(cbu.submit-for-validation :cbu-id "{cbu_id}")"#))
+            .await?;
+        db.execute_dsl(&format!(r#"(cbu.confirm :cbu-id "{cbu_id}")"#))
+            .await?;
+
+        // Act: run add-product in a scope we then ROLL BACK (drop without commit).
+        let ast = parse_program(&format!(
+            r#"(cbu.add-product :cbu-id "{cbu_id}" :product "CUSTODY")"#
+        ))
+        .map_err(|e| anyhow::anyhow!("{:?}", e))?;
+        let plan = compile(&ast).map_err(|e| anyhow::anyhow!("{:?}", e))?;
+        let executor = DslExecutor::new(db.pool.clone()).with_sem_os_ops(sem_os_registry());
+        {
+            let mut scope = PgTransactionScope::begin(&db.pool).await?;
+            let mut tx_ctx = ExecutionContext::new();
+            executor
+                .execute_plan_atomic_in_scope(&plan, &mut tx_ctx, &mut scope)
+                .await?;
+            // scope drops here without commit → ROLLBACK
+        }
+
+        // After rollback: a committed (pool) read must see NO orphan children.
+        let orphan_intents: i64 =
+            sqlx::query_scalar(r#"SELECT count(*) FROM "ob-poc".service_intents WHERE cbu_id = $1"#)
+                .bind(cbu_id)
+                .fetch_one(&db.pool)
+                .await?;
+        assert_eq!(
+            orphan_intents, 0,
+            "ATOMICITY: rolled-back add-product must leave NO orphan service_intents \
+             (this was the committed-orphan defect)"
+        );
+        let orphan_discoveries: i64 = sqlx::query_scalar(
+            r#"SELECT count(*) FROM "ob-poc".srdef_discovery_reasons WHERE cbu_id = $1"#,
+        )
+        .bind(cbu_id)
+        .fetch_one(&db.pool)
+        .await?;
+        assert_eq!(
+            orphan_discoveries, 0,
+            "ATOMICITY: rolled-back add-product must leave NO orphan srdef_discovery_reasons"
         );
 
         db.cleanup().await?;

@@ -38,8 +38,6 @@
 #   V1.3-3  parent_slot: for master-feeder / umbrella-compartment hierarchy
 #   V1.3-4  expected_lifetime: long_lived; SUSPENDED states present
 #   V1.3-5  dual_lifecycle: discovery-vs-operational
-#   V1.3-8  category_gated: on investor / holding / share_class slots
-#           (fund-structure slots only activate for FUND_MANDATE)
 #
 # New slot:
 #   service_consumption (per-service-per-CBU lifecycle — custody, TA, FA,
@@ -156,8 +154,8 @@ overall_lifecycle:
         all_of:
           - "cbus.status = 'VALIDATION_PENDING'"
       progression_verbs:
-        - cbu.decide               # APPROVE → VALIDATED
-        - cbu.decide               # REJECT  → VALIDATION_FAILED
+        - cbu.confirm              # → VALIDATED (structural confirm)
+        - cbu.reject               # → VALIDATION_FAILED (structural reject)
         - cbu.validate-roles
         - cbu.request-proof-update
         - cbu.reopen-validation
@@ -321,7 +319,7 @@ slots:
       severity: error
     state_machine:
       id: cbu_discovery_lifecycle
-      owner: compliance                   # v1.3-5 KYC/governance artefact
+      owner: cbu                          # structural validation is CBU-owned, NOT compliance/KYC (domain isolation, 2026-06-22)
       expected_lifetime: long_lived       # v1.3-4
       source_entity: '"ob-poc".cbus'
       state_column: status
@@ -383,12 +381,10 @@ slots:
           via: cbu.submit-for-validation
         - from: VALIDATION_PENDING
           to: VALIDATED
-          via: cbu.decide
-          args: { decision: APPROVE }
+          via: cbu.confirm
         - from: VALIDATION_PENDING
           to: VALIDATION_FAILED
-          via: cbu.decide
-          args: { decision: REJECT }
+          via: cbu.reject
         - from: VALIDATED
           to: UPDATE_PENDING_PROOF
           via: cbu.request-proof-update
@@ -542,79 +538,11 @@ slots:
 
   - id: entity_proper_person
     stateless: false
-    closure: closed_unbounded
-    eligibility:
-      entity_kinds: [proper_person]
-    entry_state: GHOST
-    state_machine:
-      id: entity_proper_person_lifecycle
-      source_entity: '"ob-poc".entity_proper_persons'
-      state_column: person_state
-      scope: per_natural_person_entity
-      description: |
-        Natural-person entity state. 3 states from schema comment.
-        Applies to UBOs, directors, signatories, beneficial owners.
-      states:
-        - id: GHOST
-          entry: true
-          description: "Name-only; no identifying attributes."
-        - id: IDENTIFIED
-          description: "Has DOB / nationality / ID numbers."
-        - id: VERIFIED
-          description: "Confirmed by official documents."
-      transitions:
-        - from: GHOST
-          to: IDENTIFIED
-          via: entity.identify
-        - from: IDENTIFIED
-          to: VERIFIED
-          via: entity.verify
-      terminal_states: [VERIFIED]
+    state_machine: "(reference — relocated 2026-06-22 to kyc_dag.yaml; CBU reads this state read-only. Domain isolation: CBU knows nothing about KYC.)"
 
   - id: entity_limited_company_ubo
     stateless: false
-    closure: closed_unbounded
-    eligibility:
-      entity_kinds: [limited_company]
-    entry_state: PENDING
-    state_machine:
-      id: entity_limited_company_ubo_lifecycle
-      source_entity: '"ob-poc".entity_limited_companies'
-      state_column: ubo_status
-      scope: per_limited_company_entity
-      description: |
-        UBO discovery state for limited companies. 5 states from
-        schema comment. Tracks whether beneficial ownership has
-        been traced and categorised.
-      states:
-        - id: PENDING
-          entry: true
-          description: "UBO discovery not yet attempted."
-        - id: DISCOVERED
-          description: "Beneficial owners identified via research."
-        - id: PUBLIC_FLOAT
-          description: "Widely-held public company; no UBO lookup required."
-        - id: EXEMPT
-          description: "Regulator-exempt (state-owned, sovereign, etc.)."
-        - id: MANUAL_REQUIRED
-          description: "Automated discovery failed; manual investigation needed."
-      transitions:
-        - from: PENDING
-          to: DISCOVERED
-          via: "(backend: UBO discovery pipeline)"
-        - from: PENDING
-          to: PUBLIC_FLOAT
-          via: "(backend: listed-company check)"
-        - from: PENDING
-          to: EXEMPT
-          via: "(backend: exemption classifier)"
-        - from: PENDING
-          to: MANUAL_REQUIRED
-          via: "(backend: pipeline failure)"
-        - from: MANUAL_REQUIRED
-          to: DISCOVERED
-          via: ubo.registry.promote  # cross-workspace from KYC
-      terminal_states: [DISCOVERED, PUBLIC_FLOAT, EXEMPT]
+    state_machine: "(reference — relocated 2026-06-22 to kyc_dag.yaml; CBU reads this state read-only. Domain isolation: CBU knows nothing about KYC.)"
 
   # ---------------------------------------------------------------------------
   # 2.3 CBU evidence (new state machine)
@@ -687,124 +615,11 @@ slots:
 
   - id: investor
     stateless: false
-    # V1.3-8 category_gated: investor register only exists for funds.
-    category_gated:
-      category_column: cbu_category
-      category_source: cbus
-      activated_by: [FUND_MANDATE]
-    state_machine:
-      id: investor_lifecycle
-      owner: "ops"
-      expected_lifetime: long_lived     # V1.3-4 (SUSPENDED present)
-      source_entity: '"ob-poc".investors'
-      state_column: (derived from investor lifecycle events + status)
-      scope: per_investor
-      description: |
-        Investor commercial lifecycle — from eligibility check through
-        active subscription to offboarding. Distinct from investor_kyc
-        (parallel; see below). This lifecycle is the
-        "can-they-invest-right-now" state.
-      states:
-        - id: DRAFT
-          entry: true
-          description: "Investor record created; eligibility not confirmed."
-        - id: ELIGIBLE
-          description: "Eligibility confirmed (qualification test passed)."
-        - id: ACTIVE
-          description: "Subscribed; holding units."
-        # REDEEMING + REDEEMED removed 2026-04-29 (D-003) — orphan states with
-        # zero transitions reaching or leaving them. Redemption flow re-modelled
-        # later if BNY-style redemption lifecycle is needed.
-        - id: SUSPENDED
-          description: "Temporary hold (KYC refresh, dispute, sanctions)."
-        - id: OFFBOARDED
-          description: "Account closed; exit completed."
-      transitions:
-        - from: DRAFT
-          to: ELIGIBLE
-          via: investor.mark-eligible
-        - from: ELIGIBLE
-          to: ACTIVE
-          via: investor.activate
-          precondition: "investor_kyc.status = APPROVED"
-        - from: ACTIVE
-          to: SUSPENDED
-          via: investor.suspend
-        - from: SUSPENDED
-          to: ACTIVE
-          via: investor.reinstate
-        - from: "(ACTIVE, SUSPENDED)"
-          to: OFFBOARDED
-          via: investor.offboard
-      terminal_states: [OFFBOARDED]
+    state_machine: "(reference — relocated 2026-06-22 to kyc_dag.yaml; CBU reads this state read-only. Domain isolation: CBU knows nothing about KYC.)"
 
   - id: investor_kyc
     stateless: false
-    # V1.3-4: no SUSPENDED state — KYC refresh semantics handled via
-    # EXPIRED / REFRESH_REQUIRED; SUSPENDED doesn't apply.
-    suspended_state_exempt: true
-    # V1.3-8 category_gated: investor KYC only runs for fund-mandate CBUs.
-    category_gated:
-      category_column: cbu_category
-      category_source: cbus
-      activated_by: [FUND_MANDATE]
-    # V1.3-6 periodic review cadence.
-    periodic_review_cadence:
-      base_window: "P2Y"
-      risk_tiered_overrides:
-        - risk_tier: HIGH
-          window: "P1Y"
-        - risk_tier: LOW
-          window: "P3Y"
-      review_scope: full
-    state_machine:
-      id: investor_kyc_lifecycle
-      owner: compliance
-      expected_lifetime: long_lived
-      source_entity: '"ob-poc".investors'
-      state_column: kyc_status
-      scope: per_investor
-      description: |
-        Per-investor KYC state, parallel to investor_lifecycle. 6
-        states from schema comment. Refresh cadence is regulatory
-        (annual high-risk, biennial low-risk). Matches KYC findings
-        V1.3-CAND-3 periodic review cadence pattern.
-      states:
-        - id: NOT_STARTED
-          entry: true
-        - id: IN_PROGRESS
-          description: "KYC evidence being collected + verified."
-        - id: APPROVED
-          description: "KYC passed; investor can be ACTIVE."
-        - id: REJECTED
-          description: "KYC failed; investor cannot be ACTIVE. Terminal."
-        - id: EXPIRED
-          entry_via:
-            trigger:
-              name: kyc_expires_at
-          description: "Approval lapsed; refresh required before new activity."
-        - id: REFRESH_REQUIRED
-          description: "Material change triggered mandatory re-KYC."
-      transitions:
-        - from: NOT_STARTED
-          to: IN_PROGRESS
-          via: investor.start-kyc
-        - from: IN_PROGRESS
-          to: APPROVED
-          via: investor.approve-kyc
-        - from: IN_PROGRESS
-          to: REJECTED
-          via: investor.reject-kyc
-        - from: APPROVED
-          to: EXPIRED
-          via: "(backend: kyc_expires_at trigger)"
-        - from: APPROVED
-          to: REFRESH_REQUIRED
-          via: investor.request-documents
-        - from: "(EXPIRED, REFRESH_REQUIRED)"
-          to: IN_PROGRESS
-          via: investor.start-kyc
-      terminal_states: [REJECTED]
+    state_machine: "(reference — relocated 2026-06-22 to kyc_dag.yaml; CBU reads this state read-only. Domain isolation: CBU knows nothing about KYC.)"
 
   # ---------------------------------------------------------------------------
   # 2.5 Holding lifecycle
@@ -812,74 +627,7 @@ slots:
 
   - id: holding
     stateless: false
-    # V1.3-8 category_gated: holdings only exist for fund-mandate CBUs.
-    category_gated:
-      category_column: cbu_category
-      category_source: cbus
-      activated_by: [FUND_MANDATE]
-    state_machine:
-      id: holding_lifecycle
-      owner: "ops"
-      expected_lifetime: long_lived     # V1.3-4
-      source_entity: '"ob-poc".holdings'
-      state_column: holding_status
-      scope: per_holding
-      description: |
-        Per-holding lifecycle. 7 states (schema has 4; v1.3 extends
-        with RESTRICTED / PLEDGED / FROZEN per CBU findings G-8 for
-        encumbered-holdings semantics — legal locks, collateral pledges,
-        sanctions freezes). Schema migration deferred (D-2).
-      states:
-        - id: PENDING
-          entry: true
-          description: "Subscription recorded; awaiting settlement."
-        - id: ACTIVE
-          description: "Settled; units held; dividends accrue."
-        - id: SUSPENDED
-          description: "Temporary hold (dispute, KYC suspend on investor)."
-        - id: RESTRICTED
-          description: "Legal lock — court order, dispute freeze, specific restriction."
-        - id: PLEDGED
-          description: "Pledged as collateral against a loan/derivative; cannot redeem freely."
-        - id: FROZEN
-          description: "Sanctions exposure on investor; regulatory freeze."
-        - id: CLOSED
-          description: "Redemption complete; zero units."
-      transitions:
-        - from: PENDING
-          to: ACTIVE
-          via: holding.update-status
-          args: { status: ACTIVE }
-        - from: ACTIVE
-          to: SUSPENDED
-          via: holding.update-status
-          args: { status: SUSPENDED }
-        - from: SUSPENDED
-          to: ACTIVE
-          via: holding.update-status
-          args: { status: ACTIVE }
-        - from: ACTIVE
-          to: RESTRICTED
-          via: holding.restrict
-        - from: RESTRICTED
-          to: ACTIVE
-          via: holding.lift-restriction
-        - from: ACTIVE
-          to: PLEDGED
-          via: holding.pledge
-        - from: PLEDGED
-          to: ACTIVE
-          via: holding.release-pledge
-        - from: [ACTIVE, SUSPENDED, RESTRICTED, PLEDGED]
-          to: FROZEN
-          via: "(backend: sanctions hit)"
-        - from: FROZEN
-          to: ACTIVE
-          via: "(backend: sanctions cleared)"
-        - from: [ACTIVE, SUSPENDED, PENDING, RESTRICTED]
-          to: CLOSED
-          via: holding.close
-      terminal_states: [CLOSED]
+    state_machine: "(reference — relocated 2026-06-22 to kyc_dag.yaml; CBU reads this state read-only. Domain isolation: CBU knows nothing about KYC.)"
 
   # ---------------------------------------------------------------------------
   # 2.5b Service consumption (R-3 foundational concern #3)
@@ -1183,39 +931,7 @@ slots:
 
   - id: client_group_entity_review
     stateless: false
-    state_machine:
-      id: client_group_entity_review_lifecycle
-      source_entity: '"ob-poc".client_group_entity'
-      state_column: review_status
-      scope: per_client_group_entity_link
-      description: |
-        Per-(client_group, entity) link review state. 4 states from
-        schema comment. Governs inclusion of an entity into a client
-        group during onboarding research.
-      states:
-        - id: pending
-          entry: true
-          description: "Entity link proposed by research; awaiting review."
-        - id: confirmed
-          description: "Entity confirmed as part of the client group."
-        - id: rejected
-          description: "Entity rejected from the client group."
-        - id: needs_update
-          description: "Source data changed; review needs redo."
-      transitions:
-        - from: pending
-          to: confirmed
-          via: "(backend: client-group researcher review — cross-workspace verb from onboarding)"
-        - from: pending
-          to: rejected
-          via: "(backend: client-group researcher review)"
-        - from: "(confirmed, rejected)"
-          to: needs_update
-          via: "(backend: source data change trigger)"
-        - from: needs_update
-          to: pending
-          via: "(backend: re-review required)"
-      terminal_states: []  # confirmed is final for ops but can always return to needs_update
+    state_machine: "(reference — relocated 2026-06-22 to onboarding_request_dag.yaml; CBU reads this state read-only. Domain isolation: CBU knows nothing about KYC.)"
 
   # ---------------------------------------------------------------------------
   # 2.7 Reconcile-existing (cross-workspace)
@@ -1267,10 +983,6 @@ slots:
     # V1.3-4: HARD_CLOSED + WINDING_DOWN cover the pause/hold semantics
     # for share classes — generic SUSPENDED doesn't apply.
     suspended_state_exempt: true
-    category_gated:
-      category_column: cbu_category
-      category_source: cbus
-      activated_by: [FUND_MANDATE]
     state_machine:
       id: share_class_lifecycle
       owner: "ops+fund-admin"
@@ -1328,109 +1040,10 @@ slots:
   # carrier table is `manco_regulatory_status` keyed by manco_entity_id.
   - id: manco
     stateless: false
-    closure: closed_bounded
-    eligibility:
-      entity_kinds: [limited_company]
-    cardinality_max: 1
-    entry_state: UNDER_REVIEW
-    state_machine:
-      id: manco_lifecycle
-      owner: compliance
-      expected_lifetime: long_lived
-      source_entity: '"ob-poc".manco_regulatory_status'
-      state_column: regulatory_status
-      scope: per_manco
-      description: |
-        Per-manco regulatory + operational state. A manco under
-        regulatory action cascades SUSPENDED to all CBUs it manages
-        (cross-slot constraint hooked via cbu_entity_roles where role
-        = fund_manager / sub_manager). Reference-data-like in v1.2;
-        R-6 promotes to stateful because regulatory-action cascade
-        is real commercial risk (Credit Suisse 2022, FTX, etc.).
-      predicate_bindings:
-        - entity: regulatory_licence
-          source_kind: dag_entity
-          source_entity: regulatory_licence
-          scope: attached_to this manco
-          required_universe:
-            source_kind: dag_entity
-            source_entity: regulatory_licence_requirement
-        - entity: investigation
-          source_kind: dag_entity
-          source_entity: investigation
-          scope: attached_to this manco
-        - entity: periodic_review
-          source_kind: dag_entity
-          source_entity: periodic_review
-          scope: attached_to this manco
-        - entity: credit_risk_assessment
-          source_kind: dag_entity
-          source_entity: credit_risk_assessment
-          scope: attached_to this manco
-        - entity: operational_risk_assessment
-          source_kind: dag_entity
-          source_entity: operational_risk_assessment
-          scope: attached_to this manco
-      states:
-        - id: UNDER_REVIEW
-          entry: true
-          description: "New manco being onboarded; not yet approved to manage mandates."
-        - id: APPROVED
-          description: "Manco cleared to manage new mandates."
-          green_when: |
-            every regulatory_licence exists
-            AND every regulatory_licence.state = CURRENT
-            AND no investigation exists with state = OPEN
-            AND periodic_review exists
-            AND periodic_review.state = COMPLETE
-            AND credit_risk_assessment exists
-            AND credit_risk_assessment.state in {WITHIN_LIMITS, LOW}
-            AND operational_risk_assessment exists
-            AND operational_risk_assessment.state in {WITHIN_LIMITS, LOW}
-        - id: UNDER_INVESTIGATION
-          description: |
-            Regulatory action or internal investigation; new mandates
-            blocked; existing mandates under heightened scrutiny.
-            Propagates SUSPENDED to all managed CBUs (cascade).
-        - id: SUSPENDED
-          description: "Full operational hold — managed CBUs all SUSPENDED."
-        - id: SUNSET
-          description: "No new mandates; existing ones run to exit. Wind-down in progress."
-        - id: TERMINATED
-          description: "Terminal. All mandates transferred or wound down; manco retired."
-      transitions:
-        - from: UNDER_REVIEW
-          to: APPROVED
-          via: manco.approve
-        - from: UNDER_REVIEW
-          to: TERMINATED
-          via: manco.reject
-        - from: APPROVED
-          to: UNDER_INVESTIGATION
-          via: manco.flag-regulatory
-        - from: UNDER_INVESTIGATION
-          to: APPROVED
-          via: manco.clear-regulatory
-        - from: UNDER_INVESTIGATION
-          to: SUSPENDED
-          via: manco.suspend
-        - from: SUSPENDED
-          to: UNDER_INVESTIGATION
-          via: manco.partial-reinstate   # out of full suspension but still flagged
-        - from: [APPROVED, UNDER_INVESTIGATION, SUSPENDED]
-          to: SUNSET
-          via: manco.begin-sunset
-        - from: SUNSET
-          to: TERMINATED
-          via: manco.terminate
-      terminal_states: [TERMINATED]
+    state_machine: "(reference — relocated 2026-06-22 to kyc_dag.yaml; CBU reads this state read-only. Domain isolation: CBU knows nothing about KYC.)"
 
   - id: investor_role
     stateless: true
-    category_gated:
-      category_column: cbu_category
-      category_source: cbus
-      activated_by: [FUND_MANDATE]
     rationale: |
       Investor role annotations (nominee, fund-of-funds, master-pool,
       end-investor). Categorical; roles added / removed over time but
@@ -1558,19 +1171,13 @@ cross_slot_constraints:
 
 cross_workspace_constraints:
 
-  # Promoted from cross_slot_constraints (was v1_3_candidate: true).
-  - id: cbu_validated_requires_kyc_case_approved
-    description: |
-      CBU cannot transition DISCOVERY.VALIDATION_PENDING → VALIDATED
-      unless the sponsoring KYC case is APPROVED.
-    source_workspace: kyc
-    source_slot: kyc_case
-    source_state: APPROVED
-    source_predicate: "cases.sponsor_cbu_id = this_cbu.cbu_id OR cases.client_group_id = this_cbu.primary_client_group_id"
-    target_workspace: cbu
-    target_slot: cbu
-    target_transition: "VALIDATION_PENDING -> VALIDATED"
-    severity: error
+  # NOTE (2026-06-22): the former `cbu_validated_requires_kyc_case_approved`
+  # gate was REMOVED here. CBU structural validation (VALIDATION_PENDING →
+  # VALIDATED via cbu.confirm) is PURELY STRUCTURAL and must NOT depend on KYC
+  # clearance — CBU is a structural container that knows nothing about KYC. The
+  # KYC "good-to-transact" read stays on the OPERATIONAL/transact gate only
+  # (see cbu_operationally_active reading kyc.kyc_case). Domain isolation:
+  # CBU→KYC = none; KYC→CBU = read-only via ManCo.
 
   # R2 (2026-04-26): cbu.service_consumption.proposed → provisioned
   # requires the underlying service in the catalogue to be active.
@@ -1701,10 +1308,10 @@ derived_cross_workspace_state:
 # =============================================================================
 # 6. PRODUCT-MODULE GATES
 # =============================================================================
-# V1.2-3 product gating. NOTE: v1.3-8 category_gated: replaces most of
-# the conditionally_on entries below (investor, share_class, etc. are
-# now gated at slot-level by cbu_category). This section retained for
-# any product-level conditional slots that remain (none in R-3).
+# V1.2-3 product gating. The fund-only slot-activation rule (category_gated)
+# was REMOVED 2026-06-22 — investor/holding/share_class slots are no longer
+# gated by cbu_category. This section retained for any product-level
+# conditional slots that remain (none in R-3).
 
 product_module_gates:
 
@@ -1726,10 +1333,8 @@ product_module_gates:
     - kyc_case
 
   conditionally_on:
-  # v1.3-8: fund-structure conditionals migrated to slot-level
-  # `category_gated:` fields (see investor, investor_kyc, holding,
-  # share_class, investor_role slot definitions above). Retained here
-  # as informational only.
+  # The fund-only slot-activation rule (category_gated) was REMOVED
+  # 2026-06-22; no slots are conditionally gated by cbu_category.
 
 # =============================================================================
 # 7. OUT OF SCOPE (P16 three-layer + cross-workspace)
@@ -1753,7 +1358,7 @@ out_of_scope:
   - "Client-group discovery + research — governed by onboarding workspace (may be reconciled into CBU in a future pass)"
 
   # Cross-workspace constraints (v1.3 candidates)
-  - "Formal cross_workspace_constraints: KYC APPROVED → CBU VALIDATED gate (see v1.3-CAND-2)"
+  - "REMOVED 2026-06-22: the KYC-APPROVED → CBU-VALIDATED gate. CBU structural validation is independent of KYC by the domain-isolation rule (CBU knows nothing about KYC); the KYC good-to-transact read lives on the operational/transact gate only."
   - "Formal cross_workspace_constraints: CBU VALIDATED → trading_profile activation (see v1.3-CAND-2)"
 
 # =============================================================================

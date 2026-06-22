@@ -214,6 +214,8 @@ domains:
           - "compliance approval"
           - "case approved"
           - "kyc approved"
+          - "record KYC decision"
+          - "record AML decision"
         metadata:
           tier: intent
           source_of_truth: workflow

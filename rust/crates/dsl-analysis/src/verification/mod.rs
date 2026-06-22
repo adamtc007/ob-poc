@@ -11,7 +11,7 @@
 //! - `attribute_observations` - Evidence storage with confidence scores
 //! - `client_allegations` - Client claims requiring verification
 //! - `observation_discrepancies` - Conflict tracking and resolution
-//! - `cbu_relationship_verification` - Ownership convergence model
+//! - `ubo_relationship_verification` - Ownership convergence model
 //!
 //! ## Key Components
 //!

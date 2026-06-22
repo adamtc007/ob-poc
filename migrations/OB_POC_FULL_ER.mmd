@@ -207,9 +207,9 @@ erDiagram
   ob_poc__cbus ||--o{ ob_poc__cbu_change_log : FK
   ob_poc__cbus ||--o{ ob_poc__cbu_control_anchors : FK
   ob_poc__entities ||--o{ ob_poc__cbu_control_anchors : FK
-  ob_poc__cbus ||--o{ ob_poc__cbu_relationship_verification : FK
-  ob_poc__document_catalog ||--o{ ob_poc__cbu_relationship_verification : FK
-  ob_poc__entity_relationships ||--o{ ob_poc__cbu_relationship_verification : FK
+  ob_poc__cbus ||--o{ ob_poc__ubo_relationship_verification : FK
+  ob_poc__document_catalog ||--o{ ob_poc__ubo_relationship_verification : FK
+  ob_poc__entity_relationships ||--o{ ob_poc__ubo_relationship_verification : FK
   ob_poc__cbus ||--o{ ob_poc__cbu_creation_log : FK
   ob_poc__cbus ||--o{ ob_poc__cbu_entity_roles : FK
   ob_poc__entities ||--o{ ob_poc__cbu_entity_roles : FK

@@ -37,7 +37,7 @@ use super::domain_context::DomainContext;
 #[cfg(feature = "database")]
 use super::generic_executor::{GenericCrudExecutor, GenericExecutionResult};
 #[cfg(feature = "database")]
-use super::runtime_registry::{runtime_registry, RuntimeBehavior};
+use super::runtime_registry::{runtime_registry, RuntimeBehavior, RuntimeVerb};
 #[cfg(feature = "database")]
 use super::submission::{DslSubmission, SubmissionError, SubmissionLimits};
 #[cfg(feature = "database")]
@@ -1923,6 +1923,22 @@ impl DslExecutor {
             .get(&vc.domain, &vc.verb)
             .ok_or_else(|| anyhow!("Unknown verb: {}.{}", vc.domain, vc.verb))?;
 
+        // ── Phase 3 C1: execution-time `requires_states` precondition ──────
+        // The "validate" half of select-then-validate. Classification stays
+        // membership-scoped (discovery); executability is checked here against
+        // the selected verb's own entity. FAIL-OPEN — see
+        // `enforce_requires_states_precondition`. Only computes resolved args
+        // when there is a non-empty `requires_states` to check.
+        if runtime_verb
+            .lifecycle
+            .as_ref()
+            .is_some_and(|lc| !lc.requires_states.is_empty())
+        {
+            if let Ok(json_args) = Self::verbcall_args_to_json(&vc.arguments, ctx) {
+                enforce_requires_states_precondition(runtime_verb, &json_args, scope).await?;
+            }
+        }
+
         // Durable verbs: normally routed through WorkflowDispatcher. The
         // BPMN worker path sets `ctx.allow_durable_direct` so internal
         // service tasks can invoke durable verb implementations directly —
@@ -1994,6 +2010,110 @@ impl DslExecutor {
         tracing::debug!("execute_verb_in_scope: EXIT success");
         Ok(result.to_legacy())
     }
+}
+
+/// Phase 3 C1 — execution-time `requires_states` precondition (FAIL-OPEN).
+///
+/// The "validate" half of select-then-validate, relocated from the
+/// discovery-time Step-5 prune (`agent::verb_surface` `PruneLayer::LifecycleState`).
+/// Classification stays membership-scoped; executability is checked here, against
+/// the *selected* verb's *own* entity, at the single dispatch chokepoint every
+/// execution door funnels through (`execute_verb_in_scope`).
+///
+/// **FAIL-OPEN by construction.** Enforcement is opt-in via an authored
+/// `lifecycle.entity_arg`. Every uncertainty PASSES: no lifecycle, empty
+/// `requires_states`, unbound entity (`entity_arg` absent), an `entity_arg` that
+/// does not resolve to a uuid, no slot→table mapping for the verb's domain, or a
+/// NULL/absent current state. This mirrors the live-DB reality (the CBU
+/// operational lifecycle column is unpopulated; see
+/// `docs/todo/phase3-discoverable-executable-split-plan.md` F-findings) and
+/// guarantees the relocation never bricks a verb the discovery prune only hid.
+///
+/// It hard-blocks **only** when the entity's CURRENT, non-NULL state is genuinely
+/// absent from `requires_states` — a true precondition violation — returning an
+/// error that names the required states and the actual state.
+///
+/// NOTE (deferred guard): there is no out-of-domain check yet — if a verb were
+/// authored with both `entity_arg` and `requires_states` values that the mapped
+/// state column cannot express, this would wrongly block it. No such verb exists
+/// today (the `entity_arg`-bearing CBU verbs all require `cbus.status` values).
+/// Authoring `entity_arg` onto an out-of-domain verb (e.g. an operational-state
+/// verb) must add the constraint-domain guard first — tracked in the Phase-3 plan.
+#[cfg(feature = "database")]
+async fn enforce_requires_states_precondition(
+    runtime_verb: &RuntimeVerb,
+    json_args: &HashMap<String, JsonValue>,
+    scope: &mut dyn TransactionScope,
+) -> Result<()> {
+    let Some(lifecycle) = runtime_verb.lifecycle.as_ref() else {
+        return Ok(());
+    };
+    if lifecycle.requires_states.is_empty() {
+        return Ok(());
+    }
+    // Opt-in: without an authored entity binding we cannot identify the entity.
+    let Some(entity_arg) = lifecycle.entity_arg.as_deref() else {
+        tracing::debug!(
+            verb = %runtime_verb.full_name,
+            "requires_states present but entity_arg unbound — fail-open"
+        );
+        return Ok(());
+    };
+    // Resolve the entity id from the (kebab-keyed) resolved args.
+    let Some(entity_id) = json_args
+        .get(entity_arg)
+        .and_then(JsonValue::as_str)
+        .and_then(|s| Uuid::parse_str(s).ok())
+    else {
+        tracing::debug!(
+            verb = %runtime_verb.full_name,
+            entity_arg,
+            "entity_arg did not resolve to a uuid — fail-open"
+        );
+        return Ok(());
+    };
+    // Convention: workspace == slot == verb domain (covers `cbu.cbu`). A verb
+    // whose state lives under a non-self-named slot has no mapping here and
+    // fails open — richer slot resolution is deferred (Phase-3 plan).
+    let Ok((table, column, pk)) =
+        dsl_runtime::resolve_slot_table(&runtime_verb.domain, &runtime_verb.domain)
+    else {
+        tracing::debug!(
+            verb = %runtime_verb.full_name,
+            domain = %runtime_verb.domain,
+            "no slot-state mapping — fail-open"
+        );
+        return Ok(());
+    };
+    // Read CURRENT state INSIDE the open transaction (sees prior in-txn steps).
+    let sql = format!(r#"SELECT {column}::text AS state FROM "ob-poc".{table} WHERE {pk} = $1"#);
+    let current_state = match sqlx::query_scalar::<sqlx::Postgres, Option<String>>(&sql)
+        .bind(entity_id)
+        .fetch_optional(scope.executor())
+        .await
+    {
+        Ok(Some(Some(state))) => state,
+        // DB error, no row, or NULL state → fail-open (never brick on absent state).
+        _ => {
+            tracing::debug!(
+                verb = %runtime_verb.full_name,
+                %entity_id,
+                "current state absent/NULL/unreadable — fail-open"
+            );
+            return Ok(());
+        }
+    };
+    if lifecycle.requires_states.iter().any(|s| s == &current_state) {
+        return Ok(());
+    }
+    bail!(
+        "precondition not met: {} requires {} {} to be in one of {:?}, but it is '{}'",
+        runtime_verb.full_name,
+        runtime_verb.domain,
+        entity_id,
+        lifecycle.requires_states,
+        current_state
+    );
 }
 
 // ============================================================================
@@ -2956,6 +3076,205 @@ mod tests {
             registry.len() > 100,
             "SemOsVerbOpRegistry should have >100 ops, got {}",
             registry.len()
+        );
+    }
+
+    /// Phase 3 C1 — execution-time `requires_states` precondition, exercised at
+    /// the dispatch chokepoint helper directly (no full DslExecutor needed).
+    ///
+    /// Read-only: picks existing committed CBU rows by status and runs the
+    /// precondition against the open (rolled-back) transaction. Uses the REAL
+    /// registry verbs so the lifecycle metadata under test is the authored one.
+    ///
+    /// Proves select-then-validate's "validate" half end-to-end (real registry
+    /// verbs, against a DISCOVERED CBU):
+    /// - BLOCK: `cbu.confirm` (requires VALIDATION_PENDING) → Err naming VALIDATION_PENDING.
+    /// - PASS:  `cbu.submit-for-validation` (requires DISCOVERED|VALIDATION_FAILED) → Ok.
+    /// - BLOCK: `cbu.add-product` (ARMED: `entity_arg=cbu-id`, requires VALIDATED) → Err
+    ///   naming VALIDATED — the confirm-first gate at the junction (commit 95d2a238).
+    /// - FAIL-OPEN: any gated verb against a non-existent cbu (no row) → Ok regardless;
+    ///   the absent-state branch F-D will tighten once operational state is populated.
+    ///
+    /// Run: `DATABASE_URL=… cargo test --features database -p ob-poc \
+    ///   --lib -- dsl_v2::executor::tests::c1_requires_states_precondition --ignored --nocapture`
+    #[cfg(feature = "database")]
+    #[tokio::test]
+    #[ignore = "requires DATABASE_URL (dev DB)"]
+    async fn c1_requires_states_precondition() {
+        let url = std::env::var("DATABASE_URL").expect("DATABASE_URL must be set");
+        let pool = sqlx::PgPool::connect(&url).await.expect("connect");
+
+        // Ensure the cbu.cbu slot mapping is present (idempotent across the run).
+        if dsl_runtime::resolve_slot_table("cbu", "cbu").is_err() {
+            let map: std::collections::HashMap<String, (String, String, String)> = [(
+                "cbu.cbu".to_string(),
+                (
+                    "cbus".to_string(),
+                    "status".to_string(),
+                    "cbu_id".to_string(),
+                ),
+            )]
+            .into_iter()
+            .collect();
+            dsl_runtime::set_slot_state_table(map);
+        }
+
+        let mut scope = crate::sequencer_tx::PgTransactionScope::begin(&pool)
+            .await
+            .expect("begin scope");
+
+        // An existing committed DISCOVERED row (read-only; scope rolls back on drop).
+        let discovered: Uuid =
+            sqlx::query_scalar(r#"SELECT cbu_id FROM "ob-poc".cbus WHERE status = 'DISCOVERED' LIMIT 1"#)
+                .fetch_one(scope.executor())
+                .await
+                .expect("a DISCOVERED cbu must exist");
+
+        let reg = runtime_registry();
+        let confirm = reg.get("cbu", "confirm").expect("cbu.confirm registered");
+        let submit = reg
+            .get("cbu", "submit-for-validation")
+            .expect("cbu.submit-for-validation registered");
+        let add_product = reg
+            .get("cbu", "add-product")
+            .expect("cbu.add-product registered");
+
+        let args = |id: Uuid| -> HashMap<String, JsonValue> {
+            [("cbu-id".to_string(), JsonValue::String(id.to_string()))]
+                .into_iter()
+                .collect()
+        };
+
+        // BLOCK: the dedicated confirm verb (requires VALIDATION_PENDING) on a
+        // DISCOVERED cbu — the structural-validation gate, C1-enforced with a
+        // named error (replaces the deleted cbu.decide as the block example).
+        let confirm_blocked =
+            enforce_requires_states_precondition(confirm, &args(discovered), &mut scope).await;
+        let cmsg = confirm_blocked
+            .expect_err("confirm on DISCOVERED must be blocked")
+            .to_string();
+        assert!(
+            cmsg.contains("VALIDATION_PENDING") && cmsg.contains("cbu.confirm"),
+            "confirm block must name the required state and verb: {cmsg}"
+        );
+
+        // PASS: submit-for-validation (requires DISCOVERED|VALIDATION_FAILED) on a DISCOVERED cbu.
+        enforce_requires_states_precondition(submit, &args(discovered), &mut scope)
+            .await
+            .expect("submit-for-validation on DISCOVERED must pass");
+
+        // BLOCK: add-product is now ARMED (commit 95d2a238 authored
+        // entity_arg=cbu-id alongside requires_states:[VALIDATED]) — the
+        // confirm-first gate. On a DISCOVERED cbu it must hard-block at the
+        // junction with a named error.
+        assert!(
+            add_product.lifecycle.as_ref().is_some_and(|lc| {
+                lc.entity_arg.as_deref() == Some("cbu-id")
+                    && lc.requires_states.iter().any(|s| s == "VALIDATED")
+            }),
+            "fixture assumption: cbu.add-product is armed (entity_arg=cbu-id, requires VALIDATED)"
+        );
+        let ap_blocked =
+            enforce_requires_states_precondition(add_product, &args(discovered), &mut scope).await;
+        let apmsg = ap_blocked
+            .expect_err("add-product on DISCOVERED must be blocked (confirm-first)")
+            .to_string();
+        assert!(
+            apmsg.contains("VALIDATED") && apmsg.contains("cbu.add-product"),
+            "add-product block must name the required state and verb: {apmsg}"
+        );
+
+        // FAIL-OPEN (absent-state branch): a gated verb against a non-existent
+        // cbu reads no row → PASS regardless. This is the branch F-D will tighten
+        // once operational state is populated; today it must never brick.
+        let ghost = Uuid::new_v4();
+        enforce_requires_states_precondition(confirm, &args(ghost), &mut scope)
+            .await
+            .expect("absent row ⇒ C1 fail-open (never brick on missing state)");
+
+        // scope drops here → rollback; no rows mutated anyway.
+    }
+
+    /// Phase 3 C5 — the end-to-end Definition-of-Done: a lifecycle-gated verb is
+    /// DISCOVERABLE (C2: discovery does not prune on lifecycle) AND execution
+    /// returns a NAMED precondition error (C1). Select-then-validate, proven on
+    /// one verb in one test.
+    ///
+    /// `cbu.confirm` requires VALIDATION_PENDING; against a DISCOVERED CBU it is
+    /// classifiable (in the surface, tagged ineligible) yet refused at execution
+    /// with an error naming the required state.
+    #[cfg(feature = "database")]
+    #[tokio::test]
+    #[ignore = "requires DATABASE_URL (dev DB)"]
+    async fn c5_discoverable_but_not_executable_dod() {
+        use crate::agent::sem_os_context_envelope::SemOsContextEnvelope;
+        use crate::agent::verb_surface::{
+            compute_session_verb_surface, VerbSurfaceContext, VerbSurfaceFailPolicy,
+        };
+        use sem_os_types::agent_mode::AgentMode;
+
+        // ── Half 1 — DISCOVERABLE (C2). No DB: reads registry + macro files. ──
+        let envelope = SemOsContextEnvelope::unavailable();
+        let ctx = VerbSurfaceContext {
+            agent_mode: AgentMode::Governed,
+            stage_focus: Some("semos-onboarding"),
+            envelope: &envelope,
+            fail_policy: VerbSurfaceFailPolicy::FailOpen,
+            entity_state: Some("DISCOVERED"),
+            has_group_scope: true,
+            is_infrastructure_scope: false,
+            composite_state: None,
+        };
+        let surface = compute_session_verb_surface(&ctx);
+        assert!(
+            surface.contains("cbu.confirm"),
+            "DoD: cbu.confirm must be DISCOVERABLE at DISCOVERED (no lifecycle prune)"
+        );
+        assert!(
+            !surface.is_lifecycle_eligible("cbu.confirm"),
+            "DoD: cbu.confirm must be tagged lifecycle-ineligible at DISCOVERED"
+        );
+
+        // ── Half 2 — NOT EXECUTABLE, with a named error (C1). Needs DB. ──
+        let url = std::env::var("DATABASE_URL").expect("DATABASE_URL must be set");
+        let pool = sqlx::PgPool::connect(&url).await.expect("connect");
+        if dsl_runtime::resolve_slot_table("cbu", "cbu").is_err() {
+            let map: std::collections::HashMap<String, (String, String, String)> = [(
+                "cbu.cbu".to_string(),
+                (
+                    "cbus".to_string(),
+                    "status".to_string(),
+                    "cbu_id".to_string(),
+                ),
+            )]
+            .into_iter()
+            .collect();
+            dsl_runtime::set_slot_state_table(map);
+        }
+        let mut scope = crate::sequencer_tx::PgTransactionScope::begin(&pool)
+            .await
+            .expect("begin scope");
+        let discovered: Uuid =
+            sqlx::query_scalar(r#"SELECT cbu_id FROM "ob-poc".cbus WHERE status = 'DISCOVERED' LIMIT 1"#)
+                .fetch_one(scope.executor())
+                .await
+                .expect("a DISCOVERED cbu must exist");
+        let confirm = runtime_registry()
+            .get("cbu", "confirm")
+            .expect("cbu.confirm registered");
+        let args: HashMap<String, JsonValue> = [(
+            "cbu-id".to_string(),
+            JsonValue::String(discovered.to_string()),
+        )]
+        .into_iter()
+        .collect();
+        let err = enforce_requires_states_precondition(confirm, &args, &mut scope)
+            .await
+            .expect_err("DoD: execution must return a precondition error");
+        let msg = err.to_string();
+        assert!(
+            msg.contains("VALIDATION_PENDING") && msg.contains("cbu.confirm"),
+            "DoD: precondition error must name the required state and verb: {msg}"
         );
     }
 }

@@ -816,7 +816,7 @@ impl GraphQueryEngine {
                 e_to.name as to_name,
                 crv.status as verification_status
             FROM "ob-poc".entity_relationships er
-            JOIN "ob-poc".cbu_relationship_verification crv ON er.relationship_id = crv.relationship_id
+            JOIN "ob-poc".ubo_relationship_verification crv ON er.relationship_id = crv.relationship_id
             JOIN "ob-poc".entities e_from ON er.from_entity_id = e_from.entity_id
             JOIN "ob-poc".entities e_to ON er.to_entity_id = e_to.entity_id
             WHERE crv.cbu_id = $1

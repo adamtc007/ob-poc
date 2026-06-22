@@ -14,15 +14,15 @@
 
 use anyhow::Result;
 use async_trait::async_trait;
-use sqlx::PgPool;
 
 use crate::execution::VerbExecutionOutcome;
+use crate::tx::TransactionScope;
 
 #[async_trait]
 pub trait ServicePipelineService: Send + Sync {
     async fn dispatch_service_pipeline_verb(
         &self,
-        pool: &PgPool,
+        scope: &mut dyn TransactionScope,
         domain: &str,
         verb_name: &str,
         args: &serde_json::Value,

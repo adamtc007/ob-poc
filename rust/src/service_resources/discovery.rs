@@ -6,7 +6,7 @@
 
 use anyhow::{Context, Result};
 use serde_json::{json, Value as JsonValue};
-use sqlx::{PgPool, Postgres, Transaction};
+use sqlx::{Connection, PgConnection, PgPool, Postgres, Transaction};
 use std::collections::{HashMap, HashSet};
 use std::sync::{Arc, LazyLock};
 use tracing::{debug, info, warn};
@@ -31,26 +31,26 @@ use dsl_analysis::entity_kind;
 
 /// Engine for discovering required SRDEFs from service intents
 pub struct ResourceDiscoveryEngine<'a> {
-    pool: &'a PgPool,
-    service: ServiceResourcePipelineService,
+    // The add-product path threads a `&mut PgConnection` per method so every
+    // write joins the ambient transaction; the engine only needs the registry.
     registry: &'a SrdefRegistry,
 }
 
 impl<'a> ResourceDiscoveryEngine<'a> {
-    pub fn new(pool: &'a PgPool, registry: &'a SrdefRegistry) -> Self {
-        Self {
-            pool,
-            service: ServiceResourcePipelineService::new(pool.clone()),
-            registry,
-        }
+    pub fn new(registry: &'a SrdefRegistry) -> Self {
+        Self { registry }
     }
 
     /// Discover required SRDEFs for a CBU based on their service intents
-    pub async fn discover_for_cbu(&self, cbu_id: Uuid) -> Result<DiscoveryResult> {
+    pub async fn discover_for_cbu(
+        &self,
+        conn: &mut PgConnection,
+        cbu_id: Uuid,
+    ) -> Result<DiscoveryResult> {
         info!("Starting resource discovery for CBU {}", cbu_id);
 
         // Get active service intents
-        let intents = self.service.get_service_intents(cbu_id).await?;
+        let intents = ServiceResourcePipelineService::get_service_intents_in(conn, cbu_id).await?;
         if intents.is_empty() {
             info!("No active service intents for CBU {}", cbu_id);
             return Ok(DiscoveryResult::default());
@@ -63,7 +63,7 @@ impl<'a> ResourceDiscoveryEngine<'a> {
 
         for intent in &intents {
             // Get service code
-            let service_code = self.get_service_code(intent.service_id).await?;
+            let service_code = self.get_service_code(conn, intent.service_id).await?;
 
             // Find SRDEFs triggered by this service
             let triggered_srdefs = self.registry.get_by_service(&service_code);
@@ -118,10 +118,11 @@ impl<'a> ResourceDiscoveryEngine<'a> {
         // Persist discoveries
         let mut result = DiscoveryResult::default();
         for info in discovered.values() {
+            let resource_type_id = self.get_resource_type_id(conn, &info.srdef_id).await?;
             let discovery = NewSrdefDiscovery {
                 cbu_id,
                 srdef_id: info.srdef_id.clone(),
-                resource_type_id: self.get_resource_type_id(&info.srdef_id).await?,
+                resource_type_id,
                 triggered_by_intents: info.triggered_by.clone(),
                 discovery_rule: info.discovery_rule.clone(),
                 discovery_reason: json!({
@@ -131,7 +132,7 @@ impl<'a> ResourceDiscoveryEngine<'a> {
                 parameters: Some(info.parameters.clone()),
             };
 
-            self.service.record_discovery(&discovery).await?;
+            ServiceResourcePipelineService::record_discovery_in(conn, &discovery).await?;
             result.discovered.push(info.clone());
         }
 
@@ -145,24 +146,32 @@ impl<'a> ResourceDiscoveryEngine<'a> {
     }
 
     /// Get service code by ID
-    async fn get_service_code(&self, service_id: Uuid) -> Result<String> {
+    async fn get_service_code(
+        &self,
+        conn: &mut PgConnection,
+        service_id: Uuid,
+    ) -> Result<String> {
         let code: Option<(String,)> = sqlx::query_as(
             r#"SELECT COALESCE(service_code, name) FROM "ob-poc".services WHERE service_id = $1"#,
         )
         .bind(service_id)
-        .fetch_optional(self.pool)
+        .fetch_optional(&mut *conn)
         .await?;
 
         Ok(code.map(|(c,)| c).unwrap_or_else(|| service_id.to_string()))
     }
 
     /// Get resource type ID by SRDEF ID
-    async fn get_resource_type_id(&self, srdef_id: &str) -> Result<Option<Uuid>> {
+    async fn get_resource_type_id(
+        &self,
+        conn: &mut PgConnection,
+        srdef_id: &str,
+    ) -> Result<Option<Uuid>> {
         let id: Option<(Uuid,)> = sqlx::query_as(
             r#"SELECT resource_id FROM "ob-poc".service_resource_types WHERE srdef_id = $1"#,
         )
         .bind(srdef_id)
-        .fetch_optional(self.pool)
+        .fetch_optional(&mut *conn)
         .await?;
 
         Ok(id.map(|(id,)| id))
@@ -302,25 +311,25 @@ pub struct DiscoveryResult {
 // =============================================================================
 
 /// Engine for rolling up attribute requirements across discovered SRDEFs
-pub struct AttributeRollupEngine<'a> {
-    pool: &'a PgPool,
-    service: ServiceResourcePipelineService,
-}
+#[derive(Default)]
+pub struct AttributeRollupEngine;
 
-impl<'a> AttributeRollupEngine<'a> {
-    pub fn new(pool: &'a PgPool) -> Self {
-        Self {
-            pool,
-            service: ServiceResourcePipelineService::new(pool.clone()),
-        }
+impl AttributeRollupEngine {
+    pub fn new() -> Self {
+        Self
     }
 
     /// Build unified attribute requirements for a CBU
-    pub async fn rollup_for_cbu(&self, cbu_id: Uuid) -> Result<RollupResult> {
+    pub async fn rollup_for_cbu(
+        &self,
+        conn: &mut PgConnection,
+        cbu_id: Uuid,
+    ) -> Result<RollupResult> {
         info!("Starting attribute rollup for CBU {}", cbu_id);
 
         // Get active discoveries
-        let discoveries = self.service.get_active_discoveries(cbu_id).await?;
+        let discoveries =
+            ServiceResourcePipelineService::get_active_discoveries_in(conn, cbu_id).await?;
         if discoveries.is_empty() {
             info!("No active discoveries for CBU {}", cbu_id);
             return Ok(RollupResult::default());
@@ -337,7 +346,7 @@ impl<'a> AttributeRollupEngine<'a> {
         for discovery in &discoveries {
             // Get attribute requirements for this SRDEF
             let requirements = self
-                .get_srdef_attribute_requirements(&discovery.srdef_id)
+                .get_srdef_attribute_requirements(conn, &discovery.srdef_id)
                 .await?;
 
             for req in requirements {
@@ -377,24 +386,24 @@ impl<'a> AttributeRollupEngine<'a> {
         }
 
         // Clear existing and write new
-        self.service.clear_unified_attr_requirements(cbu_id).await?;
+        ServiceResourcePipelineService::clear_unified_attr_requirements_in(conn, cbu_id).await?;
 
         let mut result = RollupResult::default();
         for info in attr_map.values() {
             // Determine preferred source
             let preferred = info.source_policy.first().cloned();
 
-            self.service
-                .upsert_unified_attr_requirement(
-                    cbu_id,
-                    info.attr_id,
-                    &info.requirement_strength,
-                    &info.merged_constraints,
-                    preferred.as_deref(),
-                    &info.required_by_srdefs,
-                    info.conflict.as_ref(),
-                )
-                .await?;
+            ServiceResourcePipelineService::upsert_unified_attr_requirement_in(
+                conn,
+                cbu_id,
+                info.attr_id,
+                &info.requirement_strength,
+                &info.merged_constraints,
+                preferred.as_deref(),
+                &info.required_by_srdefs,
+                info.conflict.as_ref(),
+            )
+            .await?;
 
             if info.requirement_strength == "required" {
                 result.required_count += 1;
@@ -421,6 +430,7 @@ impl<'a> AttributeRollupEngine<'a> {
     /// Get attribute requirements for an SRDEF
     async fn get_srdef_attribute_requirements(
         &self,
+        conn: &mut PgConnection,
         srdef_id: &str,
     ) -> Result<Vec<SrdefAttrRequirement>> {
         let rows = sqlx::query_as::<_, SrdefAttrRequirementRow>(
@@ -438,7 +448,7 @@ impl<'a> AttributeRollupEngine<'a> {
             "#,
         )
         .bind(srdef_id)
-        .fetch_all(self.pool)
+        .fetch_all(&mut *conn)
         .await
         .context("Failed to get SRDEF attribute requirements")?;
 
@@ -501,8 +511,11 @@ pub struct RollupResult {
 
 /// Engine for populating attribute values from various sources
 pub struct PopulationEngine<'a> {
+    // `pool` drives the static-registry reads (bridge, derivation specs) and
+    // the standalone recompute path; `identity` resolves SemOS FQNs. The
+    // populate path threads a `&mut PgConnection` so its writes join the
+    // ambient txn.
     pool: &'a PgPool,
-    service: ServiceResourcePipelineService,
     identity: AttributeIdentityService,
 }
 
@@ -537,22 +550,29 @@ impl<'a> PopulationEngine<'a> {
     pub fn new(pool: &'a PgPool) -> Self {
         Self {
             pool,
-            service: ServiceResourcePipelineService::new(pool.clone()),
             identity: AttributeIdentityService::new(pool.clone()),
         }
     }
 
     /// Attempt to populate missing attribute values for a CBU
-    pub async fn populate_for_cbu(&self, cbu_id: Uuid) -> Result<PopulationResult> {
+    pub async fn populate_for_cbu(
+        &self,
+        conn: &mut PgConnection,
+        cbu_id: Uuid,
+    ) -> Result<PopulationResult> {
         info!("Starting attribute population for CBU {}", cbu_id);
+        // Static SemOS registry bridge read — stays pool-based (not in-txn data).
         ensure_semos_registry_bridge(self.pool).await?;
 
         // Get unified requirements
-        let requirements = self.service.get_unified_attr_requirements(cbu_id).await?;
+        let requirements =
+            ServiceResourcePipelineService::get_unified_attr_requirements_in(conn, cbu_id).await?;
+        // Static sem_reg snapshot reads — stays pool-based.
         let derivation_specs = self.load_derivation_specs_by_attr().await?;
 
         // Get existing values
-        let existing_values = self.service.get_cbu_attr_values(cbu_id).await?;
+        let existing_values =
+            ServiceResourcePipelineService::get_cbu_attr_values_in(conn, cbu_id).await?;
         let existing_ids: HashSet<Uuid> = existing_values.iter().map(|v| v.attr_id).collect();
 
         let mut result = PopulationResult::default();
@@ -577,7 +597,7 @@ impl<'a> PopulationEngine<'a> {
 
             for source in &source_policy {
                 match self
-                    .try_populate(cbu_id, req.attr_id, source, &derivation_specs)
+                    .try_populate(conn, cbu_id, req.attr_id, source, &derivation_specs)
                     .await?
                 {
                     Some(value) => {
@@ -597,7 +617,8 @@ impl<'a> PopulationEngine<'a> {
                                     output: None,
                                 }]),
                             };
-                            self.service.set_cbu_attr_value(&input).await?;
+                            ServiceResourcePipelineService::set_cbu_attr_value_in(conn, &input)
+                                .await?;
                         }
                         result.populated += 1;
                         break;
@@ -642,8 +663,10 @@ impl<'a> PopulationEngine<'a> {
             return Ok(RecomputeOutcome::StillStale);
         }
 
-        self.try_derive_for_entity(&canonical_entity_type, entity_id, attr_id, specs)
+        let mut c = self.pool.acquire().await?;
+        self.try_derive_for_entity(&mut c, &canonical_entity_type, entity_id, attr_id, specs)
             .await?;
+        drop(c);
         match get_current(self.pool, &canonical_entity_type, entity_id, attr_id).await? {
             Some(_) => Ok(RecomputeOutcome::Recomputed),
             None => Ok(RecomputeOutcome::StillStale),
@@ -702,6 +725,7 @@ impl<'a> PopulationEngine<'a> {
     /// Try to populate a single attribute from a source
     async fn try_populate(
         &self,
+        conn: &mut PgConnection,
         cbu_id: Uuid,
         attr_id: Uuid,
         source: &str,
@@ -713,11 +737,11 @@ impl<'a> PopulationEngine<'a> {
                     .get(&attr_id)
                     .map(Vec::as_slice)
                     .unwrap_or(&[]);
-                self.try_derive_for_entity("cbu", cbu_id, attr_id, specs)
+                self.try_derive_for_entity(conn, "cbu", cbu_id, attr_id, specs)
                     .await
             }
-            "entity" => self.try_from_entity(cbu_id, attr_id).await,
-            "cbu" => self.try_from_cbu(cbu_id, attr_id).await,
+            "entity" => self.try_from_entity(conn, cbu_id, attr_id).await,
+            "cbu" => self.try_from_cbu(conn, cbu_id, attr_id).await,
             "document" => Ok(None), // TODO: Document extraction
             "external" => Ok(None), // TODO: External API
             _ => Ok(None),
@@ -727,6 +751,7 @@ impl<'a> PopulationEngine<'a> {
     /// Try to derive a value from other data
     async fn try_derive_for_entity(
         &self,
+        conn: &mut PgConnection,
         entity_type: &str,
         entity_id: Uuid,
         attr_id: Uuid,
@@ -737,7 +762,7 @@ impl<'a> PopulationEngine<'a> {
         }
 
         for spec in specs {
-            let mut tx = self.pool.begin().await?;
+            let mut tx = conn.begin().await?;
             let entity_type = self.validate_entity_type(&mut tx, entity_type).await?;
             let (attr_code, value_type) = self
                 .load_derived_attr_metadata(&mut tx, attr_id)
@@ -974,12 +999,17 @@ impl<'a> PopulationEngine<'a> {
     }
 
     /// Try to get value from entity data
-    async fn try_from_entity(&self, cbu_id: Uuid, attr_id: Uuid) -> Result<Option<JsonValue>> {
+    async fn try_from_entity(
+        &self,
+        conn: &mut PgConnection,
+        cbu_id: Uuid,
+        attr_id: Uuid,
+    ) -> Result<Option<JsonValue>> {
         // Get attribute code
         let attr_code: Option<(String,)> =
             sqlx::query_as(r#"SELECT id FROM "ob-poc".attribute_registry WHERE uuid = $1"#)
                 .bind(attr_id)
-                .fetch_optional(self.pool)
+                .fetch_optional(&mut *conn)
                 .await?;
 
         let Some((attr_code,)) = attr_code else {
@@ -1000,19 +1030,24 @@ impl<'a> PopulationEngine<'a> {
         )
         .bind(cbu_id)
         .bind(&attr_code)
-        .fetch_optional(self.pool)
+        .fetch_optional(&mut *conn)
         .await?;
 
         Ok(value.map(|(v,)| v))
     }
 
     /// Try to get value from CBU data
-    async fn try_from_cbu(&self, cbu_id: Uuid, attr_id: Uuid) -> Result<Option<JsonValue>> {
+    async fn try_from_cbu(
+        &self,
+        conn: &mut PgConnection,
+        cbu_id: Uuid,
+        attr_id: Uuid,
+    ) -> Result<Option<JsonValue>> {
         // Get attribute code
         let attr_code: Option<(String,)> =
             sqlx::query_as(r#"SELECT id FROM "ob-poc".attribute_registry WHERE uuid = $1"#)
                 .bind(attr_id)
-                .fetch_optional(self.pool)
+                .fetch_optional(&mut *conn)
                 .await?;
 
         let Some((attr_code,)) = attr_code else {
@@ -1025,7 +1060,7 @@ impl<'a> PopulationEngine<'a> {
                 let value: Option<(String,)> =
                     sqlx::query_as(r#"SELECT jurisdiction FROM "ob-poc".cbus WHERE cbu_id = $1"#)
                         .bind(cbu_id)
-                        .fetch_optional(self.pool)
+                        .fetch_optional(&mut *conn)
                         .await?;
 
                 Ok(value.map(|(v,)| json!(v)))
@@ -1360,23 +1395,46 @@ pub struct PopulationResult {
 // CONVENIENCE FUNCTIONS
 // =============================================================================
 
-/// Run the full discovery + rollup + populate pipeline for a CBU
+/// Run the full discovery + rollup + populate pipeline for a CBU.
+///
+/// Pool-based convenience wrapper: acquires a single connection and runs the
+/// pipeline on it. All writes land on that connection (not the ambient txn —
+/// there is none on this path). Used by the standalone `discovery.run` MCP/batch
+/// callers that have no `TransactionScope`.
 pub async fn run_discovery_pipeline(
     pool: &PgPool,
     registry: &SrdefRegistry,
     cbu_id: Uuid,
 ) -> Result<PipelineResult> {
+    let mut conn = pool.acquire().await?;
+    run_discovery_pipeline_in(&mut conn, pool, registry, cbu_id).await
+}
+
+/// Run the full discovery + rollup + populate pipeline on the supplied
+/// connection so all writes participate in the caller's ambient transaction.
+///
+/// `conn` carries the txn-scoped writes (discovery, rollup, populate). `pool`
+/// is retained only for the engines' static-registry reads
+/// (`ensure_semos_registry_bridge`, `load_derivation_specs_by_attr`,
+/// `AttributeIdentityService`) which read immutable sem_reg snapshots, not
+/// in-flight pipeline data.
+pub async fn run_discovery_pipeline_in(
+    conn: &mut PgConnection,
+    pool: &PgPool,
+    registry: &SrdefRegistry,
+    cbu_id: Uuid,
+) -> Result<PipelineResult> {
     // Discovery
-    let discovery_engine = ResourceDiscoveryEngine::new(pool, registry);
-    let discovery = discovery_engine.discover_for_cbu(cbu_id).await?;
+    let discovery_engine = ResourceDiscoveryEngine::new(registry);
+    let discovery = discovery_engine.discover_for_cbu(conn, cbu_id).await?;
 
     // Rollup
-    let rollup_engine = AttributeRollupEngine::new(pool);
-    let rollup = rollup_engine.rollup_for_cbu(cbu_id).await?;
+    let rollup_engine = AttributeRollupEngine::new();
+    let rollup = rollup_engine.rollup_for_cbu(conn, cbu_id).await?;
 
     // Population
     let population_engine = PopulationEngine::new(pool);
-    let population = population_engine.populate_for_cbu(cbu_id).await?;
+    let population = population_engine.populate_for_cbu(conn, cbu_id).await?;
 
     Ok(PipelineResult {
         cbu_id,

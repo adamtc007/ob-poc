@@ -12488,10 +12488,10 @@ COMMENT ON TABLE "ob-poc".cbu_control_anchors IS 'Portal entities linking CBU to
 
 
 --
--- Name: cbu_relationship_verification; Type: TABLE; Schema: ob-poc; Owner: -
+-- Name: ubo_relationship_verification; Type: TABLE; Schema: ob-poc; Owner: -
 --
 
-CREATE TABLE "ob-poc".cbu_relationship_verification (
+CREATE TABLE "ob-poc".ubo_relationship_verification (
     verification_id uuid DEFAULT uuidv7() NOT NULL,
     cbu_id uuid NOT NULL,
     relationship_id uuid NOT NULL,
@@ -12508,7 +12508,7 @@ CREATE TABLE "ob-poc".cbu_relationship_verification (
     resolution_notes text,
     created_at timestamp with time zone DEFAULT now(),
     updated_at timestamp with time zone DEFAULT now(),
-    CONSTRAINT chk_crv_status CHECK (((status)::text = ANY (ARRAY[('unverified'::character varying)::text, ('alleged'::character varying)::text, ('pending'::character varying)::text, ('proven'::character varying)::text, ('disputed'::character varying)::text, ('waived'::character varying)::text])))
+    CONSTRAINT chk_urv_status CHECK (((status)::text = ANY (ARRAY[('unverified'::character varying)::text, ('alleged'::character varying)::text, ('pending'::character varying)::text, ('proven'::character varying)::text, ('disputed'::character varying)::text, ('waived'::character varying)::text])))
 );
 
 
@@ -12526,7 +12526,7 @@ CREATE VIEW "ob-poc".cbu_convergence_status AS
     count(*) FILTER (WHERE ((status)::text = 'unverified'::text)) AS unverified_count,
     count(*) FILTER (WHERE ((status)::text = 'waived'::text)) AS waived_count,
     (count(*) FILTER (WHERE ((status)::text = ANY (ARRAY[('proven'::character varying)::text, ('waived'::character varying)::text]))) = count(*)) AS is_converged
-   FROM "ob-poc".cbu_relationship_verification
+   FROM "ob-poc".ubo_relationship_verification
   GROUP BY cbu_id;
 
 
@@ -12792,7 +12792,7 @@ CREATE VIEW "ob-poc".cbu_ownership_graph AS
     r.effective_from,
     r.effective_to
    FROM ((((("ob-poc".entity_relationships r
-     JOIN "ob-poc".cbu_relationship_verification v ON ((v.relationship_id = r.relationship_id)))
+     JOIN "ob-poc".ubo_relationship_verification v ON ((v.relationship_id = r.relationship_id)))
      LEFT JOIN "ob-poc".entities e_from ON ((e_from.entity_id = r.from_entity_id)))
      LEFT JOIN "ob-poc".entity_types et_from ON ((et_from.entity_type_id = e_from.entity_type_id)))
      LEFT JOIN "ob-poc".entities e_to ON ((e_to.entity_id = r.to_entity_id)))
@@ -17899,7 +17899,7 @@ CREATE VIEW "ob-poc".ubo_convergence_status AS
     count(*) FILTER (WHERE ((status)::text = 'pending'::text)) AS pending_edges,
     count(*) FILTER (WHERE ((status)::text = 'disputed'::text)) AS disputed_edges,
     (count(*) FILTER (WHERE ((status)::text = 'proven'::text)) = count(*)) AS is_converged
-   FROM "ob-poc".cbu_relationship_verification
+   FROM "ob-poc".ubo_relationship_verification
   GROUP BY cbu_id;
 
 
@@ -17907,7 +17907,7 @@ CREATE VIEW "ob-poc".ubo_convergence_status AS
 -- Name: VIEW ubo_convergence_status; Type: COMMENT; Schema: ob-poc; Owner: -
 --
 
-COMMENT ON VIEW "ob-poc".ubo_convergence_status IS 'Computed convergence status per CBU from cbu_relationship_verification';
+COMMENT ON VIEW "ob-poc".ubo_convergence_status IS 'Computed convergence status per CBU from ubo_relationship_verification';
 
 
 --
@@ -17955,7 +17955,7 @@ CREATE VIEW "ob-poc".ubo_expired_proofs AS
     r.from_entity_id,
     r.to_entity_id,
     r.relationship_type AS edge_type
-   FROM (("ob-poc".cbu_relationship_verification v
+   FROM (("ob-poc".ubo_relationship_verification v
      JOIN "ob-poc".entity_relationships r ON ((v.relationship_id = r.relationship_id)))
      JOIN "ob-poc".document_catalog d ON ((v.proof_document_id = d.doc_id)))
   WHERE (((d.status)::text <> ALL (ARRAY[('active'::character varying)::text, ('valid'::character varying)::text])) OR ((v.status)::text = 'disputed'::text));
@@ -17988,7 +17988,7 @@ CREATE VIEW "ob-poc".ubo_missing_proofs AS
             WHEN ((r.relationship_type)::text = 'trust_role'::text) THEN 'trust_deed'::text
             ELSE NULL::text
         END AS required_proof_type
-   FROM ((("ob-poc".cbu_relationship_verification v
+   FROM ((("ob-poc".ubo_relationship_verification v
      JOIN "ob-poc".entity_relationships r ON ((v.relationship_id = r.relationship_id)))
      JOIN "ob-poc".entities f ON ((f.entity_id = r.from_entity_id)))
      JOIN "ob-poc".entities t ON ((t.entity_id = r.to_entity_id)))
@@ -20092,7 +20092,7 @@ CREATE VIEW "ob-poc".v_ubo_candidates AS
             1 AS depth,
             ARRAY[r.to_entity_id, r.from_entity_id] AS path
            FROM ("ob-poc".entity_relationships r
-             JOIN "ob-poc".cbu_relationship_verification v ON ((v.relationship_id = r.relationship_id)))
+             JOIN "ob-poc".ubo_relationship_verification v ON ((v.relationship_id = r.relationship_id)))
           WHERE (((r.relationship_type)::text = 'ownership'::text) AND ((v.status)::text = ANY (ARRAY[('proven'::character varying)::text, ('alleged'::character varying)::text, ('pending'::character varying)::text])) AND ((r.effective_to IS NULL) OR (r.effective_to > CURRENT_DATE)))
         UNION ALL
          SELECT oc_1.cbu_id,
@@ -20105,7 +20105,7 @@ CREATE VIEW "ob-poc".v_ubo_candidates AS
              JOIN "ob-poc".entities e_1 ON ((e_1.entity_id = oc_1.owner_entity_id)))
              JOIN "ob-poc".entity_types et_1 ON ((et_1.entity_type_id = e_1.entity_type_id)))
              JOIN "ob-poc".entity_relationships r ON ((r.to_entity_id = oc_1.owner_entity_id)))
-             JOIN "ob-poc".cbu_relationship_verification v ON (((v.relationship_id = r.relationship_id) AND (v.cbu_id = oc_1.cbu_id))))
+             JOIN "ob-poc".ubo_relationship_verification v ON (((v.relationship_id = r.relationship_id) AND (v.cbu_id = oc_1.cbu_id))))
           WHERE (((et_1.entity_category)::text = 'SHELL'::text) AND ((r.relationship_type)::text = 'ownership'::text) AND ((v.status)::text = ANY (ARRAY[('proven'::character varying)::text, ('alleged'::character varying)::text, ('pending'::character varying)::text])) AND ((r.effective_to IS NULL) OR (r.effective_to > CURRENT_DATE)) AND (oc_1.depth < 10) AND (NOT (r.from_entity_id = ANY (oc_1.path))))
         )
  SELECT oc.cbu_id,
@@ -22533,19 +22533,19 @@ ALTER TABLE ONLY "ob-poc".cbu_product_subscriptions
 
 
 --
--- Name: cbu_relationship_verification cbu_relationship_verification_cbu_id_relationship_id_key; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: ubo_relationship_verification ubo_relationship_verification_cbu_id_relationship_id_key; Type: CONSTRAINT; Schema: ob-poc; Owner: -
 --
 
-ALTER TABLE ONLY "ob-poc".cbu_relationship_verification
-    ADD CONSTRAINT cbu_relationship_verification_cbu_id_relationship_id_key UNIQUE (cbu_id, relationship_id);
+ALTER TABLE ONLY "ob-poc".ubo_relationship_verification
+    ADD CONSTRAINT ubo_relationship_verification_cbu_id_relationship_id_key UNIQUE (cbu_id, relationship_id);
 
 
 --
--- Name: cbu_relationship_verification cbu_relationship_verification_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: ubo_relationship_verification ubo_relationship_verification_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
 --
 
-ALTER TABLE ONLY "ob-poc".cbu_relationship_verification
-    ADD CONSTRAINT cbu_relationship_verification_pkey PRIMARY KEY (verification_id);
+ALTER TABLE ONLY "ob-poc".ubo_relationship_verification
+    ADD CONSTRAINT ubo_relationship_verification_pkey PRIMARY KEY (verification_id);
 
 
 --
@@ -26582,24 +26582,24 @@ CREATE INDEX idx_cbu_product_subscriptions_product ON "ob-poc".cbu_product_subsc
 
 
 --
--- Name: idx_cbu_rel_verif_cbu; Type: INDEX; Schema: ob-poc; Owner: -
+-- Name: idx_ubo_rel_verif_cbu; Type: INDEX; Schema: ob-poc; Owner: -
 --
 
-CREATE INDEX idx_cbu_rel_verif_cbu ON "ob-poc".cbu_relationship_verification USING btree (cbu_id);
-
-
---
--- Name: idx_cbu_rel_verif_rel; Type: INDEX; Schema: ob-poc; Owner: -
---
-
-CREATE INDEX idx_cbu_rel_verif_rel ON "ob-poc".cbu_relationship_verification USING btree (relationship_id);
+CREATE INDEX idx_ubo_rel_verif_cbu ON "ob-poc".ubo_relationship_verification USING btree (cbu_id);
 
 
 --
--- Name: idx_cbu_rel_verif_status; Type: INDEX; Schema: ob-poc; Owner: -
+-- Name: idx_ubo_rel_verif_rel; Type: INDEX; Schema: ob-poc; Owner: -
 --
 
-CREATE INDEX idx_cbu_rel_verif_status ON "ob-poc".cbu_relationship_verification USING btree (cbu_id, status);
+CREATE INDEX idx_ubo_rel_verif_rel ON "ob-poc".ubo_relationship_verification USING btree (relationship_id);
+
+
+--
+-- Name: idx_ubo_rel_verif_status; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_ubo_rel_verif_status ON "ob-poc".ubo_relationship_verification USING btree (cbu_id, status);
 
 
 --
@@ -31946,27 +31946,27 @@ ALTER TABLE ONLY "ob-poc".cbu_product_subscriptions
 
 
 --
--- Name: cbu_relationship_verification cbu_relationship_verification_cbu_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: ubo_relationship_verification ubo_relationship_verification_cbu_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
 --
 
-ALTER TABLE ONLY "ob-poc".cbu_relationship_verification
-    ADD CONSTRAINT cbu_relationship_verification_cbu_id_fkey FOREIGN KEY (cbu_id) REFERENCES "ob-poc".cbus(cbu_id);
-
-
---
--- Name: cbu_relationship_verification cbu_relationship_verification_proof_document_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
---
-
-ALTER TABLE ONLY "ob-poc".cbu_relationship_verification
-    ADD CONSTRAINT cbu_relationship_verification_proof_document_id_fkey FOREIGN KEY (proof_document_id) REFERENCES "ob-poc".document_catalog(doc_id);
+ALTER TABLE ONLY "ob-poc".ubo_relationship_verification
+    ADD CONSTRAINT ubo_relationship_verification_cbu_id_fkey FOREIGN KEY (cbu_id) REFERENCES "ob-poc".cbus(cbu_id);
 
 
 --
--- Name: cbu_relationship_verification cbu_relationship_verification_relationship_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+-- Name: ubo_relationship_verification ubo_relationship_verification_proof_document_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
 --
 
-ALTER TABLE ONLY "ob-poc".cbu_relationship_verification
-    ADD CONSTRAINT cbu_relationship_verification_relationship_id_fkey FOREIGN KEY (relationship_id) REFERENCES "ob-poc".entity_relationships(relationship_id);
+ALTER TABLE ONLY "ob-poc".ubo_relationship_verification
+    ADD CONSTRAINT ubo_relationship_verification_proof_document_id_fkey FOREIGN KEY (proof_document_id) REFERENCES "ob-poc".document_catalog(doc_id);
+
+
+--
+-- Name: ubo_relationship_verification ubo_relationship_verification_relationship_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".ubo_relationship_verification
+    ADD CONSTRAINT ubo_relationship_verification_relationship_id_fkey FOREIGN KEY (relationship_id) REFERENCES "ob-poc".entity_relationships(relationship_id);
 
 
 --

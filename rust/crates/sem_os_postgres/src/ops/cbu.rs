@@ -2,7 +2,7 @@
 //! `cbu.*` from `rust/config/verbs/cbu.yaml`.
 //!
 //! Operations for CBU (Client Business Unit) management including
-//! creation, structure links, product assignment, inspect, decide,
+//! creation, structure links, product assignment, inspect,
 //! cascade delete, and bulk creation from client groups.
 //!
 //! # Ops
@@ -13,7 +13,6 @@
 //! - `cbu.unlink-structure` — Terminate an active structure link
 //! - `cbu.add-product` — Link CBU to product and create service delivery entries
 //! - `cbu.inspect` — Show full CBU structure with entities, roles, documents, screenings
-//! - `cbu.decide` — Record KYC/AML decision for CBU collective state
 //! - `cbu.delete-cascade` — Delete CBU and related data with cascade
 //! - `cbu.create-from-client-group` — Bulk CBU creation from client group entities
 
@@ -1195,33 +1194,10 @@ impl SemOsVerbOp for Inspect {
             })
             .collect();
 
-        let screenings: Vec<(Uuid, Uuid, String, String, String, Option<String>)> = sqlx::query_as(
-            r#"SELECT s.screening_id, w.entity_id, e.name as entity_name,
-                      s.screening_type, s.status, s.result_summary
-               FROM "ob-poc".screenings s
-               JOIN "ob-poc".entity_workstreams w ON w.workstream_id = s.workstream_id
-               JOIN "ob-poc".cases c ON c.case_id = w.case_id
-               JOIN "ob-poc".entities e ON e.entity_id = w.entity_id
-               WHERE c.cbu_id = $1 AND e.deleted_at IS NULL
-               ORDER BY s.screening_type, e.name"#,
-        )
-        .bind(cbu_id)
-        .fetch_all(scope.executor())
-        .await?;
-
-        let screening_list: Vec<Value> = screenings
-            .iter()
-            .map(|(sid, eid, ename, stype, status, result)| {
-                serde_json::json!({
-                    "screening_id": sid,
-                    "entity_id": eid,
-                    "entity_name": ename,
-                    "screening_type": stype,
-                    "status": status,
-                    "result": result
-                })
-            })
-            .collect();
+        // NOTE (2026-06-22): cbu.inspect is a STRUCTURAL projection only. It must
+        // NOT read KYC state (screenings / cases) — CBU knows nothing about KYC.
+        // KYC reads CBU (via ManCo), never the reverse. See the domain-isolation
+        // rule; KYC inspection belongs to a KYC-domain verb.
 
         let services: Vec<(Uuid, String, String, String, String)> = sqlx::query_as(
             r#"SELECT sdm.delivery_id, p.name as product_name, p.product_code,
@@ -1248,45 +1224,9 @@ impl SemOsVerbOp for Inspect {
             })
             .collect();
 
-        let cases: Vec<(
-            Uuid,
-            String,
-            String,
-            Option<String>,
-            Option<String>,
-            chrono::DateTime<chrono::Utc>,
-            Option<chrono::DateTime<chrono::Utc>>,
-        )> = sqlx::query_as(
-            r#"SELECT case_id, status, case_type, risk_rating, escalation_level,
-                      opened_at, closed_at
-               FROM "ob-poc".cases WHERE cbu_id = $1 ORDER BY opened_at DESC"#,
-        )
-        .bind(cbu_id)
-        .fetch_all(scope.executor())
-        .await?;
-
-        let case_list: Vec<Value> = cases
-            .iter()
-            .map(
-                |(cid, status, ctype, risk_rating, escalation_level, opened_at, closed_at)| {
-                    serde_json::json!({
-                        "case_id": cid,
-                        "status": status,
-                        "case_type": ctype,
-                        "risk_rating": risk_rating,
-                        "escalation_level": escalation_level,
-                        "opened_at": opened_at.to_rfc3339(),
-                        "closed_at": closed_at.map(|t| t.to_rfc3339())
-                    })
-                },
-            )
-            .collect();
-
         let entity_count = entity_list.len();
         let document_count = doc_list.len();
-        let screening_count = screening_list.len();
         let service_count = service_list.len();
-        let case_count = case_list.len();
 
         Ok(VerbExecutionOutcome::Record(serde_json::json!({
             "cbu_id": cbu.0,
@@ -1301,180 +1241,12 @@ impl SemOsVerbOp for Inspect {
             "as_of_date": as_of_date.to_string(),
             "entities": entity_list,
             "documents": doc_list,
-            "screenings": screening_list,
             "services": service_list,
-            "kyc_cases": case_list,
             "summary": {
                 "entity_count": entity_count,
                 "document_count": document_count,
-                "screening_count": screening_count,
-                "service_count": service_count,
-                "case_count": case_count
+                "service_count": service_count
             }
-        })))
-    }
-}
-
-// =============================================================================
-// cbu.decide
-// =============================================================================
-
-/// Record KYC/AML decision for CBU collective state.
-pub struct Decide;
-
-#[async_trait]
-impl SemOsVerbOp for Decide {
-    fn fqn(&self) -> &str {
-        "cbu.decide"
-    }
-
-    async fn execute(
-        &self,
-        args: &Value,
-        ctx: &mut VerbExecutionContext,
-        scope: &mut dyn TransactionScope,
-    ) -> Result<VerbExecutionOutcome> {
-        let cbu_id = json_extract_uuid(args, ctx, "cbu-id")?;
-        let decision = json_extract_string(args, "decision")?;
-        let decided_by = json_extract_string(args, "decided-by")?;
-        let rationale = json_extract_string(args, "rationale")?;
-        let case_id = if args.get("case-id").is_some() {
-            Some(json_extract_uuid(args, ctx, "case-id")?)
-        } else {
-            None
-        };
-        let conditions = json_extract_string_opt(args, "conditions");
-        let escalation_reason = json_extract_string_opt(args, "escalation-reason");
-
-        if decision == "REFERRED" && escalation_reason.is_none() {
-            return Err(anyhow::anyhow!(
-                "escalation-reason is required when decision is REFERRED"
-            ));
-        }
-
-        let cbu: (String, Option<String>) = sqlx::query_as(
-            r#"SELECT name, status
-               FROM "ob-poc".cbus
-               WHERE cbu_id = $1
-                 AND deleted_at IS NULL"#,
-        )
-        .bind(cbu_id)
-        .fetch_optional(scope.executor())
-        .await?
-        .ok_or_else(|| anyhow::anyhow!("CBU not found: {}", cbu_id))?;
-
-        let new_cbu_status = match decision.as_str() {
-            "APPROVED" => "VALIDATED",
-            "REJECTED" => "VALIDATION_FAILED",
-            "REFERRED" => "VALIDATION_PENDING",
-            _ => return Err(anyhow::anyhow!("Invalid decision: {}", decision)),
-        };
-
-        let new_case_status = match decision.as_str() {
-            "APPROVED" => "APPROVED",
-            "REJECTED" => "REJECTED",
-            "REFERRED" => "REVIEW",
-            _ => "REVIEW",
-        };
-
-        let case_id = match case_id {
-            Some(id) => id,
-            None => {
-                let row: Option<(Uuid,)> = sqlx::query_as(
-                    r#"SELECT case_id FROM "ob-poc".cases
-                       WHERE cbu_id = $1 AND status NOT IN ('APPROVED', 'REJECTED', 'WITHDRAWN', 'EXPIRED')
-                       ORDER BY opened_at DESC LIMIT 1"#,
-                )
-                .bind(cbu_id)
-                .fetch_optional(scope.executor())
-                .await?;
-                row.ok_or_else(|| anyhow::anyhow!("No active KYC case found for CBU"))?
-                    .0
-            }
-        };
-
-        sqlx::query(
-            r#"UPDATE "ob-poc".cbus
-               SET status = $1, updated_at = now()
-               WHERE cbu_id = $2
-                 AND deleted_at IS NULL"#,
-        )
-        .bind(new_cbu_status)
-        .bind(cbu_id)
-        .execute(scope.executor())
-        .await?;
-
-        let current_case_status: String =
-            sqlx::query_scalar(r#"SELECT status FROM "ob-poc".cases WHERE case_id = $1"#)
-                .bind(case_id)
-                .fetch_optional(scope.executor())
-                .await?
-                .ok_or_else(|| anyhow::anyhow!("KYC case not found: {}", case_id))?;
-
-        match decision.as_str() {
-            "APPROVED" | "REJECTED" => {
-                let child_args = serde_json::json!({
-                    "case-id": case_id,
-                    "status": new_case_status,
-                    "notes": rationale
-                });
-                dispatch_child_verb(self.fqn(), "kyc-case.close", &child_args, ctx, scope).await?;
-            }
-            "REFERRED" => {
-                if current_case_status != "REVIEW" {
-                    let status_args = serde_json::json!({
-                        "case-id": case_id,
-                        "status": new_case_status,
-                        "notes": escalation_reason
-                    });
-                    dispatch_child_verb(
-                        self.fqn(),
-                        "kyc-case.update-status",
-                        &status_args,
-                        ctx,
-                        scope,
-                    )
-                    .await?;
-                }
-
-                let escalate_args = serde_json::json!({
-                    "case-id": case_id,
-                    "escalation-level": "SENIOR_COMPLIANCE",
-                    "notes": escalation_reason
-                });
-                dispatch_child_verb(self.fqn(), "kyc-case.escalate", &escalate_args, ctx, scope)
-                    .await?;
-            }
-            _ => return Err(anyhow::anyhow!("Invalid decision: {}", decision)),
-        }
-
-        let snapshot_id = Uuid::new_v4();
-        sqlx::query(
-            r#"INSERT INTO "ob-poc".case_evaluation_snapshots
-               (snapshot_id, case_id, soft_count, escalate_count, hard_stop_count, total_score,
-                recommended_action, evaluated_by, decision_made, decision_made_at, decision_made_by, decision_notes)
-               VALUES ($1, $2, 0, 0, 0, 0, $3, $4, $3, now(), $4, $5)"#,
-        )
-        .bind(snapshot_id)
-        .bind(case_id)
-        .bind(&decision)
-        .bind(&decided_by)
-        .bind(&rationale)
-        .execute(scope.executor())
-        .await?;
-
-        Ok(VerbExecutionOutcome::Record(serde_json::json!({
-            "cbu_id": cbu_id,
-            "cbu_name": cbu.0,
-            "case_id": case_id,
-            "snapshot_id": snapshot_id,
-            "decision": decision,
-            "previous_status": cbu.1,
-            "new_status": new_cbu_status,
-            "decided_by": decided_by,
-            "rationale": rationale,
-            "conditions": conditions,
-            "escalation_reason": escalation_reason
         })))
     }
 }

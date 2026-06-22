@@ -4,7 +4,7 @@
 
 use anyhow::{Context, Result};
 use serde_json::{json, Value as JsonValue};
-use sqlx::PgPool;
+use sqlx::{PgConnection, PgPool};
 use tracing::info;
 use uuid::Uuid;
 
@@ -29,8 +29,11 @@ impl ServiceResourcePipelineService {
     // SERVICE INTENTS
     // =========================================================================
 
-    /// Create a new service intent
-    pub(crate) async fn create_service_intent(&self, input: &NewServiceIntent) -> Result<Uuid> {
+    /// Create a new service intent (connection-based, joins ambient txn).
+    pub(crate) async fn create_service_intent_in(
+        conn: &mut PgConnection,
+        input: &NewServiceIntent,
+    ) -> Result<Uuid> {
         let intent_id = Uuid::new_v4();
         let options = input.options.clone().unwrap_or(json!({}));
 
@@ -52,7 +55,7 @@ impl ServiceResourcePipelineService {
         .bind(input.service_id)
         .bind(&options)
         .bind(&input.created_by)
-        .execute(&self.pool)
+        .execute(&mut *conn)
         .await
         .context("Failed to create service intent")?;
 
@@ -63,8 +66,17 @@ impl ServiceResourcePipelineService {
         Ok(intent_id)
     }
 
-    /// Get service intents for a CBU
-    pub async fn get_service_intents(&self, cbu_id: Uuid) -> Result<Vec<ServiceIntent>> {
+    /// Create a new service intent
+    pub(crate) async fn create_service_intent(&self, input: &NewServiceIntent) -> Result<Uuid> {
+        let mut conn = self.pool.acquire().await?;
+        Self::create_service_intent_in(&mut conn, input).await
+    }
+
+    /// Get service intents for a CBU (connection-based).
+    pub(crate) async fn get_service_intents_in(
+        conn: &mut PgConnection,
+        cbu_id: Uuid,
+    ) -> Result<Vec<ServiceIntent>> {
         sqlx::query_as::<_, ServiceIntent>(
             r#"
             SELECT intent_id, cbu_id, product_id, service_id, options, status,
@@ -75,9 +87,15 @@ impl ServiceResourcePipelineService {
             "#,
         )
         .bind(cbu_id)
-        .fetch_all(&self.pool)
+        .fetch_all(&mut *conn)
         .await
         .context("Failed to get service intents")
+    }
+
+    /// Get service intents for a CBU
+    pub async fn get_service_intents(&self, cbu_id: Uuid) -> Result<Vec<ServiceIntent>> {
+        let mut conn = self.pool.acquire().await?;
+        Self::get_service_intents_in(&mut conn, cbu_id).await
     }
 
     /// Get a specific service intent
@@ -96,30 +114,15 @@ impl ServiceResourcePipelineService {
         .context("Failed to get service intent")
     }
 
-    /// Cancel a service intent
-    #[allow(dead_code)]
-    pub(crate) async fn cancel_service_intent(&self, intent_id: Uuid) -> Result<bool> {
-        let result = sqlx::query(
-            r#"
-            UPDATE "ob-poc".service_intents
-            SET status = 'cancelled', updated_at = NOW()
-            WHERE intent_id = $1 AND status = 'active'
-            "#,
-        )
-        .bind(intent_id)
-        .execute(&self.pool)
-        .await
-        .context("Failed to cancel service intent")?;
-
-        Ok(result.rows_affected() > 0)
-    }
-
     // =========================================================================
     // SRDEF DISCOVERY
     // =========================================================================
 
-    /// Record a discovery reason
-    pub(crate) async fn record_discovery(&self, input: &NewSrdefDiscovery) -> Result<Uuid> {
+    /// Record a discovery reason (connection-based).
+    pub(crate) async fn record_discovery_in(
+        conn: &mut PgConnection,
+        input: &NewSrdefDiscovery,
+    ) -> Result<Uuid> {
         let discovery_id = Uuid::new_v4();
         let triggered_by = json!(input.triggered_by_intents);
         let parameters = input.parameters.clone().unwrap_or(json!({}));
@@ -135,7 +138,7 @@ impl ServiceResourcePipelineService {
         .bind(input.cbu_id)
         .bind(&input.srdef_id)
         .bind(&parameters)
-        .execute(&self.pool)
+        .execute(&mut *conn)
         .await?;
 
         // Insert new discovery
@@ -155,7 +158,7 @@ impl ServiceResourcePipelineService {
         .bind(&input.discovery_rule)
         .bind(&input.discovery_reason)
         .bind(&parameters)
-        .execute(&self.pool)
+        .execute(&mut *conn)
         .await
         .context("Failed to record discovery")?;
 
@@ -166,8 +169,11 @@ impl ServiceResourcePipelineService {
         Ok(discovery_id)
     }
 
-    /// Get active discoveries for a CBU
-    pub async fn get_active_discoveries(&self, cbu_id: Uuid) -> Result<Vec<SrdefDiscoveryReason>> {
+    /// Get active discoveries for a CBU (connection-based).
+    pub(crate) async fn get_active_discoveries_in(
+        conn: &mut PgConnection,
+        cbu_id: Uuid,
+    ) -> Result<Vec<SrdefDiscoveryReason>> {
         sqlx::query_as::<_, SrdefDiscoveryReason>(
             r#"
             SELECT discovery_id, cbu_id, srdef_id, resource_type_id, triggered_by_intents,
@@ -178,19 +184,25 @@ impl ServiceResourcePipelineService {
             "#,
         )
         .bind(cbu_id)
-        .fetch_all(&self.pool)
+        .fetch_all(&mut *conn)
         .await
         .context("Failed to get discoveries")
+    }
+
+    /// Get active discoveries for a CBU
+    pub async fn get_active_discoveries(&self, cbu_id: Uuid) -> Result<Vec<SrdefDiscoveryReason>> {
+        let mut conn = self.pool.acquire().await?;
+        Self::get_active_discoveries_in(&mut conn, cbu_id).await
     }
 
     // =========================================================================
     // CBU UNIFIED ATTRIBUTES
     // =========================================================================
 
-    /// Upsert a unified attribute requirement
+    /// Upsert a unified attribute requirement (connection-based).
     #[allow(clippy::too_many_arguments)]
-    pub(crate) async fn upsert_unified_attr_requirement(
-        &self,
+    pub(crate) async fn upsert_unified_attr_requirement_in(
+        conn: &mut PgConnection,
         cbu_id: Uuid,
         attr_id: Uuid,
         requirement_strength: &str,
@@ -223,16 +235,16 @@ impl ServiceResourcePipelineService {
         .bind(preferred_source)
         .bind(&srdefs_json)
         .bind(conflict)
-        .execute(&self.pool)
+        .execute(&mut *conn)
         .await
         .context("Failed to upsert unified attr requirement")?;
 
         Ok(())
     }
 
-    /// Get unified attribute requirements for a CBU
-    pub async fn get_unified_attr_requirements(
-        &self,
+    /// Get unified attribute requirements for a CBU (connection-based).
+    pub(crate) async fn get_unified_attr_requirements_in(
+        conn: &mut PgConnection,
         cbu_id: Uuid,
     ) -> Result<Vec<CbuUnifiedAttrRequirement>> {
         sqlx::query_as::<_, CbuUnifiedAttrRequirement>(
@@ -245,17 +257,29 @@ impl ServiceResourcePipelineService {
             "#,
         )
         .bind(cbu_id)
-        .fetch_all(&self.pool)
+        .fetch_all(&mut *conn)
         .await
         .context("Failed to get unified attr requirements")
     }
 
-    /// Clear unified attr requirements for a CBU (before rebuild)
-    pub(crate) async fn clear_unified_attr_requirements(&self, cbu_id: Uuid) -> Result<u64> {
+    /// Get unified attribute requirements for a CBU
+    pub async fn get_unified_attr_requirements(
+        &self,
+        cbu_id: Uuid,
+    ) -> Result<Vec<CbuUnifiedAttrRequirement>> {
+        let mut conn = self.pool.acquire().await?;
+        Self::get_unified_attr_requirements_in(&mut conn, cbu_id).await
+    }
+
+    /// Clear unified attr requirements for a CBU (connection-based, before rebuild).
+    pub(crate) async fn clear_unified_attr_requirements_in(
+        conn: &mut PgConnection,
+        cbu_id: Uuid,
+    ) -> Result<u64> {
         let result =
             sqlx::query(r#"DELETE FROM "ob-poc".cbu_unified_attr_requirements WHERE cbu_id = $1"#)
                 .bind(cbu_id)
-                .execute(&self.pool)
+                .execute(&mut *conn)
                 .await
                 .context("Failed to clear unified attr requirements")?;
 
@@ -270,7 +294,10 @@ impl ServiceResourcePipelineService {
     ///
     /// Derived values are persisted in the canonical `derived_attribute_values`
     /// table by the derivation engine — they must never be written here.
-    pub(crate) async fn set_cbu_attr_value(&self, input: &SetCbuAttrValue) -> Result<()> {
+    pub(crate) async fn set_cbu_attr_value_in(
+        conn: &mut PgConnection,
+        input: &SetCbuAttrValue,
+    ) -> Result<()> {
         if input.source == AttributeSource::Derived {
             anyhow::bail!(
                 "Derived values must not be written to cbu_attr_values — \
@@ -300,7 +327,7 @@ impl ServiceResourcePipelineService {
         .bind(input.source.to_string())
         .bind(&evidence)
         .bind(&explain)
-        .execute(&self.pool)
+        .execute(&mut *conn)
         .await
         .context("Failed to set CBU attr value")?;
 
@@ -310,11 +337,17 @@ impl ServiceResourcePipelineService {
         );
         Ok(())
     }
-    /// Get effective CBU attribute values.
-    ///
-    /// This returns legacy non-derived rows from `cbu_attr_values` together with
-    /// canonical derived rows projected from `v_cbu_derived_values`.
-    pub async fn get_cbu_attr_values(&self, cbu_id: Uuid) -> Result<Vec<CbuAttrValue>> {
+
+    pub(crate) async fn set_cbu_attr_value(&self, input: &SetCbuAttrValue) -> Result<()> {
+        let mut conn = self.pool.acquire().await?;
+        Self::set_cbu_attr_value_in(&mut conn, input).await
+    }
+
+    /// Get effective CBU attribute values (connection-based).
+    pub(crate) async fn get_cbu_attr_values_in(
+        conn: &mut PgConnection,
+        cbu_id: Uuid,
+    ) -> Result<Vec<CbuAttrValue>> {
         sqlx::query_as::<_, CbuAttrValue>(
             r#"
             WITH effective_values AS (
@@ -338,17 +371,23 @@ impl ServiceResourcePipelineService {
             "#,
         )
         .bind(cbu_id)
-        .fetch_all(&self.pool)
+        .fetch_all(&mut *conn)
         .await
         .context("Failed to get CBU attr values")
     }
 
-    /// Get one effective CBU attribute value.
+    /// Get effective CBU attribute values.
     ///
-    /// Derived rows resolve from the canonical projection view rather than the
-    /// legacy `cbu_attr_values` table.
-    pub async fn get_cbu_attr_value(
-        &self,
+    /// This returns legacy non-derived rows from `cbu_attr_values` together with
+    /// canonical derived rows projected from `v_cbu_derived_values`.
+    pub async fn get_cbu_attr_values(&self, cbu_id: Uuid) -> Result<Vec<CbuAttrValue>> {
+        let mut conn = self.pool.acquire().await?;
+        Self::get_cbu_attr_values_in(&mut conn, cbu_id).await
+    }
+
+    /// Get one effective CBU attribute value (connection-based).
+    pub(crate) async fn get_cbu_attr_value_in(
+        conn: &mut PgConnection,
         cbu_id: Uuid,
         attr_id: Uuid,
     ) -> Result<Option<CbuAttrValue>> {
@@ -378,9 +417,22 @@ impl ServiceResourcePipelineService {
         )
         .bind(cbu_id)
         .bind(attr_id)
-        .fetch_optional(&self.pool)
+        .fetch_optional(&mut *conn)
         .await
         .context("Failed to get CBU attr value")
+    }
+
+    /// Get one effective CBU attribute value.
+    ///
+    /// Derived rows resolve from the canonical projection view rather than the
+    /// legacy `cbu_attr_values` table.
+    pub async fn get_cbu_attr_value(
+        &self,
+        cbu_id: Uuid,
+        attr_id: Uuid,
+    ) -> Result<Option<CbuAttrValue>> {
+        let mut conn = self.pool.acquire().await?;
+        Self::get_cbu_attr_value_in(&mut conn, cbu_id, attr_id).await
     }
 
     // =========================================================================
@@ -460,30 +512,6 @@ impl ServiceResourcePipelineService {
         .context("Failed to get pending requests")
     }
 
-    /// Update provisioning request status
-    #[allow(dead_code)]
-    pub(crate) async fn update_request_status(
-        &self,
-        request_id: Uuid,
-        status: ProvisioningStatus,
-        owner_ticket_id: Option<&str>,
-    ) -> Result<bool> {
-        let result = sqlx::query(
-            r#"
-            UPDATE "ob-poc".provisioning_requests
-            SET status = $1, owner_ticket_id = COALESCE($2, owner_ticket_id)
-            WHERE request_id = $3
-            "#,
-        )
-        .bind(status.to_string())
-        .bind(owner_ticket_id)
-        .bind(request_id)
-        .execute(&self.pool)
-        .await
-        .context("Failed to update request status")?;
-
-        Ok(result.rows_affected() > 0)
-    }
 
     // =========================================================================
     // PROVISIONING EVENTS
@@ -638,18 +666,6 @@ impl ServiceResourcePipelineService {
         .fetch_all(&self.pool)
         .await
         .context("Failed to get stale readiness records")
-    }
-
-    /// Clear readiness for a CBU (before rebuild)
-    #[allow(dead_code)]
-    pub(crate) async fn clear_service_readiness(&self, cbu_id: Uuid) -> Result<u64> {
-        let result = sqlx::query(r#"DELETE FROM "ob-poc".cbu_service_readiness WHERE cbu_id = $1"#)
-            .bind(cbu_id)
-            .execute(&self.pool)
-            .await
-            .context("Failed to clear service readiness")?;
-
-        Ok(result.rows_affected())
     }
 
     // =========================================================================

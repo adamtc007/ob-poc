@@ -710,7 +710,6 @@ categories:
       - cbu.parties
       - cbu.inspect
       - cbu.add-product
-      - cbu.decide
 
   ownership_control:
     label: "Ownership & Control"
@@ -1080,7 +1079,6 @@ workflow_phases:
       - red-flag.raise
       - red-flag.mitigate
       - kyc-case.escalate
-      - cbu.decide
     transitions_to:
       - approved
       - rejected

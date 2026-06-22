@@ -410,7 +410,7 @@ pub struct ScreeningView {
     pub entity_name: Option<String>,
 }
 
-/// UBO edge from entity_relationships + cbu_relationship_verification tables
+/// UBO edge from entity_relationships + ubo_relationship_verification tables
 /// This is the new unified ownership/control model with separated structure and verification
 #[derive(Debug, Clone)]
 pub struct UboEdgeView {
@@ -1543,7 +1543,7 @@ impl VisualizationRepository {
     // GRAPH QUERIES - UBO LAYER
     // =========================================================================
 
-    /// Get UBO edges for a CBU from entity_relationships + cbu_relationship_verification
+    /// Get UBO edges for a CBU from entity_relationships + ubo_relationship_verification
     /// This is the primary source of truth for ownership/control chains with status workflow
     pub async fn get_ubo_edges(&self, cbu_id: Uuid) -> Result<Vec<UboEdgeView>> {
         let rows = sqlx::query!(
@@ -1566,7 +1566,7 @@ impl VisualizationRepository {
                 from_et.entity_category as "from_category?",
                 to_et.entity_category as "to_category?"
                FROM "ob-poc".entity_relationships r
-               JOIN "ob-poc".cbu_relationship_verification v ON v.relationship_id = r.relationship_id
+               JOIN "ob-poc".ubo_relationship_verification v ON v.relationship_id = r.relationship_id
                JOIN "ob-poc".entities from_e ON r.from_entity_id = from_e.entity_id
                JOIN "ob-poc".entities to_e ON r.to_entity_id = to_e.entity_id
                JOIN "ob-poc".entity_types from_et ON from_e.entity_type_id = from_et.entity_type_id
