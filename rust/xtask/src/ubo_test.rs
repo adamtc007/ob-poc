@@ -132,10 +132,24 @@ pub(crate) async fn clean_test_data(pool: &PgPool) -> Result<()> {
         }
     }
 
-    // Also clean any orphaned test entities
-    sqlx::query(r#"DELETE FROM "ob-poc".entities WHERE name LIKE 'UBO Test:%'"#)
-        .execute(pool)
+    // Also clean any orphaned test entities. Run under replica mode (in a tx)
+    // so the delete ignores FK references from ANY table (cbu_groups.manco_entity_id,
+    // entity_relationships, etc.) without a hand-maintained child-table list.
+    let mut tx = pool.begin().await?;
+    sqlx::query("SET LOCAL session_replication_role = replica")
+        .execute(&mut *tx)
         .await?;
+    sqlx::query(
+        r#"DELETE FROM "ob-poc".entity_relationships
+           WHERE from_entity_id IN (SELECT entity_id FROM "ob-poc".entities WHERE name LIKE 'UBO Test:%')
+              OR to_entity_id   IN (SELECT entity_id FROM "ob-poc".entities WHERE name LIKE 'UBO Test:%')"#,
+    )
+    .execute(&mut *tx)
+    .await?;
+    sqlx::query(r#"DELETE FROM "ob-poc".entities WHERE name LIKE 'UBO Test:%'"#)
+        .execute(&mut *tx)
+        .await?;
+    tx.commit().await?;
 
     println!("Clean complete.");
     Ok(())
@@ -145,86 +159,17 @@ pub(crate) async fn clean_test_data(pool: &PgPool) -> Result<()> {
 async fn delete_cbu_cascade(pool: &PgPool, cbu_id: Uuid) -> Result<()> {
     let mut tx = pool.begin().await?;
 
-    // ═══════════════════════════════════════════════════════════════════════
-    // NEW ARCHITECTURE: Delete from ubo_relationship_verification (CBU-scoped)
-    // Note: entity_relationships are structural facts and persist across CBUs
-    // ═══════════════════════════════════════════════════════════════════════
-
-    // Get relationship IDs for this CBU before deleting verification records
-    let relationship_ids: Vec<Uuid> = sqlx::query_scalar(
-        r#"SELECT relationship_id FROM "ob-poc".ubo_relationship_verification WHERE cbu_id = $1"#,
-    )
-    .bind(cbu_id)
-    .fetch_all(&mut *tx)
-    .await?;
-
-    // Delete CBU-scoped verification records
-    sqlx::query(r#"DELETE FROM "ob-poc".ubo_relationship_verification WHERE cbu_id = $1"#)
-        .bind(cbu_id)
+    // Disable FK enforcement for this cleanup transaction so the delete order
+    // across the ~77 FK-children of cbus is irrelevant (test-only; SET LOCAL is
+    // transaction-scoped and auto-resets on commit/rollback). This replaces the
+    // old hand-maintained child-table list, which had drifted ~65 tables behind
+    // the schema and failed on the first uncovered FK (e.g. cbu_resource_instances).
+    sqlx::query("SET LOCAL session_replication_role = replica")
         .execute(&mut *tx)
         .await?;
 
-    // Delete orphaned entity_relationships (those with no remaining CBU verifications)
-    // This is safe for test data since test entities are only used by test CBUs
-    for rel_id in relationship_ids {
-        let count: i64 = sqlx::query_scalar(
-            r#"SELECT COUNT(*) FROM "ob-poc".ubo_relationship_verification WHERE relationship_id = $1"#,
-        )
-        .bind(rel_id)
-        .fetch_one(&mut *tx)
-        .await?;
-
-        if count == 0 {
-            sqlx::query(r#"DELETE FROM "ob-poc".entity_relationships WHERE relationship_id = $1"#)
-                .bind(rel_id)
-                .execute(&mut *tx)
-                .await?;
-        }
-    }
-
-    // Legacy tables (try delete, ignore if not exist)
-    let _ = sqlx::query(r#"DELETE FROM "ob-poc".ubo_assertion_log WHERE cbu_id = $1"#)
-        .bind(cbu_id)
-        .execute(&mut *tx)
-        .await;
-
-    let _ = sqlx::query(r#"DELETE FROM "ob-poc".kyc_decisions WHERE cbu_id = $1"#)
-        .bind(cbu_id)
-        .execute(&mut *tx)
-        .await;
-
-    let _ = sqlx::query(r#"DELETE FROM "ob-poc".proofs WHERE cbu_id = $1"#)
-        .bind(cbu_id)
-        .execute(&mut *tx)
-        .await;
-
-    // KYC schema
-    sqlx::query(r#"DELETE FROM kyc.screenings WHERE workstream_id IN (SELECT workstream_id FROM kyc.entity_workstreams WHERE case_id IN (SELECT case_id FROM kyc.cases WHERE cbu_id = $1))"#)
-        .bind(cbu_id).execute(&mut *tx).await?;
-    sqlx::query(r#"DELETE FROM kyc.doc_requests WHERE workstream_id IN (SELECT workstream_id FROM kyc.entity_workstreams WHERE case_id IN (SELECT case_id FROM kyc.cases WHERE cbu_id = $1))"#)
-        .bind(cbu_id).execute(&mut *tx).await?;
-    sqlx::query(r#"DELETE FROM kyc.case_events WHERE case_id IN (SELECT case_id FROM kyc.cases WHERE cbu_id = $1)"#)
-        .bind(cbu_id).execute(&mut *tx).await?;
-    sqlx::query(r#"DELETE FROM kyc.red_flags WHERE case_id IN (SELECT case_id FROM kyc.cases WHERE cbu_id = $1)"#)
-        .bind(cbu_id).execute(&mut *tx).await?;
-    sqlx::query(r#"DELETE FROM kyc.entity_workstreams WHERE case_id IN (SELECT case_id FROM kyc.cases WHERE cbu_id = $1)"#)
-        .bind(cbu_id).execute(&mut *tx).await?;
-    sqlx::query(r#"DELETE FROM kyc.cases WHERE cbu_id = $1"#)
-        .bind(cbu_id)
-        .execute(&mut *tx)
-        .await?;
-
-    // Core tables
-    sqlx::query(r#"DELETE FROM "ob-poc".cbu_entity_roles WHERE cbu_id = $1"#)
-        .bind(cbu_id)
-        .execute(&mut *tx)
-        .await?;
-    sqlx::query(r#"DELETE FROM "ob-poc".document_catalog WHERE cbu_id = $1"#)
-        .bind(cbu_id)
-        .execute(&mut *tx)
-        .await?;
-
-    // Get entities linked to this CBU before deleting
+    // Capture test entities linked to this CBU before the link rows are deleted.
+    // (entities are NOT FK-children of cbus, so the dynamic sweep won't touch them.)
     let entity_ids: Vec<Uuid> = sqlx::query_scalar(
         r#"SELECT DISTINCT entity_id FROM "ob-poc".cbu_entity_roles WHERE cbu_id = $1"#,
     )
@@ -232,25 +177,58 @@ async fn delete_cbu_cascade(pool: &PgPool, cbu_id: Uuid) -> Result<()> {
     .fetch_all(&mut *tx)
     .await?;
 
+    // Delete the case/workstream subtree explicitly: these FK to cases/workstreams,
+    // NOT directly to cbus, so they are not covered by the direct-child sweep below.
+    for sql in [
+        r#"DELETE FROM "ob-poc".screenings WHERE workstream_id IN (SELECT workstream_id FROM "ob-poc".entity_workstreams WHERE case_id IN (SELECT case_id FROM "ob-poc".cases WHERE cbu_id = $1))"#,
+        r#"DELETE FROM "ob-poc".doc_requests WHERE workstream_id IN (SELECT workstream_id FROM "ob-poc".entity_workstreams WHERE case_id IN (SELECT case_id FROM "ob-poc".cases WHERE cbu_id = $1))"#,
+        r#"DELETE FROM "ob-poc".case_events WHERE case_id IN (SELECT case_id FROM "ob-poc".cases WHERE cbu_id = $1)"#,
+        r#"DELETE FROM "ob-poc".red_flags WHERE case_id IN (SELECT case_id FROM "ob-poc".cases WHERE cbu_id = $1)"#,
+        r#"DELETE FROM "ob-poc".entity_workstreams WHERE case_id IN (SELECT case_id FROM "ob-poc".cases WHERE cbu_id = $1)"#,
+    ] {
+        sqlx::query(sql).bind(cbu_id).execute(&mut *tx).await?;
+    }
+
+    // Dynamically delete every DIRECT FK-child of cbus for this cbu_id, via
+    // whatever column FKs to cbus (cbu_id, sponsor_cbu_id, parent_cbu_id,
+    // child_cbu_id, owning_cbu_id, applies_to_cbu_id). Covers cases,
+    // cbu_resource_instances, service_intents, subscriptions, ubo_* and ~70
+    // others — sourced from the live FK catalogue so it never bit-rots.
+    let children: Vec<(String, String)> = sqlx::query_as(
+        r#"SELECT tc.table_name, kcu.column_name
+           FROM information_schema.table_constraints tc
+           JOIN information_schema.key_column_usage kcu
+             ON tc.constraint_name = kcu.constraint_name
+            AND tc.table_schema = kcu.table_schema
+           JOIN information_schema.constraint_column_usage ccu
+             ON tc.constraint_name = ccu.constraint_name
+            AND tc.table_schema = ccu.table_schema
+           WHERE tc.constraint_type = 'FOREIGN KEY'
+             AND ccu.table_name = 'cbus'
+             AND ccu.table_schema = 'ob-poc'
+             AND tc.table_schema = 'ob-poc'"#,
+    )
+    .fetch_all(&mut *tx)
+    .await?;
+    for (table, col) in children {
+        let sql = format!(r#"DELETE FROM "ob-poc"."{table}" WHERE "{col}" = $1"#);
+        sqlx::query(&sql).bind(cbu_id).execute(&mut *tx).await?;
+    }
+
+    // The CBU itself.
     sqlx::query(r#"DELETE FROM "ob-poc".cbus WHERE cbu_id = $1"#)
         .bind(cbu_id)
         .execute(&mut *tx)
         .await?;
 
-    // Delete test entities (only those with UBO Test: prefix)
-    // First, delete entity_relationships that reference these entities (FK constraint)
+    // Test entities (UBO Test: prefix only) + their structural relationships.
     for entity_id in &entity_ids {
         sqlx::query(
-            r#"DELETE FROM "ob-poc".entity_relationships
-               WHERE from_entity_id = $1 OR to_entity_id = $1"#,
+            r#"DELETE FROM "ob-poc".entity_relationships WHERE from_entity_id = $1 OR to_entity_id = $1"#,
         )
         .bind(entity_id)
         .execute(&mut *tx)
         .await?;
-    }
-
-    // Now delete the entities
-    for entity_id in &entity_ids {
         sqlx::query(
             r#"DELETE FROM "ob-poc".entities WHERE entity_id = $1 AND name LIKE 'UBO Test:%'"#,
         )
@@ -961,8 +939,8 @@ async fn create_ubo_edge(
     let relationship_id: Uuid = sqlx::query_scalar(
         r#"
         INSERT INTO "ob-poc".entity_relationships
-            (from_entity_id, to_entity_id, relationship_type, percentage, control_type, trust_role, source)
-        VALUES ($1, $2, $3, $4, $5, $6, 'TEST_HARNESS')
+            (from_entity_id, to_entity_id, relationship_type, percentage, control_type, trust_role, source, confidence)
+        VALUES ($1, $2, $3, $4, $5, $6, 'TEST_HARNESS', 'MEDIUM')
         RETURNING relationship_id
         "#,
     )
