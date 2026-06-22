@@ -979,11 +979,6 @@ slots:
 
   - id: investor
     stateless: false
-    # V1.3-8 category_gated: investor register only exists for funds.
-    category_gated:
-      category_column: cbu_category
-      category_source: cbus
-      activated_by: [FUND_MANDATE]
     state_machine:
       id: investor_lifecycle
       owner: "ops"
@@ -1035,11 +1030,6 @@ slots:
     # V1.3-4: no SUSPENDED state — KYC refresh semantics handled via
     # EXPIRED / REFRESH_REQUIRED; SUSPENDED doesn't apply.
     suspended_state_exempt: true
-    # V1.3-8 category_gated: investor KYC only runs for fund-mandate CBUs.
-    category_gated:
-      category_column: cbu_category
-      category_source: cbus
-      activated_by: [FUND_MANDATE]
     # V1.3-6 periodic review cadence.
     periodic_review_cadence:
       base_window: "P2Y"
@@ -1100,11 +1090,6 @@ slots:
 
   - id: holding
     stateless: false
-    # V1.3-8 category_gated: holdings only exist for fund-mandate CBUs.
-    category_gated:
-      category_column: cbu_category
-      category_source: cbus
-      activated_by: [FUND_MANDATE]
     state_machine:
       id: holding_lifecycle
       owner: "ops"

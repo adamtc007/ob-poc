@@ -38,8 +38,6 @@
 #   V1.3-3  parent_slot: for master-feeder / umbrella-compartment hierarchy
 #   V1.3-4  expected_lifetime: long_lived; SUSPENDED states present
 #   V1.3-5  dual_lifecycle: discovery-vs-operational
-#   V1.3-8  category_gated: on investor / holding / share_class slots
-#           (fund-structure slots only activate for FUND_MANDATE)
 #
 # New slot:
 #   service_consumption (per-service-per-CBU lifecycle — custody, TA, FA,
@@ -985,10 +983,6 @@ slots:
     # V1.3-4: HARD_CLOSED + WINDING_DOWN cover the pause/hold semantics
     # for share classes — generic SUSPENDED doesn't apply.
     suspended_state_exempt: true
-    category_gated:
-      category_column: cbu_category
-      category_source: cbus
-      activated_by: [FUND_MANDATE]
     state_machine:
       id: share_class_lifecycle
       owner: "ops+fund-admin"
@@ -1050,10 +1044,6 @@ slots:
 
   - id: investor_role
     stateless: true
-    category_gated:
-      category_column: cbu_category
-      category_source: cbus
-      activated_by: [FUND_MANDATE]
     rationale: |
       Investor role annotations (nominee, fund-of-funds, master-pool,
       end-investor). Categorical; roles added / removed over time but
@@ -1318,10 +1308,10 @@ derived_cross_workspace_state:
 # =============================================================================
 # 6. PRODUCT-MODULE GATES
 # =============================================================================
-# V1.2-3 product gating. NOTE: v1.3-8 category_gated: replaces most of
-# the conditionally_on entries below (investor, share_class, etc. are
-# now gated at slot-level by cbu_category). This section retained for
-# any product-level conditional slots that remain (none in R-3).
+# V1.2-3 product gating. The fund-only slot-activation rule (category_gated)
+# was REMOVED 2026-06-22 — investor/holding/share_class slots are no longer
+# gated by cbu_category. This section retained for any product-level
+# conditional slots that remain (none in R-3).
 
 product_module_gates:
 
@@ -1343,10 +1333,8 @@ product_module_gates:
     - kyc_case
 
   conditionally_on:
-  # v1.3-8: fund-structure conditionals migrated to slot-level
-  # `category_gated:` fields (see investor, investor_kyc, holding,
-  # share_class, investor_role slot definitions above). Retained here
-  # as informational only.
+  # The fund-only slot-activation rule (category_gated) was REMOVED
+  # 2026-06-22; no slots are conditionally gated by cbu_category.
 
 # =============================================================================
 # 7. OUT OF SCOPE (P16 three-layer + cross-workspace)
