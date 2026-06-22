@@ -3089,8 +3089,12 @@ mod tests {
     /// Proves select-then-validate's "validate" half end-to-end (real registry
     /// verbs, against a DISCOVERED CBU):
     /// - BLOCK: `cbu.decide` (requires VALIDATION_PENDING) → Err naming VALIDATION_PENDING.
+    /// - BLOCK: `cbu.confirm` (requires VALIDATION_PENDING) → Err naming VALIDATION_PENDING.
     /// - PASS:  `cbu.submit-for-validation` (requires DISCOVERED|VALIDATION_FAILED) → Ok.
-    /// - FAIL-OPEN: `cbu.add-product` (requires VALIDATED, but `entity_arg` unbound) → Ok regardless.
+    /// - BLOCK: `cbu.add-product` (ARMED: `entity_arg=cbu-id`, requires VALIDATED) → Err
+    ///   naming VALIDATED — the confirm-first gate at the junction (commit 95d2a238).
+    /// - FAIL-OPEN: any gated verb against a non-existent cbu (no row) → Ok regardless;
+    ///   the absent-state branch F-D will tighten once operational state is populated.
     ///
     /// Run: `DATABASE_URL=… cargo test --features database -p ob-poc \
     ///   --lib -- dsl_v2::executor::tests::c1_requires_states_precondition --ignored --nocapture`
@@ -3170,18 +3174,34 @@ mod tests {
             .await
             .expect("submit-for-validation on DISCOVERED must pass");
 
-        // FAIL-OPEN: add-product requires VALIDATED but has no authored entity_arg
-        // → the validate cannot identify the entity → PASS regardless of state.
+        // BLOCK: add-product is now ARMED (commit 95d2a238 authored
+        // entity_arg=cbu-id alongside requires_states:[VALIDATED]) — the
+        // confirm-first gate. On a DISCOVERED cbu it must hard-block at the
+        // junction with a named error.
         assert!(
-            add_product
-                .lifecycle
-                .as_ref()
-                .is_some_and(|lc| lc.entity_arg.is_none() && !lc.requires_states.is_empty()),
-            "fixture assumption: cbu.add-product has requires_states but no entity_arg"
+            add_product.lifecycle.as_ref().is_some_and(|lc| {
+                lc.entity_arg.as_deref() == Some("cbu-id")
+                    && lc.requires_states.iter().any(|s| s == "VALIDATED")
+            }),
+            "fixture assumption: cbu.add-product is armed (entity_arg=cbu-id, requires VALIDATED)"
         );
-        enforce_requires_states_precondition(add_product, &args(discovered), &mut scope)
+        let ap_blocked =
+            enforce_requires_states_precondition(add_product, &args(discovered), &mut scope).await;
+        let apmsg = ap_blocked
+            .expect_err("add-product on DISCOVERED must be blocked (confirm-first)")
+            .to_string();
+        assert!(
+            apmsg.contains("VALIDATED") && apmsg.contains("cbu.add-product"),
+            "add-product block must name the required state and verb: {apmsg}"
+        );
+
+        // FAIL-OPEN (absent-state branch): a gated verb against a non-existent
+        // cbu reads no row → PASS regardless. This is the branch F-D will tighten
+        // once operational state is populated; today it must never brick.
+        let ghost = Uuid::new_v4();
+        enforce_requires_states_precondition(decide, &args(ghost), &mut scope)
             .await
-            .expect("add-product must FAIL-OPEN (entity_arg unbound)");
+            .expect("absent row ⇒ C1 fail-open (never brick on missing state)");
 
         // scope drops here → rollback; no rows mutated anyway.
     }
