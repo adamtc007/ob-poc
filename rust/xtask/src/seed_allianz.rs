@@ -411,8 +411,8 @@ async fn clean_allianz_internal(pool: &PgPool) -> Result<()> {
             "cbu_entity_roles",
         ),
         (
-            r#"DELETE FROM "ob-poc".cbu_relationship_verification WHERE cbu_id IN (SELECT cbu_id FROM "ob-poc".cbus WHERE name ILIKE 'Allianz%')"#,
-            "cbu_relationship_verification",
+            r#"DELETE FROM "ob-poc".ubo_relationship_verification WHERE cbu_id IN (SELECT cbu_id FROM "ob-poc".cbus WHERE name ILIKE 'Allianz%')"#,
+            "ubo_relationship_verification",
         ),
     ];
 

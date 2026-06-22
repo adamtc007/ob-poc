@@ -117,7 +117,7 @@ impl SemOsVerbOp for MarkDeceased {
 
         let affected_cbus: Vec<Uuid> = sqlx::query_scalar(
             r#"SELECT DISTINCT v.cbu_id
-               FROM "ob-poc".cbu_relationship_verification v
+               FROM "ob-poc".ubo_relationship_verification v
                JOIN "ob-poc".entity_relationships r ON r.relationship_id = v.relationship_id
                WHERE r.from_entity_id = $1"#,
         )
@@ -126,7 +126,7 @@ impl SemOsVerbOp for MarkDeceased {
         .await?;
 
         let verifications_updated = sqlx::query(
-            r#"UPDATE "ob-poc".cbu_relationship_verification
+            r#"UPDATE "ob-poc".ubo_relationship_verification
                SET status = 'unverified',
                    discrepancy_notes = COALESCE(discrepancy_notes, '') ||
                        ' [UBO deceased ' || $1::text || ' - requires redetermination]',
@@ -247,7 +247,7 @@ impl SemOsVerbOp for ConvergenceSupersede {
         .await?;
 
         sqlx::query(
-            r#"UPDATE "ob-poc".cbu_relationship_verification
+            r#"UPDATE "ob-poc".ubo_relationship_verification
                SET status = 'waived',
                    discrepancy_notes = COALESCE(discrepancy_notes, '') ||
                        ' [Superseded on ' || $1::text || ': ' || $2 || ']',
@@ -280,7 +280,7 @@ impl SemOsVerbOp for ConvergenceSupersede {
         .await?;
 
         sqlx::query(
-            r#"INSERT INTO "ob-poc".cbu_relationship_verification
+            r#"INSERT INTO "ob-poc".ubo_relationship_verification
                (cbu_id, relationship_id, alleged_percentage, allegation_source, status, alleged_at)
                VALUES ($1, $2, $3, 'ubo.supersede', 'alleged', NOW())"#,
         )
@@ -393,7 +393,7 @@ impl SemOsVerbOp for TransferControl {
             .await?;
 
             sqlx::query(
-                r#"UPDATE "ob-poc".cbu_relationship_verification
+                r#"UPDATE "ob-poc".ubo_relationship_verification
                    SET status = 'waived',
                        discrepancy_notes = COALESCE(discrepancy_notes, '') ||
                            ' [Control transferred on ' || $1::text || ']',
@@ -424,7 +424,7 @@ impl SemOsVerbOp for TransferControl {
         .await?;
 
         sqlx::query(
-            r#"INSERT INTO "ob-poc".cbu_relationship_verification
+            r#"INSERT INTO "ob-poc".ubo_relationship_verification
                (cbu_id, relationship_id, allegation_source, status, alleged_at)
                VALUES ($1, $2, 'ubo.transfer-control', 'alleged', NOW())"#,
         )
@@ -520,7 +520,7 @@ impl SemOsVerbOp for WaiveVerification {
 
         let exists: bool = sqlx::query_scalar(
             r#"SELECT EXISTS (
-                SELECT 1 FROM "ob-poc".cbu_relationship_verification
+                SELECT 1 FROM "ob-poc".ubo_relationship_verification
                 WHERE cbu_id = $1 AND relationship_id = $2
             )"#,
         )
@@ -548,7 +548,7 @@ impl SemOsVerbOp for WaiveVerification {
         );
 
         sqlx::query(
-            r#"UPDATE "ob-poc".cbu_relationship_verification
+            r#"UPDATE "ob-poc".ubo_relationship_verification
                SET status = 'waived',
                    resolved_at = NOW(),
                    resolved_by = $1,

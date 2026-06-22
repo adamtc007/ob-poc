@@ -20,7 +20,7 @@ migration_tables = [
     "ob_kyc.entity_regulatory_registrations", "ob_ref.registration_types", "ob_ref.regulators",
     "ob_ref.regulatory_tiers", "ob_ref.request_types", "ob_ref.role_types",
     "ob-poc.cbu_entity_roles_history", "ob-poc.cbu_lifecycle_instances", "ob-poc.cbu_matrix_product_overlay",
-    "ob-poc.cbu_product_subscriptions", "ob-poc.cbu_relationship_verification", "ob-poc.cbu_service_contexts",
+    "ob-poc.cbu_product_subscriptions", "ob-poc.ubo_relationship_verification", "ob-poc.cbu_service_contexts",
     "ob-poc.cbu_sla_commitments", "ob-poc.cbu_structure_links", "ob-poc.dsl_graph_contexts",
     "ob-poc.dsl_verb_categories", "ob-poc.dsl_verb_sync_log", "ob-poc.dsl_verbs",
     "ob-poc.dsl_view_state_changes", "ob-poc.dsl_workflow_phases", "ob-poc.edge_types",

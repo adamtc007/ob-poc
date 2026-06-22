@@ -53,7 +53,7 @@ async fn compute_metrics(
     let ownership_stats: (i64, i64) = sqlx::query_as(
         r#"
         SELECT COUNT(*), COUNT(*) FILTER (WHERE status = 'proven')
-        FROM "ob-poc".cbu_relationship_verification
+        FROM "ob-poc".ubo_relationship_verification
         WHERE cbu_id = $1
         "#,
     )

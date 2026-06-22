@@ -146,20 +146,20 @@ async fn delete_cbu_cascade(pool: &PgPool, cbu_id: Uuid) -> Result<()> {
     let mut tx = pool.begin().await?;
 
     // ═══════════════════════════════════════════════════════════════════════
-    // NEW ARCHITECTURE: Delete from cbu_relationship_verification (CBU-scoped)
+    // NEW ARCHITECTURE: Delete from ubo_relationship_verification (CBU-scoped)
     // Note: entity_relationships are structural facts and persist across CBUs
     // ═══════════════════════════════════════════════════════════════════════
 
     // Get relationship IDs for this CBU before deleting verification records
     let relationship_ids: Vec<Uuid> = sqlx::query_scalar(
-        r#"SELECT relationship_id FROM "ob-poc".cbu_relationship_verification WHERE cbu_id = $1"#,
+        r#"SELECT relationship_id FROM "ob-poc".ubo_relationship_verification WHERE cbu_id = $1"#,
     )
     .bind(cbu_id)
     .fetch_all(&mut *tx)
     .await?;
 
     // Delete CBU-scoped verification records
-    sqlx::query(r#"DELETE FROM "ob-poc".cbu_relationship_verification WHERE cbu_id = $1"#)
+    sqlx::query(r#"DELETE FROM "ob-poc".ubo_relationship_verification WHERE cbu_id = $1"#)
         .bind(cbu_id)
         .execute(&mut *tx)
         .await?;
@@ -168,7 +168,7 @@ async fn delete_cbu_cascade(pool: &PgPool, cbu_id: Uuid) -> Result<()> {
     // This is safe for test data since test entities are only used by test CBUs
     for rel_id in relationship_ids {
         let count: i64 = sqlx::query_scalar(
-            r#"SELECT COUNT(*) FROM "ob-poc".cbu_relationship_verification WHERE relationship_id = $1"#,
+            r#"SELECT COUNT(*) FROM "ob-poc".ubo_relationship_verification WHERE relationship_id = $1"#,
         )
         .bind(rel_id)
         .fetch_one(&mut *tx)
@@ -938,7 +938,7 @@ async fn create_ubo_edge(
     role: Option<&str>,
 ) -> Result<Uuid> {
     // ═══════════════════════════════════════════════════════════════════════
-    // NEW ARCHITECTURE: Insert into entity_relationships + cbu_relationship_verification
+    // NEW ARCHITECTURE: Insert into entity_relationships + ubo_relationship_verification
     // ═══════════════════════════════════════════════════════════════════════
 
     // Map edge_type to relationship_type (lowercase per check constraint)
@@ -979,7 +979,7 @@ async fn create_ubo_edge(
     // Step 2: Create the CBU-scoped verification record with allegation
     sqlx::query(
         r#"
-        INSERT INTO "ob-poc".cbu_relationship_verification
+        INSERT INTO "ob-poc".ubo_relationship_verification
             (cbu_id, relationship_id, alleged_percentage, status, alleged_at)
         VALUES ($1, $2, $3, 'alleged', NOW())
         "#,
@@ -1061,7 +1061,7 @@ async fn get_convergence_status(pool: &PgPool, cbu_id: Uuid) -> Result<Convergen
 }
 
 /// Creates a proof with its backing document
-/// Returns (document_id, proof_id) - document_id is stored in cbu_relationship_verification
+/// Returns (document_id, proof_id) - document_id is stored in ubo_relationship_verification
 async fn create_proof(pool: &PgPool, cbu_id: Uuid, proof_type: &str) -> Result<Uuid> {
     // Step 1: Create backing document in document_catalog
     let document_id: Uuid = sqlx::query_scalar(
@@ -1088,16 +1088,16 @@ async fn create_proof(pool: &PgPool, cbu_id: Uuid, proof_type: &str) -> Result<U
     .await
     .context("Failed to create proof")?;
 
-    // Return document_id - this is what gets stored in cbu_relationship_verification.proof_document_id
+    // Return document_id - this is what gets stored in ubo_relationship_verification.proof_document_id
     Ok(document_id)
 }
 
 async fn get_single_edge(pool: &PgPool, cbu_id: Uuid) -> Result<Uuid> {
     // ═══════════════════════════════════════════════════════════════════════
-    // NEW ARCHITECTURE: Query entity_relationships via cbu_relationship_verification
+    // NEW ARCHITECTURE: Query entity_relationships via ubo_relationship_verification
     // ═══════════════════════════════════════════════════════════════════════
     sqlx::query_scalar::<_, Uuid>(
-        r#"SELECT relationship_id FROM "ob-poc".cbu_relationship_verification WHERE cbu_id = $1 LIMIT 1"#,
+        r#"SELECT relationship_id FROM "ob-poc".ubo_relationship_verification WHERE cbu_id = $1 LIMIT 1"#,
     )
     .bind(cbu_id)
     .fetch_one(pool)
@@ -1115,13 +1115,13 @@ struct UboEdge {
 
 async fn get_all_edges(pool: &PgPool, cbu_id: Uuid) -> Result<Vec<UboEdge>> {
     // ═══════════════════════════════════════════════════════════════════════
-    // NEW ARCHITECTURE: Join entity_relationships + cbu_relationship_verification
+    // NEW ARCHITECTURE: Join entity_relationships + ubo_relationship_verification
     // ═══════════════════════════════════════════════════════════════════════
     let rows = sqlx::query_as::<_, (Uuid, String, Option<f64>, Option<String>, Option<String>)>(
         r#"
         SELECT r.relationship_id, r.relationship_type, v.alleged_percentage::float8, r.control_type, r.trust_role
         FROM "ob-poc".entity_relationships r
-        JOIN "ob-poc".cbu_relationship_verification v ON v.relationship_id = r.relationship_id
+        JOIN "ob-poc".ubo_relationship_verification v ON v.relationship_id = r.relationship_id
         WHERE v.cbu_id = $1
         "#,
     )
@@ -1144,11 +1144,11 @@ async fn get_all_edges(pool: &PgPool, cbu_id: Uuid) -> Result<Vec<UboEdge>> {
 
 async fn link_proof_to_edge(pool: &PgPool, relationship_id: Uuid, document_id: Uuid) -> Result<()> {
     // ═══════════════════════════════════════════════════════════════════════
-    // NEW ARCHITECTURE: Update cbu_relationship_verification.proof_document_id
+    // NEW ARCHITECTURE: Update ubo_relationship_verification.proof_document_id
     // Note: document_id is from document_catalog, not proofs table
     // ═══════════════════════════════════════════════════════════════════════
     sqlx::query(
-        r#"UPDATE "ob-poc".cbu_relationship_verification
+        r#"UPDATE "ob-poc".ubo_relationship_verification
            SET proof_document_id = $1, status = 'pending', updated_at = NOW()
            WHERE relationship_id = $2"#,
     )
@@ -1161,14 +1161,14 @@ async fn link_proof_to_edge(pool: &PgPool, relationship_id: Uuid, document_id: U
 
 async fn verify_edge(pool: &PgPool, edge_id: Uuid, proven_percentage: f64) -> Result<()> {
     // ═══════════════════════════════════════════════════════════════════════
-    // NEW ARCHITECTURE: Update cbu_relationship_verification + entity_relationships
+    // NEW ARCHITECTURE: Update ubo_relationship_verification + entity_relationships
     // Note: edge_id is now relationship_id
     // ═══════════════════════════════════════════════════════════════════════
 
     // Update verification record
     sqlx::query(
         r#"
-        UPDATE "ob-poc".cbu_relationship_verification
+        UPDATE "ob-poc".ubo_relationship_verification
         SET status = 'proven',
             observed_percentage = $1,
             resolved_at = NOW(),
@@ -1199,12 +1199,12 @@ async fn verify_edge(pool: &PgPool, edge_id: Uuid, proven_percentage: f64) -> Re
 
 async fn verify_edge_control(pool: &PgPool, edge_id: Uuid, _role: Option<&str>) -> Result<()> {
     // ═══════════════════════════════════════════════════════════════════════
-    // NEW ARCHITECTURE: Update cbu_relationship_verification for control edges
+    // NEW ARCHITECTURE: Update ubo_relationship_verification for control edges
     // Note: edge_id is now relationship_id
     // ═══════════════════════════════════════════════════════════════════════
     sqlx::query(
         r#"
-        UPDATE "ob-poc".cbu_relationship_verification
+        UPDATE "ob-poc".ubo_relationship_verification
         SET status = 'proven',
             resolved_at = NOW(),
             updated_at = NOW()
@@ -1237,12 +1237,12 @@ struct UboEvaluation {
 
 async fn evaluate_ubo(pool: &PgPool, cbu_id: Uuid) -> Result<UboEvaluation> {
     // Find beneficial owners (>=25% ownership) using new tables
-    // Join entity_relationships (structural) with cbu_relationship_verification (CBU-scoped status)
+    // Join entity_relationships (structural) with ubo_relationship_verification (CBU-scoped status)
     let owners = sqlx::query_as::<_, (String, f64)>(
         r#"
         SELECT e.name, COALESCE(v.observed_percentage, r.percentage)::float8 as proven_percentage
         FROM "ob-poc".entity_relationships r
-        JOIN "ob-poc".cbu_relationship_verification v ON v.relationship_id = r.relationship_id
+        JOIN "ob-poc".ubo_relationship_verification v ON v.relationship_id = r.relationship_id
         JOIN "ob-poc".entities e ON e.entity_id = r.from_entity_id
         WHERE v.cbu_id = $1
           AND r.relationship_type = 'ownership'
@@ -1267,7 +1267,7 @@ async fn evaluate_ubo(pool: &PgPool, cbu_id: Uuid) -> Result<UboEvaluation> {
         r#"
         SELECT e.name, r.trust_role, r.relationship_type
         FROM "ob-poc".entity_relationships r
-        JOIN "ob-poc".cbu_relationship_verification v ON v.relationship_id = r.relationship_id
+        JOIN "ob-poc".ubo_relationship_verification v ON v.relationship_id = r.relationship_id
         JOIN "ob-poc".entities e ON e.entity_id = r.from_entity_id
         WHERE v.cbu_id = $1
           AND r.relationship_type IN ('control', 'trust_role')

@@ -1863,7 +1863,7 @@ erDiagram
     uuid subscription_id
     timestamp_with_time_zone updated_at
   }
-  ob_poc__cbu_relationship_verification {
+  ob_poc__ubo_relationship_verification {
     uuid cbu_id FK
     uuid proof_document_id FK
     uuid relationship_id FK
@@ -5122,7 +5122,7 @@ erDiagram
   ob_poc__cbus ||--o{ ob_poc__cbu_lifecycle_instances : "cbu_lifecycle_instances_cbu_fk:cbu_id"
   ob_poc__cbus ||--o{ ob_poc__cbu_matrix_product_overlay : "cbu_matrix_product_overlay_cbu_id_fkey:cbu_id"
   ob_poc__cbus ||--o{ ob_poc__cbu_product_subscriptions : "cbu_product_subscriptions_cbu_id_fkey:cbu_id"
-  ob_poc__cbus ||--o{ ob_poc__cbu_relationship_verification : "cbu_relationship_verification_cbu_id_fkey:cbu_id"
+  ob_poc__cbus ||--o{ ob_poc__ubo_relationship_verification : "ubo_relationship_verification_cbu_id_fkey:cbu_id"
   ob_poc__cbus ||--o{ ob_poc__cbu_resource_instances : "cbu_resource_instances_cbu_id_fkey:cbu_id"
   ob_poc__cbus ||--o{ ob_poc__cbu_service_contexts : "cbu_service_contexts_cbu_id_fkey:cbu_id"
   ob_poc__cbus ||--o{ ob_poc__cbu_service_readiness : "cbu_service_readiness_cbu_id_fkey:cbu_id"
@@ -5175,7 +5175,7 @@ erDiagram
   ob_poc__document_catalog ||--o{ kyc__special_rights : "special_rights_source_document_id_fkey:source_document_id"
   ob_poc__document_catalog ||--o{ ob_poc__attribute_observations : "attribute_observations_source_document_id_fkey:source_document_id"
   ob_poc__document_catalog ||--o{ ob_poc__cbu_evidence : "cbu_evidence_document_id_fkey:document_id"
-  ob_poc__document_catalog ||--o{ ob_poc__cbu_relationship_verification : "cbu_relationship_verification_proof_document_id_fkey:proof_document_id"
+  ob_poc__document_catalog ||--o{ ob_poc__ubo_relationship_verification : "ubo_relationship_verification_proof_document_id_fkey:proof_document_id"
   ob_poc__document_catalog ||--o{ ob_poc__cbu_sla_commitments : "cbu_sla_commitments_source_document_id_fkey:source_document_id"
   ob_poc__document_catalog ||--o{ ob_poc__cbu_trading_profiles : "cbu_trading_profiles_source_document_id_fkey:source_document_id"
   ob_poc__document_catalog ||--o{ ob_poc__delegation_relationships : "delegation_relationships_contract_doc_id_fkey:contract_doc_id"
@@ -5284,7 +5284,7 @@ erDiagram
   ob_poc__entities ||--o{ ob_poc__ubo_registry : "fk_ubo_registry_subject_entity_id:subject_entity_id; fk_ubo_registry_ubo_proper_person_id:ubo_proper_person_id; ubo_registry_subject_entity_id_fkey:subject_entity_id; ubo_registry_ubo_proper_person_id_fkey:ubo_proper_person_id"
   ob_poc__entities ||--o{ ob_poc__verification_challenges : "verification_challenges_entity_id_fkey:entity_id"
   ob_poc__entities ||--o{ teams__teams : "teams_delegating_entity_id_fkey:delegating_entity_id"
-  ob_poc__entity_relationships ||--o{ ob_poc__cbu_relationship_verification : "cbu_relationship_verification_relationship_id_fkey:relationship_id"
+  ob_poc__entity_relationships ||--o{ ob_poc__ubo_relationship_verification : "ubo_relationship_verification_relationship_id_fkey:relationship_id"
   ob_poc__entity_relationships ||--o{ ob_poc__client_group_relationship : "client_group_relationship_promoted_to_relationship_id_fkey:promoted_to_relationship_id"
   ob_poc__entity_trusts ||--o{ ob_poc__trust_parties : "fk_trust_parties_trust_id:trust_id; trust_parties_trust_id_fkey:trust_id"
   ob_poc__entity_types ||--o{ ob_poc__entities : "entities_entity_type_id_fkey:entity_type_id; fk_entities_entity_type_id:entity_type_id"

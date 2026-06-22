@@ -52,7 +52,7 @@ Client Business Unit (trading unit) and all direct child tables.
 - `cbu_product_subscriptions` - Product subscriptions per CBU
 - `cbu_trading_profiles` - Trading profile instances
 - `cbu_matrix_product_overlay` - Matrix customization per CBU
-- `cbu_relationship_verification` - Intra-CBU verification
+- `ubo_relationship_verification` - Intra-CBU verification
 - `cbu_resource_instances` - Service resource allocation
 - `cbu_service_readiness` - Service readiness tracking
 - `cbu_sla_commitments` - SLA assignments
@@ -356,7 +356,7 @@ Know-Your-Customer, due diligence, screening, and sanctions checks.
 **Verification & Challenges (7):**
 - `verification_challenges` - Verification blockers
 - `verification_escalations` - Escalated verifications
-- `cbu_relationship_verification` - Relationship verification
+- `ubo_relationship_verification` - Relationship verification
 - `threshold_requirements` - Risk threshold definitions
 - `risk_ratings` - Risk assessment scores
 - `risk_bands` - Risk band definitions

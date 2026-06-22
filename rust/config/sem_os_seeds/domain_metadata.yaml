@@ -231,7 +231,7 @@ domains:
         governance_tier: operational
         classification: internal
         pii: false
-      cbu_relationship_verification:
+      ubo_relationship_verification:
         description: "CBU relationship verification status and evidence tracking"
         governance_tier: governed
         classification: confidential
