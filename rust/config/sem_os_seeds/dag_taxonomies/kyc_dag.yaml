@@ -893,6 +893,385 @@ slots:
       snapshot_type categorical only (MANUAL / PERIODIC / EVENT_DRIVEN /
       CASE_OPEN / CASE_CLOSE).
 
+  # ---------------------------------------------------------------------------
+  # 2.4 Relocated from cbu_dag.yaml (2026-06-22 — domain isolation)
+  #
+  # These KYC-domain state machines previously lived in the CBU DAG. They are
+  # owned by KYC; CBU reads them read-only via a reference stub. Slot content
+  # preserved exactly as authored in cbu_dag.yaml.
+  # ---------------------------------------------------------------------------
+
+  - id: entity_proper_person
+    stateless: false
+    closure: closed_unbounded
+    eligibility:
+      entity_kinds: [proper_person]
+    entry_state: GHOST
+    state_machine:
+      id: entity_proper_person_lifecycle
+      source_entity: '"ob-poc".entity_proper_persons'
+      state_column: person_state
+      scope: per_natural_person_entity
+      description: |
+        Natural-person entity state. 3 states from schema comment.
+        Applies to UBOs, directors, signatories, beneficial owners.
+      states:
+        - id: GHOST
+          entry: true
+          description: "Name-only; no identifying attributes."
+        - id: IDENTIFIED
+          description: "Has DOB / nationality / ID numbers."
+        - id: VERIFIED
+          description: "Confirmed by official documents."
+      transitions:
+        - from: GHOST
+          to: IDENTIFIED
+          via: entity.identify
+        - from: IDENTIFIED
+          to: VERIFIED
+          via: entity.verify
+      terminal_states: [VERIFIED]
+
+  - id: entity_limited_company_ubo
+    stateless: false
+    closure: closed_unbounded
+    eligibility:
+      entity_kinds: [limited_company]
+    entry_state: PENDING
+    state_machine:
+      id: entity_limited_company_ubo_lifecycle
+      source_entity: '"ob-poc".entity_limited_companies'
+      state_column: ubo_status
+      scope: per_limited_company_entity
+      description: |
+        UBO discovery state for limited companies. 5 states from
+        schema comment. Tracks whether beneficial ownership has
+        been traced and categorised.
+      states:
+        - id: PENDING
+          entry: true
+          description: "UBO discovery not yet attempted."
+        - id: DISCOVERED
+          description: "Beneficial owners identified via research."
+        - id: PUBLIC_FLOAT
+          description: "Widely-held public company; no UBO lookup required."
+        - id: EXEMPT
+          description: "Regulator-exempt (state-owned, sovereign, etc.)."
+        - id: MANUAL_REQUIRED
+          description: "Automated discovery failed; manual investigation needed."
+      transitions:
+        - from: PENDING
+          to: DISCOVERED
+          via: "(backend: UBO discovery pipeline)"
+        - from: PENDING
+          to: PUBLIC_FLOAT
+          via: "(backend: listed-company check)"
+        - from: PENDING
+          to: EXEMPT
+          via: "(backend: exemption classifier)"
+        - from: PENDING
+          to: MANUAL_REQUIRED
+          via: "(backend: pipeline failure)"
+        - from: MANUAL_REQUIRED
+          to: DISCOVERED
+          via: ubo.registry.promote  # cross-workspace from KYC
+      terminal_states: [DISCOVERED, PUBLIC_FLOAT, EXEMPT]
+
+  - id: investor
+    stateless: false
+    # V1.3-8 category_gated: investor register only exists for funds.
+    category_gated:
+      category_column: cbu_category
+      category_source: cbus
+      activated_by: [FUND_MANDATE]
+    state_machine:
+      id: investor_lifecycle
+      owner: "ops"
+      expected_lifetime: long_lived     # V1.3-4 (SUSPENDED present)
+      source_entity: '"ob-poc".investors'
+      state_column: (derived from investor lifecycle events + status)
+      scope: per_investor
+      description: |
+        Investor commercial lifecycle — from eligibility check through
+        active subscription to offboarding. Distinct from investor_kyc
+        (parallel; see below). This lifecycle is the
+        "can-they-invest-right-now" state.
+      states:
+        - id: DRAFT
+          entry: true
+          description: "Investor record created; eligibility not confirmed."
+        - id: ELIGIBLE
+          description: "Eligibility confirmed (qualification test passed)."
+        - id: ACTIVE
+          description: "Subscribed; holding units."
+        # REDEEMING + REDEEMED removed 2026-04-29 (D-003) — orphan states with
+        # zero transitions reaching or leaving them. Redemption flow re-modelled
+        # later if BNY-style redemption lifecycle is needed.
+        - id: SUSPENDED
+          description: "Temporary hold (KYC refresh, dispute, sanctions)."
+        - id: OFFBOARDED
+          description: "Account closed; exit completed."
+      transitions:
+        - from: DRAFT
+          to: ELIGIBLE
+          via: investor.mark-eligible
+        - from: ELIGIBLE
+          to: ACTIVE
+          via: investor.activate
+          precondition: "investor_kyc.status = APPROVED"
+        - from: ACTIVE
+          to: SUSPENDED
+          via: investor.suspend
+        - from: SUSPENDED
+          to: ACTIVE
+          via: investor.reinstate
+        - from: "(ACTIVE, SUSPENDED)"
+          to: OFFBOARDED
+          via: investor.offboard
+      terminal_states: [OFFBOARDED]
+
+  - id: investor_kyc
+    stateless: false
+    # V1.3-4: no SUSPENDED state — KYC refresh semantics handled via
+    # EXPIRED / REFRESH_REQUIRED; SUSPENDED doesn't apply.
+    suspended_state_exempt: true
+    # V1.3-8 category_gated: investor KYC only runs for fund-mandate CBUs.
+    category_gated:
+      category_column: cbu_category
+      category_source: cbus
+      activated_by: [FUND_MANDATE]
+    # V1.3-6 periodic review cadence.
+    periodic_review_cadence:
+      base_window: "P2Y"
+      risk_tiered_overrides:
+        - risk_tier: HIGH
+          window: "P1Y"
+        - risk_tier: LOW
+          window: "P3Y"
+      review_scope: full
+    state_machine:
+      id: investor_kyc_lifecycle
+      owner: compliance
+      expected_lifetime: long_lived
+      source_entity: '"ob-poc".investors'
+      state_column: kyc_status
+      scope: per_investor
+      description: |
+        Per-investor KYC state, parallel to investor_lifecycle. 6
+        states from schema comment. Refresh cadence is regulatory
+        (annual high-risk, biennial low-risk). Matches KYC findings
+        V1.3-CAND-3 periodic review cadence pattern.
+      states:
+        - id: NOT_STARTED
+          entry: true
+        - id: IN_PROGRESS
+          description: "KYC evidence being collected + verified."
+        - id: APPROVED
+          description: "KYC passed; investor can be ACTIVE."
+        - id: REJECTED
+          description: "KYC failed; investor cannot be ACTIVE. Terminal."
+        - id: EXPIRED
+          entry_via:
+            trigger:
+              name: kyc_expires_at
+          description: "Approval lapsed; refresh required before new activity."
+        - id: REFRESH_REQUIRED
+          description: "Material change triggered mandatory re-KYC."
+      transitions:
+        - from: NOT_STARTED
+          to: IN_PROGRESS
+          via: investor.start-kyc
+        - from: IN_PROGRESS
+          to: APPROVED
+          via: investor.approve-kyc
+        - from: IN_PROGRESS
+          to: REJECTED
+          via: investor.reject-kyc
+        - from: APPROVED
+          to: EXPIRED
+          via: "(backend: kyc_expires_at trigger)"
+        - from: APPROVED
+          to: REFRESH_REQUIRED
+          via: investor.request-documents
+        - from: "(EXPIRED, REFRESH_REQUIRED)"
+          to: IN_PROGRESS
+          via: investor.start-kyc
+      terminal_states: [REJECTED]
+
+  - id: holding
+    stateless: false
+    # V1.3-8 category_gated: holdings only exist for fund-mandate CBUs.
+    category_gated:
+      category_column: cbu_category
+      category_source: cbus
+      activated_by: [FUND_MANDATE]
+    state_machine:
+      id: holding_lifecycle
+      owner: "ops"
+      expected_lifetime: long_lived     # V1.3-4
+      source_entity: '"ob-poc".holdings'
+      state_column: holding_status
+      scope: per_holding
+      description: |
+        Per-holding lifecycle. 7 states (schema has 4; v1.3 extends
+        with RESTRICTED / PLEDGED / FROZEN per CBU findings G-8 for
+        encumbered-holdings semantics — legal locks, collateral pledges,
+        sanctions freezes). Schema migration deferred (D-2).
+      states:
+        - id: PENDING
+          entry: true
+          description: "Subscription recorded; awaiting settlement."
+        - id: ACTIVE
+          description: "Settled; units held; dividends accrue."
+        - id: SUSPENDED
+          description: "Temporary hold (dispute, KYC suspend on investor)."
+        - id: RESTRICTED
+          description: "Legal lock — court order, dispute freeze, specific restriction."
+        - id: PLEDGED
+          description: "Pledged as collateral against a loan/derivative; cannot redeem freely."
+        - id: FROZEN
+          description: "Sanctions exposure on investor; regulatory freeze."
+        - id: CLOSED
+          description: "Redemption complete; zero units."
+      transitions:
+        - from: PENDING
+          to: ACTIVE
+          via: holding.update-status
+          args: { status: ACTIVE }
+        - from: ACTIVE
+          to: SUSPENDED
+          via: holding.update-status
+          args: { status: SUSPENDED }
+        - from: SUSPENDED
+          to: ACTIVE
+          via: holding.update-status
+          args: { status: ACTIVE }
+        - from: ACTIVE
+          to: RESTRICTED
+          via: holding.restrict
+        - from: RESTRICTED
+          to: ACTIVE
+          via: holding.lift-restriction
+        - from: ACTIVE
+          to: PLEDGED
+          via: holding.pledge
+        - from: PLEDGED
+          to: ACTIVE
+          via: holding.release-pledge
+        - from: [ACTIVE, SUSPENDED, RESTRICTED, PLEDGED]
+          to: FROZEN
+          via: "(backend: sanctions hit)"
+        - from: FROZEN
+          to: ACTIVE
+          via: "(backend: sanctions cleared)"
+        - from: [ACTIVE, SUSPENDED, PENDING, RESTRICTED]
+          to: CLOSED
+          via: holding.close
+      terminal_states: [CLOSED]
+
+  # R-6 G-3: manco promoted to stateful. Regulatory-action cascade
+  # applies to ALL CBUs managed by this manco. Schema landed in
+  # migration 20260425_manco_regulatory_status.sql — manco state
+  # carrier table is `manco_regulatory_status` keyed by manco_entity_id.
+  - id: manco
+    stateless: false
+    closure: closed_bounded
+    eligibility:
+      entity_kinds: [limited_company]
+    cardinality_max: 1
+    entry_state: UNDER_REVIEW
+    state_machine:
+      id: manco_lifecycle
+      owner: compliance
+      expected_lifetime: long_lived
+      source_entity: '"ob-poc".manco_regulatory_status'
+      state_column: regulatory_status
+      scope: per_manco
+      description: |
+        Per-manco regulatory + operational state. A manco under
+        regulatory action cascades SUSPENDED to all CBUs it manages
+        (cross-slot constraint hooked via cbu_entity_roles where role
+        = fund_manager / sub_manager). Reference-data-like in v1.2;
+        R-6 promotes to stateful because regulatory-action cascade
+        is real commercial risk (Credit Suisse 2022, FTX, etc.).
+      predicate_bindings:
+        - entity: regulatory_licence
+          source_kind: dag_entity
+          source_entity: regulatory_licence
+          scope: attached_to this manco
+          required_universe:
+            source_kind: dag_entity
+            source_entity: regulatory_licence_requirement
+        - entity: investigation
+          source_kind: dag_entity
+          source_entity: investigation
+          scope: attached_to this manco
+        - entity: periodic_review
+          source_kind: dag_entity
+          source_entity: periodic_review
+          scope: attached_to this manco
+        - entity: credit_risk_assessment
+          source_kind: dag_entity
+          source_entity: credit_risk_assessment
+          scope: attached_to this manco
+        - entity: operational_risk_assessment
+          source_kind: dag_entity
+          source_entity: operational_risk_assessment
+          scope: attached_to this manco
+      states:
+        - id: UNDER_REVIEW
+          entry: true
+          description: "New manco being onboarded; not yet approved to manage mandates."
+        - id: APPROVED
+          description: "Manco cleared to manage new mandates."
+          green_when: |
+            every regulatory_licence exists
+            AND every regulatory_licence.state = CURRENT
+            AND no investigation exists with state = OPEN
+            AND periodic_review exists
+            AND periodic_review.state = COMPLETE
+            AND credit_risk_assessment exists
+            AND credit_risk_assessment.state in {WITHIN_LIMITS, LOW}
+            AND operational_risk_assessment exists
+            AND operational_risk_assessment.state in {WITHIN_LIMITS, LOW}
+        - id: UNDER_INVESTIGATION
+          description: |
+            Regulatory action or internal investigation; new mandates
+            blocked; existing mandates under heightened scrutiny.
+            Propagates SUSPENDED to all managed CBUs (cascade).
+        - id: SUSPENDED
+          description: "Full operational hold — managed CBUs all SUSPENDED."
+        - id: SUNSET
+          description: "No new mandates; existing ones run to exit. Wind-down in progress."
+        - id: TERMINATED
+          description: "Terminal. All mandates transferred or wound down; manco retired."
+      transitions:
+        - from: UNDER_REVIEW
+          to: APPROVED
+          via: manco.approve
+        - from: UNDER_REVIEW
+          to: TERMINATED
+          via: manco.reject
+        - from: APPROVED
+          to: UNDER_INVESTIGATION
+          via: manco.flag-regulatory
+        - from: UNDER_INVESTIGATION
+          to: APPROVED
+          via: manco.clear-regulatory
+        - from: UNDER_INVESTIGATION
+          to: SUSPENDED
+          via: manco.suspend
+        - from: SUSPENDED
+          to: UNDER_INVESTIGATION
+          via: manco.partial-reinstate   # out of full suspension but still flagged
+        - from: [APPROVED, UNDER_INVESTIGATION, SUSPENDED]
+          to: SUNSET
+          via: manco.begin-sunset
+        - from: SUNSET
+          to: TERMINATED
+          via: manco.terminate
+      terminal_states: [TERMINATED]
+
 # =============================================================================
 # 3. CROSS-SLOT CONSTRAINTS
 # =============================================================================

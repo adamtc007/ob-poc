@@ -503,6 +503,51 @@ slots:
       Contract lifecycle lives in contract domain (separate from Deal
       DAG). Stateless reference.
 
+  # ---------------------------------------------------------------------------
+  # Relocated from cbu_dag.yaml (2026-06-22 — domain isolation)
+  #
+  # client_group_entity_review governs inclusion of an entity into a client
+  # group during onboarding research. Owned by onboarding_request; CBU reads
+  # it read-only via a reference stub. Slot content preserved exactly as
+  # authored in cbu_dag.yaml.
+  # ---------------------------------------------------------------------------
+
+  - id: client_group_entity_review
+    stateless: false
+    state_machine:
+      id: client_group_entity_review_lifecycle
+      source_entity: '"ob-poc".client_group_entity'
+      state_column: review_status
+      scope: per_client_group_entity_link
+      description: |
+        Per-(client_group, entity) link review state. 4 states from
+        schema comment. Governs inclusion of an entity into a client
+        group during onboarding research.
+      states:
+        - id: pending
+          entry: true
+          description: "Entity link proposed by research; awaiting review."
+        - id: confirmed
+          description: "Entity confirmed as part of the client group."
+        - id: rejected
+          description: "Entity rejected from the client group."
+        - id: needs_update
+          description: "Source data changed; review needs redo."
+      transitions:
+        - from: pending
+          to: confirmed
+          via: "(backend: client-group researcher review — cross-workspace verb from onboarding)"
+        - from: pending
+          to: rejected
+          via: "(backend: client-group researcher review)"
+        - from: "(confirmed, rejected)"
+          to: needs_update
+          via: "(backend: source data change trigger)"
+        - from: needs_update
+          to: pending
+          via: "(backend: re-review required)"
+      terminal_states: []  # confirmed is final for ops but can always return to needs_update
+
 # =============================================================================
 # 3. CROSS-SLOT CONSTRAINTS
 # =============================================================================
