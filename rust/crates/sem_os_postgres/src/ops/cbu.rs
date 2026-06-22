@@ -1194,33 +1194,10 @@ impl SemOsVerbOp for Inspect {
             })
             .collect();
 
-        let screenings: Vec<(Uuid, Uuid, String, String, String, Option<String>)> = sqlx::query_as(
-            r#"SELECT s.screening_id, w.entity_id, e.name as entity_name,
-                      s.screening_type, s.status, s.result_summary
-               FROM "ob-poc".screenings s
-               JOIN "ob-poc".entity_workstreams w ON w.workstream_id = s.workstream_id
-               JOIN "ob-poc".cases c ON c.case_id = w.case_id
-               JOIN "ob-poc".entities e ON e.entity_id = w.entity_id
-               WHERE c.cbu_id = $1 AND e.deleted_at IS NULL
-               ORDER BY s.screening_type, e.name"#,
-        )
-        .bind(cbu_id)
-        .fetch_all(scope.executor())
-        .await?;
-
-        let screening_list: Vec<Value> = screenings
-            .iter()
-            .map(|(sid, eid, ename, stype, status, result)| {
-                serde_json::json!({
-                    "screening_id": sid,
-                    "entity_id": eid,
-                    "entity_name": ename,
-                    "screening_type": stype,
-                    "status": status,
-                    "result": result
-                })
-            })
-            .collect();
+        // NOTE (2026-06-22): cbu.inspect is a STRUCTURAL projection only. It must
+        // NOT read KYC state (screenings / cases) — CBU knows nothing about KYC.
+        // KYC reads CBU (via ManCo), never the reverse. See the domain-isolation
+        // rule; KYC inspection belongs to a KYC-domain verb.
 
         let services: Vec<(Uuid, String, String, String, String)> = sqlx::query_as(
             r#"SELECT sdm.delivery_id, p.name as product_name, p.product_code,
@@ -1247,45 +1224,9 @@ impl SemOsVerbOp for Inspect {
             })
             .collect();
 
-        let cases: Vec<(
-            Uuid,
-            String,
-            String,
-            Option<String>,
-            Option<String>,
-            chrono::DateTime<chrono::Utc>,
-            Option<chrono::DateTime<chrono::Utc>>,
-        )> = sqlx::query_as(
-            r#"SELECT case_id, status, case_type, risk_rating, escalation_level,
-                      opened_at, closed_at
-               FROM "ob-poc".cases WHERE cbu_id = $1 ORDER BY opened_at DESC"#,
-        )
-        .bind(cbu_id)
-        .fetch_all(scope.executor())
-        .await?;
-
-        let case_list: Vec<Value> = cases
-            .iter()
-            .map(
-                |(cid, status, ctype, risk_rating, escalation_level, opened_at, closed_at)| {
-                    serde_json::json!({
-                        "case_id": cid,
-                        "status": status,
-                        "case_type": ctype,
-                        "risk_rating": risk_rating,
-                        "escalation_level": escalation_level,
-                        "opened_at": opened_at.to_rfc3339(),
-                        "closed_at": closed_at.map(|t| t.to_rfc3339())
-                    })
-                },
-            )
-            .collect();
-
         let entity_count = entity_list.len();
         let document_count = doc_list.len();
-        let screening_count = screening_list.len();
         let service_count = service_list.len();
-        let case_count = case_list.len();
 
         Ok(VerbExecutionOutcome::Record(serde_json::json!({
             "cbu_id": cbu.0,
@@ -1300,15 +1241,11 @@ impl SemOsVerbOp for Inspect {
             "as_of_date": as_of_date.to_string(),
             "entities": entity_list,
             "documents": doc_list,
-            "screenings": screening_list,
             "services": service_list,
-            "kyc_cases": case_list,
             "summary": {
                 "entity_count": entity_count,
                 "document_count": document_count,
-                "screening_count": screening_count,
-                "service_count": service_count,
-                "case_count": case_count
+                "service_count": service_count
             }
         })))
     }
