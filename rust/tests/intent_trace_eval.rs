@@ -578,7 +578,7 @@ mod db_eval {
     /// (M4). `entity_state` only flips the per-verb `lifecycle_eligible` TAG
     /// (the select-then-validate signal), never membership.
     ///
-    /// Pre-C2 this FAILED: the `Some("DISCOVERED")` surface pruned `cbu.decide`
+    /// Pre-C2 this FAILED: the `Some("DISCOVERED")` surface pruned `cbu.confirm`
     /// (requires VALIDATION_PENDING) and friends, so it was strictly smaller
     /// than the harness/`None` set. Post-C2 all three are identical.
     #[test]
@@ -631,8 +631,8 @@ mod db_eval {
 
         // The state-ineligible verb stays a classification candidate…
         assert!(
-            discovered_surface.contains("cbu.decide"),
-            "cbu.decide must remain discoverable at DISCOVERED"
+            discovered_surface.contains("cbu.confirm"),
+            "cbu.confirm must remain discoverable at DISCOVERED"
         );
         // …yet entity_state still flips its eligibility TAG (read the pub field;
         // external tests use the public API only).
@@ -643,12 +643,12 @@ mod db_eval {
                 .map(|v| v.lifecycle_eligible)
         };
         assert_eq!(
-            eligible(&discovered_surface, "cbu.decide"),
+            eligible(&discovered_surface, "cbu.confirm"),
             Some(false),
-            "cbu.decide (requires VALIDATION_PENDING) tagged ineligible at DISCOVERED"
+            "cbu.confirm (requires VALIDATION_PENDING) tagged ineligible at DISCOVERED"
         );
         assert_eq!(
-            eligible(&none_surface, "cbu.decide"),
+            eligible(&none_surface, "cbu.confirm"),
             Some(true),
             "no entity_state ⇒ eligible (cannot check)"
         );

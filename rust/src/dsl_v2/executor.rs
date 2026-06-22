@@ -3088,7 +3088,6 @@ mod tests {
     ///
     /// Proves select-then-validate's "validate" half end-to-end (real registry
     /// verbs, against a DISCOVERED CBU):
-    /// - BLOCK: `cbu.decide` (requires VALIDATION_PENDING) → Err naming VALIDATION_PENDING.
     /// - BLOCK: `cbu.confirm` (requires VALIDATION_PENDING) → Err naming VALIDATION_PENDING.
     /// - PASS:  `cbu.submit-for-validation` (requires DISCOVERED|VALIDATION_FAILED) → Ok.
     /// - BLOCK: `cbu.add-product` (ARMED: `entity_arg=cbu-id`, requires VALIDATED) → Err
@@ -3132,7 +3131,6 @@ mod tests {
                 .expect("a DISCOVERED cbu must exist");
 
         let reg = runtime_registry();
-        let decide = reg.get("cbu", "decide").expect("cbu.decide registered");
         let confirm = reg.get("cbu", "confirm").expect("cbu.confirm registered");
         let submit = reg
             .get("cbu", "submit-for-validation")
@@ -3147,18 +3145,9 @@ mod tests {
                 .collect()
         };
 
-        // BLOCK: decide (requires VALIDATION_PENDING) on a DISCOVERED cbu.
-        let blocked =
-            enforce_requires_states_precondition(decide, &args(discovered), &mut scope).await;
-        let err = blocked.expect_err("decide on DISCOVERED must be blocked");
-        let msg = err.to_string();
-        assert!(
-            msg.contains("VALIDATION_PENDING") && msg.contains("cbu.decide"),
-            "block error must name the required state and verb: {msg}"
-        );
-
         // BLOCK: the dedicated confirm verb (requires VALIDATION_PENDING) on a
-        // DISCOVERED cbu — proves the new confirmation/rework set is C1-enforced.
+        // DISCOVERED cbu — the structural-validation gate, C1-enforced with a
+        // named error (replaces the deleted cbu.decide as the block example).
         let confirm_blocked =
             enforce_requires_states_precondition(confirm, &args(discovered), &mut scope).await;
         let cmsg = confirm_blocked
@@ -3199,7 +3188,7 @@ mod tests {
         // cbu reads no row → PASS regardless. This is the branch F-D will tighten
         // once operational state is populated; today it must never brick.
         let ghost = Uuid::new_v4();
-        enforce_requires_states_precondition(decide, &args(ghost), &mut scope)
+        enforce_requires_states_precondition(confirm, &args(ghost), &mut scope)
             .await
             .expect("absent row ⇒ C1 fail-open (never brick on missing state)");
 
@@ -3211,7 +3200,7 @@ mod tests {
     /// returns a NAMED precondition error (C1). Select-then-validate, proven on
     /// one verb in one test.
     ///
-    /// `cbu.decide` requires VALIDATION_PENDING; against a DISCOVERED CBU it is
+    /// `cbu.confirm` requires VALIDATION_PENDING; against a DISCOVERED CBU it is
     /// classifiable (in the surface, tagged ineligible) yet refused at execution
     /// with an error naming the required state.
     #[cfg(feature = "database")]
@@ -3238,12 +3227,12 @@ mod tests {
         };
         let surface = compute_session_verb_surface(&ctx);
         assert!(
-            surface.contains("cbu.decide"),
-            "DoD: cbu.decide must be DISCOVERABLE at DISCOVERED (no lifecycle prune)"
+            surface.contains("cbu.confirm"),
+            "DoD: cbu.confirm must be DISCOVERABLE at DISCOVERED (no lifecycle prune)"
         );
         assert!(
-            !surface.is_lifecycle_eligible("cbu.decide"),
-            "DoD: cbu.decide must be tagged lifecycle-ineligible at DISCOVERED"
+            !surface.is_lifecycle_eligible("cbu.confirm"),
+            "DoD: cbu.confirm must be tagged lifecycle-ineligible at DISCOVERED"
         );
 
         // ── Half 2 — NOT EXECUTABLE, with a named error (C1). Needs DB. ──
@@ -3270,21 +3259,21 @@ mod tests {
                 .fetch_one(scope.executor())
                 .await
                 .expect("a DISCOVERED cbu must exist");
-        let decide = runtime_registry()
-            .get("cbu", "decide")
-            .expect("cbu.decide registered");
+        let confirm = runtime_registry()
+            .get("cbu", "confirm")
+            .expect("cbu.confirm registered");
         let args: HashMap<String, JsonValue> = [(
             "cbu-id".to_string(),
             JsonValue::String(discovered.to_string()),
         )]
         .into_iter()
         .collect();
-        let err = enforce_requires_states_precondition(decide, &args, &mut scope)
+        let err = enforce_requires_states_precondition(confirm, &args, &mut scope)
             .await
             .expect_err("DoD: execution must return a precondition error");
         let msg = err.to_string();
         assert!(
-            msg.contains("VALIDATION_PENDING") && msg.contains("cbu.decide"),
+            msg.contains("VALIDATION_PENDING") && msg.contains("cbu.confirm"),
             "DoD: precondition error must name the required state and verb: {msg}"
         );
     }

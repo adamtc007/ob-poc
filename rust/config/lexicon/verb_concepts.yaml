@@ -200,21 +200,6 @@ cbu.submit-for-validation:
   target_types: [cbu]
   crud_type: update
 
-cbu.decide:
-  pref_label: "decide cbu validation"
-  alt_labels:
-    - "approve cbu"
-    - "reject cbu"
-    - "refer cbu"
-    - "make validation decision"
-  invocation_phrases:
-    - "approve this cbu"
-    - "reject this fund"
-    - "refer this cbu for review"
-  domain: cbu
-  target_types: [cbu]
-  crud_type: update
-
 cbu.request-proof-update:
   pref_label: "request proof update"
   alt_labels:

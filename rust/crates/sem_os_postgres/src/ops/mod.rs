@@ -732,7 +732,6 @@ pub fn build_registry() -> SemOsVerbOpRegistry {
     registry.register(Arc::new(cbu::UnlinkStructure));
     registry.register(Arc::new(cbu::AddProduct));
     registry.register(Arc::new(cbu::Inspect));
-    registry.register(Arc::new(cbu::Decide));
     registry.register(Arc::new(cbu::DeleteCascade));
     registry.register(Arc::new(cbu::CreateFromClientGroup));
 

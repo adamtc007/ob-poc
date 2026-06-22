@@ -305,9 +305,6 @@ domains:
       cbu.submit-for-validation:
         reads: [cbus]
         writes: [cbus]
-      cbu.decide:
-        reads: [cbus, cases, case_evaluation_snapshots]
-        writes: [cbus, cases, case_evaluation_snapshots]
       cbu.request-proof-update:
         reads: [cbus]
         writes: [cbus]

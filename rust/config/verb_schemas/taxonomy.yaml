@@ -185,7 +185,8 @@ domains:
         verbs:
           - cbu.create
           - cbu.submit-for-validation
-          - cbu.decide
+          - cbu.confirm
+          - cbu.reject
           - cbu.request-proof-update
           - cbu.reopen-validation
           - cbu.delete

@@ -1284,8 +1284,8 @@ mod tests {
     /// a classification candidate (invariant M2) — but be flagged
     /// lifecycle-ineligible so the fast-path execution gate refuses it.
     ///
-    /// RED before C2: Step 5 pruned `cbu.decide` (requires VALIDATION_PENDING)
-    /// at `entity_state = DISCOVERED`, so `contains("cbu.decide")` was false.
+    /// RED before C2: Step 5 pruned `cbu.confirm` (requires VALIDATION_PENDING)
+    /// at `entity_state = DISCOVERED`, so `contains("cbu.confirm")` was false.
     /// GREEN after C2: it is present, with `is_lifecycle_eligible == false`,
     /// while an in-state verb (`submit-for-validation`, requires DISCOVERED)
     /// stays eligible.
@@ -1306,15 +1306,15 @@ mod tests {
 
         // M2: the state-ineligible verb is NOT pruned from discovery.
         assert!(
-            surface.contains("cbu.decide"),
-            "C2: cbu.decide (requires VALIDATION_PENDING) must remain a \
+            surface.contains("cbu.confirm"),
+            "C2: cbu.confirm (requires VALIDATION_PENDING) must remain a \
              classification candidate at DISCOVERED — discovery must not prune \
              on lifecycle"
         );
         // …but it is tagged ineligible for the fast-path execution gate.
         assert!(
-            !surface.is_lifecycle_eligible("cbu.decide"),
-            "C2: cbu.decide must be tagged lifecycle-ineligible at DISCOVERED"
+            !surface.is_lifecycle_eligible("cbu.confirm"),
+            "C2: cbu.confirm must be tagged lifecycle-ineligible at DISCOVERED"
         );
         // An in-state verb stays eligible.
         assert!(

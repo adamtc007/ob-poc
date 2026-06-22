@@ -156,8 +156,8 @@ overall_lifecycle:
         all_of:
           - "cbus.status = 'VALIDATION_PENDING'"
       progression_verbs:
-        - cbu.decide               # APPROVE → VALIDATED
-        - cbu.decide               # REJECT  → VALIDATION_FAILED
+        - cbu.confirm              # → VALIDATED (structural confirm)
+        - cbu.reject               # → VALIDATION_FAILED (structural reject)
         - cbu.validate-roles
         - cbu.request-proof-update
         - cbu.reopen-validation
@@ -383,12 +383,10 @@ slots:
           via: cbu.submit-for-validation
         - from: VALIDATION_PENDING
           to: VALIDATED
-          via: cbu.decide
-          args: { decision: APPROVE }
+          via: cbu.confirm
         - from: VALIDATION_PENDING
           to: VALIDATION_FAILED
-          via: cbu.decide
-          args: { decision: REJECT }
+          via: cbu.reject
         - from: VALIDATED
           to: UPDATE_PENDING_PROOF
           via: cbu.request-proof-update
@@ -1558,19 +1556,13 @@ cross_slot_constraints:
 
 cross_workspace_constraints:
 
-  # Promoted from cross_slot_constraints (was v1_3_candidate: true).
-  - id: cbu_validated_requires_kyc_case_approved
-    description: |
-      CBU cannot transition DISCOVERY.VALIDATION_PENDING → VALIDATED
-      unless the sponsoring KYC case is APPROVED.
-    source_workspace: kyc
-    source_slot: kyc_case
-    source_state: APPROVED
-    source_predicate: "cases.sponsor_cbu_id = this_cbu.cbu_id OR cases.client_group_id = this_cbu.primary_client_group_id"
-    target_workspace: cbu
-    target_slot: cbu
-    target_transition: "VALIDATION_PENDING -> VALIDATED"
-    severity: error
+  # NOTE (2026-06-22): the former `cbu_validated_requires_kyc_case_approved`
+  # gate was REMOVED here. CBU structural validation (VALIDATION_PENDING →
+  # VALIDATED via cbu.confirm) is PURELY STRUCTURAL and must NOT depend on KYC
+  # clearance — CBU is a structural container that knows nothing about KYC. The
+  # KYC "good-to-transact" read stays on the OPERATIONAL/transact gate only
+  # (see cbu_operationally_active reading kyc.kyc_case). Domain isolation:
+  # CBU→KYC = none; KYC→CBU = read-only via ManCo.
 
   # R2 (2026-04-26): cbu.service_consumption.proposed → provisioned
   # requires the underlying service in the catalogue to be active.
