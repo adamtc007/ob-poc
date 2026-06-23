@@ -54,6 +54,7 @@
 // Phase 5e — board_ops relocated to `dsl-runtime::domain_ops::board_ops`
 mod bpmn_controller_ops;
 mod bpmn_lite_ops;
+mod catalogue_maintenance_ops;
 mod catalogue_ops;
 mod simple_status_op;
 mod stub_op;
@@ -564,6 +565,38 @@ pub fn extend_registry(registry: &mut sem_os_postgres::ops::SemOsVerbOpRegistry)
     registry.register(Arc::new(catalogue_ops::CatalogueCommit));
     registry.register(Arc::new(catalogue_ops::CatalogueRollback));
     registry.register(Arc::new(catalogue_ops::CatalogueListProposals));
+
+    // Phase 1 catalogue governance — granular product/service/resource
+    // catalogue maintenance verbs.
+    registry.register(Arc::new(catalogue_maintenance_ops::ProductDefine));
+    registry.register(Arc::new(catalogue_maintenance_ops::ProductAmend));
+    registry.register(Arc::new(catalogue_maintenance_ops::ProductRetire));
+    registry.register(Arc::new(catalogue_maintenance_ops::ServiceDefine));
+    registry.register(Arc::new(catalogue_maintenance_ops::ServiceVersionDraft));
+    registry.register(Arc::new(
+        catalogue_maintenance_ops::ServiceResourceDefineType,
+    ));
+    registry.register(Arc::new(
+        catalogue_maintenance_ops::ServiceResourceAmendType,
+    ));
+    registry.register(Arc::new(
+        catalogue_maintenance_ops::ServiceResourceRetireType,
+    ));
+    registry.register(Arc::new(catalogue_maintenance_ops::ProductServiceLink));
+    registry.register(Arc::new(catalogue_maintenance_ops::ProductServiceAmend));
+    registry.register(Arc::new(catalogue_maintenance_ops::ProductServiceUnlink));
+    registry.register(Arc::new(
+        catalogue_maintenance_ops::ServiceResourceAddCapability,
+    ));
+    registry.register(Arc::new(
+        catalogue_maintenance_ops::ServiceResourceAmendCapability,
+    ));
+    registry.register(Arc::new(
+        catalogue_maintenance_ops::ServiceResourceRemoveCapability,
+    ));
+    registry.register(Arc::new(catalogue_maintenance_ops::ResourceOwnerAssign));
+    registry.register(Arc::new(catalogue_maintenance_ops::ResourceOwnerAmend));
+    registry.register(Arc::new(catalogue_maintenance_ops::ResourceOwnerUnassign));
 
     // Phase B Pattern B slice #80: StubOp — registers FQNs for plugin
     // verbs whose real impls are pending (catalogue.* P.8 prototype +

@@ -146,11 +146,7 @@ impl<'a> ResourceDiscoveryEngine<'a> {
     }
 
     /// Get service code by ID
-    async fn get_service_code(
-        &self,
-        conn: &mut PgConnection,
-        service_id: Uuid,
-    ) -> Result<String> {
+    async fn get_service_code(&self, conn: &mut PgConnection, service_id: Uuid) -> Result<String> {
         let code: Option<(String,)> = sqlx::query_as(
             r#"SELECT COALESCE(service_code, name) FROM "ob-poc".services WHERE service_id = $1"#,
         )
@@ -184,55 +180,62 @@ impl<'a> ResourceDiscoveryEngine<'a> {
         srdef: &super::srdef_loader::LoadedSrdef,
         options: &JsonValue,
     ) -> Result<Vec<JsonValue>> {
-        let mut dimensions = Vec::new();
+        extract_srdef_parameters(srdef, options)
+    }
+}
 
-        if srdef.per_market {
-            dimensions.push(parameter_values(
-                options,
-                "markets",
-                &[("market_id", "market_id"), ("market", "market")],
-            ));
-        }
-        if srdef.per_currency {
-            let currencies = parameter_values(options, "currencies", &[("currency", "currency")]);
-            if currencies == vec![json!({})] {
-                if let Some(currency) = options.get("settlement_currency") {
-                    dimensions.push(vec![json!({ "currency": currency })]);
-                } else {
-                    dimensions.push(currencies);
-                }
+pub(crate) fn extract_srdef_parameters(
+    srdef: &super::srdef_loader::LoadedSrdef,
+    options: &JsonValue,
+) -> Result<Vec<JsonValue>> {
+    let mut dimensions = Vec::new();
+
+    if srdef.per_market {
+        dimensions.push(parameter_values(
+            options,
+            "markets",
+            &[("market_id", "market_id"), ("market", "market")],
+        ));
+    }
+    if srdef.per_currency {
+        let currencies = parameter_values(options, "currencies", &[("currency", "currency")]);
+        if currencies == vec![json!({})] {
+            if let Some(currency) = options.get("settlement_currency") {
+                dimensions.push(vec![json!({ "currency": currency })]);
             } else {
                 dimensions.push(currencies);
             }
+        } else {
+            dimensions.push(currencies);
         }
-        if srdef.per_counterparty {
-            dimensions.push(parameter_values(
-                options,
-                "counterparties",
-                &[
-                    ("counterparty_entity_id", "counterparty_entity_id"),
-                    ("counterparty", "counterparty"),
-                ],
-            ));
-        }
-
-        if dimensions.is_empty() {
-            return Ok(vec![json!({})]);
-        }
-
-        let mut params = vec![json!({})];
-        for dimension in dimensions {
-            let mut next = Vec::new();
-            for base in &params {
-                for value in &dimension {
-                    next.push(merge_parameter_objects(base, value));
-                }
-            }
-            params = next;
-        }
-
-        Ok(params)
     }
+    if srdef.per_counterparty {
+        dimensions.push(parameter_values(
+            options,
+            "counterparties",
+            &[
+                ("counterparty_entity_id", "counterparty_entity_id"),
+                ("counterparty", "counterparty"),
+            ],
+        ));
+    }
+
+    if dimensions.is_empty() {
+        return Ok(vec![json!({})]);
+    }
+
+    let mut params = vec![json!({})];
+    for dimension in dimensions {
+        let mut next = Vec::new();
+        for base in &params {
+            for value in &dimension {
+                next.push(merge_parameter_objects(base, value));
+            }
+        }
+        params = next;
+    }
+
+    Ok(params)
 }
 
 fn parameter_values(

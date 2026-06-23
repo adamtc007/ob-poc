@@ -3,7 +3,12 @@
 //! Tests the Deal → Products → Rate Cards DAG using DSL verbs only.
 //! Validates precedence constraints are enforced at the database level.
 
-use anyhow::{Context, Result};
+use anyhow::{anyhow, Context, Result};
+use dsl_runtime::{VerbExecutionContext, VerbExecutionOutcome};
+use ob_poc::sequencer_tx::PgTransactionScope;
+use sem_os_core::principal::Principal;
+use sem_os_postgres::ops::{build_registry, SemOsVerbOpRegistry};
+use serde_json::json;
 use sqlx::PgPool;
 use std::collections::HashMap;
 
@@ -99,6 +104,61 @@ async fn execute_dsl(pool: &PgPool, dsl: &str) -> Result<serde_json::Value> {
             ExecutionResult::BatchControl(bc) => Ok(serde_json::json!({"status": bc.status})),
         }
     }
+}
+
+fn catalogue_registry() -> SemOsVerbOpRegistry {
+    let mut registry = build_registry();
+    ob_poc::domain_ops::extend_registry(&mut registry);
+    registry
+}
+
+async fn define_test_product(
+    registry: &SemOsVerbOpRegistry,
+    ctx: &mut VerbExecutionContext,
+    scope: &mut PgTransactionScope,
+    name: &str,
+    description: &str,
+) -> Result<(String, String)> {
+    let op = registry
+        .get("product.define")
+        .ok_or_else(|| anyhow!("missing registered op product.define"))?;
+    let outcome = op
+        .execute(
+            &json!({
+                "name": name,
+                "description": description,
+                "product-category": "CORE",
+                "is-active": true,
+                "governance-status": "active"
+            }),
+            ctx,
+            scope,
+        )
+        .await?;
+    let product_id = match outcome {
+        VerbExecutionOutcome::Uuid(id) => id.to_string(),
+        VerbExecutionOutcome::Record(record) => record
+            .get("product_id")
+            .or_else(|| record.get("id"))
+            .and_then(serde_json::Value::as_str)
+            .ok_or_else(|| anyhow!("product.define returned no product id"))?
+            .to_string(),
+        VerbExecutionOutcome::RecordSet(records) => {
+            return Err(anyhow!(
+                "product.define returned {} records, expected one product id",
+                records.len()
+            ));
+        }
+        VerbExecutionOutcome::Affected(rows) => {
+            return Err(anyhow!(
+                "product.define affected {rows} rows, expected one product id"
+            ));
+        }
+        VerbExecutionOutcome::Void => {
+            return Err(anyhow!("product.define returned void, expected product id"));
+        }
+    };
+    Ok((name.to_string(), product_id))
 }
 
 /// Extract UUID from execution result
@@ -750,24 +810,30 @@ async fn get_test_products(pool: &PgPool, _verbose: bool) -> Result<HashMap<Stri
     .await?;
 
     if rows.is_empty() {
-        // Create test products if none exist
-        let custody: (String, String) = sqlx::query_as(
-            r#"INSERT INTO "ob-poc".products (name, description, product_category)
-               VALUES ('CUSTODY', 'Custody Services', 'CORE')
-               ON CONFLICT (name) DO UPDATE SET name = EXCLUDED.name
-               RETURNING name, product_id::text"#,
+        let registry = catalogue_registry();
+        let mut scope = PgTransactionScope::begin(pool).await?;
+        let principal = Principal::in_process(
+            "deal-harness",
+            vec!["resource_owner".to_string(), "compliance_admin".to_string()],
+        );
+        let mut ctx = VerbExecutionContext::new(principal);
+        let custody = define_test_product(
+            &registry,
+            &mut ctx,
+            &mut scope,
+            "CUSTODY",
+            "Custody Services",
         )
-        .fetch_one(pool)
         .await?;
-
-        let fund_acct: (String, String) = sqlx::query_as(
-            r#"INSERT INTO "ob-poc".products (name, description, product_category)
-               VALUES ('FUND_ACCOUNTING', 'Fund Accounting Services', 'CORE')
-               ON CONFLICT (name) DO UPDATE SET name = EXCLUDED.name
-               RETURNING name, product_id::text"#,
+        let fund_acct = define_test_product(
+            &registry,
+            &mut ctx,
+            &mut scope,
+            "FUND_ACCOUNTING",
+            "Fund Accounting Services",
         )
-        .fetch_one(pool)
         .await?;
+        scope.commit().await?;
 
         let mut map = HashMap::new();
         map.insert(custody.0, custody.1);

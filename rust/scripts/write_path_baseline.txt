@@ -1,1 +1,38 @@
-
+attribute_registry	src/services/attribute_registry_enrichment.rs	UPDATE	UPDATE "ob-poc".attribute_registry
+attribute_registry	src/services/attribute_service_impl.rs	INSERT	INSERT INTO "ob-poc".attribute_registry (
+attribute_registry	src/services/attribute_service_impl.rs	UPDATE	UPDATE "ob-poc".attribute_registry
+attribute_registry	src/services/attribute_service_impl.rs	UPDATE	r#"UPDATE "ob-poc".attribute_registry SET sem_reg_snapshot_id = $1, updated_at = NOW() WHERE id = $2"#,
+product_service_conditions	src/domain_ops/catalogue_maintenance_ops.rs	INSERT	r#"INSERT INTO "ob-poc".product_service_conditions
+product_service_option_overrides	crates/sem_os_postgres/src/ops/service_options.rs	INSERT	INSERT INTO "ob-poc".product_service_option_overrides
+product_services	src/database/service_service.rs	INSERT	sqlx::query(r#"INSERT INTO "ob-poc".product_services (product_id, service_id) VALUES ($1, $2) ON CONFLICT DO NOTHING"#)
+product_services	src/domain_ops/catalogue_maintenance_ops.rs	DELETE	r#"DELETE FROM "ob-poc".product_services
+product_services	src/domain_ops/catalogue_maintenance_ops.rs	INSERT	r#"INSERT INTO "ob-poc".product_services
+product_services	src/domain_ops/catalogue_maintenance_ops.rs	UPDATE	r#"UPDATE "ob-poc".product_services SET
+products	src/database/product_service.rs	DELETE	let result = sqlx::query(r#"DELETE FROM "ob-poc".products WHERE product_id = $1"#)
+products	src/database/product_service.rs	INSERT	sqlx::query(r#"INSERT INTO "ob-poc".products (product_id, name, description, product_code, product_category, regulatory_framework, min_asset_requirement, is_active, metadata, created_at, updated_at) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW(), NOW())"#)
+products	src/database/product_service.rs	UPDATE	let result = sqlx::query(r#"UPDATE "ob-poc".products SET name = COALESCE($1, name), description = COALESCE($2, description), updated_at = NOW() WHERE product_id = $3"#)
+products	src/domain_ops/catalogue_maintenance_ops.rs	INSERT	r#"INSERT INTO "ob-poc".products
+products	src/domain_ops/catalogue_maintenance_ops.rs	UPDATE	r#"UPDATE "ob-poc".products
+products	src/domain_ops/catalogue_maintenance_ops.rs	UPDATE	r#"UPDATE "ob-poc".products SET
+resource_attribute_requirements	src/service_resources/srdef_loader.rs	INSERT	INSERT INTO "ob-poc".resource_attribute_requirements
+resource_owner_principals	src/domain_ops/catalogue_maintenance_ops.rs	INSERT	r#"INSERT INTO "ob-poc".resource_owner_principals
+resource_owner_principals	src/domain_ops/catalogue_maintenance_ops.rs	UPDATE	r#"UPDATE "ob-poc".resource_owner_principals
+resource_owner_principals	src/domain_ops/catalogue_maintenance_ops.rs	UPDATE	r#"UPDATE "ob-poc".resource_owner_principals SET
+resource_owner_principals	src/service_resources/onboarding_data_request.rs	INSERT	INSERT INTO "ob-poc".resource_owner_principals
+resource_owner_principals	src/service_resources/srdef_loader.rs	INSERT	INSERT INTO "ob-poc".resource_owner_principals
+service_resource_capabilities	src/domain_ops/catalogue_maintenance_ops.rs	INSERT	r#"INSERT INTO "ob-poc".service_resource_capabilities
+service_resource_capabilities	src/domain_ops/catalogue_maintenance_ops.rs	UPDATE	r#"UPDATE "ob-poc".service_resource_capabilities
+service_resource_capabilities	src/domain_ops/catalogue_maintenance_ops.rs	UPDATE	r#"UPDATE "ob-poc".service_resource_capabilities SET
+service_resource_types	src/database/service_resource_service.rs	DELETE	sqlx::query(r#"DELETE FROM "ob-poc".service_resource_types WHERE resource_id = $1"#)
+service_resource_types	src/database/service_resource_service.rs	INSERT	sqlx::query(r#"INSERT INTO "ob-poc".service_resource_types (resource_id, name, description, owner, dictionary_group, resource_code, resource_type, vendor, version, api_endpoint, api_version, authentication_method, is_active, created_at, updated_at) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, NOW(), NOW())"#)
+service_resource_types	src/database/service_resource_service.rs	UPDATE	let result = sqlx::query(r#"UPDATE "ob-poc".service_resource_types SET name = COALESCE($1, name), description = COALESCE($2, description), owner = COALESCE($3, owner), updated_at = NOW() WHERE resource_id = $4"#)
+service_resource_types	src/domain_ops/catalogue_maintenance_ops.rs	INSERT	r#"INSERT INTO "ob-poc".service_resource_types
+service_resource_types	src/domain_ops/catalogue_maintenance_ops.rs	UPDATE	r#"UPDATE "ob-poc".service_resource_types
+service_resource_types	src/domain_ops/catalogue_maintenance_ops.rs	UPDATE	r#"UPDATE "ob-poc".service_resource_types SET
+service_resource_types	src/service_resources/srdef_loader.rs	INSERT	INSERT INTO "ob-poc".service_resource_types
+service_resource_types	src/service_resources/srdef_loader.rs	UPDATE	UPDATE "ob-poc".service_resource_types
+service_versions	src/domain_ops/catalogue_maintenance_ops.rs	INSERT	r#"INSERT INTO "ob-poc".service_versions
+services	src/database/service_service.rs	DELETE	let result = sqlx::query(r#"DELETE FROM "ob-poc".services WHERE service_id = $1"#)
+services	src/database/service_service.rs	INSERT	sqlx::query(r#"INSERT INTO "ob-poc".services (service_id, name, description, service_code, service_category, sla_definition, is_active, created_at, updated_at) VALUES ($1, $2, $3, $4, $5, $6, $7, NOW(), NOW())"#)
+services	src/database/service_service.rs	UPDATE	let result = sqlx::query(r#"UPDATE "ob-poc".services SET name = COALESCE($1, name), description = COALESCE($2, description), updated_at = NOW() WHERE service_id = $3"#)
+services	src/domain_ops/catalogue_maintenance_ops.rs	INSERT	r#"INSERT INTO "ob-poc".services

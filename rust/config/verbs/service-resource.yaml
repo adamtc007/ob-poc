@@ -2,6 +2,423 @@ domains:
   service-resource:
     description: "Service resource type (read-only) and instance operations"
     verbs:
+      define-type:
+        flavour: attribute_mutating
+        description: Define a governed service resource type
+        effect_class: read_modify_write
+        role_guard:
+          any_of: [resource_owner, compliance_admin, senior_compliance, mlro]
+        invocation_phrases:
+          - "define service resource type"
+          - "register resource type"
+          - "add resource type to catalogue"
+        behavior: plugin
+        metadata:
+          tier: intent
+          source_of_truth: catalog
+          scope: global
+          noun: service_resource
+          tags: [catalogue, service-resource-type, governance, write]
+          phase_tags: [stewardship]
+          side_effects: state_write
+        args:
+          - name: resource-id
+            type: uuid
+            required: false
+          - name: name
+            type: string
+            required: true
+          - name: resource-code
+            type: string
+            required: true
+          - name: resource-type
+            type: string
+            required: true
+          - name: owner
+            type: string
+            required: true
+          - name: owner-principal-fqn
+            type: string
+            required: false
+          - name: description
+            type: string
+            required: false
+          - name: lifecycle-status
+            type: string
+            required: false
+          - name: governance-status
+            type: string
+            required: false
+          - name: metadata
+            type: json
+            required: false
+          - name: is-active
+            type: boolean
+            required: false
+          - name: service-scope
+            type: string
+            required: false
+          - name: resource-namespace
+            type: string
+            required: false
+          - name: category
+            type: string
+            required: false
+          - name: version
+            type: string
+            required: false
+          - name: srdef-version
+            type: string
+            required: false
+          - name: implementation-type
+            type: string
+            required: false
+          - name: validation-rules
+            type: json
+            required: false
+          - name: capability-schema
+            type: json
+            required: false
+          - name: default-config
+            type: json
+            required: false
+          - name: ui-schema
+            type: json
+            required: false
+          - name: dependency-config
+            type: json
+            required: false
+        returns:
+          type: uuid
+        three_axis:
+          state_effect: transition
+          external_effects: [emitting]
+          consequence:
+            baseline: requires_confirmation
+
+      amend-type:
+        flavour: attribute_mutating
+        description: Amend a governed service resource type
+        effect_class: read_modify_write
+        role_guard:
+          any_of: [resource_owner, compliance_admin, senior_compliance, mlro]
+        invocation_phrases:
+          - "amend service resource type"
+          - "update resource type"
+          - "revise resource type definition"
+        behavior: plugin
+        metadata:
+          tier: intent
+          source_of_truth: catalog
+          scope: global
+          noun: service_resource
+          tags: [catalogue, service-resource-type, governance, write]
+          phase_tags: [stewardship]
+          side_effects: state_write
+        args:
+          - name: resource-id
+            type: uuid
+            required: false
+          - name: resource
+            type: string
+            required: false
+          - name: resource-code
+            type: string
+            required: false
+          - name: name
+            type: string
+            required: false
+          - name: description
+            type: string
+            required: false
+          - name: resource-type
+            type: string
+            required: false
+          - name: owner
+            type: string
+            required: false
+          - name: owner-principal-fqn
+            type: string
+            required: false
+          - name: lifecycle-status
+            type: string
+            required: false
+          - name: governance-status
+            type: string
+            required: false
+          - name: metadata
+            type: json
+            required: false
+          - name: is-active
+            type: boolean
+            required: false
+          - name: service-scope
+            type: string
+            required: false
+          - name: resource-namespace
+            type: string
+            required: false
+          - name: category
+            type: string
+            required: false
+          - name: version
+            type: string
+            required: false
+          - name: srdef-version
+            type: string
+            required: false
+          - name: implementation-type
+            type: string
+            required: false
+          - name: validation-rules
+            type: json
+            required: false
+          - name: capability-schema
+            type: json
+            required: false
+          - name: default-config
+            type: json
+            required: false
+          - name: ui-schema
+            type: json
+            required: false
+          - name: dependency-config
+            type: json
+            required: false
+        returns:
+          type: affected
+        three_axis:
+          state_effect: preserving
+          external_effects: [emitting]
+          consequence:
+            baseline: requires_confirmation
+
+      retire-type:
+        flavour: discretionary
+        description: Retire a governed service resource type
+        effect_class: read_modify_write
+        role_guard:
+          any_of: [resource_owner, compliance_admin, senior_compliance, mlro]
+        invocation_phrases:
+          - "retire service resource type"
+          - "retire resource type"
+          - "sunset resource type"
+        behavior: plugin
+        metadata:
+          tier: intent
+          source_of_truth: catalog
+          scope: global
+          noun: service_resource
+          tags: [catalogue, service-resource-type, governance, write]
+          phase_tags: [stewardship]
+          side_effects: state_write
+        args:
+          - name: resource-id
+            type: uuid
+            required: false
+          - name: resource
+            type: string
+            required: false
+          - name: resource-code
+            type: string
+            required: false
+        returns:
+          type: affected
+        three_axis:
+          state_effect: transition
+          external_effects: [emitting]
+          consequence:
+            baseline: requires_explicit_authorisation
+
+      add-capability:
+        flavour: attribute_mutating
+        description: Add a service-resource capability mapping
+        effect_class: read_modify_write
+        role_guard:
+          any_of: [resource_owner, compliance_admin, senior_compliance, mlro]
+        invocation_phrases:
+          - "add service resource capability"
+          - "link service to resource capability"
+          - "create resource capability"
+        behavior: plugin
+        metadata:
+          tier: intent
+          source_of_truth: catalog
+          scope: global
+          noun: service_resource_capability
+          tags: [catalogue, service-resource-capability, governance, write]
+          phase_tags: [stewardship]
+          side_effects: state_write
+        args:
+          - name: capability-id
+            type: uuid
+            required: false
+          - name: service-id
+            type: uuid
+            required: false
+          - name: service
+            type: string
+            required: false
+          - name: service-code
+            type: string
+            required: false
+          - name: resource-id
+            type: uuid
+            required: false
+          - name: resource
+            type: string
+            required: false
+          - name: resource-code
+            type: string
+            required: false
+          - name: supported-options
+            type: json
+            required: false
+          - name: priority
+            type: integer
+            required: false
+          - name: cost-factor
+            type: decimal
+            required: false
+          - name: performance-rating
+            type: integer
+            required: false
+          - name: resource-config
+            type: json
+            required: false
+          - name: is-active
+            type: boolean
+            required: false
+          - name: is-required
+            type: boolean
+            required: false
+        returns:
+          type: uuid
+        three_axis:
+          state_effect: transition
+          external_effects: [emitting]
+          consequence:
+            baseline: requires_confirmation
+
+      amend-capability:
+        flavour: attribute_mutating
+        description: Amend a service-resource capability mapping
+        effect_class: read_modify_write
+        role_guard:
+          any_of: [resource_owner, compliance_admin, senior_compliance, mlro]
+        invocation_phrases:
+          - "amend service resource capability"
+          - "update service resource capability"
+          - "revise resource capability"
+        behavior: plugin
+        metadata:
+          tier: intent
+          source_of_truth: catalog
+          scope: global
+          noun: service_resource_capability
+          tags: [catalogue, service-resource-capability, governance, write]
+          phase_tags: [stewardship]
+          side_effects: state_write
+        args:
+          - name: capability-id
+            type: uuid
+            required: false
+          - name: service-id
+            type: uuid
+            required: false
+          - name: service
+            type: string
+            required: false
+          - name: service-code
+            type: string
+            required: false
+          - name: resource-id
+            type: uuid
+            required: false
+          - name: resource
+            type: string
+            required: false
+          - name: resource-code
+            type: string
+            required: false
+          - name: supported-options
+            type: json
+            required: false
+          - name: priority
+            type: integer
+            required: false
+          - name: cost-factor
+            type: decimal
+            required: false
+          - name: performance-rating
+            type: integer
+            required: false
+          - name: resource-config
+            type: json
+            required: false
+          - name: is-active
+            type: boolean
+            required: false
+          - name: is-required
+            type: boolean
+            required: false
+        returns:
+          type: affected
+        three_axis:
+          state_effect: preserving
+          external_effects: [emitting]
+          consequence:
+            baseline: requires_confirmation
+
+      remove-capability:
+        flavour: discretionary
+        description: Remove a service-resource capability mapping from active use
+        effect_class: read_modify_write
+        role_guard:
+          any_of: [resource_owner, compliance_admin, senior_compliance, mlro]
+        invocation_phrases:
+          - "remove service resource capability"
+          - "deactivate service resource capability"
+          - "retire resource capability"
+        behavior: plugin
+        metadata:
+          tier: intent
+          source_of_truth: catalog
+          scope: global
+          noun: service_resource_capability
+          tags: [catalogue, service-resource-capability, governance, write]
+          phase_tags: [stewardship]
+          side_effects: state_write
+        args:
+          - name: capability-id
+            type: uuid
+            required: false
+          - name: service-id
+            type: uuid
+            required: false
+          - name: service
+            type: string
+            required: false
+          - name: service-code
+            type: string
+            required: false
+          - name: resource-id
+            type: uuid
+            required: false
+          - name: resource
+            type: string
+            required: false
+          - name: resource-code
+            type: string
+            required: false
+        returns:
+          type: affected
+        three_axis:
+          state_effect: transition
+          external_effects: [emitting]
+          consequence:
+            baseline: requires_explicit_authorisation
+
       # === Type Operations (read-only - reference data) ===
       read:
         flavour: attribute_mutating

@@ -134,8 +134,8 @@ SemOS-first attribute lifecycle (2026-03-28, extended 2026-04-02):
 - Materialization trigger on `sem_reg.snapshots` auto-projects active AttributeDef snapshots to `attribute_registry`
 - Identity resolution prioritizes SemOS FQNs (precedence 0) over store UUIDs (precedence 1)
 - SRDEF loader resolves attributes via SemOS first, with store fallback
-- Store write functions restricted to `pub(crate)` — verb handlers are the only callers
-- CI lint: `rust/scripts/lint_write_paths.sh` enforces no new raw SQL writes outside allowlisted paths
+- Catalogue store write functions are restricted to `pub(crate)` — governed verb handlers and accepted SemOS projectors are the sanctioned callers
+- CI lint: `rust/scripts/lint_write_paths.sh` enforces the table-scoped P1 catalogue write allowlist and rejects public `src/database` catalogue writers
 
 Derived attribute persistence (2026-03-27):
 - runtime derived values persist in `"ob-poc".derived_attribute_values`

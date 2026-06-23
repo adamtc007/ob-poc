@@ -33,7 +33,8 @@ pub struct ServiceResourceRow {
 }
 
 #[derive(Debug, Clone)]
-pub struct NewServiceResourceFields {
+#[allow(dead_code)]
+pub(crate) struct NewServiceResourceFields {
     pub name: String,
     pub description: Option<String>,
     pub owner: String,
@@ -61,7 +62,11 @@ impl ServiceResourceService {
         &self.pool
     }
 
-    pub async fn create_service_resource(&self, fields: &NewServiceResourceFields) -> Result<Uuid> {
+    #[allow(dead_code)]
+    pub(crate) async fn create_service_resource(
+        &self,
+        fields: &NewServiceResourceFields,
+    ) -> Result<Uuid> {
         let resource_id = Uuid::new_v4();
         sqlx::query(r#"INSERT INTO "ob-poc".service_resource_types (resource_id, name, description, owner, dictionary_group, resource_code, resource_type, vendor, version, api_endpoint, api_version, authentication_method, is_active, created_at, updated_at) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, NOW(), NOW())"#)
             .bind(resource_id).bind(&fields.name).bind(&fields.description).bind(&fields.owner)
@@ -101,7 +106,8 @@ impl ServiceResourceService {
             .bind(limit.unwrap_or(100)).bind(offset.unwrap_or(0)).fetch_all(&self.pool).await.context("Failed to list Service Resources")
     }
 
-    pub async fn update_service_resource(
+    #[allow(dead_code)]
+    pub(crate) async fn update_service_resource(
         &self,
         resource_id: Uuid,
         name: Option<&str>,
@@ -116,7 +122,8 @@ impl ServiceResourceService {
         Ok(result.rows_affected() > 0)
     }
 
-    pub async fn delete_service_resource(&self, resource_id: Uuid) -> Result<bool> {
+    #[allow(dead_code)]
+    pub(crate) async fn delete_service_resource(&self, resource_id: Uuid) -> Result<bool> {
         let result =
             sqlx::query(r#"DELETE FROM "ob-poc".service_resource_types WHERE resource_id = $1"#)
                 .bind(resource_id)

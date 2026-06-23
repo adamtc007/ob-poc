@@ -45,6 +45,7 @@
 pub mod discovery;
 pub mod onboarding_data_request;
 pub mod provisioning;
+pub mod resolve;
 pub mod service;
 pub mod srdef_loader;
 pub mod types;
@@ -107,6 +108,10 @@ pub use service::ServiceResourcePipelineService;
 pub use onboarding_data_request::{
     CancellationResult, CompileDataRequestResult, ConfirmProvisioningResult,
     DispatchReadySlicesResult, OnboardingDataRequestService,
+};
+
+pub use resolve::{
+    resolve, ResolvedDependencies, ResourceDictionaryAttribute, ResourceTypeWithDictionary, Service,
 };
 
 // Re-export loader types

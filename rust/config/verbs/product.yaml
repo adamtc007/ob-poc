@@ -1,7 +1,170 @@
 domains:
   product:
-    description: "Product catalog operations (read-only - products are reference data)"
+    description: "Product catalogue governance and read operations"
     verbs:
+      define:
+        flavour: attribute_mutating
+        description: Define a governed product catalogue entry
+        effect_class: read_modify_write
+        role_guard:
+          any_of: [resource_owner, compliance_admin, senior_compliance, mlro]
+        invocation_phrases:
+        - "define product"
+        - "register product in catalogue"
+        - "create governed product"
+        - "add product to catalogue"
+        behavior: plugin
+        metadata:
+          tier: intent
+          source_of_truth: catalog
+          scope: global
+          noun: product
+          tags: [catalogue, product, governance, write]
+          phase_tags: [stewardship]
+          side_effects: state_write
+        args:
+        - name: product-id
+          type: uuid
+          required: false
+        - name: name
+          type: string
+          required: true
+        - name: description
+          type: string
+          required: false
+        - name: product-code
+          type: string
+          required: false
+        - name: product-category
+          type: string
+          required: false
+        - name: regulatory-framework
+          type: string
+          required: false
+        - name: min-asset-requirement
+          type: decimal
+          required: false
+        - name: is-active
+          type: boolean
+          required: false
+        - name: metadata
+          type: json
+          required: false
+        - name: owner-principal-fqn
+          type: string
+          required: false
+        - name: governance-status
+          type: string
+          required: false
+        returns:
+          type: uuid
+        three_axis:
+          state_effect: transition
+          external_effects: [emitting]
+          consequence:
+            baseline: requires_confirmation
+
+      amend:
+        flavour: attribute_mutating
+        description: Amend a governed product catalogue entry
+        effect_class: read_modify_write
+        role_guard:
+          any_of: [resource_owner, compliance_admin, senior_compliance, mlro]
+        invocation_phrases:
+        - "amend product"
+        - "update product catalogue entry"
+        - "revise product definition"
+        behavior: plugin
+        metadata:
+          tier: intent
+          source_of_truth: catalog
+          scope: global
+          noun: product
+          tags: [catalogue, product, governance, write]
+          phase_tags: [stewardship]
+          side_effects: state_write
+        args:
+        - name: product-id
+          type: uuid
+          required: false
+        - name: product
+          type: string
+          required: false
+        - name: product-code
+          type: string
+          required: false
+        - name: name
+          type: string
+          required: false
+        - name: description
+          type: string
+          required: false
+        - name: product-category
+          type: string
+          required: false
+        - name: regulatory-framework
+          type: string
+          required: false
+        - name: min-asset-requirement
+          type: decimal
+          required: false
+        - name: is-active
+          type: boolean
+          required: false
+        - name: metadata
+          type: json
+          required: false
+        - name: owner-principal-fqn
+          type: string
+          required: false
+        - name: governance-status
+          type: string
+          required: false
+        returns:
+          type: affected
+        three_axis:
+          state_effect: preserving
+          external_effects: [emitting]
+          consequence:
+            baseline: requires_confirmation
+
+      retire:
+        flavour: discretionary
+        description: Retire a governed product catalogue entry
+        effect_class: read_modify_write
+        role_guard:
+          any_of: [resource_owner, compliance_admin, senior_compliance, mlro]
+        invocation_phrases:
+        - "retire product"
+        - "remove product from active catalogue"
+        - "sunset product"
+        behavior: plugin
+        metadata:
+          tier: intent
+          source_of_truth: catalog
+          scope: global
+          noun: product
+          tags: [catalogue, product, governance, write]
+          phase_tags: [stewardship]
+          side_effects: state_write
+        args:
+        - name: product-id
+          type: uuid
+          required: false
+        - name: product
+          type: string
+          required: false
+        - name: product-code
+          type: string
+          required: false
+        returns:
+          type: affected
+        three_axis:
+          state_effect: transition
+          external_effects: [emitting]
+          consequence:
+            baseline: requires_explicit_authorisation
+
       read:
         flavour: attribute_mutating
         description: Read a product by ID or code

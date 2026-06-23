@@ -1,0 +1,64 @@
+--
+-- PostgreSQL database dump
+--
+
+\restrict dbEIFm3yht5gbjz9mDC3kq4Sl46J9ew3naB53xbqlrLJktUEMyDAVJzrPSs7o6f
+
+-- Dumped from database version 18.1 (Homebrew)
+-- Dumped by pg_dump version 18.1 (Homebrew)
+
+SET statement_timeout = 0;
+SET lock_timeout = 0;
+SET idle_in_transaction_session_timeout = 0;
+SET transaction_timeout = 0;
+SET client_encoding = 'UTF8';
+SET standard_conforming_strings = on;
+SELECT pg_catalog.set_config('search_path', '', false);
+SET check_function_bodies = false;
+SET xmloption = content;
+SET client_min_messages = warning;
+SET row_security = off;
+
+--
+-- Data for Name: service_versions; Type: TABLE DATA; Schema: ob-poc; Owner: adamtc007
+--
+
+COPY "ob-poc".service_versions (id, service_id, version, lifecycle_status, spec, drafted_at, reviewed_at, published_at, superseded_at, retired_at, notes, created_at, updated_at) FROM stdin;
+b01a5ae0-1a44-452d-898f-2ca823d970ba	631b59f4-7317-432c-a4b2-64c12c643cdd	v1	published	{"seeded_from": "Phase 0 service-options baseline", "service_code": "INCOME_COLLECT"}	2026-05-03 15:31:01.995797+01	2026-05-03 16:31:01.995797+01	2026-05-03 16:31:01.995797+01	\N	\N	Seeded baseline published v1 for service-options framework Phase 0	2026-05-03 15:31:01.995797+01	2026-05-03 15:31:01.995797+01
+eadf2ce1-3cf8-4b9c-8806-af756fe76b49	24c54be5-c507-45ce-9955-b52212d09b95	v1	published	{"seeded_from": "Phase 0 service-options baseline", "service_code": "PROXY_VOTING"}	2026-05-03 15:31:01.995797+01	2026-05-03 16:31:01.995797+01	2026-05-03 16:31:01.995797+01	\N	\N	Seeded baseline published v1 for service-options framework Phase 0	2026-05-03 15:31:01.995797+01	2026-05-03 15:31:01.995797+01
+9a00775e-2da1-4008-9ffe-11e942a1ae4a	449435fb-6b07-4c46-b0f5-77bee288b305	v1	published	{"seeded_from": "Phase 0 service-options baseline", "service_code": "FX_EXECUTION"}	2026-05-03 15:31:01.995797+01	2026-05-03 16:31:01.995797+01	2026-05-03 16:31:01.995797+01	\N	\N	Seeded baseline published v1 for service-options framework Phase 0	2026-05-03 15:31:01.995797+01	2026-05-03 15:31:01.995797+01
+ac51ec2d-5906-40d2-a006-eaaf3cda26f3	e4140ad9-9d91-46c1-913d-ef38a06a12c3	v1	published	{"seeded_from": "Phase 0 service-options baseline", "service_code": "FUND_REPORTING"}	2026-05-03 15:31:01.995797+01	2026-05-03 16:31:01.995797+01	2026-05-03 16:31:01.995797+01	\N	\N	Seeded baseline published v1 for service-options framework Phase 0	2026-05-03 15:31:01.995797+01	2026-05-03 15:31:01.995797+01
+6f646664-965d-42c1-a6b2-bb5a4e2c97a2	096f3dc8-3619-46ea-b2ba-a9a41c79bdcb	v1	published	{"seeded_from": "Phase 0 service-options baseline", "service_code": "EXPENSE_MGMT"}	2026-05-03 15:31:01.995797+01	2026-05-03 16:31:01.995797+01	2026-05-03 16:31:01.995797+01	\N	\N	Seeded baseline published v1 for service-options framework Phase 0	2026-05-03 15:31:01.995797+01	2026-05-03 15:31:01.995797+01
+e6d23e76-ad2f-4793-bb00-b4aa781f663c	6f3b44ff-bbbf-4f61-a368-3436aaac6acd	v1	published	{"seeded_from": "Phase 0 service-options baseline", "service_code": "PERF_MEASURE"}	2026-05-03 15:31:01.995797+01	2026-05-03 16:31:01.995797+01	2026-05-03 16:31:01.995797+01	\N	\N	Seeded baseline published v1 for service-options framework Phase 0	2026-05-03 15:31:01.995797+01	2026-05-03 15:31:01.995797+01
+090f1dd5-65cd-495b-9a8e-af969be1dc15	91f5e266-8802-4522-bbd2-8501831a5ccb	v1	published	{"seeded_from": "Phase 0 service-options baseline", "service_code": "POSITION_MGMT"}	2026-05-03 15:31:01.995797+01	2026-05-03 16:31:01.995797+01	2026-05-03 16:31:01.995797+01	\N	\N	Seeded baseline published v1 for service-options framework Phase 0	2026-05-03 15:31:01.995797+01	2026-05-03 15:31:01.995797+01
+7cf2f42c-97e6-4e4d-8dc8-b995e86d800c	555cea6c-d32b-4490-8705-9a157f48644d	v1	published	{"seeded_from": "Phase 0 service-options baseline", "service_code": "TRADE_CAPTURE"}	2026-05-03 15:31:01.995797+01	2026-05-03 16:31:01.995797+01	2026-05-03 16:31:01.995797+01	\N	\N	Seeded baseline published v1 for service-options framework Phase 0	2026-05-03 15:31:01.995797+01	2026-05-03 15:31:01.995797+01
+28ff5337-dd7e-41ed-8b8d-f7c935a829ba	f4ad454a-4479-4bec-b922-a7f45922dc9d	v1	published	{"seeded_from": "Phase 0 service-options baseline", "service_code": "COLLATERAL_MGMT"}	2026-05-03 15:31:01.995797+01	2026-05-03 16:31:01.995797+01	2026-05-03 16:31:01.995797+01	\N	\N	Seeded baseline published v1 for service-options framework Phase 0	2026-05-03 15:31:01.995797+01	2026-05-03 15:31:01.995797+01
+a1fde180-81ff-47db-904c-3d717bee2889	d2d71198-dd5b-4f66-9547-ff76bf242e0a	v1	published	{"seeded_from": "Phase 0 service-options baseline", "service_code": "RECON_POSITIONS"}	2026-05-03 15:31:01.995797+01	2026-05-03 16:31:01.995797+01	2026-05-03 16:31:01.995797+01	\N	\N	Seeded baseline published v1 for service-options framework Phase 0	2026-05-03 15:31:01.995797+01	2026-05-03 15:31:01.995797+01
+8b752b27-7bc0-4995-b4dd-9326afe5d709	4a560fb4-b635-4f84-a4ad-fba24b08818a	v1	published	{"seeded_from": "Phase 0 service-options baseline", "service_code": "RECON_TRANSACTIONS"}	2026-05-03 15:31:01.995797+01	2026-05-03 16:31:01.995797+01	2026-05-03 16:31:01.995797+01	\N	\N	Seeded baseline published v1 for service-options framework Phase 0	2026-05-03 15:31:01.995797+01	2026-05-03 15:31:01.995797+01
+7cd252a2-7d6d-4c66-9bbf-64d01dbb3077	e64867f9-67e4-4288-96ae-76df27e52376	v1	published	{"seeded_from": "Phase 0 service-options baseline", "service_code": "NAV_DISSEM"}	2026-05-03 15:31:01.995797+01	2026-05-03 16:31:01.995797+01	2026-05-03 16:31:01.995797+01	\N	\N	Seeded baseline published v1 for service-options framework Phase 0	2026-05-03 15:31:01.995797+01	2026-05-03 15:31:01.995797+01
+97ff5fac-6d9f-4920-a6e3-83aff178c979	ff28326c-c9ac-4752-b704-339a4263e17a	v1	published	{"seeded_from": "Phase 0 service-options baseline", "service_code": "ASSET_PRICING"}	2026-05-03 15:31:01.995797+01	2026-05-03 16:31:01.995797+01	2026-05-03 16:31:01.995797+01	\N	\N	Seeded baseline published v1 for service-options framework Phase 0	2026-05-03 15:31:01.995797+01	2026-05-03 15:31:01.995797+01
+e10ac1dc-2614-4459-85c7-63e2ac9170e1	2f43e57d-1de8-462a-bf6c-7460f4dfa3a1	v1	published	{"seeded_from": "Phase 0 service-options baseline", "service_code": "VAR_MARGIN"}	2026-05-03 15:31:01.995797+01	2026-05-03 16:31:01.995797+01	2026-05-03 16:31:01.995797+01	\N	\N	Seeded baseline published v1 for service-options framework Phase 0	2026-05-03 15:31:01.995797+01	2026-05-03 15:31:01.995797+01
+125eb483-9bca-4bd4-ad0b-348ec05ea8b9	3fcc8612-d9e0-4346-a2d4-a4f95451cf87	v1	published	{"seeded_from": "Phase 0 service-options baseline", "service_code": "WITHHOLD_TAX"}	2026-05-03 15:31:01.995797+01	2026-05-03 16:31:01.995797+01	2026-05-03 16:31:01.995797+01	\N	\N	Seeded baseline published v1 for service-options framework Phase 0	2026-05-03 15:31:01.995797+01	2026-05-03 15:31:01.995797+01
+0ae5e3b5-6910-434b-bff3-e24fa6ad3182	045b5f42-b484-406f-a8f4-c44a3281e13f	v1	published	{"seeded_from": "Phase 0 service-options baseline", "service_code": "MIFID_REG"}	2026-05-03 15:31:01.995797+01	2026-05-03 16:31:01.995797+01	2026-05-03 16:31:01.995797+01	\N	\N	Seeded baseline published v1 for service-options framework Phase 0	2026-05-03 15:31:01.995797+01	2026-05-03 15:31:01.995797+01
+d0cba4c0-3ca1-437a-94af-6df8d77c37d6	e559f68b-120f-4a4e-9c09-af5793e1c860	v1	published	{"seeded_from": "Phase 0 service-options baseline", "service_code": "KYC_SERVICE"}	2026-05-03 15:31:01.995797+01	2026-05-03 16:31:01.995797+01	2026-05-03 16:31:01.995797+01	\N	\N	Seeded baseline published v1 for service-options framework Phase 0	2026-05-03 15:31:01.995797+01	2026-05-03 15:31:01.995797+01
+dd7c9dbd-51d5-4494-8c29-17856308e656	911ed95b-97a1-4dfd-95f8-08c038e8ebe5	v1	published	{"seeded_from": "Phase 0 service-options baseline", "service_code": "MANCO_REPORTING"}	2026-05-03 15:31:01.995797+01	2026-05-03 16:31:01.995797+01	2026-05-03 16:31:01.995797+01	\N	\N	Seeded baseline published v1 for service-options framework Phase 0	2026-05-03 15:31:01.995797+01	2026-05-03 15:31:01.995797+01
+df7f9032-b7cb-45cf-865e-5343b4feb228	c50cda37-ad92-4437-bf72-18d12302da1f	v1	published	{"seeded_from": "Phase 0 service-options baseline", "service_code": "CAPSTOCK_AUTO"}	2026-05-03 15:31:01.995797+01	2026-05-03 16:31:01.995797+01	2026-05-03 16:31:01.995797+01	\N	\N	Seeded baseline published v1 for service-options framework Phase 0	2026-05-03 15:31:01.995797+01	2026-05-03 15:31:01.995797+01
+0470b55e-4029-4a06-98c4-abbbcff43035	511d2ddf-1509-4627-ad78-fdf94fb7115d	v1	published	{"seeded_from": "Phase 0 service-options baseline", "service_code": "HEDGE_FUND_ACCOUNTING"}	2026-05-03 15:31:01.995797+01	2026-05-03 16:31:01.995797+01	2026-05-03 16:31:01.995797+01	\N	\N	Seeded baseline published v1 for service-options framework Phase 0	2026-05-03 15:31:01.995797+01	2026-05-03 15:31:01.995797+01
+ca6af002-4cc8-4b27-9ad7-af81755cde93	3edd818d-d0c5-40e5-b497-411d69ae701f	v1	published	{"seeded_from": "Phase 0 service-options baseline", "service_code": "HEDGE_FUND_TA"}	2026-05-03 15:31:01.995797+01	2026-05-03 16:31:01.995797+01	2026-05-03 16:31:01.995797+01	\N	\N	Seeded baseline published v1 for service-options framework Phase 0	2026-05-03 15:31:01.995797+01	2026-05-03 15:31:01.995797+01
+08e00b9b-516b-4cf3-a46c-f376ced5a2d0	c0658157-8201-4f9e-9e7d-34ba91a9aed8	v1	published	{"seeded_from": "Phase 0 service-options baseline", "service_code": "INVESTOR_REG"}	2026-05-03 15:31:01.995797+01	2026-05-03 16:31:01.995797+01	2026-05-03 16:31:01.995797+01	\N	\N	Seeded baseline published v1 for service-options framework Phase 0	2026-05-03 15:31:01.995797+01	2026-05-03 15:31:01.995797+01
+50550285-7c45-4a46-ad32-a83bb9b585b1	42c49225-1a06-4416-99f0-ae89cebd8f8f	v1	published	{"seeded_from": "Phase 0 service-options baseline", "service_code": "SAFEKEEPING"}	2026-05-03 15:31:01.995797+01	2026-05-03 16:31:01.995797+01	2026-05-03 16:31:01.995797+01	\N	\N	Seeded baseline published v1 for service-options framework Phase 0	2026-05-03 15:31:01.995797+01	2026-05-03 15:31:01.995797+01
+d4dd04b5-2240-4e0d-b7e5-fec13c3a83f2	22a021c0-e169-46cd-b4da-41c9b2c1cade	v1	published	{"seeded_from": "Phase 0 service-options baseline", "service_code": "CASH_MGMT"}	2026-05-03 15:31:01.995797+01	2026-05-03 16:31:01.995797+01	2026-05-03 16:31:01.995797+01	\N	\N	Seeded baseline published v1 for service-options framework Phase 0	2026-05-03 15:31:01.995797+01	2026-05-03 15:31:01.995797+01
+d517a4ef-0a9d-458d-90f0-4c5f13f09fca	b1b1cf13-369a-448e-aae6-24dfbb6ed739	v1	published	{"seeded_from": "Phase 0 service-options baseline", "service_code": "SETTLEMENT"}	2026-05-03 15:31:01.995797+01	2026-05-03 16:31:01.995797+01	2026-05-03 16:31:01.995797+01	\N	\N	Seeded baseline published v1 for service-options framework Phase 0	2026-05-03 15:31:01.995797+01	2026-05-03 15:31:01.995797+01
+33873b24-7e81-4327-8916-957c8225a2fd	0e12b362-c4e1-47d2-90f4-51ca0fddc1bf	v1	published	{"seeded_from": "Phase 0 service-options baseline", "service_code": "REPORTING"}	2026-05-03 15:31:01.995797+01	2026-05-03 16:31:01.995797+01	2026-05-03 16:31:01.995797+01	\N	\N	Seeded baseline published v1 for service-options framework Phase 0	2026-05-03 15:31:01.995797+01	2026-05-03 15:31:01.995797+01
+fd3be28b-170a-43ec-becb-771d27e9fe61	a41be122-5c04-4944-9976-fdc656e25578	v1	published	{"seeded_from": "Phase 0 service-options baseline", "service_code": "CORP_ACTIONS"}	2026-05-03 15:31:01.995797+01	2026-05-03 16:31:01.995797+01	2026-05-03 16:31:01.995797+01	\N	\N	Seeded baseline published v1 for service-options framework Phase 0	2026-05-03 15:31:01.995797+01	2026-05-03 15:31:01.995797+01
+8a6f260a-2691-4dd6-8756-b5957fe93a77	7c536c3f-d475-4fa1-b665-f05e3dbd4e45	v1	published	{"seeded_from": "Phase 0 service-options baseline", "service_code": "NAV_CALC"}	2026-05-03 15:31:01.995797+01	2026-05-03 16:31:01.995797+01	2026-05-03 16:31:01.995797+01	\N	\N	Seeded baseline published v1 for service-options framework Phase 0	2026-05-03 15:31:01.995797+01	2026-05-03 15:31:01.995797+01
+ac5a0f2d-35f1-475f-bf99-42682db86d18	e75cef50-8f2e-4260-8a18-4f63cab526dc	v1	published	{"seeded_from": "Phase 0 service-options baseline", "service_code": "REG_REPORTING"}	2026-05-03 15:31:01.995797+01	2026-05-03 16:31:01.995797+01	2026-05-03 16:31:01.995797+01	\N	\N	Seeded baseline published v1 for service-options framework Phase 0	2026-05-03 15:31:01.995797+01	2026-05-03 15:31:01.995797+01
+38926adf-6f79-49df-a289-e784a0512647	71084961-a94f-438f-a5b7-bd7b5a425469	v1	published	{"seeded_from": "Phase 0 service-options baseline", "service_code": "INVESTOR_ACCT"}	2026-05-03 15:31:01.995797+01	2026-05-03 16:31:01.995797+01	2026-05-03 16:31:01.995797+01	\N	\N	Seeded baseline published v1 for service-options framework Phase 0	2026-05-03 15:31:01.995797+01	2026-05-03 15:31:01.995797+01
+\.
+
+
+--
+-- PostgreSQL database dump complete
+--
+
+\unrestrict dbEIFm3yht5gbjz9mDC3kq4Sl46J9ew3naB53xbqlrLJktUEMyDAVJzrPSs7o6f

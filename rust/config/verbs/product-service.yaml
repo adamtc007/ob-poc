@@ -2,6 +2,182 @@ domains:
   product-service:
     description: "Product-service catalogue relationship operations."
     verbs:
+      link:
+        flavour: attribute_mutating
+        description: Link a product to a service in the governed catalogue
+        effect_class: read_modify_write
+        role_guard:
+          any_of: [resource_owner, compliance_admin, senior_compliance, mlro]
+        invocation_phrases:
+          - "link product to service"
+          - "add service to product"
+          - "create product service mapping"
+        behavior: plugin
+        metadata:
+          tier: intent
+          source_of_truth: catalog
+          scope: global
+          noun: product_service
+          subject_kinds: [product, service]
+          tags: [catalogue, product-service, governance, write]
+          phase_tags: [stewardship]
+          side_effects: state_write
+        args:
+          - name: product-id
+            type: uuid
+            required: false
+          - name: product
+            type: string
+            required: false
+          - name: product-code
+            type: string
+            required: false
+          - name: service-id
+            type: uuid
+            required: false
+          - name: service
+            type: string
+            required: false
+          - name: service-code
+            type: string
+            required: false
+          - name: is-mandatory
+            type: boolean
+            required: false
+          - name: is-default
+            type: boolean
+            required: false
+          - name: display-order
+            type: integer
+            required: false
+          - name: configuration
+            type: json
+            required: false
+          - name: condition-key
+            type: string
+            required: false
+            description: Stable key when this link is conditional
+          - name: predicate-dsl
+            type: string
+            required: false
+            description: CBU-profile predicate for conditional service membership
+          - name: description
+            type: string
+            required: false
+        returns:
+          type: record
+        three_axis:
+          state_effect: transition
+          external_effects: [emitting]
+          consequence:
+            baseline: requires_confirmation
+
+      amend:
+        flavour: attribute_mutating
+        description: Amend a product-service catalogue mapping
+        effect_class: read_modify_write
+        role_guard:
+          any_of: [resource_owner, compliance_admin, senior_compliance, mlro]
+        invocation_phrases:
+          - "amend product service mapping"
+          - "update product service link"
+          - "revise product service mapping"
+        behavior: plugin
+        metadata:
+          tier: intent
+          source_of_truth: catalog
+          scope: global
+          noun: product_service
+          subject_kinds: [product, service]
+          tags: [catalogue, product-service, governance, write]
+          phase_tags: [stewardship]
+          side_effects: state_write
+        args:
+          - name: product-id
+            type: uuid
+            required: false
+          - name: product
+            type: string
+            required: false
+          - name: product-code
+            type: string
+            required: false
+          - name: service-id
+            type: uuid
+            required: false
+          - name: service
+            type: string
+            required: false
+          - name: service-code
+            type: string
+            required: false
+          - name: is-mandatory
+            type: boolean
+            required: false
+          - name: is-default
+            type: boolean
+            required: false
+          - name: display-order
+            type: integer
+            required: false
+          - name: configuration
+            type: json
+            required: false
+        returns:
+          type: affected
+        three_axis:
+          state_effect: preserving
+          external_effects: [emitting]
+          consequence:
+            baseline: requires_confirmation
+
+      unlink:
+        flavour: discretionary
+        description: Unlink a product-service catalogue mapping
+        effect_class: read_modify_write
+        role_guard:
+          any_of: [resource_owner, compliance_admin, senior_compliance, mlro]
+        invocation_phrases:
+          - "unlink product from service"
+          - "remove service from product"
+          - "delete product service mapping"
+        behavior: plugin
+        metadata:
+          tier: intent
+          source_of_truth: catalog
+          scope: global
+          noun: product_service
+          subject_kinds: [product, service]
+          tags: [catalogue, product-service, governance, write]
+          phase_tags: [stewardship]
+          side_effects: state_write
+        args:
+          - name: product-id
+            type: uuid
+            required: false
+          - name: product
+            type: string
+            required: false
+          - name: product-code
+            type: string
+            required: false
+          - name: service-id
+            type: uuid
+            required: false
+          - name: service
+            type: string
+            required: false
+          - name: service-code
+            type: string
+            required: false
+        returns:
+          type: affected
+        three_axis:
+          state_effect: transition
+          external_effects: [emitting]
+          consequence:
+            baseline: requires_explicit_authorisation
+
       override-option:
         flavour: attribute_mutating
         description: Declare a product-specific override for a service option

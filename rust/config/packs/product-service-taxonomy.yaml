@@ -5,9 +5,10 @@ id: product-service-taxonomy
 name: Product Service Taxonomy
 version: "1.0"
 description: >
-  Explore the design-time product, service, and servicing-resource taxonomy.
-  Guides catalog discovery so product onboarding and activation can resolve
-  products into services, resources, and attribute dictionaries.
+  Explore and maintain the governed product, service, servicing-resource,
+  resource-owner, and dictionary catalogue. Guides catalog discovery so product
+  onboarding and activation can resolve products into services, resources, and
+  attribute dictionaries without crossing into instance provisioning.
 
 invocation_phrases:
   - "product service taxonomy"
@@ -30,13 +31,23 @@ workspaces:
   - product_maintenance
 
 allowed_verbs:
+  # Product catalogue lifecycle
   - product.list
   - product.read
+  - product.define
+  - product.amend
+  - product.retire
+  # Service catalogue lifecycle
   - service.list
   - service.read
   - service.list-by-product
   - service.list-versions
   - service.show
+  - service.define
+  - service.propose-revision
+  - service.deprecate
+  - service.retire
+  # Service option catalogue
   - service-option.list-by-service
   - service-option.read
   - service.declare-option
@@ -44,22 +55,38 @@ allowed_verbs:
   - service.bind-option-source
   - service.deprecate-option
   - product-service.override-option
+  # Product-service catalogue mappings
+  - product-service.link
+  - product-service.amend
+  - product-service.unlink
+  # Service-resource type/capability catalogue
   - service-resource.list
   - service-resource.read
   - service-resource.list-by-service
   - service-resource.list-attributes
+  - service-resource.define-type
+  - service-resource.amend-type
+  - service-resource.retire-type
+  - service-resource.add-capability
+  - service-resource.amend-capability
+  - service-resource.remove-capability
   - service-resource.declare-eligibility
   - service-resource.declare-fanout-rule
+  - service-resource.sync-definitions
+  # Resource-owner principals
+  - resource-owner.assign
+  - resource-owner.amend
+  - resource-owner.unassign
+  # Attribute dictionary authoring
   - attribute.list
   - attribute.read
+  - attribute.define
+  - attribute.define-derived
+  - attribute.define-internal
   # R2 (2026-04-26) — service + service-version governance verbs.
   # These mutate the catalogue lifecycle and are admin-AgentMode-gated
   # at runtime by ABAC policy; the read-only exploration flow above is
   # unaffected for non-admin users.
-  - service.define
-  - service.propose-revision
-  - service.deprecate
-  - service.retire
   - service-version.draft
   - service-version.submit-for-review
   - service-version.publish

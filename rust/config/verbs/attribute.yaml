@@ -38,6 +38,12 @@ domains:
           - "define a new attribute for KYC risk"
         behavior: plugin
         handler: attribute_define_governed
+        conditional_role_guards:
+          - when:
+              arg: category
+              equals: resource
+            role_guard:
+              any_of: [resource_owner]
         args:
           - name: id
             type: string

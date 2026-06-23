@@ -23,7 +23,8 @@ pub struct ServiceRow {
 }
 
 #[derive(Debug, Clone)]
-pub struct NewServiceFields {
+#[allow(dead_code)]
+pub(crate) struct NewServiceFields {
     pub name: String,
     pub description: Option<String>,
     pub service_code: Option<String>,
@@ -45,7 +46,8 @@ impl ServiceService {
         &self.pool
     }
 
-    pub async fn create_service(&self, fields: &NewServiceFields) -> Result<Uuid> {
+    #[allow(dead_code)]
+    pub(crate) async fn create_service(&self, fields: &NewServiceFields) -> Result<Uuid> {
         let service_id = Uuid::new_v4();
         sqlx::query(r#"INSERT INTO "ob-poc".services (service_id, name, description, service_code, service_category, sla_definition, is_active, created_at, updated_at) VALUES ($1, $2, $3, $4, $5, $6, $7, NOW(), NOW())"#)
             .bind(service_id).bind(&fields.name).bind(&fields.description).bind(&fields.service_code)
@@ -74,7 +76,8 @@ impl ServiceService {
             .bind(limit.unwrap_or(100)).bind(offset.unwrap_or(0)).fetch_all(&self.pool).await.context("Failed to list Services")
     }
 
-    pub async fn update_service(
+    #[allow(dead_code)]
+    pub(crate) async fn update_service(
         &self,
         service_id: Uuid,
         name: Option<&str>,
@@ -88,7 +91,8 @@ impl ServiceService {
         Ok(result.rows_affected() > 0)
     }
 
-    pub async fn delete_service(&self, service_id: Uuid) -> Result<bool> {
+    #[allow(dead_code)]
+    pub(crate) async fn delete_service(&self, service_id: Uuid) -> Result<bool> {
         let result = sqlx::query(r#"DELETE FROM "ob-poc".services WHERE service_id = $1"#)
             .bind(service_id)
             .execute(&self.pool)
@@ -100,7 +104,8 @@ impl ServiceService {
         Ok(result.rows_affected() > 0)
     }
 
-    pub async fn link_product(&self, service_id: Uuid, product_id: Uuid) -> Result<()> {
+    #[allow(dead_code)]
+    pub(crate) async fn link_product(&self, service_id: Uuid, product_id: Uuid) -> Result<()> {
         sqlx::query(r#"INSERT INTO "ob-poc".product_services (product_id, service_id) VALUES ($1, $2) ON CONFLICT DO NOTHING"#)
             .bind(product_id).bind(service_id).execute(&self.pool).await.context("Failed to link service to product")?;
         info!("Linked service {} to product {}", service_id, product_id);

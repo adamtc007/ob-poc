@@ -34,6 +34,7 @@ use crate::sem_reg::types::{
 use crate::services::attribute_identity_service::AttributeIdentityService;
 
 const EXT_AUDIT_USER: &str = "audit_user";
+const RESOURCE_ATTRIBUTE_AUTHOR_ROLES: &[&str] = &["resource_owner", "admin"];
 
 pub struct ObPocAttributeService;
 
@@ -145,6 +146,20 @@ fn audit_user_for(principal: &Principal, fallback: &str) -> String {
     } else {
         fallback.to_string()
     }
+}
+
+fn require_resource_attribute_authority(principal: &Principal) -> Result<()> {
+    if RESOURCE_ATTRIBUTE_AUTHOR_ROLES
+        .iter()
+        .any(|role| principal.has_role(role))
+    {
+        return Ok(());
+    }
+
+    Err(anyhow!(
+        "attribute.define category=resource requires one of roles: {}",
+        RESOURCE_ATTRIBUTE_AUTHOR_ROLES.join(", ")
+    ))
 }
 
 fn record(value: Value) -> AttributeDispatchOutcome {
@@ -1038,6 +1053,9 @@ async fn attribute_define(
     let raw_id = arg_string(args, "id")?;
     let display_name = arg_string(args, "display-name")?;
     let category = arg_string(args, "category")?;
+    if category.eq_ignore_ascii_case("resource") {
+        require_resource_attribute_authority(principal)?;
+    }
     let value_type = arg_string(args, "value-type")?;
     let domain = arg_string_opt(args, "domain");
     let semantic_id = normalize_attribute_id(&raw_id, domain.as_deref());

@@ -27,7 +27,8 @@ pub struct ProductRow {
 }
 
 #[derive(Debug, Clone)]
-pub struct NewProductFields {
+#[allow(dead_code)]
+pub(crate) struct NewProductFields {
     pub name: String,
     pub description: Option<String>,
     pub product_code: Option<String>,
@@ -51,7 +52,8 @@ impl ProductService {
         &self.pool
     }
 
-    pub async fn create_product(&self, fields: &NewProductFields) -> Result<Uuid> {
+    #[allow(dead_code)]
+    pub(crate) async fn create_product(&self, fields: &NewProductFields) -> Result<Uuid> {
         let product_id = Uuid::new_v4();
         sqlx::query(r#"INSERT INTO "ob-poc".products (product_id, name, description, product_code, product_category, regulatory_framework, min_asset_requirement, is_active, metadata, created_at, updated_at) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW(), NOW())"#)
             .bind(product_id).bind(&fields.name).bind(&fields.description).bind(&fields.product_code)
@@ -81,7 +83,8 @@ impl ProductService {
             .bind(limit.unwrap_or(100)).bind(offset.unwrap_or(0)).fetch_all(&self.pool).await.context("Failed to list Products")
     }
 
-    pub async fn update_product(
+    #[allow(dead_code)]
+    pub(crate) async fn update_product(
         &self,
         product_id: Uuid,
         name: Option<&str>,
@@ -95,7 +98,8 @@ impl ProductService {
         Ok(result.rows_affected() > 0)
     }
 
-    pub async fn delete_product(&self, product_id: Uuid) -> Result<bool> {
+    #[allow(dead_code)]
+    pub(crate) async fn delete_product(&self, product_id: Uuid) -> Result<bool> {
         let result = sqlx::query(r#"DELETE FROM "ob-poc".products WHERE product_id = $1"#)
             .bind(product_id)
             .execute(&self.pool)

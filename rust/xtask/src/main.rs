@@ -35,6 +35,7 @@ mod reconcile;
 mod replay_tuner;
 mod runbook_envelope_determinism;
 mod seed_allianz;
+mod seed_catalogue;
 mod sem_reg;
 mod ubo_test;
 mod utterance_roundtrip;
@@ -416,6 +417,17 @@ enum Command {
     Catalogue {
         #[command(subcommand)]
         action: catalogue::CatalogueAction,
+    },
+
+    /// Replay Phase 1 catalogue genesis through governed verb dispatch.
+    SeedCatalogue {
+        /// Directory containing phase1_genesis pg_dump files.
+        #[arg(long)]
+        seed_dir: Option<std::path::PathBuf>,
+
+        /// Parse and replay inside a transaction, then roll it back.
+        #[arg(long)]
+        dry_run: bool,
     },
 
     /// Lexicon service commands (compile, lint, bench)
@@ -1524,6 +1536,10 @@ fn main() -> Result<()> {
             let rt = tokio::runtime::Runtime::new()?;
             rt.block_on(catalogue::run(action))?;
             Ok(())
+        }
+        Command::SeedCatalogue { seed_dir, dry_run } => {
+            let rt = tokio::runtime::Runtime::new()?;
+            rt.block_on(seed_catalogue::run(seed_dir, dry_run))
         }
         Command::Verbs { action } => {
             let rt = tokio::runtime::Runtime::new()?;

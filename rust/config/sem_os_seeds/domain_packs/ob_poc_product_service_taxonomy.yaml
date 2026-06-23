@@ -19,13 +19,18 @@ owned_universes:
   - universe.client_lifecycle
 owned_verb_prefixes:
   - product.
+  - product-service.
   - service.
   - service-option.
+  - service-resource.
   - service-version.
+  - resource-owner.
 owned_entity_kinds:
   - product
   - service
+  - product_service
   - resource_type
+  - service_resource_capability
   - service_resource_def
   - resource_owner_principal
 business_crates: []

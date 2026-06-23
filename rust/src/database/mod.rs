@@ -79,15 +79,13 @@ pub use generation_log_repository::{
     CompileResult, CorrectionPair, GenerationAttempt, GenerationLogRepository, GenerationLogRow,
     GenerationStatsSummary, LintResult, ParseResult, PromptStats, TrainingPair,
 };
-pub use product_service::{NewProductFields, ProductRow, ProductService};
+pub use product_service::{ProductRow, ProductService};
 pub use resource_instance_service::{
     NewResourceInstance, ResourceInstanceAttributeRow, ResourceInstanceRow,
     ResourceInstanceService, ServiceDeliveryRow, SetInstanceAttribute,
 };
-pub use service_resource_service::{
-    NewServiceResourceFields, ServiceResourceRow, ServiceResourceService,
-};
-pub use service_service::{NewServiceFields, ServiceRow, ServiceService};
+pub use service_resource_service::{ServiceResourceRow, ServiceResourceService};
+pub use service_service::{ServiceRow, ServiceService};
 pub use visualization_repository::{
     CbuBasicView, CbuDocumentView, CbuEntityView, CbuRoleView, CbuScreeningView, CbuSummaryView,
     CbuView, ControlRelationshipView, DocumentAttributeView, DocumentTypeView, EntityAttributeView,
