@@ -15,11 +15,24 @@ products	src/domain_ops/catalogue_maintenance_ops.rs	INSERT	r#"INSERT INTO "ob-p
 products	src/domain_ops/catalogue_maintenance_ops.rs	UPDATE	r#"UPDATE "ob-poc".products
 products	src/domain_ops/catalogue_maintenance_ops.rs	UPDATE	r#"UPDATE "ob-poc".products SET
 resource_attribute_requirements	src/service_resources/srdef_loader.rs	INSERT	INSERT INTO "ob-poc".resource_attribute_requirements
+resource_attribute_requirements	src/service_resources/srdef_loader.rs	UPDATE	UPDATE "ob-poc".resource_attribute_requirements
 resource_owner_principals	src/domain_ops/catalogue_maintenance_ops.rs	INSERT	r#"INSERT INTO "ob-poc".resource_owner_principals
 resource_owner_principals	src/domain_ops/catalogue_maintenance_ops.rs	UPDATE	r#"UPDATE "ob-poc".resource_owner_principals
 resource_owner_principals	src/domain_ops/catalogue_maintenance_ops.rs	UPDATE	r#"UPDATE "ob-poc".resource_owner_principals SET
 resource_owner_principals	src/service_resources/onboarding_data_request.rs	INSERT	INSERT INTO "ob-poc".resource_owner_principals
 resource_owner_principals	src/service_resources/srdef_loader.rs	INSERT	INSERT INTO "ob-poc".resource_owner_principals
+resource_owner_principals	src/service_resources/srdef_loader.rs	UPDATE	UPDATE "ob-poc".resource_owner_principals
+sem_reg.snapshots	crates/sem_os_postgres/src/store.rs	INSERT	INSERT INTO sem_reg.snapshots (
+sem_reg.snapshots	crates/sem_os_postgres/src/store.rs	UPDATE	UPDATE sem_reg.snapshots
+sem_reg.snapshots	src/sem_reg/stewardship/tools_phase0.rs	UPDATE	UPDATE sem_reg.snapshots
+sem_reg.snapshots	src/sem_reg/stewardship/tools_phase0.rs	UPDATE	UPDATE sem_reg.snapshots existing
+sem_reg.snapshots	src/sem_reg/stewardship/tools_phase0.rs	UPDATE	UPDATE sem_reg.snapshots s
+sem_reg.snapshots	src/sem_reg/store.rs	INSERT	INSERT INTO sem_reg.snapshots (
+sem_reg.snapshots	src/sem_reg/store.rs	UPDATE	UPDATE sem_reg.snapshots
+sem_reg.snapshots	src/services/attribute_service_impl.rs	INSERT	INSERT INTO sem_reg.snapshots (
+sem_reg.snapshots	src/services/attribute_service_impl.rs	UPDATE	UPDATE sem_reg.snapshots
+sem_reg.snapshots	src/services/phrase_service_impl.rs	INSERT	INSERT INTO sem_reg.snapshots (
+sem_reg.snapshots	src/services/phrase_service_impl.rs	UPDATE	UPDATE sem_reg.snapshots
 service_resource_capabilities	src/domain_ops/catalogue_maintenance_ops.rs	INSERT	r#"INSERT INTO "ob-poc".service_resource_capabilities
 service_resource_capabilities	src/domain_ops/catalogue_maintenance_ops.rs	UPDATE	r#"UPDATE "ob-poc".service_resource_capabilities
 service_resource_capabilities	src/domain_ops/catalogue_maintenance_ops.rs	UPDATE	r#"UPDATE "ob-poc".service_resource_capabilities SET

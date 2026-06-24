@@ -390,11 +390,18 @@ impl SrdefLoader {
                 .as_ref()
                 .and_then(|binding| binding.application_instance_id);
 
-            self.ensure_resource_owner_principal(pool, srdef).await?;
+            match self.ensure_resource_owner_principal(pool, srdef).await? {
+                EntityMutation::Inserted => result.owner_inserted += 1,
+                EntityMutation::Updated => result.owner_updated += 1,
+                EntityMutation::Unchanged => result.owner_unchanged += 1,
+            }
 
             // Check if exists
-            let existing: Option<(Uuid,)> = sqlx::query_as(
-                r#"SELECT resource_id FROM "ob-poc".service_resource_types WHERE srdef_id = $1"#,
+            let existing: Option<SrdefRowState> = sqlx::query_as(
+                r#"SELECT resource_id, srdef_snapshot_hash, lifecycle_status,
+                          attribute_gap_count, attribute_conflict_count
+                   FROM "ob-poc".service_resource_types
+                   WHERE srdef_id = $1"#,
             )
             .bind(srdef_id)
             .fetch_optional(pool)
@@ -402,61 +409,70 @@ impl SrdefLoader {
 
             let depends_on_json = json!(srdef.depends_on);
 
-            if let Some((resource_id,)) = existing {
-                // Update existing
-                sqlx::query(
-                    r#"
-                    UPDATE "ob-poc".service_resource_types
-                    SET name = $1,
-                        description = $2,
-                        owner = $3,
-                        resource_code = $4,
-                        resource_type = $5,
-                        resource_purpose = $6,
-                        provisioning_strategy = $7,
-                        depends_on = $8,
-                        per_market = $9,
-                        per_currency = $10,
-                        per_counterparty = $11,
-                        owner_principal_fqn = $12,
-                        srdef_lineage = 'yaml',
-                        srdef_snapshot = $13,
-                        srdef_snapshot_hash = $14,
-                        srdef_snapshot_id = $15,
-                        binding_policy = $16,
-                        l4_binding_required = $17,
-                        bound_application_id = $18,
-                        bound_application_instance_id = $19,
-                        srdef_synced_at = NOW(),
-                        updated_at = NOW()
-                    WHERE resource_id = $20
-                    "#,
-                )
-                .bind(&srdef.name)
-                .bind(&srdef.purpose)
-                .bind(&srdef.owner)
-                .bind(&srdef.code)
-                .bind(&srdef.resource_type)
-                .bind(&srdef.purpose)
-                .bind(&srdef.provisioning_strategy)
-                .bind(&depends_on_json)
-                .bind(srdef.per_market)
-                .bind(srdef.per_currency)
-                .bind(srdef.per_counterparty)
-                .bind(&owner_principal_fqn)
-                .bind(&srdef_snapshot)
-                .bind(srdef_snapshot_hash.as_str())
-                .bind(srdef_snapshot_id)
-                .bind(&binding_policy)
-                .bind(l4_binding_required)
-                .bind(bound_application_id)
-                .bind(bound_application_instance_id)
-                .bind(resource_id)
-                .execute(pool)
-                .await?;
+            let mut srdef_row_changed = false;
+            let resource_id = if let Some(existing) = existing {
+                if existing.srdef_snapshot_hash.as_deref() == Some(srdef_snapshot_hash.as_str()) {
+                    result.unchanged += 1;
+                    debug!("SRDEF unchanged: {}", srdef_id);
+                    existing.resource_id
+                } else {
+                    // Update existing
+                    sqlx::query(
+                        r#"
+                        UPDATE "ob-poc".service_resource_types
+                        SET name = $1,
+                            description = $2,
+                            owner = $3,
+                            resource_code = $4,
+                            resource_type = $5,
+                            resource_purpose = $6,
+                            provisioning_strategy = $7,
+                            depends_on = $8,
+                            per_market = $9,
+                            per_currency = $10,
+                            per_counterparty = $11,
+                            owner_principal_fqn = $12,
+                            srdef_lineage = 'yaml',
+                            srdef_snapshot = $13,
+                            srdef_snapshot_hash = $14,
+                            srdef_snapshot_id = $15,
+                            binding_policy = $16,
+                            l4_binding_required = $17,
+                            bound_application_id = $18,
+                            bound_application_instance_id = $19,
+                            srdef_synced_at = NOW(),
+                            updated_at = NOW()
+                        WHERE resource_id = $20
+                        "#,
+                    )
+                    .bind(&srdef.name)
+                    .bind(&srdef.purpose)
+                    .bind(&srdef.owner)
+                    .bind(&srdef.code)
+                    .bind(&srdef.resource_type)
+                    .bind(&srdef.purpose)
+                    .bind(&srdef.provisioning_strategy)
+                    .bind(&depends_on_json)
+                    .bind(srdef.per_market)
+                    .bind(srdef.per_currency)
+                    .bind(srdef.per_counterparty)
+                    .bind(&owner_principal_fqn)
+                    .bind(&srdef_snapshot)
+                    .bind(srdef_snapshot_hash.as_str())
+                    .bind(srdef_snapshot_id)
+                    .bind(&binding_policy)
+                    .bind(l4_binding_required)
+                    .bind(bound_application_id)
+                    .bind(bound_application_instance_id)
+                    .bind(existing.resource_id)
+                    .execute(pool)
+                    .await?;
 
-                result.updated += 1;
-                debug!("Updated SRDEF: {}", srdef_id);
+                    result.updated += 1;
+                    srdef_row_changed = true;
+                    debug!("Updated SRDEF: {}", srdef_id);
+                    existing.resource_id
+                }
             } else {
                 // Insert new
                 let resource_id = Uuid::new_v4();
@@ -498,8 +514,10 @@ impl SrdefLoader {
                 .await?;
 
                 result.inserted += 1;
+                srdef_row_changed = true;
                 debug!("Inserted SRDEF: {}", srdef_id);
-            }
+                resource_id
+            };
 
             // Sync attribute requirements
             let attr_summary = self
@@ -511,27 +529,58 @@ impl SrdefLoader {
                 } else {
                     "complete"
                 };
-            sqlx::query(
-                r#"
-                UPDATE "ob-poc".service_resource_types
-                SET lifecycle_status = $1,
-                    attribute_gap_count = $2,
-                    attribute_conflict_count = $3,
-                    updated_at = NOW()
-                WHERE srdef_id = $4
-                "#,
+            result.attribute_inserted += attr_summary.inserted;
+            result.attribute_updated += attr_summary.updated;
+            result.attribute_unchanged += attr_summary.unchanged;
+            result.attribute_missing_defs += attr_summary.missing_attribute_defs;
+            result.attribute_conflicts += attr_summary.conflicts;
+
+            let lifecycle_state: Option<SrdefLifecycleState> = sqlx::query_as(
+                r#"SELECT lifecycle_status, attribute_gap_count, attribute_conflict_count
+                   FROM "ob-poc".service_resource_types
+                   WHERE resource_id = $1"#,
             )
-            .bind(lifecycle_status)
-            .bind(attr_summary.missing_attribute_defs as i32)
-            .bind(attr_summary.conflicts as i32)
-            .bind(srdef_id)
-            .execute(pool)
+            .bind(resource_id)
+            .fetch_optional(pool)
             .await?;
+            let expected_gap_count = attr_summary.missing_attribute_defs as i32;
+            let expected_conflict_count = attr_summary.conflicts as i32;
+            let lifecycle_changed = lifecycle_state.is_none_or(|state| {
+                state.lifecycle_status != lifecycle_status
+                    || state.attribute_gap_count != expected_gap_count
+                    || state.attribute_conflict_count != expected_conflict_count
+            });
+
+            if lifecycle_changed {
+                sqlx::query(
+                    r#"
+                    UPDATE "ob-poc".service_resource_types
+                    SET lifecycle_status = $1,
+                        attribute_gap_count = $2,
+                        attribute_conflict_count = $3,
+                        updated_at = NOW()
+                    WHERE resource_id = $4
+                    "#,
+                )
+                .bind(lifecycle_status)
+                .bind(expected_gap_count)
+                .bind(expected_conflict_count)
+                .bind(resource_id)
+                .execute(pool)
+                .await?;
+
+                if !srdef_row_changed {
+                    result.updated += 1;
+                }
+            }
         }
 
         info!(
-            "SRDEF sync complete: {} inserted, {} updated",
-            result.inserted, result.updated
+            "SRDEF sync complete: {} inserted, {} updated, {} unchanged, {} entity transitions",
+            result.inserted,
+            result.updated,
+            result.unchanged,
+            result.recorded_transitions()
         );
         Ok(result)
     }
@@ -593,42 +642,94 @@ impl SrdefLoader {
 
             let source_policy = json!(attr.source_policy);
 
-            // Upsert attribute requirement
-            sqlx::query(
+            let expected = AttributeRequirementState {
+                requirement_type: attr.requirement.clone(),
+                source_policy: source_policy.clone(),
+                constraints: attr.constraints.clone(),
+                default_value: attr.default_value.as_ref().map(|v| v.to_string()),
+                condition_expression: attr.condition.clone(),
+                evidence_policy: attr.evidence_policy.clone(),
+                is_mandatory: attr.requirement == "required",
+                display_order: idx as i32,
+                requirement_status: "synced".to_string(),
+                conflict_reason: None,
+            };
+            let existing: Option<AttributeRequirementState> = sqlx::query_as(
                 r#"
-                INSERT INTO "ob-poc".resource_attribute_requirements
-                    (requirement_id, resource_id, attribute_id, requirement_type,
-                     source_policy, constraints, default_value, condition_expression,
-                     evidence_policy, is_mandatory, display_order, requirement_status,
-                     conflict_reason)
-                VALUES (gen_random_uuid(), $1, $2, $3, $4, $5, $6, $7, $8, $9,
-                        $10, 'synced', NULL)
-                ON CONFLICT (resource_id, attribute_id) DO UPDATE SET
-                    requirement_type = EXCLUDED.requirement_type,
-                    source_policy = EXCLUDED.source_policy,
-                    constraints = EXCLUDED.constraints,
-                    default_value = EXCLUDED.default_value,
-                    condition_expression = EXCLUDED.condition_expression,
-                    evidence_policy = EXCLUDED.evidence_policy,
-                    is_mandatory = EXCLUDED.is_mandatory,
-                    display_order = EXCLUDED.display_order,
-                    requirement_status = EXCLUDED.requirement_status,
-                    conflict_reason = EXCLUDED.conflict_reason
+                SELECT requirement_type, source_policy, constraints, default_value,
+                       condition_expression, evidence_policy, is_mandatory,
+                       display_order, requirement_status, conflict_reason
+                FROM "ob-poc".resource_attribute_requirements
+                WHERE resource_id = $1 AND attribute_id = $2
                 "#,
             )
             .bind(resource_id)
             .bind(attr_uuid)
-            .bind(&attr.requirement)
-            .bind(&source_policy)
-            .bind(&attr.constraints)
-            .bind(attr.default_value.as_ref().map(|v| v.to_string()))
-            .bind(&attr.condition)
-            .bind(&attr.evidence_policy)
-            .bind(attr.requirement == "required")
-            .bind(idx as i32)
-            .execute(pool)
+            .fetch_optional(pool)
             .await?;
-            summary.synced += 1;
+
+            match existing {
+                Some(existing) if existing == expected => {
+                    summary.unchanged += 1;
+                }
+                Some(_) => {
+                    sqlx::query(
+                        r#"
+                        UPDATE "ob-poc".resource_attribute_requirements
+                        SET requirement_type = $3,
+                            source_policy = $4,
+                            constraints = $5,
+                            default_value = $6,
+                            condition_expression = $7,
+                            evidence_policy = $8,
+                            is_mandatory = $9,
+                            display_order = $10,
+                            requirement_status = 'synced',
+                            conflict_reason = NULL
+                        WHERE resource_id = $1 AND attribute_id = $2
+                        "#,
+                    )
+                    .bind(resource_id)
+                    .bind(attr_uuid)
+                    .bind(&attr.requirement)
+                    .bind(&source_policy)
+                    .bind(&attr.constraints)
+                    .bind(attr.default_value.as_ref().map(|v| v.to_string()))
+                    .bind(&attr.condition)
+                    .bind(&attr.evidence_policy)
+                    .bind(attr.requirement == "required")
+                    .bind(idx as i32)
+                    .execute(pool)
+                    .await?;
+                    summary.updated += 1;
+                }
+                None => {
+                    sqlx::query(
+                        r#"
+                        INSERT INTO "ob-poc".resource_attribute_requirements
+                            (requirement_id, resource_id, attribute_id, requirement_type,
+                             source_policy, constraints, default_value, condition_expression,
+                             evidence_policy, is_mandatory, display_order, requirement_status,
+                             conflict_reason)
+                        VALUES (gen_random_uuid(), $1, $2, $3, $4, $5, $6, $7, $8, $9,
+                                $10, 'synced', NULL)
+                        "#,
+                    )
+                    .bind(resource_id)
+                    .bind(attr_uuid)
+                    .bind(&attr.requirement)
+                    .bind(&source_policy)
+                    .bind(&attr.constraints)
+                    .bind(attr.default_value.as_ref().map(|v| v.to_string()))
+                    .bind(&attr.condition)
+                    .bind(&attr.evidence_policy)
+                    .bind(attr.requirement == "required")
+                    .bind(idx as i32)
+                    .execute(pool)
+                    .await?;
+                    summary.inserted += 1;
+                }
+            }
         }
 
         Ok(summary)
@@ -638,26 +739,73 @@ impl SrdefLoader {
         &self,
         pool: &PgPool,
         srdef: &LoadedSrdef,
-    ) -> Result<()> {
-        sqlx::query(
+    ) -> Result<EntityMutation> {
+        let owner_principal_fqn = format!("resource_owner:{}", srdef.owner);
+        let principal_capabilities = json!(["resource_owner"]);
+        let existing: Option<ResourceOwnerPrincipalState> = sqlx::query_as(
             r#"
-            INSERT INTO "ob-poc".resource_owner_principals
-                (owner_principal_fqn, owner_system, display_name,
-                 principal_kind, principal_capabilities, dispatch_enabled)
-            VALUES ($1, $2, $2, 'resource_owner', '["resource_owner"]'::jsonb, TRUE)
-            ON CONFLICT (owner_principal_fqn) DO UPDATE
-            SET owner_system = EXCLUDED.owner_system,
-                display_name = COALESCE("ob-poc".resource_owner_principals.display_name, EXCLUDED.display_name),
-                principal_kind = 'resource_owner',
-                principal_capabilities = EXCLUDED.principal_capabilities,
-                updated_at = NOW()
+            SELECT owner_system, display_name, principal_kind,
+                   principal_capabilities, dispatch_enabled
+            FROM "ob-poc".resource_owner_principals
+            WHERE owner_principal_fqn = $1
             "#,
         )
-        .bind(format!("resource_owner:{}", srdef.owner))
-        .bind(&srdef.owner)
-        .execute(pool)
+        .bind(&owner_principal_fqn)
+        .fetch_optional(pool)
         .await?;
-        Ok(())
+
+        let expected = ResourceOwnerPrincipalState {
+            owner_system: srdef.owner.clone(),
+            display_name: existing
+                .as_ref()
+                .map(|state| state.display_name.clone())
+                .unwrap_or_else(|| srdef.owner.clone()),
+            principal_kind: "resource_owner".to_string(),
+            principal_capabilities: principal_capabilities.clone(),
+            dispatch_enabled: existing
+                .as_ref()
+                .map(|state| state.dispatch_enabled)
+                .unwrap_or(true),
+        };
+
+        match existing {
+            Some(existing) if existing == expected => Ok(EntityMutation::Unchanged),
+            Some(_) => {
+                sqlx::query(
+                    r#"
+                    UPDATE "ob-poc".resource_owner_principals
+                    SET owner_system = $2,
+                        display_name = COALESCE(display_name, $2),
+                        principal_kind = 'resource_owner',
+                        principal_capabilities = $3,
+                        updated_at = NOW()
+                    WHERE owner_principal_fqn = $1
+                    "#,
+                )
+                .bind(&owner_principal_fqn)
+                .bind(&srdef.owner)
+                .bind(&principal_capabilities)
+                .execute(pool)
+                .await?;
+                Ok(EntityMutation::Updated)
+            }
+            None => {
+                sqlx::query(
+                    r#"
+                    INSERT INTO "ob-poc".resource_owner_principals
+                        (owner_principal_fqn, owner_system, display_name,
+                         principal_kind, principal_capabilities, dispatch_enabled)
+                    VALUES ($1, $2, $2, 'resource_owner', $3, TRUE)
+                    "#,
+                )
+                .bind(&owner_principal_fqn)
+                .bind(&srdef.owner)
+                .bind(&principal_capabilities)
+                .execute(pool)
+                .await?;
+                Ok(EntityMutation::Inserted)
+            }
+        }
     }
 }
 
@@ -666,14 +814,88 @@ impl SrdefLoader {
 pub struct SyncResult {
     pub inserted: usize,
     pub updated: usize,
+    pub unchanged: usize,
+    pub owner_inserted: usize,
+    pub owner_updated: usize,
+    pub owner_unchanged: usize,
+    pub attribute_inserted: usize,
+    pub attribute_updated: usize,
+    pub attribute_unchanged: usize,
+    pub attribute_missing_defs: usize,
+    pub attribute_conflicts: usize,
     pub errors: Vec<String>,
+}
+
+impl SyncResult {
+    /// Count entity-grain transitions recorded by the sync.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// let mut result = ob_poc::service_resources::srdef_loader::SyncResult::default();
+    /// result.inserted = 1;
+    /// result.attribute_updated = 2;
+    /// assert_eq!(result.recorded_transitions(), 3);
+    /// ```
+    pub fn recorded_transitions(&self) -> usize {
+        self.inserted
+            + self.updated
+            + self.owner_inserted
+            + self.owner_updated
+            + self.attribute_inserted
+            + self.attribute_updated
+    }
 }
 
 #[derive(Debug, Default)]
 struct AttributeSyncSummary {
-    synced: usize,
+    inserted: usize,
+    updated: usize,
+    unchanged: usize,
     missing_attribute_defs: usize,
     conflicts: usize,
+}
+
+#[derive(Debug, sqlx::FromRow)]
+struct SrdefRowState {
+    resource_id: Uuid,
+    srdef_snapshot_hash: Option<String>,
+}
+
+#[derive(Debug, sqlx::FromRow)]
+struct SrdefLifecycleState {
+    lifecycle_status: String,
+    attribute_gap_count: i32,
+    attribute_conflict_count: i32,
+}
+
+#[derive(Debug, PartialEq, sqlx::FromRow)]
+struct AttributeRequirementState {
+    requirement_type: String,
+    source_policy: JsonValue,
+    constraints: JsonValue,
+    default_value: Option<String>,
+    condition_expression: Option<String>,
+    evidence_policy: JsonValue,
+    is_mandatory: bool,
+    display_order: i32,
+    requirement_status: String,
+    conflict_reason: Option<String>,
+}
+
+#[derive(Debug, PartialEq, sqlx::FromRow)]
+struct ResourceOwnerPrincipalState {
+    owner_system: String,
+    display_name: String,
+    principal_kind: String,
+    principal_capabilities: JsonValue,
+    dispatch_enabled: bool,
+}
+
+enum EntityMutation {
+    Inserted,
+    Updated,
+    Unchanged,
 }
 
 fn binding_policy(srdef: &LoadedSrdef) -> JsonValue {
