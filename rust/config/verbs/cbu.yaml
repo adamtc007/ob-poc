@@ -833,6 +833,17 @@ domains:
           - "assign account operator"
           - "I need to add a signatory"
           - "authorize representative for trading"
+        sentences:
+          step:
+            - "Assign {role} role in this structure"
+            - "Add role relationship for {entity-id}"
+          summary:
+            - "assigned {role} role"
+          clarify:
+            cbu-id: "Which structure should receive the role assignment?"
+            role: "Which role should be assigned?"
+            entity-id: "Which entity should receive the role?"
+          completed: "{role} role assigned"
         behavior: plugin
         handler: AssignRole   # dispatches on role-type (I1 fold of the 6 cbu.assign-* specialists)
         metadata:
