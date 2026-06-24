@@ -169,6 +169,12 @@ pids/
 *.seed
 *.pid.lock
 
+# Local model/evaluation scratch outputs
+/assets/
+/scratch/
+/rust/reports/*.json
+/rust/reports/*.jsonl
+
 # Temporary files
 tmp/
 temp/
@@ -418,4 +424,3 @@ ob_poc_unreachable_pub_v2.txt
 patch.rs
 rust/check.txt
 rust/check_after.txt
-

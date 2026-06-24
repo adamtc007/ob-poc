@@ -111,59 +111,112 @@ fn get_simulated_allowed_verbs(expected_verb: &str) -> HashSet<String> {
     match namespace {
         "cbu" => {
             for v in &[
-                "cbu.create", "cbu.update", "cbu.delete", "cbu.assign-role", "cbu.add-product",
-                "cbu.parties", "cbu.delete-cascade", "cbu.terminate", "cbu.suspend",
-                "cbu.list-roles", "cbu.get-config",
+                "cbu.create",
+                "cbu.update",
+                "cbu.delete",
+                "cbu.assign-role",
+                "cbu.add-product",
+                "cbu.parties",
+                "cbu.delete-cascade",
+                "cbu.terminate",
+                "cbu.suspend",
+                "cbu.list-roles",
+                "cbu.get-config",
             ] {
                 allowed.insert(v.to_string());
             }
         }
         "entity" | "party" => {
             for v in &[
-                "entity.create", "entity.update", "entity.delete", "entity.read",
-                "entity.verify-name", "entity.add-parent", "entity.list-placeholders",
-                "entity.resolve-placeholder", "entity.read-structure", "entity.check-status",
+                "entity.create",
+                "entity.update",
+                "entity.delete",
+                "entity.read",
+                "entity.verify-name",
+                "entity.add-parent",
+                "entity.list-placeholders",
+                "entity.resolve-placeholder",
+                "entity.read-structure",
+                "entity.check-status",
             ] {
                 allowed.insert(v.to_string());
             }
         }
         "screening" | "ubo" | "control" | "kyc" | "red-flag" => {
             for v in &[
-                "screening.sanctions", "screening.pep", "screening.adverse-media",
-                "screening.full", "ubo.list-ubos", "ubo.add-ownership", "ubo.compute-chains",
-                "ubo.trace-chains", "ubo.mark-deceased", "ubo.waive-verification",
-                "ubo.update-ownership", "control.add", "control.show-board-controller",
-                "control.import-psc-register", "red-flag.dismiss", "red-flag.escalate",
-                "red-flag.list", "kyc.download-cert",
+                "screening.sanctions",
+                "screening.pep",
+                "screening.adverse-media",
+                "screening.full",
+                "ubo.list-ubos",
+                "ubo.add-ownership",
+                "ubo.compute-chains",
+                "ubo.trace-chains",
+                "ubo.mark-deceased",
+                "ubo.waive-verification",
+                "ubo.update-ownership",
+                "control.add",
+                "control.show-board-controller",
+                "control.import-psc-register",
+                "red-flag.dismiss",
+                "red-flag.escalate",
+                "red-flag.list",
+                "kyc.download-cert",
             ] {
                 allowed.insert(v.to_string());
             }
         }
         "onboarding" | "gleif" => {
             for v in &[
-                "onboarding.start", "onboarding.status", "onboarding.resume", "onboarding.pause",
-                "onboarding.check-readiness", "onboarding.runsheet", "onboarding.send-welcome",
-                "gleif.search", "gleif.enrich", "gleif.import-tree", "gleif.check-active",
+                "onboarding.start",
+                "onboarding.status",
+                "onboarding.resume",
+                "onboarding.pause",
+                "onboarding.check-readiness",
+                "onboarding.runsheet",
+                "onboarding.send-welcome",
+                "gleif.search",
+                "gleif.enrich",
+                "gleif.import-tree",
+                "gleif.check-active",
             ] {
                 allowed.insert(v.to_string());
             }
         }
         "document" | "doc-request" => {
             for v in &[
-                "document.solicit", "document.upload-version", "document.verify",
-                "document.reject", "document.extract", "document.solicit-batch",
-                "document.list-pending", "document.approve", "document.archive",
+                "document.solicit",
+                "document.upload-version",
+                "document.verify",
+                "document.reject",
+                "document.extract",
+                "document.solicit-batch",
+                "document.list-pending",
+                "document.approve",
+                "document.archive",
             ] {
                 allowed.insert(v.to_string());
             }
         }
         "deal" | "custody" | "share-class" | "fund" => {
             for v in &[
-                "deal.create", "deal.add-participant", "deal.read", "deal.create-rate-card",
-                "deal.add-rate-card-line", "deal.propose-rate-card", "deal.counter-rate-card",
-                "deal.update-status", "deal.request-onboarding", "deal.cancel", "fund.create",
-                "fund.create-subfund", "share-class.create", "fund.link-feeder",
-                "fund.list-investors", "fund.add-investment", "custody.settlement-cycle",
+                "deal.create",
+                "deal.add-participant",
+                "deal.read",
+                "deal.create-rate-card",
+                "deal.add-rate-card-line",
+                "deal.propose-rate-card",
+                "deal.counter-rate-card",
+                "deal.update-status",
+                "deal.request-onboarding",
+                "deal.cancel",
+                "fund.create",
+                "fund.create-subfund",
+                "share-class.create",
+                "fund.link-feeder",
+                "fund.list-investors",
+                "fund.add-investment",
+                "custody.settlement-cycle",
             ] {
                 allowed.insert(v.to_string());
             }
@@ -279,10 +332,15 @@ fn phase0_board_enrichment_receipt() {
     let (mut total_reach, mut total_unreach) = (0usize, 0usize);
 
     for case in &corpus {
-        let set = legal_sets
-            .get(&case.board_id)
-            .unwrap_or_else(|| panic!("case {} references unknown board {}", case.id, case.board_id));
-        let entry = per_board_cases.entry(case.board_id.clone()).or_insert((0, 0, 0));
+        let set = legal_sets.get(&case.board_id).unwrap_or_else(|| {
+            panic!(
+                "case {} references unknown board {}",
+                case.id, case.board_id
+            )
+        });
+        let entry = per_board_cases
+            .entry(case.board_id.clone())
+            .or_insert((0, 0, 0));
         entry.0 += 1;
         if reachable(case, set) {
             entry.1 += 1;
@@ -291,7 +349,10 @@ fn phase0_board_enrichment_receipt() {
             entry.2 += 1;
             total_unreach += 1;
             if unreachable_examples.len() < 20 {
-                unreachable_examples.push(format!("{} [{}] {}", case.id, case.expected_verb, case.utterance));
+                unreachable_examples.push(format!(
+                    "{} [{}] {}",
+                    case.id, case.expected_verb, case.utterance
+                ));
             }
         }
     }
@@ -300,7 +361,10 @@ fn phase0_board_enrichment_receipt() {
         .iter()
         .map(|b| {
             let set = &legal_sets[&b.board_id];
-            let (cases, reach, unreach) = per_board_cases.get(&b.board_id).copied().unwrap_or((0, 0, 0));
+            let (cases, reach, unreach) = per_board_cases
+                .get(&b.board_id)
+                .copied()
+                .unwrap_or((0, 0, 0));
             BoardReport {
                 board_id: b.board_id.clone(),
                 corpus_domain: b.corpus_domain.clone(),
@@ -353,7 +417,10 @@ fn phase0_board_enrichment_receipt() {
             unreach_macro += 1;
         } else {
             unreach_vocab += 1;
-            vocab_gap_examples.push(format!("{} [{}] {}", case.id, case.expected_verb, case.utterance));
+            vocab_gap_examples.push(format!(
+                "{} [{}] {}",
+                case.id, case.expected_verb, case.utterance
+            ));
         }
     }
 
@@ -440,7 +507,10 @@ mod db_eval {
     use std::sync::Arc;
 
     fn boards_by_id() -> HashMap<String, Board> {
-        load_boards().into_iter().map(|b| (b.board_id.clone(), b)).collect()
+        load_boards()
+            .into_iter()
+            .map(|b| (b.board_id.clone(), b))
+            .collect()
     }
 
     /// Genuine board allowed-set for the SEARCH path: registry verbs in
@@ -665,21 +735,21 @@ mod db_eval {
     fn true_workspace_for(domain: &str) -> &'static str {
         match domain {
             // SemOS-maintenance / data governance.
-            "attribute" | "service-resource" | "governance" | "derivation"
-            | "typed-attribute" | "changeset" | "registry" | "schema" | "authoring"
-            | "service" => "sem_os_maintenance",
+            "attribute" | "service-resource" | "governance" | "derivation" | "typed-attribute"
+            | "changeset" | "registry" | "schema" | "authoring" | "service" => "sem_os_maintenance",
             // KYC / UBO.
-            "ownership" | "evidence" | "screening" | "case" | "allegation" | "bods"
-            | "ubo" | "kyc" | "requirement" | "entity-workstream" | "movement" => "kyc",
+            "ownership" | "evidence" | "screening" | "case" | "allegation" | "bods" | "ubo"
+            | "kyc" | "requirement" | "entity-workstream" | "movement" => "kyc",
             // Pre-workspace scope-gate (selected before a workspace exists).
             "client-group" => "scope_gate",
             // System / contextual-query surface (no mutation workspace).
             "narration" => "system",
             // Capital / instruments / structuring referenced-entity content not
             // owned by the onboarding workspace's atomic domains.
-            "capital" | "instrument-class" | "booking-principal" | "partnership"
-            | "trust" | "identifier" | "mandate" | "readiness" | "tollgate"
-            | "product" | "structure" => "other",
+            "capital" | "instrument-class" | "booking-principal" | "partnership" | "trust"
+            | "identifier" | "mandate" | "readiness" | "tollgate" | "product" | "structure" => {
+                "other"
+            }
             _ => "unmapped",
         }
     }
@@ -713,13 +783,14 @@ mod db_eval {
             } else {
                 let domain = c.expected_verb.split('.').next().unwrap_or("");
                 let ws = true_workspace_for(domain);
-                out_by_ws.entry(ws.to_string()).or_default().push(
-                    serde_json::json!({
+                out_by_ws
+                    .entry(ws.to_string())
+                    .or_default()
+                    .push(serde_json::json!({
                         "id": c.id,
                         "expected_verb": c.expected_verb,
                         "domain": domain,
-                    }),
-                );
+                    }));
             }
         }
 
@@ -774,8 +845,16 @@ mod db_eval {
         }
         // Scenario route targets — read raw YAML and harvest dotted verb/macro FQNs.
         if let Ok(text) = std::fs::read_to_string("config/scenario_index.yaml") {
-            for tok in text.split(|c: char| !(c.is_alphanumeric() || c == '.' || c == '-' || c == '_')) {
-                if tok.contains('.') && tok.split('.').next().map(|d| !d.is_empty()).unwrap_or(false) {
+            for tok in
+                text.split(|c: char| !(c.is_alphanumeric() || c == '.' || c == '-' || c == '_'))
+            {
+                if tok.contains('.')
+                    && tok
+                        .split('.')
+                        .next()
+                        .map(|d| !d.is_empty())
+                        .unwrap_or(false)
+                {
                     fqns.insert(tok.to_string());
                 }
             }
@@ -794,12 +873,16 @@ mod db_eval {
         let embedder = Arc::new(CandleEmbedder::new().expect("embedder"));
         let dyn_embedder: Arc<dyn Embedder> = embedder;
         let verb_service = Arc::new(VerbService::new(pool.clone()));
-        let (learned_data, _) = LearningWarmup::new(pool.clone()).warmup().await.expect("warmup");
+        let (learned_data, _) = LearningWarmup::new(pool.clone())
+            .warmup()
+            .await
+            .expect("warmup");
 
         let macro_index = {
             let path = Path::new("config/verb_schemas/macros");
             path.is_dir().then(|| {
-                let reg = ob_poc::dsl_v2::load_macro_registry_from_dir(path).expect("macro registry");
+                let reg =
+                    ob_poc::dsl_v2::load_macro_registry_from_dir(path).expect("macro registry");
                 Arc::new(MacroIndex::from_registry(&reg, None))
             })
         };
@@ -809,7 +892,8 @@ mod db_eval {
                 .then(|| Arc::new(ScenarioIndex::from_yaml_file(path).expect("scenario index")))
         };
 
-        let mut s = HybridVerbSearcher::new(verb_service, Some(learned_data)).with_embedder(dyn_embedder);
+        let mut s =
+            HybridVerbSearcher::new(verb_service, Some(learned_data)).with_embedder(dyn_embedder);
         if let Some(mi) = macro_index {
             s = s.with_macro_index(mi);
         }
@@ -852,10 +936,13 @@ mod db_eval {
         let allowed = board_allowed_set(board, &macro_scenario);
 
         let results = search(&searcher, &case.utterance, &allowed).await;
-        let ranked: Vec<(String, f32)> = results.iter().map(|r| (r.verb.clone(), r.score)).collect();
+        let ranked: Vec<(String, f32)> =
+            results.iter().map(|r| (r.verb.clone(), r.score)).collect();
 
         // Evidence fields (the Option-C extension).
-        let total_registry = ob_poc::dsl_v2::execution::runtime_registry().all_verbs().count();
+        let total_registry = ob_poc::dsl_v2::execution::runtime_registry()
+            .all_verbs()
+            .count();
         let flow = soft_stage_flow(&results);
         let allowed_vec: Vec<String> = allowed.iter().cloned().collect();
         let observations = observe_state_reachability(&allowed_vec, board.entity_state.as_deref());
@@ -880,8 +967,11 @@ mod db_eval {
         });
 
         std::fs::create_dir_all("reports").ok();
-        std::fs::write("reports/phase1_single_trace.json", serde_json::to_string_pretty(&trace).unwrap())
-            .expect("write phase1_single_trace.json");
+        std::fs::write(
+            "reports/phase1_single_trace.json",
+            serde_json::to_string_pretty(&trace).unwrap(),
+        )
+        .expect("write phase1_single_trace.json");
         println!("\n===== PHASE 1 SINGLE EXTENDED TRACE =====");
         println!("{}", serde_json::to_string_pretty(&trace).unwrap());
         println!("\n  receipt -> reports/phase1_single_trace.json");
@@ -908,14 +998,16 @@ mod db_eval {
 
             // Bare search.
             let bare = search(&searcher, &case.utterance, &allowed).await;
-            let bare_ranked: Vec<(String, f32)> = bare.iter().map(|r| (r.verb.clone(), r.score)).collect();
+            let bare_ranked: Vec<(String, f32)> =
+                bare.iter().map(|r| (r.verb.clone(), r.score)).collect();
 
             // Search + capture (read-only observation).
             let captured = search(&searcher, &case.utterance, &allowed).await;
             let _flow = soft_stage_flow(&captured);
             let allowed_vec: Vec<String> = allowed.iter().cloned().collect();
             let _obs = observe_state_reachability(&allowed_vec, board.entity_state.as_deref());
-            let cap_ranked: Vec<(String, f32)> = captured.iter().map(|r| (r.verb.clone(), r.score)).collect();
+            let cap_ranked: Vec<(String, f32)> =
+                captured.iter().map(|r| (r.verb.clone(), r.score)).collect();
 
             if bare_ranked != cap_ranked {
                 diffs.push(serde_json::json!({
@@ -934,8 +1026,15 @@ mod db_eval {
         )
         .expect("write ranking proof");
         println!("\n===== PHASE 1 RANKING-UNCHANGED PROOF =====");
-        println!("sample=20 diffs={} (empty diff => ranking unchanged)", diffs.len());
-        assert!(diffs.is_empty(), "ranking changed under capture: {:?}", diffs);
+        println!(
+            "sample=20 diffs={} (empty diff => ranking unchanged)",
+            diffs.len()
+        );
+        assert!(
+            diffs.is_empty(),
+            "ranking changed under capture: {:?}",
+            diffs
+        );
     }
 
     // ── Phase 2 + 3: batch eval over the full corpus → jsonl + aggregate ──
@@ -964,7 +1063,9 @@ mod db_eval {
         let macro_scenario = load_macro_scenario_fqns();
         let known = all_known_fqns(&macro_scenario);
         let corpus = load_corpus();
-        let total_registry = ob_poc::dsl_v2::execution::runtime_registry().all_verbs().count();
+        let total_registry = ob_poc::dsl_v2::execution::runtime_registry()
+            .all_verbs()
+            .count();
 
         std::fs::create_dir_all("reports").ok();
         let mut jsonl = std::fs::File::create("reports/intent_traces.jsonl").expect("jsonl");
@@ -986,7 +1087,8 @@ mod db_eval {
             let board = &boards[&case.board_id];
             let allowed = board_allowed_set(board, &macro_scenario);
             let allowed_vec: Vec<String> = allowed.iter().cloned().collect();
-            let observations = observe_state_reachability(&allowed_vec, board.entity_state.as_deref());
+            let observations =
+                observe_state_reachability(&allowed_vec, board.entity_state.as_deref());
             let unreachable: HashSet<&String> = observations
                 .iter()
                 .filter(|o| !o.state_reachable)
@@ -1018,7 +1120,16 @@ mod db_eval {
             }
 
             let results = searcher
-                .search(&case.utterance, None, None, None, 25, Some(&allowed), None, None)
+                .search(
+                    &case.utterance,
+                    None,
+                    None,
+                    None,
+                    25,
+                    Some(&allowed),
+                    None,
+                    None,
+                )
                 .await
                 .unwrap_or_default();
             for r in &results {
@@ -1100,7 +1211,13 @@ mod db_eval {
         }
 
         let n = corpus.len() as f32;
-        let mean = |v: &[f32]| if v.is_empty() { 0.0 } else { v.iter().sum::<f32>() / v.len() as f32 };
+        let mean = |v: &[f32]| {
+            if v.is_empty() {
+                0.0
+            } else {
+                v.iter().sum::<f32>() / v.len() as f32
+            }
+        };
         let collapse_ratios: Vec<f32> = collapse_samples
             .iter()
             .map(|(f, p)| *p as f32 / *f as f32)
@@ -1118,7 +1235,8 @@ mod db_eval {
                     .unwrap_or(false)
             })
             .count();
-        let state_precondition_coverage = verbs_with_state_preconditions as f32 / total_registry as f32;
+        let state_precondition_coverage =
+            verbs_with_state_preconditions as f32 / total_registry as f32;
 
         let aggregate = serde_json::json!({
             "note": "Intent Trace Option-C aggregate. Survival = expected reaches the surface/ranked; \
@@ -1221,7 +1339,11 @@ mod db_eval {
         println!("\n  per-case traces -> reports/intent_traces.jsonl");
         println!("  aggregate       -> reports/intent_trace_aggregate.json");
 
-        assert!(max_score <= 1.0 + f32::EPSILON, "max_score exceeded 1.0: {}", max_score);
+        assert!(
+            max_score <= 1.0 + f32::EPSILON,
+            "max_score exceeded 1.0: {}",
+            max_score
+        );
     }
 
     // ── CBU Phase 2: First-hit / Second-hit metric (frozen pack 88eb3699) ──
@@ -1282,16 +1404,29 @@ mod db_eval {
         };
 
         for case in &cbu_cases {
-            let expected_in_pack =
-                allowed.contains(&case.expected_verb) || case.alt_verbs.iter().any(|x| allowed.contains(x));
+            let expected_in_pack = allowed.contains(&case.expected_verb)
+                || case.alt_verbs.iter().any(|x| allowed.contains(x));
             if expected_in_pack {
                 in_pack_total += 1;
             }
             let candidates = searcher
-                .search(&case.utterance, None, None, None, 10, Some(&allowed), None, None)
+                .search(
+                    &case.utterance,
+                    None,
+                    None,
+                    None,
+                    10,
+                    Some(&allowed),
+                    None,
+                    None,
+                )
                 .await
                 .unwrap_or_default();
-            if candidates.iter().take(5).any(|c| state_unreachable.contains(&c.verb)) {
+            if candidates
+                .iter()
+                .take(5)
+                .any(|c| state_unreachable.contains(&c.verb))
+            {
                 a.shortlist_has_state_unreachable += 1;
             }
             let outcome = check_ambiguity(&candidates, threshold);
@@ -1330,7 +1465,12 @@ mod db_eval {
         }
 
         let n = cbu_cases.len() as f32;
-        let second_at = |k: usize| a.ask_ranks.iter().filter(|(r, _)| r.map(|r| r < k).unwrap_or(false)).count();
+        let second_at = |k: usize| {
+            a.ask_ranks
+                .iter()
+                .filter(|(r, _)| r.map(|r| r < k).unwrap_or(false))
+                .count()
+        };
         let second_at_in_pack = |k: usize| {
             a.ask_ranks
                 .iter()
@@ -1340,7 +1480,8 @@ mod db_eval {
         let second3 = second_at(3);
         let second5 = second_at(5);
         // rank distribution (1-indexed) among ask outcomes where expected is within top-5
-        let mut rank_hist: std::collections::BTreeMap<usize, usize> = std::collections::BTreeMap::new();
+        let mut rank_hist: std::collections::BTreeMap<usize, usize> =
+            std::collections::BTreeMap::new();
         for (r, _) in &a.ask_ranks {
             if let Some(r) = r {
                 if *r < 5 {
@@ -1416,14 +1557,33 @@ mod db_eval {
         });
 
         std::fs::create_dir_all("reports").ok();
-        std::fs::write("reports/cbu_second_hit.json", serde_json::to_string_pretty(&report).unwrap())
-            .expect("write cbu_second_hit.json");
-        println!("\n===== CBU SECOND-HIT METRIC (frozen {}) =====", &FROZEN[..8]);
-        println!("{}", serde_json::to_string_pretty(&report["rates_all_219"]).unwrap());
-        println!("in-pack discovery: {}", serde_json::to_string_pretty(&report["in_pack_subset"]).unwrap());
-        println!("coverage: {}", serde_json::to_string_pretty(&report["coverage"]).unwrap());
+        std::fs::write(
+            "reports/cbu_second_hit.json",
+            serde_json::to_string_pretty(&report).unwrap(),
+        )
+        .expect("write cbu_second_hit.json");
+        println!(
+            "\n===== CBU SECOND-HIT METRIC (frozen {}) =====",
+            &FROZEN[..8]
+        );
+        println!(
+            "{}",
+            serde_json::to_string_pretty(&report["rates_all_219"]).unwrap()
+        );
+        println!(
+            "in-pack discovery: {}",
+            serde_json::to_string_pretty(&report["in_pack_subset"]).unwrap()
+        );
+        println!(
+            "coverage: {}",
+            serde_json::to_string_pretty(&report["coverage"]).unwrap()
+        );
         println!("  -> reports/cbu_second_hit.json");
-        assert_eq!(a.first + a.confident_wrong + second5 + miss5, cbu_cases.len(), "buckets must sum to N");
+        assert_eq!(
+            a.first + a.confident_wrong + second5 + miss5,
+            cbu_cases.len(),
+            "buckets must sum to N"
+        );
     }
 
     /// One arm of the composed metric over a fixed allowed set.
@@ -1467,7 +1627,16 @@ mod db_eval {
         let mut ask_in_top5 = 0usize;
         for case in cases {
             let candidates = searcher
-                .search(&case.utterance, None, None, None, 10, Some(allowed), None, None)
+                .search(
+                    &case.utterance,
+                    None,
+                    None,
+                    None,
+                    10,
+                    Some(allowed),
+                    None,
+                    None,
+                )
                 .await
                 .unwrap_or_default();
             let rank = candidates.iter().position(|c| is_hit(&c.verb, case));
@@ -1528,8 +1697,19 @@ mod db_eval {
         let allowed_full = production_allowed_set(&board);
         // Sensitivity arm: atomic-only (strip the membership-owned macros).
         let atomic_domains: HashSet<&str> = [
-            "cbu", "entity", "session", "view", "agent", "contract", "deal", "billing",
-            "trading-profile", "custody", "onboarding", "gleif", "research",
+            "cbu",
+            "entity",
+            "session",
+            "view",
+            "agent",
+            "contract",
+            "deal",
+            "billing",
+            "trading-profile",
+            "custody",
+            "onboarding",
+            "gleif",
+            "research",
         ]
         .into_iter()
         .collect();
@@ -1621,7 +1801,10 @@ mod db_eval {
             allowed_full.len(),
             full.n
         );
-        println!("{}", serde_json::to_string_pretty(&report["primary_arm_composed"]).unwrap());
+        println!(
+            "{}",
+            serde_json::to_string_pretty(&report["primary_arm_composed"]).unwrap()
+        );
         println!("  -> reports/cbu_second_hit_composed.json");
     }
 }
@@ -1671,7 +1854,12 @@ fn cbu_metadata_audit_inventory() {
                 has_lifecycle: lc.is_some(),
                 requires_states: lc.map(|l| l.requires_states.clone()).unwrap_or_default(),
                 transitions_to: lc.and_then(|l| l.transitions_to.clone()),
-                required_args: v.args.iter().filter(|a| a.required).map(|a| a.name.clone()).collect(),
+                required_args: v
+                    .args
+                    .iter()
+                    .filter(|a| a.required)
+                    .map(|a| a.name.clone())
+                    .collect(),
                 harm_class: v.harm_class.map(|h| format!("{:?}", h)),
             }
         })
@@ -1681,14 +1869,20 @@ fn cbu_metadata_audit_inventory() {
     // ── I1: cluster by action stem (candidate collision families) ──
     let mut by_stem: BTreeMap<String, Vec<String>> = BTreeMap::new();
     for v in &cbu {
-        by_stem.entry(v.action_stem.clone()).or_default().push(v.full_name.clone());
+        by_stem
+            .entry(v.action_stem.clone())
+            .or_default()
+            .push(v.full_name.clone());
     }
     let stem_clusters: BTreeMap<String, Vec<String>> =
         by_stem.into_iter().filter(|(_, m)| m.len() > 1).collect();
     // Exact (stem,object) duplicates — true I1 collisions.
     let mut by_so: BTreeMap<String, Vec<String>> = BTreeMap::new();
     for v in &cbu {
-        by_so.entry(format!("{}|{}", v.action_stem, v.object)).or_default().push(v.full_name.clone());
+        by_so
+            .entry(format!("{}|{}", v.action_stem, v.object))
+            .or_default()
+            .push(v.full_name.clone());
     }
     let exact_dups: BTreeMap<String, Vec<String>> =
         by_so.into_iter().filter(|(_, m)| m.len() > 1).collect();
@@ -1709,10 +1903,16 @@ fn cbu_metadata_audit_inventory() {
     }
 
     // ── I4: signature gaps ──
-    let missing_subject_kind: Vec<String> =
-        cbu.iter().filter(|v| v.subject_kinds.is_empty()).map(|v| v.full_name.clone()).collect();
-    let missing_args: Vec<String> =
-        cbu.iter().filter(|v| v.required_args.is_empty()).map(|v| v.full_name.clone()).collect();
+    let missing_subject_kind: Vec<String> = cbu
+        .iter()
+        .filter(|v| v.subject_kinds.is_empty())
+        .map(|v| v.full_name.clone())
+        .collect();
+    let missing_args: Vec<String> = cbu
+        .iter()
+        .filter(|v| v.required_args.is_empty())
+        .map(|v| v.full_name.clone())
+        .collect();
 
     // ── I2: board domain composition (load board fixture) ──
     let board = load_boards()
@@ -1747,11 +1947,31 @@ fn cbu_metadata_audit_inventory() {
     });
 
     std::fs::create_dir_all("reports").ok();
-    std::fs::write("reports/cbu_audit_inventory.json", serde_json::to_string_pretty(&report).unwrap())
-        .expect("write cbu_audit_inventory.json");
+    std::fs::write(
+        "reports/cbu_audit_inventory.json",
+        serde_json::to_string_pretty(&report).unwrap(),
+    )
+    .expect("write cbu_audit_inventory.json");
     println!("CBU audit inventory -> reports/cbu_audit_inventory.json");
-    println!("  cbu verbs: {} | board legal: {} across {} domains", cbu.len(), board_total, domain_counts.len());
-    println!("  I1 action-stem clusters >1: {} | exact (stem,object) dups: {}", stem_clusters.len(), exact_dups.len());
-    println!("  I3 lifecycle-gated: {} | of which missing requires_states: {}", lifecycle_gated.len(), lifecycle_without_states.len());
-    println!("  I4 missing subject_kind: {} | missing required args: {}", missing_subject_kind.len(), missing_args.len());
+    println!(
+        "  cbu verbs: {} | board legal: {} across {} domains",
+        cbu.len(),
+        board_total,
+        domain_counts.len()
+    );
+    println!(
+        "  I1 action-stem clusters >1: {} | exact (stem,object) dups: {}",
+        stem_clusters.len(),
+        exact_dups.len()
+    );
+    println!(
+        "  I3 lifecycle-gated: {} | of which missing requires_states: {}",
+        lifecycle_gated.len(),
+        lifecycle_without_states.len()
+    );
+    println!(
+        "  I4 missing subject_kind: {} | missing required args: {}",
+        missing_subject_kind.len(),
+        missing_args.len()
+    );
 }

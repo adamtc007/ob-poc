@@ -512,7 +512,6 @@ impl ServiceResourcePipelineService {
         .context("Failed to get pending requests")
     }
 
-
     // =========================================================================
     // PROVISIONING EVENTS
     // =========================================================================

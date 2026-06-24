@@ -2103,7 +2103,11 @@ async fn enforce_requires_states_precondition(
             return Ok(());
         }
     };
-    if lifecycle.requires_states.iter().any(|s| s == &current_state) {
+    if lifecycle
+        .requires_states
+        .iter()
+        .any(|s| s == &current_state)
+    {
         return Ok(());
     }
     bail!(
@@ -3124,11 +3128,12 @@ mod tests {
             .expect("begin scope");
 
         // An existing committed DISCOVERED row (read-only; scope rolls back on drop).
-        let discovered: Uuid =
-            sqlx::query_scalar(r#"SELECT cbu_id FROM "ob-poc".cbus WHERE status = 'DISCOVERED' LIMIT 1"#)
-                .fetch_one(scope.executor())
-                .await
-                .expect("a DISCOVERED cbu must exist");
+        let discovered: Uuid = sqlx::query_scalar(
+            r#"SELECT cbu_id FROM "ob-poc".cbus WHERE status = 'DISCOVERED' LIMIT 1"#,
+        )
+        .fetch_one(scope.executor())
+        .await
+        .expect("a DISCOVERED cbu must exist");
 
         let reg = runtime_registry();
         let confirm = reg.get("cbu", "confirm").expect("cbu.confirm registered");
@@ -3254,11 +3259,12 @@ mod tests {
         let mut scope = crate::sequencer_tx::PgTransactionScope::begin(&pool)
             .await
             .expect("begin scope");
-        let discovered: Uuid =
-            sqlx::query_scalar(r#"SELECT cbu_id FROM "ob-poc".cbus WHERE status = 'DISCOVERED' LIMIT 1"#)
-                .fetch_one(scope.executor())
-                .await
-                .expect("a DISCOVERED cbu must exist");
+        let discovered: Uuid = sqlx::query_scalar(
+            r#"SELECT cbu_id FROM "ob-poc".cbus WHERE status = 'DISCOVERED' LIMIT 1"#,
+        )
+        .fetch_one(scope.executor())
+        .await
+        .expect("a DISCOVERED cbu must exist");
         let confirm = runtime_registry()
             .get("cbu", "confirm")
             .expect("cbu.confirm registered");

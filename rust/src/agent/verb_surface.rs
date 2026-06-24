@@ -622,8 +622,7 @@ pub fn observe_state_reachability(
 ) -> Vec<crate::agent::telemetry::StateObservation> {
     use crate::agent::telemetry::StateObservation;
     let registry = runtime_registry();
-    fqns
-        .iter()
+    fqns.iter()
         .map(|fqn| {
             let lifecycle = registry.get_by_name(fqn).and_then(|v| v.lifecycle.as_ref());
             let (state_reachable, failing_predicate) = match (lifecycle, entity_state) {
@@ -737,8 +736,7 @@ impl SessionVerbSurface {
     /// match then drop any FQN not in this set, so a workspace macro must be in
     /// the set to survive. Cross-workspace macros are absent → still dropped.
     pub fn allowed_fqns(&self) -> HashSet<String> {
-        let mut fqns: HashSet<String> =
-            self.verbs.iter().map(|v| v.fqn.clone()).collect();
+        let mut fqns: HashSet<String> = self.verbs.iter().map(|v| v.fqn.clone()).collect();
         fqns.extend(self.owned_macros.iter().cloned());
         fqns
     }

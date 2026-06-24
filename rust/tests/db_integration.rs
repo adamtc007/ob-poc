@@ -1070,8 +1070,10 @@ slots:
         let cbu_id = ctx.resolve("cbu").unwrap();
 
         // Confirm-first: cbu.add-product requires VALIDATED (Phase 3 C1).
-        db.execute_dsl(&format!(r#"(cbu.submit-for-validation :cbu-id "{cbu_id}")"#))
-            .await?;
+        db.execute_dsl(&format!(
+            r#"(cbu.submit-for-validation :cbu-id "{cbu_id}")"#
+        ))
+        .await?;
         db.execute_dsl(&format!(r#"(cbu.confirm :cbu-id "{cbu_id}")"#))
             .await?;
 
@@ -1128,8 +1130,10 @@ slots:
 
         // Confirm-first: reach VALIDATED so add-product gets past the lifecycle
         // gate to its product validation (Phase 3 C1).
-        db.execute_dsl(&format!(r#"(cbu.submit-for-validation :cbu-id "{cbu_id}")"#))
-            .await?;
+        db.execute_dsl(&format!(
+            r#"(cbu.submit-for-validation :cbu-id "{cbu_id}")"#
+        ))
+        .await?;
         db.execute_dsl(&format!(r#"(cbu.confirm :cbu-id "{cbu_id}")"#))
             .await?;
 
@@ -1187,8 +1191,10 @@ slots:
         let cbu_id = ctx.resolve("cbu").unwrap();
 
         // Confirm-first: cbu.add-product requires VALIDATED (Phase 3 C1).
-        db.execute_dsl(&format!(r#"(cbu.submit-for-validation :cbu-id "{cbu_id}")"#))
-            .await?;
+        db.execute_dsl(&format!(
+            r#"(cbu.submit-for-validation :cbu-id "{cbu_id}")"#
+        ))
+        .await?;
         db.execute_dsl(&format!(r#"(cbu.confirm :cbu-id "{cbu_id}")"#))
             .await?;
 
@@ -1234,8 +1240,10 @@ slots:
         let cbu_id = ctx.resolve("cbu").unwrap();
 
         // Confirm-first: cbu.add-product requires VALIDATED (Phase 3 C1).
-        db.execute_dsl(&format!(r#"(cbu.submit-for-validation :cbu-id "{cbu_id}")"#))
-            .await?;
+        db.execute_dsl(&format!(
+            r#"(cbu.submit-for-validation :cbu-id "{cbu_id}")"#
+        ))
+        .await?;
         db.execute_dsl(&format!(r#"(cbu.confirm :cbu-id "{cbu_id}")"#))
             .await?;
 
@@ -1319,8 +1327,10 @@ slots:
             ))
             .await?;
         let cbu_id = ctx.resolve("cbu").unwrap();
-        db.execute_dsl(&format!(r#"(cbu.submit-for-validation :cbu-id "{cbu_id}")"#))
-            .await?;
+        db.execute_dsl(&format!(
+            r#"(cbu.submit-for-validation :cbu-id "{cbu_id}")"#
+        ))
+        .await?;
         db.execute_dsl(&format!(r#"(cbu.confirm :cbu-id "{cbu_id}")"#))
             .await?;
 
@@ -1341,11 +1351,12 @@ slots:
         }
 
         // After rollback: a committed (pool) read must see NO orphan children.
-        let orphan_intents: i64 =
-            sqlx::query_scalar(r#"SELECT count(*) FROM "ob-poc".service_intents WHERE cbu_id = $1"#)
-                .bind(cbu_id)
-                .fetch_one(&db.pool)
-                .await?;
+        let orphan_intents: i64 = sqlx::query_scalar(
+            r#"SELECT count(*) FROM "ob-poc".service_intents WHERE cbu_id = $1"#,
+        )
+        .bind(cbu_id)
+        .fetch_one(&db.pool)
+        .await?;
         assert_eq!(
             orphan_intents, 0,
             "ATOMICITY: rolled-back add-product must leave NO orphan service_intents \

@@ -242,7 +242,8 @@ impl VerbSearchResult {
 /// of `search()`, never from inside it. This is how Intent Trace records the
 /// soft-stage flow without instrumenting (and risking) the search body.
 pub fn soft_stage_flow(results: &[VerbSearchResult]) -> crate::agent::telemetry::SoftStageFlow {
-    let mut by_source: std::collections::BTreeMap<String, usize> = std::collections::BTreeMap::new();
+    let mut by_source: std::collections::BTreeMap<String, usize> =
+        std::collections::BTreeMap::new();
     let mut by_tier: std::collections::BTreeMap<String, usize> = std::collections::BTreeMap::new();
     for r in results {
         *by_source.entry(format!("{:?}", r.source)).or_insert(0) += 1;
