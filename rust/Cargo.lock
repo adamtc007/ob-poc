@@ -4355,6 +4355,7 @@ dependencies = [
  "sha2 0.10.9",
  "sqlx",
  "thiserror 1.0.69",
+ "tokio",
  "tracing",
  "uuid",
 ]
@@ -4392,6 +4393,7 @@ dependencies = [
  "smallvec",
  "sqlx",
  "thiserror 1.0.69",
+ "tokio",
  "tracing",
  "unicode-normalization",
  "uuid",
@@ -4496,12 +4498,14 @@ dependencies = [
  "bigdecimal",
  "chrono",
  "ob-poc-types",
+ "reqwest 0.12.28",
  "serde",
  "serde_json",
  "serde_yaml",
  "sqlx",
  "thiserror 1.0.69",
  "tokio",
+ "toml 0.8.23",
  "uuid",
 ]
 
@@ -4518,6 +4522,7 @@ dependencies = [
  "sha2 0.10.9",
  "sqlx",
  "thiserror 1.0.69",
+ "tokio",
  "uuid",
 ]
 
@@ -6110,14 +6115,20 @@ name = "sem_os_obpoc_adapter"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "async-trait",
+ "chrono",
  "dsl-core",
  "sem_os_core",
  "sem_os_ontology",
+ "sem_os_policy",
  "sem_os_types",
  "serde",
  "serde_json",
  "serde_yaml",
+ "tokio",
+ "toml 0.8.23",
  "tracing",
+ "uuid",
 ]
 
 [[package]]

@@ -9,7 +9,7 @@
 //! Run: cargo test --features database --test verb_search_integration test_cbu_extended -- --ignored --nocapture
 
 #![allow(unused_imports)]
-use crate::{ExpectedOutcome, TestScenario};
+use super::{ExpectedOutcome, TestScenario};
 
 /// CBU role assignment scenarios - adding parties to CBUs
 pub(crate) fn cbu_assign_role_scenarios() -> Vec<TestScenario> {

@@ -24,8 +24,11 @@ uuid = { version = "1", features = ["v4", "serde"] }
 sqlx = { version = "0.8", features = ["runtime-tokio-rustls", "postgres", "uuid", "chrono", "json"], optional = true }
 
 [features]
-default = []
+default = ["database"]
 database = ["dep:sqlx"]
+
+[dev-dependencies]
+tokio = { version = "1", features = ["macros", "rt"] }
 
 [lints.rust]
 unreachable_pub = "deny"

@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO dsl_event_queue (instance_id, event_kind, payload)\n           VALUES ($1, 'HumanTaskComplete', $2)",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Jsonb"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "ac16652438097fab012c68cce8a138d38984dc65b1700c7707b74e3e898fa5a1"
+}

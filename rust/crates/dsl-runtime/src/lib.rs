@@ -149,3 +149,6 @@ pub use cross_workspace::test_harness::{self, LiveScenarioRunner, ScenarioRunner
 
 #[cfg(test)]
 pub use port::test_support;
+
+#[cfg(test)]
+mod integration_tests;

@@ -969,14 +969,14 @@ slots:
             "expected cbu_operationally_active tollgate to be indexed"
         );
 
-        // Deal should have its KYC-clearance constraint indexed.
-        let deal_constraints =
-            r.constraints_for_transition("deal", "deal", "IN_CLEARANCE", "CONTRACTED");
+        // Service consumption should have its active-service constraint indexed.
+        let service_constraints =
+            r.constraints_for_transition("cbu", "service_consumption", "proposed", "provisioned");
         assert!(
-            deal_constraints
+            service_constraints
                 .iter()
-                .any(|c| c.id == "deal_contracted_requires_kyc_approved"),
-            "expected deal contract gate to be indexed"
+                .any(|c| c.id == "service_consumption_requires_active_service"),
+            "expected service consumption gate to be indexed"
         );
 
         // deal.cancel should be indexed across many from-states.

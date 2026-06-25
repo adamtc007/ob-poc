@@ -81,7 +81,9 @@ futures = "0.3"
 # Cross-workspace DAG test harness. Off by default; enabled by integration
 # tests in this crate (and optionally by external crates that want to use
 # the harness for their own DAG-driven scenario tests).
+default = ["database"]
 harness = []
+database = []
 
 [dev-dependencies]
 tokio = { version = "1", features = ["macros", "rt"] }

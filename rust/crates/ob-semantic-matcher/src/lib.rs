@@ -57,3 +57,6 @@ pub use feedback::{
     MatchConfidence, Outcome, PatternLearner, PipelineStatus, PromotableCandidate, PromotionReport,
     PromotionService, ReviewCandidate, WeeklyHealthMetrics,
 };
+
+#[cfg(test)]
+mod integration_tests;

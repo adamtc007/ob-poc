@@ -1,6 +1,7 @@
 //! Phase 1 Task 2 (§10.6) — optimistic-concurrency (CAS) on the directly-mutated
 //! compliance write-paths, with the three-class carve-out.
 //!
+#![allow(clippy::doc_overindented_list_items)]
 //! v0.5 §10.6 turns LWW into compare-and-set for operator-authored compliance
 //! values. The ratified design carves the surface into three classes:
 //!   * Class 1 — operator-authored, NON-ManCo compliance facts → version-CAS'd

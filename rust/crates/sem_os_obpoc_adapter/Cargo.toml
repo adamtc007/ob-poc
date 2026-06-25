@@ -15,5 +15,17 @@ serde_yaml = "0.9"
 anyhow = "1.0"
 tracing = "0.1"
 
+[dev-dependencies]
+tokio = { version = "1", features = ["macros", "rt"] }
+toml = "0.8"
+uuid = { version = "1", features = ["v4"] }
+async-trait = "0.1"
+sem_os_policy.workspace = true
+chrono = "0.4"
+
+[features]
+default = ["database"]
+database = []
+
 [lints.rust]
 unreachable_pub = "deny"

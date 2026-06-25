@@ -117,6 +117,7 @@ fn rel_id(outcome: &VerbExecutionOutcome) -> Option<String> {
 /// One role-type parity case: (label, dispatcher role-type, the specialist op,
 /// the role name, whether an entity_relationships edge is expected, and the
 /// per-CBU arg builder).
+#[allow(dead_code)]
 struct Case {
     label: &'static str,
     role_type: Option<&'static str>,

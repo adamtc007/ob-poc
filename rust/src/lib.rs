@@ -321,3 +321,6 @@ pub mod system_info {
         )
     }
 }
+
+#[cfg(test)]
+mod integration_tests;

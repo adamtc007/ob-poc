@@ -65,3 +65,6 @@ impl PgStores {
         }
     }
 }
+
+#[cfg(test)]
+mod integration_tests;

@@ -1,6 +1,6 @@
 # CLAUDE.md
 
-> **Last reviewed:** 2026-05-26
+> **Last reviewed:** 2026-06-25
 > **Frontend:** React/TypeScript (`ob-poc-ui-react/`) — Chat UI with scope panel, Inspector, Semantic OS Tab
 > **Backend:** Rust/Axum (`rust/crates/ob-poc-web/`) — Serves React + REST API
 > **Crates:** 51 workspace crates (incl. `ob-poc` application root) — 18 ob-poc-* library (web, types, diagnostics, boundary, sage, journey, authoring, agent, macros · split-v1: bods, deal, booking-principal, semtaxonomy, ontology, entity-linking, trading-profile, derived-attributes, taxonomy) · 11 sem_os_* (core, types, ontology, policy, taxonomy, postgres, server, client, obpoc_adapter, harness, mcp) · 4 dsl-* (dsl-core, dsl-lsp, dsl-runtime, dsl-analysis) · 4 ob-* (ob-agentic, ob-templates, ob-workflow, ob-semantic-matcher) · 4 misc (entity-gateway, xtask, playbook-core, inspector-projection) · 9 unified-dsl-v0.1 (dsl-atoms, dsl-diagnostics, dsl-parser, dsl-ast, dsl-bpmn-frontend, dsl-lowering, dsl-resolution, bpmn-runtime, bpmn-test-harness)
@@ -663,11 +663,11 @@ Never `.unwrap()` in production. Use `?`, `.ok_or_else(|| anyhow!(...))`, `let S
 
 ### Backend Test Suites
 
-**Test boundary rule:** Tests are either crate-internal (`#[cfg(test)]` inside `src/`) or external harnesses (`rust/tests/`). No test crosses crate boundaries — external tests use only the crate's public API. Internal tests may access `pub(crate)` types and `include_str!` source files.
+**Test boundary rule:** Tests are either crate-internal (`#[cfg(test)]` inside `src/`) or external harnesses (`rust/tests/` or `crates/<subcrate>/tests/`). No test crosses crate boundaries — external tests use only the crate's public API. Internal tests may access `pub(crate)` types and `include_str!` source files.
 
 ```bash
-# Unified pipeline tollgate tests (9 tests — gates + trace + adapter)
-cargo test --test unified_pipeline_tollgates
+# Unified pipeline tollgate tests (internal module tests under ob-poc)
+cargo test -p ob-poc --lib integration_tests::unified_pipeline_tollgates
 
 # Runbook pipeline harnesses (external, public API only, YAML macro fixtures)
 cargo test --test runbook_e2e_test --test runbook_pipeline_test
@@ -675,9 +675,13 @@ cargo test --test runbook_e2e_test --test runbook_pipeline_test
 # Runbook source-scanning invariant tests (internal, include_str!)
 cargo test -p ob-poc --lib -- runbook::invariant_tests
 
-# Full REPL V2 suite (149 tests across 8 files)
-cargo test --test repl_v2_golden_loop --test repl_v2_phase2 --test repl_v2_phase3 \
-  --test repl_v2_phase4 --test repl_v2_phase5 --test repl_v2_phase6 --test repl_v2_integration
+# Full REPL V2 suite (internal module tests under ob-poc)
+cargo test -p ob-poc --lib integration_tests::repl_v2
+
+# Sub-crate internal capability tests
+cargo test -p dsl-runtime --lib
+cargo test -p sem_os_postgres --lib
+cargo test -p ob-semantic-matcher --lib
 
 # Intent hit rate (needs DATABASE_URL)
 DATABASE_URL="postgresql:///data_designer" cargo test --features database --test intent_hit_rate -- --ignored --nocapture

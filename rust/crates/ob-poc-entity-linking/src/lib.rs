@@ -61,3 +61,6 @@ pub use resolver::{
 };
 pub use snapshot::{EntityId, EntityRow, EntitySnapshot, SnapshotStats, SNAPSHOT_VERSION};
 pub use stub::StubEntityLinkingService;
+
+#[cfg(test)]
+mod integration_tests;

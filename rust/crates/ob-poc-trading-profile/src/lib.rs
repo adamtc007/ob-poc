@@ -42,3 +42,6 @@ pub use types::{
 pub use validate::{validate_csa_ssi_refs, validate_document, ValidationError};
 // `document_ops::*` glob removed — consumers reach helpers via the
 // `crate::trading_profile::document_ops::*` path directly.
+
+#[cfg(test)]
+mod integration_tests;

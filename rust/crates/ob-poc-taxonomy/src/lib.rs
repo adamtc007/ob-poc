@@ -11,3 +11,6 @@
 
 pub mod taxonomy;
 pub mod view_config_service;
+
+#[cfg(test)]
+mod integration_tests;

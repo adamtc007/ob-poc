@@ -313,3 +313,6 @@ mod tests {
         assert!(fqns.contains(&"trading.aggregate_aum"));
     }
 }
+
+#[cfg(test)]
+mod integration_tests;
