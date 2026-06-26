@@ -802,10 +802,11 @@ The Client Business Unit (CBU) status transition and validation engine has been 
 
 ### Architectural Rules
 1. **Purity Bound:** The `com.ob.poc.cbu.model` package contains pure functional business logic. No database access, Spring Framework annotations, Hibernate, or ORM frameworks are permitted within this package.
-2. **Compile-Time Exhaustiveness:**
-   - Transition guards switching over sealed status types (`ValidationState`, `OperationalState`, `DispositionState`) **must be default-free** (no `default ->` or `case ... default` branches).
-   - Every switch expression must explicitly list every permitted sub-record type and include a `case null ->` branch.
-   - Adding a new record to any sealed state interface must immediately break compilation at all switch locations that check that state.
+2. **Sealed Class Gate Discipline Pattern:**
+   - Transition guards and state eligibility checks switching over sealed status types (`ValidationState`, `OperationalState`, `DispositionState`) **MUST NOT** use runtime string comparisons (e.g., matching on `.rawStatus().toUpperCase()`).
+   - Every switch expression **MUST be default-free** (no `default ->` or `case ... default` branches). This guarantees compile-time exhaustiveness checks.
+   - Every switch expression **MUST** explicitly enumerate every permitted sub-record type of the sealed interface, along with a `case null ->` branch.
+   - The Java compiler acts as the exhaustiveness validator: any future addition of a new state to the sealed hierarchy must immediately trigger compiler errors at all switch guard locations, preventing unhandled states at runtime.
 3. **State Machines:**
    - `ValidationState`: `ValidationPending`, `Validated`, `ValidationFailed`, `UpdatePendingProof`, `Evidenced`.
    - `OperationalState`: `PreValidated`, `OperationallyActive`, `Suspended`, `Restricted`, `WindingDown`, `Offboarded`, `Dormant`, `Archived`.
